@@ -4,7 +4,10 @@ import { readFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { test } from 'node:test'
 import {
+  checkDefinitions,
   checkFlagDrift,
+  definitionProblems,
+  readFlagDefinitions,
   describeDrift,
   expectedValues,
   findFlagDrift,
@@ -229,4 +232,170 @@ test('the CLI refuses to run without the project token', () => {
   })
   assert.equal(run.status, 2)
   assert.match(run.stderr, /POSTHOG_PROD_PROJECT_TOKEN is not set/)
+})
+
+// Definitions: what proves a rollout is uniform, which 12 probe subjects cannot.
+const released = (key, everyone, extra = {}) => ({
+  key,
+  active: true,
+  deleted: false,
+  archived: false,
+  is_remote_configuration: false,
+  evaluation_runtime: 'all',
+  features: [],
+  filters: {
+    groups: [{ properties: [], rollout_percentage: everyone ? 100 : 0 }],
+    aggregation_group_type_index: null,
+  },
+  ...extra,
+})
+const withFilters = (definition, filters) => ({
+  ...definition,
+  filters: { ...definition.filters, ...filters },
+})
+
+test('a definition released to everyone at the expected value passes', () => {
+  assert.deepEqual(definitionProblems(released('a', false), false), [])
+  assert.deepEqual(definitionProblems(released('a', true), true), [])
+  // PostHog reads a missing rollout percentage as everyone.
+  assert.deepEqual(
+    definitionProblems(
+      withFilters(released('a', true), { groups: [{ properties: [] }] }),
+      true
+    ),
+    []
+  )
+})
+
+test('red: a cohort-targeted release is not uniform', () => {
+  const cohort = withFilters(released('community_read_enabled', false), {
+    groups: [
+      {
+        properties: [{ key: 'id', type: 'cohort', operator: 'in', value: 42 }],
+        rollout_percentage: 100,
+      },
+    ],
+  })
+  assert.deepEqual(definitionProblems(cohort, false), [
+    'release group 1 filters on properties or cohorts',
+  ])
+})
+
+test('red: a 1 percent rollout is not uniform', () => {
+  const partial = withFilters(released('community_read_enabled', false), {
+    groups: [{ properties: [], rollout_percentage: 1 }],
+  })
+  assert.deepEqual(definitionProblems(partial, false), [
+    'release group 1 rolls out to 1 percent',
+  ])
+})
+
+test('red: a multivariate flag with no released variant still fails', () => {
+  const variants = withFilters(released('community_read_enabled', false), {
+    multivariate: {
+      variants: [
+        { key: 'a', rollout_percentage: 50 },
+        { key: 'b', rollout_percentage: 50 },
+      ],
+    },
+  })
+  assert.deepEqual(definitionProblems(variants, false), ['multivariate'])
+})
+
+test('a full release opposite the expected value fails', () => {
+  assert.deepEqual(definitionProblems(released('a', true), false), [
+    'released to everyone as true, expected false',
+  ])
+})
+
+test('inactive, client-only, holdout, super group, group-aggregated and remote-config flags fail', () => {
+  const base = released('a', false)
+  for (const [definition, problem] of [
+    [{ ...base, active: false }, 'inactive'],
+    [{ ...base, evaluation_runtime: 'client' }, 'evaluation runtime client'],
+    [{ ...base, holdout: { id: 1 } }, 'holdout'],
+    [withFilters(base, { holdout_groups: [{ id: 1 }] }), 'holdout'],
+    [withFilters(base, { super_groups: [{ properties: [] }] }), 'super group'],
+    [withFilters(base, { aggregation_group_type_index: 0 }), 'group aggregation'],
+    [{ ...base, is_remote_configuration: true }, 'remote configuration'],
+    [withFilters(base, { feature_enrollment: true }), 'early access enrollment'],
+    [
+      withFilters(base, {
+        groups: [{ properties: [], rollout_percentage: 0, variant: 'a' }],
+      }),
+      'release group 1 forces a variant',
+    ],
+  ])
+    assert.ok(definitionProblems(definition, false).includes(problem), problem)
+})
+
+test('a missing or deleted definition fails, and overrides set the expected value', () => {
+  assert.deepEqual(
+    checkDefinitions(
+      [
+        released('kept', true),
+        { ...released('deleted', false), deleted: true },
+        released('color_analysis_enabled', true),
+      ],
+      { kept: true, deleted: false, absent: false, color_analysis_enabled: true }
+    ),
+    [
+      { key: 'deleted', problem: 'no active definition in the project' },
+      { key: 'absent', problem: 'no active definition in the project' },
+    ]
+  )
+})
+
+test('reads every page of definitions with the read key', async () => {
+  const requests = []
+  const pages = {
+    '/api/projects/329012/feature_flags/?limit=200': {
+      results: [released('a', false)],
+      next: 'http://app.example.test/api/projects/329012/feature_flags/?limit=200&offset=200',
+    },
+    '/api/projects/329012/feature_flags/?limit=200&offset=200': {
+      results: [released('b', true)],
+      next: null,
+    },
+  }
+  const definitions = await readFlagDefinitions({
+    key: 'phx_synthetic',
+    appHost: 'http://app.example.test/',
+    fetchImpl: async (url, init) => {
+      const path = new URL(url).pathname + new URL(url).search
+      requests.push({ path, authorization: init.headers.Authorization })
+      return json(pages[path])
+    },
+  })
+  assert.deepEqual(
+    definitions.map((definition) => definition.key),
+    ['a', 'b']
+  )
+  assert.deepEqual(
+    requests.map((request) => request.authorization),
+    ['Bearer phx_synthetic', 'Bearer phx_synthetic']
+  )
+})
+
+test('an unreadable definitions page is an error, never a pass', async () => {
+  await assert.rejects(
+    readFlagDefinitions({ key: 'phx_synthetic', fetchImpl: async () => json({}, 403) }),
+    /HTTP 403/
+  )
+  await assert.rejects(
+    readFlagDefinitions({
+      key: 'phx_synthetic',
+      fetchImpl: async () => json({ detail: 'x' }),
+    }),
+    /no results/
+  )
+})
+
+test('the CLI refuses to run without the definition read key', () => {
+  const run = spawnSync(process.execPath, ['scripts/ci/posthog-flag-drift.mjs'], {
+    env: { PATH: process.env.PATH, POSTHOG_PROD_PROJECT_TOKEN: 'phc_synthetic' },
+    encoding: 'utf8',
+  })
+  assert.equal(run.status, 2)
+  assert.match(run.stderr, /POSTHOG_FLAG_READ_KEY is not set/)
 })

@@ -6,7 +6,15 @@
 // community_read_enabled read as unavailable and every push delivery re-deferred until its group
 // expired, with nothing reporting it. The posthog-flag-drift workflow runs this hourly.
 //
-// It asks /flags (v2) with the project token, the public key the runtime ships with, and the API
+// Two checks, both required:
+// 1. Definitions, read through the PostHog API with a read-only personal key (feature_flag:read
+//    on 329012): every declared flag exists, is active, boolean, evaluated server-side, and
+//    released to everyone at its expected value: every release group has no property or cohort
+//    filter and a 0 or 100 percent rollout, with no super group, holdout, early-access enrollment
+//    or remote configuration. This is what proves a rollout is uniform.
+// 2. Runtime probes, below, which see what the API itself is answered.
+//
+// The probes ask /flags (v2) with the project token, the public key the runtime ships with, and the API
 // adapter's server User-Agent, so PostHog applies the runtime filtering the API gets. Each check
 // evaluates every declared key for several synthetic subjects and fails when a key is:
 // - omitted: missing, inactive, or filtered from the server runtime;
@@ -111,6 +119,97 @@ export async function findFlagDrift({
   return { omitted: [...omitted], multivariate: [...multivariate], mismatched }
 }
 
+const DEFAULT_APP_HOST = 'https://us.posthog.com'
+export const PRODUCTION_PROJECT_ID = '329012'
+
+/** Every flag definition in the project, following pagination. */
+export async function readFlagDefinitions({
+  key,
+  projectId = PRODUCTION_PROJECT_ID,
+  appHost = DEFAULT_APP_HOST,
+  fetchImpl = fetch,
+}) {
+  const definitions = []
+  let url = `${appHost.replace(/\/+$/, '')}/api/projects/${projectId}/feature_flags/?limit=200`
+  while (url) {
+    const response = await fetchImpl(url, {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10_000),
+    })
+    if (!response.ok)
+      throw new Error(`reading flag definitions returned HTTP ${response.status}`)
+    const page = await response.json()
+    if (!Array.isArray(page?.results))
+      throw new Error('flag definitions page has no results')
+    definitions.push(...page.results)
+    url = page.next ?? null
+  }
+  return definitions
+}
+
+const empty = (value) => value == null || (Array.isArray(value) && value.length === 0)
+
+/** Flag-level settings that make a flag anything but a plain server-side boolean. */
+function flagProblems(definition) {
+  const filters = definition.filters ?? {}
+  return [
+    [definition.active !== true, 'inactive'],
+    [definition.archived === true, 'archived'],
+    [definition.is_remote_configuration === true, 'remote configuration'],
+    [
+      !['all', 'server', null, undefined].includes(definition.evaluation_runtime),
+      `evaluation runtime ${definition.evaluation_runtime}`,
+    ],
+    [!empty(filters.multivariate?.variants), 'multivariate'],
+    [filters.aggregation_group_type_index != null, 'group aggregation'],
+    [!empty(filters.super_groups), 'super group'],
+    [!empty(filters.holdout_groups) || definition.holdout != null, 'holdout'],
+    [
+      filters.feature_enrollment === true || !empty(definition.features),
+      'early access enrollment',
+    ],
+  ]
+    .filter(([failed]) => failed)
+    .map(([, problem]) => problem)
+}
+
+/** Release-group settings that target anyone short of everyone or no one. */
+function groupProblems(group, index) {
+  const label = `release group ${index + 1}`
+  // PostHog reads a missing rollout percentage as everyone.
+  const rollout = group.rollout_percentage ?? 100
+  return [
+    [!empty(group.properties), `${label} filters on properties or cohorts`],
+    [group.variant != null, `${label} forces a variant`],
+    [group.aggregation_group_type_index != null, `${label} aggregates by group`],
+    [rollout !== 0 && rollout !== 100, `${label} rolls out to ${rollout} percent`],
+  ]
+    .filter(([failed]) => failed)
+    .map(([, problem]) => problem)
+}
+
+/** Why one definition cannot give everyone `expected`, or an empty list. */
+export function definitionProblems(definition, expected) {
+  if (!definition) return ['no active definition in the project']
+  const groups = definition.filters?.groups ?? []
+  const problems = [...flagProblems(definition), ...groups.flatMap(groupProblems)]
+  if (problems.length) return problems
+  const released = groups.some((group) => (group.rollout_percentage ?? 100) === 100)
+  return released === expected
+    ? []
+    : [`released to everyone as ${released}, expected ${expected}`]
+}
+
+/** Checks every expected key against the project's definitions. */
+export function checkDefinitions(definitions, expected) {
+  const byKey = new Map(
+    definitions.filter((definition) => definition.deleted !== true).map((d) => [d.key, d])
+  )
+  return Object.entries(expected).flatMap(([key, value]) =>
+    definitionProblems(byKey.get(key), value).map((problem) => ({ key, problem }))
+  )
+}
+
 /** Retries an unavailable answer; a definitive answer, drift or none, returns at once. */
 export async function checkFlagDrift({
   attempts = 3,
@@ -169,6 +268,32 @@ async function main() {
     FEATURE_FLAG_KEYS.map((key) => [key, getDefaultFeatureFlagValue(key)])
   )
   const expected = expectedValues(declared)
+  const readKey = process.env.POSTHOG_FLAG_READ_KEY
+  if (!readKey) {
+    console.error(
+      'POSTHOG_FLAG_READ_KEY is not set: the definition check needs a personal API key with ' +
+        'feature_flag:read on project 329012.'
+    )
+    return 2
+  }
+  let definitionDrift
+  try {
+    definitionDrift = checkDefinitions(
+      await readFlagDefinitions({ key: readKey }),
+      expected
+    )
+  } catch (error) {
+    console.error(`Could not read the production flag definitions: ${error.message}.`)
+    return 1
+  }
+  if (definitionDrift.length) {
+    console.error(
+      ['Production flag definitions disagree with the declared flags:']
+        .concat(definitionDrift.map(({ key, problem }) => `${key}: ${problem}.`))
+        .join('\n')
+    )
+    return 1
+  }
   const result = await checkFlagDrift({ expected, token, host: process.env.POSTHOG_HOST })
   if (result.unavailable) {
     console.error(
@@ -187,7 +312,8 @@ async function main() {
     return 1
   }
   console.log(
-    `All ${FEATURE_FLAG_KEYS.length} declared flags answer their expected value in production ` +
+    `All ${FEATURE_FLAG_KEYS.length} declared flags are released uniformly and answer their ` +
+      'expected value in production ' +
       `for ${SUBJECTS.length} subjects (${Object.keys(INTENTIONAL_OVERRIDES).length} pinned override).`
   )
   return 0

@@ -1317,19 +1317,27 @@ event.
 
 **Drift check.** The `PostHog flag drift` workflow runs `scripts/ci/posthog-flag-drift.mjs`
 hourly, on every push to main and on any pull request that edits `packages/config/src/flags.ts`.
-It asks `/flags` with the project token in the repository variable `POSTHOG_PROD_PROJECT_TOKEN`
-and the API adapter's server User-Agent, so PostHog filters runtimes as it does for the API,
-and evaluates every declared key for 12 synthetic subjects. It fails, naming each key, when
-PostHog omits one (missing, inactive or not evaluated server-side), when a flag is
-multivariate, or when any subject gets a value other than the declared default: a partial
-rollout or a release opposite the default. A production value that differs on purpose is pinned
-in the script's `INTENTIONAL_OVERRIDES` with its reason; today that is only
+Each declared key must pass two checks, and the expected value is its declared default unless
+the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today that is only
 `color_analysis_enabled` at `true` (owner decision 2026-11-11: color analysis stays on in
-production, and the code default stays `false` so a degraded PostHog fails closed). An
-evaluation error, quota limit or HTTP error is retried three times and then fails as
-unavailable, never as drift. A pull request that declares a new flag stays red until the flag
-exists in 329012 as an active boolean released to everyone at its declared default (0 percent
-for `false`, 100 for `true`), or carries a pinned override.
+production, and the code default stays `false` so a degraded PostHog fails closed).
+
+- Definition, read through the PostHog API with the repository secret `POSTHOG_FLAG_READ_KEY`
+  (a personal API key limited to `feature_flag:read` on 329012): the flag exists, is active,
+  boolean, evaluated server-side, and released to everyone at the expected value. Every release
+  group has no property or cohort filter and a 0 or 100 percent rollout, with no super group,
+  holdout, early-access enrollment, group aggregation or remote configuration. This is what
+  proves a rollout is uniform; probes cannot see a cohort or a 1 percent rollout they miss.
+- Runtime: `/flags` with the project token in the repository variable
+  `POSTHOG_PROD_PROJECT_TOKEN` and the API adapter's server User-Agent, for 12 synthetic
+  subjects. It fails when PostHog omits a key (missing, inactive or not evaluated server-side),
+  answers a variant, or answers any subject other than the expected value.
+
+The job fails closed when either input is missing. An evaluation error, quota limit or HTTP
+error on the probes is retried three times and then fails as unavailable, never as drift. A pull
+request that declares a new flag stays red until the flag exists in 329012 as an active boolean
+released to everyone at its declared default (0 percent for `false`, 100 for `true`), or carries
+a pinned override.
 
 **A key PostHog omits.** An omission does not prove the flag is missing: PostHog also omits an
 inactive flag and one filtered from the server runtime. Community evaluation resolves it closed
