@@ -4,6 +4,7 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { APT_RETRY_PAUSES_S, configureAptRetries, withAptRetries } from './apt-retry.mjs'
 
 const sourceLine = /^[\t ]*(?:URIs:|deb(?:-src)?\s)/
 const azureArchive = /https?:\/\/azure\.archive\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g
@@ -85,52 +86,59 @@ export async function provisionShareCardBrowsers({
   if (failure) throw failure
 }
 
+/** The install's share of the provisioning step's 12 minutes, after the browser-deps suite. */
+export const BROWSER_INSTALL_DEADLINE_S = 660
+
 /**
  * Use the installed lockfile-matched Playwright CLI; OS browser versions are independent.
  *
- * A failed install gets one more attempt after a pause. While an Ubuntu archive mirror
- * is syncing it serves index files of the wrong size and apt exits with
- * "Mirror sync in progress?"; the sync settles within seconds.
- * A deadline hit is not retried, because the step's time is already spent.
+ * A failed install runs again after apt-retry.mjs's pauses (15, 30, 60 and 120 s), with apt's
+ * own fetch retries configured first: an Ubuntu mirror mid-sync serves index files of the wrong
+ * size ("Mirror sync in progress?"), and the runner's resolver once failed for five minutes
+ * (2026-11-11). No attempt starts that the step's deadline cannot finish, and each runs under
+ * what remains of it. A deadline hit is not retried, because the step's time is already spent.
  */
 export function installPinnedPlaywrightBrowsers({
   run = spawnSync,
   node = process.execPath,
   cli = createRequire(import.meta.url).resolve('@playwright/test/cli'),
   browsers = ['chromium', 'firefox', 'webkit'],
-  retryPauseSeconds = 45,
+  pauses = APT_RETRY_PAUSES_S,
+  deadlineSeconds = BROWSER_INSTALL_DEADLINE_S,
+  now = Date.now,
 } = {}) {
   if (
     !Array.isArray(browsers) ||
     !['chromium', 'chromium,firefox,webkit'].includes(browsers.join(','))
   )
     throw new Error('browser_dependency_engine_selection_required')
-  try {
-    installOnce({ run, node, cli, browsers })
-  } catch (error) {
-    if (error.message !== 'browser_dependency_install_failed') throw error
-    console.log(
-      `Browser dependency install failed; retrying once in ${retryPauseSeconds}s in case an Ubuntu mirror sync was in progress.`
-    )
-    run('sleep', [String(retryPauseSeconds)], { stdio: 'inherit' })
-    installOnce({ run, node, cli, browsers })
-  }
+  withAptRetries(
+    ({ remainingSeconds }) =>
+      installOnce({ run, node, cli, browsers, seconds: Math.min(600, remainingSeconds) }),
+    {
+      retryable: (error) => error.message === 'browser_dependency_install_failed',
+      pauses,
+      deadlineSeconds,
+      now,
+      sleep: (seconds) => run('sleep', [String(seconds)], { stdio: 'inherit' }),
+    }
+  )
 }
 
-function installOnce({ run, node, cli, browsers }) {
+function installOnce({ run, node, cli, browsers, seconds }) {
   const result = run(
     'timeout',
     [
       '--signal=TERM',
       '--kill-after=15s',
-      '600s',
+      `${seconds}s`,
       node,
       cli,
       'install',
       '--with-deps',
       ...browsers,
     ],
-    { stdio: 'inherit', timeout: 620000, killSignal: 'SIGKILL' }
+    { stdio: 'inherit', timeout: (seconds + 20) * 1000, killSignal: 'SIGKILL' }
   )
   if (result.error?.code === 'ENOENT')
     throw new Error('browser_dependency_deadline_required')
@@ -183,7 +191,10 @@ async function main() {
       if (result.error || result.status !== 0)
         throw new Error('browser_dependency_source_write_failed')
     },
-    install: () => installPinnedPlaywrightBrowsers({ browsers }),
+    install: () => {
+      configureAptRetries()
+      installPinnedPlaywrightBrowsers({ browsers })
+    },
   })
   console.log(
     'Pinned browser dependencies installed within the bounded provisioning step; original APT sources restored.'

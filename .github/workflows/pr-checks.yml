@@ -128,9 +128,11 @@ jobs:
         id: build
         run: npm run build
 
+      # apt-retry: bounded retries, so a mirror sync or a resolver blip does not fail the PR.
       - name: Install Playwright Chromium
         id: chromium
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 11
+        run: node scripts/ci/apt-retry.mjs --deadline-seconds 600 -- npx playwright install --with-deps chromium
 
       - name: Run Lighthouse accessibility gate
         id: lighthouse
@@ -293,7 +295,7 @@ jobs:
         run: |
           chromium=
           if [ "$SHARD" = mobile ]; then
-            npx playwright install --with-deps chromium &
+            node scripts/ci/apt-retry.mjs --deadline-seconds 420 -- npx playwright install --with-deps chromium &
             chromium=$!
           fi
           npm run build
