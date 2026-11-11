@@ -338,6 +338,32 @@ describe('U-ANALYTICS-PRIVACY-WEB-PROXY: bounded upstream work', () => {
     expect(received).toEqual([])
   })
 
+  it('answers 504 at once for a request the browser already left, its upload still open', async () => {
+    const client = new AbortController()
+    client.abort()
+    let cancelled = false
+    const proxied = proxyPostHogIngest(
+      eventRequest({
+        signal: client.signal,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"event":'))
+          },
+          cancel() {
+            cancelled = true
+          },
+        }),
+        duplex: 'half',
+      } as RequestInit),
+      { api: origin, assets: origin }
+    )
+    const response = await within(proxied, 1_000)
+    expect(response.status).toBe(504)
+    expect(await response.text()).toBe('')
+    expect(cancelled).toBe(true)
+    expect(received).toEqual([])
+  })
+
   it('forwards an empty event body and answers 502 when PostHog cannot be reached', async () => {
     const empty = await proxyPostHogIngest(eventRequest({ body: null }), {
       api: origin,

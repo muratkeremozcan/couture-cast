@@ -69,6 +69,12 @@ async function readCappedBody(
   let size = 0
   try {
     for (;;) {
+      // An abort that came before the listener (the browser already left) never fires
+      // it, so every read starts by checking the signal.
+      if (signal.aborted) {
+        cancel()
+        signal.throwIfAborted()
+      }
       const { done, value } = await reader.read()
       if (done) break
       size += value.byteLength
