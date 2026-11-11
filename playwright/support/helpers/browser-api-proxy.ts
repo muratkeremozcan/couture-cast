@@ -21,6 +21,10 @@ type ProxyApiCallOptions = ApiProxyRouteOptions & {
 type ApiProxyState = {
   authOverrides: Map<string, ApiProxyRouteOptions['auth']>
   baseUrl: string
+  /** Proxied calls still running, so the drain lets them finish before it unroutes. */
+  inFlight: Set<Promise<void>>
+  /** Set once teardown starts draining. */
+  draining: boolean
 }
 
 type InterceptNetworkCallOptions = {
@@ -123,9 +127,18 @@ async function proxyApiRequest(route: Route, state: ApiProxyState) {
 export async function drainApiProxy(
   page: Pick<Page, 'isClosed' | 'unrouteAll'>
 ): Promise<void> {
-  if (!apiProxyStates.has(page as Page) || page.isClosed()) return
+  const state = apiProxyStates.get(page as Page)
+  if (!state || page.isClosed()) return
+  state.draining = true
+  // `unrouteAll` takes the interception away first, and Playwright then sends every route still in
+  // flight on to the network, so a call still fetching would find its route handled. Measured on
+  // preview 2026-11-11: 7 of 40 P-D-PREVIEW-CLOSED runs failed exactly that way in teardown.
+  while (state.inFlight.size > 0) await Promise.allSettled([...state.inFlight])
   await page.unrouteAll({ behavior: 'wait' })
 }
+
+const isAlreadyHandled = (error: unknown) =>
+  error instanceof Error && /Route is already handled/.test(error.message)
 
 /**
  * A last resort for a page something closed mid-call, which `drainApiProxy` could not reach. Nobody is waiting
@@ -144,6 +157,31 @@ export function isAbandonedByClose(
   )
 }
 
+/**
+ * A call the page itself gave up on while the proxy fetched it: a client-side navigation aborts the old
+ * page's fetches, Playwright marks their routes handled, and the proxy's `route.fulfill` then throws.
+ * Nobody waits for that answer. Measured on preview 2026-11-11: P-D-PREVIEW-CLOSED clicks into a case
+ * while the queue's `evidence-exports/availability` read is in flight, about 1 run in 40. The fulfill
+ * can fail before the request's failure reaches the test, so the request settles first; `response()`
+ * resolves null once it failed.
+ */
+export async function isAbandonedByPage(
+  error: unknown,
+  request: Pick<ReturnType<Route['request']>, 'failure' | 'response'>,
+  settleMs = 2_000
+): Promise<boolean> {
+  if (!isAlreadyHandled(error)) return false
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([
+    request.response().catch(() => null),
+    new Promise((resolve) => (timer = setTimeout(resolve, settleMs))),
+  ])
+  clearTimeout(timer)
+  return /ERR_ABORTED|NS_BINDING_ABORTED|cancelled/i.test(
+    request.failure()?.errorText ?? ''
+  )
+}
+
 export async function installApiProxy(page: Page, testInfo: TestInfo): Promise<void> {
   if (apiProxyStates.has(page)) {
     return
@@ -152,14 +190,27 @@ export async function installApiProxy(page: Page, testInfo: TestInfo): Promise<v
   const state: ApiProxyState = {
     authOverrides: new Map(),
     baseUrl: resolveApiBaseUrl(testInfo),
+    inFlight: new Set(),
+    draining: false,
   }
   apiProxyStates.set(page, state)
 
   await page.route(apiRoutePattern, async (route) => {
+    const call = (async () => {
+      try {
+        await proxyApiRequest(route, state)
+      } catch (error) {
+        if (isAbandonedByClose(error, page)) return
+        // A call that started after the drain's wait: teardown sent it on, and nobody waits for it.
+        if (state.draining && isAlreadyHandled(error)) return
+        if (!(await isAbandonedByPage(error, route.request()))) throw error
+      }
+    })()
+    state.inFlight.add(call)
     try {
-      await proxyApiRequest(route, state)
-    } catch (error) {
-      if (!isAbandonedByClose(error, page)) throw error
+      await call
+    } finally {
+      state.inFlight.delete(call)
     }
   })
 }

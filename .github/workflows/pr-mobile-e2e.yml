@@ -125,9 +125,11 @@ jobs:
     # reset, and the emulator boot plus Expo/Metro warm-up inside the "Run
     # Maestro suite" step itself -- on top of its own slice of flow time. Wall
     # clock is that fixed cost plus the slowest shard's slice, so the shard
-    # count is chosen to keep the slowest slice under about 4 minutes against
-    # `scripts/maestro-flow-durations.json`'s recorded flow costs, landing the
-    # whole gate under 15 minutes with some margin.
+    # count is chosen to keep the slowest slice under about 4.5 minutes against
+    # `scripts/maestro-flow-durations.json`'s recorded flow costs. Seven shards
+    # packed a 5.8 minute slice and green shard jobs reached 19 minutes (27 runs
+    # at 18 or more, 2026-11-05 to 2026-11-10); nine keep every shard job under
+    # the 20-minute PR job limit.
     #
     # Each shard is a full, independent job: its own emulator, Supabase, API and
     # Metro, running a slice of the flow list. They share the AVD snapshot cache,
@@ -146,7 +148,7 @@ jobs:
       # learn everything that is broken in one run.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
     # timeout-minutes = measured work + the Supabase start budget + cache.
     # Measured on recent green runs (2026-10-22), work excluding the Supabase
     # step peaked at 21.9 min across 56 shard runs; start-local-supabase may spend up to its
@@ -501,7 +503,7 @@ jobs:
           # not readable from a job that only `needs:` the matrix, so this is a
           # label rather than a derived value; the flow counts in the comment
           # come from the reports themselves and are unaffected by it.
-          shards: '7'
+          shards: '9'
           platform: Android (Expo Go)
           device-label: API ${{ env.ANDROID_API_LEVEL }} · ${{ env.ANDROID_PROFILE }} · ${{ env.ANDROID_ARCH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
