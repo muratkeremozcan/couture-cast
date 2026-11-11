@@ -51,6 +51,7 @@ const EOCD_SEARCH_WINDOW = 22 + 0xffff
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04])
 const EMPTY_ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x05, 0x06])
+const CENTRAL_HEADER_MAGIC = Buffer.from([0x50, 0x4b, 0x01, 0x02])
 const GZIP_MAGIC = Buffer.from([0x1f, 0x8b])
 const BASE64_RUN = /[A-Za-z0-9+/_-]{24,}={0,2}/g
 
@@ -251,8 +252,30 @@ function zipEntries(buffer) {
 function containerKind(buffer) {
   if (startsWith(buffer, GZIP_MAGIC)) return 'gzip'
   if (startsWith(buffer, ZIP_MAGIC) || startsWith(buffer, EMPTY_ZIP_MAGIC)) return 'zip'
-  const tail = buffer.subarray(Math.max(0, buffer.length - EOCD_SEARCH_WINDOW))
-  return tail.includes(EMPTY_ZIP_MAGIC) ? 'zip-suffix' : undefined
+  return hasCentralDirectory(buffer) ? 'zip-suffix' : undefined
+}
+
+/**
+ * Whether the last directory record in the tail, the one an unzipper reads, describes
+ * a real directory: its entries start with a central header right before the record.
+ * A screenshot can hold the record's four bytes by chance, and one whose offsets land
+ * on a run of zero bytes opens as entries with empty names (Maestro, 2026-11-11), so
+ * the signature alone would fail the scan on an innocent image. A ZIP64 directory
+ * keeps its sizes elsewhere, so it stays a zip and opening it decides.
+ */
+function hasCentralDirectory(buffer) {
+  const start = Math.max(0, buffer.length - EOCD_SEARCH_WINDOW)
+  const eocd = buffer.lastIndexOf(EMPTY_ZIP_MAGIC)
+  if (eocd < start || eocd + 22 > buffer.length) return false
+  const entries = buffer.readUInt16LE(eocd + 10)
+  const size = buffer.readUInt32LE(eocd + 12)
+  if (entries === 0xffff || size === 0xffffffff) return true
+  if (entries === 0) return size === 0
+  const directory = eocd - size
+  return (
+    directory >= 0 &&
+    buffer.subarray(directory, directory + 4).equals(CENTRAL_HEADER_MAGIC)
+  )
 }
 
 /** Short and opaque on purpose: entry names come from inside the artifact. */

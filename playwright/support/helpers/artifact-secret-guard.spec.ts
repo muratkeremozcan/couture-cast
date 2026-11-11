@@ -348,6 +348,39 @@ describe('check-artifact-secrets', () => {
     expect(result.findings).toEqual([])
   })
 
+  // Maestro on Android, 2026-11-11: two onboarding screenshots refused the upload this way.
+  it('treats a stray directory record that points at zero bytes as plain bytes', () => {
+    const record = Buffer.alloc(22)
+    record.writeUInt32LE(0x06054b50, 0)
+    record.writeUInt16LE(2, 8)
+    record.writeUInt16LE(2, 10)
+    record.writeUInt32LE(600, 16)
+    write(
+      'maestro/step-055.png',
+      Buffer.concat([
+        Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+        randomBytes(592),
+        Buffer.alloc(400),
+        record,
+        randomBytes(64),
+      ])
+    )
+
+    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([])
+  })
+
+  it('still opens a zip appended to an image', () => {
+    const zip = Buffer.from(zipSync({ 'a.txt': strToU8(DUMMY_SECRET) }))
+    const file = write(
+      'maestro/step-056.png',
+      Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), randomBytes(512), zip])
+    )
+
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
+    ])
+  })
+
   it('finds a value in a file name and reports that file by position', () => {
     write(`artifacts/${DUMMY_SECRET}.txt`, 'clean contents')
 
