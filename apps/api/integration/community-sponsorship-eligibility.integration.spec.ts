@@ -37,6 +37,7 @@ import {
   seedPost,
   shift,
 } from './helpers/community-sponsorship-fixtures.js'
+import { deletePosts } from './helpers/privacy-guards.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
@@ -432,7 +433,7 @@ describe('6.7b per-viewer chain (real SQL)', () => {
 describe('6.7b link lifetime follows the post (real SQL)', () => {
   it('6.7b-INT-014 hard-deleting a post cascades its links', async () => {
     const { postId, linkId } = await livePost()
-    await prisma.lookbookPost.delete({ where: { id: postId } })
+    await deletePosts(prisma, { id: postId })
     expect(await prisma.communityPostSponsorship.count({ where: { id: linkId } })).toBe(0)
   })
 

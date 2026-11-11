@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { CommunityCommentsProcessor } from '../src/modules/community/community-comments.processor.js'
 import { commentsTestContext } from './helpers/community-comments-context.js'
+import { deleteMembers, deletePosts, updatePost } from './helpers/privacy-guards.js'
 
 const {
   prisma,
@@ -28,13 +29,16 @@ async function consentingTeen() {
   return { adult, teen, consent }
 }
 
-/** Delete an account row directly, bypassing the erasure service, so only database rules run. */
+/**
+ * Delete an account row directly, bypassing the erasure service, so only database rules
+ * run. The deletes hold the account's privacy guards, as erasure does.
+ */
 async function deleteAccountDirectly(userId: string) {
-  await prisma.lookbookPost.deleteMany({ where: { user_id: userId } })
+  await deletePosts(prisma, { user_id: userId })
   await prisma.userProfile.delete({ where: { user_id: userId } })
   await prisma.comfortPreferences.deleteMany({ where: { user_id: userId } })
   await prisma.communityAlias.deleteMany({ where: { user_id: userId } })
-  await prisma.user.delete({ where: { id: userId } })
+  await deleteMembers(prisma, { id: userId })
 }
 
 describe('Story 6.4 comment consent gates', () => {
@@ -262,10 +266,7 @@ describe('Story 6.4 comment erasure', () => {
         })
       ).content_snapshot
     ).toBeNull()
-    await prisma.lookbookPost.update({
-      where: { id: other.postId },
-      data: { status: 'withdrawn' },
-    })
+    await updatePost(prisma, other.postId, { status: 'withdrawn' })
     await expect(roots(other.userId, other.postId)).rejects.toMatchObject({ status: 404 })
     await expect(
       service.submissions({ userId: other.userId, postId: other.postId, limit: 20 })

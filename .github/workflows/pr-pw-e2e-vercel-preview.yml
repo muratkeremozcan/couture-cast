@@ -6,6 +6,8 @@ on:
     types: [labeled, synchronize]
 
 permissions:
+  # The shard balancer reads the run's artifacts and jobs.
+  actions: read
   contents: read
 
 concurrency:

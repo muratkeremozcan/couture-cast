@@ -4,6 +4,7 @@ import 'reflect-metadata'
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { PrismaClient } from '@prisma/client'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Query-plan evidence for the capsule read paths.
@@ -133,7 +134,7 @@ describe('4.3 capsule query plans', () => {
     await prisma.outfitCapsuleGarment.deleteMany({ where: { user_id: ownerUserId } })
     await prisma.outfitCapsule.deleteMany({ where: { user_id: ownerUserId } })
     await prisma.userProfile.deleteMany({ where: { user_id: ownerUserId } })
-    await prisma.user.deleteMany({ where: { email: { contains: namespace } } })
+    await deleteMembers(prisma, { email: { contains: namespace } })
     await prisma.$disconnect()
   })
 

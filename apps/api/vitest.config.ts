@@ -155,6 +155,9 @@ export default defineConfig({
         : ['**/*.acceptance.spec.ts']),
     ],
     setupFiles: [resolve(__dirname, 'src/test-setup.ts')],
+    // The integration tier runs with the privacy guard on: see
+    // integration/helpers/privacy-capability.ts.
+    globalSetup: [resolve(__dirname, 'integration/global-setup.ts')],
     // Both names are pinned so the lookup chain the integration suites share cannot
     // resolve to two different databases depending on which of them a suite reads.
     env: {

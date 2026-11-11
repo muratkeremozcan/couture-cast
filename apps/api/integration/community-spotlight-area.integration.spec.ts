@@ -13,6 +13,7 @@ import {
   hoursBeforeAsOf,
   spotlightTestContext,
 } from './helpers/community-spotlight-context.js'
+import { withPrivacyGuards } from './helpers/privacy-guards.js'
 
 const ctx = spotlightTestContext('area')
 
@@ -165,9 +166,14 @@ describe('6.6 area stamping', () => {
       ctx.prisma
         .$executeRaw`UPDATE "LookbookPost" SET area_country = 'x', area_city = 'y' WHERE id = ${id}`
     ).rejects.toThrow(/LookbookPost_area_hierarchical/)
+    // Anonymizing is a privacy write, so the post's guard is held and the constraint decides.
     await expect(
-      ctx.prisma
-        .$executeRaw`UPDATE "LookbookPost" SET area_country = 'x', anonymized_at = now() WHERE id = ${id}`
+      withPrivacyGuards(
+        ctx.prisma,
+        { posts: [id] },
+        (tx) =>
+          tx.$executeRaw`UPDATE "LookbookPost" SET area_country = 'x', anonymized_at = now() WHERE id = ${id}`
+      )
     ).rejects.toThrow(/LookbookPost_area_cleared_when_anonymized/)
   })
 })

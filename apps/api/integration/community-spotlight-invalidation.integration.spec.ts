@@ -17,6 +17,7 @@ import {
 } from './helpers/community-spotlight-context.js'
 import { drainCommunityOutbox } from './helpers/community-outbox-drain.js'
 import { buildLookbookPostCreateInput, createLookbookPost } from '@couture/testing'
+import { deletePosts } from './helpers/privacy-guards.js'
 
 const ctx = spotlightTestContext('invalidation')
 
@@ -161,7 +162,7 @@ describe('6.6 spotlight read model', () => {
     await ctx.prisma.communityReaction.deleteMany({
       where: { post_id: cohort.posts.at(-1)!.id },
     })
-    await ctx.prisma.lookbookPost.delete({ where: { id: cohort.posts.at(-1)!.id } })
+    await deletePosts(ctx.prisma, { id: cohort.posts.at(-1)!.id })
     await ctx.drain()
     // A missing post also bumps the epoch, so the bump alone cannot show the
     // append converted these rows: every new public event is an anonymous resync.
