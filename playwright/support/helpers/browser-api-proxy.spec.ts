@@ -4,7 +4,12 @@
 // when a context closes with a fetch in flight, measured on 2026-11-05.
 import type { Page, TestInfo } from '@playwright/test'
 import { describe, expect, it, vi } from 'vitest'
-import { drainApiProxy, installApiProxy, isAbandonedByClose } from './browser-api-proxy'
+import {
+  drainApiProxy,
+  installApiProxy,
+  isAbandonedByClose,
+  isAbandonedByPage,
+} from './browser-api-proxy'
 
 const DISPOSED = new Error('route.fetch: Request context disposed.')
 const page = (closed: boolean) => ({ isClosed: () => closed })
@@ -37,6 +42,48 @@ describe('isAbandonedByClose', () => {
   })
 })
 
+describe('isAbandonedByPage', () => {
+  const HANDLED = new Error('route.fulfill: Route is already handled!')
+  /** A request whose failure arrives `lateMs` after the fulfill failed, as on preview. */
+  const request = (errorText?: string, lateMs = 0) => {
+    let failure: { errorText: string } | null = null
+    const settled = new Promise<null>((resolve) =>
+      setTimeout(() => {
+        if (errorText !== undefined) failure = { errorText }
+        resolve(null)
+      }, lateMs)
+    )
+    return {
+      failure: () => failure,
+      response: () =>
+        errorText === undefined ? new Promise<null>(() => undefined) : settled,
+    }
+  }
+
+  it('ignores a fulfill the page made moot by aborting the request, also when the failure lands later', async () => {
+    // Preview, P-D-PREVIEW-CLOSED: the click into a case aborts the queue's availability read.
+    expect(await isAbandonedByPage(HANDLED, request('net::ERR_ABORTED'))).toBe(true)
+    expect(await isAbandonedByPage(HANDLED, request('net::ERR_ABORTED', 20))).toBe(true)
+    expect(await isAbandonedByPage(HANDLED, request('NS_BINDING_ABORTED'))).toBe(true)
+  })
+
+  it('keeps a double handling the page did not cause, and every other failure', async () => {
+    expect(await isAbandonedByPage(HANDLED, request(undefined), 20)).toBe(false)
+    expect(await isAbandonedByPage(HANDLED, request('net::ERR_CONNECTION_REFUSED'))).toBe(
+      false
+    )
+    expect(
+      await isAbandonedByPage(
+        new Error('connect ECONNREFUSED'),
+        request('net::ERR_ABORTED')
+      )
+    ).toBe(false)
+    expect(
+      await isAbandonedByPage('Route is already handled!', request('net::ERR_ABORTED'))
+    ).toBe(false)
+  })
+})
+
 describe('drainApiProxy', () => {
   const fakePage = (closed = false) =>
     ({
@@ -54,6 +101,46 @@ describe('drainApiProxy', () => {
     await installApiProxy(page, info)
     await drainApiProxy(page)
     expect(page.unrouteAll).toHaveBeenCalledWith({ behavior: 'wait' })
+  })
+
+  it('lets a proxied call finish before it unroutes, and swallows a route teardown sent on', async () => {
+    const page = fakePage()
+    await installApiProxy(page, info)
+    const handler = (page.route as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (
+      route: unknown
+    ) => Promise<void>
+    let answer!: (response: unknown) => void
+    const fulfilled: string[] = []
+    const route = {
+      request: () => ({
+        method: () => 'GET',
+        url: () => 'https://web.test/api/v1/moderation/evidence-exports/availability',
+        headers: () => ({}),
+        failure: () => null,
+        response: () => new Promise(() => undefined),
+      }),
+      fetch: () => new Promise((resolve) => (answer = resolve)),
+      fulfill: vi.fn(() => {
+        // Preview: unrouteAll has already sent this route on, so the fulfill finds it handled.
+        if (page.unrouteAll.mock.calls.length)
+          return Promise.reject(new Error('route.fulfill: Route is already handled!'))
+        fulfilled.push('fulfilled')
+        return Promise.resolve()
+      }),
+    }
+    const proxied = handler(route)
+    const drained = drainApiProxy(page)
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(page.unrouteAll).not.toHaveBeenCalled()
+    answer({ text: () => Promise.resolve('{}'), headers: () => ({}), status: () => 200 })
+    await Promise.all([proxied, drained])
+    expect(fulfilled).toEqual(['fulfilled'])
+    expect(page.unrouteAll).toHaveBeenCalledWith({ behavior: 'wait' })
+
+    // A call that starts after the wait and loses its route to the unroute is not a test failure.
+    const late = handler(route)
+    answer({ text: () => Promise.resolve('{}'), headers: () => ({}), status: () => 200 })
+    await expect(late).resolves.toBeUndefined()
   })
 
   it('leaves a page with no proxy, and a closed page, alone', async () => {

@@ -30,6 +30,8 @@ on:
           - o1-realtime-probe
 
 permissions:
+  # The shard balancer reads the run's artifacts and jobs.
+  actions: read
   contents: read
 
 # if this workflow is triggered back to back, cancel the older run, but allow different test environments to run parallel
