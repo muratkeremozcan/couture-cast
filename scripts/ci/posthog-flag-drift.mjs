@@ -24,7 +24,8 @@
 //   INTENTIONAL_OVERRIDES pins another, with its reason.
 //
 //   POSTHOG_PROD_PROJECT_TOKEN=phc_... node scripts/ci/posthog-flag-drift.mjs
-import { pathToFileURL } from 'node:url'
+import { realpathSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const DEFAULT_HOST = 'https://us.i.posthog.com'
@@ -323,5 +324,6 @@ async function main() {
   return 0
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href)
+// The real path: an argv[1] through a symlink (macOS keeps /tmp as one) must still run main.
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url))
   process.exitCode = await main()
