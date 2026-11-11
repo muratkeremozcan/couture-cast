@@ -210,77 +210,64 @@ describe('apt source rewrite', () => {
 })
 
 describe('pinned browser installer', () => {
-  test('browser installer uses the pinned CLI and a GNU deadline with TERM, kill grace and outer bound', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
+  const recording = (results) => {
     const calls = []
+    const run = (command, args, options) => {
+      calls.push([command, args, options])
+      return results.shift() ?? { status: 0 }
+    }
+    return { calls, run }
+  }
+
+  test('system packages go through apt-install.sh, then the pinned CLI downloads the browsers', async () => {
+    const { installPinnedPlaywrightBrowsers, APT_INSTALL_SCRIPT } = await helper()
+    const { calls, run } = recording([])
     installPinnedPlaywrightBrowsers({
       node: '/owned/node',
       cli: '/pinned/playwright/cli.js',
-      run: (...args) => {
-        calls.push(args)
-        return { status: 0 }
-      },
+      run,
     })
+    assert.equal(APT_INSTALL_SCRIPT, 'scripts/ci/apt-install.sh')
     assert.deepEqual(calls, [
       [
-        'timeout',
-        [
-          '--signal=TERM',
-          '--kill-after=15s',
-          '600s',
-          '/owned/node',
-          '/pinned/playwright/cli.js',
-          'install',
-          '--with-deps',
-          'chromium',
-          'firefox',
-          'webkit',
-        ],
-        { stdio: 'inherit', timeout: 620000, killSignal: 'SIGKILL' },
+        'bash',
+        ['scripts/ci/apt-install.sh', '--playwright', 'chromium', 'firefox', 'webkit'],
+        { stdio: 'inherit' },
+      ],
+      [
+        '/owned/node',
+        ['/pinned/playwright/cli.js', 'install', 'chromium', 'firefox', 'webkit'],
+        { stdio: 'inherit' },
       ],
     ])
   })
 
   test('API32 provisions only the Chromium engine required by the browser-mode accessibility bridge', async () => {
     const { installPinnedPlaywrightBrowsers } = await helper()
-    let observed
+    const { calls, run } = recording([])
     installPinnedPlaywrightBrowsers({
       node: '/owned/node',
       cli: '/pinned/cli.js',
       browsers: ['chromium'],
-      run: (...args) => {
-        observed = args
-        return { status: 0 }
-      },
+      run,
     })
-    assert.deepEqual(observed[1], [
-      '--signal=TERM',
-      '--kill-after=15s',
-      '600s',
-      '/owned/node',
-      '/pinned/cli.js',
-      'install',
-      '--with-deps',
+    assert.deepEqual(calls[0][1], [
+      'scripts/ci/apt-install.sh',
+      '--playwright',
       'chromium',
     ])
+    assert.deepEqual(calls[1][1], ['/pinned/cli.js', 'install', 'chromium'])
   })
 
   test('the installer accepts only the two required engine sets', async () => {
     const { installPinnedPlaywrightBrowsers } = await helper()
     for (const browsers of [[], ['firefox'], ['chromium', 'firefox'], 'chromium']) {
-      let called = false
+      const { calls, run } = recording([])
       assert.throws(
-        () =>
-          installPinnedPlaywrightBrowsers({
-            browsers,
-            run: () => {
-              called = true
-              return { status: 0 }
-            },
-          }),
+        () => installPinnedPlaywrightBrowsers({ browsers, run }),
         /browser_dependency_engine_selection_required/
       )
-      assert.equal(called, false)
+      assert.equal(calls.length, 0)
     }
   })
 
@@ -295,77 +282,28 @@ describe('pinned browser installer', () => {
       )
   })
 
-  test('a failed install retries once after a pause and succeeds when the mirror has settled', async () => {
+  test('a package install that apt-install.sh gave up on, or a failed download, fails closed', async () => {
     const { installPinnedPlaywrightBrowsers } = await helper()
-    const calls = []
-    const results = [{ status: 1 }, { status: 0 }, { status: 0 }]
-    installPinnedPlaywrightBrowsers({
-      node: '/owned/node',
-      cli: '/pinned/cli.js',
-      browsers: ['chromium'],
-      retryPauseSeconds: 7,
-      run: (command, args) => {
-        calls.push([command, args[0]])
-        return results.shift()
-      },
-    })
-    assert.deepEqual(calls, [
-      ['timeout', '--signal=TERM'],
-      ['sleep', '7'],
-      ['timeout', '--signal=TERM'],
-    ])
-  })
-
-  test('a second install failure, a deadline hit or a missing deadline is never retried again', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
-    for (const [results, expected, installs] of [
+    for (const [results, expected, calls] of [
+      [[{ status: 100 }], /browser_dependency_install_failed/, 1],
       [
-        [{ status: 1 }, { status: 0 }, { status: 1 }],
+        [{ status: null, error: new Error('spawn bash ENOENT') }],
         /browser_dependency_install_failed/,
-        2,
-      ],
-      [[{ status: 124 }], /browser_dependency_install_timeout/, 1],
-      [
-        [{ error: Object.assign(new Error('missing'), { code: 'ENOENT' }) }],
-        /browser_dependency_deadline_required/,
         1,
       ],
+      [[{ status: 0 }, { status: 1 }], /browser_dependency_download_failed/, 2],
     ]) {
-      let attempts = 0
+      const recorded = recording(results)
       assert.throws(
         () =>
           installPinnedPlaywrightBrowsers({
             node: '/owned/node',
             cli: '/pinned/cli.js',
-            retryPauseSeconds: 0,
-            run: (command) => {
-              if (command === 'timeout') attempts += 1
-              return results.shift()
-            },
+            run: recorded.run,
           }),
         expected
       )
-      assert.equal(attempts, installs)
-    }
-  })
-
-  test('missing deadline, timeout and installer failure all fail closed', async () => {
-    const { installPinnedPlaywrightBrowsers } = await helper()
-    for (const result of [
-      { error: Object.assign(new Error('missing'), { code: 'ENOENT' }) },
-      { status: 124 },
-      { status: 137 },
-      { status: 7 },
-    ]) {
-      assert.throws(
-        () =>
-          installPinnedPlaywrightBrowsers({
-            node: '/owned/node',
-            cli: '/pinned/cli.js',
-            run: () => result,
-          }),
-        /browser_dependency_(deadline_required|install_timeout|install_failed)/
-      )
+      assert.equal(recorded.calls.length, calls)
     }
   })
 })

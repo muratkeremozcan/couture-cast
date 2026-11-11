@@ -1,6 +1,18 @@
 // Story 6.5 acceptance: owned loopback provider; never logs payloads or credentials.
 import { createServer } from 'node:http'
 let mode = 'accepted'
+// Story 6.5 D10 amendment: each send answers after the next latency in this comma-separated list,
+// round and round, so the herd proof runs at the latency Expo shows from the hosted worker. The
+// `latency` op swaps the list for the slow-provider scenario and back.
+const parseLatencies = (raw) => {
+  const values = String(raw).split(',').map(Number)
+  if (values.some((value) => !Number.isFinite(value) || value < 0))
+    throw new Error('Provider latencies must be a list of ms.')
+  return values
+}
+let latencies = parseLatencies(process.env.STORY65_PROVIDER_LATENCY_MS ?? '0')
+let nextLatency = 0
+const latency = () => latencies[nextLatency++ % latencies.length]
 const ledger = []
 const receipts = []
 const held = new Set()
@@ -69,7 +81,11 @@ const server = createServer((request, response) => {
         held.add(response)
         response.once('close', () => held.delete(response))
       } else if (mode === 'disconnect') response.destroy()
-      else answer(response)
+      else {
+        const waitMs = latency()
+        if (waitMs > 0) setTimeout(() => answer(response), waitMs)
+        else answer(response)
+      }
     } catch {
       response.writeHead(400)
       response.end()
@@ -83,6 +99,10 @@ process.send?.({
 })
 process.on('message', ({ id, op, args }) => {
   if (op === 'mode') mode = args
+  if (op === 'latency') {
+    latencies = parseLatencies(args)
+    nextLatency = 0
+  }
   if (op === 'release') {
     mode = args ?? 'accepted'
     held.forEach(answer)

@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as ShutdownResourcesModule from './shutdown-resources'
 import {
   COMMUNITY_SHUTDOWN_TIMEOUT_MS,
+  COMMUNITY_WORKER_LOOPS,
+  communityWorkerLoops,
   createCommunityWorkerProcessState,
   performShutdown,
   startCommunityWorkers,
@@ -275,6 +277,23 @@ describe('dedicated community worker bootstrap', () => {
       await bootstrap.performShutdown()
     })
 
+    it('lets a test stack cap an idle erasure sweep at 30 seconds, so an aged request is swept in time', async () => {
+      vi.stubEnv('COMMUNITY_MAINTENANCE_IDLE_CAP_MS', '30000')
+      try {
+        const idle = { hidden: 0, anonymized: 0, objectsPurged: 0, requestsCompleted: 0 }
+        const { bootstrap, calls } = await startRecording(
+          'sweepErasureRequests',
+          [],
+          idle
+        )
+        await vi.advanceTimersByTimeAsync(150_000)
+        expect(calls).toEqual([30_000, 60_000, 90_000, 120_000, 150_000])
+        await bootstrap.performShutdown()
+      } finally {
+        vi.unstubAllEnvs()
+      }
+    })
+
     it('treats a failed sweep as idle, so a dependency outage is retried at the cap', async () => {
       vi.useFakeTimers()
       const dispatchPending = vi.fn().mockRejectedValue(new Error('database down'))
@@ -536,5 +555,38 @@ describe('dedicated community worker bootstrap', () => {
     await bootstrap.startCommunityWorkers()
 
     expect(exit).toHaveBeenCalledWith(1)
+  })
+})
+
+describe('communityWorkerLoops: the maintenance idle cap a test stack may lower', () => {
+  it('runs production loops when the cap is unset', () => {
+    expect(communityWorkerLoops({ NODE_ENV: 'production' })).toBe(COMMUNITY_WORKER_LOOPS)
+  })
+
+  it('lowers only the maintenance cap in a test stack', () => {
+    expect(
+      communityWorkerLoops({
+        NODE_ENV: 'test',
+        COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
+      })
+    ).toEqual({
+      dispatch: COMMUNITY_WORKER_LOOPS.dispatch,
+      maintenance: { baseMs: 30_000, idleCapMs: 30_000 },
+    })
+  })
+
+  it('refuses the cap outside a test stack', () => {
+    expect(() =>
+      communityWorkerLoops({
+        NODE_ENV: 'production',
+        COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
+      })
+    ).toThrow('for test stacks only')
+  })
+
+  it.each(['29999', '300001', '1e4', '-30000', 'soon'])('refuses a cap of %s', (raw) => {
+    expect(() =>
+      communityWorkerLoops({ NODE_ENV: 'test', COMMUNITY_MAINTENANCE_IDLE_CAP_MS: raw })
+    ).toThrow('must be whole ms from 30000 to 300000')
   })
 })

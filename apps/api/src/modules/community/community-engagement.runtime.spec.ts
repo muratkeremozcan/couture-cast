@@ -24,10 +24,67 @@ import * as spotlightCache from './community-spotlight-cache.js'
 import * as spotlightInvalidator from './community-spotlight-invalidator.js'
 import * as idleBackoff from './community-idle-backoff.js'
 import * as prismaClient from '../../prisma/prisma-client.js'
+import * as guardClient from '../../prisma/guard-prisma-client.js'
 import * as complimentaryAccess from '../feature-flags/complimentary-access.service.js'
+import * as runtimeModule from './community-engagement.runtime.js'
 import { startCommunityEngagementRuntime } from './community-engagement.runtime.js'
 
 const poolConstructor = vi.hoisted(() => vi.fn())
+type LogFields = Record<string, unknown>
+const readinessLines = vi.hoisted((): LogFields[] => [])
+const dispatchEvents = vi.hoisted((): LogFields[] => [])
+// Records the readiness and dispatch lines and still writes every line to the real logger.
+vi.mock('../../logger/pino.config.js', async (original) => {
+  const actual = await original<typeof logger>()
+  type Logger = ReturnType<typeof actual.createBaseLogger>
+  type Write = (fields: LogFields, message?: string) => void
+  const record = (level: string, fields: LogFields, message?: string) => {
+    if (message === 'community_dispatch_readiness')
+      readinessLines.push({ level, ...fields })
+    if (String(fields.event).startsWith('community_dispatch_'))
+      dispatchEvents.push({ level, ...fields })
+  }
+  const recording = (target: Logger): Logger =>
+    new Proxy(target, {
+      get(logger, property, receiver) {
+        if (property === 'child') {
+          const child = logger.child.bind(logger) as (...bindings: unknown[]) => Logger
+          return (...bindings: unknown[]) => recording(child(...bindings))
+        }
+        if (property === 'info' || property === 'warn' || property === 'error') {
+          const write = logger[property].bind(logger) as Write
+          return (fields: LogFields, message?: string) => {
+            record(property, fields, message)
+            write(fields, message)
+          }
+        }
+        return Reflect.get(logger, property, receiver) as unknown
+      },
+    })
+  return {
+    ...actual,
+    createBaseLogger: (...args: Parameters<typeof actual.createBaseLogger>) =>
+      recording(actual.createBaseLogger(...args)),
+  }
+})
+const guardPools = vi.hoisted(
+  () =>
+    [] as {
+      url: string
+      options: { max: number; acquireTimeoutMs: number; queryTimeoutMs: number }
+    }[]
+)
+// The guard pool's factory records what it was asked for and builds the same stand-in.
+vi.mock('../../prisma/guard-prisma-client.js', async (original) => ({
+  ...(await original<typeof guardClient>()),
+  createGuardPrismaClient: (
+    url: string,
+    options: { max: number; acquireTimeoutMs: number; queryTimeoutMs: number }
+  ) => {
+    guardPools.push({ url, options })
+    return poolConstructor({ guardPool: true }) as PrismaClient
+  },
+}))
 vi.mock('@prisma/client', async (original) => ({
   ...(await original<typeof prismaModule>()),
   PrismaClient: class {
@@ -38,7 +95,9 @@ vi.mock('@prisma/client', async (original) => ({
 }))
 
 // Only the external database boundary is controlled. Runtime and workers execute unchanged.
-function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = 'ready') {
+function databaseBoundary(
+  capability: 'ready' | 'old-server' | 'privacy-0' | 'bad-timeout' = 'ready'
+) {
   const queries: string[] = []
   const delegate = () => ({
     findMany: vi.fn(() => Promise.resolve([])),
@@ -64,7 +123,10 @@ function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = '
       queries.push(text)
       if (text.includes('server_version_num'))
         return Promise.resolve([
-          { version: capability === 'old-server' ? 160000 : 170000, privacy_version: 1 },
+          {
+            version: capability === 'old-server' ? 160000 : 170000,
+            privacy_version: capability === 'privacy-0' ? 0 : 1,
+          },
         ])
       if (text.includes("current_setting('transaction_timeout')"))
         return Promise.resolve([
@@ -121,6 +183,7 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
     './community-spotlight-invalidator.js': spotlightInvalidator,
     './community-idle-backoff.js': idleBackoff,
     '../../prisma/prisma-client.js': prismaClient,
+    '../../prisma/guard-prisma-client.js': guardClient,
     '../feature-flags/complimentary-access.service.js': complimentaryAccess,
   }
   const exports = {} as {
@@ -169,6 +232,9 @@ beforeEach(() => {
   )
   guard = databaseBoundary()
   poolConstructor.mockReset().mockImplementation(() => guard.prisma)
+  readinessLines.length = 0
+  guardPools.length = 0
+  dispatchEvents.length = 0
 })
 afterEach(async () => {
   await Promise.all(opened.splice(0).map((runtime) => runtime.close()))
@@ -393,12 +459,14 @@ describe('T03 actual engagement runtime composition', () => {
         status: 'standby',
       })
       expect(poolConstructor).toHaveBeenCalledTimes(1)
-      const configuration = poolConstructor.mock.calls[0]![0] as {
-        datasources: { db: { url: string } }
-      }
-      const url = new URL(configuration.datasources.db.url)
-      expect(url.searchParams.get('connection_limit')).toBe('36')
-      expect(url.searchParams.get('pool_timeout')).toBe('1')
+      // Ten send slots by default plus D10's four control connections, on node-postgres with
+      // the measured acquisition and query bounds.
+      expect(guardPools).toEqual([
+        {
+          url: 'postgresql://fixture:fixture@db.test/fixture?connection_limit=1',
+          options: { max: 14, acquireTimeoutMs: 5000, queryTimeoutMs: 5000 },
+        },
+      ])
       await vi.advanceTimersByTimeAsync(60_001)
       assertHousekeeping(general)
       assertHousekeeping(community)
@@ -610,6 +678,7 @@ describe('T03 actual engagement runtime composition', () => {
     ['guard_unconfigured', 'missing'],
     ['guard_mismatch', 'mismatch'],
     ['capability_unavailable', 'old-server'],
+    ['capability_unavailable', 'privacy-0'],
     ['capability_unavailable', 'bad-timeout'],
   ] as const
   describe.each(['general', 'community'] as const)(
@@ -626,12 +695,13 @@ describe('T03 actual engagement runtime composition', () => {
               'COMMUNITY_GUARD_DATABASE_URL',
               'postgresql://fixture:fixture@other.test/fixture'
             )
-          if (fault === 'old-server' || fault === 'bad-timeout')
+          if (fault === 'old-server' || fault === 'privacy-0' || fault === 'bad-timeout')
             guard = databaseBoundary(fault)
           const primary = databaseBoundary()
           const runtime = await start(primary, role)
           expect(runtime.dispatch).toEqual({ status: 'degraded', reason })
-          const allocated = fault === 'old-server' || fault === 'bad-timeout'
+          const allocated =
+            fault === 'old-server' || fault === 'privacy-0' || fault === 'bad-timeout'
           expect(poolConstructor).toHaveBeenCalledTimes(allocated ? 1 : 0)
           expect(guard.db.$disconnect).toHaveBeenCalledTimes(allocated ? 1 : 0)
           await vi.advanceTimersByTimeAsync(60_001)
@@ -646,4 +716,380 @@ describe('T03 actual engagement runtime composition', () => {
       )
     }
   )
+})
+
+const connectTimeout = () =>
+  new prismaModule.Prisma.PrismaClientInitializationError(
+    'Timed out fetching a new connection from the connection pool. More info: ' +
+      'http://pris.ly/d/connection-pool (Current connection pool timeout: 1, connection limit: 36)',
+    'test'
+  )
+const poolTimeout = () =>
+  new prismaModule.Prisma.PrismaClientKnownRequestError(
+    'Timed out fetching a new connection from the connection pool.',
+    { code: 'P2024', clientVersion: 'test' }
+  )
+const versionQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
+  boundary.queries.filter((query) => query.includes('server_version_num')).length
+const warmQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
+  boundary.queries.filter((query) => query.includes('AS lease')).length
+const isWarm = (sql: TemplateStringsArray | { strings: readonly string[] }) =>
+  ('strings' in sql ? sql.strings : sql).join('?').includes('AS lease')
+
+describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
+  it('opens every guard connection before the first send and logs how many opened', async () => {
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'ready' })
+    expect(warmQueries(guard)).toBe(14)
+    expect(readinessLines).toEqual([
+      expect.objectContaining({
+        level: 'info',
+        dispatchStatus: 'ready',
+        preflightAttempts: 1,
+        guardConnections: 14,
+        sendSlots: 10,
+      }),
+    ])
+  })
+
+  it('sizes the pool from COMMUNITY_DISPATCH_SEND_SLOTS: 32 slots open the 36 connections of D10', async () => {
+    vi.stubEnv('COMMUNITY_DISPATCH_SEND_SLOTS', '32')
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'ready' })
+    expect(guardPools[0]!.options.max).toBe(36)
+    expect(warmQueries(guard)).toBe(36)
+    expect(readinessLines[0]).toMatchObject({ guardConnections: 36, sendSlots: 32 })
+  })
+
+  it.each(['0', '33', '-1', '4.5', 'ten', '010'])(
+    'keeps dispatch off for COMMUNITY_DISPATCH_SEND_SLOTS=%s and allocates no pool',
+    async (value) => {
+      vi.stubEnv('COMMUNITY_DISPATCH_SEND_SLOTS', value)
+      const runtime = await start(databaseBoundary(), 'general')
+      expect(runtime.dispatch).toEqual({
+        status: 'degraded',
+        reason: 'send_slots_invalid',
+      })
+      expect(poolConstructor).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([
+    ['an initialization error', connectTimeout],
+    ['a P2024 request error', poolTimeout],
+  ])(
+    'retries %s from the pool after one backoff and then reaches ready',
+    async (_shape, failure) => {
+      guard.db.$queryRaw.mockRejectedValueOnce(failure())
+      const pending = start(databaseBoundary(), 'general')
+      await vi.advanceTimersByTimeAsync(999)
+      expect(versionQueries(guard)).toBe(0)
+      await vi.advanceTimersByTimeAsync(1)
+      const runtime = await pending
+      expect(runtime.dispatch).toEqual({ status: 'ready' })
+      expect(versionQueries(guard)).toBe(1)
+      expect(readinessLines[0]).toMatchObject({
+        preflightAttempts: 2,
+        guardConnections: 14,
+      })
+    }
+  )
+
+  it('reports guard_unreachable after four attempts 1, 2 and 4 s apart, and frees the pool', async () => {
+    vi.stubEnv('COMMUNITY_ENGAGEMENT_OWNER', 'community')
+    guard.db.$queryRaw.mockRejectedValue(poolTimeout())
+    const pending = start(databaseBoundary(), 'community')
+    await vi.advanceTimersByTimeAsync(6999)
+    expect(guard.db.$queryRaw).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(1)
+    const runtime = await pending
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(guard.db.$queryRaw).toHaveBeenCalledTimes(4)
+    expect(guard.db.$disconnect).toHaveBeenCalledTimes(1)
+    expect(readinessLines).toEqual([
+      {
+        level: 'error',
+        dispatchStatus: 'degraded',
+        reason: 'guard_unreachable',
+        role: 'community',
+        errorClass: 'PrismaClientKnownRequestError',
+        errorCode: 'P2024',
+        preflightAttempts: 4,
+      },
+    ])
+    await vi.advanceTimersByTimeAsync(60_001)
+    expect(guard.db.$queryRaw).toHaveBeenCalledTimes(4)
+  })
+
+  it('reports guard_unreachable when the warm-up stops answering, without leaving startup pending', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql)
+        ? new Promise(() => undefined)
+        : answer(sql, ...values)) as typeof answer)
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(9999)
+    expect(readinessLines).toEqual([])
+    // The lease deadline, then the bounded release of leases that never answered.
+    await vi.advanceTimersByTimeAsync(1 + 2000)
+    expect((await pending).dispatch).toEqual({
+      status: 'degraded',
+      reason: 'guard_unreachable',
+    })
+    expect(guard.db.$disconnect).toHaveBeenCalledTimes(1)
+    expect(readinessLines[0]).toMatchObject({
+      errorClass: 'GuardStepTimeout',
+      preflightAttempts: 1,
+    })
+  })
+
+  it('treats a preflight that stops answering as a connect failure and retries it', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    let stalled = false
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) => {
+      const text = ('strings' in sql ? sql.strings : sql).join('?')
+      if (!stalled && text.includes('server_version_num')) {
+        stalled = true
+        return new Promise(() => undefined)
+      }
+      return answer(sql, ...values)
+    }) as typeof answer)
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(10_000 + 1000)
+    expect((await pending).dispatch).toEqual({ status: 'ready' })
+    expect(readinessLines[0]).toMatchObject({
+      preflightAttempts: 2,
+      guardConnections: 14,
+    })
+  })
+
+  it('reports guard_unreachable when every warm-up query fails after the preflight passed', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql)
+        ? Promise.reject(poolTimeout())
+        : answer(sql, ...values)) as typeof answer)
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(readinessLines[0]).toMatchObject({ errorCode: 'P2024', preflightAttempts: 1 })
+  })
+
+  it('caps the send slots at the connections it proved open when some leases fail', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    let refused = 0
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql) && refused++ < 5
+        ? Promise.reject(poolTimeout())
+        : answer(sql, ...values)) as typeof answer)
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'ready' })
+    // 9 of 14 held at once: 4 stay for control work and 5 carry sends.
+    expect(readinessLines[0]).toMatchObject({
+      guardConnections: 9,
+      sendSlots: 5,
+      configuredSendSlots: 10,
+    })
+  })
+
+  it('reports guard_unreachable when the leases held cannot carry one send beside control work', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    let refused = 0
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql) && refused++ < 10
+        ? Promise.reject(poolTimeout())
+        : answer(sql, ...values)) as typeof answer)
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(readinessLines[0]).toMatchObject({ errorClass: 'GuardCapacityShortfall' })
+  })
+
+  it('counts connections held at once, so a pool that serializes every checkout proves only one', async () => {
+    // One connection: each transaction waits for the previous one to finish. Successful
+    // queries would count fourteen; held leases count one.
+    let queue = Promise.resolve()
+    guard.db.$transaction.mockImplementation(((
+      work: (tx: unknown) => Promise<unknown>
+    ) => {
+      const run = queue.then(() => work(guard.db))
+      queue = run.then(
+        () => undefined,
+        () => undefined
+      )
+      return run
+    }) as typeof guard.db.$transaction)
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(10_000 + 2000)
+    const runtime = await pending
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(readinessLines[0]).toMatchObject({ errorClass: 'GuardCapacityShortfall' })
+  })
+
+  it.each([
+    ['old-server', 'server_version'],
+    ['privacy-0', 'privacy_version'],
+    ['bad-timeout', 'guard_timeouts'],
+  ] as const)(
+    'answers capability %s at once, without retrying, and logs the %s check',
+    async (fault, check) => {
+      guard = databaseBoundary(fault)
+      const runtime = await start(databaseBoundary(), 'general')
+      expect(runtime.dispatch).toEqual({
+        status: 'degraded',
+        reason: 'capability_unavailable',
+      })
+      expect(versionQueries(guard)).toBe(1)
+      expect(warmQueries(guard)).toBe(0)
+      expect(readinessLines).toEqual([
+        expect.objectContaining({
+          reason: 'capability_unavailable',
+          errorClass: 'CommunityDispatchPreflightError',
+          check,
+        }),
+      ])
+    }
+  )
+
+  it('keeps messages, hosts and credentials out of the readiness line', async () => {
+    guard.db.$queryRaw.mockRejectedValue(
+      new prismaModule.Prisma.PrismaClientInitializationError(
+        "Can't reach database server at `db.test:6543` as fixture:fixture",
+        'test',
+        'P1001'
+      )
+    )
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(7000)
+    expect((await pending).dispatch.reason).toBe('guard_unreachable')
+    const line = JSON.stringify(readinessLines)
+    expect(line).toContain('"errorCode":"P1001"')
+    expect(line).not.toMatch(/db\.test|fixture|Can't reach/)
+  })
+
+  it.each([
+    [connectTimeout(), true],
+    [poolTimeout(), true],
+    [
+      new prismaModule.Prisma.PrismaClientKnownRequestError(
+        'Transaction API error: Unable to start a transaction in the given time.',
+        { code: 'P2028', clientVersion: 'test' }
+      ),
+      true,
+    ],
+    [
+      new prismaModule.Prisma.PrismaClientKnownRequestError(
+        'Transaction API error: Transaction already closed.',
+        { code: 'P2028', clientVersion: 'test' }
+      ),
+      false,
+    ],
+    [new send.CommunityDispatchPreflightError('privacy_version'), false],
+    [new Error('Timed out fetching a new connection from the connection pool'), false],
+  ])('classifies %s as a connect failure: %s', (error, expected) => {
+    expect(runtimeModule.isGuardConnectFailure(error)).toBe(expected)
+  })
+})
+
+describe('dispatch send slots (Story 6.5 D10 amendment, 2026-11-11)', () => {
+  it('selects at most its slot count a pass and logs one at-capacity and one below-capacity line per stretch', async () => {
+    const passes = [3, 3, 1, 0]
+    const limits: unknown[] = []
+    const prisma = {
+      $queryRaw: vi.fn((sql: TemplateStringsArray, ...values: unknown[]) => {
+        if (sql.join('?').includes('AS lag_ms'))
+          return Promise.resolve([{ lag_ms: 0, outstanding: 0 }])
+        limits.push(values.at(-1))
+        const rows = passes.shift() ?? 0
+        return Promise.resolve(
+          Array.from({ length: rows }, (_, index) => ({ id: `d${index}` }))
+        )
+      }),
+    } as unknown as PrismaClient
+    let inFlight = 0
+    let peak = 0
+    const sender = {
+      dispatch: vi.fn(async () => {
+        inFlight += 1
+        peak = Math.max(peak, inFlight)
+        await Promise.resolve()
+        inFlight -= 1
+        return true
+      }),
+    }
+    const worker = new notifications.CommunityNotificationsWorker(prisma, sender, 3)
+    for (let pass = 0; pass < 4; pass++) await worker.dispatch()
+    expect(limits).toEqual([3, 3, 3, 3])
+    expect(sender.dispatch).toHaveBeenCalledTimes(7)
+    expect(peak).toBe(3)
+    expect(dispatchEvents).toEqual([
+      expect.objectContaining({ event: 'community_dispatch_at_capacity', sendSlots: 3 }),
+      expect.objectContaining({
+        event: 'community_dispatch_below_capacity',
+        sendSlots: 3,
+        saturatedPasses: 2,
+      }),
+    ])
+  })
+
+  it('logs behind once when outstanding work passes 60 s from eligibility, and caught up once after', async () => {
+    const lags = [
+      { lag_ms: 30_000, outstanding: 12 },
+      { lag_ms: 61_000, outstanding: 9 },
+      { lag_ms: 75_000, outstanding: 4 },
+      { lag_ms: 62_000, outstanding: 1 },
+      { lag_ms: null, outstanding: 0 },
+    ]
+    const passes = [3, 3, 3, 1, 0]
+    const prisma = {
+      $queryRaw: vi.fn((sql: TemplateStringsArray) => {
+        if (sql.join('?').includes('AS lag_ms')) return Promise.resolve([lags.shift()])
+        const rows = passes.shift() ?? 0
+        return Promise.resolve(
+          Array.from({ length: rows }, (_, index) => ({ id: `d${index}` }))
+        )
+      }),
+    } as unknown as PrismaClient
+    const worker = new notifications.CommunityNotificationsWorker(
+      prisma,
+      { dispatch: () => Promise.resolve(true) },
+      3
+    )
+    for (let pass = 0; pass < 5; pass++) await worker.dispatch()
+    const lagEvents = dispatchEvents.filter((line) =>
+      ['community_dispatch_behind', 'community_dispatch_caught_up'].includes(
+        String(line.event)
+      )
+    )
+    expect(lagEvents).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        event: 'community_dispatch_behind',
+        lagMs: 61_000,
+        outstanding: 9,
+      }),
+      expect.objectContaining({
+        level: 'info',
+        event: 'community_dispatch_caught_up',
+        outstanding: 0,
+      }),
+    ])
+  })
+
+  it('reads no lag while idle and not behind, so an idle loop adds no query', async () => {
+    const queryRaw = vi.fn(() => Promise.resolve([]))
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient
+    const worker = new notifications.CommunityNotificationsWorker(
+      prisma,
+      { dispatch: () => Promise.resolve(true) },
+      3
+    )
+    for (let pass = 0; pass < 3; pass++) await worker.dispatch()
+    expect(queryRaw).toHaveBeenCalledTimes(3)
+  })
+
+  it('defaults to ten slots', () => {
+    expect(notifications.COMMUNITY_DISPATCH_SEND_SLOTS.default).toBe(10)
+    expect(runtimeModule.communityDispatchSendSlots(undefined)).toBe(10)
+    expect(runtimeModule.communityDispatchSendSlots('32')).toBe(32)
+    expect(runtimeModule.communityGuardConnections(10)).toBe(14)
+  })
 })

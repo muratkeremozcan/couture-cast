@@ -65,6 +65,7 @@ import {
   ModerationAfterCommit,
   ModerationSanctionsService,
 } from '../../src/modules/moderation/moderation-sanctions.service.js'
+import { birthdateForAge } from '../../src/testing/birthdate.js'
 import { listenHttpApp } from '../../src/testing/loopback-http-app.js'
 
 /** The detail body with the 6.11 fields, parsed by the shipped strict schema. */
@@ -317,8 +318,15 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   const label = () => `${++counter}`
   let sequence = 0
 
+  // Birthdates come from JavaScript's clock, which the age checks read (calculateAge in
+  // guardian-participation.ts and the profile age gate), never from the suite's pinned `now()`:
+  // a teen born 15 years before a pinned 2026-11-04 turns 16 on the real clock in May 2027 and
+  // stops being refused. A suite that fakes Date moves both together.
   async function seedOwnMember(alias: string | null): Promise<SeededMember> {
-    const user = await persistUser(prisma, createUser())
+    const user = await persistUser(
+      prisma,
+      createUser({ age: 40, birthdate: birthdateForAge(40) })
+    )
     const name = alias ?? `${runId}-operator${label()}`
     if (alias) await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     return { id: user.id, alias: name }
@@ -335,10 +343,15 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
     const user = await persistUser(
       prisma,
       createTeenUser({
+        age: 15,
+        birthdate: birthdateForAge(15),
         profilePreferences: { compliance: { accountStatus: 'active' } },
       })
     )
-    const guardian = await persistUser(prisma, createUser())
+    const guardian = await persistUser(
+      prisma,
+      createUser({ age: 42, birthdate: birthdateForAge(42) })
+    )
     const alias = `${runId}-teen${label()}`
     await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     await prisma.guardianConsent.create({
@@ -620,10 +633,14 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   ) {
     const kind = params.kind ?? 'temporary'
     const createdAt = params.createdAt ?? now()
+    // A default temporary ban runs 7 days from the later of the test clock and the real one.
+    // Enforcement (findActiveCommunitySanction) reads the real clock by design, and suites pin
+    // the test clock to a fixed date: 7 days from 2026-11-04 expired at 2026-11-11T12:00Z and
+    // turned a banned author into an active one in CI.
     const expiresAt =
       params.expiresAt === undefined
         ? kind === 'temporary'
-          ? new Date(createdAt.getTime() + 7 * SEED_DAY_MS)
+          ? new Date(Math.max(createdAt.getTime(), Date.now()) + 7 * SEED_DAY_MS)
           : null
         : params.expiresAt
     const caseKey = params.caseKey ?? `post.${runId}-seeded-${label()}`

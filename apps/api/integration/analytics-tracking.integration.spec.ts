@@ -24,6 +24,7 @@ import {
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { AuthModule } from '../src/modules/auth/auth.module'
 import { ModerationModule } from '../src/modules/moderation/moderation.module'
+import { birthdateForAge } from '../src/testing/birthdate'
 
 const { trackedEvents, posthogCaptureMock, posthogShutdownMock } = vi.hoisted(() => {
   const trackedEvents: MemoryTrackedAnalyticsEvent[] = []
@@ -92,7 +93,7 @@ describe('Analytics tracking endpoints (integration)', () => {
     id: 'teen-1',
     email: 'teen1@example.com',
     age: 13,
-    birthdate: new Date('2013-03-04T00:00:00.000Z'),
+    birthdate: birthdateForAge(13),
   })
   const originalEnv = { ...process.env }
   const eventExpectations = createAnalyticsEventExpectations(trackedEvents, expect)

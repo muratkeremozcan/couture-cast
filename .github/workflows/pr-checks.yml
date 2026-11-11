@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      clock_offset_days:
+        description: Days unit-tests-year-ahead moves the real clock, for a longer look ahead (3650)
+        required: false
+        default: '365'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -123,9 +128,14 @@ jobs:
         id: build
         run: npm run build
 
+      # System packages through apt-install.sh, which retries, so a mirror sync or a resolver blip
+      # does not fail the PR; this step's timeout bounds it.
       - name: Install Playwright Chromium
         id: chromium
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 11
+        run: |
+          bash scripts/ci/apt-install.sh --playwright chromium
+          npx playwright install chromium
 
       - name: Run Lighthouse accessibility gate
         id: lighthouse
@@ -278,17 +288,19 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
-      # Together, because a slow apt mirror once added 2 minutes to the Chromium install and more than
+      # Together, because a slow Ubuntu mirror once added 2 minutes to the Chromium install and more than
       # 4 in another run. Only `apps/mobile` runs tests in a browser.
       - name: Build packages and install Playwright Chromium
         id: build
         if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.prisma.outcome == 'success' }}
+        # Bounds apt-install.sh's retries too, which the runner enforces on the whole process tree.
+        timeout-minutes: 12
         env:
           SHARD: ${{ matrix.shard }}
         run: |
           chromium=
           if [ "$SHARD" = mobile ]; then
-            npx playwright install --with-deps chromium &
+            (bash scripts/ci/apt-install.sh --playwright chromium && npx playwright install chromium) &
             chromium=$!
           fi
           npm run build
@@ -339,6 +351,69 @@ jobs:
         run: |
           echo "::error::Workspace tests failed"
           exit 1
+
+  # The database-free unit suites once more with the real clock a year ahead. Only JavaScript's clock
+  # moves (scripts/ci/real-clock-offset.mjs, loaded into every Vitest worker); these suites run no
+  # database and no Prisma engine, so nothing reads a clock that disagrees with it. A pinned test
+  # clock stays pinned. A test that seeds a fixed date the code compares with the real clock (a teen
+  # birthdate literal, an expiry from a pinned clock) fails here a year before it fails on every PR:
+  # on 2026-11-11 a seeded 7-day ban from a clock pinned at 2026-11-04 turned the api shard red.
+  # The integration tier is not shifted, because its database and the Prisma engine keep the real
+  # clock; apps/api/src/testing/integration-clock-literals.guard.spec.ts checks it statically. The
+  # mobile suite runs in a browser, which a Node preload cannot reach.
+  unit-tests-year-ahead:
+    name: Unit tests a year ahead
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REAL_CLOCK_OFFSET_DAYS: ${{ inputs.clock_offset_days || '365' }}
+      # Nothing listens here, so the api integration suites skip themselves and nothing reaches a
+      # database.
+      INTEGRATION_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:1/none
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Check the clock preload
+        id: preload
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: node --test scripts/ci/real-clock-offset.test.mjs
+
+      - name: Generate Prisma Client and build packages
+        id: build
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: |
+          npm run db:generate
+          npm run build:packages
+
+      # Each suite runs even when an earlier one failed, so one red run lists every date bomb.
+      - name: Run unit suites a year ahead
+        if: ${{ !cancelled() && steps.preload.outcome == 'success' && steps.build.outcome == 'success' }}
+        run: |
+          preload="--import $GITHUB_WORKSPACE/scripts/ci/real-clock-offset.mjs"
+          node --import ./scripts/ci/real-clock-offset.mjs -e \
+            "console.log('test clock', new Date().toISOString())"
+          failed=
+          for workspace in packages/config packages/utils packages/api-client packages/testing; do
+            (cd "$workspace" && NODE_OPTIONS="$preload" npx vitest run --config vitest.config.ts) ||
+              failed="$failed $workspace"
+          done
+          (cd apps/api && NODE_OPTIONS="--conditions=development $preload" npx vitest run src) ||
+            failed="$failed apps/api"
+          (cd apps/web && NODE_OPTIONS="$preload" npx vitest run --config vitest.config.ts) ||
+            failed="$failed apps/web"
+          if [ -n "$failed" ]; then
+            echo "::error::Unit suites failed a year ahead:$failed"
+            exit 1
+          fi
 
   # The name every reader knows. It reports all shards as one coverage comment and goes red unless
   # every shard passed, so a skipped or cancelled shard is a failure too.

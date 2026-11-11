@@ -768,6 +768,7 @@ describe('6.7b operator atomicity and database constraints', () => {
     })
 
     it('6.7b-INT-123 the window CHECK refuses ends_at at or before starts_at', async () => {
+      // clock-literal-ok: the CHECK compares ends_at with starts_at, never with the clock
       for (const endsAt of ['2030-01-01T00:00:00.000Z', '2029-12-31T23:59:59.999Z']) {
         expect(
           await refusal(() =>
@@ -781,6 +782,7 @@ describe('6.7b operator atomicity and database constraints', () => {
       await insert({
         ...ended,
         ended_by_id: admin.userId,
+        // clock-literal-ok: the CHECK compares ends_at with starts_at, never with the clock
         ends_at: new Date('2030-01-01T00:00:00.001Z'),
       })
     })

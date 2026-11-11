@@ -704,6 +704,35 @@ An insufficient existing pool is a failed capacity gate. Concurrency may change 
 same herd/deadline proof passes; neither the required herd nor expiry/guard bounds shrink.
 Report any required compute-plan change to the coordinator; no silent plan upgrade is allowed.
 
+**D10 amendment, 2026-11-11 (PR #205).** The production project runs on the free plan's Nano
+compute, and no plan change is available. Its Supavisor transaction pool serves about 15 server
+connections at a time (36 one-second guarded transactions took 3.4 s), shared with the API. Each
+send holds one server connection through its guarded transaction, so 32 slots would queue the
+excess at Supavisor, unbounded and unlogged, and take the API's connections. Send concurrency is
+now `COMMUNITY_DISPATCH_SEND_SLOTS`, default 10, 1 to 32; an invalid value keeps dispatch off
+(`send_slots_invalid`). The guard pool has one connection per slot plus the four control
+connections, 14 by default, and the preflight caps the slots to the connections it actually held
+at once. The slot math assumes one worker instance. A pass selects at most the slots and passes
+never overlap, so a herd larger than the slots waits in the database, due.
+The 60-second acceptance stands for normal provider latency. Expo answered 100 sends from the
+hosted worker, 10 at a time, at p50 103 ms, p95 804 ms and max 1299 ms; the herd suite replays
+those samples at the default 10 slots. In all three scenarios (no outage, a stalled worker, a
+stalled provider) every one of the 500 herd and 100 normal deliveries settled within 60 s, each
+sent once. The latest herd delivery settled at 21.8 s and the latest normal one at 24.9 s; with
+the provider held, 90 herd deliveries settled as `unknown` handoffs and the rest were accepted. A slow provider is a separate, degraded state that the bound does not
+cover. At a flat 887 ms per send (the p95 of an earlier 30-send sample) the herd is on the edge:
+one run settled 33 of the 100 normal sends past 60 s, a rerun settled all within 56 s. The
+suite's fourth scenario holds every send at 1500 ms, above Expo's slowest measured answer and
+under the 2 s provider deadline, so the 600 sends need about 90 s at 10 slots. It accepts
+lateness up to 120 s and requires the worker to report it. Every delivery was accepted and settled within 90.0 s, 216 of
+them past 60 s; the worker logged `community_dispatch_behind` 60.8 s after the release with 230
+outstanding and `community_dispatch_caught_up` at 96.1 s. The worker logs
+`community_dispatch_behind` (warn) when the oldest outstanding delivery is more than 60 seconds
+past its original eligibility and `community_dispatch_caught_up` when it no longer is;
+eligibility timestamps stay as qualified. `community_dispatch_at_capacity` and
+`community_dispatch_below_capacity` mark a stretch of full passes. 32 slots, and D10's 57-second
+lower bound, are the setting for a compute plan whose pooler serves them.
+
 Before proof, count all due groups times their frozen token generations in the largest actual
 timezone cohort. Record recipient count, group count, mean/max tokens and total H. The 500
 floor covers 100 recipients with five tokens and one group each; multiple post groups count

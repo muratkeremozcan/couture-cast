@@ -38,6 +38,7 @@ describe('load-env', () => {
     delete process.env.POSTHOG_API_KEY
     delete process.env.E2E_CALLER_OWNED_ENV_KEYS
     delete process.env.CC12B_TEST_DATABASE_URL
+    delete process.env.COMMUNITY_MAINTENANCE_IDLE_CAP_MS
   })
 
   it('loads root .env files in expected precedence order for development', async () => {
@@ -107,6 +108,23 @@ describe('load-env', () => {
 
     expect(process.env.CC12B_TEST_DATABASE_URL).toBe('postgresql://isolated/test')
     expect(process.env.MISSING_KEY).toBeUndefined()
+  })
+
+  it('keeps the launcher-owned test stack and maintenance cap against a development .env.local', async () => {
+    // Story 6.14: the community worker takes the lowered maintenance cap only with NODE_ENV=test.
+    process.env.TEST_ENV = 'local'
+    process.env.NODE_ENV = 'test'
+    process.env.COMMUNITY_MAINTENANCE_IDLE_CAP_MS = '30000'
+    process.env.E2E_CALLER_OWNED_ENV_KEYS = 'NODE_ENV,COMMUNITY_MAINTENANCE_IDLE_CAP_MS'
+    loadEnvMock.mockImplementation(() => {
+      process.env.NODE_ENV = 'development'
+      process.env.COMMUNITY_MAINTENANCE_IDLE_CAP_MS = '300000'
+    })
+
+    await import('#load-env')
+
+    expect(process.env.NODE_ENV).toBe('test')
+    expect(process.env.COMMUNITY_MAINTENANCE_IDLE_CAP_MS).toBe('30000')
   })
 })
 

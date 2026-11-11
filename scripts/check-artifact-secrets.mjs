@@ -218,29 +218,36 @@ function normalizedViews(text) {
 }
 
 /**
- * Archive entries in central-directory order, refusing names that would make two
- * entries share a slot: a duplicate name keeps only the last copy, and `__proto__`
- * never becomes an own property, so either would hide an entry from the scan.
+ * Archive entries in central-directory order, every copy of every name. An unzip keyed by
+ * name keeps only the last of two entries that share a name, which would hide the first
+ * from the scan, so an archive with a repeated name opens each entry on its own. Playwright's
+ * blob reporter writes one: it names an attachment after its file path, so a file attached
+ * twice (a retried test, 2026-11-11) is stored twice under one name. `__proto__` never becomes
+ * an own property of the result, so an entry with that name is refused.
  */
 function zipEntries(buffer) {
+  const bytes = new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length)
   const names = []
-  const entries = unzipSync(
-    new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length),
-    {
-      filter: (file) => {
-        names.push(file.name)
-        return true
-      },
-    }
-  )
-  if (new Set(names).size !== names.length || names.includes('__proto__')) {
+  const entries = unzipSync(bytes, {
+    filter: (file) => {
+      names.push(file.name)
+      return true
+    },
+  })
+  if (names.includes('__proto__')) {
     // Marked so a zip found only by its trailing record still fails closed: it
     // opened, so it is a zip, and the ambiguity is real.
-    throw Object.assign(new Error('duplicate or reserved entry names'), {
-      ambiguous: true,
-    })
+    throw Object.assign(new Error('reserved entry name'), { ambiguous: true })
   }
-  return names.map((name) => entries[name])
+  if (new Set(names).size === names.length) return names.map((name) => entries[name])
+  return names.map((name, index) => {
+    let position = 0
+    const one = unzipSync(bytes, { filter: () => position++ === index })
+    const opened = Object.keys(one)
+    if (opened.length !== 1 || opened[0] !== name)
+      throw Object.assign(new Error('entry did not open on its own'), { ambiguous: true })
+    return one[name]
+  })
 }
 
 /**

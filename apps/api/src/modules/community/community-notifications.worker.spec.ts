@@ -51,12 +51,27 @@ describe('notification fan-out after a pldbgapi2 re-run (repeat safety)', () => 
 })
 
 describe('dispatch pass report', () => {
-  it('counts moved and rejected deliveries and resolves, so one rejection never fails the pass', async () => {
-    const prisma = {
-      $queryRaw: vi
-        .fn()
-        .mockResolvedValue([{ id: 'moved' }, { id: 'unchanged' }, { id: 'rejected' }]),
+  const isLag = (sql: TemplateStringsArray) => sql.join('?').includes('AS lag_ms')
+  function deliveries(rows: { id: string }[]) {
+    const tx = {
+      $executeRawUnsafe: vi.fn().mockResolvedValue(0),
+      $executeRaw: vi.fn().mockResolvedValue(1),
     }
+    const prisma = {
+      $queryRaw: vi.fn((sql: TemplateStringsArray) =>
+        Promise.resolve(isLag(sql) ? [{ lag_ms: 0, outstanding: 0 }] : rows)
+      ),
+      $transaction: vi.fn((work: (client: typeof tx) => Promise<unknown>) => work(tx)),
+    }
+    return { prisma, tx }
+  }
+
+  it('counts moved and rejected deliveries and resolves, so one rejection never fails the pass', async () => {
+    const { prisma, tx } = deliveries([
+      { id: 'moved' },
+      { id: 'unchanged' },
+      { id: 'rejected' },
+    ])
     const dispatch = vi.fn((id: string) =>
       id === 'rejected'
         ? Promise.reject(new Error('lock timeout'))
@@ -67,5 +82,24 @@ describe('dispatch pass report', () => {
     })
     await expect(worker.dispatch()).resolves.toEqual({ selected: 3, moved: 1, failed: 1 })
     expect(dispatch).toHaveBeenCalledTimes(3)
+    // Only the rejected delivery moves on, in a bounded transaction that skips held rows.
+    expect(tx.$executeRawUnsafe.mock.calls).toEqual([
+      ["SET LOCAL lock_timeout = '100ms'"],
+      ["SET LOCAL statement_timeout = '500ms'"],
+    ])
+    expect(tx.$executeRaw).toHaveBeenCalledTimes(1)
+    expect(
+      (tx.$executeRaw.mock.calls[0]![0] as TemplateStringsArray).join('?')
+    ).toContain('FOR UPDATE SKIP LOCKED')
+    expect(tx.$executeRaw.mock.calls[0]!.slice(1)).toEqual([['rejected']])
+  })
+
+  it('still resolves the pass when moving a rejected delivery on fails', async () => {
+    const { prisma } = deliveries([{ id: 'rejected' }])
+    prisma.$transaction.mockRejectedValue(new Error('database down'))
+    const worker = new CommunityNotificationsWorker(prisma as unknown as PrismaClient, {
+      dispatch: () => Promise.reject(new Error('lock timeout')),
+    })
+    await expect(worker.dispatch()).resolves.toEqual({ selected: 1, moved: 0, failed: 1 })
   })
 })

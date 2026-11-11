@@ -5,6 +5,9 @@ import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
 
+/** The one script CI installs Ubuntu packages through; see its header. */
+export const APT_INSTALL_SCRIPT = 'scripts/ci/apt-install.sh'
+
 const sourceLine = /^[\t ]*(?:URIs:|deb(?:-src)?\s)/
 const azureArchive = /https?:\/\/azure\.archive\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g
 const runnerMirrorList = /mirror\+file:\/etc\/apt\/apt-mirrors\.txt(?=\s|$)/g
@@ -88,56 +91,31 @@ export async function provisionShareCardBrowsers({
 /**
  * Use the installed lockfile-matched Playwright CLI; OS browser versions are independent.
  *
- * A failed install gets one more attempt after a pause. While an Ubuntu archive mirror
- * is syncing it serves index files of the wrong size and apt exits with
- * "Mirror sync in progress?"; the sync settles within seconds.
- * A deadline hit is not retried, because the step's time is already spent.
+ * The browsers' system packages come through apt-install.sh, which configures apt's own retries
+ * and runs the install again after 15, 30, 60 and 120 s: an Ubuntu mirror mid-sync serves index
+ * files of the wrong size ("Mirror sync in progress?"), and the runner's resolver once failed for
+ * five minutes (2026-11-11). The browsers themselves then download through the pinned CLI. The
+ * provisioning step's `timeout-minutes` bounds both.
  */
 export function installPinnedPlaywrightBrowsers({
   run = spawnSync,
   node = process.execPath,
   cli = createRequire(import.meta.url).resolve('@playwright/test/cli'),
   browsers = ['chromium', 'firefox', 'webkit'],
-  retryPauseSeconds = 45,
 } = {}) {
   if (
     !Array.isArray(browsers) ||
     !['chromium', 'chromium,firefox,webkit'].includes(browsers.join(','))
   )
     throw new Error('browser_dependency_engine_selection_required')
-  try {
-    installOnce({ run, node, cli, browsers })
-  } catch (error) {
-    if (error.message !== 'browser_dependency_install_failed') throw error
-    console.log(
-      `Browser dependency install failed; retrying once in ${retryPauseSeconds}s in case an Ubuntu mirror sync was in progress.`
-    )
-    run('sleep', [String(retryPauseSeconds)], { stdio: 'inherit' })
-    installOnce({ run, node, cli, browsers })
-  }
-}
-
-function installOnce({ run, node, cli, browsers }) {
-  const result = run(
-    'timeout',
-    [
-      '--signal=TERM',
-      '--kill-after=15s',
-      '600s',
-      node,
-      cli,
-      'install',
-      '--with-deps',
-      ...browsers,
-    ],
-    { stdio: 'inherit', timeout: 620000, killSignal: 'SIGKILL' }
-  )
-  if (result.error?.code === 'ENOENT')
-    throw new Error('browser_dependency_deadline_required')
-  if ([124, 137].includes(result.status) || result.error?.code === 'ETIMEDOUT')
-    throw new Error('browser_dependency_install_timeout')
-  if (result.error || result.status !== 0)
+  const packages = run('bash', [APT_INSTALL_SCRIPT, '--playwright', ...browsers], {
+    stdio: 'inherit',
+  })
+  if (packages.error || packages.status !== 0)
     throw new Error('browser_dependency_install_failed')
+  const download = run(node, [cli, 'install', ...browsers], { stdio: 'inherit' })
+  if (download.error || download.status !== 0)
+    throw new Error('browser_dependency_download_failed')
 }
 
 export function shareCardBrowserEngines(args) {

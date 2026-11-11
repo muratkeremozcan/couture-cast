@@ -65,7 +65,9 @@ function receiptsClass(): typeof CommunityReceiptsWorker {
 
 describe('T04 actual receipt 24-hour boundary', () => {
   it('clamps a pending provider lookup to attempt expiry, then settles without another lookup or send', async () => {
-    const expires = new Date('2030-01-02T12:00:00.000Z')
+    // A month past the real clock: the test pins JavaScript's clock, but the database keeps the real
+    // one, so a fixed expiry would turn into a past one on the day the calendar reaches it.
+    const expires = new Date(Date.now() + 30 * 86_400_000)
     const started = new Date(expires.getTime() - 86_400_000)
     const beforeExpiry = new Date(expires.getTime() - 500)
     const group = await prisma.communityNotificationGroup.create({

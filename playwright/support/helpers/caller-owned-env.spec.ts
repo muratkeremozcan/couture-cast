@@ -16,7 +16,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { config as loadEnv } from 'dotenv'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { loadLauncherEnv } from '../../../scripts/lib/caller-owned-env.mjs'
+import {
+  loadEnvKeepingCallerOwned,
+  loadLauncherEnv,
+} from '../../../scripts/lib/caller-owned-env.mjs'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 // The CLI the package declares as its `playwright` bin, wherever it is installed.
@@ -286,5 +289,45 @@ describe('caller-owned environment keys survive the .env.local override', () => 
     const unlisted = resolve({ PORT: '4077', HTTP_CORS_ORIGIN: 'http://127.0.0.1:3077' })
     expect(unlisted.PORT).toBe('4000')
     expect(unlisted.HTTP_CORS_ORIGIN).toBe('http://127.0.0.1:3005')
+  })
+
+  it('6.14-ENV-05 keeps the test stack and its maintenance cap through the launcher and every child', () => {
+    // A developer's .env.local may say NODE_ENV=development under TEST_ENV=local. The community
+    // worker takes the launcher's lowered maintenance cap only with NODE_ENV=test and otherwise
+    // refuses to start, so the launcher owns both and every child's load-env keeps them.
+    fs.writeFileSync(
+      path.join(directory, '.env.local'),
+      'NODE_ENV=development\nTEST_ENV=local\nCOMMUNITY_MAINTENANCE_IDLE_CAP_MS=300000\n'
+    )
+    const fromEnvLocal = (target: NodeJS.ProcessEnv) => () => {
+      loadEnv({
+        path: path.join(directory, '.env.local'),
+        override: true,
+        processEnv: target as Record<string, string>,
+        quiet: true,
+      })
+    }
+    // What start-api-e2e-with-workers.mjs builds before it loads the env files.
+    const launcher: NodeJS.ProcessEnv = {
+      NODE_ENV: 'test',
+      TEST_ENV: 'local',
+      COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
+    }
+    loadLauncherEnv(launcher, fromEnvLocal(launcher))
+    expect(launcher).toMatchObject({
+      NODE_ENV: 'test',
+      COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
+    })
+    expect(launcher.E2E_CALLER_OWNED_ENV_KEYS?.split(',')).toEqual(
+      expect.arrayContaining(['NODE_ENV', 'COMMUNITY_MAINTENANCE_IDLE_CAP_MS'])
+    )
+    // A child (the API, the community worker) inherits that env and runs load-env.ts, whose
+    // caller-owned rule is this module's, kept in step by load-env.spec.ts.
+    const child: NodeJS.ProcessEnv = { ...launcher }
+    loadEnvKeepingCallerOwned(fromEnvLocal(child), child)
+    expect(child).toMatchObject({
+      NODE_ENV: 'test',
+      COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
+    })
   })
 })

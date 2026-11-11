@@ -772,6 +772,7 @@ A post or comment published to an idle worker waits at most 10 seconds for dispa
 The API appends on every sync and realtime tick (`assist`), so the worker's append loop is the backstop for Story 6.5's 10-second realtime bound.
 The push lanes run only where `COMMUNITY_DISPATCH_ENABLED=true`; grouping wakes fanout and fanout wakes dispatch inside the process, so a new intent sees at most the 5-second cap, and a quiet-hour exit herd starts when it falls due.
 The maintenance caps match or beat the general worker's crons for the same sweeps.
+Only a test stack (`NODE_ENV=test`) may lower the maintenance cap, with `COMMUNITY_MAINTENANCE_IDLE_CAP_MS` from 30 s to 5 min; the end-to-end stack sets 30 s so its erasure journey sees the real sweep within its wait. Production never sets it, and a worker that finds it outside a test stack refuses to start.
 
 Two deliveries used to be leased forever.
 PostHog's `/i/v0/e/` answers an accepted event with `{"status": "Ok"}`, and the acknowledgement check accepted only `{"status": 1}`, so every operational telemetry row failed and was re-leased about hourly: 57,025 rows, attempts up to 197, on 2026-11-10.
@@ -1023,21 +1024,69 @@ The erasure extension has no flag, because it is a privacy duty on the establish
 
 Production community rollout remains frozen. `COMMUNITY_DISPATCH_ENABLED` defaults off.
 When an isolated approved lane enables it, `COMMUNITY_ENGAGEMENT_OWNER` must select
-`general` or `community`. The selected composition alone allocates the dedicated guard pool
-with 36 connections and 32 send slots. The general-only deployment selects `general`; the
-standalone community composition selects `community`. Other compositions report `standby`.
-These configured limits require the story's actual capacity and timing evidence before use.
+`general` or `community`. The general-only deployment selects `general`; the standalone
+community composition selects `community`. Other compositions report `standby`. Only the
+selected composition allocates the dedicated guard pool.
 
-`COMMUNITY_GUARD_DATABASE_URL` must identify the same primary host/database as `DATABASE_URL`.
-Dispatch additionally verifies PG17+, the privacy capability and effective server guard timeouts.
-No credential value or database URL belongs in readiness logs.
+**Send slots.** `COMMUNITY_DISPATCH_SEND_SLOTS` sets how many sends run at once: default 10,
+1 to 32, and an invalid value keeps dispatch off with `send_slots_invalid`. The guard pool holds
+one connection per slot plus four for control work, 14 by default. Production keeps the default:
+its Nano transaction pooler serves about 15 connections at a time, shared with the API, and 32
+slots (36 connections) are the setting for a compute plan whose pooler serves them (Story 6.5
+D10 amendment, 2026-11-11). The arithmetic assumes one dispatching worker instance: each
+instance has its own slots, so a second one, a rolling deploy's overlap included, doubles the
+demand on the pooler.
 
-The runtime returns `dispatch.status`: `disabled`, `standby`, `ready` or `degraded`.
-`community_dispatch_readiness` logs that status, role and a sanitized reason. Degraded reasons
-are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch` and `capability_unavailable`.
-A dispatch preflight failure closes its owned guard pool and starts no dispatch/provider loop.
-Moderation, append, stream/detail retention and operational telemetry continue independently in
-both compositions. The runtime's close hook retains ownership of all its timers and connections.
+**Guard pool.** It runs on node-postgres through Prisma's driver adapter with the operator
+client's TLS (the committed Supabase root CA, host name checked). An acquisition, opening a
+connection included, may take 5 seconds: opening one through the pooler measured 0.6 to 0.7 s
+on the hosted worker while idle, 1.0 to 1.2 s with its two vCPUs busy and up to about 4 s with
+both saturated. One query may wait 5 seconds for its answer, ten times the server's 500 ms
+statement bound; a query that runs out destroys its connection, so a connection that stops
+answering is closed and replaced instead of held. A connection lost under a query (the pooler
+closed it, the network reset it) is named `connection_lost`, apart from a SQL error. Opened
+connections stay open while idle.
+
+**Preflight and warm-up.** The preflight retries only failures to get or use a guard connection,
+1, 2 and 4 seconds apart, and reports `guard_unreachable` when the fourth attempt fails. Each
+attempt and the warm-up must finish within 10 seconds, and closing a pool that failed takes at
+most 2 seconds. The warm-up holds every guard connection at once, each in an open transaction,
+until all are held or the deadline passes, then commits them all and counts only the ones held
+together whose COMMIT succeeded within 2 seconds: a connection whose COMMIT failed or was never
+answered cannot serve a send. Sends get the connections it proved, less the four control ones: a shortfall lowers `sendSlots`, and too few for one send
+reports `guard_unreachable` (`GuardCapacityShortfall`). A send waits at most 2 s from its claim
+to its provider call, and the server-side guard bounds are unchanged.
+
+**Readiness.** `community_dispatch_readiness` logs `disabled`, `standby`, `ready` or `degraded`
+with the role. Degraded reasons are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch`,
+`guard_unreachable`, `capability_unavailable` and `send_slots_invalid`. A degraded line names the
+error class, the Prisma error code and, for `capability_unavailable`, the failed check
+(`server_version`, `privacy_version` or `guard_timeouts`), never the error message. A ready line
+gives `preflightAttempts`, `guardConnections` (held at once), `sendSlots` (in use) and
+`configuredSendSlots`. `COMMUNITY_GUARD_DATABASE_URL` must name the same primary host and
+database as `DATABASE_URL`, and no credential value or database URL appears in a log.
+
+**While dispatching.** A pass selects at most `sendSlots` due deliveries and passes never overlap,
+so a herd waits in the database, due. `community_dispatch_at_capacity` and
+`community_dispatch_below_capacity` mark a stretch of full passes. `community_dispatch_behind`
+(warn) fires when the oldest outstanding delivery is more than 60 seconds past its original
+eligibility, the herd acceptance bound, and `community_dispatch_caught_up` when it no longer
+is: that is the slow-provider envelope, and eligibility times are never rewritten to hide it.
+A send that fails before the guard settles it moves its delivery 2 seconds on, in a transaction
+bounded at 100 ms of lock wait and 500 ms per statement that skips a row another transaction
+holds, so one held delivery cannot stall the loop or shutdown. An attempt that could not get or
+use a guard connection before the provider call ends `no_call:guard_unreachable`; any other
+failure before it ends `no_call:guard_failure`, and one after it `handoff_uncertain`.
+
+Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
+`max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
+pool size (the pooler config returns null for both). Idle guard connections are Supavisor clients
+only: 36 of them left Supavisor's server connections at 21 before and after, and 36 one-second
+transactions through them took 3.4 s, about 15 at a time. Over 180-second windows, 36 idle guard
+connections added no statement calls or network bytes against a control window (96 against 255
+calls, 75 KB against 87 KB received). With dispatch on at the default 10 slots, the clients are
+14 guard, 3 for the worker's main pool and 5 per API function instance, which leaves 183 for
+about 36 concurrent API instances.
 
 Operators investigate degraded dispatch while keeping community rollout off, verify the selected
 owner and existing primary's measured capabilities, then restart the assigned process after the
@@ -1129,6 +1178,31 @@ the Northflank `couture-cast/community-worker` service:
   1. Raising it enables `community_require_guard` enforcement for every community privacy
      write, so it is an owner decision with its own rollout check, made before the next attempt.
 - Step 4 did not run, because nothing dispatches.
+
+**Second attempt, 2026-11-11 UTC (`143b3438`).** The worker was back at one instance after the
+idle-egress fix (#203).
+
+- Step 1 at 10:23:23: zero `CommunityTokenDelivery`, `CommunityNotificationGroup`, `PushToken`,
+  `NotificationPreference` and `CommunityNotificationIntent` rows; one
+  `ComplimentaryAccessGrant`.
+- At 10:24:05 one `UPDATE` raised `privacy_version` from 0 to 1, which read back as 1 and
+  stays. The production API logged no request and no error from 10:20 to 10:30.
+- Steps 2 and 3: `COMMUNITY_DISPATCH_ENABLED=true` at 10:24:20; readiness logged `degraded`,
+  `capability_unavailable`, at 10:24:39. The flag went back to `false` at 10:25:09 and readiness
+  logged `disabled` at 10:25:24. The instance count stayed at one.
+- Cause: the guard pool, not the capability. Run inside the live worker with its own guard URL,
+  the deployed `createPrismaClient` and `CommunitySendGuard.verifyRuntime` passed in 1.2 s while
+  idle. With CPU load the first connection took 1.0 to 1.2 s and Prisma failed it with `Timed
+out fetching a new connection from the connection pool` (pool timeout 1); with both vCPUs
+  saturated it failed 12 of 12. At boot the preflight runs while Redis, the engagement loops
+  and the main pool open their own TLS connections, and its catch reported every failure as
+  `capability_unavailable`.
+- The same worker, 64 send-shaped guard operations at concurrency 16 with both vCPUs saturated:
+  the 1 s pool completed 0 of 64, twice; the pool described above completed 58 and 64 of 64.
+  The six misses were the claim's own 500 ms `transaction_timeout` under full starvation.
+  Kept idle, the 36 connections answered together in 377 ms after 10 s and 768 ms after 400 s;
+  with Prisma's default 300-second idle lifetime they were reopened (1570 ms).
+- The fix is the pool budget, preflight retry and readiness detail above.
 
 **`privacy_version` 1 rollout check, 2026-11-11.** Run on stock `postgres:17` with every
 migration and the capability at 1, before any production change:

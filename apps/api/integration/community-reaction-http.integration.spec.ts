@@ -1,6 +1,7 @@
 // Learning path Step 41: Curated reactions.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-41-curated-reactions
 import { listenHttpApp, httpTestUrl } from '../src/testing/loopback-http-app.js'
+import { birthdateForAge } from '../src/testing/birthdate.js'
 import { communityReactionResponseSchema } from '@couture/api-client/contracts/http'
 import { Test } from '@nestjs/testing'
 import 'reflect-metadata'
@@ -21,7 +22,7 @@ const { prisma, repository, guardian, input, fixture, mutate } = reactionTestCon
 describe('Story 6.3 guarded reaction HTTP routes', () => {
   it('uses the actual guarded HTTP route for revoked teen retraction and rejects participation', async () => {
     const owner = await fixture()
-    const teen = await fixture('2012-01-01T00:00:00Z')
+    const teen = await fixture(birthdateForAge(15).toISOString())
     await prisma.guardianConsent.create({
       data: { guardian_id: owner.userId, teen_id: teen.userId, status: 'granted' },
     })

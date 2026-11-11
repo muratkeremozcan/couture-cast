@@ -115,12 +115,20 @@ export function loadEnvKeepingLocalStack(loadEnvFiles, env = process.env) {
   Object.assign(env, kept)
 }
 
-/** Keys the launcher keeps from its caller whatever their value. */
-const LAUNCHER_CALLER_OWNED_KEYS = [
+/**
+ * Keys the launcher keeps from its caller whatever their value. `NODE_ENV` and
+ * `COMMUNITY_MAINTENANCE_IDLE_CAP_MS` travel together: the launcher's stack is a
+ * test stack, and the community worker accepts the lowered maintenance cap only
+ * with `NODE_ENV=test`, so a `.env.local` that sets `NODE_ENV=development` would
+ * otherwise make the worker refuse to start (Codex review of #205, 2026-11-11).
+ */
+export const LAUNCHER_CALLER_OWNED_KEYS = [
   'DATABASE_URL',
   'COMMUNITY_NSFW_SCREENER',
   'OPENWEATHER_API_ORIGIN',
   'WEATHERAPI_API_ORIGIN',
+  'NODE_ENV',
+  'COMMUNITY_MAINTENANCE_IDLE_CAP_MS',
 ]
 
 /**

@@ -13,6 +13,7 @@ import {
   hoursBeforeAsOf,
   spotlightTestContext,
 } from './helpers/community-spotlight-context.js'
+import { birthdateForAge } from '../src/testing/birthdate.js'
 import { withPrivacyGuards } from './helpers/privacy-guards.js'
 
 const ctx = spotlightTestContext('area')
@@ -250,7 +251,7 @@ describe('6.6 area clearing', () => {
         email: `cc66-teen-${randomUUID()}@synthetic.test`,
         profile: {
           create: {
-            birthdate: new Date('2012-01-01T00:00:00Z'),
+            birthdate: birthdateForAge(15),
             preferences: { compliance: { accountStatus: 'active' } },
           },
         },

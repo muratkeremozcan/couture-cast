@@ -222,18 +222,51 @@ describe('check-artifact-secrets', () => {
     expect(scan(['DUMMY_SECRET']).findings).toHaveLength(1)
   })
 
-  it('refuses an archive with duplicate entry names', () => {
+  it.each([
+    ['first', { 'aaaa.txt': DUMMY_SECRET, 'bbbb.txt': 'clean' }, 1],
+    ['second', { 'aaaa.txt': 'clean', 'bbbb.txt': DUMMY_SECRET }, 2],
+  ])(
+    'scans every copy of a repeated entry name, with the secret in the %s',
+    (_, contents, entry) => {
+      const zip = Buffer.from(
+        zipSync(
+          Object.fromEntries(
+            Object.entries(contents).map(([name, text]) => [name, strToU8(text)])
+          )
+        )
+      )
+      const file = write(
+        'blob-report/report-1.zip',
+        Buffer.from(zip.toString('latin1').replaceAll('bbbb.txt', 'aaaa.txt'), 'latin1')
+      )
+
+      const result = scan(['DUMMY_SECRET'])
+      expect(result.unreadable).toEqual([])
+      expect(result.findings).toEqual([
+        { location: `${file}!entry#${entry}`, name: 'DUMMY_SECRET', encoding: 'raw' },
+      ])
+    }
+  )
+
+  it('opens a blob report that stores one attachment twice under one name', () => {
+    // Playwright names a blob attachment after its file path, so a file attached twice (a
+    // retried test) is stored twice under the same name with the same bytes.
     const zip = Buffer.from(
-      zipSync({ 'aaaa.txt': strToU8(DUMMY_SECRET), 'bbbb.txt': strToU8('clean') })
+      zipSync({
+        'resources/aaaa.png': strToU8('clean image'),
+        'resources/bbbb.png': strToU8('clean image'),
+        'report.jsonl': strToU8('{}'),
+      })
     )
-    const file = write(
-      'blob-report/report-1.zip',
-      Buffer.from(zip.toString('latin1').replaceAll('bbbb.txt', 'aaaa.txt'), 'latin1')
+    write(
+      'blob-report/report-2.zip',
+      Buffer.from(
+        zip.toString('latin1').replaceAll('resources/bbbb.png', 'resources/aaaa.png'),
+        'latin1'
+      )
     )
 
-    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
-      { location: file, reason: 'duplicate or reserved entry names' },
-    ])
+    expect(scan(['DUMMY_SECRET'])).toMatchObject({ findings: [], unreadable: [] })
   })
 
   it('refuses an archive with an entry named __proto__', () => {
@@ -244,11 +277,11 @@ describe('check-artifact-secrets', () => {
     )
 
     expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
-      { location: file, reason: 'duplicate or reserved entry names' },
+      { location: file, reason: 'reserved entry name' },
     ])
   })
 
-  it('refuses ambiguous entry names behind a preamble too', () => {
+  it('scans every copy of a repeated name behind a preamble too', () => {
     const zip = Buffer.from(
       zipSync({ 'aaaa.txt': strToU8(DUMMY_SECRET), 'bbbb.txt': strToU8('clean') })
     )
@@ -261,8 +294,8 @@ describe('check-artifact-secrets', () => {
       Buffer.concat([Buffer.from('preamble\n'), duplicated])
     )
 
-    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
-      { location: file, reason: 'duplicate or reserved entry names' },
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
     ])
   })
 
@@ -286,7 +319,7 @@ describe('check-artifact-secrets', () => {
     ])
   })
 
-  it('refuses ambiguous entry names behind a preamble that the offsets count', () => {
+  it('scans every copy of a repeated name behind a preamble that the offsets count', () => {
     const zip = Buffer.from(
       zipSync({ 'aaaa.txt': strToU8(DUMMY_SECRET), 'bbbb.txt': strToU8('clean') })
     )
@@ -299,8 +332,8 @@ describe('check-artifact-secrets', () => {
       withAdjustedPreamble(duplicated, 'preamble\n')
     )
 
-    expect(scan(['DUMMY_SECRET']).unreadable).toEqual([
-      { location: file, reason: 'duplicate or reserved entry names' },
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
     ])
   })
 

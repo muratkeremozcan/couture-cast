@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 import type { Request } from 'express'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { birthdateForAge } from '../../testing/birthdate.js'
 import { AccessTokenIdentityService } from './access-token-identity.service.js'
 
 const requestWithHeaders = (headers: Record<string, string>) =>
@@ -509,8 +510,8 @@ describe('AccessTokenIdentityService', () => {
   })
 
   it.each([
-    ['1990-01-01', 'guardian'],
-    ['2011-01-01', 'teen'],
+    [birthdateForAge(36).toISOString(), 'guardian'],
+    [birthdateForAge(15).toISOString(), 'teen'],
   ])(
     'maps verified OTP email to the canonical app identity with profile birthdate %s',
     async (birthdate, role) => {
