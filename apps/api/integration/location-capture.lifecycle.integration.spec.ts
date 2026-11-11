@@ -42,6 +42,7 @@ import {
   sentinel,
   useLocationCaptureSuite,
 } from './helpers/location-capture-harness'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Story 1.2b: what happens around a saved location against the real database,
@@ -637,7 +638,7 @@ describeRealDatabase('Location capture real-database integration: lifecycle', ()
     const window = { where: { user_id: viewer.id } }
     expect(await harness.prisma.locationSearchWindow.count(window)).toBe(1)
 
-    await harness.prisma.user.delete({ where: { id: viewer.id } })
+    await deleteMembers(harness.prisma, { id: viewer.id })
 
     expect(await harness.prisma.locationSearchWindow.count(window)).toBe(0)
   })

@@ -10,6 +10,7 @@ import {
   WardrobeOnboardingService,
 } from '../src/modules/wardrobe/wardrobe-onboarding.service.js'
 import type { AnalyticsClient } from '../src/analytics/analytics.service.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Real-PostgreSQL coverage for the onboarding state machine.
@@ -102,7 +103,7 @@ describe('4.4 wardrobe onboarding state machine against real PostgreSQL', () => 
     await prismaA.garmentItem.deleteMany({
       where: { user: { email: { contains: namespace } } },
     })
-    await prismaA.user.deleteMany({ where: { email: { contains: namespace } } })
+    await deleteMembers(prismaA, { email: { contains: namespace } })
     await prismaA.$disconnect()
     await prismaB.$disconnect()
   })

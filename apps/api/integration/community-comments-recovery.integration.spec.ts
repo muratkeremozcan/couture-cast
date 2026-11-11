@@ -9,6 +9,7 @@ import {
   pinClock,
   SECOND_MS,
 } from './helpers/community-comments-context.js'
+import { deleteComments } from './helpers/privacy-guards.js'
 
 const { prisma, processor, fixture, create } = commentsTestContext()
 
@@ -47,7 +48,7 @@ async function age(id: string, createdAt: Date, outboxUpdatedAt = createdAt) {
 // The sweeps are global, so each case starts from an empty comment and analytics backlog.
 beforeEach(async () => {
   await prisma.communityCommentAnalyticsSubject.deleteMany()
-  await prisma.communityComment.deleteMany()
+  await deleteComments(prisma)
 })
 
 describe('Story 6.4 screening dispatch and recovery', () => {

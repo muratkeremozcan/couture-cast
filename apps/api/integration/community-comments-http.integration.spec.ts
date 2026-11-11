@@ -19,6 +19,7 @@ import {
   pinClock,
   SECOND_MS,
 } from './helpers/community-comments-context.js'
+import { updatePost } from './helpers/privacy-guards.js'
 
 const { prisma, repository, flags, guardian, input, fixture, publish, bootApp } =
   commentsTestContext()
@@ -431,10 +432,7 @@ describe('Story 6.4 comment eligibility at the HTTP boundary', () => {
       member = await fixture()
     const own = await publish(member.userId, author.postId)
     const target = await publish(author.userId, author.postId)
-    await prisma.lookbookPost.update({
-      where: { id: author.postId },
-      data: { status: 'withdrawn' },
-    })
+    await updatePost(prisma, author.postId, { status: 'withdrawn' })
     const { app, authorized } = await bootApp({ userId: member.userId })
     const url = postPath(author.postId)
     try {

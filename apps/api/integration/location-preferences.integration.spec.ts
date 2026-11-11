@@ -33,6 +33,7 @@ import {
 } from '../src/modules/location-preferences/location-clock'
 import { WeatherRefreshQueue } from '../src/modules/weather/weather-refresh.queue'
 import { WeatherRepository } from '../src/modules/weather/weather.repository'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 // Story 1.2b collaborators these suites do not exercise; the capture path has its
 // own real-database suite in location-capture.integration.spec.ts.
@@ -469,9 +470,7 @@ describeRealDatabase('Location preferences API Prisma integration', () => {
       await prisma.savedLocation.deleteMany({
         where: { user_id: { in: [primaryUserId, foreignUserId] } },
       })
-      await prisma.user.deleteMany({
-        where: { id: { in: [primaryUserId, foreignUserId] } },
-      })
+      await deleteMembers(prisma, { id: { in: [primaryUserId, foreignUserId] } })
       await prisma.$disconnect()
       prisma = undefined
     }

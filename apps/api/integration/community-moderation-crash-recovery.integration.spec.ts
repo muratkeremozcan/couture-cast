@@ -41,6 +41,7 @@ import {
 } from '../src/modules/community/community-moderation.worker.js'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import { disconnectPrismaClient } from '../src/workers/prisma.js'
+import { deleteMembers, deletePosts } from './helpers/privacy-guards.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -139,12 +140,12 @@ afterAll(async () => {
     const owned = { user: { email: { startsWith: namespace } } }
     await prisma.moderationEvent.deleteMany({ where: { post: owned } })
     await prisma.communityModerationOutbox.deleteMany({ where: { post: owned } })
-    await prisma.lookbookPost.deleteMany({ where: owned })
+    await deletePosts(prisma, owned)
     await prisma.communityAlias.deleteMany({ where: owned })
     await prisma.userProfile.deleteMany({
       where: { user: { email: { startsWith: namespace } } },
     })
-    await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+    await deleteMembers(prisma, { email: { startsWith: namespace } })
     await prisma.jobFailure.deleteMany({ where: { queue_name: queueName } })
   }
   await prisma.$disconnect()

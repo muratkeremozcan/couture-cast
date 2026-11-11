@@ -5,6 +5,7 @@ import 'reflect-metadata'
 import { describe, expect, it, vi } from 'vitest'
 
 import { reactionTestContext } from './helpers/community-reaction-context.js'
+import { deleteMembers, updatePost } from './helpers/privacy-guards.js'
 
 const { prisma, repository, namespace, guardian, input, fixture, mutate } =
   reactionTestContext()
@@ -107,10 +108,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
     const original = await prisma.lookbookPost.findUniqueOrThrow({
       where: { id: postId },
     })
-    await prisma.lookbookPost.update({
-      where: { id: postId },
-      data: { status: 'flagged' },
-    })
+    await updatePost(prisma, postId, { status: 'flagged' })
     expect((await repository.reactionSummaries([postId], userId)).size).toBe(0)
     await expect(mutate(userId, postId, input(null, 1))).rejects.toMatchObject({
       status: 404,
@@ -136,7 +134,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
       await repository.reactionSummaries([author.postId], author.userId)
     ).get(author.postId)
     await prisma.userProfile.delete({ where: { user_id: member.userId } })
-    await prisma.user.delete({ where: { id: member.userId } })
+    await deleteMembers(prisma, { id: member.userId })
     const after = (
       await repository.reactionSummaries([author.postId], author.userId)
     ).get(author.postId)
@@ -230,10 +228,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
   it('refuses a report while erasure is pending', async () => {
     const owner = await fixture()
     const reporter = await fixture()
-    await prisma.lookbookPost.update({
-      where: { id: owner.postId },
-      data: { erasure_requested_at: new Date() },
-    })
+    await updatePost(prisma, owner.postId, { erasure_requested_at: new Date() })
     expect(
       await repository.recordReport({
         postId: owner.postId,

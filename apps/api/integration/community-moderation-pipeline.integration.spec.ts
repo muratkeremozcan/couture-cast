@@ -45,6 +45,7 @@ import { createWorker } from '../src/workers/base.worker.js'
 import { getRedisConfig, redisOptionsFromConfig } from '../src/config/redis.js'
 import { disconnectPrismaClient } from '../src/workers/prisma.js'
 import { FIXTURE_ENGINE_VERSION_SUFFIX } from '../src/modules/community/community-screening-policy.js'
+import { deleteMembers, deletePosts } from './helpers/privacy-guards.js'
 
 const communityRolloutFixture = { getFeatureFlag: vi.fn().mockResolvedValue(true) }
 
@@ -201,10 +202,10 @@ afterAll(async () => {
     await prisma.communityModerationOutbox.deleteMany({
       where: { post: { user: { email: { startsWith: namespace } } } },
     })
-    await prisma.lookbookPost.deleteMany({ where: owned })
+    await deletePosts(prisma, owned)
     await prisma.communityAlias.deleteMany({ where: owned })
     await prisma.userProfile.deleteMany({ where: owned })
-    await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+    await deleteMembers(prisma, { email: { startsWith: namespace } })
     await prisma.jobFailure.deleteMany({
       where: { queue_name: { startsWith: namespace } },
     })
