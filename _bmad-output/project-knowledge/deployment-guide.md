@@ -7,6 +7,7 @@ Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, re
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
+Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -1077,6 +1078,17 @@ bounded at 100 ms of lock wait and 500 ms per statement that skips a row another
 holds, so one held delivery cannot stall the loop or shutdown. An attempt that could not get or
 use a guard connection before the provider call ends `no_call:guard_unreachable`; any other
 failure before it ends `no_call:guard_failure`, and one after it `handoff_uncertain`.
+
+**Append.** The worker appends committed outbox rows to the public and private streams in one
+statement, `community_append_batch` (migration `20261111120000`): a batch costs four round
+trips whatever its size, about 125 ms plus server work at the 31 ms measured from the worker.
+Before 2026-11-11 each candidate took about 16 round trips from TypeScript, every batch ran past
+its 500 ms bound, and production append never succeeded (public head sequence 0). Signals:
+`community_append_retry` rows name `head_contention` or `budget_pressure`; the `community_backlog`
+row for lane `append` carries the oldest unappended age; past five minutes the worker logs
+`Community append stalled` and records `community_append_stalled` once every five minutes,
+which the PostHog alert on project 329012 watches. A stall means rows are not appending: read
+the worker's `Community append deferred` lines for the reason before anything else.
 
 Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
 `max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
