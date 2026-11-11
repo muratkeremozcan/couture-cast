@@ -38,6 +38,7 @@ jobs:
       runs: ${{ steps.plan.outputs.runs }}
       total: ${{ steps.plan.outputs.total }}
       shards: ${{ steps.plan.outputs.shards }}
+      mode: ${{ steps.plan.outputs.mode }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -96,7 +97,7 @@ jobs:
 
       # The library's own analyzer selects the specs, and `playwright test --list` counts
       # the runs, repeats included; `shardCount` in playwright/scripts/burn-in-changed.ts
-      # turns that into the matrix size.
+      # turns that into the matrix size. The shards then split by recorded test duration.
       - name: Plan the burn-in shards
         id: plan
         if: steps.detect-changed.outputs.changed == 'true'
@@ -181,13 +182,22 @@ jobs:
         id: git-sha
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      # Balances the shards by past test durations, read from the history the main E2E suite
+      # publishes from main (same tests, same project; a repeat is priced like its test). It
+      # exports PSP_ARGS, which burn-in-changed.ts appends to this shard's Playwright command,
+      # and the finish step in pr-pw-e2e-local.yml checks that every run happened once.
+      # Fallback mode samples with its own --shard, so the step stays off there.
+      - name: Balance burn-in shards by duration
+        if: needs.plan.outputs.mode == 'targeted'
+        uses: muratkeremozcan/playwright-smart-parallelization@v1
+
       - name: Run burn-in for this shard
         id: burn-in-step
         working-directory: ${{ inputs.test-directory }}
         run: |
           HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
           SHARD_FLAG=()
-          if [[ "${{ needs.plan.outputs.total }}" != "1" ]]; then
+          if [[ "${{ needs.plan.outputs.mode }}" == "targeted" ]]; then
             SHARD_FLAG=(--shard="${{ matrix.shard }}/${{ needs.plan.outputs.total }}")
           fi
           npm run test:pw:burn-in-changed -- --base-branch=${{ needs.plan.outputs.base-ref }} "${SHARD_FLAG[@]}"

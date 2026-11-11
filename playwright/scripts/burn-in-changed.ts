@@ -1,120 +1,22 @@
+import { spawnSync } from 'node:child_process'
+import { appendFileSync, existsSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
-import type { runBurnIn as RunBurnIn } from '@seontechnologies/playwright-utils/burn-in'
-import type TypeScript from 'typescript'
-
-/** An import that names a URL, such as k6's `https://jslib.k6.io/...` modules. */
-const URL_SPECIFIER = /^[a-z][a-z0-9+.-]*:\/\//i
+import type { BurnInOptions } from '@seontechnologies/playwright-utils/burn-in'
 
 /**
- * Makes the burn-in dependency analysis see the repository's real import graph.
+ * Burn-in for the specs a change can affect, in three modes:
  *
- * The library runs madge over the whole checkout and walks each spec's imports
- * for a changed file. Three defects decided which specs burned in:
+ * - `--plan-out=<file>` selects the specs, counts the test runs with `playwright test --list`
+ *   and appends the plan to `<file>` (`$GITHUB_OUTPUT` in CI), which sizes the shard matrix.
+ * - `--shard=i/n` runs one shard of that selection. The shards are split by recorded test
+ *   duration: the playwright-smart-parallelization Action exports `PSP_ARGS`, and appending it
+ *   adds the reporter that keeps each shard's own tests. Without `PSP_ARGS` (no history, or the
+ *   Action skipped), Playwright's own `--shard` splits them.
+ * - Without a shard, or when the library falls back to `--only-changed`, the library runs it.
  *
- * - URL imports crashed it. madge resolves through filing-cabinet 4.2.0, which
- *   reads `failedLookupLocations.filter` for an import it cannot resolve, and
- *   TypeScript 5 leaves that field undefined for a URL specifier. The first k6
- *   scenario importing `https://jslib.k6.io/...` threw "Cannot read properties
- *   of undefined (reading 'filter')", and burn-in fell back to percentage mode
- *   with `--only-changed`. A URL is never a file in this repository, so it now
- *   resolves to nothing, as any unresolvable import does.
- * - The walk never left the spec. madge keys its graph and lists its edges
- *   relative to the directory it ran in, and the library looks specs and their
- *   edges up as absolute paths, so only a changed spec file ever matched; a
- *   changed helper selected nothing. The graph is handed over with absolute
- *   paths, which is what the walk expects.
- * - Workspace imports led to build output. With the root tsconfig,
- *   `@couture/api-client` resolved to `packages/api-client/dist`, which a
- *   change never touches. Resolution now uses the Playwright tsconfig and its
- *   `paths` under `Bundler` resolution, as the suite itself compiles, which
- *   lands on `src` and still accepts the `.js`-suffixed NodeNext imports.
- *
- * dependency-tree and the analyzer keep their own references to filing-cabinet
- * and madge from the moment they load, so this runs before the burn-in library
- * is imported.
+ * The library's analyzer selects the specs in every mode, so the plan and the shards agree.
  */
-function resolveDependencyAnalysisLikeTheSuite(): void {
-  const fromRoot = createRequire(path.join(process.cwd(), 'package.json'))
-  const burnIn = fromRoot.resolve('@seontechnologies/playwright-utils/burn-in')
-  const madgePath = createRequire(burnIn).resolve('madge')
-  const dependencyTree = createRequire(madgePath).resolve('dependency-tree')
-  const cabinetPath = createRequire(dependencyTree).resolve('filing-cabinet')
-
-  const ts = createRequire(cabinetPath)('typescript') as typeof TypeScript
-  const configPath = path.join(process.cwd(), 'playwright', 'tsconfig.json')
-  const parsed = ts.getParsedCommandLineOfConfigFile(
-    configPath,
-    {},
-    {
-      ...ts.sys,
-      onUnRecoverableConfigFileDiagnostic: (diagnostic) => {
-        throw new Error(ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
-      },
-    }
-  )
-  if (!parsed) throw new Error(`Could not read ${configPath}`)
-  // filing-cabinet plucks `options` from an already parsed config.
-  const tsConfig = {
-    options: {
-      ...parsed.options,
-      module: ts.ModuleKind.ESNext,
-      moduleResolution: ts.ModuleResolutionKind.Bundler,
-    },
-  }
-
-  type CabinetOptions = { partial: string; tsConfig?: unknown; tsConfigPath?: string }
-  const resolve = fromRoot(cabinetPath) as ((options: CabinetOptions) => string) &
-    Record<string, unknown>
-  replaceModuleExports(
-    fromRoot,
-    cabinetPath,
-    Object.assign(
-      (options: CabinetOptions) =>
-        URL_SPECIFIER.test(options.partial)
-          ? ''
-          : // No tsConfigPath: the parsed `paths` already resolve inside TypeScript.
-            resolve({ ...options, tsConfig, tsConfigPath: undefined }),
-      resolve
-    )
-  )
-
-  type Graph = Record<string, string[]>
-  type MadgeResult = { obj: () => Graph }
-  const madge = fromRoot(madgePath) as ((
-    target: string,
-    config: unknown
-  ) => Promise<MadgeResult>) &
-    Record<string, unknown>
-  replaceModuleExports(
-    fromRoot,
-    madgePath,
-    Object.assign(async (target: string, config: unknown) => {
-      const result = await madge(target, config)
-      const baseDir = path.resolve(target)
-      const relativeGraph = result.obj.bind(result)
-      const absolute = (file: string) => path.resolve(baseDir, file)
-      result.obj = () =>
-        Object.fromEntries(
-          Object.entries(relativeGraph()).map(([file, edges]) => [
-            absolute(file),
-            edges.map(absolute),
-          ])
-        )
-      return result
-    }, madge)
-  )
-}
-
-function replaceModuleExports(
-  fromRoot: NodeJS.Require,
-  modulePath: string,
-  exports: unknown
-): void {
-  const cached = fromRoot.cache[modulePath]
-  if (!cached) throw new Error(`${modulePath} was not loaded`)
-  cached.exports = exports
-}
 
 /**
  * Test runs one burn-in shard owns. A shard pays about 8 minutes of fixed setup (install,
@@ -141,6 +43,13 @@ export function shardCount(runs: number): number {
   return Math.min(BURN_IN_MAX_SHARDS, Math.ceil(runs / BURN_IN_RUNS_PER_SHARD))
 }
 
+/** Reads `Total: N tests in M files` from `playwright test --list` output. */
+export function listedRuns(output: string): number {
+  const match = output.match(/Total: (\d+) tests? in \d+ files?/)
+  if (!match) throw new Error('playwright test --list printed no total')
+  return Number(match[1])
+}
+
 /** The plan as `key=value` lines for `$GITHUB_OUTPUT`; `shards` is the matrix list. */
 export function planOutputs(result: BurnInPlan): string {
   const shards = Array.from({ length: result.shards }, (_, index) => index + 1)
@@ -152,88 +61,165 @@ export function planOutputs(result: BurnInPlan): string {
   ].join('\n')
 }
 
-/** Reads `Total: N tests in M files` from `playwright test --list` output. */
-export function listedRuns(output: string): number {
-  const match = output.match(/Total: (\d+) tests? in \d+ files?/)
-  if (!match) throw new Error('playwright test --list printed no total')
-  return Number(match[1])
+/**
+ * The Playwright arguments of one shard: the library's command with this shard in place of its
+ * `--shard=1/1`, then the Action's arguments, last, as the Action requires.
+ */
+export function shardCommand(command: string[], shard: string, pspArgs = ''): string[] {
+  return [
+    ...command.filter((argument) => !argument.startsWith('--shard=')),
+    `--shard=${shard}`,
+    ...pspArgs.split(/\s+/).filter(Boolean),
+  ]
 }
 
 type Analyzer = {
   getChangedFiles: (base: string) => { all: string[] }
   analyzeTestableDependencies: (files: {
     all: string[]
-  }) => Promise<{ tests: string[] | null }>
+  }) => Promise<{ tests: string[] | null; reason: string }>
   buildCommand: (plan: { tests: string[] | null }) => string[] | null
 }
 
 /**
- * The plan the shards will run, built by the library's own analyzer so selection never
- * differs between the plan and the shards. Fallback mode already shards by percentage
- * inside its command, so it runs as one shard.
+ * The workspace sources behind a build output the resolver landed on. Workspace packages export
+ * `dist`, so TypeScript resolves `@couture/utils` to `packages/utils/dist/index.js`, which a
+ * change never touches; the spec really depends on `packages/utils/src/index.ts`.
  */
-async function plan(options: Parameters<typeof RunBurnIn>[0]): Promise<BurnInPlan> {
+export function workspaceSources(file: string, root: string): string[] {
+  const relative = path.relative(root, file).split(path.sep).join('/')
+  const match = /^packages\/([^/]+)\/dist\/(.+?)(?:\.d)?\.(?:js|ts|mjs|cjs)$/.exec(
+    relative
+  )
+  if (!match) return []
+  const source = path.join(root, 'packages', match[1]!, 'src', match[2]!)
+  return [`${source}.ts`, `${source}.tsx`].filter((candidate) => existsSync(candidate))
+}
+
+let workspaceSourcesInstalled = false
+
+/** The library's analyzer; the package exports only `runBurnIn`, which owns it. */
+function analyzer(options: BurnInOptions): Analyzer {
   const fromRoot = createRequire(path.join(process.cwd(), 'package.json'))
   const entry = fromRoot.resolve('@seontechnologies/playwright-utils/burn-in')
-  const { BurnInRunner } = createRequire(entry)('./runner') as {
-    BurnInRunner: new (options: Parameters<typeof RunBurnIn>[0]) => { analyzer: Analyzer }
+  const fromEntry = createRequire(entry)
+  if (!workspaceSourcesInstalled) {
+    // The analyzer creates its resolver from this class, so every walk, the fallback's too,
+    // follows a workspace import into its sources.
+    const { DependencyResolver } = fromEntry('./core/dependency-graph') as {
+      DependencyResolver: { prototype: { getDependencies: (file: string) => string[] } }
+    }
+    const resolve = DependencyResolver.prototype.getDependencies
+    DependencyResolver.prototype.getDependencies = function (file: string) {
+      const dependencies = resolve.call(this, file)
+      const sources = dependencies.flatMap((dependency) =>
+        workspaceSources(dependency, process.cwd())
+      )
+      return sources.length ? [...new Set([...dependencies, ...sources])] : dependencies
+    }
+    workspaceSourcesInstalled = true
   }
-  const analyzer = new BurnInRunner(options).analyzer
-  const changed = analyzer.getChangedFiles(options?.baseBranch ?? 'main')
-  if (changed.all.length === 0) return { mode: 'none', runs: 0, shards: 1 }
-  const testPlan = await analyzer.analyzeTestableDependencies(changed)
-  const command = analyzer.buildCommand(testPlan)
-  if (!command) return { mode: 'none', runs: 0, shards: 1 }
-  if (testPlan.tests === null) return { mode: 'fallback', runs: 0, shards: 1 }
-  const { execFileSync } = await import('node:child_process')
-  const [bin, ...rest] = command
-  const output = execFileSync(bin!, [...rest, '--list'], {
-    encoding: 'utf8',
-    env: { ...process.env, PW_BURN_IN: 'true', PW_SHARD: '' },
-    maxBuffer: 64 * 1024 * 1024,
-  })
-  const runs = listedRuns(output)
+  const { BurnInRunner } = fromEntry('./runner') as {
+    BurnInRunner: new (options: BurnInOptions) => { analyzer: Analyzer }
+  }
+  return new BurnInRunner(options).analyzer
+}
+
+/** The Playwright CLI the library itself runs. */
+function playwrightCli(): string {
+  return createRequire(path.join(process.cwd(), 'package.json')).resolve(
+    '@playwright/test/cli'
+  )
+}
+
+/** The selection and its Playwright arguments, or null when nothing needs to run. */
+async function select(
+  options: BurnInOptions
+): Promise<{ tests: string[] | null; command: string[] } | null> {
+  const burnIn = analyzer(options)
+  const changed = burnIn.getChangedFiles(options.baseBranch ?? 'main')
+  if (changed.all.length === 0) return null
+  const testPlan = await burnIn.analyzeTestableDependencies(changed)
+  console.log(`Burn-in selection: ${testPlan.reason}`)
+  const command = burnIn.buildCommand(testPlan)
+  return command ? { tests: testPlan.tests, command } : null
+}
+
+const burnInEnv = (): NodeJS.ProcessEnv => ({ ...process.env, PW_BURN_IN: 'true' })
+
+async function plan(options: BurnInOptions): Promise<BurnInPlan> {
+  const selection = await select(options)
+  if (!selection) return { mode: 'none', runs: 0, shards: 1 }
+  // Fallback samples with its own `--shard` inside the command, so it runs as one shard.
+  if (selection.tests === null) return { mode: 'fallback', runs: 0, shards: 1 }
+  const listed = spawnSync(
+    process.execPath,
+    [playwrightCli(), ...selection.command, '--list'],
+    { encoding: 'utf8', env: burnInEnv(), maxBuffer: 64 * 1024 * 1024 }
+  )
+  if (listed.error) throw listed.error
+  if (listed.status !== 0)
+    throw new Error(
+      `playwright test --list exited with ${listed.status}\n${listed.stderr}`
+    )
+  const runs = listedRuns(listed.stdout)
   return { mode: 'targeted', runs, shards: shardCount(runs) }
 }
 
-async function main() {
+async function runShard(options: BurnInOptions, shard: string): Promise<number> {
+  const selection = await select(options)
+  if (!selection) {
+    console.log('No tests need to burn in.')
+    return 0
+  }
+  if (selection.tests === null) {
+    // The library's fallback already samples by percentage.
+    const { runBurnIn } = await import('@seontechnologies/playwright-utils/burn-in')
+    await runBurnIn(options)
+    return 0
+  }
+  const args = shardCommand(selection.command, shard, process.env.PSP_ARGS)
+  console.log(`Burn-in shard ${shard}: playwright ${args.join(' ')}`)
+  const result = spawnSync(process.execPath, [playwrightCli(), ...args], {
+    stdio: 'inherit',
+    env: burnInEnv(),
+  })
+  if (result.error) throw result.error
+  return result.status ?? 1
+}
+
+async function main(): Promise<number> {
   const args = process.argv.slice(2)
-  const baseArg = args.find((arg) => arg.startsWith('--base-branch='))
-  const shardArg = args.find((arg) => arg.startsWith('--shard='))
-  const configArg = args.find((arg) => arg.startsWith('--config-path='))
-  const planArg = args.find((arg) => arg.startsWith('--plan-out='))
+  const value = (name: string) =>
+    args.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3)
 
-  const options: Parameters<typeof RunBurnIn>[0] = {
-    configPath: configArg
-      ? configArg.split('=')[1]
-      : 'playwright/config/.burn-in.config.ts',
+  const options: BurnInOptions = {
+    configPath: value('config-path') ?? 'playwright/config/.burn-in.config.ts',
+    baseBranch: value('base-branch'),
   }
 
-  if (baseArg) {
-    options.baseBranch = baseArg.split('=')[1]
-  }
-
-  if (shardArg) {
-    process.env.PW_SHARD = shardArg.split('=')[1]
-  }
-
-  resolveDependencyAnalysisLikeTheSuite()
-  if (planArg) {
+  const planOut = value('plan-out')
+  if (planOut) {
     const result = await plan(options)
     // Appends, so `--plan-out="$GITHUB_OUTPUT"` adds the plan to the step's outputs.
-    const { appendFileSync } = await import('node:fs')
-    appendFileSync(planArg.slice('--plan-out='.length), `${planOutputs(result)}\n`)
+    appendFileSync(planOut, `${planOutputs(result)}\n`)
     console.log(`Burn-in plan:\n${planOutputs(result)}`)
-    return
+    return 0
   }
+  const shard = value('shard')
+  if (shard) return runShard(options, shard)
   const { runBurnIn } = await import('@seontechnologies/playwright-utils/burn-in')
   await runBurnIn(options)
+  return 0
 }
 
 // Imported by its unit test for the pure helpers; runs only as a script.
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
-  main().catch((err) => {
-    console.error(err)
-    process.exit(1)
-  })
+  main().then(
+    (code) => process.exit(code),
+    (err) => {
+      console.error(err)
+      process.exit(1)
+    }
+  )
 }

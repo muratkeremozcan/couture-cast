@@ -317,6 +317,14 @@ describe('deployment workflows', () => {
     expect(burnIn).toContain(
       'SHARD_FLAG=(--shard="${{ matrix.shard }}/${{ needs.plan.outputs.total }}")'
     )
+    // The shards split by recorded duration: the Action runs before the burn-in command,
+    // which appends its PSP_ARGS, and stays off for fallback, which samples on its own.
+    const balance = burnIn.indexOf(
+      'uses: muratkeremozcan/playwright-smart-parallelization@v1'
+    )
+    expect(balance).toBeGreaterThan(-1)
+    expect(balance).toBeLessThan(burnIn.indexOf('npm run test:pw:burn-in-changed'))
+    expect(burnIn).toContain("if: needs.plan.outputs.mode == 'targeted'")
     for (const [name, block] of jobs) {
       const minutes = Number(/^ {4}timeout-minutes: (\d+)$/m.exec(block)?.[1])
       expect({ name, fits: minutes > 0 && minutes <= 20 }).toEqual({ name, fits: true })
@@ -331,6 +339,40 @@ describe('deployment workflows', () => {
     expect(report.match(/<!-- playwright-burn-in-report -->/g)).toHaveLength(1)
     expect(burnIn).not.toContain('playwright-burn-in-report')
     expect(workflow).toContain('value: ${{ jobs.report.outputs.runE2E }}')
+  })
+
+  it('the deployed E2E suites split by recorded duration, one history per environment', () => {
+    const workflow = fs.readFileSync(e2eReusableWorkflow, 'utf8')
+    expect(workflow).toContain(
+      "shard: ${{ fromJSON(inputs.realtime_probe && '[1]' || '[1, 2]') }}"
+    )
+    expect(workflow).toContain(
+      'uses: muratkeremozcan/playwright-smart-parallelization@v1'
+    )
+    expect(workflow.match(/history-key: e2e-\$\{\{ inputs\.test_env \}\}/g)).toHaveLength(
+      2
+    )
+    expect(workflow).toContain(
+      'uses: muratkeremozcan/playwright-smart-parallelization/finish@v1'
+    )
+    expect(workflow).toContain(
+      '$TEST_COMMAND "${SEPARATOR[@]}" --shard="$SHARD" $PSP_ARGS'
+    )
+    expect(workflow).toContain(
+      'name: pw-artifacts-${{ inputs.test_env }}-shard-${{ matrix.shard }}'
+    )
+    // A reusable job gets no permission its caller withholds.
+    for (const caller of [
+      'pr-pw-e2e-vercel-preview.yml',
+      'pw-e2e-trigger.yml',
+      'pw-e2e-prod.yml',
+    ])
+      expect({
+        caller,
+        actionsRead: /^permissions:\n(?: {2}#.*\n)* {2}actions: read$/m.test(
+          fs.readFileSync(path.join(repoRoot, '.github', 'workflows', caller), 'utf8')
+        ),
+      }).toEqual({ caller, actionsRead: true })
   })
 
   it('the share-card native workflow runs only the browser lane on pull requests', () => {

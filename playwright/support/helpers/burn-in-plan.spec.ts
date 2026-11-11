@@ -1,10 +1,13 @@
+import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
   BURN_IN_MAX_SHARDS,
   BURN_IN_RUNS_PER_SHARD,
   listedRuns,
   planOutputs,
+  shardCommand,
   shardCount,
+  workspaceSources,
 } from '../../scripts/burn-in-changed'
 
 // The burn-in matrix is sized from the plan, so a PR that changes many specs fans out
@@ -35,6 +38,50 @@ describe('burn-in plan sizing', () => {
     )
     expect(planOutputs({ mode: 'fallback', runs: 0, shards: 1 })).toBe(
       'mode=fallback\nruns=0\ntotal=1\nshards=[1]'
+    )
+  })
+
+  it('runs one shard with its own --shard in place of the library one, and the Action arguments last', () => {
+    const command = [
+      'test',
+      '^/repo/a\\.spec\\.ts$',
+      '--shard=1/1',
+      '--repeat-each=3',
+      '--retries=0',
+    ]
+    expect(shardCommand(command, '2/3', ' --add-reporter=/tmp/psp/reporter.js ')).toEqual(
+      [
+        'test',
+        '^/repo/a\\.spec\\.ts$',
+        '--repeat-each=3',
+        '--retries=0',
+        '--shard=2/3',
+        '--add-reporter=/tmp/psp/reporter.js',
+      ]
+    )
+    // No history or the Action skipped: PSP_ARGS is empty and Playwright's own --shard splits.
+    expect(shardCommand(command, '1/1', '')).toEqual([
+      'test',
+      '^/repo/a\\.spec\\.ts$',
+      '--repeat-each=3',
+      '--retries=0',
+      '--shard=1/1',
+    ])
+    expect(shardCommand(command, '1/2')).toContain('--shard=1/2')
+  })
+
+  it('follows a workspace build output back to the sources a change touches', () => {
+    const root = path.resolve(__dirname, '../../..')
+    const at = (file: string) => path.join(root, file)
+    expect(workspaceSources(at('packages/utils/dist/index.js'), root)).toEqual([
+      at('packages/utils/src/index.ts'),
+    ])
+    expect(workspaceSources(at('packages/config/dist/index.d.ts'), root)).toEqual([
+      at('packages/config/src/index.ts'),
+    ])
+    expect(workspaceSources(at('packages/utils/src/index.ts'), root)).toEqual([])
+    expect(workspaceSources(at('playwright/support/helpers/api-test.ts'), root)).toEqual(
+      []
     )
   })
 })
