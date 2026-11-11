@@ -6,6 +6,11 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      clock_offset:
+        description: libfaketime offset for tests-year-ahead, for a longer look ahead (+3650d)
+        required: false
+        default: +365d
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -357,7 +362,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
       DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      YEAR_AHEAD: +365d
+      YEAR_AHEAD: ${{ inputs.clock_offset || '+365d' }}
     services:
       redis:
         image: redis:7-alpine
