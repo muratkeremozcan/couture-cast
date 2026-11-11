@@ -192,8 +192,11 @@ the send guard holds. The functions are `SECURITY INVOKER` with a pinned `search
 the owner role the worker connects as may execute them. The INT-001..006 observations now read
 `pg_locks` after a skipped candidate's subtransaction rolls back, and a latency proxy adding the
 production round trip keeps the budget honest. The append retry row's own transaction budget
-rose from 150 to 400 ms, since two statements at 31 ms missed 150 ms most of the time. An append
-lane older than five minutes records `community_append_stalled`, which PostHog alerts on.
+rose from 150 ms to 1 s: two statements at 31 ms missed 150 ms most of the time, and a cold
+connection's first insert (it prepares its statement on the direct-session pool) at a slow round
+trip still missed 400 ms (6.5-INT-033). A retry row that is not written logs
+`Community append retry not recorded` with its error code (6.5-INT-034). An append lane older
+than five minutes records `community_append_stalled`, which PostHog alerts on.
 
 **Ordering argument:** appender B cannot allocate a sequence for a stream until A's lock
 releases. If A commits, its event rows and counter become visible together before B allocates.

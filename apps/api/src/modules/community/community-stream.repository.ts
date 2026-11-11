@@ -150,12 +150,27 @@ export class CommunityStreamRepository {
             })
           },
           // Two statements: about 125 ms p50 and 190 ms p95 at production's 31 ms round trip
-          // (2026-11-11). The old 150 ms budget dropped most retry rows there, so the backlog
-          // went unrecorded; the server still bounds the insert at 100 ms.
-          { timeout: 400, maxWait: 50 }
+          // (2026-11-11). The old 150 ms budget dropped most retry rows there. A connection's
+          // first insert also prepares its statement, and production's round trip reached
+          // 220 ms at worst, so 400 ms still dropped the occasional cold row; CI dropped one
+          // at load. 1 s holds a cold write at three times the round trip (6.5-INT-033), and
+          // the server still bounds the insert at 100 ms.
+          { timeout: 1_000, maxWait: 50 }
         )
-      } catch {
-        /* The sanitized process observation remains when the telemetry DB is unavailable. */
+      } catch (telemetryError) {
+        // The deferral warning above remains the observation; this one says the durable row
+        // is missing, so a gap in community_append_retry is never silent.
+        this.logger.warn(
+          {
+            reason,
+            code:
+              postgresError(telemetryError)?.code ??
+              (telemetryError instanceof Prisma.PrismaClientKnownRequestError
+                ? telemetryError.code
+                : 'unknown'),
+          },
+          'Community append retry not recorded'
+        )
       }
       throw error
     }

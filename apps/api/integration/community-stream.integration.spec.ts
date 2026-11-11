@@ -20,7 +20,7 @@ import { latencyProxy } from './helpers/latency-proxy.js'
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
 // An append is bounded by its own timeouts: 100 ms maxWait and the 750 ms transaction,
-// then on failure the 50 ms maxWait and 400 ms telemetry transaction, 1.3 s. The slowest
+// then on failure the 50 ms maxWait and 1 s telemetry transaction, 1.9 s. The slowest
 // append measured 2026-10-27 took 0.53 s idle and 1.21 s across ten runs at load average
 // 34 to 87 on 14 cores. 3 s is 2.5x that, so an append that never settles fails in
 // seconds, naming its test and attempt, where R01 alone would otherwise wait 90 s.
@@ -33,9 +33,10 @@ let slowestAppend = { label: '', ms: 0 }
 function bounded(repository: CommunityStreamRepository) {
   const test = expect.getState().currentTestName ?? 'unnamed test'
   let attempt = 0
-  // The appender logs every deferral; its durable retry row is written in a 150 ms
-  // best-effort transaction that a loaded host drops (0 rows for 1 failure at load
-  // average 108), so the log is the observation that holds at any load.
+  // The appender logs every deferral; its durable retry row is written in a 1 s
+  // best-effort transaction that a loaded host can still drop (the old 150 ms one wrote
+  // 0 rows for 1 failure at load average 108), so the log is the observation that holds
+  // at any load, and a dropped row logs that it is missing.
   type Deferral = { reason: string; nextBatchLimit: number }
   type Warn = (fields: Deferral, message: string) => void
   const deferrals: Deferral[] = []
@@ -400,12 +401,12 @@ describe('Story 6.5 committed stream append', () => {
       })
     )
     // Timeout from the recovering worst case above. A failed append costs at most its
-    // 150 ms preparation window, the 450 ms statement timeout and the 400 ms telemetry
-    // transaction, 1.0 s; a success took at most 0.46 s at load average 15. 43
-    // failures and 40 successes are 62 s, and the rest of this case took 7.7 s loaded,
-    // so about 70 s. 90 s is 1.3x that, and an appender that never recovers (83
-    // failures, at most 83 s) reaches the attempt bound first.
-  }, 90_000)
+    // 150 ms preparation window, the 450 ms statement timeout and the 1 s telemetry
+    // transaction, 1.6 s; a success took at most 0.46 s at load average 15. 43
+    // failures and 40 successes are 87 s, and the rest of this case took 7.7 s loaded,
+    // so about 95 s. 140 s is 1.5x that, and an appender that never recovers (83
+    // failures, at most 133 s) reaches the attempt bound first.
+  }, 140_000)
 
   // Without latency a batch holds at most the 25-event ready limit. Preparation runs inside
   // community_append_batch, so production's 31 ms round trip (15.5 ms each way through the

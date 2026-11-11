@@ -21,20 +21,31 @@ const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
 // 15.5 ms each way is the 31 ms production round trip.
 const proxy = latencyProxy(database.url, 15.5)
+// 50 ms each way, three times production's round trip. Production's worker (2026-11-11, 100
+// transactions) starts a transaction in 30 ms at p50, 46 ms at p99 and 220 ms at worst, and
+// its main pool is a direct session, so a connection's first telemetry insert also prepares
+// its statement. A cold retry write at a slow round trip is this client.
+const slowProxy = latencyProxy(database.url, 50)
 let remote: PrismaClient
+let slow: PrismaClient
 
 beforeAll(async () => {
   await database.migrate()
   remote = new PrismaClient({ datasources: { db: { url: await proxy.listen() } } })
   await remote.$queryRaw`SELECT 1`
+  slow = new PrismaClient({ datasources: { db: { url: await slowProxy.listen() } } })
+  await slow.$queryRaw`SELECT 1`
 }, 30_000)
 beforeEach(async () => {
   await prisma.communityStreamEvent.deleteMany()
   await prisma.communityDomainOutbox.deleteMany()
+  await prisma.communityEngagementTelemetry.deleteMany()
 })
 afterAll(async () => {
   await remote?.$disconnect()
+  await slow?.$disconnect()
   await proxy.close()
+  await slowProxy.close()
   await prisma.$disconnect()
   await database.drop()
 })
@@ -88,4 +99,88 @@ describe('community append at production database latency', () => {
       outcomes.filter((outcome) => outcome === 'budget_pressure').length
     ).toBeLessThan(3)
   }, 120_000)
+
+  it('6.5-INT-033: a deferred append records its retry row on a cold connection at three times the round trip', async () => {
+    await publishPosts(1)
+    const repository = new CommunityStreamRepository(slow)
+    // Another session holds the public head, so the batch defers on head contention.
+    let release!: () => void
+    const released = new Promise<void>((resolve) => (release = resolve))
+    let locked!: () => void
+    const isLocked = new Promise<void>((resolve) => (locked = resolve))
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "CommunityStreamHead" WHERE id = 'public' FOR UPDATE`
+        locked()
+        await released
+      },
+      { timeout: 20_000 }
+    )
+    await isLocked
+    try {
+      const outcome = await repository.appendWithReport().then(
+        () => 'appended',
+        (error: unknown) => appendFailure(error)
+      )
+      expect(outcome).toBe('head_contention')
+    } finally {
+      release()
+      await holder
+    }
+    // The cold retry write at a 100 ms round trip ran past the old 400 ms budget and was
+    // dropped without a trace; the 1 s budget holds it.
+    expect(
+      await prisma.communityEngagementTelemetry.findMany({
+        where: { event_type: 'community_append_retry' },
+        select: { reason: true, outcome: true },
+      })
+    ).toEqual([{ reason: 'head_contention', outcome: 'aborted' }])
+  }, 30_000)
+
+  it('6.5-INT-034: a retry row that cannot be written is logged as missing', async () => {
+    await publishPosts(1)
+    await prisma.$executeRawUnsafe(`CREATE FUNCTION tea_refuse_telemetry() RETURNS trigger
+      LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'telemetry refused'; END $$`)
+    await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_refuse_telemetry BEFORE INSERT
+      ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_refuse_telemetry()`)
+    const repository = new CommunityStreamRepository(remote)
+    const warnings: [Record<string, unknown>, string][] = []
+    const logger = Reflect.get(repository, 'logger') as {
+      warn: (fields: Record<string, unknown>, message: string) => void
+    }
+    logger.warn = (fields, message) => warnings.push([fields, message])
+    let release!: () => void
+    const released = new Promise<void>((resolve) => (release = resolve))
+    let locked!: () => void
+    const isLocked = new Promise<void>((resolve) => (locked = resolve))
+    const holder = prisma.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "CommunityStreamHead" WHERE id = 'public' FOR UPDATE`
+        locked()
+        await released
+      },
+      { timeout: 20_000 }
+    )
+    await isLocked
+    try {
+      await expect(repository.appendWithReport()).rejects.toSatisfy(
+        (error: unknown) => appendFailure(error) === 'head_contention'
+      )
+    } finally {
+      release()
+      await holder
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER tea_refuse_telemetry ON "CommunityEngagementTelemetry"'
+      )
+      await prisma.$executeRawUnsafe('DROP FUNCTION tea_refuse_telemetry()')
+    }
+    expect(warnings).toEqual([
+      [{ reason: 'head_contention', nextBatchLimit: 25 }, 'Community append deferred'],
+      [
+        { reason: 'head_contention', code: 'P0001' },
+        'Community append retry not recorded',
+      ],
+    ])
+    expect(await prisma.communityEngagementTelemetry.count()).toBe(0)
+  }, 30_000)
 })
