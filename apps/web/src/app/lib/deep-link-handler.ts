@@ -1,7 +1,7 @@
 // Story 3.7 Task 2 step 1 owner: implement web deep-link handler, alert autoscroll, and community card highlight
 import {
+  analyticsRouteUrl,
   resolveWeatherAlertDeepLinkTarget,
-  sanitizeAnalyticsUrl,
   type WeatherAlertDeepLinkTarget,
 } from '@couture/api-client'
 import {
@@ -64,7 +64,7 @@ function invalidDeepLink(options: ApplyDeepLinkOptions, reason: string) {
   posthog.capture('deep_link_invalid', {
     // Origin and route template only: invitation tokens, ids and emails stay home.
     rawUrl:
-      typeof window !== 'undefined' ? sanitizeAnalyticsUrl(window.location.href) : '',
+      typeof window !== 'undefined' ? analyticsRouteUrl(window.location.href, 'web') : '',
     reason,
     surface: 'web',
   })

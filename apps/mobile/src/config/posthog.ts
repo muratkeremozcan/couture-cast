@@ -4,7 +4,7 @@ import PostHog, { type PostHogOptions } from 'posthog-react-native'
 import {
   SHARE_CARD_SHARED_EVENT,
   sanitizeShareCardSharedProperties,
-  stripPersonalAnalyticsData,
+  mobileAnalyticsPrivacyFilter,
 } from '@couture/api-client'
 
 type ExpoExtra = {
@@ -76,21 +76,25 @@ export function mobilePostHogBeforeSend(
 /**
  * Production analytics privacy: CoutureCast has members aged 13 to 15 (with guardian
  * consent) and wardrobe photos, so the app sends explicit events, screens and
- * exceptions only. Session replay and surveys stay off, anonymous members get no
- * person profile, console output is never captured as an exception, and
- * stripPersonalAnalyticsData removes email, name and birth date keys from every event
- * and person update before the share allowlist runs. Touch and screen autocapture are
- * off in MobileAnalyticsProvider. See the "Production analytics" section of
+ * exceptions only. Session replay and surveys stay off; feature flags and remote config
+ * are never requested (the app reads no PostHog flag); anonymous members get no person
+ * profile; console output is never captured as an exception; and
+ * mobileAnalyticsPrivacyFilter drops every event and property outside its allowlist
+ * before the share allowlist runs. Touch and screen autocapture are off in
+ * MobileAnalyticsProvider. See the "Production analytics" section of
  * _bmad-output/project-knowledge/deployment-guide.md.
  */
 export const mobilePostHogPrivacyOptions = {
   personProfiles: 'identified_only',
   enableSessionReplay: false,
   disableSurveys: true,
+  disableRemoteConfig: true,
+  preloadFeatureFlags: false,
+  sendFeatureFlagEvent: false,
   errorTracking: {
     autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: false },
   },
-  before_send: [stripPersonalAnalyticsData, mobilePostHogBeforeSend],
+  before_send: [mobileAnalyticsPrivacyFilter, mobilePostHogBeforeSend],
 } satisfies PostHogOptions
 
 /**
@@ -130,18 +134,13 @@ export const posthogProviderClient = new PostHog(
     maxBatchSize: 100, // Maximum events per batch
     maxQueueSize: 1000, // Maximum queued events (oldest dropped when full)
 
-    // Feature flags
-    preloadFeatureFlags: true, // Load flags on initialization
-    sendFeatureFlagEvent: true, // Track getFeatureFlag calls for experiments
-    featureFlagsRequestTimeoutMs: 10000, // Timeout for flag requests
-
     // Network settings
     requestTimeout: 10000, // General request timeout in ms
     fetchRetryCount: 3, // Number of retry attempts for failed requests
     fetchRetryDelay: 3000, // Delay between retries in ms
 
-    // Privacy switches and before_send: the personal data guard, then the Story 6.9
-    // D5 share_card_shared allowlist.
+    // Privacy switches, no flags or remote config, and before_send: the privacy
+    // filter, then the Story 6.9 D5 share_card_shared allowlist.
     ...mobilePostHogPrivacyOptions,
   }
 )

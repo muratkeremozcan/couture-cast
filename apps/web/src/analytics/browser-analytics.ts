@@ -1,10 +1,9 @@
 // Story 6.9 Task 6 step 2 owner: sanitize web share events in `apps/web/src/analytics/browser-analytics.ts`
 import posthog, { type CaptureResult } from 'posthog-js'
 import {
-  PERSONAL_ANALYTICS_PROPERTY_KEYS,
   SHARE_CARD_SHARED_EVENT,
   sanitizeShareCardSharedProperties,
-  stripPersonalAnalyticsData,
+  webAnalyticsPrivacyFilter,
 } from '@couture/api-client'
 
 export interface BrowserAnalyticsClient {
@@ -135,15 +134,16 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
     }
 
     // Production analytics privacy: CoutureCast has members aged 13 to 15 (with
-    // guardian consent) and wardrobe photos, so the SDK sends explicit events,
-    // pageviews and exceptions only, in every environment. Autocapture, rage and dead
-    // clicks, heatmaps, session recording, surveys, product tours and conversations
-    // stay off; element text, attributes and inputs are masked should any capture
-    // mode be switched on remotely; no extension script but exception autocapture
-    // loads; anonymous visitors get no person profile; and stripPersonalAnalyticsData
-    // removes personal keys, reduces every URL to origin and route template, and
-    // scrubs exception messages before any event leaves. See the "Production
-    // analytics" section of _bmad-output/project-knowledge/deployment-guide.md.
+    // guardian consent) and wardrobe photos. The SDK sends explicit events, pageviews
+    // and exceptions only, in every environment: autocapture, rage and dead clicks,
+    // heatmaps, session recording, surveys, product tours and conversations stay off;
+    // no extension script but exception autocapture loads; client feature flags and
+    // remote config are never requested (the web app reads no PostHog flag), so no
+    // /flags request carries person properties; initial URL, referrer and campaign
+    // properties are never stored; anonymous visitors get no person profile; and
+    // webAnalyticsPrivacyFilter drops every event and property outside its allowlist
+    // before anything leaves. See the "Production analytics" section of
+    // _bmad-output/project-knowledge/deployment-guide.md.
     posthog.init(postHogToken, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
@@ -159,8 +159,14 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
       disable_conversations: true,
       mask_all_text: true,
       mask_all_element_attributes: true,
+      // posthog-js keeps the session's entry URL in localStorage for session entry
+      // properties (the filter never sends them). Credentials in its query string are
+      // masked there too.
       mask_personal_data_properties: true,
-      custom_personal_data_properties: [...PERSONAL_ANALYTICS_PROPERTY_KEYS],
+      custom_personal_data_properties: ['token', 'focusToken', 'email'],
+      advanced_disable_flags: true,
+      save_referrer: false,
+      save_campaign_params: false,
       person_profiles: 'identified_only',
       prepare_external_dependency_script: allowExceptionAutocaptureScriptOnly,
       request_batching: !analyticsTestMode,
@@ -169,7 +175,7 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
       defaults: '2026-01-30',
       // Enables capturing unhandled exceptions via Error Tracking
       capture_exceptions: !analyticsTestMode,
-      before_send: [stripPersonalAnalyticsData, shareCardSharedBeforeSend],
+      before_send: [webAnalyticsPrivacyFilter, shareCardSharedBeforeSend],
       // Turn on debug in development mode
       debug: process.env.NODE_ENV === 'development',
     })

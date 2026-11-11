@@ -1,137 +1,49 @@
+import {
+  DEEP_LINK_FAILURE_REASONS,
+  deepLinkNotificationTypeSchema,
+  deepLinkSlotSchema,
+  deepLinkSourceSchema,
+  deepLinkWidgetSizeSchema,
+} from '@couture/utils'
+import { alertRuleTypeSchema } from './contracts/http/alerts'
+import { affiliateCommunitySurfaceSchema } from './contracts/http/commerce'
+import { communityFeedModeSchema } from './contracts/http/community'
+import { supportedLocales } from './contracts/http/localization'
+import { weatherConditionSchema } from './contracts/http/weather'
+import {
+  type AnalyticsPlatform,
+  UNKNOWN_ANALYTICS_ROUTE,
+  templateAnalyticsRoute,
+} from './analytics-routes'
+import {
+  shareCardShareClientSchema,
+  shareCardShareOutcomeSchema,
+  shareCardShareTargetSchema,
+} from './types/analytics-events'
+
 /**
- * Production analytics privacy guard, shared by the web (posthog-js) and mobile
- * (posthog-react-native) before_send hooks. CoutureCast has members aged 13 to 15 with
- * guardian consent and wardrobe photos, so an event leaves an SDK only after a closed
- * policy has run over its properties and its `$set` / `$set_once` person updates, at
- * every depth:
+ * Production analytics privacy boundary, run first in the web (posthog-js) and mobile
+ * (posthog-react-native) before_send chains. CoutureCast has members aged 13 to 15 with
+ * guardian consent and wardrobe photos, so nothing leaves an SDK unless it is on a
+ * closed allowlist:
  *
- * - A key that names a person or their birth date is removed.
- * - A URL-bearing key (`$current_url`, `$pathname`, `$referrer`, `$initial_*` and
- *   session entry URLs, `url`, `rawUrl`, deep link fields, `$screen_name`) and any string
- *   that is itself an absolute URL keep only the origin and a route template: query
- *   string and fragment are dropped and every path segment that is not a plain route
- *   word becomes `:id`.
- * - Exception payloads (`$exception_*`) keep their types, code locations and function
- *   names; free text (messages, values) is scrubbed of emails, URLs, UUIDs, tokens and
- *   long numbers, and stack frame file paths lose their query string and fragment.
- * - Every other string has emails redacted and embedded URLs reduced as above.
- *
- * Keys match after lowercasing and dropping every character that is not a letter or a
- * digit, so `email`, `$email`, `firstName`, `first_name` and `Date-Of-Birth` all match.
+ * - An event not named in ANALYTICS_EVENT_PROPERTIES or the platform's SDK events is
+ *   dropped.
+ * - A property not on that event's list or the SDK property list is dropped, and so is
+ *   a value that fails its rule. A string survives only as an enum member, a route
+ *   template, an origin, a host, an SDK identifier or version, or a timestamp.
+ * - Paths and URLs keep a known route's static segments (`:param` for dynamic ones);
+ *   anything else is `/:unknown`. External URLs and referrers keep their origin only.
+ * - Exceptions keep their type and in-app frames as file basename, line and column.
+ *   Messages are replaced by EXCEPTION_MESSAGE_PLACEHOLDER.
+ * - `$set` and `$set_once` person updates never leave: the clients never identify.
  */
-export const PERSONAL_ANALYTICS_PROPERTY_KEYS = Object.freeze([
-  'email',
-  'name',
-  'first_name',
-  'last_name',
-  'full_name',
-  'display_name',
-  'username',
-  'birthdate',
-  'birth_date',
-  'date_of_birth',
-  'dob',
-  'birthday',
-  'phone',
-  'phone_number',
-] as const)
 
-/** The placeholder for a path segment that is not a plain route word. */
-export const ANALYTICS_ROUTE_PARAMETER = ':id'
-const REDACTED = '[redacted]'
-
-const normalizeKey = (key: string) => key.toLowerCase().replace(/[^a-z0-9]/g, '')
-const personalKeys: ReadonlySet<string> = new Set(
-  PERSONAL_ANALYTICS_PROPERTY_KEYS.map(normalizeKey)
-)
-// URL-bearing keys, after normalization. `$referring_domain` holds a host only.
-const urlKeyFragments = ['url', 'href', 'pathname', 'referrer', 'referer', 'link']
-const urlKeys: ReadonlySet<string> = new Set(['screenname', 'path', 'route'])
-const isUrlKey = (key: string) => {
-  const normalized = normalizeKey(key)
-  return (
-    urlKeys.has(normalized) ||
-    normalized.endsWith('path') ||
-    urlKeyFragments.some((fragment) => normalized.includes(fragment))
-  )
-}
-// Inside an exception payload: stack frame locations and code identifiers survive;
-// every other string is free text.
-const frameLocationKeys: ReadonlySet<string> = new Set(['filename', 'abs_path'])
-const exceptionCodeKeys: ReadonlySet<string> = new Set([
-  'type',
-  '$exception_types',
-  '$exception_type',
-  '$exception_level',
-  'function',
-  'module',
-  'platform',
-  'lang',
-  'chunk_id',
-  'raw_id',
-  'context_line',
-  'pre_context',
-  'post_context',
-])
-
-// A route word: lowercase letters joined by single hyphens or underscores, optionally
-// wrapped in parentheses for an Expo Router group such as `(tabs)`.
-const routeWord = /^\(?[a-z]+(?:[-_][a-z]+)*\)?$/
-const templateSegment = (segment: string) =>
-  segment === '' || (segment.length <= 48 && routeWord.test(segment))
-    ? segment
-    : ANALYTICS_ROUTE_PARAMETER
-const templatePath = (path: string) => path.split('/').map(templateSegment).join('/')
-const webSchemes: ReadonlySet<string> = new Set(['http:', 'https:'])
-const absoluteUrl = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]*)([^?#]*)/i
-const hostname = /^[a-z0-9-]+(?:\.[a-z0-9-]+)+(?::\d+)?$/i
-
-/**
- * Reduces a URL or path to its origin and route template: no query string, no fragment,
- * no user info, and `:id` for every path segment that is not a plain route word. For an
- * app scheme such as `couturecast://community/post-1` the host is a route segment too.
- * A value that is neither a URL nor a path survives only as a route word or a host name.
- */
-export function sanitizeAnalyticsUrl(value: string): string {
-  const match = absoluteUrl.exec(value)
-  if (match) {
-    const scheme = match[1]!.toLowerCase()
-    const host = match[2]!.slice(match[2]!.lastIndexOf('@') + 1)
-    const origin = webSchemes.has(scheme) ? host.toLowerCase() : templateSegment(host)
-    return `${scheme}//${origin}${templatePath(match[3]!)}`
-  }
-  const path = value.split(/[?#]/, 1)[0]!
-  if (path.startsWith('/')) return templatePath(path)
-  if (value === '' || value === '$direct' || hostname.test(value)) return value
-  return routeWord.test(value) && value.length <= 48 ? value : REDACTED
-}
-
-/** Drops the query string and fragment of a stack frame location and keeps the path. */
-const stripQueryAndFragment = (value: string) => value.split(/[?#]/, 1)[0]!
-
-const emailPattern = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
-const embeddedUrlPattern = /\b[a-z][a-z0-9+.-]*:\/\/[^\s'"<>)\]]+/gi
-const redactEmails = (value: string) => value.replace(emailPattern, '[email]')
-const reduceEmbeddedUrls = (value: string) =>
-  value.replace(embeddedUrlPattern, (url) => sanitizeAnalyticsUrl(url))
-
-/**
- * Free text from an exception message: URLs keep their origin and route template;
- * emails, JWTs, UUIDs, long hex or base64 tokens and long digit runs are replaced.
- */
-export function scrubAnalyticsText(value: string): string {
-  return redactEmails(reduceEmbeddedUrls(value))
-    .replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]*/g, '[token]')
-    .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '[id]')
-    .replace(/\b[0-9a-f]{16,}\b/gi, '[token]')
-    .replace(
-      /(?=[A-Za-z0-9+/_-]*\d)(?=[A-Za-z0-9+/_-]*[A-Za-z])[A-Za-z0-9+/_-]{20,}={0,2}/g,
-      '[token]'
-    )
-    .replace(/\d{6,}/g, '[number]')
-}
-
-type Context = { exception: boolean; ancestors: object[] }
+type Rule = (value: unknown, platform: AnalyticsPlatform) => unknown
+const DROP = Symbol('drop')
+// Hermes in older React Native builds has no Object.hasOwn.
+const has = (record: object, key: string) =>
+  Object.prototype.hasOwnProperty.call(record, key)
 
 const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
@@ -139,73 +51,455 @@ const isPlainRecord = (value: unknown): value is Record<string, unknown> => {
   return prototype === Object.prototype || prototype === null
 }
 
-const DROP = Symbol('drop')
-
-const isExceptionKey = (key: string) => key.startsWith('$exception')
-
-function sanitizeString(key: string, value: string, context: Context): string {
-  if (context.exception || isExceptionKey(key)) {
-    if (frameLocationKeys.has(key)) return redactEmails(stripQueryAndFragment(value))
-    if (exceptionCodeKeys.has(key)) return redactEmails(value)
-    return scrubAnalyticsText(value)
+const oneOf =
+  (values: readonly string[]): Rule =>
+  (value) =>
+    typeof value === 'string' && values.includes(value) ? value : DROP
+const listOf =
+  (values: readonly string[]): Rule =>
+  (value) =>
+    Array.isArray(value)
+      ? value.filter(
+          (item): item is string => typeof item === 'string' && values.includes(item)
+        )
+      : DROP
+const matching =
+  (pattern: RegExp): Rule =>
+  (value) =>
+    typeof value === 'string' && pattern.test(value) ? value : DROP
+const number: Rule = (value) =>
+  typeof value === 'number' && Number.isFinite(value) ? value : DROP
+const integer: Rule = (value) => (Number.isInteger(value) ? value : DROP)
+const boolean: Rule = (value) => (typeof value === 'boolean' ? value : DROP)
+const nullValue: Rule = (value) => (value === null ? null : DROP)
+const either =
+  (...rules: Rule[]): Rule =>
+  (value, platform) => {
+    for (const rule of rules) {
+      const result = rule(value, platform)
+      if (result !== DROP) return result
+    }
+    return DROP
   }
-  if (isUrlKey(key) || absoluteUrl.test(value)) return sanitizeAnalyticsUrl(value)
-  return redactEmails(reduceEmbeddedUrls(value))
+
+const timestamp = matching(
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|[+-]\d{2}:\d{2})$/
+)
+// SDK-generated identifiers (anonymous distinct id, session, window, device and
+// pageview ids, the project token) and SDK descriptions (browser, OS, device model,
+// library and app versions).
+const sdkId = matching(/^[A-Za-z0-9_-]{1,100}$/)
+const sdkText = matching(/^[A-Za-z0-9 ._()+-]{1,64}$/)
+const sdkValue = either(sdkText, number)
+const version = matching(/^[A-Za-z0-9._+-]{1,32}$/)
+const host = matching(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d{1,5})?$/i)
+// Identifiers our own server issues for catalog entries (affiliate partner slugs, offer
+// and recommendation ids); never typed by a member.
+const catalogId = matching(/^[A-Za-z0-9_-]{1,128}$/)
+const regionCode = matching(/^(?:\*|[A-Z0-9]{2,3})$/)
+const locale = oneOf(supportedLocales)
+
+const absoluteUrl = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]*)([^?#]*)/i
+const webSchemes = new Set(['http:', 'https:'])
+const hostOf = (authority: string) => authority.slice(authority.lastIndexOf('@') + 1)
+
+/**
+ * A URL or path reduced to a known route on `platform`: an http(s) URL keeps its origin
+ * and route template, an app link (`couturecast://guardian-accept?token=...`) keeps
+ * its scheme and route template, a path becomes its route template, and anything else
+ * is `/:unknown`.
+ */
+export function analyticsRouteUrl(value: string, platform: AnalyticsPlatform): string {
+  const match = absoluteUrl.exec(value)
+  if (!match) {
+    return value.startsWith('/')
+      ? templateAnalyticsRoute(value, platform)
+      : UNKNOWN_ANALYTICS_ROUTE
+  }
+  const scheme = match[1]!.toLowerCase()
+  const authority = hostOf(match[2]!)
+  if (webSchemes.has(scheme)) {
+    const origin = host(authority, platform) === DROP ? '' : authority.toLowerCase()
+    return `${scheme}//${origin}${templateAnalyticsRoute(match[3]!, platform)}`
+  }
+  // In an app link the host is the first route segment.
+  return `${scheme}/${templateAnalyticsRoute(`/${authority}${match[3]!}`, platform)}`
 }
 
-function sanitizeValue(key: string, value: unknown, context: Context): unknown {
-  if (typeof value === 'string') return sanitizeString(key, value, context)
-  const isArray = Array.isArray(value)
-  if (!isArray && !isPlainRecord(value)) return value
-  // A cyclic value cannot be serialized; it is dropped instead of followed.
-  if (context.ancestors.includes(value)) return DROP
-  const nested: Context = {
-    exception: context.exception || isExceptionKey(key),
-    ancestors: [...context.ancestors, value],
-  }
-  if (isArray) {
-    return value
-      .map((item) => sanitizeValue(key, item, nested))
-      .filter((item) => item !== DROP)
-  }
-  return sanitizeRecord(value, nested)
+/** A URL reduced to its origin; anything that is not an absolute URL is dropped. */
+export function analyticsOriginUrl(value: string): string | undefined {
+  const match = absoluteUrl.exec(value)
+  if (!match) return undefined
+  const scheme = match[1]!.toLowerCase()
+  const authority = hostOf(match[2]!)
+  if (!webSchemes.has(scheme)) return `${scheme}//`
+  return host(authority, 'web') === DROP
+    ? undefined
+    : `${scheme}//${authority.toLowerCase()}`
 }
 
-function sanitizeRecord(
-  record: Record<string, unknown>,
-  context: Context
-): Record<string, unknown> {
-  const sanitized: Record<string, unknown> = {}
-  for (const key of Object.keys(record)) {
-    if (personalKeys.has(normalizeKey(key))) continue
-    const value = sanitizeValue(key, record[key], context)
-    if (value !== DROP) sanitized[key] = value
+const route: Rule = (value, platform) =>
+  typeof value === 'string' ? analyticsRouteUrl(value, platform) : DROP
+const origin: Rule = (value) =>
+  typeof value === 'string' ? (analyticsOriginUrl(value) ?? DROP) : DROP
+
+/** What an exception message is sent as. */
+export const EXCEPTION_MESSAGE_PLACEHOLDER = 'redacted'
+const exceptionType = (value: unknown) =>
+  typeof value === 'string' && /^[A-Za-z_$][\w$]{0,63}$/.test(value) ? value : 'Error'
+const mechanismTypes = [
+  'generic',
+  'onerror',
+  'onunhandledrejection',
+  'onuncaughtexception',
+  'onconsole',
+]
+const framePlatforms = ['web:javascript', 'node:javascript', 'custom', 'hermes']
+const codeFile = /^[A-Za-z0-9_.-]{1,100}\.(?:m?js|cjs|jsx|ts|tsx|bundle|hbc)$/
+const UNKNOWN_CODE_FILE = '<unknown>'
+const basenameOf = (value: unknown) => {
+  if (typeof value !== 'string') return UNKNOWN_CODE_FILE
+  const parts = value.split(/[?#]/, 1)[0]!.split('/')
+  const name = parts[parts.length - 1]!
+  return codeFile.test(name) ? name : UNKNOWN_CODE_FILE
+}
+
+function sanitizeFrame(frame: Record<string, unknown>) {
+  const sanitized: Record<string, unknown> = {
+    filename: basenameOf(frame.filename),
+    in_app: true,
   }
+  for (const key of ['lineno', 'colno'])
+    if (Number.isInteger(frame[key])) sanitized[key] = frame[key]
+  if (typeof frame.platform === 'string' && framePlatforms.includes(frame.platform))
+    sanitized.platform = frame.platform
   return sanitized
 }
 
-// The parts of an event that carry data: its properties and the person updates SDKs
-// place on the event. The envelope (event name, uuid, timestamp) is left as it is.
-const dataKeys = ['properties', '$set', '$set_once'] as const
-
-/**
- * A before_send hook for either SDK: returns a copy of the event with the closed policy
- * above applied to its properties and person updates. The caller's objects are never
- * mutated. Any error drops the event (null): the SDKs send the original event when a
- * hook throws, so this never throws.
- */
-export function stripPersonalAnalyticsData<T extends object>(event: T | null): T | null {
-  if (!event) return event
-  try {
-    const source = event as Record<string, unknown>
-    const sanitized: Record<string, unknown> = { ...source }
-    for (const key of dataKeys) {
-      const value = source[key]
-      if (isPlainRecord(value))
-        sanitized[key] = sanitizeRecord(value, { exception: false, ancestors: [value] })
-    }
-    return sanitized as T
-  } catch {
-    return null
+function sanitizeException(entry: Record<string, unknown>) {
+  const mechanism = isPlainRecord(entry.mechanism) ? entry.mechanism : {}
+  const stacktrace = isPlainRecord(entry.stacktrace) ? entry.stacktrace : {}
+  const frames = Array.isArray(stacktrace.frames) ? stacktrace.frames : []
+  return {
+    type: exceptionType(entry.type),
+    value: EXCEPTION_MESSAGE_PLACEHOLDER,
+    mechanism: {
+      type:
+        typeof mechanism.type === 'string' && mechanismTypes.includes(mechanism.type)
+          ? mechanism.type
+          : 'generic',
+      handled: mechanism.handled === true,
+      synthetic: mechanism.synthetic === true,
+    },
+    stacktrace: {
+      type: 'raw',
+      frames: frames
+        .filter((frame) => isPlainRecord(frame) && frame.in_app === true)
+        .map((frame) => sanitizeFrame(frame as Record<string, unknown>)),
+    },
   }
 }
+
+const exceptionList: Rule = (value) =>
+  Array.isArray(value)
+    ? value
+        .filter(isPlainRecord)
+        .slice(0, 10)
+        .map((entry) => sanitizeException(entry))
+    : DROP
+
+// Fixed reasons the web and mobile deep link handlers send.
+const deepLinkInvalidReasons = [
+  ...DEEP_LINK_FAILURE_REASONS,
+  'Weather alert target could not be loaded',
+  'Weather alert target was not found',
+  'Weather alert notification type was not found',
+  'Widget target slot was not found',
+  'Community card target was not found',
+  'Deep link target was not found',
+  'target_unavailable',
+]
+const deepLinkParamKeys = [
+  'source',
+  'slot',
+  'size',
+  'type',
+  'alertId',
+  'cardId',
+  'commentId',
+  'parentId',
+  'focus',
+  'focusToken',
+  'expiresAt',
+]
+const errorNames = [
+  'Error',
+  'AbortError',
+  'AggregateError',
+  'ChunkLoadError',
+  'DOMException',
+  'EvalError',
+  'NetworkError',
+  'NotFoundError',
+  'RangeError',
+  'ReferenceError',
+  'SyntaxError',
+  'TypeError',
+  'URIError',
+]
+const surfaces = ['web', 'mobile']
+const scenarios = ['morning', 'midday', 'evening']
+const chipCategories = ['Personal', 'Community', 'Sponsored']
+
+/**
+ * The explicit events the clients send and the only properties each may carry. Every
+ * event may also carry `locale`, and the SDK properties below.
+ */
+export const ANALYTICS_EVENT_PROPERTIES: Readonly<
+  Record<string, Readonly<Record<string, Rule>>>
+> = Object.freeze({
+  ritual_created: {
+    ritual_type: oneOf(['daily_outfit']),
+    weather_context: oneOf([...weatherConditionSchema.options, 'hero_cta']),
+    timestamp,
+  },
+  wardrobe_upload_started: {
+    file_size: number,
+    item_count: integer,
+    upload_source: oneOf(['web_file_picker']),
+    timestamp,
+  },
+  alert_received: {
+    alert_type: oneOf([
+      ...alertRuleTypeSchema.options,
+      'alert:weather',
+      'weather_alert',
+      'push_notification',
+    ]),
+    severity: oneOf(['info', 'warning', 'critical']),
+    weather_severity: oneOf(['minor', 'moderate', 'severe', 'extreme', 'unknown']),
+    timestamp,
+  },
+  affiliate_cta_shown: {
+    partner_id: catalogId,
+    offer_id: catalogId,
+    recommendation_id: catalogId,
+    scenario: oneOf(scenarios),
+    surface: oneOf(['mobile_hero', ...affiliateCommunitySurfaceSchema.options]),
+    locale_region: regionCode,
+  },
+  premium_subscribe_tapped: {
+    plan: oneOf(['premium_monthly', 'premium_annual']),
+    surface: oneOf(['mobile_settings', 'web_settings']),
+  },
+  locale_switched: { from_locale: locale, to_locale: locale, timestamp },
+  share_card_shared: {
+    client: oneOf(shareCardShareClientSchema.options),
+    target: oneOf(shareCardShareTargetSchema.options),
+    outcome: oneOf(shareCardShareOutcomeSchema.options),
+    duration_ms: number,
+  },
+  cta_clicked: {
+    cta_label: oneOf(['Start signup', 'Preview outfits', 'See the planner']),
+    cta_type: oneOf(['primary', 'secondary']),
+  },
+  nav_link_clicked: {
+    label: oneOf(['Daily ritual', 'Wardrobe', 'Community']),
+    href: oneOf(['#ritual', '#wardrobe', '#community']),
+  },
+  chip_changed: {
+    chipCategory: oneOf(chipCategories),
+    previousCategory: oneOf(chipCategories),
+    surface: oneOf(surfaces),
+  },
+  layout_interaction: {
+    action: oneOf(['filter_chip_click', 'toggle_comparison', 'toggle_mobile_preview']),
+    target: oneOf([
+      ...communityFeedModeSchema.options,
+      'comparison_mode_button',
+      'mobile_preview_button',
+    ]),
+  },
+  lookbook_prism_viewed: {
+    viewportWidth: integer,
+    layoutMode: oneOf(['split', 'stacked', 'mobile']),
+  },
+  bottom_nav_clicked: {
+    tabId: oneOf(['home', 'wardrobe', 'community', 'settings']),
+    targetPath: route,
+  },
+  error_page_viewed: {
+    error_name: oneOf(errorNames),
+    error_digest: matching(/^(?:none|\d{1,20})$/),
+  },
+  error_reset_clicked: {
+    error_name: oneOf(errorNames),
+    error_digest: matching(/^(?:none|\d{1,20})$/),
+  },
+  deep_link_invalid: {
+    rawUrl: either(oneOf(['community-notification']), route),
+    reason: oneOf(deepLinkInvalidReasons),
+    surface: oneOf(surfaces),
+    param_keys: listOf(deepLinkParamKeys),
+  },
+  deep_link_handled: {
+    source: oneOf(deepLinkSourceSchema.options),
+    slot: oneOf(deepLinkSlotSchema.options),
+    widgetSize: oneOf(deepLinkWidgetSizeSchema.options),
+    type: oneOf(deepLinkNotificationTypeSchema.options),
+    surface: oneOf(surfaces),
+  },
+  hero_interaction: {
+    interactionType: oneOf([
+      'scenario_toggle',
+      'ribbon_toggle',
+      'garment_swap',
+      'widget_tap',
+      'watch_tap',
+    ]),
+    scenario: oneOf(scenarios),
+    isExpanded: boolean,
+    widgetSize: oneOf(deepLinkWidgetSizeSchema.options),
+    slot: oneOf(deepLinkSlotSchema.options),
+  },
+  tab_one_viewed: {},
+  tab_two_viewed: {},
+  modal_opened: {},
+  external_link_tapped: { url: origin },
+})
+
+/** SDK events each client may send, with their own properties. */
+const SDK_EVENT_PROPERTIES: Record<
+  AnalyticsPlatform,
+  Record<string, Record<string, Rule>>
+> = {
+  web: {
+    $pageview: {},
+    $pageleave: {},
+    $exception: {},
+  },
+  mobile: {
+    $screen: { $screen_name: route, previous_screen: either(nullValue, route) },
+    $exception: {},
+    'Application Opened': { url: route, from_background: boolean },
+    'Application Became Active': {},
+    'Application Backgrounded': {},
+    'Application Installed': { version, build: version },
+    'Application Updated': {
+      version,
+      build: version,
+      previous_version: version,
+      previous_build: version,
+    },
+  },
+}
+
+/** Properties any event may carry: locale and the harmless SDK properties. */
+const COMMON_PROPERTIES: Record<string, Rule> = {
+  locale,
+  token: sdkId,
+  distinct_id: sdkId,
+  $session_id: sdkId,
+  $window_id: sdkId,
+  $device_id: sdkId,
+  $pageview_id: sdkId,
+  $prev_pageview_id: sdkId,
+  $insert_id: sdkId,
+  $lib: sdkText,
+  $lib_version: sdkText,
+  $browser: sdkText,
+  $browser_version: sdkValue,
+  $browser_language: sdkText,
+  $os: sdkText,
+  $os_name: sdkText,
+  $os_version: sdkValue,
+  $device_type: sdkText,
+  $device: sdkText,
+  $device_manufacturer: sdkText,
+  $device_model: sdkText,
+  $app_build: version,
+  $app_name: sdkText,
+  $app_namespace: sdkText,
+  $app_version: version,
+  $screen_height: number,
+  $screen_width: number,
+  $viewport_height: number,
+  $viewport_width: number,
+  $time: number,
+  $current_url: route,
+  $pathname: route,
+  $host: host,
+  $referrer: either(oneOf(['$direct']), origin),
+  $referring_domain: either(oneOf(['$direct']), host),
+  $prev_pageview_pathname: route,
+  $prev_pageview_duration: number,
+  $prev_pageview_last_scroll: number,
+  $prev_pageview_last_scroll_percentage: number,
+  $prev_pageview_max_scroll: number,
+  $prev_pageview_max_scroll_percentage: number,
+  $prev_pageview_last_content: number,
+  $prev_pageview_last_content_percentage: number,
+  $prev_pageview_max_content: number,
+  $prev_pageview_max_content_percentage: number,
+  $process_person_profile: boolean,
+  $is_identified: boolean,
+  $geoip_disable: boolean,
+  $ip: nullValue,
+  $exception_list: exceptionList,
+  $exception_level: oneOf(['fatal', 'error', 'warning', 'log', 'info', 'debug']),
+}
+
+/** The event names the platform may send. */
+export function analyticsEventNames(platform: AnalyticsPlatform): string[] {
+  return [
+    ...Object.keys(ANALYTICS_EVENT_PROPERTIES),
+    ...Object.keys(SDK_EVENT_PROPERTIES[platform]),
+  ]
+}
+
+/**
+ * The before_send hook for `platform`: returns a new event with only its envelope
+ * (event, uuid, timestamp) and allowlisted properties, or null for an event outside the
+ * allowlist. Any error drops the event: the SDKs send the original event when a hook
+ * throws, so this never throws.
+ */
+export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
+  const sdkEvents = SDK_EVENT_PROPERTIES[platform]
+  return function analyticsPrivacyFilter<T extends object>(event: T | null): T | null {
+    if (!event) return event
+    try {
+      const source = event as Record<string, unknown>
+      const name = source.event
+      if (typeof name !== 'string') return null
+      const eventRules = has(ANALYTICS_EVENT_PROPERTIES, name)
+        ? ANALYTICS_EVENT_PROPERTIES[name]
+        : has(sdkEvents, name)
+          ? sdkEvents[name]
+          : undefined
+      if (!eventRules) return null
+      const properties = isPlainRecord(source.properties) ? source.properties : {}
+      const sanitized: Record<string, unknown> = {}
+      for (const key of Object.keys(properties)) {
+        const rule = has(eventRules, key)
+          ? eventRules[key]
+          : has(COMMON_PROPERTIES, key)
+            ? COMMON_PROPERTIES[key]
+            : undefined
+        if (!rule) continue
+        const value = rule(properties[key], platform)
+        if (value !== DROP) sanitized[key] = value
+      }
+      const result: Record<string, unknown> = { event: name, properties: sanitized }
+      if (source.uuid !== undefined) result.uuid = source.uuid
+      if (source.timestamp !== undefined) result.timestamp = source.timestamp
+      return result as T
+    } catch {
+      return null
+    }
+  }
+}
+
+/** The web client's privacy boundary; see createAnalyticsPrivacyFilter. */
+export const webAnalyticsPrivacyFilter = createAnalyticsPrivacyFilter('web')
+/** The mobile client's privacy boundary; see createAnalyticsPrivacyFilter. */
+export const mobileAnalyticsPrivacyFilter = createAnalyticsPrivacyFilter('mobile')

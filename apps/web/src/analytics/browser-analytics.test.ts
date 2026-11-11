@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { BeforeSendFn, CaptureResult, PostHogConfig } from 'posthog-js'
 import {
   SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
-  stripPersonalAnalyticsData,
+  webAnalyticsPrivacyFilter,
 } from '@couture/api-client'
 
 const posthog = vi.hoisted(() => ({
@@ -175,7 +175,7 @@ describe('browser analytics initialization', () => {
     expect(posthog.init).toHaveBeenCalledExactlyOnceWith(
       'phc_project',
       expect.objectContaining({
-        before_send: [stripPersonalAnalyticsData, shareCardSharedBeforeSend],
+        before_send: [webAnalyticsPrivacyFilter, shareCardSharedBeforeSend],
       })
     )
     expect(window.__capturedAnalyticsEvents).toEqual([
@@ -231,6 +231,10 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
     mask_all_element_attributes: true,
     mask_personal_data_properties: true,
     person_profiles: 'identified_only',
+    // No /flags or remote config request, and no stored initial URL or referrer.
+    advanced_disable_flags: true,
+    save_referrer: false,
+    save_campaign_params: false,
   }
 
   it('turns off autocapture, recording and surveys and keeps pageviews and exceptions', async () => {
@@ -241,9 +245,6 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
       capture_exceptions: true,
       session_recording: { maskAllInputs: true, maskTextSelector: '*' },
     })
-    expect(options.custom_personal_data_properties).toEqual(
-      expect.arrayContaining(['email', 'name', 'birthdate'])
-    )
   })
 
   it('loads only the exception autocapture script; logs, remote config JS and the rest are blocked', async () => {
@@ -277,16 +278,17 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
     })
   })
 
-  it('sends no email, name or birthdate in event or person properties', async () => {
+  it('sends only allowlisted properties and no person updates', async () => {
     const hooks = (await initOptions(false)).before_send as BeforeSendFn[]
     const pageview: CaptureResult = {
       uuid: '0199-pageview',
       event: '$pageview',
       properties: {
-        $current_url: 'https://couturecast.app/',
+        $current_url: 'https://couturecast.app/profile/alice-smith?token=guardian-secret',
         email: 'member@example.test',
         name: 'Teen Member',
         birthdate: '2011-04-01',
+        plan_tier: 'premium',
         $set: { email: 'member@example.test' },
       },
       $set: { email: 'member@example.test', name: 'Teen Member', plan: 'premium' },
@@ -299,10 +301,7 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
     expect(sent).toEqual({
       uuid: '0199-pageview',
       event: '$pageview',
-      properties: { $current_url: 'https://couturecast.app/', $set: {} },
-      $set: { plan: 'premium' },
-      $set_once: {},
+      properties: { $current_url: 'https://couturecast.app/:unknown' },
     })
-    expect(JSON.stringify(sent)).not.toMatch(/member@example|Teen Member|2011-04-01/)
   })
 })

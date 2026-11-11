@@ -241,40 +241,51 @@ stays inert.
 
 CoutureCast has members aged 13 to 15 with guardian consent, and members upload wardrobe photos.
 The clients therefore send explicit events, pageviews or screens, and exceptions only, and every
-event passes a closed privacy policy before it leaves the device:
+boundary where data leaves the device is a closed allowlist:
 
 - Autocapture is off in every environment: web turns off autocapture, rage clicks, dead clicks and
-  heatmaps; mobile passes `autocapture={false}`, so no touch or screen autocapture. Feature code
-  sends named events, and the mobile root layout sends screens.
-- Session recording is off: `disable_session_recording: true` on web, `enableSessionReplay: false`
-  on mobile. Web also masks inputs, text and element attributes.
-- Surveys are off on both clients; web also turns off product tours and conversations.
-- Remote config cannot switch an extension on: posthog-js may load only its exception autocapture
-  script from `/ingest/static/`. Console logs, replay, surveys, toolbar, web vitals, site apps and
-  the remote config script are refused by `prepare_external_dependency_script`. This matters for
-  console logs: their exporter bypasses `before_send`, and a local `false` is no veto in posthog-js
-  1.356.
-- Person profiles are created for identified users only (`identified_only`).
-- `stripPersonalAnalyticsData` in [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts)
-  runs first in both `before_send` chains, over properties and `$set` / `$set_once` at every depth:
-  - email, name, birth date and phone keys are removed;
-  - every URL-bearing property (`$current_url`, `$pathname`, referrers, `$initial_*` and session
-    entry URLs, `url`, `rawUrl`, deep link fields, `$screen_name`) and every absolute URL string
-    keeps only its origin and route template: no query string, no fragment, and `:id` for each
-    path segment that is not a plain route word. A guardian invitation link becomes
-    `https://couturecast.app/guardian/accept`;
-  - exceptions keep their type, function names and line numbers. Messages lose emails, URLs
-    beyond their route, UUIDs, JWTs, long hex or base64 tokens and long digit runs, and stack
-    frame paths lose their query string;
-  - every other string has emails redacted.
-- Link analytics send no link values: web `deep_link_invalid.rawUrl` is the route template, mobile
-  sends `param_keys`, and the parse failure reason names the field and the issue code only.
+  heatmaps; mobile passes `autocapture={false}`. Feature code sends named events, and the mobile
+  root layout sends screens.
+- Session recording, surveys, product tours and conversations are off.
+- No feature flag or remote config request is made: neither app reads a PostHog flag, so web sets
+  `advanced_disable_flags` and mobile sets `preloadFeatureFlags: false` and
+  `disableRemoteConfig: true`. A `/flags` request would otherwise carry the initial URL in person
+  properties outside `before_send`. Web also stores no initial URL, referrer or campaign
+  properties (`save_referrer` and `save_campaign_params` are off), and masks `token`,
+  `focusToken` and `email` in the session entry URL posthog-js keeps in localStorage.
+- posthog-js may load only its exception autocapture script from `/ingest/static/`, so no remote
+  setting can start console logs (whose exporter bypasses `before_send`), replay, surveys,
+  toolbar, web vitals or site apps.
+- Person profiles are created for identified users only, and the clients never identify.
+- `webAnalyticsPrivacyFilter` and `mobileAnalyticsPrivacyFilter` in
+  [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts) run first in the
+  `before_send` chains:
+  - an event outside `ANALYTICS_EVENT_PROPERTIES` or the platform's SDK events is dropped;
+  - each event keeps only its listed properties, and a string survives only as an enum member, a
+    route template, an origin, a host, an SDK identifier or version, or a timestamp. Reasons are
+    fixed codes; ids, labels, titles and free text are dropped. Affiliate `partner_id`,
+    `offer_id` and `recommendation_id` are the one exception: server-issued catalog ids, kept
+    when they match a strict id pattern;
+  - SDK properties are limited to browser, OS, device, library, app version, screen size,
+    timestamps, session and anonymous ids, and the route-reduced page fields;
+  - paths, URLs and screens are matched against the routes in
+    [analytics-routes.ts](../../packages/api-client/src/analytics-routes.ts): a known route keeps
+    its static segments and sends `:param` for dynamic ones, anything else is `/:unknown`, and
+    external URLs and referrers keep their origin only. A test derives the route lists from
+    `apps/web/src/app` and `apps/mobile/app` and fails when a route is added without updating
+    them, and another fails when client code captures an event that has no allowlist entry;
+  - exceptions keep their type and in-app frames as file basename, line and column; the message
+    is replaced with `redacted`. Web stack frames therefore lose the full script URL that
+    PostHog uses for source map lookup;
+  - `$set` and `$set_once` never leave.
 
 The configuration lives in [browser-analytics.ts](../../apps/web/src/analytics/browser-analytics.ts)
 and [posthog.ts](../../apps/mobile/src/config/posthog.ts). The `U-ANALYTICS-PRIVACY-WEB` and
-`U-ANALYTICS-PRIVACY-MOBILE` wire tests decode the request bodies the real SDKs send and assert the
-invitation token, fragments, ids, emails and photo URLs never appear in them, and that a remote
-config asking for console logs never loads the logs extension.
+`U-ANALYTICS-PRIVACY-MOBILE` wire tests start a fresh client on the guardian invitation link,
+decode every request the real SDKs make (event batches and any base64 `data=` body), and assert
+that no flags or config request happens and that no token, email, name, birth date, personal
+UUID or personal path segment appears. They also assert that a remote config asking for console
+logs never loads the logs extension.
 
 ### Post-merge step: add the production keys
 

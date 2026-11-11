@@ -48,7 +48,7 @@ import {
 } from './posthog'
 import {
   SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
-  stripPersonalAnalyticsData,
+  mobileAnalyticsPrivacyFilter,
 } from '@couture/api-client'
 
 bootstrap.restoreConsole()
@@ -95,19 +95,22 @@ describe('mobile PostHog provider configuration', () => {
       fetchRetryCount: 3,
       requestTimeout: 10000,
       captureAppLifecycleEvents: true,
-      preloadFeatureFlags: true,
     })
   })
 
   /**
    * Production analytics privacy: members are 13 to 15 (with guardian consent) and
    * upload wardrobe photos, so the app sends explicit events, screens and exceptions
-   * only. No session replay, no surveys, no person profile for anonymous members.
+   * only. No session replay, no surveys, no person profile for anonymous members, and
+   * no feature flag or remote config request (the app reads no PostHog flag).
    */
-  it('U-ANALYTICS-PRIVACY-MOBILE: turns replay and surveys off and exceptions on', () => {
+  it('U-ANALYTICS-PRIVACY-MOBILE: turns replay, surveys and flags off and exceptions on', () => {
     expect(bootstrap.constructions[0]?.options).toMatchObject({
       enableSessionReplay: false,
       disableSurveys: true,
+      disableRemoteConfig: true,
+      preloadFeatureFlags: false,
+      sendFeatureFlagEvent: false,
       personProfiles: 'identified_only',
       errorTracking: {
         autocapture: {
@@ -119,29 +122,25 @@ describe('mobile PostHog provider configuration', () => {
     })
   })
 
-  it('U-ANALYTICS-PRIVACY-MOBILE: sends no email, name or birthdate in any event', () => {
+  it('U-ANALYTICS-PRIVACY-MOBILE: runs the privacy filter first, then the share allowlist', () => {
     const hooks = bootstrap.constructions[0]?.options.before_send as ((
       event: HookEvent | null
     ) => HookEvent | null)[]
-    expect(hooks).toEqual([stripPersonalAnalyticsData, mobilePostHogBeforeSend])
-    const opened: HookEvent = {
-      event: 'app_opened',
+    expect(hooks).toEqual([mobileAnalyticsPrivacyFilter, mobilePostHogBeforeSend])
+    const viewed: HookEvent = {
+      event: 'tab_one_viewed',
       properties: {
         locale: 'en-US',
         email: 'member@example.com',
         displayName: 'Teen Member',
         date_of_birth: '2011-04-01',
+        $device_name: "Alice's iPhone",
       } as HookEvent['properties'],
       $set: { email: 'member@example.com', plan: 'premium' } as HookEvent['$set'],
       $set_once: { birthdate: '2011-04-01' } as HookEvent['$set'],
     }
-    const sent = hooks.reduce<HookEvent | null>((event, hook) => hook(event), opened)
-    expect(sent).toEqual({
-      event: 'app_opened',
-      properties: { locale: 'en-US' },
-      $set: { plan: 'premium' },
-      $set_once: {},
-    })
+    const sent = hooks.reduce<HookEvent | null>((event, hook) => hook(event), viewed)
+    expect(sent).toEqual({ event: 'tab_one_viewed', properties: { locale: 'en-US' } })
   })
 
   /** The legacy alias must stay the same instance while the facade rolls out. */
@@ -188,7 +187,7 @@ const enriched = {
 describe('U-SHARE-SANITIZER-MOBILE: before_send for share_card_shared', () => {
   it('installs the exported hook as the last SDK before_send hook', () => {
     expect(bootstrap.constructions[0]?.options.before_send).toEqual([
-      stripPersonalAnalyticsData,
+      mobileAnalyticsPrivacyFilter,
       mobilePostHogBeforeSend,
     ])
   })

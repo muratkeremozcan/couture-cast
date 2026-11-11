@@ -189,10 +189,9 @@ function RootLayoutNav() {
 
       trackMobileAlertReceived(mobileAnalyticsClient, {
         userId: mobileAnalyticsClient.getDistinctId() || 'mobile-anonymous-user',
+        // Never the notification title: it is free text and may name the member.
         alertType:
-          (typeof data?.alertType === 'string' && data.alertType) ||
-          notification.request.content.title ||
-          'push_notification',
+          (typeof data?.alertType === 'string' && data.alertType) || 'push_notification',
         severity,
         weatherSeverity:
           typeof data?.weatherSeverity === 'string' ? data.weatherSeverity : undefined,

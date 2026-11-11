@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PERSONAL_ANALYTICS_PROPERTY_KEYS,
-  sanitizeAnalyticsUrl,
-  scrubAnalyticsText,
-  stripPersonalAnalyticsData,
+  EXCEPTION_MESSAGE_PLACEHOLDER,
+  analyticsOriginUrl,
+  analyticsRouteUrl,
+  mobileAnalyticsPrivacyFilter,
+  webAnalyticsPrivacyFilter,
 } from '../src'
 
 type Event = {
   event: string
+  uuid?: string
   timestamp?: Date
   properties?: Record<string, unknown>
   $set?: Record<string, unknown>
@@ -18,140 +20,311 @@ type Event = {
 // and the guardian's email.
 const invitationToken =
   'eyJhbGciOiJIUzI1NiJ9.eyJ0ZWVuSWQiOiJ0ZWVuLTEiLCJndWFyZGlhbkVtYWlsIjoiZ0BleC50ZXN0In0.c2lnbmF0dXJl'
-const invitationUrl = `https://couturecast.app/guardian/accept?token=${invitationToken}#consent`
+const personalUuid = '01234567-89ab-cdef-0123-456789abcdef'
+const sdk = {
+  token: 'phc_project',
+  distinct_id: '0192f0c4-0000-7000-8000-000000000001',
+  $session_id: '0192f0c4-0000-7000-8000-000000000002',
+  $lib: 'web',
+  $lib_version: '1.356.1',
+  $browser: 'Chrome',
+  $browser_version: 130,
+  $os: 'Mac OS X',
+  $device_type: 'Desktop',
+  $screen_width: 1440,
+  $process_person_profile: false,
+}
+// Everything posthog-js or a careless caller could add that must never leave.
+const hostile = {
+  email: 'teen@example.test',
+  name: 'Alice Smith',
+  birthdate: '2011-04-01',
+  plan_tier: 'premium',
+  $raw_user_agent: 'Mozilla/5.0',
+  $timezone: 'America/Chicago',
+  $device_name: "Alice's iPhone",
+  $session_entry_url: `https://couturecast.app/guardian/accept?token=${invitationToken}`,
+  $initial_current_url: `https://couturecast.app/guardian/accept?token=${invitationToken}`,
+  $set: { email: 'teen@example.test' },
+}
+const leaks = [
+  invitationToken,
+  'eyJ',
+  'teen@example',
+  'teen%40example',
+  'Alice',
+  'alice',
+  '2011-04-01',
+  personalUuid,
+  'guardian-secret',
+  'hidden',
+]
+const expectNoLeak = (value: unknown) => {
+  const serialized = JSON.stringify(value)
+  for (const leak of leaks) expect(serialized).not.toContain(leak)
+}
 
-describe('stripPersonalAnalyticsData: personal keys', () => {
-  it('names email, name and birthdate keys in the frozen denylist', () => {
-    expect(PERSONAL_ANALYTICS_PROPERTY_KEYS).toEqual(
-      expect.arrayContaining(['email', 'name', 'birthdate', 'date_of_birth'])
-    )
-    expect(Object.isFrozen(PERSONAL_ANALYTICS_PROPERTY_KEYS)).toBe(true)
+describe('analytics privacy filter: events and properties', () => {
+  it('keeps the envelope and only allowlisted, valid properties of an explicit event', () => {
+    const timestamp = new Date('2026-11-11T12:00:00.000Z')
+    const sent = webAnalyticsPrivacyFilter<Event>({
+      uuid: '0199-event',
+      event: 'ritual_created',
+      timestamp,
+      properties: {
+        ...sdk,
+        ...hostile,
+        ritual_type: 'daily_outfit',
+        weather_context: 'rain',
+        timestamp: '2026-11-11T12:00:00.000Z',
+        user_id: 'web-anonymous-user',
+        location_id: 'America/Chicago',
+        locale: 'de-DE',
+      },
+      $set: { email: 'teen@example.test' },
+      $set_once: { birthdate: '2011-04-01' },
+    })
+    expect(sent).toEqual({
+      uuid: '0199-event',
+      event: 'ritual_created',
+      timestamp,
+      properties: {
+        ...sdk,
+        ritual_type: 'daily_outfit',
+        weather_context: 'rain',
+        timestamp: '2026-11-11T12:00:00.000Z',
+        locale: 'de-DE',
+      },
+    })
+    expectNoLeak(sent)
   })
 
-  it('removes personal keys at every depth, in objects and arrays', () => {
-    const event: Event = {
-      event: '$pageview',
+  it('drops strings outside their enum and values of the wrong type', () => {
+    const sent = mobileAnalyticsPrivacyFilter<Event>({
+      event: 'alert_received',
       properties: {
-        locale: 'en-US',
-        email: 'member@example.test',
-        $name: 'Teen Member',
-        firstName: 'Teen',
-        'Date-Of-Birth': '2011-04-01',
-        member: { display_name: 'Teen Member', plan: 'premium' },
-        members: [{ username: 'teen', role: 'teen' }],
-        $set: { email: 'member@example.test', plan: 'premium' },
-        $set_once: { birthdate: '2011-04-01', first_seen: 'today' },
+        alert_type: 'Storm warning for Alice at 12 Elm St',
+        severity: 'critical',
+        weather_severity: 'severe',
+        timestamp: 'yesterday',
+        locale: 'xx-XX',
       },
-      $set: { display_name: 'Teen Member', plan: 'premium' },
-      $set_once: { BIRTHDAY: '04-01', first_seen: 'today' },
-    }
-    expect(stripPersonalAnalyticsData(event)).toEqual({
-      event: '$pageview',
-      properties: {
-        locale: 'en-US',
-        member: { plan: 'premium' },
-        members: [{ role: 'teen' }],
-        $set: { plan: 'premium' },
-        $set_once: { first_seen: 'today' },
-      },
-      $set: { plan: 'premium' },
-      $set_once: { first_seen: 'today' },
     })
-    // The caller's event is left as it was.
-    expect(event.properties).toHaveProperty('email', 'member@example.test')
+    expect(sent?.properties).toEqual({ severity: 'critical', weather_severity: 'severe' })
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: 'deep_link_invalid',
+        properties: {
+          reason: `token=${invitationToken}`,
+          param_keys: ['source', 'email', invitationToken],
+          surface: 'web',
+        },
+      })?.properties
+    ).toEqual({ param_keys: ['source'], surface: 'web' })
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: 'lookbook_prism_viewed',
+        properties: { viewportWidth: '1440', layoutMode: 'split' },
+      })?.properties
+    ).toEqual({ layoutMode: 'split' })
+  })
+
+  it('drops events outside the allowlist, person updates included', () => {
+    for (const event of ['$identify', '$set', '$autocapture', 'moderation_case_viewed'])
+      expect(
+        webAnalyticsPrivacyFilter<Event>({ event, properties: { ...sdk } })
+      ).toBeNull()
+    // Each client keeps only its own SDK events.
+    expect(
+      webAnalyticsPrivacyFilter<Event>({ event: '$screen', properties: {} })
+    ).toBeNull()
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({ event: '$pageview', properties: {} })
+    ).toBeNull()
+    expect(webAnalyticsPrivacyFilter(null)).toBeNull()
+    expect(webAnalyticsPrivacyFilter({ properties: {} })).toBeNull()
+  })
+
+  it('drops the event instead of throwing when reading it fails', () => {
+    const properties = Object.defineProperty({}, 'locale', {
+      enumerable: true,
+      get() {
+        throw new Error('teen@example.test')
+      },
+    })
+    expect(() =>
+      webAnalyticsPrivacyFilter({ event: 'modal_opened', properties })
+    ).not.toThrow()
+    expect(webAnalyticsPrivacyFilter({ event: 'modal_opened', properties })).toBeNull()
+    expect(webAnalyticsPrivacyFilter({ event: 'modal_opened' })).toEqual({
+      event: 'modal_opened',
+      properties: {},
+    })
   })
 })
 
-describe('stripPersonalAnalyticsData: URLs keep only origin and route template', () => {
-  it('reduces every URL-bearing property, initial and session props included', () => {
-    const sent = stripPersonalAnalyticsData({
-      event: '$pageview',
-      properties: {
-        $current_url: invitationUrl,
-        $pathname: '/moderation/cases/case-123',
-        $referrer: 'https://mail.example/inbox/msg-42?to=g@ex.test',
-        $referring_domain: 'mail.example',
-        $session_entry_url: 'https://couturecast.app/community/posts/0192f0c4?ref=x',
-        $prev_pageview_pathname: '/teen/dashboard',
-        rawUrl: 'https://couturecast.app/?cardId=card-9&email=teen%40example.test',
-        url: 'couturecast://guardian-accept?token=secret#frag',
-        deep_link: '{"cardId":"card-9","email":"teen@example.test"}',
-        $screen_name: '/community/post-123',
-        $host: 'couturecast.app',
-        distinct_id: '0192f0c4-0000-7000-8000-000000000001',
-        token: 'phc_project',
-      },
-      $set_once: {
-        $initial_current_url: invitationUrl,
-        $initial_person_info: { r: '$direct', u: invitationUrl },
-      },
+describe('analytics privacy filter: value rules', () => {
+  it('keeps valid values and drops invalid ones for every rule type', () => {
+    const properties = Object.assign(Object.create(null) as Record<string, unknown>, {
+      interactionType: 'ribbon_toggle',
+      isExpanded: 'yes',
+      scenario: 'morning',
     })
-    expect(sent).toEqual({
-      event: '$pageview',
-      properties: {
-        $current_url: 'https://couturecast.app/guardian/accept',
-        $pathname: '/moderation/cases/:id',
-        $referrer: 'https://mail.example/inbox/:id',
-        $referring_domain: 'mail.example',
-        $session_entry_url: 'https://couturecast.app/community/posts/:id',
-        $prev_pageview_pathname: '/teen/dashboard',
-        rawUrl: 'https://couturecast.app/',
-        url: 'couturecast://guardian-accept',
-        deep_link: '[redacted]',
-        $screen_name: '/community/:id',
-        $host: 'couturecast.app',
-        distinct_id: '0192f0c4-0000-7000-8000-000000000001',
-        token: 'phc_project',
-      },
-      $set_once: {
-        $initial_current_url: 'https://couturecast.app/guardian/accept',
-        $initial_person_info: {
-          r: '$direct',
-          u: 'https://couturecast.app/guardian/accept',
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({ event: 'hero_interaction', properties })
+        ?.properties
+    ).toEqual({ interactionType: 'ribbon_toggle', scenario: 'morning' })
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: 'lookbook_prism_viewed',
+        properties: { viewportWidth: 1440, layoutMode: 'mobile' },
+      })?.properties
+    ).toEqual({ viewportWidth: 1440, layoutMode: 'mobile' })
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: 'share_card_shared',
+        properties: { duration_ms: Number.NaN, client: 'web' },
+      })?.properties
+    ).toEqual({ client: 'web' })
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: 'deep_link_invalid',
+        properties: { param_keys: 'source', reason: 'Deep link expired' },
+      })?.properties
+    ).toEqual({ reason: 'Deep link expired' })
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: 'external_link_tapped',
+        properties: { url: 42 },
+      })?.properties
+    ).toEqual({})
+  })
+
+  it('sends a bare exception entry as type, placeholder and an empty stack', () => {
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: '$exception',
+        properties: {
+          $exception_list: [
+            {
+              type: 'TypeError',
+              stacktrace: {
+                frames: [{ filename: 42, in_app: true, lineno: 'x', platform: 'alice' }],
+              },
+            },
+          ],
         },
-      },
+      })?.properties
+    ).toEqual({
+      $exception_list: [
+        {
+          type: 'TypeError',
+          value: EXCEPTION_MESSAGE_PLACEHOLDER,
+          mechanism: { type: 'generic', handled: false, synthetic: false },
+          stacktrace: { type: 'raw', frames: [{ filename: '<unknown>', in_app: true }] },
+        },
+      ],
     })
   })
+})
 
-  it('templates ids, drops user info, query and fragment, and keeps route words', () => {
-    expect(sanitizeAnalyticsUrl('https://user:pass@CoutureCast.app/a/b2/c?x#y')).toBe(
-      'https://couturecast.app/a/:id/c'
-    )
-    expect(sanitizeAnalyticsUrl('couturecast://post-1/comments')).toBe(
-      'couturecast://:id/comments'
-    )
-    expect(sanitizeAnalyticsUrl('/(tabs)/wardrobe/teen@example.test')).toBe(
-      '/(tabs)/wardrobe/:id'
-    )
-    expect(sanitizeAnalyticsUrl('community-notification')).toBe('community-notification')
-    expect(sanitizeAnalyticsUrl('')).toBe('')
-    expect(sanitizeAnalyticsUrl('card-9')).toBe('[redacted]')
-  })
-
-  it('reduces absolute URLs and redacts emails in any other string', () => {
-    const sent = stripPersonalAnalyticsData({
-      event: 'external_link_tapped',
+describe('analytics privacy filter: URLs, paths and screens', () => {
+  it('sends known routes as templates and everything else as /:unknown', () => {
+    const sent = webAnalyticsPrivacyFilter<Event>({
+      event: '$pageview',
       properties: {
-        target: 'https://weather.example/alerts/123?zip=60601',
-        note: `opened ${invitationUrl} for teen@example.test`,
-        tags: ['https://cdn.example/p/photo.jpg?sig=abc', 'plain'],
+        $current_url: `https://CoutureCast.app/guardian/accept?token=${invitationToken}&email=teen%40example.test#frag`,
+        $pathname: '/moderation/cases/case-123',
+        $prev_pageview_pathname: '/profile/alice-smith/reset/guardian-secret',
+        $referrer: `https://mail.example/inbox/alice-smith?token=${invitationToken}`,
+        $referring_domain: 'mail.example',
+        $host: 'couturecast.app',
       },
     })
     expect(sent?.properties).toEqual({
-      target: 'https://weather.example/alerts/:id',
-      note: 'opened https://couturecast.app/guardian/accept for [email]',
-      tags: ['https://cdn.example/p/:id', 'plain'],
+      $current_url: 'https://couturecast.app/guardian/accept',
+      $pathname: '/moderation/cases/:param',
+      $prev_pageview_pathname: '/:unknown',
+      $referrer: 'https://mail.example',
+      $referring_domain: 'mail.example',
+      $host: 'couturecast.app',
     })
+    expectNoLeak(sent)
+  })
+
+  it('covers mobile screens, previous screens and lifecycle links', () => {
+    const screen = mobileAnalyticsPrivacyFilter<Event>({
+      event: '$screen',
+      properties: {
+        $screen_name: '/community',
+        previous_screen: '/profile/alice-smith',
+        $device_name: "Alice's iPhone",
+        $app_version: '1.4.0',
+      },
+    })
+    expect(screen?.properties).toEqual({
+      $screen_name: '/community',
+      previous_screen: '/:unknown',
+      $app_version: '1.4.0',
+    })
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: '$screen',
+        properties: { $screen_name: '/', previous_screen: null },
+      })?.properties
+    ).toEqual({ $screen_name: '/', previous_screen: null })
+    const opened = mobileAnalyticsPrivacyFilter<Event>({
+      event: 'Application Opened',
+      properties: {
+        url: `couturecast://guardian-accept?token=${invitationToken}#frag`,
+        from_background: false,
+      },
+    })
+    expect(opened?.properties).toEqual({
+      url: 'couturecast://guardian-accept',
+      from_background: false,
+    })
+  })
+
+  it('treats bare tokens and non-URLs as unknown and keeps only origins of external links', () => {
+    expect(analyticsRouteUrl(invitationToken, 'web')).toBe('/:unknown')
+    expect(analyticsRouteUrl('community-notification', 'mobile')).toBe('/:unknown')
+    expect(analyticsRouteUrl('https://u:p@couturecast.app/', 'web')).toBe(
+      'https://couturecast.app/'
+    )
+    expect(analyticsRouteUrl('https://bad host/wardrobe', 'web')).toBe(
+      'https:///wardrobe'
+    )
+    expect(analyticsRouteUrl('exp://192.168.1.5:8081/--/post/1', 'mobile')).toBe(
+      'exp://:unknown'
+    )
+    expect(analyticsOriginUrl('https://weather.example/alerts/alice?zip=60601')).toBe(
+      'https://weather.example'
+    )
+    expect(analyticsOriginUrl('couturecast://guardian-accept?token=x')).toBe(
+      'couturecast://'
+    )
+    expect(analyticsOriginUrl('/relative')).toBeUndefined()
+    expect(analyticsOriginUrl('https://bad host/')).toBeUndefined()
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: 'external_link_tapped',
+        properties: { url: 'https://weather.example/alerts/alice-smith?zip=60601' },
+      })?.properties
+    ).toEqual({ url: 'https://weather.example' })
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: '$pageview',
+        properties: { $referrer: invitationToken, $current_url: 42 },
+      })?.properties
+    ).toEqual({})
   })
 })
 
-describe('stripPersonalAnalyticsData: exception payloads', () => {
-  it('keeps types and code locations and scrubs messages and frame URLs', () => {
-    const message =
-      'Photo upload failed for teen@example.test: https://cdn.test/private-photo.jpg?token=photo-secret ' +
-      `id 0192f0c4-0000-7000-8000-000000000001 sig deadbeefdeadbeefdeadbeef jwt ${invitationToken} ` +
-      'key AbC123dEf456GhI789jKl012 phone 3125550100'
-    const sent = stripPersonalAnalyticsData({
+describe('analytics privacy filter: exceptions', () => {
+  it('sends the type and in-app frames as basename, line and column only', () => {
+    const message = `Invalid token=guardian-secret for Alice Smith, DOB 2011-04-01, email teen%40example.test ${invitationToken}`
+    const sent = webAnalyticsPrivacyFilter<Event>({
       event: '$exception',
       properties: {
         $exception_level: 'error',
@@ -162,94 +335,83 @@ describe('stripPersonalAnalyticsData: exception payloads', () => {
           {
             type: 'UploadError',
             value: message,
-            mechanism: { type: 'onunhandledrejection', handled: false },
+            module: 'alice',
+            mechanism: { type: 'onunhandledrejection', handled: false, extra: message },
             stacktrace: {
-              type: 'raw',
+              type: 'resolved',
               frames: [
                 {
                   platform: 'web:javascript',
                   filename:
                     'https://couturecast.app/_next/static/chunks/app-4f2a.js?dpl=x#L1',
-                  abs_path: 'file:///var/mobile/photo.jpg?token=photo-secret',
-                  function: 'uploadGarmentPhoto',
+                  abs_path:
+                    'https://couturecast.app/_next/static/chunks/app-4f2a.js?dpl=x',
+                  function: 'uploadAliceSmithPhoto',
                   lineno: 12,
                   colno: 4,
                   in_app: true,
+                  context_line: message,
+                },
+                {
+                  platform: 'web:javascript',
+                  filename: `https://cdn.test/private/${personalUuid}/teen%40example.test.jpg?token=hidden`,
+                  lineno: 3,
+                  in_app: true,
+                },
+                {
+                  filename: 'https://third-party.example/sdk.js',
+                  lineno: 1,
+                  colno: 1,
+                  in_app: false,
                 },
               ],
             },
           },
+          { type: 'not a type', mechanism: { type: 'alice' } },
+          'not an entry',
         ],
       },
     })
-    const scrubbed =
-      'Photo upload failed for [email]: https://cdn.test/:id id [id] sig [token] jwt [token] key [token] phone [number]'
     expect(sent?.properties).toEqual({
       $exception_level: 'error',
-      $exception_message: scrubbed,
-      $exception_types: ['UploadError'],
-      $exception_values: [scrubbed],
       $exception_list: [
         {
           type: 'UploadError',
-          value: scrubbed,
-          mechanism: { type: 'onunhandledrejection', handled: false },
+          value: EXCEPTION_MESSAGE_PLACEHOLDER,
+          mechanism: { type: 'onunhandledrejection', handled: false, synthetic: false },
           stacktrace: {
             type: 'raw',
             frames: [
               {
                 platform: 'web:javascript',
-                filename: 'https://couturecast.app/_next/static/chunks/app-4f2a.js',
-                abs_path: 'file:///var/mobile/photo.jpg',
-                function: 'uploadGarmentPhoto',
+                filename: 'app-4f2a.js',
                 lineno: 12,
                 colno: 4,
+                in_app: true,
+              },
+              {
+                platform: 'web:javascript',
+                filename: '<unknown>',
+                lineno: 3,
                 in_app: true,
               },
             ],
           },
         },
+        {
+          type: 'Error',
+          value: EXCEPTION_MESSAGE_PLACEHOLDER,
+          mechanism: { type: 'generic', handled: false, synthetic: false },
+          stacktrace: { type: 'raw', frames: [] },
+        },
       ],
     })
-    expect(scrubAnalyticsText('TypeError: x is undefined')).toBe(
-      'TypeError: x is undefined'
-    )
-  })
-})
-
-describe('stripPersonalAnalyticsData: envelope and failure', () => {
-  it('keeps the envelope, drops cycles and passes null through', () => {
-    const timestamp = new Date('2026-11-11T12:00:00.000Z')
-    const properties: Record<string, unknown> = { locale: 'en-US', when: timestamp }
-    properties.self = properties
-    properties.list = [properties, 'kept']
-    const sent = stripPersonalAnalyticsData({ event: 'cyclic', timestamp, properties })
-    expect(sent).toEqual({
-      event: 'cyclic',
-      timestamp,
-      properties: { locale: 'en-US', when: timestamp, list: ['kept'] },
-    })
-    expect(sent?.timestamp).toBe(timestamp)
-    expect(stripPersonalAnalyticsData({ event: 'no_properties' })).toEqual({
-      event: 'no_properties',
-    })
-    expect(stripPersonalAnalyticsData(null)).toBeNull()
-  })
-
-  it('leaves non-object data fields alone', () => {
-    const event = { event: 'odd', properties: 'not-an-object', $set: ['email'] }
-    expect(stripPersonalAnalyticsData(event)).toEqual(event)
-  })
-
-  it('drops the event instead of throwing when reading it fails', () => {
-    const properties = Object.defineProperty({}, 'email_hint', {
-      enumerable: true,
-      get() {
-        throw new Error('member@example.test')
-      },
-    })
-    const hostile = { event: 'x', properties }
-    expect(() => stripPersonalAnalyticsData(hostile)).not.toThrow()
-    expect(stripPersonalAnalyticsData(hostile)).toBeNull()
+    expectNoLeak(sent)
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: '$exception',
+        properties: { $exception_list: 'Alice', $exception_level: 'alice' },
+      })?.properties
+    ).toEqual({})
   })
 })

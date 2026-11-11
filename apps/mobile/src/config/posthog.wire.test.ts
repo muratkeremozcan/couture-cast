@@ -125,7 +125,7 @@ async function captureShare() {
     $set: { email: 'member@example.com' },
     $set_once: { first_url: sensitiveUrl },
   })
-  client.capture('app_opened', { locale: 'en-US' })
+  client.capture('tab_one_viewed', { locale: 'en-US' })
 }
 
 describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => {
@@ -202,36 +202,29 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       duration_ms: 2150,
       locale: 'en-US',
     })
-    // Other events keep their own properties, their URLs reduced to a route template.
-    const opened = request!.batch.find((item) => item.event === 'app_opened')
-    expect((opened?.properties as Record<string, unknown>).$current_url).toBe(
-      'https://couturecast.app/share/:id'
-    )
+    // Other events keep their own allowlist: no super property, a route URL.
+    const viewed = request!.batch.find((item) => item.event === 'tab_one_viewed')
+    expect(viewed?.properties).toMatchObject({
+      locale: 'en-US',
+      $current_url: 'https://couturecast.app/:unknown',
+    })
+    expect(viewed?.properties).not.toHaveProperty('registered_super_property')
   })
 
-  it('U-ANALYTICS-PRIVACY-MOBILE: sends no email, name or birthdate on the wire', async () => {
+  it('U-ANALYTICS-PRIVACY-MOBILE: sends no person update or personal property on the wire', async () => {
     await client.ready()
-    client.identify('member-123', {
-      email: 'member@example.com',
-      name: 'Teen Member',
-      plan: 'premium',
-    })
-    client.capture('app_opened', {
+    client.identify('member-123', { email: 'member@example.com', name: 'Alice Smith' })
+    client.capture('tab_one_viewed', {
       locale: 'en-US',
       email: 'member@example.com',
       birthdate: '2011-04-01',
-      $set: { firstName: 'Teen' },
-      $set_once: { date_of_birth: '2011-04-01' },
+      $set: { firstName: 'Alice' },
     })
     const items = (await flushedBatches()).flatMap((batch) => batch.batch)
-    const opened = items.find((item) => item.event === 'app_opened')
-    expect(opened?.properties).toMatchObject({ locale: 'en-US' })
-    const identified = items.find((item) => item.event === '$identify')
-    expect((identified?.properties as Record<string, unknown>).$set).toEqual({
-      plan: 'premium',
-    })
+    expect(items.map((item) => item.event)).not.toContain('$identify')
+    expect(propertiesOf(items, 'tab_one_viewed')).toMatchObject({ locale: 'en-US' })
     const serialized = JSON.stringify(items)
-    for (const leak of ['member@example.com', 'Teen', '2011-04-01'])
+    for (const leak of ['member@example.com', 'Alice', '2011-04-01'])
       expect(serialized).not.toContain(leak)
   })
 
@@ -252,7 +245,7 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       const batches = await flushedBatches()
       const items = batches.flatMap((batch) => batch.batch)
       expect(items.filter((item) => item.event === 'share_card_shared')).toEqual([])
-      expect(items.map((item) => item.event)).toContain('app_opened')
+      expect(items.map((item) => item.event)).toContain('tab_one_viewed')
       // One closed code per dropped share event, never the event or its properties.
       expect(new Set(warn.mock.calls.flat())).toEqual(
         new Set([
@@ -283,8 +276,8 @@ async function privacyBatch(scenario: (privacyClient: PostHog) => Promise<void>)
     persistence: 'memory',
     flushAt: 100,
     flushInterval: 0,
-    preloadFeatureFlags: false,
     fetchRetryCount: 0,
+    // The app's own privacy options decide flags and remote config here.
     ...mobilePostHogPrivacyOptions,
     // Exceptions are captured explicitly below; the runner keeps its own global handlers.
     errorTracking: { autocapture: false },
@@ -312,22 +305,35 @@ async function sentItems() {
 }
 const propertiesOf = (items: Record<string, unknown>[], event: string) =>
   items.find((item) => item.event === event)?.properties as Record<string, unknown>
+const personalUuid = '01234567-89ab-cdef-0123-456789abcdef'
 const leaks = [
   invitationToken,
   'eyJ',
   'teen@example.test',
   'teen%40example.test',
   'frag-teen',
+  'Alice',
+  'alice',
+  '2011-04-01',
+  personalUuid,
+  'guardian-secret',
   'post-123',
   'card-9',
   'private-photo',
   'photo-secret',
 ]
+/** Every request the client made, by URL: only event batches, never flags or config. */
+function requestUrls() {
+  return (fetchMock.mock.calls as [string, RequestInit][]).map(([url]) => String(url))
+}
 
 describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
   it('sends link URLs as origin and route template only', async () => {
     const items = await privacyBatch(async (privacyClient) => {
       const analytics = createMobileAnalyticsClient(privacyClient)
+      await privacyClient.screen('/community', {
+        previous_screen: '/profile/alice-smith',
+      })
       await privacyClient.screen('/community/post-123')
       await processMobileDeepLink({
         params: { source: 'bad_source', email: 'teen@example.test', cardId: 'card-9' },
@@ -340,45 +346,54 @@ describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
         pushToCommunity: vi.fn(),
       })
       analytics.capture('external_link_tapped', {
-        url: 'https://couturecast.app/community/posts/post-123?ref=teen@example.test',
+        url: 'https://weather.example/alerts/alice-smith?ref=teen@example.test',
       })
     })
     expect(propertiesOf(items, 'Application Opened').url).toBe(
       'couturecast://guardian-accept'
     )
-    expect(propertiesOf(items, '$screen').$screen_name).toBe('/community/:id')
+    const screens = items
+      .filter((item) => item.event === '$screen')
+      .map((item) => item.properties as Record<string, unknown>)
+    expect(screens[0]).toMatchObject({
+      $screen_name: '/community',
+      previous_screen: '/:unknown',
+    })
+    expect(screens[1]?.$screen_name).toBe('/:unknown')
+    for (const url of requestUrls()) expect(url).toMatch(/\/batch\/$/)
+    // Only known link parameter names: an unexpected name never leaves.
     expect(propertiesOf(items, 'deep_link_invalid').param_keys).toEqual([
       'cardId',
-      'email',
       'source',
     ])
     expect(propertiesOf(items, 'external_link_tapped').url).toBe(
-      'https://couturecast.app/community/posts/:id'
+      'https://weather.example'
     )
     const serialized = JSON.stringify(items)
     for (const leak of leaks) expect(serialized).not.toContain(leak)
   })
 
-  it('sends exceptions with their type and without personal text', async () => {
+  it('sends exceptions as type and code locations only', async () => {
     const items = await privacyBatch((privacyClient) => {
       privacyClient.captureException(
         new Error(
-          `Photo upload failed for teen@example.test: https://cdn.test/private-photo.jpg?token=photo-secret ${invitationToken}`
+          `Invalid token=guardian-secret for Alice Smith, DOB 2011-04-01, email teen%40example.test ${invitationToken} https://cdn.test/private/${personalUuid}/private-photo.jpg?token=photo-secret`
         )
       )
       return Promise.resolve()
     })
-    const [entry] = propertiesOf(items, '$exception').$exception_list as {
+    const exception = propertiesOf(items, '$exception')
+    expect(Object.keys(exception)).not.toContain('$exception_values')
+    const [entry] = exception.$exception_list as {
       type: string
       value: string
-      stacktrace?: { frames: { filename?: string; abs_path?: string }[] }
+      stacktrace: { frames: Record<string, unknown>[] }
     }[]
     expect(entry!.type).toBe('Error')
-    expect(entry!.value).toBe(
-      'Photo upload failed for [email]: https://cdn.test/:id [token]'
-    )
-    for (const frame of entry!.stacktrace?.frames ?? [])
-      expect(`${frame.filename ?? ''}${frame.abs_path ?? ''}`).not.toMatch(/[?#]/)
+    expect(entry!.value).toBe('redacted')
+    for (const frame of entry!.stacktrace.frames)
+      expect(frame.filename).toMatch(/^(?:<unknown>|[A-Za-z0-9_.-]+)$/)
+    for (const url of requestUrls()) expect(url).toMatch(/\/batch\/$/)
     const serialized = JSON.stringify(items)
     for (const leak of leaks) expect(serialized).not.toContain(leak)
   })
