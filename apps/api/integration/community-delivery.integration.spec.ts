@@ -888,4 +888,54 @@ describe('Story 6.5 actual guarded provider boundary', () => {
     })
     expect(current.token).not.toBe(old.token)
   })
+
+  // A delivery whose send throws is moved 2 s on so it cannot hold a slot every pass. Without a
+  // bound that move repeats forever, past the group's expiry: nothing else ever settles the row.
+  it('6.5-INT-025: a delivery whose send keeps throwing expires with its group', async () => {
+    const { deliveries } = await fixture()
+    const delivery = deliveries[0]!
+    const past = new Date(Date.now() - 1000)
+    await prisma.communityNotificationGroup.update({
+      where: { id: delivery.group_id },
+      data: { expires_at: past },
+    })
+    await prisma.communityTokenDelivery.update({
+      where: { id: delivery.id },
+      data: { status: 'deferred', next_attempt_at: past },
+    })
+    const throwing = {
+      dispatch: () => Promise.reject(new Error('synthetic send failure')),
+    } as unknown as CommunitySendGuard
+    const pass = await new CommunityNotificationsWorker(prisma, throwing).dispatch()
+    expect(pass).toMatchObject({ selected: 1, failed: 1 })
+    expect(
+      await prisma.communityTokenDelivery.findUniqueOrThrow({
+        where: { id: delivery.id },
+      })
+    ).toMatchObject({ status: 'expired' })
+    expect(requests).toHaveLength(0)
+  })
+
+  it('6.5-INT-026: a throwing send before expiry is moved on, never past the expiry', async () => {
+    const { deliveries } = await fixture()
+    const delivery = deliveries[0]!
+    const expiresAt = new Date(Date.now() + 500)
+    await prisma.communityNotificationGroup.update({
+      where: { id: delivery.group_id },
+      data: { expires_at: expiresAt },
+    })
+    await prisma.communityTokenDelivery.update({
+      where: { id: delivery.id },
+      data: { status: 'deferred', next_attempt_at: new Date(Date.now() - 1000) },
+    })
+    const throwing = {
+      dispatch: () => Promise.reject(new Error('synthetic send failure')),
+    } as unknown as CommunitySendGuard
+    await new CommunityNotificationsWorker(prisma, throwing).dispatch()
+    const moved = await prisma.communityTokenDelivery.findUniqueOrThrow({
+      where: { id: delivery.id },
+    })
+    expect(moved.status).toBe('deferred')
+    expect(moved.next_attempt_at.getTime()).toBeLessThanOrEqual(expiresAt.getTime())
+  })
 })

@@ -9,13 +9,20 @@ import { PrismaClient } from '@prisma/client'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
 import { PostHogService } from '../src/posthog/posthog.service.js'
-import { CommunityFlagEvaluationService } from '../src/modules/feature-flags/community-flag-evaluation.service.js'
+import {
+  CommunityFlagEvaluationService,
+  CommunityUnavailableException,
+} from '../src/modules/feature-flags/community-flag-evaluation.service.js'
 
 const db = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: db.url } } })
 let server: Server
 let adapter: PostHogService
 let result: unknown = true
+// What the recorder answers: the evaluated flag, PostHog's definitive answer for a key the
+// project does not define (HTTP 200, no errors, the key left out), or that same omission
+// while PostHog reports an evaluation error.
+let answer: 'evaluated' | 'absent' | 'absent_with_errors' = 'evaluated'
 const calls: { body: unknown; agent: string | undefined }[] = []
 beforeAll(async () => {
   await db.migrate()
@@ -30,14 +37,17 @@ beforeAll(async () => {
       // Primary source: https://posthog.com/docs/api/flags, basic v2 response.
       response.end(
         JSON.stringify({
-          flags: {
-            community_read_enabled: {
-              key: 'community_read_enabled',
-              enabled: result,
-              reason: { code: 'condition_match' },
-            },
-          },
-          errorsWhileComputingFlags: false,
+          flags:
+            answer === 'evaluated'
+              ? {
+                  community_read_enabled: {
+                    key: 'community_read_enabled',
+                    enabled: result,
+                    reason: { code: 'condition_match' },
+                  },
+                }
+              : {},
+          errorsWhileComputingFlags: answer === 'absent_with_errors',
           requestId: randomUUID(),
         })
       )
@@ -79,4 +89,78 @@ describe('Story 6.5 actual remote flag adapter and HTTP recorder', () => {
       expect(calls).toHaveLength(previous + 1)
     }
   )
+
+  // Production 2026-11-11: the PostHog project the runtime read defined no
+  // community_read_enabled, so every claim saw a definitive "absent" and threw unavailable.
+  // Each delivery re-deferred about every 45 s until its group expired a day later. An absent
+  // key now resolves like every other flag read: the FeatureFlag fallback row, then the
+  // declared default, cached for one claim cadence.
+  describe('a key PostHog answers as absent', () => {
+    const evaluateAbsent = async (row: boolean | null) => {
+      answer = 'absent'
+      if (row === null)
+        await prisma.featureFlag.deleteMany({ where: { key: 'community_read_enabled' } })
+      else
+        await prisma.featureFlag.upsert({
+          where: { key: 'community_read_enabled' },
+          create: { key: 'community_read_enabled', value: row },
+          update: { value: row },
+        })
+      const member = await prisma.user.create({
+        data: { email: `story65-absent-${randomUUID()}@synthetic.test` },
+      })
+      const previous = calls.length
+      const cache = new CommunityFlagEvaluationService(
+        prisma,
+        adapter,
+        noComplimentaryGrants
+      )
+      try {
+        const first = await cache.evaluate(member.id)
+        const second = await cache.evaluate(member.id)
+        return {
+          first: first.value,
+          second: second.value,
+          calls: calls.length - previous,
+        }
+      } finally {
+        answer = 'evaluated'
+        await prisma.featureFlag.deleteMany({ where: { key: 'community_read_enabled' } })
+      }
+    }
+
+    it.each([true, false])(
+      '6.5-INT-010a: resolves to the fallback row %s and caches it with one network invocation',
+      async (row) => {
+        expect(await evaluateAbsent(row)).toEqual({ first: row, second: row, calls: 1 })
+      }
+    )
+
+    it('6.5-INT-010b: resolves to the declared default false when no fallback row exists', async () => {
+      expect(await evaluateAbsent(null)).toEqual({
+        first: false,
+        second: false,
+        calls: 1,
+      })
+    })
+
+    it('6.5-INT-010c: stays unavailable when PostHog reports an evaluation error', async () => {
+      answer = 'absent_with_errors'
+      try {
+        const member = await prisma.user.create({
+          data: { email: `story65-absent-error-${randomUUID()}@synthetic.test` },
+        })
+        const cache = new CommunityFlagEvaluationService(
+          prisma,
+          adapter,
+          noComplimentaryGrants
+        )
+        await expect(cache.evaluate(member.id)).rejects.toBeInstanceOf(
+          CommunityUnavailableException
+        )
+      } finally {
+        answer = 'evaluated'
+      }
+    })
+  })
 })

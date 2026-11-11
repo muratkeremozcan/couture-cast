@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
+import { coerceFeatureFlagValue, getDefaultFeatureFlagValue } from '@couture/config'
 import {
   InjectRemoteFeatureFlagProvider,
+  REMOTE_FLAG_ABSENT,
   type RemoteFeatureFlagProvider,
 } from './remote-feature-flag-provider.js'
 
@@ -273,8 +275,11 @@ export class CommunityFlagEvaluationService {
       const signal = AbortSignal.timeout(
         Math.max(1, Math.floor(invocationDeadline - performance.now()))
       )
-      // The row holds a remote answer or a complimentary grant (Story 6.14 D4), never a
-      // fallback or code default. A granted member is true without asking PostHog.
+      // The row holds a remote answer, a complimentary grant (Story 6.14 D4), or, when PostHog
+      // answers that the key does not exist, the FeatureFlag fallback row and then the declared
+      // default: the order every other flag read uses. An absent key is a definitive answer that
+      // retrying cannot change, so deferring on it only re-polled every 45 s until the group
+      // expired. An unreachable PostHog or an evaluation error still caches nothing.
       value = await Promise.race([
         this.complimentary
           .check(member, {
@@ -288,9 +293,11 @@ export class CommunityFlagEvaluationService {
             grantCheck = check
             return check === 'granted'
               ? true
-              : this.remote.getFeatureFlagValue('community_read_enabled', member, {
-                  signal,
-                })
+              : this.remote
+                  .getFeatureFlagValue('community_read_enabled', member, { signal })
+                  .then((answer) =>
+                    answer === REMOTE_FLAG_ABSENT ? this.fallback(budget) : answer
+                  )
           }),
         delay(Math.max(1, Math.floor(invocationDeadline - performance.now()))).then(
           () => undefined
@@ -346,6 +353,17 @@ export class CommunityFlagEvaluationService {
       throw error
     }
   }
+  /** The FeatureFlag fallback row, else the declared default. A failed read caches nothing. */
+  private async fallback(budget: CommunityAuthorizationBudget): Promise<boolean> {
+    const row = await budget.connection(() =>
+      this.prisma.featureFlag.findUnique({ where: { key: 'community_read_enabled' } })
+    )
+    return (
+      coerceFeatureFlagValue('community_read_enabled', row?.value) ??
+      getDefaultFeatureFlagValue('community_read_enabled')
+    )
+  }
+
   private async releaseFailedClaim(
     member: string,
     owner: string,

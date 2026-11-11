@@ -1,0 +1,57 @@
+# Fails when a flag declared in packages/config/src/flags.ts is missing from the production
+# PostHog project (couturecast-prod, 329012). On 2026-11-11 production read a project that defined
+# 4 of the 14 declared flags, and community push deliveries re-deferred for a day with nothing
+# reporting it. The hourly run turns a deleted or never-created flag into a red scheduled run,
+# which GitHub emails to the workflow's owner. A pull request that declares a new flag runs it
+# too, so the flag is created in production before the code that reads it merges.
+#
+# POSTHOG_PROD_PROJECT_TOKEN is a repository variable holding the project token, the public key
+# the production runtime already ships with; the check reads no rollout and needs no secret.
+name: PostHog flag drift
+
+on:
+  pull_request:
+    paths:
+      - 'packages/config/src/flags.ts'
+      - 'scripts/ci/posthog-flag-drift.mjs'
+      - 'scripts/ci/posthog-flag-drift.test.mjs'
+      - '.github/workflows/posthog-flag-drift.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'packages/config/src/flags.ts'
+      - 'scripts/ci/posthog-flag-drift.mjs'
+      - 'scripts/ci/posthog-flag-drift.test.mjs'
+      - '.github/workflows/posthog-flag-drift.yml'
+  schedule:
+    - cron: '23 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: posthog-flag-drift-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: Declared flags exist in production PostHog
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check the drift script
+        run: node --test scripts/ci/posthog-flag-drift.test.mjs
+
+      # Runs even when the script's own tests fail, so a broken test never hides real drift.
+      - name: Compare declared flags with production PostHog
+        if: ${{ !cancelled() }}
+        env:
+          POSTHOG_PROD_PROJECT_TOKEN: ${{ vars.POSTHOG_PROD_PROJECT_TOKEN }}
+        run: node scripts/ci/posthog-flag-drift.mjs
