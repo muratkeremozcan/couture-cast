@@ -1,7 +1,7 @@
 // Owner operator commands' database client (Story 6.14 follow-up).
 import { readFileSync } from 'node:fs'
 import { PrismaPg } from '@prisma/adapter-pg'
-import { PrismaClient } from '@prisma/client'
+import type { PrismaClient } from '@prisma/client'
 import {
   DatabaseTlsRefusedError,
   findDatabaseCa,
@@ -45,5 +45,5 @@ export function createOperatorPrismaClient(
     ssl: { ca: readCa(caPath), servername: host, rejectUnauthorized: true },
     max: 1,
   })
-  return new PrismaClient({ adapter })
+  return createPrismaClient({ adapter })
 }

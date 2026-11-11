@@ -2,7 +2,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const pgAdapter = vi.hoisted(() => vi.fn())
-const prismaCtor = vi.hoisted(() => vi.fn())
 const createPrismaClient = vi.hoisted(() => vi.fn(() => ({ kind: 'api-client' })))
 const findDatabaseCa = vi.hoisted(() =>
   vi.fn<() => string | undefined>(() => '/repo/apps/api/certs/ca.pem')
@@ -11,11 +10,6 @@ const findDatabaseCa = vi.hoisted(() =>
 vi.mock('@prisma/adapter-pg', () => ({
   PrismaPg: function PrismaPg(this: unknown, config: unknown) {
     pgAdapter(config)
-  },
-}))
-vi.mock('@prisma/client', () => ({
-  PrismaClient: function PrismaClient(this: unknown, options: unknown) {
-    prismaCtor(options)
   },
 }))
 vi.mock('./prisma-client.js', () => ({ createPrismaClient }))
@@ -53,9 +47,13 @@ describe('createOperatorPrismaClient', () => {
       },
       max: 1,
     })
-    const [options] = prismaCtor.mock.calls[0] as [{ adapter: unknown }]
+    // Through the central factory, so the retry extension wraps the operator client too.
+    expect(createPrismaClient).toHaveBeenCalledTimes(1)
+    const [options] = createPrismaClient.mock.calls[0] as unknown as [
+      { adapter: unknown },
+    ]
     expect(Object.keys(options)).toEqual(['adapter'])
-    expect(createPrismaClient).not.toHaveBeenCalled()
+    expect(options.adapter).toBeInstanceOf(Object)
   })
 
   it('refuses a remote database when the CA is missing', () => {
