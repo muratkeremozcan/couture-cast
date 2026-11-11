@@ -70,8 +70,12 @@ const provider = {
   },
 } as unknown as CommunityPushProvider
 
-/** Holds every new connection for `holdMs` before it reaches the database. */
-function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS) {
+/**
+ * Holds every new connection for `holdMs` before it reaches the database. With `stallOn`,
+ * a connection that sends that text stops receiving answers: the query is accepted and
+ * never answered.
+ */
+function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS, stallOn?: string) {
   const sockets = new Set<Socket>()
   let accepted = 0
   const server = createServer((client) => {
@@ -86,8 +90,14 @@ function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS) {
         upstream.destroy()
       }
       upstream.on('connect', () => {
-        client.pipe(upstream)
-        upstream.pipe(client)
+        let stalled = false
+        client.on('data', (chunk: Buffer) => {
+          if (stallOn && chunk.includes(stallOn)) stalled = true
+          upstream.write(chunk)
+        })
+        upstream.on('data', (chunk: Buffer) => {
+          if (!stalled) client.write(chunk)
+        })
         client.resume()
       })
       upstream.on('error', close)
@@ -118,14 +128,17 @@ const privacyVersion = (version: 0 | 1) =>
 
 const proxy = slowConnectProxy(new URL(db.url))
 const fastProxy = slowConnectProxy(new URL(db.url), 0)
+const stallingProxy = slowConnectProxy(new URL(db.url), 0, 'pg_sleep(0.1)')
 let guardUrl: string
 let fastGuardUrl: string
+let stallingGuardUrl: string
 beforeAll(async () => {
   expect(new URL(db.url).hostname).toBe('127.0.0.1')
   await db.migrate()
   await seedMemberFlagsOff(prisma)
   guardUrl = await proxy.listen()
   fastGuardUrl = await fastProxy.listen()
+  stallingGuardUrl = await stallingProxy.listen()
 }, 120_000)
 afterEach(() => {
   vi.unstubAllEnvs()
@@ -133,6 +146,7 @@ afterEach(() => {
 afterAll(async () => {
   await proxy.close()
   await fastProxy.close()
+  await stallingProxy.close()
   await prisma.$disconnect()
   await db.drop()
 })
@@ -266,6 +280,38 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     }
   })
 
+  it('reports guard_unreachable and finishes starting when the warm-up queries are never answered', async () => {
+    await privacyVersion(1)
+    vi.stubEnv('COMMUNITY_DISPATCH_ENABLED', 'true')
+    vi.stubEnv('COMMUNITY_ENGAGEMENT_OWNER', 'general')
+    vi.stubEnv('DATABASE_URL', db.url)
+    vi.stubEnv('COMMUNITY_GUARD_DATABASE_URL', stallingGuardUrl)
+    const started = Date.now()
+    const runtime = await startCommunityEngagementRuntime(
+      prisma,
+      remote.provider,
+      'general',
+      {
+        spotlightRedis: {
+          get: () => Promise.resolve(null),
+          set: () => Promise.resolve('OK' as const),
+          eval: () => Promise.resolve(1),
+          disconnect: () => undefined,
+        },
+      }
+    )
+    try {
+      expect(runtime.dispatch).toEqual({
+        status: 'degraded',
+        reason: 'guard_unreachable',
+      })
+      // The 10 s warm-up deadline, plus a bounded close of the stalled pool.
+      expect(Date.now() - started).toBeLessThan(20_000)
+    } finally {
+      await runtime.close()
+    }
+  })
+
   it('reports exactly the connections it opened when opening one is fast', async () => {
     await privacyVersion(1)
     const pool = new PrismaClient({
@@ -318,5 +364,44 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     expect(peak).toBe(slots)
     expect(selected).toEqual([slots, slots, slots, 2, 0])
     expect(new Set(handled)).toEqual(new Set(burst.map((delivery) => delivery.id)))
+  })
+
+  it('moves a delivery whose send keeps throwing past the slots so later deliveries are sent', async () => {
+    const slots = 4
+    const poisoned: { id: string }[] = []
+    for (let index = 0; index < slots; index++)
+      poisoned.push(await seededDelivery({ granted: false }))
+    const healthy: { id: string }[] = []
+    for (let index = 0; index < 6; index++)
+      healthy.push(await seededDelivery({ granted: false }))
+    await privacyVersion(0)
+    const poison = new Set(poisoned.map((delivery) => delivery.id))
+    const handled: string[] = []
+    const sender = {
+      dispatch: async (id: string) => {
+        if (poison.has(id)) throw new Error('claim lock busy')
+        await prisma.communityTokenDelivery.update({
+          where: { id },
+          data: { status: 'accepted' },
+        })
+        handled.push(id)
+        return true
+      },
+    }
+    const worker = new CommunityNotificationsWorker(prisma, sender, slots)
+    // Passes run back to back, well inside the 2 s the failed ones move on.
+    for (let pass = 0; pass < 4; pass++) await worker.dispatch()
+    expect(new Set(handled)).toEqual(new Set(healthy.map((delivery) => delivery.id)))
+    const later = await prisma.communityTokenDelivery.findMany({
+      where: { id: { in: [...poison] } },
+      select: { status: true, next_attempt_at: true },
+    })
+    const [clock] = await prisma.$queryRaw<
+      { now: Date }[]
+    >`SELECT clock_timestamp() AS now`
+    for (const delivery of later) {
+      expect(delivery.status).toBe('pending')
+      expect(delivery.next_attempt_at.getTime()).toBeGreaterThan(clock!.now.getTime())
+    }
   })
 })

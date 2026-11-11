@@ -56,6 +56,7 @@ describe('dispatch pass report', () => {
       $queryRaw: vi
         .fn()
         .mockResolvedValue([{ id: 'moved' }, { id: 'unchanged' }, { id: 'rejected' }]),
+      $executeRaw: vi.fn().mockResolvedValue(1),
     }
     const dispatch = vi.fn((id: string) =>
       id === 'rejected'
@@ -67,5 +68,19 @@ describe('dispatch pass report', () => {
     })
     await expect(worker.dispatch()).resolves.toEqual({ selected: 3, moved: 1, failed: 1 })
     expect(dispatch).toHaveBeenCalledTimes(3)
+    // Only the rejected delivery moves on, so it cannot hold a slot every pass.
+    expect(prisma.$executeRaw).toHaveBeenCalledTimes(1)
+    expect(prisma.$executeRaw.mock.calls[0]!.slice(1)).toEqual([['rejected']])
+  })
+
+  it('still resolves the pass when moving a rejected delivery on fails', async () => {
+    const prisma = {
+      $queryRaw: vi.fn().mockResolvedValue([{ id: 'rejected' }]),
+      $executeRaw: vi.fn().mockRejectedValue(new Error('database down')),
+    }
+    const worker = new CommunityNotificationsWorker(prisma as unknown as PrismaClient, {
+      dispatch: () => Promise.reject(new Error('lock timeout')),
+    })
+    await expect(worker.dispatch()).resolves.toEqual({ selected: 1, moved: 0, failed: 1 })
   })
 })

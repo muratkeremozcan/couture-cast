@@ -543,10 +543,25 @@ export class CommunityNotificationsWorker {
       due.map((delivery) => this.sender.dispatch(delivery.id))
     )
     let moved = 0
-    let failed = 0
-    for (const outcome of outcomes) {
-      if (outcome.status === 'rejected') failed += 1
+    const rejected: string[] = []
+    outcomes.forEach((outcome, index) => {
+      if (outcome.status === 'rejected') rejected.push(due[index]!.id)
       else if (outcome.value) moved += 1
+    })
+    const failed = rejected.length
+    // A send that threw before the guard settled it leaves its delivery due. Moving it 2 s on,
+    // as the guard does with its own deferrals, keeps a delivery that keeps failing from
+    // holding a slot every pass while later ones wait.
+    if (failed) {
+      try {
+        await this.prisma.$executeRaw`
+            UPDATE "CommunityTokenDelivery" SET next_attempt_at = clock_timestamp() + interval '2 seconds'
+            WHERE id = ANY(${rejected}::uuid[]) AND status IN ('pending','retryable_rejection','deferred')
+              AND next_attempt_at <= clock_timestamp()
+          `
+      } catch {
+        // The rows stay due as they were; the next pass retries them.
+      }
     }
     if (failed)
       logger.warn(

@@ -448,6 +448,7 @@ describe('T03 actual engagement runtime composition', () => {
       // acquisition budget covers it, and idle connections stay open.
       expect(url.searchParams.get('pool_timeout')).toBe('5')
       expect(url.searchParams.get('max_idle_connection_lifetime')).toBe('0')
+      expect(url.searchParams.get('socket_timeout')).toBe('15')
       await vi.advanceTimersByTimeAsync(60_001)
       assertHousekeeping(general)
       assertHousekeeping(community)

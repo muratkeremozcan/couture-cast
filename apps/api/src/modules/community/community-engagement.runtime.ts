@@ -212,6 +212,15 @@ export const COMMUNITY_GUARD_POOL = {
    * startup forever.
    */
   stepDeadlineMs: 10_000,
+  /**
+   * Longest one guard query may wait for its answer (Prisma `socket_timeout`). Every guard
+   * statement is bounded at 500 ms and a guarded transaction at 3 s on the server, so only a
+   * connection that stopped answering reaches it; without it a stalled query also stalls
+   * `$disconnect`, which waits for in-flight queries.
+   */
+  socketTimeoutSeconds: 15,
+  /** Longest the close of a pool that failed its preflight may take. */
+  closeDeadlineMs: 2000,
 } as const
 
 /**
@@ -238,6 +247,10 @@ export function communityGuardPoolUrl(configured: string, sendSlots: number): st
   url.searchParams.set('connection_limit', String(communityGuardConnections(sendSlots)))
   url.searchParams.set('pool_timeout', String(COMMUNITY_GUARD_POOL.acquireSeconds))
   url.searchParams.set('max_idle_connection_lifetime', '0')
+  url.searchParams.set(
+    'socket_timeout',
+    String(COMMUNITY_GUARD_POOL.socketTimeoutSeconds)
+  )
   return url.toString()
 }
 
@@ -455,7 +468,12 @@ async function startDispatch(
       },
     }
   } catch (error) {
-    await guardPool?.$disconnect().catch(() => undefined)
+    // Bounded: a pool whose queries stopped answering would hold startup in $disconnect.
+    if (guardPool)
+      await Promise.race([
+        guardPool.$disconnect().catch(() => undefined),
+        pause(COMMUNITY_GUARD_POOL.closeDeadlineMs),
+      ])
     return {
       dispatch: {
         status: 'degraded',

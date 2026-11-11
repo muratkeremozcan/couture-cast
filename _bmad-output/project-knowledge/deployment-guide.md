@@ -1051,8 +1051,12 @@ connection, TLS through the transaction pooler, measured 0.6 to 0.7 s on the hos
 idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and Prisma's `pool_timeout` covers
 opening as well as waiting. The preflight retries only connect and acquisition failures, 1, 2
 and 4 seconds apart, and reports `guard_unreachable` when the fourth attempt still cannot
-connect. A send still waits at most 250 ms for its transaction, and the server-side guard bounds
-are unchanged.
+connect. Each preflight attempt and the warm-up must finish within 10 seconds, one guard query
+waits at most 15 seconds for its answer (`socket_timeout=15`), and closing a pool that failed
+its preflight takes at most 2 seconds, so a connection that stops answering cannot hold worker
+startup. A send that throws before the guard settles it moves its delivery 2 seconds on, so it
+cannot hold a slot every pass. A send still waits at most 250 ms for its transaction, and the
+server-side guard bounds are unchanged.
 
 Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
 `max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
