@@ -19,52 +19,31 @@ on:
     outputs:
       runE2E:
         description: Whether downstream E2E should run
-        value: ${{ jobs.burn-in.outputs.runE2E }}
+        value: ${{ jobs.report.outputs.runE2E }}
     secrets:
       GUARDIAN_INVITE_JWT_SECRET:
         required: false
 
 jobs:
-  burn-in:
+  # Detects changed specs and sizes the burn-in matrix, so a wide PR fans out across shards
+  # instead of running past the 20-minute PR job limit in one job. No Supabase or browsers.
+  plan:
     runs-on: ubuntu-latest
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 12.6 min across 6 runs, and it grows with
-    # the number of changed specs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    timeout-minutes: 35
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    timeout-minutes: 10
     permissions:
-      actions: read
       contents: read
-      pull-requests: write
-    env:
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
     outputs:
-      runE2E: ${{ steps.set-output.outputs.runE2E }}
-      status: ${{ steps.set-output.outputs.status }}
+      changed: ${{ steps.detect-changed.outputs.changed }}
+      base-ref: ${{ steps.base-ref.outputs.value }}
+      runs: ${{ steps.plan.outputs.runs }}
+      total: ${{ steps.plan.outputs.total }}
+      shards: ${{ steps.plan.outputs.shards }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
 
       - name: Resolve base ref
         id: base-ref
@@ -114,25 +93,77 @@ jobs:
         uses: ./.github/actions/install
         with:
           install-command: ${{ inputs.install-command }}
-        
-      - name: Setup Playwright browsers
+
+      # The library's own analyzer selects the specs, and `playwright test --list` counts
+      # the runs, repeats included; `shardCount` in playwright/scripts/burn-in-changed.ts
+      # turns that into the matrix size.
+      - name: Plan the burn-in shards
+        id: plan
         if: steps.detect-changed.outputs.changed == 'true'
+        run: |
+          npm run prepare:playwright
+          npx tsx playwright/scripts/burn-in-changed.ts \
+            --base-branch="${{ steps.base-ref.outputs.value }}" \
+            --plan-out="$GITHUB_OUTPUT"
+
+  burn-in:
+    needs: plan
+    if: needs.plan.outputs.changed == 'true' && needs.plan.outputs.total != ''
+    runs-on: ubuntu-latest
+    # The plan caps a shard at 200 test runs, about 4.5 min at one worker, on top of about
+    # 8 min of setup: about 13 min, which leaves 7 min for slow Supabase start attempts.
+    timeout-minutes: 20
+    strategy:
+      # Every shard reports; one red shard must not hide another.
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    permissions:
+      actions: read
+      contents: read
+    env:
+      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      # First step after checkout, before this job's own network traffic, so
+      # no outgoing connection can take a Supabase host port as its local port.
+      - name: Reserve the local Supabase host ports
+        uses: ./.github/actions/reserve-supabase-ports
+
+      - name: Setup Node and install deps
+        uses: ./.github/actions/install
+        with:
+          install-command: ${{ inputs.install-command }}
+
+      - name: Setup Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
 
       - name: Start local Supabase services
-        if: steps.detect-changed.outputs.changed == 'true'
         uses: ./.github/actions/start-local-supabase
 
       - name: Reset local burn-in database
-        if: steps.detect-changed.outputs.changed == 'true'
         run: npm run db:reset
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
 
       - name: Prepare base branch for diff
-        if: steps.detect-changed.outputs.changed == 'true'
         run: |
-          BASE_REF="${{ steps.base-ref.outputs.value }}"
+          BASE_REF="${{ needs.plan.outputs.base-ref }}"
           if [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]; then
             git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null || git fetch origin "$BASE_REF" --quiet || true
           else
@@ -148,16 +179,18 @@ jobs:
 
       - name: Record git SHA
         id: git-sha
-        if: steps.detect-changed.outputs.changed == 'true'
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Run burn-in for changed specs
+      - name: Run burn-in for this shard
         id: burn-in-step
         working-directory: ${{ inputs.test-directory }}
-        if: steps.detect-changed.outputs.changed == 'true'
         run: |
           HUSKY=0 NEXT_DISABLE_ESLINT=1 NEXT_PRIVATE_SKIP_TYPE_CHECK=1 npm run build --workspace web
-          npm run test:pw:burn-in-changed -- --base-branch=${{ steps.base-ref.outputs.value }}
+          SHARD_FLAG=()
+          if [[ "${{ needs.plan.outputs.total }}" != "1" ]]; then
+            SHARD_FLAG=(--shard="${{ matrix.shard }}/${{ needs.plan.outputs.total }}")
+          fi
+          npm run test:pw:burn-in-changed -- --base-branch=${{ needs.plan.outputs.base-ref }} "${SHARD_FLAG[@]}"
         env:
           # Align health check SHA with the build produced in this workflow; use HEAD, not the PR merge ref
           EXPECTED_SHA: ${{ steps.git-sha.outputs.sha }}
@@ -177,7 +210,7 @@ jobs:
       # holds. Fails closed: if the scan cannot run, nothing is uploaded.
       - name: Check burn-in artifacts for secret values
         id: secret-scan
-        if: ${{ always() && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' }}
+        if: ${{ always() && steps.burn-in-step.outcome == 'failure' }}
         env:
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           GH_TOKEN: ${{ github.token }}
@@ -189,48 +222,69 @@ jobs:
 
       - name: Upload burn-in failure artifacts
         id: upload-burn-in-artifacts
-        if: ${{ always() && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' && steps.secret-scan.outcome == 'success' }}
+        if: ${{ always() && steps.burn-in-step.outcome == 'failure' && steps.secret-scan.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-report
+          name: playwright-report-shard-${{ matrix.shard }}
           path: |
             ${{ inputs.test-directory }}/playwright-report
             ${{ inputs.test-directory }}/test-results
           if-no-files-found: warn
 
+  # One verdict and one PR comment for all shards, and the gate output callers read.
+  report:
+    needs: [plan, burn-in]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    outputs:
+      runE2E: ${{ steps.set-output.outputs.runE2E }}
+      status: ${{ steps.set-output.outputs.status }}
+    steps:
+      - name: Resolve burn-in outcome
+        id: outcome
+        run: |
+          if [[ "${{ needs.plan.result }}" != "success" ]]; then
+            OUTCOME=failure
+          elif [[ "${{ needs.plan.outputs.changed }}" != "true" ]]; then
+            OUTCOME=skipped
+          else
+            OUTCOME="${{ needs.burn-in.result }}"
+          fi
+          echo "value=$OUTCOME" >> "$GITHUB_OUTPUT"
+          echo "Burn-in outcome: $OUTCOME (plan ${{ needs.plan.result }}, shards ${{ needs.plan.outputs.total }}, runs ${{ needs.plan.outputs.runs }})"
+
       - name: Resolve burn-in artifact URL
         id: resolve-url
-        if: ${{ always() && github.event_name == 'pull_request' && steps.detect-changed.outputs.changed == 'true' && steps.burn-in-step.outcome == 'failure' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+        if: ${{ always() && github.event_name == 'pull_request' && steps.outcome.outputs.value == 'failure' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
         uses: actions/github-script@v7
         with:
           script: |
-            const artifactName = 'playwright-report';
-            const uploadedArtifactUrl = '${{ steps.upload-burn-in-artifacts.outputs.artifact-url }}';
-            let reportUrl = uploadedArtifactUrl || `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            if (!uploadedArtifactUrl) {
-              try {
-                const { data } = await github.rest.actions.listWorkflowRunArtifacts({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  run_id: context.runId,
-                });
-                const artifact = data.artifacts.find((candidate) => candidate.name === artifactName);
-                if (artifact?.id) {
-                  reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}/artifacts/${artifact.id}`;
-                }
-              } catch (error) {
-                core.warning(`Could not resolve burn-in report URL: ${error instanceof Error ? error.message : String(error)}`);
-              }
+            let reportUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            try {
+              const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                run_id: context.runId,
+                per_page: 100,
+              });
+              const first = artifacts.find((artifact) => artifact.name.startsWith('playwright-report-shard-'));
+              if (first?.id) reportUrl = `${reportUrl}/artifacts/${first.id}`;
+            } catch (error) {
+              core.warning(`Could not resolve burn-in report URL: ${error instanceof Error ? error.message : String(error)}`);
             }
             core.setOutput('report_url', reportUrl);
 
       - name: Comment burn-in result on PR
-        if: ${{ always() && github.event_name == 'pull_request' && steps.detect-changed.outputs.changed == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
+        if: ${{ always() && github.event_name == 'pull_request' && needs.plan.outputs.changed == 'true' && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
         uses: actions/github-script@v7
         with:
           script: |
             const marker = '<!-- playwright-burn-in-report -->';
-            const burnInOutcome = '${{ steps.burn-in-step.outcome }}';
+            const burnInOutcome = '${{ steps.outcome.outputs.value }}';
             const reportUrl = '${{ steps.resolve-url.outputs.report_url }}';
 
             let body;
@@ -302,7 +356,8 @@ jobs:
         id: set-output
         if: always()
         run: |
-          if [[ "${{ steps.detect-changed.outputs.changed }}" != "true" ]]; then
+          OUTCOME="${{ steps.outcome.outputs.value }}"
+          if [[ "$OUTCOME" == "skipped" ]]; then
             echo "runE2E=true" >> "$GITHUB_OUTPUT"
             echo "status=skipped" >> "$GITHUB_OUTPUT"
             echo "✅ Burn-in skipped (no changed specs)";
@@ -310,15 +365,16 @@ jobs:
           fi
 
           RUN_E2E="true"
-          if [[ "${{ steps.burn-in-step.outcome }}" != "success" ]]; then
+          if [[ "$OUTCOME" != "success" ]]; then
             RUN_E2E="false"
           fi
 
           echo "runE2E=${RUN_E2E}" >> "$GITHUB_OUTPUT"
-          echo "status=${{ steps.burn-in-step.outcome }}" >> "$GITHUB_OUTPUT"
+          echo "status=${OUTCOME}" >> "$GITHUB_OUTPUT"
 
           if [[ "$RUN_E2E" == "true" ]]; then
             echo "✅ Burn-in gate passed"
           else
             echo "❌ Burn-in gate blocked"
+            exit 1
           fi

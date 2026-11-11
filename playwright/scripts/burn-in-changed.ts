@@ -116,11 +116,92 @@ function replaceModuleExports(
   cached.exports = exports
 }
 
+/**
+ * Test runs one burn-in shard owns. A shard pays about 8 minutes of fixed setup (install,
+ * Supabase from its image cache, the web build, the database reset), up to 10 more when
+ * Supabase spends its whole start budget, and burn-in runs one worker at about 1.3 s per
+ * test run (465 runs took 10.4 min on 2026-11-10). 200 runs keep the worst case under the
+ * 20-minute PR job limit whatever a PR changes.
+ */
+export const BURN_IN_RUNS_PER_SHARD = 200
+/** Runner cost cap; past it a shard runs more than its budget instead of fanning out further. */
+export const BURN_IN_MAX_SHARDS = 8
+
+export type BurnInPlan = {
+  /** `targeted`: the analyzer named the specs. `fallback`: it used `--only-changed`. `none`: nothing to run. */
+  mode: 'targeted' | 'fallback' | 'none'
+  /** Test runs, repeats included, from `playwright test --list`. */
+  runs: number
+  shards: number
+}
+
+/** Shards for a run count: ceil(runs / per shard), at least 1, at most the cap. */
+export function shardCount(runs: number): number {
+  if (runs <= 0) return 1
+  return Math.min(BURN_IN_MAX_SHARDS, Math.ceil(runs / BURN_IN_RUNS_PER_SHARD))
+}
+
+/** The plan as `key=value` lines for `$GITHUB_OUTPUT`; `shards` is the matrix list. */
+export function planOutputs(result: BurnInPlan): string {
+  const shards = Array.from({ length: result.shards }, (_, index) => index + 1)
+  return [
+    `mode=${result.mode}`,
+    `runs=${result.runs}`,
+    `total=${result.shards}`,
+    `shards=${JSON.stringify(shards)}`,
+  ].join('\n')
+}
+
+/** Reads `Total: N tests in M files` from `playwright test --list` output. */
+export function listedRuns(output: string): number {
+  const match = output.match(/Total: (\d+) tests? in \d+ files?/)
+  if (!match) throw new Error('playwright test --list printed no total')
+  return Number(match[1])
+}
+
+type Analyzer = {
+  getChangedFiles: (base: string) => { all: string[] }
+  analyzeTestableDependencies: (files: {
+    all: string[]
+  }) => Promise<{ tests: string[] | null }>
+  buildCommand: (plan: { tests: string[] | null }) => string[] | null
+}
+
+/**
+ * The plan the shards will run, built by the library's own analyzer so selection never
+ * differs between the plan and the shards. Fallback mode already shards by percentage
+ * inside its command, so it runs as one shard.
+ */
+async function plan(options: Parameters<typeof RunBurnIn>[0]): Promise<BurnInPlan> {
+  const fromRoot = createRequire(path.join(process.cwd(), 'package.json'))
+  const entry = fromRoot.resolve('@seontechnologies/playwright-utils/burn-in')
+  const { BurnInRunner } = createRequire(entry)('./runner') as {
+    BurnInRunner: new (options: Parameters<typeof RunBurnIn>[0]) => { analyzer: Analyzer }
+  }
+  const analyzer = new BurnInRunner(options).analyzer
+  const changed = analyzer.getChangedFiles(options?.baseBranch ?? 'main')
+  if (changed.all.length === 0) return { mode: 'none', runs: 0, shards: 1 }
+  const testPlan = await analyzer.analyzeTestableDependencies(changed)
+  const command = analyzer.buildCommand(testPlan)
+  if (!command) return { mode: 'none', runs: 0, shards: 1 }
+  if (testPlan.tests === null) return { mode: 'fallback', runs: 0, shards: 1 }
+  const { execFileSync } = await import('node:child_process')
+  const [bin, ...rest] = command
+  const output = execFileSync(bin!, [...rest, '--list'], {
+    encoding: 'utf8',
+    env: { ...process.env, PW_BURN_IN: 'true', PW_SHARD: '' },
+    maxBuffer: 64 * 1024 * 1024,
+  })
+  const runs = listedRuns(output)
+  return { mode: 'targeted', runs, shards: shardCount(runs) }
+}
+
 async function main() {
   const args = process.argv.slice(2)
   const baseArg = args.find((arg) => arg.startsWith('--base-branch='))
   const shardArg = args.find((arg) => arg.startsWith('--shard='))
   const configArg = args.find((arg) => arg.startsWith('--config-path='))
+  const planArg = args.find((arg) => arg.startsWith('--plan-out='))
 
   const options: Parameters<typeof RunBurnIn>[0] = {
     configPath: configArg
@@ -137,11 +218,22 @@ async function main() {
   }
 
   resolveDependencyAnalysisLikeTheSuite()
+  if (planArg) {
+    const result = await plan(options)
+    // Appends, so `--plan-out="$GITHUB_OUTPUT"` adds the plan to the step's outputs.
+    const { appendFileSync } = await import('node:fs')
+    appendFileSync(planArg.slice('--plan-out='.length), `${planOutputs(result)}\n`)
+    console.log(`Burn-in plan:\n${planOutputs(result)}`)
+    return
+  }
   const { runBurnIn } = await import('@seontechnologies/playwright-utils/burn-in')
   await runBurnIn(options)
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+// Imported by its unit test for the pure helpers; runs only as a script.
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(__filename)) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

@@ -294,6 +294,45 @@ describe('deployment workflows', () => {
     expect(startingJobs).toBe(14)
   })
 
+  it('the burn-in fans out across planned shards that each fit the 20-minute PR job limit', () => {
+    const workflow = fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'rwf-burn-in.yml'),
+      'utf8'
+    )
+    const jobs = new Map(
+      workflow
+        .slice(workflow.search(/^jobs:\s*$/m))
+        .split(/^(?= {2}[A-Za-z0-9_-]+:\s*$)/m)
+        .slice(1)
+        .map((block) => [block.slice(2, block.indexOf(':')), block] as const)
+    )
+    expect([...jobs.keys()]).toEqual(['plan', 'burn-in', 'report'])
+    const plan = jobs.get('plan')!
+    const burnIn = jobs.get('burn-in')!
+    const report = jobs.get('report')!
+    // The plan sizes the matrix from `playwright test --list`, so a wide PR adds shards.
+    expect(plan).toContain('--plan-out="$GITHUB_OUTPUT"')
+    expect(burnIn).toContain('shard: ${{ fromJSON(needs.plan.outputs.shards) }}')
+    expect(burnIn).toContain('fail-fast: false')
+    expect(burnIn).toContain(
+      'SHARD_FLAG=(--shard="${{ matrix.shard }}/${{ needs.plan.outputs.total }}")'
+    )
+    for (const [name, block] of jobs) {
+      const minutes = Number(/^ {4}timeout-minutes: (\d+)$/m.exec(block)?.[1])
+      expect({ name, fits: minutes > 0 && minutes <= 20 }).toEqual({ name, fits: true })
+    }
+    // Each shard scans and uploads its own failure report under a distinct name.
+    expect(burnIn).toContain('node scripts/check-artifact-secrets.mjs')
+    expect(burnIn).toContain("steps.secret-scan.outcome == 'success'")
+    expect(burnIn).toContain('name: playwright-report-shard-${{ matrix.shard }}')
+    // One verdict, one PR comment and the gate output, whatever the shards did.
+    expect(report).toContain('needs: [plan, burn-in]')
+    expect(report).toContain('if: always()')
+    expect(report.match(/<!-- playwright-burn-in-report -->/g)).toHaveLength(1)
+    expect(burnIn).not.toContain('playwright-burn-in-report')
+    expect(workflow).toContain('value: ${{ jobs.report.outputs.runE2E }}')
+  })
+
   it('the share-card native workflow runs only the browser lane on pull requests', () => {
     const content = fs.readFileSync(
       path.join(repoRoot, '.github', 'workflows', 'pr-share-card-native.yml'),
