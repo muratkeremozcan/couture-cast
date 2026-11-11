@@ -4,6 +4,7 @@ Updated: 2026-07-17 - Brownfield deep scan of deployment and operational configu
 Updated: 2026-10-16 (Story 6.2b): community worker container, canary, restart drill and rollback.
 Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, SLA sweep rollout.
 Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, retention and account erasure.
+Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
@@ -55,6 +56,12 @@ time:
 - It embeds the resolved build SHA and branch for `/api/health`.
 - It proxies `/api/v1/*` to a separately configured API origin.
 - Under `NODE_ENV=production`, production API variables are preferred before preview variables.
+- The `couture-cast-web` production project must set `PROD_API_BASE_URL`
+  (`https://couture-cast-api.vercel.app`). With no API variable the rewrite is never registered,
+  so every API call from the site, signup included, answers 404 from the web origin while both
+  health checks stay green. Production ran that way until 2026-11-11.
+  `playwright/tests/web-api-proxy.spec.ts` now runs in every lane, the production run included,
+  and fails on that 404.
 - TypeScript and ESLint build failures are ignored by Next itself. The separate PR quality workflow
   is therefore the repository's build-quality guard.
 
@@ -1078,7 +1085,10 @@ npm run access:complimentary -- list --env-file .env.prod --confirm-target <proj
   --actor-email <admin email>
 ```
 
-`--dry-run` runs every check and writes nothing. The actor must be an auth user whose
+`--dry-run` runs every check and writes nothing. The command reaches a remote database through
+node-postgres, which verifies the certificate against the committed Supabase root CA with Node's
+OpenSSL; the Prisma engine's TLS on macOS rejects Supabase's pooler certificate, so this is what
+lets it run from a laptop. `community:sponsorship` connects the same way. The actor must be an auth user whose
 `app_metadata.app_role` is `admin`, with no pending erasure request. Each grant and revoke
 writes one `AuditLog` row, `complimentary_access_granted` or `complimentary_access_revoked`,
 holding the actor and the grant id only. The member, reason and times live on the grant row,

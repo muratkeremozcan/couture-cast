@@ -115,6 +115,7 @@
     "@opentelemetry/exporter-metrics-otlp-http": "^0.213.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.213.0",
     "@opentelemetry/sdk-node": "^0.213.0",
+    "@prisma/adapter-pg": "6.19.0",
     "@prisma/client": "6.19.0",
     "@supabase/supabase-js": "^2.112.0",
     "@tensorflow/tfjs": "npm:@tensorflow/tfjs-core@4.16.0",

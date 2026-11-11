@@ -3,7 +3,7 @@
 import { readFileSync } from 'node:fs'
 import { parseArgs } from 'node:util'
 import type { PrismaClient } from '@prisma/client'
-import { createPrismaClient } from '../../prisma/prisma-client.js'
+import { createOperatorPrismaClient } from '../../prisma/operator-prisma-client.js'
 import {
   ComplimentaryAccessOperatorService,
   ComplimentaryAccessRefusal,
@@ -47,8 +47,8 @@ const defaultDeps: ComplimentaryAccessCliDeps = {
   stdout: (line) => process.stdout.write(`${line}\n`),
   stderr: (line) => process.stderr.write(`${line}\n`),
   readEnvFile: (path) => readFileSync(path, 'utf8'),
-  createPrisma: (databaseUrl) =>
-    createPrismaClient({ datasources: { db: { url: databaseUrl } } }),
+  // Verified TLS through node-postgres for a remote target, so it runs from macOS too.
+  createPrisma: (databaseUrl) => createOperatorPrismaClient(databaseUrl),
 }
 
 class UsageError extends Error {}

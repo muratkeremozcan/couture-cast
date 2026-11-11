@@ -192,6 +192,9 @@ export function withVerifiedDatasource(
   env: NodeJS.ProcessEnv = process.env,
   tls: Parameters<typeof withVerifiedDatabaseTls>[1] = {}
 ): Prisma.PrismaClientOptions | undefined {
+  // A driver adapter owns its own connection and TLS (the operator CLIs' node-postgres pool),
+  // and Prisma refuses a datasource URL beside one, so its options pass through untouched.
+  if (options?.adapter) return options
   const explicit = options?.datasources?.db?.url
   if (options && explicit) {
     const verified = withVerifiedDatabaseTls(explicit, tls)
