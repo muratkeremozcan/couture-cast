@@ -17,6 +17,7 @@ import {
   seedPost,
   seedPostReport,
 } from './helpers/moderation-queue-seed.js'
+import { deletePosts } from './helpers/privacy-guards.js'
 
 const NOW = new Date('2026-11-03T12:00:00.000Z')
 const ctx = moderationQueueTestContext()
@@ -432,7 +433,7 @@ describe('I-Q-ERASURE-REKEY: erasing the target is the one documented re-key', (
     const cursor = before.nextCursor!
 
     // Author erasure deletes the post row; both reports keep their snapshot and lose post_id.
-    await prisma.lookbookPost.delete({ where: { id: post.id } })
+    await deletePosts(prisma, { id: post.id })
 
     await moderator.get(`/api/v1/moderation/cases/post.${post.id}`).expect(404)
     const after = await walk('', 25)

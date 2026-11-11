@@ -19,6 +19,7 @@ import {
 } from '../src/modules/commerce/affiliate-offer.service.js'
 import { CommerceRepository } from '../src/modules/commerce/commerce.repository.js'
 import type { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Real-PostgreSQL coverage for offer selection.
@@ -217,7 +218,7 @@ describe('5.1 affiliate offer selection against real PostgreSQL', () => {
       await prisma.commercePreference.deleteMany({ where: { user_id: userId } })
       await prisma.garmentItem.deleteMany({ where: { user_id: userId } })
       await prisma.commercePartner.deleteMany({ where: { id: partnerId } })
-      await prisma.user.deleteMany({ where: { id: userId } })
+      await deleteMembers(prisma, { id: userId })
     }
     await prisma.$disconnect()
   })

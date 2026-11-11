@@ -39,6 +39,7 @@ import { SilhouettePhotoProcessor } from '../src/modules/wardrobe/silhouette-pho
 import { buildFixtureSilhouettePhoto } from '../src/modules/wardrobe/fixture-silhouette-photo-moderation.engine.js'
 import type { WardrobeStorage } from '../src/modules/wardrobe/wardrobe-storage.adapter.js'
 import type { SilhouettePhotoModerationEngine } from '../src/modules/wardrobe/silhouette-photo-moderation.engine.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Real-PostgreSQL (and, for the moderation-review handoff, real Redis)
@@ -391,7 +392,7 @@ describe('4.4 wardrobe silhouette against real PostgreSQL', () => {
     await prismaA.guardianConsent.deleteMany({
       where: { teen: { email: { contains: namespace } } },
     })
-    await prismaA.user.deleteMany({ where: { email: { contains: namespace } } })
+    await deleteMembers(prismaA, { email: { contains: namespace } })
   })
 
   // Numbered 19, not 10: the onboarding suite's `4.4-INT-10` (crash-replay

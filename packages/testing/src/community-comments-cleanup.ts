@@ -7,6 +7,14 @@ export async function cleanupCommunityCommentFixtures(
   commentIds: string[]
 ): Promise<void> {
   if (commentIds.length === 0) return
+  // Erasing or deleting a comment is a privacy write: hold its post's guard, as product
+  // deletion does, so the cleanup also runs where `privacy_version` is 1.
+  const posts = await tx.communityComment.findMany({
+    where: { id: { in: commentIds } },
+    select: { post_id: true },
+    distinct: ['post_id'],
+  })
+  await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[]::text[], ${posts.map((row) => row.post_id)}::text[], true)`
   const referencedRoots = await tx.communityComment.findMany({
     where: { parent_id: { in: commentIds }, id: { notIn: commentIds } },
     select: { parent_id: true },

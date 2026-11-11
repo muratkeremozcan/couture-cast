@@ -31,6 +31,7 @@ import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { SupabaseWardrobeStorageAdapter } from '../src/modules/wardrobe/wardrobe-storage.adapter.js'
 import { PLANNER_DAY_CHANGED_MESSAGE } from '../src/contracts/http.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Story 5.5 Task 10: the planner SERVICE layer against a real database and a
@@ -373,7 +374,7 @@ describe('5.5 premium planner against real PostgreSQL and real HTTP', () => {
       await prisma.userProfile.deleteMany({
         where: { user: { email: { startsWith: namespace } } },
       })
-      await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+      await deleteMembers(prisma, { email: { startsWith: namespace } })
     }
     await prisma.$disconnect()
   })

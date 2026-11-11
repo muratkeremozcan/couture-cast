@@ -8,6 +8,7 @@ import {
   PrismaWeatherAlertProcessingRepository,
   type WeatherAlertEventCandidate,
 } from '../src/modules/alerts/weather-alert-processing.repository'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Gated on a reachable schema, the way every sibling suite in this directory is,
@@ -126,7 +127,7 @@ describe(
       // Last, and only after the envelopes above: the outbox rows cascade from the
       // envelopes and the envelopes cascade from the user, so deleting the user
       // first would take the rows this cleanup is auditing with it.
-      await prisma.user.deleteMany({ where: { id: `${testPrefix}-user` } })
+      await deleteMembers(prisma, { id: `${testPrefix}-user` })
       await prisma.$disconnect()
     })
 

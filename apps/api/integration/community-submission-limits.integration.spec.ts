@@ -30,6 +30,7 @@ import {
   DAILY_REPORT_CAP,
   REPORT_SLA_HOURS,
 } from '../src/modules/community/community.service.js'
+import { deleteMembers, deletePosts } from './helpers/privacy-guards.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -171,12 +172,12 @@ afterAll(async () => {
     await prisma.communityModerationOutbox.deleteMany({
       where: { post: { user: { email: { startsWith: namespace } } } },
     })
-    await prisma.lookbookPost.deleteMany({ where: owned })
+    await deletePosts(prisma, owned)
     await prisma.communityAlias.deleteMany({ where: owned })
     await prisma.userProfile.deleteMany({
       where: { user: { email: { startsWith: namespace } } },
     })
-    await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+    await deleteMembers(prisma, { email: { startsWith: namespace } })
   }
   await prisma.$disconnect()
 })

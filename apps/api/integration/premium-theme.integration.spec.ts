@@ -16,6 +16,7 @@ import { CommerceModule } from '../src/modules/commerce/commerce.module.js'
 import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.warmup.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Story 5.3 follow-up: closes `deferred-work.md`'s "5.3-INT-001 and
@@ -267,7 +268,7 @@ describe('5.3 premium theme preference against real PostgreSQL and real HTTP', (
       // user is safe to delete: no service path exercised here writes an
       // AuditLog row (theme changes are explicitly not audited, per
       // premium-theme.service.ts's docblock), so nothing RESTRICTs the delete.
-      await prisma.user.deleteMany({ where: { id: userId } })
+      await deleteMembers(prisma, { id: userId })
     }
     await prisma.$disconnect()
     await prisma2?.$disconnect()

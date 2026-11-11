@@ -4,6 +4,7 @@ import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 
 import { reactionTestContext } from './helpers/community-reaction-context.js'
+import { updatePost } from './helpers/privacy-guards.js'
 
 const { prisma, repository, input, fixture, mutate } = reactionTestContext()
 
@@ -57,7 +58,7 @@ describe('Story 6.3 concurrent snapshots and hidden-post privacy', () => {
     async (status) => {
       const { userId, postId } = await fixture()
       await mutate(userId, postId, input('love'))
-      await prisma.lookbookPost.update({ where: { id: postId }, data: { status } })
+      await updatePost(prisma, postId, { status })
       for (const selection of ['applause', null] as const)
         await expect(mutate(userId, postId, input(selection, 1))).rejects.toMatchObject({
           status: 404,

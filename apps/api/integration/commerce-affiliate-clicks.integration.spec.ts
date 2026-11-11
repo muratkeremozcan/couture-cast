@@ -33,6 +33,7 @@ import { FeatureFlagsWarmup } from '../src/modules/feature-flags/feature-flags.w
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Real-PostgreSQL, real-HTTP coverage for the attributed click endpoint.
@@ -283,7 +284,7 @@ describe('5.1 affiliate clicks against real PostgreSQL and real HTTP', () => {
       await prismaA.commercePreference.deleteMany({ where: { user_id: userId } })
       await prismaA.outfitRecommendation.deleteMany({ where: { user_id: userId } })
       await prismaA.commercePartner.deleteMany({ where: { id: partnerId } })
-      await prismaA.user.deleteMany({ where: { id: userId } })
+      await deleteMembers(prismaA, { id: userId })
     }
     await prismaA.$disconnect()
     await prismaB.$disconnect()

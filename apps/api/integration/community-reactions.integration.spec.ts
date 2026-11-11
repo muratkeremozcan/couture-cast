@@ -5,6 +5,7 @@ import 'reflect-metadata'
 import { describe, expect, it } from 'vitest'
 
 import { reactionTestContext } from './helpers/community-reaction-context.js'
+import { withPrivacyGuards } from './helpers/privacy-guards.js'
 
 const { prisma, repository, namespace, input, fixture, mutate } = reactionTestContext()
 
@@ -15,9 +16,10 @@ describe('Story 6.3 durable reaction semantics', () => {
     const seed = async (userId: string, postId: string) => {
       const now = new Date()
       const expires = new Date(now.getTime() + 60000)
-      const preference = await prisma.communityNotificationPreference.create({
-        data: { user_id: userId },
-      })
+      // The opt-in is a privacy write: the preferences service takes the member's guard.
+      const preference = await withPrivacyGuards(prisma, { members: [userId] }, (tx) =>
+        tx.communityNotificationPreference.create({ data: { user_id: userId } })
+      )
       const cache = await prisma.communityFlagEvaluation.create({
         data: {
           member_id: userId,
@@ -96,7 +98,10 @@ describe('Story 6.3 durable reaction semantics', () => {
       { conname: 'community_subject_user_fk', confupdtype: 'c', confdeltype: 'c' },
     ])
     const replacement = randomUUID()
-    await prisma.user.update({ where: { id: owner.userId }, data: { id: replacement } })
+    // The key change cascades into privacy rows of both identities, so both guards are held.
+    await withPrivacyGuards(prisma, { members: [owner.userId, replacement] }, (tx) =>
+      tx.user.update({ where: { id: owner.userId }, data: { id: replacement } })
+    )
     expect(
       await prisma.communitySubject.findUnique({ where: { member_id: owner.userId } })
     ).toBeNull()

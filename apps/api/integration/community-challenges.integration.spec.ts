@@ -23,6 +23,7 @@ import {
   CommunityChallengeWindowError,
   CommunityRepository,
 } from '../src/modules/community/community.repository.js'
+import { deleteMembers, deletePosts } from './helpers/privacy-guards.js'
 
 const databaseUrl =
   process.env.INTEGRATION_TEST_DATABASE_URL ??
@@ -110,8 +111,8 @@ afterAll(async () => {
     await prisma.communityModerationOutbox.deleteMany({
       where: { post: { user: { email: { startsWith: namespace } } } },
     })
-    await prisma.lookbookPost.deleteMany({ where: owned })
-    await prisma.user.deleteMany({ where: { email: { startsWith: namespace } } })
+    await deletePosts(prisma, owned)
+    await deleteMembers(prisma, { email: { startsWith: namespace } })
     await prisma.communityChallenge.deleteMany({
       where: { slug: { startsWith: namespace } },
     })

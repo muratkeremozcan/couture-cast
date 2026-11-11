@@ -33,6 +33,7 @@ import {
   url,
   useShareCardApi,
 } from './helpers/share-card-api.js'
+import { updateGuardianConsent, updatePost } from './helpers/privacy-guards.js'
 
 useShareCardApi()
 
@@ -191,15 +192,13 @@ describe('share-card actual API and isolated database', () => {
       try {
         await inserting
         if (change === 'consent')
-          await prisma.guardianConsent.update({
-            where: { id: consentId },
-            data: { status: 'revoked', revoked_at: new Date() },
-          })
+          await updateGuardianConsent(
+            prisma,
+            { id: consentId },
+            { status: 'revoked', revoked_at: new Date() }
+          )
         else if (change === 'withdrawal')
-          await prisma.lookbookPost.update({
-            where: { id: row.id },
-            data: { status: 'withdrawn' },
-          })
+          await updatePost(prisma, row.id, { status: 'withdrawn' })
         else
           await prisma.outfitRecommendation.update({
             where: { id: row.id },
@@ -357,10 +356,7 @@ describe('share-card actual API and isolated database', () => {
     'I-POST-DENY: %s visibility guard prevents media fetch',
     async (field) => {
       const row = await photoPost()
-      await prisma.lookbookPost.update({
-        where: { id: row.id },
-        data: { [field]: new Date() },
-      })
+      await updatePost(prisma, row.id, { [field]: new Date() })
       await post(preview({ kind: 'community_post', postId: row.id })).expect(404)
       expect(reads).toBe(0)
     }
@@ -396,10 +392,11 @@ describe('share-card actual API and isolated database', () => {
     const row = await outfit()
     const input = preview({ kind: 'outfit', recommendationId: row.id })
     await post(input).expect(200)
-    await prisma.guardianConsent.update({
-      where: { id: consent.id },
-      data: { status: 'revoked', revoked_at: new Date() },
-    })
+    await updateGuardianConsent(
+      prisma,
+      { id: consent.id },
+      { status: 'revoked', revoked_at: new Date() }
+    )
     await post(input).expect(403)
     const published = await photoPost()
     await post(preview({ kind: 'community_post', postId: published.id })).expect(403)
@@ -566,15 +563,13 @@ describe('share-card actual API and isolated database', () => {
       await started
       try {
         if (mutation === 'withdrawal')
-          await prisma.lookbookPost.update({
-            where: { id: row.id },
-            data: { status: 'withdrawn' },
-          })
+          await updatePost(prisma, row.id, { status: 'withdrawn' })
         if (mutation === 'consent')
-          await prisma.guardianConsent.update({
-            where: { id: consentId! },
-            data: { status: 'revoked', revoked_at: new Date() },
-          })
+          await updateGuardianConsent(
+            prisma,
+            { id: consentId! },
+            { status: 'revoked', revoked_at: new Date() }
+          )
         if (mutation === 'flag')
           flags.communityReadEvaluation.mockResolvedValue({
             value: false,

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Client } from 'pg'
+import { ENABLE_PRIVACY_GUARD_SQL } from './privacy-capability.js'
 
 /** Global sweeps own a complete migrated database, including their clock and backlog. */
 export function isolatedCommunityDatabase() {
@@ -63,6 +64,8 @@ export function isolatedCommunityDatabase() {
           await readFile(resolve(directory, migration, 'migration.sql'), 'utf8')
         )
       }
+      // The same privacy guard as the shared integration database.
+      await isolated.query(ENABLE_PRIVACY_GUARD_SQL)
     } catch (error) {
       await isolated.end()
       await drop()
