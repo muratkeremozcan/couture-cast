@@ -7,7 +7,7 @@ Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, re
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
-Updated: 2026-11-11 (production analytics): PostHog project map, privacy configuration, web and EAS keys.
+Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -189,7 +189,7 @@ The mobile app is configured under [apps/mobile](../../apps/mobile/). Its
 
 - the app version source is local;
 - native version numbers auto-increment;
-- builds load the `production` EAS environment, which holds `POSTHOG_API_KEY`;
+- builds load the `production` EAS environment (see [Production analytics](#production-analytics));
 - Android produces an app bundle;
 - iOS requests the `m-medium` resource class;
 - an empty production submit profile exists.
@@ -234,41 +234,66 @@ Web and mobile read one variable, `POSTHOG_API_KEY`: web inlines it at build tim
 [app.config.ts](../../apps/mobile/app.config.ts) into `extra.posthogApiKey`. Without it each client
 stays inert.
 
-| PostHog project           | Used by                             | Where the key lives                                                                                    |
-| ------------------------- | ----------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| 329012 `couturecast-prod` | Production API, worker, web, mobile | Vercel `couture-cast-api` and `couture-cast-web` Production, EAS `production`, Northflank, `.env.prod` |
-| 327096 `couturecast-dev`  | Local and Preview                   | `.env.local`, `.env.preview`, Vercel `couture-cast-api` Preview and Development                        |
+| PostHog project           | Used by                             | Where the key lives                                                                             |
+| ------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 329012 `couturecast-prod` | Production API, worker, web, mobile | Vercel `couture-cast-api` Production, Northflank, `.env.prod`; web and EAS after the step below |
+| 327096 `couturecast-dev`  | Local and Preview                   | `.env.local`, `.env.preview`, Vercel `couture-cast-api` Preview and Development                 |
 
 CoutureCast has members aged 13 to 15 with guardian consent, and members upload wardrobe photos.
-The clients therefore send explicit events, pageviews or screens, and exceptions only:
+The clients therefore send explicit events, pageviews or screens, and exceptions only, and every
+event passes a closed privacy policy before it leaves the device:
 
 - Autocapture is off in every environment: web turns off autocapture, rage clicks, dead clicks and
   heatmaps; mobile passes `autocapture={false}`, so no touch or screen autocapture. Feature code
   sends named events, and the mobile root layout sends screens.
 - Session recording is off: `disable_session_recording: true` on web, `enableSessionReplay: false`
-  on mobile. Web also masks all inputs and text in the recording options and masks element text
-  and attributes, in case a capture mode is ever switched on remotely.
+  on mobile. Web also masks inputs, text and element attributes.
 - Surveys are off on both clients; web also turns off product tours and conversations.
-- Web pageviews (`history_change`) and exception capture stay on. Mobile captures uncaught
-  exceptions and unhandled rejections, never console output.
+- Remote config cannot switch an extension on: posthog-js may load only its exception autocapture
+  script from `/ingest/static/`. Console logs, replay, surveys, toolbar, web vitals, site apps and
+  the remote config script are refused by `prepare_external_dependency_script`. This matters for
+  console logs: their exporter bypasses `before_send`, and a local `false` is no veto in posthog-js
+  1.356.
 - Person profiles are created for identified users only (`identified_only`).
 - `stripPersonalAnalyticsData` in [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts)
-  runs first in both `before_send` chains and removes email, name, birth date and phone keys from
-  event properties and from `$set` and `$set_once`. Web also masks those keys in captured URLs.
+  runs first in both `before_send` chains, over properties and `$set` / `$set_once` at every depth:
+  - email, name, birth date and phone keys are removed;
+  - every URL-bearing property (`$current_url`, `$pathname`, referrers, `$initial_*` and session
+    entry URLs, `url`, `rawUrl`, deep link fields, `$screen_name`) and every absolute URL string
+    keeps only its origin and route template: no query string, no fragment, and `:id` for each
+    path segment that is not a plain route word. A guardian invitation link becomes
+    `https://couturecast.app/guardian/accept`;
+  - exceptions keep their type, function names and line numbers. Messages lose emails, URLs
+    beyond their route, UUIDs, JWTs, long hex or base64 tokens and long digit runs, and stack
+    frame paths lose their query string;
+  - every other string has emails redacted.
+- Link analytics send no link values: web `deep_link_invalid.rawUrl` is the route template, mobile
+  sends `param_keys`, and the parse failure reason names the field and the issue code only.
 
 The configuration lives in [browser-analytics.ts](../../apps/web/src/analytics/browser-analytics.ts)
-and [posthog.ts](../../apps/mobile/src/config/posthog.ts), and the `U-ANALYTICS-PRIVACY-WEB` and
-`U-ANALYTICS-PRIVACY-MOBILE` unit and wire tests pin it.
+and [posthog.ts](../../apps/mobile/src/config/posthog.ts). The `U-ANALYTICS-PRIVACY-WEB` and
+`U-ANALYTICS-PRIVACY-MOBILE` wire tests decode the request bodies the real SDKs send and assert the
+invitation token, fragments, ids, emails and photo URLs never appear in them, and that a remote
+config asking for console logs never loads the logs extension.
 
-Web picks up a key change on its next production deployment. Mobile binaries read the key at
-build time, so a shipped binary starts sending analytics only from its next production EAS build.
-The EAS variable was created with:
+### Post-merge step: add the production keys
+
+Web Production and the EAS `production` environment hold no PostHog key until the privacy policy
+above is on `main`, so no production build ships an older client with a key. After the PR that
+adds it merges, add the key for project 329012 (the `POSTHOG_API_KEY` value in `.env.prod`) to:
 
 ```bash
-cd apps/mobile
+# Vercel couture-cast-web, Production only; preview and development stay without a key.
+vercel env add POSTHOG_API_KEY -e production --no-sensitive \
+  --project couture-cast-web --scope muratkeremozcans-projects < key-file
+# EAS production environment, from apps/mobile.
 eas env:create --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
   --visibility plaintext --scope project --type string --non-interactive
 ```
+
+Web picks up the key on its next production deployment, so redeploy production web after adding
+it. Mobile binaries read the key at build time, so a shipped binary starts sending analytics only
+from its next production EAS build.
 
 ## Environment separation
 

@@ -54,6 +54,31 @@ export function shareCardSharedBeforeSend(
   }
 }
 
+// The only script posthog-js may load at runtime: the exception autocapture bundle.
+const ALLOWED_EXTERNAL_SCRIPT = /^\/ingest\/static\/exception-autocapture\.js$/
+
+/**
+ * Production analytics privacy: posthog-js loads optional extensions (console logs,
+ * session replay, surveys, toolbar, web vitals, the remote config script and site apps)
+ * as scripts when the project's remote config asks for them, and a local `false` is no
+ * veto for console logs, whose exporter bypasses before_send. This hook lets through
+ * the exception autocapture script from our own /ingest proxy and refuses every other
+ * script, so no remote setting can switch those extensions on.
+ */
+export function allowExceptionAutocaptureScriptOnly(
+  script: HTMLScriptElement
+): HTMLScriptElement | null {
+  try {
+    const url = new URL(script.src, window.location.origin)
+    return url.origin === window.location.origin &&
+      ALLOWED_EXTERNAL_SCRIPT.test(url.pathname)
+      ? script
+      : null
+  } catch {
+    return null
+  }
+}
+
 function isAnalyticsTestMode() {
   return typeof window !== 'undefined' && window.__enableAnalyticsTestHook === true
 }
@@ -114,10 +139,11 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
     // pageviews and exceptions only, in every environment. Autocapture, rage and dead
     // clicks, heatmaps, session recording, surveys, product tours and conversations
     // stay off; element text, attributes and inputs are masked should any capture
-    // mode be switched on remotely; anonymous visitors get no person profile; and
-    // stripPersonalAnalyticsData removes email, name and birth date keys from every
-    // event and person update. See the "Production analytics" section of
-    // _bmad-output/project-knowledge/deployment-guide.md.
+    // mode be switched on remotely; no extension script but exception autocapture
+    // loads; anonymous visitors get no person profile; and stripPersonalAnalyticsData
+    // removes personal keys, reduces every URL to origin and route template, and
+    // scrubs exception messages before any event leaves. See the "Production
+    // analytics" section of _bmad-output/project-knowledge/deployment-guide.md.
     posthog.init(postHogToken, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
@@ -136,6 +162,7 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
       mask_personal_data_properties: true,
       custom_personal_data_properties: [...PERSONAL_ANALYTICS_PROPERTY_KEYS],
       person_profiles: 'identified_only',
+      prepare_external_dependency_script: allowExceptionAutocaptureScriptOnly,
       request_batching: !analyticsTestMode,
       disable_compression: analyticsTestMode,
       // Include the defaults option as required by PostHog

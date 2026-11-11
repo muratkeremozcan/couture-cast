@@ -101,6 +101,58 @@ async function flushBatches() {
       batches.push(await decode(request.body))
   return batches
 }
+const remoteConfig = {
+  logs: { captureConsoleLogs: true },
+  sessionRecording: { endpoint: '/s/' },
+  surveys: true,
+}
+// A guardian invitation token as the API issues it: a JWT whose payload names the teen
+// and the guardian's email.
+const invitationToken =
+  'eyJhbGciOiJIUzI1NiJ9.eyJ0ZWVuSWQiOiJ0ZWVuLTEiLCJndWFyZGlhbkVtYWlsIjoiZ0BleC50ZXN0In0.c2lnbmF0dXJl'
+async function bodyText(body: unknown): Promise<string> {
+  if (body instanceof Blob) {
+    const bytes = await readBlob(body)
+    try {
+      return gunzipSync(bytes).toString('utf8')
+    } catch {
+      return new TextDecoder().decode(bytes)
+    }
+  }
+  return typeof body === 'string' ? body : JSON.stringify(body ?? null)
+}
+/**
+ * Lets the request queue flush, then returns the captured events and every request to
+ * /ingest (URL and decoded body, flags and config included) as one string.
+ */
+async function drain() {
+  await vi.advanceTimersByTimeAsync(3500)
+  const events: SerializedEvent[] = []
+  const bodies: string[] = []
+  for (const request of wire.requests.splice(0)) {
+    const text = await bodyText(request.body)
+    bodies.push(request.url, text)
+    if (/^\/ingest\/(e|i\/v0\/e)\//.test(request.url)) {
+      const parsed = JSON.parse(text) as SerializedEvent | SerializedEvent[]
+      events.push(...(Array.isArray(parsed) ? parsed : [parsed]))
+    }
+  }
+  return { events, serialized: bodies.join('\n') }
+}
+function expectNoLeak(serialized: string) {
+  for (const leak of [
+    invitationToken,
+    'eyJ',
+    'teen@example.test',
+    'teen%40example.test',
+    'frag-teen',
+    'case-123',
+    'post-123',
+    'private-photo',
+    'photo-secret',
+  ])
+    expect(serialized).not.toContain(leak)
+}
 // The web client sends every allowlisted key: the business keys, its locale, the GeoIP,
 // IP and person profile switches and the SDK identity and transport keys.
 const WEB_ALLOWLIST = [...SHARE_CARD_SHARED_ALLOWED_PROPERTIES].sort()
@@ -118,6 +170,11 @@ beforeAll(async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] })
   vi.stubEnv('POSTHOG_API_KEY', 'phc_wire_test')
   window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
+  // The project's remote config, preloaded the way the token-specific array.js bundle
+  // delivers it, with console log capture, replay and surveys switched on remotely.
+  ;(window as unknown as { _POSTHOG_REMOTE_CONFIG: object })._POSTHOG_REMOTE_CONFIG = {
+    phc_wire_test: { config: remoteConfig },
+  }
   initializeBrowserAnalytics()
   posthog.register({ plan_tier: 'premium' })
   posthog.identify('member-123', { email: 'member@example.test' })
@@ -173,11 +230,11 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     const serialized = JSON.stringify(share)
     for (const leak of ['post-123', 'private-campaign', 'premium', 'member@example.test'])
       expect(serialized).not.toContain(leak)
-    // Every other event keeps what posthog-js gave it.
+    // Every other event keeps what posthog-js gave it, its URL reduced to a route.
     const other = events.find(({ event }) => event === 'ritual_created')
     expect(other?.properties).toMatchObject({
       plan_tier: 'premium',
-      $current_url: expect.stringContaining('post-123') as string,
+      $current_url: expect.stringMatching(/\/community\/posts\/:id$/) as string,
     })
   })
 
@@ -199,6 +256,81 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     const serialized = JSON.stringify(events)
     for (const leak of ['member@example.test', 'Teen Member', '2011-04-01'])
       expect(serialized).not.toContain(leak)
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: URLs leave as origin and route template only', async () => {
+    // The guardian invitation link: a JWT naming the teen and the guardian's email.
+    window.history.pushState(
+      {},
+      '',
+      `/guardian/accept?token=${invitationToken}&email=teen%40example.test#frag-teen`
+    )
+    try {
+      browserAnalytics.capture('ritual_created', { ritual_type: 'daily_outfit' })
+      posthog.capture('deep_link_invalid', {
+        rawUrl: window.location.href,
+        reason: 'expired',
+        surface: 'web',
+      })
+      window.history.pushState(
+        {},
+        '',
+        '/moderation/cases/case-123?note=teen%40example.test'
+      )
+      browserAnalytics.capture('moderation_case_viewed', {
+        url: 'https://couturecast.app/community/posts/post-123?ref=teen@example.test#c1',
+      })
+      const { events, serialized } = await drain()
+      const ritual = events.find(({ event }) => event === 'ritual_created')
+      expect(ritual?.properties.$current_url).toMatch(
+        /^https?:\/\/[^/]+\/guardian\/accept$/
+      )
+      expect(ritual?.properties.$pathname).toBe('/guardian/accept')
+      const invalid = events.find(({ event }) => event === 'deep_link_invalid')
+      expect(invalid?.properties.rawUrl).toMatch(/\/guardian\/accept$/)
+      const viewed = events.find(({ event }) => event === 'moderation_case_viewed')
+      expect(viewed?.properties.$pathname).toBe('/moderation/cases/:id')
+      expect(viewed?.properties.url).toBe('https://couturecast.app/community/posts/:id')
+      expectNoLeak(serialized)
+    } finally {
+      window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
+    }
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: exceptions keep their type and lose personal text', async () => {
+    const error = new Error(
+      `Photo upload failed for teen@example.test: https://cdn.test/private-photo.jpg?token=photo-secret ${invitationToken}`
+    )
+    posthog.captureException(error)
+    const { events, serialized } = await drain()
+    const exception = events.find(({ event }) => event === '$exception')
+    const [entry] = exception!.properties.$exception_list as {
+      type: string
+      value: string
+      stacktrace?: { frames: { filename?: string }[] }
+    }[]
+    expect(entry!.type).toBe('Error')
+    expect(entry!.value).toBe(
+      'Photo upload failed for [email]: https://cdn.test/:id [token]'
+    )
+    for (const frame of entry!.stacktrace?.frames ?? [])
+      expect(frame.filename ?? '').not.toMatch(/[?#]/)
+    expectNoLeak(serialized)
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: a remote config that turns on console logs never loads the logs extension', async () => {
+    await vi.advanceTimersByTimeAsync(1000)
+    const scriptSources = [...document.querySelectorAll('script')].map(
+      (script) => script.src
+    )
+    expect(scriptSources.filter((src) => /\/static\/logs\.js/.test(src))).toEqual([])
+    expect(
+      scriptSources.filter((src) => /recorder|surveys|config\.js/.test(src))
+    ).toEqual([])
+    expect(
+      (window as unknown as { __PosthogExtensions__?: { logs?: unknown } })
+        .__PosthogExtensions__?.logs
+    ).toBeUndefined()
   })
 
   it.each(['throw', 'null'] as const)(

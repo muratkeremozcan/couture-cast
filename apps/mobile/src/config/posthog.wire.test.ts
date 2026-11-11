@@ -1,6 +1,7 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Linking } from 'react-native'
 import { PostHog } from 'posthog-react-native'
 import type * as PostHogModule from 'posthog-react-native'
 import type * as ApiClientModule from '@couture/api-client'
@@ -47,6 +48,7 @@ import {
 import { mobilePostHogPrivacyOptions } from './posthog'
 import { createMobileAnalyticsClient } from '../analytics/mobile-analytics'
 import { trackMobileShareCardShared } from '../analytics/track-events'
+import { processMobileDeepLink } from '../lib/mobile-deep-link-handler'
 quiet()
 
 type Batch = { api_key: string; batch: Record<string, unknown>[]; sent_at: string }
@@ -200,10 +202,10 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       duration_ms: 2150,
       locale: 'en-US',
     })
-    // Other events keep their own properties: the allowlist is share-specific.
+    // Other events keep their own properties, their URLs reduced to a route template.
     const opened = request!.batch.find((item) => item.event === 'app_opened')
     expect((opened?.properties as Record<string, unknown>).$current_url).toBe(
-      sensitiveUrl
+      'https://couturecast.app/share/:id'
     )
   })
 
@@ -261,6 +263,125 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       )
     }
   )
+})
+
+// A guardian invitation token as the API issues it: a JWT whose payload names the teen
+// and the guardian's email, delivered to the app as a cold-start link.
+const invitationToken =
+  'eyJhbGciOiJIUzI1NiJ9.eyJ0ZWVuSWQiOiJ0ZWVuLTEiLCJndWFyZGlhbkVtYWlsIjoiZ0BleC50ZXN0In0.c2lnbmF0dXJl'
+const invitationLink = `couturecast://guardian-accept?token=${invitationToken}&email=teen%40example.test#frag-teen`
+
+/**
+ * Runs `scenario` against a real client built with the app's privacy options and
+ * returns every batch item it sent, decoded from the request body.
+ */
+async function privacyBatch(scenario: (privacyClient: PostHog) => Promise<void>) {
+  vi.spyOn(Linking, 'getInitialURL').mockResolvedValue(invitationLink)
+  fetchMock.mockClear()
+  const privacyClient = new PostHog('phc_wire_test', {
+    host: 'https://wire.test',
+    persistence: 'memory',
+    flushAt: 100,
+    flushInterval: 0,
+    preloadFeatureFlags: false,
+    fetchRetryCount: 0,
+    ...mobilePostHogPrivacyOptions,
+    // Exceptions are captured explicitly below; the runner keeps its own global handlers.
+    errorTracking: { autocapture: false },
+    // The automatic lifecycle path: Application Opened carries the cold-start link.
+    captureAppLifecycleEvents: true,
+  })
+  try {
+    await privacyClient.ready()
+    await scenario(privacyClient)
+    await vi.waitFor(async () => {
+      await privacyClient.flush()
+      const items = await sentItems()
+      expect(items.map((item) => item.event)).toContain('Application Opened')
+    })
+    return await sentItems()
+  } finally {
+    await privacyClient.shutdown()
+  }
+}
+async function sentItems() {
+  const items: Record<string, unknown>[] = []
+  for (const [url, init] of fetchMock.mock.calls as [string, RequestInit][])
+    if (String(url).endsWith('/batch/')) items.push(...(await bodyOf(init)).batch)
+  return items
+}
+const propertiesOf = (items: Record<string, unknown>[], event: string) =>
+  items.find((item) => item.event === event)?.properties as Record<string, unknown>
+const leaks = [
+  invitationToken,
+  'eyJ',
+  'teen@example.test',
+  'teen%40example.test',
+  'frag-teen',
+  'post-123',
+  'card-9',
+  'private-photo',
+  'photo-secret',
+]
+
+describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
+  it('sends link URLs as origin and route template only', async () => {
+    const items = await privacyBatch(async (privacyClient) => {
+      const analytics = createMobileAnalyticsClient(privacyClient)
+      await privacyClient.screen('/community/post-123')
+      await processMobileDeepLink({
+        params: { source: 'bad_source', email: 'teen@example.test', cardId: 'card-9' },
+        locale: 'en-US',
+        analytics,
+        setWidgetScenario: vi.fn(),
+        setForecastSlot: vi.fn(),
+        setFocusedWeatherAlert: vi.fn(),
+        setIsInvalidDeepLink: vi.fn(),
+        pushToCommunity: vi.fn(),
+      })
+      analytics.capture('external_link_tapped', {
+        url: 'https://couturecast.app/community/posts/post-123?ref=teen@example.test',
+      })
+    })
+    expect(propertiesOf(items, 'Application Opened').url).toBe(
+      'couturecast://guardian-accept'
+    )
+    expect(propertiesOf(items, '$screen').$screen_name).toBe('/community/:id')
+    expect(propertiesOf(items, 'deep_link_invalid').param_keys).toEqual([
+      'cardId',
+      'email',
+      'source',
+    ])
+    expect(propertiesOf(items, 'external_link_tapped').url).toBe(
+      'https://couturecast.app/community/posts/:id'
+    )
+    const serialized = JSON.stringify(items)
+    for (const leak of leaks) expect(serialized).not.toContain(leak)
+  })
+
+  it('sends exceptions with their type and without personal text', async () => {
+    const items = await privacyBatch((privacyClient) => {
+      privacyClient.captureException(
+        new Error(
+          `Photo upload failed for teen@example.test: https://cdn.test/private-photo.jpg?token=photo-secret ${invitationToken}`
+        )
+      )
+      return Promise.resolve()
+    })
+    const [entry] = propertiesOf(items, '$exception').$exception_list as {
+      type: string
+      value: string
+      stacktrace?: { frames: { filename?: string; abs_path?: string }[] }
+    }[]
+    expect(entry!.type).toBe('Error')
+    expect(entry!.value).toBe(
+      'Photo upload failed for [email]: https://cdn.test/:id [token]'
+    )
+    for (const frame of entry!.stacktrace?.frames ?? [])
+      expect(`${frame.filename ?? ''}${frame.abs_path ?? ''}`).not.toMatch(/[?#]/)
+    const serialized = JSON.stringify(items)
+    for (const leak of leaks) expect(serialized).not.toContain(leak)
+  })
 })
 
 /**

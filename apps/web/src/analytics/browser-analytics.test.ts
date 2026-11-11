@@ -246,6 +246,28 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
     )
   })
 
+  it('loads only the exception autocapture script; logs, remote config JS and the rest are blocked', async () => {
+    const prepare = (await initOptions(false)).prepare_external_dependency_script!
+    const script = (src: string) => {
+      const tag = document.createElement('script')
+      tag.src = src
+      return tag
+    }
+    const allowed = script('/ingest/static/exception-autocapture.js?v=1.356.1')
+    expect(prepare(allowed)).toBe(allowed)
+    for (const blocked of [
+      '/ingest/static/logs.js?v=1.356.1',
+      '/ingest/array/phc_project/config.js',
+      '/ingest/static/lazy-recorder.js?v=1.356.1',
+      '/ingest/static/surveys.js?v=1.356.1',
+      '/ingest/static/toolbar.js?v=1.356.1&t=1',
+      '/ingest/static/web-vitals.js?v=1.356.1',
+      '/ingest/static/exception-autocapture.js.evil/logs.js',
+      'https://evil.example/static/exception-autocapture.js',
+    ])
+      expect(prepare(script(blocked))).toBeNull()
+  })
+
   it('keeps the same privacy switches in analytics test mode', async () => {
     const options = await initOptions(true)
     expect(options).toMatchObject({

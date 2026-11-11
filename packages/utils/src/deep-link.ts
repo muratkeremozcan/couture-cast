@@ -159,10 +159,14 @@ export function parseDeepLink(
   const parsed = deepLinkSchema.safeParse(normalizedParams)
   if (!parsed.success) {
     const firstIssue = parsed.error.issues[0]
+    // The reason reaches analytics. Our own refinements carry fixed messages; Zod's
+    // built-in messages quote the received value, so those keep only their issue code.
     return {
       valid: false,
       errorReason: firstIssue
-        ? `${firstIssue.path.join('.')}: ${firstIssue.message}`
+        ? `${firstIssue.path.join('.')}: ${
+            firstIssue.code === 'custom' ? firstIssue.message : firstIssue.code
+          }`
         : 'Invalid deep link parameters',
     }
   }

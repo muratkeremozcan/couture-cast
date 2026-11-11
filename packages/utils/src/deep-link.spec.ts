@@ -107,6 +107,20 @@ describe('parseDeepLink', () => {
     expect(result.errorReason).toContain('slot')
   })
 
+  it('names the failing field and issue code, never the received value', () => {
+    // The reason goes to analytics as deep_link_invalid.reason, and link values carry
+    // ids, tokens and sometimes emails.
+    for (const params of [
+      { source: 'teen@example.test', slot: 'am' },
+      { source: 'widget', slot: 'eyJsecret-token' },
+    ]) {
+      const result = parseDeepLink(params)
+      expect(result.valid).toBe(false)
+      expect(result.errorReason).toMatch(/^(source|slot): [a-z_]+$/)
+      expect(result.errorReason).not.toMatch(/teen@example|eyJsecret/)
+    }
+  })
+
   it('rejects missing source parameter', () => {
     const result = parseDeepLink({ slot: 'am' })
     expect(result.valid).toBe(false)
