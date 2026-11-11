@@ -4,7 +4,12 @@ import path from 'node:path'
 import { createRequire } from 'node:module'
 import { pathToFileURL } from 'node:url'
 import { spawnSync } from 'node:child_process'
-import { APT_RETRY_PAUSES_S, configureAptRetries, withAptRetries } from './apt-retry.mjs'
+import {
+  APT_RETRY_PAUSES_S,
+  APT_TERMINATION_RESERVE_S,
+  configureAptRetries,
+  withAptRetries,
+} from './apt-retry.mjs'
 
 const sourceLine = /^[\t ]*(?:URIs:|deb(?:-src)?\s)/
 const azureArchive = /https?:\/\/azure\.archive\.ubuntu\.com\/ubuntu(?=[/\s]|$)/g
@@ -114,7 +119,14 @@ export function installPinnedPlaywrightBrowsers({
     throw new Error('browser_dependency_engine_selection_required')
   withAptRetries(
     ({ remainingSeconds }) =>
-      installOnce({ run, node, cli, browsers, seconds: Math.min(600, remainingSeconds) }),
+      installOnce({
+        run,
+        node,
+        cli,
+        browsers,
+        // The KILL grace and teardown come out of what remains, as in apt-retry.mjs.
+        seconds: Math.min(600, remainingSeconds - APT_TERMINATION_RESERVE_S),
+      }),
     {
       retryable: (error) => error.message === 'browser_dependency_install_failed',
       pauses,

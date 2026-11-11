@@ -381,10 +381,11 @@ describe('pinned browser installer', () => {
         }),
       /browser_dependency_install_failed/
     )
-    // Of 660 s: a 200 s attempt (capped at 600 s), a 15 s pause, a 200 s attempt under the 445 s
-    // left, a 30 s pause, a 200 s attempt under the 215 s left. 15 s then remain, too little for
-    // the 60 s pause and another attempt, so the install fails there.
-    assert.deepEqual(deadlines, ['600s', '445s', '215s'])
+    // Of 660 s, each attempt keeps 20 s back for the KILL grace and teardown: a 200 s attempt
+    // (capped at 600 s), a 15 s pause, a 200 s attempt under 445 - 20 s, a 30 s pause, a 200 s
+    // attempt under 215 - 20 s. 15 s then remain, too little for the 60 s pause and another
+    // attempt, so the install fails there.
+    assert.deepEqual(deadlines, ['600s', '425s', '195s'])
   })
 
   test('missing deadline, timeout and installer failure all fail closed', async () => {
