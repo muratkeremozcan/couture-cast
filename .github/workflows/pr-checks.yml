@@ -7,10 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      clock_offset:
-        description: libfaketime offset for tests-year-ahead, for a longer look ahead (+3650d)
+      clock_offset_days:
+        description: Days unit-tests-year-ahead moves the real clock, for a longer look ahead (3650)
         required: false
-        default: +365d
+        default: '365'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -345,117 +345,68 @@ jobs:
           echo "::error::Workspace tests failed"
           exit 1
 
-  # Every workspace suite once more with every clock a year ahead: the test processes (Node and
-  # the Prisma engine inside it) through libfaketime, and PostgreSQL through the same library in
-  # its container. A pinned test clock stays pinned. A fixture that seeds an expiry, window or
-  # retention from a pinned clock while the code reads the real one passes on the day it lands
-  # and fails here at once, instead of a year later on every PR: on 2026-11-11 a seeded 7-day
-  # ban from a clock pinned at 2026-11-04 expired at 12:00 UTC and turned the api shard red.
-  tests-year-ahead:
-    name: Workspace tests a year ahead (${{ matrix.shard }})
+  # The database-free unit suites once more with the real clock a year ahead. Only JavaScript's clock
+  # moves (scripts/ci/real-clock-offset.mjs, loaded into every Vitest worker); these suites run no
+  # database and no Prisma engine, so nothing reads a clock that disagrees with it. A pinned test
+  # clock stays pinned. A test that seeds a fixed date the code compares with the real clock (a teen
+  # birthdate literal, an expiry from a pinned clock) fails here a year before it fails on every PR:
+  # on 2026-11-11 a seeded 7-day ban from a clock pinned at 2026-11-04 turned the api shard red.
+  # The integration tier is not shifted, because its database and the Prisma engine keep the real
+  # clock; apps/api/src/testing/integration-clock-literals.guard.spec.ts checks it statically. The
+  # mobile suite runs in a browser, which a Node preload cannot reach.
+  unit-tests-year-ahead:
+    name: Unit tests a year ahead
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [api, mobile, other]
+    timeout-minutes: 15
     env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
-      YEAR_AHEAD: ${{ inputs.clock_offset || '+365d' }}
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+      REAL_CLOCK_OFFSET_DAYS: ${{ inputs.clock_offset_days || '365' }}
+      # Nothing listens here, so the api integration suites skip themselves and nothing reaches a
+      # database.
+      INTEGRATION_TEST_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:1/none
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-
-      # The coverage shards' database with libfaketime added, a year ahead. A service container
-      # cannot add the library, so this one is built and started here.
-      - name: Start PostgreSQL a year ahead
-        id: database
-        run: |
-          printf 'FROM postgres:17-alpine\nRUN apk add --no-cache libfaketime\n' |
-            docker build -q -t postgres-year-ahead -
-          docker run -d --name postgres -p 5432:5432 \
-            -e POSTGRES_PASSWORD=postgres \
-            -e LD_PRELOAD=/usr/lib/faketime/libfaketime.so.1 \
-            -e FAKETIME="$YEAR_AHEAD" -e DONT_FAKE_MONOTONIC=1 \
-            postgres-year-ahead
-          for attempt in $(seq 1 60); do
-            docker exec postgres pg_isready -U postgres && break
-            sleep 1
-          done
-          docker exec postgres psql -U postgres -tAc 'SELECT now()'
-
-      - name: Install libfaketime for the test processes
-        id: faketime
-        if: ${{ !cancelled() }}
-        run: |
-          sudo apt-get install -y -qq libfaketime
-          ls /usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
 
       - name: Setup Node environment
         id: setup
-        if: ${{ !cancelled() }}
         uses: ./.github/actions/setup-node-env
         with:
           use-npm-ci: 'false'
 
-      - name: Generate Prisma Client
-        id: prisma
+      - name: Check the clock preload
+        id: preload
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
-        run: npm run db:generate
+        run: node --test scripts/ci/real-clock-offset.test.mjs
 
-      # The coverage shards' own provisioning SQL, read from their step so the two cannot drift.
-      - name: Provision Supabase-compatible roles and auth schema
-        id: roles
-        if: ${{ !cancelled() && steps.database.outcome == 'success' && steps.setup.outcome == 'success' }}
-        run: |
-          node --input-type=module -e "import('./scripts/integration-postgres.mjs').then((m) => process.stdout.write(m.qualityGateProvisioningSql()))" |
-            psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1
-
-      - name: Apply migrations to the test database
-        id: migrations
-        if: ${{ !cancelled() && steps.roles.outcome == 'success' }}
-        run: node scripts/prisma-migrate-deploy.mjs
-
-      - name: Build packages and install Playwright Chromium
+      - name: Generate Prisma Client and build packages
         id: build
-        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.prisma.outcome == 'success' }}
-        env:
-          SHARD: ${{ matrix.shard }}
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: |
-          chromium=
-          if [ "$SHARD" = mobile ]; then
-            npx playwright install --with-deps chromium &
-            chromium=$!
-          fi
-          npm run build
-          if [ -n "$chromium" ]; then wait "$chromium"; fi
+          npm run db:generate
+          npm run build:packages
 
-      - name: Run tests a year ahead
-        id: tests
-        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.faketime.outcome == 'success' }}
-        env:
-          COVERAGE_SHARD: ${{ matrix.shard }}
-          COVERAGE_SHARED_DEPS_BUILT: 'true'
-          LD_PRELOAD: /usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
-          FAKETIME: ${{ env.YEAR_AHEAD }}
-          DONT_FAKE_MONOTONIC: '1'
+      # Each suite runs even when an earlier one failed, so one red run lists every date bomb.
+      - name: Run unit suites a year ahead
+        if: ${{ !cancelled() && steps.preload.outcome == 'success' && steps.build.outcome == 'success' }}
         run: |
-          node -e "console.log('test clock', new Date().toISOString())"
-          npm run test:coverage
+          preload="--import $GITHUB_WORKSPACE/scripts/ci/real-clock-offset.mjs"
+          node --import ./scripts/ci/real-clock-offset.mjs -e \
+            "console.log('test clock', new Date().toISOString())"
+          failed=
+          for workspace in packages/config packages/utils packages/api-client packages/testing; do
+            (cd "$workspace" && NODE_OPTIONS="$preload" npx vitest run --config vitest.config.ts) ||
+              failed="$failed $workspace"
+          done
+          (cd apps/api && NODE_OPTIONS="--conditions=development $preload" npx vitest run src) ||
+            failed="$failed apps/api"
+          (cd apps/web && NODE_OPTIONS="$preload" npx vitest run --config vitest.config.ts) ||
+            failed="$failed apps/web"
+          if [ -n "$failed" ]; then
+            echo "::error::Unit suites failed a year ahead:$failed"
+            exit 1
+          fi
 
   # The name every reader knows. It reports all shards as one coverage comment and goes red unless
   # every shard passed, so a skipped or cancelled shard is a failure too.

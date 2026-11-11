@@ -65,6 +65,7 @@ import {
   ModerationAfterCommit,
   ModerationSanctionsService,
 } from '../../src/modules/moderation/moderation-sanctions.service.js'
+import { birthdateForAge } from '../../src/testing/birthdate.js'
 import { listenHttpApp } from '../../src/testing/loopback-http-app.js'
 
 /** The detail body with the 6.11 fields, parsed by the shipped strict schema. */
@@ -317,8 +318,13 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   const label = () => `${++counter}`
   let sequence = 0
 
+  // Birthdates follow the suite's clock: the age gate reads it, and a member made on the real
+  // clock could be under 18 on a pinned clock that runs behind it.
   async function seedOwnMember(alias: string | null): Promise<SeededMember> {
-    const user = await persistUser(prisma, createUser())
+    const user = await persistUser(
+      prisma,
+      createUser({ age: 40, birthdate: birthdateForAge(40, now()) })
+    )
     const name = alias ?? `${runId}-operator${label()}`
     if (alias) await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     return { id: user.id, alias: name }
@@ -335,10 +341,15 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
     const user = await persistUser(
       prisma,
       createTeenUser({
+        age: 15,
+        birthdate: birthdateForAge(15, now()),
         profilePreferences: { compliance: { accountStatus: 'active' } },
       })
     )
-    const guardian = await persistUser(prisma, createUser())
+    const guardian = await persistUser(
+      prisma,
+      createUser({ age: 42, birthdate: birthdateForAge(42, now()) })
+    )
     const alias = `${runId}-teen${label()}`
     await prisma.communityAlias.create({ data: { user_id: user.id, alias } })
     await prisma.guardianConsent.create({

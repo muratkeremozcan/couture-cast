@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import 'reflect-metadata'
 import { describe, expect, it, vi } from 'vitest'
 
+import { birthdateForAge } from '../src/testing/birthdate.js'
 import { reactionTestContext } from './helpers/community-reaction-context.js'
 import { deleteMembers, updatePost } from './helpers/privacy-guards.js'
 
@@ -12,7 +13,11 @@ const { prisma, repository, namespace, guardian, input, fixture, mutate } =
 
 describe('Story 6.3 reaction consent, visibility and erasure', () => {
   it('refuses missing age, under-13 and unconsented teens; permits retraction after consent loss', async () => {
-    for (const age of [null, '2020-01-01T00:00:00Z', '2012-01-01T00:00:00Z']) {
+    for (const age of [
+      null,
+      birthdateForAge(6).toISOString(),
+      birthdateForAge(15).toISOString(),
+    ]) {
       const { userId, postId } = await fixture(age ?? undefined)
       if (age === null)
         await prisma.userProfile.update({
@@ -27,7 +32,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
     await mutate(userId, postId, input('love'))
     await prisma.userProfile.update({
       where: { user_id: userId },
-      data: { birthdate: new Date('2012-01-01T00:00:00Z') },
+      data: { birthdate: birthdateForAge(15) },
     })
     await expect(mutate(userId, postId, input('applause', 1))).rejects.toMatchObject({
       status: 403,
@@ -39,7 +44,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
 
   it('withdraws a teens counted votes atomically when the last consent is revoked', async () => {
     const owner = await fixture()
-    const teen = await fixture('2012-01-01T00:00:00Z')
+    const teen = await fixture(birthdateForAge(15).toISOString())
     await prisma.guardianConsent.create({
       data: { guardian_id: owner.userId, teen_id: teen.userId, status: 'granted' },
     })
@@ -61,7 +66,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
 
   it('serializes consent revocation behind an in-flight accepted reaction', async () => {
     const owner = await fixture()
-    const teen = await fixture('2012-01-01T00:00:00Z')
+    const teen = await fixture(birthdateForAge(15).toISOString())
     await prisma.guardianConsent.create({
       data: { guardian_id: owner.userId, teen_id: teen.userId, status: 'granted' },
     })
@@ -156,7 +161,7 @@ describe('Story 6.3 reaction consent, visibility and erasure', () => {
 
   it('serializes a new guardian grant and repeated revocation without restoring withdrawn votes', async () => {
     const owner = await fixture()
-    const teen = await fixture('2012-01-01T00:00:00Z')
+    const teen = await fixture(birthdateForAge(15).toISOString())
     await prisma.userProfile.update({
       where: { user_id: teen.userId },
       data: {

@@ -1,5 +1,16 @@
 import { beforeAll } from 'vitest'
 
+// pr-checks' unit-tests-year-ahead job moves the real clock through scripts/ci/real-clock-offset.mjs.
+// A worker that did not load it would pass on today's clock, so the run stops instead.
+if (
+  Number(process.env.REAL_CLOCK_OFFSET_DAYS ?? 0) !== 0 &&
+  !(Date as unknown as Record<symbol, unknown>)[
+    Symbol.for('couture-cast.real-clock-offset-days')
+  ]
+) {
+  throw new Error('REAL_CLOCK_OFFSET_DAYS is set but this worker runs on the real clock.')
+}
+
 beforeAll(() => {
   const originalFetch =
     globalThis.fetch ||
