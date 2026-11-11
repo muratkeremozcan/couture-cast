@@ -340,6 +340,118 @@ jobs:
           echo "::error::Workspace tests failed"
           exit 1
 
+  # Every workspace suite once more with every clock a year ahead: the test processes (Node and
+  # the Prisma engine inside it) through libfaketime, and PostgreSQL through the same library in
+  # its container. A pinned test clock stays pinned. A fixture that seeds an expiry, window or
+  # retention from a pinned clock while the code reads the real one passes on the day it lands
+  # and fails here at once, instead of a year later on every PR: on 2026-11-11 a seeded 7-day
+  # ban from a clock pinned at 2026-11-04 expired at 12:00 UTC and turned the api shard red.
+  tests-year-ahead:
+    name: Workspace tests a year ahead (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [api, mobile, other]
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      YEAR_AHEAD: +365d
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+
+      # The coverage shards' database with libfaketime added, a year ahead. A service container
+      # cannot add the library, so this one is built and started here.
+      - name: Start PostgreSQL a year ahead
+        id: database
+        run: |
+          printf 'FROM postgres:17-alpine\nRUN apk add --no-cache libfaketime\n' |
+            docker build -q -t postgres-year-ahead -
+          docker run -d --name postgres -p 5432:5432 \
+            -e POSTGRES_PASSWORD=postgres \
+            -e LD_PRELOAD=/usr/lib/faketime/libfaketime.so.1 \
+            -e FAKETIME="$YEAR_AHEAD" -e DONT_FAKE_MONOTONIC=1 \
+            postgres-year-ahead
+          for attempt in $(seq 1 60); do
+            docker exec postgres pg_isready -U postgres && break
+            sleep 1
+          done
+          docker exec postgres psql -U postgres -tAc 'SELECT now()'
+
+      - name: Install libfaketime for the test processes
+        id: faketime
+        if: ${{ !cancelled() }}
+        run: |
+          sudo apt-get install -y -qq libfaketime
+          ls /usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
+
+      - name: Setup Node environment
+        id: setup
+        if: ${{ !cancelled() }}
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      - name: Generate Prisma Client
+        id: prisma
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run db:generate
+
+      # The coverage shards' own provisioning SQL, read from their step so the two cannot drift.
+      - name: Provision Supabase-compatible roles and auth schema
+        id: roles
+        if: ${{ !cancelled() && steps.database.outcome == 'success' && steps.setup.outcome == 'success' }}
+        run: |
+          node --input-type=module -e "import('./scripts/integration-postgres.mjs').then((m) => process.stdout.write(m.qualityGateProvisioningSql()))" |
+            psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1
+
+      - name: Apply migrations to the test database
+        id: migrations
+        if: ${{ !cancelled() && steps.roles.outcome == 'success' }}
+        run: node scripts/prisma-migrate-deploy.mjs
+
+      - name: Build packages and install Playwright Chromium
+        id: build
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.prisma.outcome == 'success' }}
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          chromium=
+          if [ "$SHARD" = mobile ]; then
+            npx playwright install --with-deps chromium &
+            chromium=$!
+          fi
+          npm run build
+          if [ -n "$chromium" ]; then wait "$chromium"; fi
+
+      - name: Run tests a year ahead
+        id: tests
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.migrations.outcome == 'success' && steps.faketime.outcome == 'success' }}
+        env:
+          COVERAGE_SHARD: ${{ matrix.shard }}
+          COVERAGE_SHARED_DEPS_BUILT: 'true'
+          LD_PRELOAD: /usr/lib/x86_64-linux-gnu/faketime/libfaketime.so.1
+          FAKETIME: ${{ env.YEAR_AHEAD }}
+          DONT_FAKE_MONOTONIC: '1'
+        run: |
+          node -e "console.log('test clock', new Date().toISOString())"
+          npm run test:coverage
+
   # The name every reader knows. It reports all shards as one coverage comment and goes red unless
   # every shard passed, so a skipped or cancelled shard is a failure too.
   tests:
