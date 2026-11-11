@@ -288,7 +288,7 @@ jobs:
         if: ${{ !cancelled() && steps.setup.outcome == 'success' && steps.roles.outcome == 'success' }}
         run: node scripts/prisma-migrate-deploy.mjs
 
-      # Together, because a slow apt mirror once added 2 minutes to the Chromium install and more than
+      # Together, because a slow Ubuntu mirror once added 2 minutes to the Chromium install and more than
       # 4 in another run. Only `apps/mobile` runs tests in a browser.
       - name: Build packages and install Playwright Chromium
         id: build

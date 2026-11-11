@@ -16,11 +16,12 @@ import { fileURLToPath } from 'node:url'
 
 const repository = fileURLToPath(new URL('../../', import.meta.url))
 const SCRIPT = 'scripts/ci/apt-install.sh'
+// Any whole-word mention of the package tools, however it is spelled around them (`sudo apt -y
+// install`, `spawnSync('apt', ['install'])`), and Playwright's package installer. `apt-install.sh`
+// is not a mention: a hyphen joins it to the rest of the name.
 const APT_CALL = new RegExp(
   [
-    'apt-get',
-    String.raw`\bapt\s+(?:install|update|upgrade|full-upgrade|dist-upgrade|remove|purge|autoremove)\b`,
-    String.raw`\bdpkg\s+-i\b`,
+    String.raw`(?<![\w-])(?:apt|apt-get|aptitude|dpkg)(?![\w-])`,
     'install-deps',
     '--with-deps',
   ].join('|')
@@ -30,6 +31,8 @@ const APT_CALL = new RegExp(
 const ALLOWLIST = {
   [SCRIPT]: 'the one place CI installs Ubuntu packages',
   'scripts/ci/apt-install.test.mjs': 'this guard: its pattern and its red cases',
+  'scripts/ci/share-card-browser-deps.mjs':
+    'points /etc/apt sources at the official archive and restores them; installs through apt-install.sh',
   'scripts/ci/share-card-browser-deps.test.mjs':
     'asserts the share-card workflows run no direct Playwright package install',
 }
@@ -89,6 +92,7 @@ describe('CI installs Ubuntu packages only through apt-install.sh', () => {
     assert.deepEqual(Object.keys(ALLOWLIST).sort(), [
       'scripts/ci/apt-install.sh',
       'scripts/ci/apt-install.test.mjs',
+      'scripts/ci/share-card-browser-deps.mjs',
       'scripts/ci/share-card-browser-deps.test.mjs',
     ])
   })
@@ -123,6 +127,31 @@ describe('CI installs Ubuntu packages only through apt-install.sh', () => {
     assert.deepEqual(hits, [
       "scripts/zz-install.mjs:1: spawnSync('npx', ['playwright', 'install-deps', 'chromium'])",
     ])
+  })
+
+  test('apt with options before its verb, and apt as a quoted Node argument, fail', () => {
+    assert.deepEqual(
+      repoWith({
+        '.github/workflows/zz-probe.yml':
+          'jobs:\n  b:\n    steps:\n      - run: sudo apt -y install jq\n',
+        'scripts/zz-install.mjs': "spawnSync('sudo', ['apt', 'install', '-y', 'jq'])\n",
+        'scripts/zz-other.mjs': 'spawnSync("dpkg", ["--configure", "-a"])\n',
+      }).hits.sort(),
+      [
+        '.github/workflows/zz-probe.yml:4: - run: sudo apt -y install jq',
+        "scripts/zz-install.mjs:1: spawnSync('sudo', ['apt', 'install', '-y', 'jq'])",
+        'scripts/zz-other.mjs:1: spawnSync("dpkg", ["--configure", "-a"])',
+      ]
+    )
+  })
+
+  test("the script's own name is not a mention", () => {
+    assert.deepEqual(
+      repoWith({
+        'scripts/zz-entry.sh': 'bash scripts/ci/apt-install.sh --playwright chromium\n',
+      }).hits,
+      []
+    )
   })
 
   test('a package.json script that installs packages fails', () => {
