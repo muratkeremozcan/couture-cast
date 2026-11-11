@@ -8,6 +8,7 @@ import {
   APT_RETRY_PAUSES_S,
   APT_TERMINATION_RESERVE_S,
   configureAptRetries,
+  superviseCommand,
   withAptRetries,
 } from './apt-retry.mjs'
 
@@ -100,11 +101,14 @@ export const BROWSER_INSTALL_DEADLINE_S = 660
  * A failed install runs again after apt-retry.mjs's pauses (15, 30, 60 and 120 s), with apt's
  * own fetch retries configured first: an Ubuntu mirror mid-sync serves index files of the wrong
  * size ("Mirror sync in progress?"), and the runner's resolver once failed for five minutes
- * (2026-11-11). No attempt starts that the step's deadline cannot finish, and each runs under
- * what remains of it. A deadline hit is not retried, because the step's time is already spent.
+ * (2026-11-11). Each attempt runs under apt-retry.mjs's supervisor, which ends its whole process
+ * tree, root-owned apt included, with TERM and then KILL when its share of the deadline is spent.
+ * No attempt starts that the step's deadline cannot finish, and a deadline hit is not retried,
+ * because the step's time is already spent.
  */
-export function installPinnedPlaywrightBrowsers({
-  run = spawnSync,
+export async function installPinnedPlaywrightBrowsers({
+  supervise = superviseCommand,
+  sleep,
   node = process.execPath,
   cli = createRequire(import.meta.url).resolve('@playwright/test/cli'),
   browsers = ['chromium', 'firefox', 'webkit'],
@@ -117,47 +121,24 @@ export function installPinnedPlaywrightBrowsers({
     !['chromium', 'chromium,firefox,webkit'].includes(browsers.join(','))
   )
     throw new Error('browser_dependency_engine_selection_required')
-  withAptRetries(
-    ({ remainingSeconds }) =>
-      installOnce({
-        run,
-        node,
-        cli,
-        browsers,
+  await withAptRetries(
+    async ({ remainingSeconds }) => {
+      const result = await supervise(node, [cli, 'install', '--with-deps', ...browsers], {
         // The KILL grace and teardown come out of what remains, as in apt-retry.mjs.
         seconds: Math.min(600, remainingSeconds - APT_TERMINATION_RESERVE_S),
-      }),
+      })
+      if (result.timedOut) throw new Error('browser_dependency_install_timeout')
+      if (result.error || result.status !== 0)
+        throw new Error('browser_dependency_install_failed')
+    },
     {
       retryable: (error) => error.message === 'browser_dependency_install_failed',
       pauses,
       deadlineSeconds,
       now,
-      sleep: (seconds) => run('sleep', [String(seconds)], { stdio: 'inherit' }),
+      ...(sleep ? { sleep } : {}),
     }
   )
-}
-
-function installOnce({ run, node, cli, browsers, seconds }) {
-  const result = run(
-    'timeout',
-    [
-      '--signal=TERM',
-      '--kill-after=15s',
-      `${seconds}s`,
-      node,
-      cli,
-      'install',
-      '--with-deps',
-      ...browsers,
-    ],
-    { stdio: 'inherit', timeout: (seconds + 20) * 1000, killSignal: 'SIGKILL' }
-  )
-  if (result.error?.code === 'ENOENT')
-    throw new Error('browser_dependency_deadline_required')
-  if ([124, 137].includes(result.status) || result.error?.code === 'ETIMEDOUT')
-    throw new Error('browser_dependency_install_timeout')
-  if (result.error || result.status !== 0)
-    throw new Error('browser_dependency_install_failed')
 }
 
 export function shareCardBrowserEngines(args) {
@@ -203,9 +184,9 @@ async function main() {
       if (result.error || result.status !== 0)
         throw new Error('browser_dependency_source_write_failed')
     },
-    install: () => {
+    install: async () => {
       configureAptRetries()
-      installPinnedPlaywrightBrowsers({ browsers })
+      await installPinnedPlaywrightBrowsers({ browsers })
     },
   })
   console.log(

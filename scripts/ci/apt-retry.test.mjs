@@ -2,160 +2,270 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { INSTALLERS, WRAPPER, unwrappedAptCalls } from './apt-retry-coverage.mjs'
+import { ALLOWLIST, WRAPPER, aptInventory, shellCommands } from './apt-retry-coverage.mjs'
 import {
   APT_RETRIES_CONFIG,
   APT_RETRIES_FILE,
-  boundedRun,
   configureAptRetries,
   parseAptRetryArgs,
   runAptCommand,
+  superviseCommand,
   withAptRetries,
 } from './apt-retry.mjs'
 
 const repository = fileURLToPath(new URL('../../', import.meta.url))
 const readRepo = (file) => readFileSync(path.join(repository, file), 'utf8')
+const trackedFiles = () =>
+  execFileSync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], {
+    cwd: repository,
+    encoding: 'utf8',
+  })
+    .split('\n')
+    .filter(Boolean)
 
-/** A repository made of the given files, for the coverage walk. */
-function fakeRepo(contents) {
+/** The real repository with `changes` applied, as the inventory reads it. */
+function repoWith(changes = {}) {
+  const files = [...new Set([...trackedFiles(), ...Object.keys(changes)])]
   return {
-    files: Object.keys(contents),
-    read: (file) => contents[file],
-    exists: (file) => file in contents,
+    files,
+    read: (file) => (file in changes ? changes[file] : readRepo(file)),
   }
 }
 
-const workflow = (...runs) =>
-  `jobs:\n  build:\n    steps:\n${runs
-    .map(
-      (run) =>
-        `      - run: |\n${run
-          .split('\n')
-          .map((line) => `          ${line}`)
-          .join('\n')}`
-    )
+const step = (run) =>
+  `jobs:\n  build:\n    steps:\n      - run: |\n${run
+    .split('\n')
+    .map((line) => `          ${line}`)
     .join('\n')}\n`
+const unwrappedWith = (changes) => aptInventory(repoWith(changes)).unwrapped.sort()
 
-describe('every apt install in CI retries', () => {
-  test('no workflow, action or script they run calls apt outside the wrapper', () => {
-    const files = execFileSync('git', ['ls-files'], { cwd: repository, encoding: 'utf8' })
-      .split('\n')
-      .filter(Boolean)
-    const { unwrapped, reached } = unwrappedAptCalls({
-      files,
-      read: readRepo,
-      exists: (file) => existsSync(path.join(repository, file)),
-    })
-    assert.deepEqual(unwrapped, [])
-    // The walk got somewhere: npm scripts, and the share-card installer the native lanes run.
-    assert.ok(reached.length > 50, `reached ${reached.length}`)
-    assert.ok(reached.includes('scripts/ci/share-card-browser-deps.mjs'))
-    assert.ok(reached.some((entry) => entry.startsWith('npm:')))
+describe('every apt call in CI is wrapped or reviewed', () => {
+  test('the repository has none outside the wrapper and the reviewed allowlist', () => {
+    assert.deepEqual(aptInventory(repoWith()), { unwrapped: [], stale: [] })
   })
 
-  test('direct, Playwright, continued and action apt calls are found and wrapped ones pass', () => {
-    const repo = fakeRepo({
-      '.github/workflows/w.yml': workflow(
-        'sudo apt-get update && sudo apt-get install -y libfaketime',
-        'npx playwright install --with-deps chromium &\nnpx playwright install-deps',
-        'sudo apt \\\n  install -y jq',
-        `node ${WRAPPER} --deadline-seconds 600 -- npx playwright install --with-deps chromium`,
-        '# sudo apt-get install -y ignored\necho apt-cache-free'
-      ),
-      '.github/actions/a/action.yml':
-        'runs:\n  using: composite\n  steps:\n    - run: sudo dpkg -i package.deb\n      shell: bash\n',
-    })
-    assert.deepEqual(unwrappedAptCalls(repo).unwrapped, [
-      '.github/workflows/w.yml: sudo apt-get update',
-      '.github/workflows/w.yml: sudo apt-get install -y libfaketime',
-      '.github/workflows/w.yml: npx playwright install --with-deps chromium',
-      '.github/workflows/w.yml: npx playwright install-deps',
-      '.github/workflows/w.yml: sudo apt install -y jq',
-      '.github/actions/a/action.yml: sudo dpkg -i package.deb',
-    ])
-  })
-
-  test('a wrapped update chained with an unwrapped install is found', () => {
-    const repo = fakeRepo({
-      '.github/workflows/w.yml': workflow(
-        `node ${WRAPPER} --deadline-seconds 600 -- sudo apt-get update && sudo apt-get install -y jq`
-      ),
-    })
-    assert.deepEqual(unwrappedAptCalls(repo).unwrapped, [
-      '.github/workflows/w.yml: sudo apt-get install -y jq',
-    ])
-  })
-
-  test('the wrapper named in a comment does not wrap the command', () => {
-    const repo = fakeRepo({
-      '.github/workflows/w.yml': workflow(`sudo apt-get install -y jq # ${WRAPPER}`),
-    })
-    assert.deepEqual(unwrappedAptCalls(repo).unwrapped, [
-      '.github/workflows/w.yml: sudo apt-get install -y jq',
-    ])
-  })
-
-  test('apt in a repository script a step runs is found, unless the wrapper runs the script', () => {
-    const installer = '#!/usr/bin/env bash\nset -e\nsudo apt-get install -y jq\n'
-    const direct = fakeRepo({
-      '.github/workflows/w.yml': workflow('bash scripts/install-packages.sh'),
-      'scripts/install-packages.sh': installer,
-    })
-    assert.deepEqual(unwrappedAptCalls(direct).unwrapped, [
-      'scripts/install-packages.sh: sudo apt-get install -y jq',
-    ])
-    const wrappedScript = fakeRepo({
-      '.github/workflows/w.yml': workflow(
-        `node ${WRAPPER} --deadline-seconds 600 -- bash scripts/install-packages.sh`
-      ),
-      'scripts/install-packages.sh': installer,
-    })
-    assert.deepEqual(unwrappedAptCalls(wrappedScript).unwrapped, [])
-  })
-
-  test('npm scripts, their pre scripts, workspaces and Node scripts are followed', () => {
-    const repo = fakeRepo({
-      '.github/workflows/w.yml': workflow(
-        'npm run setup',
-        'npm run deps --workspace api'
-      ),
-      'package.json': JSON.stringify({
-        workspaces: ['apps/*'],
-        scripts: { presetup: 'node scripts/fetch.mjs', setup: 'echo ready' },
-      }),
-      'apps/api/package.json': JSON.stringify({
-        name: 'api',
-        scripts: { deps: 'sudo apt-get install -y libvips' },
-      }),
-      'scripts/fetch.mjs': "spawnSync('sudo', ['apt-get', 'install', '-y', 'jq'])\n",
-    })
-    assert.deepEqual(unwrappedAptCalls(repo).unwrapped, [
-      'scripts/fetch.mjs (run from .github/workflows/w.yml > npm run presetup): issues apt calls itself',
-      '.github/workflows/w.yml > npm run deps -w api: sudo apt-get install -y libvips',
-    ])
-  })
-
-  test('only the listed installers may issue apt calls themselves, and the share-card one retries', () => {
-    assert.deepEqual(Object.keys(INSTALLERS).sort(), [
+  test('the allowlist is pinned, and the share-card installer in it retries under the supervisor', () => {
+    assert.deepEqual(Object.keys(ALLOWLIST).sort(), [
+      'scripts/ci/apt-retry-coverage.mjs',
       'scripts/ci/apt-retry.mjs',
+      'scripts/ci/apt-retry.test.mjs',
       'scripts/ci/share-card-browser-deps.mjs',
+      'scripts/ci/share-card-browser-deps.test.mjs',
     ])
     const source = readRepo('scripts/ci/share-card-browser-deps.mjs')
     assert.match(
       source,
-      /import \{[^}]*configureAptRetries[^}]*\} from '\.\/apt-retry\.mjs'/
+      /configureAptRetries\(\)\n\s*await installPinnedPlaywrightBrowsers/
     )
-    assert.match(source, /withAptRetries\(/)
-    assert.match(source, /configureAptRetries\(\)\n\s*installPinnedPlaywrightBrowsers/)
+    assert.match(source, /await withAptRetries\(/)
+    assert.match(source, /supervise = superviseCommand/)
+  })
+
+  test('apt appended to install-dependencies.sh, which the install actions run by a quoted action path, is found', () => {
+    const file = 'scripts/ci/install-dependencies.sh'
+    assert.deepEqual(
+      unwrappedWith({ [file]: `${readRepo(file)}sudo apt-get install -y jq\n` }),
+      [`${file}: sudo apt-get install -y jq`]
+    )
+  })
+
+  test('apt in a script a step runs by a quoted path is found', () => {
+    assert.deepEqual(
+      unwrappedWith({
+        '.github/workflows/zz-probe.yml': step('bash "scripts/zz-install.sh"'),
+        'scripts/zz-install.sh': '#!/usr/bin/env bash\nsudo apt-get install -y jq\n',
+      }),
+      ['scripts/zz-install.sh: sudo apt-get install -y jq']
+    )
+  })
+
+  test('apt in a helper a Node script imports by a relative path is found', () => {
+    assert.deepEqual(
+      unwrappedWith({
+        'scripts/zz-entry.mjs': "import './zz-install.mjs'\n",
+        'scripts/zz-install.mjs':
+          "spawnSync('sudo', ['apt-get', 'install', '-y', 'jq'])\n",
+      }),
+      ["scripts/zz-install.mjs: spawnSync('sudo', ['apt-get', 'install', '-y', 'jq'])"]
+    )
+  })
+
+  test('a wrapped update chained with an unwrapped install, and the wrapper only in a comment, are found', () => {
+    assert.deepEqual(
+      unwrappedWith({
+        '.github/workflows/zz-probe.yml': step(
+          `node ${WRAPPER} --deadline-seconds 600 -- sudo apt-get update && sudo apt-get install -y jq\nsudo apt-get install -y curl # ${WRAPPER}`
+        ),
+      }),
+      [
+        '.github/workflows/zz-probe.yml: sudo apt-get install -y curl',
+        '.github/workflows/zz-probe.yml: sudo apt-get install -y jq',
+      ]
+    )
+  })
+
+  test('a command list quoted inside the wrapper is one wrapped command', () => {
+    assert.deepEqual(
+      unwrappedWith({
+        '.github/workflows/zz-probe.yml': step(
+          `node ${WRAPPER} --deadline-seconds 600 -- bash -c 'sudo apt-get update && sudo apt-get install -y jq'\nnode "\${{ github.workspace }}/${WRAPPER}" --deadline-seconds 600 -- npx playwright install --with-deps chromium`
+        ),
+      }),
+      []
+    )
+  })
+
+  test('direct, Playwright, continued, action and npm script calls are found', () => {
+    const packageJson = JSON.parse(readRepo('package.json'))
+    packageJson.scripts['zz:deps'] = 'npx playwright install-deps'
+    assert.deepEqual(
+      unwrappedWith({
+        '.github/workflows/zz-probe.yml': step(
+          'npx playwright install --with-deps chromium &\nsudo apt \\\n  install -y jq'
+        ),
+        '.github/actions/zz-probe/action.yml':
+          'runs:\n  using: composite\n  steps:\n    - run: sudo dpkg -i package.deb\n      shell: bash\n',
+        'package.json': JSON.stringify(packageJson),
+      }),
+      [
+        '.github/actions/zz-probe/action.yml: sudo dpkg -i package.deb',
+        '.github/workflows/zz-probe.yml: npx playwright install --with-deps chromium',
+        '.github/workflows/zz-probe.yml: sudo apt install -y jq',
+        'package.json scripts.zz:deps: npx playwright install-deps',
+      ]
+    )
+  })
+
+  test('an allowlisted file that no longer calls apt is reported, so the list stays exact', () => {
+    assert.deepEqual(
+      aptInventory(
+        repoWith({ 'scripts/ci/share-card-browser-deps.test.mjs': '// gone\n' })
+      ).stale,
+      ['scripts/ci/share-card-browser-deps.test.mjs']
+    )
+  })
+
+  test('shell commands honour quotes, escapes, comments and continuations', () => {
+    assert.deepEqual(
+      shellCommands('a \'b && c\' && d "e;f" ; g\\\n h # i && j\nk 2>&1 | l & m'),
+      ["a 'b && c'", 'd "e;f"', 'g h', 'k 2>&1', 'l', 'm']
+    )
+  })
+})
+
+/** A Node script in a temporary directory; returns its path. */
+function script(directory, name, body) {
+  const file = path.join(directory, name)
+  writeFileSync(file, body)
+  return file
+}
+
+/** Whether `pid` is still a live process (not a zombie). */
+function alive(pid) {
+  try {
+    process.kill(pid, 0)
+  } catch {
+    return false
+  }
+  const state = spawnSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
+  return !String(state.stdout).trim().startsWith('Z')
+}
+
+describe('apt-retry supervisor', () => {
+  for (const [name, parentIgnoresTerm] of [
+    ['a parent and child that both ignore TERM', true],
+    ['a child that ignores TERM after its parent exits on it', false],
+  ])
+    test(`${name} are killed at the deadline`, async () => {
+      const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-retry-'))
+      const pidFile = path.join(directory, 'child.pid')
+      const parent = script(
+        directory,
+        'parent.mjs',
+        `import { spawn } from 'node:child_process'
+import { writeFileSync } from 'node:fs'
+${parentIgnoresTerm ? "process.on('SIGTERM', () => undefined)" : ''}
+const child = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], { stdio: 'ignore' })
+writeFileSync(${JSON.stringify(pidFile)}, String(child.pid))
+setInterval(() => {}, 1000)
+`
+      )
+      try {
+        const started = Date.now()
+        const result = await superviseCommand(process.execPath, [parent], {
+          seconds: 1.5,
+          graceSeconds: 1,
+        })
+        const elapsed = Date.now() - started
+        assert.deepEqual(result, { status: 124, timedOut: true })
+        assert.ok(elapsed < 4500, `ran ${elapsed} ms for 1.5 s plus 1 s of grace`)
+        const child = Number(readFileSync(pidFile, 'utf8'))
+        let survived = alive(child)
+        for (let wait = 0; wait < 20 && survived; wait += 1) {
+          spawnSync('sleep', ['0.1'])
+          survived = alive(child)
+        }
+        assert.equal(survived, false, 'the child outlived the deadline')
+      } finally {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    })
+
+  test('a command that finishes in time keeps its exit status', async () => {
+    assert.deepEqual(
+      await superviseCommand(process.execPath, ['-e', 'process.exit(3)'], {
+        seconds: 10,
+      }),
+      { status: 3, signal: null }
+    )
+  })
+
+  test('a budget of 0 or less is refused, never passed on as no limit', async () => {
+    for (const seconds of [0, -1, Number.NaN])
+      await assert.rejects(
+        superviseCommand('true', [], { seconds, start: () => assert.fail('started') }),
+        /apt_retry_deadline_spent/
+      )
+  })
+
+  test('the CLI runs the same supervisor end to end, inside its deadline', async () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-retry-'))
+    const stubborn = script(
+      directory,
+      'stubborn.mjs',
+      "process.on('SIGTERM', () => undefined)\nsetInterval(() => {}, 1000)\n"
+    )
+    try {
+      const started = Date.now()
+      await assert.rejects(
+        runAptCommand(['4', '--', process.execPath, stubborn], {
+          parse: (args) => ({
+            deadlineSeconds: Number(args[0]),
+            command: args[2],
+            commandArgs: args.slice(3),
+          }),
+          configure: () => undefined,
+          graceSeconds: 1,
+          reserveSeconds: 2,
+          pauses: [],
+        }),
+        (error) => error.status === 124
+      )
+      assert.ok(Date.now() - started < 4000)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 })
 
 describe('apt-retry wrapper', () => {
+  const quiet = { log: () => undefined }
+
   test('writes apt fetch retries to the runner configuration', () => {
     const calls = []
     configureAptRetries({
@@ -178,205 +288,69 @@ describe('apt-retry wrapper', () => {
     )
   })
 
-  test('retries after 15, 30, 60 and 120 s, then fails with the last error', () => {
+  test('retries after 15, 30, 60 and 120 s, then fails with the last error', async () => {
     const slept = []
     let attempts = 0
-    assert.throws(
-      () =>
-        withAptRetries(
-          () => {
-            attempts += 1
-            throw new Error(`failure ${attempts}`)
-          },
-          { sleep: (seconds) => slept.push(seconds), log: () => undefined }
-        ),
+    await assert.rejects(
+      withAptRetries(
+        async () => {
+          attempts += 1
+          throw new Error(`failure ${attempts}`)
+        },
+        { sleep: async (seconds) => slept.push(seconds), ...quiet }
+      ),
       /failure 5/
     )
     assert.deepEqual(slept, [15, 30, 60, 120])
   })
 
-  test('returns as soon as an attempt succeeds', () => {
+  test('returns as soon as an attempt succeeds, and never retries a final error', async () => {
     let attempts = 0
-    const slept = []
-    withAptRetries(
-      () => {
+    await withAptRetries(
+      async () => {
         attempts += 1
         if (attempts < 3) throw new Error('resolver down')
       },
-      { sleep: (seconds) => slept.push(seconds), log: () => undefined }
+      { sleep: async () => undefined, ...quiet }
     )
     assert.equal(attempts, 3)
-    assert.deepEqual(slept, [15, 30])
-  })
-
-  test('never retries an error it is told is final', () => {
-    let attempts = 0
-    assert.throws(
-      () =>
-        withAptRetries(
-          () => {
-            attempts += 1
-            throw new Error('timeout')
-          },
-          { retryable: () => false, sleep: () => undefined }
-        ),
+    let finals = 0
+    await assert.rejects(
+      withAptRetries(
+        async () => {
+          finals += 1
+          throw new Error('timeout')
+        },
+        { retryable: () => false, sleep: async () => undefined }
+      ),
       /timeout/
     )
-    assert.equal(attempts, 1)
+    assert.equal(finals, 1)
   })
 
-  test('starts no attempt the deadline cannot fit, and tells each one what remains', () => {
-    let clock = 0
-    const remaining = []
-    assert.throws(
-      () =>
-        withAptRetries(
-          ({ remainingSeconds }) => {
-            remaining.push(remainingSeconds)
-            clock += 100_000
-            throw new Error('mirror down')
-          },
-          {
-            deadlineSeconds: 300,
-            now: () => clock,
-            sleep: (seconds) => {
-              clock += seconds * 1000
-            },
-            log: () => undefined,
-          }
-        ),
-      /mirror down/
-    )
-    // 300, then 185 after 100 + 15, then 55 after 100 + 30: under a minute, so no third pause.
-    assert.deepEqual(remaining, [300, 185])
-  })
-
-  test('the CLI configures apt, then runs each attempt under timeout with the KILL grace reserved', () => {
-    const calls = []
-    const results = [{ status: 100 }, { status: 0 }]
-    runAptCommand(['--deadline-seconds', '600', '--', 'npx', 'playwright', 'install'], {
-      configure: () => calls.push(['configure']),
-      run: (command, args, options) => {
-        calls.push([command, args, options.timeout, options.killSignal])
-        return results.shift()
-      },
-      now: () => 0,
-      sleep: () => undefined,
-      log: () => undefined,
-    })
-    const attempt = [
-      'timeout',
-      ['--signal=TERM', '--kill-after=15s', '580s', 'npx', 'playwright', 'install'],
-      600_000,
-      'SIGKILL',
-    ]
-    assert.deepEqual(calls, [['configure'], attempt, attempt])
-    assert.throws(
-      () =>
-        runAptCommand(['--deadline-seconds', '600', '--', 'false'], {
-          configure: () => undefined,
-          run: () => ({ status: 100 }),
-          pauses: [],
-        }),
-      (error) => error.status === 100
-    )
-  })
-
-  test('the time configuration took comes out of the deadline', () => {
+  test('the CLI reserves the KILL grace, deducts configuration time and rereads the deadline after a late pause', async () => {
     let clock = 0
     const budgets = []
-    runAptCommand(['--deadline-seconds', '600', '--', 'true'], {
-      configure: () => {
-        clock += 9_000
-      },
-      run: (_command, args) => {
-        budgets.push(args[2])
-        return { status: 0 }
-      },
-      now: () => clock,
-    })
-    assert.deepEqual(budgets, ['571s'])
-  })
-
-  test('a pause that returns late starts no attempt the deadline no longer covers', () => {
-    let clock = 0
-    const budgets = []
-    assert.throws(
-      () =>
-        runAptCommand(['--deadline-seconds', '100', '--', 'apt-get', 'update'], {
-          configure: () => undefined,
-          run: (_command, args) => {
-            budgets.push(args[2])
-            return { status: 100 }
-          },
-          now: () => clock,
-          // Asked for 15 s, back after 99.5 s: half a second of the deadline is left.
-          sleep: () => {
-            clock += 99_500
-          },
-          log: () => undefined,
-        }),
+    await assert.rejects(
+      runAptCommand(['--deadline-seconds', '120', '--', 'apt-get', 'update'], {
+        configure: () => {
+          clock += 9_000
+        },
+        supervise: async (_command, _args, { seconds }) => {
+          budgets.push(seconds)
+          return { status: 100 }
+        },
+        now: () => clock,
+        // Asked for 15 s, back after 110.5 s: half a second of the deadline is left.
+        sleep: async () => {
+          clock += 110_500
+        },
+        ...quiet,
+      }),
       (error) => error.status === 100
     )
-    assert.deepEqual(budgets, ['80s'])
-  })
-
-  test('a finite budget is never passed as 0, which timeout reads as no limit', () => {
-    for (const seconds of [0, -1, 0.5])
-      assert.throws(
-        () => boundedRun(() => ({ status: 0 }), 'true', [], { seconds }),
-        /apt_retry_deadline_spent/
-      )
-  })
-
-  test('a command and its children that ignore TERM are killed within the deadline', () => {
-    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-retry-'))
-    const pidFile = path.join(directory, 'grandchild.pid')
-    const stubborn = path.join(directory, 'stubborn.mjs')
-    writeFileSync(
-      stubborn,
-      `import { spawn } from 'node:child_process'
-import { writeFileSync } from 'node:fs'
-process.on('SIGTERM', () => undefined)
-const grandchild = spawn(process.execPath, ['-e', "process.on('SIGTERM', () => {}); setTimeout(() => {}, 30000)"], { stdio: 'ignore' })
-writeFileSync(${JSON.stringify(pidFile)}, String(grandchild.pid))
-setTimeout(() => {}, 30000)
-`
-    )
-    const started = Date.now()
-    try {
-      assert.throws(
-        () =>
-          runAptCommand(['4', '--', process.execPath, stubborn], {
-            // A 4 s deadline: 2 s of work, TERM, then KILL 1 s later, 1 s to spare.
-            parse: (args) => ({
-              deadlineSeconds: Number(args[0]),
-              command: args[2],
-              commandArgs: args.slice(3),
-            }),
-            configure: () => undefined,
-            graceSeconds: 1,
-            reserveSeconds: 2,
-            pauses: [],
-          }),
-        /apt_backed_command_failed/
-      )
-      const elapsed = Date.now() - started
-      assert.ok(elapsed < 4000, `ran ${elapsed} ms on a 4 s deadline`)
-      const grandchild = Number(readFileSync(pidFile, 'utf8'))
-      let alive = true
-      for (let wait = 0; wait < 20 && alive; wait += 1) {
-        try {
-          process.kill(grandchild, 0)
-          spawnSync('sleep', ['0.1'])
-        } catch {
-          alive = false
-        }
-      }
-      assert.equal(alive, false, 'the grandchild outlived the attempt')
-    } finally {
-      rmSync(directory, { recursive: true, force: true })
-    }
+    // 120 s, less 9 s of configuration, less the 20 s reserve.
+    assert.deepEqual(budgets, [91])
   })
 
   test('the CLI needs a deadline and a command', () => {
