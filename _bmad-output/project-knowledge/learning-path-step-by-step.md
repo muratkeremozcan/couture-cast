@@ -17,7 +17,7 @@ Added Steps 40 to 54:
 - Step 51: Story 6.11, moderation decisions and account sanctions, `3efd8423` (PR #195), merged on 2026-11-05.
 - Step 52: Story 6.12, SLA monitoring and escalation, `56509fa8` (PR #196), merged on 2026-11-05.
 - Step 53: Story 6.13, immutable moderation history, `63bd6fcd` (PR #197), merged on 2026-11-06.
-- Step 54: Story 6.14, complimentary full access, in review on `feat/story-6-14-complimentary-access` (PR #198), not yet merged.
+- Step 54: Story 6.14, complimentary full access, `1fa40089` (PR #198), merged on 2026-11-10.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -25,6 +25,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Moved Step 54 to completed after PR #198 merged as `1fa40089`, and recorded the post-merge production checks in its `Evidence boundaries`.
 Step 54 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Moved Step 53 to completed after PR #197 merged as `63bd6fcd`.
 Corrected Step 53 where the last commits before merge left it stale: its test map now lists the orphaning suite, and its `Evidence boundaries` record the third independent review and the PR checks at merge.
@@ -115,11 +116,11 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 54, Story 6.14, complimentary full access, not yet merged, on `feat/story-6-14-complimentary-access` (PR #198).
-  `sprint-status.yaml` lists the story as `in-progress`.
+- Latest completed step: Step 54, Story 6.14, complimentary full access, status `done`, merged as `1fa40089` (PR #198) on 2026-11-10.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-14-complimentary-full-access.md`.
-  No grant exists in production until the owner runs the command after merge, and production push to grantees waits on the Northflank dispatch switch-on.
-- Latest completed step: Step 53, Story 6.13, immutable moderation history, status `done`, merged as `63bd6fcd` (PR #197) on 2026-11-06.
+  Step 54 was written before review and merge, and its `Evidence boundaries` section records the production checks run after merge.
+  No grant exists in production yet, and dispatch stays off: both wait on owner actions listed there.
+- Previous completed step: Step 53, Story 6.13, immutable moderation history, status `done`, merged as `63bd6fcd` (PR #197) on 2026-11-06.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-13-immutable-moderation-history.md`.
   Step 53 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_history_enabled` defaults to false, and the database enforcement has no flag.
@@ -10590,11 +10591,22 @@ Evidence boundaries:
   It raised 9 findings and 8 were patched.
   F6, one PostHog call per grantee check, was rejected, because D2 rules out an in-process cache.
   The owner waived the 100-file acceptance line for this PR.
-- **What runs after merge.**
-  `X-DISPATCH`: the backlog count, then `COMMUNITY_DISPATCH_ENABLED=true`, `COMMUNITY_ENGAGEMENT_OWNER=community` and `COMMUNITY_GUARD_DATABASE_URL` on the Northflank `couture-cast/community-worker`, the `ready` log and a non-grantee delivery that ends `suppressed` with zero attempts.
-  `X-PROD-GRANT`: the first production grant, for a test account, read back through `list`, then a revoke.
-  Until `X-DISPATCH` runs, the production push path is unproven, and push is proved only through the engagement harness and its forked worker.
-  No hosted database read-back of the 6.14 migration is recorded.
+- **After merge, on production (2026-11-11 UTC, `1fa40089`).**
+  The Vercel production deploy applied `20261110120000_complimentary_access`: `ComplimentaryAccessGrant` has RLS on and zero policies, and holds zero rows.
+  `GET /api/v1/commerce/premium/access` on the production API answers 401 with `Cache-Control: private, no-store` to a request with no bearer.
+  The pending `CommunityTokenDelivery` count before any change was zero, of every status.
+- **`X-DISPATCH` ran and stopped at readiness.**
+  `COMMUNITY_DISPATCH_ENABLED=true`, `COMMUNITY_ENGAGEMENT_OWNER=community` and `COMMUNITY_GUARD_DATABASE_URL` were set on the Northflank `couture-cast/community-worker` at 00:27:23.
+  The worker logged `community_dispatch_readiness` `degraded` with reason `capability_unavailable` at 00:27:41, so the guard configuration passed and the capability check did not.
+  `COMMUNITY_DISPATCH_ENABLED` went back to `false` at 00:27:55, and readiness logged `disabled` at 00:28:08.
+  The cause is `CommunityRuntimeCapability.privacy_version`, which is 0 in production while dispatch requires 1.
+  Raising it turns on `community_require_guard` enforcement for every community privacy write in production, which belongs to the Story 6.5 rollout, so it waits for the owner.
+  The non-grantee delivery check did not run, because nothing dispatches.
+- **`X-PROD-GRANT` is blocked.**
+  Production `auth.users` holds no rows while `User` holds 10, so no admin actor exists for the owner command.
+  From macOS, the command cannot open its database connection: `createPrismaClient` requires strict verification against the committed Supabase Root 2021 CA, `openssl` verifies both poolers against that CA, and Prisma on macOS still answers `The certificate was not trusted`. `community:sponsorship` shares the client and the limit.
+  The targeting guard was proved on production: without `--confirm-target` the command refused and named the project, and `AuditLog` and the grant table stayed at zero rows.
+  Until both are resolved, the production push path and the first grant are unproven, and push is proved only through the engagement harness and its forked worker.
 - **Stated residuals.**
   A store purchase by a grantee on a device: the server cannot refuse it, mobile hides the controls, and a client that ignores them can still buy.
   The mobile complimentary state is proved by component tests only, and no Maestro flow or device run covers it.
