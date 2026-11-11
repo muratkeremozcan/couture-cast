@@ -29,6 +29,7 @@ import {
 } from '../src/modules/community/community-maintenance.service.js'
 import { CommunityRepository } from '../src/modules/community/community.repository.js'
 import { InMemoryCommunityStorage } from '../src/modules/community/community-storage.fake.js'
+import { deletePosts } from './helpers/privacy-guards.js'
 
 const BATCH = 200
 const HOUR_MS = 60 * 60 * 1000
@@ -54,7 +55,7 @@ afterAll(async () => {
 })
 
 afterEach(async () => {
-  await prisma.lookbookPost.deleteMany()
+  await deletePosts(prisma, {})
 })
 
 describe('erasure work is one queue ordered by due time', () => {

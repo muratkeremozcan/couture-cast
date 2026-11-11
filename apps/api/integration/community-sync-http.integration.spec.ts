@@ -40,6 +40,7 @@ import { GuardianConsentStateService } from '../src/modules/auth/guardian-consen
 import { CommunityFlagEvaluationService } from '../src/modules/feature-flags/community-flag-evaluation.service.js'
 import { FeatureFlagsService } from '../src/modules/feature-flags/feature-flags.service.js'
 import { FeatureFlagsRepository } from '../src/modules/feature-flags/feature-flags.repository.js'
+import { withPrivacyGuards } from './helpers/privacy-guards.js'
 
 const db = isolatedCommunityDatabase()
 const prisma = new PrismaClient({
@@ -449,10 +450,13 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
       .spyOn(access, 'authorize')
       .mockImplementation(async (...args) => {
         if (++calls === 2) {
-          await prisma.communityComment.update({
-            where: { id: a.id },
-            data: { status: 'author_deleted', body: null },
-          })
+          // Author deletion holds the post's guard, as the product's deletion does.
+          await withPrivacyGuards(prisma, { posts: [a.post_id] }, (tx) =>
+            tx.communityComment.update({
+              where: { id: a.id },
+              data: { status: 'author_deleted', body: null },
+            })
+          )
         }
         return backend(...args)
       })
@@ -655,10 +659,12 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
             where: { id: posts[0]!.id },
             data: { community_revision: { increment: 1 } },
           })
-          await prisma.communityComment.update({
-            where: { id: comment.id },
-            data: { status: 'author_deleted', body: null },
-          })
+          await withPrivacyGuards(prisma, { posts: [comment.post_id] }, (tx) =>
+            tx.communityComment.update({
+              where: { id: comment.id },
+              data: { status: 'author_deleted', body: null },
+            })
+          )
         }
         return result
       })
@@ -730,7 +736,9 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
     const owner = await fixture()
     await prisma.notificationPreference.deleteMany({ where: { user_id: owner.id } })
     const current = await clients(owner.id).preferences()
-    await prisma.notificationPreference.create({ data: { user_id: owner.id } })
+    await withPrivacyGuards(prisma, { members: [owner.id] }, (tx) =>
+      tx.notificationPreference.create({ data: { user_id: owner.id } })
+    )
     await expect(
       clients(owner.id).patchPreferences({
         baseRevision: current.revision,
@@ -803,8 +811,10 @@ describe('Story 6.5 actual HTTP controllers and generated client wrappers', () =
       permission: 'granted',
     } as const
     const stale = await clients(previousOwner.id).register(device)
-    // Receipt cleanup or retention prunes the previous owner's row.
-    await prisma.pushToken.delete({ where: { id: stale.registrationId } })
+    // Receipt cleanup or retention prunes the previous owner's row under that member's guard.
+    await withPrivacyGuards(prisma, { members: [previousOwner.id] }, (tx) =>
+      tx.pushToken.delete({ where: { id: stale.registrationId } })
+    )
     const conflictCode = async (work: Promise<unknown>) => {
       const error: unknown = await work.then(
         () => undefined,

@@ -47,6 +47,7 @@ import {
   WEBHOOK_TIMESTAMP_TOLERANCE_SECONDS,
 } from '../src/modules/commerce/affiliate-webhook-signature'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service'
+import { deleteMembers } from './helpers/privacy-guards.js'
 
 /**
  * Story 5.1 Task 5, real PostgreSQL and real HTTP.
@@ -185,7 +186,7 @@ describe('Story 5.1 affiliate conversion webhook against real PostgreSQL', () =>
     onTestFinished(async () => {
       // Clicks cascade from the user; the explicit delete keeps the order
       // deterministic when the conversion cleanup above has already run.
-      await prisma.user.deleteMany({ where: { id: user.id } })
+      await deleteMembers(prisma, { id: user.id })
     })
 
     const click = await persistAffiliateClick(

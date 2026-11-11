@@ -18,6 +18,7 @@ import { CommunityRepository } from '../src/modules/community/community.reposito
 import { CommunityReactionOutboxDispatcher } from '../src/modules/community/community-reaction.outbox.js'
 import { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { deleteMembers, deletePosts } from './helpers/privacy-guards.js'
 
 const database = isolatedCommunityDatabase()
 const url = new URL(database.url)
@@ -253,8 +254,8 @@ describe('Story 6.3 committed reaction lease ownership', () => {
       ).toEqual(before)
     } finally {
       if (external) {
-        await unrelated.lookbookPost.delete({ where: { id: external.post.id } })
-        await unrelated.user.delete({ where: { id: external.user.id } })
+        await deletePosts(unrelated, { id: external.post.id })
+        await deleteMembers(unrelated, { id: external.user.id })
       }
       await unrelated.$disconnect()
     }
