@@ -265,8 +265,10 @@ function containerKind(buffer) {
  */
 function hasCentralDirectory(buffer) {
   const start = Math.max(0, buffer.length - EOCD_SEARCH_WINDOW)
-  const eocd = buffer.lastIndexOf(EMPTY_ZIP_MAGIC)
-  if (eocd < start || eocd + 22 > buffer.length) return false
+  // From the last place a whole record fits, as the unzipper searches, so a comment that
+  // ends in the signature bytes cannot hide the record before it.
+  const eocd = buffer.lastIndexOf(EMPTY_ZIP_MAGIC, buffer.length - 22)
+  if (eocd < start) return false
   const entries = buffer.readUInt16LE(eocd + 10)
   const size = buffer.readUInt32LE(eocd + 12)
   if (entries === 0xffff || size === 0xffffffff) return true

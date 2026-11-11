@@ -369,6 +369,20 @@ describe('check-artifact-secrets', () => {
     expect(scan(['DUMMY_SECRET']).unreadable).toEqual([])
   })
 
+  it('opens an appended zip whose comment ends in the directory signature', () => {
+    const zip = Buffer.from(zipSync({ 'a.txt': strToU8(DUMMY_SECRET) }))
+    const commented = Buffer.concat([zip, Buffer.from('PK\x05\x06')])
+    commented.writeUInt16LE(4, zip.length - 2)
+    const file = write(
+      'maestro/step-057.png',
+      Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47]), randomBytes(512), commented])
+    )
+
+    expect(scan(['DUMMY_SECRET']).findings).toEqual([
+      { location: `${file}!entry#1`, name: 'DUMMY_SECRET', encoding: 'raw' },
+    ])
+  })
+
   it('still opens a zip appended to an image', () => {
     const zip = Buffer.from(zipSync({ 'a.txt': strToU8(DUMMY_SECRET) }))
     const file = write(
