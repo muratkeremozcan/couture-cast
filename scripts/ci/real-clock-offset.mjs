@@ -15,9 +15,10 @@ if (!Number.isInteger(days)) {
   throw new Error(`REAL_CLOCK_OFFSET_DAYS must be a whole number of days, got ${days}.`)
 }
 
-if (days !== 0 && !globalThis.Date[REAL_CLOCK_OFFSET]) {
+/** Replaces the global Date with one whose real-clock reads are `days` ahead. */
+function installShiftedClock(offsetDays) {
   const RealDate = globalThis.Date
-  const offsetMs = days * 86_400_000
+  const offsetMs = offsetDays * 86_400_000
   const now = () => RealDate.now() + offsetMs
 
   // A function with the real prototype, so `instanceof Date` holds for dates from either constructor.
@@ -28,6 +29,8 @@ if (days !== 0 && !globalThis.Date[REAL_CLOCK_OFFSET]) {
   Object.setPrototypeOf(ShiftedDate, RealDate)
   ShiftedDate.prototype = RealDate.prototype
   ShiftedDate.now = now
-  ShiftedDate[REAL_CLOCK_OFFSET] = days
+  ShiftedDate[REAL_CLOCK_OFFSET] = offsetDays
   globalThis.Date = ShiftedDate
 }
+
+if (days !== 0 && !globalThis.Date[REAL_CLOCK_OFFSET]) installShiftedClock(days)

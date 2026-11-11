@@ -772,6 +772,7 @@ A post or comment published to an idle worker waits at most 10 seconds for dispa
 The API appends on every sync and realtime tick (`assist`), so the worker's append loop is the backstop for Story 6.5's 10-second realtime bound.
 The push lanes run only where `COMMUNITY_DISPATCH_ENABLED=true`; grouping wakes fanout and fanout wakes dispatch inside the process, so a new intent sees at most the 5-second cap, and a quiet-hour exit herd starts when it falls due.
 The maintenance caps match or beat the general worker's crons for the same sweeps.
+Only a test stack (`NODE_ENV=test`) may lower the maintenance cap, with `COMMUNITY_MAINTENANCE_IDLE_CAP_MS` from 30 s to 5 min; the end-to-end stack sets 30 s so its erasure journey sees the real sweep within its wait. Production never sets it, and a worker that finds it outside a test stack refuses to start.
 
 Two deliveries used to be leased forever.
 PostHog's `/i/v0/e/` answers an accepted event with `{"status": "Ok"}`, and the acknowledgement check accepted only `{"status": 1}`, so every operational telemetry row failed and was re-leased about hourly: 57,025 rows, attempts up to 197, on 2026-11-10.

@@ -98,6 +98,30 @@ export const COMMUNITY_WORKER_LOOPS = {
   maintenance: { baseMs: 30_000, idleCapMs: 300_000 },
 } as const satisfies Record<string, IdleBackoffPolicy>
 
+/**
+ * The loops this process runs: production's, except that a test stack (`NODE_ENV=test`) may cap
+ * an idle maintenance sweep lower with `COMMUNITY_MAINTENANCE_IDLE_CAP_MS`, from its 30 s base up
+ * to production's five minutes. The end-to-end stack sets 30 s: its erasure journey ages a request
+ * in the database and waits for the real sweep, which an idle five-minute backoff could leave
+ * untouched past any reasonable test timeout (pw-e2e, 2026-11-11). Set anywhere else, or outside
+ * that range, the worker refuses to start rather than run a cadence nobody measured.
+ */
+export function communityWorkerLoops(
+  env: NodeJS.ProcessEnv = process.env
+): Record<keyof typeof COMMUNITY_WORKER_LOOPS, IdleBackoffPolicy> {
+  const raw = env.COMMUNITY_MAINTENANCE_IDLE_CAP_MS?.trim()
+  if (!raw) return COMMUNITY_WORKER_LOOPS
+  if (env.NODE_ENV !== 'test')
+    throw new Error('COMMUNITY_MAINTENANCE_IDLE_CAP_MS is for test stacks only.')
+  const { baseMs, idleCapMs } = COMMUNITY_WORKER_LOOPS.maintenance
+  const cap = /^\d{1,6}$/.test(raw) ? Number(raw) : Number.NaN
+  if (!(cap >= baseMs && cap <= idleCapMs))
+    throw new Error(
+      `COMMUNITY_MAINTENANCE_IDLE_CAP_MS must be whole ms from ${baseMs} to ${idleCapMs}.`
+    )
+  return { ...COMMUNITY_WORKER_LOOPS, maintenance: { baseMs, idleCapMs: cap } }
+}
+
 /** What one community worker process started, owned by its caller. */
 export type CommunityWorkerProcessState = {
   readonly workers: Worker[]
@@ -227,47 +251,30 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
     }
 
     const { sweeps } = community
-    scheduleWithBackoff(state, 'dispatch', COMMUNITY_WORKER_LOOPS.dispatch, async () =>
+    const loops = communityWorkerLoops()
+    scheduleWithBackoff(state, 'dispatch', loops.dispatch, async () =>
       tickFromCount(await sweeps.dispatchPending())
     )
-    scheduleWithBackoff(
-      state,
-      'stale-review',
-      COMMUNITY_WORKER_LOOPS.maintenance,
-      async () => tickFromCount(await sweeps.sweepStalePendingReview())
+    scheduleWithBackoff(state, 'stale-review', loops.maintenance, async () =>
+      tickFromCount(await sweeps.sweepStalePendingReview())
     )
-    scheduleWithBackoff(
-      state,
-      'upload-expiry',
-      COMMUNITY_WORKER_LOOPS.maintenance,
-      async () => {
-        const result = await sweeps.sweepExpiredUploads()
-        return tickFromCount(result.objectsDeleted + result.draftsDeleted)
-      }
-    )
-    scheduleWithBackoff(
-      state,
-      'erasure',
-      COMMUNITY_WORKER_LOOPS.maintenance,
-      async () => {
-        const result = await sweeps.sweepErasureRequests()
-        return tickFromCount(
-          result.hidden +
-            result.anonymized +
-            result.objectsPurged +
-            result.requestsCompleted
-        )
-      }
-    )
-    scheduleWithBackoff(
-      state,
-      'ban-expiry',
-      COMMUNITY_WORKER_LOOPS.maintenance,
-      async () => {
-        const result = await sweeps.sweepExpiredBanHolds()
-        return tickFromCount(result.subjects + result.posts + result.comments)
-      }
-    )
+    scheduleWithBackoff(state, 'upload-expiry', loops.maintenance, async () => {
+      const result = await sweeps.sweepExpiredUploads()
+      return tickFromCount(result.objectsDeleted + result.draftsDeleted)
+    })
+    scheduleWithBackoff(state, 'erasure', loops.maintenance, async () => {
+      const result = await sweeps.sweepErasureRequests()
+      return tickFromCount(
+        result.hidden +
+          result.anonymized +
+          result.objectsPurged +
+          result.requestsCompleted
+      )
+    })
+    scheduleWithBackoff(state, 'ban-expiry', loops.maintenance, async () => {
+      const result = await sweeps.sweepExpiredBanHolds()
+      return tickFromCount(result.subjects + result.posts + result.comments)
+    })
     // Story 6.12: this is the path that runs in production, because the hosted process has no
     // `maintenance` consumer. The sweep's keys make an overlap with the general worker harmless.
     schedule(

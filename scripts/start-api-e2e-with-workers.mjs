@@ -68,6 +68,9 @@ const env = {
   NODE_ENV: 'test',
   TEST_ENV: 'local',
   COMMUNITY_FLAG_FIXTURE_MODE: 'true',
+  // An idle maintenance sweep rechecks every 30 s here instead of production's five minutes, so a
+  // journey that ages an erasure request sees the real sweep finish it inside its wait.
+  COMMUNITY_MAINTENANCE_IDLE_CAP_MS: '30000',
   NEXT_PUBLIC_E2E_AUTH: 'true',
   NEXT_PUBLIC_REALTIME_URL: process.env.API_BASE_URL ?? 'http://127.0.0.1:4000',
   GARMENT_TAGGING_ENGINE: 'fixture',
