@@ -48,6 +48,14 @@ const noCall = (reason: string, next?: Date): Authorization => ({
   next: next ?? new Date(Date.now() + 2000),
 })
 
+/** A dispatch preflight check that answered no; `check` names which, for the readiness log. */
+export class CommunityDispatchPreflightError extends Error {
+  constructor(readonly check: 'server_version' | 'privacy_version' | 'guard_timeouts') {
+    super(`Community dispatch preflight failed: ${check}.`)
+    this.name = 'CommunityDispatchPreflightError'
+  }
+}
+
 export class CommunitySendGuard {
   constructor(
     private readonly prisma: PrismaClient,
@@ -62,8 +70,10 @@ export class CommunitySendGuard {
       SELECT current_setting('server_version_num')::integer AS version, privacy_version
       FROM "CommunityRuntimeCapability" WHERE id = 1
     `
-    if (!version[0] || version[0].version < 170000 || version[0].privacy_version < 1)
-      throw new Error('Community dispatch capability unavailable.')
+    if (!version[0] || version[0].version < 170000)
+      throw new CommunityDispatchPreflightError('server_version')
+    if (version[0].privacy_version < 1)
+      throw new CommunityDispatchPreflightError('privacy_version')
     await interactiveTransaction(this.prisma, async (tx) => {
       await this.configure(tx)
       const [settings] = await tx.$queryRaw<
@@ -80,7 +90,7 @@ export class CommunitySendGuard {
         lock: '250ms',
       }
       if (JSON.stringify(settings) !== JSON.stringify(expected))
-        throw new Error('Community dispatch server timeouts ineffective.')
+        throw new CommunityDispatchPreflightError('guard_timeouts')
     })
   }
 

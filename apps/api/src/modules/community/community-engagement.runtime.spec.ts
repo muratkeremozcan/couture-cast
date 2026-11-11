@@ -25,9 +25,33 @@ import * as spotlightInvalidator from './community-spotlight-invalidator.js'
 import * as idleBackoff from './community-idle-backoff.js'
 import * as prismaClient from '../../prisma/prisma-client.js'
 import * as complimentaryAccess from '../feature-flags/complimentary-access.service.js'
+import * as runtimeModule from './community-engagement.runtime.js'
 import { startCommunityEngagementRuntime } from './community-engagement.runtime.js'
 
 const poolConstructor = vi.hoisted(() => vi.fn())
+type LogFields = Record<string, unknown>
+const readinessLines = vi.hoisted((): LogFields[] => [])
+// Records the readiness line; the rest of the runtime's logging goes nowhere.
+vi.mock('../../logger/pino.config.js', async (original) => {
+  const actual = await original<typeof logger>()
+  const record =
+    (level: string) =>
+    (fields: LogFields, message?: string): void => {
+      if (message === 'community_dispatch_readiness')
+        readinessLines.push({ level, ...fields })
+    }
+  const scoped: Record<string, unknown> = {
+    info: record('info'),
+    error: record('error'),
+    warn: record('warn'),
+    debug: record('debug'),
+  }
+  scoped.child = () => scoped
+  return {
+    ...actual,
+    createBaseLogger: (() => scoped) as unknown as typeof actual.createBaseLogger,
+  }
+})
 vi.mock('@prisma/client', async (original) => ({
   ...(await original<typeof prismaModule>()),
   PrismaClient: class {
@@ -38,7 +62,9 @@ vi.mock('@prisma/client', async (original) => ({
 }))
 
 // Only the external database boundary is controlled. Runtime and workers execute unchanged.
-function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = 'ready') {
+function databaseBoundary(
+  capability: 'ready' | 'old-server' | 'privacy-0' | 'bad-timeout' = 'ready'
+) {
   const queries: string[] = []
   const delegate = () => ({
     findMany: vi.fn(() => Promise.resolve([])),
@@ -64,7 +90,10 @@ function databaseBoundary(capability: 'ready' | 'old-server' | 'bad-timeout' = '
       queries.push(text)
       if (text.includes('server_version_num'))
         return Promise.resolve([
-          { version: capability === 'old-server' ? 160000 : 170000, privacy_version: 1 },
+          {
+            version: capability === 'old-server' ? 160000 : 170000,
+            privacy_version: capability === 'privacy-0' ? 0 : 1,
+          },
         ])
       if (text.includes("current_setting('transaction_timeout')"))
         return Promise.resolve([
@@ -169,6 +198,7 @@ beforeEach(() => {
   )
   guard = databaseBoundary()
   poolConstructor.mockReset().mockImplementation(() => guard.prisma)
+  readinessLines.length = 0
 })
 afterEach(async () => {
   await Promise.all(opened.splice(0).map((runtime) => runtime.close()))
@@ -398,7 +428,10 @@ describe('T03 actual engagement runtime composition', () => {
       }
       const url = new URL(configuration.datasources.db.url)
       expect(url.searchParams.get('connection_limit')).toBe('36')
-      expect(url.searchParams.get('pool_timeout')).toBe('1')
+      // Opening a guard connection measured 0.6 to 1.2 s on the hosted worker: the
+      // acquisition budget covers it, and idle connections stay open.
+      expect(url.searchParams.get('pool_timeout')).toBe('5')
+      expect(url.searchParams.get('max_idle_connection_lifetime')).toBe('0')
       await vi.advanceTimersByTimeAsync(60_001)
       assertHousekeeping(general)
       assertHousekeeping(community)
@@ -610,6 +643,7 @@ describe('T03 actual engagement runtime composition', () => {
     ['guard_unconfigured', 'missing'],
     ['guard_mismatch', 'mismatch'],
     ['capability_unavailable', 'old-server'],
+    ['capability_unavailable', 'privacy-0'],
     ['capability_unavailable', 'bad-timeout'],
   ] as const
   describe.each(['general', 'community'] as const)(
@@ -626,12 +660,13 @@ describe('T03 actual engagement runtime composition', () => {
               'COMMUNITY_GUARD_DATABASE_URL',
               'postgresql://fixture:fixture@other.test/fixture'
             )
-          if (fault === 'old-server' || fault === 'bad-timeout')
+          if (fault === 'old-server' || fault === 'privacy-0' || fault === 'bad-timeout')
             guard = databaseBoundary(fault)
           const primary = databaseBoundary()
           const runtime = await start(primary, role)
           expect(runtime.dispatch).toEqual({ status: 'degraded', reason })
-          const allocated = fault === 'old-server' || fault === 'bad-timeout'
+          const allocated =
+            fault === 'old-server' || fault === 'privacy-0' || fault === 'bad-timeout'
           expect(poolConstructor).toHaveBeenCalledTimes(allocated ? 1 : 0)
           expect(guard.db.$disconnect).toHaveBeenCalledTimes(allocated ? 1 : 0)
           await vi.advanceTimersByTimeAsync(60_001)
@@ -646,4 +681,147 @@ describe('T03 actual engagement runtime composition', () => {
       )
     }
   )
+})
+
+const connectTimeout = () =>
+  new prismaModule.Prisma.PrismaClientInitializationError(
+    'Timed out fetching a new connection from the connection pool. More info: ' +
+      'http://pris.ly/d/connection-pool (Current connection pool timeout: 1, connection limit: 36)',
+    'test'
+  )
+const poolTimeout = () =>
+  new prismaModule.Prisma.PrismaClientKnownRequestError(
+    'Timed out fetching a new connection from the connection pool.',
+    { code: 'P2024', clientVersion: 'test' }
+  )
+const versionQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
+  boundary.queries.filter((query) => query.includes('server_version_num')).length
+const warmQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
+  boundary.queries.filter((query) => query.trim() === 'SELECT 1').length
+
+describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
+  it('opens every guard connection before the first send and logs how many opened', async () => {
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'ready' })
+    expect(warmQueries(guard)).toBe(36)
+    expect(readinessLines).toEqual([
+      expect.objectContaining({
+        level: 'info',
+        dispatchStatus: 'ready',
+        preflightAttempts: 1,
+        guardConnections: 36,
+      }),
+    ])
+  })
+
+  it.each([
+    ['an initialization error', connectTimeout],
+    ['a P2024 request error', poolTimeout],
+  ])(
+    'retries %s from the pool after one backoff and then reaches ready',
+    async (_shape, failure) => {
+      guard.db.$queryRaw.mockRejectedValueOnce(failure())
+      const pending = start(databaseBoundary(), 'general')
+      await vi.advanceTimersByTimeAsync(999)
+      expect(versionQueries(guard)).toBe(0)
+      await vi.advanceTimersByTimeAsync(1)
+      const runtime = await pending
+      expect(runtime.dispatch).toEqual({ status: 'ready' })
+      expect(versionQueries(guard)).toBe(1)
+      expect(readinessLines[0]).toMatchObject({
+        preflightAttempts: 2,
+        guardConnections: 36,
+      })
+    }
+  )
+
+  it('reports guard_unreachable after four attempts 1, 2 and 4 s apart, and frees the pool', async () => {
+    vi.stubEnv('COMMUNITY_ENGAGEMENT_OWNER', 'community')
+    guard.db.$queryRaw.mockRejectedValue(poolTimeout())
+    const pending = start(databaseBoundary(), 'community')
+    await vi.advanceTimersByTimeAsync(6999)
+    expect(guard.db.$queryRaw).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(1)
+    const runtime = await pending
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(guard.db.$queryRaw).toHaveBeenCalledTimes(4)
+    expect(guard.db.$disconnect).toHaveBeenCalledTimes(1)
+    expect(readinessLines).toEqual([
+      {
+        level: 'error',
+        dispatchStatus: 'degraded',
+        reason: 'guard_unreachable',
+        role: 'community',
+        errorClass: 'PrismaClientKnownRequestError',
+        errorCode: 'P2024',
+        preflightAttempts: 4,
+      },
+    ])
+    await vi.advanceTimersByTimeAsync(60_001)
+    expect(guard.db.$queryRaw).toHaveBeenCalledTimes(4)
+  })
+
+  it.each([
+    ['old-server', 'server_version'],
+    ['privacy-0', 'privacy_version'],
+    ['bad-timeout', 'guard_timeouts'],
+  ] as const)(
+    'answers capability %s at once, without retrying, and logs the %s check',
+    async (fault, check) => {
+      guard = databaseBoundary(fault)
+      const runtime = await start(databaseBoundary(), 'general')
+      expect(runtime.dispatch).toEqual({
+        status: 'degraded',
+        reason: 'capability_unavailable',
+      })
+      expect(versionQueries(guard)).toBe(1)
+      expect(warmQueries(guard)).toBe(0)
+      expect(readinessLines).toEqual([
+        expect.objectContaining({
+          reason: 'capability_unavailable',
+          errorClass: 'CommunityDispatchPreflightError',
+          check,
+        }),
+      ])
+    }
+  )
+
+  it('keeps messages, hosts and credentials out of the readiness line', async () => {
+    guard.db.$queryRaw.mockRejectedValue(
+      new prismaModule.Prisma.PrismaClientInitializationError(
+        "Can't reach database server at `db.test:6543` as fixture:fixture",
+        'test',
+        'P1001'
+      )
+    )
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(7000)
+    expect((await pending).dispatch.reason).toBe('guard_unreachable')
+    const line = JSON.stringify(readinessLines)
+    expect(line).toContain('"errorCode":"P1001"')
+    expect(line).not.toMatch(/db\.test|fixture|Can't reach/)
+  })
+
+  it.each([
+    [connectTimeout(), true],
+    [poolTimeout(), true],
+    [
+      new prismaModule.Prisma.PrismaClientKnownRequestError(
+        'Transaction API error: Unable to start a transaction in the given time.',
+        { code: 'P2028', clientVersion: 'test' }
+      ),
+      true,
+    ],
+    [
+      new prismaModule.Prisma.PrismaClientKnownRequestError(
+        'Transaction API error: Transaction already closed.',
+        { code: 'P2028', clientVersion: 'test' }
+      ),
+      false,
+    ],
+    [new send.CommunityDispatchPreflightError('privacy_version'), false],
+    [new Error('Timed out fetching a new connection from the connection pool'), false],
+  ])('classifies %s as a connect failure: %s', (error, expected) => {
+    expect(runtimeModule.isGuardConnectFailure(error)).toBe(expected)
+  })
 })

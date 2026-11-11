@@ -2,7 +2,7 @@ import { CommunityRetentionWorker } from './community-retention.worker.js'
 import { CommunityOperationalTelemetry } from './community-operational-telemetry.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service.js'
 // Story 6.5 owner: independent bounded loops; dispatch is frozen until capability verification.
-import type { PrismaClient } from '@prisma/client'
+import { Prisma, type PrismaClient } from '@prisma/client'
 import { createPrismaClient } from '../../prisma/prisma-client.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { ComplimentaryAccessService } from '../feature-flags/complimentary-access.service.js'
@@ -13,7 +13,10 @@ import {
   CommunityStreamRepository,
   isAppendDeferral,
 } from './community-stream.repository.js'
-import { CommunitySendGuard } from './community-send-guard.js'
+import {
+  CommunityDispatchPreflightError,
+  CommunitySendGuard,
+} from './community-send-guard.js'
 import { CommunityNotificationsWorker } from './community-notifications.worker.js'
 import { CommunityReceiptsWorker } from './community-receipts.worker.js'
 import {
@@ -151,9 +154,9 @@ export async function startCommunityEngagementRuntime(
   loop('operational-telemetry', LOOPS.operationalTelemetry, async () =>
     tickFromCount(await telemetry.deliver())
   )
-  const { dispatch, guardPool } = await startDispatch(prisma, remote, role, loop)
+  const { dispatch, guardPool, details } = await startDispatch(prisma, remote, role, loop)
   logger[dispatch.status === 'degraded' ? 'error' : 'info'](
-    { dispatchStatus: dispatch.status, reason: dispatch.reason, role },
+    { dispatchStatus: dispatch.status, reason: dispatch.reason, role, ...details },
     'community_dispatch_readiness'
   )
   return {
@@ -173,7 +176,136 @@ export type CommunityDispatchReadiness = {
     | 'owner_unconfigured'
     | 'guard_unconfigured'
     | 'guard_mismatch'
+    | 'guard_unreachable'
     | 'capability_unavailable'
+}
+
+/**
+ * The dispatch guard pool: Story 6.5 D10's 36 connections for 32 send slots plus control work.
+ *
+ * Opening one guard connection (TCP, TLS and the pooler's startup) took 0.6 to 0.7 s on the
+ * hosted worker while idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and 36 at
+ * once took about 2 s. Prisma's `pool_timeout` bounds every acquisition, opening included, so
+ * the earlier 1 s failed the startup preflight and every send that had to open a connection.
+ *
+ * - `acquireSeconds` is the engine's own default connect timeout, so an acquisition may take
+ *   as long as opening a connection is allowed to. A send still waits at most 250 ms for its
+ *   transaction (`maxWait` in CommunitySendGuard.dispatch), and every server-side guard bound
+ *   (transaction, idle, statement and lock timeouts) is unchanged.
+ * - The pool opens all its connections before the first send (`openCommunityGuardPool`).
+ * - `max_idle_connection_lifetime=0` keeps idle connections. Prisma otherwise closes one after
+ *   300 idle seconds, and the first send after a quiet spell would open it again.
+ */
+export const COMMUNITY_GUARD_POOL = {
+  connections: 36,
+  acquireSeconds: 5,
+  /** Waits between preflight attempts after a connect failure; one more attempt than waits. */
+  preflightBackoffMs: [1000, 2000, 4000],
+} as const
+
+/** The guard pool's datasource URL: the configured primary with the pool's own budget. */
+export function communityGuardPoolUrl(configured: string): string {
+  const url = new URL(configured)
+  url.searchParams.set('connection_limit', String(COMMUNITY_GUARD_POOL.connections))
+  url.searchParams.set('pool_timeout', String(COMMUNITY_GUARD_POOL.acquireSeconds))
+  url.searchParams.set('max_idle_connection_lifetime', '0')
+  return url.toString()
+}
+
+const CONNECT_FAILURE_CODES = new Set(['P1001', 'P1002', 'P1017', 'P2024'])
+
+function prismaErrorCode(error: unknown): string | undefined {
+  if (error instanceof Prisma.PrismaClientKnownRequestError) return error.code
+  if (error instanceof Prisma.PrismaClientInitializationError) return error.errorCode
+  return undefined
+}
+
+/**
+ * True only when the guard pool could not hand out a connection: the database was
+ * unreachable or closed the connection, the pool timed out opening one, or an interactive
+ * transaction could not start in time. Every other failure is a real preflight answer.
+ */
+export function isGuardConnectFailure(error: unknown): boolean {
+  const code = prismaErrorCode(error)
+  if (code && CONNECT_FAILURE_CODES.has(code)) return true
+  if (code === 'P2028')
+    return (error as Error).message.includes('Unable to start a transaction')
+  return (
+    error instanceof Prisma.PrismaClientInitializationError &&
+    error.message.includes('Timed out fetching a new connection from the connection pool')
+  )
+}
+
+class GuardUnreachableError extends Error {
+  constructor(
+    readonly attempts: number,
+    readonly last: unknown
+  ) {
+    super('Community dispatch guard unreachable.')
+    this.name = 'GuardUnreachableError'
+  }
+}
+
+/** Readiness log fields that name a failure without its message, which can carry a host. */
+type ReadinessDetails = {
+  errorClass?: string
+  errorCode?: string
+  check?: string
+  preflightAttempts?: number
+  guardConnections?: number
+}
+
+function failureDetails(error: unknown): ReadinessDetails {
+  const cause = error instanceof GuardUnreachableError ? error.last : error
+  const details: ReadinessDetails = {}
+  const name = cause instanceof Error ? cause.constructor.name : typeof cause
+  if (/^[A-Za-z]{1,64}$/.test(name)) details.errorClass = name
+  const code = prismaErrorCode(cause)
+  if (code && /^P\d{4}$/.test(code)) details.errorCode = code
+  if (cause instanceof CommunityDispatchPreflightError) details.check = cause.check
+  if (error instanceof GuardUnreachableError) details.preflightAttempts = error.attempts
+  return details
+}
+
+const pause = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms).unref?.()
+  })
+
+/**
+ * Verifies the guard capability, retrying only connect failures with backoff, then opens
+ * every pool connection so no send has to. Returns how many connections opened: a shortfall
+ * is not fatal, because the pool opens the rest on demand within its acquisition budget.
+ */
+export async function openCommunityGuardPool(
+  guardPool: PrismaClient,
+  sender: Pick<CommunitySendGuard, 'verifyRuntime'>
+): Promise<{ attempts: number; connections: number }> {
+  const waits = COMMUNITY_GUARD_POOL.preflightBackoffMs
+  let attempts = 0
+  for (;;) {
+    attempts++
+    try {
+      await sender.verifyRuntime()
+      break
+    } catch (error) {
+      if (!isGuardConnectFailure(error)) throw error
+      const wait = waits[attempts - 1]
+      if (wait === undefined) throw new GuardUnreachableError(attempts, error)
+      await pause(wait)
+    }
+  }
+  // Concurrent, so each finds no idle connection and opens its own.
+  const opened = await Promise.allSettled(
+    Array.from(
+      { length: COMMUNITY_GUARD_POOL.connections },
+      () => guardPool.$queryRaw`SELECT 1`
+    )
+  )
+  return {
+    attempts,
+    connections: opened.filter((result) => result.status === 'fulfilled').length,
+  }
 }
 type Loop = (
   lane: string,
@@ -185,7 +317,11 @@ async function startDispatch(
   remote: RemoteFeatureFlagProvider,
   role: 'general' | 'community',
   loop: Loop
-): Promise<{ dispatch: CommunityDispatchReadiness; guardPool?: PrismaClient }> {
+): Promise<{
+  dispatch: CommunityDispatchReadiness
+  guardPool?: PrismaClient
+  details?: ReadinessDetails
+}> {
   if (process.env.COMMUNITY_DISPATCH_ENABLED !== 'true')
     return { dispatch: { status: 'disabled' } }
   const owner = process.env.COMMUNITY_ENGAGEMENT_OWNER
@@ -202,10 +338,10 @@ async function startDispatch(
     const primary = new URL(process.env.DATABASE_URL ?? '')
     if (url.hostname !== primary.hostname || url.pathname !== primary.pathname)
       throw new Error('Guard primary mismatch')
-    url.searchParams.set('connection_limit', '36')
-    url.searchParams.set('pool_timeout', '1')
     reason = 'capability_unavailable'
-    guardPool = createPrismaClient({ datasources: { db: { url: url.toString() } } })
+    guardPool = createPrismaClient({
+      datasources: { db: { url: communityGuardPoolUrl(configured) } },
+    })
     const sender = new CommunitySendGuard(
       guardPool,
       new CommunityFlagEvaluationService(
@@ -214,7 +350,7 @@ async function startDispatch(
         new ComplimentaryAccessService(prisma, remote)
       )
     )
-    await sender.verifyRuntime()
+    const opened = await openCommunityGuardPool(guardPool, sender)
     const notifications = new CommunityNotificationsWorker(prisma, sender)
     const receipts = new CommunityReceiptsWorker(prisma, new PushTokenRepository(prisma))
     // A pass that moved any delivery keeps the 50 ms cadence, even when other sends in the same
@@ -241,9 +377,22 @@ async function startDispatch(
       tickFromCount(await notifications.recover())
     )
     loop('receipts', LOOPS.receipts, async () => tickFromCount(await receipts.sweep()))
-    return { dispatch: { status: 'ready' }, guardPool }
-  } catch {
+    return {
+      dispatch: { status: 'ready' },
+      guardPool,
+      details: {
+        preflightAttempts: opened.attempts,
+        guardConnections: opened.connections,
+      },
+    }
+  } catch (error) {
     await guardPool?.$disconnect().catch(() => undefined)
-    return { dispatch: { status: 'degraded', reason } }
+    return {
+      dispatch: {
+        status: 'degraded',
+        reason: error instanceof GuardUnreachableError ? 'guard_unreachable' : reason,
+      },
+      details: failureDetails(error),
+    }
   }
 }
