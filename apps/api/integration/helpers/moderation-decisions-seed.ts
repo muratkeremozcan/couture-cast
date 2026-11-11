@@ -620,10 +620,14 @@ export function decisionFixtures(prisma: PrismaClient, now: () => Date) {
   ) {
     const kind = params.kind ?? 'temporary'
     const createdAt = params.createdAt ?? now()
+    // A default temporary ban runs 7 days from the later of the test clock and the real one.
+    // Enforcement (findActiveCommunitySanction) reads the real clock by design, and suites pin
+    // the test clock to a fixed date: 7 days from 2026-11-04 expired at 2026-11-11T12:00Z and
+    // turned a banned author into an active one in CI.
     const expiresAt =
       params.expiresAt === undefined
         ? kind === 'temporary'
-          ? new Date(createdAt.getTime() + 7 * SEED_DAY_MS)
+          ? new Date(Math.max(createdAt.getTime(), Date.now()) + 7 * SEED_DAY_MS)
           : null
         : params.expiresAt
     const caseKey = params.caseKey ?? `post.${runId}-seeded-${label()}`
