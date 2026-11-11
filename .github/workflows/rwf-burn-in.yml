@@ -281,8 +281,10 @@ jobs:
                 run_id: context.runId,
                 per_page: 100,
               });
-              const first = artifacts.find((artifact) => artifact.name.startsWith('playwright-report-shard-'));
-              if (first?.id) reportUrl = `${reportUrl}/artifacts/${first.id}`;
+              // Several red shards each upload a report; the run page lists them all, so link
+              // straight to a report only when exactly one shard produced one.
+              const reports = artifacts.filter((artifact) => artifact.name.startsWith('playwright-report-shard-'));
+              if (reports.length === 1 && reports[0].id) reportUrl = `${reportUrl}/artifacts/${reports[0].id}`;
             } catch (error) {
               core.warning(`Could not resolve burn-in report URL: ${error instanceof Error ? error.message : String(error)}`);
             }

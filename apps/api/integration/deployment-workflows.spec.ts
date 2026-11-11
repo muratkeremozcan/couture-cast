@@ -338,6 +338,8 @@ describe('deployment workflows', () => {
     expect(report).toContain('if: always()')
     expect(report.match(/<!-- playwright-burn-in-report -->/g)).toHaveLength(1)
     expect(burnIn).not.toContain('playwright-burn-in-report')
+    // With several red shards the comment links the run, which lists every report.
+    expect(report).toContain('if (reports.length === 1 && reports[0].id)')
     expect(workflow).toContain('value: ${{ jobs.report.outputs.runE2E }}')
   })
 
