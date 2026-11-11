@@ -29,6 +29,7 @@ import {
   interactiveTransaction,
   singleRunTransaction,
 } from '../../prisma/prisma-client.js'
+import { GuardDriverError } from '../../prisma/guard-prisma-client.js'
 
 type Delivery = Prisma.CommunityTokenDeliveryGetPayload<{
   include: { group: { include: { intents: true } } }
@@ -243,8 +244,15 @@ export class CommunitySendGuard {
         },
         { timeout: 3000, maxWait: 250 }
       )
-    } catch {
+    } catch (error) {
       abort.abort()
+      // Before the provider call, a guard connection that could not be had or used is named
+      // apart from every other failure; after it, the handoff is uncertain either way.
+      const reason = invoked
+        ? 'handoff_uncertain'
+        : error instanceof GuardDriverError
+          ? 'no_call:guard_unreachable'
+          : 'no_call:guard_failure'
       await interactiveTransaction(this.prisma, (tx) =>
         this.finish(
           tx,
@@ -252,7 +260,7 @@ export class CommunitySendGuard {
           owner,
           {
             status: invoked ? 'unknown' : 'deferred',
-            reason: invoked ? 'handoff_uncertain' : 'no_call:guard_failure',
+            reason,
           },
           invoked ? undefined : new Date(Date.now() + 2000)
         )

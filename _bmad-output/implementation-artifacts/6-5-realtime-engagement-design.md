@@ -711,11 +711,21 @@ send holds one server connection through its guarded transaction, so 32 slots wo
 excess at Supavisor, unbounded and unlogged, and take the API's connections. Send concurrency is
 now `COMMUNITY_DISPATCH_SEND_SLOTS`, default 10, 1 to 32; an invalid value keeps dispatch off
 (`send_slots_invalid`). The guard pool has one connection per slot plus the four control
-connections, 14 by default. A herd larger than the slots waits in the database, due, for the next
-non-overlapping pass, and the worker logs `community_dispatch_saturated` when passes start filling
-every slot and `community_dispatch_drained` when the backlog clears. The lower-bound calculation
-becomes `ceil(600 / 10) * 3 = 180 seconds` at the three-second worst case per guarded operation;
-32 slots, and D10's 57 seconds, are the setting for a compute plan whose pooler serves them.
+connections, 14 by default, and the preflight caps the slots to the connections it actually held
+at once. The slot math assumes one worker instance. A pass selects at most the slots and passes
+never overlap, so a herd larger than the slots waits in the database, due.
+The 60-second acceptance stands for normal provider latency. Expo answered 100 sends from the
+hosted worker, 10 at a time, at p50 103 ms, p95 804 ms and max 1299 ms; the herd suite replays
+those samples at the default 10 slots. All three scenarios (no outage, a stalled worker, a
+stalled provider) delivered 500 herd and 100 normal sends with none past 60 s: the latest herd
+send settled at 22.4 s and the latest normal send at 24.7 s. A slow provider is a separate,
+degraded state that the bound does not cover. With every send at 887 ms (the p95 of an earlier
+30-send sample) the herd still settled inside 60 s, but 33 of the 100 normal sends behind it did
+not. The worker logs `community_dispatch_behind` (warn) when the oldest outstanding delivery is
+more than 60 seconds past its original eligibility and `community_dispatch_caught_up` when it no
+longer is; eligibility timestamps stay as qualified. `community_dispatch_at_capacity` and
+`community_dispatch_below_capacity` mark a stretch of full passes. 32 slots, and D10's 57-second
+lower bound, are the setting for a compute plan whose pooler serves them.
 
 Before proof, count all due groups times their frozen token generations in the largest actual
 timezone cohort. Record recipient count, group count, mean/max tokens and total H. The 500

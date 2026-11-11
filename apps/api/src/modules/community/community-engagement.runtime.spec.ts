@@ -24,6 +24,7 @@ import * as spotlightCache from './community-spotlight-cache.js'
 import * as spotlightInvalidator from './community-spotlight-invalidator.js'
 import * as idleBackoff from './community-idle-backoff.js'
 import * as prismaClient from '../../prisma/prisma-client.js'
+import * as guardClient from '../../prisma/guard-prisma-client.js'
 import * as complimentaryAccess from '../feature-flags/complimentary-access.service.js'
 import * as runtimeModule from './community-engagement.runtime.js'
 import { startCommunityEngagementRuntime } from './community-engagement.runtime.js'
@@ -66,6 +67,24 @@ vi.mock('../../logger/pino.config.js', async (original) => {
       recording(actual.createBaseLogger(...args)),
   }
 })
+const guardPools = vi.hoisted(
+  () =>
+    [] as {
+      url: string
+      options: { max: number; acquireTimeoutMs: number; queryTimeoutMs: number }
+    }[]
+)
+// The guard pool's factory records what it was asked for and builds the same stand-in.
+vi.mock('../../prisma/guard-prisma-client.js', async (original) => ({
+  ...(await original<typeof guardClient>()),
+  createGuardPrismaClient: (
+    url: string,
+    options: { max: number; acquireTimeoutMs: number; queryTimeoutMs: number }
+  ) => {
+    guardPools.push({ url, options })
+    return poolConstructor({ guardPool: true }) as PrismaClient
+  },
+}))
 vi.mock('@prisma/client', async (original) => ({
   ...(await original<typeof prismaModule>()),
   PrismaClient: class {
@@ -164,6 +183,7 @@ function runtimeUnderTest(): typeof startCommunityEngagementRuntime {
     './community-spotlight-invalidator.js': spotlightInvalidator,
     './community-idle-backoff.js': idleBackoff,
     '../../prisma/prisma-client.js': prismaClient,
+    '../../prisma/guard-prisma-client.js': guardClient,
     '../feature-flags/complimentary-access.service.js': complimentaryAccess,
   }
   const exports = {} as {
@@ -213,6 +233,7 @@ beforeEach(() => {
   guard = databaseBoundary()
   poolConstructor.mockReset().mockImplementation(() => guard.prisma)
   readinessLines.length = 0
+  guardPools.length = 0
   dispatchEvents.length = 0
 })
 afterEach(async () => {
@@ -438,17 +459,14 @@ describe('T03 actual engagement runtime composition', () => {
         status: 'standby',
       })
       expect(poolConstructor).toHaveBeenCalledTimes(1)
-      const configuration = poolConstructor.mock.calls[0]![0] as {
-        datasources: { db: { url: string } }
-      }
-      const url = new URL(configuration.datasources.db.url)
-      // Ten send slots by default plus D10's four control connections.
-      expect(url.searchParams.get('connection_limit')).toBe('14')
-      // Opening a guard connection measured 0.6 to 1.2 s on the hosted worker: the
-      // acquisition budget covers it, and idle connections stay open.
-      expect(url.searchParams.get('pool_timeout')).toBe('5')
-      expect(url.searchParams.get('max_idle_connection_lifetime')).toBe('0')
-      expect(url.searchParams.get('socket_timeout')).toBe('15')
+      // Ten send slots by default plus D10's four control connections, on node-postgres with
+      // the measured acquisition and query bounds.
+      expect(guardPools).toEqual([
+        {
+          url: 'postgresql://fixture:fixture@db.test/fixture?connection_limit=1',
+          options: { max: 14, acquireTimeoutMs: 5000, queryTimeoutMs: 5000 },
+        },
+      ])
       await vi.advanceTimersByTimeAsync(60_001)
       assertHousekeeping(general)
       assertHousekeeping(community)
@@ -714,9 +732,9 @@ const poolTimeout = () =>
 const versionQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
   boundary.queries.filter((query) => query.includes('server_version_num')).length
 const warmQueries = (boundary: ReturnType<typeof databaseBoundary>) =>
-  boundary.queries.filter((query) => query.includes('pg_sleep(0.1)')).length
+  boundary.queries.filter((query) => query.includes('AS lease')).length
 const isWarm = (sql: TemplateStringsArray | { strings: readonly string[] }) =>
-  ('strings' in sql ? sql.strings : sql).join('?').includes('pg_sleep(0.1)')
+  ('strings' in sql ? sql.strings : sql).join('?').includes('AS lease')
 
 describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
   it('opens every guard connection before the first send and logs how many opened', async () => {
@@ -738,12 +756,7 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
     vi.stubEnv('COMMUNITY_DISPATCH_SEND_SLOTS', '32')
     const runtime = await start(databaseBoundary(), 'general')
     expect(runtime.dispatch).toEqual({ status: 'ready' })
-    const configuration = poolConstructor.mock.calls[0]![0] as {
-      datasources: { db: { url: string } }
-    }
-    expect(
-      new URL(configuration.datasources.db.url).searchParams.get('connection_limit')
-    ).toBe('36')
+    expect(guardPools[0]!.options.max).toBe(36)
     expect(warmQueries(guard)).toBe(36)
     expect(readinessLines[0]).toMatchObject({ guardConnections: 36, sendSlots: 32 })
   })
@@ -817,7 +830,8 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
     const pending = start(databaseBoundary(), 'general')
     await vi.advanceTimersByTimeAsync(9999)
     expect(readinessLines).toEqual([])
-    await vi.advanceTimersByTimeAsync(1)
+    // The lease deadline, then the bounded release of leases that never answered.
+    await vi.advanceTimersByTimeAsync(1 + 2000)
     expect((await pending).dispatch).toEqual({
       status: 'degraded',
       reason: 'guard_unreachable',
@@ -858,6 +872,56 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
     const runtime = await start(databaseBoundary(), 'general')
     expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
     expect(readinessLines[0]).toMatchObject({ errorCode: 'P2024', preflightAttempts: 1 })
+  })
+
+  it('caps the send slots at the connections it proved open when some leases fail', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    let refused = 0
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql) && refused++ < 5
+        ? Promise.reject(poolTimeout())
+        : answer(sql, ...values)) as typeof answer)
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'ready' })
+    // 9 of 14 held at once: 4 stay for control work and 5 carry sends.
+    expect(readinessLines[0]).toMatchObject({
+      guardConnections: 9,
+      sendSlots: 5,
+      configuredSendSlots: 10,
+    })
+  })
+
+  it('reports guard_unreachable when the leases held cannot carry one send beside control work', async () => {
+    const answer = guard.db.$queryRaw.getMockImplementation()!
+    let refused = 0
+    guard.db.$queryRaw.mockImplementation(((sql, ...values) =>
+      isWarm(sql) && refused++ < 10
+        ? Promise.reject(poolTimeout())
+        : answer(sql, ...values)) as typeof answer)
+    const runtime = await start(databaseBoundary(), 'general')
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(readinessLines[0]).toMatchObject({ errorClass: 'GuardCapacityShortfall' })
+  })
+
+  it('counts connections held at once, so a pool that serializes every checkout proves only one', async () => {
+    // One connection: each transaction waits for the previous one to finish. Successful
+    // queries would count fourteen; held leases count one.
+    let queue = Promise.resolve()
+    guard.db.$transaction.mockImplementation(((
+      work: (tx: unknown) => Promise<unknown>
+    ) => {
+      const run = queue.then(() => work(guard.db))
+      queue = run.then(
+        () => undefined,
+        () => undefined
+      )
+      return run
+    }) as typeof guard.db.$transaction)
+    const pending = start(databaseBoundary(), 'general')
+    await vi.advanceTimersByTimeAsync(10_000 + 2000)
+    const runtime = await pending
+    expect(runtime.dispatch).toEqual({ status: 'degraded', reason: 'guard_unreachable' })
+    expect(readinessLines[0]).toMatchObject({ errorClass: 'GuardCapacityShortfall' })
   })
 
   it.each([
@@ -926,11 +990,13 @@ describe('dispatch guard pool preflight (X-DISPATCH, 2026-11-11)', () => {
 })
 
 describe('dispatch send slots (Story 6.5 D10 amendment, 2026-11-11)', () => {
-  it('selects at most its slot count a pass and logs one saturated and one drained line per herd', async () => {
+  it('selects at most its slot count a pass and logs one at-capacity and one below-capacity line per stretch', async () => {
     const passes = [3, 3, 1, 0]
     const limits: unknown[] = []
     const prisma = {
-      $queryRaw: vi.fn((_sql: TemplateStringsArray, ...values: unknown[]) => {
+      $queryRaw: vi.fn((sql: TemplateStringsArray, ...values: unknown[]) => {
+        if (sql.join('?').includes('AS lag_ms'))
+          return Promise.resolve([{ lag_ms: 0, outstanding: 0 }])
         limits.push(values.at(-1))
         const rows = passes.shift() ?? 0
         return Promise.resolve(
@@ -955,13 +1021,69 @@ describe('dispatch send slots (Story 6.5 D10 amendment, 2026-11-11)', () => {
     expect(sender.dispatch).toHaveBeenCalledTimes(7)
     expect(peak).toBe(3)
     expect(dispatchEvents).toEqual([
-      expect.objectContaining({ event: 'community_dispatch_saturated', sendSlots: 3 }),
+      expect.objectContaining({ event: 'community_dispatch_at_capacity', sendSlots: 3 }),
       expect.objectContaining({
-        event: 'community_dispatch_drained',
+        event: 'community_dispatch_below_capacity',
         sendSlots: 3,
         saturatedPasses: 2,
       }),
     ])
+  })
+
+  it('logs behind once when outstanding work passes 60 s from eligibility, and caught up once after', async () => {
+    const lags = [
+      { lag_ms: 30_000, outstanding: 12 },
+      { lag_ms: 61_000, outstanding: 9 },
+      { lag_ms: 75_000, outstanding: 4 },
+      { lag_ms: 62_000, outstanding: 1 },
+      { lag_ms: null, outstanding: 0 },
+    ]
+    const passes = [3, 3, 3, 1, 0]
+    const prisma = {
+      $queryRaw: vi.fn((sql: TemplateStringsArray) => {
+        if (sql.join('?').includes('AS lag_ms')) return Promise.resolve([lags.shift()])
+        const rows = passes.shift() ?? 0
+        return Promise.resolve(
+          Array.from({ length: rows }, (_, index) => ({ id: `d${index}` }))
+        )
+      }),
+    } as unknown as PrismaClient
+    const worker = new notifications.CommunityNotificationsWorker(
+      prisma,
+      { dispatch: () => Promise.resolve(true) },
+      3
+    )
+    for (let pass = 0; pass < 5; pass++) await worker.dispatch()
+    const lagEvents = dispatchEvents.filter((line) =>
+      ['community_dispatch_behind', 'community_dispatch_caught_up'].includes(
+        String(line.event)
+      )
+    )
+    expect(lagEvents).toEqual([
+      expect.objectContaining({
+        level: 'warn',
+        event: 'community_dispatch_behind',
+        lagMs: 61_000,
+        outstanding: 9,
+      }),
+      expect.objectContaining({
+        level: 'info',
+        event: 'community_dispatch_caught_up',
+        outstanding: 0,
+      }),
+    ])
+  })
+
+  it('reads no lag while idle and not behind, so an idle loop adds no query', async () => {
+    const queryRaw = vi.fn(() => Promise.resolve([]))
+    const prisma = { $queryRaw: queryRaw } as unknown as PrismaClient
+    const worker = new notifications.CommunityNotificationsWorker(
+      prisma,
+      { dispatch: () => Promise.resolve(true) },
+      3
+    )
+    for (let pass = 0; pass < 3; pass++) await worker.dispatch()
+    expect(queryRaw).toHaveBeenCalledTimes(3)
   })
 
   it('defaults to ten slots', () => {

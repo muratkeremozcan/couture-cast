@@ -6,6 +6,8 @@
 // The compiled engagement runtime runs as production composes it, in an owned child, against
 // a UUID PG17 database. Only Expo, the remote flag provider and analytics are local doubles.
 import { randomUUID } from 'node:crypto'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { PrismaClient } from '@prisma/client'
 import {
@@ -35,6 +37,16 @@ const BURST = 40
 const SUSTAINED = 60
 const EXPIRING = 10
 const BOUND_MS = 60_000
+const expoLatency = JSON.parse(
+  readFileSync(join(__dirname, 'support/expo-push-latency-2026-11-11.json'), 'utf8')
+) as { measuredAt: string; samplesMs: number[] }
+// Story 6.5 D10 amendment (2026-11-11): the provider answers each send after the next of 100
+// latencies measured from the hosted worker to Expo (p50 103 ms, p95 804 ms, max 1299 ms), and the
+// runtime dispatches at its default 10 send slots, so the 60 s bound is proved at Expo's normal
+// latency. STORY65_PROVIDER_LATENCY_MS (one value or a comma-separated list) runs the
+// slow-provider envelope instead, which the bound does not cover: see D10.
+const PROVIDER_LATENCY_MS =
+  process.env.STORY65_PROVIDER_LATENCY_MS ?? expoLatency.samplesMs.join(',')
 // Currently observing DST (northern and southern) and fixed offsets, including :30 and :45.
 const ZONES = [
   'UTC',
@@ -64,6 +76,10 @@ let skewMs = 0
 let actors: string[] = []
 const evidence: Record<string, unknown> = {
   herd: HERD,
+  providerLatencyMs:
+    process.env.STORY65_PROVIDER_LATENCY_MS ??
+    `Expo from the worker, ${expoLatency.measuredAt}`,
+  sendSlots: 'runtime default',
   hInput: process.env.STORY65_HERD_H ?? 'open',
 }
 
@@ -177,7 +193,9 @@ beforeAll(async () => {
     SELECT current_setting('server_version_num')::integer AS version`
   expect(server?.version).toBeGreaterThanOrEqual(170000)
   await prisma.$executeRaw`UPDATE "CommunityRuntimeCapability" SET privacy_version = 1 WHERE id = 1`
-  provider = spawn('community-provider-recorder.mjs')
+  provider = spawn('community-provider-recorder.mjs', {
+    STORY65_PROVIDER_LATENCY_MS: PROVIDER_LATENCY_MS,
+  })
   const recorder = readySchema.parse(await provider.event('ready'))
   const remote = spawn('community-flag-remote.mjs')
   const flags = readySchema.parse(await remote.event('ready'))

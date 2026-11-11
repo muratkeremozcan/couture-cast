@@ -3,7 +3,11 @@ import { CommunityOperationalTelemetry } from './community-operational-telemetry
 import type { AnalyticsClient } from '../../analytics/analytics.service.js'
 // Story 6.5 owner: independent bounded loops; dispatch is frozen until capability verification.
 import { Prisma, type PrismaClient } from '@prisma/client'
-import { createPrismaClient } from '../../prisma/prisma-client.js'
+import {
+  createGuardPrismaClient,
+  GuardDriverError,
+} from '../../prisma/guard-prisma-client.js'
+import { interactiveTransaction } from '../../prisma/prisma-client.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { ComplimentaryAccessService } from '../feature-flags/complimentary-access.service.js'
 import { CommunityFlagEvaluationService } from '../feature-flags/community-flag-evaluation.service.js'
@@ -186,39 +190,30 @@ export type CommunityDispatchReadiness = {
 
 /**
  * The dispatch guard pool: one connection per send slot plus D10's four for control work, so
- * 14 at the default 10 slots and D10's 36 at 32.
+ * 14 at the default 10 slots and D10's 36 at 32. It runs on node-postgres
+ * (prisma/guard-prisma-client.ts), so a query that is never answered ends and frees its
+ * connection.
  *
  * Opening one guard connection (TCP, TLS and the pooler's startup) took 0.6 to 0.7 s on the
- * hosted worker while idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and 36 at
- * once took about 2 s. Prisma's `pool_timeout` bounds every acquisition, opening included, so
- * the earlier 1 s failed the startup preflight and every send that had to open a connection.
+ * hosted worker while idle, 1.0 to 1.2 s with its two vCPUs busy and up to about 4 s with both
+ * saturated (2026-11-11); 36 at once took about 2 s. A guard statement is bounded at 500 ms on
+ * the server, and the slowest round trip measured under saturation was about 350 ms.
  *
- * - `acquireSeconds` is the engine's own default connect timeout, so an acquisition may take
- *   as long as opening a connection is allowed to. A send still waits at most 250 ms for its
- *   transaction (`maxWait` in CommunitySendGuard.dispatch), and every server-side guard bound
- *   (transaction, idle, statement and lock timeouts) is unchanged.
- * - The pool opens all its connections before the first send (`openCommunityGuardPool`).
- * - `max_idle_connection_lifetime=0` keeps idle connections. Prisma otherwise closes one after
- *   300 idle seconds, and the first send after a quiet spell would open it again.
+ * - `acquireTimeoutMs` covers opening a connection under that load. With a driver adapter it is
+ *   the only acquisition bound: Prisma's `maxWait` does not apply (measured).
+ * - `queryTimeoutMs` is ten times the server's statement bound, so only a connection that
+ *   stopped answering reaches it.
+ * - The pool opens all its connections before the first send (`openCommunityGuardPool`) and
+ *   keeps them while idle.
  */
 export const COMMUNITY_GUARD_POOL = {
   controlConnections: 4,
-  acquireSeconds: 5,
+  acquireTimeoutMs: 5000,
+  queryTimeoutMs: 5000,
   /** Waits between preflight attempts after a connect failure; one more attempt than waits. */
   preflightBackoffMs: [1000, 2000, 4000],
-  /**
-   * Longest a preflight attempt or the warm-up may take: one acquisition budget plus 5 s.
-   * Prisma sets no socket timeout, so a connection whose answers stop would otherwise hold
-   * startup forever.
-   */
+  /** Longest a preflight attempt or the warm-up may take: one acquisition budget plus 5 s. */
   stepDeadlineMs: 10_000,
-  /**
-   * Longest one guard query may wait for its answer (Prisma `socket_timeout`). Every guard
-   * statement is bounded at 500 ms and a guarded transaction at 3 s on the server, so only a
-   * connection that stopped answering reaches it; without it a stalled query also stalls
-   * `$disconnect`, which waits for in-flight queries.
-   */
-  socketTimeoutSeconds: 15,
   /** Longest the close of a pool that failed its preflight may take. */
   closeDeadlineMs: 2000,
 } as const
@@ -241,17 +236,16 @@ export function communityDispatchSendSlots(
 export const communityGuardConnections = (sendSlots: number) =>
   sendSlots + COMMUNITY_GUARD_POOL.controlConnections
 
-/** The guard pool's datasource URL: the configured primary with the pool's own budget. */
-export function communityGuardPoolUrl(configured: string, sendSlots: number): string {
-  const url = new URL(configured)
-  url.searchParams.set('connection_limit', String(communityGuardConnections(sendSlots)))
-  url.searchParams.set('pool_timeout', String(COMMUNITY_GUARD_POOL.acquireSeconds))
-  url.searchParams.set('max_idle_connection_lifetime', '0')
-  url.searchParams.set(
-    'socket_timeout',
-    String(COMMUNITY_GUARD_POOL.socketTimeoutSeconds)
-  )
-  return url.toString()
+/** The guard pool for a slot count, on the configured primary. */
+export function createCommunityGuardPool(
+  configured: string,
+  sendSlots: number
+): PrismaClient {
+  return createGuardPrismaClient(configured, {
+    max: communityGuardConnections(sendSlots),
+    acquireTimeoutMs: COMMUNITY_GUARD_POOL.acquireTimeoutMs,
+    queryTimeoutMs: COMMUNITY_GUARD_POOL.queryTimeoutMs,
+  })
 }
 
 const CONNECT_FAILURE_CODES = new Set(['P1001', 'P1002', 'P1017', 'P2024'])
@@ -287,7 +281,7 @@ function prismaErrorCode(error: unknown): string | undefined {
  * transaction could not start in time. Every other failure is a real preflight answer.
  */
 export function isGuardConnectFailure(error: unknown): boolean {
-  if (error instanceof GuardStepTimeout) return true
+  if (error instanceof GuardStepTimeout || error instanceof GuardDriverError) return true
   const code = prismaErrorCode(error)
   if (code && CONNECT_FAILURE_CODES.has(code)) return true
   if (code === 'P2028')
@@ -296,6 +290,14 @@ export function isGuardConnectFailure(error: unknown): boolean {
     error instanceof Prisma.PrismaClientInitializationError &&
     error.message.includes('Timed out fetching a new connection from the connection pool')
   )
+}
+
+/** The warm-up held too few guard connections for even one send slot beside the control ones. */
+class GuardCapacityShortfall extends Error {
+  constructor() {
+    super('Community dispatch guard capacity too small for one send slot.')
+    this.name = 'GuardCapacityShortfall'
+  }
 }
 
 class GuardUnreachableError extends Error {
@@ -316,6 +318,7 @@ type ReadinessDetails = {
   preflightAttempts?: number
   guardConnections?: number
   sendSlots?: number
+  configuredSendSlots?: number
 }
 
 function failureDetails(error: unknown): ReadinessDetails {
@@ -336,9 +339,10 @@ const pause = (ms: number) =>
   })
 
 /**
- * Verifies the guard capability, retrying only connect failures with backoff, then opens
- * every pool connection so no send has to. Returns how many connections opened: a shortfall
- * is not fatal, because the pool opens the rest on demand within its acquisition budget.
+ * Verifies the guard capability, retrying only connect failures with backoff, then opens up to
+ * `connections` guard connections so no send has to. Returns how many it proved open at once;
+ * the caller sizes the send slots to that, so a shortfall lowers concurrency instead of leaving
+ * slots that would have to open a connection inside a send's 250 ms wait.
  */
 export async function openCommunityGuardPool(
   guardPool: PrismaClient,
@@ -359,27 +363,73 @@ export async function openCommunityGuardPool(
       await pause(wait)
     }
   }
-  // Every query holds its connection for 100 ms while the others start, so none can reuse
-  // another's: each one that succeeds opened a connection of its own.
-  let opened: PromiseSettledResult<unknown>[]
-  try {
-    opened = await withinDeadline(
-      Promise.allSettled(
-        Array.from(
-          { length: connections },
-          () => guardPool.$queryRaw`SELECT pg_sleep(0.1)::text AS held`
-        )
-      )
-    )
-  } catch (error) {
-    throw new GuardUnreachableError(attempts, error)
+  const leases = await holdLeases(guardPool, connections)
+  if (leases.held === 0) throw new GuardUnreachableError(attempts, leases.firstFailure)
+  return { attempts, connections: leases.held }
+}
+
+/**
+ * Opens up to `target` guard connections and proves how many it holds at once. Each lease is an
+ * interactive transaction that, after its first answer, waits until every lease is held, every
+ * other lease has failed, or the step deadline passes; only then are all released. A
+ * connection that one lease released can therefore never be counted again by another, so
+ * `held` is a count of distinct connections open together, not of successful queries.
+ */
+async function holdLeases(
+  guardPool: PrismaClient,
+  target: number
+): Promise<{ held: number; firstFailure?: unknown }> {
+  let held = 0
+  let failed = 0
+  let firstFailure: unknown
+  let release!: () => void
+  const released = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  let decided!: () => void
+  const allAccounted = new Promise<void>((resolve) => {
+    decided = resolve
+  })
+  const account = () => {
+    if (held + failed >= target) decided()
   }
-  const fulfilled = opened.filter((result) => result.status === 'fulfilled').length
-  if (fulfilled === 0) {
-    const first = opened.find((result) => result.status === 'rejected')
-    throw new GuardUnreachableError(attempts, first?.reason)
+  // A lease runs only `SELECT 1`, which calls no PL/pgSQL, so the pldbgapi2 retry inside
+  // interactiveTransaction cannot repeat it and count it twice.
+  const leases = Array.from({ length: target }, () =>
+    interactiveTransaction(
+      guardPool,
+      async (tx) => {
+        await tx.$queryRaw`SELECT 1 AS lease`
+        held += 1
+        account()
+        await released
+      },
+      {
+        timeout:
+          COMMUNITY_GUARD_POOL.stepDeadlineMs + COMMUNITY_GUARD_POOL.closeDeadlineMs,
+      }
+    ).catch((error: unknown) => {
+      failed += 1
+      firstFailure ??= error
+      account()
+    })
+  )
+  let timer: ReturnType<typeof setTimeout> | undefined
+  await Promise.race([
+    allAccounted,
+    new Promise<void>((resolve) => {
+      timer = setTimeout(resolve, COMMUNITY_GUARD_POOL.stepDeadlineMs)
+    }),
+  ])
+  clearTimeout(timer)
+  const count = held
+  release()
+  // Bounded: a lease whose query is never answered settles only at the socket timeout.
+  await Promise.race([Promise.all(leases), pause(COMMUNITY_GUARD_POOL.closeDeadlineMs)])
+  return {
+    held: count,
+    firstFailure: firstFailure ?? (count === 0 ? new GuardStepTimeout() : undefined),
   }
-  return { attempts, connections: fulfilled }
 }
 type Loop = (
   lane: string,
@@ -416,9 +466,7 @@ async function startDispatch(
     if (url.hostname !== primary.hostname || url.pathname !== primary.pathname)
       throw new Error('Guard primary mismatch')
     reason = 'capability_unavailable'
-    guardPool = createPrismaClient({
-      datasources: { db: { url: communityGuardPoolUrl(configured, sendSlots) } },
-    })
+    guardPool = createCommunityGuardPool(configured, sendSlots)
     const sender = new CommunitySendGuard(
       guardPool,
       new CommunityFlagEvaluationService(
@@ -432,7 +480,15 @@ async function startDispatch(
       sender,
       communityGuardConnections(sendSlots)
     )
-    const notifications = new CommunityNotificationsWorker(prisma, sender, sendSlots)
+    // Sends run only on connections proven open: a send waits at most 250 ms for its
+    // transaction, far less than opening a connection takes, so a slot without one would fail.
+    const activeSlots = Math.min(
+      sendSlots,
+      opened.connections - COMMUNITY_GUARD_POOL.controlConnections
+    )
+    if (activeSlots < 1)
+      throw new GuardUnreachableError(opened.attempts, new GuardCapacityShortfall())
+    const notifications = new CommunityNotificationsWorker(prisma, sender, activeSlots)
     const receipts = new CommunityReceiptsWorker(prisma, new PushTokenRepository(prisma))
     // A pass that moved any delivery keeps the 50 ms cadence, even when other sends in the same
     // batch were rejected: a quiet-hour herd keeps its pace through partial failures.
@@ -464,11 +520,13 @@ async function startDispatch(
       details: {
         preflightAttempts: opened.attempts,
         guardConnections: opened.connections,
-        sendSlots,
+        sendSlots: activeSlots,
+        configuredSendSlots: sendSlots,
       },
     }
   } catch (error) {
-    // Bounded: a pool whose queries stopped answering would hold startup in $disconnect.
+    // Bounded: $disconnect waits for in-flight queries, and a query that stopped answering ends
+    // only at the guard pool's query bound, so startup does not wait for it.
     if (guardPool)
       await Promise.race([
         guardPool.$disconnect().catch(() => undefined),

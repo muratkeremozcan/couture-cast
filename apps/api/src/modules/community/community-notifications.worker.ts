@@ -10,6 +10,7 @@ import {
 import { nextAllowedCommunityInstant } from './community-push-policy.js'
 import type { CommunitySendGuard } from './community-send-guard.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { GuardDriverError } from '../../prisma/guard-prisma-client.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 
 const logger = createBaseLogger().child({ feature: 'community-dispatch' })
@@ -79,9 +80,13 @@ const unmoved = { created: 0, settled: false } as const
  */
 export const COMMUNITY_DISPATCH_SEND_SLOTS = { default: 10, max: 32 } as const
 
+/** Story 6.5 D10's herd acceptance bound: a due delivery is sent within 60 s of eligibility. */
+export const COMMUNITY_DISPATCH_BEHIND_MS = 60_000
+
 export class CommunityNotificationsWorker {
   private saturatedSince: number | null = null
   private saturatedPasses = 0
+  private behindSince: number | null = null
 
   constructor(
     private readonly prisma: PrismaClient,
@@ -554,27 +559,56 @@ export class CommunityNotificationsWorker {
     // holding a slot every pass while later ones wait.
     if (failed) {
       try {
-        await this.prisma.$executeRaw`
-            UPDATE "CommunityTokenDelivery" SET next_attempt_at = clock_timestamp() + interval '2 seconds'
-            WHERE id = ANY(${rejected}::uuid[]) AND status IN ('pending','retryable_rejection','deferred')
-              AND next_attempt_at <= clock_timestamp()
-          `
+        // Bounded and lock-skipping: a delivery row another transaction holds stays as it is
+        // instead of holding this pass, and so every later pass and shutdown, behind it.
+        await interactiveTransaction(
+          this.prisma,
+          async (tx) => {
+            await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
+            await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '500ms'")
+            await tx.$executeRaw`
+              UPDATE "CommunityTokenDelivery" SET next_attempt_at = clock_timestamp() + interval '2 seconds'
+              WHERE id IN (
+                SELECT id FROM "CommunityTokenDelivery"
+                WHERE id = ANY(${rejected}::uuid[])
+                  AND status IN ('pending','retryable_rejection','deferred')
+                  AND next_attempt_at <= clock_timestamp()
+                FOR UPDATE SKIP LOCKED
+              )`
+          },
+          { maxWait: 250, timeout: 1000 }
+        )
       } catch {
         // The rows stay due as they were; the next pass retries them.
       }
     }
     if (failed)
       logger.warn(
-        { event: 'community_dispatch_send_failed', failed, selected: due.length },
+        {
+          event: 'community_dispatch_send_failed',
+          failed,
+          // Sends that could not get or use a guard connection, apart from every other failure.
+          guardUnreachable: outcomes.filter(
+            (outcome) =>
+              outcome.status === 'rejected' && outcome.reason instanceof GuardDriverError
+          ).length,
+          selected: due.length,
+        },
         'Community dispatch sends failed; their deliveries stay due for the next pass'
       )
     this.recordSaturation(due.length)
+    try {
+      await this.trackLag(due.length)
+    } catch {
+      // A lag reading that fails leaves the state as it was; the next pass reads again.
+    }
     return { selected: due.length, moved, failed }
   }
 
   /**
-   * Logs when passes start filling every slot, which means more deliveries are due than the
-   * slots send at once, and when the backlog has drained: two lines per herd.
+   * Logs when passes start filling every slot (more deliveries are due than the slots send at
+   * once) and when a pass first runs below them: two lines per stretch at capacity. Below
+   * capacity says nothing about deliveries still pending; `trackLag` reports that.
    */
   private recordSaturation(selected: number) {
     if (selected >= this.sendSlots) {
@@ -582,7 +616,7 @@ export class CommunityNotificationsWorker {
       if (this.saturatedSince === null) {
         this.saturatedSince = Date.now()
         logger.info(
-          { event: 'community_dispatch_saturated', sendSlots: this.sendSlots },
+          { event: 'community_dispatch_at_capacity', sendSlots: this.sendSlots },
           'Community dispatch is sending at its slot limit; due deliveries wait for the next pass'
         )
       }
@@ -591,15 +625,62 @@ export class CommunityNotificationsWorker {
     if (this.saturatedSince === null) return
     logger.info(
       {
-        event: 'community_dispatch_drained',
+        event: 'community_dispatch_below_capacity',
         sendSlots: this.sendSlots,
         saturatedPasses: this.saturatedPasses,
         saturatedMs: Date.now() - this.saturatedSince,
       },
-      'Community dispatch backlog drained'
+      'Community dispatch is sending below its slot limit'
     )
     this.saturatedSince = null
     this.saturatedPasses = 0
+  }
+
+  /**
+   * Story 6.5 D10, amended 2026-11-11: dispatch is behind when the oldest outstanding delivery
+   * passed its original eligibility more than 60 s ago, the herd acceptance bound. That is the
+   * slow-provider envelope: sends still go out in eligibility order, and no eligibility time is
+   * rewritten to hide the lag. One line when it starts and one when the work catches up. Checked
+   * only after a pass that selected work, or while behind, so an idle loop adds no query.
+   */
+  private async trackLag(selected: number) {
+    if (selected === 0 && this.behindSince === null) return
+    const [row] = await this.prisma.$queryRaw<
+      { lag_ms: number | null; outstanding: number }[]
+    >`
+      SELECT (extract(epoch FROM clock_timestamp() - min(g.eligible_at)) * 1000)::float8 AS lag_ms,
+        count(*)::int AS outstanding
+      FROM "CommunityTokenDelivery" d JOIN "CommunityNotificationGroup" g ON g.id = d.group_id
+      WHERE d.status IN ('pending','retryable_rejection','deferred','sending')
+        AND g.expires_at > clock_timestamp()
+    `
+    const lag = row?.lag_ms ?? 0
+    const outstanding = row?.outstanding ?? 0
+    if (lag > COMMUNITY_DISPATCH_BEHIND_MS && outstanding > 0) {
+      if (this.behindSince !== null) return
+      this.behindSince = Date.now()
+      logger.warn(
+        {
+          event: 'community_dispatch_behind',
+          lagMs: Math.round(lag),
+          outstanding,
+          sendSlots: this.sendSlots,
+        },
+        'Community dispatch is more than 60 s behind original eligibility'
+      )
+      return
+    }
+    if (this.behindSince === null) return
+    logger.info(
+      {
+        event: 'community_dispatch_caught_up',
+        behindMs: Date.now() - this.behindSince,
+        outstanding,
+        sendSlots: this.sendSlots,
+      },
+      'Community dispatch caught up with original eligibility'
+    )
+    this.behindSince = null
   }
 
   /** Returns how many orphaned attempts, intents and groups it settled. */

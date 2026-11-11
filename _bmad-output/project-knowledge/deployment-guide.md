@@ -1023,40 +1023,56 @@ The erasure extension has no flag, because it is a privacy duty on the establish
 
 Production community rollout remains frozen. `COMMUNITY_DISPATCH_ENABLED` defaults off.
 When an isolated approved lane enables it, `COMMUNITY_ENGAGEMENT_OWNER` must select
-`general` or `community`. The selected composition alone allocates the dedicated guard pool:
-`COMMUNITY_DISPATCH_SEND_SLOTS` send slots (default 10, 1 to 32; an invalid value reports
-`send_slots_invalid`) and one guard connection per slot plus four for control work, 14 by
-default. Production keeps the default: its Nano transaction pooler serves about 15 connections
-at a time, shared with the API, and 32 slots (36 connections) need a larger compute plan
-(Story 6.5 D10 amendment, 2026-11-11). The worker logs `community_dispatch_saturated` when
-passes fill every slot and `community_dispatch_drained` when the backlog clears. The general-only deployment selects `general`; the
-standalone community composition selects `community`. Other compositions report `standby`.
-These configured limits require the story's actual capacity and timing evidence before use.
+`general` or `community`. The general-only deployment selects `general`; the standalone
+community composition selects `community`. Other compositions report `standby`. Only the
+selected composition allocates the dedicated guard pool.
 
-`COMMUNITY_GUARD_DATABASE_URL` must identify the same primary host/database as `DATABASE_URL`.
-Dispatch additionally verifies PG17+, the privacy capability and effective server guard timeouts.
-No credential value or database URL belongs in readiness logs.
+**Send slots.** `COMMUNITY_DISPATCH_SEND_SLOTS` sets how many sends run at once: default 10,
+1 to 32, and an invalid value keeps dispatch off with `send_slots_invalid`. The guard pool holds
+one connection per slot plus four for control work, 14 by default. Production keeps the default:
+its Nano transaction pooler serves about 15 connections at a time, shared with the API, and 32
+slots (36 connections) are the setting for a compute plan whose pooler serves them (Story 6.5
+D10 amendment, 2026-11-11). The arithmetic assumes one dispatching worker instance: each
+instance has its own slots, so a second one, a rolling deploy's overlap included, doubles the
+demand on the pooler.
 
-The runtime returns `dispatch.status`: `disabled`, `standby`, `ready` or `degraded`.
-`community_dispatch_readiness` logs that status, role and a sanitized reason. Degraded reasons
-are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch`, `guard_unreachable` and
-`capability_unavailable`. A degraded line also names the error class, the Prisma error code and,
-for `capability_unavailable`, the failed check (`server_version`, `privacy_version` or
-`guard_timeouts`), never the error message. A ready line gives `preflightAttempts` and
-`guardConnections`, the number of guard connections open before the first send.
+**Guard pool.** It runs on node-postgres through Prisma's driver adapter with the operator
+client's TLS (the committed Supabase root CA, host name checked). An acquisition, opening a
+connection included, may take 5 seconds: opening one through the pooler measured 0.6 to 0.7 s
+on the hosted worker while idle, 1.0 to 1.2 s with its two vCPUs busy and up to about 4 s with
+both saturated. One query may wait 5 seconds for its answer, ten times the server's 500 ms
+statement bound; a query that runs out destroys its connection, so a connection that stops
+answering is closed and replaced instead of held. Opened connections stay open while idle.
 
-The guard pool gives one acquisition 5 seconds (`pool_timeout=5`), opens all its connections
-before the first send and keeps idle ones (`max_idle_connection_lifetime=0`). Opening one guard
-connection, TLS through the transaction pooler, measured 0.6 to 0.7 s on the hosted worker while
-idle and 1.0 to 1.2 s with its two vCPUs busy (2026-11-11), and Prisma's `pool_timeout` covers
-opening as well as waiting. The preflight retries only connect and acquisition failures, 1, 2
-and 4 seconds apart, and reports `guard_unreachable` when the fourth attempt still cannot
-connect. Each preflight attempt and the warm-up must finish within 10 seconds, one guard query
-waits at most 15 seconds for its answer (`socket_timeout=15`), and closing a pool that failed
-its preflight takes at most 2 seconds, so a connection that stops answering cannot hold worker
-startup. A send that throws before the guard settles it moves its delivery 2 seconds on, so it
-cannot hold a slot every pass. A send still waits at most 250 ms for its transaction, and the
-server-side guard bounds are unchanged.
+**Preflight and warm-up.** The preflight retries only failures to get or use a guard connection,
+1, 2 and 4 seconds apart, and reports `guard_unreachable` when the fourth attempt fails. Each
+attempt and the warm-up must finish within 10 seconds, and closing a pool that failed takes at
+most 2 seconds. The warm-up holds every guard connection at once, each in an open transaction,
+until all are held or the deadline passes, and counts what it held. Sends get the connections it
+proved, less the four control ones: a shortfall lowers `sendSlots`, and too few for one send
+reports `guard_unreachable` (`GuardCapacityShortfall`). A send waits at most 2 s from its claim
+to its provider call, and the server-side guard bounds are unchanged.
+
+**Readiness.** `community_dispatch_readiness` logs `disabled`, `standby`, `ready` or `degraded`
+with the role. Degraded reasons are `owner_unconfigured`, `guard_unconfigured`, `guard_mismatch`,
+`guard_unreachable`, `capability_unavailable` and `send_slots_invalid`. A degraded line names the
+error class, the Prisma error code and, for `capability_unavailable`, the failed check
+(`server_version`, `privacy_version` or `guard_timeouts`), never the error message. A ready line
+gives `preflightAttempts`, `guardConnections` (held at once), `sendSlots` (in use) and
+`configuredSendSlots`. `COMMUNITY_GUARD_DATABASE_URL` must name the same primary host and
+database as `DATABASE_URL`, and no credential value or database URL appears in a log.
+
+**While dispatching.** A pass selects at most `sendSlots` due deliveries and passes never overlap,
+so a herd waits in the database, due. `community_dispatch_at_capacity` and
+`community_dispatch_below_capacity` mark a stretch of full passes. `community_dispatch_behind`
+(warn) fires when the oldest outstanding delivery is more than 60 seconds past its original
+eligibility, the herd acceptance bound, and `community_dispatch_caught_up` when it no longer
+is: that is the slow-provider envelope, and eligibility times are never rewritten to hide it.
+A send that fails before the guard settles it moves its delivery 2 seconds on, in a transaction
+bounded at 100 ms of lock wait and 500 ms per statement that skips a row another transaction
+holds, so one held delivery cannot stall the loop or shutdown. An attempt that could not get or
+use a guard connection before the provider call ends `no_call:guard_unreachable`; any other
+failure before it ends `no_call:guard_failure`, and one after it `handoff_uncertain`.
 
 Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
 `max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
@@ -1064,10 +1080,9 @@ pool size (the pooler config returns null for both). Idle guard connections are 
 only: 36 of them left Supavisor's server connections at 21 before and after, and 36 one-second
 transactions through them took 3.4 s, about 15 at a time. Over 180-second windows, 36 idle guard
 connections added no statement calls or network bytes against a control window (96 against 255
-calls, 75 KB against 87 KB received). With dispatch on at the default 10 slots, the clients are 14 guard, 3
-for the worker's main pool and 5 per API function instance, which leaves 183 for about 36
-concurrent API instances. The transaction pool of about 15 caps concurrent guarded sends below D10's 32 send
-slots, so the worker now sends 10 at a time by default and a herd waits in the worker.
+calls, 75 KB against 87 KB received). With dispatch on at the default 10 slots, the clients are
+14 guard, 3 for the worker's main pool and 5 per API function instance, which leaves 183 for
+about 36 concurrent API instances.
 
 Operators investigate degraded dispatch while keeping community rollout off, verify the selected
 owner and existing primary's measured capabilities, then restart the assigned process after the

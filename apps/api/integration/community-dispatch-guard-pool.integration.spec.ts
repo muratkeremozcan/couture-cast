@@ -29,7 +29,7 @@ import {
 } from './helpers/complimentary-access-fixtures.js'
 import {
   communityGuardConnections,
-  communityGuardPoolUrl,
+  createCommunityGuardPool,
   openCommunityGuardPool,
   startCommunityEngagementRuntime,
 } from '../src/modules/community/community-engagement.runtime.js'
@@ -81,10 +81,12 @@ function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS, stallOn?: strin
   const server = createServer((client) => {
     accepted++
     sockets.add(client)
+    client.on('close', () => sockets.delete(client))
     client.pause()
     const opening = setTimeout(() => {
       const upstream = connect(Number(target.port || 5432), target.hostname)
       sockets.add(upstream)
+      upstream.on('close', () => sockets.delete(upstream))
       const close = () => {
         client.destroy()
         upstream.destroy()
@@ -109,6 +111,8 @@ function slowConnectProxy(target: URL, holdMs = SLOW_CONNECT_MS, stallOn?: strin
   })
   return {
     accepted: () => accepted,
+    /** Client and upstream sockets still open through this proxy. */
+    open: () => sockets.size,
     async listen() {
       await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
       const url = new URL(db.url)
@@ -128,7 +132,7 @@ const privacyVersion = (version: 0 | 1) =>
 
 const proxy = slowConnectProxy(new URL(db.url))
 const fastProxy = slowConnectProxy(new URL(db.url), 0)
-const stallingProxy = slowConnectProxy(new URL(db.url), 0, 'pg_sleep(0.1)')
+const stallingProxy = slowConnectProxy(new URL(db.url), 0, 'AS lease')
 let guardUrl: string
 let fastGuardUrl: string
 let stallingGuardUrl: string
@@ -243,9 +247,7 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     const deliveries: { id: string }[] = []
     for (let index = 0; index < SLOTS; index++)
       deliveries.push(await seededDelivery({ granted: true }))
-    const pool = new PrismaClient({
-      datasources: { db: { url: communityGuardPoolUrl(guardUrl, SLOTS) } },
-    })
+    const pool = createCommunityGuardPool(guardUrl, SLOTS)
     try {
       const guard = new CommunitySendGuard(pool, flags, provider)
       const opened = await openCommunityGuardPool(
@@ -310,13 +312,16 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     } finally {
       await runtime.close()
     }
+    // The stalled pool is gone too: each unanswered query ends at the 5 s query bound and
+    // destroys its connection. Prisma's own pool kept all 28 sockets open here.
+    const deadline = Date.now() + 30_000
+    while (stallingProxy.open() > 0 && Date.now() < deadline) await delay(250)
+    expect(stallingProxy.open()).toBe(0)
   })
 
   it('reports exactly the connections it opened when opening one is fast', async () => {
     await privacyVersion(1)
-    const pool = new PrismaClient({
-      datasources: { db: { url: communityGuardPoolUrl(fastGuardUrl, SLOTS) } },
-    })
+    const pool = createCommunityGuardPool(fastGuardUrl, SLOTS)
     try {
       const before = fastProxy.accepted()
       const opened = await openCommunityGuardPool(
@@ -402,6 +407,61 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
     for (const delivery of later) {
       expect(delivery.status).toBe('pending')
       expect(delivery.next_attempt_at.getTime()).toBeGreaterThan(clock!.now.getTime())
+    }
+  })
+
+  it('reschedules failed sends without waiting on a delivery row another transaction holds', async () => {
+    const slots = 4
+    const held = await seededDelivery({ granted: false })
+    const healthy: { id: string }[] = []
+    for (let index = 0; index < 3; index++)
+      healthy.push(await seededDelivery({ granted: false }))
+    await privacyVersion(0)
+    const locker = new PrismaClient({ datasources: { db: { url: db.url } } })
+    let unlock!: () => void
+    const unlocked = new Promise<void>((resolve) => {
+      unlock = resolve
+    })
+    let locked!: () => void
+    const isLocked = new Promise<void>((resolve) => {
+      locked = resolve
+    })
+    const holder = locker.$transaction(
+      async (tx) => {
+        await tx.$queryRaw`SELECT id FROM "CommunityTokenDelivery" WHERE id = ${held.id}::uuid FOR UPDATE`
+        locked()
+        await unlocked
+      },
+      { timeout: 60_000 }
+    )
+    try {
+      await isLocked
+      const handled: string[] = []
+      const worker = new CommunityNotificationsWorker(
+        prisma,
+        {
+          dispatch: async (id: string) => {
+            if (id === held.id) throw new Error('flag evaluation failed')
+            await prisma.communityTokenDelivery.update({
+              where: { id },
+              data: { status: 'accepted' },
+            })
+            handled.push(id)
+            return true
+          },
+        },
+        slots
+      )
+      const started = Date.now()
+      const pass = await worker.dispatch()
+      // The pass, and so the loop and shutdown behind it, never waits for the held row.
+      expect(Date.now() - started).toBeLessThan(2000)
+      expect(pass).toMatchObject({ selected: 4, failed: 1 })
+      expect(new Set(handled)).toEqual(new Set(healthy.map((delivery) => delivery.id)))
+    } finally {
+      unlock()
+      await holder
+      await locker.$disconnect()
     }
   })
 })
