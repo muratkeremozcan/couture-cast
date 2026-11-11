@@ -11,6 +11,7 @@ import { PrismaClient } from '@prisma/client'
 import {
   COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE,
   SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE,
+  COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE,
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
   SUBSCRIPTION_NOT_WEB_MANAGED_MESSAGE,
   type SubscriptionPlan,
@@ -84,6 +85,15 @@ export class StripeBillingService {
     const entitlement = await this.entitlements.getEntitlement(userId)
     if (entitlement?.status === 'active' || entitlement?.status === 'grace_period') {
       throw new ConflictException(SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE)
+    }
+    // Story 6.14 D5: nobody is charged for what a complimentary grant already gives them, and
+    // a grant that cannot be read right now stops checkout rather than risk the charge.
+    const complimentary = await this.entitlements.complimentaryAccessCheck(userId)
+    if (complimentary === 'granted') {
+      throw new ConflictException(COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE)
+    }
+    if (complimentary === 'unavailable') {
+      throw new ServiceUnavailableException(COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE)
     }
 
     const baseUrl = resolveWebBaseUrl()

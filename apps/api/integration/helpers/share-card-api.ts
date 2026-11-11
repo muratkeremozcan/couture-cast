@@ -9,6 +9,7 @@
  * hooks below reassign; ES module live bindings let the specs read the current value.
  */
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './no-complimentary-grants.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
@@ -60,7 +61,9 @@ const posthogDown = {
 }
 export const featureFlags = new FeatureFlagsService(
   new FeatureFlagsRepository(prisma),
-  posthogDown
+  posthogDown,
+  undefined,
+  noComplimentaryGrants
 )
 export const service = new ShareCardsService(
   prisma,

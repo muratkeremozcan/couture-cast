@@ -165,6 +165,10 @@ export const COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE =
 export const SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE =
   'This account already has an active Premium subscription.'
 
+/** Story 6.14 D5: checkout refused for a member with complimentary full access. */
+export const COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE =
+  'This account already has complimentary Premium access.'
+
 /** Portal session requested with no Stripe billing profile on record. */
 export const SUBSCRIPTION_NOT_FOUND_MESSAGE =
   'No web subscription found for this account.'
@@ -328,7 +332,7 @@ export function registerSubscriptionContracts(
         },
       },
       409: {
-        description: `The account already has an active or grace-period subscription ("${SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE}")`,
+        description: `The account already has an active or grace-period subscription ("${SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE}"), or complimentary access ("${COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE}")`,
         content: {
           'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
         },

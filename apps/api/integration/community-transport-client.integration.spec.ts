@@ -1,6 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import type { INestApplication } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { createHash } from 'node:crypto'
@@ -43,7 +44,8 @@ const remote = { getFeatureFlagValue: vi.fn(() => Promise.resolve(true)) }
 const flags = new FeatureFlagsService(
   new FeatureFlagsRepository(prisma),
   remote,
-  new CommunityFlagEvaluationService(prisma, remote)
+  new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants),
+  noComplimentaryGrants
 )
 const access = new CommunityAccessService(prisma, flags)
 const streams = new CommunityStreamRepository(prisma)

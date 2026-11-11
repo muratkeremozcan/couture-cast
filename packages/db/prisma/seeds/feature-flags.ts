@@ -69,6 +69,9 @@ const canonicalFlagOverrides: Record<FeatureFlagKey, FeatureFlagStoredValue> = {
   moderation_sla_monitoring_enabled: true,
   // Story 6.13: same reasoning for the erasure route, the evidence export and the alert prune.
   moderation_history_enabled: true,
+  // Story 6.14: the registry default is already true; the seed states it so a seeded database
+  // carries an explicit row the kill-switch tests can flip.
+  complimentary_access_enabled: true,
 }
 
 const supplementalFeatureFlags: SeededFeatureFlag[] = [

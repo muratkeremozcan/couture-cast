@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "CoutureCast HTTP API",
-    "version": "1.7.0",
+    "version": "1.8.0",
     "description": "Canonical HTTP contracts shared across API, web, mobile, and tests."
   },
   "servers": [
@@ -7641,6 +7641,170 @@
               "themesEnabled"
             ],
             "additionalProperties": false
+          }
+        },
+        "required": [
+          "data"
+        ]
+      },
+      "PremiumAccessSource": {
+        "type": "string",
+        "enum": [
+          "subscription",
+          "complimentary",
+          "none"
+        ]
+      },
+      "PremiumAccess": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "premium": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ],
+                "description": "True when the member passes the premium guard right now."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "subscription"
+                ]
+              }
+            },
+            "required": [
+              "premium",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "premium": {
+                "type": "boolean",
+                "enum": [
+                  true
+                ],
+                "description": "True when the member passes the premium guard right now."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "complimentary"
+                ]
+              }
+            },
+            "required": [
+              "premium",
+              "source"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "premium": {
+                "type": "boolean",
+                "enum": [
+                  false
+                ],
+                "description": "True when the member passes the premium guard right now."
+              },
+              "source": {
+                "type": "string",
+                "enum": [
+                  "none"
+                ]
+              }
+            },
+            "required": [
+              "premium",
+              "source"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "Where premium access comes from. `premium` is true exactly when `source` is not `none`."
+      },
+      "PremiumAccessResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "premium": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ],
+                    "description": "True when the member passes the premium guard right now."
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "subscription"
+                    ]
+                  }
+                },
+                "required": [
+                  "premium",
+                  "source"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "premium": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ],
+                    "description": "True when the member passes the premium guard right now."
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "complimentary"
+                    ]
+                  }
+                },
+                "required": [
+                  "premium",
+                  "source"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "premium": {
+                    "type": "boolean",
+                    "enum": [
+                      false
+                    ],
+                    "description": "True when the member passes the premium guard right now."
+                  },
+                  "source": {
+                    "type": "string",
+                    "enum": [
+                      "none"
+                    ]
+                  }
+                },
+                "required": [
+                  "premium",
+                  "source"
+                ],
+                "additionalProperties": false
+              }
+            ],
+            "description": "Where premium access comes from. `premium` is true exactly when `source` is not `none`."
           }
         },
         "required": [
@@ -24462,7 +24626,7 @@
             }
           },
           "409": {
-            "description": "The account already has an active or grace-period subscription (\"This account already has an active Premium subscription.\")",
+            "description": "The account already has an active or grace-period subscription (\"This account already has an active Premium subscription.\"), or complimentary access (\"This account already has complimentary Premium access.\")",
             "content": {
               "application/json": {
                 "schema": {
@@ -24755,6 +24919,52 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/commerce/premium/access": {
+      "get": {
+        "tags": [
+          "subscription"
+        ],
+        "summary": "Read whether the member has premium and where it comes from",
+        "description": "Bearer only, private and never cached. `premium` matches the premium guard for the same request. `source` is `complimentary` for an owner grant (which wins when the member also pays), `subscription` for an active or grace-period subscription, and `none` otherwise.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Premium access source resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PremiumAccessResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error occurred",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InternalServerErrorHttpError"
                 }
               }
             }

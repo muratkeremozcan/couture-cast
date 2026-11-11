@@ -148,6 +148,8 @@ import {
   verifyCommunityAffiliateClickMintInteraction,
   verifyCommunityAffiliateClickEndedInteraction,
   verifyNeverSubscribedStatusInteraction,
+  verifyComplimentaryPremiumAccessInteraction,
+  verifyNoPremiumAccessInteraction,
   verifyCheckoutSessionInteraction,
   verifyPortalSessionInteraction,
   verifySubscriptionErrorInteraction,
@@ -536,6 +538,15 @@ describe('CoutureCastWeb -> CoutureCastApi HTTP contract', () => {
   // Stripe redirect and re-reads status instead.
   it('reads the premium subscription status of a never-subscribed user', async () => {
     await verifyNeverSubscribedStatusInteraction(pact, createWebClientForMockServer)
+  })
+
+  // Story 6.14: settings read the access source to show the complimentary state.
+  it('reads the premium access source of a complimentary member', async () => {
+    await verifyComplimentaryPremiumAccessInteraction(pact, createWebClientForMockServer)
+  })
+
+  it('reads the premium access source of a member without premium', async () => {
+    await verifyNoPremiumAccessInteraction(pact, createWebClientForMockServer)
   })
 
   it('creates a Stripe Checkout session', async () => {

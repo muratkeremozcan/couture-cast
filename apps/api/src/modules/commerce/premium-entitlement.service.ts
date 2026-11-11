@@ -8,6 +8,10 @@ import {
   type Prisma,
 } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
+import {
+  ComplimentaryAccessService,
+  type ComplimentaryAccessCheck,
+} from '../feature-flags/complimentary-access.service.js'
 import { RevenueCatClient } from './revenuecat-client.js'
 import { StripeBillingClient } from './stripe-client.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
@@ -137,7 +141,10 @@ export class PremiumEntitlementService {
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
     @Inject(RevenueCatClient) private readonly revenueCat: RevenueCatClient,
-    @Inject(StripeBillingClient) private readonly stripeBilling: StripeBillingClient
+    @Inject(StripeBillingClient) private readonly stripeBilling: StripeBillingClient,
+    // Story 6.14 D5: read-side only. No ledger write path in this class consults it.
+    @Inject(ComplimentaryAccessService)
+    private readonly complimentary: Pick<ComplimentaryAccessService, 'isActive' | 'check'>
   ) {}
 
   /**
@@ -191,6 +198,36 @@ export class PremiumEntitlementService {
    * RENEWAL or EXPIRATION, both of which resolve this properly.
    */
   async hasPremiumAccess(userId: string): Promise<boolean> {
+    // Story 6.14 D5 (TEA-16): the paid row first; a grant is asked only when it does not entitle.
+    if (await this.hasPaidAccess(userId)) return true
+    return this.complimentary.isActive(userId)
+  }
+
+  /**
+   * Story 6.14 D6: where premium access comes from. A complimentary grant wins when both apply,
+   * so the member sees the grant. Nothing here writes, and a revoke leaves the answer to the
+   * paid row again on the next request.
+   */
+  async premiumAccessSource(
+    userId: string
+  ): Promise<'subscription' | 'complimentary' | 'none'> {
+    const [paid, complimentary] = await Promise.all([
+      this.hasPaidAccess(userId),
+      this.complimentary.isActive(userId),
+    ])
+    if (complimentary) return 'complimentary'
+    return paid ? 'subscription' : 'none'
+  }
+
+  /**
+   * Story 6.14 D5: the three-way grant answer for checkout, which must not fail open: a
+   * grantee whose grant cannot be read right now is not sold what they may already have.
+   */
+  complimentaryAccessCheck(userId: string): Promise<ComplimentaryAccessCheck> {
+    return this.complimentary.check(userId)
+  }
+
+  private async hasPaidAccess(userId: string): Promise<boolean> {
     const row = await this.prisma.premiumEntitlement.findUnique({
       where: { user_id: userId },
       select: { status: true },

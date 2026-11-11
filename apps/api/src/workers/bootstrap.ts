@@ -13,6 +13,7 @@ import Redis from 'ioredis'
 import { AdminService } from '../admin/admin.service'
 import { GuardianConsentStateService } from '../modules/auth/guardian-consent-state.service'
 import { UserSessionService } from '../modules/auth/user-session.service'
+import { ComplimentaryAccessService } from '../modules/feature-flags/complimentary-access.service'
 import { FeatureFlagsRepository } from '../modules/feature-flags/feature-flags.repository'
 import { FeatureFlagsService } from '../modules/feature-flags/feature-flags.service'
 import { GuardianService } from '../modules/guardian/guardian.service'
@@ -172,6 +173,8 @@ export async function startWorkers(state: WorkerProcessState) {
     })
     redisClients.push(alertRelayRedis)
     const posthogService = new PostHogService()
+    // Story 6.14 D2: one complimentary seam for every evaluator this worker builds.
+    const complimentaryAccess = new ComplimentaryAccessService(prisma, posthogService)
     state.posthogService = posthogService
     const telemetryService = new TelemetryService(prisma, posthogService)
     try {
@@ -228,7 +231,8 @@ export async function startWorkers(state: WorkerProcessState) {
     const premiumEntitlementService = new PremiumEntitlementService(
       prisma,
       revenueCatClient,
-      resolveStripeClient()
+      resolveStripeClient(),
+      complimentaryAccess
     )
     const billingReconciliationService = new BillingReconciliationService(
       prisma,
@@ -317,7 +321,8 @@ export async function startWorkers(state: WorkerProcessState) {
     const runtimeFlags = new FeatureFlagsService(
       new FeatureFlagsRepository(prisma),
       posthogService,
-      new CommunityFlagEvaluationService(prisma, posthogService)
+      new CommunityFlagEvaluationService(prisma, posthogService, complimentaryAccess),
+      complimentaryAccess
     )
     const community = await createCommunityWorkerRuntime({
       prisma,
@@ -343,7 +348,8 @@ export async function startWorkers(state: WorkerProcessState) {
       featureFlags: new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
         posthogService,
-        new CommunityFlagEvaluationService(prisma, posthogService)
+        new CommunityFlagEvaluationService(prisma, posthogService, complimentaryAccess),
+        complimentaryAccess
       ),
       guardian: new GuardianService(
         posthogService,

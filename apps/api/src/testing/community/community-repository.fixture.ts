@@ -65,6 +65,11 @@ export const createRepo = () => {
     communityReaction: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communityReactionReceipt: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     communityReactionOutbox: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    // Story 6.14 D8: erasure deletes the member's grants and nulls them as an operator.
+    complimentaryAccessGrant: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
     communitySpotlightReadWindow: { deleteMany: spotlightReadWindowDeleteMany },
     savedLocation: { findMany: savedLocationFindMany },
     lookbookPost: {

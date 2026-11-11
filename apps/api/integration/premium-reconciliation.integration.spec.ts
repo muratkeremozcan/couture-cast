@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -95,7 +96,8 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
     const entitlements = new PremiumEntitlementService(
       prisma,
       ledger,
-      new FakeStripeBillingClient()
+      new FakeStripeBillingClient(),
+      noComplimentaryGrants
     )
     return new BillingReconciliationService(
       prisma,

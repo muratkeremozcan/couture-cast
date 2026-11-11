@@ -26,7 +26,8 @@
         "active": "Premium est actif : {{plan}}. La période en cours se termine le {{date}}.",
         "gracePeriod": "Premium est actif, mais il y a un problème de paiement.",
         "expired": "Votre abonnement Premium a expiré.",
-        "revoked": "Votre abonnement Premium a été révoqué."
+        "revoked": "Votre abonnement Premium a été révoqué.",
+        "complimentary": "Vous avez un accès Premium gracieux offert par CoutureCast."
       },
       "planMonthly": "Premium mensuel",
       "planAnnual": "Premium annuel",
@@ -40,9 +41,11 @@
       "portalLagHint": "Les changements effectués dans le portail de facturation, en particulier les annulations, peuvent mettre quelques heures à apparaître ici.",
       "graceBanner": "Il y a un problème avec votre moyen de paiement. Mettez-le à jour dans la boutique ou le portail de facturation de votre abonnement pour conserver Premium.",
       "endedNote": "Votre abonnement est terminé. Vous pouvez vous réabonner à tout moment.",
+      "complimentaryNote": "Vous avez aussi un accès Premium gracieux : Premium reste actif quoi qu'il arrive à cet abonnement.",
       "errorLoad": "Impossible de charger l'état de l'abonnement.",
       "errorPurchase": "Impossible de démarrer le paiement. Veuillez réessayer.",
       "errorAlreadySubscribed": "Vous avez déjà un abonnement Premium actif. Rechargez cette page pour le voir.",
+      "errorComplimentary": "Ce compte a déjà un accès Premium gracieux, il n'y a donc rien à acheter.",
       "errorNoWebSubscription": "Aucun abonnement web à gérer n'est associé à ce compte.",
       "errorSubscribeDisabled": "Les nouveaux abonnements Premium sont suspendus pour le moment. Réessayez sous peu.",
       "signedOutHint": "Connectez-vous pour vous abonner ou gérer Premium",

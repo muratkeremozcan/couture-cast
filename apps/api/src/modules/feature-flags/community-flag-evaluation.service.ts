@@ -1,4 +1,4 @@
-// Story 6.5 owner: remote-only, cross-process member rollout evaluation.
+// Story 6.5 owner: cross-process member rollout evaluation, remote or complimentary (6.14).
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Inject, Injectable } from '@nestjs/common'
@@ -14,6 +14,10 @@ import {
   type CommunityGrant,
 } from '../community/community-availability.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import {
+  ComplimentaryAccessService,
+  type ComplimentaryAccessCheck,
+} from './complimentary-access.service.js'
 export { CommunityUnavailableException } from '../community/community-availability.js'
 type Evaluation = CommunityGrant
 type CacheRow = {
@@ -51,7 +55,11 @@ export class CommunityFlagEvaluationService {
   >()
   constructor(
     @Inject(PrismaClient) private readonly prisma: PrismaClient,
-    @InjectRemoteFeatureFlagProvider() private readonly remote: RemoteFeatureFlagProvider
+    @InjectRemoteFeatureFlagProvider() private readonly remote: RemoteFeatureFlagProvider,
+    // Story 6.14 D2: required at every composition, the push dispatch worker included, so no
+    // hand-built site can silently drop complimentary members from the read grant.
+    @Inject(ComplimentaryAccessService)
+    readonly complimentary: Pick<ComplimentaryAccessService, 'isActive' | 'check'>
   ) {}
 
   async evaluate(
@@ -260,19 +268,44 @@ export class CommunityFlagEvaluationService {
       claimStarted + 1900
     )
     let value: unknown
+    let grantCheck = 'not_granted' as ComplimentaryAccessCheck
     try {
       const signal = AbortSignal.timeout(
         Math.max(1, Math.floor(invocationDeadline - performance.now()))
       )
-      // The provider is remote-only. Synthetic fallback values never enter this table.
+      // The row holds a remote answer or a complimentary grant (Story 6.14 D4), never a
+      // fallback or code default. A granted member is true without asking PostHog.
       value = await Promise.race([
-        this.remote.getFeatureFlagValue('community_read_enabled', member, { signal }),
+        this.complimentary
+          .check(member, {
+            signal,
+            runGrantRead: (read) => budget.connection(read),
+            // Half of what is left, so a slow grant read or kill switch still leaves the
+            // PostHog call its time; past the cap this request treats the member as ungranted.
+            budgetMs: (invocationDeadline - performance.now()) / 2,
+          })
+          .then((check) => {
+            grantCheck = check
+            return check === 'granted'
+              ? true
+              : this.remote.getFeatureFlagValue('community_read_enabled', member, {
+                  signal,
+                })
+          }),
         delay(Math.max(1, Math.floor(invocationDeadline - performance.now()))).then(
           () => undefined
         ),
       ])
     } catch {
       value = undefined
+    }
+    // A false that rests on a grant check that could not finish is not cached: every instance,
+    // realtime and the push guard read this row, and a grantee would be shut out for a minute.
+    if (value === false && grantCheck === 'unavailable') {
+      // ...and the claim reopens at once, so the next request retries in place of waiting out
+      // the claim cadence with a 503 a non-grantee never saw before 6.14.
+      await this.releaseFailedClaim(member, owner, claim.subject_generation, true)
+      return
     }
     if (typeof value !== 'boolean' || performance.now() >= invocationDeadline) {
       await this.releaseFailedClaim(member, owner, claim.subject_generation)
@@ -313,7 +346,12 @@ export class CommunityFlagEvaluationService {
       throw error
     }
   }
-  private async releaseFailedClaim(member: string, owner: string, generation: number) {
+  private async releaseFailedClaim(
+    member: string,
+    owner: string,
+    generation: number,
+    retryNow = false
+  ) {
     await interactiveTransaction(
       this.prisma,
       async (tx) => {
@@ -321,7 +359,8 @@ export class CommunityFlagEvaluationService {
         await tx.$executeRaw`SELECT community_privacy_guards(ARRAY[${member}]::text[],ARRAY[]::text[],false)`
         // Failure finishes this claim without changing its original cadence or authorization.
         await tx.$executeRaw`
-        UPDATE "CommunityFlagEvaluation" e SET refresh_until = NULL, refresh_owner = NULL
+        UPDATE "CommunityFlagEvaluation" e SET refresh_until = NULL, refresh_owner = NULL,
+          next_claim_at = CASE WHEN ${retryNow} THEN clock_timestamp() ELSE e.next_claim_at END
         FROM "CommunitySubject" s WHERE e.member_id = ${member} AND e.flag_key = 'community_read_enabled'
           AND e.refresh_owner = ${owner}::uuid AND e.refresh_until > clock_timestamp()
           AND e.subject_generation = ${generation} AND s.member_id = e.member_id AND s.generation = e.subject_generation

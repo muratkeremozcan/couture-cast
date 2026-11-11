@@ -34,7 +34,9 @@ function createService({
     getFeatureFlagValue,
   } as unknown as RemoteFeatureFlagProvider
 
-  const service = new FeatureFlagsService(repository, remoteProvider)
+  const service = new FeatureFlagsService(repository, remoteProvider, undefined, {
+    isActive: () => Promise.resolve(false),
+  })
 
   return { service, findValue, upsertMany, getFeatureFlagValue }
 }
@@ -57,7 +59,9 @@ describe('FeatureFlagsService', () => {
         featureFlag: { findUnique },
         $transaction,
       } as unknown as PrismaClient),
-      { getFeatureFlagValue: vi.fn() }
+      { getFeatureFlagValue: vi.fn() },
+      undefined,
+      { isActive: () => Promise.resolve(false) }
     )
     try {
       const expired = service.communityReadEvaluation(
@@ -146,6 +150,7 @@ describe('FeatureFlagsService', () => {
       ['moderation_decisions_enabled', false],
       ['moderation_sla_monitoring_enabled', false],
       ['moderation_history_enabled', false],
+      ['complimentary_access_enabled', false],
     ])
 
     const cachedValues = new Map<string, boolean | null>([
@@ -162,6 +167,7 @@ describe('FeatureFlagsService', () => {
       ['moderation_decisions_enabled', null],
       ['moderation_sla_monitoring_enabled', null],
       ['moderation_history_enabled', null],
+      ['complimentary_access_enabled', null],
     ])
 
     const findValue = vi
@@ -181,9 +187,11 @@ describe('FeatureFlagsService', () => {
       getFeatureFlagValue,
     } as unknown as RemoteFeatureFlagProvider
 
-    const service = new FeatureFlagsService(repository, remoteProvider)
+    const service = new FeatureFlagsService(repository, remoteProvider, undefined, {
+      isActive: () => Promise.resolve(false),
+    })
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 13, fallbackCount: 0 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 14, fallbackCount: 0 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: true },
       { key: 'community_read_enabled', value: false },
@@ -198,6 +206,7 @@ describe('FeatureFlagsService', () => {
       { key: 'moderation_decisions_enabled', value: false },
       { key: 'moderation_sla_monitoring_enabled', value: false },
       { key: 'moderation_history_enabled', value: false },
+      { key: 'complimentary_access_enabled', value: false },
     ])
   })
 
@@ -221,9 +230,11 @@ describe('FeatureFlagsService', () => {
       getFeatureFlagValue,
     } as unknown as RemoteFeatureFlagProvider
 
-    const service = new FeatureFlagsService(repository, remoteProvider)
+    const service = new FeatureFlagsService(repository, remoteProvider, undefined, {
+      isActive: () => Promise.resolve(false),
+    })
 
-    await expect(service.syncFlags()).resolves.toEqual({ synced: 13, fallbackCount: 13 })
+    await expect(service.syncFlags()).resolves.toEqual({ synced: 14, fallbackCount: 14 })
     expect(upsertMany).toHaveBeenCalledWith([
       { key: 'premium_themes_enabled', value: false },
       { key: 'community_read_enabled', value: false },
@@ -246,6 +257,7 @@ describe('FeatureFlagsService', () => {
       { key: 'moderation_decisions_enabled', value: false },
       { key: 'moderation_sla_monitoring_enabled', value: false },
       { key: 'moderation_history_enabled', value: false },
+      { key: 'complimentary_access_enabled', value: true },
     ])
   })
 })

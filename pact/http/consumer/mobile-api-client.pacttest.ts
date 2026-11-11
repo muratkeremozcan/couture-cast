@@ -127,6 +127,8 @@ import {
   verifyCommunityAffiliateClickMintInteraction,
   verifyCommunityAffiliateClickEndedInteraction,
   verifyEntitledSubscriptionStatusInteraction,
+  verifyComplimentaryPremiumAccessInteraction,
+  verifyNoPremiumAccessInteraction,
   verifySubscriptionRefreshInteraction,
   verifyEntitledThemeReadInteraction,
   verifyEntitledThemeReadDefaultInteraction,
@@ -509,6 +511,18 @@ describe('CoutureCastMobile -> CoutureCastApi HTTP contract', () => {
       pact,
       createMobileClientForMockServer
     )
+  })
+
+  // Story 6.14: settings read the access source to hide purchase controls.
+  it('reads the premium access source of a complimentary member', async () => {
+    await verifyComplimentaryPremiumAccessInteraction(
+      pact,
+      createMobileClientForMockServer
+    )
+  })
+
+  it('reads the premium access source of a member without premium', async () => {
+    await verifyNoPremiumAccessInteraction(pact, createMobileClientForMockServer)
   })
 
   it('refreshes the premium subscription from the entitlement ledger', async () => {

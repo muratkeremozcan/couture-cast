@@ -11,6 +11,7 @@ build/
 .next
 .next-real-session/
 .next-share-card/
+.next-complimentary/
 .cache/
 **/garment-tagging-model/
 coverage/

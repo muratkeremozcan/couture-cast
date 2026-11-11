@@ -1,6 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { createHash, randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
@@ -226,11 +227,16 @@ const prisma = new Proxy(actualPrisma, {
   },
 })
 const remote = { getFeatureFlagValue: () => Promise.resolve(true) }
-const evaluation = new CommunityFlagEvaluationService(prisma, remote)
+const evaluation = new CommunityFlagEvaluationService(
+  prisma,
+  remote,
+  noComplimentaryGrants
+)
 const flags = new FeatureFlagsService(
   new FeatureFlagsRepository(prisma),
   remote,
-  evaluation
+  evaluation,
+  noComplimentaryGrants
 )
 const access = new CommunityAccessService(prisma, flags)
 const provider = vi

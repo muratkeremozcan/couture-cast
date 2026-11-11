@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-05.
-Added Steps 40 to 52:
+Updated: 2026-11-10.
+Added Steps 40 to 54:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -16,7 +16,8 @@ Added Steps 40 to 52:
 - Step 50: Story 6.10, moderator queue and case detail, `6337dc8c` (PR #194), merged on 2026-11-04.
 - Step 51: Story 6.11, moderation decisions and account sanctions, `3efd8423` (PR #195), merged on 2026-11-05.
 - Step 52: Story 6.12, SLA monitoring and escalation, `56509fa8` (PR #196), merged on 2026-11-05.
-- Step 53: Story 6.13, immutable moderation history, in review on `feat/cc-6-13-immutable-moderation-history` (PR #197), not yet merged.
+- Step 53: Story 6.13, immutable moderation history, `63bd6fcd` (PR #197), merged on 2026-11-06.
+- Step 54: Story 6.14, complimentary full access, in review on `feat/story-6-14-complimentary-access` (PR #198), not yet merged.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -24,6 +25,10 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Step 54 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Moved Step 53 to completed after PR #197 merged as `63bd6fcd`.
+Corrected Step 53 where the last commits before merge left it stale: its test map now lists the orphaning suite, and its `Evidence boundaries` record the third independent review and the PR checks at merge.
+Added Steps 50 to 54 to `The whole project in plain English`, which stopped at Step 49, and Step 51 to `Current position`, which skipped it.
 Step 53 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Moved Step 52 to completed after PR #196 merged as `56509fa8`.
 Step 52 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -110,12 +115,21 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 53, Story 6.13, immutable moderation history, not yet merged, on `feat/cc-6-13-immutable-moderation-history`.
+- In review: Step 54, Story 6.14, complimentary full access, not yet merged, on `feat/story-6-14-complimentary-access` (PR #198).
+  `sprint-status.yaml` lists the story as `in-progress`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-14-complimentary-full-access.md`.
+  No grant exists in production until the owner runs the command after merge, and production push to grantees waits on the Northflank dispatch switch-on.
+- Latest completed step: Step 53, Story 6.13, immutable moderation history, status `done`, merged as `63bd6fcd` (PR #197) on 2026-11-06.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-13-immutable-moderation-history.md`.
+  Step 53 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_history_enabled` defaults to false, and the database enforcement has no flag.
-- Latest completed step: Step 52, Story 6.12, SLA monitoring and escalation, status `done`, merged as `56509fa8` (PR #196) on 2026-11-05.
+- Step 52, Story 6.12, SLA monitoring and escalation, status `done`, merged as `56509fa8` (PR #196) on 2026-11-05.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-12-sla-monitoring-escalation.md`.
   Step 52 was written before review and merge, and its `Evidence boundaries` section says so.
+  Production stays dark because `moderation_decisions_enabled` and `moderation_console_enabled` default to false.
+- Step 51, Story 6.11, Moderation decisions and account sanctions, status `done`, merged as `3efd8423` (PR #195) on 2026-11-05.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-11-moderation-decisions-account-sanctions.md`.
+  Step 51 was written before review and merge, and its `Evidence boundaries` section says so.
   Production stays dark because `moderation_decisions_enabled` and `moderation_console_enabled` default to false.
 - Step 50, Story 6.10, Moderator queue and case detail, status `done`, merged as `6337dc8c` (PR #194) on 2026-11-04.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-10-moderator-queue-case-detail.md`.
@@ -125,7 +139,7 @@ Read it before changing or adding a numbered step.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`.
   Step 49 was written from the PR head `37a00d33` before merge, and its `Evidence boundaries` section says so.
   Production stays dark because `share_card_native_share_enabled` defaults to false.
-- Next in `backlog` under epic 6, which is `in-progress`: Stories 6.13 (immutable moderation history), 6.14 (complimentary full access) and 6.15 (Expo SDK 58 live font-scale layout).
+- Next in `backlog` under epic 6, which is `in-progress`: Story 6.15 (Expo SDK 58 live font-scale layout).
 - Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
   Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
 - Step 47, Story 6.7b, Sponsored community highlights, status `done`, merged as `1d7b9848` (PR #161).
@@ -248,6 +262,11 @@ Read it before changing or adding a numbered step.
 |   47 | Let the owner sponsor a look. Label it. Re-check every click.                |
 |   48 | Turn a look into a branded card. Save exactly the card you saw.              |
 |   49 | Share that same card to other apps. Keep the preview after a failed handoff. |
+|   50 | Show moderators every case in one queue. Let them read before they act.      |
+|   51 | Let a moderator decide a whole case. A ban closes the community only.        |
+|   52 | Warn before a case goes late. Escalate when it does.                         |
+|   53 | Lock moderation history. Erasure may remove only who was involved.           |
+|   54 | Let the owner give a member everything free. Keep the gift out of billing.   |
 
 ## Special feature: AI garment tagging
 
@@ -10190,7 +10209,7 @@ Story reference:
 - `_bmad-output/test-artifacts/community-beta-gate-signatures.md`
 - `_bmad-output/project-knowledge/deployment-guide.md`, section "Story 6.13 moderation history"
 - `_bmad-output/test-artifacts/story-6-13/` (screenshots of the real pages in light and dark at desktop and phone widths)
-- Commits on `feat/cc-6-13-immutable-moderation-history`, not yet pushed or merged when this step was written
+- Squash-merged as `63bd6fcd` (PR #197) on 2026-11-06, after this step was written on `feat/cc-6-13-immutable-moderation-history`
 
 Cross-links:
 
@@ -10241,6 +10260,7 @@ API integration tests, against real PostgreSQL:
 - [`apps/api/integration/moderation-history-retention.integration.spec.ts`](../../apps/api/integration/moderation-history-retention.integration.spec.ts): proves the 400-day boundary, that nothing else is pruned, and a real injected drift.
 - [`apps/api/integration/moderation-history-route.integration.spec.ts`](../../apps/api/integration/moderation-history-route.integration.spec.ts): proves both routes over real HTTP, every refusal, the canary exclusions, the byte cap and the audit row.
 - [`apps/api/integration/moderation-history-sequential.integration.spec.ts`](../../apps/api/integration/moderation-history-sequential.integration.spec.ts): proves every ordered pair of erasures through the real sweep, the comment report link, operators erased before and during a decision or appeal, and the conflict rule on orphan siblings.
+- [`apps/api/integration/moderation-history-orphaning.integration.spec.ts`](../../apps/api/integration/moderation-history-orphaning.integration.spec.ts): proves every operator action on either side of the step that deletes a post and orphans its reports, then each other person's erasure, and conflict for every viewer on every surface.
 - [`apps/api/integration/moderation-history-route-period.integration.spec.ts`](../../apps/api/integration/moderation-history-route-period.integration.spec.ts): proves the period export's role, limits, conflicts and time bounds, on the shared context in [`apps/api/integration/helpers/moderation-history-route-context.ts`](../../apps/api/integration/helpers/moderation-history-route-context.ts).
 - [`apps/api/integration/moderation-history-gate.spec.ts`](../../apps/api/integration/moderation-history-gate.spec.ts): reads the gate record, runbook and guide, and proves the readiness scripts are unchanged.
 
@@ -10266,13 +10286,17 @@ Evidence boundaries:
 
 - **An independent review found what the suites missed.**
   Codex reviewed `1175a24c` on the real image and reproduced three major gaps and two minor ones, each now with a red-first test or spec correction, recorded as `CX-1` to `CX-6` in the spec.
-- **Written before merge.**
-  The code and tests are in PR #197, on `feat/cc-6-13-immutable-moderation-history`, when this step was written.
+  A third independent review found four more gaps, R3-1 to R3-4, all in sequences that act after a post's deletion, logged as `CX-10` to `CX-13`, and TEA's matrix for that family added `CX-14`.
+  The fixes added the `20261106120000_moderation_report_origins` migration and the orphaning suite.
+- **Written before merge, and merged since.**
+  PR #197 squash-merged as `63bd6fcd` on 2026-11-06, with 44 checks passing and 13 skipped.
+  The commit hashes below are from the PR branch, before that squash.
 - **Sign-off runs at `4d280d90`.**
   Three consecutive full unfiltered runs, each count identical, 13894 tests per run, with no failure and no retry.
   `packages/db` 449 on plain Postgres and 449 on the Supabase image, `apps/api` 8568 on plain Postgres, 120 `moderation-history` tests on the image, location and weather 34 with the `pr-checks` flags, real Storage 10, `packages/api-client` 1757, `packages/config` 31, `apps/web` 1931, Pact consumer 456, Pact provider 1, the proxy helper 3, and Playwright 85 in a real browser on the image.
   The verifier passed 16 of 16, `node --test` 43, and 48 of 48 seeded defects were caught at `c546b130`, with only test files changed after.
   The numbers per lane are in the test design's Execution record.
+  These runs predate the review 3 fixes and the orphaning suite, which CI on PR #197 covers.
 - **A real stack walk ran on the real image.**
   The launcher ran the built API, the real `community.bootstrap` worker and the web server on a disposable `supabase/postgres:17.6.1.054` container, as its non-superuser `postgres`.
   Every refused statement answered 42501 and the row compared byte-identical, including `UPDATE`, `DELETE` and `TRUNCATE` under `session_replication_role = replica`, which that image lets the role set.
@@ -10283,9 +10307,10 @@ Evidence boundaries:
 - **`prisma migrate reset` did not run on the Supabase image locally.**
   The Prisma CLI refuses it from an agent without the user's consent, so the local proof dropped and recreated `public` and ran `migrate deploy`, twice.
   The real `db:reset` first runs there in the `pr-pw-e2e-local` job.
-- **The migration ran on hosted Preview and has not run on Production.**
+- **The migration ran on hosted Preview before merge, and no Production read-back is recorded.**
   `M-PREVIEW-VERIFY` on 2026-11-05 shows 56 migrations finished, `moderation_history_owner` owning the table, and 16 of 16 checks through the fixed script with the certificate verified.
-  Read-only queries show Production on Postgres 17.6 with `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, so its outcome stays unproven until deploy, and the Supabase patch version was not read.
+  Read-only queries before merge show Production on Postgres 17.6 with `postgres` as NOSUPERUSER, CREATEROLE, BYPASSRLS, and the Supabase patch version was not read.
+  Production applies the migration during the API's Vercel production build, and no `moderation:history:verify` run against Production is recorded since the merge.
 - **Sign-offs are owner rulings.**
   The gate record carries no cryptographic signature, and staffing rests on the owner's statement, with no roster or schedule.
 - **Production stays dark.**
@@ -10324,4 +10349,281 @@ flowchart TD
   Read --> File["JSON attachment"]
   Daily["daily job"] --> Prune["terminal alerts past 400 days"]
   Daily --> Drift["catalog checks, drift log"]
+```
+
+## Step 54: Complimentary full access
+
+User/business impact:
+
+Until this step premium came only from the RevenueCat mirror in `PremiumEntitlement`, and every community lane was closed in production by default-false flags.
+The owner had no way to give family testers the full product without making them pay.
+This step adds an owner grant that opens premium and the community rollout for one chosen member, with no charge and no store record.
+The grant lives in its own table, `ComplimentaryAccessGrant`, which billing code never reads or writes, so the reconciliation sweep cannot expire it.
+One read seam, `ComplimentaryAccessService`, answers for the premium check, the per-member flags, the community flag cache and, through that cache, push dispatch.
+The owner grants, revokes and lists through an audited command with no HTTP route, and account erasure deletes a member's grants at request time.
+Web and mobile settings show a "Complimentary access" state with no purchase control.
+The kill switch `complimentary_access_enabled` defaults to true, so a grant works in production with no flag flip, and members without a grant get the same answers as before.
+
+Key takeaways:
+
+1. **Keep a gift out of the ledger that would expire it.**
+   A `promotional` row in `PremiumEntitlement` was turned down, because `applyLedgerSnapshot` and the reconciliation sweep upsert that table by `user_id` from RevenueCat, which has no record of an owner grant.
+   The store enum's `promotional` already means RevenueCat's own grants.
+   A separate worker-only table with a partial unique index on `member_id` where `revoked_at IS NULL` keeps one active grant per member and revoked rows as history.
+   `billing-untouched.complimentary.spec.ts` pins the separation both ways: no billing file names the grant, and the operator names no billing model.
+2. **Give every consumer one question to ask.**
+   `ComplimentaryAccessService` is the only complimentary read, through `isActive` or its three-way `check`.
+   `hasPremiumAccess`, `FeatureFlagsService.getFeatureFlag`, the community cache refresh and the E2E fixture branch all ask it, and push reads the cache row the refresh writes.
+   The seam depends on Prisma and the remote provider only, because `FeatureFlagsService` already injects `CommunityFlagEvaluationService`, which injects the seam.
+   It is a required constructor argument at every hand-built site, so no worker composition can drop grantees silently.
+3. **A switch that can only widen access may default open.**
+   `complimentary_access_enabled` defaults to true, the one deliberate exception besides `weather_alerts_enabled`.
+   A degraded PostHog that answers true can only reach members the owner already granted.
+   It is evaluated for the fixed subject `complimentary-access-kill-switch`, so PostHog never sees a member id for it.
+   Off reaches premium and five flags on the next request, and community read, realtime and push within the 60-second life of the cache row.
+4. **Unknown is a third answer.**
+   `check` returns `granted`, `not_granted` or `unavailable`, and `isActive` is true only for `granted`.
+   The community refresh never caches a false that rests on `unavailable`, and it reopens the claim at once, so nobody waits out an answer the seam could not establish.
+   Checkout answers 503 on `unavailable`, because a grantee whose grant cannot be read must not be charged.
+   The access route answers from the paid row, so a failing grant read never becomes a 500.
+5. **Ask the costly question only when it can change the answer.**
+   `hasPremiumAccess` reads the paid row first and asks the seam only when that row does not entitle.
+   `getFeatureFlag` reads grants only for the five shortcut keys.
+   The seam reads the grant first and evaluates the kill switch only when a grant exists, so a member with no grant costs no PostHog call.
+6. **Give each member one answer per flag.**
+   `community_read_enabled` stays out of the `getFeatureFlag` shortcut and reaches the override only through the cache refresh.
+   `readAuthorized`, realtime and the push send guard all read that cache row, so a second path could disagree with it.
+   The E2E fixture branch of `communityReadEvaluation` skips the cache, so it asks `isActive` first as well.
+7. **Invalidate a shared cache by deleting the row under its guard.**
+   Grant and revoke `DELETE` the member's `CommunityFlagEvaluation` rows after `community_privacy_guards`, as `community_forget_subject` does, inside the grant transaction.
+   Nulling the value would have left `next_claim_at` up to 45 seconds ahead, a 503 right after a grant, and an in-flight refresh could still write a pre-revoke true for 60 seconds.
+8. **An owner power needs a command, a target check and no route.**
+   `npm run access:complimentary` copies the Story 6.7b operator pattern: `--env-file` is the only `DATABASE_URL` source, a remote host needs `--confirm-target <project ref>`, and `--dry-run` rolls back.
+   The actor must be an auth user whose `app_metadata.app_role` is `admin`, resolved by the shared `resolveOperatorAdmin`.
+   `A-NO-GRANT-ROUTE` proves no registered route can grant or revoke.
+9. **Audit the act, and keep the identity on the row erasure removes.**
+   `buildComplimentaryAccessAuditRow` writes the actor and the grant id only, because Story 6.13 ruled that no member id enters the immutable `AuditLog`.
+   Member, reason and times live on the grant row.
+   `requestAccountErasure` deletes the member's grants and nulls `granted_by_id` and `revoked_by_id` where they name the erased member.
+10. **Take locks in the order the other writers take them.**
+    Grant and revoke take both members' privacy guards in one `community_privacy_guards` call, then each guard and `community_member:` lock in sorted id order, before reading `ModerationErasureRequest`.
+    Account erasure and the push send guard use the same order, so a grant cannot slip past a racing erasure and the command cannot deadlock with a send.
+11. **Add a route when a frozen contract cannot grow.**
+    Web and mobile parse `GET /api/v1/commerce/subscription` with strict schemas, so a new key would break installed builds.
+    `GET /api/v1/commerce/premium/access` answers `premium` and `source` from a discriminated union, so `premium` cannot contradict `source`, and the OpenAPI document moves to 1.8.0.
+    A checked-in 1.7.0 baseline keeps the subscription contract frozen in CI.
+12. **State the purchase the server cannot refuse.**
+    Mobile buys through the RevenueCat SDK on the device.
+    Mobile hides purchase controls for `source: 'complimentary'` and configures the SDK for a grantee only when a paying grantee taps Manage.
+    A client that ignores those rules can still buy.
+    The deployment guide states that residual.
+
+Hard-won lessons from the implementation and review of this story:
+
+- **Three seeded defects passed every test on the first run.**
+  A wiring spec that counted three constructor arguments accepted an inline stub that always answered false (S-8).
+  The flag checks derived their expected list from the constant under test, so adding `commerce_subscription_enabled` to it passed (S-9).
+  Nothing compared billing rows around a grant, so an operator that also wrote a `PremiumEntitlement` row passed (S-10).
+  The tests now pin the real seam, the exact six names and the billing rows, and each defect turns them red.
+- **A slow grant read made the community read answer 503.**
+  `U-REFRESH-BOUNDED` and `I-KILL-REMOTE-SLOW` found that a hanging grant read or kill switch used up the remote call's time.
+  The refresh now gives the seam half of what is left, and the kill switch's PostHog read gets 80% of that, so the remote call still lands.
+- **The kill switch failed open when its fallback row read threw.**
+  With PostHog silent, the `@couture/config` resolver hands back the code default when the fallback row read throws, and that default is true.
+  The fallback read now catches its own error, and the seam answers `unavailable` (review F1).
+- **A slow grant read could cache false for 60 seconds.**
+  Every instance, realtime and the push guard read that row, so one timeout shut a grantee out for a minute.
+  The refresh now releases its claim with `next_claim_at` set to now, which also spared a non-grantee 45 seconds of 503 (review findings 8 and F3).
+- **Checkout failed open on a grant read error.**
+  An error read as no grant, so a grantee could reach Stripe.
+  `createCheckoutSession` now asks `complimentaryAccessCheck` and answers 503 on `unavailable` (review F4).
+- **A reason of only tabs or line breaks passed the database check.**
+  `D-CHECK-REASON-LEN` found the gap, while the command's `trim()` already refused such a reason.
+  The checks now strip leading and trailing `[[:space:]]` with `regexp_replace` before they count.
+- **The contract let `premium` disagree with `source`.**
+  `U-C-STRICT` found it, and `premiumAccessSchema` is now a discriminated union on `source`.
+- **Mobile configured RevenueCat for a grantee and flashed purchase controls.**
+  `M-HIDE-PURCHASE`, `M-NO-FLASH` and `M-DISCLOSURE-HIDDEN` found the SDK configured, and the purchase controls and the billing disclosure on screen before the access read settled.
+  Settings now waits for the access read before configuring RevenueCat and holds the section in loading until it settles.
+  A paying grantee's Manage tap then found no configured SDK, so `showManageSubscriptionsInStore` now configures it first (review F2).
+- **Review found client state that hid or kept the wrong thing.**
+  Web hid the grace banner from a paying grantee, and mobile kept the previous account's access answer after sign-out (review findings 10 and 11).
+  A hung access read could also hold the web section, so it now gives up after 5 seconds and renders as it did before this story (review F9).
+- **The push proof first ran through a stub.**
+  The engagement harness built its own evaluator, so a broken production composition still passed `I-PUSH-GRANTEE`.
+  The harness and the forked worker now build the real seam (review finding 13).
+- **A frozen-contract proof cannot read `main` in CI.**
+  `U-C-SUBSCRIPTION-FROZEN` compared against `main` through git, and CI checks out a single commit with no `main` ref.
+  The 1.7.0 subscription schemas now live in `packages/api-client/testing/subscription-contract-1.7.0.baseline.json`.
+- **A flags-off proof cannot share the parallel E2E stack.**
+  The shared stack seeds every member flag true and runs specs in parallel against one database, so a pass there would prove the seed.
+  `scripts/e2e-complimentary/run.mjs` owns one UUID-named database per run, checks its name before any statement, runs one worker and drops the database afterwards.
+- **A new upload step broke the workflow policy.**
+  The complimentary artifact upload ran on `failure()` after the secret scan with no stated condition, which the step-shadowing policy rejects and which could publish flagged artifacts.
+  It now runs on `always()` and only when the scan succeeded, as the shard jobs do.
+- **Fake credentials in fixtures still trip secret scanners.**
+  The CLI targeting tests carried `user:password` pairs in their URLs, and neither test needed them.
+- **A banned-notice test read an effect before it ran.**
+  The grid reports a ban through `onBannedChange` from a passive effect after commit, and under CI load the assertion ran first.
+  The tests now wait for the call.
+- **A required constructor argument reached 24 existing suites.**
+  Suites that never grant take `noComplimentaryGrants` from `apps/api/integration/helpers/no-complimentary-grants.ts`, and TEA ran all 24 files again.
+
+Story/Task mapping:
+
+- Story 6.14
+- Task numbers follow the order of the spec's Execution checklist, which has none.
+- Task 1 (model, migration, partial unique index, checks, RLS, harness and cleanup registration)
+- Task 2 (flag `complimentary_access_enabled`, default true, seeded true, and `COMPLIMENTARY_MEMBER_FLAGS`)
+- Task 3 (read seam, flag shortcut, community cache override)
+- Task 4 (premium seam and checkout refusal)
+- Task 5 (operator service, command, script, shared admin-actor and targeting helpers)
+- Task 6 (grant erasure)
+- Task 7 (access contract, OpenAPI, regenerated SDK, route)
+- Task 8 (web and mobile complimentary state, locales)
+- Task 9 (tests per the TEA plan, red first)
+- Task 10 (deployment guide, sprint status)
+- Task 11 (post-merge: production push on Northflank, one real grant and revoke), open
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-14-complimentary-full-access.md`, with decisions D1 to D10, the Plan Change Log TEA-01 to TEA-23 and the Review Triage Log
+- `_bmad-output/test-artifacts/test-design/cc614-complimentary-access-test-design.md`, with its Execution record
+- `_bmad-output/test-artifacts/story-6-14/seeded-defects.md`
+- `_bmad-output/project-knowledge/deployment-guide.md`, section "Story 6.14 complimentary access"
+- `_bmad-output/test-artifacts/story-6-14/screenshots/` (grantee and control settings and the grantee's theme gallery at 1280 and 390 pixels)
+- PR #198 on `feat/story-6-14-complimentary-access`, open and not yet merged when this step was written
+
+Cross-links:
+
+- Step 34 provides `PremiumEntitlement`, the RevenueCat webhook and the reconciliation sweep this step keeps away from grants.
+- Steps 35, 36 and 37 provide the theme, palette and planner capabilities and their flags, which a grant opens.
+- Step 38 provides the community rollout flags and the erasure sweep.
+- Step 43 provides `CommunityFlagEvaluation`, the push send guard and `COMMUNITY_DISPATCH_ENABLED`.
+- Step 47 provides the sponsorship operator command whose admin check and targeting this step moved into shared helpers.
+- Step 49 provides `share_card_native_share_enabled`.
+- Step 53 provides `requestAccountErasure`, the 72-hour schedule and the rule that no member id enters `AuditLog`.
+
+Sequence to follow:
+
+1. `packages/db/prisma/migrations/20261110120000_complimentary_access/migration.sql` for the table, the partial unique index, the checks and RLS.
+2. `packages/config/src/flags.ts` for `complimentary_access_enabled` and `COMPLIMENTARY_MEMBER_FLAGS`.
+3. `apps/api/src/modules/feature-flags/complimentary-access.service.ts`, `check`, for the three answers and the kill switch.
+4. `apps/api/src/modules/feature-flags/feature-flags.service.ts`, `getFeatureFlag` and `communityReadEvaluation`, for the shortcut and the fixture branch.
+5. `apps/api/src/modules/feature-flags/community-flag-evaluation.service.ts`, `refresh`, for the cache override and the released claim.
+6. `apps/api/src/modules/commerce/premium-entitlement.service.ts`, `hasPremiumAccess` and `premiumAccessSource`, then `stripe-billing.service.ts`, `createCheckoutSession`.
+7. `apps/api/src/modules/commerce/complimentary-access-operator.service.ts` for the lock order, the audit row and the cache delete, entered through `complimentary-access.cli.ts` and `scripts/complimentary-access.ts`.
+8. `apps/api/src/modules/community/community.repository.ts`, `requestAccountErasure`, for the grant erasure.
+9. `packages/api-client/src/contracts/http/premium-access.ts` and `apps/api/src/modules/commerce/premium-access.controller.ts` for the access route.
+10. `apps/web/src/app/components/subscription-section.tsx` and `apps/mobile/app/(tabs)/settings.tsx` for the complimentary state.
+11. `_bmad-output/project-knowledge/deployment-guide.md`, section "Story 6.14 complimentary access", for the command, the kill switch and push enablement.
+
+Task owner map:
+
+- Story 6.14 Task 1 owner: add `ComplimentaryAccessGrant` in `packages/db/prisma/schema.prisma`, with the index, checks and RLS in `packages/db/prisma/migrations/20261110120000_complimentary_access/migration.sql`, registered in `packages/db/test/rls/harness.ts` and `packages/testing/src/cleanup.ts`.
+- Story 6.14 Task 2 owner: declare the flag and the list in `packages/config/src/flags.ts`, seeded true in `packages/db/prisma/seeds/feature-flags.ts`.
+- Story 6.14 Task 3 owner: answer in `apps/api/src/modules/feature-flags/complimentary-access.service.ts`, exported from `apps/api/src/modules/feature-flags/feature-flags.module.ts`, asked in `apps/api/src/modules/feature-flags/feature-flags.service.ts` and `apps/api/src/modules/feature-flags/community-flag-evaluation.service.ts`, and passed in `apps/api/src/modules/community/community-engagement.runtime.ts`, `apps/api/src/workers/bootstrap.ts` and `apps/api/src/workers/community.bootstrap.ts`.
+- Story 6.14 Task 4 owner: entitle in `apps/api/src/modules/commerce/premium-entitlement.service.ts` and refuse checkout in `apps/api/src/modules/commerce/stripe-billing.service.ts`.
+- Story 6.14 Task 5 owner: write in `apps/api/src/modules/commerce/complimentary-access-operator.service.ts`, parse in `apps/api/src/modules/commerce/complimentary-access.cli.ts`, and enter through `scripts/complimentary-access.ts` and the root `package.json` script `access:complimentary`, with the shared checks in `apps/api/src/modules/commerce/operator-actor.ts` and `apps/api/src/modules/commerce/operator-cli-target.ts`.
+- Story 6.14 Task 6 owner: delete and null grants in `requestAccountErasure` in `apps/api/src/modules/community/community.repository.ts`.
+- Story 6.14 Task 7 owner: define the contract in `packages/api-client/src/contracts/http/premium-access.ts` and serve it from `apps/api/src/modules/commerce/premium-access.controller.ts`, registered in `apps/api/src/modules/commerce/commerce.module.ts`.
+- Story 6.14 Task 8 owner: read the route in `apps/web/src/lib/premium.ts` and `apps/mobile/src/lib/premium.ts`, and render it in `apps/web/src/app/components/subscription-section.tsx` and `apps/mobile/app/(tabs)/settings.tsx`.
+- Story 6.14 Task 10 owner: document in `_bmad-output/project-knowledge/deployment-guide.md`.
+
+Tests that cover this step:
+
+API unit tests:
+
+- [`apps/api/src/modules/commerce/premium-entitlement.complimentary.spec.ts`](../../apps/api/src/modules/commerce/premium-entitlement.complimentary.spec.ts): proves the paid row is read first, a grant entitles a free member, no grant answers false, and `premiumAccessSource` lets a grant win.
+- [`apps/api/src/modules/commerce/stripe-billing.complimentary.spec.ts`](../../apps/api/src/modules/commerce/stripe-billing.complimentary.spec.ts): proves the checkout order, the complimentary 409 with no Stripe call, the 503 when the grant cannot be read, and the portal for a paying grantee.
+- [`apps/api/src/modules/commerce/billing-untouched.complimentary.spec.ts`](../../apps/api/src/modules/commerce/billing-untouched.complimentary.spec.ts): proves no billing file names the grant model or its seam, and the operator names no billing model.
+- [`apps/api/src/modules/feature-flags/complimentary-access.wiring.spec.ts`](../../apps/api/src/modules/feature-flags/complimentary-access.wiring.spec.ts): proves every hand-built composition passes the real seam, and the seam never imports `FeatureFlagsService`.
+
+API integration tests, against real PostgreSQL:
+
+- [`apps/api/integration/complimentary-access-seam.integration.spec.ts`](../../apps/api/integration/complimentary-access-seam.integration.spec.ts): proves `isActive` on real rows, the kill switch by row and by remote for its fixed subject, every failing read, the five-flag shortcut, the fixture branch and a control member whose answers never change.
+- [`apps/api/integration/complimentary-access-cache.integration.spec.ts`](../../apps/api/integration/complimentary-access-cache.integration.spec.ts): proves a grant or revoke shows on the next request with no 503, an in-flight refresh never writes a stale answer back, an unavailable check is never cached, and the kill switch reaches a cached true when the row expires.
+- [`apps/api/integration/complimentary-access-premium.integration.spec.ts`](../../apps/api/integration/complimentary-access-premium.integration.spec.ts): proves the reconciliation sweep, the RevenueCat webhook and refresh leave the grant intact, and a revoke leaves the paid row to decide.
+- [`apps/api/integration/complimentary-access-cli.integration.spec.ts`](../../apps/api/integration/complimentary-access-cli.integration.spec.ts): proves the command end to end: the exact audit rows, every refusal writing nothing, the dry run, ambient and remote targeting, `list` with `[erased]`, atomicity and forced races.
+- [`apps/api/integration/complimentary-access-erasure.integration.spec.ts`](../../apps/api/integration/complimentary-access-erasure.integration.spec.ts): proves erasure deletes grants and nulls operator ids, both orders of each race with a grant, rollback, and the grant lifecycle as ordered pairs.
+- [`apps/api/integration/complimentary-access-routes.integration.spec.ts`](../../apps/api/integration/complimentary-access-routes.integration.spec.ts): proves every AC1 route opens for a free grantee with the flags off while the control stays locked, the access route's shape, headers, auth and failure answers, checkout, and that no route can grant or revoke.
+- [`apps/api/integration/complimentary-access-push.integration.spec.ts`](../../apps/api/integration/complimentary-access-push.integration.spec.ts): proves only the grantee's delivery reaches the provider, a revoke before or after evaluation sends nothing, opt-out still holds, and a revoked grantee's socket closes within one revalidation.
+- [`apps/api/integration/helpers/complimentary-access-fixtures.ts`](../../apps/api/integration/helpers/complimentary-access-fixtures.ts): the shared fixtures, which seed the six member flags false and answer false from a fake remote that records every call.
+
+Contract and database tests:
+
+- [`packages/db/test/complimentary-access-schema.spec.ts`](../../packages/db/test/complimentary-access-schema.spec.ts): proves the D1 columns, the cascade and set-null keys, the partial unique index, the checks, worker-only RLS with 42501 for client roles, and the seeded flag.
+- [`packages/config/src/complimentary-member-flags.spec.ts`](../../packages/config/src/complimentary-member-flags.spec.ts): pins the six flags in order, and the kill switch and weather alerts as the only true defaults.
+- [`packages/api-client/testing/premium-access-contract.spec.ts`](../../packages/api-client/testing/premium-access-contract.spec.ts): proves the strict union, the bearer-only OpenAPI registration and committed document, and the subscription contract against its 1.7.0 baseline.
+- [`pact/http/consumer/interactions/premium-access.ts`](../../pact/http/consumer/interactions/premium-access.ts): the complimentary and no-premium access reads, which `web-api-client.pacttest.ts` and `mobile-api-client.pacttest.ts` both verify, four interactions in all.
+
+Web, mobile and Playwright tests:
+
+- [`apps/web/src/app/components/subscription-section.complimentary.test.tsx`](../../apps/web/src/app/components/subscription-section.complimentary.test.tsx): proves the complimentary status with no subscribe or portal control, the disclosure withheld while the access read is pending, a paying grantee's note and portal, a failed access read, and the two 409 meanings.
+- [`apps/mobile/src/screens/settings-premium-section.complimentary.test.tsx`](../../apps/mobile/src/screens/settings-premium-section.complimentary.test.tsx): proves the complimentary status, a paying grantee's Manage tap, that RevenueCat is never configured for an unpaid grantee, and that no purchase control flashes while the access read is pending.
+- [`apps/mobile/src/lib/premium.test.ts`](../../apps/mobile/src/lib/premium.test.ts): proves the Manage tap configures the store SDK first and answers false with no store SDK or a failed configure.
+- [`playwright/tests/complimentary-access.spec.ts`](../../playwright/tests/complimentary-access.spec.ts): proves a free grantee granted by the real command gets Premium and the community at desktop and phone widths, a non-grantee in the same run sees every locked state, a revoke locks the former grantee on the next request, and axe passes in dark.
+- [`scripts/e2e-complimentary/run.mjs`](../../scripts/e2e-complimentary/run.mjs): owns one UUID-named database per run behind `npm run test:pw-complimentary`, and refuses any other name or a non-loopback server.
+- [`playwright/config/complimentary.config.ts`](../../playwright/config/complimentary.config.ts): points the run at that database and its own ports, and every other config ignores the spec.
+
+Evidence boundaries:
+
+- **Written before merge.**
+  The code and tests are in PR #198, on `feat/story-6-14-complimentary-access`, open and not yet merged when this step was written.
+  CI on that PR was still running.
+- **What TEA planned.**
+  20 risks, 9 of them high, and 141 scenarios: P0 105, P1 33, P2 3, of which 131 are red-first, 8 are green guards and 2 are manual.
+- **Sign-off runs at `fb24cfd7`.**
+  The 6.14 integration suites with the feature-flags and commerce units passed 645 of 645 in three consecutive runs.
+  Every existing integration suite the constructor change touched passed on a stock `postgres:17` started by `scripts/integration-postgres.mjs`: 24 files, 605 tests, none skipped.
+  The realtime budget config passed 2 of 2, and the Story 6.5 acceptance pair with `RUN_STORY65_ACCEPTANCE=true` and its own Redis passed retention cutoffs 2 of 2 and realtime load 1 of 1.
+  The Pact consumer passed 460 with provider verification green, and the E2E passed 5 of 5 on its own database in four runs of 36 to 73 seconds.
+  Lint at zero warnings and `tsc` were clean in `apps/api`, `pact` and `playwright` for every TEA file.
+  The six commits after `fb24cfd7`, through `87d7fb39`, came after these counts, and CI on the PR covers them.
+- **Seeded defects.**
+  All 21, S-1 to S-21, turn their named tests red and return to green on restore.
+  The first run left S-8, S-9 and S-10 green, and they turned red only after the tests were strengthened.
+  The record and the screenshots under `_bmad-output/test-artifacts/story-6-14/` are git-ignored local evidence.
+- **CodeRabbit skipped the PR, and a fable review stood in.**
+  Pass 1, a quick lens, raised 17 findings, and 11 were patched.
+  CodeRabbit skipped PR #198 at 128 files, over its limit of 100, so a fable review at high effort stood in as pass 2.
+  It raised 9 findings and 8 were patched.
+  F6, one PostHog call per grantee check, was rejected, because D2 rules out an in-process cache.
+  The owner waived the 100-file acceptance line for this PR.
+- **What runs after merge.**
+  `X-DISPATCH`: the backlog count, then `COMMUNITY_DISPATCH_ENABLED=true`, `COMMUNITY_ENGAGEMENT_OWNER=community` and `COMMUNITY_GUARD_DATABASE_URL` on the Northflank `couture-cast/community-worker`, the `ready` log and a non-grantee delivery that ends `suppressed` with zero attempts.
+  `X-PROD-GRANT`: the first production grant, for a test account, read back through `list`, then a revoke.
+  Until `X-DISPATCH` runs, the production push path is unproven, and push is proved only through the engagement harness and its forked worker.
+  No hosted database read-back of the 6.14 migration is recorded.
+- **Stated residuals.**
+  A store purchase by a grantee on a device: the server cannot refuse it, mobile hides the controls, and a client that ignores them can still buy.
+  The mobile complimentary state is proved by component tests only, and no Maestro flow or device run covers it.
+  The spec's manual real-stack check on web and mobile has no entry in the Execution record, and the E2E covers web in a real browser.
+  The E2E scans axe in dark only, because settings is a dark-only member surface.
+- **Known limits by design.**
+  Closing a community flag for an incident leaves it open for complimentary members, so the guide's incident rule also turns off `complimentary_access_enabled`.
+  That switch reaches community read, realtime and push only when each member's 60-second cache row expires.
+  With PostHog down, the fallback `FeatureFlag` row syncs every 5 minutes, and the guide gives the `UPDATE` for an immediate stop.
+  Every grantee check asks PostHog once for the kill switch, a cost D2 accepts.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Owner["owner: npm run access:complimentary"] -->|"env file, confirm-target, admin actor"| Op["ComplimentaryAccessOperatorService\nprivacy guards and member locks, sorted"]
+  Op --> Grant["ComplimentaryAccessGrant\none active row per member"]
+  Op --> Audit["AuditLog\nactor and grant id only"]
+  Op -->|"DELETE"| Cache["CommunityFlagEvaluation row"]
+  Seam["ComplimentaryAccessService.check\ngranted, not_granted, unavailable"] -->|"reads"| Grant
+  Seam -->|"only when granted"| Kill{"complimentary_access_enabled\nfixed system subject"}
+  Premium["hasPremiumAccess\npaid row first"] --> Seam
+  Flags["getFeatureFlag\nfive shortcut keys"] --> Seam
+  Refresh["community cache refresh"] --> Seam
+  Refresh -->|"grant true, or the remote answer"| Cache
+  Cache --> Reads["feed, realtime, push send guard"]
+  Checkout["createCheckoutSession"] -->|"granted 409, unavailable 503"| Seam
+  Route["GET /api/v1/commerce/premium/access"] --> Source["premiumAccessSource\na grant wins"]
+  Source --> Seam
+  Billing["webhook, refresh, reconciliation sweep"] --> PE["PremiumEntitlement"]
+  Erase["requestAccountErasure"] -->|"delete member grants, null operator ids"| Grant
 ```

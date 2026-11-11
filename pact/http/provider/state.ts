@@ -314,6 +314,29 @@ export function resetProviderSubscriptionState() {
 }
 
 /* --------------------------------------------------------------------------- *
+ * Story 6.14 premium access source provider states. The double answers the
+ * access route's source from this arrangement; which grant, kill switch or paid
+ * row produces it is proven in the API integration suites.
+ * --------------------------------------------------------------------------- */
+export type ProviderPremiumAccessScenario = 'complimentary' | 'none'
+
+let providerPremiumAccessState: { scenario: ProviderPremiumAccessScenario } | null = null
+
+export function configureProviderPremiumAccessState(state: {
+  scenario: ProviderPremiumAccessScenario
+}) {
+  providerPremiumAccessState = { scenario: state.scenario }
+}
+
+export function getProviderPremiumAccessState() {
+  return providerPremiumAccessState
+}
+
+export function resetProviderPremiumAccessState() {
+  providerPremiumAccessState = null
+}
+
+/* --------------------------------------------------------------------------- *
  * Story 5.3 premium theme switcher provider states.
  *
  * Same design as the 5.2 subscription states above: each scenario names an

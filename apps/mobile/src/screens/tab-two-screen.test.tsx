@@ -110,6 +110,9 @@ vi.mock('@/src/lib/commerce', () => ({
 // section only has to render deterministically.
 vi.mock('@/src/lib/premium', () => ({
   getSubscriptionFromMobile: getSubscriptionMock,
+  // Story 6.14: the access source; these suites cover members with no grant.
+  getPremiumAccessFromMobile: () => Promise.resolve({ premium: false, source: 'none' }),
+  isComplimentaryAccess: () => false,
   ensurePurchasesConfigured: ensurePurchasesConfiguredMock,
   ...premiumPassthroughMocks,
 }))

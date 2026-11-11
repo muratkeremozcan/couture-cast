@@ -344,7 +344,8 @@
         "active": "Premium, {{plan}} planıyla etkin. Geçerli dönem {{date}} tarihinde sona eriyor.",
         "gracePeriod": "Premium ek süre döneminde ({{plan}}). Geçerli dönem {{date}} tarihinde sona eriyor.",
         "expired": "Premium aboneliğinizin süresi doldu.",
-        "revoked": "Premium aboneliğiniz feshedildi."
+        "revoked": "Premium aboneliğiniz feshedildi.",
+        "complimentary": "CoutureCast'ten ücretsiz Premium erişimin var."
       },
       "planMonthly": "Aylık Premium",
       "planAnnual": "Yıllık Premium",
@@ -358,6 +359,7 @@
       "portalLagHint": "Webde yapılan abonelik değişikliklerinin burada görünmesi birkaç saat sürebilir.",
       "graceBanner": "Aboneliğinizde bir ödeme sorunu var. Premium'u korumak için mağazadaki ödeme yönteminizi güncelleyin.",
       "endedNote": "Aboneliğiniz sona erdi. Premium özelliklere yeniden kavuşmak için dilediğiniz zaman tekrar abone olun.",
+      "complimentaryNote": "Ayrıca ücretsiz Premium erişimin de var; bu abonelikle ne olursa olsun Premium açık kalır.",
       "errorLoad": "Abonelik durumunuz yüklenemedi. Lütfen tekrar deneyin.",
       "errorPurchase": "Satın alma tamamlanamadı. Lütfen tekrar deneyin.",
       "unavailableInBuild": "Bu uygulama sürümünde satın alma yapılamıyor. Abone olmak için CoutureCast'in App Store veya Play Store sürümünü kullanın.",

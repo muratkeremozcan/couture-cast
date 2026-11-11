@@ -15216,6 +15216,161 @@ export type PrecipPreparedness =
   (typeof PrecipPreparedness)[keyof typeof PrecipPreparedness]
 
 /**
+ * @type PremiumAccess
+ * Where premium access comes from. `premium` is true exactly when `source` is not `none`.
+ * @export
+ */
+export type PremiumAccess = PremiumAccessOneOf | PremiumAccessOneOf1 | PremiumAccessOneOf2
+/**
+ *
+ * @export
+ * @interface PremiumAccessOneOf
+ */
+export interface PremiumAccessOneOf {
+  /**
+   * True when the member passes the premium guard right now.
+   * @type {PremiumAccessOneOfPremiumEnum}
+   * @memberof PremiumAccessOneOf
+   */
+  premium: PremiumAccessOneOfPremiumEnum
+  /**
+   *
+   * @type {PremiumAccessOneOfSourceEnum}
+   * @memberof PremiumAccessOneOf
+   */
+  source: PremiumAccessOneOfSourceEnum
+}
+
+/**
+ * @export
+ */
+export const PremiumAccessOneOfPremiumEnum = {
+  true: true,
+} as const
+export type PremiumAccessOneOfPremiumEnum =
+  (typeof PremiumAccessOneOfPremiumEnum)[keyof typeof PremiumAccessOneOfPremiumEnum]
+
+/**
+ * @export
+ */
+export const PremiumAccessOneOfSourceEnum = {
+  subscription: 'subscription',
+} as const
+export type PremiumAccessOneOfSourceEnum =
+  (typeof PremiumAccessOneOfSourceEnum)[keyof typeof PremiumAccessOneOfSourceEnum]
+
+/**
+ *
+ * @export
+ * @interface PremiumAccessOneOf1
+ */
+export interface PremiumAccessOneOf1 {
+  /**
+   * True when the member passes the premium guard right now.
+   * @type {PremiumAccessOneOf1PremiumEnum}
+   * @memberof PremiumAccessOneOf1
+   */
+  premium: PremiumAccessOneOf1PremiumEnum
+  /**
+   *
+   * @type {PremiumAccessOneOf1SourceEnum}
+   * @memberof PremiumAccessOneOf1
+   */
+  source: PremiumAccessOneOf1SourceEnum
+}
+
+/**
+ * @export
+ */
+export const PremiumAccessOneOf1PremiumEnum = {
+  true: true,
+} as const
+export type PremiumAccessOneOf1PremiumEnum =
+  (typeof PremiumAccessOneOf1PremiumEnum)[keyof typeof PremiumAccessOneOf1PremiumEnum]
+
+/**
+ * @export
+ */
+export const PremiumAccessOneOf1SourceEnum = {
+  complimentary: 'complimentary',
+} as const
+export type PremiumAccessOneOf1SourceEnum =
+  (typeof PremiumAccessOneOf1SourceEnum)[keyof typeof PremiumAccessOneOf1SourceEnum]
+
+/**
+ *
+ * @export
+ * @interface PremiumAccessOneOf2
+ */
+export interface PremiumAccessOneOf2 {
+  /**
+   * True when the member passes the premium guard right now.
+   * @type {PremiumAccessOneOf2PremiumEnum}
+   * @memberof PremiumAccessOneOf2
+   */
+  premium: PremiumAccessOneOf2PremiumEnum
+  /**
+   *
+   * @type {PremiumAccessOneOf2SourceEnum}
+   * @memberof PremiumAccessOneOf2
+   */
+  source: PremiumAccessOneOf2SourceEnum
+}
+
+/**
+ * @export
+ */
+export const PremiumAccessOneOf2PremiumEnum = {
+  false: false,
+} as const
+export type PremiumAccessOneOf2PremiumEnum =
+  (typeof PremiumAccessOneOf2PremiumEnum)[keyof typeof PremiumAccessOneOf2PremiumEnum]
+
+/**
+ * @export
+ */
+export const PremiumAccessOneOf2SourceEnum = {
+  none: 'none',
+} as const
+export type PremiumAccessOneOf2SourceEnum =
+  (typeof PremiumAccessOneOf2SourceEnum)[keyof typeof PremiumAccessOneOf2SourceEnum]
+
+/**
+ *
+ * @export
+ * @interface PremiumAccessResponse
+ */
+export interface PremiumAccessResponse {
+  /**
+   *
+   * @type {PremiumAccessResponseData}
+   * @memberof PremiumAccessResponse
+   */
+  data: PremiumAccessResponseData
+}
+/**
+ * @type PremiumAccessResponseData
+ * Where premium access comes from. `premium` is true exactly when `source` is not `none`.
+ * @export
+ */
+export type PremiumAccessResponseData =
+  | PremiumAccessOneOf
+  | PremiumAccessOneOf1
+  | PremiumAccessOneOf2
+
+/**
+ *
+ * @export
+ */
+export const PremiumAccessSource = {
+  subscription: 'subscription',
+  complimentary: 'complimentary',
+  none: 'none',
+} as const
+export type PremiumAccessSource =
+  (typeof PremiumAccessSource)[keyof typeof PremiumAccessSource]
+
+/**
  *
  * @export
  * @interface PremiumTheme

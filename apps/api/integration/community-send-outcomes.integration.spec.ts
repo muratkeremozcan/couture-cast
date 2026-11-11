@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 owner (D7): each provider outcome settles the durable delivery exactly once,
 // and the guarded message names only what still survives at the final handoff.
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { PrismaClient } from '@prisma/client'
@@ -28,9 +29,13 @@ const db = isolatedCommunityDatabase()
 // file's limit has to outlast a fixture fanout plus three dispatches.
 vi.setConfig({ testTimeout: 90_000 })
 const prisma = new PrismaClient({ datasources: { db: { url: db.url } } })
-const flags = new CommunityFlagEvaluationService(prisma, {
-  getFeatureFlagValue: () => Promise.resolve(true),
-})
+const flags = new CommunityFlagEvaluationService(
+  prisma,
+  {
+    getFeatureFlagValue: () => Promise.resolve(true),
+  },
+  noComplimentaryGrants
+)
 type Message = Parameters<CommunityPushProvider['send']>[0]
 const sent: Message[] = []
 /** A provider double that records each invocation and answers with the given outcome. */
@@ -357,9 +362,13 @@ describe('provider outcomes', () => {
 describe('flag evaluation before the claim', () => {
   it('suppresses the delivery when the member can no longer read community', async () => {
     const { delivery } = await fixture()
-    const denied = new CommunityFlagEvaluationService(prisma, {
-      getFeatureFlagValue: () => Promise.resolve(false),
-    })
+    const denied = new CommunityFlagEvaluationService(
+      prisma,
+      {
+        getFeatureFlagValue: () => Promise.resolve(false),
+      },
+      noComplimentaryGrants
+    )
     await dispatched(new CommunitySendGuard(prisma, denied, provider(accepted)), delivery)
     expect(sent).toHaveLength(0)
     expect(await state(delivery.id)).toMatchObject({ status: 'suppressed' })

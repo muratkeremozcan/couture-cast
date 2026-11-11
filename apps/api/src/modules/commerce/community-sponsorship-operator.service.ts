@@ -15,6 +15,7 @@ import {
   type CommunitySponsorshipLinkReason,
 } from './community-sponsorship.constants.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { resolveOperatorAdmin } from './operator-actor.js'
 
 export type CommunitySponsorshipRefusalCode =
   | 'reason_invalid'
@@ -89,11 +90,6 @@ export type CommunitySponsorshipEndOutcome = {
 
 const linkReasonSchema = z.enum(COMMUNITY_SPONSORSHIP_LINK_REASONS)
 const endReasonSchema = z.enum(COMMUNITY_SPONSORSHIP_END_REASONS)
-
-const authUserRowSchema = z.object({
-  email: z.string().nullable(),
-  raw_app_meta_data: z.record(z.unknown()).nullable(),
-})
 
 /** Thrown inside a dry-run transaction so every read ran and nothing commits. */
 class DryRunRollback extends Error {}
@@ -315,56 +311,15 @@ async function databaseNow(tx: Tx): Promise<Date> {
 }
 
 /**
- * The acting owner, resolved in the same Postgres the command writes to.
- *
- * The Supabase auth user's `app_metadata.app_role` must be `admin`, the same
- * claim the API authorizes requests on. It maps to the app `User` through
- * `app_metadata.app_user_id`, or by email when that is absent, and the two
- * identities must name the same email. Any gap refuses.
+ * The acting owner, resolved by the shared operator helper with this command's own
+ * refusal codes, which stay byte-identical.
  */
-async function resolveAdminActor(tx: Tx, actorEmail: string): Promise<string> {
-  const email = actorEmail.trim().toLowerCase()
-  const rows = await tx.$queryRaw<unknown[]>(Prisma.sql`
-    SELECT email, raw_app_meta_data
-    FROM auth.users
-    WHERE lower(email) = ${email}
-  `)
-  if (rows.length !== 1) {
-    throw new CommunitySponsorshipRefusal(
-      'actor_auth_user_missing',
-      'No single auth user has that --actor-email.'
-    )
-  }
-  const authUser = authUserRowSchema.parse(rows[0])
-  const appMetadata = authUser.raw_app_meta_data ?? {}
-  if (appMetadata.app_role !== 'admin') {
-    throw new CommunitySponsorshipRefusal(
-      'actor_not_admin',
-      'The --actor-email auth user does not carry app_role admin.'
-    )
-  }
-
-  const appUserId =
-    typeof appMetadata.app_user_id === 'string' && appMetadata.app_user_id.trim()
-      ? appMetadata.app_user_id.trim()
-      : undefined
-  const appUser = await tx.user.findUnique({
-    where: appUserId ? { id: appUserId } : { email },
-    select: { id: true, email: true },
-  })
-  if (!appUser) {
-    throw new CommunitySponsorshipRefusal(
-      'actor_app_user_missing',
-      'The --actor-email auth user has no app user.'
-    )
-  }
-  if (appUser.email.toLowerCase() !== email) {
-    throw new CommunitySponsorshipRefusal(
-      'actor_identity_mismatch',
-      'The auth user and its app user name different emails.'
-    )
-  }
-  return appUser.id
+function resolveAdminActor(tx: Tx, actorEmail: string): Promise<string> {
+  return resolveOperatorAdmin(
+    tx,
+    actorEmail,
+    (code, message) => new CommunitySponsorshipRefusal(code, message)
+  )
 }
 
 /** The post must be publicly visible and written by an adult author. */

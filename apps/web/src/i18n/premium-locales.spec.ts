@@ -125,9 +125,12 @@ describe('5.2 premium locale parity (web)', () => {
   it('5.2-I18N-WEB-03 carries exactly the keys Decision 12a specifies for web', () => {
     expect([...reference.keys()].sort()).toEqual([
       'activating',
+      // Story 6.14 D6: the complimentary status, note and checkout refusal.
+      'complimentaryNote',
       'disclosure',
       'endedNote',
       'errorAlreadySubscribed',
+      'errorComplimentary',
       'errorLoad',
       'errorNoWebSubscription',
       'errorPurchase',
@@ -145,6 +148,7 @@ describe('5.2 premium locale parity (web)', () => {
       'sectionTitle',
       'signedOutHint',
       'status.active',
+      'status.complimentary',
       'status.expired',
       'status.gracePeriod',
       'status.none',

@@ -1,6 +1,7 @@
 import type { PremiumEntitlementService } from '../../../../apps/api/src/modules/commerce/premium-entitlement.service'
 import { NotFoundException } from '@nestjs/common'
 import {
+  getProviderPremiumAccessState,
   getProviderPaletteAdvisorState,
   getProviderPlannerState,
   getProviderPremiumThemeState,
@@ -38,6 +39,12 @@ export function createPremiumEntitlementDouble() {
         return Promise.resolve(plannerState.scenario !== 'not-entitled')
       }
       throw new NotFoundException('PREMIUM_ENTITLEMENT_STATE_NOT_CONFIGURED')
+    },
+    // Story 6.14: the access route's source. Unconfigured is a wiring mistake, as above.
+    premiumAccessSource: () => {
+      const accessState = getProviderPremiumAccessState()
+      if (!accessState) throw new NotFoundException('PREMIUM_ACCESS_STATE_NOT_CONFIGURED')
+      return Promise.resolve(accessState.scenario)
     },
   } as unknown as PremiumEntitlementService
 

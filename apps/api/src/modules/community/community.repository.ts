@@ -653,6 +653,18 @@ export class CommunityRepository {
       }
 
       await removeMemberFromModerationRecords(tx, userId)
+      // Story 6.14 D8: the member's grants, with their reasons, go at request time. An erased
+      // operator leaves no identity on other members' grants (TEA-11). Audit rows already hold
+      // only the actor and the grant id.
+      await tx.complimentaryAccessGrant.deleteMany({ where: { member_id: userId } })
+      await tx.complimentaryAccessGrant.updateMany({
+        where: { granted_by_id: userId },
+        data: { granted_by_id: null },
+      })
+      await tx.complimentaryAccessGrant.updateMany({
+        where: { revoked_by_id: userId },
+        data: { revoked_by_id: null },
+      })
       await eraseCommunityComments(tx, userId)
       await tx.communityReaction.deleteMany({ where: { user_id: userId } })
       await tx.communityReactionReceipt.deleteMany({ where: { user_id: userId } })

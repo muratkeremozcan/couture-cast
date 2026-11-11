@@ -32,6 +32,7 @@ import {
   configureProviderOnboardingState,
   configureProviderSilhouetteState,
   configureProviderSubscriptionState,
+  configureProviderPremiumAccessState,
   configureProviderPremiumThemeState,
   configureProviderPaletteAdvisorState,
   configureProviderPlannerState,
@@ -700,6 +701,15 @@ export const stateHandlers: StateHandlers = {
     return Promise.resolve({
       description: `Configured an active premium entitlement via ${store ?? 'stripe'}`,
     })
+  },
+  // Story 6.14: the premium access source a client renders settings from.
+  'The user has complimentary premium access': () => {
+    configureProviderPremiumAccessState({ scenario: 'complimentary' })
+    return Promise.resolve({ description: 'Configured complimentary premium access' })
+  },
+  'The user has no premium access': () => {
+    configureProviderPremiumAccessState({ scenario: 'none' })
+    return Promise.resolve({ description: 'Configured a member without premium access' })
   },
   'The user has no premium entitlement': (parameters?: unknown) => {
     const { userId } = (parameters ?? {}) as SubscriptionStateParams

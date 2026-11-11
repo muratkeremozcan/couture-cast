@@ -298,6 +298,83 @@ jobs:
           include-hidden-files: true
           retention-days: 5
 
+  # Story 6.14 TEA-15: the complimentary access spec turns every member flag off
+  # globally, so it runs here against a database scripts/e2e-complimentary/run.mjs
+  # owns (tea_cc614_e2e_<32 hex>), with the API on 4079 and the web on 3079, and
+  # never inside the sharded suite above, which seeds those flags true.
+  complimentary-access-e2e:
+    name: Complimentary access E2E
+    needs: [vars, burn-in]
+    # Same gate as pw-e2e, so the lanes run on the same commits.
+    if: |
+      always() && (
+        github.event_name != 'pull_request' ||
+        needs.vars.outputs.SKIP_BURN_IN == 'true' ||
+        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
+        (needs.burn-in.result == 'skipped')
+      )
+    # Measured locally: about 66 s for the runner with built packages. Estimated in
+    # CI: about 3 min install and browsers, the Supabase start budget (600 s), about
+    # 3 min for the API and web builds, under 2 min for the five tests.
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      # Source server for the owned database. The run creates and drops its own
+      # database there; Storage keeps its buckets in this one, for the posted look.
+      COMPLIMENTARY_E2E_SOURCE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Reserve the local Supabase host ports
+        uses: ./.github/actions/reserve-supabase-ports
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: ${{ needs.vars.outputs.install_command }}
+
+      - name: Cache Playwright browsers
+        uses: ./.github/actions/setup-playwright-browsers
+
+      - name: Start local Supabase services
+        uses: ./.github/actions/start-local-supabase
+
+      - name: Install Playwright Chromium only
+        run: npx playwright install chromium
+
+      - name: Run the complimentary access spec on its own database
+        run: npm run test:pw-complimentary
+
+      - name: Check complimentary artifacts for secret values
+        id: secret_scan
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-artifact-secrets.mjs --names GH_TOKEN playwright/artifacts
+
+      - name: Upload complimentary artifacts
+        # Only artifacts that passed the secret scan leave the runner.
+        if: always() && steps.secret_scan.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: complimentary-access-e2e
+          path: playwright/artifacts
+          retention-days: 5
+
   merge-reports:
     needs: [vars, burn-in, pw-e2e]
     if: ${{ always() }}

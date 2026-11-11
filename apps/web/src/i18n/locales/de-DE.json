@@ -26,7 +26,8 @@
         "active": "Premium ist aktiv: {{plan}}. Der aktuelle Zeitraum endet am {{date}}.",
         "gracePeriod": "Premium ist aktiv, aber es gibt ein Zahlungsproblem.",
         "expired": "Dein Premium-Abonnement ist abgelaufen.",
-        "revoked": "Dein Premium-Abonnement wurde widerrufen."
+        "revoked": "Dein Premium-Abonnement wurde widerrufen.",
+        "complimentary": "Du hast kostenlosen Premium-Zugang von CoutureCast."
       },
       "planMonthly": "Premium monatlich",
       "planAnnual": "Premium jährlich",
@@ -40,9 +41,11 @@
       "portalLagHint": "Änderungen im Abrechnungsportal, insbesondere Kündigungen, können ein paar Stunden brauchen, bis sie hier erscheinen.",
       "graceBanner": "Es gibt ein Problem mit deiner Zahlungsmethode. Aktualisiere sie im Store oder Abrechnungsportal deines Abonnements, um Premium zu behalten.",
       "endedNote": "Dein Abonnement ist beendet. Du kannst jederzeit wieder abonnieren.",
+      "complimentaryNote": "Du hast außerdem kostenlosen Premium-Zugang, daher bleibt Premium aktiv, egal was mit diesem Abo passiert.",
       "errorLoad": "Abostatus konnte nicht geladen werden.",
       "errorPurchase": "Checkout konnte nicht gestartet werden. Bitte versuche es erneut.",
       "errorAlreadySubscribed": "Du hast bereits ein aktives Premium-Abo. Lade diese Seite neu, um es zu sehen.",
+      "errorComplimentary": "Dieses Konto hat bereits kostenlosen Premium-Zugang, es gibt also nichts zu kaufen.",
       "errorNoWebSubscription": "Für dieses Konto gibt es kein Web-Abo zum Verwalten.",
       "errorSubscribeDisabled": "Neue Premium-Abos sind derzeit pausiert. Bitte versuche es in Kürze erneut.",
       "signedOutHint": "Melde dich an, um Premium zu abonnieren oder zu verwalten",

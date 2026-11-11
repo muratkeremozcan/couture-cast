@@ -4,6 +4,7 @@ Updated: 2026-07-17 - Brownfield deep scan of deployment and operational configu
 Updated: 2026-10-16 (Story 6.2b): community worker container, canary, restart drill and rollback.
 Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, SLA sweep rollout.
 Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, retention and account erasure.
+Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -960,7 +961,7 @@ The erasure extension has no flag, because it is a privacy duty on the establish
 Production community rollout remains frozen. `COMMUNITY_DISPATCH_ENABLED` defaults off.
 When an isolated approved lane enables it, `COMMUNITY_ENGAGEMENT_OWNER` must select
 `general` or `community`. The selected composition alone allocates the dedicated guard pool
-with36 connections and32 send slots. The general-only deployment selects `general`; the
+with 36 connections and 32 send slots. The general-only deployment selects `general`; the
 standalone community composition selects `community`. Other compositions report `standby`.
 These configured limits require the story's actual capacity and timing evidence before use.
 
@@ -980,3 +981,71 @@ owner and existing primary's measured capabilities, then restart the assigned pr
 configuration is corrected. This startup preflight does not automatically enable dispatch later.
 No guard/pool/privacy limit may be weakened to clear readiness. Preserve original overdue work
 and eligibility clocks for the required recovery proof; a readiness log establishes no acceptance.
+
+## Story 6.14 complimentary access
+
+The owner can give a chosen member every premium capability and the community rollout without
+payment. A grant lives in `ComplimentaryAccessGrant`, beside the RevenueCat mirror. Webhooks,
+refresh and the reconciliation sweep never read or write it, so they cannot expire, overwrite
+or bill it.
+
+**Grant, revoke and list.** Only the owner can run these: they need the production database
+credentials and an admin actor.
+
+```sh
+npm run access:complimentary -- grant --env-file .env.prod --confirm-target <project ref> \
+  --actor-email <admin email> --member-email <member email> --reason "<why>"
+npm run access:complimentary -- revoke --env-file .env.prod --confirm-target <project ref> \
+  --actor-email <admin email> --member-email <member email> --reason "<why>"
+npm run access:complimentary -- list --env-file .env.prod --confirm-target <project ref> \
+  --actor-email <admin email>
+```
+
+`--dry-run` runs every check and writes nothing. The actor must be an auth user whose
+`app_metadata.app_role` is `admin`, with no pending erasure request. Each grant and revoke
+writes one `AuditLog` row, `complimentary_access_granted` or `complimentary_access_revoked`,
+holding the actor and the grant id only. The member, reason and times live on the grant row,
+which account erasure deletes. A revoke takes effect on the member's next request, and the paid
+or free state they had before is what they get.
+
+**What a grant opens.** Premium (themes, palette advisor, planner) and these flags, for that
+member only: `premium_themes_enabled`, `color_analysis_enabled`, `premium_planner_enabled`,
+`community_read_enabled`, `community_write_enabled`, `share_card_native_share_enabled`. Age,
+guardian consent, sanctions, erasure and screening still apply. Web checkout refuses a grantee
+with 409. Mobile hides purchase controls for a grantee and never configures RevenueCat for
+them; a store purchase made through another client cannot be refused by the server.
+
+**Kill switch.** `complimentary_access_enabled` defaults on, because it can only widen access
+for members the owner granted. It is evaluated for the fixed subject
+`complimentary-access-kill-switch`. Off removes every complimentary effect: premium and five
+flags on the next request, community read, realtime and push once each member's 60-second
+cache row expires. Closing a community flag for an incident does not close it for
+complimentary members, so also turn the switch off:
+
+1. In PostHog, create or edit the boolean flag `complimentary_access_enabled` and set it to
+   false for everyone. This holds within 60 seconds while PostHog answers.
+2. When PostHog is slow or down, the API falls back to the `feature_flags` row, which the flag
+   sync refreshes every 5 minutes. For an immediate stop, also set the row. The row may not
+   exist before the first sync, so the statement upserts it:
+
+   ```sql
+   INSERT INTO feature_flags (key, value, updated_at)
+   VALUES ('complimentary_access_enabled', to_jsonb(false), now())
+   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now();
+   ```
+
+   A PostHog flag still set to true overwrites the row on the next sync, so do step 1 too.
+
+**Push.** Push reaches a grantee only when the hosted community worker dispatches. Enable it on
+the Northflank `couture-cast/community-worker` service:
+
+1. Before the change, record a read-only count of pending `CommunityTokenDelivery` rows by
+   status and expiry, so any backlog the switch would release is known.
+2. Set `COMMUNITY_DISPATCH_ENABLED=true`, `COMMUNITY_ENGAGEMENT_OWNER=community` and
+   `COMMUNITY_GUARD_DATABASE_URL` (same primary as `DATABASE_URL`), then restart.
+3. Confirm `community_dispatch_readiness` logs `ready`.
+4. Confirm a non-grantee's delivery ends `suppressed` with zero attempts. Every other member's
+   `community_read_enabled` is false in production, so dispatch suppresses them before any
+   attempt; `no_call:read_disabled` appears only when the in-transaction recheck flips.
+5. If readiness is not `ready`, set `COMMUNITY_DISPATCH_ENABLED` back off, fix the cause and
+   record the outcome here. No credential value is printed in logs or committed.

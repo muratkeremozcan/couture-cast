@@ -168,6 +168,7 @@ export {
   billingWebhookResponseSchema,
   COMMERCE_SUBSCRIPTION_DISABLED_MESSAGE,
   SUBSCRIPTION_ALREADY_ACTIVE_MESSAGE,
+  COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE,
   SUBSCRIPTION_NOT_FOUND_MESSAGE,
   SUBSCRIPTION_NOT_WEB_MANAGED_MESSAGE,
   SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE,
@@ -186,6 +187,13 @@ export {
   // PREMIUM_REQUIRED_MESSAGE is re-exported once, by the 5.2 block: it is the
   // guard's own 403 message and this story's PUT reuses it rather than
   // redefining a second copy.
+  // Story 6.14 premium access source. Same hand-maintained rule as above.
+  premiumAccessSourceSchema,
+  premiumAccessSchema,
+  premiumAccessResponseSchema,
+  type PremiumAccessSource,
+  type PremiumAccess,
+  type PremiumAccessResponse,
   premiumThemeKeySchema,
   premiumThemeSchema,
   premiumThemeResponseSchema,

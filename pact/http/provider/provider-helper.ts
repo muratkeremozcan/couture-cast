@@ -89,6 +89,7 @@ import { CommerceCacheHeadersMiddleware } from '../../../apps/api/src/modules/co
 import { CommercePreferencesController } from '../../../apps/api/src/modules/commerce/commerce-preferences.controller'
 import { CommercePreferencesService } from '../../../apps/api/src/modules/commerce/commerce-preferences.service'
 import { SubscriptionController } from '../../../apps/api/src/modules/commerce/subscription.controller'
+import { PremiumAccessController } from '../../../apps/api/src/modules/commerce/premium-access.controller'
 import { SubscriptionService } from '../../../apps/api/src/modules/commerce/subscription.service'
 import { StripeBillingService } from '../../../apps/api/src/modules/commerce/stripe-billing.service'
 import { PremiumThemeController } from '../../../apps/api/src/modules/commerce/premium-theme.controller'
@@ -142,6 +143,7 @@ import {
   resetProviderPremiumThemeState,
   resetProviderSilhouetteState,
   resetProviderSubscriptionState,
+  resetProviderPremiumAccessState,
   resetProviderWardrobeState,
 } from './state'
 
@@ -183,6 +185,7 @@ export function resetProviderState() {
   resetProviderCapsuleState()
   resetProviderCommerceState()
   resetProviderSubscriptionState()
+  resetProviderPremiumAccessState()
   resetProviderPremiumThemeState()
   resetProviderPaletteAdvisorState()
   resetProviderPlannerState()
@@ -310,6 +313,7 @@ export async function startLocalPactProvider({
       AffiliateClickController,
       AffiliateWebhookController,
       SubscriptionController,
+      PremiumAccessController,
       PremiumThemeController,
       PaletteAdvisorController,
       PlannerController,

@@ -28,7 +28,10 @@ const remote = {
     return (await response.json()).value
   },
 }
-const service = new CommunityFlagEvaluationService(prisma, remote)
+const service = new CommunityFlagEvaluationService(prisma, remote, {
+  isActive: () => Promise.resolve(false),
+  check: () => Promise.resolve('not_granted'),
+})
 await prisma.$queryRaw`SELECT 1`
 process.send?.({ event: 'ready', value: { pid: process.pid } })
 process.on('message', async ({ id, op, args }) => {

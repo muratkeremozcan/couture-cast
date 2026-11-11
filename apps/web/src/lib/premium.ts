@@ -9,8 +9,11 @@
 
 import {
   checkoutSessionResponseSchema,
+  COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE,
   portalSessionResponseSchema,
+  premiumAccessResponseSchema,
   subscriptionResponseSchema,
+  type PremiumAccess,
   type Subscription,
   type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
@@ -48,6 +51,7 @@ export { hasWebSession } from './commerce'
 export type PremiumFailureReason =
   | 'signed_out'
   | 'already_subscribed'
+  | 'complimentary_access'
   | 'store_managed'
   | 'no_web_subscription'
   | 'subscribe_disabled'
@@ -126,11 +130,14 @@ async function premiumError(
   }
   if (error instanceof ResponseError) {
     const status = error.response.status
-    const reason = statusReasons[status] ?? SHARED_REASONS[status] ?? 'unknown'
-    return new PremiumRequestError(
-      reason,
-      await readServerMessage(error.response, fallback)
-    )
+    const message = await readServerMessage(error.response, fallback)
+    // Story 6.14: checkout's 409 carries two meanings, told apart by the server's own
+    // constant, so a complimentary member never reads "already subscribed".
+    const reason =
+      status === 409 && message === COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE
+        ? 'complimentary_access'
+        : (statusReasons[status] ?? SHARED_REASONS[status] ?? 'unknown')
+    return new PremiumRequestError(reason, message)
   }
   // Anything else is a transport failure, an abort, or a contract-parse failure.
   // The message those carry is the useful one for a log; the reason stays
@@ -173,6 +180,24 @@ export async function getSubscriptionFromWeb(
   } catch (error: unknown) {
     // Developer-facing. The section renders `commerce.premium.errorLoad`.
     throw await premiumError(error, 'Unable to load subscription status.')
+  }
+}
+
+/**
+ * Story 6.14 D6: whether the member has premium and where it comes from. Read beside the
+ * subscription, whose contract stays frozen for installed clients.
+ */
+export async function getPremiumAccessFromWeb(
+  signal?: AbortSignal
+): Promise<PremiumAccess> {
+  const accessToken = readAccessToken()
+  try {
+    const response = await createWebApiClient({
+      accessToken,
+    }).apiV1CommercePremiumAccessGet({ signal })
+    return premiumAccessResponseSchema.parse(response).data
+  } catch (error: unknown) {
+    throw await premiumError(error, 'Unable to load premium access.')
   }
 }
 

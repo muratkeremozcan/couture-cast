@@ -38,6 +38,7 @@ import { RevenueCatClient, resolveRevenueCatClient } from './revenuecat-client.j
 import { StripeBillingClient, resolveStripeClient } from './stripe-client.js'
 import { StripeBillingService } from './stripe-billing.service.js'
 import { SubscriptionController } from './subscription.controller.js'
+import { PremiumAccessController } from './premium-access.controller.js'
 import { SubscriptionService } from './subscription.service.js'
 
 /**
@@ -85,6 +86,8 @@ import { SubscriptionService } from './subscription.service.js'
     // top-level /api/v1/premium namespace would sit outside that binding and
     // ship a per-user response with no Cache-Control at all.
     PremiumThemeController,
+    // Story 6.14: the premium access source read, under the same commerce prefix.
+    PremiumAccessController,
     // No @UseGuards on this one either: machine-to-machine, authenticated by
     // the provider credential over the raw request body.
     BillingWebhookController,

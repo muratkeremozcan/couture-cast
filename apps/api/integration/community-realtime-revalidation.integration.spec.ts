@@ -14,6 +14,7 @@
 // answers in 150 ms, as a PostHog /flags call does. Before the instance gated each
 // transaction by deadline and stopped flushing cache writes, 20 to 25 connected.
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import type { AddressInfo } from 'node:net'
 import { monitorEventLoopDelay, performance } from 'node:perf_hooks'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -250,7 +251,8 @@ async function connectTogether(
     new FeatureFlagsService(
       new FeatureFlagsRepository(observedPool),
       remote,
-      new CommunityFlagEvaluationService(observedPool, remote)
+      new CommunityFlagEvaluationService(observedPool, remote, noComplimentaryGrants),
+      noComplimentaryGrants
     )
   )
   const runtime = createCommunityRealtimeServer(() =>

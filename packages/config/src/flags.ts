@@ -171,6 +171,17 @@ const FEATURE_FLAG_DEFINITIONS = {
     kind: 'boolean',
     defaultValue: false,
   },
+  // Story 6.14: the kill switch for complimentary full access. It defaults TRUE, the one
+  // deliberate exception to the defaults-false rule above besides weather alerts: it can only
+  // widen access for members the owner granted through the operator command, so a degraded
+  // PostHog that answers true harms nobody, and default true lets a grant work in production
+  // with no flag flip. It is evaluated for one system subject, never a member. Off removes every
+  // complimentary effect: premium and the five shortcut flags on the next request, community
+  // read, realtime and push once the member's 60-second cache row expires.
+  complimentary_access_enabled: {
+    kind: 'boolean',
+    defaultValue: true,
+  },
 } as const satisfies Record<string, FeatureFlagDefinition<FeatureFlagStoredValue>>
 
 export type FeatureFlagKey = keyof typeof FEATURE_FLAG_DEFINITIONS
@@ -196,6 +207,29 @@ export type FeatureFlagAdapters = {
 export const FEATURE_FLAG_KEYS = Object.freeze(
   Object.keys(FEATURE_FLAG_DEFINITIONS) as FeatureFlagKey[]
 )
+
+/**
+ * Story 6.14 D4: the flags a member with an active complimentary grant receives as true,
+ * whatever PostHog or the fallback row says. Premium capabilities (5.3, 5.4, 5.5) and the
+ * community rollout (6.1, 6.5 push through the read grant, 6.9 sharing). Purchasing,
+ * affiliate revenue and every operator flag are deliberately absent.
+ */
+export const COMPLIMENTARY_MEMBER_FLAGS = Object.freeze([
+  'premium_themes_enabled',
+  'color_analysis_enabled',
+  'premium_planner_enabled',
+  'community_read_enabled',
+  'community_write_enabled',
+  'share_card_native_share_enabled',
+] as const satisfies readonly FeatureFlagKey[])
+
+export type ComplimentaryMemberFlag = (typeof COMPLIMENTARY_MEMBER_FLAGS)[number]
+
+export function isComplimentaryMemberFlag(
+  key: FeatureFlagKey
+): key is ComplimentaryMemberFlag {
+  return (COMPLIMENTARY_MEMBER_FLAGS as readonly FeatureFlagKey[]).includes(key)
+}
 
 export const FEATURE_FLAG_SYNC_DISTINCT_ID = 'feature-flags-fallback-sync'
 

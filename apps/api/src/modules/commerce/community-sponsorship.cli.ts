@@ -1,8 +1,14 @@
 // Story 6.7b operator owner: targeting, actor resolution and refusals in `apps/api/src/modules/commerce/community-sponsorship.cli.ts`, with closed codes in `apps/api/src/modules/commerce/community-sponsorship.constants.ts`
 import { readFileSync } from 'node:fs'
-import { parseArgs, parseEnv } from 'node:util'
+import { parseArgs } from 'node:util'
 import type { PrismaClient } from '@prisma/client'
 import { createPrismaClient } from '../../prisma/prisma-client.js'
+import {
+  OperatorTargetRefusal as SponsorshipTargetRefusal,
+  readOperatorDatabaseUrl,
+  resolveOperatorTarget as resolveSponsorshipTarget,
+  type OperatorTarget as SponsorshipTarget,
+} from './operator-cli-target.js'
 import {
   CommunitySponsorshipOperatorService,
   CommunitySponsorshipRefusal,
@@ -38,53 +44,11 @@ export const EXIT_OK = 0
 export const EXIT_REFUSED = 1
 export const EXIT_USAGE = 2
 
-const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
-
-export type SponsorshipTarget =
-  | { readonly kind: 'local' }
-  | { readonly kind: 'remote'; readonly ref: string }
-
-export class SponsorshipTargetRefusal extends Error {
-  constructor(message: string) {
-    super(message)
-    this.name = 'SponsorshipTargetRefusal'
-  }
-}
-
-/**
- * Decides whether this command may write to `databaseUrl`. Node's `URL`
- * reports an IPv6 loopback host as `[::1]`, so brackets are removed before
- * the loopback check.
- */
-export function resolveSponsorshipTarget(
-  databaseUrl: string,
-  confirmTarget: string | undefined
-): SponsorshipTarget {
-  let url: URL
-  try {
-    url = new URL(databaseUrl)
-  } catch {
-    throw new SponsorshipTargetRefusal('DATABASE_URL in --env-file is not a valid URL.')
-  }
-
-  const host = url.hostname.replace(/^\[(.*)\]$/, '$1').toLowerCase()
-  if (LOOPBACK_HOSTS.has(host)) return { kind: 'local' }
-
-  const ref =
-    /^postgres\.([a-z0-9]+)$/.exec(decodeURIComponent(url.username))?.[1] ??
-    /^db\.([a-z0-9]+)\.supabase\.co$/.exec(host)?.[1]
-  if (!ref) {
-    throw new SponsorshipTargetRefusal(
-      'DATABASE_URL points at a remote host whose project ref cannot be parsed; refusing.'
-    )
-  }
-  if (confirmTarget !== ref) {
-    throw new SponsorshipTargetRefusal(
-      `DATABASE_URL targets remote project ${ref}; pass --confirm-target ${ref} to write to it.`
-    )
-  }
-  return { kind: 'remote', ref }
-}
+export {
+  OperatorTargetRefusal as SponsorshipTargetRefusal,
+  resolveOperatorTarget as resolveSponsorshipTarget,
+  type OperatorTarget as SponsorshipTarget,
+} from './operator-cli-target.js'
 
 export type CommunitySponsorshipCliDeps = {
   readonly stdout: (line: string) => void
@@ -203,8 +167,7 @@ function loadDatabaseUrl(deps: CommunitySponsorshipCliDeps, envFile: string): st
   } catch {
     throw new UsageError(`--env-file ${envFile} cannot be read.`)
   }
-  const value: unknown = new Map(Object.entries(parseEnv(contents))).get('DATABASE_URL')
-  const databaseUrl = typeof value === 'string' ? value.trim() : undefined
+  const databaseUrl = readOperatorDatabaseUrl(contents)
   if (!databaseUrl) throw new UsageError(`--env-file ${envFile} has no DATABASE_URL.`)
   return databaseUrl
 }

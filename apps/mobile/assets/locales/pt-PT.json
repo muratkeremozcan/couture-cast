@@ -344,7 +344,8 @@
         "active": "O Premium está ativo no plano {{plan}}. O período atual termina a {{date}}.",
         "gracePeriod": "O Premium está em período de tolerância ({{plan}}). O período atual termina a {{date}}.",
         "expired": "A sua subscrição Premium expirou.",
-        "revoked": "A sua subscrição Premium foi revogada."
+        "revoked": "A sua subscrição Premium foi revogada.",
+        "complimentary": "Tem acesso Premium de cortesia da CoutureCast."
       },
       "planMonthly": "Premium mensal",
       "planAnnual": "Premium anual",
@@ -358,6 +359,7 @@
       "portalLagHint": "As alterações de subscrição feitas na web podem demorar algumas horas a aparecer aqui.",
       "graceBanner": "Existe um problema de pagamento com a sua subscrição. Atualize o método de pagamento na loja para manter o Premium.",
       "endedNote": "A sua subscrição terminou. Subscreva novamente quando quiser para recuperar as funcionalidades Premium.",
+      "complimentaryNote": "Também tem acesso Premium de cortesia, por isso o Premium continua ativo aconteça o que acontecer a esta subscrição.",
       "errorLoad": "Não foi possível carregar o estado da subscrição. Tente novamente.",
       "errorPurchase": "Não foi possível concluir a compra. Tente novamente.",
       "unavailableInBuild": "As compras não estão disponíveis nesta versão da aplicação. Use a versão da App Store ou da Play Store do CoutureCast para subscrever.",

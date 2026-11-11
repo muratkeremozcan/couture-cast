@@ -1,6 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
@@ -30,9 +31,13 @@ import { PushTokenRepository } from '../src/modules/notifications/push-token.rep
 
 const db = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: db.url } } })
-const flags = new CommunityFlagEvaluationService(prisma, {
-  getFeatureFlagValue: () => Promise.resolve(true),
-})
+const flags = new CommunityFlagEvaluationService(
+  prisma,
+  {
+    getFeatureFlagValue: () => Promise.resolve(true),
+  },
+  noComplimentaryGrants
+)
 let server: Server
 let endpoint: string
 let mode: 'accepted' | 'ambiguous' = 'accepted'

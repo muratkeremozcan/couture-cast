@@ -1,6 +1,7 @@
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 import 'reflect-metadata'
+import { noComplimentaryGrants } from './helpers/no-complimentary-grants.js'
 import { randomUUID } from 'node:crypto'
 import type { AddressInfo } from 'node:net'
 import { PrismaClient } from '@prisma/client'
@@ -34,7 +35,8 @@ const access = new CommunityAccessService(
   new FeatureFlagsService(
     new FeatureFlagsRepository(prisma),
     remote,
-    new CommunityFlagEvaluationService(prisma, remote)
+    new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants),
+    noComplimentaryGrants
   )
 )
 const sockets: Socket[] = []
@@ -293,7 +295,8 @@ describe('Story 6.5 real local websocket-only transport with isolated fixture au
       new FeatureFlagsService(
         new FeatureFlagsRepository(prisma),
         remote,
-        new CommunityFlagEvaluationService(prisma, remote)
+        new CommunityFlagEvaluationService(prisma, remote, noComplimentaryGrants),
+        noComplimentaryGrants
       )
     )
     const starts: number[] = []

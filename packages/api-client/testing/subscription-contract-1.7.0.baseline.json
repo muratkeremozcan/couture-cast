@@ -1,0 +1,227 @@
+{
+  "source": "main at 63bd6fcd, OpenAPI 1.7.0, before story 6.14",
+  "schemas": {
+    "SubscriptionPlan": {
+      "type": "string",
+      "enum": ["premium_monthly", "premium_annual"]
+    },
+    "SubscriptionStatus": {
+      "type": "string",
+      "enum": ["none", "active", "grace_period", "expired", "revoked"]
+    },
+    "Subscription": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["none"]
+            },
+            "store": {
+              "type": "null"
+            },
+            "productId": {
+              "type": "null"
+            },
+            "willRenew": {
+              "type": "null"
+            },
+            "currentPeriodEnd": {
+              "type": "null"
+            },
+            "syncedAt": {
+              "type": "null"
+            },
+            "purchasesEnabled": {
+              "type": "boolean",
+              "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+            }
+          },
+          "required": [
+            "status",
+            "store",
+            "productId",
+            "willRenew",
+            "currentPeriodEnd",
+            "syncedAt",
+            "purchasesEnabled"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": ["active", "grace_period", "expired", "revoked"]
+            },
+            "store": {
+              "type": "string",
+              "enum": ["app_store", "play_store", "stripe", "promotional"]
+            },
+            "productId": {
+              "type": "string",
+              "minLength": 1,
+              "description": "The provisioned product id, e.g. premium_monthly. Deliberately not the plan enum: the operator can add products without a contract change."
+            },
+            "willRenew": {
+              "type": "boolean",
+              "description": "False after a cancellation while status stays active: the user keeps what they paid for until currentPeriodEnd."
+            },
+            "currentPeriodEnd": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "syncedAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "Last successful sync from the entitlement ledger. Lets a client tell fresh state from a rate-limited refresh that served local state."
+            },
+            "purchasesEnabled": {
+              "type": "boolean",
+              "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+            }
+          },
+          "required": [
+            "status",
+            "store",
+            "productId",
+            "willRenew",
+            "currentPeriodEnd",
+            "syncedAt",
+            "purchasesEnabled"
+          ],
+          "additionalProperties": false
+        }
+      ],
+      "description": "One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them."
+    },
+    "SubscriptionResponse": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["none"]
+                },
+                "store": {
+                  "type": "null"
+                },
+                "productId": {
+                  "type": "null"
+                },
+                "willRenew": {
+                  "type": "null"
+                },
+                "currentPeriodEnd": {
+                  "type": "null"
+                },
+                "syncedAt": {
+                  "type": "null"
+                },
+                "purchasesEnabled": {
+                  "type": "boolean",
+                  "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+                }
+              },
+              "required": [
+                "status",
+                "store",
+                "productId",
+                "willRenew",
+                "currentPeriodEnd",
+                "syncedAt",
+                "purchasesEnabled"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "type": "string",
+                  "enum": ["active", "grace_period", "expired", "revoked"]
+                },
+                "store": {
+                  "type": "string",
+                  "enum": ["app_store", "play_store", "stripe", "promotional"]
+                },
+                "productId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "The provisioned product id, e.g. premium_monthly. Deliberately not the plan enum: the operator can add products without a contract change."
+                },
+                "willRenew": {
+                  "type": "boolean",
+                  "description": "False after a cancellation while status stays active: the user keeps what they paid for until currentPeriodEnd."
+                },
+                "currentPeriodEnd": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "syncedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Last successful sync from the entitlement ledger. Lets a client tell fresh state from a rate-limited refresh that served local state."
+                },
+                "purchasesEnabled": {
+                  "type": "boolean",
+                  "description": "Server-evaluated commerce_subscription_enabled flag. The only flag exposure path: clients render subscribe controls only when true. Status, refresh, and portal stay available regardless."
+                }
+              },
+              "required": [
+                "status",
+                "store",
+                "productId",
+                "willRenew",
+                "currentPeriodEnd",
+                "syncedAt",
+                "purchasesEnabled"
+              ],
+              "additionalProperties": false
+            }
+          ],
+          "description": "One variant per subscription presence. The correlations between status and the entitlement fields are expressed by the variants themselves: a `none` response carries null entitlement fields with the keys still serialized, and an entitled response always carries all of them."
+        }
+      },
+      "required": ["data"]
+    }
+  },
+  "statusResponses": {
+    "200": {
+      "description": "Subscription state retrieved (status \"none\" when never subscribed)",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/SubscriptionResponse"
+          }
+        }
+      }
+    },
+    "401": {
+      "description": "Missing or invalid authentication headers",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/UnauthorizedHttpError"
+          }
+        }
+      }
+    },
+    "500": {
+      "description": "Internal server error occurred",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/InternalServerErrorHttpError"
+          }
+        }
+      }
+    }
+  }
+}

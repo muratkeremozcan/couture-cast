@@ -378,7 +378,8 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
     const onBannedChange = vi.fn()
     renderGrid({ onBannedChange })
     await screen.findByTestId('community-banned-notice')
-    expect(onBannedChange).toHaveBeenLastCalledWith(true)
+    // The grid reports the ban from an effect after commit, which can trail the notice's paint.
+    await waitFor(() => expect(onBannedChange).toHaveBeenLastCalledWith(true))
     const reads = state.reads
     expect(screen.queryByTestId('community-filter-all')).toBeNull()
     expect(screen.queryByRole('link', { name: 'Community notifications' })).toBeNull()
@@ -437,7 +438,8 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       await screen.findByTestId('community-banned-notice')
       expect(notice()).toHaveTextContent(longDate('en-US'))
       expect(notice()).toHaveTextContent(enUS.community.banned.appeal.not_requested)
-      expect(onBannedChange).toHaveBeenLastCalledWith(true)
+      // The grid reports the ban from an effect after commit, which can trail the notice's paint.
+      await waitFor(() => expect(onBannedChange).toHaveBeenLastCalledWith(true))
       return onBannedChange
     }
 
@@ -605,7 +607,8 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
       await settle()
 
       expect(notice()).toHaveTextContent(longDate('en-US'))
-      expect(onBannedChange).toHaveBeenLastCalledWith(true)
+      // The grid reports the ban from an effect after commit, which can trail the notice's paint.
+      await waitFor(() => expect(onBannedChange).toHaveBeenLastCalledWith(true))
       expect(screen.queryByTestId('weekly-challenge-banner')).not.toBeInTheDocument()
       expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
       expect(document.body.textContent).not.toContain(CHALLENGE.title)
@@ -741,7 +744,8 @@ describe('C-WEB-D-BANNED-NOTICE: the grid', () => {
         expect(queryNotice()).not.toBeInTheDocument()
         release()
         expect(await screen.findByTestId('community-banned-notice')).toBeInTheDocument()
-        expect(onBannedChange).toHaveBeenLastCalledWith(true)
+        // The grid reports the ban from an effect after commit, which can trail the notice's paint.
+        await waitFor(() => expect(onBannedChange).toHaveBeenLastCalledWith(true))
       })
     })
 

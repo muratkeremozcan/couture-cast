@@ -11,6 +11,9 @@ const {
   CommunityFlagEvaluationService,
 } = require('../../dist/src/modules/feature-flags/community-flag-evaluation.service.js')
 const {
+  ComplimentaryAccessService,
+} = require('../../dist/src/modules/feature-flags/complimentary-access.service.js')
+const {
   CommunitySendGuard,
 } = require('../../dist/src/modules/community/community-send-guard.js')
 const {
@@ -83,7 +86,12 @@ const remote = {
 }
 const guard = new CommunitySendGuard(
   observed,
-  new CommunityFlagEvaluationService(observed, remote),
+  // Story 6.14: the forked worker builds the real complimentary seam, as production does.
+  new CommunityFlagEvaluationService(
+    observed,
+    remote,
+    new ComplimentaryAccessService(observed, remote)
+  ),
   new CommunityPushProvider(globalThis.fetch, endpoint)
 )
 await guard.verifyRuntime()
