@@ -52,18 +52,34 @@ it('creates independent canonical public and private fixtures with explicit repl
 
 it('cleans only selected fixture rows and retains roots referenced by another member', async () => {
   const comment = {
-    findMany: vi.fn().mockResolvedValue([{ parent_id: 'retained-root' }]),
+    findMany: vi
+      .fn()
+      .mockResolvedValueOnce([{ post_id: 'fixture-post' }])
+      .mockResolvedValueOnce([{ parent_id: 'retained-root' }]),
     updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
   }
   const report = { updateMany: vi.fn().mockResolvedValue({ count: 1 }) }
+  const guard = vi.fn().mockResolvedValue(0)
   const tx = {
     communityComment: comment,
     communityCommentReport: report,
+    $executeRaw: guard,
   } as unknown as Prisma.TransactionClient
   await cleanupCommunityCommentFixtures(tx, [])
   expect(comment.findMany).not.toHaveBeenCalled()
   await cleanupCommunityCommentFixtures(tx, ['retained-root', 'owned-reply'])
+  // The posts' privacy guards come first, before any comment row changes.
+  expect(comment.findMany).toHaveBeenNthCalledWith(1, {
+    where: { id: { in: ['retained-root', 'owned-reply'] } },
+    select: { post_id: true },
+    distinct: ['post_id'],
+  })
+  expect(guard).toHaveBeenCalledTimes(1)
+  expect((guard.mock.calls[0] as unknown[]).slice(1)).toEqual([['fixture-post']])
+  expect(guard.mock.invocationCallOrder[0]).toBeLessThan(
+    report.updateMany.mock.invocationCallOrder[0]!
+  )
   expect(comment.findMany).toHaveBeenCalledWith({
     where: {
       parent_id: { in: ['retained-root', 'owned-reply'] },
