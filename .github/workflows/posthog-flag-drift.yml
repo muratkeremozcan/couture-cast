@@ -52,9 +52,11 @@ jobs:
       - name: Check the drift script
         run: node --test scripts/ci/posthog-flag-drift.test.mjs
 
-      # Runs even when the script's own tests fail, so a broken test never hides real drift.
+      # Runs even when the script's own tests fail, so a broken test never hides real drift. A pull
+      # request from a fork gets neither the secret nor the variable, so it runs the script's tests
+      # only; the hourly and main runs compare production.
       - name: Compare declared flags with production PostHog
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         env:
           POSTHOG_FLAG_READ_KEY: ${{ secrets.POSTHOG_FLAG_READ_KEY }}
           POSTHOG_PROD_PROJECT_TOKEN: ${{ vars.POSTHOG_PROD_PROJECT_TOKEN }}

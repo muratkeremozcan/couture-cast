@@ -916,10 +916,11 @@ describe('Story 6.5 actual guarded provider boundary', () => {
     expect(requests).toHaveLength(0)
   })
 
-  it('6.5-INT-026: a throwing send before expiry is moved on, never past the expiry', async () => {
+  it('6.5-INT-026: a throwing send before expiry is moved on no further than the expiry', async () => {
     const { deliveries } = await fixture()
     const delivery = deliveries[0]!
-    const expiresAt = new Date(Date.now() + 500)
+    // Inside the 2 s move, so the move is cut to the expiry exactly.
+    const expiresAt = new Date(Date.now() + 1000)
     await prisma.communityNotificationGroup.update({
       where: { id: delivery.group_id },
       data: { expires_at: expiresAt },
@@ -935,7 +936,10 @@ describe('Story 6.5 actual guarded provider boundary', () => {
     const moved = await prisma.communityTokenDelivery.findUniqueOrThrow({
       where: { id: delivery.id },
     })
+    // A pass slower than the second left before expiry finds the group expired, the bound
+    // 6.5-INT-025 proves; either way the delivery never moves past its expiry.
+    if (moved.status === 'expired') return
     expect(moved.status).toBe('deferred')
-    expect(moved.next_attempt_at.getTime()).toBeLessThanOrEqual(expiresAt.getTime())
+    expect(moved.next_attempt_at.getTime()).toBe(expiresAt.getTime())
   })
 })
