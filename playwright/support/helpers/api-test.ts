@@ -1,5 +1,6 @@
 // Centralizes Playwright API-test environment, identity, and payload helpers so specs
 // do not duplicate environment guards or generated user data.
+// Shared by most API specs, so a change here burns in a wide set.
 import { createHash, randomBytes } from 'node:crypto'
 import type { TestInfo } from '@playwright/test'
 
