@@ -141,6 +141,15 @@ jobs:
         id: lighthouse
         run: npm run test:a11y:lighthouse
 
+      # Reuses this job's packages and Chromium: the real web app in a real browser, with a
+      # local receiver in place of PostHog, must send no guardian token or email in any
+      # request header or body. It needs no database.
+      - name: Run analytics privacy browser check
+        id: analytics-privacy
+        if: ${{ !cancelled() && steps.chromium.outcome == 'success' }}
+        timeout-minutes: 6
+        run: npm run test:analytics-privacy --workspace apps/web
+
       - name: Upload Lighthouse accessibility reports
         if: always()
         uses: actions/upload-artifact@v4

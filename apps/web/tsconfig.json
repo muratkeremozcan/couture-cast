@@ -30,6 +30,7 @@
   "include": [
     "**/*.ts",
     "**/*.tsx",
+    ".next-analytics-privacy/types/**/*.ts",
     ".next-real-session/types/**/*.ts",
     ".next-share-card/types/**/*.ts",
     ".next/types/**/*.ts",

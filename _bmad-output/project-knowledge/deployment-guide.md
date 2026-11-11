@@ -256,6 +256,14 @@ boundary where data leaves the device is a closed allowlist:
 - posthog-js may load only its exception autocapture script from `/ingest/static/`, so no remote
   setting can start console logs (whose exporter bypasses `before_send`), replay, surveys,
   toolbar, web vitals or site apps.
+- Every web response carries `Referrer-Policy: strict-origin`, so no request from a page (to our
+  API, PostHog or a partner) carries its path or query as Referer. Nothing in the web app or the
+  API reads a same-origin Referer path.
+- `/ingest` is served by a route handler
+  ([posthog-ingest-proxy.ts](../../apps/web/src/lib/posthog-ingest-proxy.ts)) that forwards
+  only the method, the exact path and query, the body, `Content-Type` and `Accept`, and only for
+  the event endpoints and the exception autocapture script; any other path answers 404. Referer, cookies, the client IP and every other header stay on our origin, so
+  PostHog sees our server's address and derives no member location from it.
 - Person profiles are created for identified users only, and the clients never identify.
 - `webAnalyticsPrivacyFilter` and `mobileAnalyticsPrivacyFilter` in
   [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts) run first in the
@@ -285,7 +293,11 @@ and [posthog.ts](../../apps/mobile/src/config/posthog.ts). The `U-ANALYTICS-PRIV
 decode every request the real SDKs make (event batches and any base64 `data=` body), and assert
 that no flags or config request happens and that no token, email, name, birth date, personal
 UUID or personal path segment appears. They also assert that a remote config asking for console
-logs never loads the logs extension.
+logs never loads the logs extension. `npm run test:analytics-privacy --workspace apps/web` runs
+the web app (`next dev`, production analytics init) in real Chromium with a local receiver in
+place of PostHog, opens the invitation link, and asserts no request line, header or decoded body
+the receiver gets carries the token, the email or the fragment. It needs no database and runs in
+the PR Lighthouse job, which already installs Chromium.
 
 ### Post-merge step: add the production keys
 
