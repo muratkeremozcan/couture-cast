@@ -177,3 +177,190 @@ describe('U-ANALYTICS-PRIVACY-WEB-PROXY: the /ingest proxy', () => {
     expect(received[2]!.headers).not.toHaveProperty('referer')
   })
 })
+
+/**
+ * An upstream that stalls: it reads the request, then either withholds the response or
+ * sends headers and part of the body and stops. `closed` resolves when the proxy drops
+ * the upstream connection.
+ */
+async function stallingUpstream(mode: 'before-headers' | 'mid-body') {
+  let markReceived = () => undefined as void
+  let markClosed = () => undefined as void
+  const requestReceived = new Promise<void>((resolve) => (markReceived = resolve))
+  const closed = new Promise<void>((resolve) => (markClosed = resolve))
+  const server = createServer((request, response) => {
+    request.resume()
+    request.on('end', () => {
+      markReceived()
+      if (mode === 'mid-body') {
+        response.writeHead(200, { 'Content-Type': 'text/javascript' })
+        response.write('/* partial')
+      }
+    })
+    response.on('close', () => markClosed())
+  })
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  const address = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+  return {
+    upstream: { api: address, assets: address },
+    requestReceived,
+    closed,
+    stop: () => {
+      server.closeAllConnections()
+      return new Promise((resolve) => server.close(resolve))
+    },
+  }
+}
+const within = <T>(promise: Promise<T>, ms: number) =>
+  Promise.race([
+    promise,
+    new Promise<never>((_resolve, reject) =>
+      setTimeout(() => reject(new Error(`still pending after ${ms} ms`)), ms)
+    ),
+  ])
+const eventRequest = (init: RequestInit = {}) =>
+  new Request('https://couturecast.app/ingest/e/?compression=gzip-js', {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain' },
+    body: '{"event":"$pageview"}',
+    ...init,
+  })
+
+describe('U-ANALYTICS-PRIVACY-WEB-PROXY: bounded upstream work', () => {
+  it('drops the upstream request when the browser leaves before PostHog answers', async () => {
+    const stall = await stallingUpstream('before-headers')
+    try {
+      const client = new AbortController()
+      const proxied = proxyPostHogIngest(
+        eventRequest({ signal: client.signal }),
+        stall.upstream
+      )
+      await within(stall.requestReceived, 2_000)
+      client.abort()
+      await within(stall.closed, 2_000)
+      expect((await within(proxied, 2_000)).status).toBe(504)
+    } finally {
+      await stall.stop()
+    }
+  })
+
+  it('answers 504 and closes the upstream connection when PostHog misses the deadline', async () => {
+    const stall = await stallingUpstream('before-headers')
+    try {
+      const started = Date.now()
+      const response = await within(
+        proxyPostHogIngest(eventRequest(), stall.upstream, { deadlineMs: 200 }),
+        2_000
+      )
+      expect(response.status).toBe(504)
+      expect(Date.now() - started).toBeLessThan(1_500)
+      await within(stall.closed, 2_000)
+    } finally {
+      await stall.stop()
+    }
+  })
+
+  it('keeps the deadline while the response body streams', async () => {
+    const stall = await stallingUpstream('mid-body')
+    try {
+      const response = await within(
+        proxyPostHogIngest(
+          new Request('https://couturecast.app/ingest/static/exception-autocapture.js'),
+          stall.upstream,
+          { deadlineMs: 300 }
+        ),
+        2_000
+      )
+      expect(response.status).toBe(200)
+      await expect(within(response.text(), 2_000)).rejects.toThrow()
+      await within(stall.closed, 2_000)
+    } finally {
+      await stall.stop()
+    }
+  })
+
+  it('answers 413 for a body over the cap without contacting PostHog', async () => {
+    const big = new Uint8Array(1024 * 1024 + 1)
+    const declared = await proxyPostHogIngest(eventRequest({ body: big }), {
+      api: origin,
+      assets: origin,
+    })
+    expect(declared.status).toBe(413)
+    // A streamed body with no Content-Length is counted as it arrives.
+    const streamed = await proxyPostHogIngest(
+      eventRequest({
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(big.subarray(0, 600_000))
+            controller.enqueue(big.subarray(600_000))
+            controller.close()
+          },
+        }),
+        duplex: 'half',
+      } as RequestInit),
+      { api: origin, assets: origin }
+    )
+    expect(streamed.status).toBe(413)
+    expect(received).toEqual([])
+  })
+
+  it('refuses a declared Content-Length over the cap before reading the body', async () => {
+    const response = await proxyPostHogIngest(
+      eventRequest({
+        headers: {
+          'content-type': 'text/plain',
+          'content-length': String(2 * 1024 * 1024),
+        },
+        body: '{}',
+      }),
+      { api: origin, assets: origin }
+    )
+    expect(response.status).toBe(413)
+    expect(received).toEqual([])
+  })
+
+  it('stops reading an upload the browser abandons and answers 504', async () => {
+    const client = new AbortController()
+    const proxied = proxyPostHogIngest(
+      eventRequest({
+        signal: client.signal,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode('{"event":'))
+          },
+        }),
+        duplex: 'half',
+      } as RequestInit),
+      { api: origin, assets: origin }
+    )
+    setTimeout(() => client.abort(), 50)
+    expect((await within(proxied, 2_000)).status).toBe(504)
+    expect(received).toEqual([])
+  })
+
+  it('forwards an empty event body and answers 502 when PostHog cannot be reached', async () => {
+    const empty = await proxyPostHogIngest(eventRequest({ body: null }), {
+      api: origin,
+      assets: origin,
+    })
+    expect(empty.status).toBe(200)
+    expect(received[0]?.body.byteLength).toBe(0)
+    const port = await new Promise<number>((resolve) => {
+      const probe = createServer()
+      probe.listen(0, '127.0.0.1', () => {
+        const { port: free } = probe.address() as AddressInfo
+        probe.close(() => resolve(free))
+      })
+    })
+    const unreachable = await proxyPostHogIngest(eventRequest(), {
+      api: `http://127.0.0.1:${port}`,
+      assets: `http://127.0.0.1:${port}`,
+    })
+    expect(unreachable.status).toBe(502)
+  })
+
+  it('sets a route time budget as the platform backstop', () => {
+    expect(route.maxDuration).toBeGreaterThan(0)
+    expect(route.maxDuration).toBeLessThanOrEqual(15)
+  })
+})

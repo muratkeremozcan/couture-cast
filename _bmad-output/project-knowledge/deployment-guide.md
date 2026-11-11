@@ -263,7 +263,10 @@ boundary where data leaves the device is a closed allowlist:
   ([posthog-ingest-proxy.ts](../../apps/web/src/lib/posthog-ingest-proxy.ts)) that forwards
   only the method, the exact path and query, the body, `Content-Type` and `Accept`, and only for
   the event endpoints and the exception autocapture script; any other path answers 404. Referer, cookies, the client IP and every other header stay on our origin, so
-  PostHog sees our server's address and derives no member location from it.
+  PostHog sees our server's address and derives no member location from it. Each proxied
+  request, upstream response body included, ends when the browser leaves or after 5 seconds
+  (the route's `maxDuration` of 10 seconds is the platform backstop), and an event body over
+  1 MB answers 413.
 - Person profiles are created for identified users only, and the clients never identify.
 - `webAnalyticsPrivacyFilter` and `mobileAnalyticsPrivacyFilter` in
   [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts) run first in the
