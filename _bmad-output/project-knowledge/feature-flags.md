@@ -12,9 +12,10 @@ Status: active
 
 Updated: 2026-11-11
 Reason: production reads PostHog project `couturecast-prod` (329012) and an hourly drift check
-fails when a declared flag is missing there; community evaluation resolves a key PostHog answers
-as absent to the `feature_flags` row, then the declared default. See the deployment guide,
-"PostHog projects and flag drift".
+fails when a declared flag is omitted there or answers other than its declared default or pinned
+override; community evaluation resolves a key PostHog omits closed to its declared default and
+never reads the `feature_flags` row for it. See the deployment guide, "PostHog projects and flag
+drift".
 
 ## Source of truth
 

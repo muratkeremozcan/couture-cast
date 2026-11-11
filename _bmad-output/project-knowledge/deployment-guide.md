@@ -1318,13 +1318,23 @@ event.
 **Drift check.** The `PostHog flag drift` workflow runs `scripts/ci/posthog-flag-drift.mjs`
 hourly, on every push to main and on any pull request that edits `packages/config/src/flags.ts`.
 It asks `/flags` with the project token in the repository variable `POSTHOG_PROD_PROJECT_TOKEN`
-for every declared key and fails, naming each key, when PostHog leaves one out. An evaluation
-error, quota limit or HTTP error is retried three times and then fails as unavailable, never as
-missing. A pull request that declares a new flag stays red until the flag exists in 329012:
-create it as an active boolean whose rollout matches the declared default (0 percent for
-`false`, 100 for `true`), then rerun the job.
+and the API adapter's server User-Agent, so PostHog filters runtimes as it does for the API,
+and evaluates every declared key for 12 synthetic subjects. It fails, naming each key, when
+PostHog omits one (missing, inactive or not evaluated server-side), when a flag is
+multivariate, or when any subject gets a value other than the declared default: a partial
+rollout or a release opposite the default. A production value that differs on purpose is pinned
+in the script's `INTENTIONAL_OVERRIDES` with its reason; today that is only
+`color_analysis_enabled` at `true` (owner decision 2026-11-11: color analysis stays on in
+production, and the code default stays `false` so a degraded PostHog fails closed). An
+evaluation error, quota limit or HTTP error is retried three times and then fails as
+unavailable, never as drift. A pull request that declares a new flag stays red until the flag
+exists in 329012 as an active boolean released to everyone at its declared default (0 percent
+for `false`, 100 for `true`), or carries a pinned override.
 
-**A key PostHog answers as absent.** Community evaluation resolves it the way every other flag
-read does: the `feature_flags` row, then the declared default, cached for one 60-second claim.
-An unreachable PostHog, an evaluation error or a quota limit still caches nothing and defers the
-delivery, bounded by its group's expiry, as is a delivery whose send keeps throwing.
+**A key PostHog omits.** An omission does not prove the flag is missing: PostHog also omits an
+inactive flag and one filtered from the server runtime. Community evaluation resolves it closed
+to the declared default (`false` for `community_read_enabled`), cached for one 60-second claim,
+and never reads the `feature_flags` row, whose stale `true` could otherwise renew a
+non-grantee's access. A grantee is still granted before PostHog is asked. An unreachable
+PostHog, an evaluation error or a quota limit still caches nothing and defers the delivery,
+bounded by its group's expiry, as is a delivery whose send keeps throwing.

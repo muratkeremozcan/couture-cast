@@ -91,11 +91,13 @@ describe('Story 6.5 actual remote flag adapter and HTTP recorder', () => {
   )
 
   // Production 2026-11-11: the PostHog project the runtime read defined no
-  // community_read_enabled, so every claim saw a definitive "absent" and threw unavailable.
-  // Each delivery re-deferred about every 45 s until its group expired a day later. An absent
-  // key now resolves like every other flag read: the FeatureFlag fallback row, then the
-  // declared default, cached for one claim cadence.
-  describe('a key PostHog answers as absent', () => {
+  // community_read_enabled, so every claim saw the key omitted and threw unavailable, and each
+  // delivery re-deferred about every 45 s until its group expired a day later. An omission does
+  // not prove the flag is missing: PostHog also omits an inactive flag and one filtered from the
+  // server runtime. So an omitted key resolves closed to its declared default (false here),
+  // cached for one claim, and never reads the FeatureFlag fallback row, whose true could
+  // otherwise renew a non-grantee's access for as long as the omission lasts.
+  describe('a key PostHog omits', () => {
     const evaluateAbsent = async (row: boolean | null) => {
       answer = 'absent'
       if (row === null)
@@ -129,19 +131,25 @@ describe('Story 6.5 actual remote flag adapter and HTTP recorder', () => {
       }
     }
 
-    it.each([true, false])(
-      '6.5-INT-010a: resolves to the fallback row %s and caches it with one network invocation',
+    it.each([true, false, null])(
+      '6.5-INT-010a: resolves closed to the declared default false whatever the fallback row (%s), cached with one network invocation',
       async (row) => {
-        expect(await evaluateAbsent(row)).toEqual({ first: row, second: row, calls: 1 })
+        expect(await evaluateAbsent(row)).toEqual({
+          first: false,
+          second: false,
+          calls: 1,
+        })
       }
     )
 
-    it('6.5-INT-010b: resolves to the declared default false when no fallback row exists', async () => {
-      expect(await evaluateAbsent(null)).toEqual({
-        first: false,
-        second: false,
-        calls: 1,
-      })
+    it('6.5-INT-010b: never reads the FeatureFlag fallback row', async () => {
+      const reads = vi.spyOn(prisma.featureFlag, 'findUnique')
+      try {
+        await evaluateAbsent(true)
+        expect(reads).not.toHaveBeenCalled()
+      } finally {
+        reads.mockRestore()
+      }
     })
 
     it('6.5-INT-010c: stays unavailable when PostHog reports an evaluation error', async () => {
