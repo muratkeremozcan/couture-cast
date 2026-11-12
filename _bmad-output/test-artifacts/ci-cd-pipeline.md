@@ -60,9 +60,10 @@ Playwright environment selection uses `TEST_ENV`:
   stop all get at most what is left of it. Each caller stops the step at 10 minutes, keeps its
   log on failure and then stops the containers a failed start left
   (`scripts/ci/supabase-start-bounds.test.mjs`).
-- The share-card browser matrix runs three Playwright workers. A worker runs one spec file of
-  one browser, and `prepare.mjs --web-browsers` gives each browser and spec pair its own
-  accounts and post, so no two workers share a session, a watermark choice or a sign-out.
+- The share-card browser matrix runs on one Playwright worker. Three workers (one fixture set
+  per browser and spec) took 1.4 minutes locally against 3.4 serial, but 6.4 minutes on the
+  4-vCPU runner against 5.4 serial: three browsers, the web server, the API and Postgres
+  saturate it, so each case ran three times slower. The parallel matrix was reverted.
 - `actions-cache-prune.yml` keeps the 10 GB Actions cache clear of closed pull requests and
   keys unread for 48 hours (`scripts/ci/prune-actions-cache.mjs`), daily and when a pull request
   closes, so GitHub's own eviction never pushes out a live key.

@@ -12,8 +12,6 @@ export function browserWatermarkHoldDeadlineMs(authorizationBudgetMs) {
 }
 export const browserWatermarkPhases = [
   'profile-before',
-  // Waiting for the other workers' tests to end (scripts/lib/owned-database-turn.mjs).
-  'turn',
   'connect',
   'pin',
   'acquire',

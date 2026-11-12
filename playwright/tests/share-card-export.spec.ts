@@ -26,7 +26,6 @@ import {
   userProfileResponseSchema,
 } from '@couture/api-client/contracts/http'
 import { test, expect } from '../support/fixtures/share-card-fixtures'
-import type { OwnedDatabaseTurn } from '../../scripts/lib/owned-database-turn.mjs'
 import {
   activateFocused,
   build,
@@ -188,8 +187,7 @@ async function rapidWatermarkDuringRealPreparation(
   page: Page,
   open: () => Promise<void>,
   apiOrigin: string,
-  readProfile: ProfileRead,
-  turn: OwnedDatabaseTurn
+  readProfile: ProfileRead
 ) {
   const started = performance.now()
   const browser = test.info().project.name
@@ -247,62 +245,53 @@ async function rapidWatermarkDuringRealPreparation(
         userProfileResponseSchema.parse(owner.body).user.id ===
           fixture.identities[0]!.appUserId
     )
-    // The barrier locks the whole LookbookPost table and counts any blocked read as this
-    // case's own, so it waits until no other worker's test is running and holds them off
-    // until it releases (scripts/lib/owned-database-turn.mjs).
-    phase('turn')
-    await turn.exclusive()
-    try {
-      await withBrowserWatermarkLock({
-        connectionString,
-        // Every source read the barrier blocks runs under this API budget, and the
-        // barrier's own deadline is a share of it.
-        authorizationBudgetMs: COMMUNITY_AUTHORIZATION_BUDGET_MS,
-        createClient: (options) => new pg.Client(options),
-        onPhase: phase,
-        onCheck: check,
-        onHeld: (ms) => {
-          record.heldMs = ms
-        },
-        whileLocked: async ({ signal, waitForBlocked, checkBlocked }) => {
-          const live = () => {
-            if (signal.aborted) throw signal.reason
-          }
-          // playwright-utils deviation: interceptNetworkCall cannot select a request by
-          // its body, and each wait here selects the preparation by its watermark value.
-          phase('initial')
-          const initial = page.waitForRequest((request) => isPreparation(request, true))
-          await open()
-          await initial
-          live()
-          check('initialRequest', true)
-          phase('blocked')
-          await waitForBlocked()
-          check('blockedSource', true)
-          // Keyboard toggles skip pointer actionability waits, which keeps the held
-          // window short on a slow browser.
-          const checkbox = modal(page).getByRole('checkbox')
-          phase('off')
-          const off = page.waitForRequest((request) => isPreparation(request, false))
-          await checkbox.press('Space')
-          await off
-          live()
-          check('watermarkOff', true)
-          phase('on')
-          const on = page.waitForRequest((request) => isPreparation(request, true))
-          await checkbox.press('Space')
-          await on
-          live()
-          check('watermarkOn', true)
-          phase('profile-after')
-          check('authenticatedProfile', (await readProfile(apiOrigin)).status === 200)
-          phase('blocked-after')
-          check('blockedAtRelease', await checkBlocked())
-        },
-      })
-    } finally {
-      await turn.share()
-    }
+    await withBrowserWatermarkLock({
+      connectionString,
+      // Every source read the barrier blocks runs under this API budget, and the
+      // barrier's own deadline is a share of it.
+      authorizationBudgetMs: COMMUNITY_AUTHORIZATION_BUDGET_MS,
+      createClient: (options) => new pg.Client(options),
+      onPhase: phase,
+      onCheck: check,
+      onHeld: (ms) => {
+        record.heldMs = ms
+      },
+      whileLocked: async ({ signal, waitForBlocked, checkBlocked }) => {
+        const live = () => {
+          if (signal.aborted) throw signal.reason
+        }
+        // playwright-utils deviation: interceptNetworkCall cannot select a request by
+        // its body, and each wait here selects the preparation by its watermark value.
+        phase('initial')
+        const initial = page.waitForRequest((request) => isPreparation(request, true))
+        await open()
+        await initial
+        live()
+        check('initialRequest', true)
+        phase('blocked')
+        await waitForBlocked()
+        check('blockedSource', true)
+        // Keyboard toggles skip pointer actionability waits, which keeps the held
+        // window short on a slow browser.
+        const checkbox = modal(page).getByRole('checkbox')
+        phase('off')
+        const off = page.waitForRequest((request) => isPreparation(request, false))
+        await checkbox.press('Space')
+        await off
+        live()
+        check('watermarkOff', true)
+        phase('on')
+        const on = page.waitForRequest((request) => isPreparation(request, true))
+        await checkbox.press('Space')
+        await on
+        live()
+        check('watermarkOn', true)
+        phase('profile-after')
+        check('authenticatedProfile', (await readProfile(apiOrigin)).status === 200)
+        phase('blocked-after')
+        check('blockedAtRelease', await checkBlocked())
+      },
+    })
     phase('preview')
     await expect(modal(page).getByTestId('share-card-preview')).toHaveAttribute(
       'data-loaded',
@@ -587,7 +576,6 @@ for (const locale of supportedLocales)
       page,
       interceptNetworkCall,
       apiRequest,
-      ownedDatabaseTurn,
     }) => {
       const member = await identify(context)
       const readProfile: ProfileRead = (apiOrigin) =>
@@ -603,13 +591,7 @@ for (const locale of supportedLocales)
         interceptNetworkCall,
         locale === 'en-US'
           ? (open, origin) =>
-              rapidWatermarkDuringRealPreparation(
-                page,
-                open,
-                origin,
-                readProfile,
-                ownedDatabaseTurn
-              )
+              rapidWatermarkDuringRealPreparation(page, open, origin, readProfile)
           : undefined
       )
       const labels = renderCatalog(locale)
