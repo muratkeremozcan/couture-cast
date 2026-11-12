@@ -26,7 +26,7 @@ const projects = ['web', 'api'] as const
 const repoRoot = path.resolve(__dirname, '../../..')
 const vercelConfig = z.object({
   ignoreCommand: z.string().optional(),
-  git: z.object({ deploymentEnabled: z.union([z.boolean(), z.record(z.boolean())]) }),
+  git: z.object({ deploymentEnabled: z.record(z.boolean()) }),
   outputDirectory: z.string().optional(),
   functions: z.record(z.unknown()).optional(),
   rewrites: z.array(z.object({ source: z.string(), destination: z.string() })).optional(),
@@ -245,9 +245,8 @@ describe('Vercel preview storage', () => {
   it('connects both projects, the preview wait and the e2e run to the same deployment', () => {
     for (const app of ['api', 'web']) {
       const config = readVercelConfig(app)
-      // No git push creates a deployment, main included: CI creates previews and production
-      // (pw-e2e-prod.yml), only when their inputs changed.
-      expect(config.git.deploymentEnabled).toBe(false)
+      // Branch pushes create no deployment; main still deploys production.
+      expect(config.git.deploymentEnabled).toEqual({ main: true, '**': false })
       expect(config.ignoreCommand).toBeUndefined()
     }
     const read = (file: string) =>

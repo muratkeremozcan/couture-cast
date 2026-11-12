@@ -14,15 +14,13 @@ export type Deployment = {
 }
 export declare const BUILD_SETTINGS: string[]
 export declare const PREVIEW_SOURCE: string
-export declare const PRODUCTION_SOURCE: string
 export declare function configIdentity(
   project: Record<string, unknown>,
   envs: Record<string, unknown>[],
-  branch: string,
-  target?: 'preview' | 'production'
+  branch: string
 ): string
 export type PreviewResult = { id: string; url: string; sha: string; reused: boolean }
-export type DeployInput = {
+export declare function previewDeployment(input: {
   project: PreviewProject
   branch: string
   sha: string
@@ -40,18 +38,7 @@ export type DeployInput = {
   sleep?: (ms: number) => Promise<void>
   intervalMs?: number
   log?: (message: string) => void
-}
-export declare function previewDeployment(input: DeployInput): Promise<PreviewResult>
-export declare function productionDeployment(
-  input: DeployInput & {
-    current: Deployment | null
-    reportOnly?: boolean
-    cancel: (id: string) => Promise<unknown>
-    promote: (id: string) => Promise<unknown>
-    served: () => Promise<Deployment | null>
-    isOlder: (sha: string) => Promise<boolean>
-  }
-): Promise<PreviewResult>
+}): Promise<PreviewResult>
 export declare function run(
   project: PreviewProject,
   env: NodeJS.ProcessEnv,
@@ -61,6 +48,5 @@ export declare function run(
     now?: () => number
     sleep?: (ms: number) => Promise<void>
     log?: (message: string) => void
-    production?: boolean
   }
 ): Promise<PreviewResult>
