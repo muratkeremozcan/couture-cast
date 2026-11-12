@@ -10668,3 +10668,41 @@ flowchart TD
   Billing["webhook, refresh, reconciliation sweep"] --> PE["PremiumEntitlement"]
   Erase["requestAccountErasure"] -->|"delete member grants, null operator ids"| Grant
 ```
+
+### Production follow-ups (PRs #199 to #210 and #207)
+
+Running 6.14 in production for the first time exposed what the tests could not: real pooler
+latency, idle polling cost, a deploy quota and an analytics boundary that had never carried
+member traffic. Each fix below landed as its own PR, reviewed by a second model family (Codex)
+and CodeRabbit, with a failing proof before every fix.
+
+1. **Idle work costs money in production.**
+   The community worker polled Postgres with nothing to do and pushed Supabase egress past 5 GB
+   (#203). It now sleeps until there is work. The dispatch guard pool moved to node-postgres and is
+   sized to the pooler, so it can open its connections (#205).
+2. **Measure at production latency, then design for it.**
+   The append ran several round trips and timed out through the pooler. It is now one database
+   statement (#208), and the specs fail fast with a reason (#209). The latency specs check every
+   retry against one shared deadline from the real Prisma call path, run behind a proxy that
+   holds each packet a calibrated 15.5 ms, and were proved by injecting five deadline bugs (#210).
+3. **Turn a quiet misconfiguration into a red run.**
+   Production defined 4 of 14 declared flags and nothing reported it. The hourly flag drift check
+   now fails on any missing, non-uniform or wrongly released flag (#206), and on production
+   PostHog keeping client IPs (#207).
+4. **Previews only when a check needs them.**
+   Branch pushes used up Vercel's 100 deployments a day and blocked every PR. Branch pushes now
+   create no deployment; CI creates or reuses a preview only when the preview checks need it, and
+   polls it with bounded retries that honor rate-limit resets (#210).
+5. **An analytics boundary is a closed allowlist on what reaches the wire.**
+   Production analytics stayed off until #207. Both clients run one privacy filter first in
+   `before_send`: unknown events and properties are dropped, routes become templates, exceptions
+   keep type and frames only, and the filter validates a JSON snapshot so a getter, `toJSON` or
+   array subclass cannot serialize past it. Every event carries `$geoip_disable`, `$ip: null` and
+   `$process_person_profile: false`. PostHog fills a null `$ip` from the request and mobile events
+   go straight from the device, so project 329012 has Discard client IP data on, and the drift
+   check fails if it is ever off. `analytics-privacy.spec.ts`, the real `posthog-react-native`
+   wire test and the real-browser transport test each fail with the switches removed.
+6. **Keep the pipeline inside its budget.**
+   Burn-in, deployed E2E and Maestro shard by duration (#200), and the watchOS prebuild stopped
+   compiling SDK modules three times (#204). Operator commands verify production TLS from macOS
+   (#201), and the integration tier runs at `privacy_version` 1 like production (#202).
