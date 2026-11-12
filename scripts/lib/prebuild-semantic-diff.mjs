@@ -39,13 +39,37 @@ function parsePbxproj(file) {
   for (const section of Object.values(project.hash.project.objects))
     for (const [id, object] of Object.entries(section))
       if (!id.endsWith('_comment')) objects.set(id, object)
-  return { objects, root: project.hash.project.rootObject }
+  // Every top-level field besides the object table and the root reference (archiveVersion,
+  // objectVersion, classes, and anything a future format adds) is compared exactly (R3-04).
+  const header = Object.fromEntries(
+    Object.entries(project.hash.project).filter(
+      ([key]) => key !== 'objects' && key !== 'rootObject'
+    )
+  )
+  return {
+    objects,
+    root: project.hash.project.rootObject,
+    header: canonicalJson(header),
+    headComment: project.hash.headComment ?? null,
+  }
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return value.map(canonicalJson)
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.keys(value)
+        .filter((key) => !key.endsWith('_comment'))
+        .sort()
+        .map((key) => [key, canonicalJson(value[key])])
+    )
+  return value
 }
 
 const digest = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)
 
 /** Labels every object by its content and, through references, by the objects it reaches. */
-function structuralLabels({ objects, root }) {
+function structuralLabels({ objects, root, header, headComment }) {
   const encode = (value, label) => {
     if (typeof value === 'string') return objects.has(value) ? `@${label(value)}` : value
     if (Array.isArray(value)) return value.map((item) => encode(item, label))
@@ -81,6 +105,7 @@ function structuralLabels({ objects, root }) {
     distinct = count
   }
   return {
+    header: JSON.stringify({ header, headComment }),
     multiset: [...labels.values()].sort(),
     root: root === undefined ? null : (labels.get(root) ?? encode(root, () => null)),
   }
@@ -96,6 +121,7 @@ function samePbxproj(beforeFile, afterFile) {
     return false
   }
   return (
+    before.header === after.header &&
     before.root === after.root &&
     JSON.stringify(before.multiset) === JSON.stringify(after.multiset)
   )

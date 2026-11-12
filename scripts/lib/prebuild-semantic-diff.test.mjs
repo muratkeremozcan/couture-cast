@@ -204,6 +204,29 @@ describe('comparePrebuilds with the app.json key removal rule', () => {
     })
   }
 
+  // R3-04: the project's format fields sit outside the object table and are compared exactly.
+  for (const [field, from, to] of [
+    ['objectVersion', 'objectVersion = 54;', 'objectVersion = 999;'],
+    ['archiveVersion', 'archiveVersion = 1;', 'archiveVersion = 999;'],
+  ]) {
+    test(`rejects a changed ${field}`, (t) => {
+      const result = comparePrebuilds(
+        tree(t),
+        tree(t, {
+          ...keyRemoved,
+          'ios/CoutureCast.xcodeproj/project.pbxproj': PBX({ ids: 'PQRSTUVW' }).replace(
+            from,
+            to
+          ),
+        }),
+        APP_JSON_KEY_REMOVAL_RULE
+      )
+      assert.deepEqual(result.problems, [
+        'ios/CoutureCast.xcodeproj/project.pbxproj: differs beyond object IDs',
+      ])
+    })
+  }
+
   test('rejects a project that does not parse', (t) => {
     const result = comparePrebuilds(
       tree(t),
