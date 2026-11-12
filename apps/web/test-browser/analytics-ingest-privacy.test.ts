@@ -144,6 +144,19 @@ afterAll(async () => {
   await new Promise((resolve) => upstream?.close(resolve))
 })
 
+type SentEvent = { event?: unknown; properties?: Record<string, unknown> }
+
+/** The events in one capture body: a single event, an array, or a `{ batch }` envelope. */
+function eventsOf(body: string): SentEvent[] {
+  const parsed: unknown = JSON.parse(body)
+  const list = Array.isArray(parsed)
+    ? parsed
+    : parsed !== null && typeof parsed === 'object' && 'batch' in parsed
+      ? (parsed as { batch: unknown }).batch
+      : [parsed]
+  return Array.isArray(list) ? (list as SentEvent[]) : []
+}
+
 describe('U-ANALYTICS-PRIVACY-WEB-TRANSPORT: what PostHog receives', () => {
   it('a guardian opening the invitation link sends no token, email or fragment in any request', async () => {
     const context = await browser.newContext({
@@ -189,13 +202,15 @@ describe('U-ANALYTICS-PRIVACY-WEB-TRANSPORT: what PostHog receives', () => {
       }
       // The document itself tells the browser to send the origin only as Referer.
       expect(document?.headers()['referrer-policy']).toBe('strict-origin')
-      const pageview = received.find(
-        (request) => isEvent(request) && request.body.includes('$pageview')
-      )
-      expect(pageview?.body).toContain('/guardian/accept')
+      // One body can carry several events (a /batch holds the pageview and the exception
+      // together), so each assertion reads the pageview event itself.
+      const pageview = received
+        .filter(isEvent)
+        .flatMap(({ body }) => eventsOf(body))
+        .find((event) => event.event === '$pageview')
+      expect(pageview?.properties?.$current_url).toContain('/guardian/accept')
       // The event tells PostHog to add no location and sends no IP of its own.
-      expect(pageview?.body).toMatch(/"\$geoip_disable":\s*true/)
-      expect(pageview?.body).toMatch(/"\$ip":\s*null/)
+      expect(pageview?.properties).toMatchObject({ $geoip_disable: true, $ip: null })
       // The exception script came through the same proxy, from the same receiver.
       expect(
         received.some(({ url }) => url.startsWith('/static/exception-autocapture.js'))

@@ -6,6 +6,7 @@ import { test } from 'node:test'
 import {
   checkDefinitions,
   checkFlagDrift,
+  checkProduction,
   definitionProblems,
   readFlagDefinitions,
   describeDrift,
@@ -463,5 +464,87 @@ test('reads the production project settings with the read key, and an unreadable
       fetchImpl: async () => json({ id: 327096, anonymize_ips: true }),
     }),
     /project 327096, not 329012/
+  )
+})
+
+test('one failing production check never hides another', async () => {
+  const route = (handlers) => async (url, init) => {
+    const { pathname } = new URL(url)
+    for (const [prefix, answer] of handlers)
+      if (pathname.startsWith(prefix)) return answer(init)
+    throw new Error(`unexpected request ${pathname}`)
+  }
+  const unreadableSettings = () =>
+    json({ detail: "API key missing required scope 'project:read'" }, 403)
+  // Settings unreadable and a definition drifted: both are reported.
+  const both = await checkProduction({
+    expected,
+    token: 'phc_synthetic',
+    readKey: 'phx_synthetic',
+    fetchImpl: route([
+      [
+        '/api/projects/329012/feature_flags/',
+        () => json({ results: [released('community_read_enabled', true)], next: null }),
+      ],
+      ['/api/projects/329012/', unreadableSettings],
+    ]),
+  })
+  assert.equal(both.length, 2)
+  assert.match(both[0], /project settings: reading project settings returned HTTP 403/)
+  assert.match(both[1], /flag definitions disagree/)
+  // Settings off and runtime drift: both are reported, and the probes still run.
+  const probed = await checkProduction({
+    expected,
+    token: 'phc_synthetic',
+    readKey: 'phx_synthetic',
+    wait: () => Promise.resolve(),
+    fetchImpl: route([
+      [
+        '/api/projects/329012/feature_flags/',
+        () =>
+          json({
+            results: [
+              released('community_read_enabled', false),
+              released('weather_alerts_enabled', true),
+            ],
+            next: null,
+          }),
+      ],
+      ['/api/projects/329012/', () => json({ id: 329012, anonymize_ips: false })],
+      [
+        '/flags',
+        () =>
+          json({
+            flags: { community_read_enabled: flag('community_read_enabled', false) },
+          }),
+      ],
+    ]),
+  })
+  assert.equal(probed.length, 2)
+  assert.match(probed[0], /Discard client IP data/)
+  assert.match(probed[1], /weather_alerts_enabled/)
+  // Everything sound: no failures.
+  assert.deepEqual(
+    await checkProduction({
+      expected,
+      token: 'phc_synthetic',
+      readKey: 'phx_synthetic',
+      fetchImpl: route([
+        [
+          '/api/projects/329012/feature_flags/',
+          () =>
+            json({
+              results: [
+                released('community_read_enabled', false),
+                released('weather_alerts_enabled', true),
+              ],
+              next: null,
+            }),
+        ],
+        ['/api/projects/329012/', () => json({ id: 329012, anonymize_ips: true })],
+        ['/flags', answering(matching)],
+      ]),
+    }),
+    []
   )
 })
