@@ -8,6 +8,9 @@
 //   put when feedback appears;
 // - `actionRowTier` and `useActionColumns`: choose halves, content or stacked buttons from labels
 //   measured at the current scale.
+// One read outside the composer drives no layout: `LiveFontMountMarker` reports the scale
+// JavaScript sees to the live font-scale proof (Codex R2-03), in development and isolated
+// native test builds only.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -28,6 +31,7 @@ const ALLOWED = {
     'useActionColumns',
     'ComposerFeedback',
   ],
+  'components/live-font-mount-marker.tsx': ['LiveFontMountMarker'],
 }
 
 function sourceFiles(root) {

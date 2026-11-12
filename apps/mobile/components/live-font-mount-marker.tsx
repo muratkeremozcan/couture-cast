@@ -6,11 +6,12 @@
 // the process id, so it would read as a fix. Each marked component renders an invisible view
 // whose testID changes on every mount, and the proof requires the same ids before and after the
 // change. A testID costs nothing at runtime and reaches the Android and iOS hierarchies the
-// proof already reads; a native view tag would need a module to read it. Production builds
-// render nothing.
+// proof already reads; a native view tag would need a module to read it. A second view reports
+// the font scale JavaScript sees, so a scale change the app never received cannot pass as a
+// relayout. Production builds render nothing.
 import Constants from 'expo-constants'
 import { useRef } from 'react'
-import { StyleSheet, View } from 'react-native'
+import { StyleSheet, useWindowDimensions, View } from 'react-native'
 
 // One value per JavaScript runtime, so a reloaded bundle that restarts the counter still reads
 // as new.
@@ -22,21 +23,25 @@ export function liveFontMountMarkersEnabled({ dev = __DEV__ }: { dev?: boolean }
 }
 
 export function LiveFontMountMarker({ scope }: { scope: string }) {
+  const { fontScale } = useWindowDimensions()
   const id = useRef<string | null>(null)
   if (id.current === null) {
     mounts += 1
     id.current = `${runtime}${mounts.toString(36)}`
   }
   if (!liveFontMountMarkersEnabled()) return null
+  const hidden = {
+    style: styles.marker,
+    collapsable: false,
+    'aria-hidden': true,
+    importantForAccessibility: 'no-hide-descendants',
+    accessibilityElementsHidden: true,
+  } as const
   return (
-    <View
-      testID={`live-font-mount-${scope}-${id.current}`}
-      style={styles.marker}
-      collapsable={false}
-      aria-hidden
-      importantForAccessibility="no-hide-descendants"
-      accessibilityElementsHidden
-    />
+    <>
+      <View testID={`live-font-mount-${scope}-${id.current}`} {...hidden} />
+      <View testID={`live-font-scale-${scope}-${fontScale}`} {...hidden} />
+    </>
   )
 }
 

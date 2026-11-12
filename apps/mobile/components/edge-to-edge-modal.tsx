@@ -10,6 +10,7 @@ import {
   View,
   type ModalProps,
 } from 'react-native'
+import { LiveFontMountMarker } from './live-font-mount-marker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 /**
@@ -92,6 +93,8 @@ export function EdgeToEdgeModal({
   return (
     <Modal transparent {...props} statusBarTranslucent navigationBarTranslucent>
       <View testID={scrimTestID} style={[styles.fill, { backgroundColor: scrim }]}>
+        {/* The modal is its own window, so it carries its own mount marker (Story 6.15). */}
+        <LiveFontMountMarker scope="modal" />
         <KeyboardAvoidingView
           testID="edge-to-edge-modal-keyboard-view"
           style={styles.fill}

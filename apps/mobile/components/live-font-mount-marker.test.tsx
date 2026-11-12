@@ -47,6 +47,16 @@ describe('LiveFontMountMarker', () => {
     expect(marker()?.dataset.testid).not.toBe(before)
   })
 
+  it('reports the font scale JavaScript sees', () => {
+    render(<LiveFontMountMarker scope="home" />)
+
+    expect(
+      document
+        .querySelector('[data-testid^="live-font-scale-home-"]')
+        ?.getAttribute('data-testid')
+    ).toMatch(/^live-font-scale-home-\d+(\.\d+)?$/)
+  })
+
   it('stays out of the accessibility tree', () => {
     render(<LiveFontMountMarker scope="home" />)
 
