@@ -30,12 +30,29 @@ const pullRequestResults = (override = {}) =>
 // The lanes job's plan for a pull request whose diff runs, or skips, the browser lane.
 const browserRuns = { [shareCardLane]: true, maestro: false }
 const browserSkipped = { [shareCardLane]: false, maestro: true }
+// The workflow's needs always include the lanes job; a test that names no lanes result gets a
+// successful one, as every run where the plan exists does.
+const withLanes = (value) => {
+  try {
+    const parsed = JSON.parse(value)
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      !Array.isArray(parsed) &&
+      !(laneJobName in parsed)
+    )
+      return JSON.stringify({ ...parsed, [laneJobName]: { result: 'success' } })
+  } catch {
+    // Malformed input stays as it is: those cases test the refusal.
+  }
+  return value
+}
 const cli = (value, event, plan) =>
   spawnSync(process.execPath, ['scripts/ci/share-card-job-gate.mjs'], {
     encoding: 'utf8',
     env: {
       PATH: process.env.PATH,
-      ...(value === undefined ? {} : { CC68_JOB_RESULTS: value }),
+      ...(value === undefined ? {} : { CC68_JOB_RESULTS: withLanes(value) }),
       ...(event === undefined ? {} : { CC68_EVENT_NAME: event }),
       ...(plan === undefined ? {} : { CC68_LANE_PLAN: JSON.stringify(plan) }),
     },
@@ -237,7 +254,7 @@ describe('share-card aggregate job gate', () => {
           encoding: 'utf8',
           env: {
             PATH: process.env.PATH,
-            CC68_JOB_RESULTS: JSON.stringify(pullRequestResults()),
+            CC68_JOB_RESULTS: withLanes(JSON.stringify(pullRequestResults())),
             CC68_EVENT_NAME: 'pull_request',
             CC68_LANE_PLAN: raw,
           },
@@ -312,5 +329,35 @@ describe('share-card aggregate job gate', () => {
         1
       )
     })
+  })
+})
+
+describe('the lanes job result (PR 212 review)', () => {
+  // A lanes job can fail after writing its plan output (the summary write comes later), so a
+  // plan that skips the browser lane must not pass the gate unless the lanes job succeeded.
+  for (const lanes of ['failure', 'cancelled', 'skipped'])
+    test(`a ${lanes} lanes job fails the gate even with a readable plan`, () => {
+      const run = cli(
+        JSON.stringify({
+          ...pullRequestResults({ 'browser-acceptance': 'skipped' }),
+          [laneJobName]: { result: lanes },
+        }),
+        'pull_request',
+        browserSkipped
+      )
+      assert.equal(run.status, 1)
+      assert.equal(run.stderr.trim(), 'share_card_lanes_job_failed')
+    })
+
+  test('a successful lanes job and a planned skip pass', () => {
+    const run = cli(
+      JSON.stringify({
+        ...pullRequestResults({ 'browser-acceptance': 'skipped' }),
+        [laneJobName]: { result: 'success' },
+      }),
+      'pull_request',
+      browserSkipped
+    )
+    assert.equal(run.status, 0, run.stderr)
   })
 })

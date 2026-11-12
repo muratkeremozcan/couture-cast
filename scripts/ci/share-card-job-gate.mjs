@@ -88,10 +88,13 @@ if (
     } catch {
       throw new Error('share_card_job_results_invalid')
     }
-    // The gate needs the lanes job only to read its plan, which arrives in CC68_LANE_PLAN; a
-    // failed lanes job leaves that empty, which a pull request refuses.
-    if (results && typeof results === 'object' && !Array.isArray(results))
+    // The gate needs the lanes job for its plan (CC68_LANE_PLAN). A lanes job can fail after
+    // writing that output, so a plan counts only when the job itself succeeded.
+    if (results && typeof results === 'object' && !Array.isArray(results)) {
+      if (results[laneJobName]?.result !== 'success')
+        throw new Error('share_card_lanes_job_failed')
       delete results[laneJobName]
+    }
     let plan
     try {
       plan = JSON.parse(process.env.CC68_LANE_PLAN ?? '')
