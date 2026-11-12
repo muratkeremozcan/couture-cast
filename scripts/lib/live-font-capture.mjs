@@ -12,6 +12,14 @@ function attributes(node) {
   return node?.attributes ?? {}
 }
 
+/** Sorts a test-build marker id into the reading it carries. */
+function readMarker(id, { markers, jsScales, environments }) {
+  if (MARKER.test(id)) markers.push(id)
+  const reading = SCALE.exec(id)
+  if (reading) jsScales.push(Number(reading[2]))
+  if (id.startsWith('live-font-env-')) environments.push(id)
+}
+
 /**
  * Text nodes with their parent's bounds. Android puts a TextView's string in `text`; iOS puts a
  * static text's label in `accessibilityText` when `text` is empty, so it falls back to that.
@@ -21,14 +29,12 @@ export function flattenHierarchy(tree, { platform }) {
   const controls = []
   const markers = []
   const jsScales = []
+  const environments = []
   const walk = (node, parentBounds) => {
     const attrs = attributes(node)
     const id = attrs['resource-id'] ?? ''
     const bounds = attrs.bounds
-    const marker = MARKER.exec(id)
-    if (marker) markers.push(id)
-    const reading = SCALE.exec(id)
-    if (reading) jsScales.push(Number(reading[2]))
+    readMarker(id, { markers, jsScales, environments })
     const text = attrs.text || (platform === 'ios' ? (attrs.accessibilityText ?? '') : '')
     if (text && bounds)
       nodes.push({ text, id, bounds, ...(parentBounds ? { parent: parentBounds } : {}) })
@@ -39,7 +45,14 @@ export function flattenHierarchy(tree, { platform }) {
   // Every marked window reads the same scale; disagreeing readings are no reading.
   const jsFontScale =
     jsScales.length && new Set(jsScales).size === 1 ? jsScales[0] : undefined
-  return { nodes, controls, markers: markers.sort(), jsFontScale }
+  const environment = new Set(environments.map((id) => id.slice(id.indexOf('~'))))
+  return {
+    nodes,
+    controls,
+    markers: markers.sort(),
+    jsFontScale,
+    environment: environment.size === 1 ? parseEnvironment(environments[0]) : undefined,
+  }
 }
 
 /** The mount markers joined in order: one string that changes when any marked mount changes. */
@@ -207,4 +220,20 @@ export function assertLiveProvenance({ before, immediate, settled, cold, platfor
       throw new Error(`live_font_provenance_js_scale:${capture.stage}`)
   }
   return { launch: before.launch, coldLaunch: cold.launch }
+}
+
+/**
+ * The configuration the app reports through its test-build marker:
+ * `live-font-env-<scope>~<react native>~<scheme>~<ltr|rtl>~<density>~<language>`.
+ */
+export function parseEnvironment(id) {
+  const [, reactNativeVersion, scheme, direction, density, language] =
+    String(id).split('~')
+  if (!language) return undefined
+  return { reactNativeVersion, scheme, direction, density: Number(density), language }
+}
+
+/** The installed app's configuration from a flattened hierarchy, or an empty reading. */
+export function readEnvironment(flat) {
+  return flat.environment ?? {}
 }

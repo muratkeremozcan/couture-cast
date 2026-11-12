@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  parseEnvironment,
   activityToken,
   assertLiveProvenance,
   countOnCreate,
@@ -245,4 +246,35 @@ describe('assertLiveProvenance', () => {
     }
     assert.equal(assertLiveProvenance(ios).launch, 'launch-2')
   })
+})
+
+test('flattenHierarchy reads the environment every marked window agrees on', () => {
+  const tree = (...ids) =>
+    node(
+      { bounds: '[0,0][10,10]' },
+      ids.map((id) => node({ 'resource-id': id, bounds: '[0,0][1,1]' }))
+    )
+  const env = '~0.81.5~dark~rtl~2.625~ar-EG'
+  assert.deepEqual(
+    flattenHierarchy(tree(`live-font-env-root${env}`, `live-font-env-home${env}`), {
+      platform: 'android',
+    }).environment,
+    {
+      reactNativeVersion: '0.81.5',
+      scheme: 'dark',
+      direction: 'rtl',
+      density: 2.625,
+      language: 'ar-EG',
+    }
+  )
+  assert.equal(
+    flattenHierarchy(
+      tree(`live-font-env-root${env}`, 'live-font-env-home~0.81.5~light~ltr~2.625~en-US'),
+      {
+        platform: 'android',
+      }
+    ).environment,
+    undefined
+  )
+  assert.equal(parseEnvironment('live-font-env-home~0.81.5'), undefined)
 })
