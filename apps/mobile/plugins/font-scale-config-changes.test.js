@@ -25,7 +25,8 @@ function prebuiltManifest(t, { withPlugin }) {
   const appJson = path.join(root, 'app.json')
   const app = JSON.parse(fs.readFileSync(appJson, 'utf8'))
   app.expo.plugins = app.expo.plugins.filter((plugin) => plugin !== PLUGIN)
-  if (withPlugin) app.expo.plugins.push(PLUGIN)
+  // Listed first, its manifest mod runs after the other plugins' mods, so the token is appended.
+  if (withPlugin) app.expo.plugins.unshift(PLUGIN)
   fs.writeFileSync(appJson, JSON.stringify(app, null, 2))
   assertCommand(runExpoPrebuild(root, { platform: 'android' }), 'Android prebuild failed')
   return fs.readFileSync(
@@ -38,25 +39,17 @@ const MAIN =
   /(<activity[^>]*android:name="\.MainActivity"[^>]*android:configChanges=")([^"]*)(")/
 
 /**
- * Throws unless `candidate` is `control` with one `fontScale` token added to MainActivity's
- * configChanges, every existing token kept in its order, and nothing else changed. Expo runs
- * expo-localization's mod after this plugin, so the token sits before `locale`; its position
- * carries no meaning to Android.
+ * Throws unless `candidate` is `control` with `fontScale` appended to MainActivity's
+ * configChanges and nothing else in the document changed: every other token, attribute and
+ * Activity is byte-identical (Codex R3-06).
  */
 function assertFontScaleDelta(control, candidate) {
   const before = MAIN.exec(control)
-  const after = MAIN.exec(candidate)
-  assert.ok(before && after, 'MainActivity declares configChanges in both manifests')
-  const original = before[2].split('|')
-  const changed = after[2].split('|')
-  assert.ok(!original.includes('fontScale'), 'control already handles fontScale')
-  assert.equal(changed.filter((token) => token === 'fontScale').length, 1, after[2])
-  assert.deepEqual(
-    changed.filter((token) => token !== 'fontScale'),
-    original,
-    after[2]
-  )
-  assert.equal(candidate.replace(MAIN, '$1$3'), control.replace(MAIN, '$1$3'))
+  assert.ok(before, 'control MainActivity declares configChanges')
+  const tokens = before[2].split('|')
+  assert.ok(!tokens.includes('fontScale'), 'control already handles fontScale')
+  const expected = control.replace(MAIN, `$1${[...tokens, 'fontScale'].join('|')}$3`)
+  assert.equal(candidate, expected)
 }
 
 test(
@@ -76,7 +69,7 @@ test(
   }
 )
 
-// The four mutants Codex named; each must fail the exact-delta check.
+// The mutants Codex named (R2-03, R3-06); each must fail the exact-delta check.
 const CONTROL = [
   '<manifest>',
   '<application>',
@@ -91,9 +84,16 @@ const MUTANTS = {
     'keyboard|orientation|uiMode|locale" android:exported',
     'fontScale" android:exported'
   ),
-  'locale or density added': CONTROL.replace(
+  'density added': CONTROL.replace(
     'uiMode|locale" android:exported',
     'uiMode|locale|fontScale|density" android:exported'
+  ),
+  'every other Activity set to fontScale': CONTROL.replace(
+    'uiMode|locale" android:exported',
+    'uiMode|locale|fontScale" android:exported'
+  ).replace(
+    'android:name=".Other" android:configChanges="keyboard"',
+    'android:name=".Other" android:configChanges="fontScale"'
   ),
   'token on another Activity': CONTROL.replace(
     'android:name=".Other" android:configChanges="keyboard"',
