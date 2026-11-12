@@ -4,8 +4,34 @@ name: Share-card native originals
 # the gate requires a skip there and a success everywhere else.
 on:
   pull_request:
+  # A merge to main runs every device lane (10 jobs, 4 on macOS, 41 to 118 minutes), which
+  # held half of the account's 20 concurrent jobs. It runs only when a file the lanes build,
+  # run or read changed; the nightly run covers everything. scripts/ci/share-card-paths.test.mjs
+  # checks the filter against representative inputs and the last 20 commits on main.
   push:
     branches: [main]
+    paths:
+      # Root files: package.json, package-lock.json, tsconfig.json, app.json, .nvmrc.
+      - '*'
+      - '.nvmrc'
+      - 'apps/**'
+      - 'packages/**'
+      - 'supabase/**'
+      - 'scripts/**'
+      - 'maestro/**'
+      - 'playwright/share-card.config.ts'
+      - 'playwright/tests/share-card-*.spec.ts'
+      - 'playwright/support/**'
+      - '.github/actions/**'
+      - '.github/workflows/pr-share-card-native.yml'
+      - '!**/*.md'
+      # App unit and integration tests run in other workflows, except the two plugin suites
+      # this workflow's share-card-plugins gate runs (scripts/ci/node-test-suites.json).
+      - '!apps/**/*.test.*'
+      - '!apps/**/*.spec.*'
+      - '!apps/api/integration/**'
+      - 'apps/mobile/plugins/with-share-card-permissions.test.js'
+      - 'apps/mobile/plugins/with-story68-release-network.test.js'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
