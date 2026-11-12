@@ -357,6 +357,8 @@ TEA on R2 (`e40c65d8`), 2026-11-12: the test design is aligned with R2-01 to R2-
 
 TEA on R3, 2026-11-12: the test design is aligned with R3-01 to R3-07. The items are SP-01 (locale and layout direction in place, density for recreation), F-12 (whole-manifest diff and the extra-Activity mutant), C-01 and C-04 (completed observations only), S0-01 (format-version mutants), S2-08 (finite ratios bound to evidence, negative cases), S4-15 (debuggable, `__DEV__` and R8 asserted separately) and S4-14 (separate project, store check before every transition and the projection, production-negative paid-row tests). The frozen D5 "Android surviving tree" paragraph still says locale changes recreate and lists `locale` among the F-12 mutants; R3-07 changes both.
 
+TEA on R4, 2026-11-12: the test design is aligned with R4-01 to R4-08. The new tests are F-13 to F-17 for the driver, and the existing S4-14, S2-08 and C-01 are extended. F-00q now follows the helper: prereleases are not fix-expected, and a stable-version guard backs the rule.
+
 ## Review Triage Log
 
 (Filled in per review pass.)
@@ -384,7 +386,7 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
   - The oracle checks Activity, scene and root identity before any scroll or cold reference.
   - Per-style growth comes from the platform converter (Android 14 nonlinear fixtures; iOS per text style).
   - Each text node gets a direct clipping check, repeated after a post-change React update.
-  - Below 0.87 a residual run passes only inside the approved predicate for its platform, configuration and screen in the reviewed baseline file, and anything outside fails until a PR adjudicates it (F-00a to F-00a3, F-09). The version switch is proved by a residual fixture (passes at 0.86.3, fails from 0.87.0) and a healthy fixture (passes on both), with 0.87 prereleases counted as 0.87 (F-00q). Cold captures are layout fixtures only, and a provenance test rejects a cold capture presented as live (F-00b, F-00b2). From Step 4 only a complete fix passes, 3 identical runs per platform and configuration.
+  - Below 0.87 a residual run passes only inside the approved predicate for its platform, configuration and screen in the reviewed baseline file, and anything outside fails until a PR adjudicates it (F-00a to F-00a3, F-09). The version switch is proved by a residual fixture (passes at 0.86.3, fails from 0.87.0) and a healthy fixture (passes on both), where the helper compares by semver, so `0.87.0-rc.0` is not fix-expected. No step ships a prerelease, and a guard asserts each step's bundled version is stable (F-00q). Cold captures are layout fixtures only, and a provenance test rejects a cold capture presented as live (F-00b, F-00b2). From Step 4 only a complete fix passes, 3 identical runs per platform and configuration.
 - Large-text cold matrix.
 - U-05 installed-predecessor upgrade: the previous `main` Release, then the head Release, under one certificate. Android carries task registration too. The iOS simulator asserts retained state only (session, ritual cache, locale, theme, scene and deep-link state) and nothing about registration (R2-01).
 - C-02 timing table: every PR job's queue plus run p95 is 15 minutes or less, with a maximum of 20.
@@ -393,16 +395,22 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
 
 - Step 0:
   - SP-01, the TEA-16 spike (R2-03): matched SDK 54 Release pairs with and without the plugin on one emulator and SDK 58 pairs; four screens, both directions; theme, locale and layout direction updating in place (same Activity, correct language and geometry, retained state; `expo-localization` already handles `locale|layoutDirection`); density as the recreation and restoration evidence; OS and JS scale, identity and layout in every capture, so a no-op change fails (R3-07). Then F-12: a whole-manifest diff against the control that allows only the one `MainActivity` token. Its mutants are `fontScale` removed, the tokens replaced, `density` added, `fontScale` on an extra Activity, and any other change (R3-06).
+  - Driver tests (R4):
+    - F-13: a nonzero exit on any failed or incomplete required check, with an aggregate verdict.
+    - F-14: the post-update capture rechecks identity, full text, anchors and controls against `coldUpdated`, on every screen and the return leg.
+    - F-15: the real `wm_on_create_called` format, with an unavailable log never read as zero, and missing Activity identity rejected.
+    - F-16: 44 pt on iOS with no `adb` call, and 48 dp converted on Android.
+    - F-17: the full iOS category sequence and its return on one live launch.
   - Oracle fixtures F-00a to F-00q: residual predicate in and out, baseline file review, cold layout fixtures and cold-as-live provenance, stale clone, clipping, blank text, restart, same-PID recreation mutant, remount mutant, scene change, nonlinear growth, early fix, driver order, return leg, version switch.
   - The SDK 54 positive control F-01.
   - P0-05 to P0-07, and P0-08, which covers the simulator's retained state only. P0-09, the physical-iPhone registration, scheduler and worker, is a D11 gate that holds iOS releases.
   - U-01 on the Android emulator.
   - S0-01, the structural prebuild diff (`f108b625`), with its mutants: a `gradle.properties` value, a build-phase order swap, a retargeted configuration, a real-project phase swap, and `objectVersion` and `archiveVersion` changes (R3-04).
-  - C-01 timing units (failed, timed-out, cancelled, queue-only lower bound, skipped with reason, queue-inclusive breach; an in-flight lower bound never passes; acceptance needs 20 completed observations, failed and cancelled kept; R3-05) and the C-01b lane fixtures after the owner's go.
+  - C-01 timing units (failed, timed-out, cancelled, queue-only lower bound, skipped with reason, queue-inclusive breach; an in-flight lower bound never passes; acceptance needs 20 completed observations, failed and cancelled kept; R3-05; grouped per stable job identity with exact `--job` matching, mixed cohorts rejected, and a fast-job dilution fixture; R4-08) and the C-01b lane fixtures after the owner's go.
 - Every step from Step 0, the RevenueCat Test Store (D15):
   - S4-12 journey in debuggable builds on the emulator and simulator: offerings; failure and cancel leave no entitlement; success shows it in `CustomerInfo`, on the server and on `GET premium/access`, through the preview-API webhook and local reconciliation; the over-install from the previous step's paid debuggable build (from Step 1, pinned test keystore); restore after reinstall.
   - S4-13 evidence and key hygiene: config spec, bundle scan of production and preview exports, and the `test_` key refused outside `__DEV__`.
-  - S4-14 server (R3-01):
+  - S4-14 server (R3-01, R4-01): null, missing and invalid expiry and a missing product on refresh and reconciliation, for unsupported and supported stores, keep the paid row; store provenance is checked before any absence projection;
     - Test Store lives in its own RevenueCat project, whose keys never reach production.
     - Unsupported stores are rejected before every transition (`TRANSFER` included) and before the REST projection, and an unknown store never becomes a real store.
     - `test_store` is applied only when `TEST_ENV` is local or preview.
@@ -422,6 +430,8 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
     - The hold file is mandatory from SDK 56.
     - A lift needs finite, positive ratios within 10% of the Step 1 control and a real evidence artifact bound to the SDK, build, `expo` version and that control.
     - Refusal cases: null, zero, negative or non-finite ratios; a missing artifact; a mismatched SDK, build, `expo` version or control; an earlier-SDK lift; SDK 57 below 57.0.17.
+    - Further refusal cases (R4-02): an untracked or modified artifact, a nonexistent revision, a wrong build, and an inconsistent control (not the SDK 55 Step 1 merge, a mismatched `expo`, or the candidate itself).
+    - Evidence-only follow-up policy: the released commit is the candidate or a descendant that changes only the hold file and the evidence directory.
   - U-05 with the Photos add-only and denied states and a real PNG save.
 - Step 3: plugin specs on a clean tree; S3-02, the memory run on `expo` 57.0.17 or later with its lift recorded (without it the hold stays and Step 4's release cannot open); S3-03 scene opt-in checks on Xcode 26.x.
 - Step 4:
