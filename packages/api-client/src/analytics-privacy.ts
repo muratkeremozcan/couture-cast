@@ -528,7 +528,7 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
     if (!event) return event
     try {
       // Rules run on exactly what would reach the wire: serializing first applies every
-      // toJSON, reads every getter once and leaves only plain arrays, records and primitives,
+      // toJSON and getter once per serialized occurrence and leaves only plain data,
       // so no value can pass a rule and then serialize as something else.
       const source = snapshotOf(event)
       if (!source) return null
