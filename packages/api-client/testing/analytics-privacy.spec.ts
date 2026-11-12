@@ -184,6 +184,28 @@ describe('analytics privacy filter: events and properties', () => {
       } as unknown as Event)
     ).toBeNull()
 
+    // A toJSON that returns nothing on the first read and a token on the next.
+    let uuidReads = 0
+    const vanishing = {
+      toJSON: () => (++uuidReads === 1 ? undefined : invitationToken),
+    }
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: 'modal_opened',
+        uuid: vanishing,
+      } as unknown as Event)
+    ).toBeNull()
+
+    // What JSON cannot carry costs the value, never the event.
+    const cyclic: Record<string, unknown> = { locale: 'en-US' }
+    cyclic.self = cyclic
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: 'modal_opened',
+        properties: { locale: 'en-US', size: BigInt(1), loop: cyclic },
+      } as unknown as Event)
+    ).toEqual({ event: 'modal_opened', properties: { locale: 'en-US' } })
+
     // An Array subclass keeps its species through filter, slice and map.
     class LeakyArray<T> extends Array<T> {
       toJSON() {

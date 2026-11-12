@@ -457,6 +457,35 @@ export function analyticsEventNames(platform: AnalyticsPlatform): string[] {
   ]
 }
 
+/**
+ * A JSON.stringify replacer that leaves out what JSON cannot carry instead of throwing: a
+ * BigInt, and any object met a second time (a cycle, or a shared reference; leaving it out
+ * only sends less).
+ */
+function jsonSafe() {
+  const seen = new WeakSet<object>()
+  return (_key: string, value: unknown) => {
+    if (typeof value === 'bigint') return undefined
+    if (typeof value === 'object' && value !== null) {
+      if (seen.has(value)) return undefined
+      seen.add(value)
+    }
+    return value
+  }
+}
+
+/**
+ * The event as plain JSON data, or null. React Native puts the original uuid back when the
+ * result has none, and a toJSON can vanish from the snapshot once and return a token later,
+ * so an own uuid that the snapshot lost drops the event.
+ */
+function snapshotOf(event: object): Record<string, unknown> | null {
+  const snapshot: unknown = JSON.parse(JSON.stringify(event, jsonSafe()))
+  if (!isPlainRecord(snapshot)) return null
+  if (has(event, 'uuid') && snapshot.uuid === undefined) return null
+  return snapshot
+}
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ISO_TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/
@@ -498,9 +527,8 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
       // Rules run on exactly what would reach the wire: serializing first applies every
       // toJSON, reads every getter once and leaves only plain arrays, records and primitives,
       // so no value can pass a rule and then serialize as something else.
-      const snapshot: unknown = JSON.parse(JSON.stringify(event))
-      if (!isPlainRecord(snapshot)) return null
-      const source = snapshot
+      const source = snapshotOf(event)
+      if (!source) return null
       const name = source.event
       if (typeof name !== 'string') return null
       const eventRules = has(ANALYTICS_EVENT_PROPERTIES, name)

@@ -387,6 +387,10 @@ describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
       privacyClient.capture('modal_opened', { locale: 'en-US' }, {
         uuid: { toJSON: () => tokenUrl },
       } as unknown as Parameters<PostHog['capture']>[2])
+      let reads = 0
+      privacyClient.capture('tab_two_viewed', {}, {
+        uuid: { toJSON: () => (++reads === 1 ? undefined : tokenUrl) },
+      } as unknown as Parameters<PostHog['capture']>[2])
       privacyClient.capture('deep_link_invalid', {
         param_keys: keys as unknown as string[],
         surface: 'mobile',
@@ -394,6 +398,7 @@ describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
       return Promise.resolve()
     })
     expect(items.some((item) => item.event === 'modal_opened')).toBe(false)
+    expect(items.some((item) => item.event === 'tab_two_viewed')).toBe(false)
     expect(propertiesOf(items, 'deep_link_invalid')).not.toHaveProperty('param_keys')
     expect(propertiesOf(items, 'deep_link_invalid').surface).toBe('mobile')
     expect(JSON.stringify(items)).not.toContain(invitationToken)
