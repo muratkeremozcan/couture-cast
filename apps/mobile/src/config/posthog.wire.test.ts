@@ -373,6 +373,32 @@ describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
     for (const leak of leaks) expect(serialized).not.toContain(leak)
   })
 
+  it('sends no caller object whose own serialization carries a token', async () => {
+    const tokenUrl = `https://couturecast.app/guardian/accept?token=${invitationToken}`
+    class LeakyArray<T> extends Array<T> {
+      toJSON() {
+        return tokenUrl
+      }
+    }
+    const keys = new LeakyArray<string>()
+    keys.push('source')
+    const items = await privacyBatch((privacyClient) => {
+      // posthog-react-native puts the original uuid back when before_send returns none.
+      privacyClient.capture('modal_opened', { locale: 'en-US' }, {
+        uuid: { toJSON: () => tokenUrl },
+      } as unknown as Parameters<PostHog['capture']>[2])
+      privacyClient.capture('deep_link_invalid', {
+        param_keys: keys as unknown as string[],
+        surface: 'mobile',
+      })
+      return Promise.resolve()
+    })
+    expect(items.some((item) => item.event === 'modal_opened')).toBe(false)
+    expect(propertiesOf(items, 'deep_link_invalid')).not.toHaveProperty('param_keys')
+    expect(propertiesOf(items, 'deep_link_invalid').surface).toBe('mobile')
+    expect(JSON.stringify(items)).not.toContain(invitationToken)
+  })
+
   it('sends exceptions as type and code locations only', async () => {
     const items = await privacyBatch((privacyClient) => {
       privacyClient.captureException(

@@ -461,28 +461,26 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ISO_TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/
 
-/** A fresh Date or an ISO string for the event time; anything else is left out. */
-function envelopeTimestamp(value: unknown): Date | string | undefined {
-  if (value instanceof Date) {
-    const time = value.getTime()
-    return Number.isFinite(time) ? new Date(time) : undefined
-  }
-  return typeof value === 'string' && ISO_TIMESTAMP.test(value) ? value : undefined
-}
-
 /**
- * The outgoing event. The envelope is rebuilt from primitives too: an object here would
- * serialize through its own toJSON, past every property rule.
+ * The outgoing event, or null when its uuid is present but invalid: React Native restores
+ * the original uuid when the hook result has none, so leaving it out would not remove it.
+ * `source` is already a JSON snapshot, so the event time arrives as its serialized string.
  */
 function envelope(
   source: Record<string, unknown>,
   name: string,
   properties: Record<string, unknown>
-) {
+): Record<string, unknown> | null {
   const result: Record<string, unknown> = { event: name, properties }
-  if (typeof source.uuid === 'string' && UUID.test(source.uuid)) result.uuid = source.uuid
-  const timestamp = envelopeTimestamp(source.timestamp)
-  if (timestamp !== undefined) result.timestamp = timestamp
+  if (source.uuid !== undefined) {
+    if (typeof source.uuid !== 'string' || !UUID.test(source.uuid)) return null
+    result.uuid = source.uuid
+  }
+  // Both SDKs hand the hook a Date and compute offsets from it, so the time goes back as one.
+  if (typeof source.timestamp === 'string' && ISO_TIMESTAMP.test(source.timestamp)) {
+    const time = Date.parse(source.timestamp)
+    if (Number.isFinite(time)) result.timestamp = new Date(time)
+  }
   return result
 }
 
@@ -497,7 +495,12 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
   return function analyticsPrivacyFilter<T extends object>(event: T | null): T | null {
     if (!event) return event
     try {
-      const source = event as Record<string, unknown>
+      // Rules run on exactly what would reach the wire: serializing first applies every
+      // toJSON, reads every getter once and leaves only plain arrays, records and primitives,
+      // so no value can pass a rule and then serialize as something else.
+      const snapshot: unknown = JSON.parse(JSON.stringify(event))
+      if (!isPlainRecord(snapshot)) return null
+      const source = snapshot
       const name = source.event
       if (typeof name !== 'string') return null
       const eventRules = has(ANALYTICS_EVENT_PROPERTIES, name)
@@ -518,7 +521,7 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
         const value = rule(properties[key], platform)
         if (value !== DROP) sanitized[key] = value
       }
-      return envelope(source, name, sanitized) as T
+      return envelope(source, name, sanitized) as T | null
     } catch {
       return null
     }

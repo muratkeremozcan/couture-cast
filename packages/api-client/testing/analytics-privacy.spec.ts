@@ -167,30 +167,72 @@ describe('analytics privacy filter: events and properties', () => {
         return invitationToken
       }
     }
-    const sent = mobileAnalyticsPrivacyFilter<Event>({
+    const stamped = mobileAnalyticsPrivacyFilter<Event>({
       event: 'modal_opened',
-      uuid: leaky,
       timestamp: new StampedDate(0),
       properties: { locale: leaky, surface: leaky },
     } as unknown as Event)
-    expect(sent).toEqual({
-      event: 'modal_opened',
-      properties: {},
-      timestamp: new Date(0),
+    expect(stamped).toEqual({ event: 'modal_opened', properties: {} })
+    expectNoLeak(stamped)
+
+    // React Native puts the original uuid back when the result has none, so an invalid
+    // uuid drops the whole event.
+    expect(
+      mobileAnalyticsPrivacyFilter<Event>({
+        event: 'modal_opened',
+        uuid: leaky,
+      } as unknown as Event)
+    ).toBeNull()
+
+    // An Array subclass keeps its species through filter, slice and map.
+    class LeakyArray<T> extends Array<T> {
+      toJSON() {
+        return `https://couturecast.app/guardian/accept?token=${invitationToken}`
+      }
+    }
+    const keys = new LeakyArray<string>()
+    keys.push('source')
+    const list = new LeakyArray<unknown>()
+    list.push({ type: 'UploadError', stacktrace: { frames: [] } })
+    const arrays = webAnalyticsPrivacyFilter<Event>({
+      event: 'deep_link_invalid',
+      properties: { param_keys: keys, surface: 'web' },
     })
-    expect(Object.getPrototypeOf(sent?.timestamp)).toBe(Date.prototype)
-    expectNoLeak(sent)
+    expect(arrays?.properties).toEqual({ surface: 'web' })
+    expectNoLeak(arrays)
+    const exceptionArrays = mobileAnalyticsPrivacyFilter<Event>({
+      event: '$exception',
+      properties: { $exception_list: list },
+    })
+    expectNoLeak(exceptionArrays)
+
+    // A getter can pass a check on one read and return an object on the next.
+    let reads = 0
+    const frame = Object.defineProperty(
+      { filename: 'app-4f2a.js', in_app: true },
+      'lineno',
+      { enumerable: true, get: () => (++reads === 1 ? 12 : leaky) }
+    )
+    const framed = mobileAnalyticsPrivacyFilter<Event>({
+      event: '$exception',
+      properties: {
+        $exception_list: [{ type: 'UploadError', stacktrace: { frames: [frame] } }],
+      },
+    })
+    expectNoLeak(framed)
+    expect(reads).toBe(1)
+
     expect(
       webAnalyticsPrivacyFilter<Event>({
         event: 'modal_opened',
         uuid: '0190f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c6d',
-        timestamp: '2026-11-11T22:00:00.000Z',
+        timestamp: new Date('2026-11-11T22:00:00.000Z'),
       } as unknown as Event)
     ).toEqual({
       event: 'modal_opened',
       properties: {},
       uuid: '0190f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c6d',
-      timestamp: '2026-11-11T22:00:00.000Z',
+      timestamp: new Date('2026-11-11T22:00:00.000Z'),
     })
   })
 
