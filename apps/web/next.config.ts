@@ -60,9 +60,6 @@ const apiProxyBaseUrl = isProductionRuntime
     process.env.VERCEL_API_BASE_URL ||
     process.env.VERCEL_API_BRANCH_URL ||
     process.env.PROD_API_BASE_URL
-const posthogAssetsHost = posthogHost.includes('.i.posthog.com')
-  ? posthogHost.replace('.i.posthog.com', '-assets.i.posthog.com')
-  : 'https://us-assets.i.posthog.com'
 
 const nextConfig: NextConfig = {
   // The real-session E2E harness (scripts/e2e-real-session/run.mjs) builds a
@@ -85,18 +82,24 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  // Production analytics privacy: every response tells the browser to send only the
+  // origin as Referer, so no request (our API, PostHog, a partner) learns a page's path
+  // or query, such as a guardian invitation token. Nothing in the web app or the API
+  // reads a same-origin Referer path.
+  headers() {
+    return Promise.resolve([
+      {
+        source: '/:path*',
+        headers: [{ key: 'Referrer-Policy', value: 'strict-origin' }],
+      },
+    ])
+  },
+  // /ingest is served by src/app/ingest/[...path]/route.ts, which forwards only the
+  // headers PostHog needs. A rewrite would forward every browser header, Referer and
+  // cookies included.
   rewrites() {
     const routes: NonNullable<Awaited<ReturnType<NonNullable<NextConfig['rewrites']>>>> =
-      [
-        {
-          source: '/ingest/static/:path*',
-          destination: `${posthogAssetsHost}/static/:path*`,
-        },
-        {
-          source: '/ingest/:path*',
-          destination: `${posthogHost}/:path*`,
-        },
-      ]
+      []
 
     if (apiProxyBaseUrl) {
       routes.push({

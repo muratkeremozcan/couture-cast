@@ -46,7 +46,10 @@ import {
   posthog,
   posthogProviderClient,
 } from './posthog'
-import { SHARE_CARD_SHARED_ALLOWED_PROPERTIES } from '@couture/api-client'
+import {
+  SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
+  mobileAnalyticsPrivacyFilter,
+} from '@couture/api-client'
 
 bootstrap.restoreConsole()
 
@@ -92,7 +95,60 @@ describe('mobile PostHog provider configuration', () => {
       fetchRetryCount: 3,
       requestTimeout: 10000,
       captureAppLifecycleEvents: true,
-      preloadFeatureFlags: true,
+    })
+  })
+
+  /**
+   * Production analytics privacy: members are 13 to 15 (with guardian consent) and
+   * upload wardrobe photos, so the app sends explicit events, screens and exceptions
+   * only. No session replay, no surveys, no person profile for anonymous members, and
+   * no feature flag or remote config request (the app reads no PostHog flag).
+   */
+  it('U-ANALYTICS-PRIVACY-MOBILE: turns replay, surveys and flags off and exceptions on', () => {
+    expect(bootstrap.constructions[0]?.options).toMatchObject({
+      enableSessionReplay: false,
+      disableSurveys: true,
+      disableRemoteConfig: true,
+      preloadFeatureFlags: false,
+      sendFeatureFlagEvent: false,
+      disableGeoip: true,
+      personProfiles: 'identified_only',
+      errorTracking: {
+        autocapture: {
+          uncaughtExceptions: true,
+          unhandledRejections: true,
+          console: false,
+        },
+      },
+    })
+  })
+
+  it('U-ANALYTICS-PRIVACY-MOBILE: runs the privacy filter first, then the share allowlist', () => {
+    const hooks = bootstrap.constructions[0]?.options.before_send as ((
+      event: HookEvent | null
+    ) => HookEvent | null)[]
+    expect(hooks).toEqual([mobileAnalyticsPrivacyFilter, mobilePostHogBeforeSend])
+    const viewed: HookEvent = {
+      event: 'tab_one_viewed',
+      properties: {
+        locale: 'en-US',
+        email: 'member@example.com',
+        displayName: 'Teen Member',
+        date_of_birth: '2011-04-01',
+        $device_name: "Alice's iPhone",
+      } as HookEvent['properties'],
+      $set: { email: 'member@example.com', plan: 'premium' } as HookEvent['$set'],
+      $set_once: { birthdate: '2011-04-01' } as HookEvent['$set'],
+    }
+    const sent = hooks.reduce<HookEvent | null>((event, hook) => hook(event), viewed)
+    expect(sent).toEqual({
+      event: 'tab_one_viewed',
+      properties: {
+        locale: 'en-US',
+        $geoip_disable: true,
+        $ip: null,
+        $process_person_profile: false,
+      },
     })
   })
 
@@ -138,8 +194,11 @@ const enriched = {
 }
 
 describe('U-SHARE-SANITIZER-MOBILE: before_send for share_card_shared', () => {
-  it('installs the exported hook as the SDK before_send option', () => {
-    expect(bootstrap.constructions[0]?.options.before_send).toBe(mobilePostHogBeforeSend)
+  it('installs the exported hook as the last SDK before_send hook', () => {
+    expect(bootstrap.constructions[0]?.options.before_send).toEqual([
+      mobileAnalyticsPrivacyFilter,
+      mobilePostHogBeforeSend,
+    ])
   })
 
   it('keeps the envelope, allowlists properties and removes every $set', () => {

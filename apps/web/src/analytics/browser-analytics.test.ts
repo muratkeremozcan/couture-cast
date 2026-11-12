@@ -1,8 +1,11 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CaptureResult } from 'posthog-js'
-import { SHARE_CARD_SHARED_ALLOWED_PROPERTIES } from '@couture/api-client'
+import type { BeforeSendFn, CaptureResult, PostHogConfig } from 'posthog-js'
+import {
+  SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
+  webAnalyticsPrivacyFilter,
+} from '@couture/api-client'
 
 const posthog = vi.hoisted(() => ({
   init: vi.fn(),
@@ -49,7 +52,7 @@ const enriched = {
 }
 const timestamp = new Date('2026-10-30T12:00:00.000Z')
 const shareEvent = (properties: Record<string, unknown> = enriched): CaptureResult => ({
-  uuid: '0199-share',
+  uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c61',
   event: 'share_card_shared',
   properties,
   $set: { email: 'member@example.test' },
@@ -70,7 +73,7 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const result = shareCardSharedBeforeSend(shareEvent())
     expect(result).toEqual({
-      uuid: '0199-share',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c61',
       event: 'share_card_shared',
       timestamp,
       properties: { ...business, ...sdk, ...privacy },
@@ -98,7 +101,7 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
   it('passes every other event through untouched', async () => {
     const { shareCardSharedBeforeSend } = await import('./browser-analytics')
     const pageview: CaptureResult = {
-      uuid: '0199-pageview',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
       event: '$pageview',
       properties: { ...enriched },
       $set: { email: 'member@example.test' },
@@ -171,7 +174,9 @@ describe('browser analytics initialization', () => {
     browserAnalytics.capture('share_card_shared', business)
     expect(posthog.init).toHaveBeenCalledExactlyOnceWith(
       'phc_project',
-      expect.objectContaining({ before_send: shareCardSharedBeforeSend })
+      expect.objectContaining({
+        before_send: [webAnalyticsPrivacyFilter, shareCardSharedBeforeSend],
+      })
     )
     expect(window.__capturedAnalyticsEvents).toEqual([
       { event: 'share_card_shared', properties: business },
@@ -193,5 +198,115 @@ describe('browser analytics initialization', () => {
     expect(initializeBrowserAnalytics()).toBe(browserAnalytics)
     expect(posthog.init).not.toHaveBeenCalled()
     expect(posthog.capture).not.toHaveBeenCalled()
+  })
+})
+
+/** The options posthog-js was initialized with, from the single init call. */
+async function initOptions(testMode: boolean): Promise<Partial<PostHogConfig>> {
+  vi.stubEnv('POSTHOG_API_KEY', 'phc_project')
+  if (testMode) window.__enableAnalyticsTestHook = true
+  const { initializeBrowserAnalytics } = await import('./browser-analytics')
+  initializeBrowserAnalytics()
+  expect(posthog.init).toHaveBeenCalledOnce()
+  return posthog.init.mock.calls[0]![1] as Partial<PostHogConfig>
+}
+
+/**
+ * Production analytics privacy: CoutureCast has members aged 13 to 15 (with guardian
+ * consent) and wardrobe photos, so the browser SDK only sends explicit events,
+ * pageviews and exceptions. Nothing records the screen, reads element text or inputs,
+ * shows a survey or builds a person profile for an anonymous visitor.
+ */
+describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
+  const privacy = {
+    autocapture: false,
+    rageclick: false,
+    capture_dead_clicks: false,
+    capture_heatmaps: false,
+    disable_session_recording: true,
+    disable_surveys: true,
+    disable_product_tours: true,
+    disable_conversations: true,
+    mask_all_text: true,
+    mask_all_element_attributes: true,
+    mask_personal_data_properties: true,
+    person_profiles: 'identified_only',
+    // No /flags or remote config request, and no stored initial URL or referrer.
+    advanced_disable_flags: true,
+    save_referrer: false,
+    save_campaign_params: false,
+  }
+
+  it('turns off autocapture, recording and surveys and keeps pageviews and exceptions', async () => {
+    const options = await initOptions(false)
+    expect(options).toMatchObject({
+      ...privacy,
+      capture_pageview: 'history_change',
+      capture_exceptions: true,
+      session_recording: { maskAllInputs: true, maskTextSelector: '*' },
+    })
+  })
+
+  it('loads only the exception autocapture script; logs, remote config JS and the rest are blocked', async () => {
+    const prepare = (await initOptions(false)).prepare_external_dependency_script!
+    const script = (src: string) => {
+      const tag = document.createElement('script')
+      tag.src = src
+      return tag
+    }
+    const allowed = script('/ingest/static/exception-autocapture.js?v=1.356.1')
+    expect(prepare(allowed)).toBe(allowed)
+    for (const blocked of [
+      '/ingest/static/logs.js?v=1.356.1',
+      '/ingest/array/phc_project/config.js',
+      '/ingest/static/lazy-recorder.js?v=1.356.1',
+      '/ingest/static/surveys.js?v=1.356.1',
+      '/ingest/static/toolbar.js?v=1.356.1&t=1',
+      '/ingest/static/web-vitals.js?v=1.356.1',
+      '/ingest/static/exception-autocapture.js.evil/logs.js',
+      'https://evil.example/static/exception-autocapture.js',
+    ])
+      expect(prepare(script(blocked))).toBeNull()
+  })
+
+  it('keeps the same privacy switches in analytics test mode', async () => {
+    const options = await initOptions(true)
+    expect(options).toMatchObject({
+      ...privacy,
+      capture_pageview: false,
+      capture_exceptions: false,
+    })
+  })
+
+  it('sends only allowlisted properties and no person updates', async () => {
+    const hooks = (await initOptions(false)).before_send as BeforeSendFn[]
+    const pageview: CaptureResult = {
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
+      event: '$pageview',
+      properties: {
+        $current_url: 'https://couturecast.app/profile/alice-smith?token=guardian-secret',
+        email: 'member@example.test',
+        name: 'Teen Member',
+        birthdate: '2011-04-01',
+        plan_tier: 'premium',
+        $set: { email: 'member@example.test' },
+      },
+      $set: { email: 'member@example.test', name: 'Teen Member', plan: 'premium' },
+      $set_once: { birthdate: '2011-04-01' },
+    }
+    const sent = hooks.reduce<CaptureResult | null>(
+      (event, hook) => hook(event),
+      pageview
+    )
+    expect(sent).toEqual({
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
+      event: '$pageview',
+      properties: {
+        $current_url: 'https://couturecast.app/:unknown',
+        $geoip_disable: true,
+        $ip: null,
+        $process_person_profile: false,
+      },
+    })
   })
 })

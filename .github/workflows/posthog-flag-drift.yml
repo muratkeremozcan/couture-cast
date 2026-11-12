@@ -7,7 +7,9 @@
 # new flag runs it too, so the flag exists in production before the code that reads it merges.
 #
 # Two inputs: POSTHOG_FLAG_READ_KEY, a repository secret holding a personal API key limited to
-# feature_flag:read on project 329012, reads the flag definitions (targeting, rollout, variants);
+# feature_flag:read and project:read on project 329012, reads the flag definitions (targeting,
+# rollout, variants) and the project's Discard client IP data setting, which the analytics privacy
+# boundary needs on;
 # POSTHOG_PROD_PROJECT_TOKEN, a repository variable holding the public project token the runtime
 # ships with, runs the server-side evaluation probes. The job fails closed without either.
 name: PostHog flag drift

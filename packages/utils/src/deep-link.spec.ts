@@ -3,7 +3,12 @@
 // Learning path Step 46: Home spotlight teaser.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 import { describe, expect, it, vi } from 'vitest'
-import { hasDeepLinkIntent, parseDeepLink, resolveDeepLinkScenario } from './deep-link'
+import {
+  DEEP_LINK_FAILURE_REASONS,
+  hasDeepLinkIntent,
+  parseDeepLink,
+  resolveDeepLinkScenario,
+} from './deep-link'
 
 describe('parseDeepLink', () => {
   it('parses valid widget deep links with slot am', () => {
@@ -105,6 +110,26 @@ describe('parseDeepLink', () => {
     const result = parseDeepLink({ source: 'widget', slot: 'bad_slot' })
     expect(result.valid).toBe(false)
     expect(result.errorReason).toContain('slot')
+  })
+
+  it('names the failing field and issue code, never the received value', () => {
+    // The reason goes to analytics as deep_link_invalid.reason, and link values carry
+    // ids, tokens and sometimes emails.
+    for (const params of [
+      { source: 'teen@example.test', slot: 'am' },
+      { source: 'widget', slot: 'eyJsecret-token' },
+    ]) {
+      const result = parseDeepLink(params)
+      expect(result.valid).toBe(false)
+      expect(result.errorReason).toMatch(/^(source|slot): [a-z_]+$/)
+      expect(result.errorReason).not.toMatch(/teen@example|eyJsecret/)
+      expect(DEEP_LINK_FAILURE_REASONS).toContain(result.errorReason)
+    }
+    // Refinement failures keep their field and send the code, not the message.
+    expect(
+      parseDeepLink({ source: 'notification', type: 'community', commentId: 'root-1' })
+        .errorReason
+    ).toBe('commentId: custom')
   })
 
   it('rejects missing source parameter', () => {

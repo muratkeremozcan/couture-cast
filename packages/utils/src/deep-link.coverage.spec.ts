@@ -22,7 +22,7 @@ describe('community notification target boundaries', () => {
     const result = parseDeepLink(params, now)
     expect(result).toEqual({
       valid: false,
-      errorReason: 'commentId: Comment targets require a community card.',
+      errorReason: 'commentId: custom',
     })
     expect(result.payload).toBeUndefined()
   })

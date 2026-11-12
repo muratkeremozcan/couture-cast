@@ -129,6 +129,20 @@ const deepLinkIntentKeys = [
   'expiresAt',
 ] as const
 
+/**
+ * Every `errorReason` parseDeepLink can return: three fixed reasons, and the failing
+ * field with its Zod issue code. Analytics sends `deep_link_invalid.reason` only when it
+ * is one of these.
+ */
+export const DEEP_LINK_FAILURE_REASONS: readonly string[] = Object.freeze([
+  'Missing source parameter',
+  'Deep link expired',
+  'Invalid deep link parameters',
+  ...['', ...deepLinkIntentKeys].flatMap((field) =>
+    Object.values(z.ZodIssueCode).map((code) => `${field}: ${code}`)
+  ),
+])
+
 export function hasDeepLinkIntent(params: Record<string, unknown>): boolean {
   return deepLinkIntentKeys.some((key) => {
     const value = params[key]
@@ -159,10 +173,12 @@ export function parseDeepLink(
   const parsed = deepLinkSchema.safeParse(normalizedParams)
   if (!parsed.success) {
     const firstIssue = parsed.error.issues[0]
+    // The reason reaches analytics as one of DEEP_LINK_FAILURE_REASONS: the field and
+    // the issue code, never a message, because Zod's messages quote the received value.
     return {
       valid: false,
       errorReason: firstIssue
-        ? `${firstIssue.path.join('.')}: ${firstIssue.message}`
+        ? `${firstIssue.path.join('.')}: ${firstIssue.code}`
         : 'Invalid deep link parameters',
     }
   }
