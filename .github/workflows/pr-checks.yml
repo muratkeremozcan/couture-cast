@@ -30,13 +30,49 @@ env:
   # skip, when their schema probe fails.
   LOCATION_PREFERENCES_REAL_DB_INTEGRATION: 'true'
   COVERAGE_GIST_ID: 64348ebdc6e662b93ade9f40bdc03442
+  # The playwright-unit job runs the Playwright helper unit tests once per push, so the
+  # Lighthouse gate's `prepare:playwright` skips its own copy of them.
+  PLAYWRIGHT_UNIT_LANE: '1'
 
 jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: pr-checks.yml
+        run: node scripts/ci/lanes.mjs
+
   # The quality checks run as parallel jobs so none of them holds a PR for the
   # sum of the others; the last step of `tests` aggregates them. Each job states the
   # same check it ran as a step of the single former job.
   typecheck:
     name: Typecheck workspaces
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['typecheck']
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -93,6 +129,8 @@ jobs:
 
   lighthouse:
     name: Lighthouse accessibility gate
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['lighthouse']
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -137,15 +175,19 @@ jobs:
           path: playwright/artifacts/lighthouse/
 
   # One job for all workspaces took 19m41s of a 20 minute limit. The shards split it, and
-  # `scripts/ci/coverage-shards.mjs` keeps every workspace in exactly one of them.
+  # `scripts/ci/coverage-shards.mjs` keeps every workspace in exactly one of them. The lane
+  # plan lists the shards whose workspaces this push changed (coverage-api, coverage-mobile,
+  # coverage-other); an empty list skips the job, since a matrix of no rows is an error.
   tests-shard:
     name: Workspace coverage (${{ matrix.shard }})
+    needs: lanes
+    if: needs.lanes.outputs.coverage_shards != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        shard: [api, mobile, other]
+        shard: ${{ fromJSON(needs.lanes.outputs.coverage_shards) }}
     # `packages/db/test/**` holds the RLS actor matrix and every schema
     # constraint assertion, and it talks to a real PostgreSQL. It only started
     # running here when story 5.1 added `test:coverage` to that workspace, at
@@ -351,6 +393,8 @@ jobs:
   # mobile suite runs in a browser, which a Node preload cannot reach.
   unit-tests-year-ahead:
     name: Unit tests a year ahead
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['year-ahead']
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -403,12 +447,50 @@ jobs:
             exit 1
           fi
 
+  # The Playwright helper unit tests (vitest over playwright/support/helpers). They ran inside
+  # `prepare:playwright` in every Playwright job, once per job and only when a Playwright job
+  # ran; here they run once per push, whenever a file they read changes. The workflows that run
+  # Playwright beside this one set PLAYWRIGHT_UNIT_LANE so `prepare:playwright` skips them.
+  playwright-unit:
+    name: Playwright helper unit tests
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['playwright-unit']
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Setup Node environment
+        id: setup
+        uses: ./.github/actions/setup-node-env
+        with:
+          use-npm-ci: 'false'
+
+      # What `prepare:playwright` builds before the helper tests: the Prisma client and the
+      # shared packages the helpers import.
+      - name: Generate Prisma Client and build the packages the helpers import
+        id: build
+        run: |
+          npm run db:generate
+          npm run build --workspace @couture/config
+          npm run build --workspace @couture/utils
+          npm run build --workspace @couture/api-client
+          npm run build --workspace @couture/testing
+
+      # The `pretest:playwright-unit` hook verifies the community screening fixtures first.
+      - name: Run Playwright helper unit tests
+        run: npm run test:playwright-unit
+
   # The name every reader knows. It reports all shards as one coverage comment and goes red unless
-  # every shard passed, so a skipped or cancelled shard is a failure too.
+  # every shard the lane plan ran passed, so a planned shard that was skipped or cancelled is a
+  # failure too. A shard the plan skipped passes, and the merge step lists it with the reason.
   tests:
     name: Workspace tests with coverage
     # The quality gate, its own job until 2026-11-12, is this job's last step.
-    needs: [tests-shard, typecheck, lint, lighthouse]
+    needs: [lanes, tests-shard, typecheck, lint, lighthouse]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -435,14 +517,19 @@ jobs:
           merge-multiple: true
           path: .
 
+      # An unreadable plan (the lanes job failed) leaves the variable empty, and the merge then
+      # requires every shard.
       - name: Merge shard results
         id: tests
         if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        env:
+          COVERAGE_PLANNED_SHARDS: ${{ needs.lanes.outputs.coverage_shards }}
         run: node scripts/ci/coverage-shards.mjs merge
 
-      # Named `tests` so the comment reads the same outputs a single job gave it.
+      # Named `tests` so the comment reads the same outputs a single job gave it. With every
+      # shard skipped by the plan there is no coverage to report.
       - name: Coverage report and PR comment
-        if: ${{ !cancelled() && steps.tests.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.tests.outcome == 'success' && steps.tests.outputs.coverage_dirs != '[]' }}
         uses: ./.github/actions/unit-test-coverage-comment
         with:
           coverage-path: ./coverage
@@ -461,8 +548,9 @@ jobs:
         run: node --test scripts/ci/coverage-shards.test.mjs
 
       # `always()` so this names the real cause when the comment step above dies on missing coverage.
+      # A matrix the plan emptied is skipped; one that ran must succeed.
       - name: Fail unless every shard passed
-        if: ${{ always() && (needs.tests-shard.result != 'success' || steps.tests.outputs.outcome != 'success') }}
+        if: ${{ always() && ((needs.tests-shard.result != 'success' && !(needs.tests-shard.result == 'skipped' && needs.lanes.outputs.coverage_shards == '[]')) || steps.tests.outputs.outcome != 'success') }}
         env:
           SHARDS: ${{ needs.tests-shard.result }}
           OUTCOME: ${{ steps.tests.outputs.outcome }}
@@ -470,24 +558,50 @@ jobs:
           echo "::error::Workspace tests failed: shards ${SHARDS:-unknown}, merged outcome ${OUTCOME:-unknown}"
           exit 1
 
-      # Red when any quality check is red, cancelled or skipped, with every result named.
+      # Red when any quality check is red, cancelled or skipped, with every result named. A check
+      # the lane plan skipped passes, and only that: lint has no lane, and an unreadable plan
+      # (the lanes job failed) lets no skip through.
       - name: Quality gate requires every quality check to pass
         if: ${{ always() }}
         env:
           RESULTS: >-
             tests-shard=${{ needs.tests-shard.result }} lighthouse=${{ needs.lighthouse.result }}
             lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }}
+          PLAN: ${{ needs.lanes.outputs.plan }}
+          COVERAGE_SHARDS: ${{ needs.lanes.outputs.coverage_shards }}
         run: |
-          for result in $RESULTS; do
-            if [ "${result#*=}" != "success" ]; then
-              echo "::error::Quality gate failed: $RESULTS"
-              exit 1
+          # Prints true or false for a lane in the plan, or nothing when the plan is unreadable.
+          planned() {
+            printf '%s' "$PLAN" | jq -r --arg lane "$1" '.[$lane] | select(type == "boolean")' 2>/dev/null
+          }
+          failed=
+          for entry in $RESULTS; do
+            job="${entry%%=*}"
+            result="${entry#*=}"
+            if [ "$result" = success ]; then continue; fi
+            if [ "$result" = skipped ]; then
+              skip=false
+              case "$job" in
+                tests-shard) if [ "$COVERAGE_SHARDS" = '[]' ]; then skip=true; fi ;;
+                lighthouse | typecheck) if [ "$(planned "$job")" = false ]; then skip=true; fi ;;
+              esac
+              if [ "$skip" = true ]; then
+                echo "$job: skipped by the lane plan (see the Lanes job summary)"
+                continue
+              fi
             fi
+            failed="$failed $entry"
           done
+          if [ -n "$failed" ]; then
+            echo "::error::Quality gate failed:$failed (all results: $RESULTS)"
+            exit 1
+          fi
           echo "Quality gate passed: $RESULTS"
 
   community-realtime-budget:
     name: Community realtime cold-handshake budget
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['community']
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
@@ -568,6 +682,8 @@ jobs:
 
   community-screening-gates:
     name: Community corpus and mixed workload budgets
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['community']
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:

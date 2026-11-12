@@ -5,9 +5,12 @@ import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
 import {
   assertShareCardJobs,
+  laneJobName,
   pullRequestShareCardJobs,
   requiredShareCardJobs,
+  shareCardLane,
 } from './share-card-job-gate.mjs'
+import { LANES } from './lanes.mjs'
 
 const results = (override = {}) =>
   Object.fromEntries(
@@ -24,13 +27,17 @@ const pullRequestResults = (override = {}) =>
       ...Object.entries(override),
     ])
   )
-const cli = (value, event) =>
+// The lanes job's plan for a pull request whose diff runs, or skips, the browser lane.
+const browserRuns = { [shareCardLane]: true, maestro: false }
+const browserSkipped = { [shareCardLane]: false, maestro: true }
+const cli = (value, event, plan) =>
   spawnSync(process.execPath, ['scripts/ci/share-card-job-gate.mjs'], {
     encoding: 'utf8',
     env: {
       PATH: process.env.PATH,
       ...(value === undefined ? {} : { CC68_JOB_RESULTS: value }),
       ...(event === undefined ? {} : { CC68_EVENT_NAME: event }),
+      ...(plan === undefined ? {} : { CC68_LANE_PLAN: JSON.stringify(plan) }),
     },
   })
 
@@ -141,10 +148,10 @@ describe('share-card aggregate job gate', () => {
 
     test('passes when the browser lane succeeded and every device lane was skipped', () => {
       assert.deepEqual(
-        assertShareCardJobs(pullRequestResults(), 'pull_request'),
+        assertShareCardJobs(pullRequestResults(), 'pull_request', browserRuns),
         requiredShareCardJobs
       )
-      const ok = cli(JSON.stringify(pullRequestResults()), 'pull_request')
+      const ok = cli(JSON.stringify(pullRequestResults()), 'pull_request', browserRuns)
       assert.equal(ok.status, 0, ok.stderr)
       assert.match(ok.stdout, /Required share-card jobs passed/)
     })
@@ -153,10 +160,10 @@ describe('share-card aggregate job gate', () => {
       test(`${outcome} browser-acceptance fails on a pull request`, () => {
         const value = pullRequestResults({ 'browser-acceptance': outcome })
         assert.throws(
-          () => assertShareCardJobs(value, 'pull_request'),
+          () => assertShareCardJobs(value, 'pull_request', browserRuns),
           /failed: browser-acceptance$/
         )
-        assert.equal(cli(JSON.stringify(value), 'pull_request').status, 1)
+        assert.equal(cli(JSON.stringify(value), 'pull_request', browserRuns).status, 1)
       })
     }
 
@@ -165,12 +172,90 @@ describe('share-card aggregate job gate', () => {
         test(`${outcome} ${name} fails on a pull request: it must be skipped`, () => {
           const value = pullRequestResults({ [name]: outcome })
           assert.throws(
-            () => assertShareCardJobs(value, 'pull_request'),
+            () => assertShareCardJobs(value, 'pull_request', browserRuns),
             new RegExp(`failed: ${name}$`)
           )
-          assert.equal(cli(JSON.stringify(value), 'pull_request').status, 1)
+          assert.equal(cli(JSON.stringify(value), 'pull_request', browserRuns).status, 1)
         })
       }
+  })
+
+  describe('the lane plan on a pull request', () => {
+    test('names a lane that gates browser-acceptance in this workflow', () => {
+      assert.equal(LANES[shareCardLane].workflow, 'pr-share-card-native.yml')
+      assert.deepEqual(LANES[shareCardLane].jobs, [...pullRequestShareCardJobs])
+    })
+
+    test('a browser lane the plan skipped passes when it was skipped', () => {
+      const value = pullRequestResults({ 'browser-acceptance': 'skipped' })
+      assert.deepEqual(
+        assertShareCardJobs(value, 'pull_request', browserSkipped),
+        requiredShareCardJobs
+      )
+      const ok = cli(JSON.stringify(value), 'pull_request', browserSkipped)
+      assert.equal(ok.status, 0, ok.stderr)
+    })
+
+    for (const outcome of ['success', 'failure', 'cancelled'])
+      test(`a browser lane the plan skipped fails when it reports ${outcome}`, () => {
+        const value = pullRequestResults({ 'browser-acceptance': outcome })
+        assert.throws(
+          () => assertShareCardJobs(value, 'pull_request', browserSkipped),
+          /failed: browser-acceptance$/
+        )
+      })
+
+    test('a plan that skips the browser lane still requires every device lane skipped', () => {
+      for (const name of deviceLanes)
+        assert.throws(
+          () =>
+            assertShareCardJobs(
+              pullRequestResults({ 'browser-acceptance': 'skipped', [name]: 'success' }),
+              'pull_request',
+              browserSkipped
+            ),
+          new RegExp(`failed: ${name}$`)
+        )
+    })
+
+    test('a missing or unreadable plan fails a pull request without echoing it', () => {
+      const secret = 'cc68-secret-marker'
+      for (const plan of [
+        undefined,
+        null,
+        [],
+        'share-card',
+        {},
+        { [shareCardLane]: 'false' },
+      ])
+        assert.throws(
+          () => assertShareCardJobs(pullRequestResults(), 'pull_request', plan),
+          /share_card_lane_plan_invalid/
+        )
+      for (const raw of ['', `{${secret}`, 'null']) {
+        const run = spawnSync(process.execPath, ['scripts/ci/share-card-job-gate.mjs'], {
+          encoding: 'utf8',
+          env: {
+            PATH: process.env.PATH,
+            CC68_JOB_RESULTS: JSON.stringify(pullRequestResults()),
+            CC68_EVENT_NAME: 'pull_request',
+            CC68_LANE_PLAN: raw,
+          },
+        })
+        assert.equal(run.status, 1)
+        assert.equal(run.stderr.trim(), 'share_card_lane_plan_invalid')
+        assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false)
+      }
+    })
+
+    test('the CLI reads the plan from its own variable and ignores the lanes job result', () => {
+      const value = {
+        ...pullRequestResults({ 'browser-acceptance': 'skipped' }),
+        [laneJobName]: { result: 'success', outputs: { plan: '{}' } },
+      }
+      const ok = cli(JSON.stringify(value), 'pull_request', browserSkipped)
+      assert.equal(ok.status, 0, ok.stderr)
+    })
   })
 
   describe('every other event requires every lane', () => {
@@ -197,10 +282,35 @@ describe('share-card aggregate job gate', () => {
         assert.equal(cli(JSON.stringify(results()), event).status, 0)
       })
 
+    // The plan runs every lane off a pull request; a plan that says otherwise skips nothing.
+    for (const event of ['push', 'schedule', 'workflow_dispatch'])
+      test(`a plan skipping the browser lane does not excuse it on ${event}`, () => {
+        assert.throws(
+          () =>
+            assertShareCardJobs(
+              results({ 'browser-acceptance': 'skipped' }),
+              event,
+              browserSkipped
+            ),
+          /failed: browser-acceptance$/
+        )
+        assert.equal(
+          cli(
+            JSON.stringify(results({ 'browser-acceptance': 'skipped' })),
+            event,
+            browserSkipped
+          ).status,
+          1
+        )
+      })
+
     test('the pull request skip pattern fails without the pull_request event', () => {
       for (const event of ['push', 'schedule', 'workflow_dispatch', 'Pull_Request', ''])
-        assert.throws(() => assertShareCardJobs(pullRequestResults(), event))
-      assert.equal(cli(JSON.stringify(pullRequestResults())).status, 1)
+        assert.throws(() => assertShareCardJobs(pullRequestResults(), event, browserRuns))
+      assert.equal(
+        cli(JSON.stringify(pullRequestResults()), undefined, browserRuns).status,
+        1
+      )
     })
   })
 })

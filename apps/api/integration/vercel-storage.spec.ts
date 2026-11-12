@@ -78,13 +78,19 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(fixture, { recursive: true, force: true }))
 
 describe('Vercel preview storage', () => {
-  it.each(['apps/mobile/app/index.tsx', 'docs/guide.md', '_bmad-output/notes.md'])(
-    'needs no preview deployment for a branch changing only %s',
-    (file) => {
-      commit(file)
-      expect(previewRequired(fixture, 'main')).toBe(false)
-    }
-  )
+  // The preview lane of scripts/ci/lanes.mjs decides: Maestro flows, load scripts and Pact
+  // files belong to other lanes, and docs to none.
+  it.each([
+    'apps/mobile/app/index.tsx',
+    'docs/guide.md',
+    '_bmad-output/notes.md',
+    'maestro/flow.yaml',
+    'k6/load.js',
+    'pact/contract.json',
+  ])('needs no preview deployment for a branch changing only %s', (file) => {
+    commit(file)
+    expect(previewRequired(fixture, 'main')).toBe(false)
+  })
 
   it.each([
     'apps/api/src/main.ts',
@@ -112,12 +118,25 @@ describe('Vercel preview storage', () => {
   })
 
   // The CLI roots itself where it lives, so it runs from a copy inside the fixture repository,
-  // whose origin/main is a baseline commit that already holds the copy.
+  // whose origin/main is a baseline commit that already holds the copy, the lane map it asks
+  // and the workspace manifests the map reads.
   it('an explicit request requires previews that the branch alone would skip', () => {
     const cli = path.join(fixture, 'scripts/vercel-preview-inputs.mjs')
-    fs.mkdirSync(path.dirname(cli), { recursive: true })
-    fs.copyFileSync(path.join(repoRoot, 'scripts/vercel-preview-inputs.mjs'), cli)
-    git('add', '--', 'scripts/vercel-preview-inputs.mjs')
+    const copies = [
+      'scripts/vercel-preview-inputs.mjs',
+      'scripts/ci/lanes.mjs',
+      ...['apps', 'packages'].flatMap((dir) =>
+        fs
+          .readdirSync(path.join(repoRoot, dir))
+          .map((name) => `${dir}/${name}/package.json`)
+          .filter((file) => fs.existsSync(path.join(repoRoot, file)))
+      ),
+    ]
+    for (const file of copies) {
+      fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true })
+      fs.copyFileSync(path.join(repoRoot, file), path.join(fixture, file))
+    }
+    git('add', '--', ...copies)
     git(
       '-c',
       'core.hooksPath=/dev/null',
@@ -142,6 +161,17 @@ describe('Vercel preview storage', () => {
     commit('docs/guide.md')
     expect(scope('false')).toBe('required=false')
     expect(scope('true')).toBe('required=true')
+    commit('apps/web/src/app/page.tsx')
+    expect(scope('false')).toBe('required=true')
+  })
+
+  it('keeps the preview checks when the lane map cannot read the workspaces', () => {
+    commit('docs/guide.md')
+    expect(previewRequired(fixture, 'main', 'HEAD', undefined)).toBe(false)
+    // A workspace graph the map cannot expand decides nothing: previews stay required.
+    expect(previewRequired(fixture, 'main', 'HEAD', { web: ['no-such-workspace'] })).toBe(
+      true
+    )
   })
 
   it('keeps a deletion of runtime code when that code moves under docs', () => {
@@ -1037,13 +1067,13 @@ describe('Vercel preview deploy step', () => {
 
 /**
  * Evaluates the GitHub Actions expression subset the preview caller uses: literals, context
- * paths, ==, !=, !, && and || with parentheses. Strings compare case-insensitively and && and ||
- * return an operand, as GitHub does.
+ * paths, ==, !=, !, && and || with parentheses, contains(), fromJSON() and a ['key'] index.
+ * Strings compare case-insensitively and && and || return an operand, as GitHub does.
  */
 function evaluateExpression(source: string, context: Record<string, unknown>): unknown {
   const text = source.trim().replace(/^\$\{\{([\s\S]*)\}\}$/, '$1')
   const tokens: string[] = []
-  const pattern = /\s*(\(|\)|,|==|!=|&&|\|\||!|'(?:[^']|'')*'|[A-Za-z_][\w.*-]*)/y
+  const pattern = /\s*(\(|\)|\[|\]|,|==|!=|&&|\|\||!|'(?:[^']|'')*'|[A-Za-z_][\w.*-]*)/y
   while (pattern.lastIndex < text.trimEnd().length) {
     const match = pattern.exec(text)
     if (!match)
@@ -1069,7 +1099,21 @@ function evaluateExpression(source: string, context: Record<string, unknown>): u
     typeof a === 'string' && typeof b === 'string'
       ? a.toLowerCase() === b.toLowerCase()
       : (a ?? null) === (b ?? null)
+  // A ['key'] after a value reads that property, as GitHub's index syntax does.
   const primary = (): unknown => {
+    let value = operand()
+    while (tokens[at] === '[') {
+      take('[')
+      const key = or()
+      take(']')
+      value =
+        value && typeof value === 'object'
+          ? (value as Record<string, unknown>)[String(key)]
+          : undefined
+    }
+    return value
+  }
+  const operand = (): unknown => {
     const token = take()
     if (token === '(') {
       const value = or()
@@ -1089,6 +1133,12 @@ function evaluateExpression(source: string, context: Record<string, unknown>): u
       if (typeof haystack === 'string' && typeof needle === 'string')
         return haystack.toLowerCase().includes(needle.toLowerCase())
       return false
+    }
+    if (token === 'fromJSON' && tokens[at] === '(') {
+      take('(')
+      const json = or()
+      take(')')
+      return JSON.parse(String(json))
     }
     if (/^[A-Za-z_][\w.*-]*$/.test(token) && tokens[at] !== '(') {
       // A `*` step collects that property from every element, as GitHub's object filter does.
@@ -1155,7 +1205,9 @@ describe('Vercel preview PR trigger', () => {
   ) as { jobs: { 'preview-ready': { if: string; with: { force_build: string } } } }
   const job = caller.jobs['preview-ready']
   const repository = 'muratkeremozcan/couture-cast'
-  const github = (fork: boolean, action: string, label: string) => ({
+  const github = (fork: boolean, action: string, label: string, preview = true) => ({
+    // The lanes job's plan: the preview lane runs when the diff touches a preview input.
+    needs: { lanes: { outputs: { plan: JSON.stringify({ preview }) } } },
     github: {
       repository,
       event: {
@@ -1185,6 +1237,17 @@ describe('Vercel preview PR trigger', () => {
       expect(evaluateExpression(job.if, github(false, action, label))).toBe(runs)
       expect(evaluateExpression(job.with.force_build, github(false, action, label))).toBe(
         forces
+      )
+    }
+  )
+
+  // A plan that skips the preview lane provides no previews, unless PREVIEW-REBUILD was just
+  // added, which builds them whatever the diff changed.
+  it.each(events)(
+    "a same-repository %s event (label '%s') with the preview lane skipped runs previews only for a rebuild",
+    (action, label, runs, forces) => {
+      expect(evaluateExpression(job.if, github(false, action, label, false))).toBe(
+        runs && forces
       )
     }
   )

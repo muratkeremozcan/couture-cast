@@ -24,6 +24,12 @@ on:
       GUARDIAN_INVITE_JWT_SECRET:
         required: false
 
+# A caller's env does not reach a reusable workflow. On a pull request or a push the
+# playwright-unit job of pr-checks.yml runs the Playwright helper unit tests, so the burn-in
+# command's `prepare:playwright` skips its own copy of them.
+env:
+  PLAYWRIGHT_UNIT_LANE: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '1' || '' }}
+
 jobs:
   # Detects changed specs and sizes the burn-in matrix, so a wide PR fans out across shards
   # instead of running past the 20-minute PR job limit in one job. No Supabase or browsers.
@@ -98,11 +104,19 @@ jobs:
       # The library's own analyzer selects the specs, and `playwright test --list` counts
       # the runs, repeats included; `shardCount` in playwright/scripts/burn-in-changed.ts
       # turns that into the matrix size. The shards then split by recorded test duration.
+      # Listing loads every spec and what it imports at load time: the Prisma client
+      # (`@prisma/client` in the support helpers) and the built @couture/utils,
+      # @couture/api-client and @couture/testing (testing compiles against the Prisma client).
+      # @couture/config is read from source, and the API's dist only inside test bodies, so
+      # neither is built here. The helper unit tests run in pr-checks.yml.
       - name: Plan the burn-in shards
         id: plan
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
-          npm run prepare:playwright
+          npm run db:generate
+          npm run build --workspace @couture/utils
+          npm run build --workspace @couture/api-client
+          npm run build --workspace @couture/testing
           npx tsx playwright/scripts/burn-in-changed.ts \
             --base-branch="${{ steps.base-ref.outputs.value }}" \
             --plan-out="$GITHUB_OUTPUT"

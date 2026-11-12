@@ -23,12 +23,24 @@ export function coverageShardOf(workspacePath) {
 
 const resultFile = (shard) => `coverage-shard-result-${shard}.json`
 
-/** One outcome for the whole run: any shard that failed or left no result makes it a failure. */
-export function mergeShardResults(results) {
+/** Why a shard the lane plan left out did not run (scripts/ci/lanes.mjs). */
+export const PLAN_SKIP_REASON =
+  'skipped by the lane plan: no file this shard builds, runs or reads changed'
+
+/**
+ * One outcome for the whole run: any shard the plan ran that failed or left no result makes it a
+ * failure. A shard outside `planned` passes and is listed in `skipped` with the reason.
+ */
+export function mergeShardResults(results, planned = COVERAGE_SHARDS) {
   const failures = []
   const dirs = []
+  const skipped = []
   let outcome = 'success'
   for (const shard of COVERAGE_SHARDS) {
+    if (!planned.includes(shard)) {
+      skipped.push({ shard, reason: PLAN_SKIP_REASON })
+      continue
+    }
     const result = results[shard]
     if (!result) {
       outcome = 'failure'
@@ -43,7 +55,22 @@ export function mergeShardResults(results) {
     failures.push(...result.failures)
     dirs.push(...result.dirs)
   }
-  return { outcome, failures, dirs: dirs.sort() }
+  return { outcome, failures, dirs: dirs.sort(), skipped }
+}
+
+/**
+ * The shards the lane plan ran, from the lanes job's `coverage_shards` output. Anything but a
+ * JSON array of known shards (the lanes job failed, so the output is empty) requires them all.
+ */
+export function plannedShards(value) {
+  try {
+    const shards = JSON.parse(value)
+    if (Array.isArray(shards) && shards.every((shard) => COVERAGE_SHARDS.includes(shard)))
+      return shards
+  } catch {
+    // An empty or malformed value falls through to every shard.
+  }
+  return [...COVERAGE_SHARDS]
 }
 
 function record() {
@@ -65,10 +92,22 @@ function merge() {
       results[shard] = JSON.parse(readFileSync(resultFile(shard), 'utf8'))
     }
   }
-  const { outcome, failures, dirs } = mergeShardResults(results)
+  const { outcome, failures, dirs, skipped } = mergeShardResults(
+    results,
+    plannedShards(process.env.COVERAGE_PLANNED_SHARDS ?? '')
+  )
+  for (const { shard, reason } of skipped)
+    console.log(`Coverage shard ${shard}: ${reason}`)
+  if (skipped.length && process.env.GITHUB_STEP_SUMMARY)
+    appendFileSync(
+      process.env.GITHUB_STEP_SUMMARY,
+      skipped
+        .map(({ shard, reason }) => `- Coverage shard ${shard}: ${reason}\n`)
+        .join('')
+    )
   appendFileSync(
     process.env.GITHUB_OUTPUT,
-    `outcome=${outcome}\nfailures=${JSON.stringify(failures)}\ncoverage_dirs=${JSON.stringify(dirs)}\n`
+    `outcome=${outcome}\nfailures=${JSON.stringify(failures)}\ncoverage_dirs=${JSON.stringify(dirs)}\nskipped=${JSON.stringify(skipped)}\n`
   )
 }
 
