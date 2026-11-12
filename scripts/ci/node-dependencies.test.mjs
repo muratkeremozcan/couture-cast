@@ -28,7 +28,9 @@ test('the tree is keyed on exactly what decides it, and only an exact key restor
   // A custom command may build another tree.
   assert.equal(
     restore.if,
-    "inputs.install-command == 'npm ci' || inputs.install-command == 'npm install'"
+    // Linux only (about 1 GB compressed of the 10 GB cache); a custom command may build
+    // another tree.
+    "runner.os == 'Linux' && (inputs.install-command == 'npm ci' || inputs.install-command == 'npm install')"
   )
 })
 
@@ -37,13 +39,16 @@ test('a hit skips the install; a miss installs and saves before any later step',
   assert.deepEqual(steps, [
     'Restore the dependency tree for this lockfile',
     'Setup Node',
+    'Verify the restored dependency tree',
     'Install dependencies',
     'Save the dependency tree for this lockfile',
   ])
-  assert.equal(
-    step('Install dependencies').if,
-    "steps.modules.outputs.cache-hit != 'true'"
-  )
+  assert.equal(step('Install dependencies').if, "steps.verify.outputs.works != 'true'")
+  // A hit whose native pieces fail on this runner installs too.
+  const verify = step('Verify the restored dependency tree')
+  assert.equal(verify.if, "steps.modules.outputs.cache-hit == 'true'")
+  assert.match(verify.run, /if node scripts\/ci\/verify-dependency-tree\.mjs; then/)
+  assert.equal(verify['continue-on-error'], undefined)
   const save = step('Save the dependency tree for this lockfile')
   assert.equal(save.uses, 'actions/cache/save@v4')
   assert.deepEqual(save.with.path.trim().split('\n'), TREE)

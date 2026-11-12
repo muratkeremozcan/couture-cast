@@ -28,8 +28,11 @@ runs:
     - name: Restore the dependency tree for this lockfile
       id: modules
       # npm ci and npm install build the same tree from an unchanged lockfile; a custom
-      # command may not, so it always installs.
-      if: inputs.install-command == 'npm ci' || inputs.install-command == 'npm install'
+      # command may not, so it always installs. Linux only: the entry is about 1 GB
+      # compressed against the repository's 10 GB cache, and the few macOS jobs install.
+      if: >-
+        runner.os == 'Linux' &&
+        (inputs.install-command == 'npm ci' || inputs.install-command == 'npm install')
       uses: actions/cache/restore@v4
       env:
         # A stalled segment download falls back to installing.
@@ -48,8 +51,21 @@ runs:
         # The npm download cache only helps an install; a restored tree needs none.
         cache: ${{ steps.modules.outputs.cache-hit != 'true' && 'npm' || '' }}
 
+    # Native pieces install scripts put in node_modules (esbuild, sharp, lightningcss, the
+    # Prisma engines, the Supabase CLI) must work here; a tree that fails installs instead.
+    - name: Verify the restored dependency tree
+      id: verify
+      if: steps.modules.outputs.cache-hit == 'true'
+      shell: bash
+      run: |
+        if node scripts/ci/verify-dependency-tree.mjs; then
+          echo "works=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "works=false" >> "$GITHUB_OUTPUT"
+        fi
+
     - name: Install dependencies
-      if: steps.modules.outputs.cache-hit != 'true'
+      if: steps.verify.outputs.works != 'true'
       shell: bash
       env:
         INSTALL_COMMAND: ${{ inputs.install-command }}
