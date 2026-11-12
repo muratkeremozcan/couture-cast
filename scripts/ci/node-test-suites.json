@@ -27,6 +27,7 @@
   },
   "runElsewhere": {
     "apps/mobile/plugins/background-task-prebuild.test.js": "apps/mobile npm test (test:background-task-prebuild)",
+    "apps/mobile/plugins/font-scale-config-changes.test.js": "apps/mobile npm test (test:font-scale-config-changes-prebuild)",
     "apps/mobile/plugins/with-watchos.test.js": "apps/mobile npm test (test:watchos-prebuild) and watchos-native.yml",
     "apps/mobile/plugins/with-widgets.test.js": "apps/mobile npm test (test:widget-prebuild)"
   },
