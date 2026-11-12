@@ -52,6 +52,7 @@ const migrateFiles = [
   'scripts/prisma-migrate-deploy.mjs',
   'scripts/local-e2e-database.mjs',
   'scripts/lib/local-supabase-ports.mjs',
+  'scripts/lib/local-supabase-ports.cjs',
   // local-supabase-ports.mjs reads the local ports from it.
   'supabase/config.toml',
   'scripts/lib/caller-owned-env.mjs',
