@@ -11,3 +11,6 @@ export declare function runBuild(options?: { argv?: string[] }): Promise<void>
 export declare const FINGERPRINT_FILE: string
 
 export declare function buildFingerprint(packageDir: string, compiler: string[]): string
+
+/** Every file in `dist` but the stamp, with its sha256. */
+export declare function outputInventory(dist: string): Record<string, string>

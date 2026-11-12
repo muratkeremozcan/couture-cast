@@ -53,10 +53,12 @@ function fakePackage() {
   return root
 }
 
+// These suites test how a build publishes, so every build compiles: the skip of an
+// unchanged package (6.14-BUILD-*) would otherwise turn repeat builds into no-ops.
 const build = (root: string, env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'fake-tsc.cjs'], {
     cwd: root,
-    env: { ...process.env, ...env },
+    env: { ...process.env, COUTURE_FORCE_PACKAGE_BUILD: '1', ...env },
     encoding: 'utf8',
   })
 
@@ -160,7 +162,7 @@ const buildAsync = (root: string, env: NodeJS.ProcessEnv = {}, script = SCRIPT) 
       [script, '--tsc', process.execPath, 'slow-tsc.cjs'],
       {
         cwd: root,
-        env: { ...process.env, ...env },
+        env: { ...process.env, COUTURE_FORCE_PACKAGE_BUILD: '1', ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     )
@@ -367,6 +369,8 @@ describe('serial builds (R34)', () => {
         // eslint-disable-next-line no-await-in-loop -- serial on purpose
         const result = await buildAsync(root, { SLOW_TSC_MODE: 'many' })
         if (result.code !== 0) failures.push(`run ${run}: ${result.output}`)
+        if (/build skipped/.test(result.output))
+          failures.push(`run ${run} did not compile`)
       }
       expect(failures).toEqual([])
       expect(Object.keys(tree(path.join(root, 'dist')))).toHaveLength(300)
@@ -572,7 +576,7 @@ fs.writeFileSync(require('node:path').join(outDir, 'index.js'), fs.readFileSync(
   const counted = (root: string, log: string, env: NodeJS.ProcessEnv = {}) =>
     spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'counting-tsc.cjs'], {
       cwd: root,
-      env: { ...process.env, COMPILE_LOG: log, ...env },
+      env: { ...process.env, COUTURE_FORCE_PACKAGE_BUILD: '', COMPILE_LOG: log, ...env },
       encoding: 'utf8',
     })
   const compiles = (log: string) =>
@@ -647,6 +651,8 @@ describe('what the fingerprint covers (Story 6.14 follow-up)', () => {
     write('node_modules/.package-lock.json', '{"installed":1}')
     write('node_modules/.prisma/client/index.d.ts', 'export type User = { id: string }')
     write('node_modules/.prisma/client/schema.prisma', 'model User { id String @id }')
+    // Prisma can also generate into @prisma/client itself (Codex review of PR 211).
+    write('node_modules/@prisma/client/index.d.ts', "export * from '.prisma/client'")
     write('node_modules/@couture/dep/dist/.build-fingerprint', 'dep-1')
     write(
       'packages/pkg/package.json',
@@ -675,6 +681,11 @@ describe('what the fingerprint covers (Story 6.14 follow-up)', () => {
       'export type User = { id: number }',
     ],
     [
+      'the Prisma client types generated into @prisma/client',
+      'node_modules/@prisma/client/index.d.ts',
+      'export type Visibility = "PRIVATE"',
+    ],
+    [
       'the Prisma schema the client was generated from',
       'node_modules/.prisma/client/schema.prisma',
       'model User { id Int @id }',
@@ -701,5 +712,68 @@ describe('what the fingerprint covers (Story 6.14 follow-up)', () => {
     write('packages/pkg/.dist-staging-1-a/index.js', 'staging')
     write('packages/pkg/tsconfig.build.tsbuildinfo', '{}')
     expect(buildFingerprint(pkg, compiler)).toBe(before)
+  })
+})
+
+describe('what a skip trusts (Codex review of PR 211)', () => {
+  function builtPackage() {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'build-outputs-'))
+    const root = directory
+    fs.mkdirSync(path.join(root, 'src'))
+    fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'A')
+    fs.writeFileSync(
+      path.join(root, 'emit-tsc.cjs'),
+      `const fs = require('node:fs'); const path = require('node:path')
+const outDir = process.argv[process.argv.indexOf('--outDir') + 1]
+fs.appendFileSync(process.env.COMPILE_LOG, 'compiled\\n')
+fs.writeFileSync(path.join(outDir, 'index.js'), fs.readFileSync('src/index.ts', 'utf8'))
+fs.writeFileSync(path.join(outDir, 'index.d.ts'), 'declare ' + fs.readFileSync('src/index.ts', 'utf8'))`
+    )
+    return root
+  }
+  const build = (root: string, log: string) =>
+    spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'emit-tsc.cjs'], {
+      cwd: root,
+      env: { ...process.env, COMPILE_LOG: log, COUTURE_FORCE_PACKAGE_BUILD: '' },
+      encoding: 'utf8',
+    })
+  const compiles = (log: string) =>
+    fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).length
+
+  it('6.14-BUILD-06 rebuilds a dist another compiler overwrote, as build:watch does', () => {
+    const root = builtPackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-6`)
+    try {
+      expect(build(root, log).status).toBe(0)
+      // tsc --watch writes straight into dist and leaves the stamp alone.
+      fs.writeFileSync(path.join(root, 'dist', 'index.d.ts'), 'declare B')
+      expect(build(root, log).status).toBe(0)
+      expect(compiles(log)).toBe(2)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.d.ts'), 'utf8')).toBe(
+        'declare A'
+      )
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+
+  it('6.14-BUILD-07 rebuilds a dist that lost a file or gained one', () => {
+    const root = builtPackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-7`)
+    try {
+      expect(build(root, log).status).toBe(0)
+      fs.rmSync(path.join(root, 'dist', 'index.js'))
+      expect(build(root, log).status).toBe(0)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.js'), 'utf8')).toBe('A')
+      fs.writeFileSync(path.join(root, 'dist', 'stray.js'), 'stray')
+      expect(build(root, log).status).toBe(0)
+      expect(fs.existsSync(path.join(root, 'dist', 'stray.js'))).toBe(false)
+      expect(compiles(log)).toBe(3)
+      // And an untouched dist is still current.
+      expect(build(root, log).stdout).toMatch(/build skipped/)
+      expect(compiles(log)).toBe(3)
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
   })
 })
