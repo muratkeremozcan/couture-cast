@@ -8,10 +8,21 @@
 // change. A testID costs nothing at runtime and reaches the Android and iOS hierarchies the
 // proof already reads; a native view tag would need a module to read it. A second view reports
 // the font scale JavaScript sees, so a scale change the app never received cannot pass as a
-// relayout. Production builds render nothing.
+// relayout. A third reports the installed React Native version and the configuration the app
+// applied (theme, layout direction, density, language), so the proof reads the version from
+// the build under test and can check a theme, locale or density change took effect (Codex R4).
+// Production builds render nothing.
 import Constants from 'expo-constants'
 import { useRef } from 'react'
-import { StyleSheet, useWindowDimensions, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
+import {
+  I18nManager,
+  Platform,
+  StyleSheet,
+  useColorScheme,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 
 // One value per JavaScript runtime, so a reloaded bundle that restarts the counter still reads
 // as new.
@@ -22,8 +33,28 @@ export function liveFontMountMarkersEnabled({ dev = __DEV__ }: { dev?: boolean }
   return dev || Constants.expoConfig?.extra?.liveFontMountMarkers === true
 }
 
+type NativeConstants = {
+  reactNativeVersion?: {
+    major: number
+    minor: number
+    patch: number
+    prerelease?: string | number | null
+  }
+}
+
+function reactNativeVersion() {
+  // React Native Web has no native constants; the proof runs on native builds only.
+  const version = (Platform as { constants?: NativeConstants }).constants
+    ?.reactNativeVersion
+  if (!version) return 'web'
+  const { major, minor, patch, prerelease } = version
+  return `${major}.${minor}.${patch}${prerelease ? `-${prerelease}` : ''}`
+}
+
 export function LiveFontMountMarker({ scope }: { scope: string }) {
-  const { fontScale } = useWindowDimensions()
+  const { fontScale, scale } = useWindowDimensions()
+  const scheme = useColorScheme() ?? 'light'
+  const { i18n } = useTranslation()
   const id = useRef<string | null>(null)
   if (id.current === null) {
     mounts += 1
@@ -41,6 +72,10 @@ export function LiveFontMountMarker({ scope }: { scope: string }) {
     <>
       <View testID={`live-font-mount-${scope}-${id.current}`} {...hidden} />
       <View testID={`live-font-scale-${scope}-${fontScale}`} {...hidden} />
+      <View
+        testID={`live-font-env-${scope}~${reactNativeVersion()}~${scheme}~${I18nManager.isRTL ? 'rtl' : 'ltr'}~${scale}~${i18n.language}`}
+        {...hidden}
+      />
     </>
   )
 }

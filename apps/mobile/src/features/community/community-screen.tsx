@@ -2085,7 +2085,10 @@ export function CommunityScreen() {
               accessibilityRole="button"
               accessibilityLabel={t('community.newPost')}
             >
-              <Text style={[styles.primaryButtonText, { color: ON_ACCENT }]}>
+              <Text
+                style={[styles.primaryButtonText, { color: ON_ACCENT }]}
+                testID="community-new-post-label"
+              >
                 {t('community.newPost')}
               </Text>
             </TouchableOpacity>
