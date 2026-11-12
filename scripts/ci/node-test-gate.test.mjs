@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { evaluateApprovedCondition, matrixRows } from './workflow-step-shadowing.mjs'
 import nodeTestGateReporter from './node-test-gate-reporter.mjs'
@@ -263,14 +263,24 @@ describe('node-test-gate background run', () => {
         path.join(backgroundDirectory('good', env), 'started.json'),
         JSON.stringify({ files: suitesOf.good, cwd: temp, pid: process.pid })
       )
+      fs.writeFileSync(
+        path.join(backgroundDirectory('good', env), 'output.log'),
+        'DIAGNOSTIC_BEFORE_HANG\n'
+      )
+      const logs = []
       await assert.rejects(
         collectBackgroundSuites(['good'], {
           env,
           timeoutMs: 200,
           pollMs: 10,
-          log: () => undefined,
+          log: (line) => logs.push(line),
         }),
         /suite good: node_test_gate_failed: suite good did not finish within 0\.2 s/
+      )
+      // PR 216 review BA-04: how far the suite got is still reported.
+      assert.ok(
+        logs.some((line) => line.includes('DIAGNOSTIC_BEFORE_HANG')),
+        logs.join('\n')
       )
     }))
 
@@ -284,17 +294,82 @@ describe('node-test-gate background run', () => {
         path.join(backgroundDirectory('good', env), 'started.json'),
         JSON.stringify({ files: suitesOf.good, cwd: temp, pid: ended.pid })
       )
+      fs.writeFileSync(
+        path.join(backgroundDirectory('good', env), 'output.log'),
+        'DIAGNOSTIC_BEFORE_KILL\n'
+      )
+      const logs = []
       const began = Date.now()
       await assert.rejects(
         collectBackgroundSuites(['good'], {
           env,
           timeoutMs: 30_000,
           pollMs: 10,
-          log: () => undefined,
+          log: (line) => logs.push(line),
         }),
         /suite good: node_test_gate_failed: the background run of suite good ended without recording a result/
       )
       assert.ok(Date.now() - began < 10_000)
+      assert.ok(
+        logs.some((line) => line.includes('DIAGNOSTIC_BEFORE_KILL')),
+        logs.join('\n')
+      )
+    }))
+
+  // PR 216 review BA-03: the start command must return while its suites still run, or the
+  // job waits for them before setting up the browsers and the overlap is lost. The suite
+  // here blocks until the test releases it, so no timing threshold decides the result.
+  test('the starting process exits while its suite is still running, and a later process collects it', () =>
+    temporary(async (temp) => {
+      const directory = path.join(temp, 'repo')
+      fs.mkdirSync(directory)
+      const release = path.join(temp, 'release')
+      fs.writeFileSync(
+        path.join(directory, 'blocked.test.mjs'),
+        `import fs from 'node:fs'
+import { test } from 'node:test'
+test('waits for its release', async () => {
+  // Gives up when the test's temporary directory is gone, so a failed test leaks no process.
+  while (!fs.existsSync(${JSON.stringify(release)})) {
+    if (!fs.existsSync(${JSON.stringify(temp)})) throw new Error('released by cleanup')
+    await new Promise((done) => setTimeout(done, 25))
+  }
+})
+`
+      )
+      const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
+      const starter = `import { startBackgroundSuites } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'scripts/ci/node-test-gate.mjs')).href)}
+startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifest: { suites: { blocked: ['blocked.test.mjs'] } }, cwd: ${JSON.stringify(directory)}, env: process.env })
+`
+      const started = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', starter],
+        {
+          env,
+          encoding: 'utf8',
+          timeout: 30_000,
+        }
+      )
+      assert.equal(
+        started.error,
+        undefined,
+        'the starting process did not exit on its own'
+      )
+      assert.equal(started.status, 0, started.stderr)
+      assert.equal(
+        fs.existsSync(path.join(backgroundDirectory('blocked', env), 'status.json')),
+        false,
+        'the suite finished before the starting process exited'
+      )
+      fs.writeFileSync(release, '')
+      const logs = []
+      const summaries = await collectBackgroundSuites(['blocked'], {
+        env,
+        timeoutMs: 60_000,
+        pollMs: 25,
+        log: (line) => logs.push(line),
+      })
+      assert.equal(summaries.blocked.passed, 1)
     }))
 
   test('start refuses an unknown suite before launching anything', () =>
@@ -962,6 +1037,40 @@ describe('node-test-gate discovery and coverage', () => {
       )
     })
 
+    // PR 216 review BA-02: a foreground suite in the same step brought its own needs into
+    // the collect condition, and a collect step without a condition inherits success().
+    test('a collect step runs only collect lines and states !cancelled()', () => {
+      const mixed = [
+        '      - name: collect suites',
+        "        if: ${{ !cancelled() && steps.started.outcome == 'success' }}",
+        '        run: |',
+        '          node scripts/ci/node-test-gate.mjs --collect outside',
+        '          node scripts/ci/node-test-gate.mjs default',
+      ]
+      const startOutside = start({ suites: 'outside', condition: '${{ !cancelled() }}' })
+      assert.deepEqual(check([...setup, ...startOutside, ...runtime, ...mixed]), [
+        'step collect suites collects outside but also runs "node scripts/ci/node-test-gate.mjs default"; a collect step runs only collect lines',
+      ])
+      const unconditioned = [
+        '      - name: collect suites',
+        '        run: node scripts/ci/node-test-gate.mjs --collect outside default',
+      ]
+      assert.deepEqual(check([...setup, ...start(), ...runtime, ...unconditioned]), [
+        'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it',
+      ])
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...runtime,
+          ...collect({ condition: "${{ steps.started.outcome == 'success' }}" }),
+        ]),
+        [
+          'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it',
+        ]
+      )
+    })
+
     test('the collect step may wait only on the step that started its suites', () => {
       assert.deepEqual(
         check([
@@ -1016,7 +1125,10 @@ describe('node-test-gate discovery and coverage', () => {
     test('the collect step may not be skippable, continue on error or drop a matrix row', () => {
       assert.deepEqual(
         check([...setup, ...start(), ...collect({ condition: 'always()' })]),
-        ['step collect suites can be skipped by its condition: "always()"']
+        [
+          'step collect suites can be skipped by its condition: "always()"',
+          'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it',
+        ]
       )
       assert.deepEqual(
         check([

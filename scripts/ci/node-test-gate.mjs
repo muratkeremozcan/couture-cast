@@ -412,9 +412,34 @@ function gateStepProblems(manifest, step, matrix, startIds) {
           `step ${name} sets continue-on-error (${JSON.stringify(step['continue-on-error'])}), which hides a gate failure`,
         ]
       : []),
+    ...collectStepProblems(step, lines),
     ...needsProblems(manifest, step, lines, startIds),
     ...rowProblems(manifest, step, lines, matrix),
   ]
+}
+
+/**
+ * A collect step runs nothing but collect lines, so no other command can add a condition
+ * that skips it, and it states `!cancelled()`, so an unrelated failed step cannot skip it
+ * through the implicit `success()`. needsProblems then limits its outcomes to start steps.
+ */
+function collectStepProblems(step, lines) {
+  const collected = collectedSuites(lines)
+  if (!collected.length) return []
+  const name = step.name ?? step.id ?? 'unnamed'
+  const problems = []
+  const others = lines.filter(
+    (line) => line !== '' && backgroundSuites(line)?.mode !== 'collect'
+  )
+  if (others.length)
+    problems.push(
+      `step ${name} collects ${collected.join(' and ')} but also runs ${JSON.stringify(others[0])}; a collect step runs only collect lines`
+    )
+  if (!/!\s*cancelled\(\)/.test(String(step.if ?? '')))
+    problems.push(
+      `step ${name} collects ${collected.join(' and ')} without an explicit !cancelled() condition, so an unrelated failure skips it`
+    )
+  return problems
 }
 
 /**
@@ -739,10 +764,22 @@ export async function collectBackgroundSuites(
   const summaries = {}
   const failures = []
   for (const suite of suites) {
+    const output = backgroundFile(suite, env, 'output.log')
+    let printed = false
+    // The suite's log is printed whether or not it finished, so a run that died or hung
+    // still shows how far it got.
+    const printLog = () => {
+      if (printed || !fs.existsSync(output)) return
+      printed = true
+      log(fs.readFileSync(output, 'utf8'))
+    }
     try {
-      const result = await awaitStatus(suite, { env, timeoutMs, pollMs })
-      const output = backgroundFile(suite, env, 'output.log')
-      if (fs.existsSync(output)) log(fs.readFileSync(output, 'utf8'))
+      let result
+      try {
+        result = await awaitStatus(suite, { env, timeoutMs, pollMs })
+      } finally {
+        printLog()
+      }
       if (result.error) throw new Error(`node_test_gate_failed: ${result.error}`)
       const { files, cwd } = JSON.parse(
         fs.readFileSync(backgroundFile(suite, env, 'files.json'), 'utf8')

@@ -10,9 +10,10 @@
 # enforces on the whole process tree; every step that runs this script sets one.
 #
 # With APT_INSTALL_ARCHIVES set to an absolute directory, apt keeps the package files it downloads
-# there, so a workflow can cache them and a later run downloads none of them again. apt reuses a
-# file there only when its size matches the index, and a failed install drops every package file
-# before the retry, so a corrupt or partial cache falls back to a normal download.
+# there, so a workflow can cache them and a later run downloads none of them again. Before the
+# first install every file there is checked against the SHA256 in the current package index and
+# dropped when it differs (apt itself checks only the size), and a failed install drops every
+# package file before the retry, so a corrupt, altered or stale cache falls back to a download.
 #
 #   bash scripts/ci/apt-install.sh --playwright <browser>...   Playwright's system packages
 #   bash scripts/ci/apt-install.sh <package>...                Ubuntu packages
@@ -48,6 +49,68 @@ printf '%s' "$config" |
   sudo -n tee /etc/apt/apt.conf.d/80-couture-ci-retries >/dev/null ||
   { echo "::error::Could not write apt's retry settings." >&2; exit 1; }
 
+drop_archives() {
+  find "$archives" -maxdepth 1 -type f -name '*.deb' -delete
+}
+
+# apt reuses a file in its archive directory when the name and size match the index, without
+# checking its hash, so a restored file with the same size and different bytes would install.
+# Every restored file is checked against the SHA256 the current package index gives for its
+# package, version and architecture; a file the index does not list, or whose hash differs, is
+# dropped and apt downloads it again.
+verify_archives() {
+  local debs=() deb
+  while IFS= read -r -d '' deb; do debs+=("$deb"); done \
+    < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
+  (( ${#debs[@]} > 0 )) || return 0
+  local -A ids=()
+  local specs=() fields package version arch
+  for deb in "${debs[@]}"; do
+    if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
+      rm -f "$deb"
+      continue
+    fi
+    package=$(sed -n 's/^Package: //p' <<<"$fields")
+    version=$(sed -n 's/^Version: //p' <<<"$fields")
+    arch=$(sed -n 's/^Architecture: //p' <<<"$fields")
+    if [[ -z "$package" || -z "$version" || -z "$arch" ]]; then
+      rm -f "$deb"
+      continue
+    fi
+    ids[$deb]="$package|$arch|$version"
+    specs+=("$package=$version")
+  done
+  if (( ${#specs[@]} == 0 )) || ! sudo -n apt-get update; then
+    echo "::warning::Could not check the restored package files against the package index; dropping them."
+    drop_archives
+    return 0
+  fi
+  local -A expected=()
+  local id hash
+  # One record per package, version and architecture the index knows; versions it no longer
+  # lists print nothing and are dropped below.
+  while read -r id hash; do
+    expected[$id]=$hash
+  done < <(apt-cache show "${specs[@]}" 2>/dev/null | awk '
+    /^Package: / { p = $2 } /^Version: / { v = $2 } /^Architecture: / { a = $2 }
+    /^SHA256: / { h = $2 }
+    /^$/ { if (p && v && a && h) print p "|" a "|" v, h; p = v = a = h = "" }
+    END { if (p && v && a && h) print p "|" a "|" v, h }')
+  local kept=0 dropped=0
+  for deb in "${!ids[@]}"; do
+    hash=${expected[${ids[$deb]}]:-}
+    if [[ -n "$hash" && "$(sha256sum "$deb" | cut -d ' ' -f 1)" == "$hash" ]]; then
+      kept=$((kept + 1))
+    else
+      rm -f "$deb"
+      dropped=$((dropped + 1))
+    fi
+  done
+  echo "Checked the restored package files against the package index: kept $kept, dropped $dropped."
+}
+
+[[ -z "$archives" ]] || verify_archives
+
 if [[ "$1" == "--playwright" ]]; then
   shift
   (( $# > 0 )) || usage
@@ -73,7 +136,7 @@ while true; do
   if [[ -n "$archives" ]]; then
     # A restored package file may be what failed, so the retry downloads every package.
     echo "Dropping the package files in $archives before the retry."
-    find "$archives" -maxdepth 1 -type f -name '*.deb' -delete
+    drop_archives
   fi
   sleep "$pause"
   attempt=$((attempt + 1))
