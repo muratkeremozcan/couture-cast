@@ -20,6 +20,8 @@ concurrency:
 jobs:
   vars:
     runs-on: ubuntu-latest
+    # 0.1 minutes at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 5
     outputs:
       SKIP_BURN_IN: ${{ steps.check_skip_label.outputs.SKIP_BURN_IN || 'false' }}
       test_env: local
@@ -50,13 +52,9 @@ jobs:
 
   pw-e2e:
     needs: [vars, burn-in]
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 9.1 min across 16 shard runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    timeout-minutes: 25
+    # 11.3 minutes at p50, 12.4 at p95 (40 shard runs, 2026-11-11 to 12). The
+    # Supabase start stops at its own 10 minute step limit.
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       redis:
@@ -205,11 +203,8 @@ jobs:
         (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
         (needs.burn-in.result == 'skipped')
       )
-    # Estimated, not yet measured: about 3 min install and browsers, the Supabase
-    # start budget (600 s) plus about 3 min of image cache restore and save, about
-    # 3 min web build, about 3 min migrate, seed and API build, and about 2 min for
-    # the six specs.
-    timeout-minutes: 30
+    # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     services:
       redis:
@@ -412,6 +407,8 @@ jobs:
     needs: [vars, burn-in, pw-e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
+    # 1.5 minutes at p50, 1.7 at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write

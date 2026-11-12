@@ -351,7 +351,9 @@ const SKIP_WORKER = process.env.MOBILE_E2E_SKIP_WORKER === '1'
  * fixture user, its location, and its ritual into the test database, and every
  * run pointed a `deleteMany` at a database it was never meant to write to.
  */
-const MOBILE_E2E_DATABASE_URL = process.env.MOBILE_E2E_DATABASE_URL || localDatabaseUrl()
+// Resolved on use: the platform check and other early exits never need a database.
+const mobileE2eDatabaseUrl = () =>
+  process.env.MOBILE_E2E_DATABASE_URL || localDatabaseUrl()
 
 const log = (msg) =>
   console.log(`[maestro:runner]${SHARD_LABEL ? ` [${SHARD_LABEL}]` : ''} ${msg}`)
@@ -1236,7 +1238,7 @@ const requestJson = async (url, init) => {
 const mobileE2EWeatherAlertId = (userId) => `alert-777-${userId}`
 
 const seedMobileE2EWeatherAlert = async (identity) => {
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
   try {
     const payload = {
       version: '1.0.0',
@@ -1454,7 +1456,7 @@ const mobileE2ECapsuleId = (userId) => `mobile-e2e-capsule-${userId}`
 
 const seedMobileE2ECapsule = async (identity, garmentIds) => {
   const capsuleId = mobileE2ECapsuleId(identity.userId)
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
   try {
     await prisma.outfitCapsule.upsert({
       where: { id: capsuleId },
@@ -1634,7 +1636,7 @@ const FLOW_STATE_HOOKS = mobileE2EFlowStateHooks({
 })
 
 const withMobileE2EPrisma = async (work) => {
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
   try {
     await work(prisma)
   } finally {
@@ -2117,7 +2119,7 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
     }
   }
 
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -3287,7 +3289,7 @@ const startOrReuseLocalApi = async (
           stdio: ['inherit', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+            DATABASE_URL: mobileE2eDatabaseUrl(),
             GARMENT_TAGGING_ENGINE: 'fixture',
             ...deterministicFlagEnv,
             TEST_ENV: 'local',
@@ -3309,7 +3311,7 @@ const startOrReuseLocalApi = async (
       env: {
         ...process.env,
         ALLOW_DEV_GUARDIAN_SECRET: 'true',
-        DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+        DATABASE_URL: mobileE2eDatabaseUrl(),
         GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
         GARMENT_TAGGING_ENGINE: 'fixture',
         ...deterministicFlagEnv,

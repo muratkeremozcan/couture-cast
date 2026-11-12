@@ -55,6 +55,8 @@ on:
 jobs:
   preview-scope:
     runs-on: ubuntu-latest
+    # 0.3 minutes at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 5
     outputs:
       required: ${{ steps.scope.outputs.required }}
     steps:

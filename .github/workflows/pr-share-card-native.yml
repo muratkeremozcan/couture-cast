@@ -615,7 +615,10 @@ jobs:
     steps: *android36_steps
   browser-acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 14.5 minutes at p50, 17.6 at p95, 17.7 at most (last 20 runs, 2026-11-12). The
+    # steps that have stalled (install, browser dependencies, Supabase, the matrix)
+    # each stop on their own limit first.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -631,6 +634,8 @@ jobs:
       - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install
+        # 1.3 minutes at p50, 6.2 at most.
+        timeout-minutes: 8
       - name: Provision pinned share-card browser dependencies
         id: browser_deps
         if: matrix.platform == 'android'
@@ -690,6 +695,8 @@ jobs:
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
       - name: Genuine browser share-card acceptance matrix
+        # 7.0 minutes at p50, 8.7 at p95, 9.0 at most.
+        timeout-minutes: 12
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
           # A production build served by next start: no route compiles during the matrix.

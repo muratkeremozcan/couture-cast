@@ -18,6 +18,7 @@ import {
   signJwt,
   storageEnv,
 } from './native-supabase.mjs'
+import { localSupabasePorts } from '../lib/local-supabase-ports.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -73,14 +74,20 @@ test('the lane exports the composite action variables plus REDIS_URL', () => {
   )
 })
 
-test('the fixed ports are the ones the share-card scripts hardcode', async () => {
+test('the fixed ports are the ones the share-card scripts resolve on a native lane', async () => {
   assert.equal(PORTS.gateway, 54321)
   assert.equal(PORTS.postgres, 54322)
+  // The native lanes set no CI port override, so the scripts resolve config.toml's ports,
+  // which must be the ones this stack binds.
+  assert.deepEqual(
+    { api: localSupabasePorts({}).api, db: localSupabasePorts({}).db },
+    { api: PORTS.gateway, db: PORTS.postgres }
+  )
   const prepare = await readFile(
     path.join(root, 'scripts/e2e-share-card/prepare.mjs'),
     'utf8'
   )
-  assert.match(prepare, /postgres:postgres@127\.0\.0\.1:54322\/postgres/)
+  assert.match(prepare, /const adminUrl = localDatabaseUrl\(\)/)
 })
 
 test('GoTrue gets the CLI v2.62.5 values for this config.toml', async () => {

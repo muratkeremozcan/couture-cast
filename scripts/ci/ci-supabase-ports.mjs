@@ -6,7 +6,7 @@
 // port, which is how the runner's own connection took 54322 for a whole mobile e2e job
 // (run 43079319997). The CLI writes the overrides and the URLs derived from them to
 // $GITHUB_ENV, so no workflow names a port.
-import { readFileSync, appendFileSync } from 'node:fs'
+import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -92,7 +92,7 @@ export function ciSupabaseEnv(envText, configText, { databaseUrl = false } = {})
   ]
 }
 
-if (process.argv[1] === fileURLToPath(import.meta.url)) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '../..')
   try {
     const lines = ciSupabaseEnv(

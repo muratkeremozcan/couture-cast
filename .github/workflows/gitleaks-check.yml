@@ -8,6 +8,8 @@ on:
 jobs:
   gitleaks:
     runs-on: ubuntu-latest
+    # 0.3 minutes at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

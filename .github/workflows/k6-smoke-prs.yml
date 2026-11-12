@@ -24,14 +24,9 @@ permissions:
 jobs:
   k6-smoke:
     runs-on: ubuntu-latest
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 4.5 min across 6 runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    # 4.5 + 10 + 3 + 2 = 19.5 min, so 25 keeps some margin.
-    timeout-minutes: 25
+    # 4.8 minutes at p50, 5.2 at p95 (last 20 runs, 2026-11-12). The Supabase
+    # start stops at its own 10 minute step limit.
+    timeout-minutes: 15
     env:
       TEST_ENV: local
       ALLOW_DEV_GUARDIAN_SECRET: 'true'

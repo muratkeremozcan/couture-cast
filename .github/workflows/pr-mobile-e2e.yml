@@ -126,8 +126,10 @@ jobs:
     # count is chosen to keep the slowest slice under about 4.5 minutes against
     # `scripts/maestro-flow-durations.json`'s recorded flow costs. Seven shards
     # packed a 5.8 minute slice and green shard jobs reached 19 minutes (27 runs
-    # at 18 or more, 2026-11-05 to 2026-11-10); nine keep every shard job under
-    # the 20-minute PR job limit.
+    # at 18 or more, 2026-11-05 to 2026-11-10). Nine packed 269 s and shard jobs
+    # ran 14.6 minutes at p50 and 16.8 at p95 (170 shard runs, 2026-11-11 to 12);
+    # twelve pack 212 s, about a minute less per shard, for room under the
+    # 20-minute ceiling. Past twelve one expensive flow sets the floor (14: 188 s).
     #
     # Each shard is a full, independent job: its own emulator, Supabase, API and
     # Metro, running a slice of the flow list. They share the AVD snapshot cache,
@@ -146,15 +148,13 @@ jobs:
       # learn everything that is broken in one run.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 21.9 min across 56 shard runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    # 22 + 10 + 3 + 2 = 37 min, so 45 keeps about 8 min of margin.
-    timeout-minutes: 45
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
+    # No PR job runs past 20 minutes. A shard is about 5 minutes of setup, 2 of
+    # Supabase (p95 2.4) and up to 11 of Maestro (p95 11.0 at nine shards, about
+    # a minute less at twelve). The slow paths that used to hold a shard for 45
+    # minutes now stop on their own limits: the SDK install at 8 minutes, the
+    # Supabase start at 10.
+    timeout-minutes: 20
     services:
       redis:
         image: redis:7-alpine
