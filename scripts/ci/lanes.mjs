@@ -97,6 +97,18 @@ export const SHARED = [
 const SUPABASE = 'supabase/**'
 
 /**
+ * Mobile files the web and package suites read: apps/web's share-card locale spec reads the
+ * mobile locales, and packages/api-client's analytics-routes.spec.ts reads the mobile routes and
+ * sources. Every lane that runs those suites lists them.
+ */
+const MOBILE_READ_BY_WEB_AND_PACKAGE_TESTS = [
+  'apps/mobile/assets/locales/**',
+  'apps/mobile/app/**',
+  'apps/mobile/src/**',
+  'apps/mobile/components/**',
+]
+
+/**
  * Paths a path-filtered workflow owns (k6-smoke-prs.yml runs k6/** itself), so they wake only
  * typecheck here.
  */
@@ -168,21 +180,16 @@ export const LANES = {
       'utils',
       'api',
     ],
-    // packages/db's community storage seed reads its ports from supabase/config.toml, and
-    // packages/api-client's analytics-routes.spec.ts reads the mobile app's routes and sources.
-    inputs: [
-      'apps/mobile/assets/locales/**',
-      SUPABASE,
-      'apps/mobile/app/**',
-      'apps/mobile/src/**',
-      'apps/mobile/components/**',
-    ],
+    // packages/db's community storage seed reads its ports from supabase/config.toml.
+    inputs: [...MOBILE_READ_BY_WEB_AND_PACKAGE_TESTS, SUPABASE],
   },
   'year-ahead': {
     title: 'Unit tests a year ahead',
     workflow: 'pr-checks.yml',
     jobs: ['unit-tests-year-ahead'],
     workspaces: ['api', 'web', 'config', 'utils', 'api-client', 'testing'],
+    // It reruns the web and package suites, which read these mobile files.
+    inputs: MOBILE_READ_BY_WEB_AND_PACKAGE_TESTS,
   },
   community: {
     title: 'Community realtime budget and screening gates',

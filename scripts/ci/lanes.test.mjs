@@ -356,6 +356,25 @@ const TEST_RUNNERS = [
   ['playwright/**', ['web-e2e']],
   ['scripts/**', ['share-card']],
 ]
+// Lanes that also run a test under a path, beside the first TEST_RUNNERS match: the year-ahead
+// job reruns the package vitest configs, apps/api/src and the web app's vitest config.
+const ALSO_RUN_BY = [
+  ['packages/config/**', ['year-ahead']],
+  ['packages/utils/**', ['year-ahead']],
+  ['packages/api-client/**', ['year-ahead']],
+  ['packages/testing/**', ['year-ahead']],
+  ['apps/api/src/**', ['year-ahead']],
+  ['apps/web/**', ['year-ahead']],
+]
+/** Every lane that runs the test file. */
+const runnersOf = (file) => [
+  ...new Set([
+    ...(TEST_RUNNERS.find(([glob]) => minimatch(file, glob, { dot: true }))?.[1] ?? []),
+    ...ALSO_RUN_BY.filter(([glob]) => minimatch(file, glob, { dot: true })).flatMap(
+      ([, lanes]) => lanes
+    ),
+  ]),
+]
 const isTest = (file) => /\.(test|spec)\.(m?[jt]sx?|cjs)$/.test(file)
 
 const trackedSet = new Set(tracked)
@@ -471,8 +490,7 @@ test('every repository file a test or a module it imports names wakes the lanes 
   for (const file of tracked
     .filter(isTest)
     .filter((name) => name !== 'scripts/ci/lanes.test.mjs')) {
-    const runners =
-      TEST_RUNNERS.find(([glob]) => minimatch(file, glob, { dot: true }))?.[1] ?? []
+    const runners = runnersOf(file)
     if (runners.length === 0) continue
     for (const read of filesRead(file)) {
       if (NOT_READ.some(([test, sample]) => test === file && sample === read)) continue
@@ -547,6 +565,8 @@ test('the plan job writes one output per lane and a summary from the event commi
   assert.deepEqual(Object.keys(written), allLanes)
   assert.equal(written.maestro, true)
   assert.equal(written['web-e2e'], false)
+  // The year-ahead job reruns analytics-routes.spec.ts, which reads mobile sources.
+  assert.equal(written['year-ahead'], true)
   // packages/api-client's analytics-routes.spec.ts reads mobile sources, so the other shard runs.
   assert.deepEqual(JSON.parse(output.match(/^coverage_shards=(.*)$/m)[1]), [
     'mobile',
