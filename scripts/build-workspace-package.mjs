@@ -365,11 +365,24 @@ export function buildFingerprint(packageDir, compiler) {
   ]
     .filter((name) => name !== manifest.name)
     .sort()
+  // A dependency counts by what its dist holds now, every file with its sha256, and its
+  // stamp: tsc --watch rewrites dist without touching the stamp, and this package
+  // compiles against the files.
   for (const name of workspace) {
-    const stamp = path.join(packageDir, 'node_modules', name, DIST, FINGERPRINT_FILE)
-    const rootStamp = path.join(repository, 'node_modules', name, DIST, FINGERPRINT_FILE)
-    const found = [stamp, rootStamp].find((candidate) => fs.existsSync(candidate))
-    add(`dependency:${name}`, found ? fs.readFileSync(found) : 'none')
+    const dist = [
+      path.join(packageDir, 'node_modules', name, DIST),
+      path.join(repository, 'node_modules', name, DIST),
+    ].find((candidate) => fs.existsSync(candidate))
+    const stamp = dist && path.join(dist, FINGERPRINT_FILE)
+    add(
+      `dependency:${name}`,
+      dist
+        ? JSON.stringify({
+            stamp: fs.existsSync(stamp) ? fs.readFileSync(stamp, 'utf8') : null,
+            outputs: outputInventory(dist),
+          })
+        : 'none'
+    )
   }
   return hash.digest('hex')
 }

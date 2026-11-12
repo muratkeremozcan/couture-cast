@@ -691,6 +691,13 @@ describe('what the fingerprint covers (Story 6.14 follow-up)', () => {
       'model User { id Int @id }',
     ],
     [
+      // build:watch rewrites a dependency's dist without touching its stamp (Codex review
+      // of PR 211): the consumer compiles against what dist holds, so that is what counts.
+      'a dependency dist changed after its build',
+      'node_modules/@couture/dep/dist/index.d.ts',
+      'export declare const changed: 2',
+    ],
+    [
       'an imported workspace package build',
       'node_modules/@couture/dep/dist/.build-fingerprint',
       'dep-2',
