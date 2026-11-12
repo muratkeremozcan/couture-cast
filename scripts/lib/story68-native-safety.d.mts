@@ -6,6 +6,10 @@ export function assertOwnedStory68EmulatorPort(input: {
   avd: unknown
   port: unknown
 }): void
+export function androidReversePorts(
+  ownedPorts: readonly number[],
+  env?: NodeJS.ProcessEnv | Record<string, string | undefined>
+): number[]
 export function restoreAndroidReverse(input: {
   adb: string
   device: string

@@ -9,6 +9,7 @@ import { PrismaClient } from '@prisma/client'
 import { createClient } from '@supabase/supabase-js'
 import sharp from 'sharp'
 import { planRedis, resolveSupabase } from './runtime-sources.mjs'
+import { localDatabaseUrl } from '../lib/local-supabase-ports.mjs'
 import { pinNativeJourneyWeather } from '../lib/native-journey-weather.mjs'
 import { story68PublicBuildEnv } from '../lib/story68-public-build-env.mjs'
 
@@ -58,7 +59,7 @@ const { credentials: supabase } = resolveSupabase(process.env, () =>
 const supabaseUrl = supabase.SUPABASE_URL
 const redis = planRedis(process.env)
 const name = `tea_community_${randomUUID().replaceAll('-', '')}`
-const adminUrl = 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const adminUrl = localDatabaseUrl()
 const databaseUrl = new URL(adminUrl)
 databaseUrl.pathname = `/${name}`
 const resources = {

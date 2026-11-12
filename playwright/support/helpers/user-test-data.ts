@@ -1,6 +1,7 @@
 import { PrismaClient } from '@prisma/client'
 import { garmentListResponseSchema } from '@couture/api-client/contracts/http'
 import type { ApiRequestFixture } from './api-test'
+import { localSupabasePorts } from '../../../scripts/lib/local-supabase-ports.mjs'
 
 export async function cleanupWardrobeUserTestData(
   apiRequest: ApiRequestFixture,
@@ -144,7 +145,8 @@ export function localPlaywrightDatabaseUrl(): URL {
   const isSupportedLocalDatabase =
     ['postgres:', 'postgresql:'].includes(databaseUrl.protocol) &&
     localHosts.has(databaseUrl.hostname) &&
-    databaseUrl.port === '54322' &&
+    // The configured local Supabase port: CI's override, else supabase/config.toml.
+    databaseUrl.port === String(localSupabasePorts().db) &&
     (databaseUrl.pathname === '/postgres' ||
       /^\/tea_community_[a-f0-9]{32}$/.test(databaseUrl.pathname)) &&
     databaseUrl.username === 'postgres'

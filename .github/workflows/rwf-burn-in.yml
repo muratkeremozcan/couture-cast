@@ -132,8 +132,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    env:
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    # LOCAL_DATABASE_URL comes from configure-ci-supabase-ports, the first step after checkout.
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -141,10 +140,13 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node and install deps
         uses: ./.github/actions/install
@@ -155,7 +157,26 @@ jobs:
         uses: ./.github/actions/setup-playwright-browsers
 
       - name: Start local Supabase services
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Reset local burn-in database
         run: npm run db:reset

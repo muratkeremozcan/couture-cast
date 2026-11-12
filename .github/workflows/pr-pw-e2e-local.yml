@@ -20,6 +20,8 @@ concurrency:
 jobs:
   vars:
     runs-on: ubuntu-latest
+    # 0.1 minutes at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 5
     outputs:
       SKIP_BURN_IN: ${{ steps.check_skip_label.outputs.SKIP_BURN_IN || 'false' }}
       test_env: local
@@ -49,14 +51,12 @@ jobs:
     secrets: inherit
 
   pw-e2e:
-    needs: [vars, burn-in]
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 9.1 min across 16 shard runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    timeout-minutes: 25
+    # Burn-in runs beside the lanes: it still fails the gate, and waiting for it put the
+    # lanes 14 to 16 minutes after the push (scripts/ci/pr-pipeline-shape.test.mjs).
+    needs: vars
+    # 11.3 minutes at p50, 12.4 at p95 (40 shard runs, 2026-11-11 to 12). The
+    # Supabase start stops at its own 10 minute step limit.
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       redis:
@@ -68,36 +68,27 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      # Keep identical to LOCAL_E2E_DATABASE_URL in
-      # scripts/local-e2e-database.mjs, which is the default a local run falls
-      # back to when nothing sets DATABASE_URL. Both point at the Supabase
-      # container declared in supabase/config.toml (port 54322). Set explicitly
-      # here rather than relying on that fallback so CI never depends on a
-      # default it did not choose.
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    # LOCAL_DATABASE_URL and the Supabase ports come from configure-ci-supabase-ports
+    # (.github/supabase-ci-ports.env), the first step after checkout, so CI never
+    # depends on a default it did not choose.
     strategy:
       fail-fast: false
       matrix:
         shardIndex: [1, 2]
         shardTotal: [2]
-    if: |
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.vars.outputs.SKIP_BURN_IN == 'true' ||
-        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
-        (needs.burn-in.result == 'skipped')
-      )
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Record git SHA
         id: git_sha
@@ -119,7 +110,26 @@ jobs:
         uses: ./.github/actions/setup-playwright-browsers
 
       - name: Start local Supabase services
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Reset local Playwright database
         run: npm run db:reset
@@ -188,20 +198,9 @@ jobs:
   # NEXT_PUBLIC_E2E_AUTH=false web build on 3077. See playwright/README.md.
   real-session-e2e:
     name: Real-session community E2E
-    needs: [vars, burn-in]
-    # Same gate as pw-e2e, so the two lanes run on the same commits.
-    if: |
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.vars.outputs.SKIP_BURN_IN == 'true' ||
-        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
-        (needs.burn-in.result == 'skipped')
-      )
-    # Estimated, not yet measured: about 3 min install and browsers, the Supabase
-    # start budget (600 s) plus about 3 min of image cache restore and save, about
-    # 3 min web build, about 3 min migrate, seed and API build, and about 2 min for
-    # the six specs.
-    timeout-minutes: 30
+    needs: vars
+    # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 15
     runs-on: ubuntu-latest
     services:
       redis:
@@ -214,10 +213,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # Source server for the isolated database. The run's migrations and app rows
-      # never touch this database; only Supabase Storage keeps its buckets and seed
-      # objects here (start-local-supabase provisions the buckets).
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # LOCAL_DATABASE_URL, from configure-ci-supabase-ports, is the source server
+      # for the isolated database. The run's migrations and app rows never touch
+      # that database; only Supabase Storage keeps its buckets and seed objects
+      # there (start-local-supabase provisions the buckets).
       # The job owns this Redis service, so no other stack shares its queues.
       REDIS_URL: redis://127.0.0.1:6379
       STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e
@@ -233,10 +232,15 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
+        with:
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -247,11 +251,29 @@ jobs:
         uses: ./.github/actions/setup-playwright-browsers
 
       - name: Start local Supabase services with Mailpit
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
         with:
           # The action's default list without mailpit: the real-email path reads
-          # the first sign-in code from Mailpit on 54324.
+          # the first sign-in code from Mailpit (SUPABASE_LOCAL_MAILPIT_URL).
           exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Install Playwright Chromium only
         run: npx playwright install chromium
@@ -304,15 +326,7 @@ jobs:
   # never inside the sharded suite above, which seeds those flags true.
   complimentary-access-e2e:
     name: Complimentary access E2E
-    needs: [vars, burn-in]
-    # Same gate as pw-e2e, so the lanes run on the same commits.
-    if: |
-      always() && (
-        github.event_name != 'pull_request' ||
-        needs.vars.outputs.SKIP_BURN_IN == 'true' ||
-        (needs.burn-in.result == 'success' && needs.burn-in.outputs.runE2E == 'true') ||
-        (needs.burn-in.result == 'skipped')
-      )
+    needs: vars
     # Measured locally: about 66 s for the runner with built packages. Estimated in
     # CI: about 3 min install and browsers, the Supabase start budget (600 s), about
     # 3 min for the API and web builds, under 2 min for the five tests.
@@ -329,9 +343,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # Source server for the owned database. The run creates and drops its own
-      # database there; Storage keeps its buckets in this one, for the posted look.
-      COMPLIMENTARY_E2E_SOURCE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # The source server for the owned database is LOCAL_DATABASE_URL, from
+      # configure-ci-supabase-ports. The run creates and drops its own database
+      # there; Storage keeps its buckets in that one, for the posted look.
       REDIS_URL: redis://127.0.0.1:6379
     steps:
       - name: Checkout repository
@@ -339,8 +353,11 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -351,7 +368,26 @@ jobs:
         uses: ./.github/actions/setup-playwright-browsers
 
       - name: Start local Supabase services
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Install Playwright Chromium only
         run: npx playwright install chromium
@@ -379,6 +415,8 @@ jobs:
     needs: [vars, burn-in, pw-e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
+    # 1.5 minutes at p50, 1.7 at p95 (last 20 runs, 2026-11-12).
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write

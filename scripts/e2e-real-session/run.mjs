@@ -43,7 +43,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse as parseEnvFile } from 'dotenv'
 import pg from 'pg'
-import { LOCAL_E2E_DATABASE_URL, ROOT_ENV_FILES } from '../local-e2e-database.mjs'
+import { localE2eDatabaseUrl, ROOT_ENV_FILES } from '../local-e2e-database.mjs'
 import {
   assertBucketsPresent,
   bucketDefinitionsFromMigrations,
@@ -306,7 +306,7 @@ async function main() {
   const supabase = resolveSupabase(process.env)
   const redisUrl = resolveRedisUrl(process.env)
   const sourceDatabaseUrl =
-    process.env.LOCAL_DATABASE_URL?.trim() || LOCAL_E2E_DATABASE_URL
+    process.env.LOCAL_DATABASE_URL?.trim() || localE2eDatabaseUrl()
   const auth = localAuthUsers({ ...process.env, ...supabase })
 
   // The seed uploads into these; without them it fails minutes in, after the

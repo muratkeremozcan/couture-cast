@@ -28,6 +28,7 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import { localDatabaseUrl, localSupabasePorts } from './lib/local-supabase-ports.mjs'
 import {
   assertGenericMaestroFlows,
   discoverRunnableMaestroFlows,
@@ -89,6 +90,7 @@ import {
   launchStallError,
 } from './lib/maestro-launch-watchdog.mjs'
 import { runAndroidDeviceShards } from './lib/maestro-android-shards.mjs'
+import { waitForExpoStatus } from './lib/expo-dev-server.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -341,18 +343,18 @@ const SKIP_WORKER = process.env.MOBILE_E2E_SKIP_WORKER === '1'
  * NOT falling back to `process.env.DATABASE_URL`: importing `@prisma/client`
  * loads `packages/db/.env`, which on a developer machine points at their own
  * working database (`postgresql://<user>@localhost:5432/couture_cast`) rather
- * than the Supabase test instance on 54322.
+ * than the local Supabase test instance.
  *
  * That fallback was live in `cleanupMobileE2EIdentity`, so the post-run cleanup
  * was issuing its deletes against the developer's own database while the suite
- * ran against 54322. The deletes matched nothing, the transaction committed,
+ * ran against local Supabase. The deletes matched nothing, the transaction committed,
  * and the runner logged success — so every run silently leaked its signed-up
  * fixture user, its location, and its ritual into the test database, and every
  * run pointed a `deleteMany` at a database it was never meant to write to.
  */
-const MOBILE_E2E_DATABASE_URL =
-  process.env.MOBILE_E2E_DATABASE_URL ||
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+// Resolved on use: the platform check and other early exits never need a database.
+const mobileE2eDatabaseUrl = () =>
+  process.env.MOBILE_E2E_DATABASE_URL || localDatabaseUrl()
 
 const log = (msg) =>
   console.log(`[maestro:runner]${SHARD_LABEL ? ` [${SHARD_LABEL}]` : ''} ${msg}`)
@@ -650,7 +652,7 @@ const disableAndroidAnimations = async () => {
  * 8081 fallback), the local API, and local Supabase.
  *
  * Supabase is on the list because the API signs community and wardrobe image URLs
- * against SUPABASE_URL, which on a local stack is `127.0.0.1:54321`. Without a route
+ * against SUPABASE_URL, which on a local stack is `127.0.0.1` on the API port. Without a route
  * there every signed image fails on the device. community-feed.yaml used to pass
  * anyway: the community card never reached its unavailable state and kept a blank
  * placeholder that still carried the `community-card-image-*` id. Once the card was
@@ -661,7 +663,7 @@ const disableAndroidAnimations = async () => {
  * @returns {number[]}
  */
 const androidHostPorts = (metroPort) => {
-  let supabasePort = 54321
+  let supabasePort = localSupabasePorts().api
   const supabaseUrl = process.env.SUPABASE_URL?.trim()
   if (supabaseUrl) {
     const url = new URL(supabaseUrl)
@@ -1237,7 +1239,7 @@ const requestJson = async (url, init) => {
 const mobileE2EWeatherAlertId = (userId) => `alert-777-${userId}`
 
 const seedMobileE2EWeatherAlert = async (identity) => {
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
   try {
     const payload = {
       version: '1.0.0',
@@ -1455,7 +1457,7 @@ const mobileE2ECapsuleId = (userId) => `mobile-e2e-capsule-${userId}`
 
 const seedMobileE2ECapsule = async (identity, garmentIds) => {
   const capsuleId = mobileE2ECapsuleId(identity.userId)
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
   try {
     await prisma.outfitCapsule.upsert({
       where: { id: capsuleId },
@@ -1635,7 +1637,7 @@ const FLOW_STATE_HOOKS = mobileE2EFlowStateHooks({
 })
 
 const withMobileE2EPrisma = async (work) => {
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
   try {
     await work(prisma)
   } finally {
@@ -2118,7 +2120,7 @@ const cleanupMobileE2EIdentity = async (apiBaseUrl, identity) => {
     }
   }
 
-  const prisma = new PrismaClient({ datasourceUrl: MOBILE_E2E_DATABASE_URL })
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -3288,7 +3290,7 @@ const startOrReuseLocalApi = async (
           stdio: ['inherit', 'pipe', 'pipe'],
           env: {
             ...process.env,
-            DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+            DATABASE_URL: mobileE2eDatabaseUrl(),
             GARMENT_TAGGING_ENGINE: 'fixture',
             ...deterministicFlagEnv,
             TEST_ENV: 'local',
@@ -3310,7 +3312,7 @@ const startOrReuseLocalApi = async (
       env: {
         ...process.env,
         ALLOW_DEV_GUARDIAN_SECRET: 'true',
-        DATABASE_URL: MOBILE_E2E_DATABASE_URL,
+        DATABASE_URL: mobileE2eDatabaseUrl(),
         GUARDIAN_INVITE_WEB_BASE_URL: 'http://127.0.0.1:3005',
         GARMENT_TAGGING_ENGINE: 'fixture',
         ...deterministicFlagEnv,
@@ -3459,7 +3461,8 @@ const buildPortPairs = (platform, metroPort) =>
 const findRunningExpoServer = async (portPairs) => {
   for (const pair of portPairs) {
     try {
-      await waitForHealth(pair.health, 5_000, 500)
+      // Metro's /status: a request for `/` renders the web page first (lib/expo-dev-server.mjs).
+      await waitForExpoStatus(pair.health, 5_000, 500)
       log(`Detected existing Expo dev server at ${pair.health}, reusing it`)
       return pair
     } catch {
@@ -3508,7 +3511,7 @@ const waitForExpoDevServer = async (portPairs, platform) => {
   let resolvedPair
   for (const pair of portPairs) {
     try {
-      await waitForHealth(pair.health)
+      await waitForExpoStatus(pair.health)
       resolvedPair = pair
       log(`Expo dev server reachable on ${pair.health}`)
       // Reachable is not the same as serving Expo Go. Ask for the manifest

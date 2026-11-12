@@ -4,8 +4,37 @@ name: Share-card native originals
 # the gate requires a skip there and a success everywhere else.
 on:
   pull_request:
+  # A merge to main runs every device lane (10 jobs, 4 on macOS, 41 to 118 minutes), which
+  # held half of the account's 20 concurrent jobs. It runs only when a file the lanes build,
+  # run or read changed; the nightly run covers everything. scripts/ci/share-card-paths.test.mjs
+  # checks the filter against representative inputs and the last 20 commits on main.
   push:
     branches: [main]
+    paths:
+      # Root files: package.json, package-lock.json, tsconfig.json, app.json, .nvmrc.
+      - '*'
+      - '.nvmrc'
+      - 'apps/**'
+      - 'packages/**'
+      - 'supabase/**'
+      - 'scripts/**'
+      - 'maestro/**'
+      - 'playwright/share-card.config.ts'
+      - 'playwright/tests/share-card-*.spec.ts'
+      - 'playwright/support/**'
+      - '.github/actions/**'
+      - '.github/workflows/pr-share-card-native.yml'
+      - '!**/*.md'
+      # App unit and integration tests run in other workflows, except the ones this workflow
+      # runs: the share-card-plugins gate suite (scripts/ci/node-test-suites.json) and the
+      # unit files of bridge-a11y.mjs (scripts/e2e-share-card/bridge-a11y-files.mjs).
+      - '!apps/**/*.test.*'
+      - '!apps/**/*.spec.*'
+      - '!apps/api/integration/**'
+      - 'apps/mobile/plugins/with-share-card-permissions.test.js'
+      - 'apps/mobile/plugins/with-story68-release-network.test.js'
+      - 'apps/mobile/components/share-card-composer.test.tsx'
+      - 'apps/mobile/src/lib/share-card-focus.spec.ts'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
@@ -57,8 +86,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         id: checkout
-      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies
@@ -104,6 +136,20 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
         id: supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Show the Supabase start log
+        # The start's own log names the command that failed or hung. This workflow
+        # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -283,8 +329,11 @@ jobs:
     steps: &android36_steps
       - uses: actions/checkout@v4
         id: checkout
-      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies
@@ -326,6 +375,20 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
         id: supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Show the Supabase start log
+        # The start's own log names the command that failed or hung. This workflow
+        # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -599,7 +662,10 @@ jobs:
     steps: *android36_steps
   browser-acceptance:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 14.5 minutes at p50, 17.6 at p95, 17.7 at most (last 20 runs, 2026-11-12). The
+    # steps that have stalled (install, browser dependencies, Supabase, the matrix)
+    # each stop on their own limit first.
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
@@ -611,10 +677,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         id: checkout
-      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
       - uses: ./.github/actions/install
         id: install
+        # 1.3 minutes at p50, 6.2 at most.
+        timeout-minutes: 8
       - name: Provision pinned share-card browser dependencies
         id: browser_deps
         if: matrix.platform == 'android'
@@ -635,6 +706,20 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
         id: supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Show the Supabase start log
+        # The start's own log names the command that failed or hung. This workflow
+        # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -666,6 +751,8 @@ jobs:
         run: |
           node scripts/e2e-share-card/bridge-a11y.mjs
       - name: Genuine browser share-card acceptance matrix
+        # 7.0 minutes at p50, 8.7 at p95, 9.0 at most.
+        timeout-minutes: 12
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' && steps.browser_deps.outcome == 'success' }}
         run: |
           # A production build served by next start: no route compiles during the matrix.

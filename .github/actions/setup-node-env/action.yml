@@ -10,24 +10,10 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
+    # Node and the dependency tree, restored whole when the lockfile matches. The cache step
+    # this action had saved ~/.npm and node_modules under every lockfile and restored a
+    # partial match, then still ran the install.
+    - name: Setup Node and dependencies
+      uses: ./.github/actions/node-dependencies
       with:
-        node-version-file: '.nvmrc'
-        cache: 'npm'
-
-    - name: Cache npm directories
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.npm
-          ./node_modules
-        key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-npm-
-
-    - name: Install dependencies
-      shell: bash
-      env:
-        INSTALL_COMMAND: ${{ inputs.use-npm-ci == 'true' && 'npm ci' || 'npm install' }}
-      run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"
+        install-command: ${{ inputs.use-npm-ci == 'true' && 'npm ci' || 'npm install' }}

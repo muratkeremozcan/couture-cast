@@ -175,10 +175,8 @@ Blocking through PR Gate:
 
 - **PR checks:** runtime dependency check, Prisma generation, typecheck, lint, build, unit tests,
   coverage reporting, and a 50% diff-coverage threshold.
-- **Contract testing:** OpenAPI generation/lint plus deterministic Pact consumer and provider
-  tests.
-- **Run schema validation:** Optic lint and compatibility diff against `main`.
-- **Gitleaks:** full-history secrets scan.
+- **Contract testing:** one job: gitleaks secrets scan, OpenAPI generation, Optic lint and
+  compatibility diff against `main`, and deterministic Pact consumer and provider tests.
 - **Playwright e2e:** blocking when applicable; burn-in selects changed tests before local,
   sharded Playwright runs.
 - **k6 smoke:** blocking when path filters match API, contract, database, k6, or package-manifest

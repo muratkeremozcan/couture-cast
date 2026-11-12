@@ -1,0 +1,62 @@
+# Story 6.14 follow-up: loading the cached Supabase images took about 77 s of every job that
+# starts a local Supabase, on the path before the start. Callers run this right after
+# checkout: it restores the image cache and loads it in the background while the
+# dependencies install, and start-local-supabase then waits for that load instead of
+# running its own. The key is the start's own (scripts/ci/supabase-image-cache.mjs); pass the
+# same exclude list the start gets, or the start ignores the preload and loads by itself.
+name: Preload Supabase images
+description: Restore the local Supabase image cache and load it in the background
+
+inputs:
+  exclude:
+    description: The exclude list the job's start-local-supabase step passes.
+    required: false
+    default: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy'
+
+runs:
+  using: composite
+  steps:
+    - name: Compute the Supabase image cache key
+      id: cache-key
+      shell: bash
+      env:
+        EXCLUDE: ${{ inputs.exclude }}
+        CONFIG_HASH: ${{ hashFiles('supabase/config.toml') }}
+      run: node scripts/ci/supabase-image-cache.mjs
+
+    - name: Restore the Supabase image cache
+      id: cache-restore
+      uses: actions/cache/restore@v4
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
+      with:
+        path: ${{ steps.cache-key.outputs.dir }}
+        key: ${{ steps.cache-key.outputs.key }}
+
+    - name: Load the Supabase images in the background
+      shell: bash
+      env:
+        KEY: ${{ steps.cache-key.outputs.key }}
+        CACHE_DIR: ${{ steps.cache-key.outputs.dir }}
+        HIT: ${{ steps.cache-restore.outputs.cache-hit == 'true' }}
+      run: |
+        set -u -o pipefail
+        preload="$RUNNER_TEMP/supabase-preload"
+        mkdir -p "$preload"
+        printf '%s' "$HIT" > "$preload/hit"
+        if [ "$HIT" = true ]; then
+          # The same 150 s limit the start's own load has; `status` appears when it ends.
+          nohup bash -c '
+            if [ -s "$1/images.tar.zst" ] && [ -s "$1/registry" ] &&
+              timeout --kill-after=10 150 bash -o pipefail -c "zstd -dc \"\$1\" | docker load" _ "$1/images.tar.zst"; then
+              echo loaded > "$2/status.tmp"
+            else
+              echo failed > "$2/status.tmp"
+            fi
+            mv "$2/status.tmp" "$2/status"' _ "$CACHE_DIR" "$preload" > "$preload/load.log" 2>&1 < /dev/null &
+          echo "Loading the cached Supabase images in the background."
+        else
+          echo "No Supabase image cache for this key; the start pulls and saves it."
+        fi
+        # Written last: the start trusts a preload only once its key is here.
+        printf '%s' "$KEY" > "$preload/key"

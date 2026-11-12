@@ -10,6 +10,7 @@ import {
   recordPendingIdentity,
 } from '../../../scripts/e2e-real-session/identities.mjs'
 import type { ApiRequestFixture } from './api-test'
+import { localMailpitUrl } from '../../../scripts/lib/local-supabase-ports.mjs'
 
 export type RealCommunityAccount = {
   /** Null when the probe deliberately has no single canonical app account. */
@@ -205,7 +206,7 @@ export function readGeneratedCommunityCode(account: RealCommunityAccount): strin
 /** Mailpit is a harness dependency; message bodies and codes stay out of test logs. */
 export async function readCommunityMailCode(email: string): Promise<string | undefined> {
   // playwright-utils deviation: secret mail content must bypass response-body logging.
-  const response = await fetch('http://127.0.0.1:54324/api/v1/messages')
+  const response = await fetch(`${localMailpitUrl()}/api/v1/messages`)
   if (!response.ok) throw new Error('The local mail catcher is unavailable.')
   const data = (await response.json()) as {
     messages: { ID: string; To: { Address: string }[] }[]
@@ -214,7 +215,7 @@ export async function readCommunityMailCode(email: string): Promise<string | und
     row.To.some((recipient) => recipient.Address.toLowerCase() === email.toLowerCase())
   )
   if (!message) return undefined
-  const body = await fetch(`http://127.0.0.1:54324/api/v1/message/${message.ID}`)
+  const body = await fetch(`${localMailpitUrl()}/api/v1/message/${message.ID}`)
   if (!body.ok) throw new Error('The owned sign-in message could not be read.')
   const content = (await body.json()) as { Text?: string; HTML?: string }
   return `${content.Text ?? ''}\n${content.HTML ?? ''}`.match(/\b(\d{6,10})\b/)?.[1]

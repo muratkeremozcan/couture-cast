@@ -1,0 +1,29 @@
+name: Configure the CI Supabase host ports
+description: >-
+  Export the local Supabase host ports from .github/supabase-ci-ports.env, the one
+  source of CI's ports, with the URLs derived from them (LOCAL_DATABASE_URL,
+  SUPABASE_LOCAL_API_URL, SUPABASE_LOCAL_MAILPIT_URL), to $GITHUB_ENV. The Supabase CLI
+  reads the SUPABASE_<SECTION>_PORT overrides over supabase/config.toml, so CI binds
+  ports below 32768, outside every runner's ephemeral range, where no outgoing
+  connection can hold one (the runner's own connection held 54322 for a whole mobile
+  e2e job in run 43079319997). Fails when a config.toml port has no override or an
+  override is not a port below 32768. Run it as the first step after checkout in every
+  job that starts local Supabase; start-local-supabase runs it again, which exports the
+  same values.
+
+inputs:
+  database-url:
+    description: >-
+      Also export DATABASE_URL as the local Supabase database, for a job whose every
+      step runs against it.
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Export the CI Supabase host ports
+      shell: bash
+      env:
+        EXPORT_DATABASE_URL: ${{ inputs.database-url }}
+      run: node scripts/ci/ci-supabase-ports.mjs

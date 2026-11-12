@@ -29,9 +29,9 @@ import {
   seedPost,
   seedPostReport,
 } from '../../apps/api/integration/helpers/moderation-queue-seed'
+import { localDatabaseUrl } from '../../scripts/lib/local-supabase-ports.mjs'
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const databaseUrl = process.env.DATABASE_URL ?? localDatabaseUrl()
 const SLA_URL = '/moderation/sla'
 const SLA_API = '**/api/v1/moderation/sla'
 const HOUR = 3_600_000

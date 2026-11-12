@@ -14,7 +14,8 @@ jobs:
   review:
     name: test review
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # 0.2 minutes at p95 on pull requests and 1.4 at most on comments (last 100).
+    timeout-minutes: 10
     # The fork guard is only for the pull_request path; the mention path is
     # gated inside the action (OWNER/MEMBER/COLLABORATOR, never a bot).
     if: github.event_name == 'issue_comment' || github.event.pull_request.head.repo.full_name == github.repository

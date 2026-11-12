@@ -57,6 +57,7 @@ import {
   shouldRetryIosSnapshot,
   assertOwnedStory68AppReset,
   restoreAndroidReverse,
+  androidReversePorts,
   withNativeTransport,
   assertOwnedStory68EmulatorPort,
 } from './lib/story68-native-safety.mjs'
@@ -205,7 +206,11 @@ function requireDevice() {
 }
 function reverse() {
   if (platform === 'android')
-    restoreAndroidReverse({ adb, device, ports: [4088, 8089, 53068, 54321] })
+    restoreAndroidReverse({
+      adb,
+      device,
+      ports: androidReversePorts([4088, 8089, 53068]),
+    })
 }
 function nativeOriginalPaths() {
   if (platform === 'android') {

@@ -69,10 +69,13 @@ env:
   ANDROID_PROFILE: medium_phone
 
 jobs:
+  # The Robolectric tests run in their own job beside this build: together they took
+  # 14.8 minutes at p50 and 17.0 at p95 (last 20 runs, 2026-11-12), too close to the
+  # 20 minute PR job limit; apart, the build is about 13 and the tests about 7.
   android:
-    name: Android module tests and app build
+    name: Android app build
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -105,9 +108,6 @@ jobs:
         with:
           packages: platform-tools
 
-      # The release build below consumes this project. Generating it in its own step
-      # lets that build run when the Robolectric tests fail. The test script repeats
-      # the prebuild, which leaves an already generated project unchanged.
       - name: Generate the Android project
         id: android_project
         working-directory: apps/mobile
@@ -118,13 +118,6 @@ jobs:
 
       - name: Fetch the Gradle wrapper
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
-
-      - name: Robolectric tests for the focus observer
-        working-directory: apps/mobile
-        env:
-          CI: '1'
-          EXPO_NO_GIT_STATUS: '1'
-        run: npm run test:accessibility-focus:android
 
       # The release app must keep React Native's native libraries, which the
       # module's build.gradle leaves out of its own androidTest APK only.
@@ -141,6 +134,50 @@ jobs:
         run: |
           bash scripts/ci/check-accessibility-focus-builds.sh android-app apps/mobile/android/app/build/outputs/apk/release/app-release.apk
           bash scripts/ci/check-accessibility-focus-builds.sh android-test apps/mobile/modules/accessibility-focus/android/build/outputs/apk/androidTest/debug/accessibility-focus-debug-androidTest.apk
+
+  android-robolectric:
+    name: Android module tests
+    runs-on: ubuntu-latest
+    # Robolectric 3.6 minutes (p95 4.1) after about 3 minutes of setup.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Fetch the Gradle wrapper
+        run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
+
+      - name: Robolectric tests for the focus observer
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npm run test:accessibility-focus:android
 
   ios:
     name: iOS module tests
@@ -214,7 +251,8 @@ jobs:
   android-talkback:
     name: Android module against TalkBack (API 35)
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    # 10.0 minutes at p50, 12.0 at p95, 12.8 at most (last 20 runs, 2026-11-12).
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
