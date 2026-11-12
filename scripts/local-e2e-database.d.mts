@@ -9,8 +9,10 @@
  * caller import it plainly and keeps the shape in a single place.
  */
 
-/** The throwaway local Supabase connection string. Matches CI's `LOCAL_DATABASE_URL`. */
-export declare const LOCAL_E2E_DATABASE_URL: string
+/** The throwaway local Supabase connection string on the port `env` configures. */
+export declare function localE2eDatabaseUrl(
+  env?: NodeJS.ProcessEnv | Record<string, string | undefined>
+): string
 
 /** The repo-level env files every local startup path already reads, in order. */
 export declare const ROOT_ENV_FILES: readonly string[]
