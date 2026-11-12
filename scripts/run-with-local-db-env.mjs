@@ -93,8 +93,13 @@ const targetsLocalSupabase = isLocalSupabaseDatabaseUrl(env.DATABASE_URL, env)
 // server holds data this reset must not touch.
 const resetsTheLocalDatabase = () => {
   const url = new URL(env.DATABASE_URL)
-  const schema = url.searchParams.get('schema')
-  return url.pathname === '/postgres' && (schema === null || schema === 'public')
+  // Prisma takes the last of repeated parameters; one schema parameter at most.
+  const schemas = url.searchParams.getAll('schema')
+  return (
+    url.pathname === '/postgres' &&
+    schemas.length <= 1 &&
+    (schemas[0] ?? 'public') === 'public'
+  )
 }
 if (requireLocal && !(targetsLocalSupabase && resetsTheLocalDatabase())) {
   console.error(

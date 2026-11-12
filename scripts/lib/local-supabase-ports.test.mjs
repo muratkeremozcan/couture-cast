@@ -147,6 +147,9 @@ describe('start:all resets only the configured local database', () => {
     for (const url of [
       'postgresql://postgres:postgres@127.0.0.1:24322/customer_records',
       'postgresql://postgres:postgres@127.0.0.1:24322/postgres?schema=customer_records',
+      // Prisma uses the last of repeated parameters (Codex review of PR 211).
+      'postgresql://postgres:postgres@127.0.0.1:24322/postgres?schema=public&schema=customer_records',
+      'postgresql://postgres:postgres@127.0.0.1:24322/postgres?schema=public&schema=public',
     ]) {
       const result = run({ ...CI, DATABASE_URL: url })
       assert.equal(result.status, 1, url)
