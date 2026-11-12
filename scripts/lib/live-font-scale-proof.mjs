@@ -1,29 +1,52 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 //
-// Oracle for the Story 6.15 live font-scale proof (AC3, TEA-01 to TEA-03). A capture is one
-// screen at one moment:
-//   { stage, fontScale, pid, nodes: [{ text, id, bounds }], fullText?: [identity] }
-// `nodes` is the visible text in screen coordinates (Android px, iOS pt). `fullText` is the
-// screen's text multiset gathered by scrolling through it; it falls back to `nodes` for a screen
-// that does not scroll. Stages: `before` (live, base scale), `immediate` and `settled` (live,
-// target scale), `cold` (a fresh launch at the target scale).
+// Oracle for the Story 6.15 live font-scale proof (AC3; TEA-01 to TEA-03; Codex review 1, 2, 7,
+// 12). A capture is one screen at one moment:
+//   { stage, fontScale, pid, identity: { activity?, root }, nodes: [node], fullText?, controls? }
+//   node: { text, id, bounds, parent? }   bounds and parent as "[l,t][r,b]" or [l, t, r, b]
+// `nodes` is the visible text in screen coordinates (Android px, iOS pt) with the bounds of each
+// node's parent view. `fullText` is the screen's text gathered by scrolling through it; it falls
+// back to `nodes` for a screen that does not scroll. `identity.activity` is the Android Activity
+// token; `identity.root` is the mount marker the app renders in test builds. Stages: `before`
+// (live, base scale), `immediate` and `settled` (live, target scale), `cold` (fresh launch at the
+// target scale), and optionally `updated` and `coldUpdated`: the same React state change made
+// after the live change and after the cold launch.
 //
-// React Native 0.87.0 is the first stable release with commit 45904c8, the Fabric fix for text
-// keeping the font scale it was first measured at. Below it the oracle expects the Story 6.8 bug
-// signature and passes on it, so any other outcome, an early fix included, is red. Step 4 of the
-// story deletes that branch.
+// A surviving text tree is what the proof tests, so a recreated Activity or a remounted root
+// gets its own verdict, `restored`, which never counts as a fix. React Native 0.87.0 is the first
+// stable release with commit 45904c8 (text keeping a stale font scale across later commits).
+// From 0.87 the screen must be `fixed`. Below it the oracle records what it sees: `fixed` passes
+// and flags the baseline for review, `known-residual` (heights stale against the cold reference,
+// nothing else wrong) passes, and anything else fails.
 
 const FIX_VERSION = [0, 87, 0]
 
-/** Height tolerance between live and cold layout: 2 px on Android, 1 pt on iOS. */
+/** Height tolerance between two layouts: 2 px on Android, 1 pt on iOS. */
 export const HEIGHT_TOLERANCE = { android: 2, ios: 1 }
-/** A grown single line must reach this share of the scale ratio. */
-export const GROWTH_FLOOR = 0.9
-/** Heights within this ratio of 1 count as unchanged when matching the 6.8 bug signature. */
-const UNCHANGED_RATIO = 0.02
-
+/** Below this the expected scale counts as unchanged (large Android text, for one). */
+const UNCHANGED_RATIO = 0.03
+/** How far a cold control's measured ratio may sit from the platform's expected ratio. */
+const CONTROL_RATIO_TOLERANCE = 0.08
 const SYSTEM_UI = /^com\.android\.systemui:/
+
+/**
+ * AOSP FontScaleConverterFactory lookup tables (Android 14 and later scale text nonlinearly).
+ * Sizes in sp map to dp; between table points the platform interpolates linearly, below the
+ * first it interpolates from zero, and past the last it keeps the last point's ratio. A scale
+ * between two tables blends them; a scale outside the tables (below 1.05, above 2) is linear.
+ */
+const ANDROID_FROM_SP = [8, 10, 12, 14, 18, 20, 24, 30, 100]
+const ANDROID_TABLES = {
+  1.05: [8.4, 10.5, 12.6, 14.8, 18.6, 20.6, 24.4, 30, 100],
+  1.1: [8.8, 11, 13.2, 15.6, 19.2, 21.2, 24.8, 30, 100],
+  1.15: [9.2, 11.5, 13.8, 16.4, 19.8, 21.8, 25.2, 30, 100],
+  1.2: [9.6, 12, 14.4, 17.2, 20.4, 22.4, 25.6, 30, 100],
+  1.3: [10.4, 13, 15.6, 18.8, 21.6, 23.6, 26.4, 30, 100],
+  1.5: [12, 15, 18, 22, 24, 26, 28, 30, 100],
+  1.8: [14.4, 18, 21.6, 24.4, 27.6, 30.8, 32.8, 34.8, 100],
+  2: [16, 20, 24, 26, 30, 34, 36, 38, 100],
+}
 
 function fail(code, detail) {
   const error = new Error(detail ? `${code}: ${detail}` : code)
@@ -43,6 +66,45 @@ export function fixExpectedFor(version) {
   return match[4] === undefined
 }
 
+function interpolate(fromValues, toValues, value) {
+  const last = fromValues.length - 1
+  if (value >= fromValues[last]) return (value * toValues[last]) / fromValues[last]
+  if (value <= fromValues[0]) return (value * toValues[0]) / fromValues[0]
+  const index = fromValues.findIndex((point) => value <= point)
+  const [x0, x1] = [fromValues[index - 1], fromValues[index]]
+  const [y0, y1] = [toValues[index - 1], toValues[index]]
+  return y0 + ((value - x0) * (y1 - y0)) / (x1 - x0)
+}
+
+/** Rendered size in dp for `sp` at an Android font scale, as the platform converts it. */
+export function androidScaledSize(sp, fontScale) {
+  const scale = Number(fontScale)
+  if (!(sp > 0) || !(scale > 0))
+    fail('live_font_text_size_required', `${sp}@${fontScale}`)
+  const known = Object.keys(ANDROID_TABLES)
+    .map(Number)
+    .sort((a, b) => a - b)
+  const at = (value) => interpolate(ANDROID_FROM_SP, ANDROID_TABLES[value], sp)
+  if (known.includes(scale)) return at(scale)
+  const upper = known.find((value) => value > scale)
+  const lower = [...known].reverse().find((value) => value < scale)
+  // Outside the tables the platform falls back to a linear table.
+  if (upper === undefined || lower === undefined) return sp * scale
+  return at(lower) + ((scale - lower) * (at(upper) - at(lower))) / (upper - lower)
+}
+
+/**
+ * The ratio a text box should change by. Android converts each size through its nonlinear
+ * curve, so a probe declares the size that sets its line box (`lineHeight` when the style sets
+ * one, else `fontSize`). React Native on iOS multiplies every size by the content-size
+ * category's multiplier, so the ratio is the multiplier ratio whatever the text style.
+ */
+export function expectedTextRatio({ platform, sizeSp, from, to }) {
+  if (platform === 'ios') return Number(to) / Number(from)
+  if (platform !== 'android') fail('live_font_platform_required', String(platform))
+  return androidScaledSize(sizeSp, to) / androidScaledSize(sizeSp, from)
+}
+
 export function parseBounds(bounds) {
   if (Array.isArray(bounds) && bounds.length === 4) return bounds.map(Number)
   const match =
@@ -56,13 +118,13 @@ export function parseBounds(bounds) {
 }
 
 function appNodes(capture) {
-  return (capture.nodes ?? []).filter(
+  return (capture?.nodes ?? []).filter(
     (node) =>
       typeof node.text === 'string' && node.text !== '' && !SYSTEM_UI.test(node.id ?? '')
   )
 }
 
-function identity(node) {
+function identityOf(node) {
   return JSON.stringify([node.id ?? '', node.text])
 }
 
@@ -77,7 +139,7 @@ function keyed(capture) {
   const seen = new Map()
   const result = new Map()
   for (const node of ordered) {
-    const base = identity(node)
+    const base = identityOf(node)
     const occurrence = seen.get(base) ?? 0
     seen.set(base, occurrence + 1)
     result.set(`${base}#${occurrence}`, node)
@@ -86,20 +148,97 @@ function keyed(capture) {
 }
 
 function multiset(capture) {
-  return [...(capture.fullText ?? appNodes(capture).map(identity))].sort()
+  return [...(capture.fullText ?? appNodes(capture).map(identityOf))].sort()
 }
 
-function height(node) {
-  return node.box[3] - node.box[1]
-}
+const height = (node) => node.box[3] - node.box[1]
 
 function sameMultiset(a, b) {
   return a.length > 0 && JSON.stringify(a) === JSON.stringify(b)
 }
 
+function findProbe(map, probe) {
+  return [...map.values()].find((node) => node.id === probe.id)
+}
+
+/** Live against cold heights for every node both show; a miss is stale when live kept `base`. */
+function parity(live, cold, base, tolerance) {
+  const liveNodes = keyed(live)
+  const coldNodes = keyed(cold)
+  const baseNodes = keyed(base)
+  const misses = []
+  let compared = 0
+  for (const [key, node] of liveNodes) {
+    const counterpart = coldNodes.get(key)
+    if (!counterpart) continue
+    compared += 1
+    if (Math.abs(height(node) - height(counterpart)) <= tolerance) continue
+    const before = baseNodes.get(key)
+    misses.push({
+      key,
+      live: height(node),
+      cold: height(counterpart),
+      stale: before !== undefined && Math.abs(height(node) - height(before)) <= tolerance,
+    })
+  }
+  return { pass: compared > 0 && misses.length === 0, compared, misses }
+}
+
+/** A text box that leaves its parent view is clipped, whatever its own height says. */
+function clipping(capture, tolerance) {
+  const clipped = []
+  for (const node of appNodes(capture)) {
+    if (node.parent === undefined) continue
+    const [left, top, right, bottom] = parseBounds(node.bounds)
+    const [pl, pt, pr, pb] = parseBounds(node.parent)
+    if (
+      left < pl - tolerance ||
+      top < pt - tolerance ||
+      right > pr + tolerance ||
+      bottom > pb + tolerance
+    )
+      clipped.push({ id: node.id ?? '', text: node.text })
+  }
+  return { pass: clipped.length === 0, clipped }
+}
+
+function identityCheck(before, immediate, settled) {
+  const stages = [before, immediate, settled]
+  const pids = new Set(stages.map((capture) => String(capture.pid)))
+  const roots = stages.map((capture) => capture.identity?.root)
+  const activities = stages.map((capture) => capture.identity?.activity)
+  const processKept = pids.size === 1 && !pids.has('undefined')
+  const rootKnown = roots.every((root) => typeof root === 'string' && root !== '')
+  const rootKept = rootKnown && new Set(roots).size === 1
+  const activityKept =
+    activities.every((value) => value === undefined) || new Set(activities).size === 1
+  // Android's event log counts MainActivity onCreate calls (`wm_on_create_called`); a rise
+  // between `before` and `settled` is a recreation even if a token read raced it.
+  const onCreate = stages.map((capture) => capture.identity?.onCreate)
+  const created =
+    onCreate[0] === undefined || onCreate[2] === undefined
+      ? null
+      : Number(onCreate[2]) - Number(onCreate[0])
+  const notRecreated = created === null || created === 0
+  return {
+    pass: processKept && rootKept && activityKept && notRecreated,
+    processKept,
+    rootKnown,
+    rootKept,
+    activityKept,
+    activityChanged: !activityKept,
+    onCreateDelta: created,
+    pids: [...pids],
+    roots,
+    activities,
+    onCreate,
+  }
+}
+
 /**
- * The five AC3 checks for one screen and one scale change. `anchors` are testIDs that sit above
- * the fold at every scale; `probes` are testIDs of single-line text used to measure growth.
+ * The AC3 checks for one screen and one scale change. `anchors` are testIDs that sit above the
+ * fold at every scale; `probes` ({ id, sizeSp }) are single-line text whose box should follow
+ * the platform's text scaling.
  */
 export function evaluateLiveFontChange({
   platform,
@@ -107,6 +246,8 @@ export function evaluateLiveFontChange({
   immediate,
   settled,
   cold,
+  updated,
+  coldUpdated,
   anchors,
   probes,
 }) {
@@ -114,41 +255,50 @@ export function evaluateLiveFontChange({
   if (tolerance === undefined) fail('live_font_platform_required', String(platform))
   if (!anchors?.length) fail('live_font_anchors_required')
   if (!probes?.length) fail('live_font_probes_required')
-  const scaleRatio = Number(settled.fontScale) / Number(before.fontScale)
-  if (!(scaleRatio > 0) || scaleRatio === 1) fail('live_font_scale_change_required')
+  if (Number(settled.fontScale) === Number(before.fontScale))
+    fail('live_font_scale_change_required')
   if (Number(cold.fontScale) !== Number(settled.fontScale))
     fail('live_font_cold_scale_mismatch')
+  if ((updated === undefined) !== (coldUpdated === undefined))
+    fail('live_font_update_pair_required')
 
-  const stages = { before, immediate, settled }
   const missingAnchors = []
-  for (const [stage, capture] of Object.entries(stages)) {
+  for (const [stage, capture] of Object.entries({ before, immediate, settled })) {
     const ids = new Set(appNodes(capture).map((node) => node.id))
     for (const anchor of anchors)
       if (!ids.has(anchor)) missingAnchors.push(`${stage}:${anchor}`)
   }
 
+  const base = keyed(before)
   const live = keyed(settled)
   const coldNodes = keyed(cold)
-  const parityMisses = []
-  let parityCompared = 0
-  for (const [key, node] of live) {
-    const counterpart = coldNodes.get(key)
-    if (!counterpart) continue
-    parityCompared += 1
-    const delta = Math.abs(height(node) - height(counterpart))
-    if (delta > tolerance)
-      parityMisses.push({ key, live: height(node), cold: height(counterpart) })
-  }
-
-  const base = keyed(before)
   const growth = probes.map((probe) => {
-    const find = (map) => [...map.values()].find((node) => node.id === probe)
-    const from = find(base)
-    const to = find(live)
-    if (!from || !to) return { probe, ratio: null }
-    return { probe, ratio: height(to) / height(from) }
+    const expected = expectedTextRatio({
+      platform,
+      sizeSp: probe.sizeSp,
+      from: before.fontScale,
+      to: settled.fontScale,
+    })
+    const [from, to, reference] = [base, live, coldNodes].map((map) =>
+      findProbe(map, probe)
+    )
+    if (!from || !to || !reference)
+      return { probe: probe.id, expected, ratio: null, pass: false }
+    const ratio = height(to) / height(from)
+    const matchesCold = Math.abs(height(to) - height(reference)) <= tolerance
+    const direction =
+      Math.abs(expected - 1) <= UNCHANGED_RATIO
+        ? true
+        : Math.sign(ratio - 1) === Math.sign(expected - 1) &&
+          Math.abs(ratio - 1) > UNCHANGED_RATIO
+    return {
+      probe: probe.id,
+      expected,
+      ratio,
+      coldRatio: height(reference) / height(from),
+      pass: matchesCold && direction,
+    }
   })
-  const pids = new Set([before.pid, immediate.pid, settled.pid].map(String))
 
   const checks = {
     anchors: { pass: missingAnchors.length === 0, missing: missingAnchors },
@@ -157,81 +307,152 @@ export function evaluateLiveFontChange({
       before: multiset(before).length,
       settled: multiset(settled).length,
     },
-    coldParity: {
-      pass: parityCompared > 0 && parityMisses.length === 0,
-      compared: parityCompared,
-      misses: parityMisses,
-    },
-    growth: {
-      pass: growth.every(
-        ({ ratio }) => ratio !== null && ratio >= GROWTH_FLOOR * scaleRatio
-      ),
-      scaleRatio,
-      probes: growth,
-    },
-    process: { pass: pids.size === 1 && !pids.has('undefined'), pids: [...pids] },
+    identity: identityCheck(before, immediate, settled),
+    coldParity: parity(settled, cold, before, tolerance),
+    growth: { pass: growth.every((probe) => probe.pass), probes: growth },
+    clipping: clipping(settled, tolerance),
+  }
+  if (updated) {
+    checks.postUpdateParity = parity(updated, coldUpdated, before, tolerance)
+    checks.postUpdateClipping = clipping(updated, tolerance)
   }
   return { checks, verdict: classify(checks) }
 }
 
 function classify(checks) {
-  const all = Object.values(checks).every((check) => check.pass)
-  if (all) return 'fixed'
-  const unchanged = checks.growth.probes.every(
-    ({ ratio }) => ratio !== null && Math.abs(ratio - 1) <= UNCHANGED_RATIO
-  )
+  if (Object.values(checks).every((check) => check.pass)) return 'fixed'
+  const { identity } = checks
   if (
-    checks.anchors.pass &&
-    checks.fullText.pass &&
-    checks.process.pass &&
-    !checks.growth.pass &&
-    unchanged &&
-    !checks.coldParity.pass
+    identity.processKept &&
+    identity.rootKnown &&
+    (!identity.rootKept || !identity.activityKept || identity.onCreateDelta > 0)
   )
-    return 'bug-signature'
-  return 'unexpected'
+    return 'restored'
+  if (!checks.anchors.pass || !checks.fullText.pass || !identity.pass) return 'unexpected'
+  if (!checks.clipping.pass || checks.postUpdateClipping?.pass === false)
+    return 'unexpected'
+  // What remains must be stale text: heights the live screen kept from the base scale while the
+  // cold launch measured different ones.
+  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
+  return misses.length > 0 && misses.every((miss) => miss.stale)
+    ? 'known-residual'
+    : 'unexpected'
 }
 
 /**
- * The proof's pass rule. With the fix bundled the screen must relayout; without it the screen
- * must show the Story 6.8 signature (text kept, heights frozen, cold launch differs).
+ * The proof's pass rule. With the fix bundled the screen must relayout in place. Without it a
+ * stale-height residual passes, and an early correct relayout passes with `baselineReview` set
+ * so the step's baseline gets a second look; a restored screen or any other failure is red.
  */
 export function assertLiveFontProof({ reactNativeVersion, ...change }) {
   const fixExpected = fixExpectedFor(reactNativeVersion)
   const result = evaluateLiveFontChange(change)
-  const expected = fixExpected ? 'fixed' : 'bug-signature'
-  if (result.verdict !== expected) {
+  const accepted = fixExpected ? ['fixed'] : ['fixed', 'known-residual']
+  if (!accepted.includes(result.verdict)) {
     const failing = Object.entries(result.checks)
       .filter(([, check]) => !check.pass)
       .map(([name]) => name)
     fail(
-      fixExpected ? 'live_font_fix_missing' : 'live_font_bug_signature_missing',
+      fixExpected ? 'live_font_fix_missing' : 'live_font_baseline_unexpected',
       `verdict ${result.verdict}; failing ${failing.join(',') || 'none'}`
     )
   }
-  return { ...result, fixExpected }
+  return {
+    ...result,
+    fixExpected,
+    baselineReview: !fixExpected && result.verdict === 'fixed',
+  }
 }
 
 /**
  * F-01 positive control: two cold launches, base and target scale, must keep the full text and
- * grow every probe. A pass here shows the oracle can see growth before it judges a live change.
+ * move every probe by the platform's expected ratio, and at least one probe must be expected to
+ * grow. A pass shows the oracle can see scaling, and that each probe's declared size is right,
+ * before it judges a live change.
  */
 export function assertColdControl({ platform, base, target, probes }) {
   if (HEIGHT_TOLERANCE[platform] === undefined)
     fail('live_font_platform_required', String(platform))
-  const scaleRatio = Number(target.fontScale) / Number(base.fontScale)
-  if (!(scaleRatio > 1)) fail('live_font_scale_change_required')
+  if (!(Number(target.fontScale) > Number(base.fontScale)))
+    fail('live_font_scale_change_required')
   if (!sameMultiset(multiset(base), multiset(target)))
     fail('live_font_control_text_changed')
   const from = keyed(base)
   const to = keyed(target)
   const ratios = probes.map((probe) => {
-    const a = [...from.values()].find((node) => node.id === probe)
-    const b = [...to.values()].find((node) => node.id === probe)
-    if (!a || !b) fail('live_font_control_probe_missing', probe)
-    return { probe, ratio: height(b) / height(a) }
+    const a = findProbe(from, probe)
+    const b = findProbe(to, probe)
+    if (!a || !b) fail('live_font_control_probe_missing', probe.id)
+    const expected = expectedTextRatio({
+      platform,
+      sizeSp: probe.sizeSp,
+      from: base.fontScale,
+      to: target.fontScale,
+    })
+    const ratio = height(b) / height(a)
+    const slack = CONTROL_RATIO_TOLERANCE + HEIGHT_TOLERANCE[platform] / height(a)
+    return { probe: probe.id, ratio, expected, pass: Math.abs(ratio - expected) <= slack }
   })
-  if (ratios.some(({ ratio }) => ratio < GROWTH_FLOOR * scaleRatio))
-    fail('live_font_control_no_growth', JSON.stringify(ratios))
-  return { scaleRatio, ratios }
+  if (!ratios.some(({ expected }) => expected - 1 > UNCHANGED_RATIO))
+    fail('live_font_control_growth_probe_required')
+  if (ratios.some(({ pass }) => !pass))
+    fail('live_font_control_ratio_mismatch', JSON.stringify(ratios))
+  const clipped = clipping(target, HEIGHT_TOLERANCE[platform])
+  if (!clipped.pass) fail('live_font_control_clipped', JSON.stringify(clipped.clipped))
+  return { ratios }
+}
+
+function overlaps(a, b) {
+  return a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3]
+}
+
+function controlBox(capture, id) {
+  const node = (capture.controls ?? []).find((control) => control.id === id)
+  if (!node) fail('live_font_composer_control_missing', id)
+  return parseBounds(node.bounds)
+}
+
+/**
+ * F-05 across scales: Save and Share sit inside the window, are at least a touch target in
+ * size (48 dp or 44 pt, given in capture units) and do not overlap. Their bounds may move:
+ * larger text reflows the action row by design.
+ */
+export function assertComposerControls({
+  capture,
+  window,
+  minTarget,
+  ids = ['share-card-save', 'share-card-share'],
+}) {
+  const frame = parseBounds(window)
+  const boxes = ids.map((id) => ({ id, box: controlBox(capture, id) }))
+  for (const { id, box } of boxes) {
+    if (box[0] < frame[0] || box[1] < frame[1] || box[2] > frame[2] || box[3] > frame[3])
+      fail('live_font_composer_control_off_screen', id)
+    if (box[2] - box[0] < minTarget || box[3] - box[1] < minTarget)
+      fail('live_font_composer_control_too_small', id)
+  }
+  for (let i = 0; i < boxes.length; i += 1)
+    for (let j = i + 1; j < boxes.length; j += 1)
+      if (overlaps(boxes[i].box, boxes[j].box))
+        fail('live_font_composer_controls_overlap', `${boxes[i].id},${boxes[j].id}`)
+  return { tier: boxes[0].box[1] === boxes[1]?.box[1] ? 'row' : 'stacked' }
+}
+
+/** F-05 at one scale: showing feedback copy must not move Save or Share. */
+export function assertComposerFeedbackStable({
+  withoutFeedback,
+  withFeedback,
+  ids = ['share-card-save', 'share-card-share'],
+}) {
+  for (const id of ids) {
+    const [a, b] = [withoutFeedback, withFeedback].map((capture) =>
+      controlBox(capture, id)
+    )
+    if (JSON.stringify(a) !== JSON.stringify(b))
+      fail(
+        'live_font_composer_feedback_moved_control',
+        `${id} ${JSON.stringify(a)} ${JSON.stringify(b)}`
+      )
+  }
+  return { stable: true }
 }

@@ -1,15 +1,19 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 //
-// F-00: the oracle judged on recorded hierarchies before it judges any device run.
+// F-00: the oracle judged on recorded and derived hierarchies before it judges any device run.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
 
 import {
+  androidScaledSize,
   assertColdControl,
+  assertComposerControls,
+  assertComposerFeedbackStable,
   assertLiveFontProof,
   evaluateLiveFontChange,
+  expectedTextRatio,
   fixExpectedFor,
   parseBounds,
 } from './live-font-scale-proof.mjs'
@@ -20,17 +24,36 @@ const baseline = JSON.parse(
     'utf8'
   )
 )
-const stage = (name) => structuredClone(baseline.captures.find((c) => c.stage === name))
+const IDENTITY = { activity: 'activity-1', root: 'root-a1' }
+const stage = (name) => ({
+  ...structuredClone(baseline.captures.find((c) => c.stage === name)),
+  identity: { ...IDENTITY },
+})
 const ANCHORS = ['current-temperature', 'outfit-comfort-notes']
-const PROBES = ['current-temperature']
+// 48 sp temperature: Android 14+ keeps it at 48 dp at 1.5, so it correctly does not grow.
+// 14 sp condition line: 22 dp at 1.5, a 1.571 ratio.
+const PROBES = [
+  { id: 'current-temperature', sizeSp: 48 },
+  { id: 'current-condition', sizeSp: 14 },
+]
+const LARGE = new Set(['current-temperature'])
 
-/** Scale every app text box's height about its top edge; system UI is left alone. */
-function grown(capture, factor, overrides = {}) {
+/**
+ * A correct layout at the target scale: every app text box grows by the 14 sp ratio about its
+ * top edge, except the large temperature, which Android leaves at its size. System UI is left
+ * alone. Positions are not reflowed; the oracle compares heights and parents.
+ */
+function correct(capture, overrides = {}, factor = 22 / 14) {
   return {
     ...capture,
     ...overrides,
     nodes: capture.nodes.map((node) => {
-      if (/^com\.android\.systemui:/.test(node.id) || node.text === '') return node
+      if (
+        /^com\.android\.systemui:/.test(node.id) ||
+        node.text === '' ||
+        LARGE.has(node.id)
+      )
+        return node
       const [left, top, right, bottom] = parseBounds(node.bounds)
       const scaled = top + Math.round((bottom - top) * factor)
       return { ...node, bounds: `[${left},${top}][${right},${scaled}]` }
@@ -38,22 +61,21 @@ function grown(capture, factor, overrides = {}) {
   }
 }
 
-// The Story 6.8 run has no cold launch at 1.5; a correct cold layout grows every line by the
-// scale, which is what a fixed live change must match.
-const coldAtTarget = () => grown(stage('settled'), 1.5, { stage: 'cold' })
+// The Story 6.8 run has no cold launch at 1.5; its correct layout is derived as above.
+const cold = () => correct(stage('settled'), { stage: 'cold' })
 const bugChange = () => ({
   platform: 'android',
   before: stage('before'),
   immediate: stage('immediate'),
   settled: stage('settled'),
-  cold: coldAtTarget(),
+  cold: cold(),
   anchors: ANCHORS,
   probes: PROBES,
 })
 const fixedChange = () => ({
   ...bugChange(),
-  immediate: grown(stage('immediate'), 1.5),
-  settled: grown(stage('settled'), 1.5),
+  immediate: correct(stage('immediate')),
+  settled: correct(stage('settled')),
 })
 
 describe('fixExpectedFor', () => {
@@ -75,27 +97,101 @@ describe('fixExpectedFor', () => {
   })
 })
 
-describe('evaluateLiveFontChange', () => {
-  test('the Story 6.8 baseline (43 nodes, temperature at 169 px) is the bug signature', () => {
-    const { verdict, checks } = evaluateLiveFontChange(bugChange())
-    assert.equal(verdict, 'bug-signature')
-    assert.equal(checks.fullText.before, 42) // 43 nodes less the status-bar clock
-    assert.equal(checks.fullText.pass, true)
-    assert.equal(checks.anchors.pass, true)
-    assert.equal(checks.process.pass, true)
-    assert.equal(checks.growth.pass, false)
-    assert.deepEqual(checks.growth.probes, [{ probe: 'current-temperature', ratio: 1 }])
-    assert.equal(checks.coldParity.pass, false)
+describe('expected text scaling', () => {
+  test('Android 14+ follows the AOSP 1.5 curve', () => {
+    assert.equal(androidScaledSize(20, 1.5), 26)
+    assert.equal(androidScaledSize(24, 1.5), 28)
+    assert.equal(androidScaledSize(30, 1.5), 30)
+    assert.equal(androidScaledSize(48, 1.5), 48)
+    assert.equal(androidScaledSize(14, 1.5), 22)
+    assert.equal(androidScaledSize(6, 1.5), 9)
   })
 
-  test('a live change that matches the cold layout and grows is fixed', () => {
+  test('Android stays linear outside the tables and blends between them', () => {
+    assert.equal(androidScaledSize(20, 1), 20)
+    assert.equal(androidScaledSize(20, 1.04), 20 * 1.04)
+    assert.equal(androidScaledSize(20, 2.5), 50)
+    assert.ok(Math.abs(androidScaledSize(20, 1.4) - 24.8) < 1e-9)
+  })
+
+  test('iOS scales by the content-size multiplier ratio', () => {
+    assert.equal(expectedTextRatio({ platform: 'ios', from: 1, to: 1.353 }), 1.353)
+    assert.ok(
+      Math.abs(
+        expectedTextRatio({ platform: 'android', sizeSp: 14, from: 1, to: 1.5 }) - 22 / 14
+      ) < 1e-9
+    )
+  })
+})
+
+describe('evaluateLiveFontChange', () => {
+  test('the Story 6.8 baseline is a known residual: small text stale, large text correct', () => {
+    const { verdict, checks } = evaluateLiveFontChange(bugChange())
+    assert.equal(verdict, 'known-residual')
+    assert.equal(checks.fullText.before, 42) // 43 nodes less the status-bar clock
+    assert.equal(checks.identity.pass, true)
+    assert.equal(checks.coldParity.pass, false)
+    assert.ok(checks.coldParity.misses.every((miss) => miss.stale))
+    const [temperature, condition] = checks.growth.probes
+    assert.equal(
+      temperature.pass,
+      true,
+      'unchanged 48 sp text matches its cold reference'
+    )
+    assert.equal(temperature.expected, 1)
+    assert.equal(condition.pass, false, 'the 14 sp line stayed at its 1.0 height')
+    assert.equal(condition.ratio, 1)
+  })
+
+  test('a live change that matches the cold layout is fixed, with large text unchanged', () => {
     const { verdict, checks } = evaluateLiveFontChange(fixedChange())
     assert.equal(verdict, 'fixed')
     assert.equal(checks.coldParity.compared, 42)
-    assert.ok(checks.growth.probes[0].ratio >= 1.49)
+    assert.equal(checks.growth.probes[0].ratio, 1)
+    assert.ok(checks.growth.probes[1].ratio > 1.5)
   })
 
-  test('the 44-to-5 blank-text regression fails anchors and full text', () => {
+  // F-00e: Android recreates MainActivity on a font change unless it declares fontScale.
+  test('a same-PID Activity recreation is restored, never fixed, and says how', () => {
+    const change = fixedChange()
+    change.before.identity = { ...IDENTITY, onCreate: 1 }
+    change.immediate.identity = { ...IDENTITY, activity: 'activity-2', onCreate: 2 }
+    change.settled.identity = { ...IDENTITY, activity: 'activity-2', onCreate: 2 }
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(verdict, 'restored')
+    assert.equal(checks.identity.processKept, true)
+    assert.equal(checks.identity.activityChanged, true)
+    assert.equal(checks.identity.onCreateDelta, 1)
+    assert.deepEqual(checks.identity.activities, [
+      'activity-1',
+      'activity-2',
+      'activity-2',
+    ])
+  })
+
+  test('an onCreate rise is restored even when the token reads raced it', () => {
+    const change = fixedChange()
+    change.before.identity = { ...IDENTITY, onCreate: 3 }
+    change.settled.identity = { ...IDENTITY, onCreate: 4 }
+    assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  test('a same-PID React remount is restored, never fixed', () => {
+    const change = fixedChange()
+    change.immediate.identity = { ...IDENTITY, root: 'root-a2' }
+    change.settled.identity = { ...IDENTITY, root: 'root-a2' }
+    assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  test('a capture without the mount marker cannot pass identity', () => {
+    const change = fixedChange()
+    delete change.settled.identity.root
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.identity.rootKnown, false)
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('the 44-to-5 blank-text regression is unexpected', () => {
     const change = fixedChange()
     const kept = new Set(change.settled.nodes.slice(0, 5).map((node) => node.text))
     for (const name of ['immediate', 'settled'])
@@ -106,34 +202,40 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(checks.fullText.pass, false)
   })
 
-  test('a process restart fails process even when layout is right', () => {
+  test('a process restart is unexpected even when layout is right', () => {
     const change = fixedChange()
     change.settled.pid = '20001'
     const { verdict, checks } = evaluateLiveFontChange(change)
     assert.equal(verdict, 'unexpected')
-    assert.equal(checks.process.pass, false)
+    assert.equal(checks.identity.processKept, false)
   })
 
-  test('growth short of 0.9 times the scale ratio fails growth', () => {
-    const change = { ...fixedChange(), settled: grown(stage('settled'), 1.3) }
-    change.cold = grown(stage('settled'), 1.3, { stage: 'cold' })
-    const { checks } = evaluateLiveFontChange(change)
-    assert.equal(checks.coldParity.pass, true)
-    assert.equal(checks.growth.pass, false)
-  })
-
-  test('a live height off the cold height by more than the platform tolerance fails parity', () => {
+  test('text that leaves its parent is clipped and never fixed', () => {
     const change = fixedChange()
-    change.cold = grown(stage('settled'), 1.52, { stage: 'cold' })
-    assert.equal(evaluateLiveFontChange(change).checks.coldParity.pass, false)
-    assert.equal(
-      evaluateLiveFontChange({ ...fixedChange(), platform: 'ios' }).checks.coldParity
-        .pass,
-      true
-    )
+    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
+    const [left, top, right] = parseBounds(node.bounds)
+    node.parent = `[${left},${top}][${right},${top + 40}]`
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.clipping.pass, false)
+    assert.equal(verdict, 'unexpected')
   })
 
-  test('refuses a run with no scale change, no anchors, or a cold launch at another scale', () => {
+  test('a height that matches neither the base nor the cold layout is unexpected', () => {
+    const change = { ...fixedChange(), settled: correct(stage('settled'), {}, 1.3) }
+    assert.equal(evaluateLiveFontChange(change).verdict, 'unexpected')
+  })
+
+  test('stale text after a post-scale React update is a residual, caught after a clean settle', () => {
+    const change = fixedChange()
+    change.updated = stage('settled') // the update re-used the 1.0 measurements
+    change.coldUpdated = cold()
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.coldParity.pass, true)
+    assert.equal(checks.postUpdateParity.pass, false)
+    assert.equal(verdict, 'known-residual')
+  })
+
+  test('refuses a run with no scale change, no anchors, a cold launch at another scale, or half an update', () => {
     assert.throws(
       () => evaluateLiveFontChange({ ...bugChange(), settled: stage('before') }),
       { code: 'live_font_scale_change_required' }
@@ -142,26 +244,47 @@ describe('evaluateLiveFontChange', () => {
       code: 'live_font_anchors_required',
     })
     assert.throws(
-      () =>
-        evaluateLiveFontChange({
-          ...bugChange(),
-          cold: { ...coldAtTarget(), fontScale: 1 },
-        }),
+      () => evaluateLiveFontChange({ ...bugChange(), cold: { ...cold(), fontScale: 1 } }),
       { code: 'live_font_cold_scale_mismatch' }
+    )
+    assert.throws(
+      () => evaluateLiveFontChange({ ...bugChange(), updated: stage('settled') }),
+      {
+        code: 'live_font_update_pair_required',
+      }
     )
   })
 })
 
 describe('assertLiveFontProof', () => {
-  test('below 0.87 the bug signature passes and the fix itself is red', () => {
-    assert.equal(
-      assertLiveFontProof({ reactNativeVersion: '0.81.5', ...bugChange() }).fixExpected,
-      false
+  test('below 0.87 a known residual passes', () => {
+    const result = assertLiveFontProof({ reactNativeVersion: '0.81.5', ...bugChange() })
+    assert.equal(result.verdict, 'known-residual')
+    assert.equal(result.baselineReview, false)
+  })
+
+  test('below 0.87 an early correct relayout passes and flags the baseline for review', () => {
+    const result = assertLiveFontProof({
+      reactNativeVersion: '0.83.10',
+      ...fixedChange(),
+    })
+    assert.equal(result.verdict, 'fixed')
+    assert.equal(result.baselineReview, true)
+  })
+
+  test('a restored screen is red at every version', () => {
+    const change = fixedChange()
+    change.settled.identity = { ...IDENTITY, activity: 'activity-2' }
+    assert.throws(
+      () => assertLiveFontProof({ reactNativeVersion: '0.81.5', ...change }),
+      {
+        code: 'live_font_baseline_unexpected',
+      }
     )
     assert.throws(
-      () => assertLiveFontProof({ reactNativeVersion: '0.86.3', ...fixedChange() }),
+      () => assertLiveFontProof({ reactNativeVersion: '0.88.1', ...change }),
       {
-        code: 'live_font_bug_signature_missing',
+        code: 'live_font_fix_missing',
       }
     )
   })
@@ -173,7 +296,7 @@ describe('assertLiveFontProof', () => {
       () => assertLiveFontProof({ reactNativeVersion: '0.88.1', ...bugChange() }),
       (error) =>
         error.code === 'live_font_fix_missing' &&
-        /verdict bug-signature; failing coldParity,growth/.test(error.message)
+        /verdict known-residual; failing coldParity,growth/.test(error.message)
     )
     assert.equal(
       assertLiveFontProof({ reactNativeVersion: '0.88.1', ...fixedChange() }).verdict,
@@ -183,24 +306,125 @@ describe('assertLiveFontProof', () => {
 })
 
 describe('assertColdControl', () => {
-  test('cold 1.0 against cold 1.5 keeps the text and grows the probes', () => {
-    const base = { ...stage('before'), stage: 'cold' }
-    const target = grown(base, 1.5, { fontScale: 1.5 })
+  const base = () => ({ ...stage('before'), stage: 'cold' })
+
+  test('cold 1.0 against cold 1.5 keeps the text and scales each probe as the platform does', () => {
+    const target = correct(base(), { fontScale: 1.5 })
     const { ratios } = assertColdControl({
       platform: 'android',
-      base,
+      base: base(),
       target,
       probes: PROBES,
     })
-    assert.ok(ratios[0].ratio >= 1.49)
+    assert.deepEqual(
+      ratios.map(({ probe, pass }) => [probe, pass]),
+      [
+        ['current-temperature', true],
+        ['current-condition', true],
+      ]
+    )
   })
 
   test('a control that does not grow is red, so the oracle cannot pass blind', () => {
-    const base = { ...stage('before'), stage: 'cold' }
-    const target = { ...base, fontScale: 1.5 }
+    const target = { ...base(), fontScale: 1.5 }
     assert.throws(
-      () => assertColdControl({ platform: 'android', base, target, probes: PROBES }),
-      { code: 'live_font_control_no_growth' }
+      () =>
+        assertColdControl({ platform: 'android', base: base(), target, probes: PROBES }),
+      { code: 'live_font_control_ratio_mismatch' }
+    )
+  })
+
+  test('a probe declared at the wrong size is red', () => {
+    const target = correct(base(), { fontScale: 1.5 })
+    const probes = [{ id: 'current-condition', sizeSp: 30 }]
+    assert.throws(
+      () => assertColdControl({ platform: 'android', base: base(), target, probes }),
+      { code: 'live_font_control_growth_probe_required' }
+    )
+    assert.throws(
+      () =>
+        assertColdControl({
+          platform: 'android',
+          base: base(),
+          target,
+          probes: [...probes, { id: 'current-temperature', sizeSp: 14 }],
+        }),
+      { code: 'live_font_control_ratio_mismatch' }
+    )
+  })
+})
+
+describe('composer controls (F-05)', () => {
+  const capture = (save, share) => ({
+    controls: [
+      { id: 'share-card-save', bounds: save },
+      { id: 'share-card-share', bounds: share },
+    ],
+  })
+  const window = '[0,0][1080,2400]'
+
+  test('across scales the controls may move but stay on screen, apart and touchable', () => {
+    assert.equal(
+      assertComposerControls({
+        capture: capture('[42,2000][530,2126]', '[550,2000][1038,2126]'),
+        window,
+        minTarget: 126,
+      }).tier,
+      'row'
+    )
+    assert.equal(
+      assertComposerControls({
+        capture: capture('[42,1900][1038,2026]', '[42,2050][1038,2176]'),
+        window,
+        minTarget: 126,
+      }).tier,
+      'stacked'
+    )
+  })
+
+  test('overlapping, off-screen or undersized controls are red', () => {
+    assert.throws(
+      () =>
+        assertComposerControls({
+          capture: capture('[42,2000][600,2126]', '[550,2000][1038,2126]'),
+          window,
+          minTarget: 126,
+        }),
+      { code: 'live_font_composer_controls_overlap' }
+    )
+    assert.throws(
+      () =>
+        assertComposerControls({
+          capture: capture('[42,2350][530,2476]', '[550,2000][1038,2126]'),
+          window,
+          minTarget: 126,
+        }),
+      { code: 'live_font_composer_control_off_screen' }
+    )
+    assert.throws(
+      () =>
+        assertComposerControls({
+          capture: capture('[42,2000][530,2100]', '[550,2000][1038,2126]'),
+          window,
+          minTarget: 126,
+        }),
+      { code: 'live_font_composer_control_too_small' }
+    )
+  })
+
+  test('at one scale, feedback copy must not move Save or Share', () => {
+    const still = capture('[42,2000][530,2126]', '[550,2000][1038,2126]')
+    assert.deepEqual(
+      assertComposerFeedbackStable({ withoutFeedback: still, withFeedback: still }),
+      { stable: true }
+    )
+    assert.throws(
+      () =>
+        assertComposerFeedbackStable({
+          withoutFeedback: still,
+          withFeedback: capture('[42,2040][530,2166]', '[550,2040][1038,2166]'),
+        }),
+      { code: 'live_font_composer_feedback_moved_control' }
     )
   })
 })

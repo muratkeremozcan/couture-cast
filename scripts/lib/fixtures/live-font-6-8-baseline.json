@@ -1,5 +1,5 @@
 {
-  "source": "Story 6.8 main 1d7b9848 non-debuggable Release APK, live font 1.0 to 1.5 on Home, 2026-10-26 (review-main-font-baseline-observe-persisted-1). Text replaced by SHA-256 prefixes; ids and bounds kept.",
+  "source": "Story 6.8 main 1d7b9848 non-debuggable Release APK, live font 1.0 to 1.5 on Home, 2026-10-26 (review-main-font-baseline-observe-persisted-1). Text replaced by SHA-256 prefixes; ids and bounds kept. The 14 sp condition line is tagged current-condition, the testID Story 6.15 gives it; the run had no mount marker or Activity token.",
   "captures": [
     {
       "stage": "before",
@@ -43,7 +43,7 @@
         },
         {
           "text": "t-c63401aba20f",
-          "id": "",
+          "id": "current-condition",
           "bounds": "[42,667][155,718]"
         },
         {
@@ -265,7 +265,7 @@
         },
         {
           "text": "t-c63401aba20f",
-          "id": "",
+          "id": "current-condition",
           "bounds": "[42,667][155,718]"
         },
         {
@@ -492,7 +492,7 @@
         },
         {
           "text": "t-c63401aba20f",
-          "id": "",
+          "id": "current-condition",
           "bounds": "[42,667][155,718]"
         },
         {
