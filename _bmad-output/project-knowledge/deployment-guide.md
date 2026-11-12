@@ -1137,6 +1137,15 @@ row for lane `append` carries the oldest unappended age; past five minutes the w
 which the PostHog alert on project 329012 watches. A stall means rows are not appending: read
 the worker's `Community append deferred` lines for the reason before anything else.
 
+The alert is `Community append stalled` (insight `Fp43bJIe`, hourly, current hour included,
+fires above 0, emails the owner). Production record for #208 (merge `7c592b31`, 2026-11-12 UTC):
+migration `20261111120000_community_append_batch` finished 03:10:08, the three functions are in
+`pg_proc` (SECURITY INVOKER, `search_path=public, pg_temp`), the worker started on `7c592b31`
+at 03:11:09 and the API was READY at 03:11:49. Before the proof the public head sequence was 0,
+the outbox and stream empty. One identity-free public `resync` outbox row inserted at 03:15:57
+was appended 1.7 s later as public sequence 1, with no new `community_append_retry` row and no
+worker warning or error.
+
 Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
 `max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
 pool size (the pooler config returns null for both). Idle guard connections are Supavisor clients

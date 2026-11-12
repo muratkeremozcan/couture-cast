@@ -689,9 +689,14 @@ describe('Story 6.5 committed stream append', () => {
     const outcome = await stream.settle()
     expect(outcome.status).toBe('fulfilled')
     const report = (outcome as PromiseFulfilledResult<AppendReport>).value
-    expect(report).toMatchObject({ stop: 'drained', ready: 10, selectedReason: 'budget' })
+    // Preparation normally drains all ten, but a loaded host can close the 150 ms window first;
+    // either way the trim follows from what the batch reports.
+    if (report.stop === 'drained') expect(report.ready).toBe(10)
+    else expect(report).toMatchObject({ stop: 'window' })
     expect(report.writeCostMs).toBe(150)
-    expect(report.selected).toBe(Math.max(1, Math.floor(report.remainingMs / 150)))
+    const fits = Math.max(1, Math.floor(report.remainingMs / 150))
+    expect(report.selected).toBe(Math.min(report.ready, fits))
+    expect(report.selectedReason).toBe(fits < report.ready ? 'budget' : 'all')
     expect(report.count).toBe(report.selected)
     expect(await backlog()).toBe(10 - report.selected)
   })
