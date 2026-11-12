@@ -178,6 +178,109 @@ async function publishPosts(count: number) {
   })
 }
 
+/** One `$transaction` request: when it started, which phase made it and the limits it was given. */
+type AttemptBudget = {
+  phase: 'append' | 'retry-row'
+  start: number
+  maxWait: number
+  timeout: number
+}
+
+/**
+ * Records every transaction `client` is asked for, as the repository calls it. Only the append
+ * sets an isolation level, which tells its attempts from the retry row's.
+ */
+function recordBudgets(client: PrismaClient) {
+  const budgets: AttemptBudget[] = []
+  const recorded = new Proxy(client, {
+    get(target, prop, receiver) {
+      const value: unknown = Reflect.get(target, prop, receiver)
+      if (prop !== '$transaction' || typeof value !== 'function') return value
+      return (...args: unknown[]) => {
+        const limits = args[1] as
+          | { isolationLevel?: unknown; maxWait?: number; timeout?: number }
+          | undefined
+        budgets.push({
+          phase: limits?.isolationLevel === undefined ? 'retry-row' : 'append',
+          start: performance.now(),
+          maxWait: limits?.maxWait ?? Number.POSITIVE_INFINITY,
+          timeout: limits?.timeout ?? Number.POSITIVE_INFINITY,
+        })
+        return Reflect.apply(value, target, args) as unknown
+      }
+    },
+  })
+  return { client: recorded, budgets }
+}
+
+// The repository sets its deadline in the step that begins the append, and each attempt computes
+// its limits in the step that starts it; both are synchronous, so 5 ms is ample.
+const DEADLINE_TOLERANCE_MS = 5
+
+/** Every attempt started before the one deadline, with positive limits that end by it. */
+function expectOneDeadline(budgets: AttemptBudget[], started: number) {
+  const deadline = started + COMMUNITY_APPEND_DEADLINE_MS
+  for (const [index, budget] of budgets.entries()) {
+    const label = `${budget.phase} attempt ${index + 1} at ${Math.round(budget.start - started)} ms`
+    expect(
+      Number.isFinite(budget.maxWait) && budget.maxWait > 0,
+      `${label}: maxWait ${budget.maxWait}`
+    ).toBe(true)
+    expect(
+      Number.isFinite(budget.timeout) && budget.timeout > 0,
+      `${label}: timeout ${budget.timeout}`
+    ).toBe(true)
+    expect(budget.start, label).toBeLessThan(deadline)
+    expect(budget.start + budget.maxWait + budget.timeout, label).toBeLessThanOrEqual(
+      deadline + DEADLINE_TOLERANCE_MS
+    )
+  }
+}
+
+const PLDBGAPI2_ABORT = `RAISE EXCEPTION USING ERRCODE = 'XX000',
+  MESSAGE = 'cannot find parent statement on pldbgapi2 call stack'`
+
+/** Replaces the append function and adds a retry-row trigger for one test, then restores both. */
+async function withFaults<T>(
+  appendBody: string,
+  telemetryBody: string,
+  run: () => Promise<T>
+) {
+  const original = (
+    await prisma.$queryRaw<{ definition: string }[]>`
+      SELECT pg_get_functiondef('community_append_batch(integer,double precision)'::regprocedure)
+        AS definition`
+  )[0]!.definition
+  await prisma.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION
+    community_append_batch(ready_limit integer, write_cost_ms double precision)
+    RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN ${appendBody}; END $$`)
+  await prisma.$executeRawUnsafe(`CREATE FUNCTION tea_abort_telemetry() RETURNS trigger
+    LANGUAGE plpgsql AS $$ BEGIN ${telemetryBody}; RETURN NEW; END $$`)
+  await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_abort_telemetry BEFORE INSERT
+    ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_abort_telemetry()`)
+  try {
+    return await run()
+  } finally {
+    await prisma.$executeRawUnsafe(
+      'DROP TRIGGER tea_abort_telemetry ON "CommunityEngagementTelemetry"'
+    )
+    await prisma.$executeRawUnsafe('DROP FUNCTION tea_abort_telemetry()')
+    await prisma.$executeRawUnsafe(original)
+  }
+}
+
+/** A repository on one connection at three times production's round trip, its warnings kept. */
+function slowRepository() {
+  const { client, budgets } = recordBudgets(pool(1, slowUrl))
+  const repository = new CommunityStreamRepository(client)
+  const warnings: [Record<string, unknown>, string][] = []
+  const logger = Reflect.get(repository, 'logger') as {
+    warn: (fields: Record<string, unknown>, message: string) => void
+  }
+  logger.warn = (fields, message) => warnings.push([fields, message])
+  return { client, repository, budgets, warnings }
+}
+
 describe('community append at production database latency', () => {
   it('6.5-INT-030: the proxy adds one production round trip per statement', async () => {
     const started = performance.now()
@@ -367,79 +470,84 @@ describe('community append at production database latency', () => {
     // The supported pldbgapi2 abort, after 200 ms of server work in the append and 60 ms in
     // the retry row, at three times production's round trip. Each transaction may retry it
     // twice; with a fresh budget per attempt, six attempts took 5.12 s (Codex review of #208).
-    const original = (
-      await prisma.$queryRaw<{ definition: string }[]>`
-        SELECT pg_get_functiondef('community_append_batch(integer,double precision)'::regprocedure)
-          AS definition`
-    )[0]!.definition
-    const abort = `RAISE EXCEPTION USING ERRCODE = 'XX000',
-      MESSAGE = 'cannot find parent statement on pldbgapi2 call stack'`
-    await prisma.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION
-      community_append_batch(ready_limit integer, write_cost_ms double precision)
-      RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.2); ${abort}; END $$`)
-    await prisma.$executeRawUnsafe(`CREATE FUNCTION tea_abort_telemetry() RETURNS trigger
-      LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.06); ${abort}; END $$`)
-    await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_abort_telemetry BEFORE INSERT
-      ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_abort_telemetry()`)
-    const counted = heldDuring(pool(1, slowUrl), 1, {})
-    // Each attempt's start and the wait and run limits it was given.
-    const budgets: { start: number; maxWait: number; timeout: number }[] = []
-    const recorded = new Proxy(counted.client, {
-      get(target, prop, receiver) {
-        const value: unknown = Reflect.get(target, prop, receiver)
-        if (prop !== '$transaction' || typeof value !== 'function') return value
-        return (...args: unknown[]) => {
-          const limits = args[1] as { maxWait?: number; timeout?: number } | undefined
-          budgets.push({
-            start: performance.now(),
-            maxWait: limits?.maxWait ?? Number.POSITIVE_INFINITY,
-            timeout: limits?.timeout ?? Number.POSITIVE_INFINITY,
-          })
-          return Reflect.apply(value, target, args) as unknown
-        }
-      },
-    })
-    const repository = new CommunityStreamRepository(recorded)
-    const warnings: [Record<string, unknown>, string][] = []
-    const logger = Reflect.get(repository, 'logger') as {
-      warn: (fields: Record<string, unknown>, message: string) => void
-    }
-    logger.warn = (fields, message) => warnings.push([fields, message])
-    const started = performance.now()
-    // Measured before the cleanup below, which is not part of the append.
-    let elapsed = Number.POSITIVE_INFINITY
-    try {
-      await expect(repository.appendWithReport()).rejects.toBeDefined()
-      elapsed = performance.now() - started
-    } finally {
-      await prisma.$executeRawUnsafe(
-        'DROP TRIGGER tea_abort_telemetry ON "CommunityEngagementTelemetry"'
-      )
-      await prisma.$executeRawUnsafe('DROP FUNCTION tea_abort_telemetry()')
-      await prisma.$executeRawUnsafe(original)
-    }
+    const { repository, budgets, warnings } = slowRepository()
+    let started = 0
+    // Measured before the cleanup, which is not part of the append.
+    const elapsed = await withFaults(
+      `PERFORM pg_sleep(0.2); ${PLDBGAPI2_ABORT}`,
+      `PERFORM pg_sleep(0.06); ${PLDBGAPI2_ABORT}`,
+      async () => {
+        started = performance.now()
+        await expect(repository.appendWithReport()).rejects.toBeDefined()
+        return performance.now() - started
+      }
+    )
     console.info(
       JSON.stringify({
         evidence: '6.5-INT-038',
         elapsed,
-        attempts: counted.calls(),
         budgets: budgets.map((budget) => ({ ...budget, start: budget.start - started })),
         warnings,
       })
     )
-    // A retry ran, and every attempt was given only what was left of the one deadline. The
-    // repository sets its deadline when the append begins, no later than the first attempt.
-    expect(budgets.length).toBeGreaterThanOrEqual(2)
-    const deadline = budgets[0]!.start + COMMUNITY_APPEND_DEADLINE_MS
-    // 5 ms covers the synchronous step from computing the limits to starting the attempt.
-    for (const budget of budgets)
-      expect(budget.start + budget.maxWait + budget.timeout).toBeLessThanOrEqual(
-        deadline + 5
-      )
+    // The append was retried, every attempt was given only what was left of the one deadline,
+    // and the deadline, not a failed write, is why the retry row is missing.
+    expect(
+      budgets.filter((budget) => budget.phase === 'append').length
+    ).toBeGreaterThanOrEqual(2)
+    expectOneDeadline(budgets, started)
+    expect(warnings.at(-1)).toEqual([
+      expect.objectContaining({ code: 'deadline' }),
+      'Community append retry not recorded',
+    ])
     // Past the deadline only the last attempt's close remains: its statement in flight and the
     // rollback, a few 100 ms round trips here. CI has measured 2.71 to 2.85 s, so this bound
     // allows for a loaded runner; one fresh budget per attempt took 5.12 s.
     expect(elapsed).toBeLessThan(COMMUNITY_APPEND_DEADLINE_MS + 1_000)
-    expect(warnings.at(-1)?.[1]).toBe('Community append retry not recorded')
+  }, 30_000)
+
+  it('6.5-INT-039: a retry row retried after an abort stays inside the append deadline', async () => {
+    await publishPosts(1)
+    // The append fails at once with a lock timeout, which is not retried, so the retry row has
+    // time to run, abort once with the pldbgapi2 error and be written on its second attempt.
+    // The sequence counts calls across rollbacks.
+    await prisma.$executeRawUnsafe('CREATE SEQUENCE tea_retry_row_calls')
+    const { client, repository, budgets, warnings } = slowRepository()
+    // Connect first so the budget goes to the attempts, not to a cold connection.
+    await client.$queryRaw`SELECT 1`
+    let started = 0
+    try {
+      await withFaults(
+        "RAISE EXCEPTION USING ERRCODE = '55P03', MESSAGE = 'lock timeout'",
+        `IF nextval('tea_retry_row_calls') = 1 THEN ${PLDBGAPI2_ABORT}; END IF`,
+        async () => {
+          started = performance.now()
+          await expect(repository.appendWithReport()).rejects.toBeDefined()
+        }
+      )
+    } finally {
+      await prisma.$executeRawUnsafe('DROP SEQUENCE tea_retry_row_calls')
+    }
+    console.info(
+      JSON.stringify({
+        evidence: '6.5-INT-039',
+        budgets: budgets.map((budget) => ({ ...budget, start: budget.start - started })),
+        warnings,
+      })
+    )
+    expect(budgets.map((budget) => budget.phase)).toEqual([
+      'append',
+      'retry-row',
+      'retry-row',
+    ])
+    expectOneDeadline(budgets, started)
+    expect(warnings).toEqual([
+      [{ reason: 'head_contention', nextBatchLimit: 25 }, 'Community append deferred'],
+    ])
+    await expect(
+      prisma.communityEngagementTelemetry.count({
+        where: { event_type: 'community_append_retry', reason: 'head_contention' },
+      })
+    ).resolves.toBe(1)
   }, 30_000)
 })
