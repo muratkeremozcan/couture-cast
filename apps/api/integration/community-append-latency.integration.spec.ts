@@ -307,11 +307,21 @@ function recordedRepository(url: string) {
 
 describe('community append at production database latency', () => {
   it('6.5-INT-030: the proxy adds one production round trip per statement', async () => {
-    const started = performance.now()
-    for (let i = 0; i < 5; i++) await remote.$queryRaw`SELECT 1`
-    const perStatement = (performance.now() - started) / 5
-    expect(perStatement).toBeGreaterThanOrEqual(30)
-    expect(perStatement).toBeLessThan(60)
+    // The fastest of ten statements on each path: a loaded runner only adds time, so the
+    // minimum isolates what the proxy adds. A mean of five reached 70 ms on a busy CI runner.
+    const fastest = async (client: PrismaClient) => {
+      let best = Number.POSITIVE_INFINITY
+      for (let i = 0; i < 10; i++) {
+        const started = performance.now()
+        await client.$queryRaw`SELECT 1`
+        best = Math.min(best, performance.now() - started)
+      }
+      return best
+    }
+    const added = (await fastest(remote)) - (await fastest(prisma))
+    // One 31 ms round trip; two would add 62 ms.
+    expect(added).toBeGreaterThanOrEqual(30)
+    expect(added).toBeLessThan(45)
   })
 
   it('6.5-INT-031: append makes progress within its budgets at a 31 ms round trip', async () => {
