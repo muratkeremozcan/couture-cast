@@ -288,8 +288,9 @@ async function scrollThrough(first) {
 }
 
 async function settle(stage, scale, label) {
-  // Two identical hierarchies at least a second apart, within 20 seconds.
-  const deadline = Date.now() + 20_000
+  // Two identical hierarchies at least a second apart, within 60 seconds: a cold Debug launch
+  // keeps loading the teaser and the outfit images for a while after the anchors appear.
+  const deadline = Date.now() + 60_000
   let previous = flattenHierarchy(hierarchy(), { platform }).nodes
   let since = Date.now()
   while (Date.now() < deadline) {

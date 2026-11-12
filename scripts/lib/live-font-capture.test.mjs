@@ -117,6 +117,23 @@ describe('stitchPages', () => {
     )
   })
 
+  test('a node cut by the viewport matches on its visible edge', () => {
+    const box = (text, topEdge, bottomEdge) => ({
+      text,
+      id: '',
+      bounds: `[0,${topEdge}][100,${bottomEdge}]`,
+    })
+    // Page one shows "Long" cut at the bottom (top 900 visible); after a 600 px scroll page two
+    // shows it whole, its top at 300 and bottom at 500.
+    const first = [box('A', 100, 140), box('B', 500, 540), box('Long', 900, 960)]
+    const second = [box('B', -100, -60), box('Long', 300, 500), box('C', 700, 740)]
+    const third = [box('Long', -300, -100), box('C', 100, 140), box('D', 500, 540)]
+    assert.deepEqual(
+      stitchPages([first, second, third]).map((key) => JSON.parse(key)[1]),
+      ['A', 'B', 'Long', 'C', 'D']
+    )
+  })
+
   test('refuses pages with no shared anchor', () => {
     assert.throws(() => stitchPages([[at('A', 0)], [at('Z', 0)]]), {
       message: 'live_font_scroll_pages_disjoint',

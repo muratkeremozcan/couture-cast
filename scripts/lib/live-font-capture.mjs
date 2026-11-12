@@ -66,10 +66,14 @@ export function countOnCreate(eventLog, component) {
     .length
 }
 
-function top(node) {
-  const match = /^\[(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]/.exec(String(node.bounds))
-  return match ? Number(match[2]) : 0
+function edges(node) {
+  const match =
+    /^\[(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]\[(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]/.exec(
+      String(node.bounds)
+    )
+  return match ? [Number(match[2]), Number(match[4])] : [0, 0]
 }
+const top = (node) => edges(node)[0]
 
 const identityOf = (node) => JSON.stringify([node.id ?? '', node.text])
 
@@ -77,8 +81,9 @@ const identityOf = (node) => JSON.stringify([node.id ?? '', node.text])
  * Joins scrolled pages into one text multiset. A node at the same identity and position on
  * every page is fixed chrome (tab bar, sticky header) and counts once. Each page is offset from
  * the previous one by the median shift of the moving identities that appear exactly once on
- * both pages; a node whose identity and shifted position match one already taken is the same
- * node seen again.
+ * both pages; a node whose identity and shifted top or bottom match one already taken is the
+ * same node seen again. Either edge counts because the hierarchy clips a node cut by the
+ * viewport, so a node half off screen keeps only its visible edge.
  */
 export function stitchPages(pages, { tolerance = 4 } = {}) {
   if (!pages.length) return []
@@ -89,7 +94,10 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
         Math.abs(top(other) - top(node)) <= tolerance
     )
   const chrome = (node) => pages.length > 1 && pages.every((page) => at(page, node))
-  const taken = pages[0].map((node) => ({ key: identityOf(node), y: top(node) }))
+  const taken = pages[0].map((node) => {
+    const [y, bottom] = edges(node)
+    return { key: identityOf(node), y, bottom }
+  })
   let offset = 0
   for (let index = 1; index < pages.length; index += 1) {
     const once = (page) => {
@@ -112,9 +120,14 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
     for (const node of pages[index]) {
       if (chrome(node)) continue
       const key = identityOf(node)
-      const y = top(node) + offset
-      if (!taken.some((seen) => seen.key === key && Math.abs(seen.y - y) <= tolerance))
-        taken.push({ key, y })
+      const [y, bottom] = edges(node).map((edge) => edge + offset)
+      const seen = taken.some(
+        (entry) =>
+          entry.key === key &&
+          (Math.abs(entry.y - y) <= tolerance ||
+            Math.abs(entry.bottom - bottom) <= tolerance)
+      )
+      if (!seen) taken.push({ key, y, bottom })
     }
   }
   return taken.map(({ key }) => key)
