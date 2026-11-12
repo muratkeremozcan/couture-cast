@@ -56,8 +56,16 @@ Playwright environment selection uses `TEST_ENV`:
   them with `LOCAL_DATABASE_URL`; `scripts/lib/local-supabase-ports.mjs` resolves them in every
   script and guard. Developers keep `supabase/config.toml`'s 5432x.
 - Every command on the start path runs under a limit (`start-local-supabase`), an attempt runs
-  at most 170 s inside a 360 s budget, and each caller stops the step at 10 minutes and keeps
-  its log on failure (`scripts/ci/supabase-start-bounds.test.mjs`).
+  at most 170 s, and the 360 s budget is an absolute deadline: login, status, diagnostics and
+  stop all get at most what is left of it. Each caller stops the step at 10 minutes, keeps its
+  log on failure and then stops the containers a failed start left
+  (`scripts/ci/supabase-start-bounds.test.mjs`).
+- The share-card browser matrix runs three Playwright workers. A worker runs one spec file of
+  one browser, and `prepare.mjs --web-browsers` gives each browser and spec pair its own
+  accounts and post, so no two workers share a session, a watermark choice or a sign-out.
+- `actions-cache-prune.yml` keeps the 10 GB Actions cache clear of closed pull requests and
+  keys unread for 48 hours (`scripts/ci/prune-actions-cache.mjs`), daily and when a pull request
+  closes, so GitHub's own eviction never pushes out a live key.
 
 ### Advisory PR review
 
