@@ -15,11 +15,12 @@ import {
   type AppendReport,
 } from '../src/modules/community/community-stream.repository.js'
 import { updatePost } from './helpers/privacy-guards.js'
+import { latencyProxy } from './helpers/latency-proxy.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
-// An append is bounded by its own timeouts: 100 ms maxWait and the 750 ms transaction,
-// then on failure the 50 ms maxWait and 150 ms telemetry transaction, 1.05 s. The slowest
+// An append and its retry row share one 2.25 s deadline across every attempt
+// (COMMUNITY_APPEND_DEADLINE_MS, 6.5-INT-038), plus the last attempt's close. The slowest
 // append measured 2026-10-27 took 0.53 s idle and 1.21 s across ten runs at load average
 // 34 to 87 on 14 cores. 3 s is 2.5x that, so an append that never settles fails in
 // seconds, naming its test and attempt, where R01 alone would otherwise wait 90 s.
@@ -32,9 +33,10 @@ let slowestAppend = { label: '', ms: 0 }
 function bounded(repository: CommunityStreamRepository) {
   const test = expect.getState().currentTestName ?? 'unnamed test'
   let attempt = 0
-  // The appender logs every deferral; its durable retry row is written in a 150 ms
-  // best-effort transaction that a loaded host drops (0 rows for 1 failure at load
-  // average 108), so the log is the observation that holds at any load.
+  // The appender logs every deferral; its durable retry row is written in a 1 s
+  // best-effort transaction that a loaded host can still drop (the old 150 ms one wrote
+  // 0 rows for 1 failure at load average 108), so the log is the observation that holds
+  // at any load, and a dropped row logs that it is missing.
   type Deferral = { reason: string; nextBatchLimit: number }
   type Warn = (fields: Deferral, message: string) => void
   const deferrals: Deferral[] = []
@@ -97,6 +99,18 @@ function bounded(repository: CommunityStreamRepository) {
     },
   }
 }
+const proxies: ReturnType<typeof latencyProxy>[] = []
+const remotes: PrismaClient[] = []
+/** A client whose every statement costs `oneWayMs` each way, through a latency proxy. */
+async function remoteClient(oneWayMs: number) {
+  const proxy = latencyProxy(database.url, oneWayMs)
+  proxies.push(proxy)
+  const client = new PrismaClient({ datasources: { db: { url: await proxy.listen() } } })
+  remotes.push(client)
+  // The hosted worker's pool is warm; opening a connection takes several round trips more.
+  await client.$queryRaw`SELECT 1`
+  return client
+}
 const backlog = () => prisma.communityDomainOutbox.count({ where: { appended_at: null } })
 // One appender per test: its adaptive batch limit is per-instance state, and a test that
 // drove it into budget pressure must not shrink the next test's batches.
@@ -108,11 +122,8 @@ async function connection() {
   clients.push(client)
   return client
 }
-function candidatePreparationLatency(
-  delayMs: number,
-  onCandidate?: () => void
-): PrismaClient {
-  if (!delayMs && !onCandidate) return prisma
+/** Calls `onBatch` as the production batch statement is sent, inside its transaction. */
+function batchObserver(onBatch: () => void): PrismaClient {
   return new Proxy(prisma, {
     get(target, key, receiver) {
       if (key === '$transaction')
@@ -129,14 +140,17 @@ function candidatePreparationLatency(
               work(
                 new Proxy(tx, {
                   get(connection, property, connectionReceiver) {
-                    if (property === '$executeRawUnsafe')
-                      return async (query: string, ...values: unknown[]) => {
-                        if (query === 'SAVEPOINT community_candidate') {
-                          onCandidate?.()
-                          if (delayMs)
-                            await connection.$executeRaw`SELECT pg_sleep(${delayMs / 1000})`
-                        }
-                        return connection.$executeRawUnsafe(query, ...values)
+                    if (property === '$queryRaw')
+                      return (
+                        ...args: Parameters<Prisma.TransactionClient['$queryRaw']>
+                      ) => {
+                        if (
+                          (args[0] as readonly string[])
+                            .join('?')
+                            .includes('community_append_batch')
+                        )
+                          onBatch()
+                        return connection.$queryRaw(...args)
                       }
                     return Reflect.get(
                       connection,
@@ -183,6 +197,8 @@ afterAll(async () => {
       await client.end()
     })
   )
+  await Promise.all(remotes.map((client) => client.$disconnect()))
+  await Promise.all(proxies.map((proxy) => proxy.close()))
   await prisma.$disconnect()
   await database.drop()
   console.info(JSON.stringify({ evidence: 'append-deadline', slowestAppend }))
@@ -385,34 +401,31 @@ describe('Story 6.5 committed stream append', () => {
       })
     )
     // Timeout from the recovering worst case above. A failed append costs at most its
-    // 150 ms preparation window, the 450 ms statement timeout and the 150 ms telemetry
-    // transaction, 0.75 s; a success took at most 0.46 s at load average 15. 43
-    // failures and 40 successes are 51 s, and the rest of this case took 7.7 s loaded,
-    // so about 59 s. 90 s is 1.5x that, and an appender that never recovers (83
-    // failures, about 62 s) reaches the attempt bound first.
-  }, 90_000)
+    // 150 ms preparation window, the 450 ms statement timeout and the 1 s telemetry
+    // transaction, 1.6 s; a success took at most 0.46 s at load average 15. 43
+    // failures and 40 successes are 87 s, and the rest of this case took 7.7 s loaded,
+    // so about 95 s. 140 s is 1.5x that, and an appender that never recovers (83
+    // failures, at most 133 s) reaches the attempt bound first.
+  }, 140_000)
 
-  // The 150 ms preparation window closes once a batch has spent it, so with at least
-  // 20 ms of real latency per candidate no batch can exceed eight (eight candidates are
-  // already 160 ms). Without injected latency a batch holds at most the 25-event ready
-  // limit. How many batches a burst takes follows the host's load, so the bound is per
-  // batch: the per-batch maximum holds at any load. Efficiency is checked by why each
-  // batch stopped, which the appender reports: timing a whole append includes its
-  // commit, and a two-row appender at 20 ms ran 14 of 49 batches past 150 ms under load.
-  // Batch sizes are load-shaped: without latency the largest fell from 25 idle to 5 at
-  // load average 102 on 14 cores (2026-10-27), so no size is an efficiency bound.
+  // Without latency a batch holds at most the 25-event ready limit. Preparation runs inside
+  // community_append_batch, so production's 31 ms round trip (15.5 ms each way through the
+  // latency proxy) costs each batch the same four round trips and leaves its size alone: the
+  // 150 ms window measures server work. How many batches a burst takes follows the host's load,
+  // so the bound is per batch. Efficiency is checked by why each batch stopped, which the
+  // appender reports.
   it.each([
     [0, 25],
-    [20, 8],
+    [15.5, 25],
   ])(
-    'A03 routine head contention preserves capacity and commits 100 contiguous events with %ims real candidate latency',
-    async (delayMs, maxBatch) => {
+    'A03 routine head contention preserves capacity and commits 100 contiguous events with %d ms one-way database latency',
+    async (oneWayMs, maxBatch) => {
       const { post, user } = await fixture()
       const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
         select: { id: true },
       })
       const appender = bounded(
-        new CommunityStreamRepository(candidatePreparationLatency(delayMs))
+        new CommunityStreamRepository(oneWayMs ? await remoteClient(oneWayMs) : prisma)
       )
       const held = await connection()
       await held.query('BEGIN')
@@ -617,13 +630,79 @@ describe('Story 6.5 committed stream append', () => {
     expect(await prisma.communityStreamEvent.count()).toBe(2)
   })
 
+  // Moved from the unit suite when preparation moved into community_append_batch: the trim now
+  // runs in SQL. An injected write-cost estimate of 150 ms per row leaves room for two or three
+  // rows of the 400 ms budget, so the batch writes exactly the rows that fit, oldest first.
+  it('writes only the rows that fit the remaining budget and queues the rest', async () => {
+    const user = await prisma.user.create({
+      data: { email: `trim-${randomUUID()}@synthetic.test` },
+    })
+    await prisma.lookbookPost.createMany({
+      data: Array.from({ length: 20 }, () =>
+        buildLookbookPostCreateInput(
+          createLookbookPost({ userId: user.id, status: 'published' })
+        )
+      ),
+    })
+    const order = (
+      await prisma.communityDomainOutbox.findMany({
+        where: { appended_at: null },
+        orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
+        select: { id: true },
+      })
+    ).map((row) => row.id)
+    expect(order).toHaveLength(20)
+    Reflect.set(stream.repository, 'writeCostMs', 150)
+    const first = await stream.append()
+    expect(first).toBeGreaterThanOrEqual(1)
+    expect(first).toBeLessThan(20)
+    const written = await prisma.communityStreamEvent.findMany({
+      orderBy: { sequence: 'asc' },
+      select: { source_outbox_id: true },
+    })
+    expect(written.map((row) => row.source_outbox_id)).toEqual(
+      order.slice(0, written.length)
+    )
+    expect(await stream.drain()).toBe(20 - written.length)
+    expect(
+      (
+        await prisma.communityStreamEvent.findMany({
+          orderBy: { sequence: 'asc' },
+          select: { source_outbox_id: true },
+        })
+      ).map((row) => row.source_outbox_id)
+    ).toEqual(order)
+  })
+
+  it('reports a budget trim with exactly the rows the remaining budget fits', async () => {
+    const user = await prisma.user.create({
+      data: { email: `trim-report-${randomUUID()}@synthetic.test` },
+    })
+    await prisma.lookbookPost.createMany({
+      data: Array.from({ length: 10 }, () =>
+        buildLookbookPostCreateInput(
+          createLookbookPost({ userId: user.id, status: 'published' })
+        )
+      ),
+    })
+    Reflect.set(stream.repository, 'writeCostMs', 150)
+    const outcome = await stream.settle()
+    expect(outcome.status).toBe('fulfilled')
+    const report = (outcome as PromiseFulfilledResult<AppendReport>).value
+    expect(report).toMatchObject({ stop: 'drained', ready: 10, selectedReason: 'budget' })
+    expect(report.writeCostMs).toBe(150)
+    expect(report.selected).toBe(Math.max(1, Math.floor(report.remainingMs / 150)))
+    expect(report.count).toBe(report.selected)
+    expect(await backlog()).toBe(10 - report.selected)
+  })
+
   it('a SQL timeout in an append model operation defers the batch as budget pressure', async () => {
     const a = await fixture()
     await fixture()
-    // A busy candidate makes the append record contention with a model create; the
-    // trigger holds that insert past the 450 ms statement and 500 ms transaction
-    // timeouts. Prisma raises either one from a model operation as an unknown request
-    // error, which the append once reported as a dependency failure.
+    // A busy candidate makes the batch function record contention; the trigger holds that
+    // insert past the 450 ms statement and 500 ms transaction timeouts. Prisma raises either
+    // from the raw batch statement as a known request error carrying the SQLSTATE, which must
+    // read as budget pressure, never as a dependency failure.
     await prisma.$executeRawUnsafe(
       "CREATE FUNCTION story65_slow_contention() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.event_type = 'community_append_contention' THEN PERFORM pg_sleep(1); END IF; RETURN NEW; END $$"
     )
@@ -637,7 +716,7 @@ describe('Story 6.5 committed stream append', () => {
       const outcome = await stream.settle()
       expect(outcome.status).toBe('rejected')
       const reason: unknown = outcome.status === 'rejected' ? outcome.reason : undefined
-      expect(reason).toBeInstanceOf(Prisma.PrismaClientUnknownRequestError)
+      expect(reason).toBeInstanceOf(Prisma.PrismaClientKnownRequestError)
       const code = postgresError(reason)?.code
       console.info(JSON.stringify({ evidence: 'append-model-timeout', code }))
       expect(['57014', '25P04']).toContain(code)
@@ -661,19 +740,19 @@ describe('Story 6.5 committed stream append', () => {
     const priorTelemetry = await prisma.communityEngagementTelemetry.findMany({
       select: { id: true },
     })
-    // Abort while the first candidate is prepared. It becomes ready all the same, so
-    // without the abort this append would go on to write it, at any load.
+    // Abort while the batch statement runs. It prepares and writes all three all the same, so
+    // without the abort this append would commit them, at any load.
     const abort = new AbortController()
-    let candidates = 0
+    let batches = 0
     const appender = new CommunityStreamRepository(
-      candidatePreparationLatency(0, () => {
-        if (++candidates === 1) abort.abort(new Error('append abandoned'))
+      batchObserver(() => {
+        if (++batches === 1) abort.abort(new Error('append abandoned'))
       })
     )
     await expect(appender.appendWithReport(abort.signal)).rejects.toThrow(
       'append abandoned'
     )
-    expect(candidates).toBe(1)
+    expect(batches).toBe(1)
     expect(await backlog()).toBe(3)
     expect(await prisma.communityStreamEvent.count()).toBe(0)
     expect(

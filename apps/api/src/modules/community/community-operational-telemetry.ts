@@ -12,6 +12,12 @@ import { createBaseLogger } from '../../logger/pino.config.js'
  * A lane that has work, or just drained, is recorded on every observation.
  */
 export const COMMUNITY_IDLE_BACKLOG_RECORD_MS = 60 * 60 * 1000
+/**
+ * An append lane whose oldest unappended row is this old has stalled: a healthy appender drains
+ * a row within seconds. Recorded as `community_append_stalled`, which PostHog alerts on, at most
+ * this often while the stall lasts.
+ */
+export const COMMUNITY_APPEND_STALL_MS = 5 * 60 * 1000
 
 export function communityBuildIdentity() {
   const value = process.env.COUTURE_BUILD_SHA ?? process.env.VERCEL_GIT_COMMIT_SHA ?? ''
@@ -38,6 +44,8 @@ export class CommunityOperationalTelemetry {
   private parkedReported = false
   /** Per lane: the count last recorded and when, so an idle lane is not recorded every minute. */
   private readonly recorded = new Map<string, { count: number; at: number }>()
+  /** When the last stall was recorded, so a lasting stall is reported every five minutes. */
+  private stallRecordedAt = Number.NEGATIVE_INFINITY
   constructor(
     private readonly prisma: PrismaClient,
     private readonly sink: Pick<
@@ -84,6 +92,28 @@ export class CommunityOperationalTelemetry {
         },
       })
       this.recorded.set(row.lane, { count, at: now })
+      if (
+        row.lane === 'append' &&
+        count > 0 &&
+        row.age >= COMMUNITY_APPEND_STALL_MS &&
+        now - this.stallRecordedAt >= COMMUNITY_APPEND_STALL_MS
+      ) {
+        // Production 2026-11-11: append had never succeeded and rows aged for hours unnoticed.
+        this.logger.warn(
+          { event: 'community_append_stalled', backlog: count, oldestAgeMs: row.age },
+          'Community append stalled'
+        )
+        await this.prisma.communityEngagementTelemetry.create({
+          data: {
+            event_type: 'community_append_stalled',
+            outcome: 'append',
+            backlog_count: count,
+            oldest_age_ms: row.age,
+            build_identity: communityBuildIdentity(),
+          },
+        })
+        this.stallRecordedAt = now
+      }
     }
   }
   /** Returns how many rows it delivered; zero means it found nothing it could deliver. */

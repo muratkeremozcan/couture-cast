@@ -2,6 +2,7 @@
 
 Updated: 2026-10-20. Administrative approval and implementation-status record.
 Updated: 2026-11-11. D1 amendment: a key PostHog omits resolves closed to its declared default; bounded throw-path deferral.
+Updated: 2026-11-11. D2 amendment: append runs in the database, four round trips per batch.
 
 Status: in-progress; both independent story reviews are READY for implementation.
 Amendment provenance: document editor verified as GPT-6.1-Sol high. Final independent
@@ -194,6 +195,36 @@ while locks acquired before that savepoint remain. A second transaction must imm
 claim the skipped row with `FOR UPDATE NOWAIT`; row locks usually do not appear directly in
 `pg_locks`, so absence of tuple entries alone proves nothing. Retain both observations.
 [PostgreSQL lock inspection](https://www.postgresql.org/docs/17/view-pg-locks.html).
+
+D2 amendment, 2026-11-11 (append runs in the database). Production append had never succeeded.
+From the hosted worker a statement costs about 31 ms (30.7 ms p50, measured inside the worker),
+and preparing one candidate from TypeScript took about 16 round trips, so every batch ran past
+its own 500 ms deadline even at a batch limit of 1, aborted with `budget_pressure`, and retried
+forever; the public stream head stayed at sequence 0 and unappended rows were never pruned. The
+steps above now run in `community_append_batch` (migration `20261111120000`), with each
+candidate in `community_append_prepare`, whose plpgsql exception block is the savepoint. A batch
+costs four round trips whatever its size; the 150 ms preparation window and 400 ms completion
+budget measure server work only, and the 500 ms transaction and 100 ms lock bounds are
+unchanged. Lock order is unchanged too: member then post guards in sorted hashtext order, all
+tried, the row `SKIP LOCKED`, heads `NOWAIT`, so append still never waits on anything erasure or
+the send guard holds. The functions are `SECURITY INVOKER` with a pinned `search_path`, and only
+the owner role the worker connects as may execute them. The INT-001..006 observations now read
+`pg_locks` after a skipped candidate's subtransaction rolls back, and a latency proxy adding the
+production round trip keeps the budget honest. The append retry row's own transaction budget
+rose from 150 ms to 1 s: two statements at 31 ms missed 150 ms most of the time, and a cold
+connection's first insert (it prepares its statement on the direct-session pool) at a slow round
+trip still missed 400 ms (6.5-INT-033). Both the append and its retry row wait up to 250 ms
+for one of the worker's three pool connections, which its other loops hold for transactions
+that wait 250 ms to 2 s for one: at 100 ms and 50 ms a sibling loop holding the connection made
+the append fail and dropped the retry row (6.5-INT-035, 6.5-INT-036). An append that never got a
+connection reports `pool_wait` and keeps its batch size, since no batch work ran; counted as
+budget pressure it halved the batch on every busy moment (6.5-INT-037). One 2.25 s deadline
+bounds the append and its retry row across every pldbgapi2 retry, each attempt taking only what
+is left; with a fresh budget per attempt, six attempts took 5.12 s (6.5-INT-038). A retry row
+that is not written, or skipped at the deadline, logs `Community append retry not recorded`
+with its error code (6.5-INT-034).
+An append lane older
+than five minutes records `community_append_stalled`, which PostHog alerts on.
 
 **Ordering argument:** appender B cannot allocate a sequence for a stream until A's lock
 releases. If A commits, its event rows and counter become visible together before B allocates.
