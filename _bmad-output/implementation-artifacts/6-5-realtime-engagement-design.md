@@ -1,6 +1,7 @@
 # Story 6.5 realtime engagement design
 
 Updated: 2026-10-20. Administrative approval and implementation-status record.
+Updated: 2026-11-11. D1 amendment: a key PostHog omits resolves closed to its declared default; bounded throw-path deferral.
 Updated: 2026-11-11. D2 amendment: append runs in the database, four round trips per batch.
 
 Status: in-progress; both independent story reviews are READY for implementation.
@@ -99,7 +100,25 @@ the existing synthetic-user fallback cannot establish a real member's cohort eli
 On timeout, undefined, quota limit or error, keep the last remote result only until its
 original expiry, then report unavailable. No expired grant is served. A generation check
 prevents an erased member's late refresh from
-recreating a row. Read-flag/cohort loss and remote-outage access expiry take effect within
+recreating a row.
+
+D1 amendment, 2026-11-11 (omitted key). PostHog can answer HTTP 200, with no evaluation error,
+and leave the key out of `flags`. That happens when the project does not define the flag, and
+also when the flag is inactive or filtered from the server runtime, so an omission proves
+nothing about the rollout, and no retry changes it. Production showed the cost of treating it as
+unavailable: the project production read defined no `community_read_enabled`, and every
+non-grantee delivery re-deferred about every 47 s with zero attempts until its group expired a
+day later, one claim transaction and one PostHog call each time. Community evaluation now
+resolves an omitted key closed to its declared default (`false`) and caches that for one claim
+like a remote answer. It never reads the `feature_flags` fallback row: a stale `true` there
+would grant a non-grantee for 60 s and renew it for as long as the omission lasted. A grant
+still wins before PostHog is asked. The provider marks the omission with `REMOTE_FLAG_ABSENT`
+so it never reads as a value; timeout, quota limit, evaluation error and transport failure stay
+unavailable as above. The `PostHog flag drift` workflow fails when production omits a declared
+key or answers a value other than its declared default or pinned override, so the closed answer
+is a guarded misconfiguration, not a rollout mechanism. Separately, a delivery whose send keeps
+throwing is moved on at most to its group's expiry and expires there; before, the 2-second move
+repeated forever. Read-flag/cohort loss and remote-outage access expiry take effect within
 60 seconds plus the ten-second revalidation interval. JWT expiry remains immediate.
 The existing deployment freeze stays disabled throughout; no cache may override it.
 Measure this existing service's incremental usage in D10.

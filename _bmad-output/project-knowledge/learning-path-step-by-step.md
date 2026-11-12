@@ -10618,6 +10618,13 @@ Evidence boundaries:
   The api shard went red at 12:00 UTC because a moderation fixture seeded a 7-day ban from a clock pinned at 2026-11-04 while enforcement reads the real clock.
   The sweep found five more fixed dates that the code compares with the real clock: teen birthdates in the reaction HTTP and privacy suites and the access token spec, which turn into adults from 2028 to 2030, and moderation members whose random adult age came from the real clock while the suite pins 2026-10-01.
   Tests now build birthdates with `birthdateForAge` from the clock the code reads, `unit-tests-year-ahead` runs the database-free unit suites with JavaScript's clock a year ahead, and in the integration tier, whose database and engine cannot move with it, `moderation-seed-clocks.integration.spec.ts` runs the fixtures that broke on later days and a static check catches birthdate and expiry literals.
+- **The third `X-DISPATCH` attempt passed and found two production defects (2026-11-11, `c6da9ace`).**
+  Readiness logged `ready` at 17:37:40 UTC with 14 guard connections and 10 send slots. The grantee's delivery made one attempt, Expo answered `DeviceNotRegistered` for the synthetic token, the token was pruned and nothing retried.
+  The non-grantee's delivery kept re-deferring: production read the PostHog project named `couturecast-dev`, which defined 4 of the 14 declared flags, so `community_read_enabled` came back absent and community evaluation treated absent as unavailable.
+  Production now reads `couturecast-prod` (329012), which holds every declared flag; local and preview keep `couturecast-dev`, and web and mobile production carry no key until the owner decides. A rerun with two fresh non-grantees ended both deliveries `suppressed` with zero attempts.
+  An hourly `PostHog flag drift` workflow, sent with the API's server User-Agent, fails when production omits a declared key or answers any of 12 synthetic subjects with a value other than the declared default or a pinned override (`color_analysis_enabled` on, by owner decision). A key PostHog omits now resolves closed to its declared default and never reads the `feature_flags` row: Codex showed an omission also covers inactive and runtime-filtered flags, where a stale `true` row would have kept granting a non-grantee (Story 6.5 D1 amendment). A delivery whose send keeps throwing now expires with its group instead of moving 2 s on forever.
+  The second defect: community append has never succeeded in production. Every batch aborts on its own time budget at production database latency, so outbox rows never append and never prune; that fix is its own change.
+  The deployment guide's Story 6.14 section holds the timestamps, counts and `AuditLog` ids, and its "PostHog projects and flag drift" section the project map and flag list.
 - **`X-PROD-GRANT` is blocked.**
   Production `auth.users` holds no rows while `User` holds 10, so no admin actor exists for the owner command.
   From macOS, the command cannot open its database connection: `createPrismaClient` requires strict verification against the committed Supabase Root 2021 CA, `openssl` verifies both poolers against that CA, and Prisma on macOS still answers `The certificate was not trusted`. `community:sponsorship` shares the client and the limit.
@@ -10652,7 +10659,7 @@ flowchart TD
   Premium["hasPremiumAccess\npaid row first"] --> Seam
   Flags["getFeatureFlag\nfive shortcut keys"] --> Seam
   Refresh["community cache refresh"] --> Seam
-  Refresh -->|"grant true, or the remote answer"| Cache
+  Refresh -->|"grant true, the remote answer, or the declared default for an omitted key"| Cache
   Cache --> Reads["feed, realtime, push send guard"]
   Checkout["createCheckoutSession"] -->|"granted 409, unavailable 503"| Seam
   Route["GET /api/v1/commerce/premium/access"] --> Source["premiumAccessSource\na grant wins"]

@@ -566,9 +566,15 @@ export class CommunityNotificationsWorker {
           async (tx) => {
             await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
             await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '500ms'")
+            // Bounded by the group's expiry: a send that keeps throwing is moved on at most to
+            // the expiry, and a delivery already past it expires here. Without the bound the
+            // 2 s move repeated forever, because no other path settles a row whose send throws.
             await tx.$executeRaw`
-              UPDATE "CommunityTokenDelivery" SET next_attempt_at = clock_timestamp() + interval '2 seconds'
-              WHERE id IN (
+              UPDATE "CommunityTokenDelivery" d SET
+                status = CASE WHEN g.expires_at <= clock_timestamp() THEN 'expired' ELSE d.status END,
+                next_attempt_at = LEAST(clock_timestamp() + interval '2 seconds', g.expires_at)
+              FROM "CommunityNotificationGroup" g
+              WHERE g.id = d.group_id AND d.id IN (
                 SELECT id FROM "CommunityTokenDelivery"
                 WHERE id = ANY(${rejected}::uuid[])
                   AND status IN ('pending','retryable_rejection','deferred')
