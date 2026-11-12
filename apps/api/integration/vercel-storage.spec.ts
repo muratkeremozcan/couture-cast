@@ -108,16 +108,37 @@ describe('Vercel preview storage', () => {
     expect(previewRequired(fixture, 'missing-ref')).toBe(true)
   })
 
-  it.each([
-    ['true', 'required=true'],
-    ['false', /^required=(true|false)$/],
-  ] as const)('an explicit request (%s) decides the scope', (requested, expected) => {
-    const output = path.join(fixture, 'github-output')
-    execFileSync('node', [path.join(repoRoot, 'scripts/vercel-preview-inputs.mjs')], {
-      env: { ...process.env, GITHUB_OUTPUT: output, REQUIRE_PREVIEWS: requested },
-      stdio: 'pipe',
-    })
-    expect(fs.readFileSync(output, 'utf8').trim()).toMatch(expected)
+  // The CLI roots itself where it lives, so it runs from a copy inside the fixture repository,
+  // whose origin/main is a baseline commit that already holds the copy.
+  it('an explicit request requires previews that the branch alone would skip', () => {
+    const cli = path.join(fixture, 'scripts/vercel-preview-inputs.mjs')
+    fs.mkdirSync(path.dirname(cli), { recursive: true })
+    fs.copyFileSync(path.join(repoRoot, 'scripts/vercel-preview-inputs.mjs'), cli)
+    git('add', '--', 'scripts/vercel-preview-inputs.mjs')
+    git(
+      '-c',
+      'core.hooksPath=/dev/null',
+      '-c',
+      'commit.gpgsign=false',
+      'commit',
+      '-m',
+      'baseline'
+    )
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD')
+    const scope = (requested: string) => {
+      const output = path.join(fixture, `.git/scope-${requested}-${Math.random()}`)
+      execFileSync('node', [cli], {
+        cwd: fixture,
+        env: { ...process.env, GITHUB_OUTPUT: output, REQUIRE_PREVIEWS: requested },
+        stdio: 'pipe',
+      })
+      return fs.readFileSync(output, 'utf8').trim()
+    }
+    expect(scope('false')).toBe('required=false')
+    expect(scope('true')).toBe('required=true')
+    commit('docs/guide.md')
+    expect(scope('false')).toBe('required=false')
+    expect(scope('true')).toBe('required=true')
   })
 
   it('keeps a deletion of runtime code when that code moves under docs', () => {
