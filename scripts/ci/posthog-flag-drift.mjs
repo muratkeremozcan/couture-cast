@@ -24,8 +24,10 @@
 //   INTENTIONAL_OVERRIDES pins another, with its reason.
 //
 //   POSTHOG_PROD_PROJECT_TOKEN=phc_... node scripts/ci/posthog-flag-drift.mjs
-import { realpathSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { copyFileSync, mkdtempSync, realpathSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { setTimeout as delay } from 'node:timers/promises'
 
 const DEFAULT_HOST = 'https://us.i.posthog.com'
@@ -366,15 +368,34 @@ export async function checkProduction({
   return failures
 }
 
+/**
+ * Imports packages/config/src/flags.ts as an ES module. The package declares no "type", because
+ * its dist is CommonJS while its source is ES module TypeScript, so a plain import of the source
+ * makes Node reparse it and log MODULE_TYPELESS_PACKAGE_JSON. A `.mts` copy states the module
+ * type, and Node strips its types the same way. flags.ts imports nothing (a test holds that), so
+ * the copy loads on its own.
+ */
+async function importDeclaredFlags() {
+  const source = fileURLToPath(
+    new URL('../../packages/config/src/flags.ts', import.meta.url)
+  )
+  const directory = mkdtempSync(path.join(tmpdir(), 'posthog-flag-drift-'))
+  try {
+    const copy = path.join(directory, 'flags.mts')
+    copyFileSync(source, copy)
+    return await import(pathToFileURL(copy).href)
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+}
+
 async function main() {
   const token = process.env.POSTHOG_PROD_PROJECT_TOKEN
   if (!token) {
     console.error('POSTHOG_PROD_PROJECT_TOKEN is not set.')
     return 2
   }
-  const { FEATURE_FLAG_KEYS, getDefaultFeatureFlagValue } = await import(
-    '../../packages/config/src/flags.ts'
-  )
+  const { FEATURE_FLAG_KEYS, getDefaultFeatureFlagValue } = await importDeclaredFlags()
   const declared = Object.fromEntries(
     FEATURE_FLAG_KEYS.map((key) => [key, getDefaultFeatureFlagValue(key)])
   )
