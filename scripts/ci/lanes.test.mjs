@@ -340,7 +340,7 @@ test('pushes, schedules, manual runs, the label and an unreadable diff run every
   assert.ok(Object.values(unread).every((lane) => lane.run))
   const capped = selectLanes({
     event: 'pull_request',
-    files: Array.from({ length: COMPARE_FILES_CAP }, (_, i) => `docs/${i}.md`),
+    files: Array.from({ length: 300 }, (_, i) => `docs/${i}.md`),
     dependencies,
   })
   assert.ok(Object.values(capped).every((lane) => lane.run))
@@ -587,18 +587,6 @@ test('any failed, partial or unbound read runs every lane', async () => {
       url.includes(COMPARE) ? new Response('<html>') : Response.json([]),
     'the comparison lists no files': (url) =>
       url.includes(COMPARE) ? Response.json({ status: 'identical' }) : Response.json([]),
-    'the comparison reaches its file limit': (url) =>
-      url.includes(COMPARE)
-        ? compared(
-            Array.from({ length: COMPARE_FILES_CAP }, (_, i) => ({
-              filename: `docs/${i}.md`,
-            }))
-          )
-        : Response.json([]),
-    'the labels fail after the comparison succeeds': (url) =>
-      url.includes('/labels')
-        ? new Response('', { status: 502 })
-        : compared([{ filename: 'docs/guide.md' }]),
   }
   for (const [name, respond] of Object.entries(cases)) {
     const { plan, written } = await planJob(respond)
@@ -609,6 +597,107 @@ test('any failed, partial or unbound read runs every lane', async () => {
     event: { pull_request: { number: 7 } },
   })
   assert.ok(everyLaneRuns(unbound.plan), 'an event without its commits')
+})
+
+test('labels that fail on a later page, after the comparison resolved, run every lane', async () => {
+  // The comparison answers first; only then does the second labels page fail, so the file list
+  // was already in hand when the read failed.
+  let comparisonResolved
+  const resolved = new Promise((resolve) => (comparisonResolved = resolve))
+  const order = []
+  const { plan, written } = await planJob(async (url) => {
+    if (url.includes(COMPARE)) {
+      setTimeout(comparisonResolved, 0)
+      order.push('comparison')
+      return compared([{ filename: 'apps/mobile/app/index.tsx' }])
+    }
+    if (url.includes('/labels')) {
+      await resolved
+      const page = Number(new URL(url).searchParams.get('page') ?? '1')
+      order.push(`labels ${page}`)
+      if (page === 1)
+        return Response.json(
+          Array.from({ length: 100 }, (_, i) => ({ name: `label-${i}` }))
+        )
+      return new Response('', { status: 502 })
+    }
+  })
+  assert.deepEqual(order, ['comparison', 'labels 1', 'labels 2'])
+  assert.ok(everyLaneRuns(plan))
+  assert.ok(allLanes.every((id) => written[id] === true))
+})
+
+test("the comparison's 300-file limit runs every lane and 299 files still plan", async () => {
+  assert.equal(COMPARE_FILES_CAP, 300)
+  const entries = (count) => [
+    { filename: 'apps/mobile/app/index.tsx' },
+    ...Array.from({ length: count - 1 }, (_, i) => ({ filename: `docs/${i}.md` })),
+  ]
+  const respond = (count) => (url) =>
+    url.includes(COMPARE) ? compared(entries(count)) : undefined
+  const below = await planJob(respond(299))
+  assert.equal(below.written.maestro, true)
+  assert.equal(below.written['web-e2e'], false)
+  const at = await planJob(respond(300))
+  assert.ok(allLanes.every((id) => at.written[id] === true))
+  assert.match(at.plan['web-e2e'].reason, /300-file limit/)
+})
+
+test('a rename wakes the lanes of both paths and a removed file wakes its own', async () => {
+  const running = async (entry) => {
+    const { written } = await planJob((url) =>
+      url.includes(COMPARE) ? compared([entry]) : undefined
+    )
+    return allLanes.filter((id) => written[id])
+  }
+  const web = [
+    'typecheck',
+    'lighthouse',
+    'coverage-other',
+    'year-ahead',
+    'web-e2e',
+    'preview',
+    'share-card',
+  ]
+  const mobile = [
+    'typecheck',
+    'coverage-mobile',
+    'playwright-unit',
+    'maestro',
+    'share-card',
+    'watchos',
+  ]
+  const lanes = (...sets) => allLanes.filter((id) => sets.some((set) => set.includes(id)))
+  // Web source moved under docs: the destination wakes nothing, the source wakes web.
+  assert.deepEqual(
+    await running({
+      status: 'renamed',
+      filename: 'docs/page.tsx',
+      previous_filename: 'apps/web/src/app/page.tsx',
+    }),
+    lanes(web)
+  )
+  // Mobile source moved into web: both apps' lanes run, and the API's do not.
+  assert.deepEqual(
+    await running({
+      status: 'renamed',
+      filename: 'apps/web/src/app/moved.tsx',
+      previous_filename: 'apps/mobile/app/moved.tsx',
+    }),
+    lanes(web, mobile)
+  )
+  assert.deepEqual(
+    await running({ status: 'removed', filename: 'apps/web/src/app/page.tsx' }),
+    lanes(web)
+  )
+  assert.deepEqual(
+    await running({
+      status: 'renamed',
+      filename: 'docs/new.md',
+      previous_filename: 'docs/old.md',
+    }),
+    []
+  )
 })
 
 test('the label is read from every page, so ALL-LANES past the first hundred still counts', async () => {
