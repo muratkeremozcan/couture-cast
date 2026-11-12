@@ -322,8 +322,10 @@ boundary where data leaves the device is a closed allowlist:
 - Person profiles are created for identified users only, and the clients never identify.
 - Every event either client sends carries `$geoip_disable: true`, `$ip: null` and
   `$process_person_profile: false`, set by the privacy filter after its copy, and the mobile
-  SDK runs with `disableGeoip: true`. Mobile requests reach PostHog directly from the
-  device, so these switches are what keeps PostHog from storing the IP or adding a location.
+  SDK runs with `disableGeoip: true`, so PostHog adds no location. PostHog fills a null `$ip`
+  from the request, and mobile requests reach it directly from the device, so production
+  project 329012 must also have Discard client IP data (`anonymize_ips`) on: turned on
+  2026-11-12, and the hourly PostHog flag drift check fails if it is ever off.
 - `webAnalyticsPrivacyFilter` and `mobileAnalyticsPrivacyFilter` in
   [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts) run first in the
   `before_send` chains:
@@ -1497,11 +1499,14 @@ the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today that is
 production, and the code default stays `false` so a degraded PostHog fails closed).
 
 - Definition, read through the PostHog API with the repository secret `POSTHOG_FLAG_READ_KEY`
-  (a personal API key limited to `feature_flag:read` on 329012): the flag exists, is active,
+  (a personal API key limited to `feature_flag:read` and `project:read` on 329012): the flag
+  exists, is active,
   boolean, evaluated server-side, and released to everyone at the expected value. Every release
   group has no property or cohort filter and a 0 or 100 percent rollout, with no super group,
   early exit, holdout, early-access enrollment, group aggregation or remote configuration. This is what
   proves a rollout is uniform; probes cannot see a cohort or a 1 percent rollout they miss.
+- Project settings, read with the same key: Discard client IP data (`anonymize_ips`) must be on,
+  since the analytics privacy boundary depends on it (see the PostHog privacy section).
 - Runtime: `/flags` with the project token in the repository variable
   `POSTHOG_PROD_PROJECT_TOKEN` and the API adapter's server User-Agent, for 12 synthetic
   subjects. It fails when PostHog omits a key (missing, inactive or not evaluated server-side),

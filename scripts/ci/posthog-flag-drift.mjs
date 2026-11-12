@@ -148,6 +148,46 @@ export async function readFlagDefinitions({
   return definitions
 }
 
+/**
+ * The production project's settings, read with the same key (it needs project:read as well as
+ * feature_flag:read). An HTTP error or a body that is not a project is an error, never a pass.
+ */
+export async function readProjectPrivacy({
+  key,
+  projectId = PRODUCTION_PROJECT_ID,
+  appHost = DEFAULT_APP_HOST,
+  fetchImpl = fetch,
+}) {
+  const response = await fetchImpl(
+    `${appHost.replace(/\/+$/, '')}/api/projects/${projectId}/`,
+    { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10_000) }
+  )
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(
+      `reading project settings returned HTTP ${response.status}` +
+        (typeof body?.detail === 'string' ? ` (${body.detail})` : '')
+    )
+  }
+  const project = await response.json()
+  if (typeof project !== 'object' || project === null || Array.isArray(project))
+    throw new Error('the project answer has no project settings')
+  return project
+}
+
+/**
+ * Project settings the analytics privacy boundary depends on. Mobile events go from the device
+ * straight to PostHog, and PostHog fills the null $ip the privacy filter sends from the request,
+ * so only the project's Discard client IP data setting keeps the address out of storage.
+ */
+export function projectPrivacyProblems(project) {
+  return project.anonymize_ips === true
+    ? []
+    : [
+        'Discard client IP data (anonymize_ips) is off, so PostHog stores the IP of every mobile event',
+      ]
+}
+
 const empty = (value) => value == null || (Array.isArray(value) && value.length === 0)
 
 /** Flag-level settings that make a flag anything but a plain server-side boolean. */
@@ -277,7 +317,7 @@ async function main() {
   if (!readKey) {
     console.error(
       'POSTHOG_FLAG_READ_KEY is not set: the definition check needs a personal API key with ' +
-        'feature_flag:read on project 329012.'
+        'feature_flag:read and project:read on project 329012.'
     )
     return 2
   }
@@ -289,6 +329,21 @@ async function main() {
     )
   } catch (error) {
     console.error(`Could not read the production flag definitions: ${error.message}.`)
+    return 1
+  }
+  let privacyProblems
+  try {
+    privacyProblems = projectPrivacyProblems(await readProjectPrivacy({ key: readKey }))
+  } catch (error) {
+    console.error(`Could not read the production project settings: ${error.message}.`)
+    return 1
+  }
+  if (privacyProblems.length) {
+    console.error(
+      ['Production project 329012 breaks the analytics privacy settings:']
+        .concat(privacyProblems.map((problem) => `${problem}.`))
+        .join('\n')
+    )
     return 1
   }
   if (definitionDrift.length) {

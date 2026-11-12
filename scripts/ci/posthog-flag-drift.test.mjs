@@ -12,6 +12,8 @@ import {
   expectedValues,
   findFlagDrift,
   INTENTIONAL_OVERRIDES,
+  projectPrivacyProblems,
+  readProjectPrivacy,
   SERVER_USER_AGENT,
 } from './posthog-flag-drift.mjs'
 
@@ -415,5 +417,44 @@ test('red: early exit is rejected, since the first matching group decides and gr
   assert.deepEqual(
     definitionProblems(withFilters(released('a', true), { early_exit: false }), true),
     []
+  )
+})
+
+test('red: production must discard client IP data, since PostHog fills a null $ip from the request', () => {
+  assert.deepEqual(projectPrivacyProblems({ anonymize_ips: true }), [])
+  for (const value of [false, null, undefined, 'true'])
+    assert.deepEqual(projectPrivacyProblems({ anonymize_ips: value }), [
+      'Discard client IP data (anonymize_ips) is off, so PostHog stores the IP of every mobile event',
+    ])
+})
+
+test('reads the production project settings with the read key, and an unreadable answer is an error', async () => {
+  const requests = []
+  const project = await readProjectPrivacy({
+    key: 'phx_synthetic',
+    appHost: 'http://app.example.test/',
+    fetchImpl: async (url, init) => {
+      requests.push({
+        path: new URL(url).pathname,
+        authorization: init.headers.Authorization,
+      })
+      return json({ id: 329012, anonymize_ips: true })
+    },
+  })
+  assert.equal(project.anonymize_ips, true)
+  assert.deepEqual(requests, [
+    { path: '/api/projects/329012/', authorization: 'Bearer phx_synthetic' },
+  ])
+  await assert.rejects(
+    readProjectPrivacy({
+      key: 'phx_synthetic',
+      fetchImpl: async () =>
+        json({ detail: "API key missing required scope 'project:read'" }, 403),
+    }),
+    /HTTP 403.*project:read/
+  )
+  await assert.rejects(
+    readProjectPrivacy({ key: 'phx_synthetic', fetchImpl: async () => json([]) }),
+    /no project settings/
   )
 })
