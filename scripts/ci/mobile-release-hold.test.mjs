@@ -1,8 +1,8 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 //
-// S2-08 and S3-02 (D12, R2-06): deploy-mobile refuses a production build from SDK 56 until a
-// measurement on the current SDK clears the hold.
+// S2-08 and S3-02 (D12, R2-06, R3-02): deploy-mobile refuses a production build from SDK 56
+// until a committed measurement artifact on the current SDK clears the hold.
 import assert from 'node:assert/strict'
 import path from 'node:path'
 import { describe, test } from 'node:test'
@@ -10,22 +10,33 @@ import { fileURLToPath } from 'node:url'
 
 import { evaluateReleaseHold, readReleaseHold } from './mobile-release-hold.mjs'
 
+const EVIDENCE = '_bmad-output/implementation-artifacts/story-6-15/memory/sdk-57.json'
 const hold = (...lifts) => ({
   heldFrom: 56,
   reason: 'Hermes V1 memory regression with Worklets and Reanimated',
   lifts,
 })
-const lift = (overrides = {}) => ({
-  sdk: 57,
-  expo: '57.0.33',
-  measuredAt: '2026-11-25T15:00:00Z',
-  peakRatio: 1.03,
-  settledRatio: 1.01,
-  evidence: '_bmad-output/test-artifacts/story-6-15/s3-02-memory',
-  ...overrides,
-})
+const measured = (peakMb, settledMb) => ({ peakMb, settledMb })
+function artifact(overrides = {}) {
+  return {
+    sdk: 57,
+    expoVersion: '57.0.33',
+    measuredAt: '2026-11-25T15:00:00Z',
+    build: { commit: 'a'.repeat(40), android: 'b'.repeat(64), ios: 'c'.repeat(64) },
+    control: { sdk: 55, expoVersion: '55.0.32', commit: 'd'.repeat(40) },
+    android: { control: measured(300, 240), candidate: measured(309, 244) },
+    ios: { control: measured(280, 210), candidate: measured(290, 214) },
+    ...overrides,
+  }
+}
 const sdk56 = { expoRange: '~56.0.24', expoVersion: '56.0.24' }
 const sdk57 = { expoRange: '~57.0.33', expoVersion: '57.0.33' }
+const verdict = (lifted, context = sdk57, evidence = EVIDENCE) =>
+  evaluateReleaseHold({
+    hold: hold(evidence),
+    ...context,
+    readArtifact: (relative) => (relative === EVIDENCE ? lifted : null),
+  })
 
 describe('evaluateReleaseHold', () => {
   test('before SDK 56 no hold is needed', () => {
@@ -37,66 +48,114 @@ describe('evaluateReleaseHold', () => {
   })
 
   test('from SDK 56 a missing hold file refuses, so deleting it releases nothing', () => {
-    const verdict = evaluateReleaseHold({ hold: null, ...sdk57 })
-    assert.equal(verdict.allowed, false)
-    assert.match(verdict.reason, /it was removed/)
+    const result = evaluateReleaseHold({ hold: null, ...sdk57, readArtifact: () => null })
+    assert.equal(result.allowed, false)
+    assert.match(result.reason, /it was removed/)
   })
 
-  test('SDK 56 with no measurement is held', () => {
-    assert.equal(evaluateReleaseHold({ hold: hold(), ...sdk56 }).allowed, false)
-  })
-
-  test('SDK 56 releases early only on its own measurement within 10%', () => {
+  test('SDK 56 with no lift is held', () => {
     assert.equal(
-      evaluateReleaseHold({ hold: hold(lift({ sdk: 56 })), ...sdk56 }).allowed,
+      evaluateReleaseHold({ hold: hold(), ...sdk56, readArtifact: () => null }).allowed,
+      false
+    )
+  })
+
+  test('a measurement on the current SDK within 10% on both platforms releases', () => {
+    assert.equal(verdict(artifact()).allowed, true)
+    assert.equal(
+      verdict(artifact({ sdk: 56, expoVersion: '56.0.24' }), sdk56).allowed,
       true
     )
-    assert.equal(
-      evaluateReleaseHold({ hold: hold(lift({ sdk: 56, peakRatio: 1.12 })), ...sdk56 })
-        .allowed,
-      false
-    )
   })
 
-  test('Step 3 over the threshold keeps the hold', () => {
-    const verdict = evaluateReleaseHold({
-      hold: hold(lift({ peakRatio: 1.25 })),
-      ...sdk57,
+  test('over the threshold on either platform keeps the hold', () => {
+    const result = verdict(
+      artifact({ ios: { control: measured(280, 210), candidate: measured(330, 214) } })
+    )
+    assert.equal(result.allowed, false)
+    assert.match(result.reason, /ios memory ratios 1.179/)
+  })
+
+  // R3-02 refusals: each one released the build before.
+  for (const [name, overrides, reason] of [
+    [
+      'null measurements',
+      { android: { control: measured(300, 240), candidate: measured(null, null) } },
+      /finite positive/,
+    ],
+    [
+      'zero measurements',
+      { android: { control: measured(0, 240), candidate: measured(309, 244) } },
+      /finite positive/,
+    ],
+    [
+      'negative measurements',
+      { android: { control: measured(300, 240), candidate: measured(-1, -1) } },
+      /finite positive/,
+    ],
+    [
+      'non-finite measurements',
+      { ios: { control: measured(280, 210), candidate: measured(Infinity, 214) } },
+      /finite positive/,
+    ],
+    ['a measurement on another SDK', { sdk: 56 }, /measured on SDK 56/],
+    [
+      'a measurement on another expo version',
+      { expoVersion: '57.0.9' },
+      /measured on expo 57.0.9/,
+    ],
+    [
+      'a control that is not Step 1',
+      { control: { sdk: 56, expoVersion: '56.0.24', commit: 'd'.repeat(40) } },
+      /Step 1 SDK 55/,
+    ],
+    [
+      'an unidentified build',
+      { build: { commit: 'a'.repeat(40), android: 'pending', ios: 'c'.repeat(64) } },
+      /SHA-256/,
+    ],
+    ['a missing measurement date', { measuredAt: 'soon' }, /measurement date/],
+  ])
+    test(`refuses ${name}`, () => {
+      const result = verdict(artifact(overrides))
+      assert.equal(result.allowed, false)
+      assert.match(result.reason, reason)
     })
-    assert.equal(verdict.allowed, false)
-    assert.match(verdict.reason, /exceed 1.1/)
-  })
 
-  test('Step 3 within the threshold releases', () => {
-    assert.equal(evaluateReleaseHold({ hold: hold(lift()), ...sdk57 }).allowed, true)
-  })
-
-  test('a measurement from SDK 56 does not release SDK 57', () => {
-    assert.equal(
-      evaluateReleaseHold({ hold: hold(lift({ sdk: 56 })), ...sdk57 }).allowed,
-      false
-    )
+  test('refuses a lift whose evidence artifact does not exist or is not a path', () => {
+    assert.match(verdict(null).reason, /evidence artifact missing or unreadable/)
+    const objectLift = evaluateReleaseHold({
+      hold: hold({ path: EVIDENCE }),
+      ...sdk57,
+      readArtifact: () => artifact(),
+    })
+    assert.equal(objectLift.allowed, false)
+    assert.match(objectLift.reason, /must name its evidence artifact/)
   })
 
   test('SDK 57 before the fixed patch stays held even with a passing measurement', () => {
-    const verdict = evaluateReleaseHold({
-      hold: hold(lift()),
+    const result = verdict(artifact({ expoVersion: '57.0.9' }), {
       expoRange: '~57.0.9',
       expoVersion: '57.0.9',
     })
-    assert.equal(verdict.allowed, false)
-    assert.match(verdict.reason, /older than the fixed 57.0.17/)
+    assert.equal(result.allowed, false)
+    assert.match(result.reason, /older than the fixed 57.0.17/)
   })
 
-  test('missing evidence or a malformed file refuses', () => {
+  test('a malformed hold refuses', () => {
     assert.equal(
-      evaluateReleaseHold({ hold: hold(lift({ evidence: '' })), ...sdk57 }).allowed,
+      evaluateReleaseHold({
+        hold: { heldFrom: '56' },
+        ...sdk57,
+        readArtifact: () => null,
+      }).allowed,
       false
     )
-    assert.equal(
-      evaluateReleaseHold({ hold: { heldFrom: '56' }, ...sdk57 }).allowed,
-      false
-    )
+  })
+
+  test('the reader refuses evidence outside the repository', () => {
+    const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+    assert.equal(readReleaseHold(root).readArtifact('../../etc/hosts'), null)
   })
 
   test('the repository today is consistent with its SDK', () => {
