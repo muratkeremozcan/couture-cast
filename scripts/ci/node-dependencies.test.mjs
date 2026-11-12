@@ -21,7 +21,7 @@ test('the tree is keyed on exactly what decides it, and only an exact key restor
   assert.equal(restore.uses, 'actions/cache/restore@v4')
   assert.equal(
     restore.with.key,
-    "node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.node-version-file, '.npmrc', 'package-lock.json') }}"
+    "node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.node-version-file, '.npmrc', 'package-lock.json', 'package.json', 'apps/*/package.json', 'packages/*/package.json') }}"
   )
   assert.equal(restore.with['restore-keys'], undefined)
   assert.deepEqual(restore.with.path.trim().split('\n'), TREE)
@@ -59,7 +59,7 @@ test('a hit skips the install; a miss installs and saves before any later step',
   assert.match(save.if, /steps\.modules\.outputs\.cache-hit != 'true'/)
   assert.match(
     save.if,
-    /cache-primary-key == format\('node-modules-v1-\{0\}-\{1\}-\{2\}', runner\.os, runner\.arch, hashFiles\(inputs\.node-version-file, '\.npmrc', 'package-lock\.json'\)\)/
+    /cache-primary-key == format\('node-modules-v1-\{0\}-\{1\}-\{2\}', runner\.os, runner\.arch, hashFiles\(inputs\.node-version-file, '\.npmrc', 'package-lock\.json', 'package\.json', 'apps\/\*\/package\.json', 'packages\/\*\/package\.json'\)\)/
   )
   assert.equal(save['continue-on-error'], true)
   // The npm download cache is restored only for an install.
