@@ -1,3 +1,8 @@
 {
-  "ignoreCommand": "node ../../scripts/vercel-preview-inputs.mjs --ignore web"
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "**": false
+    }
+  }
 }

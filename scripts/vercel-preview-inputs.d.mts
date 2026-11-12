@@ -12,19 +12,4 @@ export declare function previewRequired(
   head?: string,
   paths?: string[]
 ): boolean
-export declare function inputsChanged(
-  cwd: string,
-  from: string,
-  to: string,
-  paths: string[]
-): { changed: string[] } | { reason: string }
-export declare function ignoredBuildDecision(
-  env: NodeJS.ProcessEnv,
-  cwd?: string,
-  project?: string
-): { code: 0 | 1; reason: string }
-export declare function ignoredBuildExitCode(
-  env: NodeJS.ProcessEnv,
-  cwd?: string,
-  project?: string
-): number
+export declare function inputsHash(cwd: string, project: PreviewProject): string

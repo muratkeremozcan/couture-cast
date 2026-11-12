@@ -9,7 +9,7 @@ Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator comman
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
-Updated: 2026-11-12 (ignored builds): each Vercel project skips a preview build its inputs do not need, and the preview wait tests the deployment standing in for it.
+Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -155,26 +155,28 @@ CI starts local Supabase through
 `ghcr.io` with the job token (the CLI default, `public.ecr.aws`, rate-limits anonymous data per
 runner IP) and skips containers no test uses.
 
-**Ignored preview builds.** Each project's `ignoreCommand`
-([`vercel-preview-inputs.mjs --ignore`](../../scripts/vercel-preview-inputs.mjs)) skips a preview build
-when nothing needs it: no preview check reads what the branch changed against main (mobile, docs and
-`_bmad-output` only), or the branch's last ready deployment of that project
-(`VERCEL_GIT_PREVIOUS_SHA`) was built from the same inputs. Each project's inputs are the repository
-less the other app, tests, workflows and load scripts, so shared packages, the lockfile, prisma,
-scripts and `vercel.json` rebuild both. A branch's first deployment that preview checks read always
-builds. Vercel's clone has no git remote and ten commits of history (probe, 2026-11-12), so main
-and the earlier commit come from the public repository; any failure to compare keeps the build,
-and every decision logs its reason in the build log.
+**Preview deployments.** Pushes to any branch other than `main` create no Vercel deployment:
+each project's `vercel.json` sets `git.deploymentEnabled` to `{"main": true, "**": false}` (a
+branch matching several rules deploys when any is true, so `main` keeps its production
+deployments). On the Hobby plan every deployment counts toward 100 a day, a build canceled by an
+ignored build step included, and on 2026-11-11 pushes no preview check needed used them up and
+blocked two merges for hours. An ignored build step cannot help: Vercel's build clone has no git
+remote and ten commits of history (probe, 2026-11-12), and its canceled builds still count.
 
-The preview wait then asks [the target resolver](../../scripts/vercel-preview-target.mjs) which
-commit each project must serve. Vercel reports a skipped build on the commit as status `success`
-with the description `Canceled by Ignored Build Step` (the deployment itself only reads
-`CANCELED`). For that status alone the branch's latest ready deployment of the project stands in,
-after the resolver confirms its inputs match the commit under test; the waits, the resolved URLs
-and the web health test (`EXPECTED_WEB_SHA`) follow that deployment. A failed, errored or
-rate-limited build (status `failure`, for example `Deployment rate limited`) fails the wait. Whether
-an ignored build counts toward the Hobby limit of 100 deployments a day is not measured; the
-ignored deployment is still listed.
+When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
+branch's changes against main, the `preview-deploy` job runs
+[the deploy script](../../scripts/vercel-preview-deploy.mjs) for web, then API. It reuses the
+newest ready deployment of the branch that it created itself with the same build inputs (a hash of
+every tracked file the project builds from: the repository less the other app, tests, workflows
+and load scripts) and the same configuration (the ids and update times of the preview variables
+that apply to the branch, and the project's build settings). Otherwise it creates a deployment
+from the exact commit through the Vercel API and waits for `READY`; `ERROR`, `CANCELED` or a
+refused creation (the rate limit answers on creation) fails the job. The health waits, the e2e
+URLs and the web health test (`EXPECTED_WEB_SHA`) use that deployment's own URL and commit.
+
+Changing a preview environment variable or a build setting changes the configuration identity, so
+the next run builds fresh. To force a rebuild without a change, push an empty commit or redeploy
+from the Vercel dashboard. Production deployments from `main` are untouched by all of this.
 
 The SHA wait is implemented by
 [the Vercel waiter](../../.github/workflows/vercel-wait-for-deployment.yml). It retries for up to the

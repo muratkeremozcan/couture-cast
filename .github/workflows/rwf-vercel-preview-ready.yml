@@ -1,9 +1,10 @@
 name: "Resolve and wait for Vercel previews"
 
-# Resolves the web and API preview deployments for one commit and waits until
-# both serve it. Web and API deploy independently, so a caller that skips the
-# wait can pin a deployment that is still building and test against Vercel's
-# placeholder pages instead of the app.
+# Provides the web and API preview deployments for one commit and waits until both serve it.
+# Branch pushes create no Vercel deployment (git.deploymentEnabled in each vercel.json); when
+# the preview checks need this branch, the preview-deploy job reuses a ready deployment built
+# from the same inputs and configuration or creates one from the exact commit, and everything
+# after it uses that deployment's own URL.
 
 on:
   workflow_call:
@@ -13,7 +14,7 @@ on:
         type: string
         required: true
       expected_sha:
-        description: "Commit SHA both previews must serve"
+        description: "Commit SHA under test"
         type: string
         required: true
     secrets:
@@ -27,13 +28,13 @@ on:
         value: ${{ jobs.preview-scope.outputs.required }}
       web_url:
         description: "Web preview deployment URL"
-        value: ${{ jobs.resolve-url.outputs.web_url }}
+        value: ${{ jobs.preview-deploy.outputs.web_url }}
       web_sha:
-        description: "Commit the web preview serves: expected_sha, or the deployment standing in for it when the web build was ignored"
-        value: ${{ jobs.preview-targets.outputs.web_sha }}
+        description: "Commit the web preview was built from: expected_sha, or an earlier commit with the same web inputs and configuration"
+        value: ${{ jobs.preview-deploy.outputs.web_sha }}
       api_url:
         description: "API preview deployment URL"
-        value: ${{ jobs.resolve-url.outputs.api_url }}
+        value: ${{ jobs.preview-deploy.outputs.api_url }}
 
 jobs:
   preview-scope:
@@ -54,21 +55,19 @@ jobs:
         id: scope
         run: node scripts/vercel-preview-inputs.mjs
 
-  preview-targets:
-    # Waits for Vercel's verdict on this commit per project. A build the ignored build step
-    # skipped stands in with the branch's latest ready deployment of that project, once its
-    # inputs are confirmed unchanged; a failed or rate-limited build fails here.
+  preview-deploy:
     needs: preview-scope
     if: needs.preview-scope.outputs.required == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
+      web_url: ${{ steps.web.outputs.web_url }}
       web_sha: ${{ steps.web.outputs.web_sha }}
+      api_url: ${{ steps.api.outputs.api_url }}
       api_sha: ${{ steps.api.outputs.api_sha }}
     env:
       EXPECTED_SHA: ${{ inputs.expected_sha }}
       GIT_REF: ${{ inputs.git_ref }}
-      GH_TOKEN: ${{ github.token }}
       VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
       VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
       VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
@@ -78,97 +77,37 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ inputs.expected_sha }}
-          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-      - name: Web preview target
+      # The Hobby plan builds one deployment at a time, so the API waits behind the web build.
+      - name: Web preview deployment
         id: web
-        run: node scripts/vercel-preview-target.mjs web
-      - name: API preview target
+        run: node scripts/vercel-preview-deploy.mjs web
+      - name: API preview deployment
         id: api
-        run: node scripts/vercel-preview-target.mjs api
-
-  resolve-url:
-    needs: [preview-scope, preview-targets]
-    if: needs.preview-scope.outputs.required == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      web_url: ${{ steps.resolve.outputs.web_url }}
-      health_url: ${{ steps.resolve.outputs.health_url }}
-      api_url: ${{ steps.resolve.outputs.api_url }}
-      api_health_url: ${{ steps.resolve.outputs.api_health_url }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-
-      - name: Resolve preview health URL
-        id: resolve
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
-          VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
-          VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects' }}
-          VERCEL_GIT_COMMIT_REF: ${{ inputs.git_ref }}
-          WEB_SHA: ${{ needs.preview-targets.outputs.web_sha }}
-          API_SHA: ${{ needs.preview-targets.outputs.api_sha }}
-          DEBUG: true
-        run: |
-          echo "Resolving preview URL for branch: $VERCEL_GIT_COMMIT_REF"
-          web_url=$(GITHUB_SHA="$WEB_SHA" EXPECTED_SHA="$WEB_SHA" node scripts/resolve-vercel-preview-url.mjs)
-          if [ -z "$web_url" ] || [[ "$web_url" != https://* ]]; then
-            echo "Failed to resolve web URL"
-            exit 1
-          fi
-
-          api_url=$(GITHUB_SHA="$API_SHA" EXPECTED_SHA="$API_SHA" node scripts/resolve-api-preview-url.mjs)
-          if [ -z "$api_url" ] || [[ "$api_url" != https://* ]]; then
-            echo "Failed to resolve API URL"
-            exit 1
-          fi
-
-          health_url="${web_url}/api/health"
-          api_health_url="${api_url}/api/health"
-          echo "Resolved web URL: $web_url"
-          echo "Resolved health URL: $health_url"
-          echo "Resolved API URL: $api_url"
-          echo "Resolved API health URL: $api_health_url"
-          {
-            echo "web_url=$web_url"
-            echo "health_url=$health_url"
-            echo "api_url=$api_url"
-            echo "api_health_url=$api_health_url"
-          } >> "$GITHUB_OUTPUT"
+        run: node scripts/vercel-preview-deploy.mjs api
 
   wait-web:
-    needs: [preview-targets, resolve-url]
+    needs: preview-deploy
     uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
-      health_url: ${{ needs.resolve-url.outputs.health_url }}
-      expected_sha: ${{ needs.preview-targets.outputs.web_sha }}
-      # The web build alone has taken 4.5 to over 10 minutes, so 20 x 30s ran out
-      # seconds before it finished (run 40728198560).
-      retries: 40
-      sleep_seconds: 30
+      health_url: ${{ needs.preview-deploy.outputs.web_url }}/api/health
+      expected_sha: ${{ needs.preview-deploy.outputs.web_sha }}
+      # The deployment is already READY; this confirms it serves its commit through the bypass.
+      retries: 10
+      sleep_seconds: 15
     secrets:
       vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
   wait-api:
-    # Waits separately so a fresh web build is never tested against a stale or
-    # still-building API deployment from the same branch.
-    needs: [preview-targets, resolve-url]
+    needs: preview-deploy
     uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
-      health_url: ${{ needs.resolve-url.outputs.api_health_url }}
-      expected_sha: ${{ needs.preview-targets.outputs.api_sha }}
-      retries: 20
-      sleep_seconds: 30
+      health_url: ${{ needs.preview-deploy.outputs.api_url }}/api/health
+      expected_sha: ${{ needs.preview-deploy.outputs.api_sha }}
+      retries: 10
+      sleep_seconds: 15
     secrets:
       vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
