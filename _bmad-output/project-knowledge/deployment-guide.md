@@ -36,8 +36,8 @@ tests.
 | Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                    | Prisma command exit status; no post-migration deployment probe               |
 | Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete             | OTEL bootstrap log, integration test, dashboards and local manual checks     |
 
-The workflows verify deployments but do not create the web or API Vercel deployments. Separate
-project names and production URLs are encoded in
+CI creates every web and API Vercel deployment: previews from the preview workflow, production
+from the production workflow; no git push creates one. Separate project names and production URLs are encoded in
 [the Preview workflow](../../.github/workflows/pr-pw-e2e-vercel-preview.yml),
 [the production workflow](../../.github/workflows/pw-e2e-prod.yml), and the
 [Playwright environment resolver](../../playwright/config/environments.ts). Vercel project linkage,
@@ -230,8 +230,13 @@ Its `deploy-web` and `deploy-api` jobs run `scripts/vercel-preview-deploy.mjs <p
 build inputs (the same hash previews use) or its production variables and build settings changed
 since the deployment production serves now. A merge that changed neither leaves production where
 it is, spends none of the daily 100, and reports the earlier commit production still serves. A
-newer production build of the same inputs, left by a superseded run, is adopted. A manual run with
-`force_deploy` builds both regardless.
+production build of the same inputs, left by a superseded run, is adopted. Production builds of
+older `main` commits with other inputs that are still running are cancelled first, so one that
+finishes late cannot take production back to code a later commit replaced. A build is reported
+only once the project's production target serves it; after an Instant Rollback Vercel stops
+assigning production to new builds, so the step promotes its build and checks the target again. A
+manual run with `force_deploy` builds both regardless; a manual run from another branch deploys
+nothing and tests what production serves.
 
 Both projects are held to the commit their deploy job reports before tests start:
 

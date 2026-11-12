@@ -8,7 +8,9 @@ name: "Prod E2E (Playwright)"
 # production configuration changed since the deployment production serves
 # (scripts/vercel-preview-deploy.mjs --production), and report the commit production serves:
 # main's head, or for a commit that changed no app input the earlier commit already deployed.
-# The health waits and the e2e run expect that commit
+# They cancel still-running production builds of older commits with other inputs first, and
+# promote their own build when the production target does not take it (after an Instant
+# Rollback). The health waits and the e2e run expect that commit
 # (scripts/ci/production-deploy-workflow.test.mjs).
 
 on:
@@ -36,8 +38,8 @@ concurrency:
 
 jobs:
   deploy-web:
-    # Production is main's; a manual run from another branch only tests what is deployed.
-    if: ${{ github.ref == 'refs/heads/main' }}
+    # Production is main's: a manual run from another branch deploys nothing
+    # (PRODUCTION_REPORT_ONLY) and tests what production serves.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -50,6 +52,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+          # Full history: in-flight builds of older main commits are cancelled by ancestry.
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
@@ -59,6 +63,7 @@ jobs:
         env: &deploy-env
           EXPECTED_SHA: ${{ github.sha }}
           GIT_REF: main
+          PRODUCTION_REPORT_ONLY: ${{ github.ref != 'refs/heads/main' }}
           FORCE_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
@@ -67,7 +72,6 @@ jobs:
         run: node scripts/vercel-preview-deploy.mjs web --production
 
   deploy-api:
-    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -80,6 +84,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
+          # Full history: in-flight builds of older main commits are cancelled by ancestry.
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

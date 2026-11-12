@@ -39,6 +39,15 @@ for (const project of ['web', 'api']) {
     assert.equal(job.outputs.sha, `\${{ steps.deploy.outputs.${project}_sha }}`)
     const checkout = job.steps.find((step) => step.uses?.startsWith('actions/checkout@'))
     assert.equal(checkout.with.ref, '${{ github.sha }}')
+    // Full history: in-flight builds of older main commits are cancelled, which needs ancestry.
+    assert.equal(checkout.with['fetch-depth'], 0)
+    // A manual run off main deploys nothing and tests what production serves, so the health
+    // waits and the e2e run still run there.
+    assert.equal(job.if, undefined)
+    assert.equal(
+      deploy.env.PRODUCTION_REPORT_ONLY,
+      "${{ github.ref != 'refs/heads/main' }}"
+    )
   })
 
   test(`the ${project} health wait expects the commit production serves, not main's head`, () => {
