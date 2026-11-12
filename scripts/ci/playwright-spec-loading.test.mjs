@@ -13,6 +13,15 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const cli = createRequire(import.meta.url).resolve('@playwright/test/cli')
 
 test('the local suite lists every spec without a load error', () => {
+  // Specs import the shared packages' dist. A job may run this before it builds them
+  // (browser-acceptance's harness step does), so build first; an unchanged package is
+  // skipped (scripts/build-workspace-package.mjs).
+  const built = spawnSync('npm', ['run', 'build:packages'], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 300_000,
+  })
+  assert.equal(built.status, 0, `${built.stdout}\n${built.stderr}`)
   const listed = spawnSync(process.execPath, [cli, 'test', '--list'], {
     cwd: root,
     encoding: 'utf8',

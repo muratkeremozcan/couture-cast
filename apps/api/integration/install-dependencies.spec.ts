@@ -420,14 +420,16 @@ process.exit(result.code)
     expect(lanes[1]).toContain('./gradlew')
   })
 
-  it('fetches in both Android jobs before the first Gradle step', () => {
+  it('fetches in every Android job before the first Gradle step', () => {
     const workflow = fs.readFileSync(
       path.join(repoRoot, '.github/workflows/pr-accessibility-focus.yml'),
       'utf8'
     )
     const jobs = workflow.split(/\n {2}(?=[\w-]+:\n {4}name: )/)
     const android = jobs.filter((job) => job.includes('Generate the Android project'))
-    expect(android).toHaveLength(2)
+    // The app build, the module's Robolectric tests (split out to keep each under 20
+    // minutes) and the TalkBack device run.
+    expect(android).toHaveLength(3)
     for (const job of android) {
       const fetchAt = job.indexOf(
         'scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android'
@@ -436,8 +438,9 @@ process.exit(result.code)
         job.indexOf('Generate the Android project')
       )
       const firstGradle = job.search(
-        /Robolectric tests for the focus observer|accessibility-focus-device-tests\.sh/
+        /\.\/gradlew |Robolectric tests for the focus observer|accessibility-focus-device-tests\.sh/
       )
+      expect(firstGradle, job.slice(0, 60)).toBeGreaterThan(-1)
       expect(fetchAt).toBeLessThan(firstGradle)
     }
   })
