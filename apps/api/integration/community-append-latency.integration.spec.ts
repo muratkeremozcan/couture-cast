@@ -307,21 +307,20 @@ function recordedRepository(url: string) {
 
 describe('community append at production database latency', () => {
   it('6.5-INT-030: the proxy adds one production round trip per statement', async () => {
-    // The fastest of ten statements on each path: a loaded runner only adds time, so the
-    // minimum isolates what the proxy adds. A mean of five reached 70 ms on a busy CI runner.
-    const fastest = async (client: PrismaClient) => {
-      let best = Number.POSITIVE_INFINITY
-      for (let i = 0; i < 10; i++) {
-        const started = performance.now()
-        await client.$queryRaw`SELECT 1`
-        best = Math.min(best, performance.now() - started)
-      }
-      return best
+    // The proxy holds each chunk at least 15.5 ms each way, so no statement through it can take
+    // under one 31 ms round trip; load only adds time. First traffic and large payloads are
+    // checked on the transport itself (helpers/latency-proxy.spec.ts). The fastest of ten is checked, with
+    // explicit room for scheduling above the floor: a mean of five reached 70 ms on a busy CI
+    // runner. A doubled delay would take 62 ms, a halved one 16.
+    let fastest = Number.POSITIVE_INFINITY
+    for (let i = 0; i < 10; i++) {
+      const started = performance.now()
+      await remote.$queryRaw`SELECT 1`
+      fastest = Math.min(fastest, performance.now() - started)
     }
-    const added = (await fastest(remote)) - (await fastest(prisma))
-    // One 31 ms round trip; two would add 62 ms.
-    expect(added).toBeGreaterThanOrEqual(30)
-    expect(added).toBeLessThan(45)
+    // 0.5 ms below 31 covers clock rounding; the proxy never forwards a chunk early.
+    expect(fastest).toBeGreaterThanOrEqual(30.5)
+    expect(fastest).toBeLessThan(50)
   })
 
   it('6.5-INT-031: append makes progress within its budgets at a 31 ms round trip', async () => {
