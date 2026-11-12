@@ -201,9 +201,23 @@ runs:
           echo "::error::Supabase startup requires GNU timeout or gtimeout; install coreutils."
           exit 2
         fi
+        # TIME_BUDGET is an absolute deadline: every limited call, the login, status,
+        # diagnostics and stop included, gets at most what is left of it. Past the
+        # deadline a call is skipped, and the caller's failure-only stop step clears
+        # whatever containers are left.
+        started_at=$(date +%s)
+        remaining_seconds() {
+          echo $(( TIME_BUDGET - ($(date +%s) - started_at) ))
+        }
         bounded() {
-          local seconds=$1
+          local seconds=$1 left
           shift
+          left=$(remaining_seconds)
+          if [ "$left" -le 0 ]; then
+            echo "::warning::The Supabase start budget (${TIME_BUDGET}s) is spent; skipped: $*" >&2
+            return 124
+          fi
+          if [ "$left" -lt "$seconds" ]; then seconds=$left; fi
           "$deadline_command" --kill-after=10 "$seconds" "$@"
         }
 
@@ -239,15 +253,10 @@ runs:
         # docker child inherits.
         registry_token="$REGISTRY_TOKEN"
         unset REGISTRY_TOKEN
-        started_at=$(date +%s)
         cached_images=""
         if [ "$CACHE_LOADED" = true ]; then
           cached_images="$(bounded 30 docker images --format '{{.Repository}}:{{.Tag}}' | sort -u)"
         fi
-
-        remaining_seconds() {
-          echo $(( TIME_BUDGET - ($(date +%s) - started_at) ))
-        }
 
         # The host ports this start publishes: [api] and [db] always, and an
         # optional service's port only when it is enabled and its container is

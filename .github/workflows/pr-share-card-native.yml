@@ -112,6 +112,12 @@ jobs:
         # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
         if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
         run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -342,6 +348,12 @@ jobs:
         # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
         if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
         run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -664,6 +676,12 @@ jobs:
         # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
         if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
         run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime

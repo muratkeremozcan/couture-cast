@@ -212,6 +212,50 @@ exit 0`,
     assert.match(result.stdout, /Supabase services started successfully/)
   })
 
+  test('the budget is an absolute deadline: status, diagnostics and stop end inside it', (t) => {
+    // Every Supabase CLI call hangs: the start, then status and stop after it is cut off.
+    const result = runStep(t, 'Start local Supabase with retry', {
+      commands: {
+        uname: 'echo Linux',
+        ss: 'exit 0',
+        sudo: 'exit 1',
+        sleep: 'exit 0',
+        docker: 'exit 0',
+        npx: 'echo "npx $*" >> "$RUNNER_TEMP/npx-calls"; exec /bin/sleep 600',
+      },
+      env: {
+        MAX_ATTEMPTS: '2',
+        BASE_DELAY: '1',
+        MAX_DELAY: '1',
+        TIME_BUDGET: '6',
+        ATTEMPT_LIMIT: '4',
+        MIN_ATTEMPT: '2',
+        EXCLUDE: 'realtime',
+        PRIMARY_REGISTRY: 'ghcr.io',
+        FALLBACK_REGISTRIES: '',
+        CACHE_LOADED: 'false',
+        CACHED_REGISTRY: '',
+        SAVE_IMAGE_CACHE: 'false',
+        CACHE_DIR: '',
+        REGISTRY_TOKEN: 'token',
+        SUPABASE_API_PORT: '24321',
+        SUPABASE_DB_PORT: '24322',
+      },
+    })
+    assert.equal(
+      result.signal,
+      null,
+      `the step outlived its 6 s budget by more than 14 s:\n${result.stdout}`
+    )
+    assert.notEqual(result.status, 0)
+    // The budget plus one kill grace for the call running when it ran out.
+    assert.ok(result.elapsedMs < 17_000, `took ${result.elapsedMs} ms`)
+    assert.match(
+      result.stderr + result.stdout,
+      /The Supabase start budget \(6s\) is spent; skipped/
+    )
+  })
+
   test('every docker and npx call on the start path runs under a limit', () => {
     const unbounded = []
     for (const candidate of action.runs.steps) {
@@ -231,7 +275,7 @@ exit 0`,
     assert.deepEqual(unbounded, [])
   })
 
-  test('every caller bounds the start step and uploads its log when it fails', () => {
+  test('every caller bounds the start step, keeps its log and stops what a failed start left', () => {
     const dir = path.join(root, '.github/workflows')
     const sites = []
     for (const file of readdirSync(dir).filter((name) => name.endsWith('.yml'))) {
@@ -271,6 +315,19 @@ exit 0`,
           assert.match(
             keep.if,
             new RegExp(`steps\\.${candidate.id}\\.outcome == 'failure'`),
+            site
+          )
+          // Then clear the containers a start cut off by its budget or step timeout left.
+          const stop = steps[index + 2]
+          assert.match(
+            stop?.run ?? '',
+            /^timeout --kill-after=\d+ \d+ npx supabase stop --no-backup$/,
+            site
+          )
+          assert.ok(stop['timeout-minutes'] > 0 && stop['timeout-minutes'] <= 2, site)
+          assert.equal(
+            stop.if,
+            `\${{ always() && steps.${candidate.id}.outcome == 'failure' }}`,
             site
           )
         }

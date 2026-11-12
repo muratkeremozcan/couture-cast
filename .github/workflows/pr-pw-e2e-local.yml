@@ -126,6 +126,12 @@ jobs:
           path: ${{ runner.temp }}/supabase-start/start.log
           if-no-files-found: ignore
           retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Reset local Playwright database
         run: npm run db:reset
@@ -267,6 +273,12 @@ jobs:
           path: ${{ runner.temp }}/supabase-start/start.log
           if-no-files-found: ignore
           retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Install Playwright Chromium only
         run: npx playwright install chromium
@@ -380,6 +392,12 @@ jobs:
           path: ${{ runner.temp }}/supabase-start/start.log
           if-no-files-found: ignore
           retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Install Playwright Chromium only
         run: npx playwright install chromium
