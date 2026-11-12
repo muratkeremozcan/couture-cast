@@ -68,7 +68,7 @@ describe('analytics privacy filter: events and properties', () => {
   it('keeps the envelope and only allowlisted, valid properties of an explicit event', () => {
     const timestamp = new Date('2026-11-11T12:00:00.000Z')
     const sent = webAnalyticsPrivacyFilter<Event>({
-      uuid: '0199-event',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c60',
       event: 'ritual_created',
       timestamp,
       properties: {
@@ -85,7 +85,7 @@ describe('analytics privacy filter: events and properties', () => {
       $set_once: { birthdate: '2011-04-01' },
     })
     expect(sent).toEqual({
-      uuid: '0199-event',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c60',
       event: 'ritual_created',
       timestamp,
       properties: {
@@ -143,6 +143,55 @@ describe('analytics privacy filter: events and properties', () => {
     ).toBeNull()
     expect(webAnalyticsPrivacyFilter(null)).toBeNull()
     expect(webAnalyticsPrivacyFilter({ properties: {} })).toBeNull()
+  })
+
+  it('sends no object whose own serialization could carry a token', () => {
+    const leaky = {
+      toJSON: () => `https://couturecast.app/guardian/accept?token=${invitationToken}`,
+    }
+    class Props {
+      locale = 'en-US'
+      toJSON() {
+        return { locale: invitationToken }
+      }
+    }
+    const fromCustomRecord = mobileAnalyticsPrivacyFilter<Event>({
+      event: 'modal_opened',
+      properties: new Props() as unknown as Record<string, unknown>,
+    })
+    expect(fromCustomRecord).toEqual({ event: 'modal_opened', properties: {} })
+    expectNoLeak(fromCustomRecord)
+
+    class StampedDate extends Date {
+      override toJSON() {
+        return invitationToken
+      }
+    }
+    const sent = mobileAnalyticsPrivacyFilter<Event>({
+      event: 'modal_opened',
+      uuid: leaky,
+      timestamp: new StampedDate(0),
+      properties: { locale: leaky, surface: leaky },
+    } as unknown as Event)
+    expect(sent).toEqual({
+      event: 'modal_opened',
+      properties: {},
+      timestamp: new Date(0),
+    })
+    expect(Object.getPrototypeOf(sent?.timestamp)).toBe(Date.prototype)
+    expectNoLeak(sent)
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: 'modal_opened',
+        uuid: '0190f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c6d',
+        timestamp: '2026-11-11T22:00:00.000Z',
+      } as unknown as Event)
+    ).toEqual({
+      event: 'modal_opened',
+      properties: {},
+      uuid: '0190f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c6d',
+      timestamp: '2026-11-11T22:00:00.000Z',
+    })
   })
 
   it('drops the event instead of throwing when reading it fails', () => {

@@ -457,6 +457,35 @@ export function analyticsEventNames(platform: AnalyticsPlatform): string[] {
   ]
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const ISO_TIMESTAMP =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/
+
+/** A fresh Date or an ISO string for the event time; anything else is left out. */
+function envelopeTimestamp(value: unknown): Date | string | undefined {
+  if (value instanceof Date) {
+    const time = value.getTime()
+    return Number.isFinite(time) ? new Date(time) : undefined
+  }
+  return typeof value === 'string' && ISO_TIMESTAMP.test(value) ? value : undefined
+}
+
+/**
+ * The outgoing event. The envelope is rebuilt from primitives too: an object here would
+ * serialize through its own toJSON, past every property rule.
+ */
+function envelope(
+  source: Record<string, unknown>,
+  name: string,
+  properties: Record<string, unknown>
+) {
+  const result: Record<string, unknown> = { event: name, properties }
+  if (typeof source.uuid === 'string' && UUID.test(source.uuid)) result.uuid = source.uuid
+  const timestamp = envelopeTimestamp(source.timestamp)
+  if (timestamp !== undefined) result.timestamp = timestamp
+  return result
+}
+
 /**
  * The before_send hook for `platform`: returns a new event with only its envelope
  * (event, uuid, timestamp) and allowlisted properties, or null for an event outside the
@@ -489,10 +518,7 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
         const value = rule(properties[key], platform)
         if (value !== DROP) sanitized[key] = value
       }
-      const result: Record<string, unknown> = { event: name, properties: sanitized }
-      if (source.uuid !== undefined) result.uuid = source.uuid
-      if (source.timestamp !== undefined) result.timestamp = source.timestamp
-      return result as T
+      return envelope(source, name, sanitized) as T
     } catch {
       return null
     }

@@ -52,7 +52,7 @@ const enriched = {
 }
 const timestamp = new Date('2026-10-30T12:00:00.000Z')
 const shareEvent = (properties: Record<string, unknown> = enriched): CaptureResult => ({
-  uuid: '0199-share',
+  uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c61',
   event: 'share_card_shared',
   properties,
   $set: { email: 'member@example.test' },
@@ -73,7 +73,7 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     const result = shareCardSharedBeforeSend(shareEvent())
     expect(result).toEqual({
-      uuid: '0199-share',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c61',
       event: 'share_card_shared',
       timestamp,
       properties: { ...business, ...sdk, ...privacy },
@@ -101,7 +101,7 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
   it('passes every other event through untouched', async () => {
     const { shareCardSharedBeforeSend } = await import('./browser-analytics')
     const pageview: CaptureResult = {
-      uuid: '0199-pageview',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
       event: '$pageview',
       properties: { ...enriched },
       $set: { email: 'member@example.test' },
@@ -281,7 +281,7 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
   it('sends only allowlisted properties and no person updates', async () => {
     const hooks = (await initOptions(false)).before_send as BeforeSendFn[]
     const pageview: CaptureResult = {
-      uuid: '0199-pageview',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
       event: '$pageview',
       properties: {
         $current_url: 'https://couturecast.app/profile/alice-smith?token=guardian-secret',
@@ -299,7 +299,7 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
       pageview
     )
     expect(sent).toEqual({
-      uuid: '0199-pageview',
+      uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
       event: '$pageview',
       properties: { $current_url: 'https://couturecast.app/:unknown' },
     })
