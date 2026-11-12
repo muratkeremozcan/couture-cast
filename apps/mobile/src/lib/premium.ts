@@ -488,3 +488,5 @@ export async function pollSubscriptionUntilEntitled(
   }
   return null
 }
+
+// Lane probe (PR 212): a mobile-only change to measure push-to-gate. Not for merge.
