@@ -17,6 +17,18 @@ on:
         description: "Commit SHA under test"
         type: string
         required: true
+      deploy_web:
+        description: "Provide the web preview (false when the caller tests a URL of its own)"
+        type: boolean
+        default: true
+      deploy_api:
+        description: "Provide the API preview (false when the caller tests a URL of its own)"
+        type: boolean
+        default: true
+      force_build:
+        description: "Build fresh deployments even when a ready one has the same inputs and configuration"
+        type: boolean
+        default: false
     secrets:
       VERCEL_TOKEN:
         required: true
@@ -28,13 +40,13 @@ on:
         value: ${{ jobs.preview-scope.outputs.required }}
       web_url:
         description: "Web preview deployment URL"
-        value: ${{ jobs.preview-deploy.outputs.web_url }}
+        value: ${{ jobs.deploy-web.outputs.url }}
       web_sha:
         description: "Commit the web preview was built from: expected_sha, or an earlier commit with the same web inputs and configuration"
-        value: ${{ jobs.preview-deploy.outputs.web_sha }}
+        value: ${{ jobs.deploy-web.outputs.sha }}
       api_url:
         description: "API preview deployment URL"
-        value: ${{ jobs.preview-deploy.outputs.api_url }}
+        value: ${{ jobs.deploy-api.outputs.url }}
 
 jobs:
   preview-scope:
@@ -55,23 +67,18 @@ jobs:
         id: scope
         run: node scripts/vercel-preview-inputs.mjs
 
-  preview-deploy:
+  # One job per project, each with its own 20 minute budget: Hobby builds one deployment at a
+  # time, so the second waits behind the first. Every Vercel request times out after 30 s.
+  # VERCEL_TOKEN reaches this job, which runs the PR's own script; GitHub withholds it from
+  # fork PRs, and the e2e job already receives it (deployment guide, preview deployments).
+  deploy-web:
     needs: preview-scope
-    if: needs.preview-scope.outputs.required == 'true'
+    if: needs.preview-scope.outputs.required == 'true' && inputs.deploy_web
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
-      web_url: ${{ steps.web.outputs.web_url }}
-      web_sha: ${{ steps.web.outputs.web_sha }}
-      api_url: ${{ steps.api.outputs.api_url }}
-      api_sha: ${{ steps.api.outputs.api_sha }}
-    env:
-      EXPECTED_SHA: ${{ inputs.expected_sha }}
-      GIT_REF: ${{ inputs.git_ref }}
-      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-      VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
-      VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
-      VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects' }}
+      url: ${{ steps.deploy.outputs.web_url }}
+      sha: ${{ steps.deploy.outputs.web_sha }}
     steps:
       - name: Checkout preview inputs
         uses: actions/checkout@v4
@@ -81,20 +88,46 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-      # The Hobby plan builds one deployment at a time, so the API waits behind the web build.
       - name: Web preview deployment
-        id: web
+        id: deploy
+        env: &deploy-env
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
+          GIT_REF: ${{ inputs.git_ref }}
+          FORCE_BUILD: ${{ inputs.force_build }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
+          VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
+          VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects' }}
         run: node scripts/vercel-preview-deploy.mjs web
+
+  deploy-api:
+    needs: preview-scope
+    if: needs.preview-scope.outputs.required == 'true' && inputs.deploy_api
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      url: ${{ steps.deploy.outputs.api_url }}
+      sha: ${{ steps.deploy.outputs.api_sha }}
+    steps:
+      - name: Checkout preview inputs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.expected_sha }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
       - name: API preview deployment
-        id: api
+        id: deploy
+        env: *deploy-env
         run: node scripts/vercel-preview-deploy.mjs api
 
   wait-web:
-    needs: preview-deploy
+    needs: deploy-web
     uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
-      health_url: ${{ needs.preview-deploy.outputs.web_url }}/api/health
-      expected_sha: ${{ needs.preview-deploy.outputs.web_sha }}
+      health_url: ${{ needs.deploy-web.outputs.url }}/api/health
+      expected_sha: ${{ needs.deploy-web.outputs.sha }}
       # The deployment is already READY; this confirms it serves its commit through the bypass.
       retries: 10
       sleep_seconds: 15
@@ -102,11 +135,11 @@ jobs:
       vercel_bypass_secret: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
 
   wait-api:
-    needs: preview-deploy
+    needs: deploy-api
     uses: ./.github/workflows/vercel-wait-for-deployment.yml
     with:
-      health_url: ${{ needs.preview-deploy.outputs.api_url }}/api/health
-      expected_sha: ${{ needs.preview-deploy.outputs.api_sha }}
+      health_url: ${{ needs.deploy-api.outputs.url }}/api/health
+      expected_sha: ${{ needs.deploy-api.outputs.sha }}
       retries: 10
       sleep_seconds: 15
     secrets:

@@ -10,6 +10,7 @@ export type Deployment = {
   created?: number
   meta?: Record<string, string>
 }
+export declare const BUILD_SETTINGS: string[]
 export declare function configIdentity(
   project: Record<string, unknown>,
   envs: Record<string, unknown>[],
@@ -21,12 +22,14 @@ export declare function previewDeployment(input: {
   sha: string
   inputs: string
   config: string
+  force?: boolean
   repoId: string | number
   projectId: string
   projectName: string
-  listReady: () => Promise<Deployment[]>
+  list: () => Promise<Deployment[]>
   create: (body: Record<string, unknown>) => Promise<Deployment>
   get: (id: string) => Promise<Deployment>
+  cancel: (id: string) => Promise<unknown>
   sleep?: (ms: number) => Promise<void>
   attempts?: number
   intervalMs?: number

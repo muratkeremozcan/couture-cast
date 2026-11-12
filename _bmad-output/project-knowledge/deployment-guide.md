@@ -164,19 +164,39 @@ blocked two merges for hours. An ignored build step cannot help: Vercel's build 
 remote and ten commits of history (probe, 2026-11-12), and its canceled builds still count.
 
 When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
-branch's changes against main, the `preview-deploy` job runs
-[the deploy script](../../scripts/vercel-preview-deploy.mjs) for web, then API. It reuses the
-newest ready deployment of the branch that it created itself with the same build inputs (a hash of
-every tracked file the project builds from: the repository less the other app, tests, workflows
-and load scripts) and the same configuration (the ids and update times of the preview variables
-that apply to the branch, and the project's build settings). Otherwise it creates a deployment
-from the exact commit through the Vercel API and waits for `READY`; `ERROR`, `CANCELED` or a
-refused creation (the rate limit answers on creation) fails the job. The health waits, the e2e
+branch's changes against main, one job per project (`deploy-web`, `deploy-api`, 20 minutes each,
+since Hobby builds one deployment at a time) runs
+[the deploy script](../../scripts/vercel-preview-deploy.mjs). Among the deployments of the branch
+it created itself, it:
+
+- cancels any still building other inputs or configuration, since a canceled Actions run leaves
+  its Vercel build running;
+- reuses the newest ready one with the same build inputs (a hash of every tracked file the project
+  builds from: the repository less the other app, tests, workflows and load scripts) and the same
+  configuration (the ids and update times of the preview variables that apply to the branch, and
+  the build settings: framework, install, build and output commands, root directory, files
+  outside it, system variable exposure, Node version, Git LFS, region and resources);
+- otherwise adopts one still building the same inputs, or creates one from the exact commit
+  through the Vercel API; when two runs create at once, the older build is kept and the newer
+  canceled.
+
+It waits for `READY` (72 polls 15 s apart, every request bounded at 30 s); `ERROR`, `CANCELED` or
+a refused creation (the rate limit answers on creation) fails the job. The health waits, the e2e
 URLs and the web health test (`EXPECTED_WEB_SHA`) use that deployment's own URL and commit.
 
-Changing a preview environment variable or a build setting changes the configuration identity, so
-the next run builds fresh. To force a rebuild without a change, push an empty commit or redeploy
-from the Vercel dashboard. Production deployments from `main` are untouched by all of this.
+Opening or reopening a PR provides its previews, as does each push to it. A manual run provides
+each preview it names no custom URL for. Changing a preview variable or a build setting changes the
+configuration identity, so the next run builds fresh. To rebuild with nothing changed (an empty
+commit keeps the same inputs), add the `PREVIEW-REBUILD` label to the PR, and remove it afterwards,
+since every run builds fresh while it is there, or run Manual E2E Tests with
+`force_preview_build`. Production deployments from `main` are untouched by all of this.
+
+`VERCEL_TOKEN` reaches the deploy jobs, which run the PR's own script at its exact commit, as it
+already reached the e2e job's test code. GitHub withholds repository secrets from pull requests
+opened from forks, so only same-repository branches can use it, and a fork's preview run fails
+for want of the token. Nothing in the repository limits what the token may do; its scope, owner
+and expiry live in the Vercel account (repository secret last set 2025-12-15) and are not
+verified here, so treat it as able to deploy to production.
 
 The SHA wait is implemented by
 [the Vercel waiter](../../.github/workflows/vercel-wait-for-deployment.yml). It retries for up to the
