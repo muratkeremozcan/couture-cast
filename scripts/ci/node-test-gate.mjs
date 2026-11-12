@@ -16,7 +16,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { parse } from 'yaml'
+import { createRequire } from 'node:module'
+
+// yaml loads on first use: node-test-gate --local must report a missing install (npm ci)
+// before anything needs a package.
+const parse = (...args) => createRequire(import.meta.url)('yaml').parse(...args)
 import {
   evaluateApprovedCondition,
   isExplicitPrerequisiteCondition,
@@ -89,10 +93,39 @@ export const LOCAL_NEEDS = {
 }
 
 /**
+ * Commands the suites shell out to, which CI runners carry and a laptop may not: the quality
+ * gate test in lanes-wiring.test.mjs runs the pr-checks shell, which uses jq.
+ */
+export const LOCAL_COMMANDS = {
+  'native-harness': [
+    { command: 'jq', how: 'install jq (brew install jq, or apt-get install jq)' },
+  ],
+}
+
+const commandExists = (name) =>
+  spawnSync('sh', ['-c', `command -v ${name}`], { stdio: 'ignore' }).status === 0
+
+/** The CI rule for a vitest JSON report: at least two tests, every one passed. */
+export function assertVitestReport(report) {
+  if (
+    !(report?.numTotalTests >= 2) ||
+    report.numPassedTests !== report.numTotalTests ||
+    report.numPendingTests !== 0 ||
+    report.numFailedTests !== 0 ||
+    report.numTodoTests !== 0
+  )
+    throw new Error('Incomplete vitest suite execution')
+}
+
+/**
  * Every suite, and the vitest files, with what is missing locally to run them as CI does. A
  * need with no local probe throws, so a new CI prerequisite cannot pass unnoticed locally.
  */
-export function localPlan({ root = repository, manifest = loadManifest(root) } = {}) {
+export function localPlan({
+  root = repository,
+  manifest = loadManifest(root),
+  hasCommand = commandExists,
+} = {}) {
   const needs = manifest.conditionNeeds ?? {}
   const suites = [
     ...Object.keys(manifest.suites).map((suite) => ({ suite, runner: 'node' })),
@@ -109,28 +142,61 @@ export function localPlan({ root = repository, manifest = loadManifest(root) } =
       if (!fs.existsSync(path.join(root, local.probe)))
         missing.push({ suite, need, how: local.how })
     }
+  for (const [suite, commands] of Object.entries(LOCAL_COMMANDS))
+    for (const { command, how } of commands)
+      if (!hasCommand(command)) missing.push({ suite, need: command, how })
   return { suites, missing }
+}
+
+/**
+ * Everything that stops a local run before any suite starts: missing setup or commands, then
+ * any suite the workflow no longer gates, which a local pass would otherwise hide.
+ */
+export function localPreflight({
+  root = repository,
+  manifest = loadManifest(root),
+  hasCommand = commandExists,
+  coverage = () => coverageProblems({ root, manifest }),
+} = {}) {
+  const { missing } = localPlan({ root, manifest, hasCommand })
+  if (missing.length)
+    return missing.map(({ suite, need, how }) => `${suite} needs ${need}: ${how}`)
+  return coverage()
 }
 
 /** Runs every suite as CI would, after refusing to start while any suite's setup is missing. */
 function runLocal() {
-  const plan = localPlan()
-  if (plan.missing.length)
+  const problems = localPreflight()
+  if (problems.length)
     throw new Error(
       [
-        'node_test_gate_local: set these up first, or the suites fail for a reason CI never sees:',
-        ...plan.missing.map(({ suite, need, how }) => `  ${suite} needs ${need}: ${how}`),
+        'node_test_gate_local: fix these first, or the suites fail or pass for a reason CI never sees:',
+        ...problems.map((problem) => `  ${problem}`),
       ].join('\n')
     )
+  const plan = localPlan()
   const manifest = loadManifest()
   for (const { suite, runner } of plan.suites) {
     if (runner === 'vitest') {
-      const result = spawnSync('npx', ['vitest', 'run', ...manifest.vitest], {
-        cwd: repository,
-        stdio: 'inherit',
-      })
+      const report = path.join(
+        fs.mkdtempSync(path.join(os.tmpdir(), 'gate-vitest-')),
+        'r.json'
+      )
+      const result = spawnSync(
+        'npx',
+        [
+          'vitest',
+          'run',
+          ...manifest.vitest,
+          '--reporter=default',
+          '--reporter=json',
+          `--outputFile=${report}`,
+        ],
+        { cwd: repository, stdio: 'inherit' }
+      )
       if (result.status !== 0)
         throw new Error('node_test_gate_failed: vitest suite failed')
+      assertVitestReport(JSON.parse(fs.readFileSync(report, 'utf8')))
       continue
     }
     const summary = runNodeTestGate({ files: resolveSuite(suite), cwd: repository })

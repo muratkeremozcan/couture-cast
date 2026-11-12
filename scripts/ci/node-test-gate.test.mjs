@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -10,12 +11,16 @@ import {
   coverageProblems,
   discoverTestFiles,
   gatedSuite,
+  assertVitestReport,
   loadManifest,
   localPlan,
+  localPreflight,
   resolveSuite,
   runNodeTestGate,
   summarizeNodeTestEvents,
 } from './node-test-gate.mjs'
+
+const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
 
 const sources = {
   'passing.test.mjs': `import { test } from 'node:test'
@@ -786,4 +791,100 @@ describe('local mode', () => {
   test('the real manifest declares only needs local mode can probe', () => {
     assert.doesNotThrow(() => localPlan({ manifest: loadManifest() }))
   })
+})
+
+describe('local mode preflight (PR 212 review)', () => {
+  const manifest = {
+    suites: { plain: ['a.test.mjs'] },
+    vitest: [],
+    conditionNeeds: { plain: ['install'], vitest: [] },
+  }
+  const rootWith = (files) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-preflight-'))
+    for (const file of files) {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      fs.writeFileSync(path.join(root, file), '')
+    }
+    return root
+  }
+
+  test('names a missing command a suite shells out to, before any suite starts', () => {
+    const plan = localPlan({
+      root: rootWith(['node_modules/.package-lock.json']),
+      manifest,
+      hasCommand: (name) => name !== 'jq',
+    })
+    assert.deepEqual(
+      plan.missing.map(({ suite, need }) => `${suite}:${need}`),
+      ['native-harness:jq']
+    )
+    assert.match(plan.missing[0].how, /jq/)
+  })
+
+  test('refuses a local run whose workflow no longer gates every suite', () => {
+    const problems = localPreflight({
+      root: rootWith(['node_modules/.package-lock.json']),
+      manifest,
+      hasCommand: () => true,
+      coverage: () => ['suite plain has no gate step'],
+    })
+    assert.deepEqual(problems, ['suite plain has no gate step'])
+  })
+
+  test('a fresh checkout without node_modules gets the install instruction, not a module error', () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fresh-'))
+    const copy = (file) => {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      fs.copyFileSync(path.join(repoRoot, file), path.join(root, file))
+    }
+    for (const file of [
+      'scripts/ci/node-test-gate.mjs',
+      'scripts/ci/node-test-gate-reporter.mjs',
+      'scripts/ci/workflow-step-shadowing.mjs',
+      'scripts/ci/node-test-suites.json',
+    ])
+      copy(file)
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/ci/node-test-gate.mjs', '--local'],
+      {
+        cwd: root,
+        encoding: 'utf8',
+      }
+    )
+    assert.notEqual(result.status, 0)
+    assert.doesNotMatch(result.stderr, /ERR_MODULE_NOT_FOUND/)
+    assert.match(result.stderr, /needs install: npm ci/)
+  })
+
+  test('applies the CI rule to a vitest JSON report', () => {
+    const report = (overrides) => ({
+      numTotalTests: 3,
+      numPassedTests: 3,
+      numPendingTests: 0,
+      numFailedTests: 0,
+      numTodoTests: 0,
+      ...overrides,
+    })
+    assert.doesNotThrow(() => assertVitestReport(report({})))
+    assert.throws(
+      () => assertVitestReport(report({ numTotalTests: 1, numPassedTests: 1 })),
+      /Incomplete vitest suite execution/
+    )
+    assert.throws(() => assertVitestReport(report({ numPendingTests: 1 })), /Incomplete/)
+  })
+})
+
+test('the local vitest rule matches the rule the share-card workflow applies to its report', () => {
+  const workflow = fs.readFileSync(
+    path.join(repoRoot, '.github/workflows/pr-share-card-native.yml'),
+    'utf8'
+  )
+  const rules = workflow.match(
+    /if \(report\.numTotalTests < 2 \|\| report\.numPassedTests !== report\.numTotalTests \|\|\s+report\.numPendingTests !== 0 \|\| report\.numFailedTests !== 0 \|\| report\.numTodoTests !== 0\)/g
+  )
+  assert.ok(
+    rules && rules.length >= 1,
+    'the workflow still checks the API entry report with the same rule'
+  )
 })
