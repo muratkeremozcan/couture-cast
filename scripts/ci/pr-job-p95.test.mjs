@@ -7,7 +7,13 @@
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
-import { jobTiming, nearestRank, summarize } from './pr-job-p95.mjs'
+import { jobTiming, nearestRank, summarize as summarizeAll } from './pr-job-p95.mjs'
+
+/** The one job these fixtures time, with the workflow verdict beside it. */
+const summarize = (jobs, now) => {
+  const all = summarizeAll(jobs, now)
+  return { ...(all.jobs.ios ?? {}), skipped: all.skipped, withinBudget: all.withinBudget }
+}
 
 const T0 = '2026-11-12T20:00:00Z'
 const at = (minutes) => new Date(Date.parse(T0) + minutes * 60_000).toISOString()
@@ -26,6 +32,37 @@ function job(name, queue, run, overrides = {}) {
   }
 }
 
+// R4-08: the owner's budget holds for every PR job, so jobs are never pooled.
+describe('per-job verdicts', () => {
+  test('nineteen fast jobs cannot dilute one slow job', () => {
+    const jobs = Array.from({ length: 20 }, () => [
+      ...Array.from({ length: 19 }, (_, index) => job(`lint-${index}`, 0, 2)),
+      job('ios', 1, 17),
+    ]).flat()
+    const summary = summarizeAll(jobs, at(60))
+    assert.equal(summary.jobs.ios.p95, 18)
+    assert.equal(summary.jobs.ios.withinBudget, false)
+    assert.equal(summary.jobs['lint-0'].withinBudget, true)
+    assert.equal(summary.withinBudget, false)
+  })
+
+  test('twenty different jobs from one run are not a sample', () => {
+    const jobs = Array.from({ length: 20 }, (_, index) => job(`job-${index}`, 0, 2))
+    const summary = summarizeAll(jobs, at(60))
+    assert.equal(summary.jobs['job-0'].n, 1)
+    assert.equal(summary.withinBudget, false)
+  })
+
+  test('a workflow passes only when every job passes on its own', () => {
+    const jobs = Array.from({ length: 20 }, () => [
+      job('android', 1, 9),
+      job('ios', 2, 10),
+    ]).flat()
+    assert.equal(summarizeAll(jobs, at(60)).withinBudget, true)
+    assert.equal(summarizeAll([], at(60)).withinBudget, false)
+  })
+})
+
 describe('nearestRank', () => {
   test('p95 of 20 values is the 19th, so it differs from the maximum', () => {
     const values = Array.from({ length: 20 }, (_, index) => index + 1)
@@ -37,9 +74,9 @@ describe('nearestRank', () => {
 describe('summarize', () => {
   test("Codex's counterexample: two cancelled long jobs are not dropped", () => {
     const jobs = [
-      ...Array.from({ length: 18 }, (_, index) => job(`ios-${index}`, 1, 9)),
-      job('ios-cancelled-a', 5, 20, { conclusion: 'cancelled' }),
-      job('ios-cancelled-b', 10, 20, { conclusion: 'cancelled' }),
+      ...Array.from({ length: 18 }, () => job('ios', 1, 9)),
+      job('ios', 5, 20, { conclusion: 'cancelled' }),
+      job('ios', 10, 20, { conclusion: 'cancelled' }),
     ]
     const summary = summarize(jobs, at(60))
     assert.equal(summary.n, 20)
@@ -49,8 +86,8 @@ describe('summarize', () => {
     assert.deepEqual(
       summary.breaches.map(({ name, total }) => [name, total]),
       [
-        ['ios-cancelled-a', 25],
-        ['ios-cancelled-b', 30],
+        ['ios', 25],
+        ['ios', 30],
       ]
     )
   })
@@ -58,8 +95,8 @@ describe('summarize', () => {
   test('failed and timed-out jobs keep their durations', () => {
     const summary = summarize(
       [
-        job('a', 2, 8, { conclusion: 'failure' }),
-        job('b', 2, 21, { conclusion: 'timed_out' }),
+        job('ios', 2, 8, { conclusion: 'failure' }),
+        job('ios', 2, 21, { conclusion: 'timed_out' }),
       ],
       at(60)
     )
@@ -102,8 +139,8 @@ describe('summarize', () => {
 
   // R3-05: in-flight rows never certify the budget, and one observation is not a sample.
   test('twenty jobs still queued at 14 minutes are not a pass', () => {
-    const queued = Array.from({ length: 20 }, (_, index) =>
-      job(`ios-${index}`, 0, 0, {
+    const queued = Array.from({ length: 20 }, () =>
+      job('ios', 0, 0, {
         status: 'queued',
         conclusion: null,
         started_at: null,
@@ -127,13 +164,13 @@ describe('summarize', () => {
 
   test('fewer than twenty completed observations never pass; twenty within budget do', () => {
     assert.equal(summarize([job('ios', 1, 5)], at(60)).withinBudget, false)
-    const twenty = Array.from({ length: 20 }, (_, index) => job(`ios-${index}`, 1, 5))
+    const twenty = Array.from({ length: 20 }, () => job('ios', 1, 5))
     assert.equal(summarize(twenty, at(60)).withinBudget, true)
   })
 
   test('a skipped job is left out with its reason', () => {
     const summary = summarize(
-      [job('a', 1, 5), job('ios', 0, 0, { conclusion: 'skipped', started_at: null })],
+      [job('ios', 1, 5), job('ios', 0, 0, { conclusion: 'skipped', started_at: null })],
       at(60)
     )
     assert.equal(summary.n, 1)

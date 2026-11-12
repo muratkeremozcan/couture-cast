@@ -11,7 +11,7 @@
 // - only jobs skipped without running are left out, each with its reason;
 // - a job past 20 minutes is a breach even when its timeout-minutes, which counts execution
 //   only, never fired.
-// Usage: node scripts/ci/pr-job-p95.mjs --workflow <file.yml> [--job <name prefix>]
+// Usage: node scripts/ci/pr-job-p95.mjs --workflow <file.yml> [--job <exact job name>]
 //   [--runs 20] [--event pull_request]
 import { spawnSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
@@ -66,16 +66,12 @@ export function jobTiming(job, now = new Date().toISOString()) {
 }
 
 /**
- * Completed jobs (terminal, including failed, timed-out and cancelled ones, and jobs cancelled
- * before they started, which count their queue) form the sample. Jobs still queued or running
- * are reported as lower bounds and never help a pass, though one already past the ceiling is a
- * breach. A pass needs REQUIRED_SAMPLE completed observations (R3-05).
+ * One job identity's verdict. Completed jobs (terminal, including failed, timed-out and cancelled
+ * ones, and jobs cancelled before they started, which count their queue) form the sample. Jobs
+ * still queued or running are reported as lower bounds and never help a pass, though one already
+ * past the ceiling is a breach. A pass needs REQUIRED_SAMPLE completed observations (R3-05).
  */
-export function summarize(jobs, now) {
-  const skipped = jobs
-    .filter((job) => job.conclusion === 'skipped')
-    .map((job) => ({ name: job.name, reason: 'skipped without running' }))
-  const timings = jobs.map((job) => jobTiming(job, now)).filter(Boolean)
+function cohortSummary(timings) {
   const completed = timings.filter((timing) => !timing.inFlight)
   const totals = completed.map((timing) => timing.total)
   const queues = completed.map((timing) => timing.queue)
@@ -96,12 +92,38 @@ export function summarize(jobs, now) {
       conclusion,
       total,
     })),
-    skipped,
     withinBudget:
       completed.length >= REQUIRED_SAMPLE &&
       p95 <= P95_BUDGET_MINUTES &&
       max <= CEILING_MINUTES &&
       breaches.length === 0,
+  }
+}
+
+/**
+ * The owner's budget holds for every PR job, so jobs are judged per identity (the job's full name,
+ * matrix values included) and never pooled: a fast job cannot dilute a slow one, and twenty
+ * different jobs from one run are not a sample (R4-08). The workflow passes only when every job
+ * it ran passes on its own.
+ */
+export function summarize(jobs, now) {
+  const skipped = jobs
+    .filter((job) => job.conclusion === 'skipped')
+    .map((job) => ({ name: job.name, reason: 'skipped without running' }))
+  const byJob = new Map()
+  for (const timing of jobs.map((job) => jobTiming(job, now)).filter(Boolean))
+    byJob.set(timing.name, [...(byJob.get(timing.name) ?? []), timing])
+  const perJob = Object.fromEntries(
+    [...byJob]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([name, timings]) => [name, cohortSummary(timings)])
+  )
+  const verdicts = Object.values(perJob)
+  return {
+    jobs: perJob,
+    skipped,
+    withinBudget:
+      verdicts.length > 0 && verdicts.every((verdict) => verdict.withinBudget),
   }
 }
 
@@ -137,7 +159,7 @@ function collect({ workflow, job, runs, event }) {
         `repos/{owner}/{repo}/actions/runs/${run.databaseId}/attempts/${attempt}/jobs?per_page=100`,
       ])
       for (const entry of page.jobs) {
-        if (job && !entry.name.startsWith(job)) continue
+        if (job && entry.name !== job) continue
         jobs.push({ ...entry, attemptCreatedAt: attemptRun.run_started_at })
       }
     }
