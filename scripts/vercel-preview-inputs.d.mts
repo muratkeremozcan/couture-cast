@@ -12,6 +12,12 @@ export declare function previewRequired(
   head?: string,
   paths?: string[]
 ): boolean
+export declare function inputsChanged(
+  cwd: string,
+  from: string,
+  to: string,
+  paths: string[]
+): { changed: string[] } | { reason: string }
 export declare function ignoredBuildDecision(
   env: NodeJS.ProcessEnv,
   cwd?: string,

@@ -29,6 +29,10 @@ on:
         type: string
         description: "Git ref from deployment event (branch name)"
         required: false
+      expected_web_sha:
+        type: string
+        description: "Commit the web preview serves when it differs from the commit under test (an ignored web build's stand-in)"
+        required: false
       vercel_web_project_slug:
         type: string
         description: "Vercel web project slug used for Preview URL resolution"
@@ -165,6 +169,7 @@ jobs:
           # Prod only: preview runs execute PR code and must not hold the prod credential.
           DATABASE_URL_PROD: ${{ inputs.test_env == 'prod' && secrets.DATABASE_URL_PROD || '' }}
           EXPECTED_SHA: ${{ steps.expected_sha.outputs.sha }}
+          EXPECTED_WEB_SHA: ${{ inputs.expected_web_sha || steps.expected_sha.outputs.sha }}
           GITHUB_SHA: ${{ steps.expected_sha.outputs.sha }}
           GH_TOKEN: ${{ github.token }}
           # Preview only: production is not behind Vercel protection, and the

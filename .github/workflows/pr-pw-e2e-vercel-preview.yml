@@ -38,4 +38,5 @@ jobs:
       deployment_ref: ${{ github.head_ref }}
       custom_base_url: ${{ needs.preview-ready.outputs.web_url }}
       custom_api_base_url: ${{ needs.preview-ready.outputs.api_url }}
+      expected_web_sha: ${{ needs.preview-ready.outputs.web_sha }}
     secrets: inherit

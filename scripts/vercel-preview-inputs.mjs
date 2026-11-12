@@ -67,13 +67,23 @@ export function previewDecision(cwd, base, head = 'HEAD', paths = previewPaths) 
   const changed = result.stdout.split('\n').filter(Boolean)
   if (!changed.length)
     return { required: false, reason: `no input changed since ${ancestor}` }
-  const more = changed.length > 3 ? ` and ${changed.length - 3} more` : ''
-  return { required: true, reason: `changed ${changed.slice(0, 3).join(', ')}${more}` }
+  return { required: true, reason: describeChanged(changed) }
 }
 
 /** @param {string} cwd @param {string} base @param {string} [head] @param {string[]} [paths] */
 export function previewRequired(cwd, base, head = 'HEAD', paths = previewPaths) {
   return previewDecision(cwd, base, head, paths).required
+}
+
+/** Origin, then the public repository Vercel names, which its clone has no remote for. */
+function remotesOf(env) {
+  const remotes = ['origin']
+  const { VERCEL_GIT_PROVIDER, VERCEL_GIT_REPO_OWNER, VERCEL_GIT_REPO_SLUG } = env
+  if (VERCEL_GIT_PROVIDER === 'github' && VERCEL_GIT_REPO_OWNER && VERCEL_GIT_REPO_SLUG)
+    remotes.push(
+      `https://github.com/${VERCEL_GIT_REPO_OWNER}/${VERCEL_GIT_REPO_SLUG}.git`
+    )
+  return remotes
 }
 
 /**
@@ -83,14 +93,8 @@ export function previewRequired(cwd, base, head = 'HEAD', paths = previewPaths) 
  * @returns {{ remote: string, base: string } | { reason: string }}
  */
 function fetchMain(env, cwd) {
-  const remotes = ['origin']
-  const { VERCEL_GIT_PROVIDER, VERCEL_GIT_REPO_OWNER, VERCEL_GIT_REPO_SLUG } = env
-  if (VERCEL_GIT_PROVIDER === 'github' && VERCEL_GIT_REPO_OWNER && VERCEL_GIT_REPO_SLUG)
-    remotes.push(
-      `https://github.com/${VERCEL_GIT_REPO_OWNER}/${VERCEL_GIT_REPO_SLUG}.git`
-    )
   const misses = []
-  for (const remote of remotes) {
+  for (const remote of remotesOf(env)) {
     const fetched = git(['fetch', '--no-tags', '--depth=50', remote, 'main'], cwd)
     if (fetched.status !== 0) {
       misses.push(
@@ -129,7 +133,48 @@ function recoverHistory(env, cwd, remote, base) {
 }
 
 /**
+ * Which of `paths` differ between two commits, compared tree to tree.
+ * @param {string} cwd @param {string} from @param {string} to @param {string[]} paths
+ * @returns {{ changed: string[] } | { reason: string }}
+ */
+export function inputsChanged(cwd, from, to, paths) {
+  const result = git(['diff', '--name-only', from, to, '--', ...paths], cwd)
+  if (result.status !== 0) return { reason: `diff failed (${failure(result)})` }
+  return { changed: result.stdout.split('\n').filter(Boolean) }
+}
+
+function describeChanged(changed) {
+  const more = changed.length > 3 ? ` and ${changed.length - 3} more` : ''
+  return `changed ${changed.slice(0, 3).join(', ')}${more}`
+}
+
+/**
+ * Makes `sha` readable in a shallow clone, fetching that one commit from origin or the
+ * public repository Vercel names.
+ * @param {NodeJS.ProcessEnv} env @param {string} cwd @param {string} sha
+ * @returns {string | undefined} why it could not, if it could not
+ */
+function ensureCommit(env, cwd, sha) {
+  if (git(['cat-file', '-e', `${sha}^{commit}`], cwd).status === 0) return undefined
+  const misses = []
+  for (const remote of remotesOf(env)) {
+    const fetched = git(['fetch', '--no-tags', '--depth=1', remote, sha], cwd)
+    if (fetched.status === 0) return undefined
+    misses.push(
+      `fetch ${remote === 'origin' ? 'origin' : 'public URL'}: ${failure(fetched)}`
+    )
+  }
+  return `commit ${sha} unavailable (${misses.join('; ')})`
+}
+
+/**
  * The ignored build step of one Vercel project: build (1) or skip (0), and why.
+ *
+ * A build is skipped when nothing needs it: no preview check reads what the branch changed
+ * against main, or the branch's last ready deployment of this project (Vercel's
+ * VERCEL_GIT_PREVIOUS_SHA) was built from the same inputs, so the preview wait can test that
+ * deployment in its place. Vercel's clone has no remote and ten commits of history (measured
+ * 2026-11-12), so main and the earlier commit come from the public repository.
  * @param {NodeJS.ProcessEnv} env @param {string} cwd @param {string | undefined} project
  * @returns {{ code: 0 | 1, reason: string }}
  */
@@ -138,12 +183,38 @@ export function ignoredBuildDecision(env, cwd = repoRoot, project) {
   if (!paths) return { code: 1, reason: `unknown project ${JSON.stringify(project)}` }
   if (env.VERCEL_ENV !== 'preview')
     return { code: 1, reason: `VERCEL_ENV is ${env.VERCEL_ENV ?? 'unset'}` }
+  const notes = []
   const main = fetchMain(env, cwd)
-  if ('reason' in main) return { code: 1, reason: main.reason }
-  const missing = recoverHistory(env, cwd, main.remote, main.base)
-  if (missing) return { code: 1, reason: missing }
-  const decision = previewDecision(cwd, main.base, 'HEAD', paths)
-  return { code: decision.required ? 1 : 0, reason: decision.reason }
+  if ('reason' in main) notes.push(main.reason)
+  else {
+    const missing = recoverHistory(env, cwd, main.remote, main.base)
+    if (missing) notes.push(missing)
+    else {
+      const preview = previewDecision(cwd, main.base, 'HEAD')
+      if (!preview.required)
+        return {
+          code: 0,
+          reason: `no preview check reads this branch (${preview.reason})`,
+        }
+      notes.push(`preview checks run (${preview.reason})`)
+    }
+  }
+  const previous = env.VERCEL_GIT_PREVIOUS_SHA
+  if (!previous || !/^[a-f0-9]{40}$/.test(previous))
+    return {
+      code: 1,
+      reason: `no earlier ${project} deployment of this branch; ${notes.join('; ')}`,
+    }
+  const unavailable = ensureCommit(env, cwd, previous)
+  if (unavailable) return { code: 1, reason: unavailable }
+  const diff = inputsChanged(cwd, previous, 'HEAD', paths)
+  if ('reason' in diff) return { code: 1, reason: diff.reason }
+  if (diff.changed.length)
+    return { code: 1, reason: `${describeChanged(diff.changed)} since ${previous}` }
+  return {
+    code: 0,
+    reason: `no ${project} input changed since ${previous}, the branch's last ${project} deployment`,
+  }
 }
 
 /** @param {NodeJS.ProcessEnv} env @param {string} [cwd] @param {string} [project] */
@@ -165,18 +236,9 @@ if (
         : `Ignored build step: ${project} build required (${reason}).`
     )
   } else {
-    const base = 'refs/remotes/origin/main'
-    const preview = previewDecision(repoRoot, base)
-    const web = previewDecision(repoRoot, base, 'HEAD', projectBuildPaths.web)
-    const api = previewDecision(repoRoot, base, 'HEAD', projectBuildPaths.api)
-    if (process.env.GITHUB_OUTPUT) {
-      fs.appendFileSync(
-        process.env.GITHUB_OUTPUT,
-        `required=${preview.required}\nweb_required=${web.required}\napi_required=${api.required}\n`
-      )
-    }
+    const preview = previewDecision(repoRoot, 'refs/remotes/origin/main')
+    if (process.env.GITHUB_OUTPUT)
+      fs.appendFileSync(process.env.GITHUB_OUTPUT, `required=${preview.required}\n`)
     console.log(`Preview checks required: ${preview.required} (${preview.reason})`)
-    console.log(`Web build required: ${web.required} (${web.reason})`)
-    console.log(`API build required: ${api.required} (${api.reason})`)
   }
 }

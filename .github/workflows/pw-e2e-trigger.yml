@@ -67,6 +67,8 @@ jobs:
       deployment_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url || needs.preview-ready.outputs.web_url }}
       custom_api_base_url: ${{ inputs.custom_api_base_url || needs.preview-ready.outputs.api_url }}
+      # A custom web URL serves whatever it serves; only a resolved preview has a known commit.
+      expected_web_sha: ${{ inputs.custom_base_url == '' && needs.preview-ready.outputs.web_sha || '' }}
     secrets: inherit
 
   run-prod-tests:

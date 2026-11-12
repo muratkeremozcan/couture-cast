@@ -9,6 +9,7 @@ Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator comman
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
+Updated: 2026-11-12 (ignored builds): each Vercel project skips a preview build its inputs do not need, and the preview wait tests the deployment standing in for it.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -153,6 +154,27 @@ CI starts local Supabase through
 [its composite action](../../.github/actions/start-local-supabase/action.yml), which pulls images from
 `ghcr.io` with the job token (the CLI default, `public.ecr.aws`, rate-limits anonymous data per
 runner IP) and skips containers no test uses.
+
+**Ignored preview builds.** Each project's `ignoreCommand`
+([`vercel-preview-inputs.mjs --ignore`](../../scripts/vercel-preview-inputs.mjs)) skips a preview build
+when nothing needs it: no preview check reads what the branch changed against main (mobile, docs and
+`_bmad-output` only), or the branch's last ready deployment of that project
+(`VERCEL_GIT_PREVIOUS_SHA`) was built from the same inputs. Each project's inputs are the repository
+less the other app, tests, workflows and load scripts, so shared packages, the lockfile, prisma,
+scripts and `vercel.json` rebuild both. A branch's first deployment that preview checks read always
+builds. Vercel's clone has no git remote and ten commits of history (probe, 2026-11-12), so main
+and the earlier commit come from the public repository; any failure to compare keeps the build,
+and every decision logs its reason in the build log.
+
+The preview wait then asks [the target resolver](../../scripts/vercel-preview-target.mjs) which
+commit each project must serve. Vercel reports a skipped build on the commit as status `success`
+with the description `Canceled by Ignored Build Step` (the deployment itself only reads
+`CANCELED`). For that status alone the branch's latest ready deployment of the project stands in,
+after the resolver confirms its inputs match the commit under test; the waits, the resolved URLs
+and the web health test (`EXPECTED_WEB_SHA`) follow that deployment. A failed, errored or
+rate-limited build (status `failure`, for example `Deployment rate limited`) fails the wait. Whether
+an ignored build counts toward the Hobby limit of 100 deployments a day is not measured; the
+ignored deployment is still listed.
 
 The SHA wait is implemented by
 [the Vercel waiter](../../.github/workflows/vercel-wait-for-deployment.yml). It retries for up to the
