@@ -2,18 +2,22 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 //
 // Compares two generated native trees (ios/ and android/ from `expo prebuild`) under a rule
-// fixed before the comparison runs (story 6.15 D4, CX-14):
-// - `project.pbxproj` is compared after normalizing only its 24-character object IDs, which
-//   prebuild generates at random on every run, and sorting its lines, since Xcode orders
-//   sections by those IDs;
+// fixed before the comparison runs (story 6.15 D4, CX-14, R2-02):
+// - `project.pbxproj` is parsed and compared by structure. Prebuild draws its 24-character object
+//   IDs at random on every run, so each object is labelled by its own fields with every reference
+//   replaced by the label of the object it points to, refined until stable. Two projects match
+//   when they hold the same multiset of labels and the same root label: renamed IDs match, while
+//   a retargeted reference or a reordered array (build phases, configurations) does not;
 // - JSON property files may differ only by the exact deletions the caller allows;
 // - every other file must be byte-identical, and both trees must hold the same files;
 // - the effective settings the caller names must hold in the second tree.
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
+import { createRequire } from 'node:module'
 import path from 'node:path'
 
+const xcode = createRequire(import.meta.url)('xcode')
 const PBXPROJ = /(^|\/)project\.pbxproj$/
-const OBJECT_ID = /\b[0-9A-F]{24}\b/g
 
 function listFiles(root) {
   const files = []
@@ -28,8 +32,73 @@ function listFiles(root) {
   return files.sort()
 }
 
-function normalizedPbxproj(text) {
-  return text.replace(OBJECT_ID, 'ID').split('\n').sort().join('\n')
+function parsePbxproj(file) {
+  const project = xcode.project(file)
+  project.parseSync()
+  const objects = new Map()
+  for (const section of Object.values(project.hash.project.objects))
+    for (const [id, object] of Object.entries(section))
+      if (!id.endsWith('_comment')) objects.set(id, object)
+  return { objects, root: project.hash.project.rootObject }
+}
+
+const digest = (text) => createHash('sha256').update(text).digest('hex').slice(0, 16)
+
+/** Labels every object by its content and, through references, by the objects it reaches. */
+function structuralLabels({ objects, root }) {
+  const encode = (value, label) => {
+    if (typeof value === 'string') return objects.has(value) ? `@${label(value)}` : value
+    if (Array.isArray(value)) return value.map((item) => encode(item, label))
+    // Array entries parse as { value, comment }; the comment is a display name.
+    if (
+      value &&
+      typeof value === 'object' &&
+      'value' in value &&
+      Object.keys(value).length <= 2
+    )
+      return encode(value.value, label)
+    if (value && typeof value === 'object')
+      return Object.fromEntries(
+        Object.keys(value)
+          .filter((key) => !key.endsWith('_comment'))
+          .sort()
+          .map((key) => [key, encode(value[key], label)])
+      )
+    return value
+  }
+  let labels = new Map([...objects.keys()].map((id) => [id, 'object']))
+  let distinct = 1
+  for (let round = 0; round <= objects.size; round += 1) {
+    const next = new Map(
+      [...objects].map(([id, object]) => [
+        id,
+        digest(JSON.stringify(encode(object, (target) => labels.get(target)))),
+      ])
+    )
+    const count = new Set(next.values()).size
+    labels = next
+    if (round > 0 && count === distinct) break
+    distinct = count
+  }
+  return {
+    multiset: [...labels.values()].sort(),
+    root: root === undefined ? null : (labels.get(root) ?? encode(root, () => null)),
+  }
+}
+
+function samePbxproj(beforeFile, afterFile) {
+  let before
+  let after
+  try {
+    before = structuralLabels(parsePbxproj(beforeFile))
+    after = structuralLabels(parsePbxproj(afterFile))
+  } catch {
+    return false
+  }
+  return (
+    before.root === after.root &&
+    JSON.stringify(before.multiset) === JSON.stringify(after.multiset)
+  )
 }
 
 function jsonDifference(file, before, after, allowed) {
@@ -60,12 +129,12 @@ function readProperties(text) {
 }
 
 /** One file present in both trees: 'identical', 'normalized', or a list of problems. */
-function compareFile(file, before, after, allowed) {
+function compareFile(file, roots, allowed) {
+  const before = fs.readFileSync(path.join(roots.before, file))
+  const after = fs.readFileSync(path.join(roots.after, file))
   if (before.equals(after)) return 'identical'
   if (PBXPROJ.test(file)) {
-    const same =
-      normalizedPbxproj(before.toString('utf8')) ===
-      normalizedPbxproj(after.toString('utf8'))
+    const same = samePbxproj(path.join(roots.before, file), path.join(roots.after, file))
     return same ? 'normalized' : [`${file}: differs beyond object IDs`]
   }
   if (file.endsWith('.json') && allowed.some((entry) => entry.file === file))
@@ -116,12 +185,7 @@ export function comparePrebuilds(beforeRoot, afterRoot, rule = {}) {
   ]
   const counts = { identical: 0, normalized: 0 }
   for (const file of beforeFiles.filter((name) => afterSet.has(name))) {
-    const outcome = compareFile(
-      file,
-      fs.readFileSync(path.join(beforeRoot, file)),
-      fs.readFileSync(path.join(afterRoot, file)),
-      allowed
-    )
+    const outcome = compareFile(file, { before: beforeRoot, after: afterRoot }, allowed)
     if (typeof outcome === 'string') counts[outcome] += 1
     else problems.push(...outcome)
   }

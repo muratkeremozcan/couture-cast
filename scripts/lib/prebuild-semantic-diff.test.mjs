@@ -11,21 +11,90 @@ import { describe, test } from 'node:test'
 
 import { APP_JSON_KEY_REMOVAL_RULE, comparePrebuilds } from './prebuild-semantic-diff.mjs'
 
-const PBX = (first, second) =>
-  [
+/**
+ * A minimal Xcode project: one target with two shell phases and a configuration list pointing at
+ * one of two Release configurations. `ids` stands in for the IDs prebuild draws at random.
+ */
+function PBX({
+  ids = 'ABCDEFGH',
+  phases = ['generate', 'consume'],
+  release = 'original',
+} = {}) {
+  const id = (key) => ids['ABCDEFGH'.indexOf(key)].repeat(24)
+  const phase = { generate: id('B'), consume: id('C') }
+  const configuration = { original: id('E'), different: id('F') }
+  const lines = [
     '// !$*UTF8*$!',
-    `\t\t${first} /* InfoPlist.strings in Resources */ = {isa = PBXBuildFile; };`,
-    `\t\t${second} /* main.m in Sources */ = {isa = PBXBuildFile; };`,
-  ].join('\n')
+    '{',
+    'archiveVersion = 1;',
+    'classes = {',
+    '};',
+    'objectVersion = 54;',
+    'objects = {',
+    '/* Begin PBXNativeTarget section */',
+    `${id('A')} /* App */ = {`,
+    'isa = PBXNativeTarget;',
+    `buildConfigurationList = ${id('D')};`,
+    'buildPhases = (',
+    ...phases.map((name) => `${phase[name]} /* ${name} */,`),
+    ');',
+    'name = App;',
+    '};',
+    '/* End PBXNativeTarget section */',
+    '/* Begin PBXProject section */',
+    `${id('G')} /* Project object */ = {`,
+    'isa = PBXProject;',
+    'targets = (',
+    `${id('A')} /* App */,`,
+    ');',
+    '};',
+    '/* End PBXProject section */',
+    '/* Begin PBXShellScriptBuildPhase section */',
+    `${id('B')} /* generate */ = {`,
+    'isa = PBXShellScriptBuildPhase;',
+    'shellScript = "generate";',
+    '};',
+    `${id('C')} /* consume */ = {`,
+    'isa = PBXShellScriptBuildPhase;',
+    'shellScript = "consume";',
+    '};',
+    '/* End PBXShellScriptBuildPhase section */',
+    '/* Begin XCBuildConfiguration section */',
+    `${id('E')} /* Release */ = {`,
+    'isa = XCBuildConfiguration;',
+    'buildSettings = {',
+    'DEVELOPMENT_TEAM = ORIGINAL;',
+    '};',
+    'name = Release;',
+    '};',
+    `${id('F')} /* Release */ = {`,
+    'isa = XCBuildConfiguration;',
+    'buildSettings = {',
+    'DEVELOPMENT_TEAM = DIFFERENT;',
+    '};',
+    'name = Release;',
+    '};',
+    '/* End XCBuildConfiguration section */',
+    '/* Begin XCConfigurationList section */',
+    `${id('D')} /* Build configuration list */ = {`,
+    'isa = XCConfigurationList;',
+    'buildConfigurations = (',
+    `${configuration[release]} /* Release */,`,
+    ');',
+    '};',
+    '/* End XCConfigurationList section */',
+    '};',
+    `rootObject = ${id('G')} /* Project object */;`,
+    '}',
+  ]
+  return `${lines.join('\n')}\n`
+}
 
 function tree(t, overrides = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-prebuild-diff-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const files = {
-    'ios/CoutureCast.xcodeproj/project.pbxproj': PBX(
-      '9A8006C674484839983129CA',
-      '6229D1F7D7814DE6BAC17DB3'
-    ),
+    'ios/CoutureCast.xcodeproj/project.pbxproj': PBX(),
     'ios/Podfile.properties.json': JSON.stringify(
       { 'expo.jsEngine': 'hermes', newArchEnabled: 'true' },
       null,
@@ -47,10 +116,7 @@ function tree(t, overrides = {}) {
 }
 
 const keyRemoved = {
-  'ios/CoutureCast.xcodeproj/project.pbxproj': PBX(
-    'A4B18D1996E64596AB4CBE40',
-    'A727A1E82E77452B84820D58'
-  ),
+  'ios/CoutureCast.xcodeproj/project.pbxproj': PBX({ ids: 'PQRSTUVW' }),
   'ios/Podfile.properties.json': JSON.stringify({ 'expo.jsEngine': 'hermes' }, null, 2),
 }
 
@@ -100,13 +166,50 @@ describe('comparePrebuilds with the app.json key removal rule', () => {
   })
 
   test('rejects a pbxproj change beyond object IDs', (t) => {
+    const changed = PBX({ ids: 'PQRSTUVW' }).replace(
+      'DEVELOPMENT_TEAM = ORIGINAL;',
+      'DEVELOPMENT_TEAM = ORIGINAL;\nIPHONEOS_DEPLOYMENT_TARGET = 16.4;'
+    )
+    const result = comparePrebuilds(
+      tree(t),
+      tree(t, { ...keyRemoved, 'ios/CoutureCast.xcodeproj/project.pbxproj': changed }),
+      APP_JSON_KEY_REMOVAL_RULE
+    )
+    assert.deepEqual(result.problems, [
+      'ios/CoutureCast.xcodeproj/project.pbxproj: differs beyond object IDs',
+    ])
+  })
+
+  // R2-02 mutants: each keeps every line's content and changes only an order or the object a
+  // reference points to.
+  for (const [name, options] of [
+    ['reversed build phases', { phases: ['consume', 'generate'] }],
+    ['a configuration list retargeted to another Release', { release: 'different' }],
+  ]) {
+    test(`rejects ${name}`, (t) => {
+      const result = comparePrebuilds(
+        tree(t),
+        tree(t, {
+          ...keyRemoved,
+          'ios/CoutureCast.xcodeproj/project.pbxproj': PBX({
+            ids: 'PQRSTUVW',
+            ...options,
+          }),
+        }),
+        APP_JSON_KEY_REMOVAL_RULE
+      )
+      assert.deepEqual(result.problems, [
+        'ios/CoutureCast.xcodeproj/project.pbxproj: differs beyond object IDs',
+      ])
+    })
+  }
+
+  test('rejects a project that does not parse', (t) => {
     const result = comparePrebuilds(
       tree(t),
       tree(t, {
         ...keyRemoved,
-        'ios/CoutureCast.xcodeproj/project.pbxproj':
-          PBX('A4B18D1996E64596AB4CBE40', 'A727A1E82E77452B84820D58') +
-          '\n\t\tIPHONEOS_DEPLOYMENT_TARGET = 16.4;',
+        'ios/CoutureCast.xcodeproj/project.pbxproj': '{ objects = ',
       }),
       APP_JSON_KEY_REMOVAL_RULE
     )
