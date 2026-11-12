@@ -11,6 +11,14 @@ import { fileURLToPath } from 'node:url'
 export const STALE_AFTER_MS = 48 * 60 * 60 * 1000
 
 /**
+ * Keys a job hands to later jobs, which restore them with fail-on-cache-miss: the native
+ * development clients of scripts/ci/native-build-cache.mjs. ios-build can find one a
+ * prune has just listed as idle and skip its build, so deleting it fails both downstream
+ * restores. These stay; GitHub's own 7-day eviction removes them once nothing reads them.
+ */
+export const PROTECTED_KEY_PREFIXES = ['cc68-native-']
+
+/**
  * The caches to delete, each with its reason: every cache of a pull request that is no longer
  * open, and every cache nobody has read for STALE_AFTER_MS. A key a job still reads stays.
  * @param {{ id: number, ref: string, key: string, size_in_bytes: number, last_accessed_at: string }[]} caches
@@ -20,6 +28,7 @@ export const STALE_AFTER_MS = 48 * 60 * 60 * 1000
 export function cachesToPrune(caches, openPullRequests, now) {
   const prune = []
   for (const cache of caches) {
+    if (PROTECTED_KEY_PREFIXES.some((prefix) => cache.key.startsWith(prefix))) continue
     const pull = /^refs\/pull\/(\d+)\/merge$/.exec(cache.ref)
     if (pull && !openPullRequests.has(Number(pull[1]))) {
       prune.push({ ...cache, reason: `pull request #${pull[1]} is closed` })
