@@ -69,6 +69,9 @@ jobs:
       # Adding the PREVIEW-REBUILD label builds fresh deployments even when ready ones match.
       # Later pushes reuse as usual; remove and add the label again to force another build.
       force_build: ${{ github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD' }}
+      # The lane plan already chose the preview lane (the diff, or the ALL-LANES label), so the
+      # reusable workflow's own scope check keeps that choice; deployments are still reused.
+      require_previews: ${{ fromJSON(needs.lanes.outputs.plan)['preview'] }}
     secrets: inherit
 
   pw-e2e:
