@@ -207,6 +207,10 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
     expect(viewed?.properties).toMatchObject({
       locale: 'en-US',
       $current_url: 'https://couturecast.app/:unknown',
+      // PostHog adds no location, keeps no IP and builds no person for any event.
+      $geoip_disable: true,
+      $ip: null,
+      $process_person_profile: false,
     })
     expect(viewed?.properties).not.toHaveProperty('registered_super_property')
   })

@@ -111,6 +111,7 @@ describe('mobile PostHog provider configuration', () => {
       disableRemoteConfig: true,
       preloadFeatureFlags: false,
       sendFeatureFlagEvent: false,
+      disableGeoip: true,
       personProfiles: 'identified_only',
       errorTracking: {
         autocapture: {
@@ -140,7 +141,15 @@ describe('mobile PostHog provider configuration', () => {
       $set_once: { birthdate: '2011-04-01' } as HookEvent['$set'],
     }
     const sent = hooks.reduce<HookEvent | null>((event, hook) => hook(event), viewed)
-    expect(sent).toEqual({ event: 'tab_one_viewed', properties: { locale: 'en-US' } })
+    expect(sent).toEqual({
+      event: 'tab_one_viewed',
+      properties: {
+        locale: 'en-US',
+        $geoip_disable: true,
+        $ip: null,
+        $process_person_profile: false,
+      },
+    })
   })
 
   /** The legacy alias must stay the same instance while the facade rolls out. */

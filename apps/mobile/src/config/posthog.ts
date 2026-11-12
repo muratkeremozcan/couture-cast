@@ -91,6 +91,9 @@ export const mobilePostHogPrivacyOptions = {
   disableRemoteConfig: true,
   preloadFeatureFlags: false,
   sendFeatureFlagEvent: false,
+  // No GeoIP lookup on any request the SDK makes; the privacy filter also sets
+  // $geoip_disable on every event.
+  disableGeoip: true,
   errorTracking: {
     autocapture: { uncaughtExceptions: true, unhandledRejections: true, console: false },
   },

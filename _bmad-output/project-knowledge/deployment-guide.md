@@ -320,6 +320,10 @@ boundary where data leaves the device is a closed allowlist:
   (the route's `maxDuration` of 10 seconds is the platform backstop), and an event body over
   1 MB answers 413.
 - Person profiles are created for identified users only, and the clients never identify.
+- Every event either client sends carries `$geoip_disable: true`, `$ip: null` and
+  `$process_person_profile: false`, set by the privacy filter after its copy, and the mobile
+  SDK runs with `disableGeoip: true`. Mobile requests reach PostHog directly from the
+  device, so these switches are what keeps PostHog from storing the IP or adding a location.
 - `webAnalyticsPrivacyFilter` and `mobileAnalyticsPrivacyFilter` in
   [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts) run first in the
   `before_send` chains:

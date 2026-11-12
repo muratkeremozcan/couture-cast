@@ -167,8 +167,9 @@ describe('U-ANALYTICS-PRIVACY-WEB-TRANSPORT: what PostHog receives', () => {
           throw new Error('autocaptured')
         }, 10)
       })
+      // The same event paths the ingest proxy forwards, /batch included.
       const isEvent = ({ method, url }: Received) =>
-        method === 'POST' && /^\/(?:e|i\/v0\/e)\/?(?:\?|$)/.test(url)
+        method === 'POST' && /^\/(?:e|i\/v0\/e|batch)\/?(?:\?|$)/.test(url)
       await waitFor(() => {
         const events = received
           .filter(isEvent)
@@ -192,6 +193,9 @@ describe('U-ANALYTICS-PRIVACY-WEB-TRANSPORT: what PostHog receives', () => {
         (request) => isEvent(request) && request.body.includes('$pageview')
       )
       expect(pageview?.body).toContain('/guardian/accept')
+      // PostHog is told to add no location and keep no IP for the event.
+      expect(pageview?.body).toMatch(/"\$geoip_disable":\s*true/)
+      expect(pageview?.body).toMatch(/"\$ip":\s*null/)
       // The exception script came through the same proxy, from the same receiver.
       expect(
         received.some(({ url }) => url.startsWith('/static/exception-autocapture.js'))

@@ -3,8 +3,8 @@ import {
   EXCEPTION_MESSAGE_PLACEHOLDER,
   analyticsOriginUrl,
   analyticsRouteUrl,
-  mobileAnalyticsPrivacyFilter,
-  webAnalyticsPrivacyFilter,
+  mobileAnalyticsPrivacyFilter as mobileFilter,
+  webAnalyticsPrivacyFilter as webFilter,
 } from '../src'
 
 type Event = {
@@ -32,7 +32,6 @@ const sdk = {
   $os: 'Mac OS X',
   $device_type: 'Desktop',
   $screen_width: 1440,
-  $process_person_profile: false,
 }
 // Everything posthog-js or a careless caller could add that must never leave.
 const hostile = {
@@ -59,6 +58,26 @@ const leaks = [
   'guardian-secret',
   'hidden',
 ]
+// Set on every event the filter sends, whatever the caller passed.
+const privacySwitches = {
+  $geoip_disable: true,
+  $ip: null,
+  $process_person_profile: false,
+}
+// The filters as the tests below use them: each sent event must carry the privacy
+// switches, which are then left out so the expectations show only what each case varies.
+const withoutSwitches =
+  (filter: typeof webFilter) =>
+  <T extends object>(event: T | null): T | null => {
+    const sent = filter(event) as (T & { properties?: Record<string, unknown> }) | null
+    if (!sent) return sent
+    expect(sent.properties).toMatchObject(privacySwitches)
+    const properties = { ...sent.properties }
+    for (const key of Object.keys(privacySwitches)) delete properties[key]
+    return { ...sent, properties }
+  }
+const webAnalyticsPrivacyFilter = withoutSwitches(webFilter)
+const mobileAnalyticsPrivacyFilter = withoutSwitches(mobileFilter)
 const expectNoLeak = (value: unknown) => {
   const serialized = JSON.stringify(value)
   for (const leak of leaks) expect(serialized).not.toContain(leak)
@@ -97,6 +116,29 @@ describe('analytics privacy filter: events and properties', () => {
       },
     })
     expectNoLeak(sent)
+  })
+
+  it('turns off GeoIP, IP and person processing on every event of both clients', () => {
+    const cases = [
+      [webFilter, '$pageview'],
+      [webFilter, '$exception'],
+      [webFilter, 'ritual_created'],
+      [mobileFilter, '$screen'],
+      [mobileFilter, '$exception'],
+      [mobileFilter, 'alert_received'],
+    ] as const
+    for (const [filter, event] of cases) {
+      // A caller or SDK that asks for location or a person profile is overruled, and
+      // an event that says nothing still opts out.
+      for (const properties of [
+        {},
+        { $geoip_disable: false, $ip: '203.0.113.7', $process_person_profile: true },
+      ]) {
+        const sent = filter<Event>({ event, properties })
+        expect(sent?.properties).toMatchObject(privacySwitches)
+        expect(JSON.stringify(sent)).not.toContain('203.0.113.7')
+      }
+    }
   })
 
   it('drops strings outside their enum and values of the wrong type', () => {

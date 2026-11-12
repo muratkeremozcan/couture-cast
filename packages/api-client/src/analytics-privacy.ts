@@ -37,6 +37,9 @@ import {
  * - Exceptions keep their type and in-app frames as file basename, line and column.
  *   Messages are replaced by EXCEPTION_MESSAGE_PLACEHOLDER.
  * - `$set` and `$set_once` person updates never leave: the clients never identify.
+ * - Every sent event carries `$geoip_disable: true`, `$ip: null` and
+ *   `$process_person_profile: false`, whatever the caller passed, so PostHog adds no
+ *   location, keeps no IP and builds no person profile.
  */
 
 type Rule = (value: unknown, platform: AnalyticsPlatform) => unknown
@@ -489,6 +492,13 @@ function snapshotOf(event: object): Record<string, unknown> | null {
   return snapshot
 }
 
+/** Set on every event the filter sends; see createAnalyticsPrivacyFilter. */
+const PRIVACY_SWITCHES = {
+  $geoip_disable: true,
+  $ip: null,
+  $process_person_profile: false,
+} as const
+
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const ISO_TIMESTAMP =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$/
@@ -552,6 +562,9 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
         const value = rule(properties[key], platform)
         if (value !== DROP) sanitized[key] = value
       }
+      // Set after the copy so no caller or SDK value can turn them off: PostHog adds no
+      // GeoIP location, stores no IP and builds no person profile for any event.
+      Object.assign(sanitized, PRIVACY_SWITCHES)
       return envelope(source, name, sanitized) as T | null
     } catch {
       return null

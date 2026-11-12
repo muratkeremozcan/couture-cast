@@ -301,7 +301,12 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
     expect(sent).toEqual({
       uuid: '0199f5c2-3d1e-7a4b-9c8d-1e2f3a4b5c62',
       event: '$pageview',
-      properties: { $current_url: 'https://couturecast.app/:unknown' },
+      properties: {
+        $current_url: 'https://couturecast.app/:unknown',
+        $geoip_disable: true,
+        $ip: null,
+        $process_person_profile: false,
+      },
     })
   })
 })
