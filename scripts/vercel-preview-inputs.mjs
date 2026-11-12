@@ -107,7 +107,12 @@ if (
   process.argv[1] &&
   fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const preview = previewDecision(repoRoot, 'refs/remotes/origin/main')
+  // An explicit manual run or forced rebuild asks for previews whatever the branch changed;
+  // only the automatic decision skips a branch no preview check reads.
+  const preview =
+    process.env.REQUIRE_PREVIEWS === 'true'
+      ? { required: true, reason: 'requested explicitly' }
+      : previewDecision(repoRoot, 'refs/remotes/origin/main')
   if (process.env.GITHUB_OUTPUT)
     fs.appendFileSync(process.env.GITHUB_OUTPUT, `required=${preview.required}\n`)
   console.log(`Preview checks required: ${preview.required} (${preview.reason})`)

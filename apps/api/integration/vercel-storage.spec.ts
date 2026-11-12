@@ -12,7 +12,9 @@ import {
 import {
   BUILD_SETTINGS,
   configIdentity,
+  PREVIEW_SOURCE,
   previewDeployment,
+  run,
   type Deployment,
 } from '../../../scripts/vercel-preview-deploy.mjs'
 
@@ -104,6 +106,18 @@ describe('Vercel preview storage', () => {
 
   it('keeps the preview checks when history is unavailable', () => {
     expect(previewRequired(fixture, 'missing-ref')).toBe(true)
+  })
+
+  it.each([
+    ['true', 'required=true'],
+    ['false', /^required=(true|false)$/],
+  ] as const)('an explicit request (%s) decides the scope', (requested, expected) => {
+    const output = path.join(fixture, 'github-output')
+    execFileSync('node', [path.join(repoRoot, 'scripts/vercel-preview-inputs.mjs')], {
+      env: { ...process.env, GITHUB_OUTPUT: output, REQUIRE_PREVIEWS: requested },
+      stdio: 'pipe',
+    })
+    expect(fs.readFileSync(output, 'utf8').trim()).toMatch(expected)
   })
 
   it('keeps a deletion of runtime code when that code moves under docs', () => {
@@ -233,6 +247,11 @@ describe('Vercel preview storage', () => {
     expect(manual).toContain("deploy_web: ${{ inputs.custom_base_url == '' }}")
     expect(manual).toContain("deploy_api: ${{ inputs.custom_api_base_url == '' }}")
     expect(manual).toContain('force_build: ${{ inputs.force_preview_build }}')
+    expect(manual).toContain('require_previews: true')
+    expect(workflow).toContain(
+      'REQUIRE_PREVIEWS: ${{ inputs.require_previews || inputs.force_build }}'
+    )
+    expect(workflow.match(/PREVIEW_JOB_STARTED_MS=\$\(date \+%s%3N\)/g)).toHaveLength(2)
     expect(manual).toContain(
       'custom_api_base_url: ${{ inputs.custom_api_base_url || needs.preview-ready.outputs.api_url }}'
     )
@@ -340,24 +359,38 @@ describe('Vercel preview deployment', () => {
   const meta = (overrides: Record<string, string> = {}) => ({
     githubCommitRef: 'feature',
     githubCommitSha: older,
+    ccPreviewSource: PREVIEW_SOURCE,
     ccPreviewInputs: 'inputs-1',
     ccPreviewConfig: 'config-1',
     ...overrides,
   })
-  const created50: Deployment = { id: 'dpl_new', url: 'built.example', created: 50 }
+  // Vercel's shapes: list items carry uid, state and created; create and get carry id,
+  // readyState and createdAt.
+  const listed = (
+    uid: string,
+    state: string,
+    created: number,
+    overrides = {}
+  ): Deployment => ({
+    uid,
+    url: `${uid}.example`,
+    state,
+    created,
+    target: null,
+    meta: meta(overrides),
+  })
   function deploy(
-    listed: Deployment[][],
-    states: Deployment[] = [{ readyState: 'READY', url: 'built.example' }],
+    list: Deployment[],
+    states: Deployment[] = [{ id: 'dpl_new', readyState: 'READY', url: 'built.example' }],
     options: {
-      create?: (body: Record<string, unknown>) => Promise<Deployment>
-      attempts?: number
+      create?: () => Promise<Deployment>
       force?: boolean
+      deadlineMs?: number
     } = {}
   ) {
+    let clock = 0
     let polls = 0
-    let lists = 0
-    const created: Record<string, unknown>[] = []
-    const canceled: string[] = []
+    const created: { body: Record<string, unknown>; force: boolean }[] = []
     const polled: string[] = []
     const result = previewDeployment({
       project: 'web',
@@ -369,186 +402,106 @@ describe('Vercel preview deployment', () => {
       repoId: 42,
       projectId: 'prj_web',
       projectName: 'couture-cast-web',
-      list: () => Promise.resolve(listed[Math.min(lists++, listed.length - 1)] ?? []),
-      create: (body) => {
-        created.push(body)
-        return options.create ? options.create(body) : Promise.resolve(created50)
+      deadline: options.deadlineMs ?? 10 * 60_000,
+      now: () => clock,
+      sleep: (ms) => {
+        clock += ms
+        return Promise.resolve()
+      },
+      list: () => Promise.resolve(list),
+      create: (body, force) => {
+        created.push({ body, force })
+        return options.create
+          ? options.create()
+          : Promise.resolve({
+              id: 'dpl_new',
+              url: 'built.example',
+              readyState: 'QUEUED',
+              createdAt: 50,
+            })
       },
       get: (id) => {
         polled.push(id)
         return Promise.resolve(states[Math.min(polls++, states.length - 1)]!)
       },
-      cancel: (id) => {
-        canceled.push(id)
-        return Promise.resolve({})
-      },
-      sleep: () => Promise.resolve(),
-      attempts: options.attempts ?? 5,
     })
-    return { result, created, canceled, polled }
+    return { result, created, polled }
   }
   const createBody = {
     name: 'couture-cast-web',
     project: 'prj_web',
     gitSource: { type: 'github', repoId: 42, ref: 'feature', sha },
-    meta: { ccPreviewInputs: 'inputs-1', ccPreviewConfig: 'config-1' },
+    meta: {
+      ccPreviewSource: PREVIEW_SOURCE,
+      ccPreviewInputs: 'inputs-1',
+      ccPreviewConfig: 'config-1',
+    },
   }
 
-  it('reuses the newest ready deployment built from the same inputs and configuration', async () => {
-    const run = deploy([
-      [
-        {
-          uid: 'dpl_old',
-          url: 'old.example',
-          readyState: 'READY',
-          created: 1,
-          meta: meta(),
-        },
-        {
-          uid: 'dpl_new',
-          url: 'new.example',
-          readyState: 'READY',
-          created: 2,
-          meta: meta(),
-        },
-      ],
-    ])
+  it('reuses the newest ready deployment it created for the same inputs and configuration', async () => {
+    const run = deploy(
+      [listed('dpl_old', 'READY', 1), listed('dpl_newer', 'READY', 2)],
+      [{ id: 'dpl_newer', readyState: 'READY', url: 'dpl_newer.example' }]
+    )
     await expect(run.result).resolves.toEqual({
-      id: 'dpl_new',
-      url: 'https://new.example',
+      id: 'dpl_newer',
+      url: 'https://dpl_newer.example',
       sha: older,
       reused: true,
     })
     expect(run.created).toEqual([])
-    expect(run.canceled).toEqual([])
   })
 
   it('reuses a ready deployment of the commit itself', async () => {
-    const same = meta({ githubCommitSha: sha })
-    await expect(
-      deploy([[{ uid: 'dpl_same', url: 'same.example', state: 'READY', meta: same }]])
-        .result
-    ).resolves.toMatchObject({ id: 'dpl_same', sha, reused: true })
+    const run = deploy(
+      [listed('dpl_same', 'READY', 1, { githubCommitSha: sha })],
+      [{ id: 'dpl_same', readyState: 'READY', url: 'dpl_same.example' }]
+    )
+    await expect(run.result).resolves.toMatchObject({
+      id: 'dpl_same',
+      sha,
+      reused: false,
+    })
+    expect(run.created).toEqual([])
   })
 
   it('adopts a build already running for the same inputs instead of creating another', async () => {
-    const running = {
-      uid: 'dpl_running',
-      url: 'running.example',
-      state: 'BUILDING',
-      meta: meta(),
-    }
     const run = deploy(
-      [[running]],
-      [{ readyState: 'BUILDING' }, { readyState: 'READY', url: 'running.example' }]
+      [listed('dpl_running', 'BUILDING', 3)],
+      [
+        { id: 'dpl_running', readyState: 'BUILDING' },
+        { id: 'dpl_running', readyState: 'READY', url: 'dpl_running.example' },
+      ]
     )
-    await expect(run.result).resolves.toEqual({
-      id: 'dpl_running',
-      url: 'https://running.example',
-      sha: older,
-      reused: true,
-    })
+    await expect(run.result).resolves.toMatchObject({ id: 'dpl_running', sha: older })
     expect(run.created).toEqual([])
     expect(run.polled).toEqual(['dpl_running', 'dpl_running'])
   })
 
-  it('cancels its own superseded builds of other inputs before creating', async () => {
-    const stale = meta({ ccPreviewInputs: 'inputs-0' })
-    const foreign = { githubCommitRef: 'feature', githubCommitSha: older }
-    const run = deploy([
-      [
-        { uid: 'dpl_stale', url: 's.example', state: 'QUEUED', meta: stale },
-        { uid: 'dpl_done', url: 'd.example', state: 'READY', meta: stale },
-        { uid: 'dpl_foreign', url: 'f.example', state: 'BUILDING', meta: foreign },
-      ],
-    ])
-    await expect(run.result).resolves.toMatchObject({ id: 'dpl_new', sha, reused: false })
-    expect(run.canceled).toEqual(['dpl_stale'])
-    expect(run.created).toEqual([createBody])
-  })
-
-  it('keeps the older of two builds that racing runs created for the same inputs', async () => {
-    const same = meta({ githubCommitSha: sha })
-    const twin = {
-      uid: 'dpl_twin',
-      url: 'twin.example',
-      state: 'BUILDING',
-      created: 10,
-      meta: same,
-    }
-    const own = {
-      uid: 'dpl_new',
-      url: 'built.example',
-      state: 'QUEUED',
-      created: 50,
-      meta: same,
-    }
-    const run = deploy([[], [twin, own]], [{ readyState: 'READY', url: 'twin.example' }])
-    await expect(run.result).resolves.toMatchObject({
-      id: 'dpl_twin',
-      url: 'https://twin.example',
-    })
-    expect(run.canceled).toEqual(['dpl_new'])
-    expect(run.polled).toEqual(['dpl_twin'])
-  })
-
-  it('keeps its own build when it is the older of two', async () => {
-    const later = {
-      uid: 'dpl_later',
-      url: 'l.example',
-      state: 'QUEUED',
-      created: 90,
-      meta: meta(),
-    }
-    const run = deploy([[], [later]])
-    await expect(run.result).resolves.toMatchObject({ id: 'dpl_new' })
-    expect(run.canceled).toEqual([])
-  })
-
-  it('builds fresh when forced, canceling its own builds still running', async () => {
-    const run = deploy(
-      [
-        [
-          { uid: 'dpl_ready', url: 'r.example', state: 'READY', meta: meta() },
-          { uid: 'dpl_running', url: 'b.example', state: 'BUILDING', meta: meta() },
-        ],
-      ],
-      undefined,
-      { force: true }
-    )
-    await expect(run.result).resolves.toMatchObject({ id: 'dpl_new', reused: false })
-    expect(run.canceled).toEqual(['dpl_running'])
-    expect(run.created).toEqual([createBody])
-  })
-
   it.each([
+    ['other inputs', listed('dpl_x', 'READY', 1, { ccPreviewInputs: 'inputs-0' })],
+    ['other configuration', listed('dpl_x', 'READY', 1, { ccPreviewConfig: 'config-0' })],
+    ['another branch', listed('dpl_x', 'READY', 1, { githubCommitRef: 'other' })],
     [
-      'other inputs',
-      { readyState: 'READY', meta: meta({ ccPreviewInputs: 'inputs-0' }) },
+      'a production deployment',
+      { ...listed('dpl_x', 'BUILDING', 1), target: 'production' },
     ],
     [
-      'other configuration',
-      { readyState: 'READY', meta: meta({ ccPreviewConfig: 'config-0' }) },
-    ],
-    ['another branch', { readyState: 'READY', meta: meta({ githubCommitRef: 'other' }) }],
-    [
-      'a deployment this script did not create',
+      'a deployment without this script’s marker',
       {
-        readyState: 'READY',
-        meta: { githubCommitRef: 'feature', githubCommitSha: older },
+        ...listed('dpl_x', 'READY', 1),
+        meta: { ...meta(), ccPreviewSource: 'dashboard' },
       },
     ],
-    [
-      'a canceled deployment',
-      { readyState: 'CANCELED', meta: meta({ githubCommitSha: sha }) },
-    ],
-  ])('builds the commit instead of reusing %s', async (_label, candidate) => {
+    ['a canceled deployment', listed('dpl_x', 'CANCELED', 1, { githubCommitSha: sha })],
+    ['a failed deployment', listed('dpl_x', 'ERROR', 1, { githubCommitSha: sha })],
+  ])('builds the commit instead of adopting %s', async (_label, candidate) => {
     const run = deploy(
-      [[{ uid: 'dpl_candidate', url: 'candidate.example', ...candidate }]],
+      [candidate],
       [
-        { readyState: 'QUEUED' },
-        { readyState: 'BUILDING' },
-        { readyState: 'READY', url: 'built.example' },
+        { id: 'dpl_new', readyState: 'QUEUED' },
+        { id: 'dpl_new', readyState: 'BUILDING' },
+        { id: 'dpl_new', readyState: 'READY', url: 'built.example' },
       ]
     )
     await expect(run.result).resolves.toEqual({
@@ -557,13 +510,24 @@ describe('Vercel preview deployment', () => {
       sha,
       reused: false,
     })
-    expect(run.created).toEqual([createBody])
-    expect(run.polled).toHaveLength(3)
+    expect(run.created).toEqual([{ body: createBody, force: false }])
+    expect(run.polled).toEqual(['dpl_new', 'dpl_new', 'dpl_new'])
+  })
+
+  it('builds fresh when forced, adopting nothing', async () => {
+    const run = deploy(
+      [listed('dpl_ready', 'READY', 1), listed('dpl_running', 'BUILDING', 2)],
+      undefined,
+      { force: true }
+    )
+    await expect(run.result).resolves.toMatchObject({ id: 'dpl_new', reused: false })
+    expect(run.created).toEqual([{ body: createBody, force: true }])
   })
 
   it.each(['ERROR', 'CANCELED'])('fails when the build ends %s', async (state) => {
     await expect(
-      deploy([[]], [{ readyState: state, readyStateReason: 'Build failed' }]).result
+      deploy([], [{ id: 'dpl_new', readyState: state, readyStateReason: 'Build failed' }])
+        .result
     ).rejects.toThrow(`web: deployment dpl_new for ${sha} ended ${state}: Build failed`)
   })
 
@@ -572,23 +536,128 @@ describe('Vercel preview deployment', () => {
       'Vercel POST /v13/deployments answered 429: Deployment rate limited'
     )
     await expect(
-      deploy([[]], [], { create: () => Promise.reject(refused) }).result
+      deploy([], [], { create: () => Promise.reject(refused) }).result
     ).rejects.toThrow('answered 429: Deployment rate limited')
   })
 
-  it('fails when the build never finishes', async () => {
-    await expect(
-      deploy([[]], [{ readyState: 'BUILDING' }], { attempts: 3 }).result
-    ).rejects.toThrow(`web: deployment dpl_new for ${sha} is still BUILDING after`)
+  it('names the queue when a build is still waiting for the single Hobby build slot', async () => {
+    const run = deploy([], [{ id: 'dpl_new', readyState: 'QUEUED' }], {
+      deadlineMs: 60_000,
+    })
+    await expect(run.result).rejects.toThrow(
+      `web: deployment dpl_new for ${sha} is still QUEUED as this job's 20 minutes run out. Hobby builds one deployment at a time, so it waits behind another build`
+    )
+    // Polls stop with one interval of the deadline left: at 0, 15, 30 and 45 s.
+    expect(run.polled).toHaveLength(4)
   })
 
-  it('gives each project its own 20 minute job with room beyond its polling', () => {
-    const workflow = fs.readFileSync(
-      path.join(repoRoot, '.github/workflows/rwf-vercel-preview-ready.yml'),
-      'utf8'
+  it('stops a build still running at the deadline', async () => {
+    await expect(
+      deploy([], [{ id: 'dpl_new', readyState: 'BUILDING' }], { deadlineMs: 60_000 })
+        .result
+    ).rejects.toThrow(
+      `web: deployment dpl_new for ${sha} is still BUILDING as this job's 20 minutes run out.`
     )
-    expect(workflow.match(/timeout-minutes: 20/g)).toHaveLength(2)
-    expect(workflow).toContain('  deploy-web:')
-    expect(workflow).toContain('  deploy-api:')
+  })
+})
+
+describe('Vercel preview deploy step', () => {
+  type Call = { method: string; path: string; body?: unknown }
+  function vercel(deployments: Deployment[]) {
+    const calls: Call[] = []
+    const fetchImpl = (url: string | URL | Request, init?: RequestInit) => {
+      const target = new URL(url instanceof Request ? url.url : url.toString())
+      const call: Call = {
+        method: init?.method ?? 'GET',
+        path: `${target.pathname}${target.search}`,
+        ...(typeof init?.body === 'string'
+          ? { body: JSON.parse(init.body) as unknown }
+          : {}),
+      }
+      calls.push(call)
+      const reply = (value: unknown) =>
+        Promise.resolve(new Response(JSON.stringify(value), { status: 200 }))
+      if (target.pathname === '/v2/teams/team-slug') return reply({ id: 'team_1' })
+      if (target.pathname === '/v9/projects/couture-cast-web')
+        return reply({ id: 'prj_web', name: 'couture-cast-web', link: { repoId: 42 } })
+      if (target.pathname === '/v9/projects/prj_web/env') return reply({ envs: [] })
+      if (target.pathname === '/v6/deployments') return reply({ deployments })
+      if (target.pathname === '/v13/deployments' && call.method === 'POST')
+        return reply({
+          id: 'dpl_new',
+          url: 'built.example',
+          readyState: 'QUEUED',
+          createdAt: 5,
+        })
+      if (target.pathname.startsWith('/v13/deployments/'))
+        return reply({
+          id: target.pathname.split('/').at(-1),
+          url: 'built.example',
+          readyState: 'READY',
+        })
+      return Promise.resolve(new Response('{}', { status: 404 }))
+    }
+    return { calls, fetchImpl: fetchImpl as typeof fetch }
+  }
+  const env = (force: boolean) => ({
+    VERCEL_TOKEN: 'token',
+    GIT_REF: 'preview',
+    EXPECTED_SHA: 'c'.repeat(40),
+    FORCE_BUILD: String(force),
+    VERCEL_WEB_PROJECT_SLUG: 'couture-cast-web',
+    VERCEL_TEAM_SLUG: 'team-slug',
+  })
+
+  it.each([
+    [false, '/v13/deployments?teamId=team_1'],
+    [true, '/v13/deployments?forceNew=1&teamId=team_1'],
+  ])(
+    'creates through the real request (force %s) and never cancels',
+    async (force, createPath) => {
+      const api = vercel([])
+      await expect(
+        run('web', env(force), {
+          fetchImpl: api.fetchImpl,
+          cwd: fixture,
+          sleep: () => Promise.resolve(),
+        })
+      ).resolves.toMatchObject({
+        id: 'dpl_new',
+        url: 'https://built.example',
+        reused: false,
+      })
+      const writes = api.calls.filter((call) => call.method !== 'GET')
+      expect(writes).toHaveLength(1)
+      expect(writes[0]).toMatchObject({
+        method: 'POST',
+        path: createPath,
+        body: {
+          name: 'couture-cast-web',
+          project: 'prj_web',
+          gitSource: { type: 'github', repoId: 42, ref: 'preview', sha: 'c'.repeat(40) },
+          meta: {
+            ccPreviewSource: PREVIEW_SOURCE,
+            ccPreviewInputs: inputsHash(fixture, 'web'),
+          },
+        },
+      })
+      // A forced build skips the lookup that could adopt an earlier one.
+      expect(api.calls.some((call) => call.path.startsWith('/v6/deployments'))).toBe(
+        !force
+      )
+    }
+  )
+
+  it('stops before the job runs out, counting setup from the job start', async () => {
+    const api = vercel([])
+    const started = 1_000_000
+    await expect(
+      run(
+        'web',
+        { ...env(false), PREVIEW_JOB_STARTED_MS: String(started) },
+        { fetchImpl: api.fetchImpl, cwd: fixture, now: () => started + 20 * 60_000 }
+      )
+    ).rejects.toThrow("Vercel GET /v2/teams/team-slug: the job's deadline passed")
+    expect(api.calls).toEqual([])
   })
 })

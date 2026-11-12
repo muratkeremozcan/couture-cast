@@ -166,30 +166,30 @@ remote and ten commits of history (probe, 2026-11-12), and its canceled builds s
 When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
 branch's changes against main, one job per project (`deploy-web`, `deploy-api`, 20 minutes each,
 since Hobby builds one deployment at a time) runs
-[the deploy script](../../scripts/vercel-preview-deploy.mjs). Among the deployments of the branch
-it created itself, it:
+[the deploy script](../../scripts/vercel-preview-deploy.mjs). It adopts a preview deployment it
+created itself (marked `ccPreviewSource`, preview target only) on this branch with the same build
+inputs (a hash of every tracked file the project builds from: the repository less the other app,
+tests, workflows and load scripts) and the same configuration (the ids and update times of the
+preview variables that apply to the branch, and the build settings: framework, install, build and
+output commands, root directory, files outside it, system variable exposure, Node version, Git LFS,
+region and resources), the newest ready one first, else one still building. Otherwise it creates
+one from the exact commit through the Vercel API. It never cancels a deployment: another run may
+be using it, and two runs racing to create cost one duplicate build at most.
 
-- cancels any still building other inputs or configuration, since a canceled Actions run leaves
-  its Vercel build running;
-- reuses the newest ready one with the same build inputs (a hash of every tracked file the project
-  builds from: the repository less the other app, tests, workflows and load scripts) and the same
-  configuration (the ids and update times of the preview variables that apply to the branch, and
-  the build settings: framework, install, build and output commands, root directory, files
-  outside it, system variable exposure, Node version, Git LFS, region and resources);
-- otherwise adopts one still building the same inputs, or creates one from the exact commit
-  through the Vercel API; when two runs create at once, the older build is kept and the newer
-  canceled.
+One deadline 45 s inside each job's 20 minutes covers setup, every request (each also bounded at
+30 s) and the 15 s polls. `ERROR`, `CANCELED`, a refused creation (the rate limit answers on
+creation) or the deadline fails the job; a build still `QUEUED` at the deadline says it waits
+behind another build, since Hobby builds one deployment at a time, so rerun once that build
+finishes. The health waits, the e2e URLs and the web health test (`EXPECTED_WEB_SHA`) use that
+deployment's own URL and commit.
 
-It waits for `READY` (72 polls 15 s apart, every request bounded at 30 s); `ERROR`, `CANCELED` or
-a refused creation (the rate limit answers on creation) fails the job. The health waits, the e2e
-URLs and the web health test (`EXPECTED_WEB_SHA`) use that deployment's own URL and commit.
-
-Opening or reopening a PR provides its previews, as does each push to it. A manual run provides
-each preview it names no custom URL for. Changing a preview variable or a build setting changes the
+Opening or reopening a PR provides its previews, as does each push to it. A manual run always
+provides each preview it names no custom URL for, even on a branch no preview check reads. Changing a preview variable or a build setting changes the
 configuration identity, so the next run builds fresh. To rebuild with nothing changed (an empty
 commit keeps the same inputs), add the `PREVIEW-REBUILD` label to the PR, and remove it afterwards,
 since every run builds fresh while it is there, or run Manual E2E Tests with
-`force_preview_build`. Production deployments from `main` are untouched by all of this.
+`force_preview_build`. A forced build sends `forceNew=1`, so Vercel builds instead of returning an
+earlier deployment of the same commit. Production deployments from `main` are untouched by all of this.
 
 `VERCEL_TOKEN` reaches the deploy jobs, which run the PR's own script at its exact commit, as it
 already reached the e2e job's test code. GitHub withholds repository secrets from pull requests

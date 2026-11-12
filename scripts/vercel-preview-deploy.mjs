@@ -7,11 +7,12 @@
  * counts toward the 100 a day, and pushes no preview check needed used them up. CI calls this
  * only when the preview checks need the branch (scripts/vercel-preview-inputs.mjs).
  *
- * A ready deployment of this branch is reused when this script created it for the same build
- * inputs (a hash of every tracked file the project builds from) and the same project
- * configuration (its preview environment variables and build settings); otherwise it creates
- * one from the exact commit and waits for it. Either way it returns that deployment's own URL,
- * id and commit, which the health wait and the e2e run use as they are.
+ * A preview deployment this script created on the branch for the same build inputs (a hash of
+ * every tracked file the project builds from) and the same project configuration (its preview
+ * environment variables and build settings) is adopted, ready or still building; otherwise it
+ * creates one from the exact commit and waits for it, within one deadline for the job. It never
+ * cancels a deployment. Either way it returns that deployment's own URL, id and commit, which the
+ * health wait and the e2e run use as they are.
  */
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -75,10 +76,13 @@ export function configIdentity(project, envs, branch) {
     .digest('hex')
 }
 
+/** Marks the deployments this script creates; only those are ever adopted. */
+export const PREVIEW_SOURCE = 'rwf-vercel-preview-ready'
+
 /**
  * @typedef {{
  *   id?: string, uid?: string, url?: string, readyState?: string, state?: string,
- *   readyStateReason?: string | null, errorMessage?: string | null, created?: number,
+ *   readyStateReason?: string | null, errorMessage?: string | null, target?: string | null,
  *   meta?: Record<string, string>,
  * }} Deployment
  * @typedef {{
@@ -91,12 +95,12 @@ export function configIdentity(project, envs, branch) {
  *   repoId: string | number,
  *   projectId: string,
  *   projectName: string,
+ *   deadline: number,
  *   list: () => Promise<Deployment[]>,
- *   create: (body: Record<string, unknown>) => Promise<Deployment>,
+ *   create: (body: Record<string, unknown>, force: boolean) => Promise<Deployment>,
  *   get: (id: string) => Promise<Deployment>,
- *   cancel: (id: string) => Promise<unknown>,
+ *   now?: () => number,
  *   sleep?: (ms: number) => Promise<void>,
- *   attempts?: number,
  *   intervalMs?: number,
  *   log?: (message: string) => void,
  * }} DeployInput
@@ -107,63 +111,12 @@ const IN_FLIGHT = new Set(['QUEUED', 'INITIALIZING', 'BUILDING'])
 
 const idOf = (deployment) => deployment.uid ?? deployment.id ?? ''
 const stateOf = (deployment) => deployment.readyState ?? deployment.state ?? ''
-const oldestFirst = (a, b) =>
-  (a.created ?? 0) - (b.created ?? 0) || idOf(a).localeCompare(idOf(b))
+const createdOf = (deployment) => deployment.created ?? deployment.createdAt ?? 0
 
-/** Cancels builds on the branch that this run supersedes. */
-async function cancelSuperseded(ours, keep, { project, cancel, log }) {
-  for (const stale of ours.filter((d) => IN_FLIGHT.has(stateOf(d)) && !keep(d))) {
-    log(
-      `${project}: canceling superseded ${idOf(stale)} (${stale.meta?.githubCommitSha})`
-    )
-    await cancel(idOf(stale)).catch((error) =>
-      log(
-        `${project}: could not cancel ${idOf(stale)}: ${error instanceof Error ? error.message : error}`
-      )
-    )
-  }
-}
-
-/** Creates a deployment, then keeps the older of two that runs racing each other created. */
-async function createOnce(input, matches) {
-  const { project, branch, sha, inputs, config, force, repoId, projectId, projectName } =
-    input
-  const { list, create, cancel, log } = input
-  const created = await create({
-    name: projectName,
-    project: projectId,
-    gitSource: { type: 'github', repoId, ref: branch, sha },
-    meta: { ccPreviewInputs: inputs, ccPreviewConfig: config },
-  })
-  if (!idOf(created))
-    throw new Error(`${project}: Vercel created no deployment for ${sha}`)
-  const own = { ...created, meta: { githubCommitSha: sha, ...created.meta } }
-  log(`${project}: created ${idOf(own)} for ${sha}`)
-  if (force) return own
-  const twin = (await list())
-    .filter(
-      (d) =>
-        d.meta?.githubCommitRef === branch &&
-        IN_FLIGHT.has(stateOf(d)) &&
-        matches(d) &&
-        idOf(d) !== idOf(own)
-    )
-    .concat([{ ...own, created: own.created ?? Number.MAX_SAFE_INTEGER }])
-    .sort(oldestFirst)[0]
-  if (!twin || idOf(twin) === idOf(own)) return own
-  log(`${project}: ${idOf(twin)} already builds the same inputs; canceling ${idOf(own)}`)
-  await cancel(idOf(own)).catch(() => undefined)
-  return twin
-}
-
-/** Polls one deployment until it is ready, failing on an error, a cancel or the budget. */
-async function untilReady(
-  target,
-  { project, sha, get, sleep, attempts, intervalMs, log }
-) {
-  const id = idOf(target)
-  const targetSha = /** @type {string} */ (target.meta?.githubCommitSha ?? sha)
-  for (let attempt = 1; ; attempt++) {
+/** Polls one deployment until it is ready, failing on an error, a cancel or the deadline. */
+async function untilReady(id, targetSha, settings) {
+  const { project, sha, get, now, sleep, intervalMs, deadline, log } = settings
+  for (;;) {
     const deployment = await get(id)
     const state = stateOf(deployment)
     if (state === 'READY')
@@ -177,124 +130,157 @@ async function untilReady(
       throw new Error(
         `${project}: deployment ${id} for ${targetSha} ended ${state}: ${deployment.readyStateReason ?? deployment.errorMessage ?? 'no reason given'}`
       )
-    // 72 polls 15 s apart, with setup and request time, keep the job inside its 20 minutes.
-    if (attempt >= attempts)
+    const left = deadline - now()
+    if (left <= intervalMs)
       throw new Error(
-        `${project}: deployment ${id} for ${targetSha} is still ${state} after ${(attempts * intervalMs) / 60_000} minutes`
+        state === 'QUEUED'
+          ? `${project}: deployment ${id} for ${targetSha} is still QUEUED as this job's 20 minutes run out. Hobby builds one deployment at a time, so it waits behind another build; rerun once that build finishes.`
+          : `${project}: deployment ${id} for ${targetSha} is still ${state} as this job's 20 minutes run out.`
       )
-    log(`${project}: ${id} is ${state} (attempt ${attempt}/${attempts})`)
+    log(`${project}: ${id} is ${state}; ${Math.round(left / 1000)} s left`)
     await sleep(intervalMs)
   }
 }
 
 /**
+ * Adopts a deployment this script created for the same inputs and configuration (ready, or still
+ * building), or creates one. It never cancels a deployment: another run may still be using it,
+ * and two runs racing to create cost one duplicate build at most.
  * @param {DeployInput} input
  * @returns {Promise<{ id: string, url: string, sha: string, reused: boolean }>}
  */
 export async function previewDeployment(input) {
   const settings = {
-    force: false,
-    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-    attempts: 72,
-    intervalMs: 15_000,
-    log: () => undefined,
     ...input,
+    force: input.force === true,
+    now: input.now ?? (() => Date.now()),
+    sleep: input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    intervalMs: input.intervalMs ?? 15_000,
+    log: input.log ?? (() => undefined),
   }
-  const { project, branch, inputs, config, force, list, log } = settings
-  // Only deployments this script created on this branch carry the identity it compares.
-  const ours = (await list()).filter(
-    (deployment) =>
-      deployment.meta?.githubCommitRef === branch &&
-      typeof deployment.meta?.ccPreviewInputs === 'string' &&
-      /^[a-f0-9]{40}$/.test(deployment.meta?.githubCommitSha ?? '')
-  )
-  const matches = (deployment) =>
-    deployment.meta?.ccPreviewInputs === inputs &&
-    deployment.meta?.ccPreviewConfig === config
-  // A cancelled Actions run leaves its Vercel build running, and Hobby builds one at a time.
-  await cancelSuperseded(ours, (d) => !force && matches(d), settings)
+  const { project, branch, sha, inputs, config, force, log } = settings
   if (!force) {
-    const ready = ours
-      .filter((d) => stateOf(d) === 'READY' && matches(d))
-      .sort(oldestFirst)
-      .at(-1)
-    if (ready) {
-      log(`${project}: reusing https://${ready.url} (${ready.meta?.githubCommitSha})`)
-      return {
-        id: idOf(ready),
-        url: `https://${ready.url}`,
-        sha: /** @type {string} */ (ready.meta?.githubCommitSha),
-        reused: true,
+    const ours = (await settings.list())
+      .filter(
+        (deployment) =>
+          (deployment.target ?? 'preview') === 'preview' &&
+          deployment.meta?.ccPreviewSource === PREVIEW_SOURCE &&
+          deployment.meta?.githubCommitRef === branch &&
+          deployment.meta?.ccPreviewInputs === inputs &&
+          deployment.meta?.ccPreviewConfig === config &&
+          /^[a-f0-9]{40}$/.test(deployment.meta?.githubCommitSha ?? '')
+      )
+      .sort((a, b) => createdOf(b) - createdOf(a))
+    const ready = ours.find((deployment) => stateOf(deployment) === 'READY')
+    const building = ours.find((deployment) => IN_FLIGHT.has(stateOf(deployment)))
+    const adopted = ready ?? building
+    if (adopted) {
+      const adoptedSha = /** @type {string} */ (adopted.meta?.githubCommitSha)
+      log(
+        `${project}: ${ready ? 'reusing' : 'adopting'} ${idOf(adopted)} (${adoptedSha}), built from the same inputs and configuration`
+      )
+      return untilReady(idOf(adopted), adoptedSha, settings)
+    }
+  }
+  const created = await settings.create(
+    {
+      name: settings.projectName,
+      project: settings.projectId,
+      gitSource: { type: 'github', repoId: settings.repoId, ref: branch, sha },
+      meta: {
+        ccPreviewSource: PREVIEW_SOURCE,
+        ccPreviewInputs: inputs,
+        ccPreviewConfig: config,
+      },
+    },
+    force
+  )
+  const id = idOf(created)
+  if (!id) throw new Error(`${project}: Vercel created no deployment for ${sha}`)
+  log(`${project}: created ${id} for ${sha}${force ? ' (forced)' : ''}`)
+  return untilReady(id, sha, settings)
+}
+
+/** Vercel's REST API, every request bounded by the job deadline and 30 s. */
+function vercelClient(token, fetchImpl, deadline, now) {
+  return async (method, pathAndQuery, body) => {
+    const budget = Math.min(30_000, deadline - now())
+    if (budget <= 0)
+      throw new Error(
+        `Vercel ${method} ${pathAndQuery.split('?')[0]}: the job's deadline passed`
+      )
+    const response = await fetchImpl(`https://api.vercel.com${pathAndQuery}`, {
+      method,
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(budget),
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    })
+    const text = await response.text()
+    if (!response.ok) {
+      let message = text.slice(0, 300)
+      try {
+        const parsed = JSON.parse(text)
+        message = parsed.error?.message ?? parsed.message ?? message
+      } catch {
+        // keep the raw text
       }
+      throw new Error(
+        `Vercel ${method} ${pathAndQuery.split('?')[0]} answered ${response.status}: ${message}`
+      )
     }
-    const building = ours
-      .filter((d) => IN_FLIGHT.has(stateOf(d)) && matches(d))
-      .sort(oldestFirst)[0]
-    if (building) {
-      log(`${project}: adopting ${idOf(building)}, already building the same inputs`)
-      return untilReady(building, settings)
-    }
+    return JSON.parse(text)
   }
-  return untilReady(await createOnce(settings, matches), settings)
 }
 
-async function vercelApi(token, method, pathAndQuery, body) {
-  const response = await fetch(`https://api.vercel.com${pathAndQuery}`, {
-    method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    // A hung request must not eat the job's budget.
-    signal: AbortSignal.timeout(30_000),
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  })
-  const text = await response.text()
-  if (!response.ok) {
-    let message = text.slice(0, 300)
-    try {
-      const parsed = JSON.parse(text)
-      message = parsed.error?.message ?? parsed.message ?? message
-    } catch {
-      // keep the raw text
-    }
-    throw new Error(
-      `Vercel ${method} ${pathAndQuery.split('?')[0]} answered ${response.status}: ${message}`
-    )
-  }
-  return JSON.parse(text)
-}
-
-async function main() {
-  const project = /** @type {'web' | 'api'} */ (process.argv[2])
-  const env = (name) => {
-    const value = process.env[name]?.trim()
+/**
+ * The CI step: provides `project`'s preview from the environment the workflow sets.
+ * PREVIEW_JOB_STARTED_MS is when the job began, so setup counts against its 20 minutes.
+ * @param {'web' | 'api'} project @param {NodeJS.ProcessEnv} env
+ * @param {{ fetchImpl?: typeof fetch, cwd?: string, now?: () => number, sleep?: (ms: number) => Promise<void>, log?: (m: string) => void }} [options]
+ */
+export async function run(project, env, options = {}) {
+  const {
+    fetchImpl = fetch,
+    cwd = repoRoot,
+    now = () => Date.now(),
+    sleep,
+    log,
+  } = options
+  const required = (name) => {
+    const value = env[name]?.trim()
     if (!value) throw new Error(`${name} is required`)
     return value
   }
-  const token = env('VERCEL_TOKEN')
-  const branch = env('GIT_REF')
-  const sha = env('EXPECTED_SHA')
-  const slug = env(
+  const started = Number(env.PREVIEW_JOB_STARTED_MS) || now()
+  // The job is capped at 20 minutes; the deploy gives up 45 s before, with room to report.
+  const deadline = started + 20 * 60_000 - 45_000
+  const api = vercelClient(required('VERCEL_TOKEN'), fetchImpl, deadline, now)
+  const branch = required('GIT_REF')
+  const sha = required('EXPECTED_SHA')
+  const force = env.FORCE_BUILD === 'true'
+  const slug = required(
     project === 'web' ? 'VERCEL_WEB_PROJECT_SLUG' : 'VERCEL_API_PROJECT_SLUG'
   )
-  const team = await vercelApi(token, 'GET', `/v2/teams/${env('VERCEL_TEAM_SLUG')}`)
+  const team = await api('GET', `/v2/teams/${required('VERCEL_TEAM_SLUG')}`)
   const scope = new URLSearchParams({ teamId: team.id })
-  const projectData = await vercelApi(token, 'GET', `/v9/projects/${slug}?${scope}`)
-  const envs = await vercelApi(
-    token,
-    'GET',
-    `/v9/projects/${projectData.id}/env?${scope}`
-  )
+  const projectData = await api('GET', `/v9/projects/${slug}?${scope}`)
+  const envs = await api('GET', `/v9/projects/${projectData.id}/env?${scope}`)
   const repoId = projectData.link?.repoId
   if (!repoId) throw new Error(`${slug} is not linked to a Git repository`)
-  const result = await previewDeployment({
+  return previewDeployment({
     project,
     branch,
     sha,
-    inputs: inputsHash(repoRoot, project),
+    inputs: inputsHash(cwd, project),
     config: configIdentity(projectData, envs.envs ?? [], branch),
+    force,
     repoId,
     projectId: projectData.id,
     projectName: projectData.name,
-    force: process.env.FORCE_BUILD === 'true',
+    deadline,
+    now,
+    ...(sleep ? { sleep } : {}),
+    ...(log ? { log } : {}),
     list: async () => {
       const query = new URLSearchParams({
         teamId: team.id,
@@ -303,11 +289,18 @@ async function main() {
         'meta-githubCommitRef': branch,
         limit: '50',
       })
-      return (await vercelApi(token, 'GET', `/v6/deployments?${query}`)).deployments ?? []
+      return (await api('GET', `/v6/deployments?${query}`)).deployments ?? []
     },
-    create: (body) => vercelApi(token, 'POST', `/v13/deployments?${scope}`, body),
-    get: (id) => vercelApi(token, 'GET', `/v13/deployments/${id}?${scope}`),
-    cancel: (id) => vercelApi(token, 'PATCH', `/v12/deployments/${id}/cancel?${scope}`),
+    // forceNew=1 makes Vercel build instead of returning an earlier deployment of the commit.
+    create: (body, forceNew) =>
+      api('POST', `/v13/deployments?${forceNew ? `forceNew=1&${scope}` : scope}`, body),
+    get: (id) => api('GET', `/v13/deployments/${id}?${scope}`),
+  })
+}
+
+async function main() {
+  const project = /** @type {'web' | 'api'} */ (process.argv[2])
+  const result = await run(project, process.env, {
     log: (message) => console.error(message),
   })
   console.log(

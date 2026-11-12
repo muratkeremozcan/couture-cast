@@ -29,6 +29,10 @@ on:
         description: "Build fresh deployments even when a ready one has the same inputs and configuration"
         type: boolean
         default: false
+      require_previews:
+        description: "Provide previews even when the branch changes nothing a preview check reads (explicit manual runs)"
+        type: boolean
+        default: false
     secrets:
       VERCEL_TOKEN:
         required: true
@@ -65,10 +69,13 @@ jobs:
           node-version-file: '.nvmrc'
       - name: Check shared Vercel preview inputs
         id: scope
+        env:
+          REQUIRE_PREVIEWS: ${{ inputs.require_previews || inputs.force_build }}
         run: node scripts/vercel-preview-inputs.mjs
 
-  # One job per project, each with its own 20 minute budget: Hobby builds one deployment at a
-  # time, so the second waits behind the first. Every Vercel request times out after 30 s.
+  # One job per project, each with one deadline 45 s inside its 20 minutes that covers setup,
+  # requests and polling. Hobby builds one deployment at a time, so a build queued behind
+  # another for too long fails with that reason; rerun once the other build finishes.
   # VERCEL_TOKEN reaches this job, which runs the PR's own script; GitHub withholds it from
   # fork PRs, and the e2e job already receives it (deployment guide, preview deployments).
   deploy-web:
@@ -80,6 +87,9 @@ jobs:
       url: ${{ steps.deploy.outputs.web_url }}
       sha: ${{ steps.deploy.outputs.web_sha }}
     steps:
+      # The deploy's deadline counts from here, so setup is inside the job's 20 minutes.
+      - name: Record job start
+        run: echo "PREVIEW_JOB_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - name: Checkout preview inputs
         uses: actions/checkout@v4
         with:
@@ -109,6 +119,9 @@ jobs:
       url: ${{ steps.deploy.outputs.api_url }}
       sha: ${{ steps.deploy.outputs.api_sha }}
     steps:
+      # The deploy's deadline counts from here, so setup is inside the job's 20 minutes.
+      - name: Record job start
+        run: echo "PREVIEW_JOB_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
       - name: Checkout preview inputs
         uses: actions/checkout@v4
         with:

@@ -55,6 +55,8 @@ jobs:
       deploy_web: ${{ inputs.custom_base_url == '' }}
       deploy_api: ${{ inputs.custom_api_base_url == '' }}
       force_build: ${{ inputs.force_preview_build }}
+      # A manual run asks for previews even when the branch changes nothing preview checks read.
+      require_previews: true
     secrets: inherit
 
   run-preview-tests:
