@@ -1,0 +1,144 @@
+# Story 6.15 D6: the one macOS job a pull request may run. It holds the Apple-native checks
+# whose queue plus run time fits the pull request budget:
+# - the share module's and the photo-save module's Swift packages (activity mapper, outcome
+#   reducer, anchor configuration, ShareCardShareFile, the PNG file rules and the cross-prefix
+#   test), which build without a prebuild;
+# - the AccessibilityFocusTarget XCTest on an iOS simulator;
+# - the watchOS prebuild suite, whose WatchApp and complication builds need Xcode.
+# Each step runs only when its own lane does (scripts/ci/lanes.mjs: ios-unit, watchos), and the
+# job runs when either lane is selected, so a pull request waits for one macOS runner at most.
+# The checks that cannot fit (the iOS app builds, the share-card iOS journeys and the Expo Go
+# proof) run in ios-native.yml on main, nightly and on demand. PR Gate makes this job required
+# whenever it runs.
+name: Apple native checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '43 4 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: apple-native-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: pr-apple-native.yml
+        run: node scripts/ci/lanes.mjs
+
+  # macos-15 and its default Xcode: none of these checks builds the Expo app, so none needs the
+  # Xcode 26.4 that SDK 56 requires, and macos-15 has the measured queue (D6). Run time: Swift
+  # packages about 3 minutes, the XCTest 2.5 at p50 and 5.0 at p95 (2026-11-12), the watchOS
+  # suite about 4 with its install; 20 is the pull request job ceiling.
+  apple-native:
+    name: Apple native checks (macOS)
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['ios-unit'] || fromJSON(needs.lanes.outputs.plan)['watchos']
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record the Xcode and Swift toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+
+      - name: Share module Swift package
+        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['ios-unit'] }}
+        working-directory: apps/mobile/modules/share-card-native-share/ios
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/share-swift-test.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/share-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: Photo-save Swift package, with the cross-prefix test
+        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['ios-unit'] }}
+        working-directory: apps/mobile/modules/share-card-photo-save/ios
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/photo-save-swift-test.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/photo-save-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: XCTest for the focus target decisions
+        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['ios-unit'] }}
+        working-directory: apps/mobile/modules/accessibility-focus/ios
+        run: |
+          set -euo pipefail
+          device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+[^(]*' | sed 's/ *$//')
+          echo "Simulator: $device"
+          xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device" 2>&1 | tee "$RUNNER_TEMP/focus-xctest.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/focus-xctest.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::xcodebuild test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "xcodebuild test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: Setup Node
+        id: node
+        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['watchos'] }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        id: deps
+        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['watchos'] && steps.node.outcome == 'success' }}
+        run: npm ci
+
+      # The suite builds the generated WatchApp and complication with xcodebuild and runs the
+      # watch Swift behavior tests. WATCHOS_REQUIRE_BUILD=1 fails it if any of them would be left
+      # out, as they were on the Linux job this replaces.
+      - name: Validate watchOS prebuild
+        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['watchos'] && steps.deps.outcome == 'success' }}
+        env:
+          WATCHOS_REQUIRE_BUILD: '1'
+        run: npm run test:watchos-prebuild --workspace mobile

@@ -440,7 +440,7 @@ test('swap and pressure probes preserve zero and mark unsupported output', () =>
 test('every workflow host sample label is accepted by the real sampler CLI', (t) => {
   const root = fileURLToPath(new URL('../../', import.meta.url))
   const workflow = fs.readFileSync(
-    path.join(root, '.github/workflows/pr-share-card-native.yml'),
+    path.join(root, '.github/workflows/ios-native.yml'),
     'utf8'
   )
   const labels = [

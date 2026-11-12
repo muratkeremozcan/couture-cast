@@ -1,15 +1,15 @@
 # Story 6.7: the accessibility-focus native module. CI has no development-build
-# lane for the mobile app, so this workflow unit-tests the module on both
-# platforms, builds a release Android app and a release iOS simulator app that
-# compile and register it, and runs its instrumentation tests against real
-# TalkBack on an emulator, with a suppressed-focus control that must fail on the
-# OS focus report. The full Home teaser flow under TalkBack is local evidence
-# (scripts/run-story67-talkback.mjs). PR Gate makes every job that runs here
-# required.
+# lane for the mobile app, so this workflow unit-tests the module's Android side,
+# builds a release Android app that compiles and registers it, and runs its
+# instrumentation tests against real TalkBack on an emulator, with a
+# suppressed-focus control that must fail on the OS focus report. The full Home
+# teaser flow under TalkBack is local evidence (scripts/run-story67-talkback.mjs).
+# PR Gate makes every job that runs here required.
 #
-# The release iOS app build takes about 21 minutes alone, over the 20 minute PR
-# job limit, so it runs on pushes to main, nightly and on demand. PRs keep the
-# XCTest module tests, the Android module tests and build, and the TalkBack run.
+# The iOS side runs on macOS (story 6.15 D6): the AccessibilityFocusTarget XCTest
+# in pr-apple-native.yml on pull requests, and the Release simulator app build
+# with its link and registration check in ios-native.yml on main, nightly and on
+# demand, since that build alone runs about 31 minutes at p95.
 name: Accessibility focus module
 
 on:
@@ -178,75 +178,6 @@ jobs:
           CI: '1'
           EXPO_NO_GIT_STATUS: '1'
         run: npm run test:accessibility-focus:android
-
-  ios:
-    name: iOS module tests
-    runs-on: macos-15
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: XCTest for the focus target decisions
-        working-directory: apps/mobile/modules/accessibility-focus/ios
-        run: |
-          device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+[^(]*' | sed 's/ *$//')
-          echo "Simulator: $device"
-          xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
-
-  # Not on pull requests: the release build alone takes about 21 minutes.
-  ios-app-build:
-    name: iOS app build
-    if: ${{ github.event_name != 'pull_request' }}
-    runs-on: macos-15
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        id: checkout
-
-      - name: Setup Node
-        id: node
-        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: npm
-
-      - name: Install dependencies
-        id: deps
-        if: ${{ !cancelled() && steps.node.outcome == 'success' }}
-        run: npm ci
-
-      # The XCTest target in the ios job leaves out AccessibilityFocusModule.swift, which
-      # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
-      - name: Generate the iOS project
-        id: ios_project
-        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
-        working-directory: apps/mobile
-        env:
-          CI: '1'
-          EXPO_NO_GIT_STATUS: '1'
-        run: npx expo prebuild --platform ios
-
-      - name: Build the release simulator app
-        id: app_build
-        if: ${{ !cancelled() && steps.ios_project.outcome == 'success' }}
-        working-directory: apps/mobile/ios
-        env:
-          NODE_ENV: production
-        run: |
-          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' | head -1)
-          workspace=${workspace#./}
-          scheme=${workspace%.xcworkspace}
-          echo "scheme=$scheme" >> "$GITHUB_ENV"
-          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release \
-            -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO build
-
-      - name: Check the app links and registers the module
-        if: ${{ !cancelled() && steps.app_build.outcome == 'success' }}
-        run: |
-          bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
-            "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios
 
   android-talkback:
     name: Android module against TalkBack (API 35)

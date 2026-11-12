@@ -4,9 +4,7 @@ import { test } from 'node:test'
 import { parse } from 'yaml'
 import { CHECKED_FLOWS, checkFlows } from './maestro-check-flows.mjs'
 
-const workflow = parse(
-  fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
-)
+const workflow = parse(fs.readFileSync('.github/workflows/ios-native.yml', 'utf8'))
 
 test('every checked flow exists', () => {
   for (const flow of CHECKED_FLOWS) assert.ok(fs.existsSync(flow), flow)
@@ -22,15 +20,22 @@ test('a binary that accepts every flow reports nothing', () => {
   assert.deepEqual(checkFlows(CHECKED_FLOWS, '/usr/bin/true'), [])
 })
 
-// ios-build only keys and, on a miss, builds the client; the iOS checks that need no client run in
-// ios-expo-go on every device run.
-test('the Expo Go job runs the check after Maestro is installed, on every device run', () => {
-  const steps = workflow.jobs['ios-expo-go'].steps
-  const install = steps.findIndex((row) => row.run?.includes('maestro-install.mjs'))
+// The iOS checks that need no client run after the Expo Go proof in ios-native.yml, on every
+// device run. Maestro comes with the Expo Go segment's runtime (scripts/ci/native-ios-runtime.sh).
+test('the Expo Go segment runs the check after Maestro is installed, on every device run', () => {
+  const steps = workflow.jobs['ios-native'].steps
+  const install = steps.findIndex(
+    (row) =>
+      row.id === 'runtime' && row.run === 'bash scripts/ci/native-ios-runtime.sh start'
+  )
   const check = steps.findIndex((row) =>
     row.run?.includes('node scripts/ci/maestro-check-flows.mjs')
   )
   assert.ok(install >= 0 && check > install)
+  assert.match(
+    fs.readFileSync('scripts/ci/native-ios-runtime.sh', 'utf8'),
+    /\n {4}node scripts\/maestro-install\.mjs\n/
+  )
   assert.match(
     steps[check].if,
     /^\$\{\{ !cancelled\(\) && steps\.runtime\.outcome == 'success' \}\}$/

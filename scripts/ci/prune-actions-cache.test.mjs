@@ -75,28 +75,31 @@ test('a native client handed between jobs is never pruned, however long it sat u
   )
 })
 
-test('every restore that fails on a miss reads a protected handoff key', () => {
+test('every native client cache and every restore that fails on a miss reads a protected key', () => {
   const root = new URL('../../', import.meta.url)
   const workflows = readdirSync(new URL('.github/workflows/', root)).filter((name) =>
     /\.ya?ml$/.test(name)
   )
   const handoff = []
+  const clients = []
   for (const name of workflows) {
     const workflow = parse(
       readFileSync(new URL(`.github/workflows/${name}`, root), 'utf8')
     )
     for (const job of Object.values(workflow.jobs ?? {}))
-      for (const step of job.steps ?? [])
+      for (const step of job.steps ?? []) {
+        if (!String(step.uses ?? '').startsWith('actions/cache/')) continue
         if (step.with?.['fail-on-cache-miss'] === true) handoff.push(step.with.key)
+        if (String(step.with?.key).includes('native_key')) clients.push(step.with.key)
+      }
   }
-  assert.ok(handoff.length >= 3, handoff.join(', '))
-  // Each such key comes from scripts/ci/native-build-cache.mjs, directly or through
-  // ios-build's output, and that script names its keys under the protected prefix.
-  for (const key of handoff)
-    assert.match(
-      key,
-      /^\$\{\{ (steps\.native_key\.outputs\.key|needs\.ios-build\.outputs\.app-key) \}\}$/
-    )
+  // Since story 6.15 D6 no job hands a client to another (the iOS client is built and used in
+  // ios-native.yml's one job), but the Android lanes and that job still restore and save one.
+  assert.ok(clients.length >= 3, clients.join(', '))
+  // Each such key comes from scripts/ci/native-build-cache.mjs, and that script names its keys
+  // under the protected prefix.
+  for (const key of [...handoff, ...clients])
+    assert.match(key, /^\$\{\{ steps\.native_key\.outputs\.key \}\}$/)
   const source = readFileSync(new URL('scripts/ci/native-build-cache.mjs', root), 'utf8')
   assert.ok(
     PROTECTED_KEY_PREFIXES.some((prefix) => source.includes(`\`${prefix}\${platform}-`)),

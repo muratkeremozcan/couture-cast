@@ -432,10 +432,6 @@ describe('deployment workflows', () => {
       'android36-native-matrix',
       'android36-original',
       'android36-release-font',
-      'ios-build',
-      'ios-evidence',
-      'ios-expo-go',
-      'ios-shard',
       'original-resource',
       'original-resource-evidence',
     ])

@@ -14,13 +14,7 @@ export const requiredShareCardJobs = Object.freeze([
   'android36-controls',
   'android36-interaction',
   'android36-release-font',
-  // The iOS journey: one build, two shards (a matrix job succeeds only when both legs do) and
-  // the job that proves both shards reported their exact cases.
-  'ios-build',
-  'ios-shard',
-  'ios-evidence',
-  // The Expo Go proof on its own fresh simulator.
-  'ios-expo-go',
+  // The iOS journey, its evidence and the Expo Go proof run in ios-native.yml (story 6.15 D6).
 ])
 
 // The lanes that run on a pull request. Every other required job drives a device or an emulator

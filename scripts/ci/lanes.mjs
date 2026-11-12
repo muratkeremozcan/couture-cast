@@ -117,7 +117,8 @@ export const OWNED_BY_PATH_FILTERS = ['k6/**']
 /**
  * The lanes. `workflow` and `jobs` name what each one gates; `inputs` are globs, a leading `!`
  * removing what an earlier glob added, as in GitHub's own path filters; `workspaces` adds those
- * workspaces and everything they depend on.
+ * workspaces and everything they depend on. A lane with `pullRequest: false` names a workflow
+ * that never runs on a pull request: its inputs are that workflow's push filter on main.
  */
 export const LANES = {
   typecheck: {
@@ -263,11 +264,71 @@ export const LANES = {
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },
+  // The one macOS job a pull request may run (story 6.15 D6) holds two lanes, each gating its
+  // own steps: the job runs when either lane does.
+  'ios-unit': {
+    title: 'iOS module unit tests (macOS)',
+    workflow: 'pr-apple-native.yml',
+    jobs: ['apple-native'],
+    // The Swift packages and the XCTest target build from these directories alone.
+    inputs: [
+      'apps/mobile/modules/share-card-native-share/ios/**',
+      'apps/mobile/modules/share-card-photo-save/ios/**',
+      'apps/mobile/modules/accessibility-focus/ios/**',
+    ],
+  },
   watchos: {
-    title: 'watchOS native',
-    workflow: 'watchos-native.yml',
-    jobs: ['watchos-native'],
+    title: 'watchOS native (macOS)',
+    workflow: 'pr-apple-native.yml',
+    jobs: ['apple-native'],
     workspaces: ['mobile'],
+  },
+  // Off the pull request path (story 6.15 D6): the iOS app builds, the share-card iOS journeys
+  // and the Expo Go proof cannot fit the 15-minute queue plus run budget, so ios-native.yml runs
+  // on main, nightly and on demand. A merge to main runs it only when one of these native iOS
+  // inputs changed (its push filter is exactly this list); the nightly run covers the rest,
+  // JavaScript included, which the Android lanes gate on every pull request.
+  'ios-native': {
+    title: 'iOS native builds and journeys (main, nightly, dispatch)',
+    workflow: 'ios-native.yml',
+    jobs: ['ios-native'],
+    pullRequest: false,
+    inputs: [
+      '.github/workflows/ios-native.yml',
+      '.github/actions/install/**',
+      '.github/actions/node-dependencies/**',
+      '.nvmrc',
+      'package.json',
+      'package-lock.json',
+      // What the Expo fingerprint and the prebuild read (scripts/ci/native-build-cache.mjs).
+      'apps/mobile/package.json',
+      'apps/mobile/app.json',
+      'apps/mobile/app.config.ts',
+      'apps/mobile/plugins/**',
+      '!apps/mobile/plugins/**/*.test.js',
+      'apps/mobile/modules/*/expo-module.config.json',
+      'apps/mobile/modules/*/ios/**',
+      'apps/mobile/targets/**',
+      'apps/mobile/locales/**',
+      'apps/mobile/assets/images/notification-icon.png',
+      'apps/mobile/native-tests/**',
+      // The flows the iOS shards and the Expo Go proof run, and the harness that runs them.
+      'maestro/story65/**',
+      'maestro/story67/**',
+      'maestro/story68/**',
+      'scripts/run-story68-native.mjs',
+      'scripts/e2e-share-card/**',
+      'scripts/lib/**',
+      'scripts/ci/native-*',
+      'scripts/ci/check-accessibility-focus-builds.sh',
+      'scripts/ci/share-card-header-semantics.sh',
+      'scripts/ci/maestro-check-flows.mjs',
+      'scripts/ci/node-test-gate.mjs',
+      'scripts/ci/node-test-suites.json',
+      'scripts/local-storage-buckets.mjs',
+      'scripts/maestro-install.mjs',
+      'scripts/maestro-version.mjs',
+    ],
   },
 }
 

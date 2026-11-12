@@ -2,6 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import test from 'node:test'
 import fs from 'node:fs'
+import { parse } from 'yaml'
 import { assertNativeEvidence } from '../lib/story68-native-evidence-schema.mjs'
 import assert from 'node:assert/strict'
 import {
@@ -29,7 +30,9 @@ const report = (shard, patch = {}) => ({
 })
 const all = () => Object.fromEntries(shards.map((shard) => [shard, report(shard)]))
 
-test('four shards: with ios-expo-go they fill the five macOS jobs the free plan runs at once', () => {
+// The four shards ran as five macOS jobs with ios-expo-go; since story 6.15 D6 they run in turn
+// in ios-native.yml's one job, each still on its own runtime and within its own budget.
+test('four shards, each a segment of the one iOS job', () => {
   assert.equal(SHARD_COUNT, 4)
   assert.deepEqual(shards, [1, 2, 3, 4])
 })
@@ -58,20 +61,20 @@ test('the shards are balanced by measured minutes and fit their job limit on a r
     Math.max(...minutes) - Math.min(...minutes) <= 3,
     `shard minutes ${minutes.join(', ')}`
   )
-  const workflow = fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
-  const limit = Number(
-    /\n {2}ios-shard:\n(?:.*\n)*? {4}timeout-minutes: (\d+)/.exec(workflow)[1]
-  )
-  for (const shard of shards)
+  const { steps } = parse(fs.readFileSync('.github/workflows/ios-native.yml', 'utf8'))
+    .jobs['ios-native']
+  for (const shard of shards) {
+    const limit = steps.find((step) => step.id === `shard_${shard}`)['timeout-minutes']
     assert.ok(
       nominalMinutes(shard) * 1.5 < limit,
-      `shard ${shard}: ${nominalMinutes(shard)} min`
+      `shard ${shard}: ${nominalMinutes(shard)} min against ${limit}`
     )
+  }
   // Shard 2 took 40.9 and 41.8 minutes on runs 41352898854 and 41429581850 before this split.
   assert.ok(Math.max(...minutes) < 36)
 })
 
-test('no shard runs the Expo Go proof: the ios-expo-go job runs it alone', () => {
+test('no shard runs the Expo Go proof: its own segment runs it after the shards', () => {
   for (const shard of Object.keys(SHARD_PLAN).map(Number)) {
     assert.ok(!SHARD_PLAN[shard].commands.includes('expo-go-proof'), `shard ${shard}`)
     assert.ok(!commandsForShard(shard).includes('expo-go-proof'), `shard ${shard}`)

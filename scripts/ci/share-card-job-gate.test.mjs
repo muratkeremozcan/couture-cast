@@ -59,7 +59,7 @@ const cli = (value, event, plan) =>
   })
 
 describe('share-card aggregate job gate', () => {
-  test('requires both API32 shards and their evidence, the browser lane, the five Android36 partitions, the Android36 matrix shard evidence, the three iOS shard jobs and the Expo Go proof', () => {
+  test('requires both API32 shards and their evidence, the browser lane, the five Android36 partitions, and the Android36 matrix shard evidence', () => {
     assert.deepEqual([...requiredShareCardJobs].sort(), [
       'android36-controls',
       'android36-interaction',
@@ -68,10 +68,6 @@ describe('share-card aggregate job gate', () => {
       'android36-original',
       'android36-release-font',
       'browser-acceptance',
-      'ios-build',
-      'ios-evidence',
-      'ios-expo-go',
-      'ios-shard',
       'original-resource',
       'original-resource-evidence',
     ])
@@ -154,10 +150,6 @@ describe('share-card aggregate job gate', () => {
         'android36-native-matrix',
         'android36-original',
         'android36-release-font',
-        'ios-build',
-        'ios-evidence',
-        'ios-expo-go',
-        'ios-shard',
         'original-resource',
         'original-resource-evidence',
       ])

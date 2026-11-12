@@ -33,26 +33,64 @@ const runsOnPullRequest = (workflow) => {
 const COVERAGE_JOB = 'tests-shard'
 const isCoverageLane = (lane) => lane.startsWith('coverage-')
 
+// A lane with pullRequest: false names a workflow that never runs on a pull request; its push
+// filter on main is the lane's inputs, and it has no plan job.
+const onPullRequest = (lane) => LANES[lane].pullRequest !== false
 /** Every [lane, workflow file, job id] the map names. */
-const gated = Object.entries(LANES).flatMap(([lane, { workflow, jobs }]) =>
+const named = Object.entries(LANES).flatMap(([lane, { workflow, jobs }]) =>
   jobs.map((job) => [lane, workflow, job])
 )
+const gated = named.filter(([lane]) => onPullRequest(lane))
 const laneWorkflows = [
-  ...new Set(Object.values(LANES).map(({ workflow }) => workflow)),
+  ...new Set(
+    Object.entries(LANES)
+      .filter(([lane]) => onPullRequest(lane))
+      .map(([, { workflow }]) => workflow)
+  ),
 ].sort()
 
 test('every workflow and job the lane map names exists', () => {
-  for (const [lane, file, job] of gated) {
+  for (const [lane, file, job] of named) {
     assert.ok(workflows[file], `${lane}: ${file} exists`)
-    assert.ok(
+    assert.equal(
       runsOnPullRequest(workflows[file]),
-      `${lane}: ${file} runs on pull requests`
+      onPullRequest(lane),
+      `${lane}: ${file} ${onPullRequest(lane) ? 'runs' : 'never runs'} on pull requests`
     )
     assert.ok(workflows[file].jobs?.[job], `${lane}: ${file} has job ${job}`)
   }
 })
 
-test('each gated job needs the plan job and runs only when its own lane does', () => {
+test('a lane off the pull request path runs on main by exactly its inputs, nightly and on demand', () => {
+  const off = Object.entries(LANES).filter(([lane]) => !onPullRequest(lane))
+  assert.deepEqual(
+    off.map(([lane]) => lane),
+    ['ios-native']
+  )
+  for (const [lane, { workflow: file, inputs, workspaces, jobs }] of off) {
+    const on = workflows[file].on ?? workflows[file][true]
+    assert.equal(workspaces, undefined, `${lane} names its inputs exactly`)
+    assert.deepEqual(on.push.branches, ['main'], lane)
+    assert.deepEqual(
+      on.push.paths,
+      inputs,
+      `${file} push paths are the ${lane} lane inputs`
+    )
+    assert.ok(inputs.includes(`.github/workflows/${file}`), `${lane}: its own workflow`)
+    assert.ok([on.schedule].flat().length > 0, `${lane}: nightly`)
+    assert.ok('workflow_dispatch' in on, `${lane}: on demand`)
+    assert.equal(workflows[file].jobs.lanes, undefined, `${file} has no plan job`)
+    for (const id of jobs)
+      assert.doesNotMatch(conditionOf(workflows[file].jobs[id]), /needs\.lanes/, id)
+  }
+})
+
+// A job several lanes gate (pr-apple-native.yml's apple-native: ios-unit and watchos) runs when
+// any of them does and reads exactly those lanes.
+const lanesOf = (file, id) =>
+  gated.filter(([, f, job]) => f === file && job === id).map(([lane]) => lane)
+
+test('each gated job needs the plan job and runs only when its own lanes do', () => {
   for (const [lane, file, id] of gated) {
     const job = workflows[file].jobs[id]
     assert.ok(needsOf(job).includes('lanes'), `${file} ${id} needs lanes`)
@@ -70,9 +108,13 @@ test('each gated job needs the plan job and runs only when its own lane does', (
       conditionOf(job).includes(planCondition(lane)),
       `${file} ${id} runs when ${planCondition(lane)}: ${conditionOf(job)}`
     )
-    // A job reads only its own lane, so one lane's plan never runs or skips another's job.
+    // A job reads only its own lanes, so one lane's plan never runs or skips another's job.
     const read = [...conditionOf(job).matchAll(/plan\)\['([^']+)'\]/g)].map((m) => m[1])
-    assert.deepEqual([...new Set(read)], [lane], `${file} ${id} reads only ${lane}`)
+    assert.deepEqual(
+      [...new Set(read)].sort(),
+      lanesOf(file, id).sort(),
+      `${file} ${id} reads only ${lanesOf(file, id).join(', ')}`
+    )
   }
 })
 

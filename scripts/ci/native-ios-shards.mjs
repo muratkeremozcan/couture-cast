@@ -1,8 +1,10 @@
 /**
  * Four-way split of the iOS native journey. Run 28 needed about 120 minutes on one runner (85
  * flows passed in 90), and two shards still took 50 and 58 minutes on main run 41312266186. Each
- * shard boots its own simulator, Supabase, Metro and signed-in account, installs the development
- * client the build job keyed by its native fingerprint, and runs the sections below. `open` and
+ * shard boots its own simulator, runtime database, Metro and signed-in account, installs the
+ * development client keyed by its native fingerprint, and runs the sections below. Since story
+ * 6.15 D6 the shards run in turn inside ios-native.yml's one job, each on its own runtime
+ * (scripts/ci/native-ios-runtime.sh) and within the 70-minute budget each shard job had. `open` and
  * `signin` run in every shard, and every shard but the one that runs `proof` sets the post-proof
  * Photos permission with `permission-baseline`; nothing else repeats.
  *
@@ -36,8 +38,8 @@ export const MATRIX_SECTIONS = PLATFORM_MATRIX_SECTIONS.ios
 /**
  * Harness commands that follow the matrix, in runner order; any of them can be dispatched. Each
  * shard names its own in SHARD_PLAN. `expo-go-proof` is no shard's: it has never passed on a shard
- * (runs 40992501585 to 41019906459, last in shard 2 on a host with 74 MB free), so the
- * `ios-expo-go` job runs it alone on a fresh simulator and the shards end here. `share-sheet`
+ * (runs 40992501585 to 41019906459, last in shard 2 on a host with 74 MB free), so the Expo Go
+ * segment of ios-native.yml runs it alone on a fresh simulator after the shards. `share-sheet`
  * (Story 6.9) runs the share fixture flows, the real-sheet smoke and ShareCardShareSheetUITests.
  */
 export const AFTER_MATRIX = Object.freeze([

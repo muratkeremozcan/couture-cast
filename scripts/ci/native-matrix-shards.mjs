@@ -92,7 +92,8 @@ const lifecycle = ['large-text', 'precommit-lifecycle', 'save-lifecycle']
  * shard step also boots the simulator and opens the app before the first command.
  */
 export const MATRIX_SHARD_PLANS = Object.freeze({
-  // Four shards: the free plan runs five macOS jobs at once, and ios-expo-go takes the fifth. Shard
+  // Four shards, chosen when the free plan's five macOS jobs ran them beside ios-expo-go; they now
+  // run in turn in ios-native.yml, each within its own 70-minute budget. Shard
   // 1 proves the original beside the pre-locale section; the other three set the same Photos
   // permission with permission-baseline. With three locales beside the lifecycle sections, shard
   // 2 was the longest on main run 41352898854 and dispatch run 41429581850 (40.9 and 41.8
