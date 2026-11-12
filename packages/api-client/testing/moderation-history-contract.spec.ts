@@ -3,7 +3,7 @@
 // Story 6.13 test owner: the strict contracts of the erasure route and the evidence bundle.
 // U-C-EXPORT-EXCLUDED, U-C-ERASURE-STRICT, U-C-RESERVED-REASON, U-C-RANGE.
 // U-C-OPENAPI is `http-openapi.spec.ts`, which fails when the document differs from a fresh build,
-// and `schema-validation.yml` regenerates the SDK from that document.
+// and `contract-testing.yml` regenerates the SDK from that document.
 import { describe, expect, it } from 'vitest'
 import {
   MODERATION_ERASED_REASON,

@@ -907,9 +907,8 @@ Deployment-adjacent controls supported by the repository include:
 
 - [PR checks](../../.github/workflows/pr-checks.yml): Prisma generation, typecheck, lint, build,
   unit coverage, and coverage reporting.
-- [Schema validation](../../.github/workflows/schema-validation.yml): generated OpenAPI and Optic
-  lint/diff.
-- [Contract testing](../../.github/workflows/contract-testing.yml): Pact consumer/provider checks.
+- [Contract testing](../../.github/workflows/contract-testing.yml): one job with the gitleaks
+  secrets scan, generated OpenAPI and Optic lint/diff, and Pact consumer/provider checks.
 - [Local Playwright](../../.github/workflows/pr-pw-e2e-local.yml): local Supabase reset, two shards,
   optional changed-test burn-in, and artifacts.
 - [Preview Playwright](../../.github/workflows/pr-pw-e2e-vercel-preview.yml): independent web/API
@@ -920,7 +919,6 @@ Deployment-adjacent controls supported by the repository include:
   changes.
 - [Manual k6 load](../../.github/workflows/k6-load.yml): selectable Preview or production load
   target with retained summaries.
-- [Gitleaks](../../.github/workflows/gitleaks-check.yml): pull-request secret scanning.
 - [Static deployment tests](../../apps/api/integration/deployment-workflows.spec.ts): presence and
   selected content of Vercel/mobile configuration.
 

@@ -957,7 +957,7 @@ Task owner map:
 - Step 7 step 2 owner: enforce local Playwright E2E gating in `.github/workflows/pr-pw-e2e-local.yml`
 - Step 7 step 3 owner: control flake burn-in behavior in `.github/workflows/rwf-burn-in.yml`
 - Step 7 step 4 owner: verify preview deployments with targeted smoke checks in `.github/workflows/pr-pw-e2e-vercel-preview.yml`
-- Step 7 step 5 owner: enforce secret scanning in `.github/workflows/gitleaks-check.yml`
+- Step 7 step 5 owner: enforce secret scanning in `.github/workflows/contract-testing.yml` (the gitleaks step)
 - Step 7 step 6 owner: keep the mobile deployment path explicit in `.github/workflows/deploy-mobile.yml`
 - Step 7 support owner: centralize install and browser setup in `.github/actions/install/action.yml` and `.github/actions/setup-playwright-browsers/action.yml`
 - Step 7 step 7 owner: wire monorepo workspace coverage directories and badge inputs in `.github/workflows/pr-checks.yml`
