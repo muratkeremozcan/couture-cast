@@ -8,7 +8,15 @@
 // reviewed into the list, however a workflow would reach it.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
@@ -181,9 +189,13 @@ describe('CI installs Ubuntu packages only through apt-install.sh', () => {
 /**
  * Runs apt-install.sh with stub `sudo`, `npx` and `sleep` on PATH. `statuses` are the exit codes of
  * successive install commands (0 once they run out). Returns the exit status, the commands run,
- * the pauses taken and what was written to apt's configuration.
+ * the pauses taken and what was written to apt's configuration. With APT_INSTALL_ARCHIVES in
+ * `env`, each recorded install also says how many package files that directory held.
  */
-function runScript(args, { statuses = [], teeStatus = 0, pauses = '1 2' } = {}) {
+function runScript(
+  args,
+  { statuses = [], teeStatus = 0, pauses = '1 2', env = {} } = {}
+) {
   const stubs = mkdtempSync(path.join(os.tmpdir(), 'apt-install-'))
   const stub = (name, body) => {
     const file = path.join(stubs, name)
@@ -199,11 +211,13 @@ if [ "$1" = tee ]; then cat > "${stubs}/tee"; exit ${teeStatus}; fi
 echo "sudo $*" >> "${stubs}/calls"
 ${next}`
   )
-  stub('npx', `echo "npx $*" >> "${stubs}/calls"\n${next}`)
+  const held =
+    '${APT_INSTALL_ARCHIVES:+ holding $(find "$APT_INSTALL_ARCHIVES" -maxdepth 1 -name "*.deb" | wc -l | tr -d " ")}'
+  stub('npx', `echo "npx $*${held}" >> "${stubs}/calls"\n${next}`)
   stub('sleep', `echo "$1" >> "${stubs}/sleeps"`)
   try {
     const result = spawnSync('bash', [path.join(repository, SCRIPT), ...args], {
-      env: { PATH: `${stubs}:${process.env.PATH}`, APT_INSTALL_PAUSES: pauses },
+      env: { PATH: `${stubs}:${process.env.PATH}`, APT_INSTALL_PAUSES: pauses, ...env },
       encoding: 'utf8',
     })
     const read = (name) => {
@@ -266,6 +280,63 @@ describe('apt-install.sh', () => {
       'sudo apt-get update',
       'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq curl',
     ])
+  })
+
+  // browser-acceptance restores the package files of its last miss into this directory, so a
+  // cache hit downloads none of them again.
+  test('keeps downloaded package files in APT_INSTALL_ARCHIVES when it is set', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      const { status, config, calls } = runScript(['--playwright', 'chromium'], {
+        env: { APT_INSTALL_ARCHIVES: archives },
+      })
+      assert.equal(status, 0)
+      assert.equal(
+        config,
+        `Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nDir::Cache::Archives "${archives}/";\n`
+      )
+      assert.ok(existsSync(path.join(archives, 'partial')))
+      assert.deepEqual(calls, [
+        'npx --no-install playwright install-deps chromium holding 0',
+      ])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('a failed install drops the restored package files, so the retry downloads them all', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      for (const name of ['libone_1.0_amd64.deb', 'libtwo_2.0_amd64.deb', 'notes.txt'])
+        writeFileSync(path.join(archives, name), 'restored')
+      const { status, calls, sleeps } = runScript(['--playwright', 'chromium'], {
+        statuses: [100, 0],
+        env: { APT_INSTALL_ARCHIVES: archives },
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(calls, [
+        'npx --no-install playwright install-deps chromium holding 2',
+        'npx --no-install playwright install-deps chromium holding 0',
+      ])
+      assert.deepEqual(sleeps, ['1'])
+      assert.ok(existsSync(path.join(archives, 'notes.txt')))
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('refuses an archive directory that is relative or has characters apt would misread', () => {
+    for (const archives of ['relative/packages', '/tmp/with space', '/tmp/quote"d']) {
+      const { status, calls, config } = runScript(['jq'], {
+        env: { APT_INSTALL_ARCHIVES: archives },
+      })
+      assert.equal(status, 2, archives)
+      assert.deepEqual(calls, [], archives)
+      assert.equal(config, '', archives)
+    }
   })
 
   test('refuses missing arguments and malformed pauses, and stops when apt cannot be configured', () => {
