@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
 import {
   inputsHash,
@@ -248,10 +249,6 @@ describe('Vercel preview storage', () => {
       "force_build: ${{ github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD' }}"
     )
     expect(caller).not.toContain('labels.*.name')
-    // Fork PRs get no VERCEL_TOKEN, so they skip previews instead of failing on it.
-    expect(caller).toContain(
-      'github.event.pull_request.head.repo.full_name == github.repository &&'
-    )
     expect(caller).toContain("if: needs.preview-ready.outputs.required == 'true'")
     expect(caller).toContain('expected_sha: ${{ github.event.pull_request.head.sha }}')
     expect(caller).toContain(
@@ -699,4 +696,170 @@ describe('Vercel preview deploy step', () => {
     ).rejects.toThrow("Vercel GET /v2/teams/team-slug: the job's deadline passed")
     expect(api.calls).toEqual([])
   })
+})
+
+/**
+ * Evaluates the GitHub Actions expression subset the preview caller uses: literals, context
+ * paths, ==, !=, !, && and || with parentheses. Strings compare case-insensitively and && and ||
+ * return an operand, as GitHub does.
+ */
+function evaluateExpression(source: string, context: Record<string, unknown>): unknown {
+  const text = source.trim().replace(/^\$\{\{([\s\S]*)\}\}$/, '$1')
+  const tokens: string[] = []
+  const pattern = /\s*(\(|\)|,|==|!=|&&|\|\||!|'(?:[^']|'')*'|[A-Za-z_][\w.*-]*)/y
+  while (pattern.lastIndex < text.trimEnd().length) {
+    const match = pattern.exec(text)
+    if (!match)
+      throw new Error(`cannot read the expression at: ${text.slice(pattern.lastIndex)}`)
+    tokens.push(match[1] as string)
+  }
+  let at = 0
+  const take = (expected?: string) => {
+    const token = tokens[at++]
+    if (token === undefined || (expected && token !== expected))
+      throw new Error(`expected ${expected ?? 'a value'} in: ${text}`)
+    return token
+  }
+  const truthy = (value: unknown) =>
+    !(
+      value === false ||
+      value === null ||
+      value === undefined ||
+      value === 0 ||
+      value === ''
+    )
+  const equal = (a: unknown, b: unknown) =>
+    typeof a === 'string' && typeof b === 'string'
+      ? a.toLowerCase() === b.toLowerCase()
+      : (a ?? null) === (b ?? null)
+  const primary = (): unknown => {
+    const token = take()
+    if (token === '(') {
+      const value = or()
+      take(')')
+      return value
+    }
+    if (token.startsWith("'")) return token.slice(1, -1).replaceAll("''", "'")
+    if (token === 'true' || token === 'false') return token === 'true'
+    if (token === 'null') return null
+    if (token === 'contains' && tokens[at] === '(') {
+      take('(')
+      const haystack = or()
+      take(',')
+      const needle = or()
+      take(')')
+      if (Array.isArray(haystack)) return haystack.some((item) => equal(item, needle))
+      if (typeof haystack === 'string' && typeof needle === 'string')
+        return haystack.toLowerCase().includes(needle.toLowerCase())
+      return false
+    }
+    if (/^[A-Za-z_][\w.*-]*$/.test(token) && tokens[at] !== '(') {
+      // A `*` step collects that property from every element, as GitHub's object filter does.
+      const lookup = (value: unknown, key: string) =>
+        value && typeof value === 'object'
+          ? (value as Record<string, unknown>)[key]
+          : undefined
+      let spread = false
+      return token.split('.').reduce<unknown>((value, key) => {
+        if (key === '*') {
+          spread = true
+          return Array.isArray(value) ? (value as unknown[]) : []
+        }
+        return spread && Array.isArray(value)
+          ? value.map((item) => lookup(item, key))
+          : lookup(value, key)
+      }, context)
+    }
+    throw new Error(`unsupported token ${token} in: ${text}`)
+  }
+  const comparison = (): unknown => {
+    const left = primary()
+    const operator = tokens[at]
+    if (operator !== '==' && operator !== '!=') return left
+    at++
+    const same = equal(left, primary())
+    return operator === '==' ? same : !same
+  }
+  const unary = (): unknown => {
+    if (tokens[at] !== '!') return comparison()
+    at++
+    return !truthy(unary())
+  }
+  const and = (): unknown => {
+    let value = unary()
+    while (tokens[at] === '&&') {
+      at++
+      const right = unary()
+      value = truthy(value) ? right : value
+    }
+    return value
+  }
+  const or = (): unknown => {
+    let value = and()
+    while (tokens[at] === '||') {
+      at++
+      const right = and()
+      value = truthy(value) ? value : right
+    }
+    return value
+  }
+  const value = or()
+  if (at !== tokens.length)
+    throw new Error(`unread tokens after ${tokens[at - 1]} in: ${text}`)
+  return truthy(value)
+}
+
+describe('Vercel preview PR trigger', () => {
+  const caller = parseYaml(
+    fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'pr-pw-e2e-vercel-preview.yml'),
+      'utf8'
+    )
+  ) as { jobs: { 'preview-ready': { if: string; with: { force_build: string } } } }
+  const job = caller.jobs['preview-ready']
+  const repository = 'muratkeremozcan/couture-cast'
+  const github = (fork: boolean, action: string, label: string) => ({
+    github: {
+      repository,
+      event: {
+        action,
+        ...(label ? { label: { name: label } } : {}),
+        pull_request: {
+          head: { repo: { full_name: fork ? 'someone/couture-cast' : repository } },
+          // The rebuild label stays on the PR in every case: only adding it may force.
+          labels: [{ name: 'PREVIEW-REBUILD' }],
+        },
+      },
+    },
+  })
+  const events: [string, string, boolean, boolean][] = [
+    // action, label added ('' for none), runs for a same-repository PR, forces a fresh build
+    ['opened', '', true, false],
+    ['reopened', '', true, false],
+    ['synchronize', '', true, false],
+    ['labeled', 'PREVIEW', true, false],
+    ['labeled', 'PREVIEW-REBUILD', true, true],
+    ['labeled', 'needs-review', false, false],
+  ]
+
+  it.each(events)(
+    "a same-repository %s event (label '%s') runs previews: %s, forces: %s",
+    (action, label, runs, forces) => {
+      expect(evaluateExpression(job.if, github(false, action, label))).toBe(runs)
+      expect(evaluateExpression(job.with.force_build, github(false, action, label))).toBe(
+        forces
+      )
+    }
+  )
+
+  // Fork PRs get no VERCEL_TOKEN, so they skip previews instead of failing on it.
+  it.each(events)(
+    "a fork %s event (label '%s') skips previews",
+    (action, label, _runs, forces) => {
+      expect(evaluateExpression(job.if, github(true, action, label))).toBe(false)
+      expect(evaluateExpression(job.with.force_build, github(true, action, label))).toBe(
+        forces
+      )
+    }
+  )
 })
