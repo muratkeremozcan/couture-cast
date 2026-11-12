@@ -154,8 +154,10 @@ export class CommunityStreamRepository {
           // first insert also prepares its statement, and production's round trip reached
           // 220 ms at worst, so 400 ms still dropped the occasional cold row; CI dropped one
           // at load. 1 s holds a cold write at three times the round trip (6.5-INT-033), and
-          // the server still bounds the insert at 100 ms.
-          { timeout: 1_000, maxWait: 50 }
+          // the server still bounds the insert at 100 ms. A 50 ms wait for a pool connection
+          // dropped the row whenever another worker loop held it; 250 ms is the wait those
+          // loops use (6.5-INT-036).
+          { timeout: 1_000, maxWait: 250 }
         )
       } catch (telemetryError) {
         // The deferral warning above remains the observation; this one says the durable row
@@ -220,7 +222,10 @@ export class CommunityStreamRepository {
       {
         isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
         timeout: 750,
-        maxWait: 100,
+        // The worker's three pool connections serve its other loops too, whose transactions wait
+        // 250 ms for one. A 100 ms wait gave up while a sibling held the connection and reported
+        // budget_pressure, halving the next batch for a busy pool (6.5-INT-035).
+        maxWait: 250,
       }
     )
   }

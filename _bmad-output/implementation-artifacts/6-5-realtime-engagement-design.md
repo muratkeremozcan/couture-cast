@@ -213,8 +213,12 @@ the owner role the worker connects as may execute them. The INT-001..006 observa
 production round trip keeps the budget honest. The append retry row's own transaction budget
 rose from 150 ms to 1 s: two statements at 31 ms missed 150 ms most of the time, and a cold
 connection's first insert (it prepares its statement on the direct-session pool) at a slow round
-trip still missed 400 ms (6.5-INT-033). A retry row that is not written logs
-`Community append retry not recorded` with its error code (6.5-INT-034). An append lane older
+trip still missed 400 ms (6.5-INT-033). Both the append and its retry row wait up to 250 ms
+for a pool connection, the wait of every other loop sharing the worker's three connections: at
+100 ms and 50 ms a sibling loop holding the connection made the append report budget_pressure,
+halving the next batch, and dropped the retry row (6.5-INT-035, 6.5-INT-036). A retry row that
+is not written logs `Community append retry not recorded` with its error code (6.5-INT-034).
+An append lane older
 than five minutes records `community_append_stalled`, which PostHog alerts on.
 
 **Ordering argument:** appender B cannot allocate a sequence for a stream until A's lock
