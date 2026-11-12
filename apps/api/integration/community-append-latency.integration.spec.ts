@@ -382,7 +382,24 @@ describe('community append at production database latency', () => {
     await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_abort_telemetry BEFORE INSERT
       ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_abort_telemetry()`)
     const counted = heldDuring(pool(1, slowUrl), 1, {})
-    const repository = new CommunityStreamRepository(counted.client)
+    // Each attempt's start and the wait and run limits it was given.
+    const budgets: { start: number; maxWait: number; timeout: number }[] = []
+    const recorded = new Proxy(counted.client, {
+      get(target, prop, receiver) {
+        const value: unknown = Reflect.get(target, prop, receiver)
+        if (prop !== '$transaction' || typeof value !== 'function') return value
+        return (...args: unknown[]) => {
+          const limits = args[1] as { maxWait?: number; timeout?: number } | undefined
+          budgets.push({
+            start: performance.now(),
+            maxWait: limits?.maxWait ?? Number.POSITIVE_INFINITY,
+            timeout: limits?.timeout ?? Number.POSITIVE_INFINITY,
+          })
+          return Reflect.apply(value, target, args) as unknown
+        }
+      },
+    })
+    const repository = new CommunityStreamRepository(recorded)
     const warnings: [Record<string, unknown>, string][] = []
     const logger = Reflect.get(repository, 'logger') as {
       warn: (fields: Record<string, unknown>, message: string) => void
@@ -406,12 +423,23 @@ describe('community append at production database latency', () => {
         evidence: '6.5-INT-038',
         elapsed,
         attempts: counted.calls(),
+        budgets: budgets.map((budget) => ({ ...budget, start: budget.start - started })),
         warnings,
       })
     )
-    // A retry ran, and every attempt ran inside the deadline plus the last attempt's close.
-    expect(counted.calls()).toBeGreaterThanOrEqual(2)
-    expect(elapsed).toBeLessThan(COMMUNITY_APPEND_DEADLINE_MS + 500)
+    // A retry ran, and every attempt was given only what was left of the one deadline. The
+    // repository sets its deadline when the append begins, no later than the first attempt.
+    expect(budgets.length).toBeGreaterThanOrEqual(2)
+    const deadline = budgets[0]!.start + COMMUNITY_APPEND_DEADLINE_MS
+    // 5 ms covers the synchronous step from computing the limits to starting the attempt.
+    for (const budget of budgets)
+      expect(budget.start + budget.maxWait + budget.timeout).toBeLessThanOrEqual(
+        deadline + 5
+      )
+    // Past the deadline only the last attempt's close remains: its statement in flight and the
+    // rollback, a few 100 ms round trips here. CI has measured 2.71 to 2.85 s, so this bound
+    // allows for a loaded runner; one fresh budget per attempt took 5.12 s.
+    expect(elapsed).toBeLessThan(COMMUNITY_APPEND_DEADLINE_MS + 1_000)
     expect(warnings.at(-1)?.[1]).toBe('Community append retry not recorded')
   }, 30_000)
 })
