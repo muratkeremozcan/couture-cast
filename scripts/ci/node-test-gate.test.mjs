@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { parse as parseYaml } from 'yaml'
 import { matrixRows } from './workflow-step-shadowing.mjs'
 import nodeTestGateReporter from './node-test-gate-reporter.mjs'
 import {
@@ -888,4 +889,41 @@ test('the local vitest rule matches the rule the share-card workflow applies to 
     rules && rules.length >= 1,
     'the workflow still checks the API entry report with the same rule'
   )
+})
+
+// Story 6.15: a suite the gate leaves to another runner must still run in CI. Each runElsewhere
+// file is run by some workflow step, by its path or through the apps/mobile npm script that
+// runs it, and the watchOS suite only with WATCHOS_REQUIRE_BUILD=1.
+test('every suite the gate leaves to another runner runs in some workflow step', () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'scripts/ci/node-test-suites.json'), 'utf8')
+  )
+  const scripts = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'apps/mobile/package.json'), 'utf8')
+  ).scripts
+  const workflowsDir = path.join(repoRoot, '.github/workflows')
+  const steps = fs
+    .readdirSync(workflowsDir)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .flatMap((file) =>
+      Object.values(
+        parseYaml(fs.readFileSync(path.join(workflowsDir, file), 'utf8')).jobs ?? {}
+      ).flatMap((job) => job.steps ?? [])
+    )
+  const unscheduled = []
+  for (const file of Object.keys(manifest.runElsewhere)) {
+    const relative = path.relative('apps/mobile', file)
+    const runners = Object.entries(scripts)
+      .filter(([name, command]) => name !== 'test' && command.includes(relative))
+      .map(([name]) => name)
+    const runs = steps.some(
+      (step) =>
+        String(step.run ?? '').includes(file) ||
+        runners.some((name) =>
+          new RegExp(`npm run ${name}(?![\\w:-])`).test(step.run ?? '')
+        )
+    )
+    if (!runs) unscheduled.push(file)
+  }
+  assert.deepEqual(unscheduled, [])
 })
