@@ -74,35 +74,43 @@ function top(node) {
 const identityOf = (node) => JSON.stringify([node.id ?? '', node.text])
 
 /**
- * Joins scrolled pages into one text multiset. Each page is offset from the previous one by the
- * median shift of the identities that appear exactly once on both pages; a node whose identity
- * and shifted position match one already taken is the same node seen again.
+ * Joins scrolled pages into one text multiset. A node at the same identity and position on
+ * every page is fixed chrome (tab bar, sticky header) and counts once. Each page is offset from
+ * the previous one by the median shift of the moving identities that appear exactly once on
+ * both pages; a node whose identity and shifted position match one already taken is the same
+ * node seen again.
  */
 export function stitchPages(pages, { tolerance = 4 } = {}) {
   if (!pages.length) return []
+  const at = (page, node) =>
+    page.some(
+      (other) =>
+        identityOf(other) === identityOf(node) &&
+        Math.abs(top(other) - top(node)) <= tolerance
+    )
+  const chrome = (node) => pages.length > 1 && pages.every((page) => at(page, node))
   const taken = pages[0].map((node) => ({ key: identityOf(node), y: top(node) }))
   let offset = 0
   for (let index = 1; index < pages.length; index += 1) {
-    const previous = pages[index - 1]
-    const current = pages[index]
     const once = (page) => {
       const counts = new Map()
       for (const node of page)
         counts.set(identityOf(node), (counts.get(identityOf(node)) ?? 0) + 1)
       return new Map(
         page
-          .filter((node) => counts.get(identityOf(node)) === 1)
+          .filter((node) => counts.get(identityOf(node)) === 1 && !chrome(node))
           .map((node) => [identityOf(node), node])
       )
     }
-    const [a, b] = [once(previous), once(current)]
+    const [a, b] = [once(pages[index - 1]), once(pages[index])]
     const shifts = [...a.keys()]
       .filter((key) => b.has(key))
       .map((key) => top(a.get(key)) - top(b.get(key)))
     if (!shifts.length) throw new Error('live_font_scroll_pages_disjoint')
     shifts.sort((x, y) => x - y)
     offset += shifts[Math.floor(shifts.length / 2)]
-    for (const node of current) {
+    for (const node of pages[index]) {
+      if (chrome(node)) continue
       const key = identityOf(node)
       const y = top(node) + offset
       if (!taken.some((seen) => seen.key === key && Math.abs(seen.y - y) <= tolerance))

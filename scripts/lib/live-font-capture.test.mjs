@@ -97,9 +97,23 @@ describe('stitchPages', () => {
       at('57°F', 300),
       at('D', 400),
     ]
+    // The second 57°F lands where the first one was; a third page shows it moved, so it is
+    // content, not chrome.
+    const third = [at('C', 0), at('57°F', 100), at('D', 200), at('E', 300)]
     assert.deepEqual(
-      stitchPages([first, second]).map((key) => JSON.parse(key)[1]),
-      ['A', 'B', '57°F', 'C', '57°F', 'D']
+      stitchPages([first, second, third]).map((key) => JSON.parse(key)[1]),
+      ['A', 'B', '57°F', 'C', '57°F', 'D', 'E']
+    )
+  })
+
+  test('counts chrome that sits still on every page once', () => {
+    const tabs = (y) => [at('Home', y), at('Settings', y)]
+    const first = [at('Top', 100), at('A', 300), at('B', 500), ...tabs(2300)]
+    const second = [at('A', 100), at('B', 300), at('C', 500), ...tabs(2300)]
+    const third = [at('B', 100), at('C', 300), at('D', 500), ...tabs(2300)]
+    assert.deepEqual(
+      stitchPages([first, second, third]).map((key) => JSON.parse(key)[1]),
+      ['Top', 'A', 'B', 'Home', 'Settings', 'C', 'D']
     )
   })
 

@@ -200,10 +200,26 @@ function capture(stage, scale, name) {
     controls: flat.controls,
     window: tree.attributes?.bounds,
   }
+  persist(result, name)
+  screenshot(name)
+  return result
+}
+
+function persist(result, name) {
+  Object.defineProperty(result, 'file', {
+    value: name,
+    enumerable: false,
+    writable: true,
+  })
   fs.writeFileSync(path.join(out, `${name}.json`), JSON.stringify(result, null, 2), {
     mode: 0o600,
   })
-  screenshot(name)
+}
+
+/** Adds the scroll-through text to a capture and rewrites its evidence file. */
+async function withFullText(result) {
+  result.fullText = await scrollThrough(result)
+  persist(result, result.file)
   return result
 }
 
@@ -225,7 +241,8 @@ function swipe(size, up) {
       String(Math.round(size.height * from)),
       String(x),
       String(Math.round(size.height * to)),
-      '400'
+      // A slow drag stops where the finger lifts; a fast one flings on after the capture.
+      '1500'
     )
   else
     maestro('maestro/live-font/swipe.yaml', {
@@ -234,19 +251,39 @@ function swipe(size, up) {
 }
 
 /** Scroll through the screen and back, returning the stitched text multiset. */
+/** The visible text once two hierarchies half a second apart agree. */
+async function stablePage() {
+  let previous = flattenHierarchy(hierarchy(), { platform }).nodes
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await pause(500)
+    const current = flattenHierarchy(hierarchy(), { platform }).nodes
+    if (sameLayout(current, previous)) return current
+    previous = current
+  }
+  throw new Error('live_font_scroll_page_unstable')
+}
+
 async function scrollThrough(first) {
   const size = windowSize(first)
   const pages = [first.nodes]
   let swipes = 0
   for (; swipes < 12; swipes += 1) {
     swipe(size, true)
-    await pause(700)
-    const page = flattenHierarchy(hierarchy(), { platform }).nodes
+    const page = await stablePage()
     if (sameLayout(page, pages[pages.length - 1])) break
     pages.push(page)
   }
   for (let back = 0; back <= swipes + 1; back += 1) swipe(size, false)
   await pause(700)
+  fs.appendFileSync(
+    path.join(out, 'scroll-through.log'),
+    `${first.stage} ${first.fontScale} pages=${pages.length} swipes=${swipes} nodes=${pages.map((page) => page.length).join(',')}\n`
+  )
+  fs.writeFileSync(
+    path.join(out, `${first.file ?? first.stage}-pages.json`),
+    JSON.stringify(pages),
+    { mode: 0o600 }
+  )
   return pages.length === 1 ? undefined : stitchPages(pages)
 }
 
@@ -293,9 +330,7 @@ async function coldScreen(name, scale, label) {
   setScale(scale)
   launch()
   maestro(`maestro/live-font/${SCREENS[name].flow}.yaml`)
-  const result = await settle('cold', scale, label)
-  result.fullText = await scrollThrough(result)
-  return result
+  return withFullText(await settle('cold', scale, label))
 }
 
 const baselines = JSON.parse(
@@ -342,14 +377,14 @@ async function liveChange(name, screen, from, to) {
   launch()
   maestro(`maestro/live-font/${screen.flow}.yaml`)
   const before = await settle('before', from, `${tag}-before`)
-  before.fullText = await scrollThrough(before)
+  await withFullText(before)
   const top = flattenHierarchy(hierarchy(), { platform }).nodes
   if (!sameLayout(top, before.nodes))
     throw new Error(`live_font_scroll_not_restored:${tag}`)
   setScale(to)
   const immediate = capture('immediate', to, `${tag}-immediate`)
   const settled = await settle('settled', to, `${tag}-settled`)
-  settled.fullText = await scrollThrough(settled)
+  await withFullText(settled)
   return { before, immediate, settled }
 }
 

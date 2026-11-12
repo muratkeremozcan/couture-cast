@@ -152,7 +152,8 @@ function keyed(capture) {
 }
 
 function multiset(capture) {
-  return [...(capture.fullText ?? appNodes(capture).map(identityOf))].sort()
+  const keys = capture.fullText ?? appNodes(capture).map(identityOf)
+  return keys.filter((key) => !SYSTEM_UI.test(JSON.parse(key)[0])).sort()
 }
 
 const height = (node) => node.box[3] - node.box[1]
