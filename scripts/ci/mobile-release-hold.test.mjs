@@ -10,6 +10,28 @@ import { fileURLToPath } from 'node:url'
 
 import { evaluateReleaseHold, readReleaseHold } from './mobile-release-hold.mjs'
 
+/** A repository where the candidate is SDK 57, the control SDK 55, and HEAD adds only evidence. */
+function fakeGit(overrides = {}) {
+  const trees = {
+    ['a'.repeat(40)]: { expo: '~57.0.33', lock: '57.0.33' },
+    ['d'.repeat(40)]: { expo: '~55.0.32', lock: '55.0.32' },
+  }
+  return {
+    tracked: () => true,
+    commitExists: (commit) => commit in trees,
+    show: (revision, file) => {
+      const tree = trees[revision]
+      if (!tree) return null
+      return file === 'apps/mobile/package.json'
+        ? JSON.stringify({ dependencies: { expo: tree.expo } })
+        : JSON.stringify({ packages: { 'node_modules/expo': { version: tree.lock } } })
+    },
+    isAncestorOfHead: () => true,
+    changedSince: () => ['apps/mobile/release-hold.json', EVIDENCE],
+    ...overrides,
+  }
+}
+
 const EVIDENCE = '_bmad-output/implementation-artifacts/story-6-15/memory/sdk-57.json'
 const hold = (...lifts) => ({
   heldFrom: 56,
@@ -31,10 +53,11 @@ function artifact(overrides = {}) {
 }
 const sdk56 = { expoRange: '~56.0.24', expoVersion: '56.0.24' }
 const sdk57 = { expoRange: '~57.0.33', expoVersion: '57.0.33' }
-const verdict = (lifted, context = sdk57, evidence = EVIDENCE) =>
+const verdict = (lifted, context = sdk57, git = fakeGit()) =>
   evaluateReleaseHold({
-    hold: hold(evidence),
+    hold: hold(EVIDENCE),
     ...context,
+    git,
     readArtifact: (relative) => (relative === EVIDENCE ? lifted : null),
   })
 
@@ -62,8 +85,20 @@ describe('evaluateReleaseHold', () => {
 
   test('a measurement on the current SDK within 10% on both platforms releases', () => {
     assert.equal(verdict(artifact()).allowed, true)
+    const sdk56Git = fakeGit({
+      show: (revision, file) => {
+        const control = revision === 'd'.repeat(40)
+        return file === 'apps/mobile/package.json'
+          ? JSON.stringify({ dependencies: { expo: control ? '~55.0.32' : '~56.0.24' } })
+          : JSON.stringify({
+              packages: {
+                'node_modules/expo': { version: control ? '55.0.32' : '56.0.24' },
+              },
+            })
+      },
+    })
     assert.equal(
-      verdict(artifact({ sdk: 56, expoVersion: '56.0.24' }), sdk56).allowed,
+      verdict(artifact({ sdk: 56, expoVersion: '56.0.24' }), sdk56, sdk56Git).allowed,
       true
     )
   })
@@ -127,11 +162,84 @@ describe('evaluateReleaseHold', () => {
     const objectLift = evaluateReleaseHold({
       hold: hold({ path: EVIDENCE }),
       ...sdk57,
+      git: fakeGit(),
       readArtifact: () => artifact(),
     })
     assert.equal(objectLift.allowed, false)
     assert.match(objectLift.reason, /must name its evidence artifact/)
   })
+
+  // R4-02: the evidence is bound to the repository, the measured build and the Step 1 control.
+  for (const [name, git, overrides, reason] of [
+    [
+      'an untracked or locally changed artifact',
+      fakeGit({ tracked: () => false }),
+      {},
+      /not committed/,
+    ],
+    [
+      'a candidate commit that does not exist',
+      fakeGit(),
+      { build: { commit: 'e'.repeat(40), android: 'b'.repeat(64), ios: 'c'.repeat(64) } },
+      /does not exist/,
+    ],
+    [
+      'a control commit that does not exist',
+      fakeGit(),
+      { control: { sdk: 55, expoVersion: '55.0.32', commit: 'f'.repeat(40) } },
+      /does not exist/,
+    ],
+    [
+      'the candidate as its own control',
+      fakeGit(),
+      { control: { sdk: 55, expoVersion: '55.0.32', commit: 'a'.repeat(40) } },
+      /same commit/,
+    ],
+    [
+      'a control whose expo does not match its commit',
+      fakeGit(),
+      { control: { sdk: 55, expoVersion: '57.0.33', commit: 'd'.repeat(40) } },
+      /is not SDK 55 with expo 57.0.33/,
+    ],
+    [
+      'a candidate commit on another SDK',
+      fakeGit({
+        show: (revision, file) =>
+          file === 'apps/mobile/package.json'
+            ? JSON.stringify({
+                dependencies: {
+                  expo: revision === 'd'.repeat(40) ? '~55.0.32' : '~56.0.24',
+                },
+              })
+            : JSON.stringify({
+                packages: {
+                  'node_modules/expo': {
+                    version: revision === 'd'.repeat(40) ? '55.0.32' : '56.0.24',
+                  },
+                },
+              }),
+      }),
+      {},
+      /candidate commit .* is not SDK 57/,
+    ],
+    [
+      'a candidate outside this history',
+      fakeGit({ isAncestorOfHead: () => false }),
+      {},
+      /not in this history/,
+    ],
+    [
+      'a release that changed the app after the measurement',
+      fakeGit({ changedSince: () => [EVIDENCE, 'apps/mobile/app/_layout.tsx'] }),
+      {},
+      /beyond evidence/,
+    ],
+  ])
+    test(`refuses ${name}`, () => {
+      const result = verdict(artifact(overrides), sdk57, git)
+      assert.equal(result.allowed, false)
+      assert.match(result.reason, reason)
+    })
 
   test('SDK 57 before the fixed patch stays held even with a passing measurement', () => {
     const result = verdict(artifact({ expoVersion: '57.0.9' }), {

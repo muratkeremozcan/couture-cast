@@ -19,6 +19,7 @@
 //   "control": { "sdk": 55, "expoVersion": "55.0.32", "commit": "<40 hex>" },
 //   "android": { "control": { "peakMb": 310, "settledMb": 240 }, "candidate": { ... } },
 //   "ios": { "control": { "peakMb": 280, "settledMb": 210 }, "candidate": { ... } } }
+import { spawnSync } from 'node:child_process'
 import fs, { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -92,8 +93,71 @@ export function liftProblem(artifact, sdk, expoVersion) {
   return null
 }
 
+/** Paths an evidence-only follow-up commit may change after the measured candidate (R4-02). */
+export const EVIDENCE_PATHS = [
+  'apps/mobile/release-hold.json',
+  '_bmad-output/implementation-artifacts/story-6-15/memory/',
+]
+
+function expoAt(git, revision) {
+  const manifest = git.show(revision, 'apps/mobile/package.json')
+  const lock = git.show(revision, 'package-lock.json')
+  if (!manifest || !lock) return null
+  const lockfile = JSON.parse(lock)
+  return {
+    sdk: version(JSON.parse(manifest).dependencies?.expo)[0],
+    expoVersion:
+      lockfile.packages['apps/mobile/node_modules/expo']?.version ??
+      lockfile.packages['node_modules/expo']?.version,
+  }
+}
+
+/**
+ * Binds a lift's evidence to the repository (story 6.15 R4-02): the artifact is tracked and
+ * unmodified; the measured candidate and the control are real commits that differ; the control
+ * is a Step 1 commit on SDK 55 with the expo version the artifact names; the candidate carries the
+ * SDK and expo version it claims; and the commit being released is the candidate or a descendant
+ * that changes only the hold file and the evidence directory. The recorded build digests stay as
+ * provenance only, because the release build is rebuilt by EAS.
+ * @returns {string | null}
+ */
+export function provenanceProblem(artifact, evidence, git) {
+  if (!git.tracked(evidence))
+    return 'evidence artifact is not committed or has local changes'
+  const { commit: candidate } = artifact.build
+  const { commit: control } = artifact.control
+  if (!git.commitExists(candidate)) return `candidate commit ${candidate} does not exist`
+  if (!git.commitExists(control)) return `control commit ${control} does not exist`
+  if (candidate === control) return 'the control and the candidate are the same commit'
+  const controlExpo = expoAt(git, control)
+  if (
+    controlExpo?.sdk !== CONTROL_SDK ||
+    controlExpo.expoVersion !== artifact.control.expoVersion
+  )
+    return `control commit ${control} is not SDK ${CONTROL_SDK} with expo ${artifact.control.expoVersion}`
+  const candidateExpo = expoAt(git, candidate)
+  if (
+    candidateExpo?.sdk !== artifact.sdk ||
+    candidateExpo.expoVersion !== artifact.expoVersion
+  )
+    return `candidate commit ${candidate} is not SDK ${artifact.sdk} with expo ${artifact.expoVersion}`
+  if (!git.isAncestorOfHead(candidate))
+    return `candidate commit ${candidate} is not in this history`
+  const changed = git.changedSince(candidate)
+  const outside = changed.filter(
+    (file) =>
+      !EVIDENCE_PATHS.some(
+        (allowed) =>
+          file === allowed || (allowed.endsWith('/') && file.startsWith(allowed))
+      )
+  )
+  if (outside.length)
+    return `the release changes ${outside.length} file(s) beyond evidence since the measured build, such as ${outside[0]}`
+  return null
+}
+
 /** @returns {{ allowed: boolean, reason: string }} */
-export function evaluateReleaseHold({ hold, expoRange, expoVersion, readArtifact }) {
+export function evaluateReleaseHold({ hold, expoRange, expoVersion, readArtifact, git }) {
   const sdk = version(expoRange)[0]
   if (!hold) {
     return sdk >= HELD_FROM_SDK
@@ -109,7 +173,8 @@ export function evaluateReleaseHold({ hold, expoRange, expoVersion, readArtifact
   for (const evidence of hold.lifts) {
     const problem =
       typeof evidence === 'string' && evidence
-        ? liftProblem(readArtifact(evidence), sdk, expoVersion)
+        ? (liftProblem(readArtifact(evidence), sdk, expoVersion) ??
+          provenanceProblem(readArtifact(evidence), evidence, git))
         : 'a lift must name its evidence artifact'
     if (!problem) return { allowed: true, reason: `SDK ${sdk} released by ${evidence}` }
     problems.push(`${evidence}: ${problem}`)
@@ -141,7 +206,22 @@ export function readReleaseHold(root) {
       return null
     }
   }
-  return { hold, expoRange, expoVersion, readArtifact }
+  const run = (args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+  const git = {
+    tracked: (file) =>
+      run(['ls-files', '--error-unmatch', file]).status === 0 &&
+      run(['diff', '--quiet', 'HEAD', '--', file]).status === 0,
+    commitExists: (commit) => run(['cat-file', '-e', `${commit}^{commit}`]).status === 0,
+    show: (revision, file) => {
+      const result = run(['show', `${revision}:${file}`])
+      return result.status === 0 ? result.stdout : null
+    },
+    isAncestorOfHead: (commit) =>
+      run(['merge-base', '--is-ancestor', commit, 'HEAD']).status === 0,
+    changedSince: (commit) =>
+      run(['diff', '--name-only', commit, 'HEAD']).stdout.split('\n').filter(Boolean),
+  }
+  return { hold, expoRange, expoVersion, readArtifact, git }
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
