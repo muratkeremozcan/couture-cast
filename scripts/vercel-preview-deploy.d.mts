@@ -43,7 +43,14 @@ export type DeployInput = {
 }
 export declare function previewDeployment(input: DeployInput): Promise<PreviewResult>
 export declare function productionDeployment(
-  input: DeployInput & { current: Deployment | null }
+  input: DeployInput & {
+    current: Deployment | null
+    reportOnly?: boolean
+    cancel: (id: string) => Promise<unknown>
+    promote: (id: string) => Promise<unknown>
+    served: () => Promise<Deployment | null>
+    isOlder: (sha: string) => Promise<boolean>
+  }
 ): Promise<PreviewResult>
 export declare function run(
   project: PreviewProject,

@@ -15,6 +15,7 @@
  * cancels a deployment. Either way it returns that deployment's own URL, id and commit, which the
  * health wait and the e2e run use as they are.
  */
+import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -260,14 +261,7 @@ async function untilReady(id, targetSha, settings) {
  * @returns {Promise<{ id: string, url: string, sha: string, reused: boolean }>}
  */
 export async function previewDeployment(input) {
-  const settings = {
-    ...input,
-    force: input.force === true,
-    now: input.now ?? (() => Date.now()),
-    sleep: input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
-    intervalMs: input.intervalMs ?? 15_000,
-    log: input.log ?? (() => undefined),
-  }
+  const settings = withDefaults(input)
   const { project, branch, sha, inputs, config, force, log } = settings
   if (!force) {
     const ours = (await settings.list())
@@ -308,6 +302,18 @@ export async function previewDeployment(input) {
   return untilReady(id, sha, settings)
 }
 
+/** A deploy input with its clock, sleep, poll interval and log filled in. */
+function withDefaults(input) {
+  return {
+    ...input,
+    force: input.force === true,
+    now: input.now ?? (() => Date.now()),
+    sleep: input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    intervalMs: input.intervalMs ?? 15_000,
+    log: input.log ?? (() => undefined),
+  }
+}
+
 /** Marks the production deployments CI creates (pw-e2e-prod.yml). */
 export const PRODUCTION_SOURCE = 'pw-e2e-prod'
 
@@ -318,52 +324,103 @@ export const PRODUCTION_SOURCE = 'pw-e2e-prod'
  * production serves now (`current`, the project's production target, which a dashboard rollback
  * moves without creating a deployment). A commit that changed neither leaves production where
  * it is, and the result names the commit production serves, which the health wait and the
- * production e2e run expect. A production build of the same inputs that is still running, left
- * by a superseded run, is adopted. It never cancels a deployment.
- * @param {DeployInput & { current: Deployment | null }} input
+ * production e2e run expect.
+ *
+ * Production builds of older main commits with other inputs that are still running (their runs
+ * were superseded, and Vercel carries on building) are cancelled first: one finishing later
+ * would take production back to code this commit replaced. A running build of the same inputs
+ * is adopted. A build this step waits for is reported only once the production target serves
+ * it; after an Instant Rollback, Vercel stops assigning production to new builds until one is
+ * promoted, so the step promotes its build when the target still points elsewhere.
+ *
+ * `reportOnly` (a manual run off main) creates, cancels and promotes nothing: it reports what
+ * production serves.
+ * @param {DeployInput & {
+ *   current: Deployment | null,
+ *   reportOnly?: boolean,
+ *   cancel: (id: string) => Promise<unknown>,
+ *   promote: (id: string) => Promise<unknown>,
+ *   served: () => Promise<Deployment | null>,
+ *   isOlder: (sha: string) => Promise<boolean>,
+ * }} input
  * @returns {Promise<{ id: string, url: string, sha: string, reused: boolean }>}
  */
 export async function productionDeployment(input) {
-  const settings = {
-    ...input,
-    force: input.force === true,
-    now: input.now ?? (() => Date.now()),
-    sleep: input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
-    intervalMs: input.intervalMs ?? 15_000,
-    log: input.log ?? (() => undefined),
-  }
-  const { project, branch, sha, inputs, config, force, log } = settings
+  const settings = withDefaults(input)
+  const { project, inputs, config, force, log } = settings
   const current = stateOf(settings.current ?? {}) === 'READY' ? settings.current : null
+  if (settings.reportOnly) {
+    if (!current || !/^[a-f0-9]{40}$/.test(shaOf(current)))
+      throw new Error(`${project}: production serves no deployment with a known commit`)
+    log(
+      `${project}: reporting what production serves (${shaOf(current)}); nothing deployed`
+    )
+    return servedResult(current)
+  }
   const same = (deployment) =>
     deployment.meta?.ccProductionSource === PRODUCTION_SOURCE &&
     deployment.meta?.ccProductionInputs === inputs &&
     deployment.meta?.ccProductionConfig === config &&
-    /^[a-f0-9]{40}$/.test(deployment.meta?.githubCommitSha ?? '')
-  if (!force) {
-    if (current && same(current)) {
-      const servedSha = /** @type {string} */ (current.meta?.githubCommitSha)
-      log(
-        `${project}: production already serves ${servedSha}, built from the same inputs and configuration; no deployment created`
-      )
-      return {
-        id: idOf(current),
-        url: `https://${current.url}`,
-        sha: servedSha,
-        reused: true,
-      }
-    }
-    const building = (await settings.list())
-      .filter((deployment) => deployment.target === 'production')
-      .sort((a, b) => createdOf(b) - createdOf(a))
-      .find((deployment) => IN_FLIGHT.has(stateOf(deployment)) && same(deployment))
-    if (building) {
-      const buildingSha = /** @type {string} */ (building.meta?.githubCommitSha)
-      log(
-        `${project}: adopting production build ${idOf(building)} (${buildingSha}) of the same inputs`
-      )
-      return untilReady(idOf(building), buildingSha, settings)
-    }
+    /^[a-f0-9]{40}$/.test(shaOf(deployment))
+  const inFlight = await cancelOlderBuilds(
+    settings,
+    (deployment) => !force && same(deployment)
+  )
+  if (!force && current && same(current)) {
+    log(
+      `${project}: production already serves ${shaOf(current)}, built from the same inputs and configuration; no deployment created`
+    )
+    return servedResult(current)
   }
+  const adopt = force ? undefined : inFlight.find(same)
+  if (adopt)
+    log(
+      `${project}: adopting production build ${idOf(adopt)} (${shaOf(adopt)}) of the same inputs`
+    )
+  const { id, targetSha } = adopt
+    ? { id: idOf(adopt), targetSha: shaOf(adopt) }
+    : await createProduction(settings, current)
+  const built = await untilReady(id, targetSha, settings)
+  await untilServed(id, settings)
+  return built
+}
+
+const shaOf = (deployment) => deployment?.meta?.githubCommitSha ?? ''
+const servedResult = (deployment) => ({
+  id: idOf(deployment),
+  url: `https://${deployment.url}`,
+  sha: shaOf(deployment),
+  reused: true,
+})
+
+/**
+ * Cancels production builds still running for older main commits, except those `keep` names
+ * (same inputs): one finishing later would replace what this commit leaves or makes current. A
+ * build from a newer push is that run's to finish. Returns the running builds, newest first.
+ */
+async function cancelOlderBuilds(settings, keep) {
+  const { project, sha, log } = settings
+  const inFlight = (await settings.list())
+    .filter(
+      (deployment) =>
+        deployment.target === 'production' && IN_FLIGHT.has(stateOf(deployment))
+    )
+    .sort((a, b) => createdOf(b) - createdOf(a))
+  for (const deployment of inFlight) {
+    if (keep(deployment)) continue
+    const buildSha = shaOf(deployment)
+    if (!buildSha || buildSha === sha || !(await settings.isOlder(buildSha))) continue
+    log(
+      `${project}: cancelling production build ${idOf(deployment)} of older commit ${buildSha} (other inputs)`
+    )
+    await settings.cancel(idOf(deployment))
+  }
+  return inFlight
+}
+
+/** Creates the production deployment of `sha`, marked with its inputs and configuration. */
+async function createProduction(settings, current) {
+  const { project, branch, sha, inputs, config, force, log } = settings
   const created = await settings.create({
     name: settings.projectName,
     project: settings.projectId,
@@ -378,10 +435,50 @@ export async function productionDeployment(input) {
   const id = idOf(created)
   if (!id)
     throw new Error(`${project}: Vercel created no production deployment for ${sha}`)
+  const replaced = current
+    ? `; production served ${shaOf(current) || idOf(current)} from other inputs or configuration`
+    : ''
   log(
-    `${project}: created production deployment ${id} for ${sha}${force ? ' (forced)' : current ? `; production served ${current.meta?.githubCommitSha ?? idOf(current)} from other inputs or configuration` : ''}`
+    `${project}: created production deployment ${id} for ${sha}${force ? ' (forced)' : replaced}`
   )
-  return untilReady(id, sha, settings)
+  return { id, targetSha: sha }
+}
+
+/**
+ * Waits until the production target serves `id`, promoting it when it does not: after an
+ * Instant Rollback Vercel leaves production on the rolled-back deployment until one is promoted.
+ */
+async function untilServed(id, settings) {
+  const { project, now, sleep, intervalMs, deadline, log } = settings
+  let promoted = false
+  for (;;) {
+    const target = await settings.served()
+    const servedId = target ? idOf(target) : ''
+    if (servedId === id) return
+    if (!promoted) {
+      log(
+        `${project}: production serves ${servedId || 'nothing'}, not ${id}; promoting ${id} (domain assignment is off after a rollback)`
+      )
+      await settings.promote(id)
+      promoted = true
+      continue
+    }
+    if (deadline - now() <= intervalMs)
+      throw new Error(
+        `${project}: production still serves ${servedId || 'nothing'}, not ${id}, after promoting it`
+      )
+    await sleep(intervalMs)
+  }
+}
+
+/** Whether `older` is a strict ancestor of `commit` in the checkout (full history). */
+function isAncestor(cwd, older, commit) {
+  if (older === commit) return false
+  const result = spawnSync('git', ['merge-base', '--is-ancestor', older, commit], {
+    cwd,
+    timeout: 30_000,
+  })
+  return result.status === 0
 }
 
 /** Vercel's REST API, every request bounded by the job deadline and 30 s. */
@@ -470,6 +567,14 @@ export async function run(project, env, options = {}) {
           productionDeployment({
             ...input,
             current: projectData.targets?.production ?? null,
+            reportOnly: env.PRODUCTION_REPORT_ONLY === 'true',
+            cancel: (id) => api('PATCH', `/v12/deployments/${id}/cancel?${scope}`),
+            promote: (id) =>
+              api('POST', `/v10/projects/${projectData.id}/promote/${id}?${scope}`),
+            served: async () =>
+              (await api('GET', `/v9/projects/${projectData.id}?${scope}`)).targets
+                ?.production ?? null,
+            isOlder: (buildSha) => Promise.resolve(isAncestor(cwd, buildSha, sha)),
           })
       : previewDeployment
   return provide({

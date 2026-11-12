@@ -31,13 +31,32 @@ const production = (
   meta,
 })
 
+const older = 'b'.repeat(40)
+const newer = 'd'.repeat(40)
+
 async function provide(
   current: Deployment | null,
   list: Deployment[] = [],
-  options: { inputs?: string; config?: string; force?: boolean } = {}
+  options: {
+    inputs?: string
+    config?: string
+    force?: boolean
+    reportOnly?: boolean
+    // After an Instant Rollback, Vercel keeps serving `current` until a deployment is promoted.
+    rollback?: boolean
+    // A promotion that never takes effect.
+    promotionIgnored?: boolean
+  } = {}
 ) {
   const created: Record<string, unknown>[] = []
   const polled: string[] = []
+  const cancelled: string[] = []
+  const promoted: string[] = []
+  let clock = 0
+  // What the production target serves: `current` until a build completes and is assigned
+  // (automatically, or by an explicit promotion after a rollback).
+  let target: Deployment | null = current
+  const ready = new Map<string, Deployment>()
   const result = await productionDeployment({
     project: 'api',
     branch: 'main',
@@ -45,13 +64,18 @@ async function provide(
     inputs: options.inputs ?? 'inputs-1',
     config: options.config ?? 'config-1',
     force: options.force,
+    reportOnly: options.reportOnly,
     current,
     repoId: 42,
     projectId: 'prj_api',
     projectName: 'couture-cast-api',
-    deadline: 60_000,
-    now: () => 0,
-    sleep: () => Promise.resolve(),
+    deadline: 120_000,
+    intervalMs: 15_000,
+    now: () => clock,
+    sleep: (ms) => {
+      clock += ms
+      return Promise.resolve()
+    },
     list: () => Promise.resolve(list),
     create: (body) => {
       created.push(body)
@@ -59,11 +83,38 @@ async function provide(
     },
     get: (id) => {
       polled.push(id)
-      return Promise.resolve({ id, readyState: 'READY', url: `${id}.example` })
+      const done: Deployment = {
+        id,
+        readyState: 'READY',
+        url: `${id}.example`,
+        meta: { githubCommitSha: head },
+      }
+      ready.set(id, done)
+      if (!options.rollback) target = { ...done, uid: id }
+      return Promise.resolve(done)
     },
+    cancel: (id) => {
+      cancelled.push(id)
+      return Promise.resolve()
+    },
+    promote: (id) => {
+      promoted.push(id)
+      if (!options.promotionIgnored) target = { ...ready.get(id), uid: id }
+      return Promise.resolve()
+    },
+    served: () => Promise.resolve(target),
+    isOlder: (sha) => Promise.resolve(sha === older || sha === served),
   })
-  return { result, created, polled }
+  return { result, created, polled, cancelled, promoted }
 }
+
+const building = (uid: string, sha: string, inputs: string, created = 3) =>
+  production(uid, 'BUILDING', created, {
+    githubCommitSha: sha,
+    ccProductionSource: PRODUCTION_SOURCE,
+    ccProductionInputs: inputs,
+    ccProductionConfig: 'config-1',
+  })
 
 describe('Vercel production deployment', () => {
   it('leaves production alone when it already serves the same inputs and configuration', async () => {
@@ -130,20 +181,87 @@ describe('Vercel production deployment', () => {
   })
 
   it('adopts a production build of the same inputs that a superseded run left', async () => {
-    const building = production('dpl_building', 'BUILDING', 3, {
-      githubCommitSha: head,
-      ccProductionSource: PRODUCTION_SOURCE,
-      ccProductionInputs: 'inputs-2',
-      ccProductionConfig: 'config-1',
-    })
     const { result, created, polled } = await provide(
       production('dpl_served', 'READY', 2),
-      [building],
+      [building('dpl_building', head, 'inputs-2')],
       { inputs: 'inputs-2' }
     )
     expect(created).toEqual([])
     expect(polled).toEqual(['dpl_building'])
     expect(result).toMatchObject({ id: 'dpl_building', sha: head })
+  })
+
+  it('cancels an older in-flight build of other inputs before keeping production as it is', async () => {
+    // A served, B (older push, other inputs) still building, this push reverted B's change.
+    const { result, created, cancelled } = await provide(
+      production('dpl_served', 'READY', 2),
+      [building('dpl_b', older, 'inputs-2')]
+    )
+    expect(cancelled).toEqual(['dpl_b'])
+    expect(created).toEqual([])
+    expect(result).toMatchObject({ id: 'dpl_served', sha: served, reused: true })
+  })
+
+  it('cancels an older in-flight build of other inputs before building its own', async () => {
+    const { created, cancelled } = await provide(
+      production('dpl_served', 'READY', 2),
+      [building('dpl_b', older, 'inputs-2')],
+      { inputs: 'inputs-3' }
+    )
+    expect(cancelled).toEqual(['dpl_b'])
+    expect(created).toHaveLength(1)
+  })
+
+  it('leaves alone an in-flight build from a newer push', async () => {
+    const { cancelled } = await provide(production('dpl_served', 'READY', 2), [
+      building('dpl_newer', newer, 'inputs-2'),
+    ])
+    expect(cancelled).toEqual([])
+  })
+
+  it('promotes its build after an Instant Rollback left domain assignment off', async () => {
+    const { result, promoted } = await provide(
+      production('dpl_rolled_back_to', 'READY', 1, {
+        githubCommitSha: older,
+        ccProductionSource: PRODUCTION_SOURCE,
+        ccProductionInputs: 'inputs-0',
+        ccProductionConfig: 'config-1',
+      }),
+      [],
+      { rollback: true }
+    )
+    expect(promoted).toEqual(['dpl_new'])
+    expect(result).toMatchObject({ id: 'dpl_new', sha: head, reused: false })
+  })
+
+  it('does not promote a build that production already serves', async () => {
+    const { promoted } = await provide(production('dpl_served', 'READY', 2), [], {
+      inputs: 'inputs-2',
+    })
+    expect(promoted).toEqual([])
+  })
+
+  it('fails, naming the promotion, when production never serves its build', async () => {
+    await expect(
+      provide(production('dpl_served', 'READY', 2), [], {
+        inputs: 'inputs-2',
+        rollback: true,
+        promotionIgnored: true,
+      })
+    ).rejects.toThrow(
+      /production still serves dpl_served, not dpl_new, after promoting it/
+    )
+  })
+
+  it('reports what production serves, creating and cancelling nothing, for a run off main', async () => {
+    const { result, created, cancelled } = await provide(
+      production('dpl_served', 'READY', 2),
+      [building('dpl_b', older, 'inputs-2')],
+      { inputs: 'inputs-9', reportOnly: true }
+    )
+    expect(created).toEqual([])
+    expect(cancelled).toEqual([])
+    expect(result).toMatchObject({ id: 'dpl_served', sha: served, reused: true })
   })
 
   it('never adopts a preview build', async () => {
