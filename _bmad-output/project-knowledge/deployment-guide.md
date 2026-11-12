@@ -14,6 +14,7 @@ Updated: 2026-11-13 (Story 6.15 Step 0): release hold, Test Store isolation, deb
 Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-11-16 (Vercel Hobby limits): one build input map, production builds skipped when unchanged, previews reused across branches, E2E asset cache.
+Updated: 2026-11-19: Community Beta opened in production; community and moderation flags pinned at 100 percent.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -1683,9 +1684,14 @@ event.
 **Drift check.** The `PostHog flag drift` workflow runs `scripts/ci/posthog-flag-drift.mjs`
 hourly, on every push to main and on any pull request that edits `packages/config/src/flags.ts`.
 Each declared key must pass two checks, and the expected value is its declared default unless
-the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today that is only
-`color_analysis_enabled` at `true` (owner decision 2026-11-11: color analysis stays on in
-production, and the code default stays `false` so a degraded PostHog fails closed).
+the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today it pins seven keys at
+`true`, and each code default stays `false` so a degraded PostHog fails closed:
+
+- `color_analysis_enabled` (owner decision 2026-11-11): color analysis stays on in production.
+- `community_read_enabled`, `community_write_enabled`, `moderation_console_enabled`,
+  `moderation_decisions_enabled`, `moderation_sla_monitoring_enabled` and
+  `moderation_history_enabled` (owner decision 2026-11-19): the Community Beta opens to every
+  member, with the moderation console, decisions, SLA sweep and history on.
 
 - Definition, read through the PostHog API with the repository secret `POSTHOG_FLAG_READ_KEY`
   (a personal API key limited to `feature_flag:read` and `project:read` on 329012): the flag
