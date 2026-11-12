@@ -225,27 +225,34 @@ describe('dependency download recovery', () => {
     expect(result.attempts).toBe(1)
   })
 
-  it('routes the shared install action through the recovery script', () => {
+  it('routes the shared dependency action through the recovery script', () => {
     const action = fs.readFileSync(
-      path.join(repoRoot, '.github/actions/install/action.yml'),
+      path.join(repoRoot, '.github/actions/node-dependencies/action.yml'),
       'utf8'
     )
     expect(action).toContain('INSTALL_COMMAND: ${{ inputs.install-command }}')
     expect(action).toContain(
       'run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"'
     )
+    expect(action).not.toMatch(/for attempt/)
   })
 
-  it('routes the other setup action through the same script, with no retry of its own', () => {
-    const action = fs.readFileSync(
-      path.join(repoRoot, '.github/actions/setup-node-env/action.yml'),
-      'utf8'
-    )
-    expect(action).toContain('INSTALL_COMMAND:')
-    expect(action).toContain(
-      'run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"'
-    )
-    expect(action).not.toMatch(/for attempt/)
+  it('routes both setup actions through the shared dependency action', () => {
+    for (const [file, command] of [
+      [
+        '.github/actions/install/action.yml',
+        'install-command: ${{ inputs.install-command }}',
+      ],
+      [
+        '.github/actions/setup-node-env/action.yml',
+        "install-command: ${{ inputs.use-npm-ci == 'true' && 'npm ci' || 'npm install' }}",
+      ],
+    ]) {
+      const action = fs.readFileSync(path.join(repoRoot, file), 'utf8')
+      expect(action, file).toContain('uses: ./.github/actions/node-dependencies')
+      expect(action, file).toContain(command)
+      expect(action, file).not.toMatch(/for attempt/)
+    }
   })
 })
 

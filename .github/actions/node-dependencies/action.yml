@@ -1,0 +1,72 @@
+# Story 6.14 follow-up: every job a push starts installed the same dependency tree, 50 to 85 s
+# each across about 30 jobs against the account's 20 concurrent job slots. The tree is a pure
+# function of the Node version, .npmrc and package-lock.json, so it is cached under exactly
+# those and restored whole: a hit skips the install, a miss installs and saves the fresh tree
+# before any later step changes it. No partial key restores an older tree.
+# scripts/ci/node-dependencies.test.mjs holds both install actions to this.
+name: Node dependencies
+description: Set up Node and the dependency tree, from the cache when the lockfile matches
+
+inputs:
+  install-command:
+    description: 'npm ci, npm install, or a custom command'
+    required: false
+    default: 'npm ci'
+  node-version-file:
+    description: 'Path to .nvmrc or version file'
+    required: false
+    default: '.nvmrc'
+
+outputs:
+  cache-hit:
+    description: 'true when the dependency tree came from the cache'
+    value: ${{ steps.modules.outputs.cache-hit }}
+
+runs:
+  using: composite
+  steps:
+    - name: Restore the dependency tree for this lockfile
+      id: modules
+      # npm ci and npm install build the same tree from an unchanged lockfile; a custom
+      # command may not, so it always installs.
+      if: inputs.install-command == 'npm ci' || inputs.install-command == 'npm install'
+      uses: actions/cache/restore@v4
+      env:
+        # A stalled segment download falls back to installing.
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '3'
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: node-modules-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(inputs.node-version-file, '.npmrc', 'package-lock.json') }}
+
+    - name: Setup Node
+      uses: actions/setup-node@v4
+      with:
+        node-version-file: ${{ inputs.node-version-file }}
+        # The npm download cache only helps an install; a restored tree needs none.
+        cache: ${{ steps.modules.outputs.cache-hit != 'true' && 'npm' || '' }}
+
+    - name: Install dependencies
+      if: steps.modules.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        INSTALL_COMMAND: ${{ inputs.install-command }}
+      run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"
+
+    - name: Save the dependency tree for this lockfile
+      # Saved before any later step writes into node_modules, and only when the install left
+      # the lockfile as keyed (npm install rewrites one that is out of step with package.json).
+      # Concurrent misses race for the key; the losers' saves fail and must not fail their jobs.
+      if: >-
+        steps.modules.outcome == 'success' && steps.modules.outputs.cache-hit != 'true' &&
+        steps.modules.outputs.cache-primary-key == format('node-modules-v1-{0}-{1}-{2}', runner.os, runner.arch, hashFiles(inputs.node-version-file, '.npmrc', 'package-lock.json'))
+      continue-on-error: true
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          node_modules
+          apps/*/node_modules
+          packages/*/node_modules
+        key: ${{ steps.modules.outputs.cache-primary-key }}
