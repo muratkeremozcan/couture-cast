@@ -1,6 +1,6 @@
 # Story 6.15 pre-flight: Expo SDK 54 to 58
 
-Updated: 2026-11-12 (pre-flight research for story drafting; every claim below cites its source in the research run and must be re-verified while writing the story)
+Updated: 2026-11-12 (pre-flight research for story drafting; sequence superseded by the story after the Codex review)
 
 ## Release facts
 
@@ -38,10 +38,17 @@ Updated: 2026-11-12 (pre-flight research for story drafting; every claim below c
 
 ## Recommended sequence
 
-1. On SDK 54: move CI macOS jobs to `macos-26`; background-fetch to background-task; media library legacy import; drop removed app.json keys.
-2. SDK 55 (RN 0.83).
-3. SDK 56 (RN 0.85): router codemod, iOS 16.4 in plugins, TypeScript 6, async file-system calls.
-4. SDK 57 (RN 0.86): prebuild cleans native folders by default.
-5. SDK 58 (RN 0.88): Strict TypeScript, router 57 to 58, scene delegate, R8 keep rules, RevenueCat decision, `xcode-27` runner trial.
+Superseded by the story's D1 step table and decisions D11 to D15 in
+`_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`, which is the
+one sequence to follow. The media-library change happens at Step 2, and the macOS move follows the
+D6 probe.
 
-Unverified: posthog-react-native's own statement of React Native 0.88 support (low risk, `captureScreens: false`), Apple's deadline for the iOS 27 SDK.
+## Resolved after review (2026-11-12)
+
+- `posthog-react-native` 4.86.0 declares no React Native range and no incompatibility; the Step 4
+  Release event capture proves it on 0.88.
+- `react-native-purchases` 11.0.2 declares `react-native >= 0.80.0`.
+- Apple requires the iOS 27 SDK for App Store uploads from April 2027; the exact date is not yet
+  announced. Steps 2 and 3 build with Xcode 26.x and stay submittable until then.
+- SDK 56 carries a Hermes V1 memory regression for apps importing Worklets or Reanimated, fixed in
+  `expo` 57.0.9 and later (story D12).
