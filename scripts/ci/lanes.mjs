@@ -264,6 +264,21 @@ export const LANES = {
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },
+  'revenuecat-bundle': {
+    title: 'RevenueCat Test Store key bundle scan',
+    workflow: 'pr-checks.yml',
+    jobs: ['revenuecat-bundle-scan'],
+    // Where the Test Store key is read and kept out of release builds, and what decides how the
+    // export inlines it; scripts/ci/revenuecat-bundle-scan.mjs is under SHARED.
+    inputs: [
+      'apps/mobile/src/lib/revenuecat-key.ts',
+      'apps/mobile/src/lib/premium.ts',
+      'apps/mobile/app.config.ts',
+      'apps/mobile/app.json',
+      'apps/mobile/metro.config.js',
+      'apps/mobile/package.json',
+    ],
+  },
   // The one macOS job a pull request may run (story 6.15 D6) holds two lanes, each gating its
   // own steps: the job runs when either lane does.
   'ios-unit': {

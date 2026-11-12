@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { parse } from 'yaml'
 
 import { readEnvValue, scanExport } from './revenuecat-bundle-scan.mjs'
 
@@ -48,4 +49,23 @@ test('reads one variable from a dotenv file, quoted or not', (t) => {
     'test_quoted'
   )
   assert.equal(readEnvValue(path.join(root, '.env.local'), 'MISSING'), undefined)
+})
+
+// Story 6.15: the pull request job runs the scan with a synthetic key of the Test Store shape, so
+// both the exact-key search and the test_ pattern apply, gated by its own lane.
+test('the pull request scan job runs this script with a synthetic Test Store key', (t) => {
+  const workflow = parse(fs.readFileSync('.github/workflows/pr-checks.yml', 'utf8'))
+  const job = workflow.jobs['revenuecat-bundle-scan']
+  assert.equal(job.if, "fromJSON(needs.lanes.outputs.plan)['revenuecat-bundle']")
+  assert.equal(job['runs-on'], 'ubuntu-latest')
+  assert.ok(job['timeout-minutes'] <= 20)
+  const scan = job.steps.find(
+    (step) => step.run === 'node scripts/ci/revenuecat-bundle-scan.mjs'
+  )
+  const key = scan.env.EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY
+  assert.match(key, /^test_[A-Za-z0-9]{16,}$/)
+  // An export that inlined the key would be caught by both searches.
+  const root = exportTree(t, { 'bundle.js': `k="${key}"` })
+  assert.deepEqual(scanExport(root, key), ['bundle.js'])
+  assert.deepEqual(scanExport(root, undefined), ['bundle.js'])
 })

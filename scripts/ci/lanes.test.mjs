@@ -207,6 +207,11 @@ const STARTS = {
     'playwright/tests/share-card-export.spec.ts',
   ],
   watchos: ['apps/mobile/plugins/with-watchos.js', 'apps/mobile/targets/watch/App.swift'],
+  'revenuecat-bundle': [
+    'apps/mobile/src/lib/revenuecat-key.ts',
+    'apps/mobile/src/lib/premium.ts',
+    'apps/mobile/app.config.ts',
+  ],
   'ios-unit': [
     'apps/mobile/modules/share-card-native-share/ios/ShareCardShareFile.swift',
     'apps/mobile/modules/share-card-photo-save/ios/Package.swift',
@@ -241,6 +246,8 @@ const EXPECTED_SKIPS = {
   maestro: [199, 148],
   'share-card': [199],
   watchos: [209, 208, 199, 180, 148],
+  // No replayed pull request touched the Test Store key's sources or the export configuration.
+  'revenuecat-bundle': [209, 208, 204, 202, 199, 192, 180, 173, 148],
   // Only the Swift packages and the XCTest target wake it; no replayed pull request touched them.
   'ios-unit': [209, 208, 204, 202, 199, 192, 180, 173, 148],
   // Its lane plan is informational on a pull request (it runs on main, nightly and dispatch);
