@@ -233,7 +233,9 @@ Verified against `main` at `a01e0307`.
 
 ## Implementation Notes
 
-(Filled in during the build.)
+- Step 0, background task (`3d458bcd`): the ritual task is `RITUAL_BACKGROUND_TASK` on `expo-background-task` with a 15-minute minimum; launch unregisters `RITUAL_BACKGROUND_FETCH_TASK` first and logs, without failing, when that throws. Expo applies the `expo-background-fetch` and `expo-task-manager` plugins on its own but not the `expo-background-task` one, so `app.json` lists it. `expo-task-manager` still adds the iOS `fetch` mode, so `plugins/with-background-modes.js` removes it; `plugins/background-task-prebuild.test.js` pins `processing`, the permitted identifier, no `fetch`, and no fetch component on Android. Seeded defects: dropping the unregister call fails two unit tests; dropping the plugin from `app.json` fails the iOS prebuild test.
+- Step 0, `app.json` keys (`447a5986`): with and without `newArchEnabled` and `edgeToEdgeEnabled`, 120 of 122 prebuilt native files are byte-identical (SHA-256 of sorted file hashes `8eca3379...a1cc43` on both sides). `project.pbxproj` differs only in prebuild's random object IDs. `ios/Podfile.properties.json` loses `"newArchEnabled": "true"`, which the Podfile reads only to compare with `'false'`, so the New Architecture stays on; `android/gradle.properties` is identical. D4's "byte-identical" holds except for that entry.
+- CI gap found in Step 0: the mobile plugin prebuild specs for widgets and the background task run only through `apps/mobile` `npm test`, which no workflow runs; watchOS runs in `watchos-native` and the share-card pair through the node-test gate. Wiring them into PR CI is part of the D6 workflow change once the owner gives the go.
 
 ## Plan Change Log
 
