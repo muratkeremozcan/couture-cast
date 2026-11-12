@@ -176,6 +176,13 @@ export class RevenueCatUnsupportedStoreError extends Error {
   }
 }
 
+export class RevenueCatUnrepresentableEntitlementError extends Error {
+  constructor(readonly reason: 'missing_product' | 'no_expiry' | 'invalid_expiry') {
+    super(`RevenueCat entitlement cannot be represented: ${reason}`)
+    this.name = 'RevenueCatUnrepresentableEntitlementError'
+  }
+}
+
 export class RevenueCatRequestError extends Error {
   constructor(
     readonly status: number,
@@ -258,21 +265,28 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (!entitlement) {
       return null
     }
+    // An entitlement that is present but that our model cannot represent fails the pull, so
+    // refresh answers 503 and reconciliation leaves the member's row as it is. Answering null
+    // here would read as "no entitlement" and expire a paying member (story 6.15 R4-01).
     const productId = entitlement.product_identifier ?? null
-    const expiresAt = entitlement.expires_date ? new Date(entitlement.expires_date) : null
-    if (productId === null || expiresAt === null || Number.isNaN(expiresAt.getTime())) {
-      // A lifetime (null-expiry) or malformed entitlement has no representable
-      // period end in our model; treat it as absent rather than inventing one.
-      return null
+    if (productId === null) {
+      throw new RevenueCatUnrepresentableEntitlementError('missing_product')
     }
-
     const subscription = body.subscriber?.subscriptions?.[productId]
     const store = restStoreMap[subscription?.store?.toLowerCase() ?? '']
     if (store === undefined) {
       // A store we do not sell (a RevenueCat Test Store purchase, AMAZON) or a missing
-      // subscription record never takes a real store's identity. The pull fails, so refresh
-      // answers 503 and reconciliation leaves the member's row as it is (story 6.15 R3-01).
+      // subscription record never takes a real store's identity (story 6.15 R3-01). Checked
+      // before the expiry, so a lifetime or malformed unsupported entitlement fails the same way.
       throw new RevenueCatUnsupportedStoreError(subscription?.store ?? null)
+    }
+    if (!entitlement.expires_date) {
+      // A lifetime entitlement has no period end in our subscription-only model.
+      throw new RevenueCatUnrepresentableEntitlementError('no_expiry')
+    }
+    const expiresAt = new Date(entitlement.expires_date)
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new RevenueCatUnrepresentableEntitlementError('invalid_expiry')
     }
     const willRenew = !subscription?.unsubscribe_detected_at
     const inGrace =

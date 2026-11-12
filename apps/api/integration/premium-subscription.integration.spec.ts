@@ -27,6 +27,7 @@ import { PremiumEntitlementGuard } from '../src/modules/commerce/premium-entitle
 import { PremiumEntitlementService } from '../src/modules/commerce/premium-entitlement.service.js'
 import {
   FakeRevenueCatClient,
+  RealRevenueCatClient,
   RevenueCatClient,
 } from '../src/modules/commerce/revenuecat-client.js'
 import { SubscriptionService } from '../src/modules/commerce/subscription.service.js'
@@ -383,6 +384,88 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
       expect(response.status).toBe(503)
       expect(envelope(response).message).toBe(SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE)
     })
+
+    // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+    // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+    // Story 6.15 R3-01 and R4-01: a ledger entitlement from a store we do not sell, or one our model
+    // cannot represent, answers 503 through the real projection and keeps the paying member's row.
+    for (const [label, premium, subscriptions] of [
+      [
+        'a Test Store monthly entitlement',
+        {
+          expires_date: '2031-01-01T00:00:00.000Z',
+          product_identifier: 'premium_monthly',
+        },
+        { premium_monthly: { store: 'test_store' } },
+      ],
+      [
+        'a Test Store lifetime entitlement',
+        { expires_date: null, product_identifier: 'premium_life' },
+        { premium_life: { store: 'test_store' } },
+      ],
+      [
+        'an Amazon lifetime entitlement',
+        { expires_date: null, product_identifier: 'premium_life' },
+        { premium_life: { store: 'amazon' } },
+      ],
+      [
+        'a supported lifetime entitlement',
+        { expires_date: null, product_identifier: 'premium_life' },
+        { premium_life: { store: 'app_store' } },
+      ],
+      [
+        'a malformed expiry',
+        { expires_date: 'soon', product_identifier: 'premium_monthly' },
+        { premium_monthly: { store: 'stripe' } },
+      ],
+      [
+        'a missing product',
+        { expires_date: '2031-01-01T00:00:00.000Z', product_identifier: null },
+        {},
+      ],
+    ] as const) {
+      it(`keeps a paid row when the ledger holds ${label}`, async (context) => {
+        if (!requireSchema(context)) return
+
+        await seedEntitlement(subscriberId, 'active')
+        const before = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: subscriberId },
+        })
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(() =>
+            Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  subscriber: { entitlements: { premium }, subscriptions },
+                }),
+                {
+                  status: 200,
+                }
+              )
+            )
+          )
+        )
+        const real = new RealRevenueCatClient('sk_test_rc_key')
+        const pull = vi
+          .spyOn(fakeLedger, 'getSubscriberEntitlement')
+          .mockImplementation((userId) => real.getSubscriberEntitlement(userId))
+        try {
+          const response = await postRefresh(subscriberId)
+
+          expect(response.status).toBe(503)
+          expect(pull).toHaveBeenCalledTimes(1)
+          expect(
+            await prisma.premiumEntitlement.findUnique({
+              where: { user_id: subscriberId },
+            })
+          ).toEqual(before)
+        } finally {
+          pull.mockRestore()
+          vi.unstubAllGlobals()
+        }
+      })
+    }
 
     it('serves local state inside the 10-second window instead of re-hammering the ledger', async (context) => {
       if (!requireSchema(context)) return

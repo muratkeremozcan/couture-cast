@@ -3,6 +3,7 @@ import {
   FakeRevenueCatClient,
   RealRevenueCatClient,
   RevenueCatRequestError,
+  RevenueCatUnrepresentableEntitlementError,
   RevenueCatUnsupportedStoreError,
 } from './revenuecat-client.js'
 
@@ -168,6 +169,51 @@ describe('RealRevenueCatClient', () => {
     const state = await client.getSubscriberEntitlement('user-1')
     expect(state).toMatchObject({ status: 'active', willRenew: false })
   })
+
+  // Story 6.15 R4-01: a present entitlement that cannot be represented fails the pull rather than
+  // reading as absent, which would expire a paying member.
+  it.each([
+    [
+      'a supported lifetime entitlement',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'app_store' } },
+      RevenueCatUnrepresentableEntitlementError,
+    ],
+    [
+      'a malformed expiry',
+      { expires_date: 'soon', product_identifier: 'premium_monthly' },
+      { premium_monthly: { store: 'play_store' } },
+      RevenueCatUnrepresentableEntitlementError,
+    ],
+    [
+      'a missing product',
+      { expires_date: '2026-09-12T12:00:00.000Z', product_identifier: null },
+      {},
+      RevenueCatUnrepresentableEntitlementError,
+    ],
+    [
+      'a Test Store lifetime entitlement',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'test_store' } },
+      RevenueCatUnsupportedStoreError,
+    ],
+    [
+      'an Amazon entitlement with a malformed expiry',
+      { expires_date: 'soon', product_identifier: 'premium_monthly' },
+      { premium_monthly: { store: 'amazon' } },
+      RevenueCatUnsupportedStoreError,
+    ],
+  ])(
+    'refuses %s instead of answering no entitlement',
+    async (_label, premium, subscriptions, error) => {
+      fetchMock.mockResolvedValueOnce(
+        subscriberResponse({ entitlements: { premium }, subscriptions })
+      )
+      await expect(client.getSubscriberEntitlement('user-1')).rejects.toBeInstanceOf(
+        error
+      )
+    }
+  )
 
   it('returns null when the subscriber has no premium entitlement', async () => {
     fetchMock.mockResolvedValueOnce(

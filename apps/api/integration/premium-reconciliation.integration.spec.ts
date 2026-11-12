@@ -270,81 +270,113 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
   // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
   // Story 6.15 R3-01: the REST projection of a RevenueCat Test Store entitlement used to become an
   // active Stripe snapshot. Through the real client, the paid row now stays exactly as it was.
-  for (const testEnv of [undefined, 'staging', 'production'] as const) {
-    it(`a Test Store entitlement on the ledger leaves a paid row unchanged (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
-      if (!requireSchema(context)) return
-      const savedEnv = process.env.TEST_ENV
-      if (testEnv === undefined) delete process.env.TEST_ENV
-      else process.env.TEST_ENV = testEnv
-      const fetchMock = vi.fn((url: string) =>
-        Promise.resolve(
-          url.endsWith(`/subscribers/${encodeURIComponent(userId)}`)
-            ? new Response(
-                JSON.stringify({
-                  subscriber: {
-                    entitlements: {
-                      premium: {
-                        expires_date: new Date(
-                          Date.now() + 30 * 86_400_000
-                        ).toISOString(),
-                        product_identifier: 'premium_monthly',
+  // R4-01 adds the shapes that used to read as "no entitlement": a lifetime or malformed
+  // entitlement, from a store we do not sell or one we do, and a missing product.
+  const ledgerShapes = [
+    [
+      'Test Store monthly',
+      { expires_date: 'FUTURE', product_identifier: 'premium_monthly' },
+      { premium_monthly: { store: 'test_store' } },
+    ],
+    [
+      'Test Store lifetime',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'test_store' } },
+    ],
+    [
+      'Amazon lifetime',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'amazon' } },
+    ],
+    [
+      'supported lifetime',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'play_store' } },
+    ],
+    [
+      'malformed expiry',
+      { expires_date: 'soon', product_identifier: 'premium_monthly' },
+      { premium_monthly: { store: 'stripe' } },
+    ],
+    ['missing product', { expires_date: 'FUTURE', product_identifier: null }, {}],
+  ] as const
+  for (const testEnv of [undefined, 'staging', 'production'] as const)
+    for (const [shape, premium, subscriptions] of ledgerShapes) {
+      it(`a ${shape} ledger entitlement leaves a paid row unchanged (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        const fetchMock = vi.fn((url: string) =>
+          Promise.resolve(
+            url.endsWith(`/subscribers/${encodeURIComponent(userId)}`)
+              ? new Response(
+                  JSON.stringify({
+                    subscriber: {
+                      entitlements: {
+                        premium: {
+                          ...premium,
+                          expires_date:
+                            premium.expires_date === 'FUTURE'
+                              ? new Date(Date.now() + 30 * 86_400_000).toISOString()
+                              : premium.expires_date,
+                        },
                       },
+                      subscriptions,
                     },
-                    subscriptions: { premium_monthly: { store: 'test_store' } },
-                  },
-                }),
-                { status: 200 }
-              )
-            : new Response('out of scope', { status: 503 })
+                  }),
+                  { status: 200 }
+                )
+              : new Response('out of scope', { status: 503 })
+          )
         )
-      )
-      vi.stubGlobal('fetch', fetchMock)
-      try {
-        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
-        const sweeper = new BillingReconciliationService(
-          prisma,
-          realLedger,
-          new PremiumEntitlementService(
+        vi.stubGlobal('fetch', fetchMock)
+        try {
+          const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+          const sweeper = new BillingReconciliationService(
             prisma,
             realLedger,
-            new FakeStripeBillingClient(),
-            noComplimentaryGrants
-          ),
-          telemetry as unknown as TelemetryService
-        )
-        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
-        await prisma.premiumEntitlement.create({
-          data: buildPremiumEntitlementCreateInput(
-            createPremiumEntitlement({
-              userId,
-              status: 'active',
-              store: 'play_store',
-              syncedAt: staleSyncedAt,
-              lastEventOccurredAt: staleSyncedAt,
-              lastEventId: `${namespace}-paid-seed`,
-            })
-          ),
-        })
-        const before = await prisma.premiumEntitlement.findUnique({
-          where: { user_id: userId },
-        })
+            new PremiumEntitlementService(
+              prisma,
+              realLedger,
+              new FakeStripeBillingClient(),
+              noComplimentaryGrants
+            ),
+            telemetry as unknown as TelemetryService
+          )
+          const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId,
+                status: 'active',
+                store: 'play_store',
+                syncedAt: staleSyncedAt,
+                lastEventOccurredAt: staleSyncedAt,
+                lastEventId: `${namespace}-paid-seed`,
+              })
+            ),
+          })
+          const before = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: userId },
+          })
 
-        await sweeper.sweep()
+          await sweeper.sweep()
 
-        expect(fetchMock).toHaveBeenCalledWith(
-          expect.stringContaining(encodeURIComponent(userId)),
-          expect.anything()
-        )
-        expect(
-          await prisma.premiumEntitlement.findUnique({ where: { user_id: userId } })
-        ).toEqual(before)
-      } finally {
-        vi.unstubAllGlobals()
-        if (savedEnv === undefined) delete process.env.TEST_ENV
-        else process.env.TEST_ENV = savedEnv
-      }
-    })
-  }
+          expect(fetchMock).toHaveBeenCalledWith(
+            expect.stringContaining(encodeURIComponent(userId)),
+            expect.anything()
+          )
+          expect(
+            await prisma.premiumEntitlement.findUnique({ where: { user_id: userId } })
+          ).toEqual(before)
+        } finally {
+          vi.unstubAllGlobals()
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
 
   it('leaves a freshly-synced entitlement alone (staleness bound respected)', async (context) => {
     if (!requireSchema(context)) return
