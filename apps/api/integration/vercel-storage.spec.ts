@@ -672,6 +672,8 @@ describe('Vercel preview deploy step', () => {
         // Sent as is, for values JSON.stringify cannot write, such as 1e999.
         rawBody?: string
         stall?: boolean
+        // Runs as the body is read, for a body that arrives late.
+        whileReading?: () => void
       }
   function failedPoll(next: PollFailure) {
     const failure = typeof next === 'number' ? { status: next } : next
@@ -691,7 +693,19 @@ describe('Vercel preview deploy step', () => {
             )
           },
         })
-      : text
+      : failure.whileReading
+        ? new ReadableStream<Uint8Array>(
+            {
+              pull(controller) {
+                failure.whileReading?.()
+                controller.enqueue(new TextEncoder().encode(text))
+                controller.close()
+              },
+            },
+            // No eager pull: the body is produced only once the client reads it.
+            { highWaterMark: 0 }
+          )
+        : text
     return new Response(body, { status: failure.status, headers: failure.headers })
   }
   function vercel(deployments: Deployment[], pollFailures: PollFailure[] = []) {
@@ -826,10 +840,16 @@ describe('Vercel preview deploy step', () => {
   describe('a rate-limited poll waits for the reset Vercel announces', () => {
     const started = 1_000_000
     const resetIn = 120_000
-    const timed = (failure: PollFailure) => {
-      let clock = started
+    // `left` is how much of the job's deadline remains when the poll is answered.
+    const timed = (
+      failure: PollFailure | ((advance: (ms: number) => void) => PollFailure),
+      left?: number
+    ) => {
+      const deadline = started + 20 * 60_000 - 45_000
+      let clock = left === undefined ? started : deadline - left
+      const advance = (ms: number) => (clock += ms)
       const waits: number[] = []
-      const api = vercel([], [failure])
+      const api = vercel([], [typeof failure === 'function' ? failure(advance) : failure])
       const result = run(
         'web',
         { ...env(false), PREVIEW_JOB_STARTED_MS: String(started) },
@@ -889,6 +909,39 @@ describe('Vercel preview deploy step', () => {
         expect(waits).toEqual([15_000])
       }
     )
+
+    it('lets a 503 retry on its interval although its quota window resets past the deadline', async () => {
+      const { result, waits } = timed({
+        status: 503,
+        headers: { 'X-RateLimit-Reset': String(resetAt(60 * 60_000) / 1000) },
+        body: { error: { limit: { resetMs: resetAt(60 * 60_000) } } },
+      })
+      await expect(result).resolves.toMatchObject({ id: 'dpl_new' })
+      expect(waits).toEqual([15_000])
+    })
+
+    it('honours Retry-After on a 503', async () => {
+      const { result, waits } = timed({
+        status: 503,
+        headers: { 'Retry-After': String(resetIn / 1000) },
+      })
+      await expect(result).resolves.toMatchObject({ id: 'dpl_new' })
+      expect(waits).toEqual([resetIn])
+    })
+
+    it('counts a relative Retry-After from when the headers arrived, not after a slow body', async () => {
+      // 130 s left when the 429 arrives; its body takes 30 s; Retry-After 110 s still fits.
+      const { result, waits } = timed(
+        (advance) => ({
+          status: 429,
+          headers: { 'Retry-After': '110' },
+          whileReading: () => advance(30_000),
+        }),
+        130_000
+      )
+      await expect(result).resolves.toMatchObject({ id: 'dpl_new' })
+      expect(waits).toEqual([80_000])
+    })
 
     it('fails at once with the reason when the reset falls past the job deadline', async () => {
       const { result, waits, api } = timed({

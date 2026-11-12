@@ -165,18 +165,30 @@ function retryWait(error, intervalMs, now) {
 }
 
 /**
- * When a refused request may be sent again, as an epoch time in ms: the latest of Retry-After
- * (seconds or an HTTP date), X-RateLimit-Reset (epoch seconds) and the body's error.limit
- * reset (epoch seconds) or resetMs, as Vercel documents for rate limits. Undefined without any.
- * @param {Headers} headers @param {unknown} parsed @param {() => number} now
+ * When a refused request may be sent again, as an epoch time in ms, or undefined when the answer
+ * announces nothing. Retry-After (seconds, counted from `receivedAt` when the headers arrived,
+ * or an HTTP date) applies to any status. Vercel sends its rate-limit reset on every response,
+ * so X-RateLimit-Reset (epoch seconds) and the body's error.limit reset (epoch seconds) or
+ * resetMs bar a retry only on a 429. The latest of those that apply wins.
+ * @param {number} status @param {Headers} headers @param {unknown} parsed
+ * @param {number} receivedAt
  */
-function announcedRetryAt(headers, parsed, now) {
+function announcedRetryAt(status, headers, parsed, receivedAt) {
   const times = []
   const retryAfter = headers.get('retry-after')?.trim()
   if (retryAfter && /^\d+$/.test(retryAfter))
-    times.push(now() + Number(retryAfter) * 1000)
+    times.push(receivedAt + Number(retryAfter) * 1000)
   else if (retryAfter && Number.isFinite(Date.parse(retryAfter)))
     times.push(Date.parse(retryAfter))
+  if (status === 429) times.push(...quotaResets(headers, parsed))
+  // A value that is not a finite time, such as Infinity or 1e999, announces nothing usable.
+  const usable = times.filter((time) => Number.isFinite(time))
+  return usable.length ? Math.max(...usable) : undefined
+}
+
+/** The rate-limit window's reset from the X-RateLimit-Reset header and the error body, in ms. */
+function quotaResets(headers, parsed) {
+  const times = []
   const resetHeader = Number(headers.get('x-ratelimit-reset'))
   if (resetHeader > 0) times.push(resetHeader * 1000)
   const limit =
@@ -184,9 +196,7 @@ function announcedRetryAt(headers, parsed, now) {
       ?.error?.limit
   if (typeof limit?.resetMs === 'number') times.push(limit.resetMs)
   if (typeof limit?.reset === 'number') times.push(limit.reset * 1000)
-  // A value that is not a finite time, such as Infinity or 1e999, announces nothing usable.
-  const usable = times.filter((time) => Number.isFinite(time))
-  return usable.length ? Math.max(...usable) : undefined
+  return times
 }
 
 /**
@@ -311,6 +321,8 @@ function vercelClient(token, fetchImpl, deadline, now) {
       signal: AbortSignal.timeout(budget),
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
+    // A relative Retry-After counts from here, before a slow body can add its own time.
+    const receivedAt = now()
     if (response.ok) return JSON.parse(await response.text())
     // The status came with the headers, so it stands even when the body cannot be read: a 403
     // whose body times out is still a 403, never a retryable timeout.
@@ -333,7 +345,7 @@ function vercelClient(token, fetchImpl, deadline, now) {
       ),
       {
         status: response.status,
-        retryAt: announcedRetryAt(response.headers, parsed, now),
+        retryAt: announcedRetryAt(response.status, response.headers, parsed, receivedAt),
       }
     )
   }
