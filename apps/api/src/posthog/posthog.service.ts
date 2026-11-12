@@ -8,7 +8,10 @@ import type {
   AnalyticsClient,
 } from '../analytics/analytics.service'
 import { createBaseLogger } from '../logger/pino.config'
-import type { RemoteFeatureFlagProvider } from '../modules/feature-flags/remote-feature-flag-provider'
+import {
+  REMOTE_FLAG_ABSENT,
+  type RemoteFeatureFlagProvider,
+} from '../modules/feature-flags/remote-feature-flag-provider'
 
 const remoteFlagResponseSchema = z.object({
   flags: z.record(
@@ -33,7 +36,8 @@ function remoteFlagValue(body: unknown, flag: string): unknown {
   )
     return undefined
   const evaluated = result.data.flags[flag]
-  if (!evaluated || evaluated.key !== flag || evaluated.failed) return undefined
+  if (!evaluated) return REMOTE_FLAG_ABSENT
+  if (evaluated.key !== flag || evaluated.failed) return undefined
   return evaluated.variant ?? evaluated.enabled
 }
 

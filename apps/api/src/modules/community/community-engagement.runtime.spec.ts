@@ -95,6 +95,21 @@ vi.mock('@prisma/client', async (original) => ({
 }))
 
 // Only the external database boundary is controlled. Runtime and workers execute unchanged.
+/** What community_append_batch answers when no candidate was ready. */
+const EMPTY_BATCH = {
+  count: 0,
+  stop: 'drained',
+  ready: 0,
+  limit: 25,
+  preparedMs: 0,
+  selected: 0,
+  selectedReason: 'all',
+  remainingMs: 400,
+  writeCostMs: 4,
+  writeMs: 0,
+}
+const appendBatchRan = (queries: string[]) =>
+  queries.some((query) => query.includes('community_append_batch'))
 function databaseBoundary(
   capability: 'ready' | 'old-server' | 'privacy-0' | 'bad-timeout' = 'ready'
 ) {
@@ -140,6 +155,11 @@ function databaseBoundary(
       // The append loop's cheap pre-check: report a waiting row, so every tick opens the bounded
       // append transaction and the housekeeping assertions below see it.
       if (text.includes('AS pending')) return Promise.resolve([{ pending: true }])
+      // The bounded append transaction's one batch statement: nothing was waiting after all.
+      if (text.includes('community_append_batch')) {
+        ;(db as { onAppendBatch?: () => void }).onAppendBatch?.()
+        return Promise.resolve([{ batch: EMPTY_BATCH }])
+      }
       // The spotlight's cheap pre-check: report the cursor behind, so every tick runs a pass.
       if (text.includes('AS work')) return Promise.resolve([{ work: true }])
       if (text.includes("SELECT 'append' AS lane"))
@@ -262,9 +282,7 @@ async function start(
   return runtime
 }
 function assertHousekeeping(primary: ReturnType<typeof databaseBoundary>) {
-  expect(primary.db.communityDomainOutbox.findMany).toHaveBeenCalledWith(
-    expect.objectContaining({ where: { appended_at: null } })
-  )
+  expect(appendBatchRan(primary.queries)).toBe(true)
   expect(primary.db.communityStreamEvent.findMany).toHaveBeenCalled()
   expect(primary.db.pushToken.findMany).toHaveBeenCalled()
   expect(primary.db.communityFlagEvaluation.findMany).toHaveBeenCalled()
@@ -551,9 +569,7 @@ describe('T03 actual engagement runtime composition', () => {
       500, 1500, 3500, 7500, 15_500, 25_500, 35_500, 45_500,
     ])
     // No idle check opened the append transaction.
-    expect(primary.db.communityDomainOutbox.findMany).not.toHaveBeenCalledWith(
-      expect.objectContaining({ where: { appended_at: null } })
-    )
+    expect(appendBatchRan(primary.queries)).toBe(false)
     // A waiting row is found on the next capped check, and the loop drops to 500 ms while it
     // appends.
     pending = true
@@ -604,10 +620,7 @@ describe('T03 actual engagement runtime composition', () => {
     const primary = databaseBoundary()
     const order: string[] = []
     const db = primary.db as typeof primary.db & Record<string, unknown>
-    vi.mocked(db.communityDomainOutbox.findMany).mockImplementation(() => {
-      order.push('append')
-      return Promise.resolve([])
-    })
+    db.onAppendBatch = () => order.push('append')
     db.communityStreamHead = {
       findUnique: vi.fn(() => {
         order.push('invalidate')
@@ -636,10 +649,9 @@ describe('T03 actual engagement runtime composition', () => {
     const primary = databaseBoundary()
     const db = primary.db as typeof primary.db & Record<string, unknown>
     let appends = 0
-    vi.mocked(db.communityDomainOutbox.findMany).mockImplementation(() => {
+    db.onAppendBatch = () => {
       appends += 1
-      return Promise.resolve([])
-    })
+    }
     db.communityStreamHead = {
       findUnique: vi.fn(() =>
         Promise.resolve({ epoch: 'epoch-1', sequence: 3n, retention_floor: 0n })

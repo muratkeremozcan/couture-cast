@@ -7,6 +7,8 @@ Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, re
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
+Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
+Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
 Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
@@ -1174,6 +1176,18 @@ holds, so one held delivery cannot stall the loop or shutdown. An attempt that c
 use a guard connection before the provider call ends `no_call:guard_unreachable`; any other
 failure before it ends `no_call:guard_failure`, and one after it `handoff_uncertain`.
 
+**Append.** The worker appends committed outbox rows to the public and private streams in one
+statement, `community_append_batch` (migration `20261111120000`): a batch costs four round
+trips whatever its size, about 125 ms plus server work at the 31 ms measured from the worker.
+Before 2026-11-11 each candidate took about 16 round trips from TypeScript, every batch ran past
+its 500 ms bound, and production append never succeeded (public head sequence 0). Signals:
+`community_append_retry` rows name `head_contention`, `budget_pressure` or `pool_wait` (no pool
+connection freed up within 250 ms, so the batch keeps its size); the `community_backlog`
+row for lane `append` carries the oldest unappended age; past five minutes the worker logs
+`Community append stalled` and records `community_append_stalled` once every five minutes,
+which the PostHog alert on project 329012 watches. A stall means rows are not appending: read
+the worker's `Community append deferred` lines for the reason before anything else.
+
 Capacity on the production project (free plan, Nano compute, measured 2026-11-11): Postgres
 `max_connections` is 60 with 3 reserved, and Supavisor admits 200 clients with the plan's default
 pool size (the pooler config returns null for both). Idle guard connections are Supavisor clients
@@ -1257,7 +1271,9 @@ the Northflank `couture-cast/community-worker` service:
 3. Confirm `community_dispatch_readiness` logs `ready`.
 4. Confirm a non-grantee's delivery ends `suppressed` with zero attempts. Every other member's
    `community_read_enabled` is false in production, so dispatch suppresses them before any
-   attempt; `no_call:read_disabled` appears only when the in-transaction recheck flips.
+   attempt; `no_call:read_disabled` appears only when the in-transaction recheck flips. The
+   flag must exist in the production PostHog project (the drift check below): until
+   2026-11-11 it did not, and every non-grantee delivery re-deferred instead.
 5. If readiness is not `ready`, set `COMMUNITY_DISPATCH_ENABLED` back off, fix the cause and
    record the outcome here. No credential value is printed in logs or committed.
 
@@ -1328,3 +1344,114 @@ with `openssl`, but Prisma on macOS rejects the chain with `The certificate was 
 and `community:sponsorship` shares that client. Run the command from Linux until the operator
 client verifies the CA through Node's TLS. The targeting guard held on production: without
 `--confirm-target` the command refused and named the project, and nothing was written.
+
+**Third attempt, X-DISPATCH, 2026-11-11 UTC (`c6da9ace`, PR #205).** The guard pool fix was
+deployed to the worker at 17:35:19. Synthetic members only: `example.test` emails with no
+`auth.users` login, the owner admin as actor, grants and revokes only through
+`access:complimentary` with `--confirm-target`, erasure through the product path, leftovers
+deleted by tag. The owner's own grant `cmwbf7als0001jpx5ifbuuo51` was not touched.
+
+- Before counts over all 83 public tables at 17:35:52. `COMMUNITY_DISPATCH_ENABLED=true` at
+  17:37:22; readiness `ready` at 17:37:40 with `preflightAttempts` 1, `guardConnections` 14,
+  `sendSlots` 10 and `configuredSendSlots` 10. The instance count stayed at one.
+- Grantee leg, tag `tea-xdispatch-9c2551bc`: seeded at 17:38:02, granted at 17:38:14 (grant
+  `cmwcek6ew0001jpbxybfjvshp`), reacted at 17:38:22. The grantee's delivery made one attempt,
+  17:38:33.988 to 17:38:36.074, which Expo answered `DeviceNotRegistered` for the synthetic
+  token: the token was pruned, the delivery ended `failed` and nothing retried. Pass.
+- Non-grantee leg, same tag: the delivery stayed `deferred` with zero attempts and re-deferred
+  about every 47 s (17:39:22, 17:40:09). Cause: the PostHog project production read defined no
+  `community_read_enabled`, and community evaluation treated the missing key as unavailable.
+  See "PostHog projects and flag drift" below.
+- Revoked at 17:41:12. `AuditLog` rows `cmwcek6g90003jpbxch33oswh`
+  (`complimentary_access_granted`, 17:38:15) and `cmwceo1000001jpf2yb3yfum1`
+  (`complimentary_access_revoked`, 17:41:14). Reasons: "X-DISPATCH synthetic grantee
+  tea-xdispatch-9c2551bc, removed after the check" on the grant and "..., check done" on the revoke.
+- Erasure requested at 17:41:34 and 17:41:35 (requests `21a59963-0366-46fd-ba0b-c716aa533634`,
+  `570300a3-11f2-4538-9759-3382d14f8f35`), members deleted at 17:42:01, leftovers purged to none.
+  After counts at 17:42:30: `AuditLog` 1 to 3 (the two immutable rows), `CommunityDomainOutbox`
+  0 to 10 (identity-free public resync rows), `CommunityEngagementTelemetry` 57043 to 57168,
+  `telemetry_events` 84 to 89 (three `api_error_occurred` 401s from the probe and two anonymous
+  `community_reaction_added`).
+- The 11 missing flags were created in the production PostHog project at 17:48 and production
+  was moved to that project (below). Non-grantee rerun, tag `tea-xdispatch-ba16aae6`, two fresh
+  non-grantees: before counts at 17:55:34, seeded at 17:55:36, reacted at 17:55:39, both
+  deliveries `suppressed` at 17:55:47 with zero attempts. Pass. Erasure requested at 17:56:16
+  and 17:56:17 (requests `d7ab9e32-2aa3-44b8-afe4-1b61b8d82c42`,
+  `6d8de50a-38b4-415c-8b64-048f8d237b84`), members deleted, leftovers purged. Erasure removes
+  the notification group's recipient, so the two groups, their deliveries and eligibility rows
+  no longer match the tag; they were deleted by id from the status read. After counts at
+  17:57:47: `CommunityDomainOutbox` 10 to 20, `CommunityEngagementTelemetry` 57475 to 57530,
+  `telemetry_events` 89 to 91 (anonymous reactions).
+- The 20 outbox rows never appended: the public stream head sequence is 0, so production append
+  has never succeeded. Every batch aborted `budget_pressure` at batch limit 1, about 25 retry
+  telemetry rows a minute from 17:38, and an unappended row is never pruned. The 20 synthetic
+  resync rows (no subject links) were deleted at 17:58:50 and the retries stopped. The append
+  fix is its own change.
+- Dispatch stays enabled.
+
+## PostHog projects and flag drift
+
+Production reads the PostHog project `couturecast-prod` (329012). Local development and Vercel
+preview read `couturecast-dev` (327096), where a seeded `feature_flags` row can turn a feature on
+for testing. Until 2026-11-11 every environment read 327096, which defined 4 of the 14 declared
+flags (with `color_analysis_enabled` at 100 percent), while the moderation SLA dashboard, its
+heartbeat alert and the warehouse source already pointed at 329012, which had never received an
+event.
+
+| Consumer                                           | Production key | Since                         |
+| -------------------------------------------------- | -------------- | ----------------------------- |
+| Vercel `couture-cast-api`, production target       | 329012         | redeploy at 17:54, 2026-11-11 |
+| Vercel `couture-cast-api`, development and preview | 327096         | unchanged                     |
+| Northflank `couture-cast/community-worker`         | 329012         | 17:50:24, 2026-11-11          |
+| `.env.prod`                                        | 329012         | 2026-11-11                    |
+| Vercel `couture-cast-web`, every target            | none           | owner decision pending        |
+| EAS `production` environment                       | none           | owner decision pending        |
+
+- Event history before the switch stays in 327096. Worker events reach 329012 from 17:50:38;
+  327096 received no production event after 17:50.
+- Web and mobile production carry no PostHog key, so they send nothing. Setting one turns on
+  autocapture, pageviews and exception capture for production users, which is an owner decision.
+  A mobile binary keeps whatever key it was built with until its next build; `app.config.ts`
+  loads `.env.local` before `.env.prod`, so a production build made on a laptop takes the local
+  key.
+- In 329012 every declared flag exists. Created 2026-11-11 at 0 percent: `community_read_enabled`,
+  `community_write_enabled`, `commerce_affiliate_enabled`, `commerce_subscription_enabled`,
+  `premium_planner_enabled`, `share_card_native_share_enabled`, `moderation_console_enabled`,
+  `moderation_decisions_enabled`, `moderation_sla_monitoring_enabled`,
+  `moderation_history_enabled`; at 100 percent, matching its declared default:
+  `complimentary_access_enabled`. Already present with the same values production read before:
+  `premium_themes_enabled` 0, `color_analysis_enabled` 100, `weather_alerts_enabled` 100 and the
+  undeclared `community_feed_enabled` 0. Production `feature_flags` rows held the declared
+  defaults, so the switch changed no answer.
+
+**Drift check.** The `PostHog flag drift` workflow runs `scripts/ci/posthog-flag-drift.mjs`
+hourly, on every push to main and on any pull request that edits `packages/config/src/flags.ts`.
+Each declared key must pass two checks, and the expected value is its declared default unless
+the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today that is only
+`color_analysis_enabled` at `true` (owner decision 2026-11-11: color analysis stays on in
+production, and the code default stays `false` so a degraded PostHog fails closed).
+
+- Definition, read through the PostHog API with the repository secret `POSTHOG_FLAG_READ_KEY`
+  (a personal API key limited to `feature_flag:read` on 329012): the flag exists, is active,
+  boolean, evaluated server-side, and released to everyone at the expected value. Every release
+  group has no property or cohort filter and a 0 or 100 percent rollout, with no super group,
+  early exit, holdout, early-access enrollment, group aggregation or remote configuration. This is what
+  proves a rollout is uniform; probes cannot see a cohort or a 1 percent rollout they miss.
+- Runtime: `/flags` with the project token in the repository variable
+  `POSTHOG_PROD_PROJECT_TOKEN` and the API adapter's server User-Agent, for 12 synthetic
+  subjects. It fails when PostHog omits a key (missing, inactive or not evaluated server-side),
+  answers a variant, or answers any subject other than the expected value.
+
+The job fails closed when either input is missing. An evaluation error, quota limit or HTTP
+error on the probes is retried three times and then fails as unavailable, never as drift. A pull
+request that declares a new flag stays red until the flag exists in 329012 as an active boolean
+released to everyone at its declared default (0 percent for `false`, 100 for `true`), or carries
+a pinned override.
+
+**A key PostHog omits.** An omission does not prove the flag is missing: PostHog also omits an
+inactive flag and one filtered from the server runtime. Community evaluation resolves it closed
+to the declared default (`false` for `community_read_enabled`), cached for one 60-second claim,
+and never reads the `feature_flags` row, whose stale `true` could otherwise renew a
+non-grantee's access. A grantee is still granted before PostHog is asked. An unreachable
+PostHog, an evaluation error or a quota limit still caches nothing and defers the delivery,
+bounded by its group's expiry, as is a delivery whose send keeps throwing.

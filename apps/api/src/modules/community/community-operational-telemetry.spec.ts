@@ -3,6 +3,7 @@
 import type { PrismaClient } from '@prisma/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  COMMUNITY_APPEND_STALL_MS,
   communityBuildIdentity,
   CommunityOperationalTelemetry,
 } from './community-operational-telemetry.js'
@@ -130,5 +131,46 @@ describe('durable operational telemetry sink', () => {
     expect(await recorded()).toEqual([])
     now += 60 * 60_000
     expect(await recorded()).toEqual(['append=0', 'delivery=0'])
+  })
+
+  // Production 2026-11-11: append never succeeded and outbox rows aged for hours with only
+  // routine backlog rows to show for it. An append lane older than five minutes is a stall:
+  // recorded as community_append_stalled (forwarded to PostHog, where an alert watches it) and
+  // logged, at most once per five minutes while it lasts.
+  it('records community_append_stalled when the oldest unappended row passes five minutes', async () => {
+    let now = Date.parse('2026-11-11T12:00:00Z')
+    let age = 0
+    const create = vi.fn().mockResolvedValue({})
+    const prisma = {
+      $queryRaw: vi.fn(() =>
+        Promise.resolve([
+          { lane: 'append', count: 2n, age },
+          { lane: 'delivery', count: 0n, age: 0 },
+        ])
+      ),
+      communityEngagementTelemetry: { create },
+    } as unknown as PrismaClient
+    const telemetry = new CommunityOperationalTelemetry(prisma, {}, () => now)
+    const stalled = async () => {
+      create.mockClear()
+      await telemetry.backlog()
+      return create.mock.calls
+        .map(
+          (call) =>
+            (call[0] as { data: { event_type: string; oldest_age_ms: number } }).data
+        )
+        .filter((data) => data.event_type === 'community_append_stalled')
+        .map((data) => data.oldest_age_ms)
+    }
+    age = COMMUNITY_APPEND_STALL_MS - 1
+    expect(await stalled()).toEqual([])
+    age = COMMUNITY_APPEND_STALL_MS
+    expect(await stalled()).toEqual([COMMUNITY_APPEND_STALL_MS])
+    now += 60_000
+    age += 60_000
+    expect(await stalled()).toEqual([])
+    now += COMMUNITY_APPEND_STALL_MS
+    age += COMMUNITY_APPEND_STALL_MS
+    expect(await stalled()).toEqual([age])
   })
 })

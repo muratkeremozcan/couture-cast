@@ -3,8 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { setTimeout as delay } from 'node:timers/promises'
 import { Inject, Injectable } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
+import { getDefaultFeatureFlagValue } from '@couture/config'
 import {
   InjectRemoteFeatureFlagProvider,
+  REMOTE_FLAG_ABSENT,
   type RemoteFeatureFlagProvider,
 } from './remote-feature-flag-provider.js'
 
@@ -273,8 +275,13 @@ export class CommunityFlagEvaluationService {
       const signal = AbortSignal.timeout(
         Math.max(1, Math.floor(invocationDeadline - performance.now()))
       )
-      // The row holds a remote answer or a complimentary grant (Story 6.14 D4), never a
-      // fallback or code default. A granted member is true without asking PostHog.
+      // The row holds a remote answer, a complimentary grant (Story 6.14 D4), or, when PostHog
+      // omits the key, its declared default (false), never the FeatureFlag fallback row. An
+      // omission is a successful answer that a retry does not change, but it does not prove the
+      // flag is missing: PostHog also omits an inactive flag and one filtered from the server
+      // runtime, so the stale true a fallback row may hold must not renew access. Deferring on
+      // it re-polled every 45 s until the group expired. An unreachable PostHog, an evaluation
+      // error or a quota limit still caches nothing.
       value = await Promise.race([
         this.complimentary
           .check(member, {
@@ -288,9 +295,13 @@ export class CommunityFlagEvaluationService {
             grantCheck = check
             return check === 'granted'
               ? true
-              : this.remote.getFeatureFlagValue('community_read_enabled', member, {
-                  signal,
-                })
+              : this.remote
+                  .getFeatureFlagValue('community_read_enabled', member, { signal })
+                  .then((answer) =>
+                    answer === REMOTE_FLAG_ABSENT
+                      ? getDefaultFeatureFlagValue('community_read_enabled')
+                      : answer
+                  )
           }),
         delay(Math.max(1, Math.floor(invocationDeadline - performance.now()))).then(
           () => undefined

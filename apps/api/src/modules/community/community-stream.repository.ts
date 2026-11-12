@@ -3,35 +3,61 @@ import { communityBuildIdentity } from './community-operational-telemetry.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import { postgresError } from '../../prisma/postgres-error.js'
 import { Inject, Injectable } from '@nestjs/common'
-import { Prisma, PrismaClient, type LookbookPost } from '@prisma/client'
+import { Prisma, PrismaClient } from '@prisma/client'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
 
-type Subject = { member_id: string; generation: number; role: string }
-type Candidate = {
-  id: string
-  stream_id: string
-  kind: string
-  revision: bigint
-  post_id: string | null
-  comment_id: string | null
-  parent_id: string | null
-}
-
-function publicSourceUnavailable(source: LookbookPost | null, kind: string) {
-  return (
-    !source ||
-    source.status !== 'published' ||
-    source.erasure_requested_at ||
-    source.anonymized_at ||
-    source.user_id.startsWith('canary-user-') ||
-    kind.endsWith('.removed')
-  )
-}
-function subjectIdentity(subjects: Subject[]): string {
-  return JSON.stringify(subjects)
+/** What `community_append_batch` returns for one batch. */
+type BatchResult = {
+  budgetExhausted?: true
+  count: number
+  stop: AppendStop
+  ready: number
+  limit: number
+  preparedMs: number
+  selected: number
+  selectedReason: 'all' | 'budget'
+  remainingMs: number
+  writeCostMs: number
+  writeMs: number
 }
 
 export class AppendBudgetExceeded extends Error {}
+/**
+ * The append never started: no pool connection freed up within its wait. No batch work ran, so
+ * the batch keeps its size (6.5-INT-037).
+ */
+export class AppendConnectionUnavailable extends Error {}
+/** Too little of the append's deadline is left to start another transaction attempt. */
+export class AppendDeadlineReached extends Error {}
+/**
+ * One bound for an append and its retry row together, across every attempt the pldbgapi2
+ * retry makes. One attempt of each is 250 ms waiting for a connection plus the 750 ms
+ * transaction, then 250 ms plus the 1 s retry-row transaction; each later attempt gets only
+ * what is left, so three attempts each cannot add up to 6.75 s (6.5-INT-038).
+ */
+export const COMMUNITY_APPEND_DEADLINE_MS = 2_250
+// The worker's three pool connections serve its other loops too, whose transactions wait for one
+// from 250 ms (notification and retention workers) to 1 s (comment outbox) and Prisma's default
+// 2 s (stream retention). A 100 ms wait gave up while a sibling held the connection
+// (6.5-INT-035), and a 50 ms one dropped the retry row (6.5-INT-036).
+const CONNECTION_WAIT_MS = 250
+const APPEND_TRANSACTION_MS = 750
+const RETRY_ROW_TRANSACTION_MS = 1_000
+// The least an attempt needs to run: an append is four round trips, about 125 ms at
+// production's 31 ms, and a retry row two statements, about 190 ms at p95 (2026-11-11).
+const APPEND_MIN_RUN_MS = 150
+const RETRY_ROW_MIN_RUN_MS = 200
+
+/** Wait and transaction limits for one attempt that must finish by `deadline`. */
+function attemptBudget(deadline: number, transactionMs: number, minRunMs: number) {
+  const left = Math.floor(deadline - performance.now())
+  if (left < minRunMs + 1)
+    throw new AppendDeadlineReached('Community append deadline reached')
+  // Prisma's timeout starts once the transaction has its connection, so the wait and the
+  // transaction share what is left.
+  const maxWait = Math.min(CONNECTION_WAIT_MS, left - minRunMs)
+  return { maxWait, timeout: Math.min(transactionMs, left - maxWait) }
+}
 // PostgreSQL 17 ends a transaction past either of its time budgets with a FATAL, each
 // under its own SQLSTATE and fixed text (postgres.c ProcessInterrupts, REL_17_STABLE;
 // reproduced on 17.6). Both are this transaction's budget running out. When either
@@ -53,6 +79,7 @@ function sqlDeferral(error: unknown) {
 }
 export function appendFailure(error: unknown) {
   if (error instanceof AppendBudgetExceeded) return 'budget_pressure'
+  if (error instanceof AppendConnectionUnavailable) return 'pool_wait'
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2028')
     return 'budget_pressure'
   return sqlDeferral(error) ?? 'dependency_unavailable'
@@ -79,7 +106,7 @@ export type AppendReport = {
   remainingMs: number
   writeCostMs: number
 }
-/** Head contention and budget pressure defer a batch; the append loop retries it. */
+/** Head contention, budget pressure and a pool wait defer a batch; the append loop retries it. */
 export function isAppendDeferral(error: unknown): boolean {
   return appendFailure(error) !== 'dependency_unavailable'
 }
@@ -131,8 +158,9 @@ export class CommunityStreamRepository {
    * records no retry either, so nothing is written after the abort.
    */
   async appendWithReport(signal?: AbortSignal): Promise<AppendReport> {
+    const deadline = performance.now() + COMMUNITY_APPEND_DEADLINE_MS
     try {
-      const report = await this.appendBatch(signal)
+      const report = await this.appendBatch(deadline, signal)
       if (report.count) this.readyLimit = Math.min(25, this.readyLimit + 2)
       return report
     } catch (error) {
@@ -159,216 +187,105 @@ export class CommunityStreamRepository {
               },
             })
           },
-          { timeout: 150, maxWait: 50 }
+          // Two statements: about 125 ms p50 and 190 ms p95 at production's 31 ms round trip
+          // (2026-11-11). The old 150 ms budget dropped most retry rows there. A connection's
+          // first insert also prepares its statement, and production's round trip reached
+          // 220 ms at worst, so 400 ms still dropped the occasional cold row; CI dropped one
+          // at load. 1 s holds a cold write at three times the round trip (6.5-INT-033), and
+          // the server still bounds the insert at 100 ms. Each attempt takes what is left of
+          // the append's deadline; with too little left the row is skipped and logged missing.
+          () => attemptBudget(deadline, RETRY_ROW_TRANSACTION_MS, RETRY_ROW_MIN_RUN_MS)
         )
-      } catch {
-        /* The sanitized process observation remains when the telemetry DB is unavailable. */
+      } catch (telemetryError) {
+        // The deferral warning above remains the observation; this one says the durable row
+        // is missing, so a gap in community_append_retry is never silent.
+        this.logger.warn(
+          {
+            reason,
+            code:
+              telemetryError instanceof AppendDeadlineReached
+                ? 'deadline'
+                : (postgresError(telemetryError)?.code ??
+                  (telemetryError instanceof Prisma.PrismaClientKnownRequestError
+                    ? telemetryError.code
+                    : 'unknown')),
+          },
+          'Community append retry not recorded'
+        )
       }
       throw error
     }
   }
 
-  private async appendBatch(signal?: AbortSignal): Promise<AppendReport> {
-    return interactiveTransaction(
-      this.prisma,
-      async (tx) => {
-        await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '500ms'")
-        await tx.$executeRawUnsafe("SET LOCAL statement_timeout = '450ms'")
-        await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
-        const started = performance.now()
-        const candidates = await tx.communityDomainOutbox.findMany({
-          where: { appended_at: null },
-          orderBy: [{ created_at: 'asc' }, { id: 'asc' }],
-          take: 100,
-        })
-        const ready: Candidate[] = []
-        const limit = this.readyLimit
-        let busy = 0
-        let stop: AppendStop = 'drained'
-        for (const candidate of candidates) {
+  /**
+   * One batch in one statement: `community_append_batch` prepares candidates and writes events
+   * server-side (migration 20261111120000), so a batch costs four round trips whatever its size.
+   * Preparing each candidate here took about 16, which at production's 31 ms round trip ran past
+   * the 500 ms transaction budget for a single candidate. The settings bound the server work;
+   * the 150 ms preparation window and 400 ms completion budget are measured inside the function.
+   */
+  private async appendBatch(
+    deadline: number,
+    signal?: AbortSignal
+  ): Promise<AppendReport> {
+    // Whether the current attempt reached its callback, that is, got a connection and began.
+    const attempt = { entered: false }
+    try {
+      return await interactiveTransaction(
+        this.prisma,
+        async (tx) => {
+          attempt.entered = true
+          await tx.$executeRaw`SELECT set_config('transaction_timeout', '500ms', true),
+          set_config('statement_timeout', '450ms', true),
+          set_config('lock_timeout', '100ms', true),
+          set_config('community.build_identity', ${communityBuildIdentity()}, true)`
           signal?.throwIfAborted()
-          // Reserve the remaining server budget for head allocation, events and commit.
-          if (performance.now() - started >= 150) {
-            stop = 'window'
-            break
-          }
-          if (ready.length >= limit) {
-            stop = 'limit'
-            break
-          }
-          const row = await this.prepareCandidate(tx, candidate)
-          if (row) ready.push(row)
-          else busy++
-        }
-        const preparedMs = performance.now() - started
-        const report = { stop, ready: ready.length, limit, preparedMs }
-        signal?.throwIfAborted()
-        if (busy)
-          await tx.communityEngagementTelemetry.create({
-            data: {
-              event_type: 'community_append_contention',
-              outcome: 'skipped',
-              reason: 'busy_or_changed_candidate',
-              backlog_count: busy,
-              elapsed_ms: Math.ceil(performance.now() - started),
-              build_identity: communityBuildIdentity(),
-            },
-          })
-
-        const streams = [...new Set(ready.map((row) => row.stream_id))].sort()
-        for (const stream of streams) {
-          // A busy head aborts this bounded batch; its holder supplies progress.
-          await tx.$queryRaw`SELECT id FROM "CommunityStreamHead" WHERE id = ${stream} FOR UPDATE NOWAIT`
-        }
-        const remaining = 400 - (performance.now() - started)
-        if (ready.length && remaining < 30)
-          throw new AppendBudgetExceeded('Community append completion budget exhausted')
-        const writeCostMs = this.writeCostMs
-        const fit = Math.max(1, Math.floor(remaining / writeCostMs))
-        const trimmed = fit < ready.length
-        const selected = trimmed ? ready.slice(0, fit) : ready
-        const written = {
-          selected: selected.length,
-          selectedReason: trimmed ? ('budget' as const) : ('all' as const),
-          remainingMs: remaining,
-          writeCostMs,
-        }
-        if (!selected.length) return { ...report, ...written, count: 0 }
-        signal?.throwIfAborted()
-        const writeStarted = performance.now()
-        await this.writeBatch(tx, selected)
-        this.writeCostMs = Math.max(
-          1,
-          (this.writeCostMs + (performance.now() - writeStarted) / selected.length) / 2
-        )
-        // An abort that lands during the write still rolls the batch back here.
-        signal?.throwIfAborted()
-        return { ...report, ...written, count: selected.length }
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        timeout: 750,
-        maxWait: 100,
-      }
-    )
-  }
-
-  private async writeBatch(tx: Prisma.TransactionClient, rows: Candidate[]) {
-    const values = rows.map(
-      (
-        row,
-        index
-      ) => Prisma.sql`(${row.id}::uuid,${row.stream_id}::text,${row.kind}::text,
-      ${row.revision}::bigint,${row.post_id}::text,${row.comment_id}::text,${row.parent_id}::text,${index}::int)`
-    )
-    await tx.$executeRaw(Prisma.sql`
-      WITH input(id,stream_id,kind,revision,post_id,comment_id,parent_id,ordinal) AS (VALUES ${Prisma.join(values)}),
-      counts AS (SELECT stream_id,count(*) AS total FROM input GROUP BY stream_id),
-      heads AS (UPDATE "CommunityStreamHead" h SET sequence = h.sequence+c.total FROM counts c
-        WHERE h.id = c.stream_id RETURNING h.id,h.sequence-c.total AS base),
-      numbered AS (SELECT i.*,row_number() OVER (PARTITION BY stream_id ORDER BY ordinal) AS offset FROM input i),
-      events AS (INSERT INTO "CommunityStreamEvent" (id,source_outbox_id,stream_id,sequence,revision,kind,post_id,comment_id,parent_id)
-        SELECT gen_random_uuid(),i.id,i.stream_id,h.base+i.offset,i.revision,i.kind,i.post_id,i.comment_id,i.parent_id
-        FROM numbered i JOIN heads h ON h.id=i.stream_id RETURNING id,source_outbox_id,kind),
-      links AS (INSERT INTO "CommunityArtifactSubject" (artifact_kind,artifact_id,member_id,role,generation)
-        SELECT 'event',e.id::text,a.member_id,a.role,a.generation FROM events e JOIN "CommunityArtifactSubject" a
-          ON a.artifact_kind='outbox' AND a.artifact_id=e.source_outbox_id::text WHERE e.kind <> 'resync')
-      UPDATE "CommunityDomainOutbox" o SET appended_at=clock_timestamp() FROM events e WHERE o.id=e.source_outbox_id
-    `)
-  }
-
-  private async prepareCandidate(
-    tx: Prisma.TransactionClient,
-    candidate: Candidate
-  ): Promise<Candidate | null> {
-    await tx.$executeRawUnsafe('SAVEPOINT community_candidate')
-    const subjects = await this.subjects(tx, candidate.id)
-    const posts = candidate.post_id ? [candidate.post_id] : []
-    if (!(await this.tryGuards(tx, subjects, posts))) {
-      await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT community_candidate')
-      return null
-    }
-    const owned = await tx.$queryRaw<Candidate[]>`
-            SELECT * FROM "CommunityDomainOutbox" WHERE id = ${candidate.id}::uuid
-              AND appended_at IS NULL FOR UPDATE SKIP LOCKED
-          `
-    if (
-      !owned[0] ||
-      subjectIdentity(subjects) !== subjectIdentity(await this.subjects(tx, candidate.id))
-    ) {
-      await tx.$executeRawUnsafe('ROLLBACK TO SAVEPOINT community_candidate')
-      return null
-    }
-    const current = await tx.$queryRaw<{ valid: boolean }[]>`
-            SELECT NOT EXISTS (
-              SELECT 1 FROM "CommunityArtifactSubject" a
-              LEFT JOIN "CommunitySubject" s ON s.member_id = a.member_id
-              WHERE a.artifact_kind = 'outbox' AND a.artifact_id = ${candidate.id}
-                AND (s.member_id IS NULL OR s.generation <> a.generation)
-            ) AS valid
-          `
-    const row = owned[0]
-    if (!current[0]?.valid && row.stream_id !== 'public') {
-      await tx.communityDomainOutbox.delete({ where: { id: row.id } })
-      await this.deleteLinks(tx, row.id)
-      await tx.$executeRawUnsafe('RELEASE SAVEPOINT community_candidate')
-      return null
-    }
-    const source = row.post_id
-      ? await tx.lookbookPost.findUnique({ where: { id: row.post_id } })
-      : null
-    let prepared = row
-    if (
-      row.stream_id === 'public' &&
-      (!current[0]?.valid || publicSourceUnavailable(source, row.kind))
-    ) {
-      prepared = {
-        ...row,
-        kind: 'resync',
-        post_id: null,
-        comment_id: null,
-        parent_id: null,
-      }
-    }
-    await tx.$executeRawUnsafe('RELEASE SAVEPOINT community_candidate')
-    return prepared
-  }
-
-  private subjects(tx: Prisma.TransactionClient, id: string): Promise<Subject[]> {
-    return tx.communityArtifactSubject.findMany({
-      where: { artifact_kind: 'outbox', artifact_id: id },
-      select: { member_id: true, generation: true, role: true },
-      orderBy: [{ member_id: 'asc' }, { role: 'asc' }],
-    })
-  }
-
-  private async tryGuards(
-    tx: Prisma.TransactionClient,
-    subjects: Subject[],
-    posts: string[]
-  ): Promise<boolean> {
-    for (const [namespace, ids] of [
-      [65001, subjects.map((s) => s.member_id)],
-      [65002, posts],
-    ] as const) {
-      if (!ids.length) continue
-      const keys = await tx.$queryRaw<{ key: number }[]>(Prisma.sql`
-        SELECT DISTINCT hashtext(value) AS key FROM unnest(ARRAY[${Prisma.join(ids)}]::text[]) value ORDER BY key
-      `)
-      for (const { key } of keys) {
-        const result = await tx.$queryRaw<{ acquired: boolean }[]>`
-          SELECT pg_try_advisory_xact_lock_shared(${namespace}::int,${key}::int) AS acquired
+          const [row] = await tx.$queryRaw<{ batch: BatchResult }[]>`
+          SELECT community_append_batch(${this.readyLimit}::integer, ${this.writeCostMs}::float8) AS batch
         `
-        if (!result[0]?.acquired) return false
-      }
+          const batch = row!.batch
+          // An abort that lands during the batch still rolls it back here.
+          signal?.throwIfAborted()
+          if (batch.budgetExhausted)
+            throw new AppendBudgetExceeded('Community append completion budget exhausted')
+          if (batch.selected)
+            this.writeCostMs = Math.max(
+              1,
+              (this.writeCostMs + batch.writeMs / batch.selected) / 2
+            )
+          return {
+            count: batch.count,
+            stop: batch.stop,
+            ready: batch.ready,
+            limit: batch.limit,
+            preparedMs: batch.preparedMs,
+            selected: batch.selected,
+            selectedReason: batch.selectedReason,
+            remainingMs: batch.remainingMs,
+            writeCostMs: batch.writeCostMs,
+          }
+        },
+        () => {
+          attempt.entered = false
+          return {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            ...attemptBudget(deadline, APPEND_TRANSACTION_MS, APPEND_MIN_RUN_MS),
+          }
+        }
+      )
+    } catch (error) {
+      // Prisma reports a wait that ran out before the transaction began as P2028, the same code
+      // as a transaction that ran out of time. Only the second spent the batch's budget.
+      if (
+        !attempt.entered &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2028'
+      )
+        throw new AppendConnectionUnavailable('No pool connection for the append', {
+          cause: error,
+        })
+      throw error
     }
-    return true
-  }
-
-  private async deleteLinks(tx: Prisma.TransactionClient, id: string) {
-    await tx.communityArtifactSubject.deleteMany({
-      where: { artifact_kind: 'outbox', artifact_id: id },
-    })
   }
 
   async retain(): Promise<number> {

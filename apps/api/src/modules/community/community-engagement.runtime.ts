@@ -125,8 +125,8 @@ export async function startCommunityEngagementRuntime(
     try {
       if (await streams.hasPending()) appended = await streams.append()
     } catch (error) {
-      // Head contention or budget pressure means rows are waiting and the batch backed off on its
-      // own; the append repository already logged it, so retry at the busy cadence.
+      // Head contention, budget pressure or a pool wait means rows are waiting and the batch backed
+      // off on its own; the append repository already logged it, so retry at the busy cadence.
       if (isAppendDeferral(error)) deferred = true
       else {
         failed = true

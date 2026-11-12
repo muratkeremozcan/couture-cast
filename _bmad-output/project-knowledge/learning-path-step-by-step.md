@@ -10618,11 +10618,23 @@ Evidence boundaries:
   The api shard went red at 12:00 UTC because a moderation fixture seeded a 7-day ban from a clock pinned at 2026-11-04 while enforcement reads the real clock.
   The sweep found five more fixed dates that the code compares with the real clock: teen birthdates in the reaction HTTP and privacy suites and the access token spec, which turn into adults from 2028 to 2030, and moderation members whose random adult age came from the real clock while the suite pins 2026-10-01.
   Tests now build birthdates with `birthdateForAge` from the clock the code reads, `unit-tests-year-ahead` runs the database-free unit suites with JavaScript's clock a year ahead, and in the integration tier, whose database and engine cannot move with it, `moderation-seed-clocks.integration.spec.ts` runs the fixtures that broke on later days and a static check catches birthdate and expiry literals.
+- **The third `X-DISPATCH` attempt passed and found two production defects (2026-11-11, `c6da9ace`).**
+  Readiness logged `ready` at 17:37:40 UTC with 14 guard connections and 10 send slots. The grantee's delivery made one attempt, Expo answered `DeviceNotRegistered` for the synthetic token, the token was pruned and nothing retried.
+  The non-grantee's delivery kept re-deferring: production read the PostHog project named `couturecast-dev`, which defined 4 of the 14 declared flags, so `community_read_enabled` came back absent and community evaluation treated absent as unavailable.
+  Production now reads `couturecast-prod` (329012), which holds every declared flag; local and preview keep `couturecast-dev`, and web and mobile production carry no key until the owner decides. A rerun with two fresh non-grantees ended both deliveries `suppressed` with zero attempts.
+  An hourly `PostHog flag drift` workflow, sent with the API's server User-Agent, fails when production omits a declared key or answers any of 12 synthetic subjects with a value other than the declared default or a pinned override (`color_analysis_enabled` on, by owner decision). A key PostHog omits now resolves closed to its declared default and never reads the `feature_flags` row: Codex showed an omission also covers inactive and runtime-filtered flags, where a stale `true` row would have kept granting a non-grantee (Story 6.5 D1 amendment). A delivery whose send keeps throwing now expires with its group instead of moving 2 s on forever.
+  The second defect: community append has never succeeded in production. Every batch aborts on its own time budget at production database latency, so outbox rows never append and never prune; that fix is its own change.
+  The deployment guide's Story 6.14 section holds the timestamps, counts and `AuditLog` ids, and its "PostHog projects and flag drift" section the project map and flag list.
 - **`X-PROD-GRANT` is blocked.**
   Production `auth.users` holds no rows while `User` holds 10, so no admin actor exists for the owner command.
   From macOS, the command cannot open its database connection: `createPrismaClient` requires strict verification against the committed Supabase Root 2021 CA, `openssl` verifies both poolers against that CA, and Prisma on macOS still answers `The certificate was not trusted`. `community:sponsorship` shares the client and the limit.
   The targeting guard was proved on production: without `--confirm-target` the command refused and named the project, and `AuditLog` and the grant table stayed at zero rows.
   Until both are resolved, the production push path and the first grant are unproven, and push is proved only through the engagement harness and its forked worker.
+- **Community append had never worked in production (2026-11-11).**
+  The third `X-DISPATCH` attempt found the public stream head at sequence 0: every append batch aborted on its own 500 ms budget, even with one candidate, and retried about 25 times a minute.
+  Measured inside the worker, a statement costs 30.7 ms, and preparing one candidate from TypeScript took about 16 of them. Raising the budgets would have hidden that, so preparation and the write moved into `community_append_batch`, one statement and four round trips per batch whatever its size, with the same lock order and the same skip rules.
+  A latency proxy that adds production's round trip reproduced the failure (0 of 30 appended) and now proves the fix; the old append specs run against the function, the savepoint lock-release proof reads `pg_locks` after a skipped candidate's subtransaction rolls back (its mutant still fails), and a race with account erasure leaves the server's deadlock counter unchanged.
+  The append retry row's transaction budget rose from 150 ms to 1 s, because at production latency it dropped most retry rows, and a cold connection's first insert at a slow round trip still missed 400 ms. A row that cannot be written now logs that it is missing. The append and its retry row now wait up to 250 ms for a pool connection; a shorter wait gave up whenever another worker loop held it and dropped the row. An append that never got a connection reports `pool_wait` and keeps its batch size, and one 2.25 s deadline bounds the append and its retry row across every retry. An append lane older than five minutes now records `community_append_stalled`, which a PostHog alert watches.
 - **Stated residuals.**
   A store purchase by a grantee on a device: the server cannot refuse it, mobile hides the controls, and a client that ignores them can still buy.
   The mobile complimentary state is proved by component tests only, and no Maestro flow or device run covers it.
@@ -10647,7 +10659,7 @@ flowchart TD
   Premium["hasPremiumAccess\npaid row first"] --> Seam
   Flags["getFeatureFlag\nfive shortcut keys"] --> Seam
   Refresh["community cache refresh"] --> Seam
-  Refresh -->|"grant true, or the remote answer"| Cache
+  Refresh -->|"grant true, the remote answer, or the declared default for an omitted key"| Cache
   Cache --> Reads["feed, realtime, push send guard"]
   Checkout["createCheckoutSession"] -->|"granted 409, unavailable 503"| Seam
   Route["GET /api/v1/commerce/premium/access"] --> Source["premiumAccessSource\na grant wins"]
