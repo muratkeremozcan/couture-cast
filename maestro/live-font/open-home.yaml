@@ -1,6 +1,7 @@
 # Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
-# Home loads the Shop this look offer after the outfit, so the flow waits for it below the fold
-# before returning to the top; otherwise a capture can miss text a later one shows.
+# Home loads the Shop this look offer after the outfit, so the flow waits for it below the fold,
+# where a build renders it, before returning to the top; otherwise a capture can miss text a
+# later one shows.
 appId: ${MAESTRO_APP_ID}
 ---
 - tapOn:
@@ -18,7 +19,9 @@ appId: ${MAESTRO_APP_ID}
     element:
       id: shop-this-look-offer-title
     direction: DOWN
-    timeout: 30000
+    timeout: 20000
+    # Release builds without the affiliate fixture never render the offer.
+    optional: true
 - scrollUntilVisible:
     element:
       id: current-temperature

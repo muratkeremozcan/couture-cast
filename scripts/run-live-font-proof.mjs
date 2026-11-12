@@ -462,13 +462,22 @@ try {
     }
     // The installed app reports its React Native version; read it once on the first launch.
     if (!reactNativeVersion) {
-      launch()
-      maestro(SCREENS[name].flow)
-      reactNativeVersion = readEnvironment(
-        flattenHierarchy(hierarchy(), { platform })
-      ).reactNativeVersion
-      if (!reactNativeVersion)
-        throw new Error('live_font_installed_rn_version_unreadable')
+      try {
+        launch()
+        maestro(SCREENS[name].flow)
+        reactNativeVersion = readEnvironment(
+          flattenHierarchy(hierarchy(), { platform })
+        ).reactNativeVersion
+        if (!reactNativeVersion)
+          throw new Error('live_font_installed_rn_version_unreadable')
+      } catch (error) {
+        // A failure before the journey still writes the report and fails the exit code.
+        results.push({
+          screen: name,
+          error: { error: error.message.split(':')[0], message: error.message },
+        })
+        continue
+      }
     }
     const report = await runScreenJourney({
       io: deviceIo(name),
