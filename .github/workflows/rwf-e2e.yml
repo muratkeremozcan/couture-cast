@@ -93,6 +93,7 @@ jobs:
         uses: ./.github/actions/configure-ci-supabase-ports
       # Loads the cached Supabase images while the dependencies install.
       - name: Preload the Supabase images
+        if: inputs.test_env == 'local'
         uses: ./.github/actions/preload-supabase-images
 
       - name: Resolve expected SHA
