@@ -547,7 +547,11 @@ test('the plan job writes one output per lane and a summary from the event commi
   assert.deepEqual(Object.keys(written), allLanes)
   assert.equal(written.maestro, true)
   assert.equal(written['web-e2e'], false)
-  assert.deepEqual(JSON.parse(output.match(/^coverage_shards=(.*)$/m)[1]), ['mobile'])
+  // packages/api-client's analytics-routes.spec.ts reads mobile sources, so the other shard runs.
+  assert.deepEqual(JSON.parse(output.match(/^coverage_shards=(.*)$/m)[1]), [
+    'mobile',
+    'other',
+  ])
   assert.match(summaryText, /Mobile end-to-end \(Maestro\) \| pr-mobile-e2e\.yml \| runs/)
   assert.doesNotMatch(
     summaryText,

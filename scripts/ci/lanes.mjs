@@ -168,8 +168,15 @@ export const LANES = {
       'utils',
       'api',
     ],
-    // packages/db's community storage seed reads its ports from supabase/config.toml.
-    inputs: ['apps/mobile/assets/locales/**', SUPABASE],
+    // packages/db's community storage seed reads its ports from supabase/config.toml, and
+    // packages/api-client's analytics-routes.spec.ts reads the mobile app's routes and sources.
+    inputs: [
+      'apps/mobile/assets/locales/**',
+      SUPABASE,
+      'apps/mobile/app/**',
+      'apps/mobile/src/**',
+      'apps/mobile/components/**',
+    ],
   },
   'year-ahead': {
     title: 'Unit tests a year ahead',
