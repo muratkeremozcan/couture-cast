@@ -44,6 +44,19 @@ function pool(connections = 1, url = database.url) {
   return client
 }
 
+/**
+ * Resolves once `holding` has run, or rejects with the transaction's own error when it ends first,
+ * so a holder that fails reports why instead of timing the test out.
+ */
+async function untilHeld(holding: Promise<void>, done: Promise<unknown>) {
+  await Promise.race([
+    holding,
+    done.then(() => {
+      throw new Error('the holder ended before it held anything')
+    }),
+  ])
+}
+
 /** Another worker loop's transaction on `client`, holding a connection until released. */
 async function holdConnection(client: PrismaClient) {
   let release!: () => void
@@ -58,7 +71,7 @@ async function holdConnection(client: PrismaClient) {
     },
     { timeout: 20_000, maxWait: 5_000 }
   )
-  await isHeld
+  await untilHeld(isHeld, done)
   return { release, done }
 }
 
@@ -85,9 +98,19 @@ function heldDuring(
       return async (...args: unknown[]) => {
         const holdMs = holds[++calls]
         if (holdMs !== undefined) {
-          const siblings = await Promise.all(
+          const taken = await Promise.allSettled(
             Array.from({ length: connections }, () => holdConnection(target))
           )
+          const siblings = taken.flatMap((hold) =>
+            hold.status === 'fulfilled' ? [hold.value] : []
+          )
+          const failed = taken.find((hold) => hold.status === 'rejected')
+          if (failed) {
+            // Let the holders that did start go before reporting the one that failed.
+            siblings.forEach((sibling) => sibling.release())
+            await Promise.allSettled(siblings.map((sibling) => sibling.done))
+            throw failed.reason
+          }
           await beforeRequest?.()
           const request = Reflect.apply(method, target, args)
           setTimeout(() => siblings.forEach((sibling) => sibling.release()), holdMs)
@@ -115,7 +138,7 @@ async function holdHead() {
     },
     { timeout: 20_000 }
   )
-  await isLocked
+  await untilHeld(isLocked, done)
   return { release, done }
 }
 
@@ -366,8 +389,11 @@ describe('community append at production database latency', () => {
     }
     logger.warn = (fields, message) => warnings.push([fields, message])
     const started = performance.now()
+    // Measured before the cleanup below, which is not part of the append.
+    let elapsed = Number.POSITIVE_INFINITY
     try {
       await expect(repository.appendWithReport()).rejects.toBeDefined()
+      elapsed = performance.now() - started
     } finally {
       await prisma.$executeRawUnsafe(
         'DROP TRIGGER tea_abort_telemetry ON "CommunityEngagementTelemetry"'
@@ -375,7 +401,6 @@ describe('community append at production database latency', () => {
       await prisma.$executeRawUnsafe('DROP FUNCTION tea_abort_telemetry()')
       await prisma.$executeRawUnsafe(original)
     }
-    const elapsed = performance.now() - started
     console.info(
       JSON.stringify({
         evidence: '6.5-INT-038',
