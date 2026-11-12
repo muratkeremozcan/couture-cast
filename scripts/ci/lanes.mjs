@@ -115,7 +115,9 @@ export const LANES = {
     title: 'Lighthouse accessibility',
     workflow: 'pr-checks.yml',
     jobs: ['lighthouse'],
-    workspaces: ['web'],
+    // test:a11y:lighthouse runs prepare:playwright (Prisma client, config, utils, api-client,
+    // testing) before it builds and starts the web app.
+    workspaces: ['web', 'config', 'utils', 'api-client', 'testing', 'db'],
   },
   'coverage-api': {
     title: 'Workspace coverage (api)',
@@ -209,8 +211,11 @@ export const LANES = {
     title: 'Mobile end-to-end (Maestro)',
     workflow: 'pr-mobile-e2e.yml',
     jobs: ['mobile-e2e-android'],
-    workspaces: ['mobile'],
-    inputs: ['maestro/**'],
+    // The journeys run the app against the real backend: the job starts local Supabase, resets
+    // the database (migrations and seed), starts the API with its workers, and Metro
+    // (scripts/run-maestro.mjs). A backend change can break a screen the flows check.
+    workspaces: ['mobile', 'api'],
+    inputs: [SUPABASE, 'maestro/**'],
   },
   'share-card': {
     title: 'Share-card browser acceptance',
