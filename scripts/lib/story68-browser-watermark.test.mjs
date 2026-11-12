@@ -190,8 +190,21 @@ function actualJourney({
     `${javascript}\nrapidWatermarkDuringRealPreparation`,
     context
   )
+  // The owned database turn (owned-database-turn.mjs): the journey takes it exclusive
+  // before the barrier and shares it again after, whatever happened in between.
+  const turnCalls = []
+  const turn = {
+    exclusive: async () => {
+      turnCalls.push(`exclusive@${order.length}`)
+    },
+    share: async () => {
+      turnCalls.push(`share@${order.length}`)
+    },
+  }
   return {
-    run: () => invoke(page, async () => emit(true), 'http://127.0.0.1:4088', readProfile),
+    run: () =>
+      invoke(page, async () => emit(true), 'http://127.0.0.1:4088', readProfile, turn),
+    turnCalls: () => turnCalls,
     cleanup: () => fs.rmSync(directory, { recursive: true, force: true }),
     proof: () =>
       JSON.parse(
@@ -297,6 +310,8 @@ describe('browser watermark journey', () => {
       assert.equal(proof.heldMs, 400.5)
       assert.equal(proof.requests, 3)
       assert.equal(proof.unavailableResponses, 0)
+      // The turn was taken alone before the barrier's first query and shared after its last.
+      assert.deepEqual(f.turnCalls(), ['exclusive@0', `share@${f.order().length}`])
       assert.equal(f.mutations(), 2)
       assert.deepEqual(f.order(), ['on:held', 'off:held', 'on:held'])
       assert.equal(f.queries.at(-1)[1], 'ROLLBACK')
