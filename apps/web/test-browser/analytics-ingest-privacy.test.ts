@@ -193,7 +193,7 @@ describe('U-ANALYTICS-PRIVACY-WEB-TRANSPORT: what PostHog receives', () => {
         (request) => isEvent(request) && request.body.includes('$pageview')
       )
       expect(pageview?.body).toContain('/guardian/accept')
-      // PostHog is told to add no location and keep no IP for the event.
+      // The event tells PostHog to add no location and sends no IP of its own.
       expect(pageview?.body).toMatch(/"\$geoip_disable":\s*true/)
       expect(pageview?.body).toMatch(/"\$ip":\s*null/)
       // The exception script came through the same proxy, from the same receiver.

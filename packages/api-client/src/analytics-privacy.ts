@@ -39,7 +39,9 @@ import {
  * - `$set` and `$set_once` person updates never leave: the clients never identify.
  * - Every sent event carries `$geoip_disable: true`, `$ip: null` and
  *   `$process_person_profile: false`, whatever the caller passed, so PostHog adds no
- *   location, keeps no IP and builds no person profile.
+ *   location and builds no person profile. PostHog fills a null `$ip` from the request,
+ *   so keeping the IP out of storage needs the project's Discard client IP data setting,
+ *   which the hourly PostHog flag drift check requires (deployment guide).
  */
 
 type Rule = (value: unknown, platform: AnalyticsPlatform) => unknown
@@ -563,7 +565,8 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
         if (value !== DROP) sanitized[key] = value
       }
       // Set after the copy so no caller or SDK value can turn them off: PostHog adds no
-      // GeoIP location, stores no IP and builds no person profile for any event.
+      // GeoIP location and builds no person profile for any event (the IP itself is
+      // dropped by the project's Discard client IP data setting).
       Object.assign(sanitized, PRIVACY_SWITCHES)
       return envelope(source, name, sanitized) as T | null
     } catch {

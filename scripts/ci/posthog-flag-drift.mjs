@@ -172,6 +172,8 @@ export async function readProjectPrivacy({
   const project = await response.json()
   if (typeof project !== 'object' || project === null || Array.isArray(project))
     throw new Error('the project answer has no project settings')
+  if (String(project.id) !== String(projectId))
+    throw new Error(`the project answer is for project ${project.id}, not ${projectId}`)
   return project
 }
 

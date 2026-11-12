@@ -457,4 +457,11 @@ test('reads the production project settings with the read key, and an unreadable
     readProjectPrivacy({ key: 'phx_synthetic', fetchImpl: async () => json([]) }),
     /no project settings/
   )
+  await assert.rejects(
+    readProjectPrivacy({
+      key: 'phx_synthetic',
+      fetchImpl: async () => json({ id: 327096, anonymize_ips: true }),
+    }),
+    /project 327096, not 329012/
+  )
 })
