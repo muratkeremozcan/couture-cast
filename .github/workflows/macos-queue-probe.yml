@@ -1,0 +1,31 @@
+# Story 6.15 D6: hosted macOS queue time, macos-26 against macos-15, before any job moves.
+# Each run starts one trivial job per image and does nothing but report the image, so its
+# queue time (job start minus run creation) is the measurement. The run is rerun one at a time
+# until each image has twenty completed observations; scripts/ci/pr-job-p95.mjs reads them.
+# This workflow lives only on the ci/macos-queue-probe branch and is never merged.
+name: macOS queue probe
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/macos-queue-probe.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: probe (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-15, macos-26]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 5
+    steps:
+      - name: Report the image
+        run: |
+          sw_vers
+          xcodebuild -version
+          ls /Applications | grep -i '^Xcode' || true
