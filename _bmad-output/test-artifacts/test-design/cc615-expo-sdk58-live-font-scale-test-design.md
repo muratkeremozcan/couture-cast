@@ -20,7 +20,7 @@ lastSaved: '2026-11-12'
 
 **Date:** 2026-11-12
 **Author:** Murat (TEA), peer of the builder in herdr pane `w0:p1`
-**Status:** Planned. No test is written yet.
+**Status:** Planned, aligned with the Codex story review (CX-01 to CX-14) on 2026-11-12. Step 0 background-task tests exist (`3d458bcd`).
 
 **Precedence:** the spec at `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md` wins wherever this document and the spec disagree.
 TEA does not edit the frozen block.
@@ -44,6 +44,7 @@ Each finding is recorded as TEA-NN in the spec's Plan Change Log with the fix.
 The evidence is here.
 
 **TEA-01 (intent; D5, Boundaries, AC4): a version-keyed characterization replaces the named expected failure.**
+_Superseded in part by CX-07: below 0.87 the proof classifies and records a per-step baseline (F-09) and no longer requires the exact 6.8 signature._
 The draft keeps the live-font proof red under a named expected-failure marker through Steps 0 to 3.
 An expected failure cannot tell the known bug from a broken emulator, a sign-in timeout or a crash: every one of them is "red, as expected".
 It also needs a `continue-on-error` or a skip somewhere in CI, which Boundaries forbid for every other test.
@@ -85,6 +86,7 @@ The Growth ratios use the multiplier actually set.
 The "1.5 equivalent" in the I/O matrix becomes "AccessibilityMedium (1.786), with ExtraExtraExtraLarge (1.353) on the way".
 
 **TEA-04 (intent; D1, D6): Step 2 cannot build iOS in CI without the runner move.**
+_The local Xcode 27.2 fallback is replaced by CX-05: Steps 2 and 3 build on Xcode 26.x (D14)._
 SDK 56 needs Xcode 26.4 or later, and `macos-15` tops out at 26.3.
 Seven jobs pin `macos-15`, and no workflow may change before the owner's go.
 If the go has not come when Step 2 starts, Step 2 has no CI iOS evidence.
@@ -172,31 +174,96 @@ Step 4 records the following for each row:
 Each step moves it with React (19.3.0 exists on npm).
 A node test asserts that `react`, `react-dom`, `react-test-renderer` and `@types/react` majors and minors are identical across every workspace and the lockfile, so D3 is enforced by a test.
 
+**TEA-15 (intent; D5 row 4, AC3 Android): Android recreates the Activity on every system font change.**
+The prebuild template's `MainActivity` `android:configChanges` has no `fontScale` in either SDK:
+
+- `expo-template-bare-minimum` 54: `keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode`.
+- `expo-template-bare-minimum` 58: the same plus `smallestScreenSize|assetsPaths`.
+
+No plugin in `apps/mobile/plugins` adds `fontScale` (`git grep configChanges` finds nothing), and the Story 6.8 spec records stock Activity recreation on a font change (`spec-6-8-safe-branded-share-card-export.md:1159`).
+Under CX-01, a recreated Activity is a restored screen and never a fix.
+As planned, every Android run on SDK 58 would therefore classify as a restored screen, and Android AC3 could never pass.
+The fix: a config plugin adds `fontScale` to `MainActivity` `configChanges`, so Android delivers `onConfigurationChanged` to the running Activity, which is the path the 0.87 layout fix serves.
+A prebuild spec pins the plugin's output (F-12).
+The D5 row 4 verdict becomes: the recreation restore stays for locale, permission revocation and memory pressure, and the manifest decides font changes.
+TEA-16 decides the step the plugin lands in.
+
+**TEA-16 (D5): an SDK 58 Android spike before the Step 0 proof merges.**
+Run it in a throwaway worktree:
+
+- Build SDK 58 Android Release with and without `fontScale` in `configChanges`.
+- Run the live font proof on Home and the composer.
+- Repeat on SDK 54 with `fontScale` added.
+
+The spike shows two things:
+
+- AC3 is reachable on Android at all, before four SDK steps are spent.
+- Whether adding `fontScale` on 0.81.5 leaves members worse off than today's recreation. Today the layout is already stale, at 169 px. A blank or frozen screen would make it worse.
+
+If 0.81.5 is no worse, the plugin lands in Step 0 and every step measures the live path that AC3 certifies.
+Otherwise it lands in Step 4, and Steps 0 to 3 record Android as a restored screen in their baselines.
+The outcome and the evidence path go in the Plan Change Log.
+
 ---
+
+## Alignment with the Codex story review (2026-11-12)
+
+The builder applied CX-01 to CX-14 to the frozen block.
+CX-05 replaces TEA-04's local Xcode 27.2 fallback.
+CX-07 replaces TEA-01's "assert the exact 6.8 signature below 0.87" with classification and per-step baselines.
+The test IDs each CX item owns:
+
+| CX    | Decision     | Test IDs                                         |
+| ----- | ------------ | ------------------------------------------------ |
+| CX-01 | D5           | F-00e, F-00f, F-00g, F-00m, F-12                 |
+| CX-02 | D5           | F-00i, F-00j, F-00k                              |
+| CX-03 | D4, D7, D11  | P0-08 (simulator scope), P0-09, U-01             |
+| CX-04 | D12          | S2-07, S2-08, S3-02                              |
+| CX-05 | D1, D14      | Gate matrix iOS row, S3-03, S4-04                |
+| CX-06 | D4, D11, D15 | S4-06, S4-12, S4-13, D7-08                       |
+| CX-07 | D5           | F-00a, F-00h, F-00l, F-09, F-10                  |
+| CX-08 | D4           | S2-05                                            |
+| CX-09 | D13          | U-05, U-03                                       |
+| CX-10 | D1           | Exit criteria, gate matrix "Native evidence" row |
+| CX-11 | D6           | C-01, C-01b                                      |
+| CX-12 | D5           | F-05a, F-05b                                     |
+| CX-13 | D4           | S4-11                                            |
+| CX-14 | D4           | S0-01                                            |
 
 ## Executive Summary
 
 The story replaces the React Native runtime under every mobile screen, four times, and ends in a production build.
-The one behavior change members should see is AC3, which turns from red to green at Step 4.
+The one behavior change members should see is AC3: live font-scale layout, certified from Step 4.
 Everything else must stay exactly as it is.
-The plan has three layers:
+The plan has four layers:
 
-1. **Static and unit gates at every step:** typecheck per workspace by error code, vitest, node-test-gate, plugin prebuild specs, and the new guards from TEA-05, TEA-06, TEA-11 and TEA-14. They run on Linux in minutes.
-2. **Device gates at every step:**
-   - Maestro on Expo Go for the PR (Android).
-   - Native journeys on our own dev client and Release builds (Android and iOS) through dispatch.
-   - The live font proof on both platforms in Debug and Release.
+1. **Static and unit gates at every step:** typecheck per workspace by error code, vitest, node-test-gate, plugin prebuild specs, and the new guards: Expo Go pin, font-scale reads, React parity, ABI check, semantic prebuild diff, release hold.
+2. **Device gates before every step merges, on the exact head SHA:**
+   - Maestro on Expo Go.
+   - Native journeys on our dev client and Release builds on both platforms.
+   - The live font classification, Debug and Release.
+   - The installed-predecessor upgrade smoke.
    - The accessibility focus bridge, share-card save, watchOS and widgets.
-3. **Release gate once:** the D7 production-shaped run, including the in-place upgrade, with Step 0 proving the background-task upgrade early (TEA-07).
+   - Every applicable P0 and P1 test (D1).
+3. **Step 4 additions:**
+   - Complete-fix assertion.
+   - The direct SDK 54 to 58 upgrade.
+   - The Android paid journey through Play license testers.
+   - The R8 reflection mutant.
+   - Foreground notifications.
+   - iOS 27 and resizable iPad checks.
+4. **Sign-off:**
+   - The D7 production-shaped run.
+   - The D11 gates once Apple Developer enrollment exists. Each D11 gate blocks sign-off, and a missing-access record never counts as a pass.
 
-Risk summary: 17 risks, 8 high (score 6 or 9), 6 medium, 3 low.
+Risk summary: 22 risks, 13 high (score 6 or 9), 7 medium, 2 low.
 
 ## Not in Scope
 
 - Behavior changes beyond AC3. Every other user-visible change is a regression.
 - A React Native source build or renderer backport (Story 6.8 ruled them out).
 - Web feature changes. The web suites run only because React moves (D3).
-- New iOS 27 SDK features. Scene lifecycle is proved for parity only.
+- New iOS 27 SDK features. The scene lifecycle is proved for parity only.
 
 ## Risk Assessment
 
@@ -204,35 +271,42 @@ Probability (P) and Impact (I) are on a 1 to 3 scale; Score = P x I.
 
 ### High-Priority Risks (Score >= 6)
 
-| ID  | Category | Risk                                                                                                                  | P   | I   | Score | Mitigation (test IDs)                                      |
-| --- | -------- | --------------------------------------------------------------------------------------------------------------------- | --- | --- | ----- | ---------------------------------------------------------- |
-| R01 | TECH     | Live font fix absent or partial on a screen (Fabric still caches a stale scale on some path)                          | 2   | 3   | 6     | F-01 to F-08, cold parity oracle                           |
-| R02 | DATA     | In-place upgrade loses the session or the ritual cache (`expo-secure-store` or storage format change across 4 majors) | 2   | 3   | 6     | U-01 to U-04, D7-05                                        |
-| R03 | TECH     | Background task dead or crashing after upgrade (TEA-07)                                                               | 3   | 3   | 9     | P0-05 to P0-08, U-03                                       |
-| R04 | TECH     | R8 strips a class used by reflection (RevenueCat, PostHog, local modules) in Release only                             | 3   | 3   | 9     | S4-06, Release journeys, D7-02                             |
-| R05 | OPS      | iOS CI cannot build from Step 2 (Xcode 26.4) or queues past the 20-minute ceiling                                     | 3   | 2   | 6     | TEA-04, C-01 to C-04                                       |
-| R06 | TECH     | expo-router 58 navigation rework breaks deep links, widget taps, back behavior or `initialRouteName` users            | 2   | 3   | 6     | S4-03, `deep-link-handling.yaml`, `widget-deep-link.yaml`  |
-| R07 | TECH     | Share-card save fails on the new media-library API, or the 6.8 add-only permission regresses                          | 2   | 3   | 6     | S2-04, share-card native journeys                          |
-| R08 | OPS      | A green PR with no native journey on its code (TEA-10)                                                                | 3   | 2   | 6     | Dispatch evidence per step, nightly green before next step |
+| ID  | Category | Risk                                                                                                                  | P   | I   | Score | Mitigation (test IDs)                                     |
+| --- | -------- | --------------------------------------------------------------------------------------------------------------------- | --- | --- | ----- | --------------------------------------------------------- |
+| R01 | TECH     | Live font fix absent or partial on a screen, or a stale clone returns on a later commit                               | 2   | 3   | 6     | F-00a to F-00n, F-01 to F-08                              |
+| R02 | DATA     | In-place upgrade loses the session or the ritual cache (`expo-secure-store` or storage format change across 4 majors) | 2   | 3   | 6     | U-03, U-04, U-05, P0-07, P0-08                            |
+| R03 | TECH     | Background task dead or crashing after upgrade (TEA-07)                                                               | 3   | 3   | 9     | P0-05 to P0-09, U-01                                      |
+| R04 | TECH     | R8 strips a class reached only by reflection, in Release only                                                         | 3   | 3   | 9     | S4-06 targeted mutant, S4-12, D7-04                       |
+| R05 | OPS      | iOS CI cannot build from Step 2 (Xcode 26.4), or the macOS queue breaks the 20-minute ceiling                         | 3   | 2   | 6     | Step 2 entry criterion, C-01 to C-04                      |
+| R06 | TECH     | expo-router 58 navigation rework breaks deep links, widget taps, back behavior or `initialRouteName` users            | 2   | 3   | 6     | S4-03, `deep-link-handling.yaml`, `widget-deep-link.yaml` |
+| R07 | TECH     | Share-card save fails on the new Android media-library API, or the 6.8 add-only permission regresses                  | 2   | 3   | 6     | S2-04, U-05 Step 2 Photos states                          |
+| R08 | OPS      | A green PR with no native journey on its exact head SHA                                                               | 3   | 2   | 6     | Gate matrix "Native evidence", exit criteria              |
+| R18 | TECH     | Android Activity recreation on font change makes AC3 unreachable or masks the fix (TEA-15)                            | 3   | 3   | 9     | TEA-16 spike, F-00e, F-12                                 |
+| R19 | TECH     | SDK 56 Hermes memory regression ships to members (D12)                                                                | 2   | 3   | 6     | S2-07, S2-08, S3-02                                       |
+| R20 | BUS      | Paid entitlement lost across the upgrade, or purchase or restore broken by RevenueCat 11 (D15)                        | 2   | 3   | 6     | S4-12, S4-13, D7-08                                       |
+| R21 | OPS      | D11 gates never run because Apple Developer enrollment is missing, which blocks sign-off                              | 3   | 2   | 6     | D11 list, P0-09, F-11; owner decision routed              |
+| R22 | TECH     | An Xcode 27 artifact misbehaves on iOS 27 (application lifecycle) or on resizable iPad                                | 2   | 3   | 6     | S3-03, S4-04                                              |
 
 ### Medium-Priority Risks (Score 3 to 4)
 
 | ID  | Category | Risk                                                                        | P   | I   | Score | Mitigation                             |
 | --- | -------- | --------------------------------------------------------------------------- | --- | --- | ----- | -------------------------------------- |
-| R09 | TECH     | `expo/fetch` global changes abort, timeout or streaming behavior            | 2   | 2   | 4     | S2-06, TEA-12 Maestro timeout check    |
+| R09 | TECH     | `expo/fetch` global changes abort, timeout or streaming behavior            | 2   | 2   | 4     | S2-06                                  |
 | R10 | TECH     | Strict TypeScript API surfaces real ref or deep-import bugs hidden by casts | 2   | 2   | 4     | tsc per workspace by code, S4-01       |
 | R11 | TECH     | Hermes and Intl change breaks localization or plural rules                  | 2   | 2   | 4     | Localization flows mandatory each step |
-| R12 | TECH     | iOS 16.4 floor or scene delegate breaks widget, watchOS or orientation      | 2   | 2   | 4     | S2-05, S4-04, watchOS lane             |
+| R12 | TECH     | Per-target iOS floors break widget, watch or pods                           | 2   | 2   | 4     | S2-05, watchOS lane                    |
 | R13 | TECH     | `NODE_ENV` forced by the CLI loads the wrong env file into a build          | 2   | 2   | 4     | S4-07                                  |
-| R14 | OPS      | Linux PR jobs over 15 min p95 get slower as builds grow                     | 2   | 2   | 4     | C-02, p95 recorded each step           |
+| R14 | OPS      | Linux PR jobs over 15 min p95 get slower as builds grow                     | 2   | 2   | 4     | C-02 each step                         |
+| R23 | TECH     | SDK 58 shows foreground notifications the app suppressed on SDK 54 (CX-13)  | 2   | 2   | 4     | S4-11                                  |
 
 ### Low-Priority Risks (Score 1 to 2)
 
-| ID  | Category | Risk                                                                              | P   | I   | Score | Action                                  |
-| --- | -------- | --------------------------------------------------------------------------------- | --- | --- | ----- | --------------------------------------- |
-| R15 | TECH     | Reanimated 4.7 drops `zIndex` from sync props, so an animation's stacking changes | 1   | 2   | 2     | S4-08 grep guard plus visual check      |
-| R16 | TECH     | AC5 Expo internals move                                                           | 1   | 2   | 2     | S4-09                                   |
-| R17 | BUS      | RevenueCat 11 changes the purchase or complimentary flow                          | 1   | 2   | 2     | `premium-subscription.yaml`, 6.14 flows |
+| ID  | Category | Risk                                                                              | P   | I   | Score | Action                             |
+| --- | -------- | --------------------------------------------------------------------------------- | --- | --- | ----- | ---------------------------------- |
+| R15 | TECH     | Reanimated 4.7 drops `zIndex` from sync props, so an animation's stacking changes | 1   | 2   | 2     | S4-08 grep guard plus visual check |
+| R16 | TECH     | AC5 Expo internals move                                                           | 1   | 2   | 2     | S4-09                              |
+
+R17 (RevenueCat 11, low) is merged into R20 now that D15 makes the paid journey real.
 
 ### Risk Category Legend
 
@@ -240,141 +314,192 @@ TECH: technical or architecture. DATA: data integrity or loss. OPS: CI, build, d
 
 ## Entry Criteria
 
-- The spec is approved with TEA-01, TEA-02, TEA-03, TEA-04, TEA-07 and TEA-09 applied to the frozen block.
-- For Step 0: an isolated `DATABASE_URL` is available for Playwright, and an Android emulator (API 36 and API 32) plus an iOS 26.1 simulator are available on this machine.
-- For Step 2: the D6 runner move is merged or its fallback is recorded (TEA-04).
+- The spec is approved with the TEA and CX intent entries applied to the frozen block, and TEA-15 decided.
+- Before the Step 0 proof merges: the TEA-16 spike result is recorded.
+- Step 0: an isolated `DATABASE_URL` for Playwright; an Android emulator (API 36 and API 32); an iOS 26.1 simulator.
+- Step 2: the `macos-26` move or D6 fallback is in, and Xcode 26.x (26.4 or later) is installed beside Xcode 27.2 for `DEVELOPER_DIR` builds (D14). An iOS 16.4 simulator runtime is installed (S2-05).
+- Step 4:
+  - The app is on the Play internal testing track.
+  - A Play license tester and a separate non-complimentary account are provisioned (D15).
+  - An iOS 27 simulator runtime and a resizable iPad simulator are installed (D14).
 
 ## Exit Criteria (per step)
 
-The step's row in the gate matrix below is fully green on the PR head SHA:
-
-- Dispatch run URLs are linked in the PR (TEA-10), and the next nightly on `main` is green before the following step starts.
+- Every applicable P0 and P1 test in this plan is green on the step's exact head SHA, the Debug font proof and U-05 included (D1).
+- Native evidence on that SHA is linked in the PR (CX-10):
+  - Before the D6 workflows: `workflow_dispatch` runs of `pr-share-card-native`, `pr-accessibility-focus` and `watchos-native`.
+  - After D6: the consolidated iOS job by dispatch, or a recorded local run of its suites when the job is off the PR path, plus the Android lanes.
+- The first nightly on `main` after merge is green before the next step opens. It never stands in for pre-merge evidence.
 - Every flake met is fixed and burned in by TEA (see Flake policy).
-- The step's PR job p95 table is appended to the spec.
+- The step's C-02 table is appended to the spec.
 
 ## Gate matrix per step
 
-"Every step" means each of Steps 0 to 4.
-A cell lists what must be green; "dispatch" means a `workflow_dispatch` on the step head.
+"Every step" means each of Steps 0 to 4, run on the step's exact head SHA.
 
-| Gate                            | How                                                                                                                                                                                                           | Steps                                             |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| `npx expo-doctor` zero findings | Local, logged in PR                                                                                                                                                                                           | Every step                                        |
-| Typecheck by code               | `npm exec -- tsc --noEmit -p <tsconfig>` in `apps/mobile`, `apps/web`, `apps/api` and every package; only the known symlink TS2742 allowed; count by code recorded. Rebuild `packages/api-client` dist first. | Every step                                        |
-| Unit                            | `npm exec -- vitest run` in every workspace; `apps/mobile` `test:widget-prebuild`, `test:watchos-prebuild`, `test:share-card-prebuild`                                                                        | Every step                                        |
-| Node-test-gate                  | Every suite in `scripts/ci/node-test-suites.json`, run blocks included                                                                                                                                        | Every step                                        |
-| New guards                      | Expo Go pin (TEA-05), font-scale reads (TEA-06), React parity (TEA-14), AAB ABI check (TEA-11)                                                                                                                | Added Step 0 (TEA-11 at Step 1), every step after |
-| Web e2e                         | PR workflows `pr-pw-e2e-local` and the Vercel preview; locally only with isolated `DATABASE_URL` and `PLAYWRIGHT_SKIP_DB_RESET=true`                                                                          | Every step (React moves)                          |
-| Contract                        | `contract-testing.yml`                                                                                                                                                                                        | Every step                                        |
-| Maestro Android (Expo Go)       | `pr-mobile-e2e`, all 9 shards, Expo Go pinned to the step's SDK                                                                                                                                               | Every step                                        |
-| Maestro iOS (Expo Go)           | `ios-expo-go` dispatch                                                                                                                                                                                        | Every step                                        |
-| Android native                  | Prebuild `--clean`, Debug and Release (x86_64 in CI); all-ABI `bundleRelease` (TEA-11); `pr-share-card-native` dispatch: API32 shards, API36 matrix, original, controls, interaction, release-font            | Every step                                        |
-| iOS native                      | Prebuild `--clean`, Debug and Release; `ios-build` and `ios-shard` dispatch, or local Xcode 27.2 with identity until TEA-04 clears                                                                            | Every step                                        |
-| watchOS and widgets             | `watchos-native` dispatch; `widget-deep-link.yaml`                                                                                                                                                            | Every step                                        |
-| Share card save                 | Android 13+ and iOS add-only save journeys in the share-card lanes, plus `share-card-export.yaml`                                                                                                             | Every step; Step 2 is the API change              |
-| Accessibility focus             | `pr-accessibility-focus` Android (TalkBack, Robolectric), iOS module, `ios-app-build` dispatch                                                                                                                | Every step                                        |
-| Live font proof                 | F-01 to F-08 on Android API 36 and iOS 26.1, Debug and Release. Below 0.87 it asserts the bug signature; Step 4 asserts the fix (TEA-01)                                                                      | Every step                                        |
-| Large-text matrix               | `story68-cold-font-scale.mjs` cold matrix                                                                                                                                                                     | Every step                                        |
-| CI timing                       | `pr-job-p95.mjs` table for the step's PR runs; `pr-job-ceilings.test.mjs`                                                                                                                                     | Every step after Step 0 CI work                   |
+| Gate                          | How                                                                                                                                                                                                                                                              | Steps                                          |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `npx expo-doctor`             | Zero findings, logged in the PR                                                                                                                                                                                                                                  | Every step                                     |
+| Typecheck by code             | `npm exec -- tsc --noEmit -p <tsconfig>` in `apps/mobile`, `apps/web`, `apps/api` and every package; only the known symlink TS2742; count by code recorded; rebuild `packages/api-client` dist first                                                             | Every step                                     |
+| Unit                          | `npm exec -- vitest run` in every workspace; `apps/mobile` `test:widget-prebuild`, `test:watchos-prebuild`, `test:share-card-prebuild` and the background-task prebuild spec (no workflow runs these today, so the PR records the local run until D6 wires them) | Every step                                     |
+| Node-test-gate                | Every suite in `scripts/ci/node-test-suites.json`, run blocks included                                                                                                                                                                                           | Every step                                     |
+| New guards                    | Expo Go pin, font-scale reads, React parity, semantic prebuild diff, release hold, `configChanges` prebuild spec (F-12); all-ABI AAB check                                                                                                                       | From the step that adds each, every step after |
+| Web e2e and contract          | `pr-pw-e2e-local`, the Vercel preview, `contract-testing.yml`; locally only with an isolated `DATABASE_URL` and `PLAYWRIGHT_SKIP_DB_RESET=true`                                                                                                                  | Every step                                     |
+| Maestro on Expo Go            | `pr-mobile-e2e` (9 shards) and `ios-expo-go`, with Expo Go pinned to the step's SDK; localization flows mandatory                                                                                                                                                | Every step                                     |
+| Native evidence               | Android: prebuild `--clean`, Debug and Release, every `pr-share-card-native` device lane, accessibility focus (TalkBack, Robolectric). iOS: prebuild, Debug and Release, `ios-build`, `ios-shard`, accessibility module and `ios-app-build`, `watchos-native`    | Every step                                     |
+| iOS toolchain                 | Xcode 26.3 on `macos-15` at Steps 0 and 1; Xcode 26.x (26.4 or later) at Steps 2 and 3; Xcode 27 from Step 4 with S4-04's iOS 27 and resizable iPad checks                                                                                                       | Per step                                       |
+| Share card save               | Android 13+ and iOS add-only save journeys, `share-card-export.yaml`                                                                                                                                                                                             | Every step; Step 2 is the Android API change   |
+| Live font classification      | F-01 to F-09 on Android API 36 and iOS 26.1, Debug and Release                                                                                                                                                                                                   | Every step; complete fix asserted from Step 4  |
+| Large-text matrix             | `story68-cold-font-scale.mjs` cold matrix                                                                                                                                                                                                                        | Every step                                     |
+| Installed-predecessor upgrade | U-05 (U-03 too at Step 4)                                                                                                                                                                                                                                        | Every step                                     |
+| Memory                        | S2-07 at Step 2, S3-02 at Step 3                                                                                                                                                                                                                                 | Steps 2 and 3                                  |
+| CI timing                     | C-02 table for the step's PR runs; `pr-job-ceilings.test.mjs`                                                                                                                                                                                                    | Every step after the Step 0 CI work            |
 
 ## Test Catalog
 
-Priorities: P0 blocks the step, P1 blocks story sign-off, P2 is recorded.
+Priorities: P0 and P1 both block the step they apply to (D1); P2 is recorded.
+Only D7 and D11 wait for sign-off.
 
-### Live font-scale proof (`scripts/lib/live-font-scale-proof.mjs`, `.test.mjs`, driver `scripts/run-live-font-proof.mjs`, Maestro anchors `maestro/live-font/*.yaml`)
+### Live font-scale proof
 
-| ID   | Priority | Test                                                                                                                                                                                                                                              |
-| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F-00 | P0       | Oracle unit tests on recorded hierarchies: the 6.8 baseline fixture (43 nodes, 169 px) classifies as the bug signature; a cold 1.0 and 1.5 pair classifies as correct; a 44-to-5 blank fixture fails "Anchors"; a restart fixture fails "Process" |
-| F-01 | P0       | Positive control on SDK 54: cold 1.0 against cold 1.5 per screen passes "Full text" and "Growth" (TEA-02)                                                                                                                                         |
-| F-02 | P0       | Android Release, Home: live 1.0 to 1.5, then back to 1.0                                                                                                                                                                                          |
-| F-03 | P0       | Android Release, Community feed: live up and down (test member with 6.14 grant)                                                                                                                                                                   |
-| F-04 | P0       | Android Release, Settings: live up and down                                                                                                                                                                                                       |
-| F-05 | P0       | Android Release, composer with card rendered and a feedback message showing: live up and down; card state kept; Save and Share bounds unchanged; action rows re-tier                                                                              |
-| F-06 | P0       | iOS Release, same four screens: `large` to `extra-extra-extra-large` to `accessibility-medium` and back (TEA-03)                                                                                                                                  |
-| F-07 | P1       | Debug dev client, both platforms, same four screens                                                                                                                                                                                               |
-| F-08 | P1       | Light and dark, Release, screenshots stored beside node counts, heights and PIDs                                                                                                                                                                  |
+The builder fork owns the code: `scripts/lib/live-font-scale-proof.mjs`, its test, and the driver `scripts/run-live-font-proof.mjs`.
+TEA owns the test IDs and the fixtures' expected classes, and reviews each fixture against a recorded hierarchy.
 
-Stability rule: the proof runs 3 times consecutively per platform at Step 4 with identical verdicts before Step 4 merges.
+Oracle unit tests run on recorded hierarchies and fake driver logs.
+Expected class at `fixExpected` false and true:
 
-### Background task and upgrade (`src/lib/background-task.test.ts`, `plugins` prebuild spec, `scripts/run-upgrade-proof.mjs`)
+| ID    | Priority | Fixture                                                                                                                                                                                                                                                                                                       | Below 0.87                                | 0.87 and above          |
+| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ----------------------- |
+| F-00a | P0       | Story 6.8 baseline: 43 nodes, 169 px unchanged, same PID                                                                                                                                                                                                                                                      | Residual bug, pass                        | Fail                    |
+| F-00b | P0       | Cold 1.0 and cold 1.5 pair presented as a live change                                                                                                                                                                                                                                                         | Complete fix, pass, flags baseline review | Complete fix, pass      |
+| F-00c | P0       | 44 nodes before, 5 after (the rejected `AppText` repair)                                                                                                                                                                                                                                                      | Unrelated failure, fail                   | Unrelated failure, fail |
+| F-00d | P0       | PID changes                                                                                                                                                                                                                                                                                                   | Unrelated failure, fail                   | Unrelated failure, fail |
+| F-00e | P0       | Same-PID Activity recreation mutant: Activity token changes, `onCreate` count rises, layout correct                                                                                                                                                                                                           | Restored screen, recorded                 | Fail                    |
+| F-00f | P0       | Remount mutant: same Activity, mounted-root identity marker changes, layout correct                                                                                                                                                                                                                           | Restored screen, recorded                 | Fail                    |
+| F-00g | P0       | iOS scene or key window identity changes                                                                                                                                                                                                                                                                      | Restored screen, recorded                 | Fail                    |
+| F-00h | P0       | Stale clone: parity and clipping hold when settled, fail after the post-change React update                                                                                                                                                                                                                   | Residual bug, pass                        | Fail                    |
+| F-00i | P0       | Clipping: heights equal the cold reference, but one text node's content bounds exceed its container                                                                                                                                                                                                           | Residual bug, pass                        | Fail                    |
+| F-00j | P0       | Android 14 and later nonlinear scaling, from the device's converter at 1.5. A large-text probe (above the converter's nonlinear threshold) grows little and passes; a linear 1.5 expectation applied to the same fixture must fail the oracle's own self-check; a small-text probe that stays unchanged fails | Per class                                 | Per class               |
+| F-00k | P0       | iOS per text style: the expected size comes from the content-size category table for the probe's style at 1.353 and 1.786; a probe that does not grow fails                                                                                                                                                   | Per class                                 | Per class               |
+| F-00l | P0       | Early complete fix below 0.87                                                                                                                                                                                                                                                                                 | Pass, `baselineReview`                    | n/a                     |
+| F-00m | P0       | Driver order: the identity check runs before any scroll-through or cold reference run; a fake driver that scrolls first is rejected                                                                                                                                                                           | Fail                                      | Fail                    |
+| F-00n | P0       | Return leg: after 1.5 to 1.0, a stale tall box remains                                                                                                                                                                                                                                                        | Residual bug, pass                        | Fail                    |
 
-| ID    | Priority | Test                                                                                                                                                                                                                                                                                           |
-| ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| P0-05 | P0       | Unit: with the old name registered, launch unregisters it, then registers the new name; an unregister throw is caught and logged, and registration still happens                                                                                                                               |
-| P0-06 | P0       | Prebuild spec: iOS Info.plist has `processing` and the task identifier in `BGTaskSchedulerPermittedIdentifiers`, and no `fetch`; Android manifest has no background-fetch receiver                                                                                                             |
-| P0-07 | P0       | Android in-place upgrade, `a01e0307` Release to Step 0 Release, same keystore. Signed in with fetch registered: install over; cold start; `adb reboot`. Logcat has no `ClassNotFoundException` and no crash; `dumpsys jobscheduler` shows exactly one job for the package; the session is kept |
-| P0-08 | P0       | iOS simulator in-place upgrade, same shape; the session is kept; the task identifier is registered                                                                                                                                                                                             |
-| U-01  | P0       | Debug: `triggerTaskWorkerForTestingAsync()` runs the ritual task: fetches when the cache is stale, no fetch when fresh, no fetch with no session                                                                                                                                               |
-| U-02  | P1       | Unit parity: the existing `background-fetch.test.ts` cases are ported one to one, with result enums mapped                                                                                                                                                                                     |
-| U-03  | P0       | D7 54 to 58 upgrade (TEA-08): session, ritual cache read with no network, one task                                                                                                                                                                                                             |
-| U-04  | P1       | Unit: the SecureStore key names and options used for auth storage are pinned by a spec, so a rename across steps is caught                                                                                                                                                                     |
+Device runs: each screen goes up and back down. The post-change React update is a deterministic state update the driver triggers on that screen, chosen per screen and recorded.
+
+| ID    | Priority | Test                                                                                                                                                                                                                                                                                                         |
+| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| F-01  | P0       | Positive control, SDK 54, per platform: a cold launch at the base scale against a cold launch at the target scale passes "Full text", per-style growth and clipping. It runs before any build is judged                                                                                                      |
+| F-02  | P0       | Android Release, Home                                                                                                                                                                                                                                                                                        |
+| F-03  | P0       | Android Release, Community feed (6.14 test member)                                                                                                                                                                                                                                                           |
+| F-04  | P0       | Android Release, Settings                                                                                                                                                                                                                                                                                    |
+| F-05a | P0       | Composer, cross-scale reflow (CX-12): at each scale, Save and Share are visible, reachable and non-overlapping, in the tier `actionRowTier` chooses from the measured labels                                                                                                                                 |
+| F-05b | P0       | Composer, fixed-scale stability (CX-12): at each scale, toggling the feedback message leaves Save and Share bounds and the popover anchor rect unchanged                                                                                                                                                     |
+| F-06  | P0       | iOS Release, F-02 to F-05b equivalents, `large` to `extra-extra-extra-large` to `accessibility-medium` and back                                                                                                                                                                                              |
+| F-07  | P1       | Debug dev client, both platforms, F-02 to F-06 (runs before every step merges, per D1)                                                                                                                                                                                                                       |
+| F-08  | P1       | Light and dark, Release, screenshots stored beside node counts, heights, identities and PIDs                                                                                                                                                                                                                 |
+| F-09  | P0       | Per-step baseline (CX-07): below 0.87, the class per platform, configuration and screen is saved under `_bmad-output/test-artifacts/story-6-15/live-font-baselines/step-N-<platform>-<config>.json` and compared with the previous step. A changed class gets a baseline-review entry in the Plan Change Log |
+| F-10  | P0       | Step 4: the below-0.87 branch and its fixtures are deleted, and a spec asserts that no class other than complete fix passes                                                                                                                                                                                  |
+| F-11  | P0       | iOS physical device, Release, F-06 (D11, blocks sign-off)                                                                                                                                                                                                                                                    |
+| F-12  | P0       | Prebuild spec: `MainActivity` `configChanges` contains `fontScale` from the step TEA-16 picks; removing the plugin turns it red                                                                                                                                                                              |
+
+Stability: at Step 4 the proof runs 3 times consecutively per platform and configuration with identical classes before Step 4 merges.
+
+### Background task and upgrades
+
+| ID    | Priority | Test                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| P0-05 | P0       | Unit: with `RITUAL_BACKGROUND_FETCH_TASK` registered, launch unregisters it, then registers `RITUAL_BACKGROUND_TASK` with `minimumInterval: 15` (minutes). An unregister throw is logged, and registration still happens                                                                                                                                                                                                                                 |
+| P0-06 | P0       | Prebuild spec: iOS `processing`, `com.expo.modules.backgroundtask.processing` in `BGTaskSchedulerPermittedIdentifiers`, no `fetch`; no fetch component on Android                                                                                                                                                                                                                                                                                        |
+| P0-07 | P0       | Android in-place upgrade, `a01e0307` Release to the Step 0 Release, same certificate. Signed in with the fetch task registered: install over, cold start, `adb reboot`. No `ClassNotFoundException` or crash in logcat; `dumpsys jobscheduler` shows exactly one WorkManager job for the package; a forced run (`cmd jobscheduler run -f`) refreshes the ritual cache; the session is kept                                                               |
+| P0-08 | P0       | iOS simulator in-place upgrade, same shape, scoped by CX-03 to two checks. The signed-in session is kept. The persisted TaskManager registration holds only the new name, read from the app container or a Debug diagnostic, with the method recorded. Scheduler acceptance is out of simulator scope                                                                                                                                                    |
+| P0-09 | P0       | iOS physical device: BackgroundTask scheduler acceptance and a Debug worker run, for the Step 0 upgrade and for D7 (D11, blocks sign-off)                                                                                                                                                                                                                                                                                                                |
+| U-01  | P0       | Android emulator, Debug: `triggerTaskWorkerForTestingAsync()` runs the ritual task: it fetches when the cache is stale, and skips the fetch when the cache is fresh or there is no session. On iOS this runs only within P0-09                                                                                                                                                                                                                           |
+| U-02  | P1       | Unit parity: every `background-fetch.test.ts` case is ported, with the result enums mapped                                                                                                                                                                                                                                                                                                                                                               |
+| U-03  | P0       | Direct SDK 54 to SDK 58 upgrade before Step 4 merges (D13), and again in D7 from EAS production builds under one certificate (TEA-08): session, ritual cache read with no network, one task, locale, theme                                                                                                                                                                                                                                               |
+| U-04  | P1       | Unit: the SecureStore key names and options for auth storage are pinned, so a rename across steps is caught                                                                                                                                                                                                                                                                                                                                              |
+| U-05  | P0       | Installed-predecessor smoke before each step merges (D13): the previous step's `main` Release, used, then this head's Release installed over it under the same certificate, Android and iOS simulator. It carries session, ritual cache, task registration, locale and theme. Step 2 adds the Photos add-only and denied states and a real PNG save after the upgrade. Step 4 adds an already-paid Android install (S4-12) and scene and deep-link state |
 
 ### Step-specific checks
 
-| ID    | Step   | Priority | Test                                                                                                                                                                                                          |
-| ----- | ------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| S0-01 | 0      | P0       | `app.json` keys removed: prebuild output on SDK 54 is byte-identical before and after (`diff -r` of both native trees, recorded hash)                                                                         |
-| S1-01 | 1      | P0       | React parity guard green; web build and web e2e on React 19.2.0                                                                                                                                               |
-| S2-01 | 2      | P0       | No `@react-navigation/*` import in app code (grep test); the router codemod compiles; `share-card-tab-heading.test.tsx` green                                                                                 |
-| S2-02 | 2      | P0       | TypeScript decision recorded with a by-code tsc count on both versions                                                                                                                                        |
-| S2-03 | 2      | P0       | Async `copy` and `move` awaited: units for `share-card-file.ts`, `palette-advisor-screen.tsx`, `garment-capture-modal.tsx`, `silhouette-editor.tsx`, with a rejected promise reaching the existing error path |
-| S2-04 | 2      | P0       | `share-card-save.native.ts` on the new asset API: units for success, add-only grant, refusal; native save journeys on both platforms                                                                          |
-| S2-05 | 2      | P0       | `with-supported-ios-target.js` floor 16.4 on app, widget and watch targets (plugin spec); watchOS lane                                                                                                        |
-| S2-06 | 2      | P1       | Maestro: network timeout shows the error state on the dev client (TEA-12)                                                                                                                                     |
-| S3-01 | 3      | P0       | Clean-prebuild default: every config plugin spec re-run against a fresh tree; the native tree checked-in policy unchanged                                                                                     |
-| S4-01 | 4      | P0       | Strict TypeScript API on, with no opt-out flag in any tsconfig (grep test)                                                                                                                                    |
-| S4-02 | 4      | P0       | `write` awaited (SDK 58 file system), with a unit for each caller                                                                                                                                             |
-| S4-03 | 4      | P0       | Async `renderRouter` in tests; deep-link, widget-deep-link and back-navigation flows green                                                                                                                    |
-| S4-04 | 4      | P0       | `SceneDelegate.swift` generated; `modal-system-bars` and `accessibility-focus` iOS modules find the key window (XCTest on the module, VoiceOver focus journey)                                                |
-| S4-05 | 4      | P0       | Android toolchain: Robolectric and module unit tests on AGP 9.2.1 and Kotlin 2.2.0                                                                                                                            |
-| S4-06 | 4      | P0       | R8 Release: purchase sheet opens and the complimentary state reads; PostHog event reaches the local capture stub; the four local modules respond. Keep-rule spec lists every reflective class                 |
-| S4-07 | 4      | P0       | Env-file spec: `expo start`, `expo export`, `eas build --profile production` each load the pinned file; a missing API base URL fails fast                                                                     |
-| S4-08 | 1 to 4 | P2       | `zIndex` in animated styles: grep guard plus the screenshot pair on the affected screens                                                                                                                      |
-| S4-09 | 4      | P0       | AC5: both internal imports resolve under SDK 58; the console guard fails a seeded missing-`ExponentConstants` warning                                                                                         |
-| S4-10 | 4      | P0       | D5 verdict measurements per TEA-13, written into the spec table                                                                                                                                               |
+| ID    | Step   | Priority | Test                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S0-01 | 0      | P0       | Semantic prebuild diff (CX-14): `prebuild-semantic-diff.mjs` units for pbxproj object-ID normalization, the one allowed `Podfile.properties.json` deletion, byte identity of every other file, and the effective settings (New Architecture on for both platforms, `edgeToEdgeEnabled=true` and `expo.edgeToEdgeEnabled=true`). Seeded mutants must turn it red: one `gradle.properties` value changed, one non-ID pbxproj line changed, one extra key removed from `Podfile.properties.json` |
+| S1-01 | 1      | P0       | React parity guard green; web build and web e2e on React 19.2.0                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| S2-01 | 2      | P0       | No `@react-navigation/*` import in app code (grep test); the codemod compiles; `share-card-tab-heading.test.tsx` green                                                                                                                                                                                                                                                                                                                                                                        |
+| S2-02 | 2      | P0       | TypeScript decision recorded with a by-code tsc count on both versions                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| S2-03 | 2      | P0       | Async `copy` and `move` awaited, with a unit per caller in which a rejected promise reaches the existing error path                                                                                                                                                                                                                                                                                                                                                                           |
+| S2-04 | 2      | P0       | Android `share-card-save.native.ts` on the new asset API: units for success, add-only grant and refusal; native save journeys. The iOS `saveOriginalPng` adapter, its hash and its add-only assertions are byte-unchanged (diff check)                                                                                                                                                                                                                                                        |
+| S2-05 | 2      | P0       | Per-target floors (CX-08): the iOS app and iOS widget at 16.4; the generated Pods floor at 16.4; the three local podspecs at 16.4; the watch app and watch widget at watchOS 9.0. A plugin spec covers each target. The app launches on the iOS 16.4 runtime, and a paired watch syncs                                                                                                                                                                                                        |
+| S2-06 | 2      | P1       | Maestro: a network timeout shows the error state on the dev client (TEA-12)                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| S2-07 | 2      | P0       | Memory (D12): Release on the same emulator and simulator, Step 1 against Step 2. Measures cold start, a 30-minute sustained Home, Community and composer journey with animations, and peak and settled PSS (Android) and physical footprint (iOS). Three runs each; medians compared; the result sets or lifts the hold                                                                                                                                                                       |
+| S2-08 | 2      | P0       | `mobile-release-hold.mjs` units: a held SDK refuses; no hold allows; a malformed or unreadable hold file refuses (fail closed); an early lift needs a recorded S2-07 result within 10%. A seeded removal of the check turns the spec red                                                                                                                                                                                                                                                      |
+| S3-01 | 3      | P0       | Clean-prebuild default: every config plugin spec runs against a fresh tree                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| S3-02 | 3      | P0       | S2-07 repeated on `expo` 57.0.9 or later; the hold file is deleted, and a spec asserts no hold remains                                                                                                                                                                                                                                                                                                                                                                                        |
+| S3-03 | 3      | P0       | Scene lifecycle opted in, built on Xcode 26.x: launch, deep link, widget tap, orientation lock, VoiceOver focus and modal system bars on the scene window                                                                                                                                                                                                                                                                                                                                     |
+| S4-01 | 4      | P0       | Strict TypeScript API on, with no opt-out flag in any tsconfig (grep test)                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| S4-02 | 4      | P0       | `write` awaited, with a unit per caller                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| S4-03 | 4      | P0       | Async `renderRouter` in tests; deep-link, widget-deep-link and back-navigation flows green                                                                                                                                                                                                                                                                                                                                                                                                    |
+| S4-04 | 4      | P0       | `SceneDelegate.swift` generated, and the iOS modules find the key window (XCTest, VoiceOver journey). Xcode 27 artifact (D14): an iOS 27 simulator runs launch, deep link, foreground and resume, window geometry and VoiceOver focus, and a resizable iPad runs the orientation check                                                                                                                                                                                                        |
+| S4-05 | 4      | P0       | Robolectric and module unit tests on AGP 9.2.1 and Kotlin 2.2.0                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| S4-06 | 4      | P0       | R8 Release: purchase sheet, complimentary state, PostHog event capture (the `posthog-react-native` 4.86.0 compatibility proof) and the four local modules. Targeted reflection mutant (CX-06): pick a class reached only by reflection whose rule `-whyareyoukeeping` shows is its only keeper, leave it unkept, and the Release journey must fail                                                                                                                                            |
+| S4-07 | 4      | P0       | Env-file spec: `expo start`, `expo export` and `eas build --profile production` each load the pinned file; a missing API base URL fails fast                                                                                                                                                                                                                                                                                                                                                  |
+| S4-08 | 1 to 4 | P2       | `zIndex` in animated styles: grep guard plus a screenshot pair on the affected screens                                                                                                                                                                                                                                                                                                                                                                                                        |
+| S4-09 | 4      | P0       | AC5: both internal imports resolve; the console guard fails a seeded missing-`ExponentConstants` warning                                                                                                                                                                                                                                                                                                                                                                                      |
+| S4-10 | 4      | P0       | D5 verdict measurements (TEA-13) written into the D5 table, with the TEA-15 manifest verdict for row 4                                                                                                                                                                                                                                                                                                                                                                                        |
+| S4-11 | 4      | P0       | Foreground notifications (CX-13). Units: the suppress-all handler is installed synchronously at module import, the community filter replaces it, and cleanup restores suppress-all. Native, Android and iOS: no banner before setup; a valid community payload shows; invalid data stays hidden; nothing shows during a delayed handler or after cleanup. Mutant: removing the module-load handler fails the "before setup" check on SDK 58                                                   |
+| S4-12 | 4      | P0       | Paid journey (D15), Android minified Release, Play license tester, separate non-complimentary account: fetch offerings, purchase, entitlement on the server and in the app, the SDK 58 build installed over a paid SDK 54 install with the entitlement intact, restore                                                                                                                                                                                                                        |
+| S4-13 | 4      | P0       | S4-12 evidence comes from a Play internal-track install. A check on the evidence rejects mocks, a debug billing client and the Expo Go fallback flow                                                                                                                                                                                                                                                                                                                                          |
 
 ### CI timing (`scripts/ci/pr-job-p95.mjs` and test)
 
-| ID   | Priority | Test                                                                                                                      |
-| ---- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| C-01 | P0       | Unit: p95 nearest-rank, both queue definitions, a job with `needs`, cancelled and skipped runs excluded                   |
-| C-02 | P0       | Per step: every PR job, queue plus run, p95 at most 15 and max at most 20 (owner queue definition)                        |
-| C-03 | P0       | `macos-26` and `macos-15` probe, about 10 runs each, queue p50 and p95 recorded (D6.5)                                    |
-| C-04 | P0       | Consolidated iOS job: 20 consecutive PR runs meet C-02, or it moves to main plus nightly with the numbers logged (TEA-09) |
-| C-05 | P1       | `pr-job-ceilings.test.mjs` updated when workflows change, plus every spec that reads a changed workflow file              |
+| ID    | Priority | Test                                                                                                                                                                                                                                                                                                                                                                          |
+| ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C-01  | P0       | Units (CX-11): nearest-rank p95; both queue definitions; a job with `needs`; failed and timed-out jobs kept with observed durations; a job cancelled after start kept; a job cancelled before start counted as a queue-only lower bound; skipped-without-running excluded with its reason; queue plus run over 20 minutes is a breach although `timeout-minutes` did not fire |
+| C-01b | P0       | Lane fixtures: a second macOS job on one PR is rejected; macOS selected for a JS-only change is rejected; a native iOS change selects exactly one macOS job                                                                                                                                                                                                                   |
+| C-02  | P0       | Per step: every PR job's queue plus run p95 is 15 minutes or less and its maximum is 20 or less, by the owner's queue measure                                                                                                                                                                                                                                                 |
+| C-03  | P0       | Probe: 20 runs each on `macos-26` and `macos-15`; queue p50 and p95 recorded in D6                                                                                                                                                                                                                                                                                            |
+| C-04  | P0       | Consolidated iOS job: 20 consecutive PR runs meet C-02, or it moves to `main` plus nightly with the numbers logged                                                                                                                                                                                                                                                            |
+| C-05  | P1       | `pr-job-ceilings.test.mjs` and every spec that reads a changed workflow file run when workflows change                                                                                                                                                                                                                                                                        |
 
 ### D7 production-shaped run (`_bmad-output/test-artifacts/story-6-15/d7/`)
 
-| ID    | Priority | Test                                                                                                                                                                                                    |
-| ----- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D7-01 | P0       | Build identities: EAS build ids, AAB and universal APK SHA-256, certificate SHA-256, `ReactNativeVersion`, all-ABI listing; iOS `production-simulator` app digest                                       |
-| D7-02 | P0       | Production API and Supabase, dedicated test member with 6.14 grant: sign-in, session restore after force-stop, Home ritual, Community feed, share-card save and share, Settings, push permission prompt |
-| D7-03 | P0       | F-02 to F-06 on the production builds                                                                                                                                                                   |
-| D7-04 | P0       | R8 checks from S4-06 on the production AAB                                                                                                                                                              |
-| D7-05 | P0       | U-03 in-place upgrade from the EAS production build of the last deployed SDK 54 commit                                                                                                                  |
-| D7-06 | P1       | Play internal track submit and TestFlight internal build when credentials allow; otherwise recorded with the reason                                                                                     |
-| D7-07 | P0       | Evidence scrub: a scan for tokens, emails, member ids and JWT shapes over the evidence dir is clean before commit                                                                                       |
+| ID    | Priority | Test                                                                                                                                                                               |
+| ----- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D7-01 | P0       | Build identities: EAS build ids, AAB and universal APK SHA-256, certificate SHA-256, `ReactNativeVersion`, all-ABI listing; iOS `production-simulator` app digest                  |
+| D7-02 | P0       | Production API and Supabase, 6.14 test member: sign-in, session restore after force-stop, Home ritual, Community feed, share-card save and share, Settings, push permission prompt |
+| D7-03 | P0       | F-02 to F-06 on the production builds                                                                                                                                              |
+| D7-04 | P0       | S4-06 on the production AAB                                                                                                                                                        |
+| D7-05 | P0       | U-03 from the EAS production build of the last deployed SDK 54 commit                                                                                                              |
+| D7-06 | P0       | D11 gates: P0-09, F-11, iOS sandbox purchase and restore, TestFlight internal build. Each blocks sign-off, and a missing-access record is not a pass                               |
+| D7-07 | P0       | Evidence scrub: a scan for tokens, emails, member ids and JWT shapes over the evidence dir is clean before commit                                                                  |
+| D7-08 | P0       | S4-12 on the production AAB through the internal track                                                                                                                             |
 
 ### Documents
 
-- D8 learning path Step 55 and test cross-links; the deployment guide mobile section.
-- Spec Verification commands updated for the new scripts.
+- D8 learning path Step 55 and test cross-links; the deployment guide mobile section, which states that devices below iOS 16.4 keep the last supporting build.
+- The spec's Verification commands updated for the new scripts.
 
 ## Red-first plan and seeded-defect proofs
 
-| Test                   | Red proof                                                                                                                                                |
-| ---------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| F-00 oracle            | Feed the 6.8 baseline as "fix expected": it must fail "Cold parity" and "Growth"                                                                         |
-| F-01 to F-06 at Step 0 | Run with `fixExpected` forced true on SDK 54: must fail with the 6.8 signature (heights fixed, nodes kept). Then the real run passes as characterization |
-| F at Step 4            | Run the characterization branch against SDK 58 before deleting it: must fail on "heights grow". This proves the flip is real and not an oracle no-op     |
-| TEA-06 guard           | Seed an `AppText` that multiplies by `fontScale`: red                                                                                                    |
-| TEA-05 pin             | Bump `expo` without the Expo Go pin: red                                                                                                                 |
-| TEA-14 parity          | Move `react` in one workspace only: red                                                                                                                  |
-| P0-05                  | Remove the unregister call: the upgraded-install unit fails                                                                                              |
-| P0-07                  | Keep the old task name: `dumpsys` shows the stale consumer, and the proof fails                                                                          |
-| S4-06                  | Remove one keep rule: the Release journey fails                                                                                                          |
-| S4-09                  | Point the alias at a missing path: the suite fails through the `globalThis.expo` guard                                                                   |
+| Test                   | Red proof                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| F-00a to F-00n         | Each fixture is run with `fixExpected` flipped; every row whose two columns differ must change outcome                            |
+| F-01 to F-06 at Step 0 | Forced `fixExpected` true on SDK 54: every screen fails as residual bug or restored screen                                        |
+| F-10 at Step 4         | Before deletion, a fixture with SDK 58's observed run classified under the below-0.87 rules is compared, proving the flip is real |
+| F-12                   | Remove the `configChanges` plugin: the prebuild spec fails, and an Android run classifies as restored screen                      |
+| Font-scale reads guard | Seed an `AppText` that multiplies by `fontScale`: red                                                                             |
+| Expo Go pin            | Bump `expo` without the Expo Go pin: red                                                                                          |
+| React parity           | Move `react` in one workspace only: red                                                                                           |
+| P0-05                  | Drop the unregister call: two units fail (done in `3d458bcd`)                                                                     |
+| P0-06                  | Drop the plugin from `app.json`: the iOS prebuild test fails (done in `3d458bcd`)                                                 |
+| P0-07                  | Keep the old task name: the stale consumer shows in `dumpsys`, and the proof fails                                                |
+| S0-01                  | The three seeded mutants listed in S0-01                                                                                          |
+| S2-08                  | Remove the hold check: the spec fails                                                                                             |
+| S4-06                  | Targeted reflection mutant                                                                                                        |
+| S4-09                  | Point the alias at a missing path: the suite fails through the `globalThis.expo` guard                                            |
+| S4-11                  | Remove the module-load handler: the "before setup" native check fails                                                             |
+| C-01, C-01b            | A fixture set with each rule broken                                                                                               |
 
 Red proofs run in a throwaway worktree or a reverted temporary commit, never with stash or reset in the shared checkout.
 
@@ -387,46 +512,61 @@ TEA owns every flaky or unrelated red check met during the story:
 3. Burn in with the same shard shape CI uses (`playwright-smart-parallelization` with `$PSP_ARGS` for Playwright; 10 consecutive Maestro runs for a flow).
 4. Record in the spec's Review Triage Log.
 
-Nothing is retried green, quarantined or marked `continue-on-error`.
+Nothing is retried green, quarantined, marked expected-failure or marked `continue-on-error`.
 
 ## Quality Gate Criteria
 
 ### Pass/Fail Thresholds
 
-- P0: 100% pass on the step head SHA. P1: 100% pass before story sign-off. P2: recorded.
-- Every high risk (R01 to R08) has its mitigating tests green at the step that owns it.
+- Every applicable P0 and P1 test: 100% pass on the step's exact head SHA before it merges. P2: recorded.
+- Every high risk has its mitigating tests green at the step that owns it.
+- D7 and the D11 gates: 100% before sign-off.
 
 ### Non-Negotiable Requirements
 
-- The AC3 proof is green in Release on both platforms against production in D7.
-- In-place upgrade keeps the session and exactly one background task.
+- AC3 complete fix in Release on both platforms, on emulator, simulator and production builds, with an iOS physical device under D11.
+- Every upgrade keeps the session and exactly one background task; the paid entitlement survives the upgrade.
 - No PR job over 20 minutes including queue; p95 at most 15.
+- No production mobile build while the SDK 56 hold stands.
 
 ## Traceability
 
-| AC or decision                  | Tests                                                         |
-| ------------------------------- | ------------------------------------------------------------- |
-| AC1                             | Gate matrix doctor, prebuild, builds; TEA-11 ABI check; D7-01 |
-| AC2                             | TEA-06 guard, S4-10, TEA-13 measurements                      |
-| AC3                             | F-00 to F-08, D7-03                                           |
-| AC4                             | Gate matrix, TEA-10 dispatch evidence, flake policy           |
-| AC5                             | S4-09                                                         |
-| D4 rows                         | P0-05 to P0-08, S0-01, S2-01 to S2-06, S3-01, S4-01 to S4-08  |
-| D6                              | C-01 to C-05                                                  |
-| D7                              | D7-01 to D7-07, U-03                                          |
-| I/O "Live font down"            | F-02 to F-06 return leg                                       |
-| I/O "Cold launch at 1.5"        | Cold parity oracle                                            |
-| I/O "Composer mid-flow"         | F-05                                                          |
-| I/O "Activity recreation"       | TEA-13 row 4 measurement, existing 6.8 recreation journey     |
-| I/O "In-place upgrade"          | P0-07, P0-08, U-03                                            |
-| I/O "Background task"           | U-01                                                          |
-| I/O "Share-card save"           | S2-04                                                         |
-| I/O "Env file selection"        | S4-07                                                         |
-| I/O "iOS scene lifecycle"       | S4-04, widget and watchOS lanes                               |
-| I/O "Release with R8"           | S4-06, D7-04                                                  |
-| I/O "Vitest Expo web setup"     | S4-09                                                         |
-| I/O "iOS job queue over budget" | C-03, C-04                                                    |
+| AC or decision                     | Tests                                                                      |
+| ---------------------------------- | -------------------------------------------------------------------------- |
+| AC1                                | Gate matrix doctor, prebuild and builds; all-ABI check; D7-01              |
+| AC2                                | Font-scale reads guard, S4-10, F-12                                        |
+| AC3                                | F-00a to F-12, D7-03                                                       |
+| AC4                                | Gate matrix, exit criteria, U-05, flake policy                             |
+| AC5                                | S4-09                                                                      |
+| D4 rows                            | P0-05 to P0-08, S0-01, S2-01 to S2-06, S3-01, S3-03, S4-01 to S4-08, S4-11 |
+| D6                                 | C-01 to C-05                                                               |
+| D7                                 | D7-01 to D7-08                                                             |
+| D11                                | P0-09, F-11, D7-06                                                         |
+| D12                                | S2-07, S2-08, S3-02                                                        |
+| D13                                | U-03, U-05                                                                 |
+| D14                                | Gate matrix iOS toolchain row, S3-03, S4-04                                |
+| D15                                | S4-12, S4-13, D7-08                                                        |
+| I/O "Live font up" (both)          | F-02 to F-06                                                               |
+| I/O "Live font, Debug"             | F-07                                                                       |
+| I/O "Live font down"               | F-02 to F-06 return leg, F-00n                                             |
+| I/O "Cold launch at 1.5"           | Cold parity in F-02 to F-06, F-01                                          |
+| I/O "Composer mid-flow"            | F-05a, F-05b                                                               |
+| I/O "Activity recreation"          | S4-10, existing 6.8 recreation journey                                     |
+| I/O "Recreated during font change" | F-00e, F-00f, F-00g                                                        |
+| I/O "Foreground notification"      | S4-11                                                                      |
+| I/O "Held release"                 | S2-08                                                                      |
+| I/O "Paid member upgrade"          | S4-12, D7-08                                                               |
+| I/O "In-place upgrade"             | P0-07, P0-08, U-03, U-05                                                   |
+| I/O "Background task"              | U-01, P0-09                                                                |
+| I/O "Share-card save"              | S2-04, U-05 Step 2                                                         |
+| I/O "Env file selection"           | S4-07                                                                      |
+| I/O "iOS scene lifecycle"          | S3-03, S4-04                                                               |
+| I/O "Release with R8"              | S4-06, D7-04                                                               |
+| I/O "Vitest Expo web setup"        | S4-09                                                                      |
+| I/O "iOS job queue over budget"    | C-03, C-04                                                                 |
 
 ## Execution record
 
-(Filled in per step: test files, run URLs, p95 tables, seeded-defect results, differences from the plan.)
+(Filled in per step: test files, run URLs, p95 tables, baselines, seeded-defect results, differences from the plan.)
+
+- Step 0, `3d458bcd`: P0-05 and P0-06 seeded defects recorded by the builder (Implementation Notes).

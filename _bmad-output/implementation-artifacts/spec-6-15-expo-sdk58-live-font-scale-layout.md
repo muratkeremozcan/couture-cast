@@ -91,16 +91,17 @@ Decisions (owner direction 2026-11-12; the rest delegated to the builder):
 
 - D5 Font workarounds (AC2). Story 6.8 left these, each with the verdict this story expects to confirm at Step 4:
 
-  | Workaround                                                                                | Expected verdict | Reason                                                                                                                                                                                                              |
-  | ----------------------------------------------------------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-  | Shared `AppText` repair and its 27 import migrations                                      | Already gone     | Reverted in `51d29f19`; `scripts/ci/font-scale-reads.test.mjs` allows font-scale reads only at the three composer sites (TEA-06)                                                                                    |
-  | `feedbackSlotHeight` in `components/share-card-composer.tsx`                              | Keep             | Reserves the feedback slot so Save and Share do not move when feedback appears at a fixed scale (iPad popover anchor); the reservation itself scales with font size; a layout rule, independent of the renderer bug |
-  | `actionRowTier` and `useActionColumns` re-measure on `fontScale` change                   | Keep             | Chooses halves, content or stacked rows from measured labels; needs the live `fontScale` from `useWindowDimensions` either way                                                                                      |
-  | Android Activity recreation restore (route, Spotlight detail, composer)                   | Keep             | Locale, permission revocation and memory pressure also recreate the Activity; record whether a font change still recreates it on 0.88                                                                               |
-  | 6.8 Release proof wording "no claim that clipping is fixed" and harness allowances for it | Remove           | `scripts/lib/story68-release-live-font.mjs` asserts the fix; `story68-cold-font-scale.mjs` stays as the cold-parity reference, retargeted to assert growth (TEA-13)                                                 |
+  | Workaround                                                                                | Expected verdict | Reason                                                                                                                                                                                                                                                                                                                                    |
+  | ----------------------------------------------------------------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | Shared `AppText` repair and its 27 import migrations                                      | Already gone     | Reverted in `51d29f19`; `scripts/ci/font-scale-reads.test.mjs` allows font-scale reads only at the three composer sites (TEA-06)                                                                                                                                                                                                          |
+  | `feedbackSlotHeight` in `components/share-card-composer.tsx`                              | Keep             | Reserves the feedback slot so Save and Share do not move when feedback appears at a fixed scale (iPad popover anchor); the reservation itself scales with font size; a layout rule, independent of the renderer bug                                                                                                                       |
+  | `actionRowTier` and `useActionColumns` re-measure on `fontScale` change                   | Keep             | Chooses halves, content or stacked rows from measured labels; needs the live `fontScale` from `useWindowDimensions` either way                                                                                                                                                                                                            |
+  | Android Activity recreation restore (route, Spotlight detail, composer)                   | Keep             | Locale, permission revocation and memory pressure still recreate the Activity. Font changes stop recreating it once `plugins/with-font-scale-config-changes.js` adds `fontScale` to `MainActivity` `configChanges` (TEA-15, F-12), in Step 0 or Step 4 as the TEA-16 spike decides; until then Android runs classify as a restored screen |
+  | 6.8 Release proof wording "no claim that clipping is fixed" and harness allowances for it | Remove           | `scripts/lib/story68-release-live-font.mjs` asserts the fix; `story68-cold-font-scale.mjs` stays as the cold-parity reference, retargeted to assert growth (TEA-13)                                                                                                                                                                       |
 
   Step 4 records the observed verdict for each row; a row that turns out unnecessary is deleted with its tests in the same step.
   Step 0 adds the live font-scale proof for AC3 on Home, Community, Settings and the composer (TEA-01, CX-07). It reads `fixExpected` from the bundled `ReactNativeVersion` (0.87.0 or above). Each run classifies the outcome as complete fix, known residual bug, restored screen or unrelated failure. Below 0.87 a known residual bug passes and is recorded as that step's observed baseline per platform and configuration; React Native 0.82 turned `enableFontScaleChangesUpdatingLayout` on, so Steps 1 to 3 may show partial growth with the residual stale-clone defect, and need not show the SDK 54 signature. An early complete fix below 0.87 passes and flags a baseline review; no step requires broken layout to be green. From 0.87 only a complete fix passes; Step 4 deletes the below-0.87 branch.
+  Android surviving tree (TEA-15, TEA-16): the Expo template's `MainActivity` `configChanges` lacks `fontScale` on SDK 54 and SDK 58, so Android recreates the Activity on every font change. A config plugin adds `fontScale` (F-12 prebuild spec). A throwaway spike before the Step 0 proof merges builds SDK 54 with the plugin and SDK 58 with and without it; if SDK 54 with the plugin is no worse than today's recreation, the plugin lands in Step 0, otherwise at Step 4 with Steps 0 to 3 recording Android as a restored screen.
   Live remeasurement (CX-01): the proof certifies a fix only on the surviving text tree. Android Activity token, iOS scene and window, and a mounted-root identity marker must be identical before and after the change, before any scroll-through or cold reference run. A recreated Activity or a remounted root is classified as a restored screen, recorded with the `onCreate` count, and never accepted as a fix. A same-PID recreation mutant and a remount mutant must be classified that way.
   Oracle (TEA-02, CX-02): anchors above the fold; the full-screen text multiset by scroll-through; live heights equal to cold-launch heights at the same scale (within 2 px on Android, 1 pt on iOS); per-style expected growth from the platform's own conversion (Android 14 and later scales text nonlinearly, so the expected size for each probe's sp comes from the device's font scale converter; iOS from the content-size category's size for the probe's text style), confirmed by the cold reference, with a large-text probe that correctly stays nearly unchanged and a small-text probe that must grow; a direct clipping check of each text node against its container; the identity check above; an unchanged PID. After the change, a deterministic React update on the screen re-renders text so a stale clone on a later commit would show, then parity and clipping are checked again. Before it judges any build, an SDK 54 cold launch at the base scale against a cold launch at the target scale proves the oracle on a known-good pair.
   Composer (CX-12): across scales, Save and Share stay visible, reachable and non-overlapping, in the tier `actionRowTier` chooses; at each fixed scale, toggling the feedback message leaves their geometry and the popover anchor unchanged.
@@ -226,6 +227,7 @@ Verified against `main` at `a01e0307`.
 
 - [ ] Step 0, SDK 54 (PR 1 of 5)
   - [ ] Live font-scale proof for AC3 on Android and iOS, Debug and Release, keyed on `ReactNativeVersion`, classifying complete fix, known residual bug, restored screen or unrelated failure, with the Activity, scene and root identity check, per-style growth, clipping check, post-change React update, and recreation and remount mutants; SDK 54 baseline recorded per platform and configuration; oracle proved first by the SDK 54 cold control -- D5, TEA-01 to TEA-03, CX-01, CX-02, CX-07, CX-12.
+  - [ ] TEA-16 spike (SDK 54 with the `fontScale` plugin, SDK 58 with and without it) decided and recorded; `plugins/with-font-scale-config-changes.js` with its F-12 prebuild spec, listed in `app.json` here or at Step 4 per the spike -- D5, TEA-15, TEA-16.
   - [ ] `scripts/ci/font-scale-reads.test.mjs` guard, red on a seeded `AppText` -- D5, TEA-06.
   - [ ] `expo-background-task` replaces `expo-background-fetch` under a new task name, tolerant unregister of the old one, prebuild spec, `minimumInterval: 15` minutes asserted, in-place upgrade from an `a01e0307` build proved on Android and, for session and persisted registration, on the iOS simulator -- D4, TEA-07, CX-03.
   - [ ] `app.json` keys removed under `scripts/lib/prebuild-semantic-diff.mjs`, with its seeded unrelated-change mutant red -- D4, CX-14.
@@ -287,6 +289,8 @@ TEA review, 2026-11-12, against `a01e0307`. Evidence for each entry is in `_bmad
 
 Builder, 2026-11-12: TEA-01, TEA-02, TEA-03, TEA-04, TEA-07 and TEA-09 applied to the frozen block; TEA-06, TEA-08 and TEA-13 also folded into D5 and D7 where the frozen text named the old approach; the rest are in Tasks and Acceptance.
 
+Builder, 2026-11-12: TEA-15 applied to D5 (row 4 and the Android surviving-tree paragraph); TEA-16's spike is assigned and its outcome lands in Implementation Notes.
+
 Codex story review, 2026-11-12 (`/tmp/codex-review-615-story.md`, coordinator relay): 6 P1 and 8 P2, all applied to the frozen block by the builder; the test design changes are TEA's.
 
 - CX-01 (intent), D5, AC3: Activity, scene and mounted-root identity join the verdict; recreation and remount are a restored screen, never a fix; mutants for both.
@@ -305,65 +309,90 @@ Codex story review, 2026-11-12 (`/tmp/codex-review-615-story.md`, coordinator re
 - CX-14 (intent), D4: semantic prebuild comparison with a seeded mutant replaces "byte-identical".
 - Reconciliation: preflight sequence now defers to the story; per-step P0 and P1 scope stated in D1; `minimumInterval` 15 minutes and Expo's fixed identifier stated in D4; iOS `saveOriginalPng` kept; PostHog and RevenueCat compatibility resolved in D2; Apple's iOS 27 SDK upload requirement (April 2027) recorded in D14.
 
+TEA alignment with CX, 2026-11-12. The test design maps every CX item to test IDs ("Alignment with the Codex story review"). Two new entries:
+
+- **TEA-15 (intent; D5 row 4, AC3 Android).** Android recreates `MainActivity` on every system font change. The SDK 54 template's `android:configChanges` is `keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode`; SDK 58 adds only `smallestScreenSize|assetsPaths`. No app plugin adds `fontScale`, and the 6.8 spec records the recreation (`spec-6-8-safe-branded-share-card-export.md:1159`). Under CX-01 every Android run is then a restored screen, so Android AC3 can never pass. Fix: a config plugin adds `fontScale` to `MainActivity` `configChanges`, pinned by a prebuild spec (F-12). The D5 row 4 verdict becomes: recreation restore stays for locale, permission revocation and memory pressure, and the manifest decides font changes.
+- **TEA-16 (D5).** Before the Step 0 proof merges, a throwaway-worktree spike builds SDK 58 Android Release with and without `fontScale` in `configChanges`, runs the proof on Home and the composer, and repeats on SDK 54 with `fontScale` added. If 0.81.5 with `fontScale` is no worse than today's recreation (stale 169 px), the plugin lands in Step 0. Otherwise it lands in Step 4, and Steps 0 to 3 record Android as a restored screen. The outcome goes here with its evidence path.
+
 ## Review Triage Log
 
 (Filled in per review pass.)
 
 ## Test Design (TEA)
 
-Full plan: `_bmad-output/test-artifacts/test-design/cc615-expo-sdk58-live-font-scale-test-design.md` (17 risks: 8 high, 6 medium, 3 low).
+Full plan: `_bmad-output/test-artifacts/test-design/cc615-expo-sdk58-live-font-scale-test-design.md`. It has 22 risks (13 high, 7 medium, 2 low), every CX item mapped to test IDs, and per-test fixtures and mutants.
+The builder fork implements the oracle and driver; TEA owns the test IDs and the fixtures' expected classes.
 
-**Gates at every step (0 to 4), on the PR head SHA:**
+**Scope per step (D1):** every applicable P0 and P1 test runs green on the step's exact head SHA before it merges, with native evidence linked (CX-10). Only D7 and the D11 gates wait for sign-off, and each of those blocks it.
 
-- Static: `expo-doctor` zero findings, plus `tsc` in every workspace counted by error code (rebuild `packages/api-client` dist first; only the symlink TS2742 is allowed).
-- Unit and node-test-gate: vitest in every workspace, the plugin prebuild specs, every suite in `node-test-suites.json`, and the new guards for the Expo Go pin, font-scale reads, React parity and the ABI check.
-- Web: `pr-pw-e2e-local`, the Vercel preview e2e and contract tests. Local Playwright runs only with an isolated `DATABASE_URL` and `PLAYWRIGHT_SKIP_DB_RESET=true`.
-- Maestro: Android on Expo Go (all 9 shards) and `ios-expo-go`, with the Expo Go pin at the step's SDK. The localization flows are mandatory.
-- Native, through dispatch until D6 lands:
-  - `pr-share-card-native`: every API32 and API36 lane, `ios-build` and `ios-shard`.
-  - `pr-accessibility-focus`: TalkBack, Robolectric, the iOS module and `ios-app-build`.
-  - `watchos-native`, plus the all-ABI `bundleRelease`.
-  - The share-card save journeys on both platforms.
-- Live font proof on Android API 36 and iOS 26.1, Debug and Release, on Home, Community, Settings and the composer. Below RN 0.87 it asserts the 6.8 bug signature; from Step 4 it asserts the fix. Step 4 needs 3 consecutive identical runs per platform.
+**Gates at every step:**
+
+- Static: `expo-doctor` zero findings, plus `tsc` in every workspace by error code (rebuild `packages/api-client` dist first; only the symlink TS2742).
+- Unit and node-test-gate:
+  - vitest in every workspace and every `node-test-suites.json` suite.
+  - The mobile plugin prebuild specs: widget, watchOS, share-card, background task, and `configChanges` (F-12). The PR records the local run until D6 wires them into CI.
+  - The guards for the Expo Go pin, font-scale reads, React parity, semantic prebuild diff and release hold.
+  - The all-ABI AAB check.
+- Web e2e and contract. Local Playwright only with an isolated `DATABASE_URL` and `PLAYWRIGHT_SKIP_DB_RESET=true`.
+- Maestro on Expo Go pinned to the step's SDK; the localization flows are mandatory.
+- Native evidence on the head SHA. Android: every share-card device lane, TalkBack and Robolectric. iOS: `ios-build`, `ios-shard`, the accessibility module and app build, and watchOS.
+- iOS toolchain: Xcode 26.3 at Steps 0 and 1, Xcode 26.x (26.4 or later) at Steps 2 and 3, Xcode 27 from Step 4.
+- Live font classification F-01 to F-09, Android API 36 and iOS 26.1, Debug and Release, on Home, Community, Settings and the composer, each split into cross-scale reflow (F-05a) and fixed-scale stability (F-05b).
+  - The oracle checks Activity, scene and root identity before any scroll or cold reference.
+  - Per-style growth comes from the platform converter (Android 14 nonlinear fixtures; iOS per text style).
+  - Each text node gets a direct clipping check, repeated after a post-change React update.
+  - Below 0.87 a run is classified and recorded as that step's baseline. From Step 4 only a complete fix passes, 3 identical runs per platform and configuration.
 - Large-text cold matrix.
-- CI timing: the `pr-job-p95.mjs` table appended per step. Every PR job's queue plus run p95 is 15 minutes or less, and the maximum is 20 or less.
+- U-05 installed-predecessor upgrade: the previous `main` Release, then the head Release, under one certificate, on Android and the iOS simulator.
+- C-02 timing table: every PR job's queue plus run p95 is 15 minutes or less, with a maximum of 20.
 
-**Step-specific (P0):**
+**Step-specific (P0 unless noted):**
 
-- Step 0: the oracle unit tests and the SDK 54 positive control; the background-task units, prebuild spec and in-place upgrade on both platforms; a byte-identical prebuild after the `app.json` key removal.
+- Step 0:
+  - TEA-16 spike, and F-12 if the plugin lands here.
+  - Oracle fixtures F-00a to F-00n: residual bug, stale clone, clipping, blank text, restart, same-PID recreation mutant, remount mutant, scene change, nonlinear growth, early fix, driver order, return leg.
+  - The SDK 54 positive control F-01.
+  - P0-05 to P0-07 and P0-08. P0-08 covers the simulator session and the persisted registration only; scheduler acceptance is P0-09 under D11.
+  - U-01 on the Android emulator.
+  - S0-01, the semantic prebuild diff, with three seeded mutants.
+  - C-01 timing units (failed, timed-out, cancelled, queue-only lower bound, skipped with reason, queue-inclusive breach) and the C-01b lane fixtures after the owner's go.
 - Step 1: React parity and web on 19.2.0.
 - Step 2:
-  - No `@react-navigation/*` import in app code.
-  - The TypeScript decision, with tsc counts on both versions.
+  - No `@react-navigation/*` import.
+  - The TypeScript decision.
   - Async `copy` and `move`.
-  - The media-library save on the new API.
-  - The iOS 16.4 floor on all three targets.
-  - The network-timeout Maestro check.
-- Step 3: every config plugin spec on a clean tree.
+  - The Android media-library save, with the iOS adapter byte-unchanged.
+  - Per-target floors: iOS app, widget, Pods and three podspecs at 16.4; watch at 9.0; launch on iOS 16.4; paired watch sync.
+  - The network-timeout Maestro check (P1).
+  - S2-07 memory against Step 1.
+  - S2-08 release-hold units, fail closed.
+  - U-05 with the Photos add-only and denied states and a real PNG save.
+- Step 3: plugin specs on a clean tree; S3-02 memory confirmation with the hold deleted; S3-03 scene opt-in checks on Xcode 26.x.
 - Step 4:
-  - The Strict TypeScript API with no opt-out.
-  - Async `write` and async `renderRouter`.
-  - The scene delegate with the window lookups for the iOS modules.
-  - The AGP 9 and Kotlin 2.2 module tests.
-  - R8 Release checks for purchase, PostHog and the four modules.
-  - The env-file spec, the AC5 proof, and the D5 verdict measurements.
+  - Strict TypeScript API; async `write` and `renderRouter`.
+  - Scene window lookups, plus the iOS 27 simulator and resizable iPad checks for the Xcode 27 artifact.
+  - AGP 9 and Kotlin 2.2 tests.
+  - R8 Release with PostHog capture and the targeted reflection mutant.
+  - The env-file spec and AC5.
+  - The D5 measurements with the TEA-15 row 4 verdict.
+  - S4-11 foreground notifications: handler at module load, valid and invalid payloads, delayed handler, after cleanup, with a mutant.
+  - S4-12 and S4-13: the Android paid journey through a Play license tester, including upgrade-while-paid and restore; evidence from the internal track only.
+  - U-03, the direct SDK 54 to 58 upgrade.
+  - F-10: the below-0.87 branch deleted.
 
-**Before sign-off (D7):**
+**Before sign-off:**
 
-- Build identities and the all-ABI listing.
-- The AC3 proof on the production builds.
-- Sign-in, session restore, Home, Community, share-card save and share, Settings and the push prompt against production, using the 6.14 test member.
-- R8 checks.
-- The 54 to 58 in-place upgrade under one certificate.
-- An evidence secret scan before commit.
+- D7 production-shaped run: build identities, AC3, the journeys, R8, the paid journey, the 54 to 58 upgrade under one certificate, and an evidence secret scan.
+- The D11 gates: iOS device scheduler and worker, iOS device font proof and upgrade, iOS sandbox purchase and restore, TestFlight.
 
 **Red proofs:**
 
-- A seeded defect for each new guard.
-- The live proof forced to "fix expected" on SDK 54, which must fail with the 6.8 signature.
-- The characterization branch run on SDK 58 before deletion, which must fail.
+- Every oracle fixture with `fixExpected` flipped.
+- SDK 54 runs forced to "fix expected".
+- The flip at Step 4.
+- Each guard's and each script's seeded mutant.
 
-Red proofs run in a throwaway worktree. TEA owns and burns in every flake met.
+All red proofs run in a throwaway worktree. TEA owns and burns in every flake met.
 
 ## Verification
 
