@@ -6,7 +6,7 @@ Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, 
 Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, retention and account erasure.
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
-Updated: 2026-11-12: CI creates production deployments, only when web or API inputs changed.
+Updated: 2026-11-12: CI creates previews and Vercel's git integration deploys production.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
@@ -27,16 +27,17 @@ tests.
 
 ## Deployment map
 
-| Surface       | Current target                                       | Trigger in the repository                                           | Verification present                                                         |
-| ------------- | ---------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Web           | Separate Vercel project                              | CI creates previews (PR) and production (`pw-e2e-prod.yml` on main) | Preview web health/SHA, production web health/SHA, Playwright                |
-| API           | Separate Vercel project and Node serverless function | CI creates previews (PR) and production (`pw-e2e-prod.yml` on main) | Preview API health/SHA, production API health/SHA                            |
-| Mobile        | Expo EAS Android production build                    | Manual GitHub `workflow_dispatch` or local npm command              | EAS authentication and build submission only; Maestro is separate and manual |
-| Workers       | Community worker container, Northflank               | `apps/api/Dockerfile.community-worker`; general and wardrobe: none  | Build-time model self-test, readiness log, `community:screening:canary`      |
-| Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                    | Prisma command exit status; no post-migration deployment probe               |
-| Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete             | OTEL bootstrap log, integration test, dashboards and local manual checks     |
+| Surface       | Current target                                       | Trigger in the repository                                                | Verification present                                                         |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Web           | Separate Vercel project                              | Previews: CI (preview workflow); production: Vercel git deploy of `main` | Preview web health/SHA, production web health/SHA, Playwright                |
+| API           | Separate Vercel project and Node serverless function | Previews: CI (preview workflow); production: Vercel git deploy of `main` | Preview API health/SHA; production only checks a secondary API route         |
+| Mobile        | Expo EAS Android production build                    | Manual GitHub `workflow_dispatch` or local npm command                   | EAS authentication and build submission only; Maestro is separate and manual |
+| Workers       | Community worker container, Northflank               | `apps/api/Dockerfile.community-worker`; general and wardrobe: none       | Build-time model self-test, readiness log, `community:screening:canary`      |
+| Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                         | Prisma command exit status; no post-migration deployment probe               |
+| Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete                  | OTEL bootstrap log, integration test, dashboards and local manual checks     |
 
-The workflows verify deployments but do not create the web or API Vercel deployments. Separate
+The preview workflow creates the web and API preview deployments; Vercel's git integration
+deploys production from each push to `main`, and the production workflow verifies it. Separate
 project names and production URLs are encoded in
 [the Preview workflow](../../.github/workflows/pr-pw-e2e-vercel-preview.yml),
 [the production workflow](../../.github/workflows/pw-e2e-prod.yml), and the
@@ -156,12 +157,12 @@ CI starts local Supabase through
 `ghcr.io` with the job token (the CLI default, `public.ecr.aws`, rate-limits anonymous data per
 runner IP) and skips containers no test uses.
 
-**Preview deployments.** No git push creates a Vercel deployment, `main` included: each
-project's `vercel.json` sets `git.deploymentEnabled` to `false`, and CI creates every preview and
-production deployment. On the Hobby plan every deployment counts toward 100 a day, a build
-canceled by an ignored build step included, and on 2026-11-11 pushes no preview check needed used
-them up and blocked two merges for hours; on 2026-11-12 the same cap refused both production
-builds of a merge that changed no app code. An ignored build step cannot help: Vercel's build clone has no git
+**Preview deployments.** Pushes to any branch other than `main` create no Vercel deployment:
+each project's `vercel.json` sets `git.deploymentEnabled` to `{"main": true, "**": false}` (a
+branch matching several rules deploys when any is true, so `main` keeps its production
+deployments). On the Hobby plan every deployment counts toward 100 a day, a build canceled by an
+ignored build step included, and on 2026-11-11 pushes no preview check needed used them up and
+blocked two merges for hours. An ignored build step cannot help: Vercel's build clone has no git
 remote and ten commits of history (probe, 2026-11-12), and its canceled builds still count.
 
 When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
@@ -196,7 +197,7 @@ provides each preview it names no custom URL for, even on a branch no preview ch
 configuration identity, so the next run builds fresh. To rebuild with nothing changed (an empty
 commit keeps the same inputs), add the `PREVIEW-REBUILD` label to the PR, or run Manual E2E Tests
 with `force_preview_build`. Adding the label forces that one run; later pushes reuse as usual, so
-remove and add it again to force another build. A forced build skips adoption.
+remove and add it again to force another build. A forced build skips adoption. Production deployments from `main` are untouched by all of this.
 
 `VERCEL_TOKEN` reaches the deploy jobs, which run the PR's own script at its exact commit, as it
 already reached the e2e job's test code. GitHub withholds repository secrets from pull requests
@@ -222,27 +223,17 @@ checks the API root response but does not assert API health metadata.
 ## Production deployment verification
 
 [Production E2E](../../.github/workflows/pw-e2e-prod.yml) runs on pushes to `main` and manually. It
-provides production first, then tests it on the fixed Vercel production domains through the
+uses fixed Vercel production domains and the
 [generic deployment waiter](../../.github/workflows/rwf-wait-for-deployment.yml).
 
-Its `deploy-web` and `deploy-api` jobs run `scripts/vercel-preview-deploy.mjs <project>
---production`, which creates a production deployment of the pushed commit only when the project's
-build inputs (the same hash previews use) or its production variables and build settings changed
-since the deployment production serves now. A merge that changed neither leaves production where
-it is, spends none of the daily 100, and reports the earlier commit production still serves. A
-newer production build of the same inputs, left by a superseded run, is adopted. A manual run with
-`force_deploy` builds both regardless.
+Both projects are held to the pushed commit before tests start:
 
-Both projects are held to the commit their deploy job reports before tests start:
-
-- The web `/api/health` must report `status: ok` and match that commit.
-- The API `/api/health` must report `status: ok` and match that commit.
-- `web-health-sha` gets the web commit as `EXPECTED_WEB_SHA`.
+- The web `/api/health` must report `status: ok` and match the pushed SHA.
+- The API `/api/health` must report `status: ok` and match the pushed SHA.
 - Playwright uses `DATABASE_URL_PROD` and fixed production web/API defaults unless overridden.
 
-The deploy step judges by the deployment production serves (the project's production target),
-so a dashboard rollback is seen as it is: the next production run finds the rolled-back
-deployment's other inputs and builds `main` again. Roll back alongside a revert on `main`.
+The production workflow is a post-push verifier, not a deployment job or promotion gate. It does
+not control whether Vercel has promoted either project.
 
 ## Mobile build and delivery
 

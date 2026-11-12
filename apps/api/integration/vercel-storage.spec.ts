@@ -26,7 +26,7 @@ const projects = ['web', 'api'] as const
 const repoRoot = path.resolve(__dirname, '../../..')
 const vercelConfig = z.object({
   ignoreCommand: z.string().optional(),
-  git: z.object({ deploymentEnabled: z.union([z.boolean(), z.record(z.boolean())]) }),
+  git: z.object({ deploymentEnabled: z.record(z.boolean()) }),
   outputDirectory: z.string().optional(),
   functions: z.record(z.unknown()).optional(),
   rewrites: z.array(z.object({ source: z.string(), destination: z.string() })).optional(),
@@ -245,9 +245,8 @@ describe('Vercel preview storage', () => {
   it('connects both projects, the preview wait and the e2e run to the same deployment', () => {
     for (const app of ['api', 'web']) {
       const config = readVercelConfig(app)
-      // No git push creates a deployment, main included: CI creates previews and production
-      // (pw-e2e-prod.yml), only when their inputs changed.
-      expect(config.git.deploymentEnabled).toBe(false)
+      // Branch pushes create no deployment; main still deploys production.
+      expect(config.git.deploymentEnabled).toEqual({ main: true, '**': false })
       expect(config.ignoreCommand).toBeUndefined()
     }
     const read = (file: string) =>
@@ -1203,8 +1202,28 @@ describe('Vercel preview PR trigger', () => {
       path.join(repoRoot, '.github', 'workflows', 'pr-pw-e2e-vercel-preview.yml'),
       'utf8'
     )
-  ) as { jobs: { 'preview-ready': { if: string; with: { force_build: string } } } }
+  ) as {
+    jobs: {
+      'preview-ready': {
+        if: string
+        with: { force_build: string; require_previews?: string }
+      }
+    }
+  }
   const job = caller.jobs['preview-ready']
+  const reusable = parseYaml(
+    fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'rwf-vercel-preview-ready.yml'),
+      'utf8'
+    )
+  ) as {
+    jobs: {
+      'preview-scope': { steps: { env?: Record<string, string> }[] }
+    }
+  }
+  const requireExpression = reusable.jobs['preview-scope'].steps.find(
+    (step) => step.env?.REQUIRE_PREVIEWS
+  )?.env?.REQUIRE_PREVIEWS
   const repository = 'muratkeremozcan/couture-cast'
   const github = (fork: boolean, action: string, label: string, preview = true) => ({
     // The lanes job's plan: the preview lane runs when the diff touches a preview input.
@@ -1249,6 +1268,30 @@ describe('Vercel preview PR trigger', () => {
     (action, label, runs, forces) => {
       expect(evaluateExpression(job.if, github(false, action, label, false))).toBe(
         runs && forces
+      )
+    }
+  )
+
+  // The lane plan already chose the preview lane (ALL-LANES, or a diff the map ties to it), so
+  // the reusable workflow's own scope check must not overrule it: the caller passes the
+  // selection as require_previews, which the scope step turns into REQUIRE_PREVIEWS (and the
+  // scope CLI then answers required=true, as the CLI case above shows for a docs-only branch).
+  it.each([
+    [true, 'synchronize', '', true],
+    [false, 'labeled', 'PREVIEW-REBUILD', true],
+    [false, 'synchronize', '', false],
+  ] as const)(
+    'a plan with the preview lane %s on a %s event (label %s) requires previews in the scope step: %s',
+    (preview, action, label, required) => {
+      const context = github(false, action, label, preview)
+      expect(job.with.require_previews).toBeDefined()
+      const inputs = {
+        require_previews: evaluateExpression(job.with.require_previews ?? '', context),
+        force_build: evaluateExpression(job.with.force_build, context),
+      }
+      expect(requireExpression).toBeDefined()
+      expect(Boolean(evaluateExpression(requireExpression ?? '', { inputs }))).toBe(
+        required
       )
     }
   )

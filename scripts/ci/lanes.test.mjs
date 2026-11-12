@@ -105,7 +105,7 @@ test('a doc a test reads wakes the lane that runs the test (#199)', () => {
   assert.deepEqual(running(files), ['coverage-api'])
 })
 
-test('an API-only pull request skips Maestro, native and the web-only lanes (#209, #180)', () => {
+test('an API-only pull request runs Maestro, whose journeys call the API, and skips native and web-only lanes (#209, #180)', () => {
   for (const number of [209, 180]) {
     const lanes = running(pullRequest(number))
     for (const id of [
@@ -115,11 +115,137 @@ test('an API-only pull request skips Maestro, native and the web-only lanes (#20
       'contract',
       'web-e2e',
       'preview',
+      'maestro',
     ])
       assert.ok(lanes.includes(id), `#${number} runs ${id}`)
-    for (const id of ['maestro', 'watchos', 'coverage-mobile', 'lighthouse'])
+    for (const id of ['watchos', 'coverage-mobile', 'lighthouse'])
       assert.ok(!lanes.includes(id), `#${number} skips ${id}`)
   }
+})
+
+// What each lane starts or builds, and so must wake it. Maestro starts local Supabase, resets
+// the database, starts the API with its workers and Metro (pr-mobile-e2e.yml,
+// scripts/run-maestro.mjs); every Playwright entry point runs prepare:playwright, which
+// generates the Prisma client and builds config, utils, api-client and testing.
+const STARTS = {
+  typecheck: [
+    'apps/web/src/app/page.tsx',
+    'packages/k6-utils/src/index.ts',
+    'k6/smoke.js',
+  ],
+  lighthouse: [
+    'apps/web/src/app/page.tsx',
+    'packages/config/src/flags.ts',
+    'packages/testing/src/index.ts',
+    'packages/utils/src/index.ts',
+    'packages/db/prisma/schema.prisma',
+  ],
+  'coverage-api': [
+    'apps/api/src/main.ts',
+    'packages/db/prisma/schema.prisma',
+    'packages/config/src/flags.ts',
+    'supabase/migrations/20260101000000_x.sql',
+  ],
+  'coverage-mobile': [
+    'apps/mobile/app/index.tsx',
+    'packages/api-client/src/index.ts',
+    'apps/web/src/i18n/locales/en-US.json',
+  ],
+  'coverage-other': [
+    'apps/web/src/app/page.tsx',
+    'packages/db/test/x.spec.ts',
+    'apps/api/src/main.ts',
+  ],
+  'year-ahead': [
+    'apps/api/src/main.ts',
+    'apps/web/src/app/page.tsx',
+    'packages/config/src/flags.ts',
+  ],
+  community: ['apps/api/src/main.ts', 'supabase/migrations/20260101000000_x.sql'],
+  contract: [
+    'apps/api/src/main.ts',
+    'pact/consumer.pact.spec.ts',
+    'packages/api-client/src/index.ts',
+  ],
+  'web-e2e': [
+    'apps/web/src/app/page.tsx',
+    'apps/api/src/main.ts',
+    'packages/db/prisma/schema.prisma',
+    'packages/config/src/flags.ts',
+    'supabase/config.toml',
+    'supabase/migrations/20260101000000_x.sql',
+    'playwright/tests/home.spec.ts',
+  ],
+  preview: [
+    'apps/web/src/app/page.tsx',
+    'apps/api/src/main.ts',
+    'packages/db/prisma/schema.prisma',
+    'packages/config/src/flags.ts',
+    'playwright/tests/home.spec.ts',
+  ],
+  'playwright-unit': [
+    'playwright/support/helpers/advisory-lock.ts',
+    'maestro/premium-subscription.yaml',
+    'apps/mobile/src/lib/premium.ts',
+  ],
+  maestro: [
+    'maestro/premium-subscription.yaml',
+    'apps/mobile/src/lib/premium.ts',
+    'apps/api/src/main.ts',
+    'packages/db/prisma/schema.prisma',
+    'packages/config/src/flags.ts',
+    'packages/api-client/src/index.ts',
+    'supabase/config.toml',
+    'supabase/seed.sql',
+    'supabase/migrations/20260101000000_x.sql',
+  ],
+  'share-card': [
+    'apps/mobile/app/index.tsx',
+    'apps/web/src/app/page.tsx',
+    'apps/api/src/main.ts',
+    'supabase/migrations/20260101000000_x.sql',
+    'playwright/tests/share-card-export.spec.ts',
+  ],
+  watchos: ['apps/mobile/plugins/with-watchos.js', 'apps/mobile/targets/watch/App.swift'],
+}
+
+// Per lane, the replayed pull requests it skips. The other 51 touched a shared or unclaimed
+// path and ran everything. #199 changed docs and one runbook the API specs read; #148 changed
+// Playwright specs and helpers; #204 and #192 the mobile app only; #209, #208 and #180 the API
+// (#208 with packages/db). A change here is a change in what CI checks: review each entry.
+const EXPECTED_SKIPS = {
+  typecheck: [199],
+  lighthouse: [209, 204, 199, 192, 180, 148],
+  'coverage-api': [204, 192],
+  'coverage-mobile': [209, 208, 199, 180, 148],
+  'coverage-other': [204, 199, 192, 148],
+  'year-ahead': [204, 199, 192, 148],
+  community: [204, 199, 192, 148],
+  contract: [204, 199, 192, 148],
+  'web-e2e': [204, 199, 192],
+  preview: [204, 199, 192],
+  'playwright-unit': [209, 199, 180],
+  maestro: [199, 148],
+  'share-card': [199],
+  watchos: [209, 208, 199, 180, 148],
+}
+
+test('each lane skips exactly the replayed pull requests reviewed for it', () => {
+  const skips = Object.fromEntries(allLanes.map((id) => [id, []]))
+  for (const { number, files } of fixture.pullRequests) {
+    const plan = selectLanes({ event: 'pull_request', files, dependencies })
+    for (const id of allLanes) if (!plan[id].run) skips[id].push(number)
+  }
+  assert.deepEqual(skips, EXPECTED_SKIPS)
+})
+
+test('every lane wakes on each file of what it starts or builds', () => {
+  assert.deepEqual(Object.keys(STARTS).sort(), [...allLanes].sort())
+  const misses = []
+  for (const [id, files] of Object.entries(STARTS))
+    for (const file of files)
+      if (!running([file]).includes(id)) misses.push(`${id}: ${file}`)
+  assert.deepEqual(misses, [])
 })
 
 test('a mobile-only pull request skips the web, API and preview lanes (#204, #192)', () => {
@@ -148,7 +274,9 @@ test('a shared package wakes every workspace that depends on it (#202: packages/
   const config = running(['packages/config/src/flags.ts'])
   for (const id of ['coverage-api', 'coverage-other', 'year-ahead', 'community'])
     assert.ok(config.includes(id), id)
-  for (const id of ['maestro', 'coverage-mobile', 'watchos'])
+  // Maestro runs on it: the API its journeys call reads the flag configuration.
+  assert.ok(config.includes('maestro'))
+  for (const id of ['coverage-mobile', 'watchos'])
     assert.ok(
       !config.includes(id),
       `apps/mobile does not depend on @couture/config: ${id}`

@@ -2,17 +2,18 @@
 
 <!-- markdownlint-configure-file {"MD013": false} -->
 
-Updated: 2026-11-12 - lane selection on pull requests, and production deployments from CI
+Updated: 2026-11-12 - lane selection on pull requests
 Updated: 2026-11-12 - PR job ceilings at 20 minutes and CI's local Supabase ports
 Updated: 2026-05-01 - document Preview and Production as the deployed Vercel targets
 
 ## Overview
 
-This repo uses GitHub Actions for CI, and CI creates every Vercel deployment (no git push does,
-`git.deploymentEnabled: false` in each `vercel.json`):
+This repo uses GitHub Actions for CI. CI creates the Vercel preview deployments, and Vercel's git
+integration deploys production from `main` (`git.deploymentEnabled` is true for `main` only in
+each `vercel.json`):
 
-- PR branches → Vercel Preview deployments, when the preview lane runs
-- `main` → Vercel Production deployments from `pw-e2e-prod.yml`, when web or API inputs changed
+- PR branches → Vercel Preview deployments from CI, when the preview lane runs
+- `main` → Vercel Production deployments
 
 In CI, Vercel Preview URLs are the `preview` Playwright target. PRs use Preview and `main` uses
 Production.
@@ -87,14 +88,6 @@ Playwright environment selection uses `TEST_ENV`:
   workflows to the map.
 - `node scripts/ci/node-test-gate.mjs --local` runs every gate suite locally after checking each
   suite's declared setup (install, Android prebuild, API build), and names what is missing.
-
-### Production deployments
-
-- `pw-e2e-prod.yml` runs `scripts/vercel-preview-deploy.mjs <web|api> --production` on each push
-  to `main`. It creates a production deployment only when the project's build inputs or its
-  production configuration differ from the deployment production serves, so a CI or docs merge
-  spends none of Hobby's 100 deployments a day. The health waits and the production e2e run
-  expect the commit the deploy step reports. A manual run with `force_deploy` builds both.
 
 ### Advisory PR review
 
