@@ -37,11 +37,15 @@
  *
  * Story 6.14 follow-up: a build whose inputs have not changed since the last one
  * published is skipped. The npm pre-hooks rebuilt the same three packages five times in
- * one mobile e2e shard (about 100 s). The fingerprint covers every file of the package
- * outside `dist` and `node_modules`, the root tsconfig.json and package-lock.json, the
- * compiler command, and the fingerprints of the workspace packages it depends on; it is
- * written to `dist/.build-fingerprint` after each publish. COUTURE_FORCE_PACKAGE_BUILD=1
- * always builds.
+ * one mobile e2e shard (about 100 s). The fingerprint covers everything the compile reads:
+ * every file of the package outside `dist` and `node_modules`, the root tsconfig.json
+ * every package tsconfig extends, package-lock.json and the installed tree npm records in
+ * node_modules/.package-lock.json, the generated Prisma client a package that depends on
+ * @prisma/client compiles against, the compiler command, and the fingerprint of every
+ * workspace package it declares or imports. tsc reads no environment variable that
+ * changes its output. It is written to `dist/.build-fingerprint` after each publish; no
+ * workflow caches `dist`, so a CI build always starts from a fresh checkout.
+ * COUTURE_FORCE_PACKAGE_BUILD=1 always builds.
  *
  * Usage, from the package directory:
  *   node ../../scripts/build-workspace-package.mjs [--tsc <command...>]
@@ -311,20 +315,42 @@ export function buildFingerprint(packageDir, compiler) {
   for (const file of inputFiles(packageDir))
     add(`file:${file}`, fs.readFileSync(path.join(packageDir, file)))
   const repository = path.resolve(packageDir, '../..')
-  for (const file of ['tsconfig.json', 'package-lock.json']) {
-    const at = path.join(repository, file)
-    add(`root:${file}`, fs.existsSync(at) ? fs.readFileSync(at) : 'none')
-  }
+  const addFile = (label, at) =>
+    add(label, fs.existsSync(at) ? fs.readFileSync(at) : 'none')
+  for (const file of [
+    'tsconfig.json',
+    'package-lock.json',
+    'node_modules/.package-lock.json',
+  ])
+    addFile(`root:${file}`, path.join(repository, file))
   const manifestFile = path.join(packageDir, 'package.json')
   const manifest = fs.existsSync(manifestFile)
     ? JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
     : {}
-  const workspace = Object.keys({
+  const declared = Object.keys({
     ...manifest.dependencies,
     ...manifest.devDependencies,
     ...manifest.peerDependencies,
   })
-    .filter((name) => name.startsWith('@couture/'))
+  // The generated client is in no lockfile: its types come from the Prisma schema.
+  if (declared.includes('@prisma/client'))
+    for (const file of ['index.d.ts', 'schema.prisma'])
+      addFile(
+        `prisma:${file}`,
+        path.join(repository, 'node_modules/.prisma/client', file)
+      )
+  // A workspace package the source imports counts even when package.json omits it.
+  const imported = new Set()
+  for (const file of inputFiles(packageDir))
+    if (/\.[cm]?[jt]sx?$/.test(file))
+      for (const match of fs
+        .readFileSync(path.join(packageDir, file), 'utf8')
+        .matchAll(/['"](@couture\/[a-z0-9-]+)/g))
+        imported.add(match[1])
+  const workspace = [
+    ...new Set([...declared.filter((name) => name.startsWith('@couture/')), ...imported]),
+  ]
+    .filter((name) => name !== manifest.name)
     .sort()
   for (const name of workspace) {
     const stamp = path.join(packageDir, 'node_modules', name, DIST, FINGERPRINT_FILE)

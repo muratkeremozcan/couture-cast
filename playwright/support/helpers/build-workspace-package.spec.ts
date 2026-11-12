@@ -10,6 +10,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
+  buildFingerprint,
   FINGERPRINT_FILE,
   replaceDistFromStaging,
 } from '../../../scripts/build-workspace-package.mjs'
@@ -629,5 +630,76 @@ fs.writeFileSync(require('node:path').join(outDir, 'index.js'), fs.readFileSync(
     } finally {
       fs.rmSync(log, { force: true })
     }
+  })
+})
+
+describe('what the fingerprint covers (Story 6.14 follow-up)', () => {
+  /** A repository with one package, `packages/pkg`, and the files it compiles against. */
+  function repository() {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'build-inputs-'))
+    const root = directory
+    const write = (file: string, content: string) => {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      fs.writeFileSync(path.join(root, file), content)
+    }
+    write('tsconfig.json', '{}')
+    write('package-lock.json', '{"lockfileVersion":3}')
+    write('node_modules/.package-lock.json', '{"installed":1}')
+    write('node_modules/.prisma/client/index.d.ts', 'export type User = { id: string }')
+    write('node_modules/.prisma/client/schema.prisma', 'model User { id String @id }')
+    write('node_modules/@couture/dep/dist/.build-fingerprint', 'dep-1')
+    write(
+      'packages/pkg/package.json',
+      JSON.stringify({ name: '@couture/pkg', dependencies: { '@prisma/client': '6' } })
+    )
+    write('packages/pkg/tsconfig.json', '{"extends":"../../tsconfig.json"}')
+    // Imported, not declared: the source decides what the compile reads.
+    write('packages/pkg/src/index.ts', "export * from '@couture/dep'")
+    return { root, write, pkg: path.join(root, 'packages/pkg') }
+  }
+  const compiler = ['tsc']
+
+  it.each([
+    ['the lockfile', 'package-lock.json', '{"lockfileVersion":3,"x":1}'],
+    [
+      'the installed dependency tree',
+      'node_modules/.package-lock.json',
+      '{"installed":2}',
+    ],
+    ['the root tsconfig', 'tsconfig.json', '{"compilerOptions":{"strict":true}}'],
+    ['the package tsconfig', 'packages/pkg/tsconfig.json', '{}'],
+    ['a source file', 'packages/pkg/src/index.ts', 'export const changed = 1'],
+    [
+      'the generated Prisma client types',
+      'node_modules/.prisma/client/index.d.ts',
+      'export type User = { id: number }',
+    ],
+    [
+      'the Prisma schema the client was generated from',
+      'node_modules/.prisma/client/schema.prisma',
+      'model User { id Int @id }',
+    ],
+    [
+      'an imported workspace package build',
+      'node_modules/@couture/dep/dist/.build-fingerprint',
+      'dep-2',
+    ],
+  ])('6.14-BUILD-04 changes with %s', (_label, file, content) => {
+    const { write, pkg } = repository()
+    const before = buildFingerprint(pkg, compiler)
+    write(file, content)
+    expect(buildFingerprint(pkg, compiler)).not.toBe(before)
+  })
+
+  it('6.14-BUILD-05 changes with the compiler command and ignores its own outputs', () => {
+    const { write, pkg } = repository()
+    const before = buildFingerprint(pkg, compiler)
+    expect(buildFingerprint(pkg, ['npm', 'exec', 'tsc'])).not.toBe(before)
+    write('packages/pkg/dist/index.js', 'built')
+    write('packages/pkg/dist/.build-fingerprint', before)
+    write('packages/pkg/node_modules/x/index.js', 'x')
+    write('packages/pkg/.dist-staging-1-a/index.js', 'staging')
+    write('packages/pkg/tsconfig.build.tsbuildinfo', '{}')
+    expect(buildFingerprint(pkg, compiler)).toBe(before)
   })
 })
