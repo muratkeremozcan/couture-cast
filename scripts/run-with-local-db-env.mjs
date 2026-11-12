@@ -30,14 +30,21 @@ import {
   applyLocalE2eDatabaseUrl,
   applyLocalSupabaseStorageEnv,
 } from './local-e2e-database.mjs'
-import { isLocalSupabaseDatabaseUrl } from './lib/local-supabase-ports.mjs'
+import {
+  isLocalSupabaseDatabaseUrl,
+  localDatabaseUrl,
+} from './lib/local-supabase-ports.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const args = process.argv.slice(2)
+// --require-local: the command resets the database, so it runs only against the local
+// Supabase server on the port Supabase binds (CI's SUPABASE_DB_PORT, else config.toml).
+// A DATABASE_URL for any other server or port is refused before anything starts.
+const requireLocal = process.argv[2] === '--require-local'
+const args = process.argv.slice(requireLocal ? 3 : 2)
 
 if (args.length === 0) {
   console.error(
-    '[run-with-local-db-env] usage: run-with-local-db-env <command> [args...]'
+    '[run-with-local-db-env] usage: run-with-local-db-env [--require-local] <command> [args...]'
   )
   process.exit(1)
 }
@@ -81,6 +88,12 @@ if (storage.applied) {
 // The local Supabase server is a loopback host on its configured port (CI's override,
 // else supabase/config.toml).
 const targetsLocalSupabase = isLocalSupabaseDatabaseUrl(env.DATABASE_URL, env)
+if (requireLocal && !targetsLocalSupabase) {
+  console.error(
+    `[run-with-local-db-env] Refusing: DATABASE_URL is not the local Supabase database on its configured port (${localDatabaseUrl(env)}).`
+  )
+  process.exit(1)
+}
 if (targetsLocalSupabase && !env.PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION) {
   env.PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION =
     'Local Supabase test database; reset and reseed are the intended operation.'

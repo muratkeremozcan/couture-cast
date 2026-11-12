@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, test } from 'node:test'
 import {
@@ -98,6 +100,56 @@ describe('run-with-local-db-env Prisma consent', () => {
         DATABASE_URL: 'postgresql://postgres:postgres@db.example.com:54322/postgres',
       }),
       'no'
+    )
+  })
+})
+
+describe('start:all resets only the configured local database', () => {
+  const wrapper = fileURLToPath(new URL('../run-with-local-db-env.mjs', import.meta.url))
+  const root = fileURLToPath(new URL('../../', import.meta.url))
+  const run = (env) =>
+    spawnSync(
+      process.execPath,
+      [
+        wrapper,
+        '--require-local',
+        process.execPath,
+        '-e',
+        'console.log(process.env.DATABASE_URL)',
+      ],
+      {
+        encoding: 'utf8',
+        env: {
+          PATH: process.env.PATH,
+          TEST_ENV: 'local',
+          SUPABASE_URL: 'http://127.0.0.1:1',
+          SUPABASE_SERVICE_ROLE_KEY: 'test',
+          ...env,
+        },
+      }
+    )
+  const at = (port) => `postgresql://postgres:postgres@127.0.0.1:${port}/postgres`
+
+  test('fills the database on the configured port', () => {
+    const result = run(CI)
+    assert.equal(result.status, 0, result.stderr)
+    assert.match(result.stdout, /127\.0\.0\.1:24322\/postgres/)
+  })
+
+  test('refuses a DATABASE_URL on another port than the one Supabase binds', () => {
+    const result = run({ ...CI, DATABASE_URL: at(54322) })
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /refusing/i)
+    assert.doesNotMatch(result.stdout, /postgresql:/)
+  })
+
+  test('the start:all script goes through that guard and names no port', () => {
+    const script = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
+      .scripts['start:all']
+    assert.doesNotMatch(script, /\b5432\d\b/)
+    assert.match(
+      script,
+      /run-with-local-db-env\.mjs --require-local npm-run-all2 --sequential supabase:start db:reset/
     )
   })
 })
