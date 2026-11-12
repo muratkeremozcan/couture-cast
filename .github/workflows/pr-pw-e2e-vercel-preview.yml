@@ -3,7 +3,8 @@ name: Vercel Preview e2e
 
 on:
   pull_request:
-    types: [labeled, synchronize]
+    # Branch pushes create no Vercel deployment, so opening a PR must provide its previews too.
+    types: [opened, reopened, labeled, synchronize]
 
 permissions:
   # The shard balancer reads the run's artifacts and jobs.
@@ -11,19 +12,26 @@ permissions:
   contents: read
 
 concurrency:
-  group: vercel-preview-${{ github.event.pull_request.number }}
+  # A label other than PREVIEW or PREVIEW-REBUILD runs nothing, so it gets its own group and
+  # never cancels the run providing this PR's previews.
+  group: vercel-preview-${{ github.event.pull_request.number }}${{ github.event.action == 'labeled' && github.event.label.name != 'PREVIEW' && github.event.label.name != 'PREVIEW-REBUILD' && format('-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
   preview-ready:
     # Find the exact web and API preview URLs for this PR commit and wait until
-    # both projects serve it.
+    # both projects serve it. Fork PRs get no VERCEL_TOKEN, so they skip previews.
     if: |
-      github.event.action == 'synchronize' || github.event.label.name == 'PREVIEW'
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action != 'labeled' ||
+      github.event.label.name == 'PREVIEW' || github.event.label.name == 'PREVIEW-REBUILD')
     uses: ./.github/workflows/rwf-vercel-preview-ready.yml
     with:
       git_ref: ${{ github.head_ref }}
       expected_sha: ${{ github.event.pull_request.head.sha }}
+      # Adding the PREVIEW-REBUILD label builds fresh deployments even when ready ones match.
+      # Later pushes reuse as usual; remove and add the label again to force another build.
+      force_build: ${{ github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD' }}
     secrets: inherit
 
   pw-e2e:
@@ -38,4 +46,5 @@ jobs:
       deployment_ref: ${{ github.head_ref }}
       custom_base_url: ${{ needs.preview-ready.outputs.web_url }}
       custom_api_base_url: ${{ needs.preview-ready.outputs.api_url }}
+      expected_web_sha: ${{ needs.preview-ready.outputs.web_sha }}
     secrets: inherit

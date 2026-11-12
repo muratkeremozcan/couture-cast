@@ -19,6 +19,10 @@ on:
         description: "Custom API base URL (optional override)"
         type: string
         required: false
+      force_preview_build:
+        description: "Build fresh preview deployments even when ready ones have the same inputs and configuration"
+        type: boolean
+        default: false
       scope:
         # A choice, never free text: each value selects a fixed command below.
         type: choice
@@ -41,14 +45,18 @@ concurrency:
 
 jobs:
   preview-ready:
-    # Without this wait a run dispatched right after a push pins deployments
-    # that are still building and tests Vercel's placeholder pages. A custom
-    # URL names its own target, so the branch previews are not awaited.
-    if: inputs.test_env == 'preview' && inputs.custom_base_url == '' && inputs.custom_api_base_url == ''
+    # Branch pushes create no Vercel deployment, so this provides each preview the run does not
+    # name a custom URL for, and waits until it serves. A custom URL names its own target.
+    if: inputs.test_env == 'preview' && (inputs.custom_base_url == '' || inputs.custom_api_base_url == '')
     uses: ./.github/workflows/rwf-vercel-preview-ready.yml
     with:
       git_ref: ${{ github.ref_name }}
       expected_sha: ${{ github.sha }}
+      deploy_web: ${{ inputs.custom_base_url == '' }}
+      deploy_api: ${{ inputs.custom_api_base_url == '' }}
+      force_build: ${{ inputs.force_preview_build }}
+      # A manual run asks for previews even when the branch changes nothing preview checks read.
+      require_previews: true
     secrets: inherit
 
   run-preview-tests:
@@ -56,7 +64,7 @@ jobs:
     if: >-
       !cancelled() && inputs.test_env == 'preview' &&
       contains(fromJSON('["success","skipped"]'), needs.preview-ready.result) &&
-      (inputs.custom_base_url != '' || inputs.custom_api_base_url != '' ||
+      ((inputs.custom_base_url != '' && inputs.custom_api_base_url != '') ||
        needs.preview-ready.outputs.required == 'true')
     uses: ./.github/workflows/rwf-e2e.yml
     with:
@@ -67,6 +75,8 @@ jobs:
       deployment_ref: ${{ github.ref_name }}
       custom_base_url: ${{ inputs.custom_base_url || needs.preview-ready.outputs.web_url }}
       custom_api_base_url: ${{ inputs.custom_api_base_url || needs.preview-ready.outputs.api_url }}
+      # A custom web URL serves whatever it serves; only a resolved preview has a known commit.
+      expected_web_sha: ${{ inputs.custom_base_url == '' && needs.preview-ready.outputs.web_sha || '' }}
     secrets: inherit
 
   run-prod-tests:

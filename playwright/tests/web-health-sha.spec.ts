@@ -4,8 +4,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-12-cross-surface-e2e-confidence
 import { test, expect } from '../support/fixtures/merged-fixtures'
 
+// The web preview can serve an earlier commit with the same web inputs when its build was
+// ignored (scripts/vercel-preview-target.mjs); EXPECTED_WEB_SHA names that commit.
 const getExpectedSha = () =>
-  process.env.EXPECTED_SHA ?? process.env.GITHUB_SHA ?? process.env.CI_COMMIT_SHA
+  process.env.EXPECTED_WEB_SHA ||
+  (process.env.EXPECTED_SHA ?? process.env.GITHUB_SHA ?? process.env.CI_COMMIT_SHA)
 
 test.describe('Web health metadata', () => {
   test('returns status and git metadata', async ({ apiRequest }, testInfo) => {

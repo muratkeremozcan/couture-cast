@@ -221,6 +221,7 @@ connection reports `pool_wait` and keeps its batch size, since no batch work ran
 budget pressure it halved the batch on every busy moment (6.5-INT-037). One 2.25 s deadline
 bounds the append and its retry row across every pldbgapi2 retry, each attempt taking only what
 is left; with a fresh budget per attempt, six attempts took 5.12 s (6.5-INT-038). A retry row
+retried after an abort gets only what is left of that deadline too (6.5-INT-039). A retry row
 that is not written, or skipped at the deadline, logs `Community append retry not recorded`
 with its error code (6.5-INT-034).
 An append lane older

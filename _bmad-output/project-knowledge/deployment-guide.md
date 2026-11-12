@@ -9,6 +9,7 @@ Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator comman
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
+Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -153,6 +154,55 @@ CI starts local Supabase through
 [its composite action](../../.github/actions/start-local-supabase/action.yml), which pulls images from
 `ghcr.io` with the job token (the CLI default, `public.ecr.aws`, rate-limits anonymous data per
 runner IP) and skips containers no test uses.
+
+**Preview deployments.** Pushes to any branch other than `main` create no Vercel deployment:
+each project's `vercel.json` sets `git.deploymentEnabled` to `{"main": true, "**": false}` (a
+branch matching several rules deploys when any is true, so `main` keeps its production
+deployments). On the Hobby plan every deployment counts toward 100 a day, a build canceled by an
+ignored build step included, and on 2026-11-11 pushes no preview check needed used them up and
+blocked two merges for hours. An ignored build step cannot help: Vercel's build clone has no git
+remote and ten commits of history (probe, 2026-11-12), and its canceled builds still count.
+
+When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
+branch's changes against main, one job per project (`deploy-web`, `deploy-api`, 20 minutes each,
+since Hobby builds one deployment at a time) runs
+[the deploy script](../../scripts/vercel-preview-deploy.mjs). It adopts a preview deployment it
+created itself (marked `ccPreviewSource`, preview target only) on this branch with the same build
+inputs (a hash of every tracked file the project builds from: the repository less the other app,
+tests, workflows and load scripts) and the same configuration (the ids and update times of the
+preview variables that apply to the branch, and the build settings: framework, install, build and
+output commands, root directory, files outside it, system variable exposure, Node version, Git LFS,
+region and resources), the newest ready one first, else one still building. Otherwise it creates
+one from the exact commit through the Vercel API with `forceNew=1`, since nothing matched and an
+earlier deployment of the same commit could carry other inputs or configuration. A variable's
+target counts whether Vercel lists it or gives it as one string. It never cancels a deployment: another run may
+be using it, and two runs racing to create cost one duplicate build at most.
+
+One deadline 45 s inside each job's 20 minutes covers setup, every request (each also bounded at
+30 s) and the 15 s polls. A poll that fails with a rate limit, a server error, a timeout or a
+lost connection is retried while the deadline allows, since the build carries on; any other 4xx
+answer fails at once, even when its body stalls after the status arrived. A `Retry-After`
+(counted from when the headers arrived) sets the next poll on any answer; after a 429 the
+quota reset Vercel announces (`X-RateLimit-Reset` or the error's `limit.reset`/`resetMs`) does
+too. A reset past the deadline fails the job at once with that reason. `ERROR`, `CANCELED`, a refused creation (the rate limit answers on
+creation) or the deadline fails the job; a build still `QUEUED` at the deadline says it waits
+behind another build, since Hobby builds one deployment at a time, so rerun once that build
+finishes. The health waits, the e2e URLs and the web health test (`EXPECTED_WEB_SHA`) use that
+deployment's own URL and commit.
+
+Opening or reopening a PR provides its previews, as does each push to it. A manual run always
+provides each preview it names no custom URL for, even on a branch no preview check reads. Changing a preview variable or a build setting changes the
+configuration identity, so the next run builds fresh. To rebuild with nothing changed (an empty
+commit keeps the same inputs), add the `PREVIEW-REBUILD` label to the PR, or run Manual E2E Tests
+with `force_preview_build`. Adding the label forces that one run; later pushes reuse as usual, so
+remove and add it again to force another build. A forced build skips adoption. Production deployments from `main` are untouched by all of this.
+
+`VERCEL_TOKEN` reaches the deploy jobs, which run the PR's own script at its exact commit, as it
+already reached the e2e job's test code. GitHub withholds repository secrets from pull requests
+opened from forks, so only same-repository branches can use it; a fork PR skips the preview
+and e2e jobs. Nothing in the repository limits what the token may do; its scope, owner
+and expiry live in the Vercel account (repository secret last set 2025-12-15) and are not
+verified here, so treat it as able to deploy to production.
 
 The SHA wait is implemented by
 [the Vercel waiter](../../.github/workflows/vercel-wait-for-deployment.yml). It retries for up to the
