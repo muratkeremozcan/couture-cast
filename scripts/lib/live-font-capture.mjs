@@ -165,10 +165,17 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
   return taken.map(({ key }) => key)
 }
 
-/** Two hierarchies show the same layout when their text nodes and bounds are identical. */
+/**
+ * Two hierarchies show the same layout when their app text nodes and bounds are identical.
+ * System UI (the status-bar clock) is ignored, since it changes on its own.
+ */
 export function sameLayout(a, b) {
   const shape = (nodes) =>
-    JSON.stringify(nodes.map((node) => [node.id, node.text, node.bounds]))
+    JSON.stringify(
+      nodes
+        .filter((node) => !/^com\.android\.systemui:/.test(node.id ?? ''))
+        .map((node) => [node.id, node.text, node.bounds])
+    )
   return shape(a) === shape(b)
 }
 
@@ -236,4 +243,31 @@ export function parseEnvironment(id) {
 /** The installed app's configuration from a flattened hierarchy, or an empty reading. */
 export function readEnvironment(flat) {
   return flat.environment ?? {}
+}
+
+/**
+ * The window's bounds. Maestro's root node carries none, so this is the union of every bounded
+ * node, which the full-screen root view spans.
+ */
+export function windowBounds(tree) {
+  let box
+  const walk = (node) => {
+    const match = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
+      node?.attributes?.bounds ?? ''
+    )
+    if (match) {
+      const [l, t, r, b] = match.slice(1).map(Number)
+      box = box
+        ? [
+            Math.min(box[0], l),
+            Math.min(box[1], t),
+            Math.max(box[2], r),
+            Math.max(box[3], b),
+          ]
+        : [l, t, r, b]
+    }
+    for (const child of node?.children ?? []) walk(child)
+  }
+  walk(tree)
+  return box ? `[${box[0]},${box[1]}][${box[2]},${box[3]}]` : undefined
 }

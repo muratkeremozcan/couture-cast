@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  windowBounds,
   parseEnvironment,
   activityToken,
   assertLiveProvenance,
@@ -161,6 +162,12 @@ test('sameLayout compares text and bounds', () => {
   const a = [{ id: 'x', text: 'A', bounds: '[0,0][1,1]' }]
   assert.equal(sameLayout(a, structuredClone(a)), true)
   assert.equal(sameLayout(a, [{ ...a[0], bounds: '[0,0][1,2]' }]), false)
+  const clock = (text) => ({
+    id: 'com.android.systemui:id/clock',
+    text,
+    bounds: '[0,0][9,9]',
+  })
+  assert.equal(sameLayout([...a, clock('4:44')], [...a, clock('4:45')]), true)
 })
 
 test('flattenHierarchy reads one JavaScript font scale or none', () => {
@@ -277,4 +284,13 @@ test('flattenHierarchy reads the environment every marked window agrees on', () 
     undefined
   )
   assert.equal(parseEnvironment('live-font-env-home~0.81.5'), undefined)
+})
+
+test('windowBounds spans every bounded node when the root has none', () => {
+  const tree = node({}, [
+    node({ bounds: '[0,0][1080,2400]' }, [node({ bounds: '[42,488][304,657]' })]),
+    node({ bounds: '[0,2274][1080,2400]' }),
+  ])
+  assert.equal(windowBounds(tree), '[0,0][1080,2400]')
+  assert.equal(windowBounds(node({})), undefined)
 })

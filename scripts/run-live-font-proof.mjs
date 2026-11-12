@@ -25,6 +25,7 @@ import {
   rootIdentity,
   sameLayout,
   stitchPages,
+  windowBounds,
 } from './lib/live-font-capture.mjs'
 import {
   aggregateVerdict,
@@ -169,7 +170,7 @@ function makeCapture(screenName, stage, scale) {
     identity: { root: rootIdentity(flat.markers), ...nativeIdentity() },
     nodes: flat.nodes,
     controls: flat.controls,
-    window: tree.attributes?.bounds,
+    window: windowBounds(tree),
   }
   Object.defineProperty(capture, 'file', {
     value: `${screenName}-${String(sequence).padStart(3, '0')}-${stage}-${scale}`,
@@ -236,8 +237,21 @@ async function fullText(capture) {
     pages.push(page)
   }
   for (let back = 0; back <= drags + 1; back += 1) drag(size, false)
-  const top = await stableNodes()
-  if (!sameLayout(top, capture.nodes)) throw new Error('live_font_scroll_not_restored')
+  let top = await stableNodes()
+  for (let extra = 0; extra < 3 && !sameLayout(top, capture.nodes); extra += 1) {
+    drag(size, false)
+    top = await stableNodes()
+  }
+  if (!sameLayout(top, capture.nodes)) {
+    fs.writeFileSync(
+      path.join(out, `${capture.file}-not-restored.json`),
+      JSON.stringify(top),
+      {
+        mode: 0o600,
+      }
+    )
+    throw new Error('live_font_scroll_not_restored')
+  }
   fs.writeFileSync(path.join(out, `${capture.file}-pages.json`), JSON.stringify(pages), {
     mode: 0o600,
   })
