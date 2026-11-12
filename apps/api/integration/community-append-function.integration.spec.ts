@@ -91,23 +91,33 @@ describe('community_append_batch inside the database', () => {
     const pid = (await appender.query<{ pid: number }>('SELECT pg_backend_pid() AS pid'))
       .rows[0]!.pid
     const inflight = batch()
-    let waiting = false
-    for (let attempt = 0; attempt < 400 && !waiting; attempt++) {
-      const row = (
-        await other.query<{ wait_event: string | null }>(
-          'SELECT wait_event FROM pg_stat_activity WHERE pid = $1',
-          [pid]
-        )
-      ).rows[0]
-      waiting = row?.wait_event === 'advisory'
-      if (!waiting) await new Promise((resolve) => setTimeout(resolve, 5))
-    }
-    expect(waiting, 'the batch reached the barrier').toBe(true)
-    await other.query(
-      'UPDATE "CommunityArtifactSubject" SET generation = generation + 1 WHERE artifact_id = $1',
-      [id]
+    // Settled whatever happens below, so a failure never leaves the batch blocked on the
+    // barrier with afterEach queued behind it on the same client.
+    const outcome = inflight.then(
+      (value) => ({ value }),
+      (error: unknown) => ({ error })
     )
-    await other.query('SELECT pg_advisory_unlock(999001)')
+    try {
+      let waiting = false
+      for (let attempt = 0; attempt < 400 && !waiting; attempt++) {
+        const row = (
+          await other.query<{ wait_event: string | null }>(
+            'SELECT wait_event FROM pg_stat_activity WHERE pid = $1',
+            [pid]
+          )
+        ).rows[0]
+        waiting = row?.wait_event === 'advisory'
+        if (!waiting) await new Promise((resolve) => setTimeout(resolve, 5))
+      }
+      expect(waiting, 'the batch reached the barrier').toBe(true)
+      await other.query(
+        'UPDATE "CommunityArtifactSubject" SET generation = generation + 1 WHERE artifact_id = $1',
+        [id]
+      )
+    } finally {
+      await other.query('SELECT pg_advisory_unlock(999001)')
+      await outcome
+    }
     expect(await inflight).toMatchObject({ count: 0, ready: 0 })
     expect(
       (

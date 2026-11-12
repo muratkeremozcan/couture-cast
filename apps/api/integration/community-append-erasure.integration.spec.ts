@@ -74,15 +74,26 @@ describe('community append racing account erasure', () => {
       const outcomes: string[] = []
       const repository = new CommunityStreamRepository(appendClient)
       let erasing = true
+      // Once erasure ends, append must drain the outbox; 50 attempts in a row that append nothing
+      // fail the case with what happened instead of waiting out its timeout.
+      let stalled = 0
       const appending = (async () => {
-        while (
-          erasing ||
-          (await prisma.communityDomainOutbox.count({ where: { appended_at: null } }))
-        ) {
+        for (;;) {
+          const backlog = await prisma.communityDomainOutbox.count({
+            where: { appended_at: null },
+          })
+          if (!erasing && !backlog) return
+          if (!erasing && stalled >= 50)
+            throw new Error(
+              `append stopped progressing with ${backlog} rows left: ${outcomes.join(', ')}`
+            )
           try {
-            outcomes.push(`appended ${await repository.append()}`)
+            const appended = await repository.append()
+            outcomes.push(`appended ${appended}`)
+            stalled = appended ? 0 : stalled + 1
           } catch (error) {
             outcomes.push(appendFailure(error))
+            stalled++
           }
         }
       })()
