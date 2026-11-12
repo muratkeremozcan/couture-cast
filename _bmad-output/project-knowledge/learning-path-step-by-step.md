@@ -10673,12 +10673,13 @@ flowchart TD
 
 Running 6.14 in production for the first time exposed what the tests could not: real pooler
 latency, idle polling cost, a deploy quota and an analytics boundary that had never carried
-member traffic. Each fix below landed as its own PR, reviewed by a second model family (Codex)
-and CodeRabbit, with a failing proof before every fix.
+member traffic. Each fix below landed as its own PR, with Codex (a second model family) and
+CodeRabbit reviewing alongside the builder.
 
 1. **Idle work costs money in production.**
    The community worker polled Postgres with nothing to do and pushed Supabase egress past 5 GB
-   (#203). It now sleeps until there is work. The dispatch guard pool moved to node-postgres and is
+   (#203). It now backs off its idle polling to a capped interval, and sibling work wakes it
+   explicitly. The dispatch guard pool moved to node-postgres and is
    sized to the pooler, so it can open its connections (#205).
 2. **Measure at production latency, then design for it.**
    The append ran several round trips and timed out through the pooler. It is now one database
@@ -10686,11 +10687,11 @@ and CodeRabbit, with a failing proof before every fix.
    retry against one shared deadline from the real Prisma call path, run behind a proxy that
    holds each packet a calibrated 15.5 ms, and were proved by injecting five deadline bugs (#210).
 3. **Turn a quiet misconfiguration into a red run.**
-   Production defined 4 of 14 declared flags and nothing reported it. The hourly flag drift check
+   Production held four flags, covering 3 of the 14 declared ones, and nothing reported it. The hourly flag drift check
    now fails on any missing, non-uniform or wrongly released flag (#206), and on production
    PostHog keeping client IPs (#207).
 4. **Previews only when a check needs them.**
-   Branch pushes used up Vercel's 100 deployments a day and blocked every PR. Branch pushes now
+   Branch pushes used up Vercel's 100 deployments a day, and preview checks failed with 402. Branch pushes now
    create no deployment; CI creates or reuses a preview only when the preview checks need it, and
    polls it with bounded retries that honor rate-limit resets (#210).
 5. **An analytics boundary is a closed allowlist on what reaches the wire.**
