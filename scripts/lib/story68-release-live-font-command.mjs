@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
-import { restoreAndroidReverse } from './story68-native-safety.mjs'
+import { androidReversePorts, restoreAndroidReverse } from './story68-native-safety.mjs'
 import { proveReleaseLiveFont } from './story68-release-live-font.mjs'
 
 const failures = new Set([
@@ -134,7 +134,7 @@ export async function runReleaseLiveFontCommand(ctx) {
           restoreAndroidReverse({
             adb: ctx.adb,
             device: ctx.device,
-            ports: [4088, 53068, 54321],
+            ports: androidReversePorts([4088, 53068]),
           }),
         maestro: ctx.maestro,
         hierarchy: (timeout) => {

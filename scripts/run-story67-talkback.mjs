@@ -30,6 +30,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import { talkbackFlowStrings } from './lib/story67-talkback-env.mjs'
+import { androidReversePorts } from './lib/story68-native-safety.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const flows = path.join(root, 'maestro', 'story67')
@@ -102,7 +103,7 @@ async function waitFor(description, probe, { timeout = 30_000, interval = 500 } 
 
 function ensureReverses() {
   run(adbPath, ['-s', device, 'wait-for-device'])
-  for (const port of [4077, 8088, 53051, 54321])
+  for (const port of androidReversePorts([4077, 8088, 53051]))
     adb('reverse', `tcp:${port}`, `tcp:${port}`)
 }
 
