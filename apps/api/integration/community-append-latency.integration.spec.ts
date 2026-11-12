@@ -14,6 +14,7 @@ import { isolatedCommunityDatabase } from './helpers/isolated-community-database
 import { latencyProxy } from './helpers/latency-proxy.js'
 import {
   appendFailure,
+  COMMUNITY_APPEND_DEADLINE_MS,
   CommunityStreamRepository,
 } from '../src/modules/community/community-stream.repository.js'
 
@@ -28,44 +29,103 @@ const proxy = latencyProxy(database.url, 15.5)
 const slowProxy = latencyProxy(database.url, 50)
 let remote: PrismaClient
 let slow: PrismaClient
-// The worker's main pool (connection_limit=3) is shared by its append, notification, retention
-// and telemetry loops, whose transactions wait up to 250 ms for a connection. One connection
-// here makes the sibling loop that holds it deterministic.
-const shared = new PrismaClient({
-  datasources: {
-    db: {
-      url: `${database.url}${database.url.includes('?') ? '&' : '?'}connection_limit=1`,
+let slowUrl: string
+const clients: PrismaClient[] = []
+/**
+ * A pool of `connections` (one by default) on the isolated database. The worker's main pool
+ * has three, shared by its append, notification, retention and telemetry loops; one makes the
+ * sibling loop that holds it deterministic.
+ */
+function pool(connections = 1, url = database.url) {
+  const target = new URL(url)
+  target.searchParams.set('connection_limit', String(connections))
+  const client = new PrismaClient({ datasources: { db: { url: target.toString() } } })
+  clients.push(client)
+  return client
+}
+
+/** Another worker loop's transaction on `client`, holding a connection until released. */
+async function holdConnection(client: PrismaClient) {
+  let release!: () => void
+  const released = new Promise<void>((resolve) => (release = resolve))
+  let held!: () => void
+  const isHeld = new Promise<void>((resolve) => (held = resolve))
+  const done = client.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT 1`
+      held()
+      await released
     },
-  },
-})
+    { timeout: 20_000, maxWait: 5_000 }
+  )
+  await isHeld
+  return { release, done }
+}
 
 /**
- * Holds `client`'s only connection with a 150 ms statement, from another worker loop. Resolves
- * once the statement runs; `done` settles when it ends.
+ * `client` as the repository sees it: before each listed `$transaction` call, a sibling takes
+ * every connection, and it lets go `holdMs` after the call asks for one. The hold is timed from
+ * the request itself, so a slow host can only lengthen the wait.
  */
-async function siblingHolds(client: PrismaClient) {
-  // A Prisma query starts only once awaited or chained, so chain it now.
-  const sibling =
-    client.$queryRaw`SELECT pg_sleep(0.15)::text, 'tea-sibling-loop' AS loop`.then(
-      () => undefined
-    )
-  for (let attempt = 0; attempt < 200; attempt++) {
-    const running = await prisma.$queryRaw<{ n: bigint }[]>`
-      SELECT count(*) AS n FROM pg_stat_activity
-      WHERE state = 'active' AND query LIKE '%tea-sibling-loop%' AND pid <> pg_backend_pid()`
-    if (Number(running[0]!.n)) return { done: sibling }
-    await new Promise((resolve) => setTimeout(resolve, 2))
-  }
-  throw new Error('the sibling statement never started')
+function heldDuring(
+  client: PrismaClient,
+  connections: number,
+  holds: Record<number, number>,
+  beforeRequest?: () => Promise<void>
+) {
+  let calls = 0
+  const settled: Promise<unknown>[] = []
+  const wrapped = new Proxy(client, {
+    get(target, prop, receiver) {
+      const value: unknown = Reflect.get(target, prop, receiver)
+      if (typeof value !== 'function') return value
+      const method = value as (...args: unknown[]) => unknown
+      if (prop !== '$transaction')
+        return (...args: unknown[]) => Reflect.apply(method, target, args)
+      return async (...args: unknown[]) => {
+        const holdMs = holds[++calls]
+        if (holdMs !== undefined) {
+          const siblings = await Promise.all(
+            Array.from({ length: connections }, () => holdConnection(target))
+          )
+          await beforeRequest?.()
+          const request = Reflect.apply(method, target, args)
+          setTimeout(() => siblings.forEach((sibling) => sibling.release()), holdMs)
+          settled.push(...siblings.map((sibling) => sibling.done))
+          return request
+        }
+        return Reflect.apply(method, target, args)
+      }
+    },
+  })
+  return { client: wrapped, calls: () => calls, settled: () => Promise.all(settled) }
+}
+
+/** Holds the public head from the test's own connection until released. */
+async function holdHead() {
+  let release!: () => void
+  const released = new Promise<void>((resolve) => (release = resolve))
+  let locked!: () => void
+  const isLocked = new Promise<void>((resolve) => (locked = resolve))
+  const done = prisma.$transaction(
+    async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "CommunityStreamHead" WHERE id = 'public' FOR UPDATE`
+      locked()
+      await released
+    },
+    { timeout: 20_000 }
+  )
+  await isLocked
+  return { release, done }
 }
 
 beforeAll(async () => {
   await database.migrate()
   remote = new PrismaClient({ datasources: { db: { url: await proxy.listen() } } })
   await remote.$queryRaw`SELECT 1`
-  slow = new PrismaClient({ datasources: { db: { url: await slowProxy.listen() } } })
+  slowUrl = await slowProxy.listen()
+  slow = new PrismaClient({ datasources: { db: { url: slowUrl } } })
   await slow.$queryRaw`SELECT 1`
-  await shared.$queryRaw`SELECT 1`
 }, 30_000)
 beforeEach(async () => {
   await prisma.communityStreamEvent.deleteMany()
@@ -75,7 +135,7 @@ beforeEach(async () => {
 afterAll(async () => {
   await remote?.$disconnect()
   await slow?.$disconnect()
-  await shared.$disconnect()
+  await Promise.all(clients.map((client) => client.$disconnect()))
   await proxy.close()
   await slowProxy.close()
   await prisma.$disconnect()
@@ -218,58 +278,30 @@ describe('community append at production database latency', () => {
 
   it('6.5-INT-035: an append waits for a connection another worker loop holds', async () => {
     await publishPosts(1)
-    const repository = new CommunityStreamRepository(shared)
-    const sibling = (await siblingHolds(shared)).done
-    // The append asked for the pool's connection while the sibling held it for 150 ms. A 100 ms
-    // wait gave up and reported budget_pressure, which halves the next batch for a busy pool.
-    const report = await repository.appendWithReport()
-    await sibling
+    // The sibling lets go 125 ms after the append asks. A 100 ms wait gave up and reported
+    // budget_pressure, which halved the next batch for a busy pool.
+    const busy = heldDuring(pool(), 1, { 1: 125 })
+    const report = await new CommunityStreamRepository(busy.client).appendWithReport()
+    await busy.settled()
     expect(report.count).toBe(1)
     expect(await prisma.communityEngagementTelemetry.count()).toBe(0)
   }, 30_000)
 
   it('6.5-INT-036: a deferred append records its retry row while another worker loop holds the connection', async () => {
     await publishPosts(1)
-    let sibling: Promise<unknown> | undefined
-    let transactions = 0
-    // The second transaction is the retry write: the sibling takes the connection first.
-    const pool = new Proxy(shared, {
-      get(target, prop, receiver) {
-        const value: unknown = Reflect.get(target, prop, receiver)
-        if (typeof value !== 'function') return value
-        const method = value as (...args: unknown[]) => unknown
-        if (prop !== '$transaction')
-          return (...args: unknown[]) => Reflect.apply(method, target, args)
-        return async (...args: unknown[]) => {
-          if (++transactions === 2) sibling = (await siblingHolds(target)).done
-          return Reflect.apply(method, target, args)
-        }
-      },
-    })
-    const repository = new CommunityStreamRepository(pool)
-    let release!: () => void
-    const released = new Promise<void>((resolve) => (release = resolve))
-    let locked!: () => void
-    const isLocked = new Promise<void>((resolve) => (locked = resolve))
-    const holder = prisma.$transaction(
-      async (tx) => {
-        await tx.$queryRaw`SELECT id FROM "CommunityStreamHead" WHERE id = 'public' FOR UPDATE`
-        locked()
-        await released
-      },
-      { timeout: 20_000 }
-    )
-    await isLocked
+    // The second transaction is the retry row; the sibling lets go 125 ms after it asks.
+    const busy = heldDuring(pool(), 1, { 2: 125 })
+    const head = await holdHead()
     try {
-      await expect(repository.appendWithReport()).rejects.toSatisfy(
-        (error: unknown) => appendFailure(error) === 'head_contention'
-      )
+      await expect(
+        new CommunityStreamRepository(busy.client).appendWithReport()
+      ).rejects.toSatisfy((error: unknown) => appendFailure(error) === 'head_contention')
     } finally {
-      release()
-      await holder
-      await sibling
+      head.release()
+      await head.done
+      await busy.settled()
     }
-    expect(transactions).toBe(2)
+    expect(busy.calls()).toBe(2)
     // A 50 ms wait dropped the row whenever a sibling loop held the connection.
     expect(
       await prisma.communityEngagementTelemetry.findMany({
@@ -277,5 +309,84 @@ describe('community append at production database latency', () => {
         select: { reason: true, outcome: true },
       })
     ).toEqual([{ reason: 'head_contention', outcome: 'aborted' }])
+  }, 30_000)
+
+  it('6.5-INT-037: an append that never got a connection keeps its batch size', async () => {
+    await publishPosts(25)
+    // Three sibling loops hold all three connections for 400 ms after each append asks, past its
+    // 250 ms wait; the retry row after each then gets a connection. No append work ran, so the
+    // batch stays at 25. Counted as budget pressure it fell 25, 12, 6, 3 (Codex review of #208).
+    const busy = heldDuring(pool(3), 3, { 1: 400, 3: 400, 5: 400 })
+    const repository = new CommunityStreamRepository(busy.client)
+    const outcomes: string[] = []
+    for (let episode = 0; episode < 3; episode++)
+      outcomes.push(
+        await repository.appendWithReport().then(
+          () => 'appended',
+          (error: unknown) => appendFailure(error)
+        )
+      )
+    await busy.settled()
+    expect(outcomes).toEqual(['pool_wait', 'pool_wait', 'pool_wait'])
+    expect(
+      await prisma.communityEngagementTelemetry.findMany({
+        where: { event_type: 'community_append_retry' },
+        select: { reason: true, backlog_count: true },
+      })
+    ).toEqual(
+      Array.from({ length: 3 }, () => ({ reason: 'pool_wait', backlog_count: 25 }))
+    )
+    expect((await repository.appendWithReport()).count).toBe(25)
+  }, 30_000)
+
+  it('6.5-INT-038: one deadline bounds an append, its retries and its retry row', async () => {
+    await publishPosts(1)
+    // The supported pldbgapi2 abort, after 200 ms of server work in the append and 60 ms in
+    // the retry row, at three times production's round trip. Each transaction may retry it
+    // twice; with a fresh budget per attempt, six attempts took 5.12 s (Codex review of #208).
+    const original = (
+      await prisma.$queryRaw<{ definition: string }[]>`
+        SELECT pg_get_functiondef('community_append_batch(integer,double precision)'::regprocedure)
+          AS definition`
+    )[0]!.definition
+    const abort = `RAISE EXCEPTION USING ERRCODE = 'XX000',
+      MESSAGE = 'cannot find parent statement on pldbgapi2 call stack'`
+    await prisma.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION
+      community_append_batch(ready_limit integer, write_cost_ms double precision)
+      RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.2); ${abort}; END $$`)
+    await prisma.$executeRawUnsafe(`CREATE FUNCTION tea_abort_telemetry() RETURNS trigger
+      LANGUAGE plpgsql AS $$ BEGIN PERFORM pg_sleep(0.06); ${abort}; END $$`)
+    await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_abort_telemetry BEFORE INSERT
+      ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_abort_telemetry()`)
+    const counted = heldDuring(pool(1, slowUrl), 1, {})
+    const repository = new CommunityStreamRepository(counted.client)
+    const warnings: [Record<string, unknown>, string][] = []
+    const logger = Reflect.get(repository, 'logger') as {
+      warn: (fields: Record<string, unknown>, message: string) => void
+    }
+    logger.warn = (fields, message) => warnings.push([fields, message])
+    const started = performance.now()
+    try {
+      await expect(repository.appendWithReport()).rejects.toBeDefined()
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER tea_abort_telemetry ON "CommunityEngagementTelemetry"'
+      )
+      await prisma.$executeRawUnsafe('DROP FUNCTION tea_abort_telemetry()')
+      await prisma.$executeRawUnsafe(original)
+    }
+    const elapsed = performance.now() - started
+    console.info(
+      JSON.stringify({
+        evidence: '6.5-INT-038',
+        elapsed,
+        attempts: counted.calls(),
+        warnings,
+      })
+    )
+    // A retry ran, and every attempt ran inside the deadline plus the last attempt's close.
+    expect(counted.calls()).toBeGreaterThanOrEqual(2)
+    expect(elapsed).toBeLessThan(COMMUNITY_APPEND_DEADLINE_MS + 500)
+    expect(warnings.at(-1)?.[1]).toBe('Community append retry not recorded')
   }, 30_000)
 })

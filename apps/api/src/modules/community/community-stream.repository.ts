@@ -22,6 +22,42 @@ type BatchResult = {
 }
 
 export class AppendBudgetExceeded extends Error {}
+/**
+ * The append never started: no pool connection freed up within its wait. No batch work ran, so
+ * the batch keeps its size (6.5-INT-037).
+ */
+export class AppendConnectionUnavailable extends Error {}
+/** Too little of the append's deadline is left to start another transaction attempt. */
+export class AppendDeadlineReached extends Error {}
+/**
+ * One bound for an append and its retry row together, across every attempt the pldbgapi2
+ * retry makes. One attempt of each is 250 ms waiting for a connection plus the 750 ms
+ * transaction, then 250 ms plus the 1 s retry-row transaction; each later attempt gets only
+ * what is left, so three attempts each cannot add up to 6.75 s (6.5-INT-038).
+ */
+export const COMMUNITY_APPEND_DEADLINE_MS = 2_250
+// The worker's three pool connections serve its other loops too, whose transactions wait for one
+// from 250 ms (notification and retention workers) to 1 s (comment outbox) and Prisma's default
+// 2 s (stream retention). A 100 ms wait gave up while a sibling held the connection
+// (6.5-INT-035), and a 50 ms one dropped the retry row (6.5-INT-036).
+const CONNECTION_WAIT_MS = 250
+const APPEND_TRANSACTION_MS = 750
+const RETRY_ROW_TRANSACTION_MS = 1_000
+// The least an attempt needs to run: an append is four round trips, about 125 ms at
+// production's 31 ms, and a retry row two statements, about 190 ms at p95 (2026-11-11).
+const APPEND_MIN_RUN_MS = 150
+const RETRY_ROW_MIN_RUN_MS = 200
+
+/** Wait and transaction limits for one attempt that must finish by `deadline`. */
+function attemptBudget(deadline: number, transactionMs: number, minRunMs: number) {
+  const left = Math.floor(deadline - performance.now())
+  if (left < minRunMs + 1)
+    throw new AppendDeadlineReached('Community append deadline reached')
+  // Prisma's timeout starts once the transaction has its connection, so the wait and the
+  // transaction share what is left.
+  const maxWait = Math.min(CONNECTION_WAIT_MS, left - minRunMs)
+  return { maxWait, timeout: Math.min(transactionMs, left - maxWait) }
+}
 // PostgreSQL 17 ends a transaction past either of its time budgets with a FATAL, each
 // under its own SQLSTATE and fixed text (postgres.c ProcessInterrupts, REL_17_STABLE;
 // reproduced on 17.6). Both are this transaction's budget running out. When either
@@ -43,6 +79,7 @@ function sqlDeferral(error: unknown) {
 }
 export function appendFailure(error: unknown) {
   if (error instanceof AppendBudgetExceeded) return 'budget_pressure'
+  if (error instanceof AppendConnectionUnavailable) return 'pool_wait'
   if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2028')
     return 'budget_pressure'
   return sqlDeferral(error) ?? 'dependency_unavailable'
@@ -69,7 +106,7 @@ export type AppendReport = {
   remainingMs: number
   writeCostMs: number
 }
-/** Head contention and budget pressure defer a batch; the append loop retries it. */
+/** Head contention, budget pressure and a pool wait defer a batch; the append loop retries it. */
 export function isAppendDeferral(error: unknown): boolean {
   return appendFailure(error) !== 'dependency_unavailable'
 }
@@ -121,8 +158,9 @@ export class CommunityStreamRepository {
    * records no retry either, so nothing is written after the abort.
    */
   async appendWithReport(signal?: AbortSignal): Promise<AppendReport> {
+    const deadline = performance.now() + COMMUNITY_APPEND_DEADLINE_MS
     try {
-      const report = await this.appendBatch(signal)
+      const report = await this.appendBatch(deadline, signal)
       if (report.count) this.readyLimit = Math.min(25, this.readyLimit + 2)
       return report
     } catch (error) {
@@ -154,10 +192,9 @@ export class CommunityStreamRepository {
           // first insert also prepares its statement, and production's round trip reached
           // 220 ms at worst, so 400 ms still dropped the occasional cold row; CI dropped one
           // at load. 1 s holds a cold write at three times the round trip (6.5-INT-033), and
-          // the server still bounds the insert at 100 ms. A 50 ms wait for a pool connection
-          // dropped the row whenever another worker loop held it; 250 ms is the wait those
-          // loops use (6.5-INT-036).
-          { timeout: 1_000, maxWait: 250 }
+          // the server still bounds the insert at 100 ms. Each attempt takes what is left of
+          // the append's deadline; with too little left the row is skipped and logged missing.
+          () => attemptBudget(deadline, RETRY_ROW_TRANSACTION_MS, RETRY_ROW_MIN_RUN_MS)
         )
       } catch (telemetryError) {
         // The deferral warning above remains the observation; this one says the durable row
@@ -166,10 +203,12 @@ export class CommunityStreamRepository {
           {
             reason,
             code:
-              postgresError(telemetryError)?.code ??
-              (telemetryError instanceof Prisma.PrismaClientKnownRequestError
-                ? telemetryError.code
-                : 'unknown'),
+              telemetryError instanceof AppendDeadlineReached
+                ? 'deadline'
+                : (postgresError(telemetryError)?.code ??
+                  (telemetryError instanceof Prisma.PrismaClientKnownRequestError
+                    ? telemetryError.code
+                    : 'unknown')),
           },
           'Community append retry not recorded'
         )
@@ -185,49 +224,68 @@ export class CommunityStreamRepository {
    * the 500 ms transaction budget for a single candidate. The settings bound the server work;
    * the 150 ms preparation window and 400 ms completion budget are measured inside the function.
    */
-  private async appendBatch(signal?: AbortSignal): Promise<AppendReport> {
-    return interactiveTransaction(
-      this.prisma,
-      async (tx) => {
-        await tx.$executeRaw`SELECT set_config('transaction_timeout', '500ms', true),
+  private async appendBatch(
+    deadline: number,
+    signal?: AbortSignal
+  ): Promise<AppendReport> {
+    // Whether the current attempt reached its callback, that is, got a connection and began.
+    const attempt = { entered: false }
+    try {
+      return await interactiveTransaction(
+        this.prisma,
+        async (tx) => {
+          attempt.entered = true
+          await tx.$executeRaw`SELECT set_config('transaction_timeout', '500ms', true),
           set_config('statement_timeout', '450ms', true),
           set_config('lock_timeout', '100ms', true),
           set_config('community.build_identity', ${communityBuildIdentity()}, true)`
-        signal?.throwIfAborted()
-        const [row] = await tx.$queryRaw<{ batch: BatchResult }[]>`
+          signal?.throwIfAborted()
+          const [row] = await tx.$queryRaw<{ batch: BatchResult }[]>`
           SELECT community_append_batch(${this.readyLimit}::integer, ${this.writeCostMs}::float8) AS batch
         `
-        const batch = row!.batch
-        // An abort that lands during the batch still rolls it back here.
-        signal?.throwIfAborted()
-        if (batch.budgetExhausted)
-          throw new AppendBudgetExceeded('Community append completion budget exhausted')
-        if (batch.selected)
-          this.writeCostMs = Math.max(
-            1,
-            (this.writeCostMs + batch.writeMs / batch.selected) / 2
-          )
-        return {
-          count: batch.count,
-          stop: batch.stop,
-          ready: batch.ready,
-          limit: batch.limit,
-          preparedMs: batch.preparedMs,
-          selected: batch.selected,
-          selectedReason: batch.selectedReason,
-          remainingMs: batch.remainingMs,
-          writeCostMs: batch.writeCostMs,
+          const batch = row!.batch
+          // An abort that lands during the batch still rolls it back here.
+          signal?.throwIfAborted()
+          if (batch.budgetExhausted)
+            throw new AppendBudgetExceeded('Community append completion budget exhausted')
+          if (batch.selected)
+            this.writeCostMs = Math.max(
+              1,
+              (this.writeCostMs + batch.writeMs / batch.selected) / 2
+            )
+          return {
+            count: batch.count,
+            stop: batch.stop,
+            ready: batch.ready,
+            limit: batch.limit,
+            preparedMs: batch.preparedMs,
+            selected: batch.selected,
+            selectedReason: batch.selectedReason,
+            remainingMs: batch.remainingMs,
+            writeCostMs: batch.writeCostMs,
+          }
+        },
+        () => {
+          attempt.entered = false
+          return {
+            isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
+            ...attemptBudget(deadline, APPEND_TRANSACTION_MS, APPEND_MIN_RUN_MS),
+          }
         }
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted,
-        timeout: 750,
-        // The worker's three pool connections serve its other loops too, whose transactions wait
-        // 250 ms for one. A 100 ms wait gave up while a sibling held the connection and reported
-        // budget_pressure, halving the next batch for a busy pool (6.5-INT-035).
-        maxWait: 250,
-      }
-    )
+      )
+    } catch (error) {
+      // Prisma reports a wait that ran out before the transaction began as P2028, the same code
+      // as a transaction that ran out of time. Only the second spent the batch's budget.
+      if (
+        !attempt.entered &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2028'
+      )
+        throw new AppendConnectionUnavailable('No pool connection for the append', {
+          cause: error,
+        })
+      throw error
+    }
   }
 
   async retain(): Promise<number> {

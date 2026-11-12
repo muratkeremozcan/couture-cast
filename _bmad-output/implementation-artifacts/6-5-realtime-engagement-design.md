@@ -214,10 +214,15 @@ production round trip keeps the budget honest. The append retry row's own transa
 rose from 150 ms to 1 s: two statements at 31 ms missed 150 ms most of the time, and a cold
 connection's first insert (it prepares its statement on the direct-session pool) at a slow round
 trip still missed 400 ms (6.5-INT-033). Both the append and its retry row wait up to 250 ms
-for a pool connection, the wait of every other loop sharing the worker's three connections: at
-100 ms and 50 ms a sibling loop holding the connection made the append report budget_pressure,
-halving the next batch, and dropped the retry row (6.5-INT-035, 6.5-INT-036). A retry row that
-is not written logs `Community append retry not recorded` with its error code (6.5-INT-034).
+for one of the worker's three pool connections, which its other loops hold for transactions
+that wait 250 ms to 2 s for one: at 100 ms and 50 ms a sibling loop holding the connection made
+the append fail and dropped the retry row (6.5-INT-035, 6.5-INT-036). An append that never got a
+connection reports `pool_wait` and keeps its batch size, since no batch work ran; counted as
+budget pressure it halved the batch on every busy moment (6.5-INT-037). One 2.25 s deadline
+bounds the append and its retry row across every pldbgapi2 retry, each attempt taking only what
+is left; with a fresh budget per attempt, six attempts took 5.12 s (6.5-INT-038). A retry row
+that is not written, or skipped at the deadline, logs `Community append retry not recorded`
+with its error code (6.5-INT-034).
 An append lane older
 than five minutes records `community_append_stalled`, which PostHog alerts on.
 

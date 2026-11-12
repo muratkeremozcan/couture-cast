@@ -1085,7 +1085,8 @@ statement, `community_append_batch` (migration `20261111120000`): a batch costs 
 trips whatever its size, about 125 ms plus server work at the 31 ms measured from the worker.
 Before 2026-11-11 each candidate took about 16 round trips from TypeScript, every batch ran past
 its 500 ms bound, and production append never succeeded (public head sequence 0). Signals:
-`community_append_retry` rows name `head_contention` or `budget_pressure`; the `community_backlog`
+`community_append_retry` rows name `head_contention`, `budget_pressure` or `pool_wait` (no pool
+connection freed up within 250 ms, so the batch keeps its size); the `community_backlog`
 row for lane `append` carries the oldest unappended age; past five minutes the worker logs
 `Community append stalled` and records `community_append_stalled` once every five minutes,
 which the PostHog alert on project 329012 watches. A stall means rows are not appending: read

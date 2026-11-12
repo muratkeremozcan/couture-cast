@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { Prisma } from '@prisma/client'
 import {
   AppendBudgetExceeded,
+  AppendConnectionUnavailable,
+  AppendDeadlineReached,
   appendFailure,
   isAppendDeferral,
 } from './community-stream.repository.js'
@@ -62,6 +64,14 @@ describe('community append failure classification', () => {
       new AppendBudgetExceeded('Community append completion budget exhausted'),
       'budget_pressure',
     ],
+    // No append work ran, so the batch keeps its size (6.5-INT-037).
+    [
+      'a pool connection that never freed up',
+      new AppendConnectionUnavailable('No pool connection for the append', {
+        cause: failure('P2028'),
+      }),
+      'pool_wait',
+    ],
   ] as const)('defers the batch on %s', (_, error, reason) => {
     expect(appendFailure(error)).toBe(reason)
     expect(isAppendDeferral(error)).toBe(true)
@@ -89,6 +99,12 @@ describe('community append failure classification', () => {
         code: 'P1017',
         clientVersion: 'test',
       }),
+    ],
+    // Only repeated pldbgapi2 aborts spend the deadline before a retry, the same failure as
+    // running out of attempts.
+    [
+      'the deadline before a retry',
+      new AppendDeadlineReached('Community append deadline reached'),
     ],
     ['a plain error', new Error('connection refused')],
     ['a non-error rejection', 'unavailable'],

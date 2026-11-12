@@ -19,8 +19,8 @@ import { latencyProxy } from './helpers/latency-proxy.js'
 
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
-// An append is bounded by its own timeouts: 250 ms maxWait and the 750 ms transaction,
-// then on failure the 250 ms maxWait and 1 s telemetry transaction, 2.25 s. The slowest
+// An append and its retry row share one 2.25 s deadline across every attempt
+// (COMMUNITY_APPEND_DEADLINE_MS, 6.5-INT-038), plus the last attempt's close. The slowest
 // append measured 2026-10-27 took 0.53 s idle and 1.21 s across ten runs at load average
 // 34 to 87 on 14 cores. 3 s is 2.5x that, so an append that never settles fails in
 // seconds, naming its test and attempt, where R01 alone would otherwise wait 90 s.
