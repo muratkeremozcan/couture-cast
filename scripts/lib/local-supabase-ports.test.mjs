@@ -143,6 +143,19 @@ describe('start:all resets only the configured local database', () => {
     assert.doesNotMatch(result.stdout, /postgresql:/)
   })
 
+  test('refuses another database or schema on the configured server', () => {
+    for (const url of [
+      'postgresql://postgres:postgres@127.0.0.1:24322/customer_records',
+      'postgresql://postgres:postgres@127.0.0.1:24322/postgres?schema=customer_records',
+    ]) {
+      const result = run({ ...CI, DATABASE_URL: url })
+      assert.equal(result.status, 1, url)
+      assert.match(result.stderr, /refusing/i, url)
+    }
+    const publicSchema = run({ ...CI, DATABASE_URL: `${at(24322)}?schema=public` })
+    assert.equal(publicSchema.status, 0, publicSchema.stderr)
+  })
+
   test('the start:all script goes through that guard and names no port', () => {
     const script = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8'))
       .scripts['start:all']

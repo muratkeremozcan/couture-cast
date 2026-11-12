@@ -88,9 +88,17 @@ if (storage.applied) {
 // The local Supabase server is a loopback host on its configured port (CI's override,
 // else supabase/config.toml).
 const targetsLocalSupabase = isLocalSupabaseDatabaseUrl(env.DATABASE_URL, env)
-if (requireLocal && !targetsLocalSupabase) {
+// The reset entry also names the database: the local server's `postgres` database in its
+// `public` schema, the one `supabase start` creates. Another database or schema on the same
+// server holds data this reset must not touch.
+const resetsTheLocalDatabase = () => {
+  const url = new URL(env.DATABASE_URL)
+  const schema = url.searchParams.get('schema')
+  return url.pathname === '/postgres' && (schema === null || schema === 'public')
+}
+if (requireLocal && !(targetsLocalSupabase && resetsTheLocalDatabase())) {
   console.error(
-    `[run-with-local-db-env] Refusing: DATABASE_URL is not the local Supabase database on its configured port (${localDatabaseUrl(env)}).`
+    `[run-with-local-db-env] Refusing: DATABASE_URL is not the local Supabase postgres database (public schema) on its configured port (${localDatabaseUrl(env)}).`
   )
   process.exit(1)
 }
