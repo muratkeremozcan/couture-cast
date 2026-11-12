@@ -181,7 +181,10 @@ be using it, and two runs racing to create cost one duplicate build at most.
 One deadline 45 s inside each job's 20 minutes covers setup, every request (each also bounded at
 30 s) and the 15 s polls. A poll that fails with a rate limit, a server error, a timeout or a
 lost connection is retried while the deadline allows, since the build carries on; any other 4xx
-answer fails at once. `ERROR`, `CANCELED`, a refused creation (the rate limit answers on
+answer fails at once, even when its body stalls after the status arrived. After a rate limit
+the next poll waits for the reset Vercel announces (`Retry-After`, `X-RateLimit-Reset` or the
+error's `limit.reset`/`resetMs`), and a reset past the deadline fails the job at once with that
+reason. `ERROR`, `CANCELED`, a refused creation (the rate limit answers on
 creation) or the deadline fails the job; a build still `QUEUED` at the deadline says it waits
 behind another build, since Hobby builds one deployment at a time, so rerun once that build
 finishes. The health waits, the e2e URLs and the web health test (`EXPECTED_WEB_SHA`) use that

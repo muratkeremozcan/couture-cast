@@ -130,6 +130,40 @@ function transient(error) {
 }
 
 /**
+ * How long to wait before polling again: one interval, or until the reset a rate-limited answer
+ * announced when that is later.
+ */
+function retryWait(error, intervalMs, now) {
+  const retryAt = /** @type {{ retryAt?: unknown }} */ (error)?.retryAt
+  if (typeof retryAt !== 'number' || retryAt - now() <= intervalMs)
+    return { ms: intervalMs, announced: false }
+  return { ms: retryAt - now(), announced: true }
+}
+
+/**
+ * When a refused request may be sent again, as an epoch time in ms: the latest of Retry-After
+ * (seconds or an HTTP date), X-RateLimit-Reset (epoch seconds) and the body's error.limit
+ * reset (epoch seconds) or resetMs, as Vercel documents for rate limits. Undefined without any.
+ * @param {Headers} headers @param {unknown} parsed @param {() => number} now
+ */
+function announcedRetryAt(headers, parsed, now) {
+  const times = []
+  const retryAfter = headers.get('retry-after')?.trim()
+  if (retryAfter && /^\d+$/.test(retryAfter))
+    times.push(now() + Number(retryAfter) * 1000)
+  else if (retryAfter && Number.isFinite(Date.parse(retryAfter)))
+    times.push(Date.parse(retryAfter))
+  const resetHeader = Number(headers.get('x-ratelimit-reset'))
+  if (resetHeader > 0) times.push(resetHeader * 1000)
+  const limit =
+    /** @type {{ error?: { limit?: { reset?: unknown, resetMs?: unknown } } }} */ (parsed)
+      ?.error?.limit
+  if (typeof limit?.resetMs === 'number') times.push(limit.resetMs)
+  if (typeof limit?.reset === 'number') times.push(limit.reset * 1000)
+  return times.length ? Math.max(...times) : undefined
+}
+
+/**
  * Polls one deployment until it is ready, failing on an error, a cancel or the deadline. A
  * transient failure of the poll itself is retried while the deadline allows, since the build
  * carries on regardless.
@@ -141,11 +175,20 @@ async function untilReady(id, targetSha, settings) {
     try {
       deployment = await get(id)
     } catch (error) {
-      if (!transient(error) || deadline - now() <= intervalMs) throw error
+      if (!transient(error)) throw error
+      const wait = retryWait(error, intervalMs, now)
+      if (deadline - now() <= wait.ms) {
+        if (wait.announced)
+          throw new Error(
+            `${project}: Vercel rate limits polling ${id} for ${Math.ceil(wait.ms / 1000)} s more, past this job's deadline (${Math.max(0, Math.round((deadline - now()) / 1000))} s left)`,
+            { cause: error }
+          )
+        throw error
+      }
       log(
-        `${project}: polling ${id} failed (${error instanceof Error ? error.message : String(error)}); retrying`
+        `${project}: polling ${id} failed (${error instanceof Error ? error.message : String(error)}); retrying in ${Math.round(wait.ms / 1000)} s`
       )
-      await sleep(intervalMs)
+      await sleep(wait.ms)
       continue
     }
     const state = stateOf(deployment)
@@ -242,23 +285,31 @@ function vercelClient(token, fetchImpl, deadline, now) {
       signal: AbortSignal.timeout(budget),
       ...(body ? { body: JSON.stringify(body) } : {}),
     })
-    const text = await response.text()
-    if (!response.ok) {
-      let message = text.slice(0, 300)
-      try {
-        const parsed = JSON.parse(text)
-        message = parsed.error?.message ?? parsed.message ?? message
-      } catch {
-        // keep the raw text
-      }
-      throw Object.assign(
-        new Error(
-          `Vercel ${method} ${pathAndQuery.split('?')[0]} answered ${response.status}: ${message}`
-        ),
-        { status: response.status }
-      )
+    if (response.ok) return JSON.parse(await response.text())
+    // The status came with the headers, so it stands even when the body cannot be read: a 403
+    // whose body times out is still a 403, never a retryable timeout.
+    let text
+    try {
+      text = await response.text()
+    } catch (error) {
+      text = `(the body could not be read: ${error instanceof Error ? error.name : 'error'})`
     }
-    return JSON.parse(text)
+    let parsed
+    try {
+      parsed = JSON.parse(text)
+    } catch {
+      parsed = undefined
+    }
+    const message = parsed?.error?.message ?? parsed?.message ?? text.slice(0, 300)
+    throw Object.assign(
+      new Error(
+        `Vercel ${method} ${pathAndQuery.split('?')[0]} answered ${response.status}: ${message}`
+      ),
+      {
+        status: response.status,
+        retryAt: announcedRetryAt(response.headers, parsed, now),
+      }
+    )
   }
 }
 

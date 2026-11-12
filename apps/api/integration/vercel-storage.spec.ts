@@ -643,7 +643,34 @@ describe('Vercel preview deployment', () => {
 
 describe('Vercel preview deploy step', () => {
   type Call = { method: string; path: string; body?: unknown }
-  function vercel(deployments: Deployment[], pollFailures: number[] = []) {
+  /** A failed poll: its status, headers and JSON body, or a body that stalls after the headers. */
+  type PollFailure =
+    | number
+    | {
+        status: number
+        headers?: Record<string, string>
+        body?: unknown
+        stall?: boolean
+      }
+  function failedPoll(next: PollFailure) {
+    const failure = typeof next === 'number' ? { status: next } : next
+    const text = JSON.stringify(failure.body ?? { error: { message: 'try later' } })
+    // A stalled body: the headers arrived, then reading the rest timed out.
+    const body = failure.stall
+      ? new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(text.slice(0, 5)))
+            controller.error(
+              Object.assign(new Error('The operation was aborted due to timeout'), {
+                name: 'TimeoutError',
+              })
+            )
+          },
+        })
+      : text
+    return new Response(body, { status: failure.status, headers: failure.headers })
+  }
+  function vercel(deployments: Deployment[], pollFailures: PollFailure[] = []) {
     const calls: Call[] = []
     const failures = [...pollFailures]
     const fetchImpl = (url: string | URL | Request, init?: RequestInit) => {
@@ -671,11 +698,7 @@ describe('Vercel preview deploy step', () => {
           createdAt: 5,
         })
       if (target.pathname.startsWith('/v13/deployments/') && failures.length)
-        return Promise.resolve(
-          new Response(JSON.stringify({ error: { message: 'try later' } }), {
-            status: failures.shift(),
-          })
-        )
+        return Promise.resolve(failedPoll(failures.shift()!))
       if (target.pathname.startsWith('/v13/deployments/'))
         return reply({
           id: target.pathname.split('/').at(-1),
@@ -754,6 +777,91 @@ describe('Vercel preview deploy step', () => {
         sleep: () => Promise.resolve(),
       })
     ).rejects.toThrow('answered 403: try later')
+  })
+
+  it.each([
+    [403, 'fails at once', 1],
+    [503, 'retries', 2],
+  ])(
+    'keeps the status when a %s body stalls after its headers, so it %s',
+    async (status, _outcome, polls) => {
+      const stalled = vercel([], [{ status, stall: true }])
+      const result = run('web', env(false), {
+        fetchImpl: stalled.fetchImpl,
+        cwd: fixture,
+        sleep: () => Promise.resolve(),
+      })
+      if (status === 403) await expect(result).rejects.toThrow('answered 403')
+      else await expect(result).resolves.toMatchObject({ id: 'dpl_new' })
+      expect(
+        stalled.calls.filter((call) => call.path.startsWith('/v13/deployments/dpl_new'))
+      ).toHaveLength(polls)
+    }
+  )
+
+  describe('a rate-limited poll waits for the reset Vercel announces', () => {
+    const started = 1_000_000
+    const resetIn = 120_000
+    const timed = (failure: PollFailure) => {
+      let clock = started
+      const waits: number[] = []
+      const api = vercel([], [failure])
+      const result = run(
+        'web',
+        { ...env(false), PREVIEW_JOB_STARTED_MS: String(started) },
+        {
+          fetchImpl: api.fetchImpl,
+          cwd: fixture,
+          now: () => clock,
+          sleep: (ms) => {
+            waits.push(ms)
+            clock += ms
+            return Promise.resolve()
+          },
+        }
+      )
+      return { result, waits, api }
+    }
+    const resetAt = (from: number) => started + from
+
+    it.each([
+      ['Retry-After', { headers: { 'Retry-After': String(resetIn / 1000) } }],
+      [
+        'X-RateLimit-Reset',
+        { headers: { 'X-RateLimit-Reset': String(resetAt(resetIn) / 1000) } },
+      ],
+      [
+        'error.limit.resetMs',
+        {
+          body: { error: { code: 'rate_limited', limit: { resetMs: resetAt(resetIn) } } },
+        },
+      ],
+      [
+        'error.limit.reset',
+        {
+          body: {
+            error: { code: 'rate_limited', limit: { reset: resetAt(resetIn) / 1000 } },
+          },
+        },
+      ],
+    ])('from %s', async (_source, timing) => {
+      const { result, waits } = timed({ status: 429, ...timing })
+      await expect(result).resolves.toMatchObject({ id: 'dpl_new' })
+      // The poll after the 429 waits until the reset, not one 15 s interval.
+      expect(Math.max(...waits)).toBeGreaterThanOrEqual(resetIn - 1_000)
+    })
+
+    it('fails at once with the reason when the reset falls past the job deadline', async () => {
+      const { result, waits, api } = timed({
+        status: 429,
+        headers: { 'Retry-After': String(60 * 60) },
+      })
+      await expect(result).rejects.toThrow(/rate limit.*past this job's deadline/i)
+      expect(waits).toEqual([])
+      expect(
+        api.calls.filter((call) => call.path.startsWith('/v13/deployments/dpl_new'))
+      ).toHaveLength(1)
+    })
   })
 
   it('stops before the job runs out, counting setup from the job start', async () => {
