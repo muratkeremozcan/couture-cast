@@ -93,8 +93,42 @@ describe('summarize', () => {
       started_at: null,
       completed_at: null,
     })
-    assert.deepEqual(summarize([waiting], at(14)).lowerBounds, 1)
-    assert.equal(summarize([waiting], at(14)).max, 14)
+    const summary = summarize([waiting], at(14))
+    assert.equal(summary.lowerBounds, 1)
+    assert.equal(summary.inFlight, 1)
+    assert.equal(summary.n, 0)
+    assert.equal(summary.max, 14)
+  })
+
+  // R3-05: in-flight rows never certify the budget, and one observation is not a sample.
+  test('twenty jobs still queued at 14 minutes are not a pass', () => {
+    const queued = Array.from({ length: 20 }, (_, index) =>
+      job(`ios-${index}`, 0, 0, {
+        status: 'queued',
+        conclusion: null,
+        started_at: null,
+        completed_at: null,
+      })
+    )
+    const summary = summarize(queued, at(14))
+    assert.equal(summary.n, 0)
+    assert.equal(summary.inFlight, 20)
+    assert.equal(summary.withinBudget, false)
+  })
+
+  test('an in-flight job already past the ceiling is a breach', () => {
+    const running = job('ios', 2, 0, {
+      status: 'in_progress',
+      conclusion: null,
+      completed_at: null,
+    })
+    assert.equal(summarize([running], at(25)).breaches.length, 1)
+  })
+
+  test('fewer than twenty completed observations never pass; twenty within budget do', () => {
+    assert.equal(summarize([job('ios', 1, 5)], at(60)).withinBudget, false)
+    const twenty = Array.from({ length: 20 }, (_, index) => job(`ios-${index}`, 1, 5))
+    assert.equal(summarize(twenty, at(60)).withinBudget, true)
   })
 
   test('a skipped job is left out with its reason', () => {

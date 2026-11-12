@@ -19,6 +19,8 @@ import { fileURLToPath } from 'node:url'
 
 export const P95_BUDGET_MINUTES = 15
 export const CEILING_MINUTES = 20
+/** The owner's budget is judged on 20 consecutive completed observations (story 6.15 TEA-09). */
+export const REQUIRED_SAMPLE = 20
 
 const minutes = (from, to) => (Date.parse(to) - Date.parse(from)) / 60_000
 
@@ -47,6 +49,7 @@ export function jobTiming(job, now = new Date().toISOString()) {
       jobQueue: minutes(job.created_at, end),
       run: 0,
       lowerBound: true,
+      inFlight: !job.completed_at,
     }
   }
   const end = job.completed_at ?? now
@@ -58,31 +61,35 @@ export function jobTiming(job, now = new Date().toISOString()) {
     jobQueue: minutes(job.created_at, started),
     run: minutes(started, end),
     lowerBound: !job.completed_at,
+    inFlight: !job.completed_at,
   }
 }
 
+/**
+ * Completed jobs (terminal, including failed, timed-out and cancelled ones, and jobs cancelled
+ * before they started, which count their queue) form the sample. Jobs still queued or running
+ * are reported as lower bounds and never help a pass, though one already past the ceiling is a
+ * breach. A pass needs REQUIRED_SAMPLE completed observations (R3-05).
+ */
 export function summarize(jobs, now) {
   const skipped = jobs
     .filter((job) => job.conclusion === 'skipped')
     .map((job) => ({ name: job.name, reason: 'skipped without running' }))
   const timings = jobs.map((job) => jobTiming(job, now)).filter(Boolean)
-  const totals = timings.map((timing) => timing.total)
+  const completed = timings.filter((timing) => !timing.inFlight)
+  const totals = completed.map((timing) => timing.total)
+  const queues = completed.map((timing) => timing.queue)
   const p95 = nearestRank(totals, 0.95)
-  const max = totals.length ? Math.max(...totals) : null
+  const max = timings.length ? Math.max(...timings.map((timing) => timing.total)) : null
   const breaches = timings.filter((timing) => timing.total > CEILING_MINUTES)
   return {
-    n: timings.length,
+    n: completed.length,
+    inFlight: timings.length - completed.length,
     p50: nearestRank(totals, 0.5),
     p95,
     max,
-    queueP50: nearestRank(
-      timings.map((timing) => timing.queue),
-      0.5
-    ),
-    queueP95: nearestRank(
-      timings.map((timing) => timing.queue),
-      0.95
-    ),
+    queueP50: nearestRank(queues, 0.5),
+    queueP95: nearestRank(queues, 0.95),
     lowerBounds: timings.filter((timing) => timing.lowerBound).length,
     breaches: breaches.map(({ name, conclusion, total }) => ({
       name,
@@ -91,7 +98,10 @@ export function summarize(jobs, now) {
     })),
     skipped,
     withinBudget:
-      p95 !== null && p95 <= P95_BUDGET_MINUTES && max !== null && max <= CEILING_MINUTES,
+      completed.length >= REQUIRED_SAMPLE &&
+      p95 <= P95_BUDGET_MINUTES &&
+      max <= CEILING_MINUTES &&
+      breaches.length === 0,
   }
 }
 
