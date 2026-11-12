@@ -372,14 +372,28 @@ adds it merges, add the key for project 329012 (the `POSTHOG_API_KEY` value in `
 # Vercel couture-cast-web, Production only; preview and development stay without a key.
 vercel env add POSTHOG_API_KEY -e production --no-sensitive \
   --project couture-cast-web --scope muratkeremozcans-projects < key-file
-# EAS production environment, from apps/mobile.
-eas env:create --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
+# EAS production environment, from apps/mobile. env:set creates or updates; env:create is
+# deprecated.
+eas env:set --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
   --visibility plaintext --scope project --type string --non-interactive
 ```
 
-Web picks up the key on its next production deployment, so redeploy production web after adding
-it. Mobile binaries read the key at build time, so a shipped binary starts sending analytics only
-from its next production EAS build.
+Then redeploy production web. Vercel fixes a deployment's environment variables when the
+deployment is created, so adding a key changes nothing the current production deployment serves.
+After #207, production web shipped an empty PostHog token until a redeploy. The same holds for
+every Vercel environment key added or changed:
+
+```bash
+# The newest Ready production deployment of couture-cast-web.
+vercel ls couture-cast-web --environment production --status READY \
+  --scope muratkeremozcans-projects
+vercel redeploy <that deployment's URL> --environment production \
+  --scope muratkeremozcans-projects
+```
+
+Then confirm the deployed client carries the key, for example by loading the production site and
+checking that PostHog requests leave the browser. Mobile binaries read the key at build time, so a
+shipped binary starts sending analytics only from its next production EAS build.
 
 ## Environment separation
 
