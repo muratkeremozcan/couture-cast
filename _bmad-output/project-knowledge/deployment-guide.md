@@ -1404,13 +1404,15 @@ event.
 | Vercel `couture-cast-api`, development and preview | 327096         | unchanged                     |
 | Northflank `couture-cast/community-worker`         | 329012         | 17:50:24, 2026-11-11          |
 | `.env.prod`                                        | 329012         | 2026-11-11                    |
-| Vercel `couture-cast-web`, every target            | none           | owner decision pending        |
-| EAS `production` environment                       | none           | owner decision pending        |
+| Vercel `couture-cast-web`, production target       | 329012         | post-merge step, PR #207      |
+| Vercel `couture-cast-web`, development and preview | none           | unchanged                     |
+| EAS `production` environment                       | 329012         | post-merge step, PR #207      |
 
 - Event history before the switch stays in 327096. Worker events reach 329012 from 17:50:38;
   327096 received no production event after 17:50.
-- Web and mobile production carry no PostHog key, so they send nothing. Setting one turns on
-  autocapture, pageviews and exception capture for production users, which is an owner decision.
+- The owner turned on web and mobile production analytics on 2026-11-11, in the privacy-safe
+  configuration under "Production analytics". Their keys are added only after that configuration
+  is on `main` (see "Post-merge step: add the production keys").
   A mobile binary keeps whatever key it was built with until its next build; `app.config.ts`
   loads `.env.local` before `.env.prod`, so a production build made on a laptop takes the local
   key.
