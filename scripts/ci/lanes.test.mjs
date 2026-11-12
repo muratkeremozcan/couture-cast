@@ -374,15 +374,19 @@ const trackedDirs = new Set(
  * it, which catches paths a test builds from a directory and a file name; shallower ones
  * (`apps/api`) are working directories and labels far more often than reads.
  */
-function filesNamed(source, file) {
+function filesNamed(source, file, modules = new Set()) {
   const named = new Set()
   const code = source
     .split('\n')
     .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
     .join('\n')
-  for (const [, , literal] of code.matchAll(
+  for (const match of code.matchAll(
     /(['"`])((?:\.{1,2}\/)*[\w@.-]+(?:\/[\w@.-]+)+)\/?\1/g
   )) {
+    const literal = match[2]
+    const imported = /\b(?:from|import|require)\s*\(?\s*$/.test(
+      code.slice(Math.max(0, match.index - 20), match.index)
+    )
     for (const candidate of [
       path.posix.normalize(literal),
       path.posix.join(path.posix.dirname(file), literal),
@@ -390,8 +394,11 @@ function filesNamed(source, file) {
       const withExtension = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js']
         .map((suffix) => `${candidate}${suffix}`)
         .find((name) => trackedSet.has(name))
-      if (withExtension) named.add(withExtension)
-      else if (trackedDirs.has(candidate) && candidate.split('/').length >= 3)
+      if (withExtension) {
+        named.add(withExtension)
+        if (imported && CODE.test(withExtension) && !isTest(withExtension))
+          modules.add(withExtension)
+      } else if (trackedDirs.has(candidate) && candidate.split('/').length >= 3)
         for (const inside of tracked)
           if (inside.startsWith(`${candidate}/`)) named.add(inside)
     }
@@ -402,9 +409,40 @@ function filesNamed(source, file) {
   return [...named]
 }
 
-// Paths a test names as sample input to the code it tests, not files it reads.
+const CODE = /\.(m?[jt]sx?|cjs)$/
+// Modules whose path literals are data they hand to other code: the lane map names every
+// lane's inputs, and the flow-state helper passes Maestro flow paths to the CLI.
+const NAMES_WITHOUT_READING = new Set([
+  'scripts/ci/lanes.mjs',
+  'scripts/lib/mobile-e2e-flow-state.mjs',
+])
+
+/**
+ * Files a test reads: what it names, then what each source module it names goes on to name, so
+ * a path read through a helper the test imports counts as read by the test.
+ */
+function filesRead(file) {
+  const read = new Set()
+  const seen = new Set([file])
+  const queue = [file]
+  while (queue.length > 0) {
+    const current = queue.shift()
+    const modules = new Set()
+    const source = readFileSync(path.join(root, current), 'utf8')
+    for (const named of filesNamed(source, current, modules)) read.add(named)
+    for (const module of modules)
+      if (!seen.has(module) && !NAMES_WITHOUT_READING.has(module)) {
+        seen.add(module)
+        queue.push(module)
+      }
+  }
+  return [...read]
+}
+
+// Paths a test names only as sample input to the code it tests.
 const NOT_READ = [
   ['apps/api/integration/vercel-storage.spec.ts', 'apps/web/src/app/page.tsx'],
+  ['apps/api/integration/vercel-storage.spec.ts', 'packages/k6-utils/src/index.ts'],
   ['scripts/ci/share-card-paths.test.mjs', 'playwright/tests/moderation-history.spec.ts'],
   [
     'scripts/ci/share-card-paths.test.mjs',
@@ -412,7 +450,7 @@ const NOT_READ = [
   ],
 ]
 
-test('every repository file a test names wakes the lanes that run that test', () => {
+test('every repository file a test or a module it imports names wakes the lanes that run that test', () => {
   const misses = []
   // This file names repository paths only as sample input to the lane map.
   for (const file of tracked
@@ -421,8 +459,7 @@ test('every repository file a test names wakes the lanes that run that test', ()
     const runners =
       TEST_RUNNERS.find(([glob]) => minimatch(file, glob, { dot: true }))?.[1] ?? []
     if (runners.length === 0) continue
-    const source = readFileSync(path.join(root, file), 'utf8')
-    for (const read of filesNamed(source, file)) {
+    for (const read of filesRead(file)) {
       if (NOT_READ.some(([test, sample]) => test === file && sample === read)) continue
       const woken = classify(read, inputs).lanes
       const missing = runners.filter((id) => !woken.includes(id))
@@ -440,10 +477,13 @@ test('DOC_INPUTS names only files that exist and lanes that exist', () => {
   }
 })
 
+const HEAD = 'a'.repeat(40)
+const EVENT = { pull_request: { number: 7, head: { sha: HEAD } } }
+
 test('the plan job writes one output per lane and a summary, and runs everything on an API failure', async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-'))
   const eventPath = path.join(dir, 'event.json')
-  writeFileSync(eventPath, JSON.stringify({ pull_request: { number: 7 } }))
+  writeFileSync(eventPath, JSON.stringify(EVENT))
   const env = {
     GITHUB_EVENT_NAME: 'pull_request',
     GITHUB_EVENT_PATH: eventPath,
@@ -456,6 +496,7 @@ test('the plan job writes one output per lane and a summary, and runs everything
   const requested = []
   const fetchImpl = async (url) => {
     requested.push(url)
+    if (url.endsWith('/pulls/7')) return Response.json({ head: { sha: HEAD } })
     if (url.includes('/labels')) return Response.json([{ name: 'documentation' }])
     if (url.includes('page=1'))
       return Response.json([
@@ -493,8 +534,9 @@ test('the plan job writes one output per lane and a summary, and runs everything
 test('the label is read from every page, so ALL-LANES past the first hundred still counts', async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-labels-'))
   const eventPath = path.join(dir, 'event.json')
-  writeFileSync(eventPath, JSON.stringify({ pull_request: { number: 7 } }))
+  writeFileSync(eventPath, JSON.stringify(EVENT))
   const fetchImpl = async (url) => {
+    if (url.endsWith('/pulls/7')) return Response.json({ head: { sha: HEAD } })
     if (url.includes('/labels')) {
       const page = Number(new URL(url).searchParams.get('page') ?? '1')
       if (page === 1)
@@ -518,4 +560,56 @@ test('the label is read from every page, so ALL-LANES past the first hundred sti
     fetchImpl,
   })
   assert.ok(Object.values(plan).every((lane) => lane.run))
+})
+
+test('a pull request whose head moved past the commit under test runs every lane', async () => {
+  // The files API answers for the pull request's head now; a rerun of an older commit, or a
+  // push while the plan reads, must not plan that commit from another commit's files.
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-head-'))
+  const eventPath = path.join(dir, 'event.json')
+  writeFileSync(eventPath, JSON.stringify(EVENT))
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/pulls/7')) return Response.json({ head: { sha: 'b'.repeat(40) } })
+    if (url.includes('/labels')) return Response.json([])
+    if (url.includes('page=1')) return Response.json([{ filename: 'docs/guide.md' }])
+    return Response.json([])
+  }
+  const plan = await main({
+    env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_REPOSITORY: 'owner/repo',
+      GITHUB_TOKEN: 'token',
+    },
+    root,
+    fetchImpl,
+  })
+  assert.ok(Object.values(plan).every((lane) => lane.run))
+  assert.match(plan.maestro.reason, /head moved/)
+})
+
+test('a plan that fails to compute runs every lane and still writes its outputs', async () => {
+  // A broken workspace manifest must not fail the lanes job, which would skip every gated job.
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-broken-'))
+  const eventPath = path.join(dir, 'event.json')
+  writeFileSync(eventPath, JSON.stringify(EVENT))
+  const output = path.join(dir, 'output')
+  const plan = await main({
+    env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_REPOSITORY: 'owner/repo',
+      GITHUB_TOKEN: 'token',
+      GITHUB_OUTPUT: output,
+    },
+    root: dir,
+    fetchImpl: async (url) =>
+      url.endsWith('/pulls/7')
+        ? Response.json({ head: { sha: HEAD } })
+        : Response.json([]),
+  })
+  assert.ok(Object.values(plan).every((lane) => lane.run))
+  assert.match(plan.maestro.reason, /could not be computed/)
+  const written = JSON.parse(readFileSync(output, 'utf8').match(/^plan=(.*)$/m)[1])
+  assert.ok(Object.values(written).every(Boolean))
 })

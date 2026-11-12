@@ -832,7 +832,7 @@ describe('local mode preflight (PR 212 review)', () => {
     assert.deepEqual(problems, ['suite plain has no gate step'])
   })
 
-  test('a fresh checkout without node_modules gets the install instruction, not a module error', () => {
+  test('a fresh checkout without node_modules gets the install instruction', () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fresh-'))
     const copy = (file) => {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })

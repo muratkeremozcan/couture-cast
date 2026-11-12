@@ -55,17 +55,6 @@ jobs:
           LANES_WORKFLOW: pr-pw-e2e-local.yml
         run: node scripts/ci/lanes.mjs
 
-  # The install command every job here shares.
-  vars:
-    runs-on: ubuntu-latest
-    # 0.1 minutes at p95 (last 20 runs, 2026-11-12).
-    timeout-minutes: 5
-    outputs:
-      install_command: npm ci
-    steps:
-      - name: The outputs above are constants
-        run: 'true'
-
   # Burn-in plans first and waits on nothing: the SKIP_BURN_IN label comes straight from the
   # event payload, and its plan job lists only the changed specs it needs.
   burn-in:
@@ -80,7 +69,7 @@ jobs:
   pw-e2e:
     # Burn-in runs beside the lanes: it still fails the gate, and waiting for it put the
     # lanes 14 to 16 minutes after the push (scripts/ci/pr-pipeline-shape.test.mjs).
-    needs: [lanes, vars]
+    needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
     # 11.3 minutes at p50, 12.4 at p95 (40 shard runs, 2026-11-11 to 12). The
     # Supabase start stops at its own 10 minute step limit.
@@ -132,7 +121,7 @@ jobs:
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -226,7 +215,7 @@ jobs:
   # NEXT_PUBLIC_E2E_AUTH=false web build on 3077. See playwright/README.md.
   real-session-e2e:
     name: Real-session community E2E
-    needs: [lanes, vars]
+    needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
     # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12).
     timeout-minutes: 15
@@ -274,7 +263,7 @@ jobs:
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -355,7 +344,7 @@ jobs:
   # never inside the sharded suite above, which seeds those flags true.
   complimentary-access-e2e:
     name: Complimentary access E2E
-    needs: [lanes, vars]
+    needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
     # Measured locally: about 66 s for the runner with built packages. Estimated in
     # CI: about 3 min install and browsers, the Supabase start budget (600 s), about
@@ -392,7 +381,7 @@ jobs:
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -444,7 +433,7 @@ jobs:
   # Passes whatever the suites did: the gate reads their own jobs. A suite the lane plan
   # skipped left no blob, so the install is skipped too and the comment says skipped.
   merge-reports:
-    needs: [vars, burn-in, pw-e2e]
+    needs: [burn-in, pw-e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     # 1.5 minutes at p50, 1.7 at p95 (last 20 runs, 2026-11-12).
@@ -461,7 +450,7 @@ jobs:
         if: ${{ needs.pw-e2e.result != 'skipped' }}
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Merge, upload, and comment
         uses: ./.github/actions/playwright-merge-report-comment

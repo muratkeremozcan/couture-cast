@@ -94,7 +94,7 @@ jobs:
 
       - name: Detect changed Playwright specs
         id: detect-changed
-        if: ${{ !cancelled() && steps.current_label.outputs.skip != 'true' }}
+        if: ${{ success() && steps.current_label.outputs.skip != 'true' }}
         run: |
           BASE_REF="${{ steps.base-ref.outputs.value }}"
           if [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]; then

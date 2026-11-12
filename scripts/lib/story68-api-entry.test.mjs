@@ -10,7 +10,7 @@ const ownedDatabase =
   'postgresql://postgres:postgres@127.0.0.1:54322/tea_community_11111111111111111111111111111111'
 
 describe('Story68 API entry without an API build', () => {
-  it('names the missing build instead of failing on a module path', () => {
+  it('names the missing API build', () => {
     // A copy of the entry inside the repository resolves node_modules from the root, and its
     // relative apps/api/dist does not exist.
     const scratch = mkdtempSync(path.join(root, '.story68-api-entry-'))

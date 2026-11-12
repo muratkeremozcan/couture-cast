@@ -65,11 +65,24 @@ function commit(file: string, content = 'changed') {
   )
 }
 
+// The workspace manifests the lane map reads, which the fixture repository holds as its own.
+const manifests = ['apps', 'packages'].flatMap((dir) =>
+  fs
+    .readdirSync(path.join(repoRoot, dir))
+    .map((name) => `${dir}/${name}/package.json`)
+    .filter((file) => fs.existsSync(path.join(repoRoot, file)))
+)
+
 beforeEach(() => {
   fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vercel-storage-'))
   git('init', '-b', 'main')
   git('config', 'user.name', 'Storage fixture')
   git('config', 'user.email', 'fixture@example.invalid')
+  for (const file of manifests) {
+    fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true })
+    fs.copyFileSync(path.join(repoRoot, file), path.join(fixture, file))
+  }
+  git('add', '--', ...manifests)
   commit('apps/api/src/main.ts', 'baseline')
   git('remote', 'add', 'origin', fixture)
   git('checkout', '-b', 'preview')
@@ -113,25 +126,31 @@ describe('Vercel preview storage', () => {
     expect(previewRequired(fixture, 'main')).toBe(true)
   })
 
+  it('expands workspaces from the manifests of the repository it diffs', () => {
+    // On main, this repository's web app depends on packages/k6-utils; the checkout running
+    // the test does not, so only its own manifests make a k6-utils change need previews.
+    git('checkout', 'main')
+    const file = 'apps/web/package.json'
+    const manifest = JSON.parse(fs.readFileSync(path.join(fixture, file), 'utf8')) as {
+      dependencies: Record<string, string>
+    }
+    manifest.dependencies['@couture/k6-utils'] = 'file:../../packages/k6-utils'
+    commit(file, JSON.stringify(manifest, null, 2))
+    git('checkout', '-B', 'preview', 'main')
+    commit('packages/k6-utils/src/index.ts')
+    expect(previewRequired(fixture, 'main')).toBe(true)
+  })
+
   it('keeps the preview checks when history is unavailable', () => {
     expect(previewRequired(fixture, 'missing-ref')).toBe(true)
   })
 
   // The CLI roots itself where it lives, so it runs from a copy inside the fixture repository,
-  // whose origin/main is a baseline commit that already holds the copy, the lane map it asks
-  // and the workspace manifests the map reads.
+  // whose origin/main is a baseline commit that already holds the copy and the lane map it
+  // asks, beside the workspace manifests every fixture holds.
   it('an explicit request requires previews that the branch alone would skip', () => {
     const cli = path.join(fixture, 'scripts/vercel-preview-inputs.mjs')
-    const copies = [
-      'scripts/vercel-preview-inputs.mjs',
-      'scripts/ci/lanes.mjs',
-      ...['apps', 'packages'].flatMap((dir) =>
-        fs
-          .readdirSync(path.join(repoRoot, dir))
-          .map((name) => `${dir}/${name}/package.json`)
-          .filter((file) => fs.existsSync(path.join(repoRoot, file)))
-      ),
-    ]
+    const copies = ['scripts/vercel-preview-inputs.mjs', 'scripts/ci/lanes.mjs']
     for (const file of copies) {
       fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true })
       fs.copyFileSync(path.join(repoRoot, file), path.join(fixture, file))

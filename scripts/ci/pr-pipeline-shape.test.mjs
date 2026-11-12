@@ -17,11 +17,11 @@ const workflow = (name) =>
   )
 const needs = (job) => [job.needs ?? []].flat()
 
-// The lanes wait only for the lane plan (seconds, no install) and the shared values.
+// The lanes wait only for the lane plan (seconds, no install).
 test('the e2e lanes start without waiting for burn-in', () => {
   const { jobs } = workflow('pr-pw-e2e-local.yml')
   for (const lane of ['pw-e2e', 'real-session-e2e', 'complimentary-access-e2e']) {
-    assert.deepEqual(needs(jobs[lane]).sort(), ['lanes', 'vars'], lane)
+    assert.deepEqual(needs(jobs[lane]), ['lanes'], lane)
     assert.doesNotMatch(String(jobs[lane].if ?? ''), /burn-in/, lane)
   }
 })
@@ -38,7 +38,10 @@ test('burn-in still runs on pull requests, fails its own job and feeds the repor
     /!contains\(github\.event\.pull_request\.labels\.\*\.name, 'SKIP_BURN_IN'\)/
   )
   assert.doesNotMatch(jobs['burn-in'].if, /needs\./)
-  assert.equal(jobs.vars.outputs.SKIP_BURN_IN, undefined)
+  // No job exists only to hand on a constant: each takes a runner and a queue slot.
+  assert.equal(jobs.vars, undefined)
+  for (const [id, job] of Object.entries(jobs))
+    assert.ok(!needs(job).includes('vars'), `${id} needs no vars job`)
   assert.ok(needs(jobs['merge-reports']).includes('burn-in'))
   // The gate requires every job; a blocked burn-in exits 1 in its report job.
   const report = workflow('rwf-burn-in.yml').jobs.report.steps.find(
@@ -171,6 +174,8 @@ test('burn-in reads the SKIP_BURN_IN label as it is now, so a rerun after adding
   assert.match(current.run, /SKIP_BURN_IN/)
   const detect = plan.steps.find((s) => s.id === 'detect-changed')
   assert.match(String(detect.if), /steps\.current_label\.outputs\.skip != 'true'/)
+  // success() keeps the implicit guard: a failed checkout or base ref must not feed the diff.
+  assert.match(String(detect.if), /^\$\{\{ success\(\) && /)
   assert.ok(
     plan.steps.indexOf(current) < plan.steps.indexOf(detect),
     'the label is read before the changed specs'

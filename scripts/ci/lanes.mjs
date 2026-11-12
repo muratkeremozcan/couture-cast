@@ -58,6 +58,9 @@ export const DOCS = [
   '**/README.md',
   // Fixture corpora keep their own README files, which the API's corpus specs read.
   '!**/test/fixtures/**',
+  // The share-card lane's iPad evidence gate (scripts/lib/story69-ipad-evidence.mjs) reads
+  // this record and its screenshots.
+  '!_bmad-output/test-artifacts/story-6-9/**',
   '**/CHANGELOG.md',
   'LICENSE',
 ]
@@ -109,7 +112,7 @@ export const LANES = {
     title: 'Typecheck workspaces',
     workflow: 'pr-checks.yml',
     jobs: ['typecheck'],
-    inputs: ['**'],
+    // classify() adds it whenever a file wakes any other lane.
   },
   lighthouse: {
     title: 'Lighthouse accessibility',
@@ -125,13 +128,16 @@ export const LANES = {
     jobs: ['tests-shard'],
     workspaces: ['api'],
     // API integration specs import the Playwright advisory lock and E2E config, read the web
-    // project's vercel.json and assert on a Maestro flow.
+    // project's vercel.json and assert on a Maestro flow; vercel-storage.spec.ts copies every
+    // workspace manifest into the repositories it decides previews for.
     inputs: [
       SUPABASE,
       'playwright/support/**',
       'playwright/config/**',
       'apps/web/vercel.json',
       'maestro/community-feed.yaml',
+      'apps/*/package.json',
+      'packages/*/package.json',
     ],
   },
   'coverage-mobile': {
@@ -162,7 +168,8 @@ export const LANES = {
       'utils',
       'api',
     ],
-    inputs: ['apps/mobile/assets/locales/**'],
+    // packages/db's community storage seed reads its ports from supabase/config.toml.
+    inputs: ['apps/mobile/assets/locales/**', SUPABASE],
   },
   'year-ahead': {
     title: 'Unit tests a year ahead',
@@ -204,8 +211,17 @@ export const LANES = {
     jobs: ['playwright-unit'],
     // `test:playwright-unit` (vitest over playwright/support/helpers). The helpers' specs pin
     // workflows, Maestro flows and mobile sources as well as the helpers themselves.
+    // Its pretest hook verifies the community screening corpus, which
+    // probe-community-preview.spec.ts reads too; playwright/config/environments.ts imports
+    // apps/web/git-metadata.ts.
     workspaces: ['utils', 'api-client', 'config', 'testing', 'db', 'mobile'],
-    inputs: [SUPABASE, 'playwright/**', 'maestro/**'],
+    inputs: [
+      SUPABASE,
+      'playwright/**',
+      'maestro/**',
+      'apps/api/test/fixtures/community-moderation/**',
+      'apps/web/git-metadata.ts',
+    ],
   },
   maestro: {
     title: 'Mobile end-to-end (Maestro)',
@@ -230,6 +246,7 @@ export const LANES = {
       'playwright/share-card.config.ts',
       'playwright/tests/share-card-*.spec.ts',
       'playwright/support/**',
+      '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },
   watchos: {
@@ -423,6 +440,27 @@ async function pullRequestFiles({ repository, number, token, fetchImpl = fetch }
   return files
 }
 
+/** The pull request's head commit now. */
+async function pullRequestHead({ repository, number, token, fetchImpl = fetch }) {
+  const response = await fetchImpl(
+    `https://api.github.com/repos/${repository}/pulls/${number}`,
+    {
+      headers: {
+        accept: 'application/vnd.github+json',
+        authorization: `Bearer ${token}`,
+        'x-github-api-version': '2022-11-28',
+      },
+      signal: AbortSignal.timeout(30_000),
+    }
+  )
+  if (!response.ok) throw new Error(`GET pull request answered ${response.status}`)
+  return (await response.json()).head?.sha
+}
+
+/** Every lane runs, for the reason given. */
+const everyLane = (reason) =>
+  Object.fromEntries(Object.keys(LANES).map((id) => [id, { run: true, reason }]))
+
 /** The labels on the pull request now, every page, so a rerun after adding ALL-LANES sees it. */
 async function pullRequestLabels({ repository, number, token, fetchImpl = fetch }) {
   const labels = []
@@ -486,8 +524,10 @@ export async function main({ env = process.env, root = process.cwd(), fetchImpl 
     ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
     : {}
   const number = payload.pull_request?.number
+  const testedHead = payload.pull_request?.head?.sha
   let files = null
   let labels = []
+  let headMoved = false
   if (event === 'pull_request') {
     try {
       const request = {
@@ -500,18 +540,33 @@ export async function main({ env = process.env, root = process.cwd(), fetchImpl 
         pullRequestFiles(request),
         pullRequestLabels(request),
       ])
+      // The files API answers for the head now. Read the head after the files: if it is not
+      // the commit this run tests, the files may belong to another commit.
+      const head = await pullRequestHead(request)
+      headMoved = !testedHead || head !== testedHead
     } catch (error) {
       console.log(
         `::warning::Could not read the pull request's files, so every lane runs: ${error.message}`
       )
     }
   }
-  const plan = selectLanes({
-    event,
-    files,
-    labels,
-    dependencies: readWorkspaceDependencies(root),
-  })
+  let plan
+  try {
+    plan = headMoved
+      ? everyLane(
+          'the pull request head moved past the commit under test, so its file list may be for another commit'
+        )
+      : selectLanes({
+          event,
+          files,
+          labels,
+          dependencies: readWorkspaceDependencies(root),
+        })
+  } catch (error) {
+    // A failed lanes job skips every job that needs it; running everything is the safe plan.
+    console.log(`::warning::The lane plan failed, so every lane runs: ${error.message}`)
+    plan = everyLane(`the lane plan could not be computed (${error.message})`)
+  }
   const workflow = env.LANES_WORKFLOW || undefined
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, outputLines(plan))
   const table = summary(plan, { workflow })

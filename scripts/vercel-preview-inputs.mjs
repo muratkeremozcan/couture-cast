@@ -55,7 +55,8 @@ function failure(result) {
  * changes. Renames count as a deletion and an addition, so moving runtime code under docs/
  * still names the path it left.
  * @param {string} cwd @param {string} base @param {string} [head]
- * @param {Record<string, string[]>} [dependencies] each workspace's @couture dependencies
+ * @param {Record<string, string[]>} [dependencies] each workspace's @couture dependencies, read
+ *   by default from the manifests in `cwd`
  * @returns {{ required: boolean, reason: string }}
  */
 export function previewDecision(cwd, base, head = 'HEAD', dependencies) {
@@ -71,7 +72,7 @@ export function previewDecision(cwd, base, head = 'HEAD', dependencies) {
     return { required: true, reason: `diff failed (${failure(result)})` }
   let inputs
   try {
-    inputs = laneInputs(dependencies ?? readWorkspaceDependencies(repoRoot))
+    inputs = laneInputs(dependencies ?? readWorkspaceDependencies(cwd))
   } catch (error) {
     return { required: true, reason: `the lane map could not be read (${error.message})` }
   }
