@@ -167,110 +167,137 @@ await pinNativeJourneyWeather(prisma)
 const authAdmin = createClient(supabaseUrl, supabase.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 })
-const identities = []
-for (const label of ['primary', 'secondary']) {
-  const email = `story65-real-${randomUUID()}@example.test`
-  const appUserId = `cc68-native-${randomUUID()}`
-  await prisma.user.create({
-    data: {
-      id: appUserId,
-      email,
-      profile: {
-        create: {
-          birthdate: new Date('1990-06-15'),
-          preferences: {
-            locale: 'en-US',
-            role: 'guardian',
-            compliance: { accountStatus: 'active' },
+// Every identity this runtime created, across sets, so cleanup removes them all.
+const createdIdentities = []
+/** One owner and one foreign account with the owner's published post and outfits. */
+async function provisionSet() {
+  const identities = []
+  for (const label of ['primary', 'secondary']) {
+    const email = `story65-real-${randomUUID()}@example.test`
+    const appUserId = `cc68-native-${randomUUID()}`
+    await prisma.user.create({
+      data: {
+        id: appUserId,
+        email,
+        profile: {
+          create: {
+            birthdate: new Date('1990-06-15'),
+            preferences: {
+              locale: 'en-US',
+              role: 'guardian',
+              compliance: { accountStatus: 'active' },
+            },
           },
         },
       },
-    },
-  })
-  const pending = {
-    email,
-    appUserId,
-    label: `cc68-${label}`,
-    issueMode: 'generated',
-    pending: true,
+    })
+    const pending = {
+      email,
+      appUserId,
+      label: `cc68-${label}`,
+      issueMode: 'generated',
+      pending: true,
+    }
+    identities.push(pending)
+    createdIdentities.push(pending)
+    privateJson('created-identities.json', createdIdentities)
+    const created = await authAdmin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+      app_metadata: { app_user_id: appUserId, app_role: 'guardian' },
+    })
+    if (created.error || !created.data.user)
+      throw new Error('Owned synthetic Auth account creation failed.')
+    Object.assign(pending, { authUserId: created.data.user.id, pending: false })
+    resources.createdIdentities.push({
+      authUserId: created.data.user.id,
+      email,
+      appUserId,
+    })
+    privateJson('created-identities.json', createdIdentities)
+    privateJson('resources.json', resources)
+    await prisma.savedLocation.create({
+      data: {
+        user_id: appUserId,
+        label: 'San Francisco',
+        location_key: 'san-francisco-ca',
+        latitude: 37.7749,
+        longitude: -122.4194,
+        timezone: 'America/Los_Angeles',
+        city: 'San Francisco',
+        region: 'CA',
+        country: 'US',
+        is_primary: true,
+      },
+    })
+    await prisma.comfortPreferences.create({ data: { user_id: appUserId } })
   }
-  identities.push(pending)
-  privateJson('created-identities.json', identities)
-  const created = await authAdmin.auth.admin.createUser({
-    email,
-    email_confirm: true,
-    app_metadata: { app_user_id: appUserId, app_role: 'guardian' },
-  })
-  if (created.error || !created.data.user)
-    throw new Error('Owned synthetic Auth account creation failed.')
-  Object.assign(pending, { authUserId: created.data.user.id, pending: false })
-  resources.createdIdentities.push({ authUserId: created.data.user.id, email, appUserId })
-  privateJson('created-identities.json', identities)
+  const primary = identities[0]
+  const postId = `cc68-native-${randomUUID()}`
+  const objectPath = `community/${postId}/${randomUUID()}.png`
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000"><rect width="800" height="1000" fill="#E9E2D0"/><rect x="80" y="60" width="640" height="880" rx="40" fill="#F8F5EE"/><path d="M280 160 L340 120 L460 120 L520 160 L590 310 L520 350 L485 280 L485 470 L315 470 L315 280 L280 350 L210 310 Z" fill="#7A1F2D"/><path d="M320 485 H480 L520 810 H440 L400 610 L360 810 H280 Z" fill="#292724"/><path d="M280 830 H360 V875 H250 Q230 860 250 845 Z M440 830 H520 L550 845 Q570 860 550 875 H440 Z" fill="#B28D46"/></svg>'
+  const photo = await sharp(Buffer.from(svg)).png().toBuffer()
+  resources.storageObjects.push({ bucket: 'community-images', objectPath })
   privateJson('resources.json', resources)
-  await prisma.savedLocation.create({
+  const uploaded = await authAdmin.storage
+    .from('community-images')
+    .upload(objectPath, photo, { contentType: 'image/png', upsert: false })
+  if (uploaded.error) throw new Error('Owned synthetic card-photo upload failed.')
+  await prisma.lookbookPost.create({
     data: {
-      user_id: appUserId,
-      label: 'San Francisco',
-      location_key: 'san-francisco-ca',
-      latitude: 37.7749,
-      longitude: -122.4194,
-      timezone: 'America/Los_Angeles',
-      city: 'San Francisco',
-      region: 'CA',
-      country: 'US',
-      is_primary: true,
-    },
-  })
-  await prisma.comfortPreferences.create({ data: { user_id: appUserId } })
-}
-const primary = identities[0]
-const postId = `cc68-native-${randomUUID()}`
-const objectPath = `community/${postId}/${randomUUID()}.png`
-const svg =
-  '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000"><rect width="800" height="1000" fill="#E9E2D0"/><rect x="80" y="60" width="640" height="880" rx="40" fill="#F8F5EE"/><path d="M280 160 L340 120 L460 120 L520 160 L590 310 L520 350 L485 280 L485 470 L315 470 L315 280 L280 350 L210 310 Z" fill="#7A1F2D"/><path d="M320 485 H480 L520 810 H440 L400 610 L360 810 H280 Z" fill="#292724"/><path d="M280 830 H360 V875 H250 Q230 860 250 845 Z M440 830 H520 L550 845 Q570 860 550 875 H440 Z" fill="#B28D46"/></svg>'
-const photo = await sharp(Buffer.from(svg)).png().toBuffer()
-resources.storageObjects.push({ bucket: 'community-images', objectPath })
-privateJson('resources.json', resources)
-const uploaded = await authAdmin.storage
-  .from('community-images')
-  .upload(objectPath, photo, { contentType: 'image/png', upsert: false })
-if (uploaded.error) throw new Error('Owned synthetic card-photo upload failed.')
-await prisma.lookbookPost.create({
-  data: {
-    id: postId,
-    user_id: primary.appUserId,
-    status: 'published',
-    caption: 'A synthetic CC68 outfit for native export proof.',
-    alt_text: 'A burgundy top, charcoal trousers and gold shoes.',
-    alt_text_confirmed_at: new Date(),
-    submitted_at: new Date(),
-    published_at: new Date(),
-    image_object_path: objectPath,
-    image_content_type: 'image/png',
-    image_checksum: createHash('sha256').update(photo).digest('hex'),
-    image_byte_size: photo.length,
-    climate_band: 'temperate_dry',
-    locale: 'en-US',
-  },
-})
-const outfits = []
-for (const scenario of ['morning', 'midday', 'evening']) {
-  const row = await prisma.outfitRecommendation.create({
-    data: {
+      id: postId,
       user_id: primary.appUserId,
-      scenario,
-      garment_ids: ['default-top', 'default-bottom', 'default-shoes'],
-      reasoning_badges: [],
+      status: 'published',
+      caption: 'A synthetic CC68 outfit for native export proof.',
+      alt_text: 'A burgundy top, charcoal trousers and gold shoes.',
+      alt_text_confirmed_at: new Date(),
+      submitted_at: new Date(),
+      published_at: new Date(),
+      image_object_path: objectPath,
+      image_content_type: 'image/png',
+      image_checksum: createHash('sha256').update(photo).digest('hex'),
+      image_byte_size: photo.length,
+      climate_band: 'temperate_dry',
+      locale: 'en-US',
     },
   })
-  outfits.push({ id: row.id, scenario })
+  const outfits = []
+  for (const scenario of ['morning', 'midday', 'evening']) {
+    const row = await prisma.outfitRecommendation.create({
+      data: {
+        user_id: primary.appUserId,
+        scenario,
+        garment_ids: ['default-top', 'default-bottom', 'default-shoes'],
+        reasoning_badges: [],
+      },
+    })
+    outfits.push({ id: row.id, scenario })
+  }
+  return {
+    identities,
+    postId,
+    objectPath,
+    photoSha256: createHash('sha256').update(photo).digest('hex'),
+    outfits,
+  }
 }
+// The browser lane runs its Playwright workers at once, and one worker runs one spec file
+// of one browser, so each browser and spec pair gets a set of its own: the sets share no
+// account, so one file's watermark choice, cached session or sign-out never reaches
+// another's. The first set is the native lanes' fixture.
+const webSets = process.argv.includes('--web-browsers')
+  ? ['chromium', 'firefox', 'webkit'].flatMap((browser) =>
+      ['share-card-export', 'share-card-native-share'].map((spec) => `${browser}/${spec}`)
+    )
+  : []
+const primarySet = await provisionSet()
+const browsers = {}
+for (const [index, key] of webSets.entries())
+  browsers[key] = index === 0 ? primarySet : await provisionSet()
 privateJson('fixtures.json', {
-  identities,
-  postId,
-  objectPath,
-  photoSha256: createHash('sha256').update(photo).digest('hex'),
-  outfits,
+  ...primarySet,
+  ...(webSets.length ? { browsers } : {}),
 })
 await prisma.$disconnect()
 console.log(
@@ -278,8 +305,8 @@ console.log(
     runtime: directory,
     database: name,
     redisContainer: resources.redisContainer,
-    authAccounts: identities.length,
-    ownedPost: postId,
+    authAccounts: createdIdentities.length,
+    ownedPost: primarySet.postId,
     status: 'ready',
     apiPort: 4088,
     metroPort: 8089,

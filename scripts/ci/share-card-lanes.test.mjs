@@ -405,6 +405,14 @@ describe('share-card parallel lane validator', () => {
             '\nnode scripts/run-story68-native.mjs metro > /tmp/cc68-metro.log'),
       ],
       [
+        'sharing one set of accounts across the parallel browsers',
+        /own accounts per browser/,
+        (jobs) => {
+          const runtime = step(browser(jobs), (row) => row.id === 'runtime')
+          runtime.run = runtime.run.replace('prepare.mjs --web-browsers', 'prepare.mjs')
+        },
+      ],
+      [
         'dropping the matrix validator',
         /complete browser matrix validator/,
         (jobs) =>

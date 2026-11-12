@@ -689,7 +689,7 @@ jobs:
           npm run db:generate
           npm run build:packages
           npm run build --workspace api
-          node scripts/e2e-share-card/prepare.mjs
+          node scripts/e2e-share-card/prepare.mjs --web-browsers
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status so an early crash is
           # reported by name instead of surfacing as an unrelated later failure.

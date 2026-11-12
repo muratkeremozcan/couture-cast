@@ -14,7 +14,10 @@ function firefoxAppData() {
 export default defineConfig({
   testDir: './tests',
   testMatch: ['share-card-export.spec.ts', 'share-card-native-share.spec.ts'],
-  workers: 1,
+  // A worker runs one spec file of one browser, on the accounts and post prepare.mjs
+  // --web-browsers made for that pair (share-card-owned-runtime.ts). A file's cases stay
+  // in order: they share those accounts.
+  workers: 3,
   fullyParallel: false,
   // A committed test.only would otherwise skip every other acceptance case on CI.
   forbidOnly: !!process.env.CI,

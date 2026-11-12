@@ -608,6 +608,16 @@ function browserProblems(name, steps, check) {
       !prepare?.run?.includes('maestro-install'),
     `${name}: browser job must avoid native preparation`
   )
+  // share-card.config.ts runs the three browser projects at once; each needs its own
+  // accounts and post (share-card-owned-runtime.ts).
+  check(
+    prepare?.run
+      ?.split('\n')
+      .some(
+        (line) => line.trim() === 'node scripts/e2e-share-card/prepare.mjs --web-browsers'
+      ),
+    `${name}: own accounts per browser required`
+  )
   const acceptance = steps.find((step) =>
     step.run?.includes('npx playwright test --config playwright/share-card.config.ts')
   )

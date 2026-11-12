@@ -12,7 +12,7 @@ import type { BrowserContext, Download, Locator, Page } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { decodeShareCardBase64, validateShareCardPng } from '@couture/api-client'
 import { afterInitialCommunityVerification } from '../../scripts/lib/story68-browser-watermark.mjs'
-import { expect } from './fixtures/share-card-fixtures'
+import { expect, test } from './fixtures/share-card-fixtures'
 export const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -24,9 +24,27 @@ export const env = read('owned-env.json') as {
 }
 if (!/^\/tea_community_[a-f0-9]{32}$/.test(new URL(env.DATABASE_URL).pathname))
   throw new Error('owned_uuid_required')
-export const fixture = read('fixtures.json') as {
+type OwnedSet = {
   postId: string
   identities: { email: string; appUserId: string; authUserId: string; label: string }[]
+}
+const owned = read('fixtures.json') as OwnedSet & { browsers?: Record<string, OwnedSet> }
+// Workers run at once (share-card.config.ts), one spec file of one browser each, and each
+// browser and spec pair has the accounts and post prepare.mjs --web-browsers made for it.
+const ownedKey = () =>
+  `${test.info().project.name}/${path.basename(test.info().file, '.spec.ts')}`
+const ownedSet = () => {
+  const set = owned.browsers?.[ownedKey()]
+  if (!set) throw new Error(`owned_browser_fixture_missing: ${ownedKey()}`)
+  return set
+}
+export const fixture: OwnedSet = {
+  get postId() {
+    return ownedSet().postId
+  },
+  get identities() {
+    return ownedSet().identities
+  },
 }
 export const build = read('public-build-env.json') as {
   EXPO_PUBLIC_SUPABASE_ANON_KEY: string
@@ -37,7 +55,7 @@ export async function session(account: number): Promise<Session> {
   const auth = createClient(proxy.proxyUrl, build.EXPO_PUBLIC_SUPABASE_ANON_KEY, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
-  const filename = `session-${account === 0 ? 'primary' : 'secondary'}.json`
+  const filename = `session-${ownedKey().replace('/', '-')}-${account === 0 ? 'primary' : 'secondary'}.json`
   if (fs.existsSync(path.join(directory, filename))) {
     const existing = read(filename) as Session
     if ((existing.expires_at ?? 0) * 1000 > Date.now() + 60000) {
