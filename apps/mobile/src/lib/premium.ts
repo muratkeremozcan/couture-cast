@@ -30,6 +30,7 @@ import {
   type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
 import { Platform } from 'react-native'
+import { revenueCatKeyEnv, selectRevenueCatApiKey } from './revenuecat-key'
 import { createMobileApiClient } from './api-client'
 import { withRequestTimeout } from './commerce'
 import { resolveMobileAccessToken } from './mobile-auth'
@@ -253,13 +254,11 @@ async function loadPurchasesModule(): Promise<PurchasesModule | null> {
 }
 
 function resolveRevenueCatApiKey(): string | undefined {
-  if (Platform.OS === 'ios') {
-    return process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY
-  }
-  if (Platform.OS === 'android') {
-    return process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
-  }
-  return undefined
+  return selectRevenueCatApiKey({
+    os: Platform.OS,
+    dev: __DEV__,
+    env: revenueCatKeyEnv(),
+  })
 }
 
 /**
