@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { minimatch } from 'minimatch'
 import { parse } from 'yaml'
+import {
+  BRIDGE_APP_DIR,
+  BRIDGE_UNIT_FILES,
+} from '../e2e-share-card/bridge-a11y-files.mjs'
 
 const read = (relative) =>
   readFileSync(fileURLToPath(new URL(relative, import.meta.url)), 'utf8')
@@ -45,9 +49,11 @@ const NOT_INPUTS = [
   'apps/**/*.spec.*',
   'apps/api/integration/**',
 ]
-// The app test files this workflow does run: its share-card-plugins gate suite.
-const pluginSuite = JSON.parse(read('./node-test-suites.json')).suites[
-  'share-card-plugins'
+// The app test files this workflow does run, from their own sources: its
+// share-card-plugins gate suite and the unit files bridge-a11y.mjs runs.
+const pluginSuite = [
+  ...JSON.parse(read('./node-test-suites.json')).suites['share-card-plugins'],
+  ...BRIDGE_UNIT_FILES.map((file) => `${BRIDGE_APP_DIR}/${file}`),
 ]
 const isInput = (file) =>
   file === '.github/workflows/pr-share-card-native.yml' ||

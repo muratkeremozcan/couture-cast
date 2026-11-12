@@ -25,13 +25,16 @@ on:
       - '.github/actions/**'
       - '.github/workflows/pr-share-card-native.yml'
       - '!**/*.md'
-      # App unit and integration tests run in other workflows, except the two plugin suites
-      # this workflow's share-card-plugins gate runs (scripts/ci/node-test-suites.json).
+      # App unit and integration tests run in other workflows, except the ones this workflow
+      # runs: the share-card-plugins gate suite (scripts/ci/node-test-suites.json) and the
+      # unit files of bridge-a11y.mjs (scripts/e2e-share-card/bridge-a11y-files.mjs).
       - '!apps/**/*.test.*'
       - '!apps/**/*.spec.*'
       - '!apps/api/integration/**'
       - 'apps/mobile/plugins/with-share-card-permissions.test.js'
       - 'apps/mobile/plugins/with-story68-release-network.test.js'
+      - 'apps/mobile/components/share-card-composer.test.tsx'
+      - 'apps/mobile/src/lib/share-card-focus.spec.ts'
   schedule:
     - cron: '17 3 * * *'
   workflow_dispatch:
