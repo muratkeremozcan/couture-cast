@@ -159,3 +159,20 @@ test('Playwright jobs beside pr-checks leave the helper unit tests to its playwr
   assert.equal(unit.name, 'Playwright helper unit tests')
   assert.equal(unit.steps.at(-1).run, 'npm run test:playwright-unit')
 })
+
+test('burn-in reads the SKIP_BURN_IN label as it is now, so a rerun after adding it skips', () => {
+  // A rerun keeps the original event's labels (PR 212 review), so the payload check in the
+  // caller only covers labels present at push time.
+  const plan = workflow('rwf-burn-in.yml').jobs.plan
+  assert.equal(plan.permissions['pull-requests'], 'read')
+  const current = plan.steps.find((s) => s.id === 'current_label')
+  assert.ok(current, 'the plan reads the current labels')
+  assert.match(current.run, /gh api "repos\/\$REPO\/issues\/\$PR\/labels"/)
+  assert.match(current.run, /SKIP_BURN_IN/)
+  const detect = plan.steps.find((s) => s.id === 'detect-changed')
+  assert.match(String(detect.if), /steps\.current_label\.outputs\.skip != 'true'/)
+  assert.ok(
+    plan.steps.indexOf(current) < plan.steps.indexOf(detect),
+    'the label is read before the changed specs'
+  )
+})

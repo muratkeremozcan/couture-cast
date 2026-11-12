@@ -38,6 +38,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      # Reads the pull request's labels as they are now.
+      pull-requests: read
     outputs:
       changed: ${{ steps.detect-changed.outputs.changed }}
       base-ref: ${{ steps.base-ref.outputs.value }}
@@ -68,8 +70,31 @@ jobs:
           echo "value=$EFFECTIVE_BASE_REF" >> "$GITHUB_OUTPUT"
           echo "Resolved base ref: $EFFECTIVE_BASE_REF"
 
+      # The caller checks the labels of the event that started the run, and a rerun keeps
+      # that event, so a SKIP_BURN_IN label added before a rerun is read here, from the API. A
+      # failed read runs burn-in.
+      - name: Read the SKIP_BURN_IN label as it is now
+        id: current_label
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if ! labels=$(gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name'); then
+            echo "::warning::Could not read the pull request's labels; running burn-in."
+            labels=''
+          fi
+          if printf '%s\n' "$labels" | grep -qx SKIP_BURN_IN; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "The SKIP_BURN_IN label is on the pull request now; skipping burn-in."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Detect changed Playwright specs
         id: detect-changed
+        if: ${{ !cancelled() && steps.current_label.outputs.skip != 'true' }}
         run: |
           BASE_REF="${{ steps.base-ref.outputs.value }}"
           if [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]; then

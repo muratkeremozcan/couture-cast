@@ -98,7 +98,10 @@ export const LOCAL_NEEDS = {
  */
 export const LOCAL_COMMANDS = {
   'native-harness': [
-    { command: 'jq', how: 'install jq (brew install jq, or apt-get install jq)' },
+    {
+      command: 'jq',
+      how: 'install jq with your package manager (brew install jq on macOS)',
+    },
   ],
 }
 
