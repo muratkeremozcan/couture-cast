@@ -101,6 +101,73 @@ async function flushBatches() {
       batches.push(await decode(request.body))
   return batches
 }
+const remoteConfig = {
+  logs: { captureConsoleLogs: true },
+  sessionRecording: { endpoint: '/s/' },
+  surveys: true,
+}
+// A guardian invitation token as the API issues it: a JWT whose payload names the teen
+// and the guardian's email.
+const invitationToken =
+  'eyJhbGciOiJIUzI1NiJ9.eyJ0ZWVuSWQiOiJ0ZWVuLTEiLCJndWFyZGlhbkVtYWlsIjoiZ0BleC50ZXN0In0.c2lnbmF0dXJl'
+async function bodyText(body: unknown): Promise<string> {
+  if (body instanceof Blob) {
+    const bytes = await readBlob(body)
+    try {
+      return gunzipSync(bytes).toString('utf8')
+    } catch {
+      return new TextDecoder().decode(bytes)
+    }
+  }
+  const text = typeof body === 'string' ? body : JSON.stringify(body ?? null)
+  // Flags and config requests with base64 compression send `data=<base64 JSON>`.
+  return text.startsWith('data=')
+    ? Buffer.from(decodeURIComponent(text.slice(5)), 'base64').toString('utf8')
+    : text
+}
+/**
+ * Lets the request queue flush, then returns the captured events and every request to
+ * /ingest (URL and decoded body, flags and config included) as one string.
+ */
+async function drain() {
+  await vi.advanceTimersByTimeAsync(3500)
+  const events: SerializedEvent[] = []
+  const bodies: string[] = []
+  for (const request of wire.requests.splice(0)) {
+    const text = await bodyText(request.body)
+    bodies.push(request.url, text)
+    if (/^\/ingest\/(e|i\/v0\/e)\//.test(request.url)) {
+      const parsed = JSON.parse(text) as SerializedEvent | SerializedEvent[]
+      events.push(...(Array.isArray(parsed) ? parsed : [parsed]))
+    }
+  }
+  return { events, serialized: bodies.join('\n') }
+}
+const invitationPath = `/guardian/accept?token=${invitationToken}&email=teen%40example.test#frag-teen`
+const personalUuid = '01234567-89ab-cdef-0123-456789abcdef'
+function expectNoLeak(serialized: string) {
+  for (const leak of [
+    invitationToken,
+    'eyJ',
+    'teen@example.test',
+    'teen%40example.test',
+    'frag-teen',
+    'Alice',
+    'alice',
+    '2011-04-01',
+    personalUuid,
+    'guardian-secret',
+    'case-123',
+    'post-123',
+    'private-photo',
+    'photo-secret',
+    'private-campaign',
+    'member@example.test',
+  ])
+    expect(serialized).not.toContain(leak)
+}
+let firstVisit: Awaited<ReturnType<typeof drain>>
+let firstVisitStorage = ''
 // The web client sends every allowlisted key: the business keys, its locale, the GeoIP,
 // IP and person profile switches and the SDK identity and transport keys.
 const WEB_ALLOWLIST = [...SHARE_CARD_SHARED_ALLOWED_PROPERTIES].sort()
@@ -117,11 +184,26 @@ const shareProperties = {
 beforeAll(async () => {
   vi.useFakeTimers({ shouldAdvanceTime: true, toFake: ['setTimeout', 'clearTimeout'] })
   vi.stubEnv('POSTHOG_API_KEY', 'phc_wire_test')
-  window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
+  // A fresh visitor whose first page is the guardian invitation link.
+  window.localStorage.clear()
+  window.sessionStorage.clear()
+  window.history.pushState({}, '', invitationPath)
+  // The project's remote config, preloaded the way the token-specific array.js bundle
+  // delivers it, with console log capture, replay and surveys switched on remotely.
+  ;(window as unknown as { _POSTHOG_REMOTE_CONFIG: object })._POSTHOG_REMOTE_CONFIG = {
+    phc_wire_test: { config: remoteConfig },
+  }
   initializeBrowserAnalytics()
+  firstVisit = await drain()
+  firstVisitStorage = JSON.stringify([
+    ...Object.entries(window.localStorage),
+    ...Object.entries(window.sessionStorage),
+    document.cookie,
+  ])
+  window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
   posthog.register({ plan_tier: 'premium' })
   posthog.identify('member-123', { email: 'member@example.test' })
-  await flushBatches()
+  await drain()
 })
 afterAll(() => {
   vi.useRealTimers()
@@ -173,12 +255,121 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     const serialized = JSON.stringify(share)
     for (const leak of ['post-123', 'private-campaign', 'premium', 'member@example.test'])
       expect(serialized).not.toContain(leak)
-    // Every other event keeps what posthog-js gave it.
+    // Every other event keeps its own allowlist: no super property, a route URL.
     const other = events.find(({ event }) => event === 'ritual_created')
     expect(other?.properties).toMatchObject({
-      plan_tier: 'premium',
-      $current_url: expect.stringContaining('post-123') as string,
+      ritual_type: 'daily_outfit',
+      $current_url: expect.stringMatching(/^http:\/\/localhost:\d+\/:unknown$/) as string,
     })
+    expect(other?.properties).not.toHaveProperty('plan_tier')
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: a fresh client on the invitation page sends nothing personal', () => {
+    // No feature flag or remote config request at all, so no person properties leave.
+    const requests = firstVisit.serialized
+      .split('\n')
+      .filter((line) => line.startsWith('/ingest'))
+    expect(requests.length).toBeGreaterThan(0)
+    for (const url of requests) expect(url).not.toMatch(/\/(flags|decide|config)\b/)
+    const pageview = firstVisit.events.find(({ event }) => event === '$pageview')
+    expect(pageview?.properties).toMatchObject({
+      $current_url: expect.stringMatching(
+        /^http:\/\/localhost:\d+\/guardian\/accept$/
+      ) as string,
+      $pathname: '/guardian/accept',
+    })
+    for (const event of firstVisit.events) {
+      expect(event).not.toHaveProperty('$set')
+      expect(event).not.toHaveProperty('$set_once')
+    }
+    expectNoLeak(firstVisit.serialized)
+    // What the SDK keeps on the device holds no credential, and the cookie no URL.
+    for (const leak of [
+      invitationToken,
+      'eyJ',
+      'teen%40example.test',
+      'teen@example.test',
+    ])
+      expect(firstVisitStorage).not.toContain(leak)
+    expect(firstVisitStorage).not.toContain('$initial_person_info')
+    expect(document.cookie).not.toContain('guardian')
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: paths leave as known route templates only', async () => {
+    window.history.pushState({}, '', invitationPath)
+    try {
+      posthog.capture('deep_link_invalid', {
+        rawUrl: window.location.href,
+        reason: `token=${invitationToken}`,
+        surface: 'web',
+      })
+      window.history.pushState(
+        {},
+        '',
+        '/moderation/cases/case-123?note=teen%40example.test'
+      )
+      window.history.pushState({}, '', '/profile/alice-smith/reset/guardian-secret')
+      browserAnalytics.capture('external_link_tapped', {
+        url: 'https://weather.example/alerts/alice-smith?email=teen@example.test',
+      })
+      const { events, serialized } = await drain()
+      const invalid = events.find(({ event }) => event === 'deep_link_invalid')
+      expect(invalid?.properties).toMatchObject({
+        rawUrl: expect.stringMatching(/\/guardian\/accept$/) as string,
+        surface: 'web',
+      })
+      expect(invalid?.properties).not.toHaveProperty('reason')
+      const paths = events
+        .filter(({ event }) => event === '$pageview')
+        .map(({ properties }) => properties.$pathname)
+      expect(paths).toEqual(
+        expect.arrayContaining(['/moderation/cases/:param', '/:unknown'])
+      )
+      const external = events.find(({ event }) => event === 'external_link_tapped')
+      expect(external?.properties.url).toBe('https://weather.example')
+      expectNoLeak(serialized)
+    } finally {
+      window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
+    }
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: exceptions leave as type and code locations only', async () => {
+    const error = new Error(
+      `Invalid token=guardian-secret for Alice Smith, DOB 2011-04-01, email teen%40example.test ${invitationToken} https://cdn.test/private/${personalUuid}/private-photo.jpg?token=photo-secret`
+    )
+    posthog.captureException(error)
+    const { events, serialized } = await drain()
+    const exception = events.find(({ event }) => event === '$exception')
+    expect(Object.keys(exception!.properties)).not.toContain('$exception_values')
+    const [entry] = exception!.properties.$exception_list as {
+      type: string
+      value: string
+      stacktrace: { frames: Record<string, unknown>[] }
+    }[]
+    expect(entry!.type).toBe('Error')
+    expect(entry!.value).toBe('redacted')
+    for (const frame of entry!.stacktrace.frames) {
+      expect(Object.keys(frame).sort()).toEqual(
+        expect.arrayContaining(['filename', 'in_app'])
+      )
+      expect(frame.filename).toMatch(/^(?:<unknown>|[A-Za-z0-9_.-]+)$/)
+    }
+    expectNoLeak(serialized)
+  })
+
+  it('U-ANALYTICS-PRIVACY-WEB: a remote config that turns on console logs never loads the logs extension', async () => {
+    await vi.advanceTimersByTimeAsync(1000)
+    const scriptSources = [...document.querySelectorAll('script')].map(
+      (script) => script.src
+    )
+    expect(scriptSources.filter((src) => /\/static\/logs\.js/.test(src))).toEqual([])
+    expect(
+      scriptSources.filter((src) => /recorder|surveys|config\.js/.test(src))
+    ).toEqual([])
+    expect(
+      (window as unknown as { __PosthogExtensions__?: { logs?: unknown } })
+        .__PosthogExtensions__?.logs
+    ).toBeUndefined()
   })
 
   it.each(['throw', 'null'] as const)(

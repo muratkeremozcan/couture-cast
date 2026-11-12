@@ -11,6 +11,7 @@ Updated: 2026-11-10 (database egress): the community worker's idle backoff, park
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
 Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
+Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -242,6 +243,7 @@ The mobile app is configured under [apps/mobile](../../apps/mobile/). Its
 
 - the app version source is local;
 - native version numbers auto-increment;
+- builds load the `production` EAS environment (see [Production analytics](#production-analytics));
 - Android produces an app bundle;
 - iOS requests the `m-medium` resource class;
 - an empty production submit profile exists.
@@ -278,6 +280,106 @@ The repository also contains a root [app.json](../../app.json) with a different 
 configuration is expected to win on those paths. Running Expo or EAS from the repository root can
 select the competing root configuration. The repo does not explain or test the intended ownership
 of the root file.
+
+## Production analytics
+
+Web and mobile read one variable, `POSTHOG_API_KEY`: web inlines it at build time through
+[next.config.ts](../../apps/web/next.config.ts), and mobile reads it through
+[app.config.ts](../../apps/mobile/app.config.ts) into `extra.posthogApiKey`. Without it each client
+stays inert.
+
+| PostHog project           | Used by                             | Where the key lives                                                                             |
+| ------------------------- | ----------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 329012 `couturecast-prod` | Production API, worker, web, mobile | Vercel `couture-cast-api` Production, Northflank, `.env.prod`; web and EAS after the step below |
+| 327096 `couturecast-dev`  | Local and Preview                   | `.env.local`, `.env.preview`, Vercel `couture-cast-api` Preview and Development                 |
+
+CoutureCast has members aged 13 to 15 with guardian consent, and members upload wardrobe photos.
+The clients therefore send explicit events, pageviews or screens, and exceptions only, and every
+boundary where data leaves the device is a closed allowlist:
+
+- Autocapture is off in every environment: web turns off autocapture, rage clicks, dead clicks and
+  heatmaps; mobile passes `autocapture={false}`. Feature code sends named events, and the mobile
+  root layout sends screens.
+- Session recording, surveys, product tours and conversations are off.
+- No feature flag or remote config request is made: neither app reads a PostHog flag, so web sets
+  `advanced_disable_flags` and mobile sets `preloadFeatureFlags: false` and
+  `disableRemoteConfig: true`. A `/flags` request would otherwise carry the initial URL in person
+  properties outside `before_send`. Web also stores no initial URL, referrer or campaign
+  properties (`save_referrer` and `save_campaign_params` are off), and masks `token`,
+  `focusToken` and `email` in the session entry URL posthog-js keeps in localStorage.
+- posthog-js may load only its exception autocapture script from `/ingest/static/`, so no remote
+  setting can start console logs (whose exporter bypasses `before_send`), replay, surveys,
+  toolbar, web vitals or site apps.
+- Every web response carries `Referrer-Policy: strict-origin`, so no request from a page (to our
+  API, PostHog or a partner) carries its path or query as Referer. Nothing in the web app or the
+  API reads a same-origin Referer path.
+- `/ingest` is served by a route handler
+  ([posthog-ingest-proxy.ts](../../apps/web/src/lib/posthog-ingest-proxy.ts)) that forwards
+  only the method, the exact path and query, the body, `Content-Type` and `Accept`, and only for
+  the event endpoints and the exception autocapture script; any other path answers 404. Referer, cookies, the client IP and every other header stay on our origin, so
+  PostHog sees our server's address and derives no member location from it. Each proxied
+  request, upstream response body included, ends when the browser leaves or after 5 seconds
+  (the route's `maxDuration` of 10 seconds is the platform backstop), and an event body over
+  1 MB answers 413.
+- Person profiles are created for identified users only, and the clients never identify.
+- Every event either client sends carries `$geoip_disable: true`, `$ip: null` and
+  `$process_person_profile: false`, set by the privacy filter after its copy, and the mobile
+  SDK runs with `disableGeoip: true`, so PostHog adds no location. PostHog fills a null `$ip`
+  from the request, and mobile requests reach it directly from the device, so production
+  project 329012 must also have Discard client IP data (`anonymize_ips`) on: turned on
+  2026-11-12, and the hourly PostHog flag drift check fails if it is ever off.
+- `webAnalyticsPrivacyFilter` and `mobileAnalyticsPrivacyFilter` in
+  [@couture/api-client](../../packages/api-client/src/analytics-privacy.ts) run first in the
+  `before_send` chains:
+  - an event outside `ANALYTICS_EVENT_PROPERTIES` or the platform's SDK events is dropped;
+  - each event keeps only its listed properties, and a string survives only as an enum member, a
+    route template, an origin, a host, an SDK identifier or version, or a timestamp. Reasons are
+    fixed codes; ids, labels, titles and free text are dropped. Affiliate `partner_id`,
+    `offer_id` and `recommendation_id` are the one exception: server-issued catalog ids, kept
+    when they match a strict id pattern;
+  - SDK properties are limited to browser, OS, device, library, app version, screen size,
+    timestamps, session and anonymous ids, and the route-reduced page fields;
+  - paths, URLs and screens are matched against the routes in
+    [analytics-routes.ts](../../packages/api-client/src/analytics-routes.ts): a known route keeps
+    its static segments and sends `:param` for dynamic ones, anything else is `/:unknown`, and
+    external URLs and referrers keep their origin only. A test derives the route lists from
+    `apps/web/src/app` and `apps/mobile/app` and fails when a route is added without updating
+    them, and another fails when client code captures an event that has no allowlist entry;
+  - exceptions keep their type and in-app frames as file basename, line and column; the message
+    is replaced with `redacted`. Web stack frames therefore lose the full script URL that
+    PostHog uses for source map lookup;
+  - `$set` and `$set_once` never leave.
+
+The configuration lives in [browser-analytics.ts](../../apps/web/src/analytics/browser-analytics.ts)
+and [posthog.ts](../../apps/mobile/src/config/posthog.ts). The `U-ANALYTICS-PRIVACY-WEB` and
+`U-ANALYTICS-PRIVACY-MOBILE` wire tests start a fresh client on the guardian invitation link,
+decode every request the real SDKs make (event batches and any base64 `data=` body), and assert
+that no flags or config request happens and that no token, email, name, birth date, personal
+UUID or personal path segment appears. They also assert that a remote config asking for console
+logs never loads the logs extension. `npm run test:analytics-privacy --workspace apps/web` runs
+the web app (`next dev`, production analytics init) in real Chromium with a local receiver in
+place of PostHog, opens the invitation link, and asserts no request line, header or decoded body
+the receiver gets carries the token, the email or the fragment. It needs no database and runs in
+the PR Lighthouse job, which already installs Chromium.
+
+### Post-merge step: add the production keys
+
+Web Production and the EAS `production` environment hold no PostHog key until the privacy policy
+above is on `main`, so no production build ships an older client with a key. After the PR that
+adds it merges, add the key for project 329012 (the `POSTHOG_API_KEY` value in `.env.prod`) to:
+
+```bash
+# Vercel couture-cast-web, Production only; preview and development stay without a key.
+vercel env add POSTHOG_API_KEY -e production --no-sensitive \
+  --project couture-cast-web --scope muratkeremozcans-projects < key-file
+# EAS production environment, from apps/mobile.
+eas env:create --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
+  --visibility plaintext --scope project --type string --non-interactive
+```
+
+Web picks up the key on its next production deployment, so redeploy production web after adding
+it. Mobile binaries read the key at build time, so a shipped binary starts sending analytics only
+from its next production EAS build.
 
 ## Environment separation
 
@@ -1367,13 +1469,15 @@ event.
 | Vercel `couture-cast-api`, development and preview | 327096         | unchanged                     |
 | Northflank `couture-cast/community-worker`         | 329012         | 17:50:24, 2026-11-11          |
 | `.env.prod`                                        | 329012         | 2026-11-11                    |
-| Vercel `couture-cast-web`, every target            | none           | owner decision pending        |
-| EAS `production` environment                       | none           | owner decision pending        |
+| Vercel `couture-cast-web`, production target       | 329012         | post-merge step, PR #207      |
+| Vercel `couture-cast-web`, development and preview | none           | unchanged                     |
+| EAS `production` environment                       | 329012         | post-merge step, PR #207      |
 
 - Event history before the switch stays in 327096. Worker events reach 329012 from 17:50:38;
   327096 received no production event after 17:50.
-- Web and mobile production carry no PostHog key, so they send nothing. Setting one turns on
-  autocapture, pageviews and exception capture for production users, which is an owner decision.
+- The owner turned on web and mobile production analytics on 2026-11-11, in the privacy-safe
+  configuration under "Production analytics". Their keys are added only after that configuration
+  is on `main` (see "Post-merge step: add the production keys").
   A mobile binary keeps whatever key it was built with until its next build; `app.config.ts`
   loads `.env.local` before `.env.prod`, so a production build made on a laptop takes the local
   key.
@@ -1395,11 +1499,14 @@ the script's `INTENTIONAL_OVERRIDES` pins another with its reason. Today that is
 production, and the code default stays `false` so a degraded PostHog fails closed).
 
 - Definition, read through the PostHog API with the repository secret `POSTHOG_FLAG_READ_KEY`
-  (a personal API key limited to `feature_flag:read` on 329012): the flag exists, is active,
+  (a personal API key limited to `feature_flag:read` and `project:read` on 329012): the flag
+  exists, is active,
   boolean, evaluated server-side, and released to everyone at the expected value. Every release
   group has no property or cohort filter and a 0 or 100 percent rollout, with no super group,
   early exit, holdout, early-access enrollment, group aggregation or remote configuration. This is what
   proves a rollout is uniform; probes cannot see a cohort or a 1 percent rollout they miss.
+- Project settings, read with the same key: Discard client IP data (`anonymize_ips`) must be on,
+  since the analytics privacy boundary depends on it (see the PostHog privacy section).
 - Runtime: `/flags` with the project token in the repository variable
   `POSTHOG_PROD_PROJECT_TOKEN` and the API adapter's server User-Agent, for 12 synthetic
   subjects. It fails when PostHog omits a key (missing, inactive or not evaluated server-side),

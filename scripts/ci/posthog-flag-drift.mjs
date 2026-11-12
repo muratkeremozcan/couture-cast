@@ -148,6 +148,48 @@ export async function readFlagDefinitions({
   return definitions
 }
 
+/**
+ * The production project's settings, read with the same key (it needs project:read as well as
+ * feature_flag:read). An HTTP error or a body that is not a project is an error, never a pass.
+ */
+export async function readProjectPrivacy({
+  key,
+  projectId = PRODUCTION_PROJECT_ID,
+  appHost = DEFAULT_APP_HOST,
+  fetchImpl = fetch,
+}) {
+  const response = await fetchImpl(
+    `${appHost.replace(/\/+$/, '')}/api/projects/${projectId}/`,
+    { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10_000) }
+  )
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}))
+    throw new Error(
+      `reading project settings returned HTTP ${response.status}` +
+        (typeof body?.detail === 'string' ? ` (${body.detail})` : '')
+    )
+  }
+  const project = await response.json()
+  if (typeof project !== 'object' || project === null || Array.isArray(project))
+    throw new Error('the project answer has no project settings')
+  if (String(project.id) !== String(projectId))
+    throw new Error(`the project answer is for project ${project.id}, not ${projectId}`)
+  return project
+}
+
+/**
+ * Project settings the analytics privacy boundary depends on. Mobile events go from the device
+ * straight to PostHog, and PostHog fills the null $ip the privacy filter sends from the request,
+ * so only the project's Discard client IP data setting keeps the address out of storage.
+ */
+export function projectPrivacyProblems(project) {
+  return project.anonymize_ips === true
+    ? []
+    : [
+        'Discard client IP data (anonymize_ips) is off, so PostHog stores the IP of every mobile event',
+      ]
+}
+
 const empty = (value) => value == null || (Array.isArray(value) && value.length === 0)
 
 /** Flag-level settings that make a flag anything but a plain server-side boolean. */
@@ -260,6 +302,70 @@ export function describeDrift(result) {
   return lines
 }
 
+/**
+ * Every production check, each reported on its own: the project settings, the flag definitions
+ * and, when the definitions are sound, the runtime probes. One failing check never hides
+ * another, so a settings problem still shows flag drift in the same run. Returns the failure
+ * messages, empty when production agrees.
+ */
+export async function checkProduction({
+  expected,
+  token,
+  readKey,
+  host,
+  fetchImpl,
+  wait,
+}) {
+  const failures = []
+  try {
+    const problems = projectPrivacyProblems(
+      await readProjectPrivacy({ key: readKey, fetchImpl })
+    )
+    if (problems.length)
+      failures.push(
+        ['Production project 329012 breaks the analytics privacy settings:']
+          .concat(problems.map((problem) => `${problem}.`))
+          .join('\n')
+      )
+  } catch (error) {
+    failures.push(`Could not read the production project settings: ${error.message}.`)
+  }
+  let definitionDrift
+  try {
+    definitionDrift = checkDefinitions(
+      await readFlagDefinitions({ key: readKey, fetchImpl }),
+      expected
+    )
+  } catch (error) {
+    failures.push(`Could not read the production flag definitions: ${error.message}.`)
+    return failures
+  }
+  if (definitionDrift.length) {
+    failures.push(
+      ['Production flag definitions disagree with the declared flags:']
+        .concat(definitionDrift.map(({ key, problem }) => `${key}: ${problem}.`))
+        .join('\n')
+    )
+    return failures
+  }
+  const result = await checkFlagDrift({ expected, token, host, fetchImpl, wait })
+  if (result.unavailable) {
+    failures.push(
+      `PostHog gave no definitive answer after 3 attempts: ${result.unavailable}.`
+    )
+    return failures
+  }
+  const drift = describeDrift(result)
+  if (drift.length)
+    failures.push(
+      `${['Production PostHog disagrees with the declared flags:', ...drift].join('\n')}\n` +
+        'Create a missing flag as an active boolean, release it to everyone at its declared ' +
+        'default, or pin an intentional value with its reason in INTENTIONAL_OVERRIDES ' +
+        '(deployment guide, PostHog flag drift).'
+    )
+  return failures
+}
+
 async function main() {
   const token = process.env.POSTHOG_PROD_PROJECT_TOKEN
   if (!token) {
@@ -277,43 +383,18 @@ async function main() {
   if (!readKey) {
     console.error(
       'POSTHOG_FLAG_READ_KEY is not set: the definition check needs a personal API key with ' +
-        'feature_flag:read on project 329012.'
+        'feature_flag:read and project:read on project 329012.'
     )
     return 2
   }
-  let definitionDrift
-  try {
-    definitionDrift = checkDefinitions(
-      await readFlagDefinitions({ key: readKey }),
-      expected
-    )
-  } catch (error) {
-    console.error(`Could not read the production flag definitions: ${error.message}.`)
-    return 1
-  }
-  if (definitionDrift.length) {
-    console.error(
-      ['Production flag definitions disagree with the declared flags:']
-        .concat(definitionDrift.map(({ key, problem }) => `${key}: ${problem}.`))
-        .join('\n')
-    )
-    return 1
-  }
-  const result = await checkFlagDrift({ expected, token, host: process.env.POSTHOG_HOST })
-  if (result.unavailable) {
-    console.error(
-      `PostHog gave no definitive answer after 3 attempts: ${result.unavailable}.`
-    )
-    return 1
-  }
-  const drift = describeDrift(result)
-  if (drift.length) {
-    console.error(
-      `${['Production PostHog disagrees with the declared flags:', ...drift].join('\n')}\n` +
-        'Create a missing flag as an active boolean, release it to everyone at its declared ' +
-        'default, or pin an intentional value with its reason in INTENTIONAL_OVERRIDES ' +
-        '(deployment guide, PostHog flag drift).'
-    )
+  const failures = await checkProduction({
+    expected,
+    token,
+    readKey,
+    host: process.env.POSTHOG_HOST,
+  })
+  if (failures.length) {
+    console.error(failures.join('\n'))
     return 1
   }
   console.log(

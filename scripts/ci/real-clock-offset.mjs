@@ -22,9 +22,10 @@ function installShiftedClock(offsetDays) {
   const now = () => RealDate.now() + offsetMs
 
   // A function with the real prototype, so `instanceof Date` holds for dates from either constructor.
+  // Constructing through new.target keeps a subclass (`class Stamp extends Date`) and its methods.
   function ShiftedDate(...args) {
     if (!new.target) return new RealDate(now()).toString()
-    return args.length === 0 ? new RealDate(now()) : new RealDate(...args)
+    return Reflect.construct(RealDate, args.length === 0 ? [now()] : args, new.target)
   }
   Object.setPrototypeOf(ShiftedDate, RealDate)
   ShiftedDate.prototype = RealDate.prototype

@@ -15,6 +15,7 @@
       }
     },
     "production": {
+      "environment": "production",
       "releaseChannel": "production",
       "autoIncrement": true,
       "ios": {

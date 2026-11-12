@@ -1,6 +1,7 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Linking } from 'react-native'
 import { PostHog } from 'posthog-react-native'
 import type * as PostHogModule from 'posthog-react-native'
 import type * as ApiClientModule from '@couture/api-client'
@@ -44,9 +45,10 @@ import {
   SHARE_CARD_SHARED_ALLOWED_PROPERTIES,
   sanitizeShareCardSharedProperties,
 } from '@couture/api-client'
-import { mobilePostHogBeforeSend } from './posthog'
+import { mobilePostHogPrivacyOptions } from './posthog'
 import { createMobileAnalyticsClient } from '../analytics/mobile-analytics'
 import { trackMobileShareCardShared } from '../analytics/track-events'
+import { processMobileDeepLink } from '../lib/mobile-deep-link-handler'
 quiet()
 
 type Batch = { api_key: string; batch: Record<string, unknown>[]; sent_at: string }
@@ -82,7 +84,7 @@ beforeEach(() => {
           seenBeforeSanitizing.push({ ...event.properties })
         return event
       },
-      mobilePostHogBeforeSend,
+      ...mobilePostHogPrivacyOptions.before_send,
     ],
   })
 })
@@ -123,7 +125,7 @@ async function captureShare() {
     $set: { email: 'member@example.com' },
     $set_once: { first_url: sensitiveUrl },
   })
-  client.capture('app_opened', { locale: 'en-US' })
+  client.capture('tab_one_viewed', { locale: 'en-US' })
 }
 
 describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => {
@@ -200,11 +202,34 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       duration_ms: 2150,
       locale: 'en-US',
     })
-    // Other events keep their own properties: the allowlist is share-specific.
-    const opened = request!.batch.find((item) => item.event === 'app_opened')
-    expect((opened?.properties as Record<string, unknown>).$current_url).toBe(
-      sensitiveUrl
-    )
+    // Other events keep their own allowlist: no super property, a route URL.
+    const viewed = request!.batch.find((item) => item.event === 'tab_one_viewed')
+    expect(viewed?.properties).toMatchObject({
+      locale: 'en-US',
+      $current_url: 'https://couturecast.app/:unknown',
+      // PostHog adds no location, keeps no IP and builds no person for any event.
+      $geoip_disable: true,
+      $ip: null,
+      $process_person_profile: false,
+    })
+    expect(viewed?.properties).not.toHaveProperty('registered_super_property')
+  })
+
+  it('U-ANALYTICS-PRIVACY-MOBILE: sends no person update or personal property on the wire', async () => {
+    await client.ready()
+    client.identify('member-123', { email: 'member@example.com', name: 'Alice Smith' })
+    client.capture('tab_one_viewed', {
+      locale: 'en-US',
+      email: 'member@example.com',
+      birthdate: '2011-04-01',
+      $set: { firstName: 'Alice' },
+    })
+    const items = (await flushedBatches()).flatMap((batch) => batch.batch)
+    expect(items.map((item) => item.event)).not.toContain('$identify')
+    expect(propertiesOf(items, 'tab_one_viewed')).toMatchObject({ locale: 'en-US' })
+    const serialized = JSON.stringify(items)
+    for (const leak of ['member@example.com', 'Alice', '2011-04-01'])
+      expect(serialized).not.toContain(leak)
   })
 
   it.each([
@@ -224,7 +249,7 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       const batches = await flushedBatches()
       const items = batches.flatMap((batch) => batch.batch)
       expect(items.filter((item) => item.event === 'share_card_shared')).toEqual([])
-      expect(items.map((item) => item.event)).toContain('app_opened')
+      expect(items.map((item) => item.event)).toContain('tab_one_viewed')
       // One closed code per dropped share event, never the event or its properties.
       expect(new Set(warn.mock.calls.flat())).toEqual(
         new Set([
@@ -235,6 +260,178 @@ describe('I-SHARE-WIRE-MOBILE: the serialized share_card_shared request', () => 
       )
     }
   )
+})
+
+// A guardian invitation token as the API issues it: a JWT whose payload names the teen
+// and the guardian's email, delivered to the app as a cold-start link.
+const invitationToken =
+  'eyJhbGciOiJIUzI1NiJ9.eyJ0ZWVuSWQiOiJ0ZWVuLTEiLCJndWFyZGlhbkVtYWlsIjoiZ0BleC50ZXN0In0.c2lnbmF0dXJl'
+const invitationLink = `couturecast://guardian-accept?token=${invitationToken}&email=teen%40example.test#frag-teen`
+
+/**
+ * Runs `scenario` against a real client built with the app's privacy options and
+ * returns every batch item it sent, decoded from the request body.
+ */
+async function privacyBatch(scenario: (privacyClient: PostHog) => Promise<void>) {
+  vi.spyOn(Linking, 'getInitialURL').mockResolvedValue(invitationLink)
+  fetchMock.mockClear()
+  const privacyClient = new PostHog('phc_wire_test', {
+    host: 'https://wire.test',
+    persistence: 'memory',
+    flushAt: 100,
+    flushInterval: 0,
+    fetchRetryCount: 0,
+    // The app's own privacy options decide flags and remote config here.
+    ...mobilePostHogPrivacyOptions,
+    // Exceptions are captured explicitly below; the runner keeps its own global handlers.
+    errorTracking: { autocapture: false },
+    // The automatic lifecycle path: Application Opened carries the cold-start link.
+    captureAppLifecycleEvents: true,
+  })
+  try {
+    await privacyClient.ready()
+    await scenario(privacyClient)
+    await vi.waitFor(async () => {
+      await privacyClient.flush()
+      const items = await sentItems()
+      expect(items.map((item) => item.event)).toContain('Application Opened')
+    })
+    return await sentItems()
+  } finally {
+    await privacyClient.shutdown()
+  }
+}
+async function sentItems() {
+  const items: Record<string, unknown>[] = []
+  for (const [url, init] of fetchMock.mock.calls as [string, RequestInit][])
+    if (String(url).endsWith('/batch/')) items.push(...(await bodyOf(init)).batch)
+  return items
+}
+const propertiesOf = (items: Record<string, unknown>[], event: string) =>
+  items.find((item) => item.event === event)?.properties as Record<string, unknown>
+const personalUuid = '01234567-89ab-cdef-0123-456789abcdef'
+const leaks = [
+  invitationToken,
+  'eyJ',
+  'teen@example.test',
+  'teen%40example.test',
+  'frag-teen',
+  'Alice',
+  'alice',
+  '2011-04-01',
+  personalUuid,
+  'guardian-secret',
+  'post-123',
+  'card-9',
+  'private-photo',
+  'photo-secret',
+]
+/** Every request the client made, by URL: only event batches, never flags or config. */
+function requestUrls() {
+  return (fetchMock.mock.calls as [string, RequestInit][]).map(([url]) => String(url))
+}
+
+describe('U-ANALYTICS-PRIVACY-MOBILE: the serialized batch', () => {
+  it('sends link URLs as origin and route template only', async () => {
+    const items = await privacyBatch(async (privacyClient) => {
+      const analytics = createMobileAnalyticsClient(privacyClient)
+      await privacyClient.screen('/community', {
+        previous_screen: '/profile/alice-smith',
+      })
+      await privacyClient.screen('/community/post-123')
+      await processMobileDeepLink({
+        params: { source: 'bad_source', email: 'teen@example.test', cardId: 'card-9' },
+        locale: 'en-US',
+        analytics,
+        setWidgetScenario: vi.fn(),
+        setForecastSlot: vi.fn(),
+        setFocusedWeatherAlert: vi.fn(),
+        setIsInvalidDeepLink: vi.fn(),
+        pushToCommunity: vi.fn(),
+      })
+      analytics.capture('external_link_tapped', {
+        url: 'https://weather.example/alerts/alice-smith?ref=teen@example.test',
+      })
+    })
+    expect(propertiesOf(items, 'Application Opened').url).toBe(
+      'couturecast://guardian-accept'
+    )
+    const screens = items
+      .filter((item) => item.event === '$screen')
+      .map((item) => item.properties as Record<string, unknown>)
+    expect(screens[0]).toMatchObject({
+      $screen_name: '/community',
+      previous_screen: '/:unknown',
+    })
+    expect(screens[1]?.$screen_name).toBe('/:unknown')
+    for (const url of requestUrls()) expect(url).toMatch(/\/batch\/$/)
+    // Only known link parameter names: an unexpected name never leaves.
+    expect(propertiesOf(items, 'deep_link_invalid').param_keys).toEqual([
+      'cardId',
+      'source',
+    ])
+    expect(propertiesOf(items, 'external_link_tapped').url).toBe(
+      'https://weather.example'
+    )
+    const serialized = JSON.stringify(items)
+    for (const leak of leaks) expect(serialized).not.toContain(leak)
+  })
+
+  it('sends no caller object whose own serialization carries a token', async () => {
+    const tokenUrl = `https://couturecast.app/guardian/accept?token=${invitationToken}`
+    class LeakyArray<T> extends Array<T> {
+      toJSON() {
+        return tokenUrl
+      }
+    }
+    const keys = new LeakyArray<string>()
+    keys.push('source')
+    const items = await privacyBatch((privacyClient) => {
+      // posthog-react-native puts the original uuid back when before_send returns none.
+      privacyClient.capture('modal_opened', { locale: 'en-US' }, {
+        uuid: { toJSON: () => tokenUrl },
+      } as unknown as Parameters<PostHog['capture']>[2])
+      let reads = 0
+      privacyClient.capture('tab_two_viewed', {}, {
+        uuid: { toJSON: () => (++reads === 1 ? undefined : tokenUrl) },
+      } as unknown as Parameters<PostHog['capture']>[2])
+      privacyClient.capture('deep_link_invalid', {
+        param_keys: keys as unknown as string[],
+        surface: 'mobile',
+      })
+      return Promise.resolve()
+    })
+    expect(items.some((item) => item.event === 'modal_opened')).toBe(false)
+    expect(items.some((item) => item.event === 'tab_two_viewed')).toBe(false)
+    expect(propertiesOf(items, 'deep_link_invalid')).not.toHaveProperty('param_keys')
+    expect(propertiesOf(items, 'deep_link_invalid').surface).toBe('mobile')
+    expect(JSON.stringify(items)).not.toContain(invitationToken)
+  })
+
+  it('sends exceptions as type and code locations only', async () => {
+    const items = await privacyBatch((privacyClient) => {
+      privacyClient.captureException(
+        new Error(
+          `Invalid token=guardian-secret for Alice Smith, DOB 2011-04-01, email teen%40example.test ${invitationToken} https://cdn.test/private/${personalUuid}/private-photo.jpg?token=photo-secret`
+        )
+      )
+      return Promise.resolve()
+    })
+    const exception = propertiesOf(items, '$exception')
+    expect(Object.keys(exception)).not.toContain('$exception_values')
+    const [entry] = exception.$exception_list as {
+      type: string
+      value: string
+      stacktrace: { frames: Record<string, unknown>[] }
+    }[]
+    expect(entry!.type).toBe('Error')
+    expect(entry!.value).toBe('redacted')
+    for (const frame of entry!.stacktrace.frames)
+      expect(frame.filename).toMatch(/^(?:<unknown>|[A-Za-z0-9_.-]+)$/)
+    for (const url of requestUrls()) expect(url).toMatch(/\/batch\/$/)
+    const serialized = JSON.stringify(items)
+    for (const leak of leaks) expect(serialized).not.toContain(leak)
+  })
 })
 
 /**

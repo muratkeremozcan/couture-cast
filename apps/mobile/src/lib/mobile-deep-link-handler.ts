@@ -57,7 +57,8 @@ function invalidDeepLink(options: ProcessMobileDeepLinkOptions, reason: string) 
   options.setFocusedWeatherAlert(null)
   options.setIsInvalidDeepLink(true)
   options.analytics.capture('deep_link_invalid', {
-    rawUrl: JSON.stringify(options.params),
+    // Parameter names only: link values carry ids, tokens and sometimes emails.
+    param_keys: Object.keys(options.params).sort(),
     reason,
     surface: 'mobile',
   })

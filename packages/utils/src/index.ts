@@ -18,6 +18,7 @@ export {
   deepLinkWidgetSizeSchema,
   deepLinkNotificationTypeSchema,
   deepLinkSchema,
+  DEEP_LINK_FAILURE_REASONS,
   hasDeepLinkIntent,
   parseDeepLink,
   resolveDeepLinkScenario,

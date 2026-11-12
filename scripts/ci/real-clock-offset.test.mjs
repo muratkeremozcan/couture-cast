@@ -60,6 +60,33 @@ test('moves every real-clock read ahead and leaves given dates alone', () => {
   assert.equal(read.marker, 365)
 })
 
+test('keeps a Date subclass and its own methods, with a shifted clock', () => {
+  const result = probe(
+    365,
+    `
+    class Stamp extends Date {
+      toJSON() { return 'stamp' }
+      label() { return 'label' }
+    }
+    const real = performance.timeOrigin + performance.now()
+    const now = new Stamp()
+    const given = new Stamp(0)
+    console.log(JSON.stringify({
+      isStamp: now instanceof Stamp && given instanceof Stamp,
+      json: JSON.stringify({ now, given }),
+      label: given.label(),
+      given: given.getTime(),
+      ahead: now.getTime() - real,
+    }))
+  `
+  )
+  assert.equal(result.isStamp, true)
+  assert.equal(result.json, '{"now":"stamp","given":"stamp"}')
+  assert.equal(result.label, 'label')
+  assert.equal(result.given, 0)
+  assert.ok(result.ahead >= 365 * 86_400_000 - 5_000)
+})
+
 test('does nothing without an offset', () => {
   const read = probe(0, READ)
   assert.ok(Math.abs(read.nowAhead) < 5_000)

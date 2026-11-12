@@ -3,6 +3,7 @@ import posthog, { type CaptureResult } from 'posthog-js'
 import {
   SHARE_CARD_SHARED_EVENT,
   sanitizeShareCardSharedProperties,
+  webAnalyticsPrivacyFilter,
 } from '@couture/api-client'
 
 export interface BrowserAnalyticsClient {
@@ -48,6 +49,31 @@ export function shareCardSharedBeforeSend(
     return sanitized
   } catch {
     console.warn(SHARE_CARD_ANALYTICS_DROPPED)
+    return null
+  }
+}
+
+// The only script posthog-js may load at runtime: the exception autocapture bundle.
+const ALLOWED_EXTERNAL_SCRIPT = /^\/ingest\/static\/exception-autocapture\.js$/
+
+/**
+ * Production analytics privacy: posthog-js loads optional extensions (console logs,
+ * session replay, surveys, toolbar, web vitals, the remote config script and site apps)
+ * as scripts when the project's remote config asks for them, and a local `false` is no
+ * veto for console logs, whose exporter bypasses before_send. This hook lets through
+ * the exception autocapture script from our own /ingest proxy and refuses every other
+ * script, so no remote setting can switch those extensions on.
+ */
+export function allowExceptionAutocaptureScriptOnly(
+  script: HTMLScriptElement
+): HTMLScriptElement | null {
+  try {
+    const url = new URL(script.src, window.location.origin)
+    return url.origin === window.location.origin &&
+      ALLOWED_EXTERNAL_SCRIPT.test(url.pathname)
+      ? script
+      : null
+  } catch {
     return null
   }
 }
@@ -107,20 +133,49 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
       return browserAnalytics
     }
 
+    // Production analytics privacy: CoutureCast has members aged 13 to 15 (with
+    // guardian consent) and wardrobe photos. The SDK sends explicit events, pageviews
+    // and exceptions only, in every environment: autocapture, rage and dead clicks,
+    // heatmaps, session recording, surveys, product tours and conversations stay off;
+    // no extension script but exception autocapture loads; client feature flags and
+    // remote config are never requested (the web app reads no PostHog flag), so no
+    // /flags request carries person properties; initial URL, referrer and campaign
+    // properties are never stored; anonymous visitors get no person profile; and
+    // webAnalyticsPrivacyFilter drops every event and property outside its allowlist
+    // before anything leaves. See the "Production analytics" section of
+    // _bmad-output/project-knowledge/deployment-guide.md.
     posthog.init(postHogToken, {
       api_host: '/ingest',
       ui_host: 'https://us.posthog.com',
       capture_pageview: analyticsTestMode ? false : 'history_change',
-      autocapture: !analyticsTestMode,
+      autocapture: false,
+      rageclick: false,
+      capture_dead_clicks: false,
+      capture_heatmaps: false,
+      disable_session_recording: true,
+      session_recording: { maskAllInputs: true, maskTextSelector: '*' },
+      disable_surveys: true,
+      disable_product_tours: true,
+      disable_conversations: true,
+      mask_all_text: true,
+      mask_all_element_attributes: true,
+      // posthog-js keeps the session's entry URL in localStorage for session entry
+      // properties (the filter never sends them). Credentials in its query string are
+      // masked there too.
+      mask_personal_data_properties: true,
+      custom_personal_data_properties: ['token', 'focusToken', 'email'],
+      advanced_disable_flags: true,
+      save_referrer: false,
+      save_campaign_params: false,
+      person_profiles: 'identified_only',
+      prepare_external_dependency_script: allowExceptionAutocaptureScriptOnly,
       request_batching: !analyticsTestMode,
       disable_compression: analyticsTestMode,
-      disable_session_recording: analyticsTestMode,
-      disable_surveys: analyticsTestMode,
       // Include the defaults option as required by PostHog
       defaults: '2026-01-30',
       // Enables capturing unhandled exceptions via Error Tracking
       capture_exceptions: !analyticsTestMode,
-      before_send: shareCardSharedBeforeSend,
+      before_send: [webAnalyticsPrivacyFilter, shareCardSharedBeforeSend],
       // Turn on debug in development mode
       debug: process.env.NODE_ENV === 'development',
     })

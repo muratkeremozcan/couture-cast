@@ -16,6 +16,8 @@
     "test": "npm run vitest:run",
     "pretest:coverage": "npm run prepare:shared-deps",
     "test:coverage": "vitest run --config vitest.config.ts --coverage",
+    "pretest:analytics-privacy": "npm run prepare:shared-deps",
+    "test:analytics-privacy": "vitest run --config vitest.analytics-privacy.config.ts",
     "dev": "node ../../node_modules/next/dist/bin/next dev",
     "build": "node ../../node_modules/next/dist/bin/next build",
     "build:e2e": "next build",

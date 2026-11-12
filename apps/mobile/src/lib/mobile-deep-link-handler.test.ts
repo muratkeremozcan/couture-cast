@@ -372,18 +372,26 @@ describe('processMobileDeepLink', () => {
       expect(options.setFocusedWeatherAlert).toHaveBeenCalledWith(null)
     })
 
-    it('includes raw params in invalid analytics payload', async () => {
-      const params = { source: 'bad_source', slot: 'bad_slot' }
+    it('names the link parameters in the invalid analytics payload, never their values', async () => {
+      const params = {
+        source: 'bad_source',
+        slot: 'bad_slot',
+        email: 'teen@example.test',
+        cardId: 'card-9',
+      }
       const { options, capture } = createMockOptions(params)
 
       await processMobileDeepLink(options)
 
-      expect(capture).toHaveBeenCalledWith(
-        'deep_link_invalid',
-        expect.objectContaining({
-          rawUrl: JSON.stringify(params),
-        })
-      )
+      const [, payload] = capture.mock.calls.find(
+        ([event]) => event === 'deep_link_invalid'
+      ) as [string, Record<string, unknown>]
+      expect(payload).toEqual({
+        param_keys: ['cardId', 'email', 'slot', 'source'],
+        reason: expect.any(String) as string,
+        surface: 'mobile',
+      })
+      expect(JSON.stringify(payload)).not.toMatch(/teen@example|card-9|bad_s/)
     })
   })
 })

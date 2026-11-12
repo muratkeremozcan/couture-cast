@@ -32,6 +32,11 @@ regexes = [
   # but gitleaks scans every commit's diff in history, so this allowlist entry
   # covers the already-committed literal rather than requiring a history rewrite.
   '''^header\.eyJzdWIiOiJ1c2VyLTEifQ\.signature$''',
+  # Fake guardian invitation JWT used only by the analytics privacy tests (web, mobile,
+  # api-client, real-browser /ingest): header {"alg":"HS256"}, payload
+  # {"teenId":"teen-1","guardianEmail":"g@ex.test"}, signature the literal word "signature".
+  # It must look like a real token so the tests prove no request carries it.
+  '''^eyJhbGciOiJIUzI1NiJ9\.eyJ0ZWVuSWQiOiJ0ZWVuLTEiLCJndWFyZGlhbkVtYWlsIjoiZ0BleC50ZXN0In0\.c2lnbmF0dXJl$''',
   # Malformed bearer fixture in the realtime handshake integration spec: header `{}`,
   # payload "not-json", so its expiry cannot be read.
   '''^e30\.bm90LWpzb24\.signature$''',
