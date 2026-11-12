@@ -3,6 +3,7 @@ import {
   FakeRevenueCatClient,
   RealRevenueCatClient,
   RevenueCatRequestError,
+  RevenueCatUnsupportedStoreError,
 } from './revenuecat-client.js'
 
 /**
@@ -114,6 +115,36 @@ describe('RealRevenueCatClient', () => {
       willRenew: false,
       currentPeriodEnd: new Date('2026-08-01T00:00:00.000Z'),
     })
+  })
+
+  // Learning path Step 55: story 6.15 R3-01. An unsupported store never becomes a real one.
+  it.each([
+    [
+      'a RevenueCat Test Store subscription',
+      { premium_monthly: { store: 'test_store' } },
+    ],
+    ['an Amazon subscription', { premium_monthly: { store: 'amazon' } }],
+    ['no subscription record for the product', {}],
+  ])('refuses %s instead of projecting it as Stripe', async (_label, subscriptions) => {
+    for (const testEnv of [undefined, 'staging', 'production']) {
+      if (testEnv === undefined) vi.stubEnv('TEST_ENV', undefined as unknown as string)
+      else vi.stubEnv('TEST_ENV', testEnv)
+      fetchMock.mockResolvedValueOnce(
+        subscriberResponse({
+          entitlements: {
+            premium: {
+              expires_date: '2026-09-12T12:00:00.000Z',
+              product_identifier: 'premium_monthly',
+            },
+          },
+          subscriptions,
+        })
+      )
+      await expect(client.getSubscriberEntitlement('user-1')).rejects.toBeInstanceOf(
+        RevenueCatUnsupportedStoreError
+      )
+    }
+    vi.unstubAllEnvs()
   })
 
   it('projects a cancelled-but-paid-up subscription as active with willRenew false', async () => {

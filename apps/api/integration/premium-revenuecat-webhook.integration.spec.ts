@@ -6,7 +6,16 @@ import { UnauthorizedException, type INestApplication } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   buildPremiumEntitlementCreateInput,
   createPremiumEntitlement,
@@ -649,6 +658,61 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
       // The loser still lost — RC has already moved the subscription.
       expect((await entitlementOf(subscriberId))?.status).toBe('revoked')
     })
+  })
+
+  // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  describe('story 6.15 R3-01: a RevenueCat Test Store event never changes production access', () => {
+    for (const testEnv of [undefined, 'staging', 'production'] as const) {
+      describe(`with TEST_ENV ${testEnv ?? 'unset'}`, () => {
+        const saved = process.env.TEST_ENV
+        beforeEach(() => {
+          if (testEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = testEnv
+        })
+        afterEach(() => {
+          if (saved === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = saved
+        })
+
+        it('a TEST_STORE purchase is recorded and grants nothing', async (context) => {
+          if (!requireSchema(context)) return
+
+          const event = purchaseEvent({ store: 'TEST_STORE' })
+          const response = await postEvent(event)
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toBeNull()
+          expect(
+            await prisma.billingEvent.count({ where: { external_event_id: event.id } })
+          ).toBe(1)
+        })
+
+        it('a TEST_STORE TRANSFER leaves the paid member and the gainer unchanged', async (context) => {
+          if (!requireSchema(context)) return
+
+          await seedEntitlement(subscriberId, 'active')
+          const before = await entitlementOf(subscriberId)
+          const auditsBefore = await auditCount(subscriberId)
+
+          const response = await postEvent({
+            id: nextEventId(),
+            type: 'TRANSFER',
+            event_timestamp_ms: T0 + eventSequence * 1000,
+            store: 'TEST_STORE',
+            product_id: 'premium_monthly',
+            expiration_at_ms: PERIOD_END.getTime(),
+            transferred_from: [subscriberId],
+            transferred_to: [gainerId],
+          })
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toEqual(before)
+          expect(await entitlementOf(gainerId)).toBeNull()
+          expect(await auditCount(subscriberId)).toBe(auditsBefore)
+        })
+      })
+    }
   })
 
   describe('unknown subjects and degraded sinks', () => {

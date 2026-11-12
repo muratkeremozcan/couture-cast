@@ -7,7 +7,10 @@ import type {
   EntitlementView,
   PremiumEntitlementService,
 } from './premium-entitlement.service.js'
-import type { RevenueCatClient } from './revenuecat-client.js'
+import {
+  type RevenueCatClient,
+  RevenueCatUnsupportedStoreError,
+} from './revenuecat-client.js'
 import { SubscriptionService } from './subscription.service.js'
 
 /**
@@ -122,6 +125,21 @@ describe('refreshSubscription', () => {
     await expect(attempt).rejects.toMatchObject({
       message: SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE,
     })
+  })
+
+  // Learning path Step 55, story 6.15 R3-01: a Test Store entitlement on the ledger refuses the
+  // pull, so the refresh changes nothing.
+  it('a ledger entitlement from an unsupported store answers 503 and applies nothing', async () => {
+    const { service, entitlements } = build({
+      ledger: vi
+        .fn()
+        .mockRejectedValue(new RevenueCatUnsupportedStoreError('test_store')),
+    })
+
+    await expect(service.refreshSubscription('user-1')).rejects.toBeInstanceOf(
+      ServiceUnavailableException
+    )
+    expect(entitlements.applyLedgerSnapshot).not.toHaveBeenCalled()
   })
 
   it('pulls once per window: a second refresh inside 10s serves local state', async () => {

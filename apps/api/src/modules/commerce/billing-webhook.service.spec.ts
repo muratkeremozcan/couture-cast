@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Stripe from 'stripe'
 import type { PrismaClient } from '@prisma/client'
 import { abortFirstRun } from '../../testing/pldbgapi2.js'
@@ -211,6 +211,93 @@ describe('the Decision 4 transition table (planning half)', () => {
     expect(
       planRevenueCatTransition(rcEvent({ type: 'RENEWAL', product_id: null }))
     ).toEqual({ kind: 'record-only' })
+  })
+})
+
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+describe('unsupported stores never reach the ledger (story 6.15 R3-01)', () => {
+  // Planning reads no environment; each case runs under every TEST_ENV a deployment can carry,
+  // so a later environment-gated Test Store path cannot open production by accident.
+  const environments = [undefined, 'staging', 'production'] as const
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each(environments)('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      if (testEnv === undefined) vi.stubEnv('TEST_ENV', undefined as unknown as string)
+      else vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it.each(['INITIAL_PURCHASE', 'RENEWAL', 'EXPIRATION', 'TRANSFER'])(
+      'a TEST_STORE %s is record-only',
+      (type) => {
+        expect(planRevenueCatTransition(rcEvent({ type, store: 'TEST_STORE' }))).toEqual({
+          kind: 'record-only',
+        })
+      }
+    )
+
+    it('a TRANSFER from any store we do not sell is record-only, so no paid row is revoked', () => {
+      expect(
+        planRevenueCatTransition(
+          rcEvent({
+            type: 'TRANSFER',
+            store: 'AMAZON',
+            transferred_from: ['paid-member'],
+            transferred_to: ['other-member'],
+          })
+        )
+      ).toEqual({ kind: 'record-only' })
+    })
+  })
+
+  it('a TRANSFER with no store still moves the losing row, as before', () => {
+    expect(planRevenueCatTransition(rcEvent({ type: 'TRANSFER', store: null }))).toEqual({
+      kind: 'transfer',
+    })
+  })
+
+  it('a TEST_STORE TRANSFER touching a paid member writes the event and no entitlement', async () => {
+    const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    try {
+      const create = vi.fn().mockResolvedValue({})
+      const prisma = {
+        billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+        user: { findUnique: vi.fn().mockResolvedValue({ id: 'paid-member' }) },
+        $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+          work({ billingEvent: { create }, premiumEntitlement: { findUnique: vi.fn() } })
+        ),
+      }
+      const applyLedgerEvent = vi.fn()
+      const service = new BillingWebhookService(
+        prisma as unknown as PrismaClient,
+        { applyLedgerEvent } as unknown as PremiumEntitlementService,
+        { emitTransition: vi.fn() } as unknown as SubscriptionService,
+        {} as RevenueCatClient
+      )
+      const body = {
+        event: rcEvent({
+          type: 'TRANSFER',
+          store: 'TEST_STORE',
+          transferred_from: ['paid-member'],
+          transferred_to: ['other-member'],
+        }),
+      }
+
+      await service.handleRevenueCatWebhook({
+        authorization: buildTestOnlyRevenueCatWebhookAuth(),
+        rawBody: Buffer.from(JSON.stringify(body)),
+      })
+
+      expect(applyLedgerEvent).not.toHaveBeenCalled()
+    } finally {
+      if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+      else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+    }
   })
 })
 

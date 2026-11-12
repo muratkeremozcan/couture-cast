@@ -167,6 +167,15 @@ const restStoreMap: Readonly<Record<string, LedgerEntitlementState['store']>> = 
   promotional: 'promotional',
 }
 
+export class RevenueCatUnsupportedStoreError extends Error {
+  constructor(readonly store: string | null) {
+    super(
+      `RevenueCat entitlement comes from an unsupported store: ${store ?? 'none recorded'}`
+    )
+    this.name = 'RevenueCatUnsupportedStoreError'
+  }
+}
+
 export class RevenueCatRequestError extends Error {
   constructor(
     readonly status: number,
@@ -258,7 +267,13 @@ export class RealRevenueCatClient extends RevenueCatClient {
     }
 
     const subscription = body.subscriber?.subscriptions?.[productId]
-    const store = restStoreMap[subscription?.store?.toLowerCase() ?? ''] ?? 'stripe'
+    const store = restStoreMap[subscription?.store?.toLowerCase() ?? '']
+    if (store === undefined) {
+      // A store we do not sell (a RevenueCat Test Store purchase, AMAZON) or a missing
+      // subscription record never takes a real store's identity. The pull fails, so refresh
+      // answers 503 and reconciliation leaves the member's row as it is (story 6.15 R3-01).
+      throw new RevenueCatUnsupportedStoreError(subscription?.store ?? null)
+    }
     const willRenew = !subscription?.unsubscribe_detected_at
     const inGrace =
       Boolean(subscription?.billing_issues_detected_at) &&

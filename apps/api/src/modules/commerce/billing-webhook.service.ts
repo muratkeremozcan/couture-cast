@@ -275,6 +275,12 @@ const REVENUECAT_TRANSITION_TABLE: Readonly<
  * end) likewise degrades to record-only rather than bouncing.
  */
 export function planRevenueCatTransition(event: RevenueCatEvent): TransitionPlan {
+  // A store we do not sell (TEST_STORE, AMAZON, anything new) never touches the ledger, a
+  // TRANSFER included: a transfer revokes the losing member's row and hands its real store to the
+  // gaining member, so an unsupported-store transfer could change paid access (story 6.15 R3-01).
+  if (event.store && mapRevenueCatStore(event.store) === null) {
+    return RECORD_ONLY
+  }
   if (event.type === 'TRANSFER') {
     return { kind: 'transfer' }
   }
