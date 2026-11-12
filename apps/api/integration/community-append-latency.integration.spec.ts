@@ -30,6 +30,7 @@ const slowProxy = latencyProxy(database.url, 50)
 let remote: PrismaClient
 let slow: PrismaClient
 let slowUrl: string
+let remoteUrl: string
 const clients: PrismaClient[] = []
 /**
  * A pool of `connections` (one by default) on the isolated database. The worker's main pool
@@ -144,7 +145,8 @@ async function holdHead() {
 
 beforeAll(async () => {
   await database.migrate()
-  remote = new PrismaClient({ datasources: { db: { url: await proxy.listen() } } })
+  remoteUrl = await proxy.listen()
+  remote = new PrismaClient({ datasources: { db: { url: remoteUrl } } })
   await remote.$queryRaw`SELECT 1`
   slowUrl = await slowProxy.listen()
   slow = new PrismaClient({ datasources: { db: { url: slowUrl } } })
@@ -178,35 +180,57 @@ async function publishPosts(count: number) {
   })
 }
 
-/** One `$transaction` request: when it started, which phase made it and the limits it was given. */
+/**
+ * One `$transaction` request: when it started, the limits it was given, and the phase its
+ * callback showed by what it ran (`not entered` when the callback never ran).
+ */
 type AttemptBudget = {
-  phase: 'append' | 'retry-row'
+  phase: 'append' | 'retry-row' | 'not entered'
   start: number
   maxWait: number
   timeout: number
 }
 
 /**
- * Records every transaction `client` is asked for, as the repository calls it. Only the append
- * sets an isolation level, which tells its attempts from the retry row's.
+ * Records every transaction `client` is asked for, as the repository calls it. The phase comes
+ * from the operation the callback runs: the append calls `community_append_batch`, the retry row
+ * writes `communityEngagementTelemetry`.
  */
 function recordBudgets(client: PrismaClient) {
   const budgets: AttemptBudget[] = []
+  const traced = (tx: object, budget: AttemptBudget) =>
+    new Proxy(tx, {
+      get(target, prop) {
+        const value: unknown = Reflect.get(target, prop)
+        if (prop === 'communityEngagementTelemetry') budget.phase = 'retry-row'
+        if (prop !== '$queryRaw' || typeof value !== 'function') return value
+        return (...query: unknown[]) => {
+          const sql = Array.isArray(query[0]) ? query[0].join('') : String(query[0])
+          if (sql.includes('community_append_batch')) budget.phase = 'append'
+          return Reflect.apply(value, target, query) as unknown
+        }
+      },
+    })
   const recorded = new Proxy(client, {
     get(target, prop, receiver) {
       const value: unknown = Reflect.get(target, prop, receiver)
       if (prop !== '$transaction' || typeof value !== 'function') return value
       return (...args: unknown[]) => {
-        const limits = args[1] as
-          | { isolationLevel?: unknown; maxWait?: number; timeout?: number }
-          | undefined
-        budgets.push({
-          phase: limits?.isolationLevel === undefined ? 'retry-row' : 'append',
+        const [work, limits] = args as [
+          (tx: object) => Promise<unknown>,
+          { maxWait?: number; timeout?: number } | undefined,
+        ]
+        const budget: AttemptBudget = {
+          phase: 'not entered',
           start: performance.now(),
           maxWait: limits?.maxWait ?? Number.POSITIVE_INFINITY,
           timeout: limits?.timeout ?? Number.POSITIVE_INFINITY,
-        })
-        return Reflect.apply(value, target, args) as unknown
+        }
+        budgets.push(budget)
+        return Reflect.apply(value, target, [
+          (tx: object) => work(traced(tx, budget)),
+          ...args.slice(1),
+        ]) as unknown
       }
     },
   })
@@ -269,9 +293,9 @@ async function withFaults<T>(
   }
 }
 
-/** A repository on one connection at three times production's round trip, its warnings kept. */
-function slowRepository() {
-  const { client, budgets } = recordBudgets(pool(1, slowUrl))
+/** A repository on one connection through `url`, its transactions recorded, its warnings kept. */
+function recordedRepository(url: string) {
+  const { client, budgets } = recordBudgets(pool(1, url))
   const repository = new CommunityStreamRepository(client)
   const warnings: [Record<string, unknown>, string][] = []
   const logger = Reflect.get(repository, 'logger') as {
@@ -470,7 +494,7 @@ describe('community append at production database latency', () => {
     // The supported pldbgapi2 abort, after 200 ms of server work in the append and 60 ms in
     // the retry row, at three times production's round trip. Each transaction may retry it
     // twice; with a fresh budget per attempt, six attempts took 5.12 s (Codex review of #208).
-    const { repository, budgets, warnings } = slowRepository()
+    const { repository, budgets, warnings } = recordedRepository(slowUrl)
     let started = 0
     // Measured before the cleanup, which is not part of the append.
     const elapsed = await withFaults(
@@ -508,17 +532,22 @@ describe('community append at production database latency', () => {
 
   it('6.5-INT-039: a retry row retried after an abort stays inside the append deadline', async () => {
     await publishPosts(1)
-    // The append fails at once with a lock timeout, which is not retried, so the retry row has
-    // time to run, abort once with the pldbgapi2 error and be written on its second attempt.
-    // The sequence counts calls across rollbacks.
+    // At production's round trip, so the row's last attempt has room: the 1.4 s of append and
+    // telemetry work before it is mostly server sleep, which latency does not stretch. The
+    // append sleeps 300 ms and aborts with the pldbgapi2 error, then sleeps 300 ms and fails
+    // with a lock timeout, which is not retried. The retry row aborts once and is written on
+    // its second attempt. Sequences count calls across rollbacks.
+    await prisma.$executeRawUnsafe('CREATE SEQUENCE tea_append_calls')
     await prisma.$executeRawUnsafe('CREATE SEQUENCE tea_retry_row_calls')
-    const { client, repository, budgets, warnings } = slowRepository()
+    const { client, repository, budgets, warnings } = recordedRepository(remoteUrl)
     // Connect first so the budget goes to the attempts, not to a cold connection.
     await client.$queryRaw`SELECT 1`
     let started = 0
     try {
       await withFaults(
-        "RAISE EXCEPTION USING ERRCODE = '55P03', MESSAGE = 'lock timeout'",
+        `PERFORM pg_sleep(0.3);
+        IF nextval('tea_append_calls') = 1 THEN ${PLDBGAPI2_ABORT}; END IF;
+        RAISE EXCEPTION USING ERRCODE = '55P03', MESSAGE = 'lock timeout'`,
         `IF nextval('tea_retry_row_calls') = 1 THEN ${PLDBGAPI2_ABORT}; END IF`,
         async () => {
           started = performance.now()
@@ -526,6 +555,7 @@ describe('community append at production database latency', () => {
         }
       )
     } finally {
+      await prisma.$executeRawUnsafe('DROP SEQUENCE tea_append_calls')
       await prisma.$executeRawUnsafe('DROP SEQUENCE tea_retry_row_calls')
     }
     console.info(
@@ -537,10 +567,13 @@ describe('community append at production database latency', () => {
     )
     expect(budgets.map((budget) => budget.phase)).toEqual([
       'append',
+      'append',
       'retry-row',
       'retry-row',
     ])
     expectOneDeadline(budgets, started)
+    // The row's last attempt ran on what was left of the deadline, short of its own 1 s.
+    expect(budgets.at(-1)!.timeout).toBeLessThan(1_000)
     expect(warnings).toEqual([
       [{ reason: 'head_contention', nextBatchLimit: 25 }, 'Community append deferred'],
     ])
