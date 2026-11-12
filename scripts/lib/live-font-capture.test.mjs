@@ -75,13 +75,28 @@ describe('Android activity facts', () => {
     assert.equal(activityToken('nothing', component), undefined)
   })
 
-  test('counts MainActivity onCreate calls in the event log', () => {
+  // F-15: lines as Android 16 (API 36) writes them, from the cc68-api36 emulator.
+  const className = 'com.couturecast.story68.MainActivity'
+  const roomy =
+    'events: ring buffer is 256 KiB (40 KiB consumed, 953 KiB readable), max entry is 5120 B, max payload is 4068 B'
+
+  test('counts MainActivity onCreate calls by the logged class name', () => {
     const log = [
-      `11-12 16:00:00.000  1 1 I wm_on_create_called: [0,9f3a21c,${component},performCreate,12]`,
-      '11-12 16:00:01.000  1 1 I wm_on_create_called: [0,1,com.other/.Main,performCreate,3]',
-      `11-12 16:00:02.000  1 1 I wm_on_create_called: [0,1b2c3d4,${component},performCreate,9]`,
+      '11-12 17:16:20.526  1366  1366 I wm_on_create_called: [68515176,com.google.android.apps.nexuslauncher.NexusLauncherActivity,performCreate,59]',
+      `11-12 17:16:21.256 20514 20514 I wm_on_create_called: [77496459,${className},performCreate,30]`,
+      `11-12 17:16:21.392 20514 20514 I wm_on_create_called: [19120456,${className},performCreate,19]`,
     ].join('\n')
-    assert.equal(countOnCreate(log, component), 2)
+    assert.equal(countOnCreate(log, className, roomy), 2)
+    assert.equal(countOnCreate(log, 'com.couturecast.story68/.MainActivity', roomy), 0)
+  })
+
+  test('an unavailable or nearly full log is unknown, never zero', () => {
+    assert.equal(countOnCreate(undefined, className, roomy), undefined)
+    assert.equal(countOnCreate('', className, undefined), undefined)
+    const full =
+      'events: ring buffer is 256 KiB (252 KiB consumed, 953 KiB readable), max entry is 5120 B, max payload is 4068 B'
+    assert.equal(countOnCreate('', className, full), undefined)
+    assert.equal(countOnCreate('', className, roomy), 0)
   })
 })
 

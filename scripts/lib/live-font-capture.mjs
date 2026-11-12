@@ -58,12 +58,31 @@ export function activityToken(dumpsys, component) {
   return matches[0][1]
 }
 
-/** MainActivity onCreate calls in the Android event log (`wm_on_create_called`). */
-export function countOnCreate(eventLog, component) {
-  return String(eventLog)
-    .split('\n')
-    .filter((line) => line.includes('wm_on_create_called') && line.includes(component))
-    .length
+/**
+ * MainActivity onCreate calls in the Android event log. The platform logs
+ * `wm_on_create_called: [token,<fully qualified class>,<reason>,<ms>]`, the class from
+ * getComponentName().getClassName(), so a match is on that field, never on the flattened
+ * `package/.Activity` component (Codex R4-05). The count is `undefined` when the log is
+ * unavailable or its ring buffer is full enough to have dropped entries, which the caller must
+ * not read as zero. `bufferStats` is `adb logcat -b events -g` output.
+ */
+export function countOnCreate(eventLog, className, bufferStats) {
+  if (typeof eventLog !== 'string' || typeof bufferStats !== 'string') return undefined
+  const ring =
+    /ring buffer is (\d+(?:\.\d+)?) ?([KMG]i?B)? .*?\((\d+(?:\.\d+)?) ?([KMG]i?B)? consumed/.exec(
+      bufferStats
+    )
+  if (!ring) return undefined
+  const bytes = (value, unit) =>
+    Number(value) * ({ KiB: 1024, KB: 1024, MiB: 1048576, MB: 1048576 }[unit] ?? 1)
+  if (bytes(ring[3], ring[4]) >= 0.9 * bytes(ring[1], ring[2])) return undefined
+  let count = 0
+  for (const line of eventLog.split('\n')) {
+    const match = /wm_on_create_called: \[([^\]]*)\]/.exec(line)
+    if (match && match[1].split(',').map((field) => field.trim())[1] === className)
+      count += 1
+  }
+  return count
 }
 
 function edges(node) {
