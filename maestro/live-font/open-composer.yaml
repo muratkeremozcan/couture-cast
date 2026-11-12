@@ -1,0 +1,23 @@
+# Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
+# Opens the share-card composer from Home's outfit, as Story 6.8's Release flow does.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-home
+- scrollUntilVisible:
+    element:
+      id: weather-header(-skeleton)?
+    direction: UP
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: outfit-share-card-open
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    id: outfit-share-card-open
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded.*
+    timeout: 30000

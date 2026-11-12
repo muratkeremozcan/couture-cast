@@ -1,0 +1,17 @@
+# Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
+# A React update after the scale change: expanding the hourly ribbon renders new entries next
+# to the ones measured before the change.
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: ribbon-expand-toggle
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: ribbon-expand-toggle
+- scrollUntilVisible:
+    element:
+      id: current-temperature
+    direction: UP
+    timeout: 20000

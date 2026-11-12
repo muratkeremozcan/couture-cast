@@ -114,6 +114,29 @@ describe('expected text scaling', () => {
     assert.ok(Math.abs(androidScaledSize(20, 1.4) - 24.8) < 1e-9)
   })
 
+  test('Android before 14 (API 34) scales linearly', () => {
+    assert.equal(
+      expectedTextRatio({
+        platform: 'android',
+        androidApi: 32,
+        sizeSp: 48,
+        from: 1,
+        to: 1.5,
+      }),
+      1.5
+    )
+    assert.equal(
+      expectedTextRatio({
+        platform: 'android',
+        androidApi: 36,
+        sizeSp: 48,
+        from: 1,
+        to: 1.5,
+      }),
+      1
+    )
+  })
+
   test('iOS scales by the content-size multiplier ratio', () => {
     assert.equal(expectedTextRatio({ platform: 'ios', from: 1, to: 1.353 }), 1.353)
     assert.ok(
@@ -257,10 +280,80 @@ describe('evaluateLiveFontChange', () => {
 })
 
 describe('assertLiveFontProof', () => {
-  test('below 0.87 a known residual passes', () => {
-    const result = assertLiveFontProof({ reactNativeVersion: '0.81.5', ...bugChange() })
+  // R2-05: the Story 6.8 Home residual as a reviewed baseline would describe it.
+  const BASELINE = {
+    staleIds: ['', 'current-condition', 'outfit-comfort-notes'],
+    maxStaleMisses: 41,
+  }
+
+  test('below 0.87 a residual passes only inside its reviewed baseline', () => {
+    const result = assertLiveFontProof({
+      reactNativeVersion: '0.81.5',
+      residualBaseline: BASELINE,
+      ...bugChange(),
+    })
     assert.equal(result.verdict, 'known-residual')
     assert.equal(result.baselineReview, false)
+    assert.throws(
+      () => assertLiveFontProof({ reactNativeVersion: '0.81.5', ...bugChange() }),
+      {
+        code: 'live_font_residual_unapproved',
+      }
+    )
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: { ...BASELINE, staleIds: [''] },
+          ...bugChange(),
+        }),
+      (error) =>
+        error.code === 'live_font_residual_unapproved' &&
+        /current-condition/.test(error.message)
+    )
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: { ...BASELINE, maxStaleMisses: 3 },
+          ...bugChange(),
+        }),
+      { code: 'live_font_residual_unapproved' }
+    )
+  })
+
+  test('the version switch: the residual fails from 0.87, the healthy run passes on both sides', () => {
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.87.0',
+          residualBaseline: BASELINE,
+          ...bugChange(),
+        }),
+      { code: 'live_font_fix_missing' }
+    )
+    for (const version of ['0.81.5', '0.88.1'])
+      assert.equal(
+        assertLiveFontProof({ reactNativeVersion: version, ...fixedChange() }).verdict,
+        'fixed'
+      )
+  })
+
+  test('a required control off screen fails inside an approved residual', () => {
+    const change = bugChange()
+    change.settled.window = '[0,0][1080,2400]'
+    change.settled.controls = [{ id: 'tab-settings', bounds: '[810,2410][1080,2520]' }]
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: BASELINE,
+          requiredControls: ['tab-settings'],
+          ...change,
+        }),
+      (error) =>
+        error.code === 'live_font_baseline_unexpected' && /controls/.test(error.message)
+    )
   })
 
   test('below 0.87 an early correct relayout passes and flags the baseline for review', () => {

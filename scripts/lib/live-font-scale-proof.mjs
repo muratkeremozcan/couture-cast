@@ -17,8 +17,10 @@
 // gets its own verdict, `restored`, which never counts as a fix. React Native 0.87.0 is the first
 // stable release with commit 45904c8 (text keeping a stale font scale across later commits).
 // From 0.87 the screen must be `fixed`. Below it the oracle records what it sees: `fixed` passes
-// and flags the baseline for review, `known-residual` (heights stale against the cold reference,
-// nothing else wrong) passes, and anything else fails.
+// and flags the baseline for review; `known-residual` (heights stale against the cold reference,
+// nothing else wrong) passes only when a reviewed baseline entry for that platform, build and
+// screen allows exactly those stale nodes (scripts/lib/fixtures/live-font-residual-baselines.json);
+// anything else fails. Required controls must stay on screen in every class.
 
 const FIX_VERSION = [0, 87, 0]
 
@@ -96,12 +98,14 @@ export function androidScaledSize(sp, fontScale) {
 /**
  * The ratio a text box should change by. Android converts each size through its nonlinear
  * curve, so a probe declares the size that sets its line box (`lineHeight` when the style sets
- * one, else `fontSize`). React Native on iOS multiplies every size by the content-size
+ * one, else `fontSize`); before Android 14 the scale is linear. React Native on iOS multiplies every size by the content-size
  * category's multiplier, so the ratio is the multiplier ratio whatever the text style.
  */
-export function expectedTextRatio({ platform, sizeSp, from, to }) {
+export function expectedTextRatio({ platform, sizeSp, from, to, androidApi = 34 }) {
   if (platform === 'ios') return Number(to) / Number(from)
   if (platform !== 'android') fail('live_font_platform_required', String(platform))
+  // Nonlinear scaling arrived in Android 14 (API 34); earlier releases scale linearly.
+  if (Number(androidApi) < 34) return Number(to) / Number(from)
   return androidScaledSize(sizeSp, to) / androidScaledSize(sizeSp, from)
 }
 
@@ -202,6 +206,22 @@ function clipping(capture, tolerance) {
   return { pass: clipped.length === 0, clipped }
 }
 
+/** Every required control is present and inside the window. */
+function controlsOnScreen(capture, ids) {
+  if (!ids.length) return { pass: true, missing: [] }
+  const frame = capture.window ? parseBounds(capture.window) : undefined
+  const missing = ids.filter((id) => {
+    const control = (capture.controls ?? []).find((entry) => entry.id === id)
+    if (!control) return true
+    if (!frame) return false
+    const box = parseBounds(control.bounds)
+    return (
+      box[0] < frame[0] || box[1] < frame[1] || box[2] > frame[2] || box[3] > frame[3]
+    )
+  })
+  return { pass: missing.length === 0, missing }
+}
+
 function identityCheck(before, immediate, settled) {
   const stages = [before, immediate, settled]
   const pids = new Set(stages.map((capture) => String(capture.pid)))
@@ -242,6 +262,7 @@ function identityCheck(before, immediate, settled) {
  */
 export function evaluateLiveFontChange({
   platform,
+  androidApi,
   before,
   immediate,
   settled,
@@ -250,6 +271,7 @@ export function evaluateLiveFontChange({
   coldUpdated,
   anchors,
   probes,
+  requiredControls = [],
 }) {
   const tolerance = HEIGHT_TOLERANCE[platform]
   if (tolerance === undefined) fail('live_font_platform_required', String(platform))
@@ -275,6 +297,7 @@ export function evaluateLiveFontChange({
   const growth = probes.map((probe) => {
     const expected = expectedTextRatio({
       platform,
+      androidApi,
       sizeSp: probe.sizeSp,
       from: before.fontScale,
       to: settled.fontScale,
@@ -311,6 +334,7 @@ export function evaluateLiveFontChange({
     coldParity: parity(settled, cold, before, tolerance),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
     clipping: clipping(settled, tolerance),
+    controls: controlsOnScreen(settled, requiredControls),
   }
   if (updated) {
     checks.postUpdateParity = parity(updated, coldUpdated, before, tolerance)
@@ -319,18 +343,30 @@ export function evaluateLiveFontChange({
   return { checks, verdict: classify(checks) }
 }
 
-function classify(checks) {
-  if (Object.values(checks).every((check) => check.pass)) return 'fixed'
-  const { identity } = checks
-  if (
+function recreated(identity) {
+  return (
     identity.processKept &&
     identity.rootKnown &&
     (!identity.rootKept || !identity.activityKept || identity.onCreateDelta > 0)
   )
-    return 'restored'
-  if (!checks.anchors.pass || !checks.fullText.pass || !identity.pass) return 'unexpected'
-  if (!checks.clipping.pass || checks.postUpdateClipping?.pass === false)
-    return 'unexpected'
+}
+
+/** Failures that no residual explains: lost text or identity, off-screen controls, clipping. */
+function structural(checks) {
+  return [
+    'anchors',
+    'fullText',
+    'identity',
+    'controls',
+    'clipping',
+    'postUpdateClipping',
+  ].some((name) => checks[name] && !checks[name].pass)
+}
+
+function classify(checks) {
+  if (Object.values(checks).every((check) => check.pass)) return 'fixed'
+  if (recreated(checks.identity)) return 'restored'
+  if (structural(checks)) return 'unexpected'
   // What remains must be stale text: heights the live screen kept from the base scale while the
   // cold launch measured different ones.
   const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
@@ -339,23 +375,53 @@ function classify(checks) {
     : 'unexpected'
 }
 
+const missId = (miss) => JSON.parse(miss.key.slice(0, miss.key.lastIndexOf('#')))[0]
+
 /**
- * The proof's pass rule. With the fix bundled the screen must relayout in place. Without it a
- * stale-height residual passes, and an early correct relayout passes with `baselineReview` set
- * so the step's baseline gets a second look; a restored screen or any other failure is red.
+ * A residual passes only as a reviewed baseline entry describes it: `staleIds` lists the ids
+ * (`''` for text without one) allowed to keep their base-scale height, and `maxStaleMisses`
+ * bounds how many nodes may. Anything outside it is a new regression until it is reviewed.
  */
-export function assertLiveFontProof({ reactNativeVersion, ...change }) {
+function residualApproved(checks, baseline) {
+  if (!baseline) return { pass: false, reason: 'no reviewed baseline' }
+  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
+  const outside = misses.filter((miss) => !baseline.staleIds.includes(missId(miss)))
+  if (outside.length)
+    return {
+      pass: false,
+      reason: `stale outside baseline: ${outside.map(missId).join(',')}`,
+    }
+  if (misses.length > baseline.maxStaleMisses)
+    return {
+      pass: false,
+      reason: `${misses.length} stale nodes, baseline allows ${baseline.maxStaleMisses}`,
+    }
+  return { pass: true }
+}
+
+/**
+ * The proof's pass rule. With the fix bundled the screen must relayout in place. Without it an
+ * early correct relayout passes with `baselineReview` set, and a residual passes only within its
+ * reviewed baseline; a restored screen or any other failure is red.
+ */
+export function assertLiveFontProof({ reactNativeVersion, residualBaseline, ...change }) {
   const fixExpected = fixExpectedFor(reactNativeVersion)
   const result = evaluateLiveFontChange(change)
-  const accepted = fixExpected ? ['fixed'] : ['fixed', 'known-residual']
-  if (!accepted.includes(result.verdict)) {
-    const failing = Object.entries(result.checks)
+  const failing = () =>
+    Object.entries(result.checks)
       .filter(([, check]) => !check.pass)
       .map(([name]) => name)
+      .join(',') || 'none'
+  if (fixExpected && result.verdict !== 'fixed')
+    fail('live_font_fix_missing', `verdict ${result.verdict}; failing ${failing()}`)
+  if (!fixExpected && !['fixed', 'known-residual'].includes(result.verdict))
     fail(
-      fixExpected ? 'live_font_fix_missing' : 'live_font_baseline_unexpected',
-      `verdict ${result.verdict}; failing ${failing.join(',') || 'none'}`
+      'live_font_baseline_unexpected',
+      `verdict ${result.verdict}; failing ${failing()}`
     )
+  if (!fixExpected && result.verdict === 'known-residual') {
+    const approved = residualApproved(result.checks, residualBaseline)
+    if (!approved.pass) fail('live_font_residual_unapproved', approved.reason)
   }
   return {
     ...result,
@@ -370,7 +436,7 @@ export function assertLiveFontProof({ reactNativeVersion, ...change }) {
  * grow. A pass shows the oracle can see scaling, and that each probe's declared size is right,
  * before it judges a live change.
  */
-export function assertColdControl({ platform, base, target, probes }) {
+export function assertColdControl({ platform, androidApi, base, target, probes }) {
   if (HEIGHT_TOLERANCE[platform] === undefined)
     fail('live_font_platform_required', String(platform))
   if (!(Number(target.fontScale) > Number(base.fontScale)))
@@ -385,6 +451,7 @@ export function assertColdControl({ platform, base, target, probes }) {
     if (!a || !b) fail('live_font_control_probe_missing', probe.id)
     const expected = expectedTextRatio({
       platform,
+      androidApi,
       sizeSp: probe.sizeSp,
       from: base.fontScale,
       to: target.fontScale,
