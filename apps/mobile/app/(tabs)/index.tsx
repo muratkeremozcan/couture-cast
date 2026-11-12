@@ -85,6 +85,7 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
@@ -738,6 +739,7 @@ export default function TabOneScreen() {
       style={[styles.safeContainer, { backgroundColor: palette.background }]}
       edges={['left', 'right']}
     >
+      <LiveFontMountMarker scope="home" />
       <ScrollView
         ref={scrollViewRef}
         // React Native's typings predate React 19's nullable RefObject.

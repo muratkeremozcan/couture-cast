@@ -61,6 +61,7 @@ import {
 } from '@/src/lib/share-card-share'
 import type { ShareCardShareAnchor } from '../modules/share-card-native-share/types'
 import { trackMobileShareCardShared } from '@/src/analytics/track-events'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 
 type PreparedPreview = {
   card: PreparedShareCard
@@ -881,6 +882,7 @@ export function ShareCardComposer({
           { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16 },
         ]}
       >
+        <LiveFontMountMarker scope="composer" />
         <ScrollView
           ref={scroll}
           scrollEventThrottle={16}

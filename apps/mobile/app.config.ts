@@ -65,6 +65,8 @@ export default ({ config }: ConfigContext) => ({
     ...config.extra,
     story65NativeFixtures: isolatedNative && !story68Native,
     story68NativeFixtures: story68Native,
+    // Story 6.15: the live font-scale proof reads mount markers from isolated native builds.
+    liveFontMountMarkers: isolatedNative,
     supabaseUrl:
       process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     supabaseAnonKey:

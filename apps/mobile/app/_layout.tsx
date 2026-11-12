@@ -32,6 +32,7 @@ import { initI18n } from '@/src/lib/i18n'
 import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useTranslation } from 'react-i18next'
 
 const isExpoGoAndroid =
@@ -231,6 +232,7 @@ function RootLayoutNav() {
           <ThemeProvider value={theme}>
             {/* iOS labels the back button with the previous route's title; the tab
                 group has none, so it read "(tabs)". */}
+            <LiveFontMountMarker scope="root" />
             <AndroidShareCardPresentation
               pathname={pathname}
               navigationReady={Boolean(navigation?.key)}

@@ -63,7 +63,7 @@ export default defineConfig({
     include: [
       '@testing-library/react',
       '@couture/testing/factories/community.factory',
-      'expo-background-fetch',
+      'expo-background-task',
       // vitest.expo-env.setup.ts installs Expo's web global from this entry. It pulls in
       // only the polyfill classes and the uuid helper, never a native module.
       'expo-modules-core/src/polyfill/dangerous-internal',

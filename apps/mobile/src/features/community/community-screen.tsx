@@ -99,6 +99,7 @@ import { CommunitySpotlightModule } from '@/components/community/community-spotl
 import { CommunitySpotlightDetail } from '@/components/community/community-spotlight-detail'
 import { SponsoredCtaImpressions } from '@/src/features/community/sponsored-cta-impressions'
 import { LiveCommunitySponsorships } from '@/src/features/community/live-sponsorships'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import {
   useCommunitySpotlight,
   type CommunitySpotlightView,
@@ -2072,6 +2073,7 @@ export function CommunityScreen() {
         style={[styles.container, { backgroundColor: palette.background }]}
         testID="community-screen"
       >
+        <LiveFontMountMarker scope="community" />
         {/* Story 6.11: a banned member has nothing to post to or filter. */}
         <UnlessBanned banned={bannedSanction !== null}>
           <View style={styles.header}>
