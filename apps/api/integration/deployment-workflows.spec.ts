@@ -52,11 +52,11 @@ const reserveSupabasePortsAction = path.join(
   repoRoot,
   '.github',
   'actions',
-  'reserve-supabase-ports',
+  'configure-ci-supabase-ports',
   'action.yml'
 )
 const startLocalSupabaseUse = 'uses: ./.github/actions/start-local-supabase'
-const reservePortsUse = 'uses: ./.github/actions/reserve-supabase-ports'
+const reservePortsUse = 'uses: ./.github/actions/configure-ci-supabase-ports'
 
 /**
  * Each job's steps in order, as the raw text of each `- ` step entry. A job whose
@@ -284,7 +284,7 @@ describe('deployment workflows', () => {
     ])
   })
 
-  it('every job that starts local Supabase reserves its ports right after checkout', () => {
+  it('every job that starts local Supabase configures its CI ports right after checkout', () => {
     const workflowsDir = path.join(repoRoot, '.github', 'workflows')
     let startingJobs = 0
     for (const file of fs.readdirSync(workflowsDir).filter((f) => f.endsWith('.yml'))) {
@@ -447,38 +447,28 @@ describe('deployment workflows', () => {
     )
     expect(content).toMatch(/registries\+=\("\$CACHED_REGISTRY"\)/)
 
-    // The ports sit in the ephemeral range. Reserving them steers new
-    // connections away; the action's own first step repeats it for any caller.
-    expect(reserve).toMatch(/net\.ipv4\.ip_local_reserved_ports=/)
-    // The write is verified by reading the sysctl back, ranges included, and
-    // every way the reservation can fail on Linux stops the job, named.
-    const write = reserve.indexOf('sudo -n sysctl -q -w')
-    const readBack = reserve.indexOf(
-      'mapfile -t missing < <(uncovered_ports "$reserved")',
-      write
+    // CI's ports come from .github/supabase-ci-ports.env, below every ephemeral
+    // range (scripts/ci/ci-supabase-ports.test.mjs); the action's own first step
+    // exports them again for any caller.
+    expect(reserve).toMatch(/run: node scripts\/ci\/ci-supabase-ports\.mjs/)
+    expect(content).toMatch(
+      /port="\$\{!override:-\$\(section_value "\$section" port\)\}"/
     )
-    expect(write).toBeGreaterThan(-1)
-    expect(readBack).toBeGreaterThan(write)
-    expect(reserve).toMatch(/entry%-\*/)
-    for (const failure of [
-      /::error::sysctl could not reserve the Supabase host ports[^\n]*"\n\s+exit 1/,
-      /::error::net\.ipv4\.ip_local_reserved_ports reads back as[^\n]*"\n\s+exit 1/,
-      /::error::Reserving the Supabase host ports needs passwordless sudo[^\n]*"\n\s+exit 1/,
-    ]) {
-      expect(reserve).toMatch(failure)
-    }
-    expect(reserve).not.toMatch(/::warning::/)
     expect(at(reservePortsUse)).toBeLessThan(
       at('name: Compute the Supabase image cache key')
     )
 
     // A socket already on a port is never closed by this action: each attempt
     // waits for it to go and, when it stays, fails that attempt naming it.
-    expect(at('! wait_for_free_ports; then ports_free=false; fi')).toBeLessThan(
-      at('run_start "$remaining" 2>&1 | tee "$attempt_log"')
+    expect(at('wait_for_free_ports || wait_status=$?')).toBeLessThan(
+      at('run_start "$attempt_seconds" 2>&1 | tee "$attempt_log"')
     )
     expect(content).toMatch(/::error::Supabase host ports are still in use after/)
     expect(content).toMatch(/held by \$\{owners/)
+    // A port held by the runner's own connection never frees, so it fails at once.
+    expect(content).toMatch(
+      /held by the runner's own connection, which lasts the whole job/
+    )
     // Listeners and live or closing connections always block. TIME_WAIT blocks
     // only while Docker's bind (SO_REUSEADDR on 0.0.0.0) would fail on it: one
     // left by a listener that is gone does not, so the start must not wait on it.

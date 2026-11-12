@@ -33,28 +33,8 @@ env:
 
 jobs:
   # The quality checks run as parallel jobs so none of them holds a PR for the
-  # sum of the others; `quality-gate` below aggregates them. Each job states the
+  # sum of the others; the last step of `tests` aggregates them. Each job states the
   # same check it ran as a step of the single former job.
-  runtime-deps:
-    name: Web aliased runtime dependencies
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-
-      - name: Setup Node environment
-        id: setup
-        uses: ./.github/actions/setup-node-env
-        with:
-          use-npm-ci: 'false'
-
-      - name: Verify web aliased runtime dependencies
-        run: npm run check:web:aliased-runtime-deps
-
   typecheck:
     name: Typecheck workspaces
     runs-on: ubuntu-latest
@@ -72,11 +52,19 @@ jobs:
         with:
           use-npm-ci: 'false'
 
+      # Its own job until 2026-11-12; a step here saves a runner and a queue slot per
+      # push, and its name still says which check failed (scripts/ci/pr-pipeline-shape.test.mjs).
+      - name: Verify web aliased runtime dependencies
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run check:web:aliased-runtime-deps
+
       - name: Generate Prisma Client
         id: prisma
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         run: npm run db:generate
 
       - name: Typecheck workspaces
+        if: ${{ !cancelled() && steps.prisma.outcome == 'success' }}
         run: npm run typecheck
 
   lint:
@@ -419,7 +407,8 @@ jobs:
   # every shard passed, so a skipped or cancelled shard is a failure too.
   tests:
     name: Workspace tests with coverage
-    needs: [tests-shard]
+    # The quality gate, its own job until 2026-11-12, is this job's last step.
+    needs: [tests-shard, typecheck, lint, lighthouse]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -481,21 +470,13 @@ jobs:
           echo "::error::Workspace tests failed: shards ${SHARDS:-unknown}, merged outcome ${OUTCOME:-unknown}"
           exit 1
 
-  # The one job a ruleset or reader needs: red when any quality check is red,
-  # cancelled or skipped, with every result named.
-  quality-gate:
-    name: quality-gate
-    needs: [runtime-deps, typecheck, lint, lighthouse, tests]
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Require every quality check to pass
+      # Red when any quality check is red, cancelled or skipped, with every result named.
+      - name: Quality gate requires every quality check to pass
+        if: ${{ always() }}
         env:
           RESULTS: >-
-            tests=${{ needs.tests.result }} lighthouse=${{ needs.lighthouse.result }}
+            tests-shard=${{ needs.tests-shard.result }} lighthouse=${{ needs.lighthouse.result }}
             lint=${{ needs.lint.result }} typecheck=${{ needs.typecheck.result }}
-            runtime-deps=${{ needs.runtime-deps.result }}
         run: |
           for result in $RESULTS; do
             if [ "${result#*=}" != "success" ]; then

@@ -15,14 +15,9 @@ inputs:
 runs:
   using: composite
   steps:
-    - name: Setup Node
-      uses: actions/setup-node@v4
+    # Node and the dependency tree, restored whole when the lockfile matches.
+    - name: Setup Node and dependencies
+      uses: ./.github/actions/node-dependencies
       with:
+        install-command: ${{ inputs.install-command }}
         node-version-file: ${{ inputs.node-version-file }}
-        cache: npm
-
-    - name: Install dependencies
-      shell: bash
-      env:
-        INSTALL_COMMAND: ${{ inputs.install-command }}
-      run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"

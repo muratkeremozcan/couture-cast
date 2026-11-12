@@ -30,9 +30,11 @@ adb shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
 # normally does this from `openAsync`, which only runs when the CLI opens the
 # app; this suite has Maestro open it instead, so nothing else establishes it.
 # run-maestro.mjs re-establishes and verifies these, but doing it here too means
-# the mapping exists before anything at all talks to the device. 54321 is local
-# Supabase: the API signs community and wardrobe image URLs against it.
-for port in 8081 4000 54321; do
+# the mapping exists before anything at all talks to the device. The last port is
+# local Supabase's API (CI's SUPABASE_API_PORT, else supabase/config.toml): the API
+# signs community and wardrobe image URLs against it.
+supabase_api_port="$(node -e "import('./scripts/lib/local-supabase-ports.mjs').then((m) => console.log(m.localSupabasePorts().api))")"
+for port in 8081 4000 "$supabase_api_port"; do
   adb reverse "tcp:${port}" "tcp:${port}" || echo "[ci-mobile-e2e] adb reverse tcp:${port} failed"
 done
 

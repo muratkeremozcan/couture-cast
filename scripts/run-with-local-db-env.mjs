@@ -6,7 +6,7 @@
  * DATABASE. The root script passed no `DATABASE_URL`, so `prisma db seed` fell through
  * to Prisma's own dotenv auto-load, which resolves relative to `packages/db` and picks
  * up `packages/db/.env` pointing at `@localhost:5432/couture_cast` rather than the
- * local Supabase container at `@127.0.0.1:54322/postgres`.
+ * local Supabase container on its configured port (`scripts/lib/local-supabase-ports.mjs`).
  *
  * That failed loudly only because the two schemas have since diverged (P2022, "the
  * column LookbookPost.status does not exist"). Before they diverged it seeded the
@@ -30,13 +30,21 @@ import {
   applyLocalE2eDatabaseUrl,
   applyLocalSupabaseStorageEnv,
 } from './local-e2e-database.mjs'
+import {
+  isLocalSupabaseDatabaseUrl,
+  localDatabaseUrl,
+} from './lib/local-supabase-ports.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
-const args = process.argv.slice(2)
+// --require-local: the command resets the database, so it runs only against the local
+// Supabase server on the port Supabase binds (CI's SUPABASE_DB_PORT, else config.toml).
+// A DATABASE_URL for any other server or port is refused before anything starts.
+const requireLocal = process.argv[2] === '--require-local'
+const args = process.argv.slice(requireLocal ? 3 : 2)
 
 if (args.length === 0) {
   console.error(
-    '[run-with-local-db-env] usage: run-with-local-db-env <command> [args...]'
+    '[run-with-local-db-env] usage: run-with-local-db-env [--require-local] <command> [args...]'
   )
   process.exit(1)
 }
@@ -77,10 +85,28 @@ if (storage.applied) {
 // Consent is granted here rather than exported globally because this wrapper has
 // already established that the target is the local Supabase container. If a real
 // `DATABASE_URL` pointed somewhere else, the guard stays armed and the refusal stands.
-const LOCAL_DATABASE_HOSTS = ['127.0.0.1:54322', 'localhost:54322']
-const targetsLocalSupabase = LOCAL_DATABASE_HOSTS.some((host) =>
-  (env.DATABASE_URL ?? '').includes(host)
-)
+// The local Supabase server is a loopback host on its configured port (CI's override,
+// else supabase/config.toml).
+const targetsLocalSupabase = isLocalSupabaseDatabaseUrl(env.DATABASE_URL, env)
+// The reset entry also names the database: the local server's `postgres` database in its
+// `public` schema, the one `supabase start` creates. Another database or schema on the same
+// server holds data this reset must not touch.
+const resetsTheLocalDatabase = () => {
+  const url = new URL(env.DATABASE_URL)
+  // Prisma takes the last of repeated parameters; one schema parameter at most.
+  const schemas = url.searchParams.getAll('schema')
+  return (
+    url.pathname === '/postgres' &&
+    schemas.length <= 1 &&
+    (schemas[0] ?? 'public') === 'public'
+  )
+}
+if (requireLocal && !(targetsLocalSupabase && resetsTheLocalDatabase())) {
+  console.error(
+    `[run-with-local-db-env] Refusing: DATABASE_URL is not the local Supabase postgres database (public schema) on its configured port (${localDatabaseUrl(env)}).`
+  )
+  process.exit(1)
+}
 if (targetsLocalSupabase && !env.PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION) {
   env.PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION =
     'Local Supabase test database; reset and reseed are the intended operation.'

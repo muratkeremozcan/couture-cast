@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import pg from 'pg'
 import { createClient } from '@supabase/supabase-js'
 import { ownedRedisContainer } from './runtime-sources.mjs'
+import { localDatabaseUrl } from '../lib/local-supabase-ports.mjs'
 
 async function resolveOwnedAuthId(admin, identity) {
   if (identity.authUserId) return identity.authUserId
@@ -63,7 +64,7 @@ export async function cleanup(directory) {
   if (redisContainer)
     execFileSync('docker', ['rm', '-f', redisContainer], { stdio: 'ignore' })
   const db = new pg.Client({
-    connectionString: 'postgresql://postgres:postgres@127.0.0.1:54322/postgres',
+    connectionString: localDatabaseUrl(),
   })
   await db.connect()
   try {

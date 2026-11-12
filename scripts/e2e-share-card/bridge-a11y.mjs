@@ -3,6 +3,7 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { shareCardAuditLocales } from '../lib/share-card-audit-report.mjs'
 import { bridgeUnitDiagnostics } from '../lib/story68-bridge-unit-result.mjs'
+import { BRIDGE_APP_DIR, BRIDGE_UNIT_FILES } from './bridge-a11y-files.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -15,12 +16,11 @@ const result = spawnSync(
   [
     path.resolve('node_modules/vitest/vitest.mjs'),
     'run',
-    'components/share-card-composer.test.tsx',
-    'src/lib/share-card-focus.spec.ts',
+    ...BRIDGE_UNIT_FILES,
     '--reporter=json',
     `--outputFile=${reportFile}`,
   ],
-  { cwd: path.resolve('apps/mobile'), stdio: ['ignore', log, log] }
+  { cwd: path.resolve(BRIDGE_APP_DIR), stdio: ['ignore', log, log] }
 )
 fs.closeSync(log)
 let report = null

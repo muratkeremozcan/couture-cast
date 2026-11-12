@@ -9,7 +9,11 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { replaceDistFromStaging } from '../../../scripts/build-workspace-package.mjs'
+import {
+  buildFingerprint,
+  FINGERPRINT_FILE,
+  replaceDistFromStaging,
+} from '../../../scripts/build-workspace-package.mjs'
 
 const SCRIPT = path.resolve('scripts/build-workspace-package.mjs')
 
@@ -49,10 +53,12 @@ function fakePackage() {
   return root
 }
 
+// These suites test how a build publishes, so every build compiles: the skip of an
+// unchanged package (6.14-BUILD-*) would otherwise turn repeat builds into no-ops.
 const build = (root: string, env: NodeJS.ProcessEnv = {}) =>
   spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'fake-tsc.cjs'], {
     cwd: root,
-    env: { ...process.env, ...env },
+    env: { ...process.env, COUTURE_FORCE_PACKAGE_BUILD: '1', ...env },
     encoding: 'utf8',
   })
 
@@ -125,10 +131,12 @@ if (mode === 'vanish') fs.rmSync(outDir, { recursive: true, force: true })
 `
 
 /** Every file under `root` with its content, for comparing whole trees. */
+// The compiled tree: the build's fingerprint stamp is the builder's record, not output.
 const tree = (root: string): Record<string, string> => {
   const files = fs
     .readdirSync(root, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
+    .filter((entry) => !(entry.parentPath === root && entry.name === FINGERPRINT_FILE))
     .map((entry): [string, string] => {
       const file = path.join(entry.parentPath, entry.name)
       return [path.relative(root, file), fs.readFileSync(file, 'utf8')]
@@ -154,7 +162,7 @@ const buildAsync = (root: string, env: NodeJS.ProcessEnv = {}, script = SCRIPT) 
       [script, '--tsc', process.execPath, 'slow-tsc.cjs'],
       {
         cwd: root,
-        env: { ...process.env, ...env },
+        env: { ...process.env, COUTURE_FORCE_PACKAGE_BUILD: '1', ...env },
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     )
@@ -361,6 +369,8 @@ describe('serial builds (R34)', () => {
         // eslint-disable-next-line no-await-in-loop -- serial on purpose
         const result = await buildAsync(root, { SLOW_TSC_MODE: 'many' })
         if (result.code !== 0) failures.push(`run ${run}: ${result.output}`)
+        if (/build skipped/.test(result.output))
+          failures.push(`run ${run} did not compile`)
       }
       expect(failures).toEqual([])
       expect(Object.keys(tree(path.join(root, 'dist')))).toHaveLength(300)
@@ -544,5 +554,233 @@ describe('publication order (R24)', () => {
       renames.mockRestore()
     }
     expect(order).toEqual([path.join('lib', 'shape.d.ts'), 'api.d.ts', 'index.d.ts'])
+  })
+})
+
+describe('unchanged inputs (Story 6.14 follow-up)', () => {
+  /** A package with sources, built by a compiler that writes only into its outDir. */
+  function sourcePackage() {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'build-fingerprint-'))
+    const root = directory
+    fs.mkdirSync(path.join(root, 'src'))
+    fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export const value = 1')
+    fs.writeFileSync(
+      path.join(root, 'counting-tsc.cjs'),
+      `const fs = require('node:fs')
+const outDir = process.argv[process.argv.indexOf('--outDir') + 1]
+fs.appendFileSync(process.env.COMPILE_LOG, 'compiled\\n')
+fs.writeFileSync(require('node:path').join(outDir, 'index.js'), fs.readFileSync('src/index.ts', 'utf8'))`
+    )
+    return root
+  }
+  const counted = (root: string, log: string, env: NodeJS.ProcessEnv = {}) =>
+    spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'counting-tsc.cjs'], {
+      cwd: root,
+      env: { ...process.env, COUTURE_FORCE_PACKAGE_BUILD: '', COMPILE_LOG: log, ...env },
+      encoding: 'utf8',
+    })
+  const compiles = (log: string) =>
+    fs.existsSync(log)
+      ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).length
+      : 0
+
+  it('6.14-BUILD-01 skips a build whose inputs match the published fingerprint', () => {
+    const root = sourcePackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-1`)
+    try {
+      expect(counted(root, log).status).toBe(0)
+      expect(fs.existsSync(path.join(root, 'dist', FINGERPRINT_FILE))).toBe(true)
+      const second = counted(root, log)
+      expect(second.status).toBe(0)
+      expect(second.stdout).toMatch(/build skipped/)
+      expect(compiles(log)).toBe(1)
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+
+  it('6.14-BUILD-02 rebuilds after a source change, a missing dist or a forced build', () => {
+    const root = sourcePackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-2`)
+    try {
+      expect(counted(root, log).status).toBe(0)
+      fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export const value = 2')
+      expect(counted(root, log).status).toBe(0)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.js'), 'utf8')).toBe(
+        'export const value = 2'
+      )
+      fs.rmSync(path.join(root, 'dist'), { recursive: true })
+      expect(counted(root, log).status).toBe(0)
+      expect(counted(root, log, { COUTURE_FORCE_PACKAGE_BUILD: '1' }).status).toBe(0)
+      expect(compiles(log)).toBe(4)
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+
+  it('6.14-BUILD-03 a failed compile leaves no stamp for its inputs, so the next build compiles', () => {
+    const root = sourcePackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-3`)
+    try {
+      expect(counted(root, log).status).toBe(0)
+      fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export const value = 3')
+      expect(counted(root, log, { COMPILE_LOG: '/nonexistent/dir/log' }).status).not.toBe(
+        0
+      )
+      expect(counted(root, log).status).toBe(0)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.js'), 'utf8')).toBe(
+        'export const value = 3'
+      )
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+})
+
+describe('what the fingerprint covers (Story 6.14 follow-up)', () => {
+  /** A repository with one package, `packages/pkg`, and the files it compiles against. */
+  function repository() {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'build-inputs-'))
+    const root = directory
+    const write = (file: string, content: string) => {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      fs.writeFileSync(path.join(root, file), content)
+    }
+    write('tsconfig.json', '{}')
+    write('package-lock.json', '{"lockfileVersion":3}')
+    write('node_modules/.package-lock.json', '{"installed":1}')
+    write('node_modules/.prisma/client/index.d.ts', 'export type User = { id: string }')
+    write('node_modules/.prisma/client/schema.prisma', 'model User { id String @id }')
+    // Prisma can also generate into @prisma/client itself (Codex review of PR 211).
+    write('node_modules/@prisma/client/index.d.ts', "export * from '.prisma/client'")
+    write('node_modules/@couture/dep/dist/.build-fingerprint', 'dep-1')
+    write(
+      'packages/pkg/package.json',
+      JSON.stringify({ name: '@couture/pkg', dependencies: { '@prisma/client': '6' } })
+    )
+    write('packages/pkg/tsconfig.json', '{"extends":"../../tsconfig.json"}')
+    // Imported, not declared: the source decides what the compile reads.
+    write('packages/pkg/src/index.ts', "export * from '@couture/dep'")
+    return { root, write, pkg: path.join(root, 'packages/pkg') }
+  }
+  const compiler = ['tsc']
+
+  it.each([
+    ['the lockfile', 'package-lock.json', '{"lockfileVersion":3,"x":1}'],
+    [
+      'the installed dependency tree',
+      'node_modules/.package-lock.json',
+      '{"installed":2}',
+    ],
+    ['the root tsconfig', 'tsconfig.json', '{"compilerOptions":{"strict":true}}'],
+    ['the package tsconfig', 'packages/pkg/tsconfig.json', '{}'],
+    ['a source file', 'packages/pkg/src/index.ts', 'export const changed = 1'],
+    [
+      'the generated Prisma client types',
+      'node_modules/.prisma/client/index.d.ts',
+      'export type User = { id: number }',
+    ],
+    [
+      'the Prisma client types generated into @prisma/client',
+      'node_modules/@prisma/client/index.d.ts',
+      'export type Visibility = "PRIVATE"',
+    ],
+    [
+      'the Prisma schema the client was generated from',
+      'node_modules/.prisma/client/schema.prisma',
+      'model User { id Int @id }',
+    ],
+    [
+      // build:watch rewrites a dependency's dist without touching its stamp (Codex review
+      // of PR 211): the consumer compiles against what dist holds, so that is what counts.
+      'a dependency dist changed after its build',
+      'node_modules/@couture/dep/dist/index.d.ts',
+      'export declare const changed: 2',
+    ],
+    [
+      'an imported workspace package build',
+      'node_modules/@couture/dep/dist/.build-fingerprint',
+      'dep-2',
+    ],
+  ])('6.14-BUILD-04 changes with %s', (_label, file, content) => {
+    const { write, pkg } = repository()
+    const before = buildFingerprint(pkg, compiler)
+    write(file, content)
+    expect(buildFingerprint(pkg, compiler)).not.toBe(before)
+  })
+
+  it('6.14-BUILD-05 changes with the compiler command and ignores its own outputs', () => {
+    const { write, pkg } = repository()
+    const before = buildFingerprint(pkg, compiler)
+    expect(buildFingerprint(pkg, ['npm', 'exec', 'tsc'])).not.toBe(before)
+    write('packages/pkg/dist/index.js', 'built')
+    write('packages/pkg/dist/.build-fingerprint', before)
+    write('packages/pkg/node_modules/x/index.js', 'x')
+    write('packages/pkg/.dist-staging-1-a/index.js', 'staging')
+    write('packages/pkg/tsconfig.build.tsbuildinfo', '{}')
+    expect(buildFingerprint(pkg, compiler)).toBe(before)
+  })
+})
+
+describe('what a skip trusts (Codex review of PR 211)', () => {
+  function builtPackage() {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'build-outputs-'))
+    const root = directory
+    fs.mkdirSync(path.join(root, 'src'))
+    fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'A')
+    fs.writeFileSync(
+      path.join(root, 'emit-tsc.cjs'),
+      `const fs = require('node:fs'); const path = require('node:path')
+const outDir = process.argv[process.argv.indexOf('--outDir') + 1]
+fs.appendFileSync(process.env.COMPILE_LOG, 'compiled\\n')
+fs.writeFileSync(path.join(outDir, 'index.js'), fs.readFileSync('src/index.ts', 'utf8'))
+fs.writeFileSync(path.join(outDir, 'index.d.ts'), 'declare ' + fs.readFileSync('src/index.ts', 'utf8'))`
+    )
+    return root
+  }
+  const build = (root: string, log: string) =>
+    spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'emit-tsc.cjs'], {
+      cwd: root,
+      env: { ...process.env, COMPILE_LOG: log, COUTURE_FORCE_PACKAGE_BUILD: '' },
+      encoding: 'utf8',
+    })
+  const compiles = (log: string) =>
+    fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).length
+
+  it('6.14-BUILD-06 rebuilds a dist another compiler overwrote, as build:watch does', () => {
+    const root = builtPackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-6`)
+    try {
+      expect(build(root, log).status).toBe(0)
+      // tsc --watch writes straight into dist and leaves the stamp alone.
+      fs.writeFileSync(path.join(root, 'dist', 'index.d.ts'), 'declare B')
+      expect(build(root, log).status).toBe(0)
+      expect(compiles(log)).toBe(2)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.d.ts'), 'utf8')).toBe(
+        'declare A'
+      )
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+
+  it('6.14-BUILD-07 rebuilds a dist that lost a file or gained one', () => {
+    const root = builtPackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-7`)
+    try {
+      expect(build(root, log).status).toBe(0)
+      fs.rmSync(path.join(root, 'dist', 'index.js'))
+      expect(build(root, log).status).toBe(0)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.js'), 'utf8')).toBe('A')
+      fs.writeFileSync(path.join(root, 'dist', 'stray.js'), 'stray')
+      expect(build(root, log).status).toBe(0)
+      expect(fs.existsSync(path.join(root, 'dist', 'stray.js'))).toBe(false)
+      expect(compiles(log)).toBe(3)
+      // And an untouched dist is still current.
+      expect(build(root, log).stdout).toMatch(/build skipped/)
+      expect(compiles(log)).toBe(3)
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
   })
 })

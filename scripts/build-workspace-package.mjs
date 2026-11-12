@@ -35,11 +35,26 @@
  * dependency: it guarded nothing correctness needed and its lease checks failed
  * serial CI builds.
  *
+ * Story 6.14 follow-up: a build whose inputs have not changed since the last one
+ * published is skipped. The npm pre-hooks rebuilt the same three packages five times in
+ * one mobile e2e shard (about 100 s). The fingerprint covers everything the compile reads:
+ * every file of the package outside `dist` and `node_modules`, the root tsconfig.json
+ * every package tsconfig extends, package-lock.json and the installed tree npm records in
+ * node_modules/.package-lock.json, the generated Prisma client a package that depends on
+ * @prisma/client compiles against, the compiler command, and the fingerprint of every
+ * workspace package it declares or imports. tsc reads no environment variable that
+ * changes its output. It is written to `dist/.build-fingerprint` after each publish with
+ * the hash of every file the build published, and a skip also requires `dist` to hold
+ * exactly those files unchanged (outputInventory). No
+ * workflow caches `dist`, so a CI build always starts from a fresh checkout.
+ * COUTURE_FORCE_PACKAGE_BUILD=1 always builds.
+ *
  * Usage, from the package directory:
  *   node ../../scripts/build-workspace-package.mjs [--tsc <command...>]
  * The default compiler is `npm exec --yes --package=typescript@5.9.3 -- tsc`.
  */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -262,6 +277,160 @@ export function replaceDistFromStaging(staging, dist) {
  * @param {string[]} args
  * @returns {Promise<number>} the exit code, 1 for a signal or a spawn error
  */
+export const FINGERPRINT_FILE = '.build-fingerprint'
+/** Package entries that are outputs or caches, never build inputs. */
+const NOT_INPUTS = new Set([DIST, 'node_modules', 'coverage', '.turbo'])
+
+/** Every input file under `root`, as sorted paths relative to it. */
+function inputFiles(root, relative = '') {
+  const files = []
+  for (const entry of fs.readdirSync(path.join(root, relative), {
+    withFileTypes: true,
+  })) {
+    const name = entry.name
+    if (relative === '' && (NOT_INPUTS.has(name) || name.startsWith(STAGING_PREFIX)))
+      continue
+    if (name.endsWith('.tsbuildinfo')) continue
+    const child = path.join(relative, name)
+    if (entry.isDirectory()) files.push(...inputFiles(root, child))
+    else if (entry.isFile()) files.push(child)
+  }
+  return files.sort()
+}
+
+/**
+ * The fingerprint of a package build: its own input files, the repository files every
+ * package compiles against, the compiler command and its workspace dependencies' own
+ * fingerprints (or their absence).
+ *
+ * @param {string} packageDir
+ * @param {string[]} compiler
+ * @returns {string}
+ */
+export function buildFingerprint(packageDir, compiler) {
+  const hash = createHash('sha256')
+  const add = (label, content) => {
+    hash.update(`${label}\0${content.length}\0`)
+    hash.update(content)
+  }
+  add('compiler', JSON.stringify(compiler))
+  for (const file of inputFiles(packageDir))
+    add(`file:${file}`, fs.readFileSync(path.join(packageDir, file)))
+  const repository = path.resolve(packageDir, '../..')
+  const addFile = (label, at) =>
+    add(label, fs.existsSync(at) ? fs.readFileSync(at) : 'none')
+  for (const file of [
+    'tsconfig.json',
+    'package-lock.json',
+    'node_modules/.package-lock.json',
+  ])
+    addFile(`root:${file}`, path.join(repository, file))
+  const manifestFile = path.join(packageDir, 'package.json')
+  const manifest = fs.existsSync(manifestFile)
+    ? JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
+    : {}
+  const declared = Object.keys({
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+    ...manifest.peerDependencies,
+  })
+  // The generated client is in no lockfile: its types come from the Prisma schema. Prisma
+  // generates into node_modules/.prisma/client, or into @prisma/client itself.
+  if (declared.includes('@prisma/client'))
+    for (const directory of [
+      'node_modules/.prisma/client',
+      'node_modules/@prisma/client',
+    ]) {
+      const at = path.join(repository, directory)
+      const files = fs.existsSync(at)
+        ? fs
+            .readdirSync(at)
+            .filter((name) => name.endsWith('.d.ts') || name === 'schema.prisma')
+            .sort()
+        : []
+      add(`prisma:${directory}`, files.join('\n'))
+      for (const file of files)
+        addFile(`prisma:${directory}/${file}`, path.join(at, file))
+    }
+  // A workspace package the source imports counts even when package.json omits it.
+  const imported = new Set()
+  for (const file of inputFiles(packageDir))
+    if (/\.[cm]?[jt]sx?$/.test(file))
+      for (const match of fs
+        .readFileSync(path.join(packageDir, file), 'utf8')
+        .matchAll(/['"](@couture\/[a-z0-9-]+)/g))
+        imported.add(match[1])
+  const workspace = [
+    ...new Set([...declared.filter((name) => name.startsWith('@couture/')), ...imported]),
+  ]
+    .filter((name) => name !== manifest.name)
+    .sort()
+  // A dependency counts by what its dist holds now, every file with its sha256, and its
+  // stamp: tsc --watch rewrites dist without touching the stamp, and this package
+  // compiles against the files.
+  for (const name of workspace) {
+    const dist = [
+      path.join(packageDir, 'node_modules', name, DIST),
+      path.join(repository, 'node_modules', name, DIST),
+    ].find((candidate) => fs.existsSync(candidate))
+    const stamp = dist && path.join(dist, FINGERPRINT_FILE)
+    add(
+      `dependency:${name}`,
+      dist
+        ? JSON.stringify({
+            stamp: fs.existsSync(stamp) ? fs.readFileSync(stamp, 'utf8') : null,
+            outputs: outputInventory(dist),
+          })
+        : 'none'
+    )
+  }
+  return hash.digest('hex')
+}
+
+/**
+ * Every file in `dist` but the stamp, with its sha256: what the last build published. A
+ * skip trusts the stamp only while `dist` still holds exactly this, so output another
+ * writer changed (tsc --watch, a deleted entry point, a stray file) is rebuilt.
+ * @param {string} dist
+ * @returns {Record<string, string>}
+ */
+export function outputInventory(dist) {
+  const walk = (relative) =>
+    fs
+      .readdirSync(path.join(dist, relative), { withFileTypes: true })
+      .flatMap((entry) => {
+        const child = path.join(relative, entry.name)
+        if (entry.isDirectory()) return walk(child)
+        if (!entry.isFile() || child === FINGERPRINT_FILE) return []
+        return [child]
+      })
+  if (!fs.existsSync(dist)) return {}
+  return Object.fromEntries(
+    walk('')
+      .sort()
+      .map((file) => [
+        file,
+        createHash('sha256')
+          .update(fs.readFileSync(path.join(dist, file)))
+          .digest('hex'),
+      ])
+  )
+}
+
+/** Whether `dist` is the build of `fingerprint`, unchanged since it was published. */
+function distIsCurrent(stampFile, fingerprint) {
+  let stamp
+  try {
+    stamp = JSON.parse(fs.readFileSync(stampFile, 'utf8'))
+  } catch {
+    return false
+  }
+  return (
+    stamp?.fingerprint === fingerprint &&
+    JSON.stringify(stamp.outputs) === JSON.stringify(outputInventory(DIST))
+  )
+}
+
 const run = (command, args) =>
   new Promise((resolve) => {
     const child = spawn(command, args, { stdio: 'inherit' })
@@ -284,6 +453,17 @@ export const runBuild = async ({ argv = process.argv } = {}) => {
     tscIndex === -1
       ? ['npm', 'exec', '--yes', '--package=typescript@5.9.3', '--', 'tsc']
       : argv.slice(tscIndex + 1)
+  const fingerprint = buildFingerprint(process.cwd(), [command, ...args])
+  const stampFile = path.join(DIST, FINGERPRINT_FILE)
+  if (
+    process.env.COUTURE_FORCE_PACKAGE_BUILD !== '1' &&
+    distIsCurrent(stampFile, fingerprint)
+  ) {
+    console.log(
+      `${path.basename(process.cwd())}: dist is current (${fingerprint.slice(0, 12)}); build skipped.`
+    )
+    return
+  }
   fs.rmSync(SHARED_TSBUILDINFO, { force: true })
   const staging = fs.mkdtempSync(`${STAGING_PREFIX}${process.pid}-`)
   const tsbuildinfo = `${staging}.tsbuildinfo`
@@ -307,6 +487,12 @@ export const runBuild = async ({ argv = process.argv } = {}) => {
       return
     }
     replaceDistFromStaging(staging, DIST)
+    // Written after the publish, so a stamp always names a complete dist. The next
+    // publish prunes it with the other files the compiler did not emit, then rewrites it.
+    fs.writeFileSync(
+      stampFile,
+      JSON.stringify({ fingerprint, outputs: outputInventory(DIST) }, null, 2)
+    )
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

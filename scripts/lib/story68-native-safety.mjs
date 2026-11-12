@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process'
+import { localSupabasePorts } from './local-supabase-ports.mjs'
 
 /** Keep both console and its adjacent ADB channel in the supported port range. */
 export function assertOwnedStory68EmulatorPort({ avd, port }) {
@@ -12,6 +13,14 @@ export function assertOwnedStory68EmulatorPort({ avd, port }) {
     value % 2 !== 0
   )
     throw new Error('owned_avd_and_safe_even_port_required')
+}
+
+/**
+ * The ports a native lane reverses into the emulator: its own services, then the local
+ * Supabase API on its configured port, which signed community image URLs point at.
+ */
+export function androidReversePorts(ownedPorts, env = process.env) {
+  return [...ownedPorts, localSupabasePorts(env).api]
 }
 
 /** Reapply only idempotent forwards after one selected-device offline transition. */

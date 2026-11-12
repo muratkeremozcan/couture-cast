@@ -68,10 +68,8 @@ permissions:
   contents: read
 
 env:
-  # Identical to LOCAL_E2E_DATABASE_URL in scripts/local-e2e-database.mjs and to
-  # the Playwright workflow's LOCAL_DATABASE_URL. Both point at the Supabase
-  # container declared in supabase/config.toml (port 54322).
-  LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  # LOCAL_DATABASE_URL and the Supabase ports come from configure-ci-supabase-ports
+  # (.github/supabase-ci-ports.env), the first step after checkout.
   # Not 30. API 30 emulators on GitHub-hosted runners have had no network
   # connectivity since 2026-06-25, which for this suite is a total-failure mode
   # rather than a slowdown: the device has to reach Metro, the local API and
@@ -128,8 +126,10 @@ jobs:
     # count is chosen to keep the slowest slice under about 4.5 minutes against
     # `scripts/maestro-flow-durations.json`'s recorded flow costs. Seven shards
     # packed a 5.8 minute slice and green shard jobs reached 19 minutes (27 runs
-    # at 18 or more, 2026-11-05 to 2026-11-10); nine keep every shard job under
-    # the 20-minute PR job limit.
+    # at 18 or more, 2026-11-05 to 2026-11-10). Nine packed 269 s and shard jobs
+    # ran 14.6 minutes at p50 and 16.8 at p95 (170 shard runs, 2026-11-11 to 12);
+    # twelve pack 212 s, about a minute less per shard, for room under the
+    # 20-minute ceiling. Past twelve one expensive flow sets the floor (14: 188 s).
     #
     # Each shard is a full, independent job: its own emulator, Supabase, API and
     # Metro, running a slice of the flow list. They share the AVD snapshot cache,
@@ -149,14 +149,14 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 21.9 min across 56 shard runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    # 22 + 10 + 3 + 2 = 37 min, so 45 keeps about 8 min of margin.
-    timeout-minutes: 45
+    # No PR job runs past 20 minutes. A shard is about 10.8 minutes of fixed cost
+    # (setup, Supabase, emulator, API and Metro) plus its share of flows (269 s at
+    # p95 with nine shards). Twelve shards saved about a minute a shard for three
+    # more jobs against the account's 20-job concurrency limit, so the suite stays at
+    # nine and the fixed cost is cut instead. The slow paths that used to hold a
+    # shard for 45 minutes now stop on their own limits: the SDK install at 8
+    # minutes, the Supabase start at 10.
+    timeout-minutes: 20
     services:
       redis:
         image: redis:7-alpine
@@ -170,15 +170,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
-
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
       # Some ubuntu-latest hosts start with under 15 GiB free; the emulator
       # snapshot restore has died with "No space left on device" on them.
       - name: Free runner disk
         uses: ./.github/actions/free-runner-disk
+
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -205,6 +208,9 @@ jobs:
       # upgrade changes its build-tools or platform version, that package is
       # simply downloaded unguarded again until this list catches up.
       - name: Install Android SDK packages for the emulator
+        # Normal 0.8 minutes (p95 1.0, 555 runs); an sdkmanager that stalled ran 33.5
+        # minutes in run 43083368586. Each install attempt is limited below.
+        timeout-minutes: 8
         shell: bash
         env:
           SDK_PACKAGES: >-
@@ -218,7 +224,11 @@ jobs:
           for package in "${packages[@]}"; do
             dir="$ANDROID_HOME/${package//;//}"
             for attempt in 1 2 3; do
-              sdkmanager --install "$package" --channel=0 > /dev/null || true
+              # An attempt that has not finished in 180 s has stalled (a whole install
+              # takes under a minute); the next one starts clean. Not cached: the repo's
+              # Actions cache is at its 10 GB limit, and a 1.5 GB SDK entry would evict
+              # the Supabase image and AVD caches every job reads.
+              timeout --kill-after=10 180 sdkmanager --install "$package" --channel=0 > /dev/null || true
               # A truncated archive never unpacks, so package.xml is the check.
               if [ -f "$dir/package.xml" ]; then
                 echo "Installed $package"
@@ -302,7 +312,26 @@ jobs:
           key: ${{ steps.avd-cache.outputs.cache-primary-key }}
 
       - name: Start local Supabase services
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Reset local database
         run: npm run db:reset

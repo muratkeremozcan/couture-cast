@@ -14,6 +14,7 @@
 import { createHash, randomUUID } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
+import { localMailpitUrl } from '../lib/local-supabase-ports.mjs'
 
 /** The specs hard-code these origins, so the harness serves exactly them. */
 export const API_PORT = 4077
@@ -27,8 +28,8 @@ export const AUTH_PROXY_PORT = 53051
 /** Kept off the default 4010 so a normal local stack can run beside this one. */
 export const WEATHER_DOUBLE_PORT = 4087
 
-/** Mailpit from `supabase/config.toml` (`[inbucket] port`). */
-export const MAILPIT_URL = 'http://127.0.0.1:54324'
+/** Mailpit on the configured `[inbucket]` port (CI's override, else supabase/config.toml). */
+export const MAILPIT_URL = localMailpitUrl()
 
 /**
  * The web build this harness makes, relative to `apps/web`. A separate output keeps

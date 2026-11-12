@@ -10,7 +10,7 @@ description: >-
   and 41429432878 still failed the 20 GiB guard: such a host had 13 GiB free, 39
   after this step, and the install, emulator, AVD and Supabase images used 19 more
   before the flows. So the unused Go, PyPy and Ruby caches and the cloud CLIs go too. Run this right after checkout (and
-  after reserve-supabase-ports where a job has it) in every Linux job that
+  after configure-ci-supabase-ports where a job has it) in every Linux job that
   builds the Android app, boots an emulator or runs the disk guard. It makes no
   network connection. Every path is optional, so an image that drops one, or
   the coming Ubuntu 26.04 ubuntu-latest, still passes. The image ships no

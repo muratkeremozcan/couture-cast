@@ -1,3 +1,4 @@
+# Step 7 step 5 owner: searchable owner anchor
 name: Contract testing
 
 on:
@@ -18,19 +19,82 @@ jobs:
   local-contracts:
     name: Local schema and Pact contracts
     runs-on: ubuntu-latest
+    # 2.7 minutes at p50, 3.1 at p95 (last 20 runs, 2026-11-12), before the secrets scan
+    # (0.3 at p95) and schema validation (2.4 at p95) joined it.
+    timeout-minutes: 10
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # gitleaks scans every commit of the pull request.
+          fetch-depth: 0
+
+      # The secrets scan and the schema checks were workflows of their own until
+      # 2026-11-12, each a runner and a queue slot per push against the account's 20
+      # concurrent jobs. Each is a named step here, run whatever the others did, so a
+      # failure still names its check (scripts/ci/pr-pipeline-shape.test.mjs).
+      - name: Gitleaks secrets scan
+        if: ${{ github.event_name != 'push' }}
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload gitleaks report
+        if: ${{ always() && github.event_name != 'push' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitleaks-report
+          path: gitleaks-report.json
+          if-no-files-found: ignore
+          retention-days: 5
 
       - name: Setup Node environment
+        id: setup
+        if: ${{ !cancelled() }}
         uses: ./.github/actions/setup-node-env
         with:
           use-npm-ci: 'false'
 
+      - name: Build the shared utils package the contracts import
+        id: utils
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
+        run: npm run build --workspace @couture/utils
+
+      - name: Schema validation, Optic lint base OpenAPI spec
+        if: ${{ !cancelled() && github.event_name != 'push' && steps.setup.outcome == 'success' }}
+        run: npm run optic:lint
+
+      - name: Schema validation, generate OpenAPI spec from code
+        id: openapi
+        if: ${{ !cancelled() && github.event_name != 'push' && steps.utils.outcome == 'success' }}
+        run: npm run generate:http-openapi
+
+      - name: Schema validation, Optic diff against main
+        if: ${{ !cancelled() && github.event_name != 'push' && steps.openapi.outcome == 'success' }}
+        run: npm run optic:diff
+
+      - name: Schema validation, checked-in socket-event schemas are current
+        if: ${{ !cancelled() && github.event_name != 'push' && steps.utils.outcome == 'success' }}
+        run: |
+          npm run gen:openapi:events --workspace @couture/api-client
+          if ! git diff --exit-code -- packages/api-client/docs/socket-events.openapi.json; then
+            echo "::error::packages/api-client/docs/socket-events.openapi.json is behind packages/api-client/src/types/socket-events.ts. Run 'npm run gen:openapi:events --workspace @couture/api-client' locally and commit the result."
+            exit 1
+          fi
+
+      - name: Schema validation, checked-in SDK is current
+        if: ${{ !cancelled() && github.event_name != 'push' && steps.utils.outcome == 'success' }}
+        run: |
+          npm run generate:api-client
+          if ! git diff --exit-code -- packages/api-client/src/generated; then
+            echo "::error::packages/api-client/src/generated is behind packages/api-client/docs/http.openapi.json. Run 'npm run generate:api-client' locally and commit the result."
+            exit 1
+          fi
+
       - name: Run blocking Pact workflow
         id: pact
+        if: ${{ !cancelled() && steps.setup.outcome == 'success' }}
         continue-on-error: true
         run: npm run test:pact
 

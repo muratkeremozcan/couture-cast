@@ -225,27 +225,34 @@ describe('dependency download recovery', () => {
     expect(result.attempts).toBe(1)
   })
 
-  it('routes the shared install action through the recovery script', () => {
+  it('routes the shared dependency action through the recovery script', () => {
     const action = fs.readFileSync(
-      path.join(repoRoot, '.github/actions/install/action.yml'),
+      path.join(repoRoot, '.github/actions/node-dependencies/action.yml'),
       'utf8'
     )
     expect(action).toContain('INSTALL_COMMAND: ${{ inputs.install-command }}')
     expect(action).toContain(
       'run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"'
     )
+    expect(action).not.toMatch(/for attempt/)
   })
 
-  it('routes the other setup action through the same script, with no retry of its own', () => {
-    const action = fs.readFileSync(
-      path.join(repoRoot, '.github/actions/setup-node-env/action.yml'),
-      'utf8'
-    )
-    expect(action).toContain('INSTALL_COMMAND:')
-    expect(action).toContain(
-      'run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"'
-    )
-    expect(action).not.toMatch(/for attempt/)
+  it('routes both setup actions through the shared dependency action', () => {
+    for (const [file, command] of [
+      [
+        '.github/actions/install/action.yml',
+        'install-command: ${{ inputs.install-command }}',
+      ],
+      [
+        '.github/actions/setup-node-env/action.yml',
+        "install-command: ${{ inputs.use-npm-ci == 'true' && 'npm ci' || 'npm install' }}",
+      ],
+    ] as const) {
+      const action = fs.readFileSync(path.join(repoRoot, file), 'utf8')
+      expect(action, file).toContain('uses: ./.github/actions/node-dependencies')
+      expect(action, file).toContain(command)
+      expect(action, file).not.toMatch(/for attempt/)
+    }
   })
 })
 
@@ -420,14 +427,16 @@ process.exit(result.code)
     expect(lanes[1]).toContain('./gradlew')
   })
 
-  it('fetches in both Android jobs before the first Gradle step', () => {
+  it('fetches in every Android job before the first Gradle step', () => {
     const workflow = fs.readFileSync(
       path.join(repoRoot, '.github/workflows/pr-accessibility-focus.yml'),
       'utf8'
     )
     const jobs = workflow.split(/\n {2}(?=[\w-]+:\n {4}name: )/)
     const android = jobs.filter((job) => job.includes('Generate the Android project'))
-    expect(android).toHaveLength(2)
+    // The app build, the module's Robolectric tests (split out to keep each under 20
+    // minutes) and the TalkBack device run.
+    expect(android).toHaveLength(3)
     for (const job of android) {
       const fetchAt = job.indexOf(
         'scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android'
@@ -436,8 +445,9 @@ process.exit(result.code)
         job.indexOf('Generate the Android project')
       )
       const firstGradle = job.search(
-        /Robolectric tests for the focus observer|accessibility-focus-device-tests\.sh/
+        /\.\/gradlew |Robolectric tests for the focus observer|accessibility-focus-device-tests\.sh/
       )
+      expect(firstGradle, job.slice(0, 60)).toBeGreaterThan(-1)
       expect(fetchAt).toBeLessThan(firstGradle)
     }
   })

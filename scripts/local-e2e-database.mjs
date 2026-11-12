@@ -23,15 +23,18 @@
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { localDatabaseUrl } from './lib/local-supabase-ports.mjs'
 
 /**
- * Must stay identical to `LOCAL_DATABASE_URL` in
- * `.github/workflows/pr-pw-e2e-local.yml`. Both point at the local Supabase
- * container from `supabase/config.toml`, whose credentials are fixed defaults
- * for a database that only ever holds generated fixtures.
+ * The local Supabase database on the port `env` configures: CI's override from
+ * `.github/supabase-ci-ports.env`, which also sets CI's `LOCAL_DATABASE_URL`, else
+ * `supabase/config.toml`. Its credentials are fixed defaults for a database that only
+ * ever holds generated fixtures. Read when needed: a launcher loads its env files after
+ * importing this module, and the port they settle is the one to use.
  */
-export const LOCAL_E2E_DATABASE_URL =
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+export function localE2eDatabaseUrl(env = process.env) {
+  return localDatabaseUrl(env)
+}
 
 /**
  * True when the process has declared itself a local or test run.
@@ -75,7 +78,7 @@ export function applyLocalE2eDatabaseUrl(env = process.env, { repoRootToScan } =
     return false
   }
 
-  env.DATABASE_URL = LOCAL_E2E_DATABASE_URL
+  env.DATABASE_URL = localE2eDatabaseUrl(env)
   return true
 }
 

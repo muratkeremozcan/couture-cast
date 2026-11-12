@@ -51,6 +51,10 @@ const ENV_LOCAL_DATABASE_URL = 'postgresql://postgres:postgres@127.0.0.1:54322/p
 const migrateFiles = [
   'scripts/prisma-migrate-deploy.mjs',
   'scripts/local-e2e-database.mjs',
+  'scripts/lib/local-supabase-ports.mjs',
+  'scripts/lib/local-supabase-ports.cjs',
+  // local-supabase-ports.mjs reads the local ports from it.
+  'supabase/config.toml',
   'scripts/lib/caller-owned-env.mjs',
   'scripts/lib/prisma-migrate-connection.mjs',
   'scripts/lib/database-tls.mjs',

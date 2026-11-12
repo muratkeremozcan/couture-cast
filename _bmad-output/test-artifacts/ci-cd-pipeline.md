@@ -2,6 +2,7 @@
 
 <!-- markdownlint-configure-file {"MD013": false} -->
 
+Updated: 2026-11-12 - PR job ceilings at 20 minutes and CI's local Supabase ports
 Updated: 2026-05-01 - document Preview and Production as the deployed Vercel targets
 
 ## Overview
@@ -41,6 +42,31 @@ Playwright environment selection uses `TEST_ENV`:
 - `.github/workflows/gitleaks-check.yml`: secret scanning.
 - `CodeRabbit` GitHub App: advisory PR review on `main`-bound pull requests once the app is
   installed; repo guidance lives in `.coderabbit.yaml`.
+
+### Job ceilings and local Supabase in CI
+
+- No job a pull request runs may take longer than 20 minutes. Each ceiling comes from the last
+  20 runs, and `scripts/ci/pr-job-ceilings.test.mjs` fails any PR job, reusable workflows
+  followed, whose `timeout-minutes` is over 20 or unset. The same test pins the lanes skipped on
+  pull requests (the share-card device lanes and the iOS release build), so none is skipped
+  silently.
+- CI's local Supabase binds the ports in `.github/supabase-ci-ports.env` (2432x), below 32768
+  and so outside the Linux and macOS ephemeral ranges: the runner's own connection once held
+  54322 for a whole job. `configure-ci-supabase-ports`, the first step after checkout, exports
+  them with `LOCAL_DATABASE_URL`; `scripts/lib/local-supabase-ports.mjs` resolves them in every
+  script and guard. Developers keep `supabase/config.toml`'s 5432x.
+- Every command on the start path runs under a limit (`start-local-supabase`), an attempt runs
+  at most 170 s, and the 360 s budget is an absolute deadline: login, status, diagnostics and
+  stop all get at most what is left of it. Each caller stops the step at 10 minutes, keeps its
+  log on failure and then stops the containers a failed start left
+  (`scripts/ci/supabase-start-bounds.test.mjs`).
+- The share-card browser matrix runs on one Playwright worker. Three workers (one fixture set
+  per browser and spec) took 1.4 minutes locally against 3.4 serial, but 6.4 minutes on the
+  4-vCPU runner against 5.4 serial: three browsers, the web server, the API and Postgres
+  saturate it, so each case ran three times slower. The parallel matrix was reverted.
+- `actions-cache-prune.yml` keeps the 10 GB Actions cache clear of closed pull requests and
+  keys unread for 48 hours (`scripts/ci/prune-actions-cache.mjs`), daily and when a pull request
+  closes, so GitHub's own eviction never pushes out a live key.
 
 ### Advisory PR review
 

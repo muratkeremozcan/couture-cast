@@ -21,6 +21,7 @@ import {
   resolveApiBaseUrl,
 } from './api-test'
 import { seedWebSession } from './commerce-session'
+import { localDatabaseUrl } from '../../../scripts/lib/local-supabase-ports.mjs'
 import { localE2EAccessToken } from './local-e2e-token'
 
 export const COMMUNITY_FEED_PATH = '/api/v1/community/feed'
@@ -514,12 +515,11 @@ export const communityTest = test.extend<{ communitySession: CommunitySession }>
  * `apps/api/vitest.config.ts` uses, and the same local Supabase default: CI sets
  * `DATABASE_URL` to the ephemeral service container
  * (`.github/workflows/pr-pw-e2e-local.yml`'s `LOCAL_DATABASE_URL`), and a local run
- * falls back to the port the repo standardises on. Nothing here reads
+ * falls back to local Supabase on its configured port. Nothing here reads
  * `packages/db/.env`: importing Prisma dotenv-loads that file as a side effect and
  * would silently repoint cleanup at a different database.
  */
-const cleanupDatabaseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const cleanupDatabaseUrl = process.env.DATABASE_URL ?? localDatabaseUrl()
 
 /**
  * Removes the uploaded objects before the rows that point at them.

@@ -44,9 +44,9 @@ import {
   seedPostReport,
   type SeededQueue,
 } from '../../apps/api/integration/helpers/moderation-queue-seed'
+import { localDatabaseUrl } from '../../scripts/lib/local-supabase-ports.mjs'
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const databaseUrl = process.env.DATABASE_URL ?? localDatabaseUrl()
 
 const SCREENSHOT_DIR = path.resolve(
   __dirname,

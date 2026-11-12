@@ -24,16 +24,10 @@ permissions:
 jobs:
   k6-smoke:
     runs-on: ubuntu-latest
-    # timeout-minutes = measured work + the Supabase start budget + cache.
-    # Measured on recent green runs (2026-10-22), work excluding the Supabase
-    # step peaked at 4.5 min across 6 runs; start-local-supabase may spend up to its
-    # time-budget-seconds (600 s = 10 min) on start attempts, restoring its
-    # image cache adds about 3 min, and a job that missed the cache saves it
-    # for the others (about 2 min more).
-    # 4.5 + 10 + 3 + 2 = 19.5 min, so 25 keeps some margin.
-    timeout-minutes: 25
+    # 4.8 minutes at p50, 5.2 at p95 (last 20 runs, 2026-11-12). The Supabase
+    # start stops at its own 10 minute step limit.
+    timeout-minutes: 15
     env:
-      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
       TEST_ENV: local
       ALLOW_DEV_GUARDIAN_SECRET: 'true'
       GUARDIAN_INVITE_WEB_BASE_URL: http://127.0.0.1:3005
@@ -43,10 +37,16 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+        with:
+          # Every step here runs against the local Supabase database.
+          database-url: 'true'
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -55,7 +55,26 @@ jobs:
         uses: grafana/setup-k6-action@v1
 
       - name: Start local Supabase services
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        # The start stops what each failed attempt leaves, unless its budget or the
+        # step timeout ended it first; this clears the rest.
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
       - name: Reset local database
         run: npm run db:reset
