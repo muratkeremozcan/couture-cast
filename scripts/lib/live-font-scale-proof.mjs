@@ -223,29 +223,35 @@ function controlsOnScreen(capture, ids) {
   return { pass: missing.length === 0, missing }
 }
 
-function identityCheck(before, immediate, settled) {
-  const stages = [before, immediate, settled]
+/**
+ * The same process, React root and (on Android) Activity across every live stage. Android must
+ * supply its native evidence: an Activity token and an onCreate count at every stage, where an
+ * unavailable count is `undefined` and never read as zero (Codex R4-05). iOS has no native
+ * window identity in the hierarchy; a new scene or window mounts a new React root, so the mount
+ * marker stands for it.
+ */
+function identityCheck(platform, stages) {
   const pids = new Set(stages.map((capture) => String(capture.pid)))
   const roots = stages.map((capture) => capture.identity?.root)
   const activities = stages.map((capture) => capture.identity?.activity)
+  const onCreate = stages.map((capture) => capture.identity?.onCreate)
   const processKept = pids.size === 1 && !pids.has('undefined')
   const rootKnown = roots.every((root) => typeof root === 'string' && root !== '')
   const rootKept = rootKnown && new Set(roots).size === 1
-  const activityKept =
-    activities.every((value) => value === undefined) || new Set(activities).size === 1
-  // Android's event log counts MainActivity onCreate calls (`wm_on_create_called`); a rise
-  // between `before` and `settled` is a recreation even if a token read raced it.
-  const onCreate = stages.map((capture) => capture.identity?.onCreate)
+  const nativeKnown =
+    platform !== 'android' ||
+    (activities.every((value) => typeof value === 'string' && value !== '') &&
+      onCreate.every((value) => Number.isInteger(value)))
+  const activityKept = new Set(activities).size === 1
+  // A rise in MainActivity onCreate calls is a recreation even if a token read raced it.
   const created =
-    onCreate[0] === undefined || onCreate[2] === undefined
-      ? null
-      : Number(onCreate[2]) - Number(onCreate[0])
-  const notRecreated = created === null || created === 0
+    nativeKnown && platform === 'android' ? onCreate.at(-1) - onCreate[0] : null
   return {
-    pass: processKept && rootKept && activityKept && notRecreated,
+    pass: processKept && rootKept && nativeKnown && activityKept && !(created > 0),
     processKept,
     rootKnown,
     rootKept,
+    nativeKnown,
     activityKept,
     activityChanged: !activityKept,
     onCreateDelta: created,
@@ -331,14 +337,40 @@ export function evaluateLiveFontChange({
       before: multiset(before).length,
       settled: multiset(settled).length,
     },
-    identity: identityCheck(before, immediate, settled),
+    identity: identityCheck(platform, [
+      before,
+      immediate,
+      settled,
+      ...(updated ? [updated] : []),
+    ]),
     coldParity: parity(settled, cold, before, tolerance),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
     clipping: clipping(settled, tolerance),
     controls: controlsOnScreen(settled, requiredControls),
   }
   if (updated) {
-    checks.postUpdateParity = parity(updated, coldUpdated, before, tolerance)
+    // Codex R4-04: the update must keep the screen whole, so it gets the structural checks and a
+    // full comparison with the cold launch that made the same update.
+    const coldKeys = [...keyed(coldUpdated).keys()].sort()
+    const liveKeys = [...keyed(updated).keys()].sort()
+    const postParity = parity(updated, coldUpdated, before, tolerance)
+    checks.postUpdateParity = {
+      ...postParity,
+      pass: postParity.pass && JSON.stringify(coldKeys) === JSON.stringify(liveKeys),
+      onlyLive: liveKeys.filter((key) => !coldKeys.includes(key)).length,
+      onlyCold: coldKeys.filter((key) => !liveKeys.includes(key)).length,
+    }
+    checks.postUpdateFullText = {
+      pass: sameMultiset(multiset(updated), multiset(coldUpdated)),
+      updated: multiset(updated).length,
+      cold: multiset(coldUpdated).length,
+    }
+    checks.postUpdateAnchors = {
+      pass: anchors.every((anchor) =>
+        appNodes(updated).some((node) => node.id === anchor)
+      ),
+    }
+    checks.postUpdateControls = controlsOnScreen(updated, requiredControls)
     checks.postUpdateClipping = clipping(updated, tolerance)
   }
   return { checks, verdict: classify(checks) }
@@ -361,6 +393,9 @@ function structural(checks) {
     'controls',
     'clipping',
     'postUpdateClipping',
+    'postUpdateFullText',
+    'postUpdateAnchors',
+    'postUpdateControls',
   ].some((name) => checks[name] && !checks[name].pass)
 }
 

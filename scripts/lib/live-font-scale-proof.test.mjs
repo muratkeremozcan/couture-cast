@@ -24,7 +24,7 @@ const baseline = JSON.parse(
     'utf8'
   )
 )
-const IDENTITY = { activity: 'activity-1', root: 'root-a1' }
+const IDENTITY = { activity: 'activity-1', root: 'root-a1', onCreate: 1 }
 const stage = (name) => ({
   ...structuredClone(baseline.captures.find((c) => c.stage === name)),
   identity: { ...IDENTITY },
@@ -204,6 +204,60 @@ describe('evaluateLiveFontChange', () => {
     change.immediate.identity = { ...IDENTITY, root: 'root-a2' }
     change.settled.identity = { ...IDENTITY, root: 'root-a2' }
     assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  // F-15 / Codex R4-05: Android must supply its native identity; unavailable is not zero.
+  test('Android without an Activity token or onCreate count cannot pass identity', () => {
+    for (const missing of ['activity', 'onCreate']) {
+      const change = fixedChange()
+      delete change.settled.identity[missing]
+      const { verdict, checks } = evaluateLiveFontChange(change)
+      assert.equal(checks.identity.nativeKnown, false, missing)
+      assert.notEqual(verdict, 'fixed', missing)
+    }
+    const ios = { ...fixedChange(), platform: 'ios' }
+    for (const name of ['before', 'immediate', 'settled'])
+      ios[name].identity = { root: 'root-a1' }
+    assert.equal(evaluateLiveFontChange(ios).checks.identity.pass, true)
+  })
+
+  // F-14 / Codex R4-04: the post-update stage keeps the screen whole and the same mount.
+  test('a remounted screen after the update is never fixed', () => {
+    const change = fixedChange()
+    change.updated = {
+      ...correct(stage('settled')),
+      pid: '20001',
+      identity: { activity: 'activity-9', root: 'root-z9', onCreate: 2 },
+    }
+    change.coldUpdated = cold()
+    assert.notEqual(evaluateLiveFontChange(change).verdict, 'fixed')
+    change.updated.pid = change.settled.pid
+    assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  test('a mostly missing screen after the update is never fixed', () => {
+    const change = fixedChange()
+    change.updated = correct(stage('settled'))
+    change.updated.nodes = change.updated.nodes.filter(
+      (node) => node.id === 'current-condition'
+    )
+    change.coldUpdated = cold()
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(
+      checks.postUpdateParity.pass,
+      false,
+      'one surviving node does not pass parity'
+    )
+    assert.equal(checks.postUpdateFullText.pass, false)
+    assert.equal(checks.postUpdateAnchors.pass, false)
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('a whole, same-mount update that matches its cold reference stays fixed', () => {
+    const change = fixedChange()
+    change.updated = correct(stage('settled'))
+    change.coldUpdated = cold()
+    assert.equal(evaluateLiveFontChange(change).verdict, 'fixed')
   })
 
   test('a capture without the mount marker cannot pass identity', () => {
