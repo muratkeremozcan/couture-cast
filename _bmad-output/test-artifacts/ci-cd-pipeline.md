@@ -2,6 +2,7 @@
 
 <!-- markdownlint-configure-file {"MD013": false} -->
 
+Updated: 2026-11-12 - PR job ceilings at 20 minutes and CI's local Supabase ports
 Updated: 2026-05-01 - document Preview and Production as the deployed Vercel targets
 
 ## Overview
@@ -41,6 +42,22 @@ Playwright environment selection uses `TEST_ENV`:
 - `.github/workflows/gitleaks-check.yml`: secret scanning.
 - `CodeRabbit` GitHub App: advisory PR review on `main`-bound pull requests once the app is
   installed; repo guidance lives in `.coderabbit.yaml`.
+
+### Job ceilings and local Supabase in CI
+
+- No job a pull request runs may take longer than 20 minutes. Each ceiling comes from the last
+  20 runs, and `scripts/ci/pr-job-ceilings.test.mjs` fails any PR job, reusable workflows
+  followed, whose `timeout-minutes` is over 20 or unset. The same test pins the lanes skipped on
+  pull requests (the share-card device lanes and the iOS release build), so none is skipped
+  silently.
+- CI's local Supabase binds the ports in `.github/supabase-ci-ports.env` (2432x), below 32768
+  and so outside the Linux and macOS ephemeral ranges: the runner's own connection once held
+  54322 for a whole job. `configure-ci-supabase-ports`, the first step after checkout, exports
+  them with `LOCAL_DATABASE_URL`; `scripts/lib/local-supabase-ports.mjs` resolves them in every
+  script and guard. Developers keep `supabase/config.toml`'s 5432x.
+- Every command on the start path runs under a limit (`start-local-supabase`), an attempt runs
+  at most 170 s inside a 360 s budget, and each caller stops the step at 10 minutes and keeps
+  its log on failure (`scripts/ci/supabase-start-bounds.test.mjs`).
 
 ### Advisory PR review
 
