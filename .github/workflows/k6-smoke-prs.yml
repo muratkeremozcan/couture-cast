@@ -44,6 +44,9 @@ jobs:
         with:
           # Every step here runs against the local Supabase database.
           database-url: 'true'
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node environment
         uses: ./.github/actions/install

@@ -120,18 +120,29 @@ runs:
       env:
         EXCLUDE: ${{ inputs.exclude }}
         CONFIG_HASH: ${{ hashFiles('supabase/config.toml') }}
+      run: node scripts/ci/supabase-image-cache.mjs
+
+    # preload-supabase-images, run right after checkout, restored this key and is loading
+    # it in the background; a preload of another key (another exclude list) is ignored.
+    - name: Check for preloaded Supabase images
+      id: preload
+      if: inputs.image-cache == 'true'
+      shell: bash
+      env:
+        KEY: ${{ steps.cache-key.outputs.key }}
       run: |
         set -u -o pipefail
-        cli_version="$(node -p "require('supabase/package.json').version")"
-        exclude_hash="$(printf '%s' "$EXCLUDE" | sha256sum | cut -c1-16)"
-        {
-          echo "key=supabase-images-v2-${RUNNER_OS}-${RUNNER_ARCH}-cli${cli_version}-config${CONFIG_HASH:0:16}-exclude${exclude_hash}"
-          echo "dir=${RUNNER_TEMP}/supabase-image-cache"
-        } >> "$GITHUB_OUTPUT"
+        preload="$RUNNER_TEMP/supabase-preload"
+        if [ -f "$preload/key" ] && [ "$(cat "$preload/key")" = "$KEY" ]; then
+          echo "preloaded=true" >> "$GITHUB_OUTPUT"
+          echo "hit=$(cat "$preload/hit")" >> "$GITHUB_OUTPUT"
+        else
+          echo "preloaded=false" >> "$GITHUB_OUTPUT"
+        fi
 
     - name: Restore the Supabase image cache
       id: cache-restore
-      if: inputs.image-cache == 'true'
+      if: inputs.image-cache == 'true' && steps.preload.outputs.preloaded != 'true'
       uses: actions/cache/restore@v4
       env:
         # A stalled download gives up after 2 minutes (a hit takes about 8 s) and
@@ -143,17 +154,35 @@ runs:
 
     - name: Load the cached Supabase images
       id: cache-load
-      if: inputs.image-cache == 'true' && steps.cache-restore.outputs.cache-hit == 'true'
+      if: >-
+        inputs.image-cache == 'true' &&
+        (steps.cache-restore.outputs.cache-hit == 'true' || steps.preload.outputs.hit == 'true')
       shell: bash
       env:
         CACHE_DIR: ${{ steps.cache-key.outputs.dir }}
+        PRELOADED: ${{ steps.preload.outputs.preloaded == 'true' }}
+        # The background load has its own 150 s limit; this wait outlasts it, then ends.
+        PRELOAD_WAIT: '170'
       run: |
         set -u -o pipefail
         mkdir -p "$RUNNER_TEMP/supabase-start"
         exec > >(tee -a "$RUNNER_TEMP/supabase-start/start.log") 2>&1
+        preload="$RUNNER_TEMP/supabase-preload"
         # A cache that does not load is treated as a miss: the start pulls. The load
         # takes about 65 s for 1.6 GB; one that has not finished in 150 s is stuck.
-        if [ -s "$CACHE_DIR/images.tar.zst" ] && [ -s "$CACHE_DIR/registry" ] &&
+        if [ "$PRELOADED" = true ]; then
+          waited=0
+          while [ ! -f "$preload/status" ] && [ "$waited" -lt "$PRELOAD_WAIT" ]; do sleep 1; waited=$(( waited + 1 )); done
+          echo "Waited ${waited}s for the background image load."
+          cat "$preload/load.log" 2> /dev/null || true
+          if [ "$(cat "$preload/status" 2> /dev/null)" = loaded ] && [ -s "$CACHE_DIR/registry" ]; then
+            echo "registry=$(cat "$CACHE_DIR/registry")" >> "$GITHUB_OUTPUT"
+            echo "loaded=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::The preloaded Supabase image cache did not load; pulling instead."
+            echo "loaded=false" >> "$GITHUB_OUTPUT"
+          fi
+        elif [ -s "$CACHE_DIR/images.tar.zst" ] && [ -s "$CACHE_DIR/registry" ] &&
           timeout --kill-after=10 150 bash -o pipefail -c \
             'zstd -dc "$1" | docker load' _ "$CACHE_DIR/images.tar.zst"; then
           echo "registry=$(cat "$CACHE_DIR/registry")" >> "$GITHUB_OUTPUT"
@@ -178,7 +207,7 @@ runs:
         FALLBACK_REGISTRIES: ${{ inputs.fallback-registries }}
         CACHE_LOADED: ${{ steps.cache-load.outputs.loaded == 'true' }}
         CACHED_REGISTRY: ${{ steps.cache-load.outputs.registry }}
-        SAVE_IMAGE_CACHE: ${{ inputs.image-cache == 'true' && inputs.save-image-cache == 'true' && steps.cache-restore.outputs.cache-hit != 'true' }}
+        SAVE_IMAGE_CACHE: ${{ inputs.image-cache == 'true' && inputs.save-image-cache == 'true' && steps.cache-restore.outputs.cache-hit != 'true' && steps.preload.outputs.hit != 'true' }}
         CACHE_DIR: ${{ steps.cache-key.outputs.dir }}
         REGISTRY_TOKEN: ${{ github.token }}
       run: |
@@ -609,7 +638,8 @@ runs:
       continue-on-error: true
       if: >-
         always() && inputs.image-cache == 'true' && inputs.save-image-cache == 'true' &&
-        steps.cache-restore.outputs.cache-hit != 'true' && steps.start.outputs.cache_written == 'true'
+        steps.cache-restore.outputs.cache-hit != 'true' && steps.preload.outputs.hit != 'true' &&
+        steps.start.outputs.cache_written == 'true'
       uses: actions/cache/save@v4
       with:
         path: ${{ steps.cache-key.outputs.dir }}

@@ -101,7 +101,7 @@ describe('start-local-supabase bounds', () => {
       // The 150 s limit scaled to 3 s.
       scale: 0.02,
       commands: { zstd: 'cat "$3"', docker: 'exec sleep 600' },
-      env: { CACHE_DIR: cache },
+      env: { CACHE_DIR: cache, PRELOADED: 'false', PRELOAD_WAIT: '170' },
     })
     assert.equal(
       result.signal,
@@ -113,6 +113,41 @@ describe('start-local-supabase bounds', () => {
     assert.match(result.output, /^loaded=false$/m)
     assert.match(result.log, /The Supabase image cache did not load; pulling instead/)
   })
+
+  for (const [status, loaded, delay] of [
+    ['loaded', 'true', 2],
+    ['failed', 'false', 1],
+    [null, 'false', 0],
+  ])
+    test(`a background load that ${status ?? 'never ends'} is waited for, bounded, and used as ${loaded === 'true' ? 'a hit' : 'a miss'}`, (t) => {
+      // preload-supabase-images loads the cache while the dependencies install; the start
+      // waits for its status file instead of loading again, never past PRELOAD_WAIT.
+      const cache = mkdtempSync(path.join(os.tmpdir(), 'supabase-bounds-cache-'))
+      t.after(() => rmSync(cache, { recursive: true, force: true }))
+      writeFileSync(path.join(cache, 'registry'), 'ghcr.io')
+      const result = runStep(t, 'Load the cached Supabase images', {
+        commands: {
+          // The preload's status lands after a delay, as the background load ends.
+          sleep: status
+            ? `[ -f "$RUNNER_TEMP/ticks" ] || echo 0 > "$RUNNER_TEMP/ticks"; n=$(( $(cat "$RUNNER_TEMP/ticks") + 1 )); echo $n > "$RUNNER_TEMP/ticks"; if [ "$n" -ge ${delay} ]; then mkdir -p "$RUNNER_TEMP/supabase-preload"; echo ${status} > "$RUNNER_TEMP/supabase-preload/status"; fi`
+            : 'exit 0',
+          docker: 'echo "a preloaded start must not load again" >&2; exit 1',
+        },
+        env: { CACHE_DIR: cache, PRELOADED: 'true', PRELOAD_WAIT: '5' },
+      })
+      assert.equal(result.status, 0, result.stderr)
+      assert.match(result.output, new RegExp(`^loaded=${loaded}$`, 'm'))
+      if (loaded === 'true') assert.match(result.output, /^registry=ghcr\.io$/m)
+      else
+        assert.match(
+          result.log,
+          /The preloaded Supabase image cache did not load; pulling instead/
+        )
+      assert.match(
+        result.log,
+        new RegExp(`Waited ${status ? delay : 5}s for the background image load`)
+      )
+    })
 
   test("a port held by the runner's own connection fails the start at once", (t) => {
     const held =

@@ -174,11 +174,14 @@ jobs:
       # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
       - name: Configure the CI Supabase host ports
         uses: ./.github/actions/configure-ci-supabase-ports
-
       # Some ubuntu-latest hosts start with under 15 GiB free; the emulator
       # snapshot restore has died with "No space left on device" on them.
       - name: Free runner disk
         uses: ./.github/actions/free-runner-disk
+
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node environment
         uses: ./.github/actions/install

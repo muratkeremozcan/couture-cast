@@ -85,6 +85,9 @@ jobs:
         id: checkout
       - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies
@@ -325,6 +328,9 @@ jobs:
         id: checkout
       - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
       - uses: ./.github/actions/install
         id: install
       - name: Provision pinned share-card browser dependencies
@@ -670,6 +676,9 @@ jobs:
         id: checkout
       - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
       - uses: ./.github/actions/install
         id: install
         # 1.3 minutes at p50, 6.2 at most.

@@ -86,6 +86,9 @@ jobs:
       # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
       - name: Configure the CI Supabase host ports
         uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Record git SHA
         id: git_sha
@@ -233,6 +236,11 @@ jobs:
       # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
       - name: Configure the CI Supabase host ports
         uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
+        with:
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -347,6 +355,9 @@ jobs:
 
       - name: Configure the CI Supabase host ports
         uses: ./.github/actions/configure-ci-supabase-ports
+      # Loads the cached Supabase images while the dependencies install.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
 
       - name: Setup Node environment
         uses: ./.github/actions/install
