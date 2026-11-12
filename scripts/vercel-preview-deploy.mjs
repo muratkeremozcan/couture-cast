@@ -114,11 +114,40 @@ const idOf = (deployment) => deployment.uid ?? deployment.id ?? ''
 const stateOf = (deployment) => deployment.readyState ?? deployment.state ?? ''
 const createdOf = (deployment) => deployment.created ?? deployment.createdAt ?? 0
 
-/** Polls one deployment until it is ready, failing on an error, a cancel or the deadline. */
+/**
+ * A failed request worth repeating: a rate limit, a server error, a request that ran out of
+ * time or a connection that failed. Any other 4xx answer will not change on a retry.
+ */
+function transient(error) {
+  const status = /** @type {{ status?: unknown }} */ (error)?.status
+  if (typeof status === 'number') return status === 429 || status >= 500
+  const name = /** @type {{ name?: unknown }} */ (error)?.name
+  return (
+    name === 'TimeoutError' ||
+    name === 'AbortError' ||
+    (error instanceof TypeError && error.message === 'fetch failed')
+  )
+}
+
+/**
+ * Polls one deployment until it is ready, failing on an error, a cancel or the deadline. A
+ * transient failure of the poll itself is retried while the deadline allows, since the build
+ * carries on regardless.
+ */
 async function untilReady(id, targetSha, settings) {
   const { project, sha, get, now, sleep, intervalMs, deadline, log } = settings
   for (;;) {
-    const deployment = await get(id)
+    let deployment
+    try {
+      deployment = await get(id)
+    } catch (error) {
+      if (!transient(error) || deadline - now() <= intervalMs) throw error
+      log(
+        `${project}: polling ${id} failed (${error instanceof Error ? error.message : String(error)}); retrying`
+      )
+      await sleep(intervalMs)
+      continue
+    }
     const state = stateOf(deployment)
     if (state === 'READY')
       return {
@@ -222,8 +251,11 @@ function vercelClient(token, fetchImpl, deadline, now) {
       } catch {
         // keep the raw text
       }
-      throw new Error(
-        `Vercel ${method} ${pathAndQuery.split('?')[0]} answered ${response.status}: ${message}`
+      throw Object.assign(
+        new Error(
+          `Vercel ${method} ${pathAndQuery.split('?')[0]} answered ${response.status}: ${message}`
+        ),
+        { status: response.status }
       )
     }
     return JSON.parse(text)

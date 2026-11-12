@@ -418,7 +418,10 @@ describe('Vercel preview deployment', () => {
   })
   function deploy(
     list: Deployment[],
-    states: Deployment[] = [{ id: 'dpl_new', readyState: 'READY', url: 'built.example' }],
+    // Each poll answers the next entry; an Error entry is a failed request.
+    states: (Deployment | Error)[] = [
+      { id: 'dpl_new', readyState: 'READY', url: 'built.example' },
+    ],
     options: {
       create?: () => Promise<Deployment>
       force?: boolean
@@ -459,7 +462,8 @@ describe('Vercel preview deployment', () => {
       },
       get: (id) => {
         polled.push(id)
-        return Promise.resolve(states[Math.min(polls++, states.length - 1)]!)
+        const next = states[Math.min(polls++, states.length - 1)]!
+        return next instanceof Error ? Promise.reject(next) : Promise.resolve(next)
       },
     })
     return { result, created, polled }
@@ -577,6 +581,45 @@ describe('Vercel preview deployment', () => {
     ).rejects.toThrow('answered 429: Deployment rate limited')
   })
 
+  const answered = (status: number) =>
+    Object.assign(
+      new Error(`Vercel GET /v13/deployments/dpl_new answered ${status}: x`),
+      {
+        status,
+      }
+    )
+
+  it('keeps polling through a rate limit, a server error, a timeout or a lost connection', async () => {
+    const run = deploy(
+      [],
+      [
+        { id: 'dpl_new', readyState: 'BUILDING' },
+        answered(429),
+        answered(503),
+        Object.assign(new Error('The operation was aborted due to timeout'), {
+          name: 'TimeoutError',
+        }),
+        new TypeError('fetch failed'),
+        { id: 'dpl_new', readyState: 'READY', url: 'built.example' },
+      ]
+    )
+    await expect(run.result).resolves.toMatchObject({ id: 'dpl_new', reused: false })
+    expect(run.polled).toHaveLength(6)
+  })
+
+  it.each([401, 404])('stops polling at once when Vercel answers %s', async (status) => {
+    const run = deploy([], [answered(status)])
+    await expect(run.result).rejects.toThrow(`answered ${status}`)
+    expect(run.polled).toHaveLength(1)
+  })
+
+  it('reports the last transient error when the deadline leaves no time to retry', async () => {
+    const run = deploy([], [answered(503)], { deadlineMs: 60_000 })
+    await expect(run.result).rejects.toThrow('answered 503')
+    // Retries stop with one interval of the deadline left: at 0, 15, 30 and 45 s.
+    expect(run.polled).toHaveLength(4)
+  })
+
   it('names the queue when a build is still waiting for the single Hobby build slot', async () => {
     const run = deploy([], [{ id: 'dpl_new', readyState: 'QUEUED' }], {
       deadlineMs: 60_000,
@@ -600,8 +643,9 @@ describe('Vercel preview deployment', () => {
 
 describe('Vercel preview deploy step', () => {
   type Call = { method: string; path: string; body?: unknown }
-  function vercel(deployments: Deployment[]) {
+  function vercel(deployments: Deployment[], pollFailures: number[] = []) {
     const calls: Call[] = []
+    const failures = [...pollFailures]
     const fetchImpl = (url: string | URL | Request, init?: RequestInit) => {
       const target = new URL(url instanceof Request ? url.url : url.toString())
       const call: Call = {
@@ -626,6 +670,12 @@ describe('Vercel preview deploy step', () => {
           readyState: 'QUEUED',
           createdAt: 5,
         })
+      if (target.pathname.startsWith('/v13/deployments/') && failures.length)
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: { message: 'try later' } }), {
+            status: failures.shift(),
+          })
+        )
       if (target.pathname.startsWith('/v13/deployments/'))
         return reply({
           id: target.pathname.split('/').at(-1),
@@ -683,6 +733,28 @@ describe('Vercel preview deploy step', () => {
       )
     }
   )
+
+  it('carries the HTTP status on a failed poll, so a 503 is retried and a 403 is not', async () => {
+    const flaky = vercel([], [503])
+    await expect(
+      run('web', env(false), {
+        fetchImpl: flaky.fetchImpl,
+        cwd: fixture,
+        sleep: () => Promise.resolve(),
+      })
+    ).resolves.toMatchObject({ id: 'dpl_new', url: 'https://built.example' })
+    expect(
+      flaky.calls.filter((call) => call.path.startsWith('/v13/deployments/dpl_new'))
+    ).toHaveLength(2)
+    const refused = vercel([], [403])
+    await expect(
+      run('web', env(false), {
+        fetchImpl: refused.fetchImpl,
+        cwd: fixture,
+        sleep: () => Promise.resolve(),
+      })
+    ).rejects.toThrow('answered 403: try later')
+  })
 
   it('stops before the job runs out, counting setup from the job start', async () => {
     const api = vercel([])

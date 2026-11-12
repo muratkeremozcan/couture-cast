@@ -275,21 +275,29 @@ async function withFaults<T>(
       SELECT pg_get_functiondef('community_append_batch(integer,double precision)'::regprocedure)
         AS definition`
   )[0]!.definition
-  await prisma.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION
-    community_append_batch(ready_limit integer, write_cost_ms double precision)
-    RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN ${appendBody}; END $$`)
-  await prisma.$executeRawUnsafe(`CREATE FUNCTION tea_abort_telemetry() RETURNS trigger
-    LANGUAGE plpgsql AS $$ BEGIN ${telemetryBody}; RETURN NEW; END $$`)
-  await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_abort_telemetry BEFORE INSERT
-    ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_abort_telemetry()`)
+  // Each step is undone only once it has happened, so a setup that fails part way still leaves
+  // the database as it found it for the next test.
+  const done = { append: false, telemetry: false, trigger: false }
   try {
+    await prisma.$executeRawUnsafe(`CREATE OR REPLACE FUNCTION
+      community_append_batch(ready_limit integer, write_cost_ms double precision)
+      RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN ${appendBody}; END $$`)
+    done.append = true
+    await prisma.$executeRawUnsafe(`CREATE FUNCTION tea_abort_telemetry() RETURNS trigger
+      LANGUAGE plpgsql AS $$ BEGIN ${telemetryBody}; RETURN NEW; END $$`)
+    done.telemetry = true
+    await prisma.$executeRawUnsafe(`CREATE TRIGGER tea_abort_telemetry BEFORE INSERT
+      ON "CommunityEngagementTelemetry" FOR EACH ROW EXECUTE FUNCTION tea_abort_telemetry()`)
+    done.trigger = true
     return await run()
   } finally {
-    await prisma.$executeRawUnsafe(
-      'DROP TRIGGER tea_abort_telemetry ON "CommunityEngagementTelemetry"'
-    )
-    await prisma.$executeRawUnsafe('DROP FUNCTION tea_abort_telemetry()')
-    await prisma.$executeRawUnsafe(original)
+    if (done.trigger)
+      await prisma.$executeRawUnsafe(
+        'DROP TRIGGER tea_abort_telemetry ON "CommunityEngagementTelemetry"'
+      )
+    if (done.telemetry)
+      await prisma.$executeRawUnsafe('DROP FUNCTION tea_abort_telemetry()')
+    if (done.append) await prisma.$executeRawUnsafe(original)
   }
 }
 
@@ -581,8 +589,19 @@ describe('community append at production database latency', () => {
       'retry-row',
     ])
     expectOneDeadline(budgets, started)
-    // The row's last attempt ran on what was left of the deadline, short of its own 1 s.
-    expect(budgets.at(-1)!.timeout).toBeLessThan(1_000)
+    // The row's last attempt got the rule's timeout: its own 1 s or what the deadline left after
+    // the connection wait, whichever is less. Every round trip through the proxy takes at least
+    // 31 ms, so that attempt cannot start before about 1.2 s, and the rule leaves it under 1 s:
+    // a deadline reset for the row would hand it the full second.
+    const last = budgets.at(-1)!
+    const deadline = started + COMMUNITY_APPEND_DEADLINE_MS
+    expect(last.timeout).toBeGreaterThanOrEqual(
+      Math.min(1_000, deadline - last.start - last.maxWait) - DEADLINE_TOLERANCE_MS
+    )
+    expect(last.timeout).toBeLessThanOrEqual(
+      Math.min(1_000, deadline - last.start - last.maxWait) + DEADLINE_TOLERANCE_MS
+    )
+    expect(last.timeout).toBeLessThan(1_000)
     expect(warnings).toEqual([
       [{ reason: 'head_contention', nextBatchLimit: 25 }, 'Community append deferred'],
     ])
@@ -592,4 +611,19 @@ describe('community append at production database latency', () => {
       })
     ).resolves.toBe(1)
   }, 30_000)
+
+  it('the fault harness restores the append function when its own setup fails', async () => {
+    const definition = async () =>
+      (
+        await prisma.$queryRaw<{ definition: string }[]>`
+          SELECT pg_get_functiondef('community_append_batch(integer,double precision)'::regprocedure)
+            AS definition`
+      )[0]!.definition
+    const before = await definition()
+    // The trigger function does not compile, so setup fails after the append was replaced.
+    await expect(
+      withFaults(`${PLDBGAPI2_ABORT}`, 'THIS IS NOT PLPGSQL', () => Promise.resolve())
+    ).rejects.toThrow()
+    expect(await definition()).toBe(before)
+  })
 })
