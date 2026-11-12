@@ -92,14 +92,16 @@ describe('community_append_batch inside the database', () => {
       .rows[0]!.pid
     const inflight = batch()
     // Settled whatever happens below, so a failure never leaves the batch blocked on the
-    // barrier with afterEach queued behind it on the same client.
+    // barrier with afterEach queued behind it on the same client. A batch that ends before
+    // the barrier reports its own error.
+    const early: { settled: boolean; error?: unknown } = { settled: false }
     const outcome = inflight.then(
-      (value) => ({ value }),
-      (error: unknown) => ({ error })
+      () => (early.settled = true),
+      (error: unknown) => Object.assign(early, { settled: true, error })
     )
     try {
       let waiting = false
-      for (let attempt = 0; attempt < 400 && !waiting; attempt++) {
+      for (let attempt = 0; attempt < 400 && !waiting && !early.settled; attempt++) {
         const row = (
           await other.query<{ wait_event: string | null }>(
             'SELECT wait_event FROM pg_stat_activity WHERE pid = $1',
@@ -109,6 +111,7 @@ describe('community_append_batch inside the database', () => {
         waiting = row?.wait_event === 'advisory'
         if (!waiting) await new Promise((resolve) => setTimeout(resolve, 5))
       }
+      if (early.settled && 'error' in early) throw early.error
       expect(waiting, 'the batch reached the barrier').toBe(true)
       await other.query(
         'UPDATE "CommunityArtifactSubject" SET generation = generation + 1 WHERE artifact_id = $1',

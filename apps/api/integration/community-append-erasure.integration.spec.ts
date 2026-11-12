@@ -74,8 +74,9 @@ describe('community append racing account erasure', () => {
       const outcomes: string[] = []
       const repository = new CommunityStreamRepository(appendClient)
       let erasing = true
-      // Once erasure ends, append must drain the outbox; 50 attempts in a row that append nothing
-      // fail the case with what happened instead of waiting out its timeout.
+      // Once erasure ends, append must drain the outbox; 50 attempts in a row after it that append
+      // nothing fail the case with what happened instead of waiting out its timeout. Deferrals
+      // while erasure holds the guards are expected and never count.
       let stalled = 0
       const appending = (async () => {
         for (;;) {
@@ -87,13 +88,15 @@ describe('community append racing account erasure', () => {
             throw new Error(
               `append stopped progressing with ${backlog} rows left: ${outcomes.join(', ')}`
             )
+          const counted = !erasing
           try {
             const appended = await repository.append()
             outcomes.push(`appended ${appended}`)
-            stalled = appended ? 0 : stalled + 1
+            if (appended) stalled = 0
+            else if (counted) stalled++
           } catch (error) {
             outcomes.push(appendFailure(error))
-            stalled++
+            if (counted) stalled++
           }
         }
       })()
