@@ -186,7 +186,8 @@ exit 0`,
         MAX_ATTEMPTS: '6',
         BASE_DELAY: '1',
         MAX_DELAY: '1',
-        TIME_BUDGET: '12',
+        // Room for two 3 s attempts after each one's 15 s kill grace.
+        TIME_BUDGET: '40',
         ATTEMPT_LIMIT: '3',
         MIN_ATTEMPT: '2',
         EXCLUDE: 'realtime',
@@ -253,6 +254,52 @@ exit 0`,
     assert.match(
       result.stderr + result.stdout,
       /The Supabase start budget \(6s\) is spent; skipped/
+    )
+  })
+
+  test('a slow registry login leaves the start only what is left of the deadline', (t) => {
+    // Codex review of PR 211: the attempt was sized before a 60 s login, so a 165 s
+    // attempt ended at 420 s against 360. Here the login takes 20 s of a 40 s budget.
+    const result = runStep(t, 'Start local Supabase with retry', {
+      limitMs: 70_000,
+      commands: {
+        uname: 'echo Linux',
+        ss: 'exit 0',
+        sudo: 'exit 1',
+        sleep: 'exit 0',
+        docker:
+          'if [ "$1" = login ]; then cat > /dev/null; exec /bin/sleep 20; fi; exit 0',
+        npx: 'exec /bin/sleep 600',
+      },
+      env: {
+        MAX_ATTEMPTS: '3',
+        BASE_DELAY: '1',
+        MAX_DELAY: '1',
+        TIME_BUDGET: '40',
+        ATTEMPT_LIMIT: '30',
+        MIN_ATTEMPT: '2',
+        EXCLUDE: 'realtime',
+        PRIMARY_REGISTRY: 'ghcr.io',
+        FALLBACK_REGISTRIES: '',
+        CACHE_LOADED: 'false',
+        CACHED_REGISTRY: '',
+        SAVE_IMAGE_CACHE: 'false',
+        CACHE_DIR: '',
+        REGISTRY_TOKEN: 'token',
+        SUPABASE_API_PORT: '24321',
+        SUPABASE_DB_PORT: '24322',
+      },
+    })
+    assert.equal(result.signal, null, `still running after 70 s:\n${result.stdout}`)
+    assert.notEqual(result.status, 0)
+    assert.ok(
+      result.elapsedMs < 41_000,
+      `took ${result.elapsedMs} ms against a 40 s deadline`
+    )
+    // The attempt got the budget left after the login, less the start's kill grace.
+    assert.match(
+      result.stdout,
+      /attempt 1\/3, registry ghcr\.io, ([1-5])s for this attempt/
     )
   })
 

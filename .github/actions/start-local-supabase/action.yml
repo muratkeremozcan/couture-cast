@@ -202,9 +202,10 @@ runs:
           exit 2
         fi
         # TIME_BUDGET is an absolute deadline: every limited call, the login, status,
-        # diagnostics and stop included, gets at most what is left of it. Past the
-        # deadline a call is skipped, and the caller's failure-only stop step clears
-        # whatever containers are left.
+        # diagnostics and stop included, gets at most what is left of it, less the grace
+        # its kill allows, so even a call that ignores SIGTERM ends by the deadline. Past
+        # it a call is skipped, and the caller's failure-only stop step clears whatever
+        # containers are left.
         started_at=$(date +%s)
         remaining_seconds() {
           echo $(( TIME_BUDGET - ($(date +%s) - started_at) ))
@@ -212,7 +213,7 @@ runs:
         bounded() {
           local seconds=$1 left
           shift
-          left=$(remaining_seconds)
+          left=$(( $(remaining_seconds) - 10 ))
           if [ "$left" -le 0 ]; then
             echo "::warning::The Supabase start budget (${TIME_BUDGET}s) is spent; skipped: $*" >&2
             return 124
@@ -527,8 +528,14 @@ runs:
               tried_registries+=("$registry")
             fi
             login_for "$registry"
-            # One attempt runs at most ATTEMPT_LIMIT seconds, so a start that hangs
-            # still leaves the budget room for another.
+            # Sized after the login, which can itself take a minute, and less the start's
+            # 15 s kill grace, so the attempt ends by the deadline. One attempt runs at most
+            # ATTEMPT_LIMIT seconds, so a start that hangs leaves the budget room for another.
+            remaining=$(( $(remaining_seconds) - 15 ))
+            if [ "$remaining" -lt "$MIN_ATTEMPT" ]; then
+              echo "::error::Supabase start time budget (${TIME_BUDGET}s) exhausted after $(( attempt - 1 )) attempts; the registry login left ${remaining}s, under min-attempt-seconds (${MIN_ATTEMPT}s)."
+              exit "$exit_code"
+            fi
             attempt_seconds=$(( remaining < ATTEMPT_LIMIT ? remaining : ATTEMPT_LIMIT ))
             echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry}, ${attempt_seconds}s for this attempt, ${remaining}s of budget left)"
 
