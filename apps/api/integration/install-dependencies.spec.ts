@@ -247,7 +247,7 @@ describe('dependency download recovery', () => {
         '.github/actions/setup-node-env/action.yml',
         "install-command: ${{ inputs.use-npm-ci == 'true' && 'npm ci' || 'npm install' }}",
       ],
-    ]) {
+    ] as const) {
       const action = fs.readFileSync(path.join(repoRoot, file), 'utf8')
       expect(action, file).toContain('uses: ./.github/actions/node-dependencies')
       expect(action, file).toContain(command)
