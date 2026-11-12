@@ -423,21 +423,27 @@ async function pullRequestFiles({ repository, number, token, fetchImpl = fetch }
   return files
 }
 
-/** The labels on the pull request now, so a rerun after adding ALL-LANES sees it. */
+/** The labels on the pull request now, every page, so a rerun after adding ALL-LANES sees it. */
 async function pullRequestLabels({ repository, number, token, fetchImpl = fetch }) {
-  const response = await fetchImpl(
-    `https://api.github.com/repos/${repository}/issues/${number}/labels?per_page=100`,
-    {
-      headers: {
-        accept: 'application/vnd.github+json',
-        authorization: `Bearer ${token}`,
-        'x-github-api-version': '2022-11-28',
-      },
-      signal: AbortSignal.timeout(30_000),
-    }
-  )
-  if (!response.ok) throw new Error(`GET pull request labels answered ${response.status}`)
-  return (await response.json()).map((label) => label.name)
+  const labels = []
+  for (let page = 1; ; page++) {
+    const response = await fetchImpl(
+      `https://api.github.com/repos/${repository}/issues/${number}/labels?per_page=100&page=${page}`,
+      {
+        headers: {
+          accept: 'application/vnd.github+json',
+          authorization: `Bearer ${token}`,
+          'x-github-api-version': '2022-11-28',
+        },
+        signal: AbortSignal.timeout(30_000),
+      }
+    )
+    if (!response.ok)
+      throw new Error(`GET pull request labels answered ${response.status}`)
+    const batch = await response.json()
+    labels.push(...batch.map((label) => label.name))
+    if (batch.length < 100) return labels
+  }
 }
 
 /** The plan as a Markdown table for the job summary. */

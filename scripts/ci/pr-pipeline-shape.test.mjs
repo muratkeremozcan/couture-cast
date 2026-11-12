@@ -167,7 +167,7 @@ test('burn-in reads the SKIP_BURN_IN label as it is now, so a rerun after adding
   assert.equal(plan.permissions['pull-requests'], 'read')
   const current = plan.steps.find((s) => s.id === 'current_label')
   assert.ok(current, 'the plan reads the current labels')
-  assert.match(current.run, /gh api "repos\/\$REPO\/issues\/\$PR\/labels"/)
+  assert.match(current.run, /gh api --paginate "repos\/\$REPO\/issues\/\$PR\/labels"/)
   assert.match(current.run, /SKIP_BURN_IN/)
   const detect = plan.steps.find((s) => s.id === 'detect-changed')
   assert.match(String(detect.if), /steps\.current_label\.outputs\.skip != 'true'/)

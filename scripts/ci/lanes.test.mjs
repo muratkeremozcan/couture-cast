@@ -489,3 +489,33 @@ test('the plan job writes one output per lane and a summary, and runs everything
   })
   assert.ok(Object.values(failing).every((lane) => lane.run))
 })
+
+test('the label is read from every page, so ALL-LANES past the first hundred still counts', async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-labels-'))
+  const eventPath = path.join(dir, 'event.json')
+  writeFileSync(eventPath, JSON.stringify({ pull_request: { number: 7 } }))
+  const fetchImpl = async (url) => {
+    if (url.includes('/labels')) {
+      const page = Number(new URL(url).searchParams.get('page') ?? '1')
+      if (page === 1)
+        return Response.json(
+          Array.from({ length: 100 }, (_, i) => ({ name: `label-${i}` }))
+        )
+      if (page === 2) return Response.json([{ name: ALL_LANES_LABEL }])
+      return Response.json([])
+    }
+    if (url.includes('page=1')) return Response.json([{ filename: 'docs/guide.md' }])
+    return Response.json([])
+  }
+  const plan = await main({
+    env: {
+      GITHUB_EVENT_NAME: 'pull_request',
+      GITHUB_EVENT_PATH: eventPath,
+      GITHUB_REPOSITORY: 'owner/repo',
+      GITHUB_TOKEN: 'token',
+    },
+    root,
+    fetchImpl,
+  })
+  assert.ok(Object.values(plan).every((lane) => lane.run))
+})

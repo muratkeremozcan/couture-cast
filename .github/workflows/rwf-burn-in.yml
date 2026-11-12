@@ -81,7 +81,7 @@ jobs:
           REPO: ${{ github.repository }}
           PR: ${{ github.event.pull_request.number }}
         run: |
-          if ! labels=$(gh api "repos/$REPO/issues/$PR/labels" --jq '.[].name'); then
+          if ! labels=$(gh api --paginate "repos/$REPO/issues/$PR/labels" --jq '.[].name'); then
             echo "::warning::Could not read the pull request's labels; running burn-in."
             labels=''
           fi

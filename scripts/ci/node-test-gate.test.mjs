@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import { matrixRows } from './workflow-step-shadowing.mjs'
 import nodeTestGateReporter from './node-test-gate-reporter.mjs'
 import {
@@ -20,7 +21,7 @@ import {
   summarizeNodeTestEvents,
 } from './node-test-gate.mjs'
 
-const repoRoot = path.resolve(path.dirname(new URL(import.meta.url).pathname), '../..')
+const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 
 const sources = {
   'passing.test.mjs': `import { test } from 'node:test'
