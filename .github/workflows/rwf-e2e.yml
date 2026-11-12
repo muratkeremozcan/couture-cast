@@ -61,6 +61,12 @@ on:
       DATABASE_URL_PROD:
         required: false
 
+# A caller's env does not reach a reusable workflow. On a pull request or a push the
+# playwright-unit job of pr-checks.yml runs the Playwright helper unit tests, so the test
+# command's `prepare:playwright` skips its own copy of them; a manual run still runs them.
+env:
+  PLAYWRIGHT_UNIT_LANE: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '1' || '' }}
+
 jobs:
   e2e:
     runs-on: ubuntu-latest

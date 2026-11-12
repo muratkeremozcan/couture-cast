@@ -16,12 +16,45 @@ permissions:
   pull-requests: write
 
 jobs:
-  local-contracts:
-    name: Local schema and Pact contracts
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
     runs-on: ubuntu-latest
-    # 2.7 minutes at p50, 3.1 at p95 (last 20 runs, 2026-11-12), before the secrets scan
-    # (0.3 at p95) and schema validation (2.4 at p95) joined it.
-    timeout-minutes: 10
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: contract-testing.yml
+        run: node scripts/ci/lanes.mjs
+
+  # Its own job on every pull request: a secret can land in any file, so no lane plan skips
+  # this scan. A push to main scans nothing (the commits were scanned on their pull request),
+  # so it does not start a runner there.
+  secrets:
+    name: Gitleaks secrets scan
+    if: ${{ github.event_name != 'push' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -30,10 +63,6 @@ jobs:
           # gitleaks scans every commit of the pull request.
           fetch-depth: 0
 
-      # The secrets scan and the schema checks were workflows of their own until
-      # 2026-11-12, each a runner and a queue slot per push against the account's 20
-      # concurrent jobs. Each is a named step here, run whatever the others did, so a
-      # failure still names its check (scripts/ci/pr-pipeline-shape.test.mjs).
       - name: Gitleaks secrets scan
         if: ${{ github.event_name != 'push' }}
         uses: gitleaks/gitleaks-action@v2
@@ -49,6 +78,27 @@ jobs:
           if-no-files-found: ignore
           retention-days: 5
 
+  local-contracts:
+    name: Local schema and Pact contracts
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['contract']
+    runs-on: ubuntu-latest
+    # 2.7 minutes at p50, 3.1 at p95 (last 20 runs, 2026-11-12), before schema validation
+    # (2.4 at p95) joined it.
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          # Full history, as before the secrets scan moved out: the Optic diff reads origin/main.
+          fetch-depth: 0
+
+      # The schema checks were a workflow of their own until 2026-11-12, a runner and a queue
+      # slot per push against the account's 20 concurrent jobs. Each is a named step here, run
+      # whatever the others did, so a failure still names its check
+      # (scripts/ci/pr-pipeline-shape.test.mjs). The secrets scan, folded in on the same day,
+      # moved to the `secrets` job above when lane selection let a plan skip this job.
       - name: Setup Node environment
         id: setup
         if: ${{ !cancelled() }}

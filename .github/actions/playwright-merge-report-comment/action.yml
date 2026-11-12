@@ -161,8 +161,13 @@ runs:
       run: |
         E2E_NORM="$(echo "${E2E_RESULT}" | tr '[:upper:]' '[:lower:]')"
         BURN_IN_NORM="$(echo "${BURN_IN}" | tr '[:upper:]' '[:lower:]')"
-        if [ "${E2E_NORM}" = "success" ] && [ "${BURN_IN_NORM}" != "failure" ] && [ "${BURN_IN_NORM}" != "failed" ]; then
+        # A suite the lane plan skipped did not run: SKIPPED, unless burn-in failed.
+        if [ "${BURN_IN_NORM}" = "failure" ] || [ "${BURN_IN_NORM}" = "failed" ]; then
+          STATUS="FAILURE"
+        elif [ "${E2E_NORM}" = "success" ]; then
           STATUS="SUCCESS"
+        elif [ "${E2E_NORM}" = "skipped" ]; then
+          STATUS="SKIPPED"
         else
           STATUS="FAILURE"
         fi
@@ -206,9 +211,12 @@ runs:
           const reportUrl = process.env.INPUT_REPORT_URL;
           const runUrl = process.env.INPUT_RUN_URL;
 
-          const isSuccess = e2eResult === 'success' && burnInResult !== 'failure' && burnInResult !== 'failed';
-          const statusEmoji = isSuccess ? '✅' : '❌';
-          const statusText = isSuccess ? 'SUCCESS' : 'FAILURE';
+          const burnInFailed = burnInResult === 'failure' || burnInResult === 'failed';
+          const isSuccess = e2eResult === 'success' && !burnInFailed;
+          // A suite the lane plan skipped did not run; the Lanes job summary says why.
+          const isSkipped = e2eResult === 'skipped' && !burnInFailed;
+          const statusEmoji = isSuccess ? '✅' : isSkipped ? '⏭️' : '❌';
+          const statusText = isSuccess ? 'SUCCESS' : isSkipped ? 'SKIPPED' : 'FAILURE';
 
           const burnInDisplay = ['success', 'passed'].includes(burnInResult) ? 'passed'
             : ['failure', 'failed'].includes(burnInResult) ? 'failed'

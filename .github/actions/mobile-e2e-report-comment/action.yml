@@ -225,8 +225,11 @@ runs:
             totals.failed === 0 &&
             totals.skipped === 0 &&
             suiteResult === 'success';
-          const statusEmoji = isSuccess ? '✅' : '❌';
-          const statusText = isSuccess ? 'SUCCESS' : 'FAILURE';
+          // A suite skipped before any shard ran, by the lane plan or an upstream job,
+          // left no report; the comment says so and replaces an earlier run's verdict.
+          const isSkipped = suiteResult === 'skipped' && !hasResults;
+          const statusEmoji = isSuccess ? '✅' : isSkipped ? '⏭️' : '❌';
+          const statusText = isSuccess ? 'SUCCESS' : isSkipped ? 'SKIPPED' : 'FAILURE';
 
           const duration = (seconds) => {
             const mins = Math.floor(seconds / 60);
@@ -256,7 +259,12 @@ runs:
             '',
           ];
 
-          if (!hasResults) {
+          if (isSkipped) {
+            lines.push(
+              `> The suite did not run. On a pull request the lane plan skips it when no file it builds, runs or reads changed; the Lanes job summary of this [run](${runUrl}) names the reason.`,
+              ''
+            );
+          } else if (!hasResults) {
             lines.push(
               `> No JUnit report was found in any shard artifact. The suite did not get as far as running a flow, so there is nothing to attribute a failure to. Start from the [job logs](${runUrl}).`,
               ''

@@ -1,8 +1,9 @@
 /**
  * Unit tests for `scripts/e2e-real-session/`, the harness the CI job
  * "Real-session community E2E" runs the Story 6.5 real-session specs in. Lives
- * here because `npm run test:playwright-unit` already runs this directory before
- * every Playwright entrypoint, the real-session one included.
+ * here because `npm run test:playwright-unit` already runs this directory: before
+ * every local Playwright entrypoint, and in CI in the playwright-unit job of
+ * pr-checks.yml.
  *
  * The rules held here are the ones that keep the harness scoped: it creates and
  * drops only `tea_community_<32 hex>` databases, issues OTPs only for addresses it

@@ -14,8 +14,41 @@ permissions:
   contents: read
 
 jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: watchos-native.yml
+        run: node scripts/ci/lanes.mjs
+
   watchos-native:
     name: watchOS native
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['watchos']
     runs-on: macos-15
     timeout-minutes: 15
 

@@ -409,8 +409,20 @@ describe('deployment workflows', () => {
       const name = block.slice(2, block.indexOf(':'))
       const condition = ifOf(block)
       if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
-      else expect(['browser-acceptance', 'share-card-lanes-gate'], name).toContain(name)
+      else
+        expect(['lanes', 'browser-acceptance', 'share-card-lanes-gate'], name).toContain(
+          name
+        )
     }
+    // A pull request runs the browser lane when its lane plan does, and always the plan
+    // job and the gate.
+    const conditionOf = (name: string) =>
+      ifOf(jobs.find((block) => block.startsWith(`  ${name}:`)) ?? '')
+    expect(conditionOf('browser-acceptance')).toBe(
+      "fromJSON(needs.lanes.outputs.plan)['share-card']"
+    )
+    expect(conditionOf('lanes')).toBeUndefined()
+    expect(conditionOf('share-card-lanes-gate')).toBe('always()')
     // The device lanes take over an hour each, and the evidence jobs only read their artifacts;
     // a pull request would wait on all of them.
     expect([...skipped].sort()).toEqual([

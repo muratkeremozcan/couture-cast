@@ -6,9 +6,11 @@ import { matrixRows } from './workflow-step-shadowing.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
 import { SHARE_RECEIVE_PREBUILT_FILES } from '../lib/story69-share-sheet.mjs'
 import {
+  laneJobName,
   pullRequestEvent,
   pullRequestShareCardJobs,
   requiredShareCardJobs,
+  shareCardLaneCondition,
 } from './share-card-job-gate.mjs'
 
 /**
@@ -53,8 +55,11 @@ export const evidenceCondition = `always() && ${deviceLaneCondition}`
 // pull request, required by share-card-lanes-gate on main, nightly and dispatch runs.
 export const expoGoJobName = 'ios-expo-go'
 export const expoGoLaneCondition = deviceLaneCondition
+// The browser lane runs whenever the lane plan runs share-card: always off a pull request, and on
+// one whose diff touches a file the lane builds, runs or reads.
 const deviceLaneIf = (name) =>
-  pullRequestShareCardJobs.includes(name) ? undefined : deviceLaneCondition
+  pullRequestShareCardJobs.includes(name) ? shareCardLaneCondition : deviceLaneCondition
+const laneNeeds = (name) => (pullRequestShareCardJobs.includes(name) ? [laneJobName] : [])
 const emulatorAction = 'reactivecircus/android-emulator-runner@v2'
 const nativeSdkActions = ['actions/setup-java@v4', 'android-actions/setup-android@v3']
 const maxMinutes = 90
@@ -92,7 +97,7 @@ function gateProblems(jobs, check) {
   check(gate.if === 'always()', 'gate must run after failure and cancellation')
   check(
     JSON.stringify([...(gate.needs ?? [])].sort()) ===
-      JSON.stringify([...requiredShareCardJobs].sort()),
+      JSON.stringify([...requiredShareCardJobs, laneJobName].sort()),
     'gate must require every browser and native partition'
   )
   check(gate['continue-on-error'] === undefined, 'gate cannot hide failure')
@@ -109,6 +114,10 @@ function gateProblems(jobs, check) {
       gateStep['continue-on-error'] === undefined &&
       gateStep.if === undefined,
     'gate must check actual dependency results without a bypass'
+  )
+  check(
+    gateStep?.env?.CC68_LANE_PLAN === `\${{ needs.${laneJobName}.outputs.plan }}`,
+    'gate must read the lane plan to accept a browser lane the plan skipped'
   )
 }
 
@@ -528,11 +537,14 @@ function workflowProblems(jobs, check) {
 function commonProblems(name, job, suites, rows, check) {
   const steps = job.steps ?? []
   check(job['runs-on'] === 'ubuntu-latest', `${name}: free Ubuntu runner required`)
-  check(job.needs === undefined, `${name}: partitions must start independently`)
+  check(
+    JSON.stringify(needsList(job)) === JSON.stringify(laneNeeds(name)),
+    `${name}: partitions must start independently`
+  )
   check(
     job.if === deviceLaneIf(name),
     pullRequestShareCardJobs.includes(name)
-      ? `${name}: the pull request lane cannot be conditional`
+      ? `${name}: the pull request lane cannot be conditional beyond its lane plan`
       : `${name}: device lane must be skipped on pull_request`
   )
   check(job['continue-on-error'] === undefined, `${name}: failures must remain visible`)

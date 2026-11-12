@@ -11,8 +11,9 @@
  * test runner, which only discovers files under `playwright/tests`
  * (`playwright/config/base.config.ts`'s `testDir`) and expects `@playwright/test`'s
  * `test`/`expect`, not vitest's. Wired into `npm run test:playwright-unit`, which
- * `prepare:playwright` runs before every Playwright entrypoint (local, preview,
- * and CI's `test:pw-local`) — not a file someone has to remember to run by hand.
+ * `prepare:playwright` runs before every local Playwright entrypoint and the
+ * playwright-unit job of pr-checks.yml runs in CI, so nobody has to remember to
+ * run it by hand.
  *
  * The proof itself: `accessibility.ts`'s `contrastRatio` takes CSS `rgb()` strings
  * and is now a thin adapter that converts to hex and delegates to

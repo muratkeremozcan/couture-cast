@@ -17,43 +17,60 @@ concurrency:
   group: playwright-e2e-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-jobs:
-  vars:
-    runs-on: ubuntu-latest
-    # 0.1 minutes at p95 (last 20 runs, 2026-11-12).
-    timeout-minutes: 5
-    outputs:
-      SKIP_BURN_IN: ${{ steps.check_skip_label.outputs.SKIP_BURN_IN || 'false' }}
-      test_env: local
-      test_command: npm run test:pw-local --
-      install_command: npm ci
-    steps:
-      - name: Check for SKIP_BURN_IN label (PRs only)
-        id: check_skip_label
-        if: ${{ github.event_name == 'pull_request' || github.event_name == 'pull_request_target' }}
-        run: |
-          if [[ "${{ contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') }}" == "true" ]]; then
-            echo "SKIP_BURN_IN=true" >> "$GITHUB_OUTPUT"
-            echo "✅ Found SKIP_BURN_IN label; skipping burn-in."
-          else
-            echo "SKIP_BURN_IN=false" >> "$GITHUB_OUTPUT"
-            echo "No SKIP_BURN_IN label; running burn-in."
-          fi
+env:
+  # On a pull request or a push the playwright-unit job of pr-checks.yml runs the Playwright
+  # helper unit tests, so `prepare:playwright` in the jobs here skips its own copy of them; a
+  # manual run, which pr-checks.yml does not accompany, still runs them.
+  PLAYWRIGHT_UNIT_LANE: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '1' || '' }}
 
+jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: pr-pw-e2e-local.yml
+        run: node scripts/ci/lanes.mjs
+
+  # Burn-in plans first and waits on nothing: the SKIP_BURN_IN label comes straight from the
+  # event payload, and its plan job lists only the changed specs it needs.
   burn-in:
-    needs: vars
-    if: ${{ github.event_name == 'pull_request' && needs.vars.outputs.SKIP_BURN_IN != 'true' }}
+    if: ${{ github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') }}
     uses: ./.github/workflows/rwf-burn-in.yml
     with:
       base-ref: ${{ github.event.pull_request.base.sha || github.base_ref || 'main' }}
       test-directory: 'playwright/'
-      install-command: ${{ needs.vars.outputs.install_command }}
+      install-command: npm ci
     secrets: inherit
 
   pw-e2e:
     # Burn-in runs beside the lanes: it still fails the gate, and waiting for it put the
     # lanes 14 to 16 minutes after the push (scripts/ci/pr-pipeline-shape.test.mjs).
-    needs: vars
+    needs: [lanes]
+    if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
     # 11.3 minutes at p50, 12.4 at p95 (40 shard runs, 2026-11-11 to 12). The
     # Supabase start stops at its own 10 minute step limit.
     timeout-minutes: 20
@@ -104,7 +121,7 @@ jobs:
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -198,7 +215,8 @@ jobs:
   # NEXT_PUBLIC_E2E_AUTH=false web build on 3077. See playwright/README.md.
   real-session-e2e:
     name: Real-session community E2E
-    needs: vars
+    needs: [lanes]
+    if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
     # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12).
     timeout-minutes: 15
     runs-on: ubuntu-latest
@@ -245,7 +263,7 @@ jobs:
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -326,7 +344,8 @@ jobs:
   # never inside the sharded suite above, which seeds those flags true.
   complimentary-access-e2e:
     name: Complimentary access E2E
-    needs: vars
+    needs: [lanes]
+    if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
     # Measured locally: about 66 s for the runner with built packages. Estimated in
     # CI: about 3 min install and browsers, the Supabase start budget (600 s), about
     # 3 min for the API and web builds, under 2 min for the five tests.
@@ -362,7 +381,7 @@ jobs:
       - name: Setup Node environment
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Cache Playwright browsers
         uses: ./.github/actions/setup-playwright-browsers
@@ -411,8 +430,10 @@ jobs:
           path: playwright/artifacts
           retention-days: 5
 
+  # Passes whatever the suites did: the gate reads their own jobs. A suite the lane plan
+  # skipped left no blob, so the install is skipped too and the comment says skipped.
   merge-reports:
-    needs: [vars, burn-in, pw-e2e]
+    needs: [burn-in, pw-e2e]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     # 1.5 minutes at p50, 1.7 at p95 (last 20 runs, 2026-11-12).
@@ -426,9 +447,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Node environment
+        if: ${{ needs.pw-e2e.result != 'skipped' }}
         uses: ./.github/actions/install
         with:
-          install-command: ${{ needs.vars.outputs.install_command }}
+          install-command: npm ci
 
       - name: Merge, upload, and comment
         uses: ./.github/actions/playwright-merge-report-comment

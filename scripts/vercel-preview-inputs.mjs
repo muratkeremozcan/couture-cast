@@ -3,23 +3,21 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { classify, laneInputs, readWorkspaceDependencies } from './ci/lanes.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
-// Paths no preview deployment and no preview check reads.
-const outsidePreviews = ['apps/mobile', 'docs', '_bmad-output']
-
-// The exact-SHA preview checks (CI, end-to-end tests) read everything else, tests and workflows
-// included. Keeping the full branch diff means a later mobile commit still checks earlier API
-// or web changes.
-const previewPaths = ['.', ...outsidePreviews.map((dir) => `:(exclude)${dir}`)]
+/** The lane in scripts/ci/lanes.mjs that runs the preview deploys and their end-to-end tests. */
+export const PREVIEW_LANE = 'preview'
 
 // Paths no Vercel build reads: tests, workflows and load scripts run in CI against a deployment.
 // A preview deployment is reused only for the same inputs (scripts/vercel-preview-deploy.mjs).
 // Everything else stays an input of both projects, shared packages, the lockfile, root
 // configuration, prisma and scripts included, so a new top-level path builds by default.
 const outsideBuilds = [
-  ...outsidePreviews,
+  'apps/mobile',
+  'docs',
+  '_bmad-output',
   '.github',
   'playwright',
   'maestro',
@@ -51,11 +49,17 @@ function failure(result) {
 }
 
 /**
- * Whether the branch changes any of `paths` since it left `base`.
- * @param {string} cwd @param {string} base @param {string} head @param {string[]} paths
+ * Whether the branch changes a file the preview lane builds, runs or reads since it left `base`.
+ * The lane map (scripts/ci/lanes.mjs) decides, as it does for the pull request's own plan; the
+ * diff covers the whole branch, so a later mobile commit still checks earlier API or web
+ * changes. Renames count as a deletion and an addition, so moving runtime code under docs/
+ * still names the path it left.
+ * @param {string} cwd @param {string} base @param {string} [head]
+ * @param {Record<string, string[]>} [dependencies] each workspace's @couture dependencies, read
+ *   by default from the manifests in `cwd`
  * @returns {{ required: boolean, reason: string }}
  */
-export function previewDecision(cwd, base, head = 'HEAD', paths = previewPaths) {
+export function previewDecision(cwd, base, head = 'HEAD', dependencies) {
   const comparison = git(['merge-base', base, head], cwd)
   const ancestor = comparison.stdout?.trim()
   if (comparison.status !== 0 || !/^[a-f0-9]{40}$/.test(ancestor))
@@ -63,18 +67,30 @@ export function previewDecision(cwd, base, head = 'HEAD', paths = previewPaths) 
       required: true,
       reason: `no common ancestor with ${base} (${failure(comparison)})`,
     }
-  const result = git(['diff', '--name-only', ancestor, head, '--', ...paths], cwd)
+  const result = git(['diff', '--name-only', '--no-renames', ancestor, head], cwd)
   if (result.status !== 0)
     return { required: true, reason: `diff failed (${failure(result)})` }
-  const changed = result.stdout.split('\n').filter(Boolean)
+  let inputs
+  try {
+    inputs = laneInputs(dependencies ?? readWorkspaceDependencies(cwd))
+  } catch (error) {
+    return { required: true, reason: `the lane map could not be read (${error.message})` }
+  }
+  const changed = result.stdout
+    .split('\n')
+    .filter(Boolean)
+    .filter((file) => classify(file, inputs).lanes.includes(PREVIEW_LANE))
   if (!changed.length)
-    return { required: false, reason: `no input changed since ${ancestor}` }
+    return { required: false, reason: `no preview input changed since ${ancestor}` }
   return { required: true, reason: describeChanged(changed) }
 }
 
-/** @param {string} cwd @param {string} base @param {string} [head] @param {string[]} [paths] */
-export function previewRequired(cwd, base, head = 'HEAD', paths = previewPaths) {
-  return previewDecision(cwd, base, head, paths).required
+/**
+ * @param {string} cwd @param {string} base @param {string} [head]
+ * @param {Record<string, string[]>} [dependencies]
+ */
+export function previewRequired(cwd, base, head = 'HEAD', dependencies) {
+  return previewDecision(cwd, base, head, dependencies).required
 }
 
 function describeChanged(changed) {

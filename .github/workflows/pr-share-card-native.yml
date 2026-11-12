@@ -46,6 +46,37 @@ concurrency:
   group: share-card-native-${{ github.ref }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
   cancel-in-progress: true
 jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: pr-share-card-native.yml
+        run: node scripts/ci/lanes.mjs
+
   # The API32 journey runs as three shards (scripts/ci/native-matrix-shards.mjs), each on its own
   # emulator with its own services and sign-in. Run 41202706840 ran it as one 62.7 minute
   # journey in an 83 minute job, and two shards still took 30.4 and 34.0 minute journeys on main
@@ -660,7 +691,11 @@ jobs:
             journey_timeout: 35
     env: *runtime_env
     steps: *android36_steps
+  # The one lane a pull request runs, and only when its diff touches a file the lane builds,
+  # runs or reads (the share-card lane of scripts/ci/lanes.mjs); every other event runs it.
   browser-acceptance:
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['share-card']
     runs-on: ubuntu-latest
     # 14.5 minutes at p50, 17.6 at p95, 17.7 at most (last 20 runs, 2026-11-12). The
     # steps that have stalled (install, browser dependencies, Supabase, the matrix)
@@ -1535,6 +1570,8 @@ jobs:
       - android36-controls
       - android36-interaction
       - android36-release-font
+      # Only for its plan: a pull request may skip browser-acceptance when the plan did.
+      - lanes
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -1543,4 +1580,5 @@ jobs:
         env:
           CC68_JOB_RESULTS: ${{ toJSON(needs) }}
           CC68_EVENT_NAME: ${{ github.event_name }}
+          CC68_LANE_PLAN: ${{ needs.lanes.outputs.plan }}
         run: node scripts/ci/share-card-job-gate.mjs
