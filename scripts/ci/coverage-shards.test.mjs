@@ -5,9 +5,12 @@ import { test } from 'node:test'
 
 import {
   COVERAGE_SHARDS,
+  PLAN_SKIP_REASON,
   coverageShardOf,
   mergeShardResults,
+  plannedShards,
 } from './coverage-shards.mjs'
+import { LANES, coverageShards } from './lanes.mjs'
 
 const coverageWorkspaces = ['apps', 'packages'].flatMap((root) =>
   readdirSync(root, { withFileTypes: true })
@@ -44,23 +47,41 @@ test('a workspace nobody named still runs', () => {
   assert.equal(coverageShardOf('packages/added-next-year'), 'other')
 })
 
+// The matrix is the lane plan's shard list, so the plan must know exactly these shards, in
+// this order, and give each one a lane that gates tests-shard.
 test('the workflow matrix runs exactly the shards this file knows', () => {
   const workflow = readFileSync('.github/workflows/pr-checks.yml', 'utf8')
-  const matrix = /\n {8}shard: \[([^\]]+)\]/.exec(workflow)
-  assert.ok(matrix)
-  assert.deepEqual(
-    matrix[1].split(',').map((shard) => shard.trim()),
-    COVERAGE_SHARDS
+  assert.match(
+    workflow,
+    /\n {8}shard: \$\{\{ fromJSON\(needs\.lanes\.outputs\.coverage_shards\) \}\}\n/
   )
+  const everyLane = Object.fromEntries(
+    Object.keys(LANES).map((id) => [id, { run: true }])
+  )
+  assert.deepEqual(coverageShards(everyLane), COVERAGE_SHARDS)
+  for (const shard of COVERAGE_SHARDS) {
+    assert.deepEqual(LANES[`coverage-${shard}`].jobs, ['tests-shard'], shard)
+    assert.equal(LANES[`coverage-${shard}`].workflow, 'pr-checks.yml', shard)
+  }
 })
 
 test('the job other checks read keeps its name and waits for every shard', () => {
   const workflow = readFileSync('.github/workflows/pr-checks.yml', 'utf8')
   assert.match(
     workflow,
-    /\n {2}tests:\n {4}name: Workspace tests with coverage\n(?: {4}#.*\n)* {4}needs: \[tests-shard, typecheck, lint, lighthouse\]\n {4}if: \$\{\{ always\(\) \}\}/
+    /\n {2}tests:\n {4}name: Workspace tests with coverage\n(?: {4}#.*\n)* {4}needs: \[lanes, tests-shard, typecheck, lint, lighthouse\]\n {4}if: \$\{\{ always\(\) \}\}/
   )
   assert.match(workflow, /needs\.tests-shard\.result != 'success'/)
+  // The merge reads the plan's shard list, and a skipped matrix passes only when that list is
+  // empty.
+  assert.match(
+    workflow,
+    /COVERAGE_PLANNED_SHARDS: \$\{\{ needs\.lanes\.outputs\.coverage_shards \}\}\n {8}run: node scripts\/ci\/coverage-shards\.mjs merge/
+  )
+  assert.match(
+    workflow,
+    /!\(needs\.tests-shard\.result == 'skipped' && needs\.lanes\.outputs\.coverage_shards == '\[\]'\)/
+  )
 })
 
 test('all passing shards merge to success with every coverage folder, sorted', () => {
@@ -98,4 +119,53 @@ test('a shard with no result, skipped or cancelled, fails the run', () => {
   })
   assert.equal(merged.outcome, 'failure')
   assert.match(merged.failures[0].workspace, /other/)
+})
+
+test('a shard the plan skipped passes and is reported with the reason', () => {
+  const merged = mergeShardResults({ api: passing(['apps/api/coverage']) }, ['api'])
+  assert.equal(merged.outcome, 'success')
+  assert.deepEqual(merged.failures, [])
+  assert.deepEqual(merged.dirs, ['apps/api/coverage'])
+  assert.deepEqual(merged.skipped, [
+    { shard: 'mobile', reason: PLAN_SKIP_REASON },
+    { shard: 'other', reason: PLAN_SKIP_REASON },
+  ])
+})
+
+test('a planned shard with no result still fails the run', () => {
+  const merged = mergeShardResults({ api: passing(['apps/api/coverage']) }, [
+    'api',
+    'other',
+  ])
+  assert.equal(merged.outcome, 'failure')
+  assert.match(merged.failures[0].workspace, /other/)
+  assert.deepEqual(
+    merged.skipped.map(({ shard }) => shard),
+    ['mobile']
+  )
+})
+
+test('a plan that skips every shard passes with no coverage', () => {
+  const merged = mergeShardResults({}, [])
+  assert.equal(merged.outcome, 'success')
+  assert.deepEqual(merged.dirs, [])
+  assert.equal(merged.skipped.length, COVERAGE_SHARDS.length)
+})
+
+test('the result of a shard the plan skipped is not read', () => {
+  const failure = { workspace: 'apps/mobile', reason: 'tests', line: 'FAIL y' }
+  const merged = mergeShardResults(
+    { mobile: { outcome: 'failure', dirs: [], failures: [failure] } },
+    []
+  )
+  // The plan skipped it, so no shard job of this run wrote that file.
+  assert.equal(merged.outcome, 'success')
+  assert.deepEqual(merged.failures, [])
+})
+
+test('an unreadable plan requires every shard', () => {
+  for (const value of ['', 'null', '{}', '["api","web"]', 'not json'])
+    assert.deepEqual(plannedShards(value), COVERAGE_SHARDS, JSON.stringify(value))
+  assert.deepEqual(plannedShards('[]'), [])
+  assert.deepEqual(plannedShards('["mobile"]'), ['mobile'])
 })

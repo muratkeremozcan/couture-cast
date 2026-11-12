@@ -14,6 +14,7 @@ import {
   gateJobName,
   shareCardLaneProblems,
 } from './share-card-lanes.mjs'
+import { shareCardLaneCondition } from './share-card-job-gate.mjs'
 
 const source = parse(
   fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
@@ -279,9 +280,62 @@ describe('share-card parallel lane validator', () => {
           'schedule',
           'workflow_dispatch',
         ])
-        assert.equal(source.jobs['browser-acceptance'].if, undefined)
+        // The browser lane's only condition is its lane plan, which runs it on every event but a
+        // pull request whose diff touches nothing it builds, runs or reads.
+        assert.equal(
+          source.jobs['browser-acceptance'].if,
+          "fromJSON(needs.lanes.outputs.plan)['share-card']"
+        )
+        assert.equal(source.jobs['browser-acceptance'].if, shareCardLaneCondition)
+        assert.equal(source.jobs['browser-acceptance'].needs, 'lanes')
       })
     })
+
+    for (const [title, expected, change] of [
+      [
+        'running the browser lane without its plan',
+        /pull request lane cannot be conditional beyond its lane plan/,
+        (jobs) => delete jobs['browser-acceptance'].if,
+      ],
+      [
+        'gating the browser lane on another lane',
+        /pull request lane cannot be conditional beyond its lane plan/,
+        (jobs) =>
+          (jobs['browser-acceptance'].if =
+            "fromJSON(needs.lanes.outputs.plan)['maestro']"),
+      ],
+      [
+        'dropping the plan job from the browser lane',
+        /browser-acceptance: partitions must start independently/,
+        (jobs) => delete jobs['browser-acceptance'].needs,
+      ],
+      [
+        'dropping the plan job from the gate',
+        /require every browser and native partition/,
+        (jobs) =>
+          (jobs[gateJobName].needs = jobs[gateJobName].needs.filter(
+            (n) => n !== 'lanes'
+          )),
+      ],
+      [
+        'not giving the gate the lane plan',
+        /read the lane plan/,
+        (jobs) => delete jobs[gateJobName].steps.at(-1).env.CC68_LANE_PLAN,
+      ],
+      [
+        'giving the gate a constant plan',
+        /read the lane plan/,
+        (jobs) =>
+          (jobs[gateJobName].steps.at(-1).env.CC68_LANE_PLAN = '{"share-card":false}'),
+      ],
+    ])
+      test(`${title} is rejected`, () => {
+        const problems = mutate(change)
+        assert.ok(
+          problems.some((problem) => expected.test(problem)),
+          problems.join('\n') || 'no problem raised'
+        )
+      })
 
     test('a missing aggregate job is rejected', () => {
       const problems = mutate((jobs) => delete jobs[gateJobName])

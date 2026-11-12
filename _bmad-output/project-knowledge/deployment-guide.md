@@ -6,6 +6,7 @@ Updated: 2026-11-05 (Story 6.12): the community worker is hosted on Northflank, 
 Updated: 2026-11-05 (Story 6.13): append-only moderation history, its limits, retention and account erasure.
 Updated: 2026-11-11: the web production rewrite variable, and operator commands that verify TLS from macOS.
 Updated: 2026-11-10 (Story 6.14): complimentary full access, its operator command, kill switch and push enablement.
+Updated: 2026-11-12: CI creates previews and Vercel's git integration deploys production.
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
@@ -27,16 +28,17 @@ tests.
 
 ## Deployment map
 
-| Surface       | Current target                                       | Trigger in the repository                                             | Verification present                                                         |
-| ------------- | ---------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Web           | Separate Vercel project                              | Vercel Git integration is expected; no deploy workflow is stored here | Preview web health/SHA, production web health/SHA, Playwright                |
-| API           | Separate Vercel project and Node serverless function | Vercel Git integration is expected; no deploy workflow is stored here | Preview API health/SHA; production only checks a secondary API route         |
-| Mobile        | Expo EAS Android production build                    | Manual GitHub `workflow_dispatch` or local npm command                | EAS authentication and build submission only; Maestro is separate and manual |
-| Workers       | Community worker container, Northflank               | `apps/api/Dockerfile.community-worker`; general and wardrobe: none    | Build-time model self-test, readiness log, `community:screening:canary`      |
-| Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                      | Prisma command exit status; no post-migration deployment probe               |
-| Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete               | OTEL bootstrap log, integration test, dashboards and local manual checks     |
+| Surface       | Current target                                       | Trigger in the repository                                                | Verification present                                                         |
+| ------------- | ---------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Web           | Separate Vercel project                              | Previews: CI (preview workflow); production: Vercel git deploy of `main` | Preview web health/SHA, production web health/SHA, Playwright                |
+| API           | Separate Vercel project and Node serverless function | Previews: CI (preview workflow); production: Vercel git deploy of `main` | Preview API health/SHA; production only checks a secondary API route         |
+| Mobile        | Expo EAS Android production build                    | Manual GitHub `workflow_dispatch` or local npm command                   | EAS authentication and build submission only; Maestro is separate and manual |
+| Workers       | Community worker container, Northflank               | `apps/api/Dockerfile.community-worker`; general and wardrobe: none       | Build-time model self-test, readiness log, `community:screening:canary`      |
+| Database      | Supabase PostgreSQL through `DATABASE_URL`           | API Vercel build and local/API E2E startup paths                         | Prisma command exit status; no post-migration deployment probe               |
+| Observability | Optional Grafana OTLP endpoint; local LGTM stack     | API process startup when OTLP configuration is complete                  | OTEL bootstrap log, integration test, dashboards and local manual checks     |
 
-The workflows verify deployments but do not create the web or API Vercel deployments. Separate
+The preview workflow creates the web and API preview deployments; Vercel's git integration
+deploys production from each push to `main`, and the production workflow verifies it. Separate
 project names and production URLs are encoded in
 [the Preview workflow](../../.github/workflows/pr-pw-e2e-vercel-preview.yml),
 [the production workflow](../../.github/workflows/pw-e2e-prod.yml), and the

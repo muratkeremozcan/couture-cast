@@ -2,14 +2,17 @@
 
 <!-- markdownlint-configure-file {"MD013": false} -->
 
+Updated: 2026-11-12 - lane selection on pull requests
 Updated: 2026-11-12 - PR job ceilings at 20 minutes and CI's local Supabase ports
 Updated: 2026-05-01 - document Preview and Production as the deployed Vercel targets
 
 ## Overview
 
-This repo uses GitHub Actions for CI and uses Vercel Git integration for web deployments:
+This repo uses GitHub Actions for CI. CI creates the Vercel preview deployments, and Vercel's git
+integration deploys production from `main` (`git.deploymentEnabled` is true for `main` only in
+each `vercel.json`):
 
-- PR branches → Vercel Preview deployments
+- PR branches → Vercel Preview deployments from CI, when the preview lane runs
 - `main` → Vercel Production deployments
 
 In CI, Vercel Preview URLs are the `preview` Playwright target. PRs use Preview and `main` uses
@@ -67,6 +70,26 @@ Playwright environment selection uses `TEST_ENV`:
 - `actions-cache-prune.yml` keeps the 10 GB Actions cache clear of closed pull requests and
   keys unread for 48 hours (`scripts/ci/prune-actions-cache.mjs`), daily and when a pull request
   closes, so GitHub's own eviction never pushes out a live key.
+
+### Lane selection on pull requests
+
+- `scripts/ci/lanes.mjs` is the one input map: each lane names the files it builds, runs or reads
+  (workspaces with their `@couture` dependencies, plus extra paths). A `lanes` job at the head of
+  each pull request workflow reads the files changed between the event's base and head commits
+  from GitHub's compare API, so a rerun plans the commit it tests, and gates the lane's jobs with
+  `fromJSON(needs.lanes.outputs.plan)['<lane>']`. A failed read, or a diff at the compare API's
+  300-file limit, runs every lane. PR Gate counts a skipped job as passing; the lanes job summary
+  names each skipped lane and why.
+- Workflows, actions, scripts, root configuration, the lockfile and any path no lane claims run
+  every lane. Docs run none, unless a test reads them (`DOC_INPUTS`). Lint, the secrets scan and
+  burn-in of changed specs run on every pull request.
+- Push to `main`, the schedules, manual runs and the `ALL-LANES` label run every lane. The label
+  is read when the lanes job runs, so add it and rerun the workflows.
+- `scripts/ci/lanes.test.mjs` replays the last 60 merged PRs and checks that every repository
+  file a test names wakes the lanes that run that test; `lanes-wiring.test.mjs` holds the
+  workflows to the map.
+- `node scripts/ci/node-test-gate.mjs --local` runs every gate suite locally after checking each
+  suite's declared setup (install, Android prebuild, API build), and names what is missing.
 
 ### Advisory PR review
 

@@ -65,11 +65,24 @@ function commit(file: string, content = 'changed') {
   )
 }
 
+// The workspace manifests the lane map reads, which the fixture repository holds as its own.
+const manifests = ['apps', 'packages'].flatMap((dir) =>
+  fs
+    .readdirSync(path.join(repoRoot, dir))
+    .map((name) => `${dir}/${name}/package.json`)
+    .filter((file) => fs.existsSync(path.join(repoRoot, file)))
+)
+
 beforeEach(() => {
   fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'vercel-storage-'))
   git('init', '-b', 'main')
   git('config', 'user.name', 'Storage fixture')
   git('config', 'user.email', 'fixture@example.invalid')
+  for (const file of manifests) {
+    fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true })
+    fs.copyFileSync(path.join(repoRoot, file), path.join(fixture, file))
+  }
+  git('add', '--', ...manifests)
   commit('apps/api/src/main.ts', 'baseline')
   git('remote', 'add', 'origin', fixture)
   git('checkout', '-b', 'preview')
@@ -78,13 +91,19 @@ beforeEach(() => {
 afterEach(() => fs.rmSync(fixture, { recursive: true, force: true }))
 
 describe('Vercel preview storage', () => {
-  it.each(['apps/mobile/app/index.tsx', 'docs/guide.md', '_bmad-output/notes.md'])(
-    'needs no preview deployment for a branch changing only %s',
-    (file) => {
-      commit(file)
-      expect(previewRequired(fixture, 'main')).toBe(false)
-    }
-  )
+  // The preview lane of scripts/ci/lanes.mjs decides: Maestro flows, load scripts and Pact
+  // files belong to other lanes, and docs to none.
+  it.each([
+    'apps/mobile/app/index.tsx',
+    'docs/guide.md',
+    '_bmad-output/notes.md',
+    'maestro/flow.yaml',
+    'k6/load.js',
+    'pact/contract.json',
+  ])('needs no preview deployment for a branch changing only %s', (file) => {
+    commit(file)
+    expect(previewRequired(fixture, 'main')).toBe(false)
+  })
 
   it.each([
     'apps/api/src/main.ts',
@@ -107,17 +126,36 @@ describe('Vercel preview storage', () => {
     expect(previewRequired(fixture, 'main')).toBe(true)
   })
 
+  it('expands workspaces from the manifests of the repository it diffs', () => {
+    // On main, this repository's web app depends on packages/k6-utils; the checkout running
+    // the test does not, so only its own manifests make a k6-utils change need previews.
+    git('checkout', 'main')
+    const file = 'apps/web/package.json'
+    const manifest = JSON.parse(fs.readFileSync(path.join(fixture, file), 'utf8')) as {
+      dependencies: Record<string, string>
+    }
+    manifest.dependencies['@couture/k6-utils'] = 'file:../../packages/k6-utils'
+    commit(file, JSON.stringify(manifest, null, 2))
+    git('checkout', '-B', 'preview', 'main')
+    commit('packages/k6-utils/src/index.ts')
+    expect(previewRequired(fixture, 'main')).toBe(true)
+  })
+
   it('keeps the preview checks when history is unavailable', () => {
     expect(previewRequired(fixture, 'missing-ref')).toBe(true)
   })
 
   // The CLI roots itself where it lives, so it runs from a copy inside the fixture repository,
-  // whose origin/main is a baseline commit that already holds the copy.
+  // whose origin/main is a baseline commit that already holds the copy and the lane map it
+  // asks, beside the workspace manifests every fixture holds.
   it('an explicit request requires previews that the branch alone would skip', () => {
     const cli = path.join(fixture, 'scripts/vercel-preview-inputs.mjs')
-    fs.mkdirSync(path.dirname(cli), { recursive: true })
-    fs.copyFileSync(path.join(repoRoot, 'scripts/vercel-preview-inputs.mjs'), cli)
-    git('add', '--', 'scripts/vercel-preview-inputs.mjs')
+    const copies = ['scripts/vercel-preview-inputs.mjs', 'scripts/ci/lanes.mjs']
+    for (const file of copies) {
+      fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true })
+      fs.copyFileSync(path.join(repoRoot, file), path.join(fixture, file))
+    }
+    git('add', '--', ...copies)
     git(
       '-c',
       'core.hooksPath=/dev/null',
@@ -142,6 +180,17 @@ describe('Vercel preview storage', () => {
     commit('docs/guide.md')
     expect(scope('false')).toBe('required=false')
     expect(scope('true')).toBe('required=true')
+    commit('apps/web/src/app/page.tsx')
+    expect(scope('false')).toBe('required=true')
+  })
+
+  it('keeps the preview checks when the lane map cannot read the workspaces', () => {
+    commit('docs/guide.md')
+    expect(previewRequired(fixture, 'main', 'HEAD', undefined)).toBe(false)
+    // A workspace graph the map cannot expand decides nothing: previews stay required.
+    expect(previewRequired(fixture, 'main', 'HEAD', { web: ['no-such-workspace'] })).toBe(
+      true
+    )
   })
 
   it('keeps a deletion of runtime code when that code moves under docs', () => {
@@ -1037,13 +1086,13 @@ describe('Vercel preview deploy step', () => {
 
 /**
  * Evaluates the GitHub Actions expression subset the preview caller uses: literals, context
- * paths, ==, !=, !, && and || with parentheses. Strings compare case-insensitively and && and ||
- * return an operand, as GitHub does.
+ * paths, ==, !=, !, && and || with parentheses, contains(), fromJSON() and a ['key'] index.
+ * Strings compare case-insensitively and && and || return an operand, as GitHub does.
  */
 function evaluateExpression(source: string, context: Record<string, unknown>): unknown {
   const text = source.trim().replace(/^\$\{\{([\s\S]*)\}\}$/, '$1')
   const tokens: string[] = []
-  const pattern = /\s*(\(|\)|,|==|!=|&&|\|\||!|'(?:[^']|'')*'|[A-Za-z_][\w.*-]*)/y
+  const pattern = /\s*(\(|\)|\[|\]|,|==|!=|&&|\|\||!|'(?:[^']|'')*'|[A-Za-z_][\w.*-]*)/y
   while (pattern.lastIndex < text.trimEnd().length) {
     const match = pattern.exec(text)
     if (!match)
@@ -1069,7 +1118,21 @@ function evaluateExpression(source: string, context: Record<string, unknown>): u
     typeof a === 'string' && typeof b === 'string'
       ? a.toLowerCase() === b.toLowerCase()
       : (a ?? null) === (b ?? null)
+  // A ['key'] after a value reads that property, as GitHub's index syntax does.
   const primary = (): unknown => {
+    let value = operand()
+    while (tokens[at] === '[') {
+      take('[')
+      const key = or()
+      take(']')
+      value =
+        value && typeof value === 'object'
+          ? (value as Record<string, unknown>)[String(key)]
+          : undefined
+    }
+    return value
+  }
+  const operand = (): unknown => {
     const token = take()
     if (token === '(') {
       const value = or()
@@ -1089,6 +1152,12 @@ function evaluateExpression(source: string, context: Record<string, unknown>): u
       if (typeof haystack === 'string' && typeof needle === 'string')
         return haystack.toLowerCase().includes(needle.toLowerCase())
       return false
+    }
+    if (token === 'fromJSON' && tokens[at] === '(') {
+      take('(')
+      const json = or()
+      take(')')
+      return JSON.parse(String(json))
     }
     if (/^[A-Za-z_][\w.*-]*$/.test(token) && tokens[at] !== '(') {
       // A `*` step collects that property from every element, as GitHub's object filter does.
@@ -1152,10 +1221,32 @@ describe('Vercel preview PR trigger', () => {
       path.join(repoRoot, '.github', 'workflows', 'pr-pw-e2e-vercel-preview.yml'),
       'utf8'
     )
-  ) as { jobs: { 'preview-ready': { if: string; with: { force_build: string } } } }
+  ) as {
+    jobs: {
+      'preview-ready': {
+        if: string
+        with: { force_build: string; require_previews?: string }
+      }
+    }
+  }
   const job = caller.jobs['preview-ready']
+  const reusable = parseYaml(
+    fs.readFileSync(
+      path.join(repoRoot, '.github', 'workflows', 'rwf-vercel-preview-ready.yml'),
+      'utf8'
+    )
+  ) as {
+    jobs: {
+      'preview-scope': { steps: { env?: Record<string, string> }[] }
+    }
+  }
+  const requireExpression = reusable.jobs['preview-scope'].steps.find(
+    (step) => step.env?.REQUIRE_PREVIEWS
+  )?.env?.REQUIRE_PREVIEWS
   const repository = 'muratkeremozcan/couture-cast'
-  const github = (fork: boolean, action: string, label: string) => ({
+  const github = (fork: boolean, action: string, label: string, preview = true) => ({
+    // The lanes job's plan: the preview lane runs when the diff touches a preview input.
+    needs: { lanes: { outputs: { plan: JSON.stringify({ preview }) } } },
     github: {
       repository,
       event: {
@@ -1185,6 +1276,41 @@ describe('Vercel preview PR trigger', () => {
       expect(evaluateExpression(job.if, github(false, action, label))).toBe(runs)
       expect(evaluateExpression(job.with.force_build, github(false, action, label))).toBe(
         forces
+      )
+    }
+  )
+
+  // A plan that skips the preview lane provides no previews, unless PREVIEW-REBUILD was just
+  // added, which builds them whatever the diff changed.
+  it.each(events)(
+    "a same-repository %s event (label '%s') with the preview lane skipped runs previews only for a rebuild",
+    (action, label, runs, forces) => {
+      expect(evaluateExpression(job.if, github(false, action, label, false))).toBe(
+        runs && forces
+      )
+    }
+  )
+
+  // The lane plan already chose the preview lane (ALL-LANES, or a diff the map ties to it), so
+  // the reusable workflow's own scope check must not overrule it: the caller passes the
+  // selection as require_previews, which the scope step turns into REQUIRE_PREVIEWS (and the
+  // scope CLI then answers required=true, as the CLI case above shows for a docs-only branch).
+  it.each([
+    [true, 'synchronize', '', true],
+    [false, 'labeled', 'PREVIEW-REBUILD', true],
+    [false, 'synchronize', '', false],
+  ] as const)(
+    'a plan with the preview lane %s on a %s event (label %s) requires previews in the scope step: %s',
+    (preview, action, label, required) => {
+      const context = github(false, action, label, preview)
+      expect(job.with.require_previews).toBeDefined()
+      const inputs = {
+        require_previews: evaluateExpression(job.with.require_previews ?? '', context),
+        force_build: evaluateExpression(job.with.force_build, context),
+      }
+      expect(requireExpression).toBeDefined()
+      expect(Boolean(evaluateExpression(requireExpression ?? '', { inputs }))).toBe(
+        required
       )
     }
   )

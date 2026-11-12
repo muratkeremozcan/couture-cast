@@ -24,6 +24,12 @@ on:
       GUARDIAN_INVITE_JWT_SECRET:
         required: false
 
+# A caller's env does not reach a reusable workflow. On a pull request or a push the
+# playwright-unit job of pr-checks.yml runs the Playwright helper unit tests, so the burn-in
+# command's `prepare:playwright` skips its own copy of them.
+env:
+  PLAYWRIGHT_UNIT_LANE: ${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '1' || '' }}
+
 jobs:
   # Detects changed specs and sizes the burn-in matrix, so a wide PR fans out across shards
   # instead of running past the 20-minute PR job limit in one job. No Supabase or browsers.
@@ -32,6 +38,8 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
+      # Reads the pull request's labels as they are now.
+      pull-requests: read
     outputs:
       changed: ${{ steps.detect-changed.outputs.changed }}
       base-ref: ${{ steps.base-ref.outputs.value }}
@@ -62,8 +70,31 @@ jobs:
           echo "value=$EFFECTIVE_BASE_REF" >> "$GITHUB_OUTPUT"
           echo "Resolved base ref: $EFFECTIVE_BASE_REF"
 
+      # The caller checks the labels of the event that started the run, and a rerun keeps
+      # that event, so a SKIP_BURN_IN label added before a rerun is read here, from the API. A
+      # failed read runs burn-in.
+      - name: Read the SKIP_BURN_IN label as it is now
+        id: current_label
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          if ! labels=$(gh api --paginate "repos/$REPO/issues/$PR/labels" --jq '.[].name'); then
+            echo "::warning::Could not read the pull request's labels; running burn-in."
+            labels=''
+          fi
+          if printf '%s\n' "$labels" | grep -qx SKIP_BURN_IN; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "The SKIP_BURN_IN label is on the pull request now; skipping burn-in."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Detect changed Playwright specs
         id: detect-changed
+        if: ${{ success() && steps.current_label.outputs.skip != 'true' }}
         run: |
           BASE_REF="${{ steps.base-ref.outputs.value }}"
           if [[ "$BASE_REF" =~ ^[0-9a-f]{40}$ ]]; then
@@ -98,11 +129,19 @@ jobs:
       # The library's own analyzer selects the specs, and `playwright test --list` counts
       # the runs, repeats included; `shardCount` in playwright/scripts/burn-in-changed.ts
       # turns that into the matrix size. The shards then split by recorded test duration.
+      # Listing loads every spec and what it imports at load time: the Prisma client
+      # (`@prisma/client` in the support helpers) and the built @couture/utils,
+      # @couture/api-client and @couture/testing (testing compiles against the Prisma client).
+      # @couture/config is read from source, and the API's dist only inside test bodies, so
+      # neither is built here. The helper unit tests run in pr-checks.yml.
       - name: Plan the burn-in shards
         id: plan
         if: steps.detect-changed.outputs.changed == 'true'
         run: |
-          npm run prepare:playwright
+          npm run db:generate
+          npm run build --workspace @couture/utils
+          npm run build --workspace @couture/api-client
+          npm run build --workspace @couture/testing
           npx tsx playwright/scripts/burn-in-changed.ts \
             --base-branch="${{ steps.base-ref.outputs.value }}" \
             --plan-out="$GITHUB_OUTPUT"

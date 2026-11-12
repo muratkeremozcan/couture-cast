@@ -11,7 +11,11 @@
 // an earlier step of the same job.
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { parse } from 'yaml'
+import { createRequire } from 'node:module'
+
+// yaml loads on first use: node-test-gate --local must report a missing install (npm ci)
+// before anything needs a package.
+const parse = (...args) => createRequire(import.meta.url)('yaml').parse(...args)
 
 const CHECK_COMMAND = new RegExp(
   [

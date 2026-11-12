@@ -18,13 +18,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: pr-pw-e2e-vercel-preview.yml
+        run: node scripts/ci/lanes.mjs
+
   preview-ready:
     # Find the exact web and API preview URLs for this PR commit and wait until
     # both projects serve it. Fork PRs get no VERCEL_TOKEN, so they skip previews.
+    # The lane plan skips a pull request that changes nothing a preview builds or tests
+    # (scripts/vercel-preview-inputs.mjs asks the same lane); adding PREVIEW-REBUILD
+    # still builds fresh previews.
+    needs: lanes
     if: |
       github.event.pull_request.head.repo.full_name == github.repository &&
       (github.event.action != 'labeled' ||
-      github.event.label.name == 'PREVIEW' || github.event.label.name == 'PREVIEW-REBUILD')
+      github.event.label.name == 'PREVIEW' || github.event.label.name == 'PREVIEW-REBUILD') &&
+      (fromJSON(needs.lanes.outputs.plan)['preview'] ||
+      (github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD'))
     uses: ./.github/workflows/rwf-vercel-preview-ready.yml
     with:
       git_ref: ${{ github.head_ref }}
@@ -32,12 +69,15 @@ jobs:
       # Adding the PREVIEW-REBUILD label builds fresh deployments even when ready ones match.
       # Later pushes reuse as usual; remove and add the label again to force another build.
       force_build: ${{ github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD' }}
+      # The lane plan already chose the preview lane (the diff, or the ALL-LANES label), so the
+      # reusable workflow's own scope check keeps that choice; deployments are still reused.
+      require_previews: ${{ fromJSON(needs.lanes.outputs.plan)['preview'] }}
     secrets: inherit
 
   pw-e2e:
     # Pass the exact URLs through so the test command does not re-resolve previews.
-    needs: preview-ready
-    if: needs.preview-ready.outputs.required == 'true'
+    needs: [lanes, preview-ready]
+    if: needs.preview-ready.outputs.required == 'true' && (fromJSON(needs.lanes.outputs.plan)['preview'] || (github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD'))
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: preview

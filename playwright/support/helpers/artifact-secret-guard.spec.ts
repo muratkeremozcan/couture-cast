@@ -1,7 +1,8 @@
 /**
  * Unit tests for `scripts/check-artifact-secrets.mjs`, the guard every Playwright
  * artifact upload runs first. Lives here because `npm run test:playwright-unit`
- * already runs this directory before every Playwright entrypoint, CI included.
+ * already runs this directory: before every local Playwright entrypoint, and in CI
+ * in the playwright-unit job of pr-checks.yml.
  *
  * Every value below is a dummy. The fixtures reproduce the shapes Playwright
  * actually writes: a blob report zip whose JSON lines carry config, a trace zip
