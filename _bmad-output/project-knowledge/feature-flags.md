@@ -10,6 +10,13 @@ fallback flow
 
 Status: active
 
+Updated: 2026-11-11
+Reason: production reads PostHog project `couturecast-prod` (329012) and an hourly drift check
+fails when a declared flag is omitted there or answers other than its declared default or pinned
+override; community evaluation resolves a key PostHog omits closed to its declared default and
+never reads the `feature_flags` row for it. See the deployment guide, "PostHog projects and flag
+drift".
+
 ## Source of truth
 
 Flag behavior is split across five files:
