@@ -45,11 +45,14 @@ jobs:
           LANES_WORKFLOW: watchos-native.yml
         run: node scripts/ci/lanes.mjs
 
+  # The watchOS check generates the iOS project with expo prebuild (no CocoaPods, no Xcode) and
+  # reads the generated watch targets, so it runs on Linux and takes no macOS runner (story 6.15
+  # D6: everything Linux can cover stays on Linux).
   watchos-native:
     name: watchOS native
     needs: lanes
     if: fromJSON(needs.lanes.outputs.plan)['watchos']
-    runs-on: macos-15
+    runs-on: ubuntu-latest
     timeout-minutes: 15
 
     steps:
