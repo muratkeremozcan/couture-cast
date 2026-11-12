@@ -146,7 +146,7 @@ Decisions (owner direction 2026-11-12; the rest delegated to the builder):
   - Google: Play license tester purchase, entitlement, upgrade-while-paid and restore; the Play-signed internal-track upgrade path; a non-debuggable R8 Release build completing a real Play Billing purchase.
     What runs now without either account: the live font proof and installed upgrades on emulators and simulators (same certificate through `bundletool`), BackgroundTask scheduling through WorkManager on the Android emulator, the minified Release journeys that need no store, and the RevenueCat Test Store journey in D15.
 - D12 SDK 56 Hermes memory regression (CX-04). Expo lists a Hermes V1 memory regression for apps importing `react-native-worklets` or `react-native-reanimated` (both here) in SDK 56; Expo's SDK 57 notes name `expo` 57.0.17 with React Native 0.86.3 as the fix (R2-06). Step 2 measures Release memory against the Step 1 control on the same emulator and simulator, as recorded local runs outside any PR job (the 30-minute journeys cannot fit the 20-minute ceiling): cold start, a 30-minute sustained journey through Home, Community and the composer with animations, and peak and settled PSS (Android) and physical footprint (iOS). From Step 2 on, `apps/mobile/release-hold.json` (`heldFrom: 56`) must exist, and `scripts/ci/mobile-release-hold.mjs` (with its test) makes `deploy-mobile` refuse a production build unless a lift measured on the current SDK shows peak and settled memory each within 10% of the Step 1 control, with its date and evidence; a lift from an earlier SDK never carries over, a missing file refuses, and SDK 57 also needs `expo` 57.0.17 or later; the workflow line lands with the D6 workflow change after the owner's go, and until then no production mobile build runs from `main`. Step 2 may release early only through its own lift within 10%. Step 3 repeats the measurement on `expo` 57.0.17 or later and records its lift; over the threshold or without evidence, the hold stays and Step 4 cannot open its release until it passes. No source patch or experimental flag is used to dodge the regression.
-- D13 Installed-predecessor upgrades (CX-09). Before each step merges, the previous step's Release build (from `main`) is installed and used, then the step's head Release build is installed over it under the same certificate, on Android and the iOS simulator. Persisted state carried across: signed-in session, ritual cache, background task registration, locale, theme; Step 2 adds Photos add-only and denied states and a real PNG save after the upgrade; every step from Step 0 carries a Test Store paid install in the debuggable pair on both platforms (D15) and scene and deep-link state. Before Step 4 merges, the direct SDK 54 to SDK 58 upgrade runs too, for members who skip releases. The bundletool same-certificate path leaves the Play-signing store path unproved; that is a D11 Google gate.
+- D13 Installed-predecessor upgrades (CX-09). Before each step merges, the previous step's Release build (from `main`) is installed and used, then the step's head Release build is installed over it under the same certificate, on Android and the iOS simulator. Persisted state carried across: signed-in session, ritual cache, locale, theme, and on Android the background task registration (the iOS simulator cannot register it; R2-01); Step 2 adds Photos add-only and denied states and a real PNG save after the upgrade; every step from Step 0 carries a Test Store paid install in the debuggable pair on both platforms (D15) and scene and deep-link state. Before Step 4 merges, the direct SDK 54 to SDK 58 upgrade runs too, for members who skip releases. The bundletool same-certificate path leaves the Play-signing store path unproved; that is a D11 Google gate.
 - D14 Xcode and scenes (CX-05). Expo documents that an app built with Xcode 27 on the application lifecycle does not launch correctly on iOS 27. Steps 2 and 3 build iOS with Xcode 26.x (26.4 or later), locally beside Xcode 27.2 through `DEVELOPER_DIR` and on `macos-26` in CI. Step 3 opts into the scene lifecycle, which SDK 57 supports from `expo` 57.0.23, so Step 4 is not its first exposure. Before any Xcode 27 artifact is accepted (Step 4 on), an iOS 27 simulator runs launch, deep link, foreground and resume, window geometry and VoiceOver focus checks, and the iPad runs two separate orientation checks (R2-08): where the system honors the lock, the locked orientation holds; in an iOS 27 resizable window, where the lock may not be honored and the reported orientation can differ from the window, the check asserts the actual window bounds across resizes, adaptive layout, reachable controls, the share popover anchored inside the scene, and retained state. Apple requires the iOS 27 SDK for uploads from April 2027 (exact date not yet announced), so Steps 2 and 3 on Xcode 26 stay submittable until then.
 - D15 Paid purchase and restore (CX-06; coordinator 2026-11-12). Real store sandboxes are D11 gates. What runs now is the RevenueCat Test Store, evaluated 2026-11-12 from RevenueCat's Test Store and webhook documentation and the `react-native-purchases` 11.0.2 package:
   - Facts: Test Store needs `react-native-purchases` 9.5.4 or later (10.7 today, 11 at Step 4) and no store account; it issues its own public API key; its purchase sheet is a RevenueCat modal with success, failure and cancel; purchases update `CustomerInfo` and entitlements and arrive as sandbox data with store `TEST_STORE`. The SDK crashes on purpose when a Test Store key runs in a non-debuggable Android build or a non-`DEBUG` iOS build, and React Native exposes no release opt-out (11.0.2 types carry only the `TEST_STORE` store value and error 42). The docs do not cover `restorePurchases` or confirm webhook delivery for Test Store; the journey establishes both, and a failure there is a finding to fix or report, never a skip.
@@ -342,6 +342,8 @@ TEA on the Test Store revision (`cb4880ae`), 2026-11-12:
 - **TEA-19 (D13, D15).** `a01e0307` has no Test Store key, so Step 0 records the paid baseline (purchase, server entitlement, restore after reinstall), and the first paid over-install is Step 0 to Step 1. Android debug keystores differ per machine, so the debuggable pair uses a pinned test-only keystore, or both sides build on one machine. Both certificate SHA-256 values are recorded.
 - **TEA-20 (D15 key hygiene).** `EXPO_PUBLIC_` values are inlined at export, so S4-13 adds a bundle scan of production and preview exports for a `test_` key. `resolveRevenueCatApiKey` refuses a `test_` key when `__DEV__` is false, so a misconfigured Release stays unconfigured instead of hitting the SDK's deliberate crash.
 
+TEA on R2 (`e40c65d8`), 2026-11-12: the test design is aligned with R2-01 to R2-08 (table "Alignment with the Codex re-review R2"), and TEA-02's original oracle contract is marked superseded. One leftover is for the builder: D13's carried-state list still names "background task registration" for both platforms, while R2-01 limits the iOS simulator to retained state. It should say Android only.
+
 ## Review Triage Log
 
 (Filled in per review pass.)
@@ -351,7 +353,7 @@ TEA on the Test Store revision (`cb4880ae`), 2026-11-12:
 Full plan: `_bmad-output/test-artifacts/test-design/cc615-expo-sdk58-live-font-scale-test-design.md`. It has 22 risks (13 high, 7 medium, 2 low), every CX item mapped to test IDs, and per-test fixtures and mutants.
 The builder fork implements the oracle and driver; TEA owns the test IDs and the fixtures' expected classes.
 
-**Scope per step (D1):** every applicable P0 and P1 test runs green on the step's exact head SHA before it merges, with native evidence linked (CX-10). Only D7 and the D11 gates wait for sign-off, and each of those blocks it.
+**Scope per step (D1):** every applicable P0 and P1 test runs green on the step's exact head SHA before it merges, with native evidence linked (CX-10). Nothing waits for sign-off except D7 and the D11 device and store gates, which hold iOS releases; shippable at every step means Android (D1, R2-01). A step that changes `react-native-purchases` or `posthog-react-native` runs that library's gate (S4-12 and S4-15, or S4-06 capture) on its head SHA (R2-07).
 
 **Gates at every step:**
 
@@ -369,20 +371,20 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
   - The oracle checks Activity, scene and root identity before any scroll or cold reference.
   - Per-style growth comes from the platform converter (Android 14 nonlinear fixtures; iOS per text style).
   - Each text node gets a direct clipping check, repeated after a post-change React update.
-  - Below 0.87 a run is classified and recorded as that step's baseline. From Step 4 only a complete fix passes, 3 identical runs per platform and configuration.
+  - Below 0.87 a residual run passes only inside the approved predicate for its platform, configuration and screen in the reviewed baseline file, and anything outside fails until a PR adjudicates it (F-00a to F-00a3, F-09). The version switch is proved by a residual fixture (passes at 0.86.3, fails from 0.87.0) and a healthy fixture (passes on both), with 0.87 prereleases counted as 0.87 (F-00q). Cold captures are layout fixtures only, and a provenance test rejects a cold capture presented as live (F-00b, F-00b2). From Step 4 only a complete fix passes, 3 identical runs per platform and configuration.
 - Large-text cold matrix.
-- U-05 installed-predecessor upgrade: the previous `main` Release, then the head Release, under one certificate, on Android and the iOS simulator.
+- U-05 installed-predecessor upgrade: the previous `main` Release, then the head Release, under one certificate. Android carries task registration too. The iOS simulator asserts retained state only (session, ritual cache, locale, theme, scene and deep-link state) and nothing about registration (R2-01).
 - C-02 timing table: every PR job's queue plus run p95 is 15 minutes or less, with a maximum of 20.
 
 **Step-specific (P0 unless noted):**
 
 - Step 0:
-  - TEA-16 spike, and F-12 if the plugin lands here.
-  - Oracle fixtures F-00a to F-00n: residual bug, stale clone, clipping, blank text, restart, same-PID recreation mutant, remount mutant, scene change, nonlinear growth, early fix, driver order, return leg.
+  - SP-01, the TEA-16 spike (R2-03): matched SDK 54 Release pairs with and without the plugin on one emulator and SDK 58 pairs; four screens, both directions; live theme, locale and density; OS and JS scale, identity and layout in every capture, so a no-op change fails. Then F-12: the exact one-token manifest delta, with four mutants.
+  - Oracle fixtures F-00a to F-00q: residual predicate in and out, baseline file review, cold layout fixtures and cold-as-live provenance, stale clone, clipping, blank text, restart, same-PID recreation mutant, remount mutant, scene change, nonlinear growth, early fix, driver order, return leg, version switch.
   - The SDK 54 positive control F-01.
-  - P0-05 to P0-07 and P0-08. P0-08 covers the simulator session and the persisted registration only; scheduler acceptance is P0-09 under D11.
+  - P0-05 to P0-07, and P0-08, which covers the simulator's retained state only. P0-09, the physical-iPhone registration, scheduler and worker, is a D11 gate that holds iOS releases.
   - U-01 on the Android emulator.
-  - S0-01, the semantic prebuild diff, with three seeded mutants.
+  - S0-01, the structural prebuild diff (`f108b625`), with its mutants: a `gradle.properties` value, a build-phase order swap, a retargeted configuration, and a real-project phase swap.
   - C-01 timing units (failed, timed-out, cancelled, queue-only lower bound, skipped with reason, queue-inclusive breach) and the C-01b lane fixtures after the owner's go.
 - Every step from Step 0, the RevenueCat Test Store (D15):
   - S4-12 journey in debuggable builds on the emulator and simulator: offerings; failure and cancel leave no entitlement; success shows it in `CustomerInfo`, on the server and on `GET premium/access`, through the preview-API webhook and local reconciliation; the over-install from the previous step's paid debuggable build (from Step 1, pinned test keystore); restore after reinstall.
@@ -398,18 +400,18 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
   - The Android media-library save, with the iOS adapter byte-unchanged.
   - Per-target floors: iOS app, widget, Pods and three podspecs at 16.4; watch at 9.0; launch on iOS 16.4; paired watch sync.
   - The network-timeout Maestro check (P1).
-  - S2-07 memory against Step 1.
-  - S2-08 release-hold units, fail closed.
+  - S2-07 memory against the Step 1 control, as recorded local runs outside PR jobs.
+  - S2-08 release-hold refusal units (`2e6fb24f`): the hold file is mandatory from SDK 56; a lift must be measured on the current SDK within 10% of the Step 1 control; an earlier-SDK lift never carries over; SDK 57 below 57.0.17 refuses.
   - U-05 with the Photos add-only and denied states and a real PNG save.
-- Step 3: plugin specs on a clean tree; S3-02 memory confirmation with the hold deleted; S3-03 scene opt-in checks on Xcode 26.x.
+- Step 3: plugin specs on a clean tree; S3-02, the memory run on `expo` 57.0.17 or later with its lift recorded (without it the hold stays and Step 4's release cannot open); S3-03 scene opt-in checks on Xcode 26.x.
 - Step 4:
   - Strict TypeScript API; async `write` and `renderRouter`.
-  - Scene window lookups, plus the iOS 27 simulator and resizable iPad checks for the Xcode 27 artifact.
+  - Scene window lookups, plus the iOS 27 simulator checks and two separate iPad checks for the Xcode 27 artifact. Where the lock is honored, the orientation holds. In an iOS 27 resizable window, the check asserts window bounds across resizes, layout, reachable controls, the popover anchored inside the scene, and retained state (R2-08).
   - AGP 9 and Kotlin 2.2 tests.
   - R8 Release with PostHog capture and the targeted reflection mutant.
   - The env-file spec and AC5.
   - The D5 measurements with the TEA-15 row 4 verdict.
-  - S4-11 foreground notifications: handler at module load, valid and invalid payloads, delayed handler, after cleanup, with a mutant.
+  - S4-11 foreground notifications (R2-04): the filter is installed before first render through a static import and never cleared. Native checks: valid and invalid payloads; a delay past the 3-second deadline, asserting the platform shows it; cold-start delivery; delivery after sign-out. Mutants: a dynamic import, and clearing on cleanup.
   - S4-06 targeted reflection mutants in the true Release and in `minifiedDebuggable`.
   - U-03, the direct SDK 54 to 58 upgrade.
   - F-10: the below-0.87 branch deleted.
@@ -424,8 +426,8 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
 
 **Red proofs:**
 
-- Every oracle fixture with `fixExpected` flipped.
-- SDK 54 runs forced to "fix expected".
+- Every oracle fixture at both sides of the version switch.
+- Forced "fix expected" only on runs classified residual or restored; healthy runs are covered by the healthy fixture.
 - The flip at Step 4.
 - Each guard's and each script's seeded mutant.
 
