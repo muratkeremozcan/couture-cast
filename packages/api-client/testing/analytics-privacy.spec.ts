@@ -206,6 +206,15 @@ describe('analytics privacy filter: events and properties', () => {
       } as unknown as Event)
     ).toEqual({ event: 'modal_opened', properties: { locale: 'en-US' } })
 
+    // A value shared with a discarded property still reaches the allowed one.
+    const shared = ['source']
+    expect(
+      webAnalyticsPrivacyFilter<Event>({
+        event: 'deep_link_invalid',
+        properties: { discarded: shared, param_keys: shared, surface: 'web' },
+      })?.properties
+    ).toEqual({ param_keys: ['source'], surface: 'web' })
+
     // An Array subclass keeps its species through filter, slice and map.
     class LeakyArray<T> extends Array<T> {
       toJSON() {

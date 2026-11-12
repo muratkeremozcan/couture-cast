@@ -459,17 +459,20 @@ export function analyticsEventNames(platform: AnalyticsPlatform): string[] {
 
 /**
  * A JSON.stringify replacer that leaves out what JSON cannot carry instead of throwing: a
- * BigInt, and any object met a second time (a cycle, or a shared reference; leaving it out
- * only sends less).
+ * BigInt, and an object that contains itself (a cycle). A shared reference that is not a
+ * cycle serializes at every place it appears, so a discarded property cannot take a value
+ * an allowed one also holds.
  */
 function jsonSafe() {
-  const seen = new WeakSet<object>()
-  return (_key: string, value: unknown) => {
+  const ancestors: object[] = []
+  return function (this: unknown, _key: string, value: unknown) {
     if (typeof value === 'bigint') return undefined
-    if (typeof value === 'object' && value !== null) {
-      if (seen.has(value)) return undefined
-      seen.add(value)
-    }
+    if (typeof value !== 'object' || value === null) return value
+    // `this` is the object holding `value`; everything after it on the stack is finished.
+    while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this)
+      ancestors.pop()
+    if (ancestors.includes(value)) return undefined
+    ancestors.push(value)
     return value
   }
 }
