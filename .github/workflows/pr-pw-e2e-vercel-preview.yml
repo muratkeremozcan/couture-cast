@@ -20,16 +20,18 @@ concurrency:
 jobs:
   preview-ready:
     # Find the exact web and API preview URLs for this PR commit and wait until
-    # both projects serve it.
+    # both projects serve it. Fork PRs get no VERCEL_TOKEN, so they skip previews.
     if: |
-      github.event.action != 'labeled' ||
-      github.event.label.name == 'PREVIEW' || github.event.label.name == 'PREVIEW-REBUILD'
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      (github.event.action != 'labeled' ||
+      github.event.label.name == 'PREVIEW' || github.event.label.name == 'PREVIEW-REBUILD')
     uses: ./.github/workflows/rwf-vercel-preview-ready.yml
     with:
       git_ref: ${{ github.head_ref }}
       expected_sha: ${{ github.event.pull_request.head.sha }}
-      # The PREVIEW-REBUILD label builds fresh deployments even when ready ones match.
-      force_build: ${{ contains(github.event.pull_request.labels.*.name, 'PREVIEW-REBUILD') }}
+      # Adding the PREVIEW-REBUILD label builds fresh deployments even when ready ones match.
+      # Later pushes reuse as usual; remove and add the label again to force another build.
+      force_build: ${{ github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD' }}
     secrets: inherit
 
   pw-e2e:

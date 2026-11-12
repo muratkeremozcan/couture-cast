@@ -32,7 +32,7 @@ export declare function previewDeployment(input: {
   projectName: string
   deadline: number
   list: () => Promise<Deployment[]>
-  create: (body: Record<string, unknown>, force: boolean) => Promise<Deployment>
+  create: (body: Record<string, unknown>) => Promise<Deployment>
   get: (id: string) => Promise<Deployment>
   now?: () => number
   sleep?: (ms: number) => Promise<void>

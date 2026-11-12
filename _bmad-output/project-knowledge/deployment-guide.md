@@ -173,7 +173,9 @@ tests, workflows and load scripts) and the same configuration (the ids and updat
 preview variables that apply to the branch, and the build settings: framework, install, build and
 output commands, root directory, files outside it, system variable exposure, Node version, Git LFS,
 region and resources), the newest ready one first, else one still building. Otherwise it creates
-one from the exact commit through the Vercel API. It never cancels a deployment: another run may
+one from the exact commit through the Vercel API with `forceNew=1`, since nothing matched and an
+earlier deployment of the same commit could carry other inputs or configuration. A variable's
+target counts whether Vercel lists it or gives it as one string. It never cancels a deployment: another run may
 be using it, and two runs racing to create cost one duplicate build at most.
 
 One deadline 45 s inside each job's 20 minutes covers setup, every request (each also bounded at
@@ -186,15 +188,14 @@ deployment's own URL and commit.
 Opening or reopening a PR provides its previews, as does each push to it. A manual run always
 provides each preview it names no custom URL for, even on a branch no preview check reads. Changing a preview variable or a build setting changes the
 configuration identity, so the next run builds fresh. To rebuild with nothing changed (an empty
-commit keeps the same inputs), add the `PREVIEW-REBUILD` label to the PR, and remove it afterwards,
-since every run builds fresh while it is there, or run Manual E2E Tests with
-`force_preview_build`. A forced build sends `forceNew=1`, so Vercel builds instead of returning an
-earlier deployment of the same commit. Production deployments from `main` are untouched by all of this.
+commit keeps the same inputs), add the `PREVIEW-REBUILD` label to the PR, or run Manual E2E Tests
+with `force_preview_build`. Adding the label forces that one run; later pushes reuse as usual, so
+remove and add it again to force another build. A forced build skips adoption. Production deployments from `main` are untouched by all of this.
 
 `VERCEL_TOKEN` reaches the deploy jobs, which run the PR's own script at its exact commit, as it
 already reached the e2e job's test code. GitHub withholds repository secrets from pull requests
-opened from forks, so only same-repository branches can use it, and a fork's preview run fails
-for want of the token. Nothing in the repository limits what the token may do; its scope, owner
+opened from forks, so only same-repository branches can use it; a fork PR skips the preview
+and e2e jobs. Nothing in the repository limits what the token may do; its scope, owner
 and expiry live in the Vercel account (repository secret last set 2025-12-15) and are not
 verified here, so treat it as able to deploy to production.
 

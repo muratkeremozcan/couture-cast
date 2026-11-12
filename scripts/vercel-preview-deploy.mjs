@@ -62,7 +62,8 @@ function stable(value) {
  */
 export function configIdentity(project, envs, branch) {
   const variables = envs
-    .filter((env) => Array.isArray(env.target) && env.target.includes('preview'))
+    // Vercel gives a variable's target as a list or as one string.
+    .filter((env) => [env.target ?? []].flat().includes('preview'))
     .filter((env) => !env.gitBranch || env.gitBranch === branch)
     .map((env) => [env.key, env.id, env.updatedAt ?? env.createdAt, env.gitBranch ?? ''])
     .sort(
@@ -97,7 +98,7 @@ export const PREVIEW_SOURCE = 'rwf-vercel-preview-ready'
  *   projectName: string,
  *   deadline: number,
  *   list: () => Promise<Deployment[]>,
- *   create: (body: Record<string, unknown>, force: boolean) => Promise<Deployment>,
+ *   create: (body: Record<string, unknown>) => Promise<Deployment>,
  *   get: (id: string) => Promise<Deployment>,
  *   now?: () => number,
  *   sleep?: (ms: number) => Promise<void>,
@@ -182,19 +183,16 @@ export async function previewDeployment(input) {
       return untilReady(idOf(adopted), adoptedSha, settings)
     }
   }
-  const created = await settings.create(
-    {
-      name: settings.projectName,
-      project: settings.projectId,
-      gitSource: { type: 'github', repoId: settings.repoId, ref: branch, sha },
-      meta: {
-        ccPreviewSource: PREVIEW_SOURCE,
-        ccPreviewInputs: inputs,
-        ccPreviewConfig: config,
-      },
+  const created = await settings.create({
+    name: settings.projectName,
+    project: settings.projectId,
+    gitSource: { type: 'github', repoId: settings.repoId, ref: branch, sha },
+    meta: {
+      ccPreviewSource: PREVIEW_SOURCE,
+      ccPreviewInputs: inputs,
+      ccPreviewConfig: config,
     },
-    force
-  )
+  })
   const id = idOf(created)
   if (!id) throw new Error(`${project}: Vercel created no deployment for ${sha}`)
   log(`${project}: created ${id} for ${sha}${force ? ' (forced)' : ''}`)
@@ -291,9 +289,9 @@ export async function run(project, env, options = {}) {
       })
       return (await api('GET', `/v6/deployments?${query}`)).deployments ?? []
     },
-    // forceNew=1 makes Vercel build instead of returning an earlier deployment of the commit.
-    create: (body, forceNew) =>
-      api('POST', `/v13/deployments?${forceNew ? `forceNew=1&${scope}` : scope}`, body),
+    // Creating runs only when no deployment matches, so it always needs a new build:
+    // forceNew=1 stops Vercel returning an earlier deployment of the commit.
+    create: (body) => api('POST', `/v13/deployments?forceNew=1&${scope}`, body),
     get: (id) => api('GET', `/v13/deployments/${id}?${scope}`),
   })
 }

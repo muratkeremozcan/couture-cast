@@ -243,8 +243,14 @@ describe('Vercel preview storage', () => {
     expect(workflow).not.toContain('resolve-vercel-preview-url')
     // Opening a PR provides its previews; no automatic deployment exists to find.
     expect(caller).toContain('types: [opened, reopened, labeled, synchronize]')
+    // Adding the label forces one rebuild; later pushes to a labeled PR reuse as usual.
     expect(caller).toContain(
-      "force_build: ${{ contains(github.event.pull_request.labels.*.name, 'PREVIEW-REBUILD') }}"
+      "force_build: ${{ github.event.action == 'labeled' && github.event.label.name == 'PREVIEW-REBUILD' }}"
+    )
+    expect(caller).not.toContain('labels.*.name')
+    // Fork PRs get no VERCEL_TOKEN, so they skip previews instead of failing on it.
+    expect(caller).toContain(
+      'github.event.pull_request.head.repo.full_name == github.repository &&'
     )
     expect(caller).toContain("if: needs.preview-ready.outputs.required == 'true'")
     expect(caller).toContain('expected_sha: ${{ github.event.pull_request.head.sha }}')
@@ -323,6 +329,19 @@ describe('Vercel preview configuration identity', () => {
       identity([variable(), variable({ key: 'PREVIEW_API_BASE_URL', id: 'env_2' })])
     ).not.toBe(base)
     expect(identity([])).not.toBe(base)
+  })
+
+  it('reads a target given as a string like one given as a list', () => {
+    const listed = identity([variable({ key: 'B', id: 'env_9', target: ['preview'] })])
+    expect(identity([variable({ key: 'B', id: 'env_9', target: 'preview' })])).toBe(
+      listed
+    )
+    expect(
+      identity([variable({ key: 'B', id: 'env_9', target: 'preview', updatedAt: 2 })])
+    ).not.toBe(listed)
+    expect(identity([variable({ key: 'B', id: 'env_9', target: 'production' })])).toBe(
+      identity([])
+    )
   })
 
   it.each(BUILD_SETTINGS)('changes when the %s setting changes', (setting) => {
@@ -411,7 +430,7 @@ describe('Vercel preview deployment', () => {
   ) {
     let clock = 0
     let polls = 0
-    const created: { body: Record<string, unknown>; force: boolean }[] = []
+    const created: Record<string, unknown>[] = []
     const polled: string[] = []
     const result = previewDeployment({
       project: 'web',
@@ -430,8 +449,8 @@ describe('Vercel preview deployment', () => {
         return Promise.resolve()
       },
       list: () => Promise.resolve(list),
-      create: (body, force) => {
-        created.push({ body, force })
+      create: (body) => {
+        created.push(body)
         return options.create
           ? options.create()
           : Promise.resolve({
@@ -531,7 +550,7 @@ describe('Vercel preview deployment', () => {
       sha,
       reused: false,
     })
-    expect(run.created).toEqual([{ body: createBody, force: false }])
+    expect(run.created).toEqual([createBody])
     expect(run.polled).toEqual(['dpl_new', 'dpl_new', 'dpl_new'])
   })
 
@@ -542,7 +561,7 @@ describe('Vercel preview deployment', () => {
       { force: true }
     )
     await expect(run.result).resolves.toMatchObject({ id: 'dpl_new', reused: false })
-    expect(run.created).toEqual([{ body: createBody, force: true }])
+    expect(run.created).toEqual([createBody])
   })
 
   it.each(['ERROR', 'CANCELED'])('fails when the build ends %s', async (state) => {
@@ -629,12 +648,11 @@ describe('Vercel preview deploy step', () => {
     VERCEL_TEAM_SLUG: 'team-slug',
   })
 
-  it.each([
-    [false, '/v13/deployments?teamId=team_1'],
-    [true, '/v13/deployments?forceNew=1&teamId=team_1'],
-  ])(
-    'creates through the real request (force %s) and never cancels',
-    async (force, createPath) => {
+  // Creating runs only when no deployment matches these inputs and this configuration, so
+  // Vercel must build: without forceNew it can hand back an earlier build of the commit.
+  it.each([false, true])(
+    'creates a fresh build through the real request (force %s) and never cancels',
+    async (force) => {
       const api = vercel([])
       await expect(
         run('web', env(force), {
@@ -651,7 +669,7 @@ describe('Vercel preview deploy step', () => {
       expect(writes).toHaveLength(1)
       expect(writes[0]).toMatchObject({
         method: 'POST',
-        path: createPath,
+        path: '/v13/deployments?forceNew=1&teamId=team_1',
         body: {
           name: 'couture-cast-web',
           project: 'prj_web',
