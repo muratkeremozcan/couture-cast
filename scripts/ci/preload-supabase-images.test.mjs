@@ -127,9 +127,11 @@ test('every job that starts Supabase preloads right after its ports, with the sa
       const preload = steps[ports + after]
       assert.equal(preload?.uses, './.github/actions/preload-supabase-images', site)
       assert.equal(preload.with?.exclude, start.with?.exclude, site)
-      // A job that starts Supabase only on some runs preloads only on those (Codex review
-      // of PR 211: rwf-e2e preloaded on its hosted environments too).
-      assert.equal(preload.if, start.if, site)
+      // A job that starts Supabase only for some inputs preloads only for those (Codex
+      // review of PR 211: rwf-e2e preloaded for its hosted environments too). A start gated
+      // on earlier steps' outcomes still preloads: those steps run after the preload.
+      if (/\binputs\./.test(start.if ?? '')) assert.equal(preload.if, start.if, site)
+      else assert.equal(preload.if, undefined, site)
     }
   }
   assert.ok(sites.length >= 10, sites.join(', '))
