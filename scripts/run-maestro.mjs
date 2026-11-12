@@ -90,6 +90,7 @@ import {
   launchStallError,
 } from './lib/maestro-launch-watchdog.mjs'
 import { runAndroidDeviceShards } from './lib/maestro-android-shards.mjs'
+import { waitForExpoStatus } from './lib/expo-dev-server.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -3460,7 +3461,8 @@ const buildPortPairs = (platform, metroPort) =>
 const findRunningExpoServer = async (portPairs) => {
   for (const pair of portPairs) {
     try {
-      await waitForHealth(pair.health, 5_000, 500)
+      // Metro's /status: a request for `/` renders the web page first (lib/expo-dev-server.mjs).
+      await waitForExpoStatus(pair.health, 5_000, 500)
       log(`Detected existing Expo dev server at ${pair.health}, reusing it`)
       return pair
     } catch {
@@ -3509,7 +3511,7 @@ const waitForExpoDevServer = async (portPairs, platform) => {
   let resolvedPair
   for (const pair of portPairs) {
     try {
-      await waitForHealth(pair.health)
+      await waitForExpoStatus(pair.health)
       resolvedPair = pair
       log(`Expo dev server reachable on ${pair.health}`)
       // Reachable is not the same as serving Expo Go. Ask for the manifest
