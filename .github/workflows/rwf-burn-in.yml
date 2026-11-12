@@ -132,8 +132,7 @@ jobs:
     permissions:
       actions: read
       contents: read
-    env:
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    # LOCAL_DATABASE_URL comes from configure-ci-supabase-ports, the first step after checkout.
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -141,10 +140,10 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
 
       - name: Setup Node and install deps
         uses: ./.github/actions/install

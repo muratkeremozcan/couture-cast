@@ -30,9 +30,9 @@ import {
   seedPost,
   seedPostReport,
 } from '../../apps/api/integration/helpers/moderation-queue-seed'
+import { localDatabaseUrl } from '../../scripts/lib/local-supabase-ports.mjs'
 
-const databaseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const databaseUrl = process.env.DATABASE_URL ?? localDatabaseUrl()
 const HOUR = 3_600_000
 const SEVENTY_ONE_HOURS = 71 * HOUR
 const ERASURE_PATH = '/api/v1/moderation/erasure-requests'

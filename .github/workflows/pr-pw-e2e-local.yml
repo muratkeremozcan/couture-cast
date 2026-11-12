@@ -68,14 +68,9 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      # Keep identical to LOCAL_E2E_DATABASE_URL in
-      # scripts/local-e2e-database.mjs, which is the default a local run falls
-      # back to when nothing sets DATABASE_URL. Both point at the Supabase
-      # container declared in supabase/config.toml (port 54322). Set explicitly
-      # here rather than relying on that fallback so CI never depends on a
-      # default it did not choose.
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    # LOCAL_DATABASE_URL and the Supabase ports come from configure-ci-supabase-ports
+    # (.github/supabase-ci-ports.env), the first step after checkout, so CI never
+    # depends on a default it did not choose.
     strategy:
       fail-fast: false
       matrix:
@@ -94,10 +89,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
 
       - name: Record git SHA
         id: git_sha
@@ -214,10 +209,10 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # Source server for the isolated database. The run's migrations and app rows
-      # never touch this database; only Supabase Storage keeps its buckets and seed
-      # objects here (start-local-supabase provisions the buckets).
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # LOCAL_DATABASE_URL, from configure-ci-supabase-ports, is the source server
+      # for the isolated database. The run's migrations and app rows never touch
+      # that database; only Supabase Storage keeps its buckets and seed objects
+      # there (start-local-supabase provisions the buckets).
       # The job owns this Redis service, so no other stack shares its queues.
       REDIS_URL: redis://127.0.0.1:6379
       STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e
@@ -233,10 +228,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -250,7 +245,7 @@ jobs:
         uses: ./.github/actions/start-local-supabase
         with:
           # The action's default list without mailpit: the real-email path reads
-          # the first sign-in code from Mailpit on 54324.
+          # the first sign-in code from Mailpit (SUPABASE_LOCAL_MAILPIT_URL).
           exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
 
       - name: Install Playwright Chromium only
@@ -329,9 +324,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     env:
-      # Source server for the owned database. The run creates and drops its own
-      # database there; Storage keeps its buckets in this one, for the posted look.
-      COMPLIMENTARY_E2E_SOURCE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+      # The source server for the owned database is LOCAL_DATABASE_URL, from
+      # configure-ci-supabase-ports. The run creates and drops its own database
+      # there; Storage keeps its buckets in that one, for the posted look.
       REDIS_URL: redis://127.0.0.1:6379
     steps:
       - name: Checkout repository
@@ -339,8 +334,8 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
 
       - name: Setup Node environment
         uses: ./.github/actions/install

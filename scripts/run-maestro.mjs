@@ -28,6 +28,7 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
+import { localDatabaseUrl, localSupabasePorts } from './lib/local-supabase-ports.mjs'
 import {
   assertGenericMaestroFlows,
   discoverRunnableMaestroFlows,
@@ -341,18 +342,16 @@ const SKIP_WORKER = process.env.MOBILE_E2E_SKIP_WORKER === '1'
  * NOT falling back to `process.env.DATABASE_URL`: importing `@prisma/client`
  * loads `packages/db/.env`, which on a developer machine points at their own
  * working database (`postgresql://<user>@localhost:5432/couture_cast`) rather
- * than the Supabase test instance on 54322.
+ * than the local Supabase test instance.
  *
  * That fallback was live in `cleanupMobileE2EIdentity`, so the post-run cleanup
  * was issuing its deletes against the developer's own database while the suite
- * ran against 54322. The deletes matched nothing, the transaction committed,
+ * ran against local Supabase. The deletes matched nothing, the transaction committed,
  * and the runner logged success — so every run silently leaked its signed-up
  * fixture user, its location, and its ritual into the test database, and every
  * run pointed a `deleteMany` at a database it was never meant to write to.
  */
-const MOBILE_E2E_DATABASE_URL =
-  process.env.MOBILE_E2E_DATABASE_URL ||
-  'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+const MOBILE_E2E_DATABASE_URL = process.env.MOBILE_E2E_DATABASE_URL || localDatabaseUrl()
 
 const log = (msg) =>
   console.log(`[maestro:runner]${SHARD_LABEL ? ` [${SHARD_LABEL}]` : ''} ${msg}`)
@@ -650,7 +649,7 @@ const disableAndroidAnimations = async () => {
  * 8081 fallback), the local API, and local Supabase.
  *
  * Supabase is on the list because the API signs community and wardrobe image URLs
- * against SUPABASE_URL, which on a local stack is `127.0.0.1:54321`. Without a route
+ * against SUPABASE_URL, which on a local stack is `127.0.0.1` on the API port. Without a route
  * there every signed image fails on the device. community-feed.yaml used to pass
  * anyway: the community card never reached its unavailable state and kept a blank
  * placeholder that still carried the `community-card-image-*` id. Once the card was
@@ -661,7 +660,7 @@ const disableAndroidAnimations = async () => {
  * @returns {number[]}
  */
 const androidHostPorts = (metroPort) => {
-  let supabasePort = 54321
+  let supabasePort = localSupabasePorts().api
   const supabaseUrl = process.env.SUPABASE_URL?.trim()
   if (supabaseUrl) {
     const url = new URL(supabaseUrl)

@@ -23,6 +23,7 @@ import {
 import { expect, test } from '../fixtures/merged-fixtures'
 import { buildUniqueId, isNonLocalEnvironment, resolveApiBaseUrl } from './api-test'
 import { seedWebSession } from './commerce-session'
+import { localDatabaseUrl } from '../../../scripts/lib/local-supabase-ports.mjs'
 import {
   communityAccessToken,
   deleteCommunityRowsForUser,
@@ -35,8 +36,7 @@ export { expect }
  * Same resolution chain as the other local-lane helpers, and never
  * `packages/db/.env`, which importing Prisma would otherwise load.
  */
-export const locationDatabaseUrl =
-  process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+export const locationDatabaseUrl = process.env.DATABASE_URL ?? localDatabaseUrl()
 
 export function locationPrisma(): PrismaClient {
   return new PrismaClient({ datasources: { db: { url: locationDatabaseUrl } } })

@@ -17,15 +17,17 @@ import { spawn } from 'node:child_process'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import pg from 'pg'
+import { localDatabaseUrl } from '../lib/local-supabase-ports.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 export const COMPLIMENTARY_E2E_DATABASE = /^tea_cc614_e2e_[a-f0-9]{32}$/
 
-/** The server the stack's Postgres runs on: CI's service, or local Supabase. */
+/** The server the stack's Postgres runs on: local Supabase, on its configured port. */
 const source = new URL(
   process.env.COMPLIMENTARY_E2E_SOURCE_DATABASE_URL ??
+    process.env.LOCAL_DATABASE_URL ??
     (process.env.CI ? process.env.DATABASE_URL : undefined) ??
-    'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+    localDatabaseUrl()
 )
 if (!['127.0.0.1', 'localhost'].includes(source.hostname))
   throw new Error('The complimentary E2E runs only against a loopback Postgres.')

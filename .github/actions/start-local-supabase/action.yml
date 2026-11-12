@@ -103,7 +103,7 @@ runs:
     # Callers run this right after checkout; here it is a no-op for them and a
     # late reservation for any caller that did not.
     - name: Reserve the Supabase host ports
-      uses: ./.github/actions/reserve-supabase-ports
+      uses: ./.github/actions/configure-ci-supabase-ports
 
     - name: Compute the Supabase image cache key
       id: cache-key

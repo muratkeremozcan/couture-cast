@@ -29,6 +29,7 @@ import {
   seedPost,
   seedPostReport,
 } from '../../../apps/api/integration/helpers/moderation-queue-seed'
+import { localDatabaseUrl } from '../../../scripts/lib/local-supabase-ports.mjs'
 
 type GuardianConsentPayload = {
   guardianId: string
@@ -399,8 +400,7 @@ test.describe('P-D-ROLES moderation decision write routes (Story 6.11)', () => {
   const decisionPath = (caseId: string) => `/api/v1/moderation/cases/${caseId}/decisions`
   const appealPath = (sanctionId: string) =>
     `/api/v1/moderation/sanctions/${sanctionId}/appeal`
-  const databaseUrl =
-    process.env.DATABASE_URL ?? 'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
+  const databaseUrl = process.env.DATABASE_URL ?? localDatabaseUrl()
   const NIL_REVISION = '0000000000000000'
 
   const decisionBody = () => ({

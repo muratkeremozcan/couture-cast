@@ -57,7 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         id: checkout
-      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install
@@ -283,7 +283,7 @@ jobs:
     steps: &android36_steps
       - uses: actions/checkout@v4
         id: checkout
-      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install
@@ -611,7 +611,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         id: checkout
-      - uses: ./.github/actions/reserve-supabase-ports
+      - uses: ./.github/actions/configure-ci-supabase-ports
       - uses: ./.github/actions/free-runner-disk
       - uses: ./.github/actions/install
         id: install

@@ -68,10 +68,8 @@ permissions:
   contents: read
 
 env:
-  # Identical to LOCAL_E2E_DATABASE_URL in scripts/local-e2e-database.mjs and to
-  # the Playwright workflow's LOCAL_DATABASE_URL. Both point at the Supabase
-  # container declared in supabase/config.toml (port 54322).
-  LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+  # LOCAL_DATABASE_URL and the Supabase ports come from configure-ci-supabase-ports
+  # (.github/supabase-ci-ports.env), the first step after checkout.
   # Not 30. API 30 emulators on GitHub-hosted runners have had no network
   # connectivity since 2026-06-25, which for this suite is a total-failure mode
   # rather than a slowdown: the device has to reach Metro, the local API and
@@ -170,10 +168,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
-        uses: ./.github/actions/reserve-supabase-ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
 
       # Some ubuntu-latest hosts start with under 15 GiB free; the emulator
       # snapshot restore has died with "No space left on device" on them.

@@ -70,8 +70,7 @@ jobs:
     # about twice one pr-pw-e2e-local shard's 9.1 min peak. Preview runs start
     # nothing locally and keep their budgets.
     timeout-minutes: ${{ inputs.test_env == 'local' && 40 || inputs.realtime_probe && 30 || 20 }}
-    env:
-      LOCAL_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+    # LOCAL_DATABASE_URL comes from configure-ci-supabase-ports, the first step after checkout.
     permissions:
       actions: read
       contents: read
@@ -87,11 +86,11 @@ jobs:
         with:
           ref: ${{ inputs.gh_ref }}
 
-      # First step after checkout, before this job's own network traffic, so
-      # no outgoing connection can take a Supabase host port as its local port.
-      - name: Reserve the local Supabase host ports
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and the URLs derived from them from here.
+      - name: Configure the CI Supabase host ports
         if: inputs.test_env == 'local'
-        uses: ./.github/actions/reserve-supabase-ports
+        uses: ./.github/actions/configure-ci-supabase-ports
 
       - name: Resolve expected SHA
         id: expected_sha
