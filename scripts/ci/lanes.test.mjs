@@ -11,11 +11,11 @@ import { test } from 'node:test'
 import { minimatch } from 'minimatch'
 import {
   ALL_LANES_LABEL,
+  COMPARE_FILES_CAP,
   DOCS,
   DOC_INPUTS,
   LANES,
   OWNED_BY_PATH_FILTERS,
-  PR_FILES_CAP,
   SHARED,
   WORKSPACES,
   classify,
@@ -340,7 +340,7 @@ test('pushes, schedules, manual runs, the label and an unreadable diff run every
   assert.ok(Object.values(unread).every((lane) => lane.run))
   const capped = selectLanes({
     event: 'pull_request',
-    files: Array.from({ length: PR_FILES_CAP }, (_, i) => `docs/${i}.md`),
+    files: Array.from({ length: COMPARE_FILES_CAP }, (_, i) => `docs/${i}.md`),
     dependencies,
   })
   assert.ok(Object.values(capped).every((lane) => lane.run))
@@ -439,6 +439,21 @@ function filesRead(file) {
   return [...read]
 }
 
+test('the read guard follows imports to the files an imported module reads', () => {
+  // db-reset-policy.spec.ts names no web file; it imports playwright/config/environments.ts,
+  // which imports apps/web/git-metadata.ts.
+  const spec = 'playwright/support/helpers/db-reset-policy.spec.ts'
+  const direct = filesNamed(readFileSync(path.join(root, spec), 'utf8'), spec)
+  assert.ok(!direct.includes('apps/web/git-metadata.ts'))
+  assert.ok(filesRead(spec).includes('apps/web/git-metadata.ts'))
+  // probe-community-preview.mjs names the corpus directory the spec reads through it.
+  assert.ok(
+    filesRead('playwright/support/helpers/probe-community-preview.spec.ts').includes(
+      'apps/api/test/fixtures/community-moderation/v1/manifest.json'
+    )
+  )
+})
+
 // Paths a test names only as sample input to the code it tests.
 const NOT_READ = [
   ['apps/api/integration/vercel-storage.spec.ts', 'apps/web/src/app/page.tsx'],
@@ -477,13 +492,17 @@ test('DOC_INPUTS names only files that exist and lanes that exist', () => {
   }
 })
 
+const BASE = 'b'.repeat(40)
 const HEAD = 'a'.repeat(40)
-const EVENT = { pull_request: { number: 7, head: { sha: HEAD } } }
+const OTHER = 'c'.repeat(40)
+const EVENT = { pull_request: { number: 7, base: { sha: BASE }, head: { sha: HEAD } } }
+const COMPARE = `/repos/owner/repo/compare/${BASE}...${HEAD}`
 
-test('the plan job writes one output per lane and a summary, and runs everything on an API failure', async () => {
+/** Runs the plan job for EVENT against a mocked API; returns the plan, outputs and requests. */
+async function planJob(respond, { event = EVENT, root: planRoot = root, workflow } = {}) {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-'))
   const eventPath = path.join(dir, 'event.json')
-  writeFileSync(eventPath, JSON.stringify(EVENT))
+  writeFileSync(eventPath, JSON.stringify(event))
   const env = {
     GITHUB_EVENT_NAME: 'pull_request',
     GITHUB_EVENT_PATH: eventPath,
@@ -491,52 +510,109 @@ test('the plan job writes one output per lane and a summary, and runs everything
     GITHUB_TOKEN: 'token',
     GITHUB_OUTPUT: path.join(dir, 'output'),
     GITHUB_STEP_SUMMARY: path.join(dir, 'summary'),
-    LANES_WORKFLOW: 'pr-mobile-e2e.yml',
+    ...(workflow ? { LANES_WORKFLOW: workflow } : {}),
   }
   const requested = []
   const fetchImpl = async (url) => {
     requested.push(url)
-    if (url.endsWith('/pulls/7')) return Response.json({ head: { sha: HEAD } })
-    if (url.includes('/labels')) return Response.json([{ name: 'documentation' }])
-    if (url.includes('page=1'))
-      return Response.json([
-        { filename: 'apps/mobile/app/index.tsx' },
-        { filename: 'docs/new.md', previous_filename: 'docs/old.md' },
-      ])
-    return Response.json([])
+    return (await respond(url)) ?? Response.json([])
   }
-  const plan = await main({ env, root, fetchImpl })
+  const plan = await main({ env, root: planRoot, fetchImpl })
+  const output = readFileSync(env.GITHUB_OUTPUT, 'utf8')
+  return {
+    plan,
+    output,
+    written: JSON.parse(output.match(/^plan=(.*)$/m)[1]),
+    summaryText: readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8'),
+    requested,
+  }
+}
+const compared = (files) => Response.json({ files })
+const everyLaneRuns = (plan) => Object.values(plan).every((lane) => lane.run)
+
+test('the plan job writes one output per lane and a summary from the event commits', async () => {
+  const { plan, output, written, summaryText, requested } = await planJob(
+    (url) => {
+      if (url.includes('/labels')) return Response.json([{ name: 'documentation' }])
+      if (url.includes(COMPARE))
+        return compared([
+          { filename: 'apps/mobile/app/index.tsx' },
+          { filename: 'docs/new.md', previous_filename: 'docs/old.md' },
+        ])
+    },
+    { workflow: 'pr-mobile-e2e.yml' }
+  )
   assert.equal(plan.maestro.run, true)
   assert.equal(plan['web-e2e'].run, false)
-  const output = readFileSync(env.GITHUB_OUTPUT, 'utf8')
-  const planOutput = JSON.parse(output.match(/^plan=(.*)$/m)[1])
-  assert.deepEqual(Object.keys(planOutput), allLanes)
-  assert.equal(planOutput.maestro, true)
-  assert.equal(planOutput['web-e2e'], false)
+  assert.deepEqual(Object.keys(written), allLanes)
+  assert.equal(written.maestro, true)
+  assert.equal(written['web-e2e'], false)
   assert.deepEqual(JSON.parse(output.match(/^coverage_shards=(.*)$/m)[1]), ['mobile'])
-  const summaryText = readFileSync(env.GITHUB_STEP_SUMMARY, 'utf8')
   assert.match(summaryText, /Mobile end-to-end \(Maestro\) \| pr-mobile-e2e\.yml \| runs/)
   assert.doesNotMatch(
     summaryText,
     /pr-checks\.yml/,
     'the summary keeps to the workflow named'
   )
-  assert.ok(requested.some((url) => url.includes('/repos/owner/repo/pulls/7/files')))
+  assert.ok(requested.some((url) => url.includes(COMPARE)))
+})
 
-  const failing = await main({
-    env: { ...env, GITHUB_OUTPUT: path.join(dir, 'output2') },
-    root,
-    fetchImpl: async () => new Response('', { status: 502 }),
+// The event's base and head commits are fixed; the pull request's files and head move with each
+// push. A rerun of commit A after a push of B, or a force-push from B back to A while the
+// plan reads, must still plan A from A's own diff.
+test('the plan reads the diff between the event base and head commits', async () => {
+  for (const head of [HEAD, OTHER, null]) {
+    const { plan, requested } = await planJob((url) => {
+      if (url.includes('/labels')) return Response.json([])
+      if (url.includes(COMPARE))
+        return compared([{ filename: 'apps/web/src/app/page.tsx' }])
+      if (url.includes('/pulls/7/files'))
+        return Response.json([{ filename: 'docs/guide.md' }])
+      if (url.endsWith('/pulls/7'))
+        return head
+          ? Response.json({ head: { sha: head } })
+          : new Response('', { status: 503 })
+    })
+    assert.equal(plan['web-e2e'].run, true, `PR head now ${head}`)
+    assert.equal(plan.maestro.run, false, `PR head now ${head}`)
+    assert.ok(!requested.some((url) => /\/pulls\/7(\/files)?(\?|$)/.test(url)))
+  }
+})
+
+test('any failed, partial or unbound read runs every lane', async () => {
+  const cases = {
+    'the comparison fails': (url) =>
+      url.includes(COMPARE) ? new Response('', { status: 503 }) : Response.json([]),
+    'the comparison is not JSON': (url) =>
+      url.includes(COMPARE) ? new Response('<html>') : Response.json([]),
+    'the comparison lists no files': (url) =>
+      url.includes(COMPARE) ? Response.json({ status: 'identical' }) : Response.json([]),
+    'the comparison reaches its file limit': (url) =>
+      url.includes(COMPARE)
+        ? compared(
+            Array.from({ length: COMPARE_FILES_CAP }, (_, i) => ({
+              filename: `docs/${i}.md`,
+            }))
+          )
+        : Response.json([]),
+    'the labels fail after the comparison succeeds': (url) =>
+      url.includes('/labels')
+        ? new Response('', { status: 502 })
+        : compared([{ filename: 'docs/guide.md' }]),
+  }
+  for (const [name, respond] of Object.entries(cases)) {
+    const { plan, written } = await planJob(respond)
+    assert.ok(everyLaneRuns(plan), name)
+    assert.ok(Object.values(written).every(Boolean), name)
+  }
+  const unbound = await planJob(() => compared([{ filename: 'docs/guide.md' }]), {
+    event: { pull_request: { number: 7 } },
   })
-  assert.ok(Object.values(failing).every((lane) => lane.run))
+  assert.ok(everyLaneRuns(unbound.plan), 'an event without its commits')
 })
 
 test('the label is read from every page, so ALL-LANES past the first hundred still counts', async () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-labels-'))
-  const eventPath = path.join(dir, 'event.json')
-  writeFileSync(eventPath, JSON.stringify(EVENT))
-  const fetchImpl = async (url) => {
-    if (url.endsWith('/pulls/7')) return Response.json({ head: { sha: HEAD } })
+  const { plan } = await planJob((url) => {
     if (url.includes('/labels')) {
       const page = Number(new URL(url).searchParams.get('page') ?? '1')
       if (page === 1)
@@ -546,70 +622,20 @@ test('the label is read from every page, so ALL-LANES past the first hundred sti
       if (page === 2) return Response.json([{ name: ALL_LANES_LABEL }])
       return Response.json([])
     }
-    if (url.includes('page=1')) return Response.json([{ filename: 'docs/guide.md' }])
-    return Response.json([])
-  }
-  const plan = await main({
-    env: {
-      GITHUB_EVENT_NAME: 'pull_request',
-      GITHUB_EVENT_PATH: eventPath,
-      GITHUB_REPOSITORY: 'owner/repo',
-      GITHUB_TOKEN: 'token',
-    },
-    root,
-    fetchImpl,
+    if (url.includes(COMPARE)) return compared([{ filename: 'docs/guide.md' }])
   })
-  assert.ok(Object.values(plan).every((lane) => lane.run))
-})
-
-test('a pull request whose head moved past the commit under test runs every lane', async () => {
-  // The files API answers for the pull request's head now; a rerun of an older commit, or a
-  // push while the plan reads, must not plan that commit from another commit's files.
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-head-'))
-  const eventPath = path.join(dir, 'event.json')
-  writeFileSync(eventPath, JSON.stringify(EVENT))
-  const fetchImpl = async (url) => {
-    if (url.endsWith('/pulls/7')) return Response.json({ head: { sha: 'b'.repeat(40) } })
-    if (url.includes('/labels')) return Response.json([])
-    if (url.includes('page=1')) return Response.json([{ filename: 'docs/guide.md' }])
-    return Response.json([])
-  }
-  const plan = await main({
-    env: {
-      GITHUB_EVENT_NAME: 'pull_request',
-      GITHUB_EVENT_PATH: eventPath,
-      GITHUB_REPOSITORY: 'owner/repo',
-      GITHUB_TOKEN: 'token',
-    },
-    root,
-    fetchImpl,
-  })
-  assert.ok(Object.values(plan).every((lane) => lane.run))
-  assert.match(plan.maestro.reason, /head moved/)
+  assert.ok(everyLaneRuns(plan))
 })
 
 test('a plan that fails to compute runs every lane and still writes its outputs', async () => {
   // A broken workspace manifest must not fail the lanes job, which would skip every gated job.
-  const dir = mkdtempSync(path.join(os.tmpdir(), 'lanes-broken-'))
-  const eventPath = path.join(dir, 'event.json')
-  writeFileSync(eventPath, JSON.stringify(EVENT))
-  const output = path.join(dir, 'output')
-  const plan = await main({
-    env: {
-      GITHUB_EVENT_NAME: 'pull_request',
-      GITHUB_EVENT_PATH: eventPath,
-      GITHUB_REPOSITORY: 'owner/repo',
-      GITHUB_TOKEN: 'token',
-      GITHUB_OUTPUT: output,
-    },
-    root: dir,
-    fetchImpl: async (url) =>
-      url.endsWith('/pulls/7')
-        ? Response.json({ head: { sha: HEAD } })
-        : Response.json([]),
-  })
-  assert.ok(Object.values(plan).every((lane) => lane.run))
+  const broken = mkdtempSync(path.join(os.tmpdir(), 'lanes-broken-'))
+  const { plan, written } = await planJob(
+    (url) =>
+      url.includes(COMPARE) ? compared([{ filename: 'docs/guide.md' }]) : undefined,
+    { root: broken }
+  )
+  assert.ok(everyLaneRuns(plan))
   assert.match(plan.maestro.reason, /could not be computed/)
-  const written = JSON.parse(readFileSync(output, 'utf8').match(/^plan=(.*)$/m)[1])
   assert.ok(Object.values(written).every(Boolean))
 })

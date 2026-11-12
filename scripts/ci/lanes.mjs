@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url'
 
 export const ALL_LANES_LABEL = 'ALL-LANES'
 
-/** GitHub's pull request files API stops at 3000 files; a diff that reaches it runs everything. */
-export const PR_FILES_CAP = 3000
+/** GitHub's comparison lists at most 300 files; a diff that reaches it runs everything. */
+export const COMPARE_FILES_CAP = 300
 
 /** Workspaces by directory. Their @couture dependencies come from each package.json. */
 export const WORKSPACES = {
@@ -379,9 +379,9 @@ export function selectLanes({ event, files, labels = [], dependencies }) {
   if (labels.includes(ALL_LANES_LABEL))
     return everything(`the ${ALL_LANES_LABEL} label runs every lane`)
   if (!files) return everything('the changed files could not be read, so every lane runs')
-  if (files.length >= PR_FILES_CAP)
+  if (files.length >= COMPARE_FILES_CAP)
     return everything(
-      `the diff reaches the API's ${PR_FILES_CAP}-file limit, so every lane runs`
+      `the diff reaches the comparison's ${COMPARE_FILES_CAP}-file limit, so every lane runs`
     )
 
   const inputs = laneInputs(dependencies)
@@ -413,37 +413,19 @@ export function selectLanes({ event, files, labels = [], dependencies }) {
   return plan
 }
 
-/** The pull request's changed files from the GitHub API, old paths of renames included. */
-async function pullRequestFiles({ repository, number, token, fetchImpl = fetch }) {
-  const files = []
-  for (let page = 1; page <= PR_FILES_CAP / 100; page++) {
-    const response = await fetchImpl(
-      `https://api.github.com/repos/${repository}/pulls/${number}/files?per_page=100&page=${page}`,
-      {
-        headers: {
-          accept: 'application/vnd.github+json',
-          authorization: `Bearer ${token}`,
-          'x-github-api-version': '2022-11-28',
-        },
-        signal: AbortSignal.timeout(30_000),
-      }
-    )
-    if (!response.ok)
-      throw new Error(`GET pull request files answered ${response.status}`)
-    const batch = await response.json()
-    for (const entry of batch) {
-      files.push(entry.filename)
-      if (entry.previous_filename) files.push(entry.previous_filename)
-    }
-    if (batch.length < 100) return files
-  }
-  return files
-}
-
-/** The pull request's head commit now. */
-async function pullRequestHead({ repository, number, token, fetchImpl = fetch }) {
+/**
+ * The files changed between the event's base and head commits, old paths of renames included.
+ * Both commits are fixed in the event, so a rerun or a push during the read cannot hand the plan
+ * another commit's files, as the pull request's own files endpoint, which answers for its head
+ * now, can. Renames count both paths, so a list at COMPARE_FILES_CAP may be cut short; the plan
+ * runs every lane then.
+ */
+async function changedFiles({ repository, base, head, token, fetchImpl = fetch }) {
+  const commit = /^[0-9a-f]{40}$/
+  if (!commit.test(base ?? '') || !commit.test(head ?? ''))
+    throw new Error('the event names no base and head commit')
   const response = await fetchImpl(
-    `https://api.github.com/repos/${repository}/pulls/${number}`,
+    `https://api.github.com/repos/${repository}/compare/${base}...${head}?per_page=1`,
     {
       headers: {
         accept: 'application/vnd.github+json',
@@ -453,8 +435,12 @@ async function pullRequestHead({ repository, number, token, fetchImpl = fetch })
       signal: AbortSignal.timeout(30_000),
     }
   )
-  if (!response.ok) throw new Error(`GET pull request answered ${response.status}`)
-  return (await response.json()).head?.sha
+  if (!response.ok) throw new Error(`GET the comparison answered ${response.status}`)
+  const { files: entries } = await response.json()
+  if (!Array.isArray(entries)) throw new Error('the comparison lists no files')
+  return entries.flatMap((entry) =>
+    entry.previous_filename ? [entry.filename, entry.previous_filename] : [entry.filename]
+  )
 }
 
 /** Every lane runs, for the reason given. */
@@ -523,45 +509,42 @@ export async function main({ env = process.env, root = process.cwd(), fetchImpl 
   const payload = env.GITHUB_EVENT_PATH
     ? JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
     : {}
-  const number = payload.pull_request?.number
-  const testedHead = payload.pull_request?.head?.sha
+  const pullRequest = payload.pull_request
   let files = null
   let labels = []
-  let headMoved = false
   if (event === 'pull_request') {
     try {
       const request = {
         repository: env.GITHUB_REPOSITORY,
-        number,
+        number: pullRequest?.number,
         token: env.GITHUB_TOKEN,
         fetchImpl,
       }
-      ;[files, labels] = await Promise.all([
-        pullRequestFiles(request),
+      const [changed, current] = await Promise.all([
+        changedFiles({
+          ...request,
+          base: pullRequest?.base?.sha,
+          head: pullRequest?.head?.sha,
+        }),
         pullRequestLabels(request),
       ])
-      // The files API answers for the head now. Read the head after the files: if it is not
-      // the commit this run tests, the files may belong to another commit.
-      const head = await pullRequestHead(request)
-      headMoved = !testedHead || head !== testedHead
+      files = changed
+      labels = current
     } catch (error) {
+      files = null
       console.log(
-        `::warning::Could not read the pull request's files, so every lane runs: ${error.message}`
+        `::warning::Could not read the pull request's changes, so every lane runs: ${error.message}`
       )
     }
   }
   let plan
   try {
-    plan = headMoved
-      ? everyLane(
-          'the pull request head moved past the commit under test, so its file list may be for another commit'
-        )
-      : selectLanes({
-          event,
-          files,
-          labels,
-          dependencies: readWorkspaceDependencies(root),
-        })
+    plan = selectLanes({
+      event,
+      files,
+      labels,
+      dependencies: readWorkspaceDependencies(root),
+    })
   } catch (error) {
     // A failed lanes job skips every job that needs it; running everything is the safe plan.
     console.log(`::warning::The lane plan failed, so every lane runs: ${error.message}`)

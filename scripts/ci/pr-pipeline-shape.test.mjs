@@ -42,6 +42,20 @@ test('burn-in still runs on pull requests, fails its own job and feeds the repor
   assert.equal(jobs.vars, undefined)
   for (const [id, job] of Object.entries(jobs))
     assert.ok(!needs(job).includes('vars'), `${id} needs no vars job`)
+  // Each job writes the install command inline: a clean install of the lockfile.
+  const installs = Object.entries(jobs).flatMap(([id, job]) =>
+    [job.with, ...(job.steps ?? []).map((candidate) => candidate.with)]
+      .filter((inputs) => inputs && 'install-command' in inputs)
+      .map((inputs) => [id, inputs['install-command']])
+  )
+  assert.deepEqual(installs.map(([id]) => id).sort(), [
+    'burn-in',
+    'complimentary-access-e2e',
+    'merge-reports',
+    'pw-e2e',
+    'real-session-e2e',
+  ])
+  for (const [id, command] of installs) assert.equal(command, 'npm ci', id)
   assert.ok(needs(jobs['merge-reports']).includes('burn-in'))
   // The gate requires every job; a blocked burn-in exits 1 in its report job.
   const report = workflow('rwf-burn-in.yml').jobs.report.steps.find(

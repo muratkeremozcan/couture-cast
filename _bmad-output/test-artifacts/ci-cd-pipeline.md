@@ -75,9 +75,11 @@ Playwright environment selection uses `TEST_ENV`:
 
 - `scripts/ci/lanes.mjs` is the one input map: each lane names the files it builds, runs or reads
   (workspaces with their `@couture` dependencies, plus extra paths). A `lanes` job at the head of
-  each pull request workflow reads the PR's changed files from the API and gates the lane's jobs
-  with `fromJSON(needs.lanes.outputs.plan)['<lane>']`. PR Gate counts a skipped job as passing;
-  the lanes job summary names each skipped lane and why.
+  each pull request workflow reads the files changed between the event's base and head commits
+  from GitHub's compare API, so a rerun plans the commit it tests, and gates the lane's jobs with
+  `fromJSON(needs.lanes.outputs.plan)['<lane>']`. A failed read, or a diff at the compare API's
+  300-file limit, runs every lane. PR Gate counts a skipped job as passing; the lanes job summary
+  names each skipped lane and why.
 - Workflows, actions, scripts, root configuration, the lockfile and any path no lane claims run
   every lane. Docs run none, unless a test reads them (`DOC_INPUTS`). Lint, the secrets scan and
   burn-in of changed specs run on every pull request.
