@@ -122,12 +122,32 @@ function transient(error) {
   const status = /** @type {{ status?: unknown }} */ (error)?.status
   if (typeof status === 'number') return status === 429 || status >= 500
   const name = /** @type {{ name?: unknown }} */ (error)?.name
-  return (
-    name === 'TimeoutError' ||
-    name === 'AbortError' ||
-    (error instanceof TypeError && error.message === 'fetch failed')
-  )
+  if (name === 'TimeoutError' || name === 'AbortError') return true
+  if (error instanceof TypeError && error.message === 'fetch failed') return true
+  // Node's fetch reports a connection lost mid-body as `TypeError: terminated`, the socket's
+  // own failure on its cause chain. Only those transport codes count; malformed JSON and any
+  // other error stay final.
+  for (let cause = error, depth = 0; cause && depth < 4; depth++) {
+    const code = /** @type {{ code?: unknown }} */ (cause).code
+    if (typeof code === 'string' && TRANSPORT_CODES.has(code)) return true
+    cause = /** @type {{ cause?: unknown }} */ (cause).cause
+  }
+  return false
 }
+
+/** Connection failures from Node's fetch (undici) and its sockets that a later request can avoid. */
+const TRANSPORT_CODES = new Set([
+  'UND_ERR_SOCKET',
+  'UND_ERR_CLOSED',
+  'UND_ERR_CONNECT_TIMEOUT',
+  'UND_ERR_HEADERS_TIMEOUT',
+  'UND_ERR_BODY_TIMEOUT',
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ETIMEDOUT',
+  'EPIPE',
+  'EAI_AGAIN',
+])
 
 /**
  * How long to wait before polling again: one interval, or until the reset a rate-limited answer
@@ -135,7 +155,11 @@ function transient(error) {
  */
 function retryWait(error, intervalMs, now) {
   const retryAt = /** @type {{ retryAt?: unknown }} */ (error)?.retryAt
-  if (typeof retryAt !== 'number' || retryAt - now() <= intervalMs)
+  if (
+    typeof retryAt !== 'number' ||
+    !Number.isFinite(retryAt) ||
+    retryAt - now() <= intervalMs
+  )
     return { ms: intervalMs, announced: false }
   return { ms: retryAt - now(), announced: true }
 }
@@ -160,7 +184,9 @@ function announcedRetryAt(headers, parsed, now) {
       ?.error?.limit
   if (typeof limit?.resetMs === 'number') times.push(limit.resetMs)
   if (typeof limit?.reset === 'number') times.push(limit.reset * 1000)
-  return times.length ? Math.max(...times) : undefined
+  // A value that is not a finite time, such as Infinity or 1e999, announces nothing usable.
+  const usable = times.filter((time) => Number.isFinite(time))
+  return usable.length ? Math.max(...usable) : undefined
 }
 
 /**

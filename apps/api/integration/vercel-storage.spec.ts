@@ -1,5 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
+import { createServer, type Server, type ServerResponse } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -432,6 +434,7 @@ describe('Vercel preview deployment', () => {
     let polls = 0
     const created: Record<string, unknown>[] = []
     const polled: string[] = []
+    const waits: number[] = []
     const result = previewDeployment({
       project: 'web',
       branch: 'feature',
@@ -445,6 +448,7 @@ describe('Vercel preview deployment', () => {
       deadline: options.deadlineMs ?? 10 * 60_000,
       now: () => clock,
       sleep: (ms) => {
+        waits.push(ms)
         clock += ms
         return Promise.resolve()
       },
@@ -466,7 +470,7 @@ describe('Vercel preview deployment', () => {
         return next instanceof Error ? Promise.reject(next) : Promise.resolve(next)
       },
     })
-    return { result, created, polled }
+    return { result, created, polled, waits }
   }
   const createBody = {
     name: 'couture-cast-web',
@@ -620,6 +624,21 @@ describe('Vercel preview deployment', () => {
     expect(run.polled).toHaveLength(4)
   })
 
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])(
+    'waits one interval when a rate limit carries an unusable reset (%s)',
+    async (retryAt) => {
+      const run = deploy(
+        [],
+        [
+          Object.assign(answered(429), { retryAt }),
+          { id: 'dpl_new', readyState: 'READY', url: 'built.example' },
+        ]
+      )
+      await expect(run.result).resolves.toMatchObject({ id: 'dpl_new' })
+      expect(run.waits).toEqual([15_000])
+    }
+  )
+
   it('names the queue when a build is still waiting for the single Hobby build slot', async () => {
     const run = deploy([], [{ id: 'dpl_new', readyState: 'QUEUED' }], {
       deadlineMs: 60_000,
@@ -650,11 +669,16 @@ describe('Vercel preview deploy step', () => {
         status: number
         headers?: Record<string, string>
         body?: unknown
+        // Sent as is, for values JSON.stringify cannot write, such as 1e999.
+        rawBody?: string
         stall?: boolean
       }
   function failedPoll(next: PollFailure) {
     const failure = typeof next === 'number' ? { status: next } : next
-    const text = JSON.stringify(failure.body ?? { error: { message: 'try later' } })
+    const text =
+      'rawBody' in failure && failure.rawBody !== undefined
+        ? failure.rawBody
+        : JSON.stringify(failure.body ?? { error: { message: 'try later' } })
     // A stalled body: the headers arrived, then reading the rest timed out.
     const body = failure.stall
       ? new ReadableStream<Uint8Array>({
@@ -851,6 +875,21 @@ describe('Vercel preview deploy step', () => {
       expect(Math.max(...waits)).toBeGreaterThanOrEqual(resetIn - 1_000)
     })
 
+    it.each([
+      ['X-RateLimit-Reset: Infinity', { headers: { 'X-RateLimit-Reset': 'Infinity' } }],
+      [
+        'error.limit.resetMs: 1e999',
+        { rawBody: '{"error":{"code":"rate_limited","limit":{"resetMs":1e999}}}' },
+      ],
+    ])(
+      'ignores an unusable reset (%s) and waits one interval',
+      async (_source, timing) => {
+        const { result, waits } = timed({ status: 429, ...timing })
+        await expect(result).resolves.toMatchObject({ id: 'dpl_new' })
+        expect(waits).toEqual([15_000])
+      }
+    )
+
     it('fails at once with the reason when the reset falls past the job deadline', async () => {
       const { result, waits, api } = timed({
         status: 429,
@@ -861,6 +900,71 @@ describe('Vercel preview deploy step', () => {
       expect(
         api.calls.filter((call) => call.path.startsWith('/v13/deployments/dpl_new'))
       ).toHaveLength(1)
+    })
+  })
+
+  describe('a poll answered through a real HTTP connection', () => {
+    let server: Server | undefined
+    afterEach(async () => {
+      await new Promise<void>((resolve) =>
+        server ? server.close(() => resolve()) : resolve()
+      )
+      server = undefined
+    })
+    /** Serves the deployment polls: `first` answers the first, READY every later one. */
+    async function polls(first: (response: ServerResponse) => void) {
+      let requests = 0
+      server = createServer((_request, response) => {
+        if (requests++ === 0) return first(response)
+        response.writeHead(200, { 'Content-Type': 'application/json' })
+        response.end(
+          JSON.stringify({ id: 'dpl_new', url: 'built.example', readyState: 'READY' })
+        )
+      })
+      await new Promise<void>((resolve) => server!.listen(0, '127.0.0.1', resolve))
+      const port = (server.address() as AddressInfo).port
+      const api = vercel([])
+      // Every other request stays mocked; the polls go through Node's fetch to the server.
+      const fetchImpl = ((url: string | URL | Request, init?: RequestInit) => {
+        const target = new URL(url instanceof Request ? url.url : url.toString())
+        return target.pathname.startsWith('/v13/deployments/dpl_new')
+          ? fetch(`http://127.0.0.1:${port}${target.pathname}${target.search}`, init)
+          : api.fetchImpl(url, init)
+      }) as typeof fetch
+      const waits: number[] = []
+      const result = run('web', env(false), {
+        fetchImpl,
+        cwd: fixture,
+        sleep: (ms) => {
+          waits.push(ms)
+          return Promise.resolve()
+        },
+      })
+      return { result, waits, requests: () => requests }
+    }
+
+    it('retries a 200 whose connection drops part way through the body', async () => {
+      const poll = await polls((response) => {
+        response.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Content-Length': '200',
+        })
+        response.write('{"id":"dpl_new","rea')
+        // Flush the partial body, then cut the connection.
+        setTimeout(() => response.socket?.destroy(), 20)
+      })
+      await expect(poll.result).resolves.toMatchObject({ id: 'dpl_new' })
+      expect(poll.requests()).toBe(2)
+      expect(poll.waits).toEqual([15_000])
+    })
+
+    it('does not retry a 200 whose body is not JSON', async () => {
+      const poll = await polls((response) => {
+        response.writeHead(200, { 'Content-Type': 'application/json' })
+        response.end('not json')
+      })
+      await expect(poll.result).rejects.toThrow(SyntaxError)
+      expect(poll.requests()).toBe(1)
     })
   })
 
