@@ -12,7 +12,7 @@ export type Deployment = {
 }
 export declare function configIdentity(
   project: Record<string, unknown>,
-  envs: Array<Record<string, unknown>>,
+  envs: Record<string, unknown>[],
   branch: string
 ): string
 export declare function previewDeployment(input: {
