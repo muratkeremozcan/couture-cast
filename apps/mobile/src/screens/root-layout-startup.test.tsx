@@ -110,8 +110,8 @@ vi.mock('@/src/analytics/track-events', () => ({
   trackMobileAlertReceived: () => undefined,
 }))
 vi.mock('@/src/lib/i18n', () => ({ initI18n: () => Promise.resolve() }))
-vi.mock('@/src/lib/background-fetch', () => ({
-  registerBackgroundFetchAsync: () => Promise.resolve(),
+vi.mock('@/src/lib/background-task', () => ({
+  registerRitualBackgroundTaskAsync: () => Promise.resolve(),
 }))
 vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   AccessibilityAnnouncerProvider: ({ children }: { children: ReactNode }) => children,

@@ -2,6 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-23-home-and-lock-screen-widgets
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -10,7 +12,7 @@ import { mockRitualResponse } from '../test-utils/msw/handlers'
 import { isWidgetCacheFresh } from './widget-cache-freshness'
 
 /**
- * `expo-task-manager` and `expo-background-fetch` are native boundaries with no
+ * `expo-task-manager` and `expo-background-task` are native boundaries with no
  * browser implementation, so they are stubbed here. Everything downstream of the
  * task body (settings, cache, HTTP, widget payload) runs for real against MSW
  * and localStorage, which is what makes the idempotency claims meaningful.
@@ -19,11 +21,12 @@ const native = vi.hoisted(() => {
   const tasks = new Map<string, () => Promise<unknown>>()
   return {
     tasks,
-    result: { NoData: 1, NewData: 2, Failed: 3 },
+    result: { Success: 1, Failed: 2 },
     defineTask: vi.fn((name: string, task: () => Promise<unknown>) => {
       tasks.set(name, task)
     }),
     isTaskRegisteredAsync: vi.fn(),
+    unregisterTaskAsync: vi.fn(),
     registerTaskAsync: vi.fn(),
   }
 })
@@ -31,18 +34,21 @@ const native = vi.hoisted(() => {
 vi.mock('expo-task-manager', () => ({
   defineTask: native.defineTask,
   isTaskRegisteredAsync: native.isTaskRegisteredAsync,
+  unregisterTaskAsync: native.unregisterTaskAsync,
 }))
 
-vi.mock('expo-background-fetch', () => ({
-  BackgroundFetchResult: native.result,
+vi.mock('expo-background-task', () => ({
+  BackgroundTaskResult: native.result,
   registerTaskAsync: native.registerTaskAsync,
 }))
 
-import { registerBackgroundFetchAsync } from './background-fetch'
+import { registerRitualBackgroundTaskAsync } from './background-task'
 import { setMobileAccessTokenResolver, setMobileApplicationUserId } from './mobile-auth'
 import { clearRitualMemoryCache, ritualCacheOwner, saveRitualCache } from './ritual-cache'
 
-const TASK_NAME = 'RITUAL_BACKGROUND_FETCH_TASK'
+const TASK_NAME = 'RITUAL_BACKGROUND_TASK'
+/** The name SDK 54 builds registered through expo-background-fetch. */
+const RETIRED_TASK_NAME = 'RITUAL_BACKGROUND_FETCH_TASK'
 const MEMBER_ID = 'bg-user'
 const USER_ID = ritualCacheOwner(MEMBER_ID)
 
@@ -95,7 +101,7 @@ describe('widget background cache freshness', () => {
   })
 })
 
-describe('ritual background fetch task', () => {
+describe('ritual background task', () => {
   const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
   let restoreAccessTokenResolver: (() => void) | undefined
 
@@ -124,7 +130,7 @@ describe('ritual background fetch task', () => {
    * wake that lands inside the freshness window must not spend a request or
    * rewrite a cache entry that is already current.
    */
-  it('does no work and reports NoData when the cached ritual is still fresh', async () => {
+  it('does no work and reports Success when the cached ritual is still fresh', async () => {
     const ritualRequests = vi.fn()
     server.use(
       http.get('*/api/v1/ritual', () => {
@@ -134,7 +140,7 @@ describe('ritual background fetch task', () => {
     )
     await seedCache(Date.now() - 60_000)
 
-    await expect(runRitualTask()).resolves.toBe(native.result.NoData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     expect(ritualRequests).not.toHaveBeenCalled()
     expect(publishedWidgetPayload()).toBeNull()
@@ -143,7 +149,7 @@ describe('ritual background fetch task', () => {
   it('refreshes an expired cache and republishes the widget payload', async () => {
     await seedCache(Date.now() - 31 * 60 * 1000)
 
-    await expect(runRitualTask()).resolves.toBe(native.result.NewData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     const entry = storedRitualEntry()
     expect(entry?.timestamp).toBeGreaterThan(Date.now() - 60_000)
@@ -151,7 +157,7 @@ describe('ritual background fetch task', () => {
   })
 
   it('populates an empty cache on the first wake', async () => {
-    await expect(runRitualTask()).resolves.toBe(native.result.NewData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     expect(storedRitualEntry()).not.toBeNull()
     expect(publishedWidgetPayload()).not.toBeNull()
@@ -171,7 +177,7 @@ describe('ritual background fetch task', () => {
       })
     )
 
-    await expect(runRitualTask()).resolves.toBe(native.result.NewData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     expect(requestedLocale).toBe('tr-TR')
     expect(publishedWidgetPayload()).toMatchObject({ locale: 'tr-TR' })
@@ -190,7 +196,7 @@ describe('ritual background fetch task', () => {
       return 'member-token'
     })
 
-    await expect(runRitualTask()).resolves.toBe(native.result.NewData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     expect(storedRitualEntry()).not.toBeNull()
     expect(signedOutKeys()).toEqual([])
@@ -207,7 +213,7 @@ describe('ritual background fetch task', () => {
     setMobileApplicationUserId(null)
     setMobileAccessTokenResolver(() => undefined)
 
-    await expect(runRitualTask()).resolves.toBe(native.result.NoData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     expect(ritualRequests).not.toHaveBeenCalled()
     expect(Object.keys(localStorage).filter((key) => key.startsWith('ritual:'))).toEqual(
@@ -223,7 +229,7 @@ describe('ritual background fetch task', () => {
   it('completes the refresh when the alert-preferences dependency is degraded', async () => {
     server.use(http.get('*/api/v1/alerts/preferences', () => HttpResponse.error()))
 
-    await expect(runRitualTask()).resolves.toBe(native.result.NewData)
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
 
     expect(storedRitualEntry()?.alertPreferences).toBeUndefined()
     expect(publishedWidgetPayload()).toMatchObject({ alertsEnabled: false })
@@ -260,34 +266,84 @@ describe('ritual background fetch task', () => {
   })
 })
 
-describe('registerBackgroundFetchAsync', () => {
-  it('registers the task on a device that has never registered it', async () => {
-    native.isTaskRegisteredAsync.mockResolvedValue(false)
+describe('registerRitualBackgroundTaskAsync', () => {
+  beforeEach(() => {
+    native.isTaskRegisteredAsync.mockReset()
+    native.unregisterTaskAsync.mockReset()
+    native.registerTaskAsync.mockReset()
+  })
 
-    await registerBackgroundFetchAsync()
+  function registered(...names: string[]) {
+    native.isTaskRegisteredAsync.mockImplementation((name: string) =>
+      Promise.resolve(names.includes(name))
+    )
+  }
+
+  it('registers the task on a device that has never registered it', async () => {
+    registered()
+
+    await registerRitualBackgroundTaskAsync()
 
     expect(native.registerTaskAsync).toHaveBeenCalledWith(TASK_NAME, {
-      minimumInterval: 15 * 60,
-      stopOnTerminate: false,
-      startOnBoot: true,
+      minimumInterval: 15,
     })
+    expect(native.unregisterTaskAsync).not.toHaveBeenCalled()
   })
 
   /** Re-registering on every launch would reset the OS scheduling budget. */
   it('skips registration when the task is already registered', async () => {
-    native.isTaskRegisteredAsync.mockResolvedValue(true)
+    registered(TASK_NAME)
 
-    await registerBackgroundFetchAsync()
+    await registerRitualBackgroundTaskAsync()
 
     expect(native.registerTaskAsync).not.toHaveBeenCalled()
   })
 
-  /** Background fetch is optional; a device that refuses it must still boot. */
+  /**
+   * An install upgraded from an SDK 54 build still has the background fetch task persisted by
+   * expo-task-manager. It is unregistered before the new task registers, so the device keeps
+   * exactly one ritual task and no consumer of the removed module.
+   */
+  it('retires the background fetch task of an upgraded install, then registers the new task', async () => {
+    registered(RETIRED_TASK_NAME)
+    const order: string[] = []
+    native.unregisterTaskAsync.mockImplementation((name: string) => {
+      order.push(`unregister:${name}`)
+      return Promise.resolve()
+    })
+    native.registerTaskAsync.mockImplementation((name: string) => {
+      order.push(`register:${name}`)
+      return Promise.resolve()
+    })
+
+    await registerRitualBackgroundTaskAsync()
+
+    expect(order).toEqual([`unregister:${RETIRED_TASK_NAME}`, `register:${TASK_NAME}`])
+  })
+
+  /** A missing consumer for the retired task must not cost the member the new task. */
+  it('still registers the new task when retiring the old one throws', async () => {
+    const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    registered(RETIRED_TASK_NAME)
+    native.unregisterTaskAsync.mockRejectedValue(new Error('Task consumer not found'))
+
+    await registerRitualBackgroundTaskAsync()
+
+    expect(native.registerTaskAsync).toHaveBeenCalledWith(TASK_NAME, {
+      minimumInterval: 15,
+    })
+    expect(consoleWarn).toHaveBeenCalledWith(
+      '[BackgroundTask] retiring the background fetch task failed',
+      expect.any(Error)
+    )
+  })
+
+  /** Background work is optional; a device that refuses it must still boot. */
   it('swallows a registration failure instead of breaking app start', async () => {
     const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     native.isTaskRegisteredAsync.mockRejectedValue(new Error('background refresh denied'))
 
-    await expect(registerBackgroundFetchAsync()).resolves.toBeUndefined()
+    await expect(registerRitualBackgroundTaskAsync()).resolves.toBeUndefined()
     expect(consoleWarn).toHaveBeenCalled()
   })
 })

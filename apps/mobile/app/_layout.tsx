@@ -29,7 +29,7 @@ import {
 } from '@/src/analytics/mobile-analytics'
 import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
-import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
+import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import { useTranslation } from 'react-i18next'
@@ -91,7 +91,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded && i18nLoaded) {
       void SplashScreen.hideAsync()
-      void registerBackgroundFetchAsync()
+      void registerRitualBackgroundTaskAsync()
     }
   }, [loaded, i18nLoaded])
 

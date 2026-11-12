@@ -45,6 +45,8 @@
     "plugins": [
       "expo-router",
       "expo-localization",
+      "expo-background-task",
+      "./plugins/with-background-modes",
       "./plugins/with-widgets",
       "./plugins/with-watchos",
       "./plugins/with-supported-ios-target",
