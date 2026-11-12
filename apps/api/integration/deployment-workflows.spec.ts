@@ -209,7 +209,7 @@ describe('deployment workflows', () => {
     }
   })
 
-  it('prod e2e waits for web and API to serve the pushed commit', () => {
+  it('prod e2e waits for web and API to serve the commit their deploy jobs report', () => {
     const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
     expect(content).toMatch(
       /health_url: https:\/\/couture-cast-web\.vercel\.app\/api\/health/
@@ -217,7 +217,7 @@ describe('deployment workflows', () => {
     expect(content).toMatch(
       /health_url: https:\/\/couture-cast-api\.vercel\.app\/api\/health/
     )
-    expect(content).toMatch(/needs: \[wait-web, wait-api\]/)
+    expect(content).toMatch(/needs: \[deploy-web, wait-web, wait-api\]/)
     // /api/v1/events/poll needs a bearer token, so waiting for 200 on it never ends.
     expect(content).not.toMatch(/_url: \S*events\/poll/)
   })

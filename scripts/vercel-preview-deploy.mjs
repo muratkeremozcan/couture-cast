@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Provides the preview deployment of one Vercel project for the commit under test.
+ * Provides the preview deployment of one Vercel project for the commit under test, and with
+ * --production the production deployment of main (productionDeployment below).
  *
- * Git pushes to branches other than main create no Vercel deployment (`git.deploymentEnabled`
- * in each project's vercel.json): on the Hobby plan every deployment, an ignored one included,
- * counts toward the 100 a day, and pushes no preview check needed used them up. CI calls this
+ * Git pushes create no Vercel deployment, main included (`git.deploymentEnabled` in each
+ * project's vercel.json): on the Hobby plan every deployment, an ignored one included, counts
+ * toward the 100 a day, and pushes no check needed used them up. CI calls this
  * only when the preview checks need the branch (scripts/vercel-preview-inputs.mjs).
  *
  * A preview deployment this script created on the branch for the same build inputs (a hash of
@@ -55,16 +56,16 @@ function stable(value) {
 }
 
 /**
- * The configuration a preview build of `branch` reads: each preview variable that applies to
- * it, by id and last update (values stay encrypted), and the project's build settings.
+ * The configuration a build of `branch` for `target` reads: each variable of that target that
+ * applies to it, by id and last update (values stay encrypted), and the project's build settings.
  * @param {Record<string, unknown>} project @param {Array<Record<string, unknown>>} envs
- * @param {string} branch
+ * @param {string} branch @param {'preview' | 'production'} [target]
  */
-export function configIdentity(project, envs, branch) {
+export function configIdentity(project, envs, branch, target = 'preview') {
   const variables = envs
     // Vercel gives a variable's target as a list or as one string.
-    .filter((env) => [env.target ?? []].flat().includes('preview'))
-    .filter((env) => !env.gitBranch || env.gitBranch === branch)
+    .filter((env) => [env.target ?? []].flat().includes(target))
+    .filter((env) => target !== 'preview' || !env.gitBranch || env.gitBranch === branch)
     .map((env) => [env.key, env.id, env.updatedAt ?? env.createdAt, env.gitBranch ?? ''])
     .sort(
       (a, b) =>
@@ -307,6 +308,82 @@ export async function previewDeployment(input) {
   return untilReady(id, sha, settings)
 }
 
+/** Marks the production deployments CI creates (pw-e2e-prod.yml). */
+export const PRODUCTION_SOURCE = 'pw-e2e-prod'
+
+/**
+ * Provides production for main's commit `sha`. Git pushes create no deployment, so this is the
+ * only path to production, and each deployment counts toward Hobby's 100 a day: it creates one
+ * only when the build inputs or the production configuration changed since the deployment
+ * production serves now (`current`, the project's production target, which a dashboard rollback
+ * moves without creating a deployment). A commit that changed neither leaves production where
+ * it is, and the result names the commit production serves, which the health wait and the
+ * production e2e run expect. A production build of the same inputs that is still running, left
+ * by a superseded run, is adopted. It never cancels a deployment.
+ * @param {DeployInput & { current: Deployment | null }} input
+ * @returns {Promise<{ id: string, url: string, sha: string, reused: boolean }>}
+ */
+export async function productionDeployment(input) {
+  const settings = {
+    ...input,
+    force: input.force === true,
+    now: input.now ?? (() => Date.now()),
+    sleep: input.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))),
+    intervalMs: input.intervalMs ?? 15_000,
+    log: input.log ?? (() => undefined),
+  }
+  const { project, branch, sha, inputs, config, force, log } = settings
+  const current = stateOf(settings.current ?? {}) === 'READY' ? settings.current : null
+  const same = (deployment) =>
+    deployment.meta?.ccProductionSource === PRODUCTION_SOURCE &&
+    deployment.meta?.ccProductionInputs === inputs &&
+    deployment.meta?.ccProductionConfig === config &&
+    /^[a-f0-9]{40}$/.test(deployment.meta?.githubCommitSha ?? '')
+  if (!force) {
+    if (current && same(current)) {
+      const servedSha = /** @type {string} */ (current.meta?.githubCommitSha)
+      log(
+        `${project}: production already serves ${servedSha}, built from the same inputs and configuration; no deployment created`
+      )
+      return {
+        id: idOf(current),
+        url: `https://${current.url}`,
+        sha: servedSha,
+        reused: true,
+      }
+    }
+    const building = (await settings.list())
+      .filter((deployment) => deployment.target === 'production')
+      .sort((a, b) => createdOf(b) - createdOf(a))
+      .find((deployment) => IN_FLIGHT.has(stateOf(deployment)) && same(deployment))
+    if (building) {
+      const buildingSha = /** @type {string} */ (building.meta?.githubCommitSha)
+      log(
+        `${project}: adopting production build ${idOf(building)} (${buildingSha}) of the same inputs`
+      )
+      return untilReady(idOf(building), buildingSha, settings)
+    }
+  }
+  const created = await settings.create({
+    name: settings.projectName,
+    project: settings.projectId,
+    target: 'production',
+    gitSource: { type: 'github', repoId: settings.repoId, ref: branch, sha },
+    meta: {
+      ccProductionSource: PRODUCTION_SOURCE,
+      ccProductionInputs: inputs,
+      ccProductionConfig: config,
+    },
+  })
+  const id = idOf(created)
+  if (!id)
+    throw new Error(`${project}: Vercel created no production deployment for ${sha}`)
+  log(
+    `${project}: created production deployment ${id} for ${sha}${force ? ' (forced)' : current ? `; production served ${current.meta?.githubCommitSha ?? idOf(current)} from other inputs or configuration` : ''}`
+  )
+  return untilReady(id, sha, settings)
+}
+
 /** Vercel's REST API, every request bounded by the job deadline and 30 s. */
 function vercelClient(token, fetchImpl, deadline, now) {
   return async (method, pathAndQuery, body) => {
@@ -355,7 +432,7 @@ function vercelClient(token, fetchImpl, deadline, now) {
  * The CI step: provides `project`'s preview from the environment the workflow sets.
  * PREVIEW_JOB_STARTED_MS is when the job began, so setup counts against its 20 minutes.
  * @param {'web' | 'api'} project @param {NodeJS.ProcessEnv} env
- * @param {{ fetchImpl?: typeof fetch, cwd?: string, now?: () => number, sleep?: (ms: number) => Promise<void>, log?: (m: string) => void }} [options]
+ * @param {{ fetchImpl?: typeof fetch, cwd?: string, now?: () => number, sleep?: (ms: number) => Promise<void>, log?: (m: string) => void, production?: boolean }} [options]
  */
 export async function run(project, env, options = {}) {
   const {
@@ -377,6 +454,7 @@ export async function run(project, env, options = {}) {
   const branch = required('GIT_REF')
   const sha = required('EXPECTED_SHA')
   const force = env.FORCE_BUILD === 'true'
+  const target = options.production ? 'production' : 'preview'
   const slug = required(
     project === 'web' ? 'VERCEL_WEB_PROJECT_SLUG' : 'VERCEL_API_PROJECT_SLUG'
   )
@@ -386,12 +464,20 @@ export async function run(project, env, options = {}) {
   const envs = await api('GET', `/v9/projects/${projectData.id}/env?${scope}`)
   const repoId = projectData.link?.repoId
   if (!repoId) throw new Error(`${slug} is not linked to a Git repository`)
-  return previewDeployment({
+  const provide =
+    target === 'production'
+      ? (input) =>
+          productionDeployment({
+            ...input,
+            current: projectData.targets?.production ?? null,
+          })
+      : previewDeployment
+  return provide({
     project,
     branch,
     sha,
     inputs: inputsHash(cwd, project),
-    config: configIdentity(projectData, envs.envs ?? [], branch),
+    config: configIdentity(projectData, envs.envs ?? [], branch, target),
     force,
     repoId,
     projectId: projectData.id,
@@ -405,7 +491,9 @@ export async function run(project, env, options = {}) {
         teamId: team.id,
         projectId: projectData.id,
         state: 'READY,BUILDING,QUEUED,INITIALIZING',
-        'meta-githubCommitRef': branch,
+        ...(target === 'production'
+          ? { target: 'production' }
+          : { 'meta-githubCommitRef': branch }),
         limit: '50',
       })
       return (await api('GET', `/v6/deployments?${query}`)).deployments ?? []
@@ -418,9 +506,14 @@ export async function run(project, env, options = {}) {
 }
 
 async function main() {
-  const project = /** @type {'web' | 'api'} */ (process.argv[2])
+  const [project, flag] = /** @type {['web' | 'api', string | undefined]} */ (
+    process.argv.slice(2)
+  )
+  if (!['web', 'api'].includes(project) || (flag && flag !== '--production'))
+    throw new Error('usage: vercel-preview-deploy.mjs <web|api> [--production]')
   const result = await run(project, process.env, {
     log: (message) => console.error(message),
+    production: flag === '--production',
   })
   console.log(
     `${project}: ${result.url} serves ${result.sha} (${result.reused ? 'reused' : 'built'}, ${result.id})`
@@ -428,7 +521,7 @@ async function main() {
   if (process.env.GITHUB_OUTPUT)
     fs.appendFileSync(
       process.env.GITHUB_OUTPUT,
-      `${project}_url=${result.url}\n${project}_sha=${result.sha}\n${project}_id=${result.id}\n`
+      `${project}_url=${result.url}\n${project}_sha=${result.sha}\n${project}_id=${result.id}\n${project}_reused=${result.reused}\n`
     )
 }
 

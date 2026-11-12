@@ -2,10 +2,7 @@
   "version": 2,
   "outputDirectory": "public",
   "git": {
-    "deploymentEnabled": {
-      "main": true,
-      "**": false
-    }
+    "deploymentEnabled": false
   },
   "functions": {
     "api/index.ts": {

@@ -286,7 +286,10 @@ const NOT_READ = [
 
 test('every repository file a test names wakes the lanes that run that test', () => {
   const misses = []
-  for (const file of tracked.filter(isTest)) {
+  // This file names repository paths only as sample input to the lane map.
+  for (const file of tracked
+    .filter(isTest)
+    .filter((name) => name !== 'scripts/ci/lanes.test.mjs')) {
     const runners =
       TEST_RUNNERS.find(([glob]) => minimatch(file, glob, { dot: true }))?.[1] ?? []
     if (runners.length === 0) continue

@@ -1,13 +1,26 @@
 name: "Prod E2E (Playwright)"
 
-# Runs E2E tests against production after deployment
-# Waits for health endpoint to return correct SHA before testing
+# Provides production for each main commit, then runs E2E tests against it.
+#
+# Git pushes create no Vercel deployment (git.deploymentEnabled in each vercel.json): on the
+# Hobby plan every deployment, an ignored git build included, counts toward the 100 a day. The
+# deploy jobs create a production deployment only when the project's build inputs or its
+# production configuration changed since the deployment production serves
+# (scripts/vercel-preview-deploy.mjs --production), and report the commit production serves:
+# main's head, or for a commit that changed no app input the earlier commit already deployed.
+# The health waits and the e2e run expect that commit
+# (scripts/ci/production-deploy-workflow.test.mjs).
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      force_deploy:
+        description: 'Create both production deployments even when their inputs did not change'
+        type: boolean
+        default: false
 
 permissions:
   # The shard balancer reads the run's artifacts and jobs.
@@ -22,33 +35,89 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  deploy-web:
+    # Production is main's; a manual run from another branch only tests what is deployed.
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.deploy.outputs.web_sha }}
+    steps:
+      # The deploy's deadline counts from here, so setup is inside the job's 20 minutes.
+      - name: Record job start
+        run: echo "PREVIEW_JOB_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - name: Checkout production inputs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Web production deployment
+        id: deploy
+        env: &deploy-env
+          EXPECTED_SHA: ${{ github.sha }}
+          GIT_REF: main
+          FORCE_BUILD: ${{ github.event_name == 'workflow_dispatch' && inputs.force_deploy }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_WEB_PROJECT_SLUG: ${{ vars.VERCEL_WEB_PROJECT_SLUG || 'couture-cast-web' }}
+          VERCEL_API_PROJECT_SLUG: ${{ vars.VERCEL_API_PROJECT_SLUG || 'couture-cast-api' }}
+          VERCEL_TEAM_SLUG: ${{ vars.VERCEL_TEAM_SLUG || 'muratkeremozcans-projects' }}
+        run: node scripts/vercel-preview-deploy.mjs web --production
+
+  deploy-api:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      sha: ${{ steps.deploy.outputs.api_sha }}
+    steps:
+      # The deploy's deadline counts from here, so setup is inside the job's 20 minutes.
+      - name: Record job start
+        run: echo "PREVIEW_JOB_STARTED_MS=$(date +%s%3N)" >> "$GITHUB_ENV"
+      - name: Checkout production inputs
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: API production deployment
+        id: deploy
+        env: *deploy-env
+        run: node scripts/vercel-preview-deploy.mjs api --production
+
   wait-web:
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    needs: deploy-web
     uses: ./.github/workflows/rwf-wait-for-deployment.yml
     with:
       health_url: https://couture-cast-web.vercel.app/api/health
-      expected_sha: ${{ github.sha }}
+      expected_sha: ${{ needs.deploy-web.outputs.sha }}
       retries: 20
       sleep_seconds: 30
 
   wait-api:
-    # Web and API deploy independently, so the API is held to the same SHA.
-    # Its health endpoint is public; /api/v1/events/poll needs a bearer token.
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    # Web and API deploy independently, so the API is held to the commit its own deploy job
+    # reports. Its health endpoint is public; /api/v1/events/poll needs a bearer token.
+    needs: deploy-api
     uses: ./.github/workflows/rwf-wait-for-deployment.yml
     with:
       health_url: https://couture-cast-api.vercel.app/api/health
-      expected_sha: ${{ github.sha }}
+      expected_sha: ${{ needs.deploy-api.outputs.sha }}
       retries: 20
       sleep_seconds: 30
 
   run-prod-tests:
-    needs: [wait-web, wait-api]
+    needs: [deploy-web, wait-web, wait-api]
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: "prod"
       test_command: "npm run test:pw-prod"
       gh_ref: ${{ github.sha }}
       deployment_ref: main
+      # web-health-sha holds production web to the commit its deploy job reports.
+      expected_web_sha: ${{ needs.deploy-web.outputs.sha }}
       custom_base_url: ''
     secrets: inherit
