@@ -203,6 +203,9 @@ jobs:
       # upgrade changes its build-tools or platform version, that package is
       # simply downloaded unguarded again until this list catches up.
       - name: Install Android SDK packages for the emulator
+        # Normal 0.8 minutes (p95 1.0, 555 runs); an sdkmanager that stalled ran 33.5
+        # minutes in run 43083368586. Each install attempt is limited below.
+        timeout-minutes: 8
         shell: bash
         env:
           SDK_PACKAGES: >-
@@ -216,7 +219,11 @@ jobs:
           for package in "${packages[@]}"; do
             dir="$ANDROID_HOME/${package//;//}"
             for attempt in 1 2 3; do
-              sdkmanager --install "$package" --channel=0 > /dev/null || true
+              # An attempt that has not finished in 180 s has stalled (a whole install
+              # takes under a minute); the next one starts clean. Not cached: the repo's
+              # Actions cache is at its 10 GB limit, and a 1.5 GB SDK entry would evict
+              # the Supabase image and AVD caches every job reads.
+              timeout --kill-after=10 180 sdkmanager --install "$package" --channel=0 > /dev/null || true
               # A truncated archive never unpacks, so package.xml is the check.
               if [ -f "$dir/package.xml" ]; then
                 echo "Installed $package"
