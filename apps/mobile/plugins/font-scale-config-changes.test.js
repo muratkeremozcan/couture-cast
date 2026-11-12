@@ -3,8 +3,9 @@
 //
 // F-12 (TEA-15, Codex R2-03): with the plugin, the prebuilt manifest differs from the one
 // without it by exactly one token: `fontScale` appended to MainActivity's configChanges. Every
-// existing token and every other attribute and Activity stay as they were, so locale and
-// density changes still recreate the Activity and uiMode is still handled in place.
+// existing token and every other attribute and Activity stay as they were: uiMode and the
+// locale|layoutDirection pair expo-localization adds are still handled in place, and a density
+// change still recreates the Activity (Codex R3-07).
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
