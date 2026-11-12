@@ -148,12 +148,14 @@ jobs:
       # learn everything that is broken in one run.
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-    # No PR job runs past 20 minutes. A shard is about 5 minutes of setup, 2 of
-    # Supabase (p95 2.4) and up to 11 of Maestro (p95 11.0 at nine shards, about
-    # a minute less at twelve). The slow paths that used to hold a shard for 45
-    # minutes now stop on their own limits: the SDK install at 8 minutes, the
-    # Supabase start at 10.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    # No PR job runs past 20 minutes. A shard is about 10.8 minutes of fixed cost
+    # (setup, Supabase, emulator, API and Metro) plus its share of flows (269 s at
+    # p95 with nine shards). Twelve shards saved about a minute a shard for three
+    # more jobs against the account's 20-job concurrency limit, so the suite stays at
+    # nine and the fixed cost is cut instead. The slow paths that used to hold a
+    # shard for 45 minutes now stop on their own limits: the SDK install at 8
+    # minutes, the Supabase start at 10.
     timeout-minutes: 20
     services:
       redis:
@@ -527,7 +529,7 @@ jobs:
           # not readable from a job that only `needs:` the matrix, so this is a
           # label rather than a derived value; the flow counts in the comment
           # come from the reports themselves and are unaffected by it.
-          shards: '12'
+          shards: '9'
           platform: Android (Expo Go)
           device-label: API ${{ env.ANDROID_API_LEVEL }} · ${{ env.ANDROID_PROFILE }} · ${{ env.ANDROID_ARCH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
