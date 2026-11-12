@@ -36,3 +36,44 @@ test('the Maestro runner asks the dev server only through /status', () => {
   assert.doesNotMatch(runner, /waitForHealth\(pair\.health/)
   assert.equal(runner.match(/waitForExpoStatus\(pair\.health/g)?.length, 2)
 })
+
+test('a response cut off mid-body settles: retried, then rejected at the one deadline', async (t) => {
+  // Codex review of PR 211: an aborted response emitted neither end nor a request error,
+  // so the wait never settled.
+  let requests = 0
+  const server = createServer((_req, res) => {
+    requests += 1
+    res.writeHead(200, { 'content-length': '100' })
+    res.write('packager-')
+    setTimeout(() => res.socket.destroy(), 20)
+  })
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => server.close())
+  const started = Date.now()
+  const outcome = await Promise.race([
+    waitForExpoStatus(`http://127.0.0.1:${server.address().port}`, 600, 100).then(
+      () => 'resolved',
+      (error) => error.message
+    ),
+    new Promise((resolve) => setTimeout(() => resolve('never settled'), 3_000)),
+  ])
+  assert.match(outcome, /not running before 600 ms/)
+  assert.ok(Date.now() - started < 1_500, `took ${Date.now() - started} ms`)
+  assert.ok(requests >= 2, `retried ${requests} times`)
+})
+
+test('a server that accepts and never answers is cut at the deadline', async (t) => {
+  // Accepts the request and never writes a response.
+  const server = createServer((req) => req.resume())
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => {
+    server.closeAllConnections()
+    server.close()
+  })
+  const started = Date.now()
+  await assert.rejects(
+    waitForExpoStatus(`http://127.0.0.1:${server.address().port}`, 500, 100),
+    /not running before 500 ms/
+  )
+  assert.ok(Date.now() - started < 1_500, `took ${Date.now() - started} ms`)
+})

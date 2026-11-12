@@ -11,38 +11,70 @@ export const METRO_RUNNING = 'packager-status:running'
 export const expoStatusUrl = (base) => new URL('/status', base).href
 
 /**
- * Resolves once the dev server at `base` reports Metro running; rejects after `timeoutMs`.
+ * Resolves once the dev server at `base` reports Metro running; rejects at `timeoutMs`,
+ * one deadline over every attempt. A request that errors, a response that is cut off and a
+ * server that never answers all end their attempt, and the deadline ends the wait with
+ * its timer, retry and request cleaned up.
  * @param {string} base
  * @param {number} [timeoutMs]
  * @param {number} [intervalMs]
  */
 export function waitForExpoStatus(base, timeoutMs = 120_000, intervalMs = 2_000) {
   const url = new URL(expoStatusUrl(base))
-  const deadline = Date.now() + timeoutMs
   return new Promise((resolve, reject) => {
-    const retry = (reason) => {
-      if (Date.now() > deadline)
-        reject(
-          new Error(
-            `Expo dev server at ${base} not running before ${timeoutMs} ms: ${reason}`
-          )
-        )
-      else setTimeout(attempt, intervalMs)
+    let settled = false
+    let retryTimer
+    let request
+    let lastReason = 'no answer'
+    const finish = (error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(deadline)
+      clearTimeout(retryTimer)
+      request?.destroy()
+      if (error) reject(error)
+      else resolve()
     }
+    const deadline = setTimeout(
+      () =>
+        finish(
+          new Error(
+            `Expo dev server at ${base} not running before ${timeoutMs} ms: ${lastReason}`
+          )
+        ),
+      timeoutMs
+    )
     const attempt = () => {
-      const req = httpRequest(url, { timeout: 5_000 }, (res) => {
+      if (settled) return
+      let over = false
+      // Each attempt ends once: on Metro's answer, or on the first failure, which retries.
+      const failed = (reason) => {
+        if (over || settled) return
+        over = true
+        lastReason = reason
+        request?.destroy()
+        retryTimer = setTimeout(attempt, intervalMs)
+      }
+      request = httpRequest(url, (res) => {
         let body = ''
         res.setEncoding('utf8')
         res.on('data', (chunk) => (body += chunk))
-        res.on('end', () =>
-          body.trim() === METRO_RUNNING
-            ? resolve()
-            : retry(`HTTP ${res.statusCode} ${body.slice(0, 80)}`)
-        )
+        res.on('aborted', () => failed('response cut off'))
+        res.on('error', (error) => failed(error.message))
+        res.on('end', () => {
+          if (over) return
+          if (body.trim() === METRO_RUNNING) {
+            over = true
+            finish()
+          } else failed(`HTTP ${res.statusCode} ${body.slice(0, 80)}`)
+        })
       })
-      req.on('timeout', () => req.destroy(new Error('status request timed out')))
-      req.on('error', (error) => retry(error.message))
-      req.end()
+      // A server that accepts and never answers is cut per attempt too.
+      request.setTimeout(Math.min(5_000, timeoutMs), () =>
+        failed('status request timed out')
+      )
+      request.on('error', (error) => failed(error.message))
+      request.end()
     }
     attempt()
   })
