@@ -1,7 +1,12 @@
 {
   "version": 2,
   "outputDirectory": "public",
-  "ignoreCommand": "node ../../scripts/vercel-preview-inputs.mjs --ignore",
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "**": false
+    }
+  },
   "functions": {
     "api/index.ts": {
       "maxDuration": 25,

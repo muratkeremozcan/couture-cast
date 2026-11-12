@@ -26,6 +26,7 @@ const vercelWaitWorkflow = path.join(
   'workflows',
   'vercel-wait-for-deployment.yml'
 )
+const previewDeployScript = path.join(repoRoot, 'scripts', 'vercel-preview-deploy.mjs')
 const manualE2eWorkflow = path.join(
   repoRoot,
   '.github',
@@ -98,28 +99,44 @@ describe('deployment workflows', () => {
     expect(content).toMatch(previewReadyCall)
 
     const ready = fs.readFileSync(previewReadyWorkflow, 'utf8')
-    expect(ready).toMatch(/Resolve preview health URL/)
+    // Each wait checks the deployment its deploy job resolved, at the commit that job built.
+    for (const project of ['web', 'api']) {
+      expect(ready).toContain(
+        `health_url: \${{ needs.deploy-${project}.outputs.url }}/api/health`
+      )
+      expect(ready).toContain(`expected_sha: \${{ needs.deploy-${project}.outputs.sha }}`)
+    }
     // Web and API are each waited on before any caller tests them.
     expect(
       ready.match(/uses: \.\/\.github\/workflows\/vercel-wait-for-deployment\.yml/g)
     ).toHaveLength(2)
   })
 
-  it('the web preview wait outlasts the slowest observed web build', () => {
+  it('the web preview deploy outlasts the slowest observed web build', () => {
     const ready = fs.readFileSync(previewReadyWorkflow, 'utf8')
+    const deploy = fs.readFileSync(previewDeployScript, 'utf8')
     const wait = fs.readFileSync(vercelWaitWorkflow, 'utf8')
+    // The deploy job polls the build to READY, so its deadline carries the build time.
+    const jobMinutes = Number(
+      /deploy-web:[\s\S]*?timeout-minutes: (\d+)/.exec(ready)?.[1]
+    )
+    const deadline = /started \+ (\d+) \* 60_000 - (\d+)_000/.exec(deploy)
+    expect(deadline).not.toBeNull()
+    const deadlineSeconds = Number(deadline?.[1]) * 60 - Number(deadline?.[2])
+    // Run 40728198560: the web build outlived 10 minutes by seconds.
+    expect(deadlineSeconds).toBeGreaterThanOrEqual(18 * 60)
+    // The script reports a still-building deployment before the runner kills the job.
+    expect(deadlineSeconds).toBeLessThan(jobMinutes * 60)
+    expect(jobMinutes).toBeLessThanOrEqual(20)
+    // The health wait starts after READY. Its worst case, every attempt hanging to the
+    // fetch limit plus the final verification fetch, fits the wait workflow's limit.
     const webCall = /wait-web:[\s\S]*?retries: (\d+)\s+sleep_seconds: (\d+)/.exec(ready)
     expect(webCall).not.toBeNull()
-    const budgetSeconds = Number(webCall?.[1]) * Number(webCall?.[2])
-    // Run 40728198560: the web build outlived 20 x 30s (10 minutes) by seconds.
-    expect(budgetSeconds).toBeGreaterThanOrEqual(1200)
-    // A hung connection must not stall an attempt: every fetch carries a hard limit.
     const fetchLimit = Number(/curl -sS -L --max-time (\d+) /.exec(wait)?.[1])
     expect(fetchLimit).toBeGreaterThan(0)
     expect(fetchLimit).toBeLessThanOrEqual(30)
-    // Worst case every attempt hangs to its fetch limit, plus the final verification fetch.
-    const sleep = Number(webCall?.[2])
-    const worstCaseSeconds = Number(webCall?.[1]) * (sleep + fetchLimit) + fetchLimit
+    const worstCaseSeconds =
+      Number(webCall?.[1]) * (Number(webCall?.[2]) + fetchLimit) + fetchLimit
     const limitMinutes = Number(/timeout-minutes: (\d+)/.exec(wait)?.[1])
     expect(limitMinutes * 60).toBeGreaterThanOrEqual(worstCaseSeconds)
   })
