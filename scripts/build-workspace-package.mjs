@@ -35,11 +35,20 @@
  * dependency: it guarded nothing correctness needed and its lease checks failed
  * serial CI builds.
  *
+ * Story 6.14 follow-up: a build whose inputs have not changed since the last one
+ * published is skipped. The npm pre-hooks rebuilt the same three packages five times in
+ * one mobile e2e shard (about 100 s). The fingerprint covers every file of the package
+ * outside `dist` and `node_modules`, the root tsconfig.json and package-lock.json, the
+ * compiler command, and the fingerprints of the workspace packages it depends on; it is
+ * written to `dist/.build-fingerprint` after each publish. COUTURE_FORCE_PACKAGE_BUILD=1
+ * always builds.
+ *
  * Usage, from the package directory:
  *   node ../../scripts/build-workspace-package.mjs [--tsc <command...>]
  * The default compiler is `npm exec --yes --package=typescript@5.9.3 -- tsc`.
  */
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -262,6 +271,70 @@ export function replaceDistFromStaging(staging, dist) {
  * @param {string[]} args
  * @returns {Promise<number>} the exit code, 1 for a signal or a spawn error
  */
+export const FINGERPRINT_FILE = '.build-fingerprint'
+/** Package entries that are outputs or caches, never build inputs. */
+const NOT_INPUTS = new Set([DIST, 'node_modules', 'coverage', '.turbo'])
+
+/** Every input file under `root`, as sorted paths relative to it. */
+function inputFiles(root, relative = '') {
+  const files = []
+  for (const entry of fs.readdirSync(path.join(root, relative), {
+    withFileTypes: true,
+  })) {
+    const name = entry.name
+    if (relative === '' && (NOT_INPUTS.has(name) || name.startsWith(STAGING_PREFIX)))
+      continue
+    if (name.endsWith('.tsbuildinfo')) continue
+    const child = path.join(relative, name)
+    if (entry.isDirectory()) files.push(...inputFiles(root, child))
+    else if (entry.isFile()) files.push(child)
+  }
+  return files.sort()
+}
+
+/**
+ * The fingerprint of a package build: its own input files, the repository files every
+ * package compiles against, the compiler command and its workspace dependencies' own
+ * fingerprints (or their absence).
+ *
+ * @param {string} packageDir
+ * @param {string[]} compiler
+ * @returns {string}
+ */
+export function buildFingerprint(packageDir, compiler) {
+  const hash = createHash('sha256')
+  const add = (label, content) => {
+    hash.update(`${label}\0${content.length}\0`)
+    hash.update(content)
+  }
+  add('compiler', JSON.stringify(compiler))
+  for (const file of inputFiles(packageDir))
+    add(`file:${file}`, fs.readFileSync(path.join(packageDir, file)))
+  const repository = path.resolve(packageDir, '../..')
+  for (const file of ['tsconfig.json', 'package-lock.json']) {
+    const at = path.join(repository, file)
+    add(`root:${file}`, fs.existsSync(at) ? fs.readFileSync(at) : 'none')
+  }
+  const manifestFile = path.join(packageDir, 'package.json')
+  const manifest = fs.existsSync(manifestFile)
+    ? JSON.parse(fs.readFileSync(manifestFile, 'utf8'))
+    : {}
+  const workspace = Object.keys({
+    ...manifest.dependencies,
+    ...manifest.devDependencies,
+    ...manifest.peerDependencies,
+  })
+    .filter((name) => name.startsWith('@couture/'))
+    .sort()
+  for (const name of workspace) {
+    const stamp = path.join(packageDir, 'node_modules', name, DIST, FINGERPRINT_FILE)
+    const rootStamp = path.join(repository, 'node_modules', name, DIST, FINGERPRINT_FILE)
+    const found = [stamp, rootStamp].find((candidate) => fs.existsSync(candidate))
+    add(`dependency:${name}`, found ? fs.readFileSync(found) : 'none')
+  }
+  return hash.digest('hex')
+}
+
 const run = (command, args) =>
   new Promise((resolve) => {
     const child = spawn(command, args, { stdio: 'inherit' })
@@ -284,6 +357,18 @@ export const runBuild = async ({ argv = process.argv } = {}) => {
     tscIndex === -1
       ? ['npm', 'exec', '--yes', '--package=typescript@5.9.3', '--', 'tsc']
       : argv.slice(tscIndex + 1)
+  const fingerprint = buildFingerprint(process.cwd(), [command, ...args])
+  const stampFile = path.join(DIST, FINGERPRINT_FILE)
+  if (
+    process.env.COUTURE_FORCE_PACKAGE_BUILD !== '1' &&
+    fs.existsSync(stampFile) &&
+    fs.readFileSync(stampFile, 'utf8') === fingerprint
+  ) {
+    console.log(
+      `${path.basename(process.cwd())}: dist is current (${fingerprint.slice(0, 12)}); build skipped.`
+    )
+    return
+  }
   fs.rmSync(SHARED_TSBUILDINFO, { force: true })
   const staging = fs.mkdtempSync(`${STAGING_PREFIX}${process.pid}-`)
   const tsbuildinfo = `${staging}.tsbuildinfo`
@@ -307,6 +392,9 @@ export const runBuild = async ({ argv = process.argv } = {}) => {
       return
     }
     replaceDistFromStaging(staging, DIST)
+    // Written after the publish, so a stamp always names a complete dist. The next
+    // publish prunes it with the other files the compiler did not emit, then rewrites it.
+    fs.writeFileSync(stampFile, fingerprint)
   } catch (error) {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1

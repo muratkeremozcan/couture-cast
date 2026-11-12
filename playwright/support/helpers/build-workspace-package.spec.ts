@@ -9,7 +9,10 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { replaceDistFromStaging } from '../../../scripts/build-workspace-package.mjs'
+import {
+  FINGERPRINT_FILE,
+  replaceDistFromStaging,
+} from '../../../scripts/build-workspace-package.mjs'
 
 const SCRIPT = path.resolve('scripts/build-workspace-package.mjs')
 
@@ -125,10 +128,12 @@ if (mode === 'vanish') fs.rmSync(outDir, { recursive: true, force: true })
 `
 
 /** Every file under `root` with its content, for comparing whole trees. */
+// The compiled tree: the build's fingerprint stamp is the builder's record, not output.
 const tree = (root: string): Record<string, string> => {
   const files = fs
     .readdirSync(root, { recursive: true, withFileTypes: true })
     .filter((entry) => entry.isFile())
+    .filter((entry) => !(entry.parentPath === root && entry.name === FINGERPRINT_FILE))
     .map((entry): [string, string] => {
       const file = path.join(entry.parentPath, entry.name)
       return [path.relative(root, file), fs.readFileSync(file, 'utf8')]
@@ -544,5 +549,85 @@ describe('publication order (R24)', () => {
       renames.mockRestore()
     }
     expect(order).toEqual([path.join('lib', 'shape.d.ts'), 'api.d.ts', 'index.d.ts'])
+  })
+})
+
+describe('unchanged inputs (Story 6.14 follow-up)', () => {
+  /** A package with sources, built by a compiler that writes only into its outDir. */
+  function sourcePackage() {
+    directory = fs.mkdtempSync(path.join(os.tmpdir(), 'build-fingerprint-'))
+    const root = directory
+    fs.mkdirSync(path.join(root, 'src'))
+    fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export const value = 1')
+    fs.writeFileSync(
+      path.join(root, 'counting-tsc.cjs'),
+      `const fs = require('node:fs')
+const outDir = process.argv[process.argv.indexOf('--outDir') + 1]
+fs.appendFileSync(process.env.COMPILE_LOG, 'compiled\\n')
+fs.writeFileSync(require('node:path').join(outDir, 'index.js'), fs.readFileSync('src/index.ts', 'utf8'))`
+    )
+    return root
+  }
+  const counted = (root: string, log: string, env: NodeJS.ProcessEnv = {}) =>
+    spawnSync(process.execPath, [SCRIPT, '--tsc', process.execPath, 'counting-tsc.cjs'], {
+      cwd: root,
+      env: { ...process.env, COMPILE_LOG: log, ...env },
+      encoding: 'utf8',
+    })
+  const compiles = (log: string) =>
+    fs.existsSync(log)
+      ? fs.readFileSync(log, 'utf8').split('\n').filter(Boolean).length
+      : 0
+
+  it('6.14-BUILD-01 skips a build whose inputs match the published fingerprint', () => {
+    const root = sourcePackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-1`)
+    try {
+      expect(counted(root, log).status).toBe(0)
+      expect(fs.existsSync(path.join(root, 'dist', FINGERPRINT_FILE))).toBe(true)
+      const second = counted(root, log)
+      expect(second.status).toBe(0)
+      expect(second.stdout).toMatch(/build skipped/)
+      expect(compiles(log)).toBe(1)
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+
+  it('6.14-BUILD-02 rebuilds after a source change, a missing dist or a forced build', () => {
+    const root = sourcePackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-2`)
+    try {
+      expect(counted(root, log).status).toBe(0)
+      fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export const value = 2')
+      expect(counted(root, log).status).toBe(0)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.js'), 'utf8')).toBe(
+        'export const value = 2'
+      )
+      fs.rmSync(path.join(root, 'dist'), { recursive: true })
+      expect(counted(root, log).status).toBe(0)
+      expect(counted(root, log, { COUTURE_FORCE_PACKAGE_BUILD: '1' }).status).toBe(0)
+      expect(compiles(log)).toBe(4)
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
+  })
+
+  it('6.14-BUILD-03 a failed compile leaves no stamp for its inputs, so the next build compiles', () => {
+    const root = sourcePackage()
+    const log = path.join(os.tmpdir(), `compile-log-${process.pid}-3`)
+    try {
+      expect(counted(root, log).status).toBe(0)
+      fs.writeFileSync(path.join(root, 'src', 'index.ts'), 'export const value = 3')
+      expect(counted(root, log, { COMPILE_LOG: '/nonexistent/dir/log' }).status).not.toBe(
+        0
+      )
+      expect(counted(root, log).status).toBe(0)
+      expect(fs.readFileSync(path.join(root, 'dist', 'index.js'), 'utf8')).toBe(
+        'export const value = 3'
+      )
+    } finally {
+      fs.rmSync(log, { force: true })
+    }
   })
 })
