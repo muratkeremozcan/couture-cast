@@ -33,10 +33,18 @@ inputs:
       Total seconds the start attempts and the waits between them may take. A
       running attempt is cut off when the budget ends, a wait is shortened to
       leave room for one more attempt, and no attempt starts with less than
-      min-attempt-seconds left. Callers size timeout-minutes to this budget plus
-      their own work. Image cache restore and save run outside it.
+      min-attempt-seconds left. Image cache restore, load and save run outside
+      it, each under its own limit. Callers give the step a timeout-minutes that
+      covers all of it and retry the step once (see pr-mobile-e2e.yml).
     required: false
-    default: '600'
+    default: '360'
+  attempt-seconds:
+    description: >-
+      Most seconds one start attempt may run. A cold pull and start measured 100
+      to 160 seconds on hosted runners, so 170 lets one finish and still leaves
+      the default budget room for a second attempt after an attempt that hangs.
+    required: false
+    default: '170'
   min-attempt-seconds:
     description: >-
       Fewest budget seconds an attempt needs to be worth starting. A cold pull
@@ -125,6 +133,10 @@ runs:
       id: cache-restore
       if: inputs.image-cache == 'true'
       uses: actions/cache/restore@v4
+      env:
+        # A stalled download gives up after 2 minutes (a hit takes about 8 s) and
+        # the start pulls instead; the action's default waits 10.
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: '2'
       with:
         path: ${{ steps.cache-key.outputs.dir }}
         key: ${{ steps.cache-key.outputs.key }}
@@ -137,9 +149,13 @@ runs:
         CACHE_DIR: ${{ steps.cache-key.outputs.dir }}
       run: |
         set -u -o pipefail
-        # A cache that does not load is treated as a miss: the start pulls.
+        mkdir -p "$RUNNER_TEMP/supabase-start"
+        exec > >(tee -a "$RUNNER_TEMP/supabase-start/start.log") 2>&1
+        # A cache that does not load is treated as a miss: the start pulls. The load
+        # takes about 65 s for 1.6 GB; one that has not finished in 150 s is stuck.
         if [ -s "$CACHE_DIR/images.tar.zst" ] && [ -s "$CACHE_DIR/registry" ] &&
-          zstd -dc "$CACHE_DIR/images.tar.zst" | docker load; then
+          timeout --kill-after=10 150 bash -o pipefail -c \
+            'zstd -dc "$1" | docker load' _ "$CACHE_DIR/images.tar.zst"; then
           echo "registry=$(cat "$CACHE_DIR/registry")" >> "$GITHUB_OUTPUT"
           echo "loaded=true" >> "$GITHUB_OUTPUT"
         else
@@ -156,6 +172,7 @@ runs:
         MAX_DELAY: ${{ inputs.max-delay-seconds }}
         TIME_BUDGET: ${{ inputs.time-budget-seconds }}
         MIN_ATTEMPT: ${{ inputs.min-attempt-seconds }}
+        ATTEMPT_LIMIT: ${{ inputs.attempt-seconds }}
         EXCLUDE: ${{ inputs.exclude }}
         PRIMARY_REGISTRY: ${{ inputs.image-registry }}
         FALLBACK_REGISTRIES: ${{ inputs.fallback-registries }}
@@ -166,10 +183,31 @@ runs:
         REGISTRY_TOKEN: ${{ github.token }}
       run: |
         set -u -o pipefail
+        mkdir -p "$RUNNER_TEMP/supabase-start"
+        # Everything this step prints also goes to a file the caller uploads when the
+        # start fails, so a stuck command is named even if the step is cut off.
+        exec > >(tee -a "$RUNNER_TEMP/supabase-start/start.log") 2>&1
         # One collation for every sorted image list, so `comm` compares them reliably.
         export LC_ALL=C
 
-        for setting in MAX_ATTEMPTS BASE_DELAY MAX_DELAY TIME_BUDGET MIN_ATTEMPT; do
+        # Every command here runs under a limit, so a hung Docker or CLI call fails
+        # its attempt instead of holding the step until the job's timeout (mobile e2e
+        # run 43161416996 shard 9 sat in this step for 42 minutes).
+        if command -v timeout > /dev/null; then
+          deadline_command=timeout
+        elif command -v gtimeout > /dev/null; then
+          deadline_command=gtimeout
+        else
+          echo "::error::Supabase startup requires GNU timeout or gtimeout; install coreutils."
+          exit 2
+        fi
+        bounded() {
+          local seconds=$1
+          shift
+          "$deadline_command" --kill-after=10 "$seconds" "$@"
+        }
+
+        for setting in MAX_ATTEMPTS BASE_DELAY MAX_DELAY TIME_BUDGET MIN_ATTEMPT ATTEMPT_LIMIT; do
           if ! [[ "${!setting}" =~ ^[0-9]+$ ]]; then
             echo "::error::${setting} must be a non-negative integer, got '${!setting}'."
             exit 2
@@ -204,7 +242,7 @@ runs:
         started_at=$(date +%s)
         cached_images=""
         if [ "$CACHE_LOADED" = true ]; then
-          cached_images="$(docker images --format '{{.Repository}}:{{.Tag}}' | sort -u)"
+          cached_images="$(bounded 30 docker images --format '{{.Repository}}:{{.Tag}}' | sort -u)"
         fi
 
         remaining_seconds() {
@@ -232,7 +270,10 @@ runs:
             if [[ ",${EXCLUDE}," == *",${container},"* ]]; then continue; fi
             if [ "$(section_value "$section" enabled)" = false ]; then continue; fi
           fi
-          port="$(section_value "$section" port)"
+          # CI's SUPABASE_<SECTION>_PORT override (configure-ci-supabase-ports) is the
+          # port the CLI binds; config.toml's is the fallback.
+          override="SUPABASE_$(printf '%s' "$section" | tr 'a-z.' 'A-Z_')_PORT"
+          port="${!override:-$(section_value "$section" port)}"
           if [[ "$port" =~ ^[0-9]+$ ]]; then bound_ports+=("$port"); fi
         done
         port_filter=""
@@ -296,6 +337,14 @@ runs:
           if [ "$wait_cap" -gt 75 ]; then wait_cap=75; fi
           if [ "$wait_cap" -lt 0 ]; then wait_cap=0; fi
           while held="$(blocking_sockets)" && [ -n "$held" ]; do
+            # The runner's own connections (Runner.Listener, Runner.Worker) last the
+            # whole job, so no wait frees a port one holds: run 43079319997 spent its
+            # entire budget waiting on 54322. Fail at once, naming it.
+            if grep -qE 'users:\(\("Runner\.(Listener|Worker)"' <<< "$held"; then
+              echo "::error::A Supabase host port is held by the runner's own connection, which lasts the whole job; no wait can free it. Use ports outside the ephemeral range (.github/supabase-ci-ports.env)."
+              printf '%s\n' "$held"
+              return 2
+            fi
             if [ "$waited" -eq 0 ]; then
               echo "Waiting up to ${wait_cap}s for sockets on the Supabase host ports to close:"
               printf '%s\n' "$held"
@@ -317,7 +366,7 @@ runs:
         diagnose_ports() {
           echo "::group::Supabase host port diagnostics"
           echo "Containers and their published ports:"
-          docker ps --all --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
+          bounded 30 docker ps --all --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}' || true
           if [ "$port_guard" = true ]; then
             echo "Sockets in any state on the Supabase host ports (${bound_ports[*]}):"
             ss_sockets -tanp state all "$port_filter" || true
@@ -330,7 +379,7 @@ runs:
         export_supabase_environment() {
           # `supabase status` leaves a field out when the service behind it is
           # excluded; a missing field must stop here, not reach $GITHUB_ENV as "null".
-          npx supabase status -o json | jq -er '
+          bounded 60 npx supabase status -o json | jq -er '
             if (.API_URL and .ANON_KEY and .SERVICE_ROLE_KEY) then
               "SUPABASE_URL=\(.API_URL)",
               "SUPABASE_ANON_KEY=\(.ANON_KEY)",
@@ -345,7 +394,7 @@ runs:
         # Anonymous pulls still work if the login fails, so it does not stop the job.
         login_for() {
           if [ "$1" = 'ghcr.io' ] && [ "$ghcr_logged_in" = false ]; then
-            if printf '%s' "$registry_token" | docker login ghcr.io -u "${GITHUB_ACTOR:-github-actions}" --password-stdin; then
+            if printf '%s' "$registry_token" | bounded 60 docker login ghcr.io -u "${GITHUB_ACTOR:-github-actions}" --password-stdin; then
               ghcr_logged_in=true
             else
               echo "::warning::ghcr.io login failed; pulling anonymously."
@@ -364,7 +413,7 @@ runs:
         # were pulled as. Mirrors use <registry>/supabase/<name>; docker.io keeps
         # the upstream names, so the containers are the registry-neutral source.
         project_images() {
-          docker ps --all --filter label=com.supabase.cli.project \
+          bounded 30 docker ps --all --filter label=com.supabase.cli.project \
             --format '{{.Image}}' | sort -u
         }
 
@@ -379,7 +428,9 @@ runs:
           fi
           mkdir -p "$CACHE_DIR"
           # shellcheck disable=SC2086 # one image reference per word
-          if docker save $images | zstd -T0 -3 -q -o "$CACHE_DIR/images.tar.zst"; then
+          # A save that has not finished in 240 s is stuck; the cache is skipped.
+          if bounded 240 bash -o pipefail -c 'docker save "${@:2}" | zstd -T0 -3 -q -o "$1"' \
+            _ "$CACHE_DIR/images.tar.zst" $images; then
             printf '%s' "$registry" > "$CACHE_DIR/registry"
             echo "cache_written=true" >> "$GITHUB_OUTPUT"
             echo "Cached $(wc -l <<< "$images") Supabase images from ${registry}."
@@ -426,6 +477,12 @@ runs:
         }
 
         attempt_log="$(mktemp)"
+        # A start cut off by the caller's step timeout leaves its containers behind;
+        # clear them so this start, the caller's retry included, begins clean.
+        if [ -n "$(project_images)" ]; then
+          echo "Stopping the Supabase containers a previous start left behind."
+          bounded 90 npx supabase stop --no-backup || true
+        fi
         registry_index=0
         tried_registries=()
         attempt=1
@@ -439,7 +496,15 @@ runs:
           # The wait spends at most the budget above min-attempt-seconds, so a
           # start that follows it still has room to run.
           ports_free=true
-          if [ "$port_guard" = true ] && ! wait_for_free_ports; then ports_free=false; fi
+          if [ "$port_guard" = true ]; then
+            wait_status=0
+            wait_for_free_ports || wait_status=$?
+            if [ "$wait_status" -eq 2 ]; then
+              diagnose_ports
+              exit 1
+            fi
+            if [ "$wait_status" -ne 0 ]; then ports_free=false; fi
+          fi
           remaining=$(remaining_seconds)
           registry="${registries[$(( registry_index % ${#registries[@]} ))]}"
           export SUPABASE_INTERNAL_IMAGE_REGISTRY="$registry"
@@ -453,13 +518,16 @@ runs:
               tried_registries+=("$registry")
             fi
             login_for "$registry"
-            echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry}, ${remaining}s of budget left)"
+            # One attempt runs at most ATTEMPT_LIMIT seconds, so a start that hangs
+            # still leaves the budget room for another.
+            attempt_seconds=$(( remaining < ATTEMPT_LIMIT ? remaining : ATTEMPT_LIMIT ))
+            echo "::group::Start local Supabase (attempt ${attempt}/${MAX_ATTEMPTS}, registry ${registry}, ${attempt_seconds}s for this attempt, ${remaining}s of budget left)"
 
             # tee keeps the live log and a copy for pull_failed; pipefail makes
             # the pipeline's status the start's own.
-            if run_start "$remaining" 2>&1 | tee "$attempt_log"; then
+            if run_start "$attempt_seconds" 2>&1 | tee "$attempt_log"; then
               echo "Supabase services started successfully from ${registry}."
-              npx supabase status || true
+              bounded 60 npx supabase status || true
               # Without -e a failed export would fall through to success and leave
               # later steps without SUPABASE_URL or the keys.
               if ! export_supabase_environment; then
@@ -476,11 +544,11 @@ runs:
             fi
 
             if [ "$exit_code" -eq 124 ] || [ "$exit_code" -eq 137 ]; then
-              echo "Supabase startup was cut off by the time budget (exit ${exit_code}, registry ${registry})."
+              echo "Supabase startup was cut off after ${attempt_seconds}s (exit ${exit_code}, registry ${registry})."
             else
               echo "Supabase startup failed with exit code ${exit_code} (registry ${registry})."
             fi
-            npx supabase status || true
+            bounded 60 npx supabase status || true
             echo "::endgroup::"
           fi
           diagnose_ports
@@ -501,7 +569,7 @@ runs:
 
           # Clear whatever this attempt left half started, so the next one
           # starts clean, from the same registry or another.
-          npx supabase stop --no-backup || true
+          bounded 90 npx supabase stop --no-backup || true
 
           # Wait, but always leave room for one more attempt inside the budget.
           sleep_seconds=$(backoff_seconds "$attempt")
@@ -515,7 +583,8 @@ runs:
     - name: Provision the local Storage buckets
       if: inputs.provision-storage-buckets == 'true'
       shell: bash
-      run: node scripts/local-storage-buckets.mjs provision
+      # The provisioning waits up to 60 s for Storage; 120 s bounds it with room.
+      run: timeout --kill-after=10 120 node scripts/local-storage-buckets.mjs provision
 
     - name: Save the Supabase image cache
       # Any caller, only on a miss, and only after a start that produced the
@@ -535,4 +604,4 @@ runs:
       # images are pulled. Logging out without a login is a harmless no-op.
       if: always()
       shell: bash
-      run: docker logout ghcr.io || true
+      run: timeout --kill-after=5 30 docker logout ghcr.io || true

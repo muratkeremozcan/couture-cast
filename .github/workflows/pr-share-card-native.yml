@@ -104,6 +104,14 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
         id: supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Show the Supabase start log
+        # The start's own log names the command that failed or hung. This workflow
+        # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -326,6 +334,14 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
         id: supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Show the Supabase start log
+        # The start's own log names the command that failed or hung. This workflow
+        # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime
@@ -635,6 +651,14 @@ jobs:
       - uses: ./.github/actions/start-local-supabase
         if: ${{ !cancelled() && steps.deadline_controls.outcome == 'success' }}
         id: supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Show the Supabase start log
+        # The start's own log names the command that failed or hung. This workflow
+        # uploads no log files (share-card-lanes.mjs), so it goes to the job log.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        run: tail -n 300 "$RUNNER_TEMP/supabase-start/start.log" || true
       - name: Prepare isolated UUID runtime and built renderer
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         id: runtime

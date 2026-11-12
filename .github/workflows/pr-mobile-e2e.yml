@@ -300,7 +300,20 @@ jobs:
           key: ${{ steps.avd-cache.outputs.cache-primary-key }}
 
       - name: Start local Supabase services
+        id: supabase
         uses: ./.github/actions/start-local-supabase
+        # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
+        timeout-minutes: 10
+
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ strategy.job-index }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Reset local database
         run: npm run db:reset

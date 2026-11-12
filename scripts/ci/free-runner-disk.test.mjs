@@ -204,11 +204,11 @@ describe('free-runner-disk callers', () => {
   })
 
   for (const { id, job } of callers)
-    test(`${id} frees disk right after checkout and its port reservation`, () => {
+    test(`${id} frees disk right after checkout and its port configuration`, () => {
       const steps = job.steps.map((step) => String(step.uses ?? ''))
       const anchor = Math.max(
         steps.indexOf('actions/checkout@v4'),
-        steps.indexOf('./.github/actions/reserve-supabase-ports')
+        steps.indexOf('./.github/actions/configure-ci-supabase-ports')
       )
       assert.equal(steps.indexOf('actions/checkout@v4'), 0)
       assert.equal(steps.indexOf(ACTION), anchor + 1)
