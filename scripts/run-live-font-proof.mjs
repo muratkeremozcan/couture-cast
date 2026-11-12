@@ -282,6 +282,10 @@ function launch() {
   launchId = `launch-${launchCount}`
   if (platform === 'android') {
     adb('shell', 'am', 'force-stop', appId)
+    // Each launch starts the onCreate count from an empty event log, so a full ring buffer
+    // cannot drop the entries the identity check needs. The Activity token alone cannot show
+    // a recreation: Android keeps the ActivityRecord token across a configuration relaunch.
+    adb('logcat', '-b', 'events', '-c')
     if (build === 'release') adb('shell', 'am', 'start', '-n', component)
     else
       adb(
@@ -430,6 +434,8 @@ const androidApi =
   platform === 'android'
     ? Number(adb('shell', 'getprop', 'ro.build.version.sdk').trim())
     : undefined
+// A 4 MiB event buffer holds a whole journey's wm_on_create_called entries.
+if (platform === 'android') adb('logcat', '-b', 'events', '-G', '4M')
 const previousScale = readScale()
 const started = Date.now()
 const results = []
