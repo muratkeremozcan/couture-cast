@@ -71,6 +71,73 @@ export function resolveSuite(
   return discoverTestFiles(root, manifest).filter((file) => !claimed.has(file))
 }
 
+/**
+ * Local stand-ins for the CI steps a suite's conditionNeeds names: a file that step leaves
+ * behind, and the command that makes it. `runtime` in CI also starts the services; the one
+ * suite declaring it locally needs only the API build it spawns.
+ */
+export const LOCAL_NEEDS = {
+  install: { probe: 'node_modules/.package-lock.json', how: 'npm ci' },
+  prebuild: {
+    probe: 'apps/mobile/android/gradlew',
+    how: 'node scripts/run-story68-native.mjs prebuild --platform android (needs Temurin 21)',
+  },
+  runtime: {
+    probe: 'apps/api/dist/src/load-env.js',
+    how: 'npm run db:generate && npm run build:packages && npm run build --workspace api',
+  },
+}
+
+/**
+ * Every suite, and the vitest files, with what is missing locally to run them as CI does. A
+ * need with no local probe throws, so a new CI prerequisite cannot pass unnoticed locally.
+ */
+export function localPlan({ root = repository, manifest = loadManifest(root) } = {}) {
+  const needs = manifest.conditionNeeds ?? {}
+  const suites = [
+    ...Object.keys(manifest.suites).map((suite) => ({ suite, runner: 'node' })),
+    { suite: 'vitest', runner: 'vitest' },
+  ]
+  const missing = []
+  for (const { suite } of suites)
+    for (const need of needs[suite] ?? []) {
+      const local = LOCAL_NEEDS[need]
+      if (!local)
+        throw new Error(
+          `node_test_gate_local: suite ${suite} needs ${need}, which has no local probe`
+        )
+      if (!fs.existsSync(path.join(root, local.probe)))
+        missing.push({ suite, need, how: local.how })
+    }
+  return { suites, missing }
+}
+
+/** Runs every suite as CI would, after refusing to start while any suite's setup is missing. */
+function runLocal() {
+  const plan = localPlan()
+  if (plan.missing.length)
+    throw new Error(
+      [
+        'node_test_gate_local: set these up first, or the suites fail for a reason CI never sees:',
+        ...plan.missing.map(({ suite, need, how }) => `  ${suite} needs ${need}: ${how}`),
+      ].join('\n')
+    )
+  const manifest = loadManifest()
+  for (const { suite, runner } of plan.suites) {
+    if (runner === 'vitest') {
+      const result = spawnSync('npx', ['vitest', 'run', ...manifest.vitest], {
+        cwd: repository,
+        stdio: 'inherit',
+      })
+      if (result.status !== 0)
+        throw new Error('node_test_gate_failed: vitest suite failed')
+      continue
+    }
+    const summary = runNodeTestGate({ files: resolveSuite(suite), cwd: repository })
+    console.log(`node-test-gate: suite ${suite} passed ${summary.passed} tests`)
+  }
+}
+
 /** The suite a workflow `run:` line hands to the gate, or null for any other line. */
 export function gatedSuite(line) {
   const tokens = line.trim().split(/\s+/)
@@ -371,7 +438,12 @@ if (
 ) {
   try {
     const [name, ...extra] = process.argv.slice(2)
-    if (!name || extra.length) throw new Error('usage: node-test-gate.mjs <suite>')
+    if (!name || extra.length)
+      throw new Error('usage: node-test-gate.mjs <suite> | node-test-gate.mjs --local')
+    if (name === '--local') {
+      runLocal()
+      process.exit(0)
+    }
     const problems = coverageProblems()
     if (problems.length)
       throw new Error(`node_test_gate_coverage: ${problems.join('; ')}`)

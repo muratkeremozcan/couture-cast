@@ -11,6 +11,7 @@ import {
   discoverTestFiles,
   gatedSuite,
   loadManifest,
+  localPlan,
   resolveSuite,
   runNodeTestGate,
   summarizeNodeTestEvents,
@@ -707,5 +708,82 @@ describe('node-test-gate discovery and coverage', () => {
     const assigned = Object.keys(manifest.suites).flatMap((name) => resolveSuite(name))
     assert.equal(new Set(assigned).size, assigned.length)
     assert.ok(assigned.includes('scripts/ci/node-test-gate.test.mjs'))
+  })
+})
+
+// Local mode: a pre-push run of every suite must check each suite's declared setup first.
+// Two suites once failed only on a local sweep that skipped it: story68-api-entry needs the
+// API build (conditionNeeds runtime) and worklets-staging the Android prebuild.
+describe('local mode', () => {
+  const manifest = {
+    suites: { plain: ['a.test.mjs'], native: ['b.test.mjs'], harness: 'discover' },
+    vitest: ['c.test.mjs'],
+    conditionNeeds: {
+      plain: ['install'],
+      native: ['prebuild'],
+      harness: [],
+      vitest: ['runtime'],
+    },
+  }
+  const rootWith = (files) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-local-'))
+    for (const file of files) {
+      fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
+      fs.writeFileSync(path.join(root, file), '')
+    }
+    return root
+  }
+
+  test('names every suite whose setup is missing, with the command that provides it', () => {
+    const plan = localPlan({
+      root: rootWith(['node_modules/.package-lock.json']),
+      manifest,
+    })
+    assert.deepEqual(
+      plan.missing.map(({ suite, need }) => `${suite}:${need}`),
+      ['native:prebuild', 'vitest:runtime']
+    )
+    assert.match(
+      plan.missing.find(({ need }) => need === 'prebuild').how,
+      /run-story68-native\.mjs prebuild --platform android/
+    )
+    assert.match(
+      plan.missing.find(({ need }) => need === 'runtime').how,
+      /npm run build --workspace api/
+    )
+  })
+
+  test('is ready once every probe exists', () => {
+    const plan = localPlan({
+      root: rootWith([
+        'node_modules/.package-lock.json',
+        'apps/mobile/android/gradlew',
+        'apps/api/dist/src/load-env.js',
+      ]),
+      manifest,
+    })
+    assert.deepEqual(plan.missing, [])
+    assert.deepEqual(
+      plan.suites.map(({ suite, runner }) => `${suite}:${runner}`),
+      ['plain:node', 'native:node', 'harness:node', 'vitest:vitest']
+    )
+  })
+
+  test('refuses a need it has no local probe for', () => {
+    assert.throws(
+      () =>
+        localPlan({
+          root: rootWith([]),
+          manifest: {
+            ...manifest,
+            conditionNeeds: { ...manifest.conditionNeeds, plain: ['emulator'] },
+          },
+        }),
+      /node_test_gate_local: suite plain needs emulator, which has no local probe/
+    )
+  })
+
+  test('the real manifest declares only needs local mode can probe', () => {
+    assert.doesNotThrow(() => localPlan({ manifest: loadManifest() }))
   })
 })
