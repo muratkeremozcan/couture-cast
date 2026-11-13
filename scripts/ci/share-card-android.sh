@@ -19,8 +19,14 @@ esac
 # Device permissions alone do not prove the emulator can use KVM. The check output stays in this
 # process: a fixed /tmp file is shared by every concurrent run on one machine, so a parallel test
 # that writes an unusable report there would fail this run.
-accel_check="$("$ANDROID_HOME/emulator/emulator" -accel-check 2>&1)"
+# The report prints before any verdict, so a failing check still shows why it failed.
+accel_status=0
+accel_check="$("$ANDROID_HOME/emulator/emulator" -accel-check 2>&1)" || accel_status=$?
 printf '%s\n' "$accel_check"
+if [ "$accel_status" -ne 0 ]; then
+  echo "emulator -accel-check exited $accel_status" >&2
+  exit "$accel_status"
+fi
 grep -q 'KVM .* is installed and usable' <<<"$accel_check"
 adb -s "$ANDROID_SERIAL" install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 node scripts/run-story68-native.mjs open --platform android --device "$ANDROID_SERIAL"

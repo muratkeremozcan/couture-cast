@@ -17,7 +17,11 @@ async function journey(
   expected = '36',
   status = 0,
   accel = 'KVM (version 12) is installed and usable.',
-  { suite = sdk.trim() === '32' ? 'all-1' : 'matrix-1', failOn = '' } = {}
+  {
+    suite = sdk.trim() === '32' ? 'all-1' : 'matrix-1',
+    failOn = '',
+    accelStatus = 0,
+  } = {}
 ) {
   const directory = await mkdtemp(path.join(os.tmpdir(), 'cc68-sdk-guard-'))
   t.after(() => rm(directory, { recursive: true, force: true }))
@@ -32,7 +36,7 @@ async function journey(
   await mkdir(path.join(directory, 'emulator'))
   await writeFile(
     path.join(directory, 'emulator', 'emulator'),
-    '#!/bin/bash\nprintf \'emulator %s\\n\' "$*" >> "$CAPTURE"\nprintf \'accel:\\n0\\n%s\\naccel\\n\' "$ACCEL"\n',
+    '#!/bin/bash\nprintf \'emulator %s\\n\' "$*" >> "$CAPTURE"\nprintf \'accel:\\n0\\n%s\\naccel\\n\' "$ACCEL"\nexit "${ACCEL_STATUS:-0}"\n',
     { mode: 0o700 }
   )
   const result = spawnSync('/bin/bash', ['scripts/ci/share-card-android.sh'], {
@@ -48,6 +52,7 @@ async function journey(
       FAIL_ON: failOn,
       ANDROID_HOME: directory,
       ACCEL: accel,
+      ACCEL_STATUS: String(accelStatus),
     },
   })
   return { result, commands: await readFile(capture, 'utf8').catch(() => '') }
@@ -369,6 +374,27 @@ describe('Android KVM guard', () => {
     assert.notEqual(result.status, 0)
     assert.match(commands, /emulator -accel-check/)
     assert.doesNotMatch(commands, /install |node |bash /)
+  })
+
+  // Codex RUNS-R3-02: a failing check must still print its report and fail with its own status,
+  // even when its output looks usable.
+  for (const [name, accel, accelStatus] of [
+    ['an unusable report', 'KVM requires a CPU that supports vmx or svm', 3],
+    ['a usable-looking report', 'KVM (version 12) is installed and usable.', 4],
+  ])
+    test(`an emulator -accel-check that exits nonzero with ${name} prints it and stops with that status`, async (t) => {
+      const { result, commands } = await journey(t, '32', '32', 0, accel, { accelStatus })
+      assert.equal(result.status, accelStatus)
+      assert.ok(result.stdout.includes(accel), result.stdout)
+      assert.match(result.stderr, new RegExp(`accel-check exited ${accelStatus}`))
+      assert.doesNotMatch(commands, /install |node |bash /)
+    })
+
+  test('an unusable report from a check that exits 0 is printed before the journey stops', async (t) => {
+    const accel = 'KVM requires a CPU that supports vmx or svm'
+    const { result } = await journey(t, '32', '32', 0, accel)
+    assert.notEqual(result.status, 0)
+    assert.ok(result.stdout.includes(accel), result.stdout)
   })
 
   test('Android CI stops before install unless the running emulator reports usable KVM', async () => {
