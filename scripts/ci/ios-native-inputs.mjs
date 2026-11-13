@@ -58,8 +58,6 @@ export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
 export const IOS_DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
 // The dispatch's first job: it stops a dispatch of a commit that already passed.
 export const DISPATCH_GATE_JOB = 'ios-dispatch-gate'
-// A dispatch builds each consumer's client in the consumer, so it skips this one called job.
-const DISPATCH_SKIPPED_JOB = 'ios-native / ios-build'
 // The jobs both iOS workflows call, whose root npm scripts an iOS run executes.
 export const IOS_JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const LOCKFILE = 'package-lock.json'
@@ -475,16 +473,13 @@ export function runGraphs(read = (file) => readFileSync(file, 'utf8')) {
 
 /**
  * Whether a completed iOS run is a whole pass: every job in `required` is listed, and every listed
- * job succeeded. A skipped, cancelled, failed or missing job never counts; a dispatch skips
- * ios-build by design.
+ * job succeeded. A skipped, cancelled, failed or missing job never counts, ios-build included: a
+ * merge, the nightly run and a dispatch each build or restore their client there.
  */
-export function runJobsPassed(jobs, required, { dispatch = false } = {}) {
-  const passed = (job) =>
-    job?.conclusion === 'success' ||
-    (dispatch && job?.name === DISPATCH_SKIPPED_JOB && job.conclusion === 'skipped')
+export function runJobsPassed(jobs, required) {
   return (
     required.length > 0 &&
-    jobs.every(passed) &&
+    jobs.every((job) => job?.conclusion === 'success') &&
     required.every((name) => jobs.some((job) => job?.name === name))
   )
 }
@@ -599,9 +594,7 @@ export async function passingRun({ repository, sha, graphs = runGraphs(), ...opt
   )
   if (!deciding || deciding.run.conclusion !== 'success') return null
   const dispatch = deciding.run.event === 'workflow_dispatch'
-  return runJobsPassed(deciding.jobs, dispatch ? graphs.dispatch : graphs.push, {
-    dispatch,
-  })
+  return runJobsPassed(deciding.jobs, dispatch ? graphs.dispatch : graphs.push)
     ? deciding.run
     : null
 }

@@ -586,7 +586,7 @@ function fakeGitHub({
   return { fetchImpl, posted, requested }
 }
 // The jobs of a dispatch whose every iOS job passed, as the real workflows list them: the gate,
-// the cache proof and the four shards; ios-build is skipped on a dispatch.
+// the cache proof, ios-build (which builds the dispatch's client) and the four shards.
 const dispatchJobs = (patch = {}) =>
   [
     'ios-dispatch-gate',
@@ -601,7 +601,7 @@ const dispatchJobs = (patch = {}) =>
     'ios-native / ios-evidence',
   ].map((name) => ({
     name,
-    conclusion: name === 'ios-native / ios-build' ? 'skipped' : 'success',
+    conclusion: 'success',
     ...patch[name],
   }))
 const pullEvent = (sha = head) => ({
@@ -974,7 +974,7 @@ describe('the evidence runs the pull_request_target job reads', () => {
   // RUNS-03: a dispatch shows every job main's dispatch file and jobs file run, each shard of
   // the matrix included; a partial graph is no evidence. A dispatch from before a matrix change
   // fails, so it needs a new dispatch.
-  test('a dispatch missing a shard, the cache proof or the gate fails', async () => {
+  test('a dispatch missing a shard, the cache proof or the gate, or with ios-build skipped, fails', async () => {
     for (const missing of [
       'ios-native / ios-shard (3)',
       'ios-cache-proof',
@@ -988,6 +988,23 @@ describe('the evidence runs the pull_request_target job reads', () => {
       )
       assert.equal(result.state, 'failure', missing)
     }
+    // Option (a): a dispatch builds its client in ios-build, so a skipped build is no evidence.
+    const unbuilt = run()
+    assert.equal(
+      (
+        await judgeEvent(
+          fakeGitHub({
+            runs: [unbuilt],
+            jobs: {
+              [unbuilt.id]: dispatchJobs({
+                'ios-native / ios-build': { conclusion: 'skipped' },
+              }),
+            },
+          })
+        )
+      ).state,
+      'failure'
+    )
     const whole = run()
     assert.equal(
       (

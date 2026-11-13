@@ -146,6 +146,8 @@ describe('a passing iOS run on main for a commit', () => {
         { 'ios-native / ios-evidence': { conclusion: null, status: 'in_progress' } },
       ],
       dispatch: [
+        // Option (a): every dispatch builds its client in ios-build, so a skipped build is a hole.
+        { 'ios-native / ios-build': { conclusion: 'skipped' } },
         { 'ios-native / ios-shard (1)': { conclusion: 'skipped' } },
         { 'ios-native / iOS app build': { conclusion: 'cancelled' } },
         { 'ios-dispatch-gate': { conclusion: 'failure' } },

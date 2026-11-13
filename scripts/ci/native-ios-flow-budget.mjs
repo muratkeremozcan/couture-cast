@@ -7,10 +7,11 @@ export const OPEN_APP_FLOW = 'maestro/story65/open-app.yaml'
  * open-app.yaml is the first flow of the iOS startup gate, so on iOS every run of it keeps one
  * fixed child budget the gate measures against. Other flows use their derived budget.
  *
- * Story 6.15 moved the iOS shards from macos-15 (Xcode 16.4, iOS 18.5 simulator) to macos-26
- * (Xcode 26.6, iOS 26.5 simulator) on the same 3-CPU, 7 GB host. The old 120000 ms had no
- * headroom even on iOS 18.5: the first open-app of 13 macos-15 shard jobs (2026-11-12 and 13)
- * took 47 to 118 s. On iOS 26.5 the simulator boots in 107 to 179 s instead of 64 to 93, and the
+ * Story 6.15 first moved the iOS shards from macos-15 (Xcode 16.4, iOS 18.5 simulator) to
+ * macos-26 (Xcode 26.6, iOS 26.5 simulator) on the same 3-CPU, 7 GB host; option (a) (PR 220)
+ * moved them back to macos-15 and iOS 18.5, so this cap now matters mostly for the nightly
+ * iOS 26.5 canary (ios-native-canary.yml). The old 120000 ms had no headroom even on iOS 18.5:
+ * the first open-app of 13 macos-15 shard jobs (2026-11-12 and 13) took 47 to 118 s. On iOS 26.5 the simulator boots in 107 to 179 s instead of 64 to 93, and the
  * first open-app passed at 79, 80, 92 and 102 s and was killed at 120 s twice (dispatch
  * 43371567368 shard 3, push 43371494463 shard 1). Those two are lower bounds: JVM plus driver
  * start took 37 and 59 s against 28 to 51 s on iOS 18.5, and the flow phase was interrupted after

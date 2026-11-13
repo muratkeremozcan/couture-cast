@@ -69,7 +69,7 @@ export const STARTED = {
 
 /**
  * The jobs of a run of `kind` whose every job passed, as the jobs API lists them, runner and
- * steps included; a dispatch skips ios-build. `patch` maps a job name to fields to change, and
+ * steps included; a dispatch runs ios-build too. `patch` maps a job name to fields to change, and
  * `extra` adds jobs.
  */
 export function iosJobs(kind, patch = {}, extra = []) {
@@ -86,17 +86,14 @@ export function iosJobs(kind, patch = {}, extra = []) {
     'ios-native / ios-evidence',
     ...extra,
   ]
-  return names.map((name) => {
-    const skipped = dispatch && name === 'ios-native / ios-build'
-    return {
-      name,
-      status: 'completed',
-      conclusion: skipped ? 'skipped' : 'success',
-      started_at: STARTED_AT,
-      ...(skipped ? unassigned : executed),
-      ...patch[name],
-    }
-  })
+  return names.map((name) => ({
+    name,
+    status: 'completed',
+    conclusion: 'success',
+    started_at: STARTED_AT,
+    ...executed,
+    ...patch[name],
+  }))
 }
 
 export function runsApi({
