@@ -1,6 +1,9 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
+#if canImport(CoreGraphics)
 import CoreGraphics
+#endif
+import Foundation
 import XCTest
 @testable import ShareCardShareCore
 

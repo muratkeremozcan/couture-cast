@@ -1,6 +1,10 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import XCTest
 @testable import ShareCardShareCore
 

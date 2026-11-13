@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 D6: a pull request runs at most one macOS job, pr-apple-native.yml's apple-native,
 // and only when the ios-unit or watchos lane is selected; each of its steps runs only for its own
 // lane, every test step fails when nothing ran, and the watchOS suite runs only on macOS with
@@ -53,9 +55,8 @@ describe('the one macOS pull request job', () => {
 
   test('each test step runs only for its own lane', () => {
     const unit = [
-      'Share module Swift package',
-      'Photo-save Swift package, with the cross-prefix test',
-      'XCTest for the focus target decisions',
+      'Share module LinkPresentation header tests',
+      'XCTest for the focus target UIKit decisions',
     ]
     for (const name of unit) assert.match(stepNamed(name).if, /\['ios-unit'\]/, name)
     for (const name of unit)
@@ -65,28 +66,58 @@ describe('the one macOS pull request job', () => {
     assert.doesNotMatch(watch.if, /\['ios-unit'\]/)
   })
 
-  test('tests both Swift packages and the focus target', () => {
+  // Story 6.15 D6: the Foundation-only rules run on Linux; macOS runs only the tests that need
+  // Apple frameworks, so each Swift test runs in exactly one place.
+  test('macOS runs only the Apple-framework tests and Linux runs every rules package', () => {
+    const mac = job.steps.filter((step) =>
+      /swift test|xcodebuild test/.test(step.run ?? '')
+    )
     assert.deepEqual(
-      job.steps
-        .filter((step) => /swift test|xcodebuild test/.test(step.run ?? ''))
-        .map((step) => step['working-directory']),
+      mac.map((step) => [
+        step['working-directory'],
+        /--filter ShareCardShareMetadataTests|-only-testing:AccessibilityFocusTargetTests/.test(
+          step.run
+        ),
+      ]),
       [
-        'apps/mobile/modules/share-card-native-share/ios',
-        'apps/mobile/modules/share-card-photo-save/ios',
-        'apps/mobile/modules/accessibility-focus/ios',
+        ['apps/mobile/modules/share-card-native-share/ios', true],
+        ['apps/mobile/modules/accessibility-focus/ios', true],
+      ]
+    )
+    const linux = workflows['pr-apple-native.yml'].jobs['swift-linux']
+    assert.equal(linux.if, lane('ios-unit'))
+    assert.equal(linux['runs-on'], 'ubuntu-latest')
+    assert.match(linux.container, /^swift:\d+\.\d+\.\d+-noble$/)
+    assert.ok(linux['timeout-minutes'] <= 20)
+    assert.deepEqual(
+      linux.steps
+        .filter((step) => /swift test/.test(step.run ?? ''))
+        .map((step) => [
+          step['working-directory'],
+          step.run.includes('taskset -c 0 swift test --skip-build 2>&1'),
+        ]),
+      [
+        ['apps/mobile/modules/share-card-native-share/ios', true],
+        ['apps/mobile/modules/share-card-photo-save/ios', true],
+        ['apps/mobile/modules/accessibility-focus/ios', true],
       ]
     )
   })
 
   test('each test step passes with tests and fails on zero tests, all skipped or a failure', () => {
-    for (const step of job.steps.filter((row) =>
-      /swift test|xcodebuild test/.test(row.run ?? '')
-    )) {
+    const steps = ['apple-native', 'swift-linux'].flatMap((id) =>
+      workflows['pr-apple-native.yml'].jobs[id].steps.filter((row) =>
+        /swift test|xcodebuild test/.test(row.run ?? '')
+      )
+    )
+    assert.equal(steps.length, 5)
+    for (const step of steps) {
       const tool = step.run.includes('xcodebuild test') ? 'xcodebuild' : 'swift'
       const stubs = (body) =>
         tool === 'xcodebuild'
           ? { xcodebuild: body, xcrun: 'echo "    iPhone 16 Pro (ID) (Shutdown)"' }
-          : { swift: body }
+          : // taskset -c 0 COMMAND: run the command on the stub PATH.
+            { swift: body, taskset: 'shift 2; exec "$@"' }
       for (const count of [1, 21])
         assert.equal(
           runWithStubs(step, stubs(xctestSummary(count))),

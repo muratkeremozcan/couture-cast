@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 D6: the one iOS job on main, nightly and dispatch keeps every guard the five macOS
 // jobs it replaced had. Each control below breaks one rule and must be rejected.
 import assert from 'node:assert/strict'

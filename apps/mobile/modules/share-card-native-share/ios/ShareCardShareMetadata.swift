@@ -1,19 +1,9 @@
 import Foundation
-import LinkPresentation
 
 /// What the share sheet header shows for the card: the public name Story 6.8's save and the web
 /// download use, which is also the handoff file's own name, with the card itself as the thumbnail.
+/// The header itself needs LinkPresentation and lives in ShareCardShareLinkMetadata.swift, so this
+/// name builds on Linux with ShareCardShareFile (story 6.15 D6).
 enum ShareCardShareMetadata {
   static let publicName = "couturecast-card.png"
-
-  /// No `url` or `originalURL`: with `originalURL` set to the file, the iOS 26.1 header showed the
-  /// cache name as its subtitle.
-  static func linkMetadata(for file: URL) -> LPLinkMetadata {
-    let metadata = LPLinkMetadata()
-    metadata.title = publicName
-    let preview = NSItemProvider(contentsOf: file)
-    preview?.suggestedName = publicName
-    metadata.iconProvider = preview
-    return metadata
-  }
 }

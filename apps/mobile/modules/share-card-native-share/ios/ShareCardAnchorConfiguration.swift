@@ -1,4 +1,7 @@
+#if canImport(CoreGraphics)
 import CoreGraphics
+#endif
+// Linux: Foundation itself defines CGRect and CGFloat (story 6.15 D6).
 import Foundation
 
 /// Where the iPad popover points. `sourceView` is the presenter's own view.

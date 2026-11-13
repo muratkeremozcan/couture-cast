@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 D6: scripts/ci/native-ios-runtime.sh gives each segment of the one iOS job its own
 // runtime. These run it against stub node, pgrep and pkill in a scratch directory.
 import assert from 'node:assert/strict'

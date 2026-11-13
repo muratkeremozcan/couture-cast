@@ -282,9 +282,9 @@ export const LANES = {
   // The one macOS job a pull request may run (story 6.15 D6) holds two lanes, each gating its
   // own steps: the job runs when either lane does.
   'ios-unit': {
-    title: 'iOS module unit tests (macOS)',
+    title: 'iOS module unit tests (Linux rules, macOS glue)',
     workflow: 'pr-apple-native.yml',
-    jobs: ['apple-native'],
+    jobs: ['apple-native', 'swift-linux'],
     // The Swift packages and the XCTest target build from these directories alone.
     inputs: [
       'apps/mobile/modules/share-card-native-share/ios/**',

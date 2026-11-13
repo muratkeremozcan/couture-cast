@@ -3,7 +3,11 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
 import XCTest
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 @testable import ShareCardPngFile
 
 final class ShareCardPhotoSaveTests: XCTestCase {
