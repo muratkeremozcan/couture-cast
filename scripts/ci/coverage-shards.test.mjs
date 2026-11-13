@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
+import { parse } from 'yaml'
 
 import {
   COVERAGE_SHARDS,
@@ -63,6 +64,21 @@ test('the workflow matrix runs exactly the shards this file knows', () => {
     assert.deepEqual(LANES[`coverage-${shard}`].jobs, ['tests-shard'], shard)
     assert.equal(LANES[`coverage-${shard}`].workflow, 'pr-checks.yml', shard)
   }
+})
+
+// TEA review of 8586f43c: the mobile shard's plugin prebuild suites run after its tests, so the
+// recorded outcome must read them too, or a red plugin suite shows the shard as passed.
+test("a shard's recorded outcome includes the mobile plugin prebuild suites", () => {
+  const workflow = parse(readFileSync('.github/workflows/pr-checks.yml', 'utf8'))
+  const steps = workflow.jobs['tests-shard'].steps
+  const plugins = steps.find((step) => step.name === 'Mobile plugin prebuild suites')
+  const record = steps.find((step) => step.name === "Record this shard's result")
+  assert.equal(plugins.id, 'plugins')
+  assert.ok(steps.indexOf(plugins) < steps.indexOf(record))
+  assert.equal(
+    record.env.OUTCOME,
+    "${{ steps.plugins.outcome == 'failure' && 'failure' || steps.tests.outcome }}"
+  )
 })
 
 test('the job other checks read keeps its name and waits for every shard', () => {

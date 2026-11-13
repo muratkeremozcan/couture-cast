@@ -359,6 +359,7 @@ jobs:
       # background task and the font-scale configChanges. They run on Linux in seconds; the watchOS
       # suite needs Xcode and runs nightly in watchos-native.yml (scripts/ci/node-test-suites.json).
       - name: Mobile plugin prebuild suites
+        id: plugins
         if: ${{ !cancelled() && matrix.shard == 'mobile' && steps.setup.outcome == 'success' }}
         working-directory: apps/mobile
         run: |
@@ -370,7 +371,8 @@ jobs:
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         env:
           SHARD: ${{ matrix.shard }}
-          OUTCOME: ${{ steps.tests.outcome }}
+          # A red plugin prebuild suite fails the shard in the coverage comment too.
+          OUTCOME: ${{ steps.plugins.outcome == 'failure' && 'failure' || steps.tests.outcome }}
           DIRS: ${{ steps.tests.outputs.coverage_dirs }}
           FAILURES: ${{ steps.tests.outputs.failures }}
         run: node scripts/ci/coverage-shards.mjs record
