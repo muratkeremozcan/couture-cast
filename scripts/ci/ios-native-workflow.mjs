@@ -141,6 +141,13 @@ const onOf = (workflow) => workflow?.on ?? workflow?.[true]
 // exactly once.
 const runs = (command) => (step) => String(step.run ?? '').includes(command)
 const INSTALLED = "${{ !cancelled() && steps.install.outcome == 'success' }}"
+/** C-16: the client's deployment target against the selected simulator runtime. */
+const CLIENT_FITS = [
+  'min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")',
+  'sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)',
+  'node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"',
+]
+
 export const MANDATORY = [
   [
     'ios-build',
@@ -257,6 +264,13 @@ export const MANDATORY = [
     (step) => step.id === 'client_unpack',
     ON_DISPATCH,
     ['set -euo pipefail', CLIENT_UNPACK, 'test -d "$APP"'],
+  ]),
+  // C-16: on every event, before any flow; a neutralized comparison is a missing one.
+  ...['ios-shard', 'ios-expo-go'].map((job) => [
+    job,
+    (step) => step.id === 'client_fits',
+    undefined,
+    ['set -euo pipefail', ...CLIENT_FITS],
   ]),
 ]
 
@@ -846,17 +860,10 @@ function consumerProblems(jobs, check) {
     const fits = stepIndex(
       jobs[name],
       (step) =>
+        step.id === 'client_fits' &&
         step.if === undefined &&
         step.env?.APP === restoredPath &&
-        String(step.run ?? '').includes(
-          'min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")'
-        ) &&
-        String(step.run ?? '').includes(
-          'sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)'
-        ) &&
-        String(step.run ?? '').includes(
-          'node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"'
-        )
+        CLIENT_FITS.every((line) => String(step.run ?? '').includes(line))
     )
     check(
       fits > restore && fits > unpack && flows > fits,

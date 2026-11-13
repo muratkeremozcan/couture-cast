@@ -1092,22 +1092,22 @@ describe('mandatory checks fail their step', () => {
       ['tar', '-cf'],
     'tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"': ['tar', '-xf'],
     'test -d "$APP"': [null, null, { APP: '/nonexistent/CoutureCastStory68.app' }],
+    'min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")': [
+      'plutil',
+      'MinimumOSVersion',
+    ],
+    'sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)': [
+      'xcrun',
+      '--show-sdk-version',
+    ],
+    'node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"': [
+      'node',
+      'native-ios-runtime-fits.mjs',
+    ],
   }
-  const RUN_AS_SCRIPT = ['node', 'bash', 'swift', 'xcodebuild', 'tar']
+  const RUN_AS_SCRIPT = ['node', 'bash', 'swift', 'xcodebuild', 'tar', 'plutil', 'xcrun']
   // The other commands the mandatory steps call, stubbed to succeed quietly.
-  const QUIET = [
-    'cat',
-    'mv',
-    'find',
-    'head',
-    'xcrun',
-    'mkdir',
-    'rm',
-    'cp',
-    'sleep',
-    'npx',
-    'npm',
-  ]
+  const QUIET = ['cat', 'mv', 'find', 'head', 'mkdir', 'rm', 'cp', 'sleep', 'npx', 'npm']
   const runStep = (body, [failing, pattern, env] = []) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-mandatory-'))
     try {
