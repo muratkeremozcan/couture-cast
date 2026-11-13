@@ -81,9 +81,11 @@ export function LiveFontMountMarker({ scope }: { scope: string }) {
 }
 
 const styles = StyleSheet.create({
+  // Mid-height at the left edge: UiAutomator leaves out views the translucent status bar or the
+  // navigation bar covers, so a marker at the top of the window never reaches the hierarchy.
   marker: {
     position: 'absolute',
-    top: 0,
+    top: '50%',
     left: 0,
     width: 1,
     height: 1,
