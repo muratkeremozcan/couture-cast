@@ -217,9 +217,10 @@ describe('the Decision 4 transition table (planning half)', () => {
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 describe('unsupported stores never reach the ledger (story 6.15 R3-01)', () => {
-  // Planning reads no environment; each case runs under every TEST_ENV a deployment can carry,
-  // so a later environment-gated Test Store path cannot open production by accident.
-  const environments = [undefined, 'staging', 'production'] as const
+  // Each case runs under every TEST_ENV that must keep the production partition, so the D15
+  // Test Store path, open only under an explicit local or preview TEST_ENV, cannot open
+  // production by accident. NODE_ENV is `test` here, which must not open it either.
+  const environments = [undefined, 'staging', 'production', 'qa'] as const
 
   afterEach(() => {
     vi.unstubAllEnvs()
@@ -239,6 +240,13 @@ describe('unsupported stores never reach the ledger (story 6.15 R3-01)', () => {
         })
       }
     )
+
+    it('TEST_STORE maps to no store and its payload projection names none', () => {
+      expect(mapRevenueCatStore('TEST_STORE')).toBeNull()
+      expect(
+        projectRevenueCatEventPayload(rcEvent({ store: 'TEST_STORE' })).store
+      ).toBeNull()
+    })
 
     it('a TRANSFER from any store we do not sell is record-only, so no paid row is revoked', () => {
       expect(
@@ -294,6 +302,142 @@ describe('unsupported stores never reach the ledger (story 6.15 R3-01)', () => {
       })
 
       expect(applyLedgerEvent).not.toHaveBeenCalled()
+    } finally {
+      if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+      else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+    }
+  })
+})
+
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+describe('the RevenueCat Test Store converges under local and preview (story 6.15 D15)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it('maps TEST_STORE to test_store, in any case, and records it in the payload', () => {
+      expect(mapRevenueCatStore('TEST_STORE')).toBe('test_store')
+      expect(mapRevenueCatStore('test_store')).toBe('test_store')
+      expect(projectRevenueCatEventPayload(rcEvent({ store: 'TEST_STORE' })).store).toBe(
+        'test_store'
+      )
+    })
+
+    it.each([
+      ['INITIAL_PURCHASE', 'active', true],
+      ['RENEWAL', 'active', true],
+      ['CANCELLATION', 'active', false],
+      ['EXPIRATION', 'expired', false],
+    ] as const)('a TEST_STORE %s applies as test_store', (type, status, willRenew) => {
+      expect(planRevenueCatTransition(rcEvent({ type, store: 'TEST_STORE' }))).toEqual({
+        kind: 'apply',
+        state: {
+          status,
+          store: 'test_store',
+          productId: 'premium_monthly',
+          willRenew,
+          currentPeriodEnd: new Date(1_757_676_700_000),
+        },
+      })
+    })
+
+    it('a TEST_STORE TRANSFER moves the entitlement', () => {
+      expect(
+        planRevenueCatTransition(
+          rcEvent({
+            type: 'TRANSFER',
+            store: 'TEST_STORE',
+            transferred_from: ['paid-member'],
+            transferred_to: ['other-member'],
+          })
+        )
+      ).toEqual({ kind: 'transfer' })
+    })
+
+    it('every other store we do not sell stays record-only, a TRANSFER included', () => {
+      for (const type of ['INITIAL_PURCHASE', 'TRANSFER']) {
+        expect(planRevenueCatTransition(rcEvent({ type, store: 'AMAZON' }))).toEqual({
+          kind: 'record-only',
+        })
+      }
+    })
+
+    it('real stores keep their mappings', () => {
+      expect(mapRevenueCatStore('APP_STORE')).toBe('app_store')
+      expect(mapRevenueCatStore('PLAY_STORE')).toBe('play_store')
+      expect(mapRevenueCatStore('STRIPE')).toBe('stripe')
+    })
+  })
+
+  it('a TEST_STORE TRANSFER under local revokes the loser and grants the gainer test_store', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    try {
+      const create = vi.fn().mockResolvedValue({})
+      const losingRow = {
+        user_id: 'paid-member',
+        status: 'active',
+        store: 'test_store',
+        product_id: 'premium_monthly',
+        current_period_end: new Date(1_757_676_700_000),
+      }
+      const prisma = {
+        billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+        user: {
+          findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+            Promise.resolve({ id: where.id })
+          ),
+        },
+        $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+          work({
+            billingEvent: { create },
+            premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(losingRow) },
+          })
+        ),
+      }
+      const applyLedgerEvent = vi.fn().mockResolvedValue(null)
+      const service = new BillingWebhookService(
+        prisma as unknown as PrismaClient,
+        { applyLedgerEvent } as unknown as PremiumEntitlementService,
+        { emitTransition: vi.fn() } as unknown as SubscriptionService,
+        {} as RevenueCatClient
+      )
+      const body = {
+        event: rcEvent({
+          type: 'TRANSFER',
+          store: 'TEST_STORE',
+          transferred_from: ['paid-member'],
+          transferred_to: ['other-member'],
+        }),
+      }
+
+      await service.handleRevenueCatWebhook({
+        authorization: buildTestOnlyRevenueCatWebhookAuth(),
+        rawBody: Buffer.from(JSON.stringify(body)),
+      })
+
+      const recordedStores = create.mock.calls.map(
+        ([input]) => (input as { data: { store: unknown } }).data.store
+      )
+      expect(recordedStores).toEqual(['test_store'])
+      const applied = applyLedgerEvent.mock.calls.map(([, input]) => {
+        const { userId, state } = input as {
+          userId: string
+          state: { status: string; store: string }
+        }
+        return { userId, status: state.status, store: state.store }
+      })
+      expect(applied).toEqual([
+        { userId: 'paid-member', status: 'revoked', store: 'test_store' },
+        { userId: 'other-member', status: 'active', store: 'test_store' },
+      ])
     } finally {
       if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
       else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc

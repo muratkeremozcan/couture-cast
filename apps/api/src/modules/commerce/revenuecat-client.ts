@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common'
-import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
+import {
+  allowsTestOnlySecrets,
+  appliesRevenueCatTestStore,
+} from '../../config/runtime-environment.js'
 import type { LedgerEntitlementState } from './premium-entitlement.service.js'
 
 /**
@@ -167,6 +170,22 @@ const restStoreMap: Readonly<Record<string, LedgerEntitlementState['store']>> = 
   promotional: 'promotional',
 }
 
+/**
+ * A REST subscription store projected onto ours, or undefined for a store we do not sell.
+ * `test_store` is ours only where {@link appliesRevenueCatTestStore} opens it (story 6.15 D15);
+ * elsewhere the pull refuses it like any other unsupported store.
+ */
+function mapRevenueCatRestStore(
+  store: string | null | undefined
+): LedgerEntitlementState['store'] | undefined {
+  const normalized = store?.toLowerCase() ?? ''
+  if (normalized === 'test_store') {
+    return appliesRevenueCatTestStore() ? 'test_store' : undefined
+  }
+  // Own keys only: an inherited name such as `constructor` is not a store.
+  return Object.hasOwn(restStoreMap, normalized) ? restStoreMap[normalized] : undefined
+}
+
 export class RevenueCatUnsupportedStoreError extends Error {
   constructor(readonly store: string | null) {
     super(
@@ -273,10 +292,11 @@ export class RealRevenueCatClient extends RevenueCatClient {
       throw new RevenueCatUnrepresentableEntitlementError('missing_product')
     }
     const subscription = body.subscriber?.subscriptions?.[productId]
-    const store = restStoreMap[subscription?.store?.toLowerCase() ?? '']
+    const store = mapRevenueCatRestStore(subscription?.store)
     if (store === undefined) {
-      // A store we do not sell (a RevenueCat Test Store purchase, AMAZON) or a missing
-      // subscription record never takes a real store's identity (story 6.15 R3-01). Checked
+      // A store we do not sell (AMAZON, a RevenueCat Test Store purchase outside an explicit local
+      // or preview TEST_ENV) or a missing subscription record never takes a real store's identity
+      // (story 6.15 R3-01, D15). Checked
       // before the expiry, so a lifetime or malformed unsupported entitlement fails the same way.
       throw new RevenueCatUnsupportedStoreError(subscription?.store ?? null)
     }

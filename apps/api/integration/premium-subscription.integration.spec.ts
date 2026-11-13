@@ -18,7 +18,9 @@ import {
 } from '@couture/testing'
 import {
   PREMIUM_REQUIRED_MESSAGE,
+  premiumAccessResponseSchema,
   SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE,
+  subscriptionResponseSchema,
 } from '../src/contracts/http.js'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
@@ -389,6 +391,16 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
     // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
     // Story 6.15 R3-01 and R4-01: a ledger entitlement from a store we do not sell, or one our model
     // cannot represent, answers 503 through the real projection and keeps the paying member's row.
+    // Each shape runs under every TEST_ENV; `qa` stands for any value other than local and preview.
+    // D15 opens only the representable Test Store shape, and only under local and preview.
+    const refreshEnvironments = [
+      undefined,
+      'staging',
+      'production',
+      'qa',
+      'local',
+      'preview',
+    ] as const
     for (const [label, premium, subscriptions] of [
       [
         'a Test Store monthly entitlement',
@@ -423,25 +435,87 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
         { expires_date: '2031-01-01T00:00:00.000Z', product_identifier: null },
         {},
       ],
-    ] as const) {
-      it(`keeps a paid row when the ledger holds ${label}`, async (context) => {
-        if (!requireSchema(context)) return
+    ] as const)
+      for (const testEnv of refreshEnvironments) {
+        if (
+          (testEnv === 'local' || testEnv === 'preview') &&
+          label === 'a Test Store monthly entitlement'
+        ) {
+          continue
+        }
+        it(`keeps a paid row when the ledger holds ${label} (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+          if (!requireSchema(context)) return
+          const savedEnv = process.env.TEST_ENV
+          if (testEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = testEnv
 
-        await seedEntitlement(subscriberId, 'active')
-        const before = await prisma.premiumEntitlement.findUnique({
-          where: { user_id: subscriberId },
+          await seedEntitlement(subscriberId, 'active')
+          const before = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: subscriberId },
+          })
+          vi.stubGlobal(
+            'fetch',
+            vi.fn(() =>
+              Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    subscriber: { entitlements: { premium }, subscriptions },
+                  }),
+                  {
+                    status: 200,
+                  }
+                )
+              )
+            )
+          )
+          const real = new RealRevenueCatClient('sk_test_rc_key')
+          const pull = vi
+            .spyOn(fakeLedger, 'getSubscriberEntitlement')
+            .mockImplementation((userId) => real.getSubscriberEntitlement(userId))
+          try {
+            const response = await postRefresh(subscriberId)
+
+            expect(response.status).toBe(503)
+            expect(pull).toHaveBeenCalledTimes(1)
+            expect(
+              await prisma.premiumEntitlement.findUnique({
+                where: { user_id: subscriberId },
+              })
+            ).toEqual(before)
+          } finally {
+            pull.mockRestore()
+            vi.unstubAllGlobals()
+            if (savedEnv === undefined) delete process.env.TEST_ENV
+            else process.env.TEST_ENV = savedEnv
+          }
         })
+      }
+
+    // Learning path Step 55: story 6.15 D15. Under an explicit local or preview TEST_ENV a Test
+    // Store entitlement on the ledger converges on refresh: the row, the status read and the
+    // access read all report test_store premium.
+    for (const testEnv of ['local', 'preview'] as const) {
+      it(`applies a Test Store entitlement on refresh (TEST_ENV ${testEnv})`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        process.env.TEST_ENV = testEnv
         vi.stubGlobal(
           'fetch',
           vi.fn(() =>
             Promise.resolve(
               new Response(
                 JSON.stringify({
-                  subscriber: { entitlements: { premium }, subscriptions },
+                  subscriber: {
+                    entitlements: {
+                      premium: {
+                        expires_date: '2031-01-01T00:00:00.000Z',
+                        product_identifier: 'premium_monthly',
+                      },
+                    },
+                    subscriptions: { premium_monthly: { store: 'TEST_STORE' } },
+                  },
                 }),
-                {
-                  status: 200,
-                }
+                { status: 200 }
               )
             )
           )
@@ -453,16 +527,28 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
         try {
           const response = await postRefresh(subscriberId)
 
-          expect(response.status).toBe(503)
-          expect(pull).toHaveBeenCalledTimes(1)
+          expect(response.status).toBe(200)
+          expect(subscriptionResponseSchema.parse(response.body).data).toMatchObject({
+            status: 'active',
+            store: 'test_store',
+            productId: 'premium_monthly',
+            currentPeriodEnd: '2031-01-01T00:00:00.000Z',
+          })
           expect(
             await prisma.premiumEntitlement.findUnique({
               where: { user_id: subscriberId },
             })
-          ).toEqual(before)
+          ).toMatchObject({ status: 'active', store: 'test_store' })
+          const access = await get('/api/v1/commerce/premium/access', subscriberId)
+          expect(access.status).toBe(200)
+          expect(premiumAccessResponseSchema.parse(access.body)).toEqual({
+            data: { premium: true, source: 'subscription' },
+          })
         } finally {
           pull.mockRestore()
           vi.unstubAllGlobals()
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
         }
       })
     }

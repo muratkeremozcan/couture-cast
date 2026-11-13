@@ -126,8 +126,15 @@ describe('RealRevenueCatClient', () => {
     ],
     ['an Amazon subscription', { premium_monthly: { store: 'amazon' } }],
     ['no subscription record for the product', {}],
+    // An inherited object key is not a store, so it can never pass as one.
+    [
+      'a store named after an inherited key',
+      { premium_monthly: { store: 'constructor' } },
+    ],
   ])('refuses %s instead of projecting it as Stripe', async (_label, subscriptions) => {
-    for (const testEnv of [undefined, 'staging', 'production']) {
+    // NODE_ENV is `test` here, which must not open the D15 Test Store path; `qa` stands for any
+    // TEST_ENV other than local and preview.
+    for (const testEnv of [undefined, 'staging', 'production', 'qa']) {
       if (testEnv === undefined) vi.stubEnv('TEST_ENV', undefined as unknown as string)
       else vi.stubEnv('TEST_ENV', testEnv)
       fetchMock.mockResolvedValueOnce(
@@ -146,6 +153,84 @@ describe('RealRevenueCatClient', () => {
       )
     }
     vi.unstubAllEnvs()
+  })
+
+  // Learning path Step 55: story 6.15 D15. Under an explicit local or preview TEST_ENV the REST
+  // pull projects a Test Store entitlement as test_store, so refresh and reconciliation converge.
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    it.each([
+      ['active', '2026-09-12T12:00:00.000Z', null, true],
+      ['active', '2026-09-12T12:00:00.000Z', '2026-08-11T00:00:00.000Z', false],
+      ['expired', '2026-08-01T00:00:00.000Z', null, false],
+    ] as const)(
+      'projects a Test Store entitlement as %s test_store (expiry %s, unsubscribed %s)',
+      async (status, expiresDate, unsubscribedAt, willRenew) => {
+        fetchMock.mockResolvedValueOnce(
+          subscriberResponse({
+            entitlements: {
+              premium: {
+                expires_date: expiresDate,
+                product_identifier: 'premium_monthly',
+              },
+            },
+            subscriptions: {
+              premium_monthly: {
+                store: 'TEST_STORE',
+                unsubscribe_detected_at: unsubscribedAt,
+              },
+            },
+          })
+        )
+
+        await expect(client.getSubscriberEntitlement('user-1')).resolves.toEqual({
+          status,
+          store: 'test_store',
+          productId: 'premium_monthly',
+          willRenew,
+          currentPeriodEnd: new Date(expiresDate),
+        })
+      }
+    )
+
+    it('still refuses every other store we do not sell and a missing record', async () => {
+      for (const subscriptions of [{ premium_monthly: { store: 'amazon' } }, {}]) {
+        fetchMock.mockResolvedValueOnce(
+          subscriberResponse({
+            entitlements: {
+              premium: {
+                expires_date: '2026-09-12T12:00:00.000Z',
+                product_identifier: 'premium_monthly',
+              },
+            },
+            subscriptions,
+          })
+        )
+        await expect(client.getSubscriberEntitlement('user-1')).rejects.toBeInstanceOf(
+          RevenueCatUnsupportedStoreError
+        )
+      }
+    })
+
+    it('still refuses a Test Store lifetime entitlement our model cannot represent', async () => {
+      fetchMock.mockResolvedValueOnce(
+        subscriberResponse({
+          entitlements: {
+            premium: { expires_date: null, product_identifier: 'premium_life' },
+          },
+          subscriptions: { premium_life: { store: 'test_store' } },
+        })
+      )
+      await expect(client.getSubscriberEntitlement('user-1')).rejects.toBeInstanceOf(
+        RevenueCatUnrepresentableEntitlementError
+      )
+    })
   })
 
   it('projects a cancelled-but-paid-up subscription as active with willRenew false', async () => {

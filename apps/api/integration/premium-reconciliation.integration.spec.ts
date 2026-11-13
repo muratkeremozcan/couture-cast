@@ -300,8 +300,23 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
     ],
     ['missing product', { expires_date: 'FUTURE', product_identifier: null }, {}],
   ] as const
-  for (const testEnv of [undefined, 'staging', 'production'] as const)
+  // `qa` stands for any TEST_ENV other than local and preview. Under the D15 local and preview
+  // values every shape but the Test Store monthly one must still leave the paid row as it was.
+  for (const testEnv of [
+    undefined,
+    'staging',
+    'production',
+    'qa',
+    'local',
+    'preview',
+  ] as const)
     for (const [shape, premium, subscriptions] of ledgerShapes) {
+      if (
+        (testEnv === 'local' || testEnv === 'preview') &&
+        shape === 'Test Store monthly'
+      ) {
+        continue
+      }
       it(`a ${shape} ledger entitlement leaves a paid row unchanged (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
         if (!requireSchema(context)) return
         const savedEnv = process.env.TEST_ENV
@@ -377,6 +392,92 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
         }
       })
     }
+
+  // Learning path Step 55: story 6.15 D15. Under an explicit local or preview TEST_ENV the sweep
+  // converges a stale Test Store row to the ledger through the real REST projection.
+  for (const testEnv of ['local', 'preview'] as const) {
+    it(`converges a stale test_store row to the Test Store ledger (TEST_ENV ${testEnv})`, async (context) => {
+      if (!requireSchema(context)) return
+      const savedEnv = process.env.TEST_ENV
+      process.env.TEST_ENV = testEnv
+      const renewedEnd = new Date(Date.now() + 30 * 86_400_000)
+      renewedEnd.setUTCMilliseconds(0)
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith(`/subscribers/${encodeURIComponent(userId)}`)
+            ? new Response(
+                JSON.stringify({
+                  subscriber: {
+                    entitlements: {
+                      premium: {
+                        expires_date: renewedEnd.toISOString(),
+                        product_identifier: 'premium_monthly',
+                      },
+                    },
+                    subscriptions: {
+                      premium_monthly: {
+                        store: 'test_store',
+                        unsubscribe_detected_at: null,
+                      },
+                    },
+                  },
+                }),
+                { status: 200 }
+              )
+            : new Response('out of scope', { status: 503 })
+        )
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      try {
+        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+        const sweeper = new BillingReconciliationService(
+          prisma,
+          realLedger,
+          new PremiumEntitlementService(
+            prisma,
+            realLedger,
+            new FakeStripeBillingClient(),
+            noComplimentaryGrants
+          ),
+          telemetry as unknown as TelemetryService
+        )
+        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+        await prisma.premiumEntitlement.create({
+          data: buildPremiumEntitlementCreateInput(
+            createPremiumEntitlement({
+              userId,
+              status: 'active',
+              store: 'test_store',
+              productId: 'premium_monthly',
+              willRenew: false,
+              currentPeriodEnd: new Date(Date.now() + 86_400_000),
+              syncedAt: staleSyncedAt,
+              lastEventOccurredAt: staleSyncedAt,
+              lastEventId: `${namespace}-test-store-seed`,
+            })
+          ),
+        })
+
+        await sweeper.sweep()
+
+        const after = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: userId },
+        })
+        expect(after).toMatchObject({
+          status: 'active',
+          store: 'test_store',
+          product_id: 'premium_monthly',
+          will_renew: true,
+          current_period_end: renewedEnd,
+        })
+        expect(after?.synced_at.getTime()).toBeGreaterThan(staleSyncedAt.getTime())
+      } finally {
+        vi.unstubAllGlobals()
+        if (savedEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = savedEnv
+      }
+    })
+  }
 
   it('leaves a freshly-synced entitlement alone (staleness bound respected)', async (context) => {
     if (!requireSchema(context)) return

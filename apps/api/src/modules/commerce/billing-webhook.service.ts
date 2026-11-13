@@ -25,6 +25,7 @@ import {
   resolveStripeWebhookSecret,
 } from './billing-webhook-secrets.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { appliesRevenueCatTestStore } from '../../config/runtime-environment.js'
 
 // Re-exported so existing importers keep one import site. The definitions live
 // in a Nest-free module because suites outside the Nest runtime import them.
@@ -121,14 +122,22 @@ const rcStoreMap: Readonly<Record<string, EntitlementStore>> = {
   PROMOTIONAL: 'promotional',
 }
 
-/** RevenueCat store strings arrive uppercase; unknown stores map to null. */
+/**
+ * RevenueCat store strings arrive uppercase; unknown stores map to null. `TEST_STORE` maps to
+ * `test_store` only where {@link appliesRevenueCatTestStore} opens it (story 6.15 D15); everywhere
+ * else it stays an unsupported store, so every transition below records it and changes nothing.
+ */
 export function mapRevenueCatStore(
   store: string | null | undefined
 ): EntitlementStore | null {
   if (!store) {
     return null
   }
-  return rcStoreMap[store.toUpperCase()] ?? null
+  const normalized = store.toUpperCase()
+  if (normalized === 'TEST_STORE') {
+    return appliesRevenueCatTestStore() ? 'test_store' : null
+  }
+  return rcStoreMap[normalized] ?? null
 }
 
 /**
@@ -275,9 +284,10 @@ const REVENUECAT_TRANSITION_TABLE: Readonly<
  * end) likewise degrades to record-only rather than bouncing.
  */
 export function planRevenueCatTransition(event: RevenueCatEvent): TransitionPlan {
-  // A store we do not sell (TEST_STORE, AMAZON, anything new) never touches the ledger, a
-  // TRANSFER included: a transfer revokes the losing member's row and hands its real store to the
-  // gaining member, so an unsupported-store transfer could change paid access (story 6.15 R3-01).
+  // A store we do not sell (AMAZON, anything new, and TEST_STORE outside an explicit local or
+  // preview TEST_ENV) never touches the ledger, a TRANSFER included: a transfer revokes the losing
+  // member's row and hands its real store to the gaining member, so an unsupported-store transfer
+  // could change paid access (story 6.15 R3-01, D15).
   if (event.store && mapRevenueCatStore(event.store) === null) {
     return RECORD_ONLY
   }
