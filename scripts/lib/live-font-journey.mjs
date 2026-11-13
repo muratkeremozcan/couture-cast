@@ -41,9 +41,14 @@ export const SCREENS = {
     flow: 'open-community',
     anchors: ['community-new-post-label'],
     // Feed and spotlight cards change between launches on their own: ranking, the climate pill
-    // each card derives, and images that fail to load and show a retry. The screen's own text
-    // (header, filters, band notice, New post) stays measured.
-    volatile: ['community-post-card-', 'community-spotlight'],
+    // each card derives, and images that fail to load and show a retry. The filter chips sit in
+    // a horizontal row that shows fewer chips as text grows (Cold and dry leaves the screen at
+    // 1.5), so the row is left out too. The header, band notice and New post stay measured.
+    volatile: [
+      'community-post-card-',
+      'community-spotlight',
+      'community-sticky-filter-chips',
+    ],
     controls: TABS,
     probes: [{ id: 'community-new-post-label', sizeSp: 13 }],
   },
