@@ -36,9 +36,37 @@ jobs:
       checks: read
       statuses: write
       actions: read
+      pull-requests: read
     steps:
       - uses: muratkeremozcan/pr-gate@main
         with:
           mode: watch
           publish: status
+      # Story 6.15 SL-10: only ios-native-evidence.yml may post the iOS evidence status. When a
+      # workflow or local action at an open pull request's head could post it, or holds the
+      # permission to, main's guard turns the gate status on that head to failure, after PR Gate's
+      # own verdict.
+      - name: Fetch main's iOS evidence guard
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            /scripts/ci/ios-native-evidence.mjs
+            /scripts/ci/ios-native-inputs.mjs
+            /scripts/ci/lanes.mjs
+          sparse-checkout-cone-mode: false
+      - name: Fail the gate when a workflow could post the iOS evidence status
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+        # The pull request that adds the guard runs before main has it.
+        run: |
+          if [ -f scripts/ci/ios-native-evidence.mjs ]; then
+            node scripts/ci/ios-native-evidence.mjs gate-guard
+          else
+            echo "main has no iOS evidence guard yet"
+          fi
 #

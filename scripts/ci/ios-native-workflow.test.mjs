@@ -471,6 +471,25 @@ describe('ios-native workflows validator', () => {
       jobs['ios-expo-go'].needs = ['ios-build', 'ios-shard']
     }
   )
+  rejected(
+    'a dead dispatch branch inside ios-build',
+    /ios-build: no step branches on a dispatch/,
+    (jobs) => {
+      step(jobs['ios-build'], (row) => row.id === 'native_save').if =
+        "${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}"
+    }
+  )
+  rejected(
+    'a dispatch install path inside ios-build',
+    /ios-build: no step branches on a dispatch/,
+    (jobs) => {
+      jobs['ios-build'].steps.splice(5, 0, {
+        name: 'Install for a dispatch',
+        if: "github.event_name == 'workflow_dispatch'",
+        run: 'bash scripts/ci/install-dependencies.sh',
+      })
+    }
+  )
   rejected('a client build on a dispatch', /a dispatch skips it/, (jobs) => {
     delete jobs['ios-build'].if
   })

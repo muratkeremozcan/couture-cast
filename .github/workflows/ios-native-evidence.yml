@@ -4,15 +4,13 @@
 # verdict is the `ios-native-evidence` commit status on that head commit, which the branch ruleset
 # requires.
 #
-# The judge must be main's, never the pull request's: a pull_request workflow runs the pull
-# request's own copy of this file, which it could edit to pass. So the pull request job runs on
-# pull_request_target, checks out main and nothing of the pull request, uses no secret, and judges
-# the head commit named in the event payload through the API. A pull_request_target run belongs
-# to the base commit, so its own check run never reaches the pull request head; the job posts the
-# status on the head commit itself, in a step that always runs, so a crash or a timeout ends in
-# failure and never in a status that stays pending. When an ios-native-dispatch.yml run completes,
-# the workflow_run job judges every open pull request whose head that dispatch tested and posts
-# the status again, so it turns green without a new push.
+# The judge runs main's copy of this workflow. The pull request job runs on pull_request_target,
+# checks out main alone, uses no secret, and judges the head commit named in the event payload
+# through the API. A pull_request_target run belongs to the base commit, so the job posts the
+# status on the head commit itself, in a step that always runs: a crash or a timeout ends in
+# failure. When an ios-native-dispatch.yml run completes, the workflow_run job judges every open
+# pull request whose head that dispatch tested and posts the status again, so it turns green
+# without a new push.
 name: iOS native evidence
 
 on:
@@ -24,7 +22,7 @@ on:
 
 permissions: {}
 
-# Both jobs judge one head commit at a time, in order, so an older verdict never lands last.
+# Both jobs judge one head commit at a time, in order, so the newest verdict lands last.
 concurrency:
   group: ios-native-evidence-${{ github.event.pull_request.head.sha && format('iOS native {0}', github.event.pull_request.head.sha) || github.event.workflow_run.display_title }}
   cancel-in-progress: false

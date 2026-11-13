@@ -15,10 +15,10 @@
 #
 # A dispatch runs a commit that has not merged, on ref main. Its caller grants the jobs
 # cache-mode: read, which GitHub enforces with a read-only cache token, so neither this file nor
-# anything the commit runs can save a cache main's runs restore. ios-build is skipped and each
-# shard and Expo Go builds its own client instead; no client leaves its job, as a cache entry or
-# as an artifact. Every cache save also skips a dispatch, a dispatch installs through no local
-# action, and setup caches are off for it.
+# anything the commit runs can save a cache main's runs restore. ios-build is skipped, each shard
+# and Expo Go builds its own client, and each client stays in its job. Every cache save also skips
+# a dispatch, a dispatch installs with npm alone and no local action, and setup caches are off for
+# it.
 #
 # Every job checks out `sha` and fails unless HEAD is exactly that commit, which the callers' run
 # names carry.
@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 jobs:
-  # A dispatch has no cache to fill: its shards and Expo Go build their own client instead.
+  # A dispatch has no cache to fill: its shards and Expo Go each build their own client.
   ios-build:
     if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: macos-26
@@ -97,20 +97,8 @@ jobs:
           node-version: '22'
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
-      # A local action is the dispatched commit's own code, and the shared install saves caches.
-      - name: Install dependencies with the shared caches
-        if: github.event_name != 'workflow_dispatch'
-        uses: ./.github/actions/install
-      - name: Set up Node without a download cache for a dispatch
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-      - name: Install dependencies without a cache for a dispatch
+      - uses: ./.github/actions/install
         id: install
-        env:
-          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
-        run: if [ "$DISPATCH" = true ]; then bash scripts/ci/install-dependencies.sh; fi
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -154,7 +142,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build postgres
       - name: Save PostgreSQL
-        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.postgres-path }}
@@ -171,7 +159,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build redis
       - name: Save Redis
-        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.redis-path }}
@@ -192,14 +180,12 @@ jobs:
         with:
           go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
           cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
-          # The module and build caches would save on a dispatch.
-          cache: ${{ github.event_name != 'workflow_dispatch' }}
       - name: Build GoTrue
         id: gotrue_build
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build gotrue
       - name: Save GoTrue
-        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.gotrue-path }}
@@ -216,7 +202,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build storage
       - name: Save storage-api
-        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.storage-path }}
@@ -239,8 +225,8 @@ jobs:
           npm run build --workspace api
           node scripts/e2e-share-card/prepare.mjs
           node scripts/lib/story68-built-render.mjs
-          # Each long-running service records its exit status so an early crash is
-          # reported by name instead of surfacing as an unrelated later failure.
+          # Each long-running service records its exit status, so an early crash is
+          # reported by the name of the service that stopped.
           (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
           (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
@@ -269,15 +255,15 @@ jobs:
         run: node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"
       - name: Save the scanned development client of this fingerprint
         id: native_save
-        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.app_scan.outcome == 'success' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
       # A save that lost a race to a concurrent run leaves no entry of this run's own; the shards
-      # need one, so the job fails here instead of in four shards.
+      # need one, so the job fails here, once, ahead of the four shards.
       - name: Require the saved development client for the shards
-        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.native_save.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native_save.outcome == 'success' }}
         uses: actions/cache/restore@v5.1.0
         with:
           path: ${{ steps.native_key.outputs.path }}
@@ -493,15 +479,15 @@ jobs:
           npm run build --workspace api
           node scripts/e2e-share-card/prepare.mjs
           node scripts/lib/story68-built-render.mjs
-          # Each long-running service records its exit status so an early crash is
-          # reported by name instead of surfacing as an unrelated later failure.
+          # Each long-running service records its exit status, so an early crash is
+          # reported by the name of the service that stopped.
           (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
           (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
       # A dispatch tests a commit that has not merged, under a read-only cache, so the client is
-      # built here; it never leaves this job.
+      # built here and stays in this job.
       - name: Generate the native development client for this dispatch
         id: prebuild
         if: github.event_name == 'workflow_dispatch'
@@ -751,15 +737,15 @@ jobs:
           npm run build --workspace api
           node scripts/e2e-share-card/prepare.mjs
           node scripts/lib/story68-built-render.mjs
-          # Each long-running service records its exit status so an early crash is
-          # reported by name instead of surfacing as an unrelated later failure.
+          # Each long-running service records its exit status, so an early crash is
+          # reported by the name of the service that stopped.
           (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
           (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
       # A dispatch tests a commit that has not merged, under a read-only cache, so the client is
-      # built here; it never leaves this job.
+      # built here and stays in this job.
       - name: Generate the native development client for this dispatch
         id: prebuild
         if: github.event_name == 'workflow_dispatch'
