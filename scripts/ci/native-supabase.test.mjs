@@ -157,42 +157,82 @@ test('storage-api runs single tenant on files with the CLI v2.62.5 values', () =
 })
 
 test('cache keys follow every pinned input and name the install paths', () => {
-  const lines = cacheOutputs({ root: '/r', platform: 'darwin', arch: 'x64' })
+  const lines = cacheOutputs({
+    root: '/r',
+    platform: 'darwin',
+    arch: 'x64',
+    release: '25.1.0',
+  })
   const outputs = Object.fromEntries(
     lines.map((line) => line.split(/=(.*)/s).slice(0, 2))
   )
   assert.match(
     outputs['postgres-key'],
-    /^native-supabase-darwin-x64-postgres-17\.6-[a-f0-9]{16}$/
+    /^native-supabase-darwin25-x64-postgres-17\.6-[a-f0-9]{16}$/
   )
   assert.match(
     outputs['redis-key'],
-    /^native-supabase-darwin-x64-redis-7\.4\.12-[a-f0-9]{16}$/
+    /^native-supabase-darwin25-x64-redis-7\.4\.12-[a-f0-9]{16}$/
   )
   assert.match(
     outputs['gotrue-key'],
-    /^native-supabase-darwin-x64-gotrue-v2\.183\.0-[a-f0-9]{16}$/
+    /^native-supabase-darwin25-x64-gotrue-v2\.183\.0-[a-f0-9]{16}$/
   )
   assert.match(
     outputs['storage-key'],
-    /^native-supabase-darwin-x64-storage-v1\.32\.0-[a-f0-9]{16}$/
+    /^native-supabase-darwin25-x64-storage-v1\.32\.0-[a-f0-9]{16}$/
   )
   assert.equal(outputs['postgres-path'], path.join('/r', 'postgres'))
   assert.equal(outputs['storage-path'], path.join('/r', 'storage'))
 
   // The architecture is part of every key: an arm64 runner never restores x64 builds.
-  const arm = cacheOutputs({ root: '/r', platform: 'darwin', arch: 'arm64' })
+  const arm = cacheOutputs({
+    root: '/r',
+    platform: 'darwin',
+    arch: 'arm64',
+    release: '25.1.0',
+  })
   for (const [index, line] of arm.entries())
     if (line.includes('-key=')) {
-      assert.match(line, /=native-supabase-darwin-arm64-/)
+      assert.match(line, /=native-supabase-darwin25-arm64-/)
       assert.notEqual(line, lines[index])
     }
+
+  // PostgreSQL and Redis compile against the host SDK with no deployment target, so a macOS 26
+  // (Darwin 25) build does not run on macOS 15 (Darwin 24): the kernel major is part of every key.
+  const older = cacheOutputs({
+    root: '/r',
+    platform: 'darwin',
+    arch: 'x64',
+    release: '24.6.0',
+  })
+  for (const [index, line] of older.entries())
+    if (line.includes('-key=')) {
+      assert.match(line, /=native-supabase-darwin24-x64-/)
+      assert.notEqual(line, lines[index])
+    } else assert.equal(line, lines[index], 'the install paths stay put')
+  assert.deepEqual(
+    cacheOutputs({ root: '/r', platform: 'darwin', arch: 'x64', release: '25.4.1' }),
+    lines,
+    'a minor kernel update keeps the builds'
+  )
+  for (const release of [undefined, '', 'Darwin', '.1.0'])
+    assert.throws(
+      () => cacheOutputs({ root: '/r', platform: 'darwin', arch: 'x64', release }),
+      /kernel_release_required/,
+      String(release)
+    )
 
   // A configure flag change is a different build, so a different key.
   const flags = PINS.postgres.configureFlags
   PINS.postgres.configureFlags = [...flags, '--with-zlib']
   try {
-    const changed = cacheOutputs({ root: '/r', platform: 'darwin', arch: 'x64' })
+    const changed = cacheOutputs({
+      root: '/r',
+      platform: 'darwin',
+      arch: 'x64',
+      release: '25.1.0',
+    })
     assert.notEqual(changed[0], lines[0])
     assert.equal(changed[2], lines[2])
   } finally {

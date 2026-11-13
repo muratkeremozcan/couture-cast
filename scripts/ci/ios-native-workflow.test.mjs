@@ -944,11 +944,16 @@ describe('cache steps behind the read-only dispatch', () => {
       tools: {},
     })
     assert.match(client, new RegExp(`^cc68-native-ios-${CACHE_VERSION}-`))
-    const keys = cacheOutputs({ root: '/tmp/x', platform: 'darwin', arch: 'arm64' })
+    const keys = cacheOutputs({
+      root: '/tmp/x',
+      platform: 'darwin',
+      arch: 'arm64',
+      release: '24.6.0',
+    })
       .filter((line) => line.includes('-key='))
       .map((line) => line.split('=')[1])
     assert.equal(keys.length, 4)
-    for (const key of keys) assert.match(key, /^native-supabase-darwin-arm64-/)
+    for (const key of keys) assert.match(key, /^native-supabase-darwin24-arm64-/)
   })
 })
 
