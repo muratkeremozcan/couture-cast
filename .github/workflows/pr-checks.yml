@@ -356,8 +356,9 @@ jobs:
         run: npm run test:coverage
 
       # The mobile config plugin prebuild suites the coverage run (Vitest) leaves out: widgets, the
-      # background task and the font-scale configChanges. They run on Linux in seconds; the watchOS
-      # suite needs Xcode and runs nightly in watchos-native.yml (scripts/ci/node-test-suites.json).
+      # background task, the font-scale configChanges and the minifiedDebuggable build type. They
+      # run on Linux in seconds; the watchOS suite needs Xcode and runs nightly in
+      # watchos-native.yml (scripts/ci/node-test-suites.json).
       - name: Mobile plugin prebuild suites
         id: plugins
         if: ${{ !cancelled() && matrix.shard == 'mobile' && steps.setup.outcome == 'success' }}
@@ -366,6 +367,7 @@ jobs:
           npm run test:widget-prebuild
           npm run test:background-task-prebuild
           npm run test:font-scale-config-changes-prebuild
+          npm run test:minified-debuggable-prebuild
 
       - name: Record this shard's result
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
