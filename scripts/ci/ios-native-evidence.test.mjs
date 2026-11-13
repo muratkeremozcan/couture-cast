@@ -47,6 +47,9 @@ const BASE = 'c'.repeat(40)
 // The guard reads workflows the way yq does on the runner; the tests use the yaml package.
 const parseYaml = (text) => parse(text, { merge: true })
 const nativePaths = ['apps/mobile/package.json', 'apps/mobile/src/screens/home.tsx']
+// Codex r3 IOS-R3-01: an evidence workflow whose pull_request trigger runs the pull request's copy.
+const guardProbe =
+  'name: harmless data-only fixture\non: [pull_request]\njobs:\n  writer:\n    runs-on: ubuntu-latest\n    permissions: { statuses: write }\n    steps:\n      - run: printf harmless-marker\n'
 const file = (filename, patch = '@@ -1 +1 @@\n-a\n+b', extra = {}) => ({
   filename,
   status: 'modified',
@@ -214,7 +217,7 @@ describe('the iOS evidence a pull request head needs', () => {
 })
 
 // Code review 3: every workflow and local action file at the head that differs from main's is
-// read whole, renamed ones included.
+// read whole, renamed ones included, the evidence workflow among them (IOS-R3-01).
 describe('only the evidence workflow may post its status', () => {
   const blob = (path, sha) => ({ path, sha, type: 'blob' })
   const mainTree = [
@@ -242,11 +245,55 @@ describe('only the evidence workflow may post its status', () => {
       [
         '.github/workflows/pr-checks.yml',
         '.github/workflows/renamed.yml',
+        EVIDENCE_WORKFLOW,
         '.github/actions/install/action.yml',
         '.github/actions/new/action.yaml',
       ]
     )
   })
+
+  // IOS-R3-01: a pull request's copy of the evidence workflow runs before the merge as soon as one
+  // of its triggers runs the pull request's copy, so every trigger must be one that runs main's.
+  const evidenceText = fs.readFileSync(EVIDENCE_WORKFLOW, 'utf8')
+  const evidence = (text) =>
+    workflowGuardProblems([{ path: EVIDENCE_WORKFLOW, text }], { parseYaml })
+  test("the evidence workflow, edited or not, passes while every trigger runs main's copy", () => {
+    assert.deepEqual(evidence(evidenceText), [])
+    assert.deepEqual(
+      evidence(evidenceText.replaceAll('timeout-minutes: 5', 'timeout-minutes: 6')),
+      []
+    )
+    assert.deepEqual(evidence('on: [pull_request_target, workflow_run]\njobs: {}\n'), [])
+  })
+
+  const triggers = {
+    "Codex's probe: a pull_request list and a statuses: write job": [
+      guardProbe,
+      'runs on pull_request',
+    ],
+    'a pull_request key beside pull_request_target': [
+      evidenceText.replace('on:\n', 'on:\n  pull_request:\n'),
+      'runs on pull_request',
+    ],
+    'a workflow_call key': [
+      evidenceText.replace('on:\n', 'on:\n  workflow_call:\n'),
+      'runs on workflow_call',
+    ],
+    'a push string': ['on: push\njobs: {}\n', 'runs on push'],
+    'a workflow_dispatch entry in a list': [
+      'on: [pull_request_target, workflow_dispatch]\njobs: {}\n',
+      'runs on workflow_dispatch',
+    ],
+    'no trigger at all': ['jobs: {}\n', 'declares no trigger'],
+    'a trigger of another shape': ['on: 7\njobs: {}\n', 'declares no trigger'],
+  }
+  for (const [name, [text, message]] of Object.entries(triggers))
+    test(`an evidence workflow with ${name} fails`, () => {
+      const problems = evidence(text)
+      assert.equal(problems.length, 1, problems.join('\n'))
+      assert.ok(problems[0].startsWith(`${EVIDENCE_WORKFLOW} `), problems[0])
+      assert.ok(problems[0].includes(message), problems[0])
+    })
 
   const sneaky = (text) =>
     workflowGuardProblems([{ path: '.github/workflows/sneaky.yml', text }], { parseYaml })
@@ -350,6 +397,13 @@ describe('only the evidence workflow may post its status', () => {
       const { yqParse } = await import('./ios-native-evidence.mjs')
       for (const [text] of Object.values(fixtures))
         assert.deepEqual(statusGrants(yqParse(text)), statusGrants(parseYaml(text)))
+      for (const text of [evidenceText, ...Object.values(triggers).map(([body]) => body)])
+        assert.deepEqual(
+          workflowGuardProblems([{ path: EVIDENCE_WORKFLOW, text }], {
+            parseYaml: yqParse,
+          }),
+          evidence(text)
+        )
     }
   )
 })
@@ -385,6 +439,7 @@ function fakeGitHub({
   truncated = [],
   blobs = {},
   onMain = () => 'behind',
+  deny = [],
 }) {
   const posted = []
   const requested = []
@@ -459,6 +514,9 @@ function fakeGitHub({
   const fetchImpl = async (url, init = {}) => {
     const { pathname, searchParams } = new URL(url)
     requested.push(`${pathname}?${searchParams}`)
+    // A token without access: every request to a denied path answers 403.
+    if (deny.some((pattern) => pattern.test(pathname)))
+      return { ok: false, status: 403, json: async () => ({}) }
     const query = {
       ...Object.fromEntries(searchParams),
       page: Number(searchParams.get('page') ?? 1),
@@ -730,11 +788,87 @@ describe('the PR Gate guard', () => {
     assert.deepEqual(orphan.posted, [])
   })
 
-  // TEA P2: the guard step fails closed. It skips only when main's commit holds no guard.
-  const guardStep = () => {
-    const workflow = parse(fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'))
-    return workflow.jobs.watch.steps.at(-1)
+  // IOS-R3-01: Codex's probe, an evidence workflow at the head that runs on pull_request, fails
+  // the head in the judge and the gate in PR Gate.
+  const evidenceProbe = {
+    trees: {
+      [head]: [{ path: EVIDENCE_WORKFLOW, sha: 'evidence2', type: 'blob' }],
+      [MAIN_SHA]: [{ path: EVIDENCE_WORKFLOW, sha: 'evidence1', type: 'blob' }],
+    },
+    blobs: { evidence2: guardProbe },
   }
+  test('an evidence workflow at the head that runs on pull_request fails the judge and the gate', async () => {
+    const judged = await judgeEvent(fakeGitHub({ diff: ['README.md'], ...evidenceProbe }))
+    assert.equal(judged.state, 'failure')
+    assert.match(judged.detail, /ios-native-evidence\.yml runs on pull_request/)
+    const github = fakeGitHub({
+      pulls: [{ number: 5, head: { sha: head } }],
+      ...evidenceProbe,
+    })
+    const problems = await guard(github)
+    assert.equal(problems.length, 1, problems.join('\n'))
+    assert.match(problems[0], /ios-native-evidence\.yml runs on pull_request/)
+    assert.deepEqual(
+      github.posted.map(({ sha, state, context }) => ({ sha, state, context })),
+      [{ sha: head, state: 'failure', context: GATE_STATUS }]
+    )
+  })
+
+  test("an edited evidence workflow whose triggers run main's copy passes both", async () => {
+    const edited = fs
+      .readFileSync(EVIDENCE_WORKFLOW, 'utf8')
+      .replaceAll('timeout-minutes: 5', 'timeout-minutes: 6')
+    const fixture = { ...evidenceProbe, blobs: { evidence2: edited } }
+    assert.equal(
+      (await judgeEvent(fakeGitHub({ diff: ['README.md'], ...fixture }))).state,
+      'success'
+    )
+    const github = fakeGitHub({ pulls: [{ number: 5, head: { sha: head } }], ...fixture })
+    assert.deepEqual(await guard(github), [])
+    assert.deepEqual(github.posted, [])
+  })
+
+  // IOS-R3-02: PR Gate posts its own verdict first, so a guard that cannot read must still end
+  // with gate=failure on the head.
+  const gatePosts = (github, sha = head) =>
+    github.posted.filter((row) => row.sha === sha && row.context === GATE_STATUS)
+  const publisherSuccess = (github) =>
+    github.posted.push({ sha: head, state: 'success', context: GATE_STATUS })
+  test('PR Gate success, then a guard read error, ends with gate=failure', async () => {
+    for (const deny of [
+      [/\/git\/ref\/heads\/main$/],
+      [/\/git\/trees\//],
+      [/\/git\/blobs\//],
+      [/\/pulls$/],
+      [/^\/repos\/o\/r\/(?!statuses\/)/],
+    ]) {
+      const github = fakeGitHub({
+        pulls: [{ number: 5, head: { sha: head } }],
+        ...rogue,
+        deny,
+      })
+      publisherSuccess(github)
+      const problems = await guard(github)
+      const last = gatePosts(github).at(-1)
+      assert.equal(last.state, 'failure', String(deny))
+      assert.match(last.description, /could not read/, String(deny))
+      assert.match(problems[0], /answered 403/, String(deny))
+    }
+  })
+
+  test('a guard that cannot post its failure fails its step, so the fallback step posts', async () => {
+    const github = fakeGitHub({
+      pulls: [{ number: 5, head: { sha: head } }],
+      deny: [/\/git\/ref\/heads\/main$/, /\/statuses\//],
+    })
+    await assert.rejects(guard(github), /answered 403/)
+  })
+
+  // TEA P2: the guard step fails closed. It skips only when main's commit holds no guard.
+  const gateSteps = () =>
+    parse(fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8')).jobs.watch.steps
+  const guardStep = () => gateSteps().find((row) => row.id === 'guard')
+  const fallbackStep = () => gateSteps().at(-1)
   const runGuardStep = ({ checkout, file, listed, gitFails = false }) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pr-gate-guard-'))
     try {
@@ -803,20 +937,139 @@ describe('the PR Gate guard', () => {
     const gate = names.findIndex((name) =>
       String(name).startsWith('muratkeremozcan/pr-gate')
     )
-    const [checkout, run] = job.steps.slice(gate + 1)
-    assert.ok(gate >= 0 && job.steps.length === gate + 3)
+    const [checkout, run, fallback] = job.steps.slice(gate + 1)
+    assert.ok(gate >= 0 && job.steps.length === gate + 4)
     assert.equal(checkout.if, 'always()')
     assert.equal(checkout.id, 'guard_checkout')
     assert.equal(checkout.with.ref, '${{ github.event.repository.default_branch }}')
     assert.equal(checkout.with['persist-credentials'], false)
     assert.equal(run.if, 'always()')
+    assert.equal(run.id, 'guard')
     assert.match(run.run, /node "\$guard" gate-guard/)
-    assert.equal(
-      run.env.HEAD_SHA,
+    const headSha =
       '${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}'
-    )
+    assert.equal(run.env.HEAD_SHA, headSha)
+    assert.equal(fallback.if, FALLBACK_IF)
+    assert.equal(fallback.env.HEAD_SHA, headSha)
+    assert.equal(fallback.env.OUTCOME, '${{ steps.guard.outcome }}')
+    assert.equal(fallback.env.GH_TOKEN, '${{ github.token }}')
     assert.equal(job.permissions['pull-requests'], 'read')
     assert.equal(job.permissions.statuses, 'write')
+  })
+
+  // IOS-R3-02: the status sequence on one head, against fake git, node and gh: PR Gate's success,
+  // then the guard step, then the fallback step whenever the guard step did not succeed. The
+  // fallback's condition is checked as text and evaluated here from the guard step's outcome.
+  const FALLBACK_IF = "always() && steps.guard.outcome != 'success'"
+  const sequence = ({
+    checkout = 'success',
+    node = 'exit 0',
+    timeout,
+    pulls = 'echo 1',
+    sha = head,
+  }) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pr-gate-sequence-'))
+    try {
+      const bin = path.join(dir, 'bin')
+      const log = path.join(dir, 'statuses')
+      fs.mkdirSync(bin)
+      fs.mkdirSync(path.join(dir, 'scripts/ci'), { recursive: true })
+      fs.writeFileSync(path.join(dir, 'scripts/ci/ios-native-evidence.mjs'), '')
+      fs.writeFileSync(log, `${sha} gate success\n`)
+      const stub = (name, body) =>
+        fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
+          mode: 0o755,
+        })
+      stub('git', `echo ${MAIN_SHA}`)
+      stub('node', node)
+      stub(
+        'gh',
+        [
+          'if [ "$1 $2" = "api -X" ]; then',
+          '  state= context=',
+          '  for arg in "$@"; do case "$arg" in state=*) state=${arg#state=} ;; context=*) context=${arg#context=} ;; esac; done',
+          `  echo "\${4##*/} $context $state" >> "${log}"`,
+          'else',
+          `  ${pulls}`,
+          'fi',
+        ].join('\n')
+      )
+      const env = {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        CHECKOUT: checkout,
+        HEAD_SHA: sha,
+        GH_REPO: 'o/r',
+        TARGET: 'https://github.com/o/r/actions/runs/7',
+      }
+      const guarded = spawnSync('bash', ['-e', '-c', guardStep().run], {
+        cwd: dir,
+        encoding: 'utf8',
+        env,
+        timeout,
+      })
+      const outcome = guarded.signal
+        ? 'cancelled'
+        : guarded.status === 0
+          ? 'success'
+          : 'failure'
+      assert.equal(fallbackStep().if, FALLBACK_IF)
+      const fallback =
+        outcome === 'success'
+          ? null
+          : spawnSync('bash', ['-e', '-c', fallbackStep().run], {
+              cwd: dir,
+              encoding: 'utf8',
+              env: { ...env, OUTCOME: outcome },
+            })
+      const gates = fs
+        .readFileSync(log, 'utf8')
+        .trim()
+        .split('\n')
+        .filter((line) => line.startsWith(`${sha} gate `))
+      return { outcome, fallback, last: gates.at(-1), gates }
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('a checkout failure after PR Gate success ends with gate=failure', () => {
+    for (const checkout of ['failure', 'cancelled', 'skipped', '']) {
+      const result = sequence({ checkout })
+      assert.equal(result.outcome, 'failure', checkout)
+      assert.equal(result.fallback.status, 0, result.fallback.stderr)
+      assert.equal(result.last, `${head} gate failure`, checkout)
+    }
+  })
+
+  test('a guard that crashes on a read error or times out ends with gate=failure', () => {
+    const crashed = sequence({
+      node: 'echo "GET /git/ref/heads/main answered 403" >&2; exit 1',
+    })
+    assert.equal(crashed.outcome, 'failure')
+    assert.equal(crashed.last, `${head} gate failure`)
+    const timedOut = sequence({ node: 'exec sleep 5 > /dev/null 2>&1', timeout: 500 })
+    assert.equal(timedOut.outcome, 'cancelled')
+    assert.equal(timedOut.last, `${head} gate failure`)
+  })
+
+  test('an unreadable pull request list still fails the gate; a commit no pull request heads posts nothing', () => {
+    assert.equal(
+      sequence({ checkout: 'failure', pulls: 'exit 1' }).last,
+      `${head} gate failure`
+    )
+    const orphan = sequence({ checkout: 'failure', pulls: 'echo 0' })
+    assert.equal(orphan.fallback.status, 0)
+    assert.deepEqual(orphan.gates, [`${head} gate success`])
+  })
+
+  test('a guard that finished leaves the gate to its verdict, and a missing head commit fails the fallback', () => {
+    const clean = sequence({})
+    assert.equal(clean.outcome, 'success')
+    assert.equal(clean.fallback, null)
+    assert.deepEqual(clean.gates, [`${head} gate success`])
+    for (const sha of ['', 'main', `${head}0`])
+      assert.notEqual(sequence({ checkout: 'failure', sha }).fallback.status, 0, sha)
   })
 })
 
@@ -833,13 +1086,13 @@ describe('a pull request that changes the shared dependency files', () => {
       'node_modules/next': { version: next },
     },
   })
-  const judge = async (after, manifest = {}) => {
+  const judge = async (after, manifest = {}, before = {}) => {
     const github = fakeGitHub({
       diff: [LOCKFILE, ROOT_MANIFEST],
       contents: {
         [older]: {
           [LOCKFILE]: JSON.stringify(lock('58.0.0', '15.0.0')),
-          [ROOT_MANIFEST]: '{}',
+          [ROOT_MANIFEST]: JSON.stringify(before),
         },
         [head]: {
           [LOCKFILE]: JSON.stringify(after),
@@ -873,6 +1126,32 @@ describe('a pull request that changes the shared dependency files', () => {
     const same = lock('58.0.0', '15.0.0')
     assert.equal((await judge(same, { scripts: { prepare: 'husky' } })).state, 'failure')
     assert.equal((await judge(same, { scripts: { lint: 'eslint .' } })).state, 'success')
+  })
+
+  // IOS-R3-03: npm ci runs preprepare and postprepare around prepare, so a hook alone, added,
+  // edited or removed, needs the evidence with an unchanged lockfile, and so does a root script
+  // either one runs.
+  test('a preprepare or postprepare hook alone, added, edited or removed, needs it', async () => {
+    const same = lock('58.0.0', '15.0.0')
+    for (const hook of ['preprepare', 'postprepare']) {
+      const cases = {
+        added: [{ scripts: { [hook]: 'printf harmless-hook-marker' } }, {}],
+        edited: [
+          { scripts: { [hook]: 'printf b' } },
+          { scripts: { [hook]: 'printf a' } },
+        ],
+        removed: [{}, { scripts: { [hook]: 'printf a' } }],
+        'a root script it runs, edited': [
+          { scripts: { [hook]: 'npm run setup:hooks', 'setup:hooks': 'printf b' } },
+          { scripts: { [hook]: 'npm run setup:hooks', 'setup:hooks': 'printf a' } },
+        ],
+      }
+      for (const [name, [after, before]] of Object.entries(cases)) {
+        const result = await judge(same, after, before)
+        assert.equal(result.state, 'failure', `${hook} ${name}`)
+        assert.match(result.detail, /package\.json/, `${hook} ${name}`)
+      }
+    }
   })
 })
 

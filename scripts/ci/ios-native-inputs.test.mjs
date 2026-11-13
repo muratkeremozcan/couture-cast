@@ -12,8 +12,15 @@ import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import { readWorkspaceDependencies, selectLanes } from './lanes.mjs'
 import {
+  disabledCondition,
+  executedLines,
+  neutralizedRun,
+  requiredLineProblems,
+} from './ios-native-workflow.mjs'
+import {
   IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
+  LIFECYCLE_SCRIPTS,
   LOCKFILE,
   ROOT_MANIFEST,
   dependencyChanges,
@@ -215,26 +222,91 @@ describe('what apps/mobile installs, from the lockfile alone', () => {
 // apps/api and packages/db skip iOS evidence only while a Linux pull request job boots the same
 // API path: browser-acceptance builds the API, runs node scripts/run-story68-native.mjs serve
 // and the story68-api-entry guard, under the share-card lane those workspaces wake.
+//
+// IOS-R3-04: the pin binds each command the way the mandatory iOS checks are bound: an exact line
+// the shell executes, unconditionally, in a step that runs and can fail the job. The serve line
+// runs in the background, so a later step that always runs must fail on its recorded exit status.
+const API_BUILD = 'npm run build --workspace api'
+const API_SERVE =
+  '(node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &'
+const API_ENTRY =
+  'npx vitest run scripts/lib/story68-api-entry.test.mjs --reporter=default --reporter=json --outputFile="$RUNNER_TEMP/story68-api-entry.json"'
+const SERVICE_EXITS = [
+  'for service in auth api; do',
+  'if [ -f "/tmp/cc68-$service.exit" ]; then',
+  'exit "$status"',
+]
+
+/**
+ * A step body without the text its here-documents carry, which the shell reads as data, and
+ * without their `<<` openers.
+ */
+function withoutHereDocuments(run) {
+  const kept = []
+  let end = null
+  for (const line of String(run ?? '').split('\n')) {
+    if (end !== null) {
+      if (line.trim() === end) end = null
+      continue
+    }
+    const opener = /<<-?\s*(['"]?)([\w-]+)\1/.exec(line)
+    if (opener) end = opener[2]
+    kept.push(opener ? line.replace(opener[0], '') : line)
+  }
+  return kept.join('\n')
+}
+
+/** Why browser-acceptance may no longer build, boot and check the API on a pull request. */
+function apiPinProblems(workflow) {
+  const job = workflow?.jobs?.['browser-acceptance']
+  if (!job) return ['browser-acceptance is gone']
+  const problems = []
+  if (job['runs-on'] !== 'ubuntu-latest')
+    problems.push('browser-acceptance left ubuntu-latest')
+  if (!/\['share-card'\]/.test(String(job.if)))
+    problems.push('browser-acceptance no longer runs on the share-card lane')
+  if (job['continue-on-error'] !== undefined && job['continue-on-error'] !== false)
+    problems.push('browser-acceptance continues on error')
+  // The steps that run under the default bash -e and can fail the job.
+  const steps = (job.steps ?? [])
+    .map((row, index) => ({ row, index, run: withoutHereDocuments(row.run) }))
+    .filter(
+      ({ row, run }) =>
+        row.run !== undefined &&
+        !disabledCondition(row.if) &&
+        (row['continue-on-error'] === undefined || row['continue-on-error'] === false) &&
+        (row.shell === undefined || row.shell === 'bash') &&
+        !neutralizedRun(run)
+    )
+  const runs = (line) =>
+    steps.find(({ run }) => requiredLineProblems(run, [line]).length === 0)
+  for (const line of [API_BUILD, API_ENTRY])
+    if (!runs(line)) problems.push(`no step that can fail runs ${line}`)
+  const serve = steps.find(({ run }) =>
+    executedLines(run).some((entry) => entry.line === API_SERVE && !entry.conditional)
+  )
+  if (!serve) problems.push(`no step that can fail runs ${API_SERVE}`)
+  else if (
+    !steps.some(
+      ({ row, index, run }) =>
+        index > serve.index &&
+        row.if === 'always()' &&
+        requiredLineProblems(run, SERVICE_EXITS).length === 0 &&
+        executedLines(run).some((entry) => entry.line === 'status=1')
+    )
+  )
+    problems.push('no later step that always runs fails on the API exit status')
+  return problems
+}
+
 describe('the API pin', () => {
   const unpinned =
     'apps/api and packages/db must return to the iOS evidence inputs (scripts/ci/ios-native-inputs.mjs)'
+  const read = () =>
+    parse(fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8'))
+
   test('browser-acceptance boots the API on every pull request apps/api or packages/db wakes', () => {
-    const workflow = parse(
-      fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
-    )
-    const job = workflow.jobs['browser-acceptance']
-    const runs = (job?.steps ?? []).map((row) => String(row.run ?? '')).join('\n')
-    assert.ok(job && job['runs-on'] === 'ubuntu-latest', unpinned)
-    assert.match(String(job.if), /\['share-card'\]/, unpinned)
-    for (const command of [
-      'npm run build --workspace api',
-      'node scripts/run-story68-native.mjs serve',
-      'scripts/lib/story68-api-entry.test.mjs',
-    ])
-      assert.ok(
-        runs.includes(command),
-        `${unpinned}: browser-acceptance no longer runs ${command}`
-      )
+    assert.deepEqual(apiPinProblems(read()), [], unpinned)
     const dependencies = readWorkspaceDependencies('.')
     for (const file of ['apps/api/src/main.ts', 'packages/db/package.json']) {
       const plan = selectLanes({ event: 'pull_request', files: [file], dependencies })
@@ -245,6 +317,53 @@ describe('the API pin', () => {
       )
     }
   })
+
+  // Each mutant edits a parsed copy; the workflow file itself stays untouched.
+  const stepWith = (job, line) =>
+    job.steps.find((row) =>
+      String(row.run ?? '')
+        .split('\n')
+        .includes(line)
+    )
+  const edit = (line, replace) => (job) => {
+    const row = stepWith(job, line)
+    row.run = row.run
+      .split('\n')
+      .map((text) => (text === line ? replace : text))
+      .join('\n')
+  }
+  const patch = (line, fields) => (job) => Object.assign(stepWith(job, line), fields)
+  const mutants = {
+    'a commented-out API build': edit(API_BUILD, `# ${API_BUILD}`),
+    'a commented-out serve line': edit(API_SERVE, `# ${API_SERVE}`),
+    'a commented-out entry guard': edit(API_ENTRY, `# ${API_ENTRY}`),
+    'a disabled build step': patch(API_BUILD, { if: false }),
+    'a disabled entry guard step': patch(API_ENTRY, {
+      if: "${{ false && steps.runtime.outcome == 'success' }}",
+    }),
+    'a build whose failure is swallowed': edit(API_BUILD, `${API_BUILD} || true`),
+    'an entry guard whose failure is swallowed': edit(API_ENTRY, `${API_ENTRY} || :`),
+    'a build step under set +e': edit(API_BUILD, `set +e\n${API_BUILD}`),
+    'a build step that continues on error': patch(API_BUILD, {
+      'continue-on-error': true,
+    }),
+    'an entry guard behind an if': edit(API_ENTRY, `if false; then\n${API_ENTRY}\nfi`),
+    'an entry guard inside a here-document': edit(
+      API_ENTRY,
+      `cat <<'TEXT'\n${API_ENTRY}\nTEXT`
+    ),
+    'a build step run by sh': patch(API_BUILD, { shell: 'sh -c "exit 0" {0}' }),
+    'a job that continues on error': (job) =>
+      Object.assign(job, { 'continue-on-error': true }),
+    'no step that fails on the API exit status': edit('exit "$status"', 'exit 0'),
+    'a disabled exit status report': patch('exit "$status"', { if: false }),
+  }
+  for (const [name, mutate] of Object.entries(mutants))
+    test(`${name} unpins the API`, () => {
+      const workflow = read()
+      mutate(workflow.jobs['browser-acceptance'])
+      assert.notDeepEqual(apiPinProblems(workflow), [], `${name} still passes the pin`)
+    })
 })
 
 describe('what the root manifest changes for an iOS run', () => {
@@ -295,7 +414,7 @@ describe('what the root manifest changes for an iOS run', () => {
     assert.deepEqual(change({ dependencies: { '@prisma/client': '^7' } }), [
       'dependencies',
     ])
-    for (const name of ['preinstall', 'install', 'postinstall', 'prepare', 'prepublish'])
+    for (const name of LIFECYCLE_SCRIPTS)
       assert.deepEqual(
         change({ scripts: { ...root.scripts, [name]: 'node scripts/setup.mjs' } }),
         [`scripts.${name}`],
@@ -307,6 +426,36 @@ describe('what the root manifest changes for an iOS run', () => {
         [`scripts.${name}`],
         name
       )
+  })
+
+  // IOS-R3-03: npm ci runs this sequence of root scripts on its own (docs.npmjs.com, Scripts,
+  // "npm ci"), preprepare and postprepare among them.
+  test('the lifecycle scripts are every root script npm ci runs, in its order', () => {
+    assert.deepEqual(LIFECYCLE_SCRIPTS, [
+      'preinstall',
+      'install',
+      'postinstall',
+      'prepublish',
+      'preprepare',
+      'prepare',
+      'postprepare',
+    ])
+    for (const hook of ['preprepare', 'postprepare']) {
+      const hooked = {
+        ...root,
+        scripts: { ...root.scripts, [hook]: 'npm run setup:hooks', 'setup:hooks': 'a' },
+      }
+      assert.ok(rootScriptClosure(text, hooked).includes('setup:hooks'), hook)
+      assert.deepEqual(
+        rootManifestChanges(
+          hooked,
+          { ...hooked, scripts: { ...hooked.scripts, 'setup:hooks': 'b' } },
+          text
+        ),
+        ['scripts.setup:hooks'],
+        hook
+      )
+    }
   })
 
   // IOS-R2-03: the root scripts a lifecycle script or a hook runs count too.
@@ -517,6 +666,32 @@ describe('the ios-changes job', () => {
       }
     )
     assert.equal(quiet.answer, false)
+  })
+
+  // IOS-R3-03: the same for a preprepare or postprepare hook, added, edited or removed.
+  test('a merge of a preprepare or postprepare hook alone runs them', async () => {
+    for (const hook of ['preprepare', 'postprepare'])
+      for (const [name, was, now] of [
+        ['added', {}, { [hook]: 'printf harmless-hook-marker' }],
+        ['edited', { [hook]: 'printf a' }, { [hook]: 'printf b' }],
+        ['removed', { [hook]: 'printf a' }, {}],
+      ]) {
+        const { answer } = await decide(
+          { EVENT: 'push', BEFORE: before },
+          {
+            files: [ROOT_MANIFEST],
+            before: {
+              [LOCKFILE]: JSON.stringify(lock),
+              [ROOT_MANIFEST]: JSON.stringify({ scripts: was }),
+            },
+            after: {
+              [LOCKFILE]: JSON.stringify(lock),
+              [ROOT_MANIFEST]: JSON.stringify({ scripts: now }),
+            },
+          }
+        )
+        assert.equal(answer, true, `${hook} ${name}`)
+      }
   })
 
   test('a merge with no earlier commit, or a diff that fails, runs them', async () => {
