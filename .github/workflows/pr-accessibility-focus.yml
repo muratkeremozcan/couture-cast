@@ -195,7 +195,8 @@ jobs:
           echo "Simulator: $device"
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
 
-  # Not on pull requests: the release build alone takes about 21 minutes.
+  # macOS runs nightly and on demand only (owner rule, 2026-11-13); the release build alone takes
+  # about 21 minutes.
   ios-app-build:
     name: iOS app build
     if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}

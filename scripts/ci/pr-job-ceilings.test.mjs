@@ -136,7 +136,7 @@ function runsOnMacos(job, inputs = {}) {
   if (/macos/i.test(runsOn)) return true
   if (
     /matrix\./.test(runsOn) &&
-    /macos/i.test(JSON.stringify(job?.strategy?.matrix ?? ''))
+    /macos/i.test(withInputs(JSON.stringify(job?.strategy?.matrix ?? ''), inputs))
   )
     return true
   return [...runsOn.matchAll(/inputs\.([A-Za-z_][\w-]*)/g)].some(([, name]) =>
@@ -144,8 +144,17 @@ function runsOnMacos(job, inputs = {}) {
   )
 }
 
-/** A caller's inputs for a reusable workflow, its declared defaults filled in. */
-function inputsFor(called, job) {
+/** Text with every `inputs.<name>` expression replaced by the value the caller passed. */
+const withInputs = (text, inputs) =>
+  String(text).replace(/\$\{\{\s*inputs\.([A-Za-z_][\w-]*)\s*\}\}/g, (_, name) =>
+    String(inputs[name] ?? '')
+  )
+
+/**
+ * A caller's inputs for a reusable workflow, its declared defaults filled in, and any value the
+ * caller forwards from its own inputs resolved against them.
+ */
+function inputsFor(called, job, parentInputs = {}) {
   const declared = (called.on ?? called[true])?.workflow_call?.inputs ?? {}
   return {
     ...Object.fromEntries(
@@ -153,7 +162,12 @@ function inputsFor(called, job) {
         .filter(([, input]) => input && 'default' in input)
         .map(([key, input]) => [key, input.default])
     ),
-    ...(job.with ?? {}),
+    ...Object.fromEntries(
+      Object.entries(job.with ?? {}).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? withInputs(value, parentInputs) : value,
+      ])
+    ),
   }
 }
 
@@ -169,7 +183,7 @@ function macosOnPullRequestOrPush(directory = dir) {
     if (typeof job.uses === 'string' && job.uses.startsWith('./.github/workflows/')) {
       if (depth > 10) throw new Error(`reusable workflow chain too deep at ${via}`)
       const called = load(directory, path.basename(job.uses))
-      const callerInputs = inputsFor(called, job)
+      const callerInputs = inputsFor(called, job, inputs)
       for (const [inner, innerJob] of Object.entries(called.jobs ?? {}))
         visit(
           inner,
@@ -239,6 +253,35 @@ test('a macOS job on a pull request, a merge or a matrix is caught; nightly-only
       'on: push\njobs:\n  call:\n    uses: ./.github/workflows/runner-input.yml\n',
     'linux-input.yml':
       'on: pull_request\njobs:\n  call:\n    uses: ./.github/workflows/runner-input.yml\n    with: { runner: ubuntu-latest }\n',
+    'forward.yml':
+      'on: pull_request\njobs:\n  call:\n    uses: ./.github/workflows/forwarder.yml\n    with: { runner: macos-15 }\n',
+    'forwarder.yml': [
+      'on:',
+      '  workflow_call:',
+      '    inputs:',
+      '      runner: { type: string, default: ubuntu-latest }',
+      'jobs:',
+      '  pass:',
+      '    uses: ./.github/workflows/runner-input.yml',
+      "    with: { runner: '${{ inputs.runner }}' }",
+      '',
+    ].join('\n'),
+    'matrix-input.yml':
+      'on: push\njobs:\n  call:\n    uses: ./.github/workflows/matrix-runner.yml\n    with: { runner: macos-26 }\n',
+    'matrix-runner.yml': [
+      'on:',
+      '  workflow_call:',
+      '    inputs:',
+      '      runner: { type: string, default: ubuntu-latest }',
+      'jobs:',
+      '  legs:',
+      '    strategy:',
+      "      matrix: { os: ['${{ inputs.runner }}'] }",
+      '    runs-on: ${{ matrix.os }}',
+      '    timeout-minutes: 10',
+      '    steps: [{ run: echo }]',
+      '',
+    ].join('\n'),
     'runner-input.yml': [
       'on:',
       '  workflow_call:',
@@ -258,6 +301,8 @@ test('a macOS job on a pull request, a merge or a matrix is caught; nightly-only
     'by-default.yml:call > runner-input.yml:work',
     'by-input.yml:call > runner-input.yml:work',
     'caller.yml:call > called.yml:mac',
+    'forward.yml:call > forwarder.yml:pass > runner-input.yml:work',
+    'matrix-input.yml:call > matrix-runner.yml:legs',
     'matrix.yml:both',
     'pr.yml:mac',
     'push.yml:mac',

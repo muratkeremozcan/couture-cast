@@ -5,7 +5,8 @@ name: Share-card native originals
 # condition skips it and a success everywhere else.
 on:
   pull_request:
-  # A merge to main runs every device lane (10 jobs, 4 on macOS, 41 to 118 minutes), which
+  # A merge to main runs every Android device lane (the iOS lanes are nightly and on demand only),
+  # once 10 jobs, 4 on macOS, 41 to 118 minutes, which
   # held half of the account's 20 concurrent jobs. It runs only when a file the lanes build,
   # run or read changed; the nightly run covers everything. scripts/ci/share-card-paths.test.mjs
   # checks the filter against representative inputs and the last 20 commits on main.
@@ -1271,8 +1272,8 @@ jobs:
         if: always()
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
-  # The Expo Go proof runs alone on a fresh simulator, skipped on pull requests like every other
-  # device lane and required by share-card-lanes-gate. The iOS checks that need no development
+  # The Expo Go proof runs alone on a fresh simulator, nightly and on demand only like the other
+  # iOS lanes, and required there by share-card-lanes-gate. The iOS checks that need no development
   # client follow it.
   ios-expo-go:
     needs: ios-build

@@ -47,8 +47,9 @@ export const android36Lanes = Object.freeze({
 export const gateJobName = 'share-card-lanes-gate'
 const reservedContext = 'gate'
 // Every device lane takes over an hour, so a pull request runs only the lanes in
-// pullRequestShareCardJobs. The rest carry this job-level condition; the gate expects them
-// skipped on pull_request and successful on main, the nightly schedule and dispatch.
+// pullRequestShareCardJobs. The Android lanes carry this job-level condition; the gate expects
+// them skipped on pull_request and successful on main, the nightly schedule and dispatch. The iOS
+// lanes carry iosLaneCondition below.
 export const deviceLaneCondition = `github.event_name != '${pullRequestEvent}'`
 export const evidenceCondition = `always() && ${deviceLaneCondition}`
 // The iOS lanes need macOS, which runs nightly and on demand only (owner rule, 2026-11-13: no
@@ -235,8 +236,8 @@ function iosShapeProblems({ build, shard, evidence, expoGo }, check) {
 }
 
 /**
- * The Expo Go proof: its own job on a fresh simulator, off every pull request and out of the
- * gate. The shard steps it shares run the same setup text as the shards, so a change to one
+ * The Expo Go proof: its own job on a fresh simulator, nightly and on demand only, and required
+ * by the gate there. The shard steps it shares run the same setup text as the shards, so a change to one
  * cannot leave the other behind.
  */
 function expoGoProblems({ shard, expoGo }, check) {
@@ -909,6 +910,6 @@ if (
     process.exitCode = 1
   } else
     console.log(
-      'Browser lane on pull requests, device lanes on main, nightly and dispatch, owned runtimes, budgets and strict gate validated.'
+      'Browser lane on pull requests, Android device lanes on main, nightly and dispatch, iOS lanes nightly and dispatch, owned runtimes, budgets and strict gate validated.'
     )
 }
