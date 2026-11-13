@@ -63,6 +63,32 @@ Spec D6 records the rule (`5c4ddbcc`). Never dispatch the story for evidence aga
 - D11 store and device gates stay blocked on Apple and Google enrollment.
 - Security, owner action: a Cursor MCP helper process carries a live GitHub token on its command line (visible in `ps`). The owner should rotate it.
 
+## TEA open items (from the outgoing TEA, 2026-11-13)
+
+- C-15: the iOS first-flow cap stays at 240 s, and a first flow over 192 s is a finding. The shards now run on macos-15 with the iOS 18.5 simulator, in the nightly run only.
+- C-16 evidence still owed:
+  - 20 first flows on macos-26 from the canary;
+  - canary triage;
+  - first-flow p95;
+  - a retirement trigger for macos-15. When GitHub announces the end of the macos-15 image, move the shards to macos-26 once the canary has been green 5 nights in a row.
+- Flake log: `_bmad-output/test-artifacts/test-design/cc615-ios-native-flake-log.md`. The open rows are iOS 26.5 runtime classes, which now appear only in the canary:
+  - the XCUITest audit cannot find `share-card-cancel`;
+  - Maestro stalls, such as `settings.yaml` in `assertNotVisible`;
+  - first `open-app` stalls.
+- Every nightly native red goes to TEA each morning and gets classified in the flake log.
+- Canary rules: `ios-native-canary.yml` runs at 04:47 UTC and never gates or blocks a merge. Triage a canary red; never rerun it to green.
+- D5 residual baselines: the device agent's SDK 54 release-plugin reruns (all four screens, plus Debug) are still unreviewed. Approve an entry in `scripts/lib/fixtures/live-font-residual-baselines.json` only when all of these hold:
+  - the leg is `known-residual`;
+  - the control passes;
+  - every structural check passes;
+  - every miss is stale;
+  - growth fails only on the named probe;
+  - ids and counts are exact, with no headroom.
+- No macOS job runs on a pull request or a merge. The PR from `ci/no-macos-on-prs` does this.
+  - `scripts/ci/pr-job-ceilings.test.mjs` fails any macOS job a pull request or push can run, and any PR job over 20 minutes.
+  - The owner skipped the 2-week p95 audit of Linux PR jobs. Run `scripts/ci/pr-job-p95.mjs` when a PR job nears 15 minutes.
+- PR 216 already carries the fixture-reap fix (18b81d7f). The local branch `tea/ba216-reap` is obsolete.
+
 ## Reports and evidence
 
 - Antigravity reports: `_bmad-output/implementation-artifacts/story-6-15/reviews/` (copied from `/tmp/agy-review-615-*.md`).
