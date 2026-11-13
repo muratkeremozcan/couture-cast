@@ -1070,6 +1070,32 @@ describe('the evidence runs the pull_request_target job reads', () => {
     assert.equal(dispatchAfterE, false, 'the next dispatch is stopped')
   })
 
+  // The gate already stopped this dispatch while its other jobs wind down: it decides nothing, and
+  // the judge stays with the earlier pass.
+  test('a dispatch in progress whose gate already failed is passed over', async () => {
+    const P = run({ created_at: '2026-11-13T09:00:00Z' })
+    const S = run({
+      created_at: '2026-11-13T10:00:00Z',
+      status: 'in_progress',
+      conclusion: null,
+    })
+    const stoppedJobs = dispatchJobs(
+      Object.fromEntries(
+        dispatchJobs().map(({ name }) => [
+          name,
+          name === 'ios-dispatch-gate'
+            ? { conclusion: 'failure' }
+            : { status: 'in_progress', conclusion: null },
+        ])
+      )
+    )
+    const result = await judgeEvent(
+      fakeGitHub({ runs: [S, P], jobs: { [S.id]: stoppedJobs } })
+    )
+    assert.equal(result.state, 'success', result.detail)
+    assert.ok(result.detail.includes(`run ${P.id} `), result.detail)
+  })
+
   test('a cancelled run is never a deciding pass', async () => {
     const P = run({ created_at: '2026-11-13T09:00:00Z' })
     const C = run({ created_at: '2026-11-13T10:00:00Z', conclusion: 'cancelled' })

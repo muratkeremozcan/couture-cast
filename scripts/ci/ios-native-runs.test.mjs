@@ -391,7 +391,17 @@ describe('the merge decision', () => {
   const O = 'f'.repeat(40)
   const N = '9'.repeat(40)
   const HEAD = 'c'.repeat(40)
-  const merge = async (t, { runs = [], jobs = {}, diffs = {}, before = B, ...extra }) => {
+  const merge = async (
+    t,
+    {
+      runs = [],
+      jobs = {},
+      diffs = {},
+      before = B,
+      currentJobs = [{ name: 'ios-changes', conclusion: null }],
+      ...extra
+    }
+  ) => {
     const current = iosRun('push', {
       head_sha: HEAD,
       status: 'in_progress',
@@ -399,7 +409,7 @@ describe('the merge decision', () => {
     })
     const api = runsApi({
       runs: [current, ...runs],
-      jobs: { ...jobs, [current.id]: [{ name: 'ios-changes', conclusion: null }] },
+      jobs: { ...jobs, [current.id]: currentJobs },
       ...extra,
     })
     const compared = []
@@ -530,6 +540,20 @@ describe('the merge decision', () => {
     })
     assert.deepEqual(only.compared, [])
     assert.equal(only.result, true)
+  })
+
+  // A re-run lists the iOS jobs its first attempt ran, so without its own exclusion it would be
+  // its own, identical base and decide run=false.
+  test('a re-run of a merge whose first attempt ran its iOS jobs is no base of itself', async (t) => {
+    const a = tested(A, { created_at: '2026-11-13T08:00:00Z' })
+    const { result, compared } = await merge(t, {
+      runs: [a.run],
+      jobs: a.jobs,
+      currentJobs: iosJobs('push', { 'ios-changes': { conclusion: null } }),
+      diffs: { [A]: ['apps/mobile/src/x.ts'], [HEAD]: [] },
+    })
+    assert.deepEqual(compared, [A])
+    assert.equal(result, true)
   })
 
   test('no tested commit, or a read error, runs everything', async (t) => {
