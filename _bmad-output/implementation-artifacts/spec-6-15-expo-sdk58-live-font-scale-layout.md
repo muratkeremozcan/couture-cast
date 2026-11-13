@@ -418,6 +418,14 @@ TEA rulings, 2026-11-13 (builder615 applied them to the D1 Step 0 and Step 4 row
 - **S2-06 to Step 0.** The Maestro network-timeout check (TEA-12) lands in Step 0 and runs every step. A guard first run at SDK 56 has no green baseline to tell an `expo/fetch` break from a broken check.
 - **S4-15 to Step 0.** The Android `minifiedDebuggable` build type (TEA-17) lands in Step 0, and the D15 Test Store journey runs there as the paid baseline on `debug` and `minifiedDebuggable`, with the RevenueCat reflection mutant turning it red. A first R8 run at Step 4 could not separate RevenueCat 11 from a wrong build type. The R8 keep-rule changes stay in Step 4.
 
+TEA rulings, 2026-11-13, R8 and the nightly (builder615 applied them):
+
+- **RevenueCat under R8.** `react-native-purchases` ships the consumer rule `-keep class com.revenuecat.** { *; }`, and AGP leaves debuggable builds unrenamed, so no targeted RevenueCat mutant exists: the story records no targeted R8 evidence for RevenueCat (D4 R8 row). CX-06 keeps its detection power through a targeted reflection mutant on one of the app's own local module classes in `minifiedDebuggable`, and the evidence script asserts that `com.revenuecat` classes survive shrinking.
+- **Release without R8 at Step 0.** SDK 54 leaves `android.enableMinifyInReleaseBuilds` unset, so the Release build runs no R8; that is a recorded Step 0 baseline fact. The evidence script checks for a Release `mapping.txt` at every step, and S4-06 runs at the first step whose Release minifies.
+- **Builder decision: Release minifies from Step 4.** Step 4 sets `android.enableMinifyInReleaseBuilds`, with S4-06 (Release event capture under R8) and the targeted local-module mutant as its gate. TEA recommends it; Step 4 already re-proves the keep rules (D4 R8 row).
+- **Nightly live font leg.** `ios-live-font` runs in the nightly `ios-native.yml` (about 140 minutes for the whole run). Until reviewed residual baselines exist it is red; the driver writes `live-font-residual-baselines.proposed.json` beside its report, and TEA approves entries against the six handoff rules as a reviewed diff of `scripts/lib/fixtures/live-font-residual-baselines.json`. The iOS canary moved to 06:37 UTC so it never shares macOS concurrency with that leg.
+- **Debug signing.** A committed test-only keystore signs `debug` and `minifiedDebuggable` (TEA-19); an existing dev-client install needs one uninstall. The Release key is unchanged, so U-05 holds.
+
 Two frozen-block items are for the builder:
 
 - D5 (the residual adjudication sentence) should say that a predicate relaxes only stale heights and growth of named probes, and that clipping, lost text and lost reachability always fail.
