@@ -56,8 +56,8 @@ export const evidenceCondition = `always() && ${deviceLaneCondition}`
 export const iosLaneCondition =
   "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
 export const iosEvidenceCondition = `always() && (${iosLaneCondition})`
-// The Expo Go proof runs alone on a fresh simulator, like every other device lane: skipped on a
-// pull request, required by share-card-lanes-gate on main, nightly and dispatch runs.
+// The Expo Go proof runs alone on a fresh simulator, like the other iOS lanes: nightly and on
+// demand only, where share-card-lanes-gate requires it.
 export const expoGoJobName = 'ios-expo-go'
 export const expoGoLaneCondition = iosLaneCondition
 // The browser lane runs whenever the lane plan runs share-card: always off a pull request, and on

@@ -1103,6 +1103,17 @@ describe('cache steps behind the read-only dispatch', () => {
       ).with.cache = 'npm'
     }
   )
+  // Antigravity review of PR 224: a substring match let this cache on a dispatch.
+  rejected(
+    'an npm cache that the dispatch condition only seems to switch off',
+    /ios-app-build: .*setup-node.* caches on a dispatch/,
+    (jobs) => {
+      step(
+        jobs['ios-app-build'],
+        (item) => item.uses === 'actions/setup-node@v4'
+      ).with.cache = "${{ github.event_name != 'workflow_dispatch' || 'npm' }}"
+    }
+  )
   rejected(
     'setup-go with its default module cache',
     /ios-shard: .*setup-go.* caches on a dispatch/,

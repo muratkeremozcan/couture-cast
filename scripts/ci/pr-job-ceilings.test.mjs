@@ -127,22 +127,61 @@ test('the jobs skipped on pull requests are exactly the device and release lanes
   ])
 })
 
-/** Whether a job's runner, or any matrix value its runner reads, is a macOS image. */
-function runsOnMacos(job) {
+/**
+ * Whether a job's runner is a macOS image: in the runner expression itself, in a matrix value it
+ * reads, or in an input it reads, with the caller's value or the input's default.
+ */
+function runsOnMacos(job, inputs = {}) {
   const runsOn = JSON.stringify(job?.['runs-on'] ?? '')
   if (/macos/i.test(runsOn)) return true
-  return (
-    /matrix\./.test(runsOn) && /macos/i.test(JSON.stringify(job?.strategy?.matrix ?? ''))
+  if (
+    /matrix\./.test(runsOn) &&
+    /macos/i.test(JSON.stringify(job?.strategy?.matrix ?? ''))
   )
+    return true
+  return [...runsOn.matchAll(/inputs\.([A-Za-z_][\w-]*)/g)].some(([, name]) =>
+    /macos/i.test(String(inputs[name] ?? ''))
+  )
+}
+
+/** A caller's inputs for a reusable workflow, its declared defaults filled in. */
+function inputsFor(called, job) {
+  const declared = (called.on ?? called[true])?.workflow_call?.inputs ?? {}
+  return {
+    ...Object.fromEntries(
+      Object.entries(declared)
+        .filter(([, input]) => input && 'default' in input)
+        .map(([key, input]) => [key, input.default])
+    ),
+    ...(job.with ?? {}),
+  }
 }
 
 /**
  * Jobs that put a macOS runner on a pull request or a merge to main: a macOS job, or a call to
- * a reusable workflow holding one, in a workflow triggered by pull_request, pull_request_target
- * or push, unless the job (or the called macOS job) runs only nightly and on demand.
+ * a reusable workflow holding one at any depth, in a workflow triggered by pull_request,
+ * pull_request_target or push, unless a job on the path runs only nightly and on demand.
  */
 function macosOnPullRequestOrPush(directory = dir) {
   const offenders = []
+  const visit = (name, job, inputs, via, depth) => {
+    if (NIGHTLY_CONDITIONS.includes(conditionOf(job))) return
+    if (typeof job.uses === 'string' && job.uses.startsWith('./.github/workflows/')) {
+      if (depth > 10) throw new Error(`reusable workflow chain too deep at ${via}`)
+      const called = load(directory, path.basename(job.uses))
+      const callerInputs = inputsFor(called, job)
+      for (const [inner, innerJob] of Object.entries(called.jobs ?? {}))
+        visit(
+          inner,
+          innerJob,
+          callerInputs,
+          `${via}:${name} > ${path.basename(job.uses)}`,
+          depth + 1
+        )
+      return
+    }
+    if (runsOnMacos(job, inputs)) offenders.push(`${via}:${name}`)
+  }
   for (const file of readdirSync(directory).filter(isWorkflow)) {
     const workflow = load(directory, file)
     const events = eventsOf(workflow.on ?? workflow[true])
@@ -152,20 +191,8 @@ function macosOnPullRequestOrPush(directory = dir) {
       )
     )
       continue
-    for (const [name, job] of Object.entries(workflow.jobs ?? {})) {
-      if (NIGHTLY_CONDITIONS.includes(conditionOf(job))) continue
-      if (typeof job.uses === 'string' && job.uses.startsWith('./.github/workflows/')) {
-        const called = load(directory, path.basename(job.uses))
-        for (const [inner, innerJob] of Object.entries(called.jobs ?? {}))
-          if (
-            runsOnMacos(innerJob) &&
-            !NIGHTLY_CONDITIONS.includes(conditionOf(innerJob))
-          )
-            offenders.push(`${file}:${name} > ${path.basename(job.uses)}:${inner}`)
-        continue
-      }
-      if (runsOnMacos(job)) offenders.push(`${file}:${name}`)
-    }
+    for (const [name, job] of Object.entries(workflow.jobs ?? {}))
+      visit(name, job, {}, file, 0)
   }
   return offenders
 }
@@ -200,15 +227,43 @@ test('a macOS job on a pull request, a merge or a matrix is caught; nightly-only
     'caller.yml':
       'on: pull_request\njobs:\n  call:\n    uses: ./.github/workflows/called.yml\n',
     'called.yml': `on: workflow_call\n${job()}`,
+    'target.yml': `on: pull_request_target\n${job()}`,
+    'evidence-gated.yml': `on: push\n${job(`    if: \${{ always() && (${NIGHTLY_ONLY}) }}\n`)}`,
+    'two-hop.yml':
+      'on: push\njobs:\n  outer:\n    uses: ./.github/workflows/middle.yml\n',
+    'middle.yml':
+      'on: workflow_call\njobs:\n  inner:\n    uses: ./.github/workflows/called.yml\n',
+    'by-input.yml':
+      'on: pull_request\njobs:\n  call:\n    uses: ./.github/workflows/runner-input.yml\n    with: { runner: macos-15 }\n',
+    'by-default.yml':
+      'on: push\njobs:\n  call:\n    uses: ./.github/workflows/runner-input.yml\n',
+    'linux-input.yml':
+      'on: pull_request\njobs:\n  call:\n    uses: ./.github/workflows/runner-input.yml\n    with: { runner: ubuntu-latest }\n',
+    'runner-input.yml': [
+      'on:',
+      '  workflow_call:',
+      '    inputs:',
+      '      runner: { type: string, default: macos-26 }',
+      'jobs:',
+      '  work:',
+      '    runs-on: ${{ inputs.runner }}',
+      '    timeout-minutes: 10',
+      '    steps: [{ run: echo }]',
+      '',
+    ].join('\n'),
   }
   for (const [name, body] of Object.entries(files))
     writeFileSync(path.join(directory, name), body)
   assert.deepEqual(macosOnPullRequestOrPush(directory).sort(), [
+    'by-default.yml:call > runner-input.yml:work',
+    'by-input.yml:call > runner-input.yml:work',
     'caller.yml:call > called.yml:mac',
     'matrix.yml:both',
     'pr.yml:mac',
     'push.yml:mac',
     'skip-pr-only.yml:mac',
+    'target.yml:mac',
+    'two-hop.yml:outer > middle.yml:inner > called.yml:mac',
   ])
 })
 

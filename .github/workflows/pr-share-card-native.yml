@@ -1,7 +1,8 @@
 name: Share-card native originals
 # Pull requests run the browser lane and the lanes gate only. Every device lane takes over an hour,
-# so it runs on main, nightly and on demand: the job-level condition skips it on pull_request, and
-# the gate requires a skip there and a success everywhere else.
+# so the Android lanes run on main, nightly and on demand, and the iOS lanes, which need macOS,
+# nightly and on demand only (owner rule, 2026-11-13). The gate requires each skip where its
+# condition skips it and a success everywhere else.
 on:
   pull_request:
   # A merge to main runs every device lane (10 jobs, 4 on macOS, 41 to 118 minutes), which

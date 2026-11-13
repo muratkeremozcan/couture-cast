@@ -7,9 +7,9 @@
 # (scripts/run-story67-talkback.mjs). PR Gate makes every job that runs here
 # required.
 #
-# The release iOS app build takes about 21 minutes alone, over the 20 minute PR
-# job limit, so it runs on pushes to main, nightly and on demand. PRs keep the
-# XCTest module tests, the Android module tests and build, and the TalkBack run.
+# Both iOS jobs (the XCTest module tests and the release iOS app build) need
+# macOS, which runs nightly and on demand only (owner rule, 2026-11-13). PRs and
+# pushes keep the Android module tests and build, and the TalkBack run.
 name: Accessibility focus module
 
 on:

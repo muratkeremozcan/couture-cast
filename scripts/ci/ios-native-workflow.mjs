@@ -68,6 +68,12 @@ export const PROOF = [
 ].join('\n')
 const ON_DISPATCH = "github.event_name == 'workflow_dispatch'"
 const NOT_DISPATCH = "github.event_name != 'workflow_dispatch'"
+// The only cache values that are off on a dispatch: the condition itself, or a cache name chosen
+// only when it holds. A substring match let `${{ NOT_DISPATCH || 'npm' }}` cache on a dispatch.
+const DISPATCH_FREE_CACHE = new RegExp(
+  `^\\$\\{\\{ ${NOT_DISPATCH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: && '[a-z]+' \\|\\| '')? \\}\\}$`
+)
+
 export const CONSUMER_IF = "${{ !cancelled() && needs.ios-build.result == 'success' }}"
 // A dispatch saves no cache, so ios-build hands the scanned client to the consumers of its run as
 // this artifact: a tar, since upload-artifact drops the executable bit.
@@ -853,7 +859,7 @@ function cacheStepProblems(name, job, step, check) {
     check(
       (cache === undefined && !uses.startsWith('actions/setup-go')) ||
         reach.neverDispatch ||
-        String(cache).includes(NOT_DISPATCH),
+        DISPATCH_FREE_CACHE.test(String(cache)),
       `${label}: ${uses.split('@')[0].split('/')[1]} caches on a dispatch; set its cache from ${NOT_DISPATCH}`
     )
   }
