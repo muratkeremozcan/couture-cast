@@ -405,13 +405,42 @@ describe('node-test-gate background run', () => {
           pollMs: 10,
           log: (line) => logs.push(line),
         }),
-        /suite good: node_test_gate_failed: suite good did not finish within 0\.2 s/
+        /suite good: node_test_gate_failed: suite good did not finish within the collection's 0\.2 s/
       )
       // PR 216 review BA-04: how far the suite got is still reported.
       assert.ok(
         logs.some((line) => line.includes('DIAGNOSTIC_BEFORE_HANG')),
         logs.join('\n')
       )
+    }))
+
+  // PR 216 CodeRabbit: the worker runs suites in turn, so one hung suite must not give the
+  // next a fresh wait; the whole collection shares one deadline inside the step's limit.
+  test('every suite shares one collection deadline, and each one is still reported', () =>
+    temporary(async (temp) => {
+      const env = { RUNNER_TEMP: temp }
+      for (const suite of ['good', 'todo']) {
+        fs.mkdirSync(backgroundDirectory(suite, env), { recursive: true })
+        fs.writeFileSync(
+          path.join(backgroundDirectory(suite, env), 'started.json'),
+          JSON.stringify({ pid: process.pid })
+        )
+      }
+      const logs = []
+      const began = Date.now()
+      await assert.rejects(
+        collectBackgroundSuites(['good', 'todo'], {
+          env,
+          timeoutMs: 1_000,
+          pollMs: 10,
+          log: (line) => logs.push(line),
+        }),
+        (error) =>
+          /suite good: .*did not finish/.test(error.message) &&
+          /suite todo: .*did not finish/.test(error.message)
+      )
+      // A wait per suite would take at least two seconds.
+      assert.ok(Date.now() - began < 1_800, `collection took ${Date.now() - began} ms`)
     }))
 
   test('collect fails at once when the background process ended without a result', () =>
@@ -1217,6 +1246,21 @@ describe('node-test-gate discovery and coverage', () => {
 
     // PR 216 review BA-02: a foreground suite in the same step brought its own needs into
     // the collect condition, and a collect step without a condition inherits success().
+    // PR 216 CodeRabbit: bash -e stops at the first failing collect line, so the second
+    // suite would never report.
+    test('a collect step holds one collect command for all its suites', () => {
+      const split = [
+        '      - name: collect suites',
+        "        if: ${{ !cancelled() && steps.started.outcome == 'success' }}",
+        '        run: |',
+        '          node scripts/ci/node-test-gate.mjs --collect outside',
+        '          node scripts/ci/node-test-gate.mjs --collect default',
+      ]
+      assert.deepEqual(check([...setup, ...start(), ...runtime, ...split]), [
+        'step collect suites has 2 collect commands; collect outside and default in one command so every suite reports before the step fails',
+      ])
+    })
+
     test('a collect step runs only collect lines and states !cancelled()', () => {
       const mixed = [
         '      - name: collect suites',

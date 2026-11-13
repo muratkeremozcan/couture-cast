@@ -436,6 +436,12 @@ function collectStepProblems(step, lines, matrix) {
     problems.push(
       `step ${name} collects ${collected.join(' and ')} but also runs ${JSON.stringify(others[0])}; a collect step runs only collect lines`
     )
+  // bash -e stops at the first failing command, so a second collect line would never report.
+  const commands = lines.filter((line) => backgroundSuites(line)?.mode === 'collect')
+  if (commands.length > 1)
+    problems.push(
+      `step ${name} has ${commands.length} collect commands; collect ${collected.join(' and ')} in one command so every suite reports before the step fails`
+    )
   // Read from the parsed condition, so a quoted value that spells !cancelled() is not it.
   const terms = parseApprovedCondition(step.if, { matrix }) ?? []
   if (!terms.some((item) => item.kind === 'notCancelled'))
@@ -723,7 +729,7 @@ function processEnded(pid) {
   }
 }
 
-async function awaitStatus(suite, { env, timeoutMs, pollMs }) {
+async function awaitStatus(suite, { env, deadline, timeoutMs, pollMs }) {
   const startedFile = backgroundFile(suite, env, 'started.json')
   const statusFile = backgroundFile(suite, env, 'status.json')
   if (!fs.existsSync(startedFile))
@@ -731,7 +737,6 @@ async function awaitStatus(suite, { env, timeoutMs, pollMs }) {
       `node_test_gate_failed: suite ${suite} was never started in the background (no ${startedFile})`
     )
   const { pid } = JSON.parse(fs.readFileSync(startedFile, 'utf8'))
-  const deadline = Date.now() + timeoutMs
   while (!fs.existsSync(statusFile)) {
     // Checked again after the process check, which may have raced the final write.
     if (processEnded(pid) && !fs.existsSync(statusFile))
@@ -740,14 +745,17 @@ async function awaitStatus(suite, { env, timeoutMs, pollMs }) {
       )
     if (Date.now() >= deadline)
       throw new Error(
-        `node_test_gate_failed: suite ${suite} did not finish within ${timeoutMs / 1000} s`
+        `node_test_gate_failed: suite ${suite} did not finish within the collection's ${timeoutMs / 1000} s`
       )
     await sleep(pollMs)
   }
   return JSON.parse(fs.readFileSync(statusFile, 'utf8'))
 }
 
-/** Ten minutes: the suites take about two alone, and the collect step's limit is longer. */
+/**
+ * Ten minutes for the whole collection: the suites take about two alone, and the collect
+ * step's limit is longer, so every suite is reported before the step limit stops it.
+ */
 export const COLLECT_TIMEOUT_MS = 10 * 60 * 1000
 
 /**
@@ -766,6 +774,9 @@ export async function collectBackgroundSuites(
   if (!suites.length) throw new Error('node_test_gate_failed: --collect names no suite')
   const summaries = {}
   const failures = []
+  // One deadline for every suite: the worker runs them in turn, so a hung first suite would
+  // otherwise give the next one a fresh wait and run past the step's limit.
+  const deadline = Date.now() + timeoutMs
   for (const suite of suites) {
     const output = backgroundFile(suite, env, 'output.log')
     let printed = false
@@ -779,7 +790,7 @@ export async function collectBackgroundSuites(
     try {
       let result
       try {
-        result = await awaitStatus(suite, { env, timeoutMs, pollMs })
+        result = await awaitStatus(suite, { env, deadline, timeoutMs, pollMs })
       } finally {
         printLog()
       }
