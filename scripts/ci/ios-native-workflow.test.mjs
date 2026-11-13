@@ -17,8 +17,10 @@ import {
   JOBS,
   RUN_NAME,
   TEST_JOBS,
+  inputCoverageProblems,
   iosNativeProblems,
   missingHelpers,
+  scriptReads,
 } from './ios-native-workflow.mjs'
 import { CACHE_VERSION, cacheKey } from './native-build-cache.mjs'
 import { cacheOutputs } from './native-supabase.mjs'
@@ -58,11 +60,11 @@ describe('ios-native workflow validator', () => {
 
   test('one build, four parallel shards and Expo Go on its client, and the Release app beside them', () => {
     assert.deepEqual(Object.keys(source.jobs).sort(), [...JOBS].sort())
-    assert.equal(source.jobs['ios-build'].needs, undefined)
+    assert.equal(source.jobs['ios-build'].needs, 'ios-changes')
     assert.deepEqual(source.jobs['ios-shard'].strategy.matrix.shard, [1, 2, 3, 4])
     assert.deepEqual(source.jobs['ios-shard'].needs, 'ios-build')
     assert.deepEqual(source.jobs['ios-expo-go'].needs, 'ios-build')
-    assert.equal(source.jobs['ios-app-build'].needs, undefined)
+    assert.equal(source.jobs['ios-app-build'].needs, 'ios-changes')
   })
 
   // Triggers and the commit a run tests.
@@ -150,9 +152,55 @@ describe('ios-native workflow validator', () => {
       jobs['ios-expo-go'].needs = ['ios-build', 'ios-shard']
     }
   )
-  rejected('a build that waits on something', /ios-build starts the run/, (jobs) => {
-    jobs['ios-build'].needs = ['ios-app-build']
-  })
+  rejected(
+    'a build that waits on something',
+    /ios-build must need only ios-changes/,
+    (jobs) => {
+      jobs['ios-build'].needs = ['ios-changes', 'ios-app-build']
+    }
+  )
+  // SL-11: only a merge asks ios-changes; a dispatch or a nightly run always tests its commit, so
+  // the commit a dispatch names cannot answer its own way out of its tests.
+  for (const name of ['ios-build', 'ios-app-build']) {
+    rejected(
+      `${name} skipping a dispatch on the answer of ios-changes`,
+      new RegExp(`${name} must need only ios-changes, and skip only a merge`),
+      (jobs) => {
+        jobs[name].if = "${{ needs.ios-changes.outputs.run == 'true' }}"
+      }
+    )
+    rejected(
+      `${name} running on a merge that changed no native iOS input`,
+      new RegExp(`${name} must need only ios-changes`),
+      (jobs) => {
+        delete jobs[name].if
+        delete jobs[name].needs
+      }
+    )
+  }
+  rejected(
+    'evidence that fails a merge ios-changes skipped',
+    /ios-evidence must run after any/,
+    (jobs) => {
+      jobs['ios-evidence'].if = 'always()'
+      jobs['ios-evidence'].needs = 'ios-shard'
+    }
+  )
+  rejected(
+    'ios-changes without the commit before the merge',
+    /ios-changes: decide from scripts\/ci\/ios-native-inputs.mjs/,
+    (jobs) => {
+      delete step(jobs['ios-changes'], (row) => row.id === 'changes').env.BEFORE
+    }
+  )
+  rejected(
+    'ios-changes deciding from another script',
+    /ios-changes: decide from scripts\/ci\/ios-native-inputs.mjs/,
+    (jobs) => {
+      step(jobs['ios-changes'], (row) => row.id === 'changes').run =
+        'echo run=true >> "$GITHUB_OUTPUT"'
+    }
+  )
   rejected('two shards', /every shard of the iOS plan/, (jobs) => {
     jobs['ios-shard'].strategy.matrix.shard = [1, 2]
   })
@@ -589,6 +637,90 @@ cat "${state}"
     assert.equal(result.status, 0)
     assert.equal(result.left.length, 1)
     assert.doesNotMatch(result.calls, /DELETE/)
+  })
+})
+
+// SL-11: the push paths are the native iOS inputs of the merge trigger and the pull request gate,
+// so they must cover every script the iOS jobs run or read, and name no scripts/lib file they do
+// not read, or a shared helper change would cost a pull request a 75-minute dispatch.
+describe('the native iOS inputs cover what the iOS jobs read', () => {
+  const libraryFiles = fs.readdirSync('scripts/lib').map((name) => `scripts/lib/${name}`)
+  const reads = scriptReads(source)
+  const coverage = (workflow) => inputCoverageProblems(workflow, { reads, libraryFiles })
+
+  test('every script the iOS jobs read is a push path, and every scripts/lib push path is read', () => {
+    assert.deepEqual(coverage(source), [])
+    assert.ok(reads.includes('scripts/run-story68-native.mjs'))
+    assert.ok(reads.includes('scripts/lib/story68-native-build.mjs'))
+    assert.ok(
+      reads.includes('scripts/ci/install-dependencies.sh'),
+      'a local action’s script'
+    )
+    assert.ok(!reads.some((file) => file.endsWith('.test.mjs')))
+  })
+
+  test('a missing script is reported', () => {
+    const workflow = fresh()
+    workflow.on.push.paths = workflow.on.push.paths.filter(
+      (glob) => glob !== 'scripts/e2e-real-session/**'
+    )
+    assert.ok(
+      coverage(workflow).includes(
+        'the push paths miss scripts/e2e-real-session/run.mjs, which the iOS jobs read'
+      )
+    )
+  })
+
+  test('scripts/lib as a whole is reported for the helpers no iOS job reads', () => {
+    const workflow = fresh()
+    workflow.on.push.paths.splice(-1, 0, 'scripts/lib/**')
+    const problems = coverage(workflow)
+    assert.ok(
+      problems.some((problem) => /name scripts\/lib\/community-/.test(problem)),
+      problems.join('\n')
+    )
+  })
+
+  test('the reads follow imports, scripts named by path, and a local action’s nested actions', () => {
+    const files = {
+      '.github/actions/outer/action.yml':
+        'runs:\n  steps:\n    - uses: ./.github/actions/inner\n',
+      '.github/actions/inner/action.yml': 'run: bash scripts/ci/inner.sh\n',
+      'scripts/a.mjs': "import x from './lib/b.mjs'\nspawn('node', ['scripts/c.mjs'])\n",
+      'scripts/lib/b.mjs': "import t from './b.test.mjs'\n",
+      'scripts/lib/b.test.mjs': "import u from './unreached.mjs'\n",
+      'scripts/lib/unreached.mjs': '',
+      'scripts/c.mjs': "path.join(dir, 'sibling.mjs')\n",
+      'scripts/sibling.mjs': '',
+      'scripts/ci/inner.sh': '',
+      'scripts/d.json': '["scripts/data-only.mjs"]',
+      'scripts/data-only.mjs': '',
+    }
+    const workflow = {
+      jobs: {
+        'ios-build': {
+          steps: [
+            { run: 'node scripts/a.mjs && cat scripts/d.json' },
+            { uses: './.github/actions/outer' },
+          ],
+        },
+        'ios-changes': { steps: [{ run: 'node scripts/decide.mjs' }] },
+      },
+    }
+    assert.deepEqual(
+      scriptReads(workflow, {
+        read: (file) => files[file] ?? null,
+        exists: (file) => file in files || file === 'scripts/decide.mjs',
+      }),
+      [
+        'scripts/a.mjs',
+        'scripts/c.mjs',
+        'scripts/ci/inner.sh',
+        'scripts/d.json',
+        'scripts/lib/b.mjs',
+        'scripts/sibling.mjs',
+      ]
+    )
   })
 })
 

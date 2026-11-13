@@ -16,12 +16,18 @@
 //   dispatch-completed  posts the status on each open pull request the completed dispatch tested.
 //
 // The jobs run this file from a sparse checkout of main with no install: it imports Node
-// built-ins and the lane map, which imports Node built-ins only.
+// built-ins and scripts/ci/ios-native-inputs.mjs, which decides what a native iOS change is.
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { matchesAny } from './lanes.mjs'
+import {
+  IOS_NATIVE_WORKFLOW,
+  LOCKFILE,
+  ROOT_MANIFEST,
+  dependencyChanges,
+  nativeIosChanges,
+  pushPaths,
+} from './ios-native-inputs.mjs'
 
-export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
 export const EVIDENCE_WORKFLOW = '.github/workflows/ios-native-evidence.yml'
 export const STATUS_CONTEXT = 'ios-native-evidence'
 export const RUN_NAME_PREFIX = 'iOS native '
@@ -29,25 +35,6 @@ const WORKFLOW_FILE = 'ios-native.yml'
 const COMMIT = /^[0-9a-f]{40}$/
 // GitHub rejects a commit status description longer than this.
 export const DESCRIPTION_LIMIT = 140
-
-/**
- * The push paths of ios-native.yml, read without a YAML parser: they are the native iOS inputs,
- * and a merge to main runs the workflow when one of them changes.
- */
-export function pushPaths(text) {
-  const lines = text.split('\n')
-  const push = lines.findIndex((line) => line === '  push:')
-  const start = lines.findIndex((line, index) => index > push && line === '    paths:')
-  if (push < 0 || start < 0) throw new Error('ios-native.yml has no push paths')
-  const paths = []
-  for (const line of lines.slice(start + 1)) {
-    const match = /^ {6}- '([^']+)'$/.exec(line)
-    if (!match) break
-    paths.push(match[1])
-  }
-  if (paths.length === 0) throw new Error('ios-native.yml has no push paths')
-  return paths
-}
 
 /** The commit a run says it tested, from its name; null for any other name. */
 export function runCommit(run) {
@@ -61,13 +48,6 @@ export function runCommit(run) {
 export function dispatchedCommit(run) {
   if (run?.event !== 'workflow_dispatch' || run?.head_branch !== 'main') return null
   return runCommit(run)
-}
-
-/** The changed paths, old paths of renames included, that ios-native.yml builds, runs or reads. */
-export function nativeIosChanges(files, inputs) {
-  return files
-    .flatMap((file) => [file.filename, file.previous_filename].filter(Boolean))
-    .filter((name) => matchesAny(name, inputs))
 }
 
 // Only the evidence workflow may post the status or hold the permission to post one. A pull
@@ -105,10 +85,11 @@ const fit = (text) =>
 
 /**
  * The status a pull request head gets. Only a workflow_dispatch run from main whose name carries
- * exactly the head commit counts; the newest such run decides.
+ * exactly the head commit counts; the newest such run decides. `dependencies` says whether the
+ * shared dependency files changed what iOS installs (scripts/ci/ios-native-inputs.mjs).
  * @returns {{ state: 'success' | 'pending' | 'failure', description: string, detail: string }}
  */
-export function evaluateEvidence({ headSha, files, runs, inputs }) {
+export function evaluateEvidence({ headSha, files, runs, inputs, dependencies }) {
   const verdict = (state, detail, description = detail) => ({
     state,
     description: fit(description),
@@ -123,7 +104,7 @@ export function evaluateEvidence({ headSha, files, runs, inputs }) {
       `Only ${EVIDENCE_WORKFLOW} may post ${STATUS_CONTEXT}: ${guard.join('; ')}`,
       guard.join('; ')
     )
-  const changed = nativeIosChanges(files, inputs)
+  const changed = nativeIosChanges(files, inputs, dependencies)
   if (changed.length === 0) return verdict('success', 'No native iOS input changed')
   const what = `${changed.slice(0, 3).join(', ')}${changed.length > 3 ? ` and ${changed.length - 3} more` : ''} changed`
   const [latest] = (runs ?? [])
@@ -151,12 +132,15 @@ export function evaluateEvidence({ headSha, files, runs, inputs }) {
   return verdict('success', `${what}; ${where} (${latest.html_url}) passed on ${headSha}`)
 }
 
-async function api(path, { token, fetchImpl = fetch, method = 'GET', body }) {
+async function api(
+  path,
+  { token, fetchImpl = fetch, method = 'GET', body, raw = false }
+) {
   for (let attempt = 1; ; attempt++) {
     const response = await fetchImpl(`https://api.github.com${path}`, {
       method,
       headers: {
-        accept: 'application/vnd.github+json',
+        accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
         authorization: `Bearer ${token}`,
         'x-github-api-version': '2022-11-28',
         ...(body ? { 'content-type': 'application/json' } : {}),
@@ -164,7 +148,9 @@ async function api(path, { token, fetchImpl = fetch, method = 'GET', body }) {
       ...(body ? { body: JSON.stringify(body) } : {}),
       signal: AbortSignal.timeout(30_000),
     })
-    if (response.ok) return response.status === 204 ? null : response.json()
+    if (response.ok)
+      return response.status === 204 ? null : raw ? response.text() : response.json()
+    if (raw && response.status === 404) return null
     if (attempt >= 3 || ![429, 500, 502, 503, 504].includes(response.status))
       throw new Error(`${method} ${path} answered ${response.status}`)
     await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt))
@@ -200,20 +186,52 @@ async function dispatchRuns({ repository, ...options }) {
   return runs
 }
 
-const nativeInputs = () => pushPaths(readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
+const workflowText = () => readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')
+
+/**
+ * Whether the shared dependency files changed what iOS installs, comparing the merge base with
+ * the head commit, as the pull request's file list does.
+ */
+async function pullDependencies({
+  repository,
+  baseSha,
+  headSha,
+  files,
+  text,
+  ...options
+}) {
+  const names = files.flatMap((file) => [file.filename, file.previous_filename])
+  if (!names.includes(LOCKFILE) && !names.includes(ROOT_MANIFEST)) return {}
+  const compare = await api(
+    `/repos/${repository}/compare/${baseSha}...${headSha}`,
+    options
+  )
+  const sides = { before: compare?.merge_base_commit?.sha, after: headSha }
+  const read = (side, file) =>
+    sides[side]
+      ? api(`/repos/${repository}/contents/${file}?ref=${sides[side]}`, {
+          ...options,
+          raw: true,
+        })
+      : null
+  return dependencyChanges(read, text)
+}
 
 /** The verdict for one pull request head, from main's copy of the rules. */
-async function judge({ headSha, number, inputs, ...options }) {
+async function judge({ headSha, baseSha, number, ...options }) {
+  const text = workflowText()
   let files = null
   let runs = []
+  let dependencies = {}
   try {
     files = await pullFiles({ ...options, number })
     runs = await dispatchRuns(options)
+    dependencies = await pullDependencies({ ...options, baseSha, headSha, files, text })
   } catch (error) {
     console.log(`::error::Could not read the evidence: ${error.message}`)
     files = null
   }
-  return evaluateEvidence({ headSha, files, runs, inputs })
+  return evaluateEvidence({ headSha, files, runs, inputs: pushPaths(text), dependencies })
 }
 
 function report(env, number, headSha, verdict) {
@@ -231,14 +249,14 @@ const oneLine = (text) => text.replace(/[\r\n]+/g, ' ')
  * pull_request_target: the verdict for the head commit the event names, as the step outputs
  * `state` and `description`. The live head may have moved since; that push gets its own event.
  */
-export async function pullRequest({ env = process.env, fetchImpl, inputs } = {}) {
+export async function pullRequest({ env = process.env, fetchImpl } = {}) {
   const payload = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
   const pull = payload.pull_request
   const headSha = pull?.head?.sha
   const verdict = await judge({
     headSha,
+    baseSha: pull?.base?.sha,
     number: pull?.number,
-    inputs: inputs ?? nativeInputs(),
     repository: env.GITHUB_REPOSITORY,
     token: env.GITHUB_TOKEN,
     fetchImpl,
@@ -257,7 +275,7 @@ export async function pullRequest({ env = process.env, fetchImpl, inputs } = {})
  * judge each open pull request whose head is that commit again and post its status. Any other
  * run is no one's evidence and posts nothing.
  */
-export async function dispatchCompleted({ env = process.env, fetchImpl, inputs } = {}) {
+export async function dispatchCompleted({ env = process.env, fetchImpl } = {}) {
   const payload = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
   const sha = dispatchedCommit(payload.workflow_run)
   if (!sha) {
@@ -283,8 +301,8 @@ export async function dispatchCompleted({ env = process.env, fetchImpl, inputs }
     const verdict = await judge({
       ...options,
       headSha: sha,
+      baseSha: pull.base?.sha,
       number: pull.number,
-      inputs: inputs ?? nativeInputs(),
     })
     report(env, pull.number, sha, verdict)
     await api(`/repos/${options.repository}/statuses/${sha}`, {

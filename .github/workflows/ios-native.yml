@@ -5,8 +5,9 @@
 # ios-evidence) and pr-accessibility-focus.yml (ios-app-build) on macos-26 with Xcode 26.4 or later,
 # which SDK 56 needs; story 6.15 then removes them from those workflows.
 #
-# Shape: ios-build keys the development client by its native inputs and builds, scans and caches it
-# only on a miss; four ios-shard jobs and ios-expo-go restore exactly that scanned client and run in
+# Shape: on a merge, ios-changes first skips the rest when only dependencies apps/mobile does not
+# install changed. ios-build keys the development client by its native inputs and builds, scans and
+# caches it only on a miss; four ios-shard jobs and ios-expo-go restore exactly that scanned client and run in
 # parallel; ios-evidence proves every shard reported its exact cases; ios-app-build builds the
 # Release app beside them. Wall time about 75 minutes (client build up to 31 when its key misses,
 # then the longest shard, 44 at p95).
@@ -26,7 +27,10 @@ name: iOS native
 run-name: iOS native ${{ inputs.sha || github.sha }}
 
 on:
-  # A merge runs it only when a native iOS input changed; the nightly run covers the rest.
+  # A merge runs it only when a native iOS input changed, and ios-changes then skips it when only
+  # dependencies that apps/mobile does not install changed; the nightly run covers the rest.
+  # scripts/ci/ios-native-workflow.test.mjs proves these paths cover every script the iOS jobs run
+  # or read, and name no scripts/lib file they do not.
   push:
     branches: [main]
     paths:
@@ -50,18 +54,49 @@ on:
       - 'maestro/story65/**'
       - 'maestro/story67/**'
       - 'maestro/story68/**'
-      - 'scripts/run-story68-native.mjs'
-      - 'scripts/e2e-share-card/**'
-      - 'scripts/lib/**'
       - 'scripts/ci/native-*'
+      - 'scripts/ci/android-talkback.sh'
       - 'scripts/ci/check-accessibility-focus-builds.sh'
-      - 'scripts/ci/share-card-header-semantics.sh'
+      - 'scripts/ci/install-dependencies.sh'
       - 'scripts/ci/maestro-check-flows.mjs'
       - 'scripts/ci/node-test-gate.mjs'
       - 'scripts/ci/node-test-suites.json'
+      - 'scripts/ci/share-card-header-semantics.sh'
+      - 'scripts/ci/verify-dependency-tree.mjs'
+      - 'scripts/ci/workflow-step-shadowing.mjs'
+      - 'scripts/e2e-real-session/**'
+      - 'scripts/e2e-share-card/**'
+      - 'scripts/lib/caller-owned-env.mjs'
+      - 'scripts/lib/database-tls.mjs'
+      - 'scripts/lib/expo-*.mjs'
+      - 'scripts/lib/local-supabase-ports.cjs'
+      - 'scripts/lib/local-supabase-ports.mjs'
+      - 'scripts/lib/maestro-*.mjs'
+      - 'scripts/lib/mobile-e2e-*.mjs'
+      - 'scripts/lib/native-*.mjs'
+      - 'scripts/lib/package-manager-readiness.mjs'
+      - 'scripts/lib/prisma-migrate-connection.mjs'
+      - 'scripts/lib/share-card-*.mjs'
+      - 'scripts/lib/story68-*.mjs'
+      - '!scripts/lib/story68-gradle-precondition.mjs'
+      - '!scripts/lib/story68-release-live-font-fixtures.mjs'
+      - 'scripts/lib/story69-share-sheet.mjs'
+      - 'scripts/lib/test-disk-space.mjs'
+      - 'scripts/lib/weather-provider-double-data.mjs'
+      - 'scripts/e2e-stack-pid.mjs'
+      - 'scripts/install-expo-go.mjs'
+      - 'scripts/local-e2e-database.mjs'
       - 'scripts/local-storage-buckets.mjs'
+      - 'scripts/maestro-flow-durations.json'
       - 'scripts/maestro-install.mjs'
       - 'scripts/maestro-version.mjs'
+      - 'scripts/prisma-migrate-deploy.mjs'
+      - 'scripts/run-maestro.mjs'
+      - 'scripts/run-story68-native.mjs'
+      - 'scripts/start-api-e2e-with-workers.mjs'
+      - 'scripts/start-ios-simulator.sh'
+      - 'scripts/weather-provider-double.mjs'
+      - '!scripts/**/*.test.mjs'
   schedule:
     - cron: '23 3 * * *'
   workflow_dispatch:
@@ -80,7 +115,37 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A merge matches the push paths by name, and package-lock.json and package.json are shared by
+  # every workspace, so this job reads what the merge changed in them and lets the iOS jobs run only
+  # when it touched what apps/mobile installs (scripts/ci/ios-native-inputs.mjs). A dispatch and the
+  # nightly run always test their commit; the iOS jobs ignore this job's answer for them.
+  ios-changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      run: ${{ steps.changes.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Require the commit under test
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
+      - name: Decide whether this merge changed a native iOS input
+        id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+        run: node scripts/ci/ios-native-inputs.mjs push-changes
+
   ios-build:
+    needs: ios-changes
+    if: ${{ github.event_name != 'push' || needs.ios-changes.outputs.run == 'true' }}
     runs-on: macos-26
     timeout-minutes: 60
     env: &runtime_env
@@ -892,6 +957,8 @@ jobs:
   # The accessibility-focus module in a Release simulator app: the build alone takes 25 to 31
   # minutes, so it runs in parallel with the client build and the shards.
   ios-app-build:
+    needs: ios-changes
+    if: ${{ github.event_name != 'push' || needs.ios-changes.outputs.run == 'true' }}
     name: iOS app build
     runs-on: macos-26
     timeout-minutes: 60
@@ -975,8 +1042,8 @@ jobs:
 
   # A skipped shard has no report, so this job fails.
   ios-evidence:
-    if: always()
-    needs: ios-shard
+    if: ${{ always() && (github.event_name != 'push' || needs.ios-changes.outputs.run == 'true') }}
+    needs: [ios-changes, ios-shard]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

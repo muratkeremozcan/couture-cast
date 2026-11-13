@@ -15,17 +15,21 @@ import { parse } from 'yaml'
 import {
   DESCRIPTION_LIMIT,
   EVIDENCE_WORKFLOW,
-  IOS_NATIVE_WORKFLOW,
   STATUS_CONTEXT,
   dispatchCompleted,
   dispatchedCommit,
   evaluateEvidence,
-  nativeIosChanges,
   pullRequest,
-  pushPaths,
   runCommit,
   statusGuardProblems,
 } from './ios-native-evidence.mjs'
+import {
+  IOS_NATIVE_WORKFLOW,
+  LOCKFILE,
+  ROOT_MANIFEST,
+  nativeIosChanges,
+  pushPaths,
+} from './ios-native-inputs.mjs'
 
 const inputs = pushPaths(fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
 const head = 'a'.repeat(40)
@@ -256,7 +260,13 @@ describe('the completed run a status follows', () => {
 
 // The jobs against a fake GitHub API: open pull requests, their files, the ios-native runs, and
 // the statuses posted.
-function fakeGitHub({ pulls = [], files = {}, runs = [] }) {
+function fakeGitHub({
+  pulls = [],
+  files = {},
+  runs = [],
+  contents = {},
+  mergeBase = older,
+}) {
   const posted = []
   const fetchImpl = async (url, init = {}) => {
     const { pathname, searchParams } = new URL(url)
@@ -271,6 +281,16 @@ function fakeGitHub({ pulls = [], files = {}, runs = [] }) {
     }
     if (/\/pulls$/.test(pathname))
       return reply(searchParams.get('page') === '1' ? pulls : [])
+    if (/\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/.test(pathname))
+      return reply({ merge_base_commit: { sha: mergeBase } })
+    const content = /\/contents\/(.+)$/.exec(pathname)
+    if (content) {
+      assert.equal(init.headers.accept, 'application/vnd.github.raw+json')
+      const text = contents[searchParams.get('ref')]?.[content[1]]
+      return text == null
+        ? { ok: false, status: 404, text: async () => '' }
+        : { ok: true, status: 200, text: async () => text }
+    }
     if (pathname.endsWith('/actions/workflows/ios-native.yml/runs')) {
       assert.equal(searchParams.get('event'), 'workflow_dispatch')
       return reply({ workflow_runs: runs })
@@ -310,7 +330,7 @@ describe('the pull_request_target job', () => {
     await withEvent(
       { pull_request: { number: 5, head: { sha: head } } },
       async (env, output) => {
-        const result = await pullRequest({ env, fetchImpl: github.fetchImpl, inputs })
+        const result = await pullRequest({ env, fetchImpl: github.fetchImpl })
         assert.equal(result.state, 'success')
         assert.match(output(), /^state=success\ndescription=.+\n$/)
       }
@@ -322,10 +342,62 @@ describe('the pull_request_target job', () => {
     await withEvent(
       { pull_request: { number: 5, head: { sha: older } } },
       async (env, output) => {
-        await pullRequest({ env, fetchImpl: github.fetchImpl, inputs })
+        await pullRequest({ env, fetchImpl: github.fetchImpl })
         assert.match(output(), /^state=failure\n/)
       }
     )
+  })
+})
+
+// SL-11: the shared dependency files count only for what apps/mobile installs, read at the merge
+// base and the head commit, the two ends of the pull request's own diff.
+describe('a pull request that changes the shared dependency files', () => {
+  const lock = (expo, next) => ({
+    lockfileVersion: 3,
+    packages: {
+      'apps/mobile': { dependencies: { expo: '*' } },
+      'apps/web': { dependencies: { next: '*' } },
+      'node_modules/expo': { version: expo },
+      'node_modules/next': { version: next },
+    },
+  })
+  const judge = async (after) => {
+    const github = fakeGitHub({
+      files: { 5: [file(LOCKFILE), file(ROOT_MANIFEST)] },
+      contents: {
+        [older]: {
+          [LOCKFILE]: JSON.stringify(lock('58.0.0', '15.0.0')),
+          [ROOT_MANIFEST]: '{}',
+        },
+        [head]: { [LOCKFILE]: JSON.stringify(after), [ROOT_MANIFEST]: '{}' },
+      },
+    })
+    return withEvent(
+      { pull_request: { number: 5, head: { sha: head }, base: { sha: 'c'.repeat(40) } } },
+      (env) => pullRequest({ env, fetchImpl: github.fetchImpl })
+    )
+  }
+
+  test('a web-only bump needs no iOS evidence', async () => {
+    assert.equal((await judge(lock('58.0.0', '15.1.0'))).state, 'success')
+  })
+
+  test('an Expo bump needs it', async () => {
+    const result = await judge(lock('58.1.0', '15.0.0'))
+    assert.equal(result.state, 'failure')
+    assert.match(result.detail, /package-lock\.json/)
+  })
+
+  test('a lockfile it cannot read at either end needs it', async () => {
+    const github = fakeGitHub({
+      files: { 5: [file(LOCKFILE)] },
+      contents: { [head]: { [LOCKFILE]: '{}' } },
+    })
+    const result = await withEvent(
+      { pull_request: { number: 5, head: { sha: head }, base: { sha: 'c'.repeat(40) } } },
+      (env) => pullRequest({ env, fetchImpl: github.fetchImpl })
+    )
+    assert.equal(result.state, 'failure')
   })
 })
 
@@ -337,7 +409,7 @@ describe('the workflow_run job', () => {
   const after = async (completed, runs = [completed]) => {
     const github = fakeGitHub({ pulls, files: { 5: native, 6: native }, runs })
     await withEvent({ workflow_run: completed }, (env) =>
-      dispatchCompleted({ env, fetchImpl: github.fetchImpl, inputs })
+      dispatchCompleted({ env, fetchImpl: github.fetchImpl })
     )
     return github.posted
   }
@@ -408,6 +480,19 @@ describe('ios-native-evidence.yml', () => {
         'pull-requests': 'read',
         statuses: 'write',
       })
+  })
+
+  test('the sparse checkout holds every module the judge imports, and nothing installs', () => {
+    const imported = new Set(['scripts/ci/ios-native-evidence.mjs'])
+    for (const file of imported)
+      for (const match of fs.readFileSync(file, 'utf8').matchAll(/from '(\.\/[\w.-]+)'/g))
+        imported.add(path.posix.join('scripts/ci', match[1]))
+    for (const job of [prJob, runJob]) {
+      const sparse = job.steps[0].with['sparse-checkout'].trim().split('\n')
+      for (const file of imported) assert.ok(sparse.includes(`/${file}`), file)
+      assert.ok(sparse.includes(`/${IOS_NATIVE_WORKFLOW}`))
+      assert.ok(!job.steps.some((step) => /npm (ci|install)/.test(step.run ?? '')))
+    }
   })
 
   test('the pull request head reaches a step only as data in env', () => {

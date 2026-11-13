@@ -7,14 +7,16 @@
 // runs an unmerged commit on ref main, so it saves nothing in main's cache scope except its own
 // client under a prefix no push or nightly key reaches, and a final job deletes that.
 import fs from 'node:fs'
+import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
+import { matchesAny } from './lanes.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
 
 export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
 export const MACOS_JOBS = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-build']
-// The jobs that check out and test the commit; ios-dispatch-cleanup checks out nothing.
-export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence']
+// The jobs that check out the commit; ios-dispatch-cleanup checks out nothing.
+export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence', 'ios-changes']
 export const HARNESS_DIRECTORY = '_bmad-output/test-artifacts/story-6-8/runtime'
 export const EVIDENCE_PATH = `${HARNESS_DIRECTORY}/public-evidence/`
 export const IOS_CLIENT =
@@ -22,6 +24,11 @@ export const IOS_CLIENT =
 export const COMMIT = '${{ inputs.sha || github.sha }}'
 export const RUN_NAME = `iOS native ${COMMIT}`
 export const CLEANUP_JOB = 'ios-dispatch-cleanup'
+export const DECISION_JOB = 'ios-changes'
+// A merge runs the iOS jobs only when ios-changes says it changed a native iOS input; a dispatch or
+// a nightly run never asks, so the commit it names cannot skip its own tests.
+const RUN_RULE = "github.event_name != 'push' || needs.ios-changes.outputs.run == 'true'"
+export const RUN_IF = `\${{ ${RUN_RULE} }}`
 export const JOBS = [...TEST_JOBS, CLEANUP_JOB]
 export const DISPATCH_PREFIX = 'dispatch-${{ inputs.sha }}-'
 const ON_DISPATCH = "github.event_name == 'workflow_dispatch'"
@@ -134,16 +141,14 @@ function jobProblems(workflow, check) {
 
 /** One build, then the four shards and Expo Go in parallel on what it cached. */
 function shapeProblems(jobs, check) {
-  const { 'ios-build': build, 'ios-shard': shard, 'ios-expo-go': expoGo } = jobs
+  const { 'ios-shard': shard, 'ios-expo-go': expoGo } = jobs
   const evidence = jobs['ios-evidence']
-  check(
-    build?.needs === undefined && build?.if === undefined,
-    'ios-build starts the run and depends on nothing'
-  )
-  check(
-    jobs['ios-app-build']?.needs === undefined && jobs['ios-app-build']?.if === undefined,
-    'ios-app-build runs beside the client build'
-  )
+  for (const name of ['ios-build', 'ios-app-build'])
+    check(
+      jobs[name]?.needs === DECISION_JOB && jobs[name]?.if === RUN_IF,
+      `${name} must need only ios-changes, and skip only a merge that changed no native iOS input`
+    )
+  decisionProblems(jobs[DECISION_JOB], check)
   for (const [name, job] of [
     ['ios-shard', shard],
     ['ios-expo-go', expoGo],
@@ -172,11 +177,24 @@ function shapeProblems(jobs, check) {
   expoGoProblems(expoGo, check)
 }
 
+/** ios-changes answers for a merge only, from main's own diff of the commit it checked out. */
+function decisionProblems(decision, check) {
+  const step = (decision?.steps ?? []).find((row) => row.id === 'changes')
+  check(
+    decision?.outputs?.run === '${{ steps.changes.outputs.run }}' &&
+      step?.run === 'node scripts/ci/ios-native-inputs.mjs push-changes' &&
+      step.env?.EVENT === '${{ github.event_name }}' &&
+      step.env?.BEFORE === '${{ github.event.before }}' &&
+      decision.steps.at(-1) === step,
+    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event and the commit before the merge'
+  )
+}
+
 /** ios-evidence runs after any shard result and fails unless every shard reported its exact cases. */
 function evidenceProblems(evidence, check) {
   check(
-    JSON.stringify(needsList(evidence)) === JSON.stringify(['ios-shard']) &&
-      evidence?.if === 'always()' &&
+    JSON.stringify(needsList(evidence)) === JSON.stringify([DECISION_JOB, 'ios-shard']) &&
+      evidence?.if === `\${{ always() && (${RUN_RULE}) }}` &&
       includesRun(evidence?.steps ?? [], 'native-ios-shards.mjs merge') &&
       includesRun(evidence?.steps ?? [], 'test "$CC68_SHARD_RESULT" = success'),
     'ios-evidence must run after any shard result and require every shard’s exact cases'
@@ -459,6 +477,94 @@ function dispatchProblems(workflow, check) {
     group.includes('${{ github.event_name }}') && group.includes(COMMIT),
     'a dispatch and a push of one commit must not cancel each other: key the group by event and commit'
   )
+}
+
+/**
+ * Every file under scripts/ that the iOS jobs run or read: the scripts their steps and local
+ * actions name, and everything those import, require or name in turn. Test files are left out
+ * and not followed: node-test-gate runs them on pull requests as well. The ios-changes job only decides whether a
+ * merge runs the rest, so what it reads is not an iOS input.
+ * @param {object} workflow the parsed ios-native.yml
+ */
+export function scriptReads(workflow, { read = readText, exists = fs.existsSync } = {}) {
+  const texts = []
+  const actions = new Set()
+  const useAction = (uses) => {
+    const action = /^\.\/(\.github\/actions\/[\w-]+)$/.exec(String(uses ?? '').trim())
+    if (!action || actions.has(action[1])) return
+    actions.add(action[1])
+    const text = read(`${action[1]}/action.yml`) ?? ''
+    texts.push(text)
+    for (const nested of text.matchAll(/uses: (\.\/\.github\/actions\/[\w-]+)/g))
+      useAction(nested[1])
+  }
+  for (const [name, job] of Object.entries(workflow.jobs ?? {})) {
+    if (name === DECISION_JOB) continue
+    for (const step of job?.steps ?? []) {
+      texts.push(String(step.run ?? ''))
+      useAction(step.uses)
+    }
+  }
+  const seen = new Set()
+  const stack = texts.flatMap((text) => namedScripts(text, '.'))
+  while (stack.length) {
+    const file = stack.pop()
+    if (seen.has(file) || isTest(file) || !exists(file)) continue
+    seen.add(file)
+    // A JSON file is data: the paths it lists are not files the jobs run.
+    if (!file.endsWith('.json'))
+      stack.push(...namedScripts(read(file) ?? '', path.posix.dirname(file), exists))
+  }
+  return [...seen].filter((file) => file.startsWith('scripts/')).sort()
+}
+
+const isTest = (file) => /\.test\.[cm]?js$/.test(file)
+const readText = (file) => {
+  try {
+    return fs.readFileSync(file, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** The repository files a script text names: relative imports, `scripts/` paths, sibling names. */
+function namedScripts(text, directory, exists = fs.existsSync) {
+  const found = []
+  for (const match of text.matchAll(
+    /(?:from\s*|import\s*\(\s*|require\s*\(\s*|import\s+)['"](\.{1,2}\/[^'"]+)['"]/g
+  ))
+    found.push(path.posix.normalize(path.posix.join(directory, match[1])))
+  for (const match of text.matchAll(
+    /(?:^|[\s"'`(=])(scripts\/[\w./-]+?\.(?:mjs|cjs|js|sh|json))(?=[\s"'`),;]|$)/gm
+  ))
+    found.push(match[1])
+  // A script that joins its own directory with a file name, such as path.join(dir, 'run.mjs').
+  for (const match of text.matchAll(/['"`]([\w.-]+\.(?:mjs|cjs|sh))['"`]/g)) {
+    const sibling = path.posix.join(directory, match[1])
+    if (directory !== '.' && exists(sibling)) found.push(sibling)
+  }
+  return found
+}
+
+/**
+ * SL-11: the push paths, which are the native iOS inputs, cover every script the iOS jobs run or
+ * read, and name no scripts/lib file they do not.
+ * @param {object} workflow the parsed ios-native.yml
+ * @param {{ reads: string[], libraryFiles: string[] }} files what scriptReads found, and every
+ *   file under scripts/lib
+ */
+export function inputCoverageProblems(workflow, { reads, libraryFiles }) {
+  const inputs = workflow.on?.push?.paths ?? []
+  const read = new Set(reads)
+  const uncovered = reads.filter((file) => !matchesAny(file, inputs))
+  const unread = libraryFiles.filter(
+    (file) =>
+      !/\.(test\.mjs|d\.mts)$/.test(file) && matchesAny(file, inputs) && !read.has(file)
+  )
+  return [
+    ...uncovered.map((file) => `the push paths miss ${file}, which the iOS jobs read`),
+    ...unread.map((file) => `the push paths name ${file}, which no iOS job reads`),
+  ]
 }
 
 /** Every repository script and local action the workflow calls exists. */

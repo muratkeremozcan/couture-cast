@@ -49,6 +49,7 @@ jobs:
             /.nvmrc
             /.github/workflows/ios-native.yml
             /scripts/ci/ios-native-evidence.mjs
+            /scripts/ci/ios-native-inputs.mjs
             /scripts/ci/lanes.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
@@ -97,6 +98,7 @@ jobs:
             /.nvmrc
             /.github/workflows/ios-native.yml
             /scripts/ci/ios-native-evidence.mjs
+            /scripts/ci/ios-native-inputs.mjs
             /scripts/ci/lanes.mjs
           sparse-checkout-cone-mode: false
       - uses: actions/setup-node@v4
