@@ -222,14 +222,6 @@ const STARTS = {
     'apps/mobile/modules/share-card-photo-save/ios/Package.swift',
     'apps/mobile/modules/accessibility-focus/ios/AccessibilityFocusTarget.swift',
   ],
-  'ios-native': [
-    'apps/mobile/app.config.ts',
-    'apps/mobile/plugins/with-watchos.js',
-    'apps/mobile/modules/accessibility-focus/ios/AccessibilityFocusModule.swift',
-    'apps/mobile/targets/widgets/WatchSyncSupport.swift',
-    'apps/mobile/native-tests/project.yml',
-    'maestro/story68/settings.yaml',
-  ],
 }
 
 // Per lane, the replayed pull requests it skips. The other 51 touched a shared or unclaimed
@@ -258,9 +250,6 @@ const EXPECTED_SKIPS = {
   'ios-flow-syntax': [209, 208, 204, 202, 199, 192, 180, 173, 148],
   // Only the Swift packages and the XCTest target wake it; no replayed pull request touched them.
   'ios-unit': [209, 208, 204, 202, 199, 192, 180, 173, 148],
-  // Its lane plan is informational on a pull request (it runs on main, nightly and dispatch);
-  // the mobile-only #204 and #192 changed JavaScript, which the Android lanes gate.
-  'ios-native': [209, 208, 204, 202, 199, 192, 180, 173, 148],
 }
 
 test('each lane skips exactly the replayed pull requests reviewed for it', () => {

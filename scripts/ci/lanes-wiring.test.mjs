@@ -33,55 +33,22 @@ const runsOnPullRequest = (workflow) => {
 const COVERAGE_JOB = 'tests-shard'
 const isCoverageLane = (lane) => lane.startsWith('coverage-')
 
-// A lane with pullRequest: false names a workflow that never runs on a pull request; its push
-// filter on main is the lane's inputs, and it has no plan job.
-const onPullRequest = (lane) => LANES[lane].pullRequest !== false
 /** Every [lane, workflow file, job id] the map names. */
-const named = Object.entries(LANES).flatMap(([lane, { workflow, jobs }]) =>
+const gated = Object.entries(LANES).flatMap(([lane, { workflow, jobs }]) =>
   jobs.map((job) => [lane, workflow, job])
 )
-const gated = named.filter(([lane]) => onPullRequest(lane))
 const laneWorkflows = [
-  ...new Set(
-    Object.entries(LANES)
-      .filter(([lane]) => onPullRequest(lane))
-      .map(([, { workflow }]) => workflow)
-  ),
+  ...new Set(Object.values(LANES).map(({ workflow }) => workflow)),
 ].sort()
 
 test('every workflow and job the lane map names exists', () => {
-  for (const [lane, file, job] of named) {
+  for (const [lane, file, job] of gated) {
     assert.ok(workflows[file], `${lane}: ${file} exists`)
-    assert.equal(
+    assert.ok(
       runsOnPullRequest(workflows[file]),
-      onPullRequest(lane),
-      `${lane}: ${file} ${onPullRequest(lane) ? 'runs' : 'never runs'} on pull requests`
+      `${lane}: ${file} runs on pull requests`
     )
     assert.ok(workflows[file].jobs?.[job], `${lane}: ${file} has job ${job}`)
-  }
-})
-
-test('a lane off the pull request path runs on main by exactly its inputs, nightly and on demand', () => {
-  const off = Object.entries(LANES).filter(([lane]) => !onPullRequest(lane))
-  assert.deepEqual(
-    off.map(([lane]) => lane),
-    ['ios-native']
-  )
-  for (const [lane, { workflow: file, inputs, workspaces, jobs }] of off) {
-    const on = workflows[file].on ?? workflows[file][true]
-    assert.equal(workspaces, undefined, `${lane} names its inputs exactly`)
-    assert.deepEqual(on.push.branches, ['main'], lane)
-    assert.deepEqual(
-      on.push.paths,
-      inputs,
-      `${file} push paths are the ${lane} lane inputs`
-    )
-    assert.ok(inputs.includes(`.github/workflows/${file}`), `${lane}: its own workflow`)
-    assert.ok([on.schedule].flat().length > 0, `${lane}: nightly`)
-    assert.ok('workflow_dispatch' in on, `${lane}: on demand`)
-    assert.equal(workflows[file].jobs.lanes, undefined, `${file} has no plan job`)
-    for (const id of jobs)
-      assert.doesNotMatch(conditionOf(workflows[file].jobs[id]), /needs\.lanes/, id)
   }
 })
 
