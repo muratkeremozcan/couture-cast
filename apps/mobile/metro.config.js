@@ -17,5 +17,3 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
 }
 
 module.exports = config
-
-// Probe comment for the ios-native-evidence status check; this PR is closed unmerged.
