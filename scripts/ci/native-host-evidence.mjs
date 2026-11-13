@@ -19,6 +19,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import { IOS_FIRST_FLOW_TIMEOUT_MS } from './native-ios-flow-budget.mjs'
 
 export const SAMPLE_LABELS = [
   'before-indexing-disable',
@@ -349,7 +350,7 @@ const WALL_KEYS = [
 const validWall = (wall) =>
   wall === null ||
   (exactKeys(wall, WALL_KEYS) &&
-    wall.timeoutMs === 120000 &&
+    wall.timeoutMs === IOS_FIRST_FLOW_TIMEOUT_MS &&
     typeof wall.timedOut === 'boolean' &&
     ['childMs', 'wrapperMs', 'workerOverheadMs', 'setupMs', 'harnessMs'].every((key) =>
       count(wall[key])
