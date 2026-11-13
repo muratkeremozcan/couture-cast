@@ -381,6 +381,8 @@ describe('Mobile Hero Experience (TabOneScreen)', () => {
     })
     expect(screen.getByText('Unable to load daily recommendations')).toBeTruthy()
     expect(screen.getByText('Retry')).toBeTruthy()
+    // maestro/network-timeout/dev-client-timeout.yaml taps Retry by this id.
+    expect(screen.getByTestId('hero-retry').textContent).toBe('Retry')
     expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
     expect(screen.queryByTestId('outfit-recommendation-card-skeleton')).toBeNull()
   })

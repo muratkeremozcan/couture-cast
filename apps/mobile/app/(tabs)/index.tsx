@@ -841,6 +841,7 @@ export default function TabOneScreen() {
               style={[styles.retryButton, { backgroundColor: palette.text }]}
               onPress={handleRetry}
               accessibilityRole="button"
+              testID="hero-retry"
             >
               <Text style={[styles.retryText, { color: palette.background }]}>
                 {t('hero.retry', { defaultValue: 'Retry' })}

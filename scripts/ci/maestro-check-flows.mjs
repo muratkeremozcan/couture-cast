@@ -49,6 +49,8 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story68/share-unavailable.yaml',
   'maestro/story68/share-other.yaml',
   'maestro/story68/share-sheet.yaml',
+  // Story 6.15 S2-06: the dev-client network-timeout check, run on a device outside the suite.
+  'maestro/network-timeout/dev-client-timeout.yaml',
 ])
 
 // The pinned install on CI, the PATH binary on a developer machine.
