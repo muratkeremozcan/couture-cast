@@ -17,8 +17,8 @@ import { expectedTextRatio } from './live-font-scale-proof.mjs'
 
 /**
  * A fake device whose screen relayouts correctly at every scale: the 13 sp label's box follows
- * the platform's text scaling, the update adds one line, and nothing remounts on the live
- * launch. `breakAt` makes one live capture stale or makes a capture throw.
+ * the platform's text scaling, the update adds one line that persists across launches until
+ * reverted (as the Settings locale does), and nothing remounts on the live launch. `breakAt` makes one live capture stale or makes a capture throw.
  */
 function fakeDevice(platform, { breakAt, throwAt } = {}) {
   const calls = []
@@ -80,12 +80,10 @@ function fakeDevice(platform, { breakAt, throwAt } = {}) {
         launches += 1
         launch = `cold-${launches}`
         scale = at
-        updated = false
         return step(`cold:${at}`, screen('cold', at))
       },
       launch: async () => {
         launch = 'live'
-        updated = false
         step('launch')
       },
       setScale: async (at) => {
@@ -144,6 +142,15 @@ describe('runScreenJourney', () => {
     assert.deepEqual(
       fake.calls.filter((call) => call.startsWith('cold:')),
       ['cold:large', 'cold:extra-extra-extra-large', 'cold:accessibility-medium']
+    )
+    // Each cold reference's update is reverted before the next launch, so none inherits it.
+    const coldPhase = fake.calls.slice(0, fake.calls.indexOf('launch'))
+    for (const [index, call] of coldPhase.entries())
+      if (call === 'update')
+        assert.equal(coldPhase[index + 2], 'revert', coldPhase.join(' '))
+    assert.ok(
+      result.controls.every((control) => control.pass),
+      JSON.stringify(result.controls)
     )
     assert.ok(
       result.legs.every((leg) => leg.pass),

@@ -158,6 +158,8 @@ export async function runScreenJourney({
       const reference = await io.cold(scale)
       await io.update()
       const updated = await io.fullText(await io.settle('cold', scale))
+      // An update can persist (the Settings locale does), so undo it before the next launch.
+      await io.revert()
       cold[scale] = { reference, updated }
     }
     for (const scale of new Set(sequence.filter((scale) => scale !== base))) {
