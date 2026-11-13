@@ -44,8 +44,10 @@ export const PROOF = [
 ].join('\n')
 const ON_DISPATCH = "github.event_name == 'workflow_dispatch'"
 const NOT_DISPATCH = "github.event_name != 'workflow_dispatch'"
-const RUN_RULE = "github.event_name != 'push' || needs.ios-changes.outputs.run == 'true'"
-export const RUN_IF = `\${{ ${RUN_RULE} }}`
+export const RUN_IF = "${{ needs.ios-changes.outputs.run == 'true' }}"
+// The ios-native call's group: merges share one and the nightly run has its own.
+export const PUSH_GROUP =
+  "${{ github.event_name == 'schedule' && 'ios-native-nightly' || 'ios-native-main-push' }}"
 export const CONSUMER_IF = `\${{ !cancelled() && (needs.ios-build.result == 'success' || (${ON_DISPATCH} && needs.ios-build.result == 'skipped')) }}`
 // A dispatch builds the client in the job first, 31 minutes at p95, before the shard's 70.
 export const CONSUMER_LIMITS = {
@@ -323,11 +325,19 @@ function pushProblems(push, check) {
     `ios-native.yml: the run name must be "${PUSH_RUN_NAME}"`
   )
   check(
-    same(push?.permissions, { contents: 'read' }) &&
-      push?.['cache-mode'] === undefined &&
-      String(push?.concurrency?.group ?? '').includes('${{ github.event_name }}') &&
-      String(push?.concurrency?.group ?? '').includes(PUSH_COMMIT),
-    'ios-native.yml: contents: read only, the trusted cache default, and one run per event and commit'
+    same(push?.permissions, { contents: 'read' }) && push?.['cache-mode'] === undefined,
+    'ios-native.yml: contents: read only, the trusted cache default'
+  )
+  // A run in progress finishes, the newest pending one waits, and ios-changes runs ungrouped.
+  const jobs = push?.jobs ?? {}
+  check(
+    push?.concurrency === undefined &&
+      Object.entries(jobs).every(([name, job]) =>
+        name === 'ios-native'
+          ? same(job?.concurrency, { group: PUSH_GROUP, 'cancel-in-progress': false })
+          : job?.concurrency === undefined
+      ),
+    `ios-native.yml: one group, on the ios-native call only: ${PUSH_GROUP} without cancelling a run in progress`
   )
 }
 
@@ -346,7 +356,7 @@ function pushJobProblems(push, check) {
       call?.if === RUN_IF &&
       call?.['cache-mode'] === undefined &&
       call?.permissions === undefined,
-    'ios-native.yml must call the jobs for github.sha, skipping only a merge that changed no native iOS input'
+    'ios-native.yml must call the jobs for github.sha, skipping only a run whose ios-changes decided run=false'
   )
   const decision = jobs[DECISION_JOB]
   check(

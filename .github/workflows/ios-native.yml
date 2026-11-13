@@ -96,11 +96,6 @@ on:
 permissions:
   contents: read
 
-# One run per event and commit, so a merge and the nightly run each finish.
-concurrency:
-  group: ios-native-${{ github.event_name }}-${{ github.sha }}
-  cancel-in-progress: true
-
 jobs:
   # A merge matches the push paths by name, and package-lock.json and package.json are shared by
   # every workspace, so this job reads what the merge changed in them and lets the iOS jobs run only
@@ -129,9 +124,16 @@ jobs:
           BEFORE: ${{ github.event.before }}
         run: node scripts/ci/ios-native-inputs.mjs push-changes
 
+  # Only a run whose ios-changes decided run=true joins a group, so ios-changes itself runs
+  # ungrouped. A merge waits for the merge run in progress, which finishes, and GitHub keeps only
+  # the newest pending one, so merges less than a run apart still test main's newest commit; the
+  # nightly run has its own group.
   ios-native:
     needs: ios-changes
-    if: ${{ github.event_name != 'push' || needs.ios-changes.outputs.run == 'true' }}
+    if: ${{ needs.ios-changes.outputs.run == 'true' }}
+    concurrency:
+      group: ${{ github.event_name == 'schedule' && 'ios-native-nightly' || 'ios-native-main-push' }}
+      cancel-in-progress: false
     uses: ./.github/workflows/ios-native-jobs.yml
     with:
       sha: ${{ github.sha }}

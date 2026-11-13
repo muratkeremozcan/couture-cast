@@ -22,6 +22,7 @@ import {
   JOBS_WORKFLOW,
   MANDATORY,
   PROOF,
+  PUSH_GROUP,
   PUSH_WORKFLOW,
   TEST_JOBS,
   disabledCondition,
@@ -132,6 +133,82 @@ describe('ios-native workflows validator', () => {
       onOf(files[P]).push.paths = [...paths.slice(9), ...paths.slice(0, 9)]
     }
   )
+  // Concurrency: ios-changes runs ungrouped, and only a call that will test its commit joins a
+  // group. A merge waits for the merge run in progress, which finishes, and GitHub keeps only the
+  // newest pending one; the nightly run has a group of its own.
+  test('only the ios-native call holds a group: one for merges, one for the nightly run', () => {
+    assert.equal(source[P].concurrency, undefined)
+    assert.equal(source[P].jobs['ios-changes'].concurrency, undefined)
+    const { group, 'cancel-in-progress': cancel } =
+      source[P].jobs['ios-native'].concurrency
+    assert.equal(cancel, false)
+    const groupFor = (event) =>
+      group === PUSH_GROUP &&
+      (event === 'schedule' ? 'ios-native-nightly' : 'ios-native-main-push')
+    assert.equal(groupFor('push'), 'ios-native-main-push')
+    assert.equal(groupFor('schedule'), 'ios-native-nightly')
+    assert.equal(
+      source[P].jobs['ios-native'].if,
+      "${{ needs.ios-changes.outputs.run == 'true' }}"
+    )
+  })
+  for (const [title, change] of [
+    [
+      'a workflow-level group on ios-native.yml',
+      (files) => {
+        files[P].concurrency = {
+          group: 'ios-native-${{ github.event_name }}-${{ github.sha }}',
+          'cancel-in-progress': true,
+        }
+      },
+    ],
+    [
+      'a group on ios-changes',
+      (files) => {
+        files[P].jobs['ios-changes'].concurrency = {
+          group: 'ios-changes',
+          'cancel-in-progress': false,
+        }
+      },
+    ],
+    [
+      'a call with no group',
+      (files) => {
+        delete files[P].jobs['ios-native'].concurrency
+      },
+    ],
+    [
+      'a call that cancels the run in progress',
+      (files) => {
+        files[P].jobs['ios-native'].concurrency['cancel-in-progress'] = true
+      },
+    ],
+    [
+      'one group for merges and the nightly run',
+      (files) => {
+        files[P].jobs['ios-native'].concurrency.group = 'ios-native-main-push'
+      },
+    ],
+    [
+      'a group per commit',
+      (files) => {
+        files[P].jobs['ios-native'].concurrency.group = 'ios-native-${{ github.sha }}'
+      },
+    ],
+  ])
+    rejected(
+      title,
+      /ios-native\.yml: one group, on the ios-native call only/,
+      (_, files) => change(files)
+    )
+  rejected(
+    'a nightly call that ignores ios-changes',
+    /skipping only a run whose ios-changes decided run=false/,
+    (_, files) => {
+      files[P].jobs['ios-native'].if =
+        "${{ github.event_name != 'push' || needs.ios-changes.outputs.run == 'true' }}"
+    }
+  )
   rejected('no nightly run', /one nightly schedule/, (_, files) => {
     delete onOf(files[P]).schedule
   })
@@ -228,13 +305,6 @@ describe('ios-native workflows validator', () => {
     /call the jobs for github.sha/,
     (_, files) => {
       files[P].jobs['ios-native'].with.sha = '${{ github.event.before }}'
-    }
-  )
-  rejected(
-    'the merge call skipping a nightly run on ios-changes',
-    /skipping only a merge/,
-    (_, files) => {
-      files[P].jobs['ios-native'].if = "${{ needs.ios-changes.outputs.run == 'true' }}"
     }
   )
   rejected(
