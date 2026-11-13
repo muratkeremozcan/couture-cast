@@ -335,19 +335,21 @@ export const QUIET_SERVICES = Object.freeze([
   'mediaanalysisd',
 ])
 
-/** Labels the simulator lists, running or idle. */
+/** Labels the simulator lists, running or idle, each with its pid, or null when idle. */
 const listedLabels = (listed) =>
-  new Set(
+  new Map(
     String(listed)
       .split('\n')
       .flatMap((line) => {
-        const m = line.trim().match(/^(?:\d+|-)\s+-?\d+\s+(\S+)$/)
-        return m ? [m[1]] : []
+        const m = line.trim().match(/^(\d+|-)\s+-?\d+\s+(\S+)$/)
+        return m ? [[m[2], m[1] === '-' ? null : Number(m[1])]] : []
       })
   )
 
 /**
- * Stop each running owned job from the list; every attempt is recorded and nonfatal. The census
+ * Stop each job from the list that runs owned by the simulator manager, or that the simulator
+ * lists idle (no pid): launchd starts an idle job on demand, as mediaanalysisd did after the
+ * quiesce in dispatch 43393247650 shard 3. Every attempt is recorded and nonfatal. The census
  * names, per entry, whether the runtime ran it ('running'), listed it idle ('idle') or does not
  * have it ('absent'), and the exit code of the boot-out, so the next run shows which labels exist.
  */
@@ -357,16 +359,25 @@ export function bootoutQuietServices(device, ps, jobs, manager, execute, listed 
   const census = {}
   for (const name of QUIET_SERVICES) {
     const service = ownedService(ps, jobs, manager, name)
+    const label = `com.apple.${name}`
     census[name] = {
-      state: service ? 'running' : labels.has(`com.apple.${name}`) ? 'idle' : 'absent',
+      state: service ? 'running' : labels.has(label) ? 'idle' : 'absent',
       bootoutExit: null,
     }
-    if (!service) continue
+    const idle = !service && labels.get(label) === null
+    if (!service && !idle) continue
     // The system form is the one the simulator accepts (apsd, run 9).
     const result = execute(
       `bootout-quiet-${name}`,
       'xcrun',
-      ['simctl', 'spawn', device, 'launchctl', 'bootout', `system/${service.label}`],
+      [
+        'simctl',
+        'spawn',
+        device,
+        'launchctl',
+        'bootout',
+        `system/${service?.label ?? label}`,
+      ],
       { fatal: false }
     )
     census[name].bootoutExit = result.exitCode ?? null
