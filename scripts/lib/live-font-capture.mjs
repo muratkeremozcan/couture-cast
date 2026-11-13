@@ -431,3 +431,69 @@ export function restoreFailure(captured, after, tolerance = 2) {
   })
   return relaid ? 'live_font_relayout_on_scroll' : 'live_font_scroll_not_restored'
 }
+
+/**
+ * A status bar the proof sets on the simulator under test (`xcrun simctl status_bar override`),
+ * derived from its UDID: battery 1 to 99%, 0 to 4 cellular bars, 0 to 2 Wi-Fi bars, so an
+ * unmarked simulator (100%, three Wi-Fi bars) never matches. Maestro 2.8 serves `hierarchy` for
+ * every iOS simulator through the one port 22087, so with a driver already up for another
+ * booted simulator a read returns that simulator's screen; the status bar names the device.
+ */
+export function deviceFingerprint(udid) {
+  let hash = 2166136261
+  for (const character of String(udid)) {
+    hash ^= character.charCodeAt(0)
+    hash = Math.imul(hash, 16777619) >>> 0
+  }
+  return {
+    battery: 1 + (hash % 99),
+    cellular: Math.floor(hash / 99) % 5,
+    wifi: Math.floor(hash / 495) % 3,
+  }
+}
+
+function statusTexts(tree) {
+  const texts = []
+  const walk = (node) => {
+    const attrs = attributes(node)
+    for (const value of [
+      attrs.accessibilityText,
+      attrs.text,
+      attrs.value,
+      attrs['resource-id'],
+    ])
+      if (value) texts.push(String(value))
+    for (const child of node?.children ?? []) walk(child)
+  }
+  // The status bar is the root's window with empty bounds (see flattenHierarchy).
+  for (const child of tree?.children ?? [])
+    if (/^\[0,0\]\[0,0\]$/.test(attributes(child).bounds ?? '[0,0][0,0]')) walk(child)
+  return texts
+}
+
+/**
+ * Fails closed on a hierarchy that came from another device or another build: on iOS the status
+ * bar must carry the device's fingerprint, and on both platforms an environment marker must name
+ * the React Native version the run read from the installed build.
+ */
+export function assertHierarchySource(
+  tree,
+  { platform, fingerprint, reactNativeVersion }
+) {
+  if (platform === 'ios' && fingerprint) {
+    const texts = statusTexts(tree)
+    const expected = [
+      `${fingerprint.battery}% battery power`,
+      `${fingerprint.cellular} of 4 bars`,
+      `${fingerprint.wifi} of 3 Wi-Fi bars`,
+    ]
+    const missing = expected.filter((part) => !texts.some((text) => text.includes(part)))
+    if (missing.length)
+      throw new Error(`live_font_hierarchy_wrong_device:${missing.join('|')}`)
+  }
+  if (reactNativeVersion) {
+    const seen = flattenHierarchy(tree, { platform }).environment?.reactNativeVersion
+    if (seen && seen !== reactNativeVersion)
+      throw new Error(`live_font_hierarchy_wrong_build:${seen}`)
+  }
+}

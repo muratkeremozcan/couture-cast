@@ -10,6 +10,8 @@ import {
   parseEnvironment,
   activityConfiguration,
   activityToken,
+  assertHierarchySource,
+  deviceFingerprint,
   assertLiveProvenance,
   countOnCreate,
   flattenHierarchy,
@@ -523,4 +525,96 @@ test('iOS leaves out the status bar window and the scroll bars', () => {
     flattenHierarchy(tree, { platform: 'ios' }).nodes.map((entry) => entry.text),
     ['CoutureCast Story68', 'Cloudy', '45%']
   )
+})
+
+describe('hierarchy source (two booted simulators)', () => {
+  // Maestro 2.8 serves `hierarchy` on every iOS simulator through the one port 22087: with a
+  // driver already up for simulator A, a read for simulator B returns A's screen.
+  const statusBar = ({ battery, cellular, wifi }) =>
+    node({ bounds: '[0,0][0,0]' }, [
+      node({ bounds: '[0,0][402,54]' }, [
+        node({ accessibilityText: '9:14 AM', bounds: '[55,22][92,42]' }),
+        node({
+          accessibilityText: 'Cellular',
+          text: `${cellular} of 4 bars, signal strength`,
+          bounds: '[288,26][307,38]',
+        }),
+        node({
+          'resource-id': `${wifi} of 3 Wi-Fi bars`,
+          text: `SSID, ${wifi} of 3 Wi-Fi bars`,
+          bounds: '[315,26][332,38]',
+        }),
+        node({
+          accessibilityText: `${battery}% battery power`,
+          bounds: '[340,26][370,38]',
+        }),
+      ]),
+    ])
+  const dump = (rn, bar) =>
+    node({ bounds: '[0,0][0,0]' }, [
+      node({ accessibilityText: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
+        node({
+          'resource-id': `live-font-env-root~${rn}~light~ltr~3~en-US`,
+          bounds: '[0,437][1,438]',
+        }),
+      ]),
+      statusBar(bar),
+    ])
+  const udidA = '679BE700-51A7-489F-89D1-E509778C6C63'
+  const udidB = 'C2AF70AA-B293-4D71-B064-00FFA8A20CE9'
+
+  test('each simulator gets its own status bar fingerprint, never the defaults', () => {
+    const [a, b] = [deviceFingerprint(udidA), deviceFingerprint(udidB)]
+    assert.notDeepEqual(a, b)
+    for (const print of [a, b]) {
+      assert.ok(print.battery >= 1 && print.battery <= 99)
+      assert.ok(print.cellular >= 0 && print.cellular <= 4)
+      assert.ok(print.wifi >= 0 && print.wifi <= 2, 'three bars is the default')
+    }
+    assert.deepEqual(deviceFingerprint(udidA), a)
+  })
+
+  test('a dump from the requested simulator and build passes', () => {
+    assert.doesNotThrow(() =>
+      assertHierarchySource(dump('0.81.5', deviceFingerprint(udidA)), {
+        platform: 'ios',
+        fingerprint: deviceFingerprint(udidA),
+        reactNativeVersion: '0.81.5',
+      })
+    )
+  })
+
+  test('a dump from the other simulator fails, whatever build it shows', () => {
+    const other = dump('0.81.5', deviceFingerprint(udidB))
+    assert.throws(
+      () =>
+        assertHierarchySource(other, {
+          platform: 'ios',
+          fingerprint: deviceFingerprint(udidA),
+          reactNativeVersion: '0.81.5',
+        }),
+      { message: /^live_font_hierarchy_wrong_device/ }
+    )
+    // An unmarked simulator shows the defaults: 100% battery, 3 Wi-Fi bars.
+    assert.throws(
+      () =>
+        assertHierarchySource(dump('0.81.5', { battery: 100, cellular: 0, wifi: 3 }), {
+          platform: 'ios',
+          fingerprint: deviceFingerprint(udidA),
+        }),
+      { message: /^live_font_hierarchy_wrong_device/ }
+    )
+  })
+
+  test("a dump carrying another build's markers fails", () => {
+    assert.throws(
+      () =>
+        assertHierarchySource(dump('0.88.1', deviceFingerprint(udidA)), {
+          platform: 'ios',
+          fingerprint: deviceFingerprint(udidA),
+          reactNativeVersion: '0.81.5',
+        }),
+      { message: /^live_font_hierarchy_wrong_build/ }
+    )
+  })
 })

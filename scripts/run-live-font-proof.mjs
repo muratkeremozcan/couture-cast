@@ -24,6 +24,8 @@ import { fileURLToPath } from 'node:url'
 import {
   activityConfiguration,
   activityToken,
+  assertHierarchySource,
+  deviceFingerprint,
   countOnCreate,
   flattenHierarchy,
   readEnvironment,
@@ -106,11 +108,18 @@ function maestro(flow) {
     { timeout: 240_000 }
   )
 }
+// iOS: the simulator under test wears a status bar derived from its UDID, and every hierarchy
+// must show it (Maestro 2.8 can answer a read for one simulator with another's screen).
+const fingerprint = platform === 'ios' ? deviceFingerprint(device) : undefined
+// Read from the installed app on the first launch; every later hierarchy must agree with it.
+let reactNativeVersion
 function hierarchy() {
   const raw = run('maestro', ['--device', device, 'hierarchy'])
   const start = raw.indexOf('{')
   if (start < 0) throw new Error('live_font_hierarchy_invalid')
-  return JSON.parse(raw.slice(start))
+  const tree = JSON.parse(raw.slice(start))
+  assertHierarchySource(tree, { platform, fingerprint, reactNativeVersion })
+  return tree
 }
 function readScale() {
   return platform === 'android'
@@ -547,7 +556,21 @@ if (platform === 'android') adb('logcat', '-b', 'events', '-G', '4M')
 const previousScale = readScale()
 const started = Date.now()
 const results = []
-let reactNativeVersion
+if (fingerprint)
+  run('xcrun', [
+    'simctl',
+    'status_bar',
+    device,
+    'override',
+    '--batteryLevel',
+    String(fingerprint.battery),
+    '--cellularMode',
+    'active',
+    '--cellularBars',
+    String(fingerprint.cellular),
+    '--wifiBars',
+    String(fingerprint.wifi),
+  ])
 try {
   if (platform === 'android' && build === 'release') {
     const flags = adb('shell', 'dumpsys', 'package', appId)
@@ -569,11 +592,11 @@ try {
       }
       continue
     }
-    // The installed app reports its React Native version; read it once on the first launch.
+    // The installed app reports its React Native version; read it once, on the screen the app
+    // opens to, before any screen's flow (a modal can hide the root's markers).
     if (!reactNativeVersion) {
       try {
         launch()
-        maestro(SCREENS[name].flow)
         reactNativeVersion = readEnvironment(
           flattenHierarchy(hierarchy(), { platform, volatile: activeVolatile })
         ).reactNativeVersion
@@ -605,6 +628,7 @@ try {
     results.push(report)
   }
 } finally {
+  if (fingerprint) spawnSync('xcrun', ['simctl', 'status_bar', device, 'clear'])
   if (platform === 'android' && previousScale === 'null')
     adb('shell', 'settings', 'delete', 'system', 'font_scale')
   else setScale(previousScale)
