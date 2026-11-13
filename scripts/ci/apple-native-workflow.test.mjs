@@ -54,9 +54,9 @@ describe('the one macOS pull request job', () => {
     assert.ok(job.steps.every((step) => step['continue-on-error'] === undefined))
   })
 
-  test('selects the Xcode ios-native.yml selects, before any Apple build or test', () => {
+  test('selects the Xcode ios-native-jobs.yml selects, before any Apple build or test', () => {
     const xcode = job.steps.findIndex((step) => step.id === 'xcode')
-    const iosNative = workflows['ios-native.yml'].jobs['ios-build'].steps.find(
+    const iosNative = workflows['ios-native-jobs.yml'].jobs['ios-build'].steps.find(
       (step) => step.id === 'xcode'
     )
     assert.equal(xcode, 1, 'right after the checkout')
@@ -435,7 +435,7 @@ describe('the watchOS suite under WATCHOS_REQUIRE_BUILD', () => {
   })
 })
 
-// TEA SL-04: the checks that fit a pull request run on Linux there, beside ios-native.yml.
+// TEA SL-04: the checks that fit a pull request run on Linux there, beside ios-native-jobs.yml.
 describe('the iOS checks shifted onto Linux pull request jobs', () => {
   const jobs = workflows['pr-apple-native.yml'].jobs
 

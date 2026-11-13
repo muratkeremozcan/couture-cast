@@ -3,7 +3,7 @@
  * flows passed in 90), and two shards still took 50 and 58 minutes on main run 41312266186. Each
  * shard boots its own simulator, Supabase, Metro and signed-in account, installs the development
  * client ios-build keyed by its native fingerprint, and runs the sections below. Since story 6.15
- * D6 the shards are parallel ios-shard jobs in ios-native.yml, on macos-26. `open` and
+ * D6 the shards are parallel ios-shard jobs in ios-native-jobs.yml, on macos-26. `open` and
  * `signin` run in every shard, and every shard but the one that runs `proof` sets the post-proof
  * Photos permission with `permission-baseline`; nothing else repeats.
  *

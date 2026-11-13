@@ -30,7 +30,8 @@ const report = (shard, patch = {}) => ({
 })
 const all = () => Object.fromEntries(shards.map((shard) => [shard, report(shard)]))
 
-// The four shards run as parallel macOS jobs beside ios-expo-go in ios-native.yml (story 6.15 D6).
+// The four shards run as parallel macOS jobs beside ios-expo-go in ios-native-jobs.yml (story 6.15
+// D6).
 test('four shards, each its own job beside the Expo Go job', () => {
   assert.equal(SHARD_COUNT, 4)
   assert.deepEqual(shards, [1, 2, 3, 4])
@@ -60,9 +61,11 @@ test('the shards are balanced by measured minutes and fit their job limit on a r
     Math.max(...minutes) - Math.min(...minutes) <= 3,
     `shard minutes ${minutes.join(', ')}`
   )
-  const limit = parse(fs.readFileSync('.github/workflows/ios-native.yml', 'utf8')).jobs[
-    'ios-shard'
-  ]['timeout-minutes']
+  // A merge and the nightly run restore the client and keep the shard's 70 minutes; a dispatch
+  // adds its own client build on top, so the shard's flows still have the merge-path limit.
+  const timeout = parse(fs.readFileSync('.github/workflows/ios-native-jobs.yml', 'utf8'))
+    .jobs['ios-shard']['timeout-minutes']
+  const limit = Number(/\|\| (\d+) \}\}$/.exec(timeout)[1])
   for (const shard of shards) {
     assert.ok(
       nominalMinutes(shard) * 1.5 < limit,

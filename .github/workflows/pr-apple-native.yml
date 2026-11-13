@@ -10,7 +10,7 @@
 # Each step runs only when its own lane does (scripts/ci/lanes.mjs: ios-unit, watchos), and the
 # job runs when either lane is selected, so a pull request waits for one macOS runner at most.
 # The checks that cannot fit (the iOS app builds, the share-card iOS journeys and the Expo Go
-# proof) run in ios-native.yml on main, nightly and on demand. PR Gate makes this job required
+# proof) run in ios-native-jobs.yml on main, nightly and on demand. PR Gate makes this job required
 # whenever it runs.
 name: Apple native checks
 
@@ -61,7 +61,7 @@ jobs:
           LANES_WORKFLOW: pr-apple-native.yml
         run: node scripts/ci/lanes.mjs
 
-  # macos-26, with the same Xcode 26.4 or later ios-native.yml selects. The D6 queue probe (PR 215,
+  # macos-26, with the same Xcode 26.4 or later ios-native-jobs.yml selects. The D6 queue probe (PR 215,
   # run 43327728813, 20 attempts) measured macos-26 queue p50 0.08, p95 0.93, max 1.63 minutes
   # against macos-15's p95 7.50 and max 27.83. Run time: the header tests about 2 minutes, the
   # XCTest 2.5 at p50 and 5.0 at p95 (2026-11-12, macos-15), the watchOS suite about 4 with its
@@ -75,7 +75,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # The selection ios-native.yml makes, step for step (apple-native-workflow.test.mjs): the
+      # The selection ios-native-jobs.yml makes, step for step (apple-native-workflow.test.mjs): the
       # newest Xcode 26.x at 26.4 or later, by name, with its build identity logged.
       - name: Select Xcode 26.4 or later
         id: xcode
@@ -242,14 +242,14 @@ jobs:
           echo "swift test ran $ran tests (${skipped:-0} skipped)"
 
       # The share-card header selection controls compile with plain swiftc; on Linux the share
-      # module's CoreGraphics shim stands in. ios-native.yml runs them on macOS too.
+      # module's CoreGraphics shim stands in. ios-native-jobs.yml runs them on macOS too.
       - name: Share-card header semantics controls
         if: ${{ !cancelled() }}
         timeout-minutes: 5
         run: bash scripts/ci/share-card-header-semantics.sh
 
   # `maestro check-syntax` over the iOS share-card flows needs no device, so it runs on Linux on
-  # every pull request that changes them, beside the full journeys in ios-native.yml. About two
+  # every pull request that changes them, beside the full journeys in ios-native-jobs.yml. About two
   # minutes: Java, the pinned Maestro CLI and the check.
   ios-flow-syntax:
     name: iOS Maestro flow syntax (Linux)

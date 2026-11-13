@@ -8,7 +8,7 @@
 #
 # The iOS side runs on macOS (story 6.15 D6): the AccessibilityFocusTarget XCTest
 # in pr-apple-native.yml on pull requests, and the Release simulator app build
-# with its link and registration check in ios-native.yml on main, nightly and on
+# with its link and registration check in ios-native-jobs.yml on main, nightly and on
 # demand, since that build alone runs about 31 minutes at p95.
 name: Accessibility focus module
 
