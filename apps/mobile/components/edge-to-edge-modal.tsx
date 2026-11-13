@@ -10,7 +10,10 @@ import {
   View,
   type ModalProps,
 } from 'react-native'
-import { LiveFontMountMarker } from './live-font-mount-marker'
+import {
+  LiveFontMountMarker,
+  liveFontMountMarkersEnabled,
+} from './live-font-mount-marker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 /**
@@ -83,22 +86,65 @@ type EdgeToEdgeModalProps = Omit<
  * R57/R61: the content sits in a keyboard view, so a focused field and the controls
  * below it stay above the software keyboard on both platforms.
  */
+type MarkerHost = {
+  accessibilityViewIsModal?: boolean
+  children?: React.ReactNode
+  dataSet?: Record<string, string>
+}
+
+/**
+ * Puts `marker` first inside the first element in `node` that sets accessibilityViewIsModal,
+ * walking arrays, fragments and the children of wrapper elements (an overlay View, a
+ * KeyboardAvoidingView). Children given as a render function are not walked.
+ */
+function placeMarker(
+  node: React.ReactNode,
+  marker: React.ReactElement
+): { node: React.ReactNode; placed: boolean } {
+  if (Array.isArray(node)) {
+    let placed = false
+    const next = (node as React.ReactNode[]).map((child: React.ReactNode) => {
+      if (placed) return child
+      const result = placeMarker(child, marker)
+      placed = result.placed
+      return result.node
+    })
+    return { node: placed ? next : node, placed }
+  }
+  if (!isValidElement<MarkerHost>(node)) return { node, placed: false }
+  // The host is tagged so a web test can tell the marker found it (react-native-web drops
+  // accessibilityViewIsModal); native views ignore dataSet.
+  if (node.props.accessibilityViewIsModal)
+    return {
+      node: cloneElement(
+        node,
+        { dataSet: { ...node.props.dataSet, liveFontModalHost: 'true' } },
+        marker,
+        node.props.children
+      ),
+      placed: true,
+    }
+  const { children } = node.props
+  if (children === undefined || typeof children === 'function')
+    return { node, placed: false }
+  const inner = placeMarker(children, marker)
+  return inner.placed
+    ? { node: cloneElement(node, { children: inner.node }), placed: true }
+    : { node, placed: false }
+}
+
 /**
  * The modal is its own window, so it carries its own mount marker (Story 6.15). A content view
  * with accessibilityViewIsModal hides every other view from VoiceOver and from the XCUITest
- * hierarchy, so the marker goes inside that view when the content is one; otherwise it sits
- * beside the content.
+ * hierarchy, so the marker goes inside that view wherever the content nests it; with no such
+ * view it sits beside the content.
  */
 function withModalMarker(children: React.ReactNode) {
+  // Production builds render no marker, so their content stays exactly as written.
+  if (!liveFontMountMarkersEnabled()) return children
   const marker = <LiveFontMountMarker key="live-font-mount-marker" scope="modal" />
-  if (
-    isValidElement<{
-      accessibilityViewIsModal?: boolean
-      children?: React.ReactNode
-    }>(children) &&
-    children.props.accessibilityViewIsModal
-  )
-    return cloneElement(children, undefined, marker, children.props.children)
+  const result = placeMarker(children, marker)
+  if (result.placed) return result.node
   return (
     <>
       {marker}

@@ -45,3 +45,21 @@ export function paddingBottomOf(element: Element): number {
 export function paddingTopOf(element: Element): number {
   return parseFloat(getComputedStyle(element).paddingTop)
 }
+
+/**
+ * Story 6.15 review P3-1: the modal's live-font mount marker must sit inside the view that sets
+ * accessibilityViewIsModal; iOS hides every view outside it from the XCUITest hierarchy the
+ * live font proof reads. react-native-web drops that prop, so EdgeToEdgeModal tags the view it
+ * put the marker in (`data-live-font-modal-host`); a marker left beside the content has none.
+ */
+export function liveFontMarkerPlacement(): {
+  markerInside: boolean
+  host: string | null
+} {
+  const marker: Element | null = document.querySelector<Element>(
+    '[data-testid^="live-font-mount-modal-"]'
+  )
+  const host =
+    marker?.parentElement?.closest('[data-live-font-modal-host="true"]') ?? null
+  return { markerInside: host !== null, host: host?.getAttribute('data-testid') ?? null }
+}

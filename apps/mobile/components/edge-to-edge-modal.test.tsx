@@ -7,6 +7,7 @@ import {
   EDGE_TO_EDGE_MODAL_PROPS,
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
+  liveFontMarkerPlacement,
   modalRenders,
 } from '@/src/test-utils/edge-to-edge-modal'
 import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
@@ -147,6 +148,38 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
     expect(screen.getByText('Composer')).toBeTruthy()
   })
 
+  it('finds the accessibility modal view inside an overlay wrapper, a fragment or an array', () => {
+    const shapes = {
+      wrapper: (
+        <ReactNative.View testID="overlay">
+          <ReactNative.View testID="sheet" accessibilityViewIsModal>
+            <Text>Sheet</Text>
+          </ReactNative.View>
+        </ReactNative.View>
+      ),
+      fragment: (
+        <>
+          <ReactNative.View testID="backdrop" />
+          <ReactNative.View testID="sheet" accessibilityViewIsModal />
+        </>
+      ),
+      array: [
+        <ReactNative.View key="a" testID="backdrop" />,
+        <ReactNative.View key="b" testID="sheet" accessibilityViewIsModal />,
+      ],
+    }
+    for (const [shape, children] of Object.entries(shapes)) {
+      const view = render(<EdgeToEdgeModal visible>{children}</EdgeToEdgeModal>)
+      const marker = document.querySelector('[data-testid^="live-font-mount-modal-"]')
+      expect(screen.getByTestId('sheet').contains(marker), shape).toBe(true)
+      expect(liveFontMarkerPlacement(), shape).toEqual({
+        markerInside: true,
+        host: 'sheet',
+      })
+      view.unmount()
+    }
+  })
+
   it('keeps the mount marker beside content that is not an accessibility modal', () => {
     render(
       <EdgeToEdgeModal visible>
@@ -156,6 +189,7 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
     expect(
       document.querySelector('[data-testid^="live-font-mount-modal-"]')
     ).not.toBeNull()
+    expect(liveFontMarkerPlacement().markerInside).toBe(false)
   })
 
   it('puts the content, its fields included, inside the keyboard view', () => {

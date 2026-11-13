@@ -53,6 +53,7 @@ import {
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
   paddingBottomOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 
 function garment(
@@ -628,6 +629,18 @@ describe('MobileCapsuleBuilderModal', () => {
 })
 
 describe('R52 MobileCapsuleBuilderModal over the system bars', () => {
+  // Story 6.15 review P3-1: iOS hides every view outside an accessibility modal view from the
+  // XCUITest hierarchy. This builder sets accessibilityViewIsModal on the Modal itself, which
+  // react-native's Modal does not apply to any view, and no content view sets it, so nothing
+  // hides the marker beside the content.
+  it('keeps the live-font marker beside content that has no accessibility modal view', () => {
+    renderModal()
+    expect(
+      document.querySelector('[data-testid^="live-font-mount-modal-"]')
+    ).not.toBeNull()
+    expect(liveFontMarkerPlacement()).toEqual({ markerInside: false, host: null })
+  })
+
   beforeAll(async () => {
     await initI18n()
     await i18n.changeLanguage('en-US')

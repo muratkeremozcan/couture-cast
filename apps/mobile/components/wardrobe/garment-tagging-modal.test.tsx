@@ -13,6 +13,7 @@ import {
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
   paddingBottomOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 import {
   createReadyGarmentFixture,
@@ -554,6 +555,20 @@ describe('MobileGarmentTaggingModal Component', () => {
 })
 
 describe('R52 MobileGarmentTaggingModal over the system bars', () => {
+  // Story 6.15 review P3-1: iOS hides every view outside the accessibility modal view from the
+  // XCUITest hierarchy, so the modal's live-font marker must sit inside it.
+  it('puts the live-font marker inside the sheet that is the accessibility modal', () => {
+    render(
+      <MobileGarmentTaggingModal
+        visible={true}
+        onClose={vi.fn()}
+        garmentId={null}
+        accessToken="test_token"
+      />
+    )
+    expect(liveFontMarkerPlacement().markerInside).toBe(true)
+  })
+
   it('covers the status and navigation bars and keeps the sheet above the gesture bar', () => {
     render(
       <MobileGarmentTaggingModal
