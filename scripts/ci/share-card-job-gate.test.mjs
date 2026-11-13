@@ -6,6 +6,7 @@ import { describe, test } from 'node:test'
 import {
   assertShareCardJobs,
   laneJobName,
+  iosShareCardJobs,
   pullRequestShareCardJobs,
   requiredShareCardJobs,
   shareCardLane,
@@ -24,6 +25,14 @@ const pullRequestResults = (override = {}) =>
   results(
     Object.fromEntries([
       ...deviceLanes.map((name) => [name, 'skipped']),
+      ...Object.entries(override),
+    ])
+  )
+// On a merge to main the iOS lanes are skipped: macOS runs nightly and on demand only.
+const pushResults = (override = {}) =>
+  results(
+    Object.fromEntries([
+      ...iosShareCardJobs.map((name) => [name, 'skipped']),
       ...Object.entries(override),
     ])
   )
@@ -59,7 +68,7 @@ const cli = (value, event, plan) =>
   })
 
 describe('share-card aggregate job gate', () => {
-  test('requires both API32 shards and their evidence, the browser lane, the five Android36 partitions, and the Android36 matrix shard evidence', () => {
+  test('requires both API32 shards and their evidence, the browser lane, the five Android36 partitions, the Android36 matrix shard evidence, the three iOS shard jobs and the Expo Go proof', () => {
     assert.deepEqual([...requiredShareCardJobs].sort(), [
       'android36-controls',
       'android36-interaction',
@@ -68,14 +77,18 @@ describe('share-card aggregate job gate', () => {
       'android36-original',
       'android36-release-font',
       'browser-acceptance',
+      'ios-build',
+      'ios-evidence',
+      'ios-expo-go',
+      'ios-shard',
       'original-resource',
       'original-resource-evidence',
     ])
   })
 
   test('passes only when every required job succeeded', () => {
-    assert.deepEqual(assertShareCardJobs(results(), 'push'), requiredShareCardJobs)
-    const ok = cli(JSON.stringify(results()), 'push')
+    assert.deepEqual(assertShareCardJobs(results(), 'schedule'), requiredShareCardJobs)
+    const ok = cli(JSON.stringify(results()), 'schedule')
     assert.equal(ok.status, 0, ok.stderr)
     assert.match(ok.stdout, /Required share-card jobs passed/)
   })
@@ -85,10 +98,10 @@ describe('share-card aggregate job gate', () => {
       test(`${outcome} ${name} fails the helper and the CLI`, () => {
         const value = results({ [name]: outcome })
         assert.throws(
-          () => assertShareCardJobs(value, 'push'),
+          () => assertShareCardJobs(value, 'schedule'),
           new RegExp(`failed: ${name}$`)
         )
-        const run = cli(JSON.stringify(value), 'push')
+        const run = cli(JSON.stringify(value), 'schedule')
         assert.equal(run.status, 1)
         assert.ok(run.stderr.includes(name))
       })
@@ -99,19 +112,19 @@ describe('share-card aggregate job gate', () => {
       const value = results()
       delete value[name]
       assert.throws(
-        () => assertShareCardJobs(value, 'push'),
+        () => assertShareCardJobs(value, 'schedule'),
         /share_card_job_results_invalid/
       )
-      assert.equal(cli(JSON.stringify(value), 'push').status, 1)
+      assert.equal(cli(JSON.stringify(value), 'schedule').status, 1)
     })
 
   test('an empty result of any required job fails', () => {
     for (const name of requiredShareCardJobs) {
       const value = results()
       value[name] = {}
-      assert.throws(() => assertShareCardJobs(value, 'push'), new RegExp(name))
+      assert.throws(() => assertShareCardJobs(value, 'schedule'), new RegExp(name))
       value[name] = null
-      assert.throws(() => assertShareCardJobs(value, 'push'), new RegExp(name))
+      assert.throws(() => assertShareCardJobs(value, 'schedule'), new RegExp(name))
     }
   })
 
@@ -126,7 +139,7 @@ describe('share-card aggregate job gate', () => {
       '',
       undefined,
     ]) {
-      const run = cli(raw, 'push')
+      const run = cli(raw, 'schedule')
       assert.equal(run.status, 1)
       assert.equal(run.stderr.trim(), 'share_card_job_results_invalid')
       assert.equal(run.stdout.includes(secret) || run.stderr.includes(secret), false)
@@ -136,7 +149,7 @@ describe('share-card aggregate job gate', () => {
   test('a success lookalike does not pass', () => {
     for (const result of ['Success', 'success ', 'successful', true, 1])
       assert.throws(() =>
-        assertShareCardJobs(results({ 'original-resource': result }), 'push')
+        assertShareCardJobs(results({ 'original-resource': result }), 'schedule')
       )
   })
 
@@ -150,6 +163,10 @@ describe('share-card aggregate job gate', () => {
         'android36-native-matrix',
         'android36-original',
         'android36-release-font',
+        'ios-build',
+        'ios-evidence',
+        'ios-expo-go',
+        'ios-shard',
         'original-resource',
         'original-resource-evidence',
       ])
@@ -267,14 +284,45 @@ describe('share-card aggregate job gate', () => {
     })
   })
 
+  describe('a push requires the iOS lanes skipped and every other lane', () => {
+    test('iOS skipped and every other lane successful passes on push', () => {
+      assert.deepEqual(assertShareCardJobs(pushResults(), 'push'), requiredShareCardJobs)
+      assert.equal(cli(JSON.stringify(pushResults()), 'push').status, 0)
+    })
+
+    for (const name of iosShareCardJobs)
+      test(`a ${name} that ran fails on push`, () => {
+        const value = pushResults({ [name]: 'success' })
+        assert.throws(
+          () => assertShareCardJobs(value, 'push'),
+          new RegExp(`failed: ${name}$`)
+        )
+        assert.equal(cli(JSON.stringify(value), 'push').status, 1)
+      })
+
+    for (const name of deviceLanes.filter((lane) => !iosShareCardJobs.includes(lane)))
+      for (const outcome of ['skipped', 'failure'])
+        test(`a ${outcome} ${name} fails on push`, () => {
+          const value = pushResults({ [name]: outcome })
+          assert.throws(
+            () => assertShareCardJobs(value, 'push'),
+            new RegExp(`failed: ${name}$`)
+          )
+          assert.equal(cli(JSON.stringify(value), 'push').status, 1)
+        })
+
+    test('a plan skipping the browser lane does not excuse it on push', () => {
+      const value = pushResults({ 'browser-acceptance': 'skipped' })
+      assert.throws(
+        () => assertShareCardJobs(value, 'push', browserSkipped),
+        /failed: browser-acceptance$/
+      )
+      assert.equal(cli(JSON.stringify(value), 'push', browserSkipped).status, 1)
+    })
+  })
+
   describe('every other event requires every lane', () => {
-    for (const event of [
-      'push',
-      'schedule',
-      'workflow_dispatch',
-      'merge_group',
-      undefined,
-    ])
+    for (const event of ['schedule', 'workflow_dispatch', 'merge_group', undefined])
       for (const name of deviceLanes)
         test(`a skipped ${name} fails on ${event}`, () => {
           const value = results({ [name]: 'skipped' })
@@ -285,14 +333,14 @@ describe('share-card aggregate job gate', () => {
           assert.equal(cli(JSON.stringify(value), event).status, 1)
         })
 
-    for (const event of ['push', 'schedule', 'workflow_dispatch'])
+    for (const event of ['schedule', 'workflow_dispatch'])
       test(`all lanes successful passes on ${event}`, () => {
         assert.deepEqual(assertShareCardJobs(results(), event), requiredShareCardJobs)
         assert.equal(cli(JSON.stringify(results()), event).status, 0)
       })
 
     // The plan runs every lane off a pull request; a plan that says otherwise skips nothing.
-    for (const event of ['push', 'schedule', 'workflow_dispatch'])
+    for (const event of ['schedule', 'workflow_dispatch'])
       test(`a plan skipping the browser lane does not excuse it on ${event}`, () => {
         assert.throws(
           () =>

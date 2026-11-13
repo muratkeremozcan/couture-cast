@@ -74,9 +74,9 @@ describe('share-card native step conditions', () => {
   })
 
   test('the iOS bridge runs once its runtime and browser succeeded', () => {
-    const iosBridge = parse(
-      fs.readFileSync('.github/workflows/ios-native-jobs.yml', 'utf8')
-    ).jobs['ios-expo-go'].steps.find((row) => row.name === bridge.name)
+    const iosBridge = workflow.jobs['ios-expo-go'].steps.find(
+      (row) => row.name === bridge.name
+    )
     const iosRuns = (outcomes) =>
       evaluateApprovedCondition(iosBridge.if, { matrix: undefined, row: {}, outcomes })
     assert.equal(iosRuns({ runtime: 'success', ios_browser: 'success' }), true)

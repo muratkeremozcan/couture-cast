@@ -118,7 +118,7 @@ test('an API-only pull request runs Maestro, whose journeys call the API, and sk
       'maestro',
     ])
       assert.ok(lanes.includes(id), `#${number} runs ${id}`)
-    for (const id of ['watchos', 'coverage-mobile', 'lighthouse'])
+    for (const id of ['coverage-mobile', 'lighthouse'])
       assert.ok(!lanes.includes(id), `#${number} skips ${id}`)
   }
 })
@@ -206,7 +206,6 @@ const STARTS = {
     'supabase/migrations/20260101000000_x.sql',
     'playwright/tests/share-card-export.spec.ts',
   ],
-  watchos: ['apps/mobile/plugins/with-watchos.js', 'apps/mobile/targets/watch/App.swift'],
   'revenuecat-bundle': [
     'apps/mobile/src/lib/revenuecat-key.ts',
     'apps/mobile/src/lib/premium.ts',
@@ -242,13 +241,12 @@ const EXPECTED_SKIPS = {
   'playwright-unit': [209, 199, 180],
   maestro: [199, 148],
   'share-card': [199],
-  // Only #204's watchOS plugin suite touched what the watchOS fixture copies.
-  watchos: [209, 208, 202, 199, 192, 180, 173, 148],
   // Every replayed pull request that changed the mobile workspace or a package it imports.
   'revenuecat-bundle': [209, 208, 199, 180, 148],
   // No replayed pull request touched the iOS share-card flows.
   'ios-flow-syntax': [209, 208, 204, 202, 199, 192, 180, 173, 148],
-  // Only the Swift packages and the XCTest target wake it; no replayed pull request touched them.
+  // Only the Swift packages and the header semantics controls wake it; no replayed pull request
+  // touched them.
   'ios-unit': [209, 208, 204, 202, 199, 192, 180, 173, 148],
 }
 
@@ -271,44 +269,28 @@ test('every lane wakes on each file of what it starts or builds', () => {
 })
 
 test('a mobile-only pull request skips the web, API and preview lanes (#204, #192)', () => {
-  const mobile = [
-    'typecheck',
-    'coverage-mobile',
-    'playwright-unit',
-    'maestro',
-    'share-card',
-    'revenuecat-bundle',
-  ]
-  // #204 changed the watchOS plugin suite, which the watchOS lane copies; #192 changed only
-  // apps/mobile/.gitignore, so it wakes no macOS job.
-  assert.deepEqual(running(pullRequest(204)), [...mobile, 'watchos'])
-  assert.deepEqual(running(pullRequest(192)), mobile)
+  for (const number of [204, 192]) {
+    assert.deepEqual(running(pullRequest(number)), [
+      'typecheck',
+      'coverage-mobile',
+      'playwright-unit',
+      'maestro',
+      'share-card',
+      'revenuecat-bundle',
+    ])
+  }
 })
 
-// Story 6.15 D6: the one macOS PR job runs only for native iOS inputs. The watchOS suite copies
-// apps/mobile's app.json, package.json, plugins, targets and assets into its fixture
-// (prebuild-test-helpers.js), and the Swift packages build from the modules' ios directories.
-test('a JavaScript-only mobile change or a package change wakes no macOS job', () => {
+// Story 6.15 D6: the Linux Swift rules wake only for the Swift module sources.
+test('a JavaScript-only mobile change or a package change wakes no Swift rules job', () => {
   for (const file of [
     'apps/mobile/src/screens/home.tsx',
     'apps/mobile/app/(tabs)/index.tsx',
     'apps/mobile/components/share-card-composer.tsx',
     'packages/utils/src/index.ts',
     'packages/api-client/src/index.ts',
-  ]) {
-    const lanes = running([file])
-    for (const id of ['watchos', 'ios-unit'])
-      assert.ok(!lanes.includes(id), `${file}: ${id}`)
-  }
-  for (const file of [
-    'apps/mobile/app.json',
-    'apps/mobile/package.json',
-    'apps/mobile/plugins/with-watchos.js',
-    'apps/mobile/plugins/prebuild-test-helpers.js',
-    'apps/mobile/targets/watchos/WatchWidgetData.swift',
-    'apps/mobile/assets/images/icon.png',
   ])
-    assert.ok(running([file]).includes('watchos'), file)
+    assert.ok(!running([file]).includes('ios-unit'), file)
 })
 
 // Story 6.15 D15: the scan exports the whole app, so any mobile source can carry a Test Store key.
@@ -337,7 +319,7 @@ test('a shared package wakes every workspace that depends on it (#202: packages/
     assert.ok(config.includes(id), id)
   // Maestro runs on it: the API its journeys call reads the flag configuration.
   assert.ok(config.includes('maestro'))
-  for (const id of ['coverage-mobile', 'watchos'])
+  for (const id of ['coverage-mobile'])
     assert.ok(
       !config.includes(id),
       `apps/mobile does not depend on @couture/config: ${id}`

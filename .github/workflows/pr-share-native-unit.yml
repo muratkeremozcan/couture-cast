@@ -1,34 +1,76 @@
 # Story 6.9: unit tests for the share-card native modules, without a prebuild. The native app
-# lanes skip pull requests, so this path-filtered workflow runs, on every PR that touches the
-# share module, its Robolectric tests from its standalone Gradle project, which compiles the pure
-# Android sources without Expo or the generated app. The Swift packages of the share and
-# photo-save modules run in pr-apple-native.yml, the one macOS job a pull request may run
-# (story 6.15 D6). The test step fails when it ran zero tests, skipped tests not counted. PR Gate
-# makes the job required whenever it runs.
+# lanes skip pull requests, so this path-filtered workflow runs, on every PR that touches them
+# (the Swift job nightly and on demand only, since it needs macOS):
+# - the share module's Swift package (activity mapper, outcome reducer, anchor configuration,
+#   ShareCardShareFile) and the photo-save package with its cross-prefix test (TEA RG3);
+# - the share module's Robolectric tests, from its standalone Gradle project, which compiles the
+#   pure Android sources without Expo or the generated app.
+# Each test step fails when it ran zero tests, skipped tests not counted. PR Gate makes every job
+# that runs here required.
 name: Share native unit tests
 
 on:
   pull_request:
     paths:
       - 'apps/mobile/modules/share-card-native-share/**'
+      - 'apps/mobile/modules/share-card-photo-save/**'
       - '.github/workflows/pr-share-native-unit.yml'
   push:
     branches: [main]
     paths:
       - 'apps/mobile/modules/share-card-native-share/**'
+      - 'apps/mobile/modules/share-card-photo-save/**'
       - '.github/workflows/pr-share-native-unit.yml'
   schedule:
     - cron: '43 4 * * *'
   workflow_dispatch:
 
 concurrency:
-  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a scheduled or dispatched run, the Swift job's only runs.
+  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  swift:
+    name: Swift packages (share and photo-save)
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13); Robolectric below stays on
+    # pull requests.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Share module Swift package
+        working-directory: apps/mobile/modules/share-card-native-share/ios
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/share-swift-test.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/share-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: Photo-save Swift package, with the cross-prefix test
+        if: ${{ !cancelled() }}
+        working-directory: apps/mobile/modules/share-card-photo-save/ios
+        run: |
+          set -euo pipefail
+          swift test 2>&1 | tee "$RUNNER_TEMP/photo-save-swift-test.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/photo-save-swift-test.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
   robolectric:
     name: Android Robolectric tests (SDK 34 and 36)
     runs-on: ubuntu-latest

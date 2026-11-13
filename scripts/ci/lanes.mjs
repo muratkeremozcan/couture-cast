@@ -275,13 +275,13 @@ export const LANES = {
     // a new source can read the key outside __DEV__ or carry a test_ literal.
     workspaces: ['mobile'],
   },
-  // The one macOS job a pull request may run (story 6.15 D6) holds two lanes, each gating its
-  // own steps: the job runs when either lane does.
+  // The Apple module rules that run on Linux (story 6.15 D6). Every macOS job runs nightly and
+  // on demand only, never on a pull request.
   'ios-unit': {
-    title: 'iOS module unit tests (Linux rules, macOS glue)',
+    title: 'iOS module rules (Linux)',
     workflow: 'pr-apple-native.yml',
-    jobs: ['apple-native', 'swift-linux'],
-    // The Swift packages and the XCTest target build from these directories alone.
+    jobs: ['swift-linux'],
+    // The Foundation-only Swift rules build from these directories alone.
     inputs: [
       'apps/mobile/modules/share-card-native-share/ios/**',
       'apps/mobile/modules/share-card-photo-save/ios/**',
@@ -296,21 +296,6 @@ export const LANES = {
     jobs: ['ios-flow-syntax'],
     // The flows scripts/ci/maestro-check-flows.mjs checks.
     inputs: ['maestro/story65/**', 'maestro/story67/**', 'maestro/story68/**'],
-  },
-  watchos: {
-    title: 'watchOS native (macOS)',
-    workflow: 'pr-apple-native.yml',
-    jobs: ['apple-native'],
-    // What the watchOS suite copies into its prebuild fixture (plugins/prebuild-test-helpers.js),
-    // the watch Swift sources under targets included; the Expo tooling it runs comes from the root
-    // install, which SHARED covers. JavaScript and package changes wake no macOS job.
-    inputs: [
-      'apps/mobile/app.json',
-      'apps/mobile/package.json',
-      'apps/mobile/plugins/**',
-      'apps/mobile/targets/**',
-      'apps/mobile/assets/**',
-    ],
   },
 }
 

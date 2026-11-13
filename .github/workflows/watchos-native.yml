@@ -1,0 +1,43 @@
+name: watchOS native
+
+# macOS runs nightly and on demand only (owner rule, 2026-11-13: no macOS job on a pull request or
+# a merge, since its queue alone can pass the 20-minute PR budget). 05:13 UTC, after the other
+# nightly macOS runs.
+on:
+  schedule:
+    - cron: '13 5 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: watchos-native-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  watchos-native:
+    name: watchOS native
+    runs-on: macos-15
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # The suite builds the generated WatchApp and complication with xcodebuild and runs the
+      # watch Swift behavior tests. WATCHOS_REQUIRE_BUILD=1 fails it if any of them would be left
+      # out.
+      - name: Validate watchOS prebuild
+        env:
+          WATCHOS_REQUIRE_BUILD: '1'
+        run: npm run test:watchos-prebuild --workspace mobile

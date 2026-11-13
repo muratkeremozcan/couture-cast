@@ -31,7 +31,7 @@ function timed(t, label, run) {
 
 /**
  * Whether the native watchOS builds run on this host. They need macOS and Xcode; elsewhere they
- * are left out. The macOS PR job that owns this suite (pr-apple-native.yml) sets
+ * are left out. The nightly macOS job that owns this suite (watchos-native.yml) sets
  * WATCHOS_REQUIRE_BUILD=1, and there a host that would leave them out is a failure, never a
  * silent pass.
  */
@@ -114,7 +114,7 @@ function buildPhaseFiles(project, target, sectionName) {
 test(
   'clean Expo prebuild generates watchOS app and complication targets',
   // The native builds are most of it: 37 to 103 s on a macos-15 runner (3 cores, Xcode 16.4),
-  // measured 2026-11-11. The macOS PR job in pr-apple-native.yml runs this suite.
+  // measured 2026-11-11. The nightly job in watchos-native.yml runs this suite.
   { timeout: 360_000 },
   (t) => {
     const fixtureRoot = createExpoPrebuildFixture(t, {

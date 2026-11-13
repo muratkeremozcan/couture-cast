@@ -2,9 +2,9 @@
 # Expo Go back on the iOS 26.5 simulator of macos-26 (ios26-canary). They left it for macos-15's
 # iOS 18.5 simulator because it was not stable enough to gate merges; this run watches it.
 #
-# It gates nothing: no pull request status or merge reads it, and ios-native.yml and
-# ios-native-dispatch.yml never pass ios26-canary. A red canary goes to TEA for triage. The iOS
-# 26.5 lane returns to blocking after 20 straight green nights, or when the runner image changes.
+# It gates nothing: no pull request status or merge reads it, and ios-native.yml never passes
+# ios26-canary. A red canary goes to TEA for triage. After 20 straight green nights, or when the
+# runner image changes, the iOS 26.5 simulator may replace iOS 18.5 in ios-native.yml's nightly run.
 name: iOS native canary
 run-name: iOS 26.5 canary ${{ github.sha }}
 

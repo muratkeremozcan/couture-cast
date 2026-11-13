@@ -1,25 +1,21 @@
-# Story 6.15 D6: the one macOS job a pull request may run. It holds the Apple-native checks
-# whose queue plus run time fits the pull request budget:
-# - the share module's LinkPresentation header tests (a Swift package, no prebuild);
-# - the AccessibilityFocusTarget UIKit XCTest on an iOS simulator;
-# - the watchOS prebuild suite, whose WatchApp and complication builds need Xcode.
-# The Foundation-only rules of those modules (activity mapper, outcome reducer, anchor
-# configuration, ShareCardShareFile, the PNG file rules with the cross-prefix test, and the focus
-# rules) and the share-card header semantics controls run in swift-linux, and the iOS Maestro flow
-# syntax in ios-flow-syntax, both on ubuntu-latest beside it.
-# Each step runs only when its own lane does (scripts/ci/lanes.mjs: ios-unit, watchos), and the
-# job runs when either lane is selected, so a pull request waits for one macOS runner at most.
-# The checks that cannot fit (the iOS app builds, the share-card iOS journeys and the Expo Go
-# proof) run in ios-native-jobs.yml on main, nightly and on demand. PR Gate makes this job required
-# whenever it runs.
+# Story 6.15 D6: the Apple module checks that run on Linux, on every pull request whose lane
+# selects them (scripts/ci/lanes.mjs: ios-unit, ios-flow-syntax):
+# - the Foundation-only rules of the share, photo-save and accessibility-focus modules (activity
+#   mapper, outcome reducer, anchor configuration, ShareCardShareFile, the PNG file rules with the
+#   cross-prefix test, and the focus rules) and the share-card header semantics controls, in
+#   swift-linux;
+# - the iOS Maestro flow syntax, in ios-flow-syntax.
+# Owner rule, 2026-11-13: no macOS job runs on a pull request or a merge to main. The
+# LinkPresentation header tests, the AccessibilityFocusTarget XCTest and the watchOS prebuild
+# suite run nightly and on demand in pr-share-native-unit.yml, pr-accessibility-focus.yml and
+# watchos-native.yml; the iOS app builds and journeys in ios-native-jobs.yml. PR Gate makes each
+# job here required whenever it runs.
 name: Apple native checks
 
 on:
   pull_request:
   push:
     branches: [main]
-  schedule:
-    - cron: '43 4 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -61,120 +57,8 @@ jobs:
           LANES_WORKFLOW: pr-apple-native.yml
         run: node scripts/ci/lanes.mjs
 
-  # macos-26, with the same Xcode 26.4 or later ios-native-jobs.yml selects. The D6 queue probe (PR 215,
-  # run 43327728813, 20 attempts) measured macos-26 queue p50 0.08, p95 0.93, max 1.63 minutes
-  # against macos-15's p95 7.50 and max 27.83. Run time: the header tests about 2 minutes, the
-  # XCTest 2.5 at p50 and 5.0 at p95 (2026-11-12, macos-15), the watchOS suite about 4 with its
-  # install; 20 is the pull request job ceiling.
-  apple-native:
-    name: Apple native checks (macOS)
-    needs: lanes
-    if: fromJSON(needs.lanes.outputs.plan)['ios-unit'] || fromJSON(needs.lanes.outputs.plan)['watchos']
-    runs-on: macos-26
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-
-      # The selection ios-native-jobs.yml's ios-build makes, step for step and with the same XCODE
-      # (apple-native-workflow.test.mjs): the newest Xcode 26.x at 26.4 or later, by name, with its
-      # build identity and its iOS simulator SDK checked.
-      - name: Select Xcode 26.4 or later
-        id: xcode
-        env:
-          XCODE: '26.4+'
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          root="${XCODE_ROOT:-/Applications}"
-          xcode=''
-          case "$XCODE" in
-            16.4)
-              if [ -d "$root/Xcode_16.4.app" ]; then xcode="$root/Xcode_16.4.app"; fi
-              ;;
-            26.4+)
-              for app in "$root"/Xcode_26.*.app; do
-                if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-                  xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-                fi
-              done
-              ;;
-          esac
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode $XCODE is required; installed: $(echo "$root"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          # The startup probe boots the simulator runtime of this SDK version.
-          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
-          echo "iOS simulator SDK $sdk"
-          case "$XCODE:$sdk" in
-            16.4:18.5 | 26.4+:26.*) ;;
-            *)
-              echo "::error::Xcode $XCODE brought iOS simulator SDK $sdk"
-              exit 1
-              ;;
-          esac
-      - name: Record the Swift toolchain
-        run: swift --version
-
-      # The Foundation-only rules of the share, photo-save and focus modules run on Linux in
-      # swift-linux below; here run only the tests that need Apple frameworks.
-      - name: Share module LinkPresentation header tests
-        if: ${{ !cancelled() && steps.xcode.outcome == 'success' && fromJSON(needs.lanes.outputs.plan)['ios-unit'] }}
-        working-directory: apps/mobile/modules/share-card-native-share/ios
-        run: |
-          set -euo pipefail
-          swift test --filter ShareCardShareMetadataTests 2>&1 | tee "$RUNNER_TEMP/share-swift-test.log"
-          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
-          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/share-swift-test.log" | tail -1 || true)
-          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
-          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
-          ran=$((${count:-0} - ${skipped:-0}))
-          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
-          echo "swift test ran $ran tests (${skipped:-0} skipped)"
-
-      - name: XCTest for the focus target UIKit decisions
-        if: ${{ !cancelled() && steps.xcode.outcome == 'success' && fromJSON(needs.lanes.outputs.plan)['ios-unit'] }}
-        working-directory: apps/mobile/modules/accessibility-focus/ios
-        run: |
-          set -euo pipefail
-          device=$(xcrun simctl list devices available | grep -m1 -oE 'iPhone [0-9]+[^(]*' | sed 's/ *$//')
-          echo "Simulator: $device"
-          xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device" -only-testing:AccessibilityFocusTargetTests 2>&1 | tee "$RUNNER_TEMP/focus-xctest.log"
-          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
-          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/focus-xctest.log" | tail -1 || true)
-          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
-          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
-          ran=$((${count:-0} - ${skipped:-0}))
-          if [ "$ran" -le 0 ]; then echo "::error::xcodebuild test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
-          echo "xcodebuild test ran $ran tests (${skipped:-0} skipped)"
-
-      - name: Setup Node
-        id: node
-        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['watchos'] }}
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: '.nvmrc'
-          cache: npm
-
-      - name: Install dependencies
-        id: deps
-        if: ${{ !cancelled() && fromJSON(needs.lanes.outputs.plan)['watchos'] && steps.node.outcome == 'success' }}
-        run: npm ci
-
-      # The suite builds the generated WatchApp and complication with xcodebuild and runs the
-      # watch Swift behavior tests. WATCHOS_REQUIRE_BUILD=1 fails it if any of them would be left
-      # out, as they were on the Linux job this replaces.
-      - name: Validate watchOS prebuild
-        if: ${{ !cancelled() && steps.xcode.outcome == 'success' && fromJSON(needs.lanes.outputs.plan)['watchos'] && steps.deps.outcome == 'success' }}
-        env:
-          WATCHOS_REQUIRE_BUILD: '1'
-        run: npm run test:watchos-prebuild --workspace mobile
-
   # The Foundation-only Swift rules on Linux, in the Swift 6.1.2 toolchain. The packages declare
-  # tools version 5.9, so this compiler and the Swift 6.3 of apple-native's Xcode 26.4 or later
+  # tools version 5.9, so this compiler and the Swift 6.3 of the nightly Xcode 26.4 or later
   # both build them in the Swift 5 language mode; 6.1.2 stays because the mutant runs (27 of 27
   # killed) and the hang study below used it. swift-crypto stands in for CryptoKit here (each
   # Package.swift), and apple-native-workflow.test.mjs bans Apple-only imports from these sources.

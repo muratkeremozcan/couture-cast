@@ -15,7 +15,6 @@ import {
   shareCardLaneProblems,
 } from './share-card-lanes.mjs'
 import { shareCardLaneCondition } from './share-card-job-gate.mjs'
-import { runWithStubs } from './workflow-step-stubs.mjs'
 
 const source = parse(
   fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
@@ -29,6 +28,7 @@ const mutate = (change) => {
 }
 const step = (job, predicate) => job.steps.find(predicate)
 const clientKey = '${{ steps.native_key.outputs.key }}'
+const restoredKey = '${{ needs.ios-build.outputs.app-key }}'
 const native = [
   'android36-native-matrix',
   'android36-original',
@@ -769,7 +769,8 @@ describe('share-card parallel lane validator', () => {
     })
   })
 
-  describe('uploads and Metro starts', () => {
+  describe('iOS journey', () => {
+    const iosJobs = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-evidence']
     const rejected = (title, expected, change) =>
       test(`${title} is rejected`, () => {
         const problems = mutate(change)
@@ -778,6 +779,324 @@ describe('share-card parallel lane validator', () => {
           problems.join('\n') || 'no problem raised'
         )
       })
+    for (const name of iosJobs)
+      rejected(
+        `removing ${name}`,
+        /required iOS job missing/,
+        (jobs) => delete jobs[name]
+      )
+    rejected('the retired Intel runner', /Intel macOS runner is retired/, (jobs) => {
+      jobs['ios-shard']['runs-on'] = 'macos-15-intel'
+    })
+    rejected('a longer ios-shard limit', /ios-shard: independent limit/, (jobs) => {
+      jobs['ios-shard']['timeout-minutes'] = 151
+    })
+    rejected('an ios-shard that does not need the build', /exactly ios-build/, (jobs) => {
+      delete jobs['ios-shard'].needs
+    })
+    rejected(
+      'a build that waits on something',
+      /ios-build must start independently/,
+      (jobs) => {
+        jobs['ios-build'].needs = ['original-resource']
+      }
+    )
+    rejected('a single shard', /every shard of the iOS plan/, (jobs) => {
+      jobs['ios-shard'].strategy.matrix.shard = [1]
+    })
+    rejected('the two-shard matrix', /every shard of the iOS plan/, (jobs) => {
+      jobs['ios-shard'].strategy.matrix.shard = [1, 2]
+    })
+    rejected(
+      'a shard matrix that cancels its sibling',
+      /every shard of the iOS plan/,
+      (jobs) => {
+        delete jobs['ios-shard'].strategy['fail-fast']
+      }
+    )
+    rejected(
+      'an evidence job skipped after a failed shard',
+      /ios-evidence must run after/,
+      (jobs) => {
+        jobs['ios-evidence'].if = "github.event_name != 'pull_request'"
+      }
+    )
+    rejected(
+      'an evidence job that also runs on pull_request',
+      /ios-evidence must run after/,
+      (jobs) => {
+        jobs['ios-evidence'].if = 'always()'
+      }
+    )
+    for (const name of ['ios-build', 'ios-shard']) {
+      rejected(
+        `${name} running on pull_request`,
+        new RegExp(`${name} must run only nightly and on demand`),
+        (jobs) => {
+          delete jobs[name].if
+        }
+      )
+      // macOS runs nightly and on demand only (owner rule, 2026-11-13), so a merge skips it too.
+      rejected(
+        `${name} running on a merge to main`,
+        new RegExp(`${name} must run only nightly and on demand`),
+        (jobs) => {
+          jobs[name].if = "github.event_name != 'pull_request'"
+        }
+      )
+    }
+    rejected(
+      'an evidence job that does not check the shard result',
+      /exact cases/,
+      (jobs) => {
+        jobs['ios-evidence'].steps = jobs['ios-evidence'].steps.filter(
+          (row) => !row.run?.includes('CC68_SHARD_RESULT')
+        )
+      }
+    )
+    rejected('a shard command without its shard', /receive its shard/, (jobs) => {
+      const row = step(jobs['ios-shard'], (item) =>
+        item.run?.includes('--shard "$shard"')
+      )
+      row.run = row.run.replace('--shard "$shard"', '')
+    })
+    rejected(
+      'uploading the app before the secret scan',
+      /secret-scanned before/,
+      (jobs) => {
+        const steps = jobs['ios-build'].steps
+        const at = steps.findIndex((row) =>
+          row.run?.includes('native-ios-app-secret-scan')
+        )
+        steps.splice(at, 1)
+      }
+    )
+    rejected(
+      'an ios-shard without the harness directory env',
+      /ios-shard: the harness directory env is required/,
+      (jobs) => {
+        delete jobs['ios-shard'].env
+      }
+    )
+    for (const name of ['ios-build', 'ios-shard', 'ios-expo-go'])
+      rejected(
+        `an evidence upload of a broader path in ${name}`,
+        /evidence upload must fail closed/,
+        (jobs) => {
+          const row = jobs[name].steps.find(
+            (item) =>
+              item.uses === 'actions/upload-artifact@v4' &&
+              String(item.with?.path).includes('public-evidence')
+          )
+          row.with.path = '_bmad-output/test-artifacts/story-6-8/runtime/'
+        }
+      )
+    rejected(
+      'an ios-expo-go without the harness directory env',
+      /ios-expo-go: the harness directory env is required/,
+      (jobs) => {
+        delete jobs['ios-expo-go'].env
+      }
+    )
+    rejected(
+      'an ios-expo-go limit over the iOS bound',
+      /ios-expo-go: independent limit/,
+      (jobs) => {
+        jobs['ios-expo-go']['timeout-minutes'] = 151
+      }
+    )
+    rejected(
+      'an ios-expo-go on pull_request',
+      /ios-expo-go must run only nightly and on demand like the other iOS lanes/,
+      (jobs) => {
+        delete jobs['ios-expo-go'].if
+      }
+    )
+    rejected(
+      'an ios-expo-go that runs on a merge to main',
+      /ios-expo-go must run only nightly and on demand like the other iOS lanes/,
+      (jobs) => {
+        jobs['ios-expo-go'].if = "github.event_name != 'pull_request'"
+      }
+    )
+    rejected(
+      'an ios-expo-go without the build',
+      /ios-expo-go must need exactly ios-build/,
+      (jobs) => {
+        jobs['ios-expo-go'].needs = ['ios-build', 'ios-shard']
+      }
+    )
+    rejected('an ios-expo-go matrix', /not in a matrix/, (jobs) => {
+      jobs['ios-expo-go'].strategy = { matrix: { shard: [1, 2] } }
+    })
+    rejected(
+      'an ios-expo-go that never runs the proof',
+      /the proof must run once/,
+      (jobs) => {
+        jobs['ios-expo-go'].steps = jobs['ios-expo-go'].steps.filter(
+          (row) => !row.run?.includes('expo-go-proof')
+        )
+      }
+    )
+    rejected('an ios-expo-go proof with a shard', /without a shard/, (jobs) => {
+      const row = step(jobs['ios-expo-go'], (item) => item.run?.includes('expo-go-proof'))
+      row.run = row.run.replace('--device "$device"', '--device "$device" --shard 2/2')
+    })
+    rejected(
+      'an ios-shard that runs the Expo Go proof',
+      /ios-shard must not run the Expo Go proof/,
+      (jobs) => {
+        const row = step(jobs['ios-shard'], (item) => item.name === 'iOS shard flows')
+        row.run += '\nnode scripts/run-story68-native.mjs expo-go-proof --platform ios\n'
+      }
+    )
+    rejected(
+      'an ios-expo-go setup that drifted from the shard',
+      /step for step/,
+      (jobs) => {
+        const row = step(
+          jobs['ios-expo-go'],
+          (item) => item.name === 'Install the iOS project generator'
+        )
+        row.run = 'brew install xcodegen --head'
+      }
+    )
+    rejected(
+      'a lanes gate without the Expo Go job',
+      /gate must require every/,
+      (jobs) => {
+        jobs[gateJobName].needs = jobs[gateJobName].needs.filter(
+          (name) => name !== 'ios-expo-go'
+        )
+      }
+    )
+    rejected(
+      'an app scan without the harness directory env',
+      /scanned with the harness directory set/,
+      (jobs) => {
+        delete jobs['ios-build'].env
+      }
+    )
+    rejected(
+      'an app scan with an empty harness argument',
+      /scanned with the harness directory set/,
+      (jobs) => {
+        const row = step(jobs['ios-build'], (item) =>
+          item.run?.includes('native-ios-app-secret-scan')
+        )
+        row.run = row.run.replace('"$CC68_HARNESS_DIR"', '""')
+      }
+    )
+    rejected(
+      'scanning a different directory than the one cached',
+      /scanned with the harness directory set/,
+      (jobs) => {
+        const row = step(jobs['ios-build'], (item) =>
+          item.run?.includes('native-ios-app-secret-scan')
+        )
+        row.run = row.run.replace('/CoutureCastStory68.app', '')
+      }
+    )
+    rejected(
+      'saving the client without waiting on the scan',
+      /scanned with the harness directory set/,
+      (jobs) => {
+        step(
+          jobs['ios-build'],
+          (row) => row.uses === 'actions/cache/save@v4' && row.with.key === clientKey
+        ).if = "${{ !cancelled() && steps.native_build.outcome == 'success' }}"
+      }
+    )
+    rejected(
+      'saving the client before the scan',
+      /secret-scanned before it is cached/,
+      (jobs) => {
+        const steps = jobs['ios-build'].steps
+        const save = steps.findIndex(
+          (row) => row.uses === 'actions/cache/save@v4' && row.with.key === clientKey
+        )
+        const [row] = steps.splice(save, 1)
+        steps.splice(
+          steps.findIndex((item) => item.run?.includes('native-ios-app-secret-scan')),
+          0,
+          row
+        )
+      }
+    )
+    rejected(
+      'a build that ignores the cache',
+      /build only when the key is not cached/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'java').if = '${{ !cancelled() }}'
+      }
+    )
+    rejected(
+      'a build step that no longer waits on the miss-only build window',
+      /build only when the key is not cached/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'native_build').if =
+          '${{ !cancelled() }}'
+      }
+    )
+    rejected(
+      'a client keyed by something else',
+      /keyed by scripts\/ci\/native-build-cache/,
+      (jobs) => {
+        step(jobs['ios-build'], (row) => row.id === 'native_key').run =
+          'echo "key=cc68-ios-${{ github.sha }}" >> "$GITHUB_OUTPUT"'
+      }
+    )
+    rejected(
+      'a build job that no longer proves its saved key exists',
+      /prove the saved key exists/,
+      (jobs) => {
+        const steps = jobs['ios-build'].steps
+        steps.splice(
+          steps.findIndex((row) => row.with?.['fail-on-cache-miss'] === true),
+          1
+        )
+      }
+    )
+    rejected(
+      'uploading the client as a public artifact',
+      /travels by cache only/,
+      (jobs) => {
+        jobs['ios-build'].steps.push({
+          uses: 'actions/upload-artifact@v4',
+          with: { name: 'cc68-ios-app', path: '/tmp/cc68-ios-app.tar' },
+        })
+      }
+    )
+    for (const name of ['ios-shard', 'ios-expo-go']) {
+      rejected(
+        `${name} restoring without failing on a miss`,
+        new RegExp(`${name}: restore exactly the key ios-build resolved`),
+        (jobs) => {
+          delete step(jobs[name], (row) => row.with?.key === restoredKey).with[
+            'fail-on-cache-miss'
+          ]
+        }
+      )
+      rejected(
+        `${name} restoring a key of its own`,
+        new RegExp(`${name}: restore exactly the key ios-build resolved`),
+        (jobs) => {
+          step(jobs[name], (row) => row.with?.key === restoredKey).with.key =
+            'cc68-native-ios-latest'
+        }
+      )
+    }
+    rejected(
+      'an Expo Go job without the PNG guards',
+      /PNG guards, accessibility bridge/,
+      (jobs) => {
+        const steps = jobs['ios-expo-go'].steps
+        steps.splice(
+          steps.findIndex((row) => row.run?.includes('swift test --package-path')),
+          1
+        )
+      }
+    )
     for (const path of [
       '_bmad-output/test-artifacts/story-6-8/runtime/native-ios-startup-private.json',
       '_bmad-output/test-artifacts/story-6-8/runtime/native-ios-sampler-private.json',
@@ -786,7 +1105,7 @@ describe('share-card parallel lane validator', () => {
       '/tmp/cc68-metro.log',
       '_bmad-output/test-artifacts/story-6-8/runtime/owned-env.json',
     ])
-      for (const name of ['original-resource', 'android36-original'])
+      for (const name of [...iosJobs, 'original-resource', 'android36-original'])
         rejected(
           `uploading ${path.split('/').pop()} from ${name}`,
           /may not name a private/,
@@ -797,7 +1116,13 @@ describe('share-card parallel lane validator', () => {
             })
           }
         )
-    for (const name of ['original-resource', 'android36-native-matrix'])
+    for (const name of [
+      'original-resource',
+      'android36-native-matrix',
+      'ios-build',
+      'ios-shard',
+      'ios-expo-go',
+    ])
       rejected(
         `a Metro start without --platform in ${name}`,
         /Metro start must pass --platform/,
@@ -985,19 +1310,47 @@ describe('share-card parallel lane validator', () => {
   })
 })
 
-// U-HARNESS-PR-WORKFLOW: the share native unit lane runs on every PR that touches the share
-// module, its Robolectric step fails on zero tests, and no job outlives the PR budget. The Swift
-// packages moved to pr-apple-native.yml (scripts/ci/apple-native-workflow.test.mjs).
+/** Runs one step's script with stub tools on PATH; returns the exit status. */
+const runWithStubs = (row, stubs) => {
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'share-native-unit-'))
+  try {
+    const bin = path.join(scratch, 'bin')
+    fs.mkdirSync(bin)
+    for (const [name, body] of Object.entries(stubs)) {
+      fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
+        mode: 0o755,
+      })
+    }
+    const cwd = path.join(scratch, row['working-directory'] ?? '.')
+    fs.mkdirSync(cwd, { recursive: true })
+    return spawnSync('bash', ['-c', row.run], {
+      cwd,
+      encoding: 'utf8',
+      env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, RUNNER_TEMP: scratch },
+    }).status
+  } finally {
+    fs.rmSync(scratch, { recursive: true, force: true })
+  }
+}
+
+const plural = (count, word) => `${count} ${word}${count === 1 ? '' : 's'}`
+// XCTest's own summary; with skips it reads "with S tests skipped and F failures".
+const swiftSummary = (count, failures = 0, skipped = 0) =>
+  `echo "Test Suite 'All tests' passed."; echo "\t Executed ${plural(count, 'test')}, with ${skipped ? `${plural(skipped, 'test')} skipped and ` : ''}${plural(failures, 'failure')} (0 unexpected) in 0.1 (0.1) seconds"; exit ${failures ? 1 : 0}`
+
+// U-HARNESS-PR-WORKFLOW: the share native unit lane runs on every PR that touches either native
+// share-card module, each test step fails on zero tests, and no job outlives the PR budget.
 describe('share native unit workflow', () => {
   const unit = parse(
     fs.readFileSync('.github/workflows/pr-share-native-unit.yml', 'utf8')
   )
   const paths = [
     'apps/mobile/modules/share-card-native-share/**',
+    'apps/mobile/modules/share-card-photo-save/**',
     '.github/workflows/pr-share-native-unit.yml',
   ]
   const testSteps = Object.values(unit.jobs).flatMap((job) =>
-    job.steps.filter((row) => /testDebugUnitTest/.test(row.run ?? ''))
+    job.steps.filter((row) => /swift test|testDebugUnitTest/.test(row.run ?? ''))
   )
 
   /** One JUnit XML report per entry: a test count, or [tests, skipped]. */
@@ -1012,7 +1365,7 @@ describe('share native unit workflow', () => {
       `exit ${status}`,
     ].join('\n')
 
-  test('runs on pull requests, main, nightly and on demand for the share module', () => {
+  test('runs on pull requests, main, nightly and on demand for both modules', () => {
     // The YAML `on` key parses as the string "on".
     const on = unit.on
     assert.deepEqual(on.pull_request.paths, paths)
@@ -1022,12 +1375,18 @@ describe('share native unit workflow', () => {
     assert.ok('workflow_dispatch' in on)
   })
 
-  test('every job is unconditional, visible on failure and within 20 minutes', () => {
+  // Swift needs macOS, which runs nightly and on demand only (owner rule, 2026-11-13).
+  test('Robolectric runs on pull requests, Swift nightly and on demand; both visible on failure and within 20 minutes', () => {
     const jobs = Object.entries(unit.jobs)
-    assert.deepEqual(jobs.map(([name]) => name).sort(), ['robolectric'])
+    assert.deepEqual(jobs.map(([name]) => name).sort(), ['robolectric', 'swift'])
+    const expected = {
+      robolectric: undefined,
+      swift:
+        "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    }
     for (const [name, job] of jobs) {
       assert.ok(job['timeout-minutes'] > 0 && job['timeout-minutes'] <= 20, name)
-      assert.equal(job.if, undefined, `${name} runs on pull requests`)
+      assert.equal(job.if, expected[name], `${name} condition`)
       assert.notEqual(job['continue-on-error'], true, name)
       assert.ok(
         job.steps.every((row) => row['continue-on-error'] !== true),
@@ -1036,7 +1395,15 @@ describe('share native unit workflow', () => {
     }
   })
 
-  test('tests the standalone Robolectric project', () => {
+  test('tests both Swift packages and the standalone Robolectric project', () => {
+    const swift = unit.jobs.swift.steps.filter((row) => /swift test/.test(row.run ?? ''))
+    assert.deepEqual(
+      swift.map((row) => row['working-directory']),
+      [
+        'apps/mobile/modules/share-card-native-share/ios',
+        'apps/mobile/modules/share-card-photo-save/ios',
+      ]
+    )
     const gradle = unit.jobs.robolectric.steps.filter((row) =>
       /testDebugUnitTest/.test(row.run ?? '')
     )
@@ -1051,42 +1418,80 @@ describe('share native unit workflow', () => {
       ).with['java-version'],
       '21'
     )
-    assert.equal(testSteps.length, 1)
+    assert.equal(testSteps.length, 3)
   })
 
-  test('the test step passes with tests and fails on zero tests, all skipped or a failure', () => {
+  test('each test step passes with tests and fails on zero tests, all skipped or a failure', () => {
     for (const row of testSteps) {
-      assert.equal(runWithStubs(row, { gradle: gradleReports([4, 11]) }), 0, row.name)
-      for (const body of [gradleReports([]), gradleReports([0, 0]), 'exit 0'])
-        assert.notEqual(runWithStubs(row, { gradle: body }), 0, `${row.name}: zero tests`)
+      const swift = /swift test/.test(row.run)
+      const tool = swift ? 'swift' : 'gradle'
+      const pass = swift ? swiftSummary(21) : gradleReports([4, 11])
+      assert.equal(runWithStubs(row, { [tool]: pass }), 0, `${row.name} passes`)
+      if (swift) assert.equal(runWithStubs(row, { swift: swiftSummary(1) }), 0, row.name)
+      const zero = swift
+        ? [swiftSummary(0), 'echo "no summary"', 'exit 0']
+        : [gradleReports([]), gradleReports([0, 0]), 'exit 0']
+      for (const body of zero) {
+        assert.notEqual(runWithStubs(row, { [tool]: body }), 0, `${row.name}: zero tests`)
+      }
       // Skipped tests did not run: an all-skipped run is a zero-test run, a partial one passes.
-      for (const body of [
-        gradleReports([
-          [4, 4],
-          [11, 11],
-        ]),
-        gradleReports([[1, 1]]),
-      ])
+      const allSkipped = swift
+        ? [swiftSummary(21, 0, 21), swiftSummary(1, 0, 1)]
+        : [
+            gradleReports([
+              [4, 4],
+              [11, 11],
+            ]),
+            gradleReports([[1, 1]]),
+          ]
+      for (const body of allSkipped) {
         assert.notEqual(
-          runWithStubs(row, { gradle: body }),
+          runWithStubs(row, { [tool]: body }),
           0,
           `${row.name}: all skipped`
         )
-      assert.equal(
-        runWithStubs(row, {
-          gradle: gradleReports([
+      }
+      const partlySkipped = swift
+        ? swiftSummary(21, 0, 20)
+        : gradleReports([
             [4, 4],
             [11, 10],
-          ]),
-        }),
+          ])
+      assert.equal(
+        runWithStubs(row, { [tool]: partlySkipped }),
         0,
         `${row.name}: one test ran`
       )
-      assert.notEqual(
-        runWithStubs(row, { gradle: gradleReports([4], 1) }),
-        0,
-        `${row.name}: failure`
-      )
+      const failing = swift ? swiftSummary(21, 1) : gradleReports([4], 1)
+      assert.notEqual(runWithStubs(row, { [tool]: failing }), 0, `${row.name}: failure`)
     }
+  })
+})
+
+describe('ios-expo-go photo-save guard', () => {
+  const guard = step(source.jobs['ios-expo-go'], (row) => row.id === 'png_file_guards')
+
+  test('passes on any nonzero count and fails on zero tests, a skip or a failure', () => {
+    // A literal count breaks the lane whenever the suite grows.
+    assert.doesNotMatch(guard.run, /Executed \d+ tests/)
+    for (const count of [1, 4, 5, 21])
+      assert.equal(
+        runWithStubs(guard, { swift: swiftSummary(count) }),
+        0,
+        `${count} tests`
+      )
+    const skipped =
+      'echo "\t Executed 5 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.1 (0.1) seconds"'
+    for (const body of [swiftSummary(0), 'echo "no summary"', 'exit 0', skipped])
+      assert.notEqual(runWithStubs(guard, { swift: body }), 0, body)
+    assert.notEqual(runWithStubs(guard, { swift: swiftSummary(5, 1) }), 0, 'failure')
+    // A failure summary from a tool that still exits zero.
+    assert.notEqual(
+      runWithStubs(guard, {
+        swift: swiftSummary(5, 1).replace(/exit \d+$/, 'exit 0'),
+      }),
+      0,
+      'failure with exit 0'
+    )
   })
 })

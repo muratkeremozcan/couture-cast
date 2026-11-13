@@ -357,7 +357,7 @@ jobs:
 
       # The mobile config plugin prebuild suites the coverage run (Vitest) leaves out: widgets, the
       # background task and the font-scale configChanges. They run on Linux in seconds; the watchOS
-      # suite needs Xcode and runs in pr-apple-native.yml (scripts/ci/node-test-suites.json).
+      # suite needs Xcode and runs nightly in watchos-native.yml (scripts/ci/node-test-suites.json).
       - name: Mobile plugin prebuild suites
         if: ${{ !cancelled() && matrix.shard == 'mobile' && steps.setup.outcome == 'success' }}
         working-directory: apps/mobile

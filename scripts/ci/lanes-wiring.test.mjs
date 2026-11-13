@@ -52,8 +52,7 @@ test('every workflow and job the lane map names exists', () => {
   }
 })
 
-// A job several lanes gate (pr-apple-native.yml's apple-native: ios-unit and watchos) runs when
-// any of them does and reads exactly those lanes.
+// A job several lanes gate runs when any of them does and reads exactly those lanes.
 const lanesOf = (file, id) =>
   gated.filter(([, f, job]) => f === file && job === id).map(([lane]) => lane)
 

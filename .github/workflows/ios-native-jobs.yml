@@ -1,13 +1,12 @@
-# Story 6.15 D6: the iOS work that cannot fit a pull request. The iOS app build runs 31 minutes at
-# p95 and a share-card shard 44, against a 15-minute queue plus run budget for every pull request
-# job, so these jobs run off the pull request path. The development client and the Release app
-# build on macos-26 with Xcode 26.4 or later, which SDK 56 needs; the shards and Expo Go run that
-# client on the iOS 18.5 simulator of macos-15 (Xcode 16.4), since the iOS 26.5 simulator of
-# macos-26 was not stable enough for them (C-16). Two workflows call them for one commit, `sha`:
+# Story 6.15 D6: the iOS native jobs. No macOS job runs on a pull request or gates a merge (owner
+# rule, 2026-11-13), so these run nightly and by manual dispatch only. The development client and
+# the Release app build on macos-26 with Xcode 26.4 or later, which SDK 56 needs; the shards and
+# Expo Go run that client on the iOS 18.5 simulator of macos-15 (Xcode 16.4), since the iOS 26.5
+# simulator of macos-26 was not stable enough for them (C-16). Two workflows call them for one
+# commit, `sha`:
 #
-#   ios-native.yml           a merge to main that changed a native iOS input, and the nightly run.
-#                            They keep the development client cache warm.
-#   ios-native-dispatch.yml  a pull request head commit, before it merges, with cache-mode: read.
+#   ios-native.yml           nightly on main, which keeps the development client cache warm, and
+#                            a manual dispatch.
 #   ios-native-canary.yml    nightly, with ios26-canary: the shards and Expo Go on macos-26's
 #                            iOS 26.5 simulator. It gates nothing.
 #
@@ -17,12 +16,10 @@
 # the Release app beside them. Wall time about 75 minutes (client build up to 31 when its key
 # misses, then the longest shard, 44 at p95).
 #
-# A dispatch runs a commit that has not merged, on ref main. Its caller grants the jobs
-# cache-mode: read, which GitHub enforces with a read-only cache token, so neither this file nor
-# anything the commit runs can save a cache main's runs restore. On a dispatch ios-build always
-# builds the commit's own client, scans it and hands it to the shards and Expo Go as an artifact
-# of this run, kept for one day. Every cache save also skips a dispatch, a dispatch installs with
-# npm alone and no local action, and setup caches are off for it.
+# On a dispatch ios-build always builds the commit's own client, scans it and hands it to the
+# shards and Expo Go as an artifact of this run, kept for one day. Every cache save skips a
+# dispatch, a dispatch installs with npm alone and no local action, and setup caches are off for
+# it, so a dispatch of any ref leaves main's caches as the nightly run wrote them.
 #
 # Every job checks out `sha` and fails unless HEAD is exactly that commit, which the callers' run
 # names carry.
@@ -61,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # The run name carries this commit, which nightly triage matches; every job proves it
       # checked out exactly that commit before anything else.
       - name: Stop unless HEAD is the commit under test
         env:
@@ -385,7 +382,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # The run name carries this commit, which nightly triage matches; every job proves it
       # checked out exactly that commit before anything else.
       - name: Stop unless HEAD is the commit under test
         env:
@@ -646,7 +643,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # The run name carries this commit, which nightly triage matches; every job proves it
       # checked out exactly that commit before anything else.
       - name: Stop unless HEAD is the commit under test
         env:
@@ -932,7 +929,7 @@ jobs:
         id: checkout
         with:
           ref: ${{ inputs.sha }}
-      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # The run name carries this commit, which nightly triage matches; every job proves it
       # checked out exactly that commit before anything else.
       - name: Stop unless HEAD is the commit under test
         env:
@@ -1001,7 +998,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ inputs.sha }}
-      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # The run name carries this commit, which nightly triage matches; every job proves it
       # checked out exactly that commit before anything else.
       - name: Stop unless HEAD is the commit under test
         env:
