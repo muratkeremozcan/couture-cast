@@ -1,14 +1,18 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, test } from 'node:test'
-import { fileURLToPath } from 'node:url'
-import { matrixRows } from './workflow-step-shadowing.mjs'
+import { after, describe, test } from 'node:test'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { parse } from 'yaml'
+import { evaluateApprovedCondition, matrixRows } from './workflow-step-shadowing.mjs'
 import nodeTestGateReporter from './node-test-gate-reporter.mjs'
 import {
   assertNodeTestGate,
+  backgroundDirectory,
+  backgroundSuites,
+  collectBackgroundSuites,
   coverageProblems,
   discoverTestFiles,
   gatedSuite,
@@ -17,7 +21,9 @@ import {
   localPlan,
   localPreflight,
   resolveSuite,
+  runGatesTestFile,
   runNodeTestGate,
+  startBackgroundSuites,
   summarizeNodeTestEvents,
 } from './node-test-gate.mjs'
 
@@ -51,13 +57,33 @@ test('broken', () => { throw new Error('broken') })
   'crashing.test.mjs': "throw new Error('load failure')\n",
 }
 
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
+
+// Temporary roots a test keeps for its whole describe block; the file removes them at its end.
+const scratchRoots = []
+function scratchRoot(prefix) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+  scratchRoots.push(root)
+  return root
+}
+after(() => {
+  for (const root of scratchRoots) fs.rmSync(root, { recursive: true, force: true })
+})
+
 function temporary(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-test-gate-fixture-'))
+  const remove = () => fs.rmSync(directory, { recursive: true, force: true })
+  let result
   try {
-    return run(directory)
-  } finally {
-    fs.rmSync(directory, { recursive: true, force: true })
+    result = run(directory)
+  } catch (error) {
+    remove()
+    throw error
   }
+  // An async body keeps its directory until it settles.
+  if (typeof result?.then === 'function') return result.finally(remove)
+  remove()
+  return result
 }
 
 function write(directory, files) {
@@ -142,6 +168,422 @@ describe('node-test-gate run', () => {
       /node_test_gate_failed: the suite has no file/
     )
   })
+})
+
+/**
+ * A pid these tests may signal as a group: a positive integer that is neither init nor this
+ * process, so a group signal can never become kill(-1) (every process of the user) or reach the
+ * test runner. Process groups are POSIX; the detached background runs need them.
+ */
+function checkedGroup(pid) {
+  if (process.platform === 'win32')
+    throw new Error('node-test-gate background tests need POSIX process groups')
+  if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid)
+    throw new Error(`not a background process group: ${pid}`)
+  return pid
+}
+
+/**
+ * Live (non-zombie) members of the group led by `pid`. macOS answers a group signal with EPERM
+ * while the group holds only a zombie its parent has not reaped yet, so that case is read here.
+ */
+function liveMembers(pid) {
+  const listed = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
+  if (listed.status !== 0) throw new Error(`ps failed: ${listed.stderr}`)
+  return listed.stdout
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([, pgid, stat]) => Number(pgid) === pid && stat && !stat.startsWith('Z'))
+    .map(([member]) => Number(member))
+}
+
+/** True while any process of the group led by `pid` is alive; ESRCH means it is gone. */
+function groupAlive(pid) {
+  try {
+    process.kill(-checkedGroup(pid), 0)
+    return true
+  } catch (error) {
+    if (error.code === 'ESRCH') return false
+    if (error.code === 'EPERM') return liveMembers(pid).length > 0
+    throw error
+  }
+}
+
+/** Kills the group led by `pid`; a group that ended, or holds only a zombie, is not an error. */
+function killGroup(pid) {
+  try {
+    process.kill(-checkedGroup(pid), 'SIGKILL')
+  } catch (error) {
+    if (error.code === 'ESRCH') return
+    if (error.code === 'EPERM' && liveMembers(pid).length === 0) return
+    throw error
+  }
+}
+
+/**
+ * A suite file that blocks until its release file appears. The background run is detached, so
+ * nothing kills it with the test that started it: it gives up when that test's temporary
+ * directory is gone, when the owning process is gone (a gate killed mid-test runs no cleanup),
+ * and after two minutes in any case, removing that directory itself when it gives up. Once it
+ * has seen its owner alive from inside the wait loop, it writes `ready`.
+ */
+function blockedSource({ release, temp, owner, ready }) {
+  if (!Number.isInteger(owner) || owner <= 1)
+    throw new Error(`not an owner pid: ${owner}`)
+  return `import fs from 'node:fs'
+import { test } from 'node:test'
+const ownerAlive = () => {
+  try {
+    process.kill(${owner}, 0)
+    return true
+  } catch (error) {
+    if (error.code === 'ESRCH') return false
+    throw error
+  }
+}
+const giveUp = (reason) => {
+  fs.rmSync(${JSON.stringify(temp)}, { recursive: true, force: true })
+  throw new Error(reason)
+}
+test('waits for its release', async () => {
+  const deadline = Date.now() + 120_000
+  while (!fs.existsSync(${JSON.stringify(release)})) {
+    if (!fs.existsSync(${JSON.stringify(temp)})) throw new Error('released by cleanup')
+    if (!ownerAlive()) giveUp('released: its owner is gone')
+    if (Date.now() > deadline) giveUp('released: two minutes passed')
+    if (!fs.existsSync(${JSON.stringify(ready)})) fs.writeFileSync(${JSON.stringify(ready)}, '')
+    await new Promise((done) => setTimeout(done, 25))
+  }
+})
+`
+}
+
+// Every background run these tests start leads its own process group. Each test settles its
+// group when it ends and drops it once gone, so no ended pid waits here to be reused; a group
+// still alive then stays listed, and the suite kills it and fails.
+const backgroundGroups = new Set()
+function trackStarted(suite, env) {
+  const { pid } = JSON.parse(
+    fs.readFileSync(path.join(backgroundDirectory(suite, env), 'started.json'), 'utf8')
+  )
+  backgroundGroups.add(checkedGroup(pid))
+  return pid
+}
+async function settleGroup(pid) {
+  for (let i = 0; i < 100 && groupAlive(pid); i++) await sleep(50)
+  if (!groupAlive(pid)) backgroundGroups.delete(pid)
+}
+
+// The background form starts suites in one detached process and a later step collects
+// them. Collect must apply the foreground pass rules and fail when a run is missing or
+// never finished.
+describe('node-test-gate background run', () => {
+  after(() => {
+    const survivors = [...backgroundGroups]
+    for (const group of survivors) killGroup(group)
+    assert.deepEqual(
+      survivors,
+      [],
+      'a background suite outlived the tests that started it'
+    )
+  })
+
+  const suitesOf = {
+    good: ['passing.test.mjs', 'grouped.test.mjs'],
+    empty: ['passing.test.mjs', 'empty.test.mjs'],
+    skipped: ['skipped.test.mjs'],
+    todo: ['todo.test.mjs'],
+    failing: ['failing.test.mjs'],
+    crashing: ['passing.test.mjs', 'crashing.test.mjs'],
+  }
+  const manifest = { suites: suitesOf }
+  const background = (run) =>
+    withFixtures((directory) =>
+      temporary((temp) => run(directory, { ...process.env, RUNNER_TEMP: temp }))
+    )
+  const startAndCollect = async (directory, env, suites) => {
+    startBackgroundSuites(suites, { root: directory, manifest, cwd: directory, env })
+    const group = trackStarted(suites[0], env)
+    const logs = []
+    try {
+      return {
+        summaries: await collectBackgroundSuites(suites, {
+          env,
+          timeoutMs: 60_000,
+          pollMs: 50,
+          log: (line) => logs.push(line),
+        }),
+        logs,
+      }
+    } catch (error) {
+      error.logs = logs
+      throw error
+    } finally {
+      await settleGroup(group)
+    }
+  }
+
+  test('writes under RUNNER_TEMP, falling back to the system temporary directory', () => {
+    assert.equal(
+      backgroundDirectory('good', { RUNNER_TEMP: '/runner/temp' }),
+      path.join('/runner/temp', 'node-test-gate', 'good')
+    )
+    assert.equal(
+      backgroundDirectory('good', {}),
+      path.join(os.tmpdir(), 'node-test-gate', 'good')
+    )
+  })
+
+  test('collect passes with the foreground summary and prints each suite log', () =>
+    background(async (directory, env) => {
+      const { summaries, logs } = await startAndCollect(directory, env, ['good'])
+      assert.deepEqual(summaries.good, gate(directory, suitesOf.good))
+      const printed = logs.join('\n')
+      assert.match(printed, /one/)
+      assert.match(printed, /three/)
+      assert.match(printed, /suite good passed 3 tests in 2 files/)
+      for (const name of ['events.jsonl', 'output.log', 'status.json'])
+        assert.ok(fs.existsSync(path.join(backgroundDirectory('good', env), name)), name)
+    }))
+
+  for (const [suite, expected] of [
+    ['empty', /node_test_gate_failed: empty\.test\.mjs reported no passing test$/m],
+    ['skipped', /node_test_gate_failed: 1 skipped$/m],
+    ['todo', /node_test_gate_failed: 1 todo$/m],
+    ['failing', /node_test_gate_failed: node --test exited 1; 1 failed$/m],
+    [
+      'crashing',
+      /node --test exited 1; 1 failed; crashing\.test\.mjs reported no passing test$/m,
+    ],
+  ])
+    test(`collect fails a ${suite} suite with the foreground message`, () =>
+      background(async (directory, env) => {
+        await assert.rejects(startAndCollect(directory, env, [suite]), expected)
+      }))
+
+  test('one failing suite fails collect after every suite is reported', () =>
+    background(async (directory, env) => {
+      const error = await startAndCollect(directory, env, ['failing', 'good']).then(
+        () => assert.fail('collect passed'),
+        (caught) => caught
+      )
+      assert.match(error.message, /suite failing: node_test_gate_failed: .*1 failed/)
+      assert.doesNotMatch(error.message, /suite good/)
+      assert.match(error.logs.join('\n'), /suite good passed 3 tests/)
+    }))
+
+  test('collect fails a suite that no start step launched', () =>
+    temporary(async (temp) => {
+      await assert.rejects(
+        collectBackgroundSuites(['good'], {
+          env: { RUNNER_TEMP: temp },
+          timeoutMs: 1000,
+          pollMs: 10,
+          log: () => undefined,
+        }),
+        /suite good: node_test_gate_failed: suite good was never started in the background \(no .*node-test-gate\/good\/started\.json\)/
+      )
+    }))
+
+  test('collect fails a run that never finished within the bounded wait', () =>
+    temporary(async (temp) => {
+      const env = { RUNNER_TEMP: temp }
+      fs.mkdirSync(backgroundDirectory('good', env), { recursive: true })
+      fs.writeFileSync(
+        path.join(backgroundDirectory('good', env), 'started.json'),
+        JSON.stringify({ files: suitesOf.good, cwd: temp, pid: process.pid })
+      )
+      fs.writeFileSync(
+        path.join(backgroundDirectory('good', env), 'output.log'),
+        'DIAGNOSTIC_BEFORE_HANG\n'
+      )
+      const logs = []
+      await assert.rejects(
+        collectBackgroundSuites(['good'], {
+          env,
+          timeoutMs: 200,
+          pollMs: 10,
+          log: (line) => logs.push(line),
+        }),
+        /suite good: node_test_gate_failed: suite good did not finish within 0\.2 s/
+      )
+      // PR 216 review BA-04: how far the suite got is still reported.
+      assert.ok(
+        logs.some((line) => line.includes('DIAGNOSTIC_BEFORE_HANG')),
+        logs.join('\n')
+      )
+    }))
+
+  test('collect fails at once when the background process ended without a result', () =>
+    temporary(async (temp) => {
+      const env = { RUNNER_TEMP: temp }
+      const ended = spawnSync(process.execPath, ['-e', ''])
+      assert.equal(ended.status, 0)
+      fs.mkdirSync(backgroundDirectory('good', env), { recursive: true })
+      fs.writeFileSync(
+        path.join(backgroundDirectory('good', env), 'started.json'),
+        JSON.stringify({ files: suitesOf.good, cwd: temp, pid: ended.pid })
+      )
+      fs.writeFileSync(
+        path.join(backgroundDirectory('good', env), 'output.log'),
+        'DIAGNOSTIC_BEFORE_KILL\n'
+      )
+      const logs = []
+      const began = Date.now()
+      await assert.rejects(
+        collectBackgroundSuites(['good'], {
+          env,
+          timeoutMs: 30_000,
+          pollMs: 10,
+          log: (line) => logs.push(line),
+        }),
+        /suite good: node_test_gate_failed: the background run of suite good ended without recording a result/
+      )
+      assert.ok(Date.now() - began < 10_000)
+      assert.ok(
+        logs.some((line) => line.includes('DIAGNOSTIC_BEFORE_KILL')),
+        logs.join('\n')
+      )
+    }))
+
+  // PR 216 review BA-03: the start command must return while its suites still run, or the
+  // job waits for them before setting up the browsers and the overlap is lost. The suite
+  // here blocks until the test releases it, so no timing threshold decides the result.
+  test('the starting process exits while its suite is still running, and a later process collects it', () =>
+    temporary(async (temp) => {
+      const directory = path.join(temp, 'repo')
+      fs.mkdirSync(directory)
+      const release = path.join(temp, 'release')
+      fs.writeFileSync(
+        path.join(directory, 'blocked.test.mjs'),
+        blockedSource({
+          release,
+          temp,
+          owner: process.pid,
+          ready: path.join(temp, 'ready'),
+        })
+      )
+      const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
+      const starter = `import { startBackgroundSuites } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'scripts/ci/node-test-gate.mjs')).href)}
+startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifest: { suites: { blocked: ['blocked.test.mjs'] } }, cwd: ${JSON.stringify(directory)}, env: process.env })
+`
+      const started = spawnSync(
+        process.execPath,
+        ['--input-type=module', '-e', starter],
+        {
+          env,
+          encoding: 'utf8',
+          timeout: 30_000,
+        }
+      )
+      assert.equal(
+        started.error,
+        undefined,
+        'the starting process did not exit on its own'
+      )
+      assert.equal(started.status, 0, started.stderr)
+      const group = trackStarted('blocked', env)
+      try {
+        assert.equal(
+          fs.existsSync(path.join(backgroundDirectory('blocked', env), 'status.json')),
+          false,
+          'the suite finished before the starting process exited'
+        )
+        fs.writeFileSync(release, '')
+        const logs = []
+        const summaries = await collectBackgroundSuites(['blocked'], {
+          env,
+          timeoutMs: 60_000,
+          pollMs: 25,
+          log: (line) => logs.push(line),
+        })
+        assert.equal(summaries.blocked.passed, 1)
+      } finally {
+        await settleGroup(group)
+      }
+    }))
+
+  // A gate killed mid-test runs no cleanup: 15 h after one, its blocked suite was still waiting
+  // (PPID 1). The fixture must end with the process that started it, not with its directory,
+  // and take that directory with it. The owner dies only once the suite is inside its wait loop.
+  test('a blocked background suite ends when the process that started it dies', () =>
+    temporary(async (temp) => {
+      const directory = path.join(temp, 'repo')
+      fs.mkdirSync(directory)
+      const scratch = path.join(temp, 'scratch')
+      fs.mkdirSync(scratch)
+      const ready = path.join(temp, 'ready')
+      const owner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+        stdio: 'ignore',
+      })
+      let group
+      try {
+        fs.writeFileSync(
+          path.join(directory, 'blocked.test.mjs'),
+          blockedSource({
+            release: path.join(temp, 'release'),
+            temp: scratch,
+            owner: owner.pid,
+            ready,
+          })
+        )
+        const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
+        startBackgroundSuites(['blocked'], {
+          root: directory,
+          manifest: { suites: { blocked: ['blocked.test.mjs'] } },
+          cwd: directory,
+          env,
+        })
+        group = trackStarted('blocked', env)
+        for (let i = 0; i < 400 && !fs.existsSync(ready); i++) await sleep(25)
+        assert.equal(fs.existsSync(ready), true, 'the suite never entered its wait loop')
+        owner.kill('SIGKILL')
+        for (let i = 0; i < 200 && groupAlive(group); i++) await sleep(50)
+        assert.equal(groupAlive(group), false, 'the background suite outlived its owner')
+        assert.equal(fs.existsSync(scratch), false, 'the suite left its directory behind')
+      } finally {
+        owner.kill('SIGKILL')
+        if (group) {
+          killGroup(group)
+          await settleGroup(group)
+        }
+      }
+    }))
+
+  test('start refuses an unknown suite before launching anything', () =>
+    temporary((temp) => {
+      assert.throws(
+        () =>
+          startBackgroundSuites(['absent'], {
+            root: temp,
+            manifest,
+            env: { RUNNER_TEMP: temp },
+            spawn: () => assert.fail('must not launch'),
+          }),
+        /node_test_gate_unknown_suite: absent/
+      )
+    }))
+
+  test('a second start clears the earlier result of the suite', () =>
+    background(async (directory, env) => {
+      await startAndCollect(directory, env, ['good'])
+      const launched = []
+      startBackgroundSuites(['good'], {
+        root: directory,
+        manifest,
+        cwd: directory,
+        env,
+        spawn: (...args) => {
+          launched.push(args)
+          return { pid: process.pid, unref: () => undefined }
+        },
+      })
+      assert.equal(launched.length, 1)
+      assert.equal(
+        fs.existsSync(path.join(backgroundDirectory('good', env), 'status.json')),
+        false
+      )
+    }))
 })
 
 describe('node-test-gate summary', () => {
@@ -699,6 +1141,264 @@ describe('node-test-gate discovery and coverage', () => {
       )
     }))
 
+  describe('background start and collect pairs', () => {
+    const paired = (steps, workflow = fixtureWorkflow) =>
+      workflow.replace(
+        '      - run: |\n          node scripts/ci/node-test-gate.mjs outside\n          node scripts/ci/node-test-gate.mjs default',
+        steps.join('\n')
+      )
+    const setup = ['      - id: setup', '        run: echo setup']
+    const runtime = ['      - id: runtime', '        run: echo runtime']
+    const start = ({
+      id = 'started',
+      condition = "${{ !cancelled() && steps.setup.outcome == 'success' }}",
+      suites = 'outside default',
+    } = {}) => [
+      `      - id: ${id}`,
+      '        name: start suites',
+      `        if: ${condition}`,
+      `        run: node scripts/ci/node-test-gate.mjs --start ${suites}`,
+    ]
+    const collect = ({
+      condition = "${{ !cancelled() && steps.started.outcome == 'success' }}",
+      extra = [],
+      suites = 'outside default',
+    } = {}) => [
+      '      - name: collect suites',
+      `        if: ${condition}`,
+      ...extra,
+      `        run: node scripts/ci/node-test-gate.mjs --collect ${suites}`,
+    ]
+    const check = (steps, workflow) =>
+      temporary((root) => {
+        write(root, fixtureTree)
+        return coverageProblems({
+          root,
+          manifest: fixtureManifest,
+          workflow: paired(steps, workflow),
+        }).sort()
+      })
+
+    test('a start step and a later collect step in the same job gate both suites', () => {
+      assert.deepEqual(check([...setup, ...start(), ...runtime, ...collect()]), [])
+    })
+
+    test('a started suite that no later step of its job collects fails, and the reverse', () => {
+      assert.deepEqual(check([...setup, ...start(), ...runtime]), [
+        'suite default is started in the background, but no later step of job first collects it',
+        'suite outside is started in the background, but no later step of job first collects it',
+      ])
+      assert.deepEqual(check([...setup, ...collect(), ...start()]), [
+        'suite default is collected, but no earlier step of job first starts it',
+        'suite default is started in the background, but no later step of job first collects it',
+        'suite outside is collected, but no earlier step of job first starts it',
+        'suite outside is started in the background, but no later step of job first collects it',
+      ])
+      assert.deepEqual(check([...setup, ...start(), ...collect({ suites: 'default' })]), [
+        'suite outside is started in the background, but no later step of job first collects it',
+      ])
+    })
+
+    test('a collect step in another job does not collect the suites', () => {
+      const workflow = `${paired([...setup, ...start()])}\n${collect({ condition: '${{ !cancelled() }}' }).join('\n')}`
+      assert.deepEqual(
+        temporary((root) => {
+          write(root, fixtureTree)
+          return coverageProblems({ root, manifest: fixtureManifest, workflow }).sort()
+        }),
+        [
+          'suite default is collected, but no earlier step of job second starts it',
+          'suite default is started in the background, but no later step of job first collects it',
+          'suite outside is collected, but no earlier step of job second starts it',
+          'suite outside is started in the background, but no later step of job first collects it',
+        ]
+      )
+    })
+
+    // PR 216 review BA-02: a foreground suite in the same step brought its own needs into
+    // the collect condition, and a collect step without a condition inherits success().
+    test('a collect step runs only collect lines and states !cancelled()', () => {
+      const mixed = [
+        '      - name: collect suites',
+        "        if: ${{ !cancelled() && steps.started.outcome == 'success' }}",
+        '        run: |',
+        '          node scripts/ci/node-test-gate.mjs --collect outside',
+        '          node scripts/ci/node-test-gate.mjs default',
+      ]
+      const startOutside = start({ suites: 'outside', condition: '${{ !cancelled() }}' })
+      assert.deepEqual(check([...setup, ...startOutside, ...runtime, ...mixed]), [
+        'step collect suites collects outside but also runs "node scripts/ci/node-test-gate.mjs default"; a collect step runs only collect lines',
+      ])
+      const unconditioned = [
+        '      - name: collect suites',
+        '        run: node scripts/ci/node-test-gate.mjs --collect outside default',
+      ]
+      assert.deepEqual(check([...setup, ...start(), ...runtime, ...unconditioned]), [
+        'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it',
+      ])
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...runtime,
+          ...collect({ condition: "${{ steps.started.outcome == 'success' }}" }),
+        ]),
+        [
+          'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it',
+        ]
+      )
+    })
+
+    // PR 216 delta review: the rule reads the parsed condition, so a quoted matrix value
+    // that spells the function does not count.
+    test('a collect condition that only quotes !cancelled() as a matrix value fails', () => {
+      const quoted = [
+        '      - name: collect suites',
+        "        if: ${{ matrix.platform == '!cancelled()' }}",
+        '        run: node scripts/ci/node-test-gate.mjs --collect outside default',
+      ]
+      assert.ok(
+        check([...setup, ...start(), ...runtime, ...quoted]).includes(
+          'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it'
+        )
+      )
+    })
+
+    test('the collect step may wait only on the step that started its suites', () => {
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...runtime,
+          ...collect({
+            condition:
+              "${{ !cancelled() && steps.started.outcome == 'success' && steps.runtime.outcome == 'success' }}",
+          }),
+        ]),
+        [
+          'step collect suites waits on steps.runtime; a collect step may wait only on the step that started outside and default',
+        ]
+      )
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...collect({
+            condition:
+              "${{ !cancelled() && steps.started.outcome == 'success' && steps.setup.outcome == 'success' }}",
+          }),
+        ]),
+        [
+          'step collect suites waits on steps.setup; a collect step may wait only on the step that started outside and default',
+        ]
+      )
+    })
+
+    test("the start step keeps today's rule: it waits only on what its suites need", () => {
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...runtime,
+          ...start({
+            condition:
+              "${{ !cancelled() && steps.setup.outcome == 'success' && steps.runtime.outcome == 'success' }}",
+          }),
+          ...collect(),
+        ]),
+        [
+          'step start suites waits on steps.runtime, which outside and default does not need',
+        ]
+      )
+      assert.deepEqual(
+        check([...setup, ...start({ condition: 'always()' }), ...collect()]),
+        ['step start suites can be skipped by its condition: "always()"']
+      )
+    })
+
+    test('the collect step may not be skippable, continue on error or drop a matrix row', () => {
+      assert.deepEqual(
+        check([...setup, ...start(), ...collect({ condition: 'always()' })]),
+        [
+          'step collect suites can be skipped by its condition: "always()"',
+          'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it',
+        ]
+      )
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...collect({ extra: ['        continue-on-error: true'] }),
+        ]),
+        ['step collect suites sets continue-on-error (true), which hides a gate failure']
+      )
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...collect({
+            condition:
+              "${{ !cancelled() && matrix.platform == 'android' && steps.started.outcome == 'success' }}",
+          }),
+        ]),
+        [
+          'step collect suites skips matrix row platform=ios, which outside and default must run on',
+        ]
+      )
+    })
+
+    test('a suite started twice in one job, or an unknown started suite, fails', () => {
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start(),
+          ...start({ id: 'again', suites: 'default' }),
+          ...collect(),
+        ]),
+        ['suite default is started more than once in job first']
+      )
+      assert.deepEqual(
+        check([
+          ...setup,
+          ...start({ suites: 'outside default renamed' }),
+          ...collect({ suites: 'outside default renamed' }),
+        ]),
+        ['workflow runs unknown suite renamed']
+      )
+    })
+
+    test('start and collect lines parse apart from the foreground form', () => {
+      assert.deepEqual(
+        backgroundSuites('node scripts/ci/node-test-gate.mjs --start a b'),
+        {
+          mode: 'start',
+          suites: ['a', 'b'],
+        }
+      )
+      assert.deepEqual(
+        backgroundSuites('  node scripts/ci/node-test-gate.mjs --collect a  '),
+        { mode: 'collect', suites: ['a'] }
+      )
+      assert.equal(backgroundSuites('node scripts/ci/node-test-gate.mjs --start'), null)
+      assert.equal(backgroundSuites('node scripts/ci/node-test-gate.mjs a'), null)
+      assert.equal(gatedSuite('node scripts/ci/node-test-gate.mjs --start a'), null)
+      // The collect step gates the files; the start step only launches them.
+      assert.equal(
+        runGatesTestFile(
+          'node scripts/ci/node-test-gate.mjs --collect share-card-plugins native-harness',
+          'scripts/ci/node-test-gate.test.mjs'
+        ),
+        true
+      )
+      assert.equal(
+        runGatesTestFile(
+          'node scripts/ci/node-test-gate.mjs --start share-card-plugins native-harness',
+          'scripts/ci/node-test-gate.test.mjs'
+        ),
+        false
+      )
+    })
+  })
+
   test('workflow lines name a suite only for a single-argument gate invocation', () => {
     assert.equal(
       gatedSuite('  node scripts/ci/node-test-gate.mjs native-harness'),
@@ -717,6 +1417,69 @@ describe('node-test-gate discovery and coverage', () => {
   })
 })
 
+// browser-acceptance runs the harness suites in the background from install on, so
+// they overlap the browser, Supabase and runtime steps, and collects them before the
+// bridge and the matrix compete for the CPU.
+describe('browser-acceptance background harness suites', () => {
+  const job = parse(fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8'))
+    .jobs['browser-acceptance']
+  const steps = job.steps
+  const at = (predicate) => steps.findIndex(predicate)
+  const suites = 'share-card-plugins native-harness'
+  const start = at(
+    (step) => step.run?.trim() === `node scripts/ci/node-test-gate.mjs --start ${suites}`
+  )
+  const collect = at(
+    (step) =>
+      step.run?.trim() === `node scripts/ci/node-test-gate.mjs --collect ${suites}`
+  )
+  const row = { platform: 'android', api: 36, suite: 'browser' }
+  const runs = (step, outcomes) =>
+    evaluateApprovedCondition(step.if, {
+      matrix: job.strategy.matrix,
+      row,
+      outcomes,
+    })
+
+  test('the start step follows install directly and waits only on it', () => {
+    assert.equal(start, at((step) => step.uses === './.github/actions/install') + 1)
+    assert.equal(
+      steps[start].if,
+      "${{ !cancelled() && steps.install.outcome == 'success' }}"
+    )
+    assert.ok(steps[start].id)
+  })
+
+  test('the collect step follows the runtime and precedes the bridge and the matrix', () => {
+    assert.ok(collect > at((step) => step.id === 'runtime'))
+    assert.ok(collect < at((step) => step.run?.includes('bridge-a11y.mjs')))
+    assert.ok(collect < at((step) => step.run?.includes('npx playwright test')))
+    assert.equal(
+      steps[collect].if,
+      `\${{ !cancelled() && steps.${steps[start].id}.outcome == 'success' }}`
+    )
+  })
+
+  test('a failed browser, Supabase or runtime step never skips the collect step', () => {
+    const started = { install: 'success', [steps[start].id]: 'success' }
+    for (const failed of [
+      { browser_deps: 'failure' },
+      { supabase: 'failure', runtime: 'skipped' },
+      { runtime: 'failure' },
+    ])
+      assert.equal(runs(steps[collect], { ...started, ...failed }), true)
+    assert.equal(runs(steps[collect], { install: 'success' }), false)
+  })
+
+  test('no foreground copy of the two suites remains in the job', () => {
+    const lines = steps.flatMap((step) => (step.run ?? '').split('\n'))
+    assert.deepEqual(
+      lines.map(gatedSuite).filter((suite) => suites.split(' ').includes(suite)),
+      []
+    )
+  })
+})
+
 // Local mode: a pre-push run of every suite must check each suite's declared setup first.
 // Two suites once failed only on a local sweep that skipped it: story68-api-entry needs the
 // API build (conditionNeeds runtime) and worklets-staging the Android prebuild.
@@ -732,7 +1495,7 @@ describe('local mode', () => {
     },
   }
   const rootWith = (files) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-local-'))
+    const root = scratchRoot('gate-local-')
     for (const file of files) {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
       fs.writeFileSync(path.join(root, file), '')
@@ -801,7 +1564,7 @@ describe('local mode preflight (PR 212 review)', () => {
     conditionNeeds: { plain: ['install'], vitest: [] },
   }
   const rootWith = (files) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-preflight-'))
+    const root = scratchRoot('gate-preflight-')
     for (const file of files) {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
       fs.writeFileSync(path.join(root, file), '')
@@ -833,7 +1596,7 @@ describe('local mode preflight (PR 212 review)', () => {
   })
 
   test('a fresh checkout without node_modules gets the install instruction', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fresh-'))
+    const root = scratchRoot('gate-fresh-')
     const copy = (file) => {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
       fs.copyFileSync(path.join(repoRoot, file), path.join(root, file))

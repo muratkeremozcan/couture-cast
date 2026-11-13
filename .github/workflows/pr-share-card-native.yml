@@ -723,19 +723,42 @@ jobs:
         id: install
         # 1.3 minutes at p50, 6.2 at most.
         timeout-minutes: 8
+      # These suites need only the installed dependencies, so they run in the background
+      # while the browsers, Supabase and the runtime are prepared (about 2 minutes saved).
+      # The collect step before the bridge reports them.
+      - name: Start share-card harness and plugin suites in the background
+        id: harness_start
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs --start share-card-plugins native-harness
+      # The browsers' Ubuntu package files, restored only by the exact key of the package
+      # list Playwright pins, so a hit downloads none of them. A miss saves them once the
+      # step succeeds; a failed install drops them before its retry (apt-install.sh).
+      - name: Key the Ubuntu package cache
+        id: ubuntu_packages_key
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: node scripts/ci/ubuntu-package-cache.mjs >> "$GITHUB_OUTPUT"
+      - name: Restore the Ubuntu package files
+        id: ubuntu_packages_cache
+        if: ${{ !cancelled() && steps.ubuntu_packages_key.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          key: ${{ steps.ubuntu_packages_key.outputs.key }}
+          path: ${{ steps.ubuntu_packages_key.outputs.path }}/*.deb
       - name: Provision pinned share-card browser dependencies
         id: browser_deps
-        if: matrix.platform == 'android'
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.install.outcome == 'success' }}
         timeout-minutes: 12
+        env:
+          APT_INSTALL_ARCHIVES: ${{ steps.ubuntu_packages_key.outputs.path }}
         run: |
           node scripts/ci/node-test-gate.mjs browser-deps
           node scripts/ci/share-card-browser-deps.mjs
-      - name: Verify share-card harness and plugin suites
-        id: harness_suites
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: |
-          node scripts/ci/node-test-gate.mjs share-card-plugins
-          node scripts/ci/node-test-gate.mjs native-harness
+      - name: Save the Ubuntu package files
+        if: ${{ !cancelled() && steps.ubuntu_packages_key.outcome == 'success' && steps.ubuntu_packages_cache.outputs.cache-hit != 'true' && steps.browser_deps.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          key: ${{ steps.ubuntu_packages_key.outputs.key }}
+          path: ${{ steps.ubuntu_packages_key.outputs.path }}/*.deb
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -781,6 +804,13 @@ jobs:
               report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
             throw new Error('Incomplete API entry guard execution')
           JS
+      # Waits only on its start step, so a browser, Supabase or runtime failure cannot
+      # hide a harness failure. It runs before the bridge and the matrix need the CPU.
+      - name: Verify share-card harness and plugin suites
+        id: harness_collect
+        if: ${{ !cancelled() && steps.harness_start.outcome == 'success' }}
+        timeout-minutes: 12
+        run: node scripts/ci/node-test-gate.mjs --collect share-card-plugins native-harness
       # The device lanes run this too, but they skip pull requests. Running it here makes
       # a test title change (a Vitest upgrade reformatting test.each names) fail the PR.
       - name: Verify localized native accessibility announcements and focus bridge
