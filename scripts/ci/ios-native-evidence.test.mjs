@@ -961,11 +961,39 @@ describe('the PR Gate guard', () => {
   // then the guard step, then the fallback step whenever the guard step did not succeed. The
   // fallback's condition is checked as text and evaluated here from the guard step's outcome.
   const FALLBACK_IF = "always() && steps.guard.outcome != 'success'"
+  // A fake gh: a status POST is logged; a GET pages through `pulls`, the pull requests the
+  // repository holds, the way the API does (30 a page unless per_page says otherwise, the next page
+  // only with --paginate), and applies --jq to each page with jq. A commit's association list
+  // holds every pull request that contains the commit, whatever its state.
+  const fakeGh = (log, fixture) =>
+    [
+      `#!${process.execPath}`,
+      "const fs = require('node:fs')",
+      "const { execFileSync } = require('node:child_process')",
+      'const args = process.argv.slice(2)',
+      `const fixture = ${JSON.stringify(fixture)}`,
+      "if (args.includes('POST')) {",
+      '  const field = (name) => args.find((arg) => arg.startsWith(`${name}=`)).slice(name.length + 1)',
+      "  const sha = args[args.indexOf('POST') + 1].split('/').pop()",
+      `  fs.appendFileSync(${JSON.stringify(log)}, \`\${sha} \${field('context')} \${field('state')}\\n\`)`,
+      '  process.exit(0)',
+      '}',
+      'if (fixture.fails) process.exit(1)',
+      "const url = new URL(args.find((arg) => arg.startsWith('repos/')), 'https://api.github.com/')",
+      'const commit = /\\/commits\\/([0-9a-f]{40})\\/pulls$/.exec(url.pathname)?.[1]',
+      "const state = url.searchParams.get('state') ?? (commit ? 'all' : 'open')",
+      "const rows = fixture.pulls.filter((pull) => (commit ? pull.commits.includes(commit) : true) && (state === 'all' || pull.state === state))",
+      "const per = Number(url.searchParams.get('per_page') ?? 30)",
+      "const jq = args.includes('--jq') ? args[args.indexOf('--jq') + 1] : '.'",
+      "for (let page = 0; page === 0 || (args.includes('--paginate') && page * per < rows.length); page++)",
+      "  process.stdout.write(execFileSync('jq', ['-r', jq], { input: JSON.stringify(rows.slice(page * per, (page + 1) * per)) }))",
+    ].join('\n')
+  const pull = (number, state, sha) => ({ number, state, head: { sha }, commits: [sha] })
   const sequence = ({
     checkout = 'success',
     node = 'exit 0',
     timeout,
-    pulls = 'echo 1',
+    pulls = { pulls: [pull(5, 'open', head)] },
     sha = head,
   }) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pr-gate-sequence-'))
@@ -982,18 +1010,7 @@ describe('the PR Gate guard', () => {
         })
       stub('git', `echo ${MAIN_SHA}`)
       stub('node', node)
-      stub(
-        'gh',
-        [
-          'if [ "$1 $2" = "api -X" ]; then',
-          '  state= context=',
-          '  for arg in "$@"; do case "$arg" in state=*) state=${arg#state=} ;; context=*) context=${arg#context=} ;; esac; done',
-          `  echo "\${4##*/} $context $state" >> "${log}"`,
-          'else',
-          `  ${pulls}`,
-          'fi',
-        ].join('\n')
-      )
+      fs.writeFileSync(path.join(bin, 'gh'), fakeGh(log, pulls), { mode: 0o755 })
       const env = {
         ...process.env,
         PATH: `${bin}:${process.env.PATH}`,
@@ -1055,12 +1072,41 @@ describe('the PR Gate guard', () => {
 
   test('an unreadable pull request list still fails the gate; a commit no pull request heads posts nothing', () => {
     assert.equal(
-      sequence({ checkout: 'failure', pulls: 'exit 1' }).last,
+      sequence({ checkout: 'failure', pulls: { fails: true } }).last,
       `${head} gate failure`
     )
-    const orphan = sequence({ checkout: 'failure', pulls: 'echo 0' })
-    assert.equal(orphan.fallback.status, 0)
+    const orphan = sequence({
+      checkout: 'failure',
+      pulls: { pulls: [pull(5, 'open', older), pull(6, 'closed', head)] },
+    })
+    assert.equal(orphan.fallback.status, 0, orphan.fallback.stderr)
     assert.deepEqual(orphan.gates, [`${head} gate success`])
+  })
+
+  // IOS-R4-01: absence of an open pull request on the head is proven across every page. Page one
+  // of the commit's associations holds 30 closed or merged pull requests, and the open one whose
+  // head is the commit comes after them, behind 100 other open pull requests.
+  test('an open pull request on a later page still fails the gate', () => {
+    const history = Array.from({ length: 30 }, (_, index) =>
+      pull(100 + index, 'closed', head)
+    )
+    const others = Array.from({ length: 100 }, (_, index) =>
+      pull(200 + index, 'open', index.toString(16).padStart(40, '0'))
+    )
+    const result = sequence({
+      checkout: 'failure',
+      pulls: { pulls: [...history, ...others, pull(5, 'open', head)] },
+    })
+    assert.equal(result.fallback.status, 0, result.fallback.stderr)
+    assert.equal(result.last, `${head} gate failure`)
+    // A pull request that once had the commit as its head, and has moved on, is no match.
+    const moved = sequence({
+      checkout: 'failure',
+      pulls: {
+        pulls: [...history, ...others, { ...pull(5, 'open', newer), commits: [head] }],
+      },
+    })
+    assert.deepEqual(moved.gates, [`${head} gate success`])
   })
 
   test('a guard that finished leaves the gate to its verdict, and a missing head commit fails the fallback', () => {
