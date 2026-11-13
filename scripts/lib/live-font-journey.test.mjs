@@ -46,6 +46,13 @@ function fakeDevice(platform, { breakAt, throwAt } = {}) {
         text: 'New post',
         bounds: `[0,100][300,${100 + h}]`,
       },
+      // A 44 pt icon button centred over a 38 pt row, the same box at every scale.
+      {
+        id: 'header-info-modal',
+        text: 'About',
+        bounds: '[358,59][402,103]',
+        parent: '[240,62][402,100]',
+      },
       ...(updated
         ? [{ id: '', text: 'Every band', bounds: `[0,300][300,${300 + h}]` }]
         : []),

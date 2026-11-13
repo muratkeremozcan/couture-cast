@@ -201,26 +201,43 @@ function parity(live, cold, base, tolerance, earlier = []) {
   return { pass: compared > 0 && misses.length === 0, compared, misses }
 }
 
+/** A box's height and its overhang above and below its parent, in capture units. */
+function overhangOf(node) {
+  const [, top, , bottom] = parseBounds(node.bounds)
+  const [, pt, , pb] = parseBounds(node.parent)
+  return { height: bottom - top, above: pt - top, below: bottom - pb }
+}
+
+/** Centred over its parent and identical, box and overhang, to the cold base launch's. */
+function unchangedCentredTarget(node, base, tolerance) {
+  if (base?.parent === undefined) return false
+  const [now, then] = [overhangOf(node), overhangOf(base)]
+  return (
+    now.above > tolerance &&
+    now.above === now.below &&
+    now.height === then.height &&
+    now.above === then.above &&
+    now.below === then.below
+  )
+}
+
 /**
  * A text box that leaves its parent view is clipped, whatever its own height says. One box is
  * exempt: a touch target centred on a shorter row (a 44 pt icon button on iOS), which overflows
- * by the same amount above and below and kept its height from `base`, the capture at the base
- * scale. Grown text that a fixed row centres overflows the same way, so a box that grew, or one
- * `base` does not show, is never exempt.
+ * by the same amount above and below. It is exempt only when `reference`, the cold launch at
+ * the platform's base scale, shows it with the same height and the same overhang: a fixed
+ * target has one box at every scale. Grown text that a fixed row centres overflows the same way,
+ * and stale text on a return leg keeps the scaled box, so any change in height or overhang from
+ * the cold base launch, or a box that launch does not show, is clipping.
  */
-function clipping(capture, tolerance, base) {
-  const baseNodes = base ? keyed(base) : new Map()
+function clipping(capture, tolerance, reference) {
+  const referenceNodes = reference ? keyed(reference) : new Map()
   const clipped = []
   for (const [key, node] of keyed(capture)) {
     if (node.parent === undefined) continue
     const [left, top, right, bottom] = parseBounds(node.bounds)
     const [pl, pt, pr, pb] = parseBounds(node.parent)
-    const before = baseNodes.get(key)
-    const centred =
-      before !== undefined &&
-      Math.abs(height(before) - (bottom - top)) <= tolerance &&
-      pt - top > tolerance &&
-      Math.abs(pt - top - (bottom - pb)) <= tolerance
+    const centred = unchangedCentredTarget(node, referenceNodes.get(key), tolerance)
     if (
       left < pl - tolerance ||
       right > pr + tolerance ||
@@ -324,6 +341,7 @@ export function evaluateLiveFontChange({
   settled,
   cold,
   coldBefore,
+  coldBase,
   earlier = [],
   updated,
   coldUpdated,
@@ -398,7 +416,7 @@ export function evaluateLiveFontChange({
     ]),
     coldParity: parity(settled, cold, before, tolerance, earlier),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
-    clipping: clipping(settled, tolerance, before),
+    clipping: clipping(settled, tolerance, coldBase),
     controls: controlsOnScreen(settled, requiredControls),
   }
   if (updated) {
@@ -424,7 +442,7 @@ export function evaluateLiveFontChange({
       ),
     }
     checks.postUpdateControls = controlsOnScreen(updated, requiredControls)
-    checks.postUpdateClipping = clipping(updated, tolerance, before)
+    checks.postUpdateClipping = clipping(updated, tolerance, coldBase)
   }
   return { checks, verdict: classify(checks) }
 }

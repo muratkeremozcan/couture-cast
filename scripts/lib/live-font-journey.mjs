@@ -207,6 +207,7 @@ export async function runScreenJourney({
         settled,
         cold: cold[to].reference,
         coldBefore: cold[from].reference,
+        coldBase: cold[base].reference,
         earlier: [...earlier],
         updated,
         coldUpdated: cold[to].updated,

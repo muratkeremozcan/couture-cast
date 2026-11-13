@@ -371,27 +371,80 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(verdict, 'unexpected')
   })
 
+  /** Gives the probe's node in `capture` a parent with `above` and `below` px of overhang. */
+  function overhang(capture, id, above, below) {
+    const node = capture.nodes.find((n) => n.id === id)
+    const [left, top, right, bottom] = parseBounds(node.bounds)
+    node.parent = `[${left},${top + above}][${right},${bottom - below}]`
+    return node
+  }
+  /** A node box of `size` px at `top`, centred over a `row` px parent. */
+  function centredBox(capture, id, size, row, top = 100) {
+    const node = capture.nodes.find((n) => n.id === id)
+    const [left, , right] = parseBounds(node.bounds)
+    const gap = (size - row) / 2
+    node.bounds = `[${left},${top}][${right},${top + size}]`
+    node.parent = `[${left},${top + gap}][${right},${top + size - gap}]`
+  }
+
   test('a touch target centred over a shorter row is not clipped text', () => {
     // iOS: a 44 pt icon button (About CoutureCast) centred on a 38 pt header row overflows it by
-    // 3 pt above and below at every text size. The temperature keeps its height at 1.5 here.
-    const change = fixedChange()
-    const node = change.settled.nodes.find((n) => n.id === 'current-temperature')
-    const [left, top, right, bottom] = parseBounds(node.bounds)
-    node.parent = `[${left},${top + 3}][${right},${bottom - 3}]`
+    // 3 pt above and below with the same box at every text size, the cold base launch included.
+    const change = { ...fixedChange(), coldBase: structuredClone(stage('before')) }
+    overhang(change.coldBase, 'current-temperature', 3, 3)
+    overhang(change.settled, 'current-temperature', 3, 3)
     assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, true)
-    node.parent = `[${left},${top}][${right},${bottom - 6}]`
+    // Without the cold base launch there is nothing to compare with: no exemption.
+    const withoutBase = { ...change }
+    delete withoutBase.coldBase
+    assert.equal(evaluateLiveFontChange(withoutBase).checks.clipping.pass, false)
+    // Overhang only below is grown text, never a centred target.
+    overhang(change.settled, 'current-temperature', 0, 6)
     assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
   })
 
   test('text that grew past a row that centres it is clipped (P2-1)', () => {
     // Yoga centres the overflow of grown text equally above and below a fixed-height row.
-    const change = fixedChange()
-    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
-    const [left, top, right, bottom] = parseBounds(node.bounds)
-    node.parent = `[${left},${top + 6}][${right},${bottom - 6}]`
+    const change = { ...fixedChange(), coldBase: structuredClone(stage('before')) }
+    overhang(change.settled, 'current-condition', 6, 6)
     const { checks, verdict } = evaluateLiveFontChange(change)
     assert.equal(checks.clipping.pass, false)
     assert.notEqual(verdict, 'fixed')
+  })
+
+  test('growth within the height tolerance still ends the exemption (P2-1 re-check)', () => {
+    // Android tolerance is 2 px: 28 px text in a 24 px centred row at the base scale, 30 px live.
+    const change = { ...fixedChange(), coldBase: structuredClone(stage('before')) }
+    centredBox(change.coldBase, 'current-temperature', 28, 24)
+    centredBox(change.settled, 'current-temperature', 30, 24)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+    // A parent that shrinks under a box of the same height ends it too.
+    centredBox(change.settled, 'current-temperature', 28, 22)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+    centredBox(change.settled, 'current-temperature', 28, 24)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, true)
+  })
+
+  test('stale text on a return leg is judged against the cold base launch (P2-1 re-check)', () => {
+    // 1.5 to 1.0: `before` is the stale 1.5 capture, so it shows the same 50 px box; the cold
+    // base launch shows the text at 20 px inside the 38 px row.
+    const before = structuredClone(stage('settled'))
+    centredBox(before, 'current-condition', 50, 38)
+    const settled = { ...structuredClone(stage('before')), stage: 'settled' }
+    centredBox(settled, 'current-condition', 50, 38)
+    const coldBase = structuredClone(stage('before'))
+    centredBox(coldBase, 'current-condition', 20, 20)
+    const change = {
+      platform: 'android',
+      before,
+      immediate: { ...settled, stage: 'immediate' },
+      settled,
+      cold: { ...stage('before'), stage: 'cold' },
+      coldBase,
+      anchors: ANCHORS,
+      probes: PROBES,
+    }
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
   })
 
   test('a height that matches neither the base nor the cold layout is unexpected', () => {
