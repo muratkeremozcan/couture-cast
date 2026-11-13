@@ -9,7 +9,9 @@ name: iOS native canary
 run-name: iOS 26.5 canary ${{ github.sha }}
 
 on:
-  # After the 03:23 UTC nightly run of ios-native.yml, so the two do not share macOS runners.
+  # After the 03:23 UTC nightly run of ios-native.yml has finished its shards (about 75 minutes),
+  # so the two share no shard runners. Its ios-live-font job may still hold one macOS runner until
+  # about 05:40 UTC; the canary skips that job.
   schedule:
     - cron: '47 4 * * *'
 

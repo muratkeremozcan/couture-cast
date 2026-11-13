@@ -15,7 +15,16 @@ import { helperProblems, npmCalls } from './ios-native-helpers.mjs'
 import {
   CANARY_WORKFLOW,
   CLIENT_ARTIFACT,
+  IOS_RELEASE_APP,
   JOBS_WORKFLOW,
+  LIVE_FONT_ARTIFACT,
+  LIVE_FONT_INSTALL,
+  LIVE_FONT_JOB,
+  LIVE_FONT_PROOF,
+  LIVE_FONT_RELEASE_BUILD,
+  LIVE_FONT_SCAN,
+  LIVE_FONT_SCREENS,
+  MACOS_JOBS,
   MANDATORY,
   NIGHTLY_WORKFLOW,
   PROOF,
@@ -864,7 +873,7 @@ describe('ios-native workflows validator', () => {
   )
 
   // Runtimes.
-  for (const name of ['ios-build', 'ios-shard', 'ios-expo-go']) {
+  for (const name of ['ios-build', 'ios-shard', 'ios-expo-go', LIVE_FONT_JOB]) {
     rejected(
       `${name} without the harness env`,
       new RegExp(`${name}: the harness directory`),
@@ -892,6 +901,319 @@ describe('ios-native workflows validator', () => {
       }
     )
   }
+})
+
+// Story 6.15 AC3 on iOS: the live font-scale proof on the Release test build, nightly and on a
+// manual dispatch only, failing its job on a nonzero driver exit and uploading its scanned proof.
+describe('the iOS live font-scale proof', () => {
+  const job = source[J].jobs[LIVE_FONT_JOB]
+  const proof = step(job, (row) => row.id === 'live_font')
+  const upload = step(job, (row) => row.with?.name === LIVE_FONT_ARTIFACT.name)
+
+  test('runs only from the nightly and dispatch caller, never on a pull request or a merge', () => {
+    assert.deepEqual(Object.keys(onOf(source[P])).sort(), [
+      'schedule',
+      'workflow_dispatch',
+    ])
+    assert.deepEqual(Object.keys(onOf(source[C])), ['schedule'])
+    assert.deepEqual(Object.keys(onOf(source[J])), ['workflow_call'])
+    assert.ok(MACOS_JOBS.includes(LIVE_FONT_JOB))
+    assert.equal(job['runs-on'], 'macos-26')
+    // The canary passes ios26-canary and skips the job; ios-native.yml never passes it.
+    assert.equal(job.if, '${{ !inputs.ios26-canary }}')
+    assert.equal(source[P].jobs['ios-native'].with['ios26-canary'], undefined)
+    assert.equal(source[C].jobs['ios-native-canary'].with['ios26-canary'], true)
+    assert.equal(job.needs, undefined)
+  })
+
+  test('has fixed limits: 180 minutes for the job, 45 for the build, 120 for the proof', () => {
+    assert.equal(job['timeout-minutes'], 180)
+    assert.equal(step(job, (row) => row.id === 'release_build')['timeout-minutes'], 45)
+    assert.equal(proof['timeout-minutes'], 120)
+  })
+
+  test('runs the driver on the Release build of every screen, and its exit decides the job', () => {
+    assert.deepEqual(LIVE_FONT_SCREENS, ['home', 'community', 'settings', 'composer'])
+    assert.equal(
+      LIVE_FONT_PROOF,
+      'node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens home,community,settings,composer --out "$RUNNER_TEMP/live-font-ios"'
+    )
+    const lines = proof.run.split('\n').map((line) => line.trim())
+    // The last command is the driver, so its status is the step's.
+    assert.equal(lines.filter(Boolean).at(-1), LIVE_FONT_PROOF)
+    assert.equal(proof.if, undefined)
+    assert.equal(proof['continue-on-error'], undefined)
+    assert.equal(job['continue-on-error'], undefined)
+    assert.equal(
+      step(job, (row) => row.id === 'release_build').run,
+      `${LIVE_FONT_RELEASE_BUILD}`
+    )
+    assert.ok(LIVE_FONT_INSTALL.endsWith(`--app ${IOS_RELEASE_APP}`))
+  })
+
+  test('the step fails when the driver exits nonzero, as bash -e runs it', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-live-font-'))
+    try {
+      const bin = path.join(dir, 'bin')
+      fs.mkdirSync(bin)
+      fs.writeFileSync(path.join(bin, 'cat'), '#!/bin/sh\necho SIM-UDID\n', {
+        mode: 0o755,
+      })
+      fs.writeFileSync(
+        path.join(bin, 'node'),
+        `#!/bin/sh\necho "$*" >> "${dir}/calls"\nexit "\${DRIVER_EXIT:-0}"\n`,
+        { mode: 0o755 }
+      )
+      const runProof = (exit) =>
+        spawnSync('/bin/bash', ['--noprofile', '--norc', '-e', '-c', proof.run], {
+          encoding: 'utf8',
+          env: { PATH: bin, HOME: dir, RUNNER_TEMP: dir, DRIVER_EXIT: String(exit) },
+        }).status
+      assert.equal(runProof(0), 0)
+      assert.equal(runProof(1), 1)
+      const calls = fs.readFileSync(path.join(dir, 'calls'), 'utf8').trim().split('\n')
+      assert.equal(
+        calls[0],
+        `scripts/run-live-font-proof.mjs --platform ios --device SIM-UDID --build release --screens home,community,settings,composer --out ${dir}/live-font-ios`
+      )
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  test('uploads the proof after its secret scan, on a pass or a failure, for a week', () => {
+    assert.deepEqual(upload.with, {
+      name: 'ios-live-font-proof',
+      path: '${{ runner.temp }}/live-font-ios/',
+      'retention-days': 7,
+      'if-no-files-found': 'error',
+    })
+    assert.equal(
+      upload.if,
+      "${{ !cancelled() && steps.live_font_scan.outcome == 'success' }}"
+    )
+    const scan = step(job, (row) => row.id === 'live_font_scan')
+    assert.equal(scan.run, LIVE_FONT_SCAN)
+    assert.equal(scan.if, "${{ !cancelled() && steps.live_font.outcome != 'skipped' }}")
+  })
+
+  test('reuses ios-shard’s runtime steps unchanged', () => {
+    const shard = source[J].jobs['ios-shard'].steps
+    for (const name of [
+      'Start the native Supabase stack',
+      'Provision the local Storage buckets',
+      'Prepare isolated UUID runtime and built renderer',
+      'Report owned background service exits',
+      'Select and scan closed evidence',
+      'Stop the owned native Supabase stack',
+    ])
+      assert.deepEqual(
+        step(job, (row) => row.name === name),
+        shard.find((row) => row.name === name),
+        name
+      )
+  })
+
+  for (const [title, expected, change] of [
+    [
+      'a live font proof under the canary',
+      /skip only under the canary/,
+      (live) => {
+        delete live.if
+      },
+    ],
+    [
+      'a live font proof that waits for ios-build',
+      /start with the run, beside the builds/,
+      (live) => {
+        live.needs = 'ios-build'
+      },
+    ],
+    [
+      'a live font proof on a Debug build',
+      /ios-live-font: ".*" does not execute: node scripts\/run-live-font-proof\.mjs/,
+      (live) => {
+        const row = step(live, (item) => item.id === 'live_font')
+        row.run = row.run.replace(' --build release', ' --build debug')
+      },
+    ],
+    [
+      'a live font proof without --build',
+      /ios-live-font: ".*" does not execute: node scripts\/run-live-font-proof\.mjs/,
+      (live) => {
+        const row = step(live, (item) => item.id === 'live_font')
+        row.run = row.run.replace(' --build release', '')
+      },
+    ],
+    [
+      'a live font proof without the composer',
+      /ios-live-font: ".*" does not execute: node scripts\/run-live-font-proof\.mjs/,
+      (live) => {
+        const row = step(live, (item) => item.id === 'live_font')
+        row.run = row.run.replace(',composer', '')
+      },
+    ],
+    [
+      'a live font proof on Android',
+      /ios-live-font: ".*" does not execute: node scripts\/run-live-font-proof\.mjs/,
+      (live) => {
+        const row = step(live, (item) => item.id === 'live_font')
+        row.run = row.run.replace('--platform ios', '--platform android')
+      },
+    ],
+    [
+      'a live font proof whose exit is ignored',
+      /ios-live-font: ".*" must exist once/,
+      (live) => {
+        const row = step(live, (item) => item.id === 'live_font')
+        row.run = row.run.replace(
+          'composer --out "$RUNNER_TEMP/live-font-ios"',
+          'composer --out "$RUNNER_TEMP/live-font-ios" || true'
+        )
+      },
+    ],
+    [
+      'a live font proof that may fail',
+      /ios-live-font: failures must remain visible/,
+      (live) => {
+        step(live, (item) => item.id === 'live_font')['continue-on-error'] = true
+      },
+    ],
+    [
+      'a live font job that may fail',
+      /ios-live-font: failures must remain visible/,
+      (live) => {
+        live['continue-on-error'] = true
+      },
+    ],
+    [
+      'a live font proof skipped on a dispatch',
+      /ios-live-font: ".*" must exist once/,
+      (live) => {
+        step(live, (item) => item.id === 'live_font').if =
+          "${{ github.event_name != 'workflow_dispatch' }}"
+      },
+    ],
+    [
+      'a live font proof without its own limit',
+      /the proof needs its own limit, inside the job's/,
+      (live) => {
+        delete step(live, (item) => item.id === 'live_font')['timeout-minutes']
+      },
+    ],
+    [
+      'a live font proof longer than its job',
+      /the proof needs its own limit, inside the job's/,
+      (live) => {
+        step(live, (item) => item.id === 'live_font')['timeout-minutes'] = 180
+      },
+    ],
+    [
+      'a live font job without a limit',
+      /ios-live-font: limit must be a fixed number of minutes/,
+      (live) => {
+        delete live['timeout-minutes']
+      },
+    ],
+    [
+      'a live font proof of the Debug configuration',
+      /ios-live-font: ".*" does not execute: node scripts\/run-story68-native\.mjs build/,
+      (live) => {
+        const row = step(live, (item) => item.id === 'release_build')
+        row.run = row.run.replace('Release', 'Debug')
+      },
+    ],
+    [
+      'a live font proof that installs the development client',
+      /ios-live-font: ".*" does not execute: node scripts\/ci\/native-ios-startup-probe\.mjs/,
+      (live) => {
+        const row = step(live, (item) =>
+          item.run?.includes('native-ios-startup-probe.mjs')
+        )
+        row.run = 'node scripts/ci/native-ios-startup-probe.mjs --for-native-flow\n'
+      },
+    ],
+    [
+      'a live font proof on the restored development client',
+      /never the development client/,
+      (live) => {
+        live.steps.splice(5, 0, {
+          if: "github.event_name != 'workflow_dispatch'",
+          uses: 'actions/cache/restore@v5.1.0',
+          with: {
+            path: '${{ needs.ios-build.outputs.app-path }}',
+            key: '${{ needs.ios-build.outputs.app-key }}',
+          },
+        })
+      },
+    ],
+    [
+      'a live font proof run before sign-in',
+      /prebuild, build the Release test build, install it, sign in, run the proof/,
+      (live) => {
+        const rows = live.steps
+        const [signin] = rows.splice(
+          rows.findIndex((row) => row.id === 'signin'),
+          1
+        )
+        rows.splice(rows.findIndex((row) => row.id === 'live_font') + 1, 0, signin)
+      },
+    ],
+    [
+      'a live font proof uploaded before its scan',
+      /scan it, then upload it/,
+      (live) => {
+        const rows = live.steps
+        const [scan] = rows.splice(
+          rows.findIndex((row) => row.id === 'live_font_scan'),
+          1
+        )
+        rows.push(scan)
+      },
+    ],
+    [
+      'a live font proof without its upload',
+      /upload the scanned proof once as ios-live-font-proof/,
+      (live) => {
+        live.steps = live.steps.filter(
+          (row) => row.with?.name !== LIVE_FONT_ARTIFACT.name
+        )
+      },
+    ],
+    [
+      'an unscanned live font proof uploaded on every outcome',
+      /ios-live-font: upload only closed evidence/,
+      (live) => {
+        step(live, (item) => item.with?.name === LIVE_FONT_ARTIFACT.name).if = 'always()'
+      },
+    ],
+    [
+      'a live font proof kept for 90 days',
+      /ios-live-font: upload only closed evidence/,
+      (live) => {
+        step(live, (item) => item.with?.name === LIVE_FONT_ARTIFACT.name).with[
+          'retention-days'
+        ] = 90
+      },
+    ],
+    [
+      'a live font proof that may be missing',
+      /ios-live-font: upload only closed evidence/,
+      (live) => {
+        step(live, (item) => item.with?.name === LIVE_FONT_ARTIFACT.name).with[
+          'if-no-files-found'
+        ] = 'warn'
+      },
+    ],
+    [
+      'a live font proof without its secret scan',
+      /ios-live-font: "a mandatory check" must exist once/,
+      (live) => {
+        live.steps = live.steps.filter((row) => row.id !== 'live_font_scan')
+      },
+    ],
+  ])
+    rejected(title, expected, (jobs) => change(jobs[LIVE_FONT_JOB]))
 })
 
 // IOS-R2-04 at the shell boundary: each mandatory step, run as GitHub runs it (bash -e) with
@@ -959,6 +1281,15 @@ describe('mandatory checks fail their step', () => {
       'node',
       'native-ios-runtime-fits.mjs',
     ],
+    [LIVE_FONT_RELEASE_BUILD]: ['node', 'build --platform ios --configuration Release'],
+    [LIVE_FONT_INSTALL]: ['node', 'native-ios-startup-probe.mjs'],
+    'xcrun simctl launch "$device" com.couturecast.story68': ['xcrun', 'simctl launch'],
+    'node scripts/run-story68-native.mjs signin --platform ios --device "$device"': [
+      'node',
+      'run-story68-native.mjs signin',
+    ],
+    [LIVE_FONT_PROOF]: ['node', 'run-live-font-proof.mjs'],
+    [LIVE_FONT_SCAN]: ['node', 'native-ios-app-secret-scan.mjs'],
   }
   const RUN_AS_SCRIPT = ['node', 'bash', 'swift', 'xcodebuild', 'tar', 'plutil', 'xcrun']
   // The other commands the mandatory steps call, stubbed to succeed quietly.
