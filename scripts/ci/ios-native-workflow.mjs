@@ -8,8 +8,10 @@
 //                            Trusted main code, so they may write the caches.
 //   ios-native-dispatch.yml  a commit that has not merged. cache-mode: read on the workflow and on
 //                            every job makes GitHub issue a read-only cache token, so the code it
-//                            runs cannot save a cache main's runs restore; each consumer job builds
-//                            its own client, and ios-cache-proof shows nothing was stored.
+//                            runs cannot save a cache main's runs restore; ios-build builds and
+//                            scans the commit's own client and hands it to the shards and Expo Go
+//                            as an artifact of the run, and ios-cache-proof shows nothing was
+//                            stored.
 //
 // The rules check that each control is present, eligible to run (no disabled or bypassable
 // condition) and able to fail its job.
@@ -45,12 +47,18 @@ const ON_DISPATCH = "github.event_name == 'workflow_dispatch'"
 const NOT_DISPATCH = "github.event_name != 'workflow_dispatch'"
 const RUN_RULE = "github.event_name != 'push' || needs.ios-changes.outputs.run == 'true'"
 export const RUN_IF = `\${{ ${RUN_RULE} }}`
-export const CONSUMER_IF = `\${{ !cancelled() && (needs.ios-build.result == 'success' || (${ON_DISPATCH} && needs.ios-build.result == 'skipped')) }}`
-// A dispatch builds the client in the job first, 31 minutes at p95, before the shard's 70.
-export const CONSUMER_LIMITS = {
-  'ios-shard': `\${{ ${ON_DISPATCH} && 110 || 70 }}`,
-  'ios-expo-go': `\${{ ${ON_DISPATCH} && 95 || 60 }}`,
-}
+export const CONSUMER_IF = "${{ !cancelled() && needs.ios-build.result == 'success' }}"
+// A dispatch saves no cache, so ios-build hands the scanned client to the consumers of its run as
+// this artifact: a tar, since upload-artifact drops the executable bit.
+export const CLIENT_ARTIFACT = 'ios-dev-client'
+export const CLIENT_DIRECTORY = '${{ runner.temp }}/ios-client'
+export const CLIENT_TAR = `${CLIENT_DIRECTORY}/client.tar`
+export const CLIENT_PACK =
+  'tar -C "$(dirname "$APP")" -cf "$RUNNER_TEMP/ios-client/client.tar" "$(basename "$APP")"'
+export const CLIENT_UNPACK =
+  'tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"'
+const PACK_IF = `\${{ ${ON_DISPATCH} && !cancelled() && steps.app_scan.outcome == 'success' }}`
+const HAND_OFF_IF = `\${{ ${ON_DISPATCH} && !cancelled() && steps.client_pack.outcome == 'success' }}`
 // GitHub-hosted runners stop any job at 360 minutes.
 const HOSTED_JOB_LIMIT = 360
 // actions/cache 5.1 is the first to handle a read-only cache token cleanly.
@@ -61,29 +69,34 @@ const pathOutput = '${{ steps.native_key.outputs.path }}'
 const restoredKey = '${{ needs.ios-build.outputs.app-key }}'
 const restoredPath = '${{ needs.ios-build.outputs.app-path }}'
 const needsList = (job) => [job?.needs ?? []].flat()
+const evidenceUpload = (step) =>
+  step.uses === 'actions/upload-artifact@v4' &&
+  step.with?.path === EVIDENCE_PATH &&
+  step.if === 'always()' &&
+  step.with?.['if-no-files-found'] === 'error'
+const clientUpload = (step) =>
+  step.uses === 'actions/upload-artifact@v4' &&
+  step.if === HAND_OFF_IF &&
+  same(step.with, {
+    name: CLIENT_ARTIFACT,
+    path: CLIENT_TAR,
+    'retention-days': 1,
+    'if-no-files-found': 'error',
+  })
+const clientDownload = (step) =>
+  step.uses === 'actions/download-artifact@v4' &&
+  step.if === ON_DISPATCH &&
+  same(step.with, { name: CLIENT_ARTIFACT, path: CLIENT_DIRECTORY })
+// The commands that build a development client; only ios-build runs them.
+const CLIENT_BUILD = [
+  'run-story68-native.mjs prebuild',
+  'run-story68-native.mjs build',
+  'native-build-daemons.mjs',
+]
 const steps = (job) => job?.steps ?? []
 const stepIndex = (job, predicate) => steps(job).findIndex(predicate)
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 const onOf = (workflow) => workflow?.on ?? workflow?.[true]
-
-/** The steps a dispatch builds its own client with, in each consumer, before the cache restore. */
-export const DISPATCH_BUILD = [
-  {
-    id: 'prebuild',
-    if: ON_DISPATCH,
-    run: 'node scripts/run-story68-native.mjs prebuild --platform ios',
-  },
-  {
-    id: 'build_window',
-    if: ON_DISPATCH,
-    run: 'node scripts/ci/native-build-daemons.mjs mark',
-  },
-  {
-    id: 'native_build',
-    if: ON_DISPATCH,
-    run: 'node scripts/run-story68-native.mjs build --platform ios',
-  },
-]
 
 // IOS-02 and IOS-R2-04: the checks every run keeps. Each entry names the job, how to find the
 // step, the one condition it may carry (none means it runs whenever every earlier step passed),
@@ -114,8 +127,14 @@ export const MANDATORY = [
   [
     'ios-build',
     (step) => step.id === 'native_save',
-    "${{ !cancelled() && steps.app_scan.outcome == 'success' }}",
+    `\${{ ${NOT_DISPATCH} && !cancelled() && steps.app_scan.outcome == 'success' }}`,
     [],
+  ],
+  [
+    'ios-build',
+    (step) => step.id === 'client_pack',
+    PACK_IF,
+    ['set -euo pipefail', CLIENT_PACK],
   ],
   [
     'ios-shard',
@@ -197,14 +216,12 @@ export const MANDATORY = [
       'node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards',
     ],
   ],
-  ...['ios-shard', 'ios-expo-go'].flatMap((job) =>
-    DISPATCH_BUILD.map(({ id, if: condition, run }) => [
-      job,
-      (step) => step.id === id,
-      condition,
-      [run],
-    ])
-  ),
+  ...['ios-shard', 'ios-expo-go'].map((job) => [
+    job,
+    (step) => step.id === 'client_unpack',
+    ON_DISPATCH,
+    ['set -euo pipefail', CLIENT_UNPACK, 'test -d "$APP"'],
+  ]),
 ]
 
 /**
@@ -485,10 +502,8 @@ function calledJobProblems(name, job, check) {
   )
   const limit = job?.['timeout-minutes']
   check(
-    CONSUMER_LIMITS[name]
-      ? limit === CONSUMER_LIMITS[name]
-      : Number.isInteger(limit) && limit > 0 && limit <= HOSTED_JOB_LIMIT,
-    `${name}: limit must stay within the hosted job limit${CONSUMER_LIMITS[name] ? `, as ${CONSUMER_LIMITS[name]}` : ''}`
+    Number.isInteger(limit) && limit > 0 && limit <= HOSTED_JOB_LIMIT,
+    `${name}: limit must be a fixed number of minutes within the hosted job limit`
   )
   commitProblems(name, job, COMMIT, check)
   if (macos) xcodeProblems(name, job, check)
@@ -577,13 +592,8 @@ function mandatoryProblems(jobs, check) {
 function shapeProblems(jobs, check) {
   const { 'ios-build': build, 'ios-shard': shard, 'ios-expo-go': expoGo } = jobs
   check(
-    build?.needs === undefined && build?.if === `\${{ ${NOT_DISPATCH} }}`,
-    'ios-build fills the cache: it starts the run, and a dispatch skips it'
-  )
-  // A dispatch skips the whole job, so a step-level dispatch branch in it is dead code.
-  check(
-    !JSON.stringify(steps(build)).includes('workflow_dispatch'),
-    'ios-build: no step branches on a dispatch, which never runs the job'
+    build?.needs === undefined && build?.if === undefined,
+    'ios-build starts every run, a dispatch included: it alone builds the client'
   )
   check(
     jobs['ios-app-build']?.needs === undefined && jobs['ios-app-build']?.if === undefined,
@@ -595,7 +605,7 @@ function shapeProblems(jobs, check) {
   ])
     check(
       same(needsList(job), ['ios-build']) && job?.if === CONSUMER_IF,
-      `${name} must need exactly ios-build, and run after it or, on a dispatch, without it`
+      `${name} must need exactly ios-build and run only after it succeeded`
     )
   check(
     same(shard?.strategy?.matrix?.shard, shardsOf('ios')) &&
@@ -657,6 +667,11 @@ function clientProblems(build, check) {
       rows[native]?.if?.includes("steps.build_window.outcome == 'success'"),
     'ios-build: build only when the key is not cached'
   )
+  // The run's consumers take a dispatch's client from the hand-off below, which only a build makes.
+  check(
+    lookup >= 0 && requires(rows[lookup], NOT_DISPATCH),
+    `ios-build: a dispatch always builds the commit's own client; skip the cache lookup with ${NOT_DISPATCH}`
+  )
   const scan = stepIndex(build, (step) => step.id === 'app_scan')
   const save = stepIndex(
     build,
@@ -673,22 +688,44 @@ function clientProblems(build, check) {
       save > scan,
     'ios-build: the client must be secret-scanned before it is cached'
   )
+  const proof = stepIndex(
+    build,
+    (step) =>
+      String(step.uses).startsWith('actions/cache/restore') &&
+      step.with?.key === keyOutput &&
+      step.with?.['lookup-only'] === true &&
+      step.with?.['fail-on-cache-miss'] === true
+  )
   check(
-    stepIndex(
-      build,
-      (step) =>
-        String(step.uses).startsWith('actions/cache/restore') &&
-        step.with?.key === keyOutput &&
-        step.with?.['lookup-only'] === true &&
-        step.with?.['fail-on-cache-miss'] === true
-    ) > save,
-    'ios-build: prove the saved key exists before the shards need it'
+    proof > save && requires(rows[proof], NOT_DISPATCH),
+    `ios-build: prove the saved key exists before the shards need it, except on a dispatch, which saves nothing (${NOT_DISPATCH})`
+  )
+  handOffProblems(build, scan, check)
+}
+
+/** On a dispatch ios-build tars the scanned client and uploads it once for the run's consumers. */
+function handOffProblems(build, scan, check) {
+  const rows = steps(build)
+  const pack = stepIndex(build, (step) => step.id === 'client_pack')
+  const handOff = stepIndex(build, clientUpload)
+  check(
+    scan >= 0 &&
+      pack > scan &&
+      rows[pack].env?.APP === pathOutput &&
+      handOff > pack &&
+      rows.filter(clientUpload).length === 1,
+    `ios-build: on a dispatch, tar the scanned client and upload it once as ${CLIENT_ARTIFACT}, after the scan, kept for one day`
   )
 }
 
-/** The shards and Expo Go restore ios-build's scanned client, or on a dispatch build their own. */
+/**
+ * The shards and Expo Go install only ios-build's scanned client: from the cache on a merge or a
+ * nightly run, from the run's artifact on a dispatch. None builds one, and no artifact carries
+ * anything else but closed evidence.
+ */
 function consumerProblems(jobs, check) {
   for (const name of ['ios-shard', 'ios-expo-go']) {
+    const rows = steps(jobs[name])
     const restore = stepIndex(
       jobs[name],
       (step) =>
@@ -698,29 +735,46 @@ function consumerProblems(jobs, check) {
         step.with?.['fail-on-cache-miss'] === true &&
         step.if === NOT_DISPATCH
     )
+    const download = stepIndex(jobs[name], clientDownload)
+    const unpack = stepIndex(jobs[name], (step) => step.id === 'client_unpack')
+    const flows = stepIndex(jobs[name], (step) =>
+      String(step.run ?? '').includes('native-ios-startup-probe.mjs --for-native-flow')
+    )
     check(
-      restore >= 0,
+      restore >= 0 && flows > restore,
       `${name}: restore exactly the key ios-build resolved, fail on a miss, and skip it on a dispatch`
     )
-    const build = DISPATCH_BUILD.map(({ id, run }) =>
-      stepIndex(jobs[name], (step) => step.id === id && step.run === run)
+    check(
+      download >= 0 &&
+        rows.filter(clientDownload).length === 1 &&
+        unpack > download &&
+        rows[unpack].env?.APP === restoredPath &&
+        flows > unpack,
+      `${name}: on a dispatch, download ${CLIENT_ARTIFACT} and unpack it at the path ios-build resolved, before the flows`
     )
     check(
-      build.every((index, at) => index >= 0 && (at === 0 || index > build[at - 1])) &&
-        build.at(-1) < restore,
-      `${name}: a dispatch builds its own client before the restore it skips`
+      !rows.some((step) =>
+        CLIENT_BUILD.some((command) => String(step.run ?? '').includes(command))
+      ),
+      `${name}: install ios-build's scanned client; never build one in the job`
     )
   }
+}
+
+/** Artifacts carry closed evidence, the shard reports, and on a dispatch the scanned client. */
+function artifactProblems(jobs, check) {
   for (const [name, job] of Object.entries(jobs))
     for (const step of steps(job)) {
-      if (step.uses === 'actions/download-artifact@v4' && name !== 'ios-evidence')
-        check(false, `${name}: the client travels by cache only, never as an artifact`)
-      if (step.uses !== 'actions/upload-artifact@v4') continue
+      if (String(step.uses).startsWith('actions/download-artifact'))
+        check(
+          (name === 'ios-evidence' && step.with?.pattern === 'share-card-ios-shard-*') ||
+            (['ios-shard', 'ios-expo-go'].includes(name) && clientDownload(step)),
+          `${name}: download only the shard reports, or on a dispatch the scanned client`
+        )
+      if (!String(step.uses).startsWith('actions/upload-artifact')) continue
       check(
-        step.with?.path === EVIDENCE_PATH &&
-          step.if === 'always()' &&
-          step.with?.['if-no-files-found'] === 'error',
-        `${name}: upload only closed evidence, always, failing when it is missing`
+        evidenceUpload(step) || (name === 'ios-build' && clientUpload(step)),
+        `${name}: upload only closed evidence, always, failing when it is missing, or from ios-build on a dispatch the scanned client`
       )
     }
 }
@@ -840,6 +894,7 @@ export function iosNativeProblems(files) {
   shapeProblems(jobs, check)
   clientProblems(jobs['ios-build'], check)
   consumerProblems(jobs, check)
+  artifactProblems(jobs, check)
   runtimeProblems(jobs, check)
   for (const [name, job] of Object.entries(jobs))
     for (const step of steps(job)) cacheStepProblems(name, job, step, check)

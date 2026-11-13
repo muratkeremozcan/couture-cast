@@ -17,7 +17,7 @@ import {
   scriptReads,
 } from './ios-native-helpers.mjs'
 import {
-  CONSUMER_LIMITS,
+  CLIENT_ARTIFACT,
   DISPATCH_WORKFLOW,
   JOBS_WORKFLOW,
   MANDATORY,
@@ -496,12 +496,22 @@ describe('ios-native workflows validator', () => {
     }
   )
   rejected(
-    'a shard skipped on a dispatch',
-    /ios-shard must need exactly ios-build, and run after it or, on a dispatch/,
+    'a shard without its run condition',
+    /ios-shard must need exactly ios-build and run only after it succeeded/,
     (jobs) => {
       delete jobs['ios-shard'].if
     }
   )
+  // ios-build runs on every event now, so a skipped build means nothing ran for the consumers.
+  for (const name of ['ios-shard', 'ios-expo-go'])
+    rejected(
+      `${name} running after a skipped ios-build on a dispatch`,
+      new RegExp(`${name} must need exactly ios-build and run only after it succeeded`),
+      (jobs) => {
+        jobs[name].if =
+          "${{ !cancelled() && (needs.ios-build.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.ios-build.result == 'skipped')) }}"
+      }
+    )
   rejected(
     'Expo Go after the shards',
     /ios-expo-go must need exactly ios-build/,
@@ -510,27 +520,12 @@ describe('ios-native workflows validator', () => {
     }
   )
   rejected(
-    'a dead dispatch branch inside ios-build',
-    /ios-build: no step branches on a dispatch/,
+    'ios-build skipped on a dispatch',
+    /ios-build starts every run, a dispatch included/,
     (jobs) => {
-      step(jobs['ios-build'], (row) => row.id === 'native_save').if =
-        "${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}"
+      jobs['ios-build'].if = "${{ github.event_name != 'workflow_dispatch' }}"
     }
   )
-  rejected(
-    'a dispatch install path inside ios-build',
-    /ios-build: no step branches on a dispatch/,
-    (jobs) => {
-      jobs['ios-build'].steps.splice(5, 0, {
-        name: 'Install for a dispatch',
-        if: "github.event_name == 'workflow_dispatch'",
-        run: 'bash scripts/ci/install-dependencies.sh',
-      })
-    }
-  )
-  rejected('a client build on a dispatch', /a dispatch skips it/, (jobs) => {
-    delete jobs['ios-build'].if
-  })
   rejected('two shards', /every shard of the iOS plan/, (jobs) => {
     jobs['ios-shard'].strategy.matrix.shard = [1, 2]
   })
@@ -541,12 +536,17 @@ describe('ios-native workflows validator', () => {
       delete jobs['ios-shard'].strategy['fail-fast']
     }
   )
-  for (const [name, limit] of Object.entries(CONSUMER_LIMITS))
+  // No consumer builds a client any more, so none needs the dispatch build time on its limit.
+  for (const [name, limit] of [
+    ['ios-shard', "${{ github.event_name == 'workflow_dispatch' && 110 || 70 }}"],
+    ['ios-expo-go', "${{ github.event_name == 'workflow_dispatch' && 95 || 60 }}"],
+    ['ios-build', 361],
+  ])
     rejected(
-      `${name} without the dispatch build time`,
-      new RegExp(`${name}: limit must stay within the hosted job limit, as`),
+      `${name} with a limit of ${limit}`,
+      new RegExp(`${name}: limit must be a fixed number of minutes within the hosted`),
       (jobs) => {
-        jobs[name]['timeout-minutes'] = Number(/\|\| (\d+)/.exec(limit)[1])
+        jobs[name]['timeout-minutes'] = limit
       }
     )
   rejected('a shard command without its shard', /receive its shard/, (jobs) => {
@@ -626,6 +626,66 @@ describe('ios-native workflows validator', () => {
       )
     }
   )
+
+  // A dispatch: ios-build builds the commit's own client, saves no cache and hands the scanned
+  // client to the consumers of its run.
+  const handOff = (jobs) =>
+    step(jobs['ios-build'], (row) => row.with?.name === CLIENT_ARTIFACT)
+  rejected(
+    'a dispatch that looks up the client main cached',
+    /a dispatch always builds the commit's own client/,
+    (jobs) => {
+      step(jobs['ios-build'], (row) => row.id === 'native_cache').if =
+        "${{ !cancelled() && steps.native_key.outcome == 'success' }}"
+    }
+  )
+  rejected(
+    'a dispatch that saves the client',
+    /ios-build: "Save the scanned development client of this fingerprint" is reachable from a dispatch/,
+    (jobs) => {
+      step(jobs['ios-build'], (row) => row.id === 'native_save').if =
+        "${{ !cancelled() && steps.app_scan.outcome == 'success' }}"
+    }
+  )
+  rejected(
+    'a dispatch that proves a saved key it never saved',
+    /prove the saved key exists before the shards need it, except on a dispatch/,
+    (jobs) => {
+      step(jobs['ios-build'], (row) => row.with?.['fail-on-cache-miss'] === true).if =
+        "${{ !cancelled() && steps.native_save.outcome == 'success' }}"
+    }
+  )
+  rejected(
+    'the client handed off on every event',
+    /upload it once as ios-dev-client/,
+    (jobs) => {
+      handOff(jobs).if = "${{ !cancelled() && steps.client_pack.outcome == 'success' }}"
+    }
+  )
+  rejected('the client packed before its scan', /after the scan/, (jobs) => {
+    const rows = jobs['ios-build'].steps
+    const [pack] = rows.splice(
+      rows.findIndex((row) => row.id === 'client_pack'),
+      1
+    )
+    rows.splice(
+      rows.findIndex((row) => row.id === 'app_scan'),
+      0,
+      pack
+    )
+  })
+  rejected('the client packed from another path', /after the scan/, (jobs) => {
+    step(jobs['ios-build'], (row) => row.id === 'client_pack').env.APP = '/tmp/other.app'
+  })
+  rejected('a hand-off kept for a week', /kept for one day/, (jobs) => {
+    handOff(jobs).with['retention-days'] = 7
+  })
+  rejected('a hand-off that may be missing', /kept for one day/, (jobs) => {
+    handOff(jobs).with['if-no-files-found'] = 'warn'
+  })
+  rejected('two hand-offs', /upload it once as ios-dev-client/, (jobs) => {
+    jobs['ios-build'].steps.push({ ...handOff(jobs) })
+  })
   for (const name of ['ios-shard', 'ios-expo-go']) {
     rejected(
       `${name} restoring without failing on a miss`,
@@ -645,27 +705,76 @@ describe('ios-native workflows validator', () => {
         delete step(jobs[name], (row) => row.with?.['fail-on-cache-miss'] === true).if
       }
     )
+    for (const [what, run] of [
+      ['prebuild', 'node scripts/run-story68-native.mjs prebuild --platform ios'],
+      ['build', 'node scripts/run-story68-native.mjs build --platform ios'],
+      ['build-service window', 'node scripts/ci/native-build-daemons.mjs mark'],
+    ])
+      rejected(
+        `${name} running its own client ${what}`,
+        new RegExp(`${name}: install ios-build's scanned client; never build one`),
+        (jobs) => {
+          jobs[name].steps.splice(5, 0, {
+            name: 'Build the client here',
+            if: "github.event_name == 'workflow_dispatch'",
+            run,
+          })
+        }
+      )
     rejected(
-      `${name} without its dispatch build`,
-      new RegExp(`${name}: a dispatch builds its own client`),
+      `${name} without the dispatch client download`,
+      new RegExp(`${name}: on a dispatch, download ios-dev-client and unpack it`),
       (jobs) => {
-        jobs[name].steps = jobs[name].steps.filter((row) => row.id !== 'native_build')
+        jobs[name].steps = jobs[name].steps.filter(
+          (row) => row.with?.name !== CLIENT_ARTIFACT
+        )
       }
     )
     rejected(
-      `${name} building after the restore`,
-      new RegExp(`${name}: a dispatch builds its own client before`),
+      `${name} downloading the client on every event`,
+      new RegExp(`${name}: on a dispatch, download ios-dev-client`),
+      (jobs) => {
+        delete step(jobs[name], (row) => row.with?.name === CLIENT_ARTIFACT).if
+      }
+    )
+    rejected(
+      `${name} unpacking the client at another path`,
+      new RegExp(
+        `${name}: on a dispatch, download ios-dev-client and unpack it at the path`
+      ),
+      (jobs) => {
+        step(jobs[name], (row) => row.id === 'client_unpack').env.APP = '/tmp/other.app'
+      }
+    )
+    rejected(
+      `${name} unpacking the client after the flows start`,
+      new RegExp(`${name}: on a dispatch, .* before the flows`),
       (jobs) => {
         const rows = jobs[name].steps
-        const [build] = rows.splice(
-          rows.findIndex((row) => row.id === 'native_build'),
+        const [unpack] = rows.splice(
+          rows.findIndex((row) => row.id === 'client_unpack'),
           1
         )
         rows.splice(
-          rows.findIndex((row) => row.with?.['fail-on-cache-miss'] === true) + 1,
+          rows.findIndex((row) =>
+            row.run?.includes('native-ios-startup-probe.mjs --for-native-flow')
+          ) + 1,
           0,
-          build
+          unpack
         )
+      }
+    )
+    rejected(
+      `${name} downloading another artifact`,
+      new RegExp(
+        `${name}: download only the shard reports, or on a dispatch the scanned client`
+      ),
+      (jobs) => {
+        jobs[name].steps.push({
+          if: "github.event_name == 'workflow_dispatch'",
+          uses: 'actions/download-artifact@v4',
+          with: { name: 'share-card-ios-build', path: '/tmp/build' },
+        })
       }
     )
   }
@@ -676,9 +785,20 @@ describe('ios-native workflows validator', () => {
       with: { name: 'client', path: '/tmp/cc68-ios-build', 'if-no-files-found': 'error' },
     })
   })
-  rejected('a shard downloading an artifact', /travels by cache only/, (jobs) => {
-    jobs['ios-shard'].steps.push({ uses: 'actions/download-artifact@v4' })
-  })
+  rejected(
+    'a shard downloading every artifact',
+    /download only the shard reports, or on a dispatch the scanned client/,
+    (jobs) => {
+      jobs['ios-shard'].steps.push({ uses: 'actions/download-artifact@v4' })
+    }
+  )
+  rejected(
+    'the client uploaded from a shard on a dispatch',
+    /ios-shard: upload only closed evidence/,
+    (jobs) => {
+      jobs['ios-shard'].steps.push({ ...handOff(jobs) })
+    }
+  )
 
   // Runtimes.
   for (const name of ['ios-build', 'ios-shard', 'ios-expo-go']) {
@@ -760,20 +880,12 @@ describe('mandatory checks fail their step', () => {
       'node',
       'native-ios-shards.mjs merge',
     ],
-    'node scripts/run-story68-native.mjs prebuild --platform ios': [
-      'node',
-      'run-story68-native.mjs prebuild',
-    ],
-    'node scripts/ci/native-build-daemons.mjs mark': [
-      'node',
-      'native-build-daemons.mjs mark',
-    ],
-    'node scripts/run-story68-native.mjs build --platform ios': [
-      'node',
-      'run-story68-native.mjs build',
-    ],
+    'tar -C "$(dirname "$APP")" -cf "$RUNNER_TEMP/ios-client/client.tar" "$(basename "$APP")"':
+      ['tar', '-cf'],
+    'tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"': ['tar', '-xf'],
+    'test -d "$APP"': [null, null, { APP: '/nonexistent/CoutureCastStory68.app' }],
   }
-  const RUN_AS_SCRIPT = ['node', 'bash', 'swift', 'xcodebuild']
+  const RUN_AS_SCRIPT = ['node', 'bash', 'swift', 'xcodebuild', 'tar']
   // The other commands the mandatory steps call, stubbed to succeed quietly.
   const QUIET = [
     'cat',
@@ -810,7 +922,7 @@ describe('mandatory checks fail their step', () => {
       }
       for (const command of QUIET)
         fs.writeFileSync(path.join(bin, command), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-      for (const tool of ['grep', 'tail', 'tee'])
+      for (const tool of ['grep', 'tail', 'tee', 'dirname', 'basename'])
         fs.symlinkSync(
           spawnSync('/usr/bin/which', [tool], { encoding: 'utf8' }).stdout.trim(),
           path.join(bin, tool)
@@ -825,6 +937,7 @@ describe('mandatory checks fail their step', () => {
           GITHUB_ENV: path.join(dir, 'env'),
           GITHUB_OUTPUT: path.join(dir, 'output'),
           CC68_SHARD_RESULT: 'success',
+          APP: dir,
           ...env,
         },
       })
