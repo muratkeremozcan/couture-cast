@@ -1,0 +1,194 @@
+# Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+#
+# Story 6.15 (Antigravity r6 P3, TEA ruling): the Android checks that ran only by hand, nightly on
+# main and by manual dispatch, never on a pull request or a merge. Both jobs run on Linux in
+# parallel; scripts/ci/android-native-workflow.mjs holds the rules this file keeps.
+#
+#   android-release-builds    the app's release AAB with every shipped ABI and its
+#                             minifiedDebuggable APK, from one Gradle run, then
+#                             android-release-abis.mjs on the AAB (four ABIs, their native
+#                             libraries and the bundled ReactNativeVersion, TEA-11) and
+#                             minified-debuggable-evidence.mjs on the APK (a debuggable manifest
+#                             and an R8 mapping, S4-15). About 60 minutes cold; limit 120.
+#   android-network-timeout   the app's debug development client on an API 36 emulator, with
+#                             Metro pointed at scripts/lib/network-tarpit.mjs, runs
+#                             maestro/network-timeout/dev-client-timeout.yaml (S2-06): Home's
+#                             15 s abort must end a request the API never answers. About 30
+#                             minutes; limit 60.
+#
+# The Android emulator lanes that run nightly today (pr-share-card-native.yml's android36 lanes,
+# pr-accessibility-focus.yml's TalkBack job) also run on a merge or a pull request, and drive the
+# Story 6.8 isolated client against its own runtime or a release app, so the flow gets its own
+# schedule-only job here. Neither job uses a secret; each uploads its evidence for 7 days.
+#
+# The plain prebuild needs no Worklets staging (scripts/lib/story68-worklets-staging.mjs, which
+# the Story 6.8 harness applies to its own builds): Reanimated's externalNativeBuild tasks depend
+# on Worklets' own, so a fresh checkout links the binary that run compiled, as
+# pr-accessibility-focus.yml's release build does.
+name: Android native
+
+on:
+  # 03:37 UTC, beside the 03:23 iOS nightly run; Linux runners have room for both.
+  schedule:
+    - cron: '37 3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One run per event and commit, so the nightly run and a dispatch each finish.
+concurrency:
+  group: android-native-${{ github.event_name }}-${{ github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  android-release-builds:
+    name: Android release builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
+      - name: Record the build identity
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-release-builds"
+          git rev-parse HEAD > "$RUNNER_TEMP/android-release-builds/commit.txt"
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      # Expo's generated gradle.properties gives the Gradle daemon 2 GiB of heap, which a release
+      # build of four ABIs outgrows; the user-level file takes precedence over the project's.
+      - name: Size the Gradle daemon for the release builds
+        run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8' >> ~/.gradle/gradle.properties
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      # Gradle's dependencies and transforms; main writes the cache, every other ref reads it.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+      - name: Fetch the Gradle wrapper
+        run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
+      # No -PreactNativeArchitectures: the AAB carries every ABI the generated gradle.properties
+      # ships, which is what the ABI check expects.
+      - name: Build the release AAB and the minifiedDebuggable APK
+        id: android_build
+        timeout-minutes: 100
+        working-directory: apps/mobile/android
+        env:
+          NODE_ENV: production
+        run: ./gradlew :app:bundleRelease :app:assembleMinifiedDebuggable --console=plain
+      - name: Check the minifiedDebuggable build is debuggable and went through R8
+        id: minified_debuggable
+        if: ${{ !cancelled() && steps.android_build.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          node scripts/lib/minified-debuggable-evidence.mjs --android apps/mobile/android | tee "$RUNNER_TEMP/android-release-builds/minified-debuggable.json"
+      - name: Check the release AAB carries every ABI and the installed React Native
+        id: release_abis
+        if: ${{ !cancelled() && steps.android_build.outcome == 'success' }}
+        run: |
+          set -euo pipefail
+          node scripts/ci/android-release-abis.mjs apps/mobile/android/app/build/outputs/bundle/release/app-release.aab | tee "$RUNNER_TEMP/android-release-builds/release-abis.txt"
+      - name: Collect the release build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-builds
+          path: ${{ runner.temp }}/android-release-builds/
+          retention-days: 7
+          if-no-files-found: error
+
+  android-network-timeout:
+    name: Android network timeout
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      MAESTRO_CLI_NO_ANALYTICS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
+      - name: Record the build identity
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-network-timeout"
+          git rev-parse HEAD > "$RUNNER_TEMP/android-network-timeout/commit.txt"
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+      - name: Fetch the Gradle wrapper
+        run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
+      - name: Build the debug development client
+        id: client_build
+        timeout-minutes: 35
+        working-directory: apps/mobile/android
+        run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain
+      - name: Install the pinned Maestro CLI
+        run: node scripts/maestro-install.mjs
+      - name: Enable and verify Android hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          # trigger only queues the uevent; wait until the rule has applied before testing.
+          sudo udevadm settle --timeout=30
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Network timeout flow against the tarpit
+        id: network_timeout
+        timeout-minutes: 25
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          NETWORK_TIMEOUT_EVIDENCE: ${{ runner.temp }}/android-network-timeout
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          script: bash scripts/ci/android-network-timeout.sh
+      - name: Collect the network timeout evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-network-timeout
+          path: ${{ runner.temp }}/android-network-timeout/
+          retention-days: 7
+          if-no-files-found: error
