@@ -40,10 +40,12 @@
 // dispatch of ios-native-dispatch.yml naming it, counts when the run and every one of its jobs
 // succeeded. Both uses are skips, so a read error answers no and the iOS jobs run.
 //
-//   push-changes   (ios-changes job) writes run=true unless a merge to main changed no push path
-//                  (dependency files by their closure), or the nightly commit already passed.
-//   dispatch-gate  (ios-native-dispatch.yml) fails the dispatch, naming the run, when the commit
-//                  already passed, so a second run is never started and never reads as evidence.
+//   push-changes   (ios-changes job) writes run=true unless no push path changed (dependency files
+//                  by their closure) since the newest ancestor a merge or nightly run tested
+//                  (testedBase), or the deciding run on the nightly commit passed.
+//   dispatch-gate  (ios-native-dispatch.yml) fails the dispatch, naming the run, when the deciding
+//                  run on the commit passed (decidingRun), so a stopped dispatch never reads as
+//                  evidence; after a later failure, a fresh dispatch runs.
 //
 // It imports Node built-ins and the lane map, which imports Node built-ins only, so it runs from a
 // sparse checkout with no install, as ios-native-evidence.mjs and PR Gate's guard import it.
@@ -612,9 +614,48 @@ export async function dispatchGate({ env = process.env, fetchImpl } = {}) {
   return false
 }
 
+// The pages of ios-native.yml runs searched for the last tested commit; past them, run everything.
+const BASE_PAGES = 3
+
 /**
- * The ios-changes job: run=true unless a merge to main changed no native iOS input, or the
- * nightly commit already has a passing iOS run.
+ * RUNS-02: the newest ancestor of `sha` whose merge or nightly run of ios-native.yml ran its iOS
+ * jobs, whatever it concluded and in progress included, or null. A merge compares with it, so a
+ * run that replaced a pending run in the group also tests that run's change. A read error throws.
+ */
+export async function testedBase({ repository, sha, runId, ...options }) {
+  for (let page = 1; page <= BASE_PAGES; page++) {
+    const body = await githubApi(
+      `/repos/${repository}/actions/workflows/ios-native.yml/runs?branch=main&per_page=100&page=${page}`,
+      options
+    )
+    const entries = body?.workflow_runs ?? []
+    const runs = entries
+      .filter(
+        (run) =>
+          String(run.id) !== String(runId) &&
+          run.head_branch === 'main' &&
+          run.head_repository?.full_name === repository &&
+          run.path === IOS_NATIVE_WORKFLOW &&
+          ['push', 'schedule'].includes(run.event) &&
+          COMMIT.test(run.head_sha ?? '')
+      )
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+    for (const run of runs) {
+      if (!ranNativeJobs(await runJobs({ ...options, repository, id: run.id }))) continue
+      const compare = await githubApi(
+        `/repos/${repository}/compare/${run.head_sha}...${sha}`,
+        options
+      )
+      if (['ahead', 'identical'].includes(compare?.status)) return run.head_sha
+    }
+    if (entries.length < 100) return null
+  }
+  return null
+}
+
+/**
+ * The ios-changes job: run=true unless a merge to main changed no native iOS input since the last
+ * tested commit, or the deciding iOS run on the nightly commit passed.
  */
 export async function pushChanges({ env = process.env, run = git, fetchImpl } = {}) {
   const decide = (answer, why) => {
@@ -647,12 +688,24 @@ export async function pushChanges({ env = process.env, run = git, fetchImpl } = 
     }
   }
   if (env.EVENT !== 'push') return decide(true, `A ${env.EVENT} run tests its commit.`)
-  const before = env.BEFORE ?? ''
-  if (!COMMIT.test(before) || /^0+$/.test(before))
+  let before
+  try {
+    before = await testedBase({
+      repository: env.GITHUB_REPOSITORY,
+      sha: env.SHA,
+      runId: env.GITHUB_RUN_ID,
+      token: env.GITHUB_TOKEN,
+      fetchImpl,
+    })
+  } catch (error) {
     return decide(
       true,
-      `No earlier commit to compare (${before || 'none'}); run everything.`
+      `Could not find the last commit the iOS jobs tested (${error.message}); run everything.`
     )
+  }
+  if (!before)
+    return decide(true, 'No ancestor on main ran the iOS jobs; run everything.')
+  console.log(`Comparing with ${before}, the last commit a merge or nightly run tested.`)
   try {
     run(['fetch', '--no-tags', '--depth=1', 'origin', before])
     const files = run(['diff', '--name-only', '--no-renames', before, 'HEAD'])

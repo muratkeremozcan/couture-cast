@@ -13,7 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
-import { runsApi } from './fixtures/ios-runs-github.mjs'
+import { REPO, iosJobs, iosRun, runsApi } from './fixtures/ios-runs-github.mjs'
 import { matchesAny, readWorkspaceDependencies, selectLanes } from './lanes.mjs'
 import {
   disabledCondition,
@@ -904,7 +904,23 @@ describe('the ios-changes job', () => {
       }
       throw new Error(`unexpected git ${args.join(' ')}`)
     }
-    const answer = await pushChanges({ env, run, fetchImpl: runsApi().fetchImpl })
+    // RUNS-02: a merge compares with the last commit a merge or nightly run tested; here that is
+    // the run at BEFORE, when BEFORE is a commit.
+    const tested = /^[0-9a-f]{40}$/.test(env.BEFORE ?? '') && !/^0+$/.test(env.BEFORE)
+    const base = iosRun('push', { head_sha: env.BEFORE })
+    const api = runsApi(
+      tested ? { runs: [base], jobs: { [base.id]: iosJobs('push') } } : {}
+    )
+    const answer = await pushChanges({
+      env: {
+        ...env,
+        SHA: 'c'.repeat(40),
+        GITHUB_REPOSITORY: REPO,
+        GITHUB_TOKEN: 'token',
+      },
+      run,
+      fetchImpl: api.fetchImpl,
+    })
     return { answer, calls }
   }
   const sides = (after) => ({
@@ -1036,8 +1052,16 @@ describe('the ios-changes job', () => {
       (await decide({ EVENT: 'push', BEFORE: 'main' }, { files: [] })).answer,
       true
     )
+    const base = iosRun('push', { head_sha: before })
     const broken = await pushChanges({
-      env: { EVENT: 'push', BEFORE: before },
+      env: {
+        EVENT: 'push',
+        SHA: 'c'.repeat(40),
+        GITHUB_REPOSITORY: REPO,
+        GITHUB_TOKEN: 't',
+      },
+      fetchImpl: runsApi({ runs: [base], jobs: { [base.id]: iosJobs('push') } })
+        .fetchImpl,
       run: () => {
         throw new Error('fetch failed')
       },

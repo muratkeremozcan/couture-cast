@@ -382,6 +382,174 @@ describe('ios-dispatch-gate', () => {
   })
 })
 
+// RUNS-02: a merge compares HEAD with the newest ancestor whose merge or nightly run ran its iOS
+// jobs, whatever it concluded and in progress included, so a run that replaced a pending one
+// still tests that run's change. Any read error, no such commit, or no ancestor runs everything.
+describe('the merge decision', () => {
+  const A = 'b'.repeat(40)
+  const B = 'e'.repeat(40)
+  const O = 'f'.repeat(40)
+  const N = '9'.repeat(40)
+  const HEAD = 'c'.repeat(40)
+  const merge = async (t, { runs = [], jobs = {}, diffs = {}, before = B, ...extra }) => {
+    const current = iosRun('push', {
+      head_sha: HEAD,
+      status: 'in_progress',
+      conclusion: null,
+    })
+    const api = runsApi({
+      runs: [current, ...runs],
+      jobs: { ...jobs, [current.id]: [{ name: 'ios-changes', conclusion: null }] },
+      ...extra,
+    })
+    const compared = []
+    const git = (args) => {
+      if (args[0] === 'fetch') return ''
+      if (args[0] === 'diff') {
+        compared.push(args[3])
+        return `${(diffs[args[3]] ?? []).join('\n')}\n`
+      }
+      throw new Error(`unexpected git ${args.join(' ')}`)
+    }
+    const { result } = await quietly(t, () =>
+      pushChanges({
+        env: {
+          ...env,
+          SHA: HEAD,
+          EVENT: 'push',
+          BEFORE: before,
+          GITHUB_RUN_ID: String(current.id),
+        },
+        fetchImpl: api.fetchImpl,
+        run: git,
+      })
+    )
+    return { result, compared }
+  }
+  const tested = (sha, patch = {}, jobPatch = {}) => {
+    const run = iosRun('push', { head_sha: sha, ...patch })
+    return { run, jobs: { [run.id]: iosJobs('push', jobPatch) } }
+  }
+  const stoppedRun = (sha, created_at) => {
+    const run = iosRun('push', { head_sha: sha, created_at })
+    return {
+      run,
+      jobs: {
+        [run.id]: [
+          { name: 'ios-changes', conclusion: 'success' },
+          { name: 'ios-native', conclusion: 'skipped' },
+        ],
+      },
+    }
+  }
+
+  test("inverted order: C replaced B's pending run, so C tests B's change too", async (t) => {
+    const a = tested(A, { created_at: '2026-11-13T08:00:00Z' })
+    // B's run was pending when C's run replaced it: cancelled, with no job.
+    const b = iosRun('push', {
+      head_sha: B,
+      created_at: '2026-11-13T09:00:00Z',
+      conclusion: 'cancelled',
+    })
+    const { result, compared } = await merge(t, {
+      runs: [b, a.run],
+      jobs: { ...a.jobs, [b.id]: [] },
+      diffs: {
+        [A]: ['apps/mobile/src/hooks/use-forecast.ts', 'docs/ci.md'],
+        [B]: ['docs/ci.md'],
+      },
+    })
+    assert.deepEqual(compared, [A])
+    assert.equal(result, true)
+  })
+
+  test('a base whose run failed is still the tested base', async (t) => {
+    const failed = tested(
+      A,
+      { created_at: '2026-11-13T09:00:00Z', conclusion: 'failure' },
+      {
+        'ios-native / ios-shard (1)': { conclusion: 'failure' },
+      }
+    )
+    const older = tested(O, { created_at: '2026-11-13T08:00:00Z' })
+    const { result, compared } = await merge(t, {
+      runs: [failed.run, older.run],
+      jobs: { ...failed.jobs, ...older.jobs },
+      diffs: { [A]: ['docs/ci.md'], [O]: ['apps/mobile/src/x.ts'] },
+    })
+    assert.deepEqual(compared, [A])
+    assert.equal(result, false)
+  })
+
+  test('a run=false run is no base, and a run in progress that ran its iOS jobs is one', async (t) => {
+    const a = tested(A, { created_at: '2026-11-13T08:00:00Z' })
+    const r = stoppedRun(B, '2026-11-13T09:00:00Z')
+    const viaStopped = await merge(t, {
+      runs: [r.run, a.run],
+      jobs: { ...a.jobs, ...r.jobs },
+      diffs: { [A]: ['apps/mobile/src/x.ts'], [B]: ['docs/ci.md'] },
+    })
+    assert.deepEqual(viaStopped.compared, [A])
+    assert.equal(viaStopped.result, true)
+    const nightly = iosRun('schedule', {
+      head_sha: B,
+      created_at: '2026-11-13T10:00:00Z',
+      status: 'in_progress',
+      conclusion: null,
+    })
+    const running = await merge(t, {
+      runs: [nightly, a.run],
+      jobs: {
+        ...a.jobs,
+        [nightly.id]: iosJobs('schedule', {
+          'ios-native / ios-evidence': { conclusion: null },
+        }),
+      },
+      diffs: { [A]: ['apps/mobile/src/x.ts'], [B]: ['docs/ci.md'] },
+    })
+    assert.deepEqual(running.compared, [B])
+    assert.equal(running.result, false)
+  })
+
+  test('a base that is no ancestor is passed over, and with none left everything runs', async (t) => {
+    const n = tested(N, { created_at: '2026-11-13T09:00:00Z' })
+    const a = tested(A, { created_at: '2026-11-13T08:00:00Z' })
+    const passedOver = await merge(t, {
+      runs: [n.run, a.run],
+      jobs: { ...n.jobs, ...a.jobs },
+      ancestry: { [N]: 'diverged' },
+      diffs: { [A]: ['docs/ci.md'], [N]: ['docs/ci.md'] },
+    })
+    assert.deepEqual(passedOver.compared, [A])
+    assert.equal(passedOver.result, false)
+    const only = await merge(t, {
+      runs: [n.run],
+      jobs: n.jobs,
+      ancestry: { [N]: 'diverged' },
+      diffs: { [N]: ['docs/ci.md'] },
+    })
+    assert.deepEqual(only.compared, [])
+    assert.equal(only.result, true)
+  })
+
+  test('no tested commit, or a read error, runs everything', async (t) => {
+    const a = tested(A)
+    for (const extra of [
+      { runs: [] },
+      { runs: [a.run], jobs: a.jobs, deny: [/\/actions\/workflows\//] },
+      { runs: [a.run], jobs: a.jobs, deny: [/\/jobs$/] },
+      { runs: [a.run], jobs: a.jobs, deny: [/\/compare\//] },
+    ]) {
+      const { result, compared } = await merge(t, {
+        diffs: { [A]: ['docs/ci.md'] },
+        ...extra,
+      })
+      assert.equal(result, true, JSON.stringify(extra.deny ?? 'none'))
+      assert.deepEqual(compared, [])
+    }
+  })
+})
+
 describe('the nightly decision', () => {
   const nightly = (t, api) =>
     quietly(t, () =>

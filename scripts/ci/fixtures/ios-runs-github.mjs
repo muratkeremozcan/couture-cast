@@ -3,7 +3,8 @@
 // filters them (head_sha, event, branch, status); the jobs of one run, 100 a page; and a commit's
 // date. A path in `deny` answers 403, and `totals` maps a run id to the total_count its jobs
 // listing reports, so the pages can hold fewer jobs than it says. With `loose`, the runs listing ignores its query, so the
-// reader's own filters are what reject another commit, branch or repository.
+// reader's own filters are what reject another commit, branch or repository. A compare of
+// base...head answers `ancestry[base]`, 'ahead' by default.
 export const REPO = 'o/r'
 export const SHA = 'a'.repeat(40)
 export const MAIN = 'd'.repeat(40)
@@ -62,6 +63,7 @@ export function runsApi({
   jobs = {},
   deny = [],
   totals = {},
+  ancestry = {},
   loose = false,
   date = '2026-11-12T08:00:00Z',
 } = {}) {
@@ -97,6 +99,8 @@ export function runsApi({
       const all = jobs[run[1]] ?? []
       return reply({ total_count: totals[run[1]] ?? all.length, jobs: slice(all) })
     }
+    const compare = /\/compare\/([0-9a-f]{40})\.\.\.([0-9a-f]{40})$/.exec(pathname)
+    if (compare) return reply({ status: ancestry[compare[1]] ?? 'ahead' })
     if (/\/commits\/[0-9a-f]{40}$/.test(pathname))
       return reply({ commit: { committer: { date } } })
     return reply({}, 404)

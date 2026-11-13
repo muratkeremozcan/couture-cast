@@ -329,16 +329,12 @@ function pushProblems(push, check) {
     same(push?.permissions, { contents: 'read' }) && push?.['cache-mode'] === undefined,
     'ios-native.yml: contents: read only, the trusted cache default'
   )
-  // A run in progress finishes, the newest pending one waits, and ios-changes runs ungrouped.
-  const jobs = push?.jobs ?? {}
+  // RUNS-02: whole runs queue in merge order; a run in progress finishes, the newest pending one
+  // waits, and no job holds a group of its own.
   check(
-    push?.concurrency === undefined &&
-      Object.entries(jobs).every(([name, job]) =>
-        name === 'ios-native'
-          ? same(job?.concurrency, { group: PUSH_GROUP, 'cancel-in-progress': false })
-          : job?.concurrency === undefined
-      ),
-    `ios-native.yml: one group, on the ios-native call only: ${PUSH_GROUP} without cancelling a run in progress`
+    same(push?.concurrency, { group: PUSH_GROUP, 'cancel-in-progress': false }) &&
+      Object.values(push?.jobs ?? {}).every((job) => job?.concurrency === undefined),
+    `ios-native.yml: one workflow-level group, ${PUSH_GROUP}, without cancelling a run in progress, and none on a job`
   )
 }
 
@@ -373,13 +369,12 @@ function pushJobProblems(push, check) {
       step?.run === 'node scripts/ci/ios-native-inputs.mjs push-changes' &&
       same(step.env, {
         EVENT: '${{ github.event_name }}',
-        BEFORE: '${{ github.event.before }}',
         SHA: PUSH_COMMIT,
         GITHUB_TOKEN: '${{ github.token }}',
       }) &&
       step.if === undefined &&
       steps(decision).at(-1) === step,
-    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event, the commit before the merge, the commit and a token'
+    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event, the commit and a token'
   )
 }
 
