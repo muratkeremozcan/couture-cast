@@ -434,3 +434,42 @@ describe('the watchOS suite under WATCHOS_REQUIRE_BUILD', () => {
     )
   })
 })
+
+// TEA SL-04: the checks that fit a pull request run on Linux there, beside ios-native.yml.
+describe('the iOS checks shifted onto Linux pull request jobs', () => {
+  const jobs = workflows['pr-apple-native.yml'].jobs
+
+  test('swift-linux runs the header semantics controls', () => {
+    const step = jobs['swift-linux'].steps.find(
+      (row) => row.run === 'bash scripts/ci/share-card-header-semantics.sh'
+    )
+    assert.ok(step)
+    assert.ok(step['timeout-minutes'] <= 10)
+    // On Linux the controls compile against the share module's CoreGraphics shim.
+    const script = fs.readFileSync('scripts/ci/share-card-header-semantics.sh', 'utf8')
+    assert.match(script, /LinuxShims\/CoreGraphics\/CoreGraphics\.swift/)
+  })
+
+  test('ios-flow-syntax checks the iOS flows with the pinned CLI on its own lane', () => {
+    const job = jobs['ios-flow-syntax']
+    assert.equal(job.if, lane('ios-flow-syntax'))
+    assert.equal(job['runs-on'], 'ubuntu-latest')
+    assert.ok(job['timeout-minutes'] <= 20)
+    const runs = job.steps.map((row) => row.run ?? '')
+    const install = runs.indexOf('node scripts/maestro-install.mjs')
+    const check = runs.indexOf('node scripts/ci/maestro-check-flows.mjs')
+    assert.ok(install >= 0 && check > install)
+    assert.ok(!runs.some((run) => /npm (ci|install)/.test(run)), 'no dependency install')
+    // That holds only while both scripts import Node built-ins and repository files.
+    for (const file of [
+      'scripts/maestro-install.mjs',
+      'scripts/ci/maestro-check-flows.mjs',
+    ]) {
+      const imports = [
+        ...fs.readFileSync(file, 'utf8').matchAll(/^import [^'"]*['"]([^'"]+)['"]/gm),
+      ].map((m) => m[1])
+      for (const specifier of imports)
+        assert.match(specifier, /^(node:|\.)/, `${file}: ${specifier}`)
+    }
+  })
+})

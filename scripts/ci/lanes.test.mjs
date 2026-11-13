@@ -212,7 +212,12 @@ const STARTS = {
     'apps/mobile/src/lib/premium.ts',
     'apps/mobile/app.config.ts',
   ],
+  'ios-flow-syntax': [
+    'maestro/story68/share-sheet.yaml',
+    'maestro/story65/open-app.yaml',
+  ],
   'ios-unit': [
+    'apps/mobile/native-tests/ShareCardHeaderSemantics.swift',
     'apps/mobile/modules/share-card-native-share/ios/ShareCardShareFile.swift',
     'apps/mobile/modules/share-card-photo-save/ios/Package.swift',
     'apps/mobile/modules/accessibility-focus/ios/AccessibilityFocusTarget.swift',
@@ -249,6 +254,8 @@ const EXPECTED_SKIPS = {
   watchos: [209, 208, 202, 199, 192, 180, 173, 148],
   // Every replayed pull request that changed the mobile workspace or a package it imports.
   'revenuecat-bundle': [209, 208, 199, 180, 148],
+  // No replayed pull request touched the iOS share-card flows.
+  'ios-flow-syntax': [209, 208, 204, 202, 199, 192, 180, 173, 148],
   // Only the Swift packages and the XCTest target wake it; no replayed pull request touched them.
   'ios-unit': [209, 208, 204, 202, 199, 192, 180, 173, 148],
   // Its lane plan is informational on a pull request (it runs on main, nightly and dispatch);

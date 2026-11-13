@@ -283,7 +283,16 @@ export const LANES = {
       'apps/mobile/modules/share-card-native-share/ios/**',
       'apps/mobile/modules/share-card-photo-save/ios/**',
       'apps/mobile/modules/accessibility-focus/ios/**',
+      // The header semantics controls (scripts/ci/share-card-header-semantics.sh).
+      'apps/mobile/native-tests/ShareCardHeaderSemantics.swift',
     ],
+  },
+  'ios-flow-syntax': {
+    title: 'iOS Maestro flow syntax (Linux)',
+    workflow: 'pr-apple-native.yml',
+    jobs: ['ios-flow-syntax'],
+    // The flows scripts/ci/maestro-check-flows.mjs checks.
+    inputs: ['maestro/story65/**', 'maestro/story67/**', 'maestro/story68/**'],
   },
   watchos: {
     title: 'watchOS native (macOS)',

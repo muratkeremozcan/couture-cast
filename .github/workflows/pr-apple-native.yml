@@ -5,7 +5,8 @@
 # - the watchOS prebuild suite, whose WatchApp and complication builds need Xcode.
 # The Foundation-only rules of those modules (activity mapper, outcome reducer, anchor
 # configuration, ShareCardShareFile, the PNG file rules with the cross-prefix test, and the focus
-# rules) run in swift-linux, on ubuntu-latest, beside it.
+# rules) and the share-card header semantics controls run in swift-linux, and the iOS Maestro flow
+# syntax in ios-flow-syntax, both on ubuntu-latest beside it.
 # Each step runs only when its own lane does (scripts/ci/lanes.mjs: ios-unit, watchos), and the
 # job runs when either lane is selected, so a pull request waits for one macOS runner at most.
 # The checks that cannot fit (the iOS app builds, the share-card iOS journeys and the Expo Go
@@ -239,3 +240,41 @@ jobs:
           ran=$((${count:-0} - ${skipped:-0}))
           if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
           echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      # The share-card header selection controls compile with plain swiftc; on Linux the share
+      # module's CoreGraphics shim stands in. ios-native.yml runs them on macOS too.
+      - name: Share-card header semantics controls
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: bash scripts/ci/share-card-header-semantics.sh
+
+  # `maestro check-syntax` over the iOS share-card flows needs no device, so it runs on Linux on
+  # every pull request that changes them, beside the full journeys in ios-native.yml. About two
+  # minutes: Java, the pinned Maestro CLI and the check.
+  ios-flow-syntax:
+    name: iOS Maestro flow syntax (Linux)
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['ios-flow-syntax']
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Both scripts import Node built-ins only, so no dependency install.
+      - name: Install the pinned Maestro CLI
+        timeout-minutes: 5
+        run: node scripts/maestro-install.mjs
+
+      - name: Check the iOS Maestro flows with the pinned CLI
+        run: node scripts/ci/maestro-check-flows.mjs
