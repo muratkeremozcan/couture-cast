@@ -591,6 +591,63 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
     })
   })
 
+  // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  // Story 6.15 D15: a stray test_store row (a preview database served by an API whose TEST_ENV is
+  // not local or preview, a restored dump) grants nothing and reads as absent there.
+  describe('a test_store row on every reader (story 6.15 D15)', () => {
+    async function seedTestStoreRow(): Promise<void> {
+      await prisma.premiumEntitlement.create({
+        data: buildPremiumEntitlementCreateInput(
+          createPremiumEntitlement({
+            userId: subscriberId,
+            status: 'active',
+            store: 'test_store',
+            lastEventId: `${namespace}-test-store-seed`,
+          })
+        ),
+      })
+    }
+
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'honors' : 'ignores'} it under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await seedTestStoreRow()
+
+          const status = await get('/api/v1/commerce/subscription', subscriberId)
+          expect(status.status).toBe(200)
+          expect(subscriptionResponseSchema.parse(status.body).data).toMatchObject(
+            open
+              ? { status: 'active', store: 'test_store' }
+              : { status: 'none', store: null }
+          )
+          const access = await get('/api/v1/commerce/premium/access', subscriberId)
+          expect(premiumAccessResponseSchema.parse(access.body)).toEqual({
+            data: open
+              ? { premium: true, source: 'subscription' }
+              : { premium: false, source: 'none' },
+          })
+          const guarded = await get('/api/v1/premium-fixture', subscriberId)
+          expect(guarded.status).toBe(open ? 200 : 403)
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+  })
+
   describe('premium guard over HTTP (5.2-API-011)', () => {
     it('passes active and grace_period, denies expired, revoked, and absent', async (context) => {
       if (!requireSchema(context)) return

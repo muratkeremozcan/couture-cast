@@ -7,6 +7,7 @@ import {
   type PremiumEntitlementStatus,
   type Prisma,
 } from '@prisma/client'
+import { appliesRevenueCatTestStore } from '../../config/runtime-environment.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
   ComplimentaryAccessService,
@@ -75,6 +76,16 @@ export type EntitlementTransition = {
 
 const statusOf = (row: PremiumEntitlement | null): PremiumEntitlementStatus | 'none' =>
   row?.status ?? 'none'
+
+/**
+ * Story 6.15 D15: whether this API honors a mirror row from `store`. A `test_store` row counts
+ * only where {@link appliesRevenueCatTestStore} holds. Elsewhere (an API whose TEST_ENV is unset,
+ * staging or production reading a preview database or a restored dump) the row is no paid access,
+ * reads as absent, and a transfer never moves it.
+ */
+export function honorsEntitlementStore(store: EntitlementStore): boolean {
+  return store !== 'test_store' || appliesRevenueCatTestStore()
+}
 
 export type EntitlementTelemetryEmission =
   | {
@@ -174,12 +185,16 @@ export class PremiumEntitlementService {
     this.logger.info({ userId }, 'Processor-side billing data erased')
   }
 
-  /** Null means "never subscribed"; the controller serializes that as status 'none'. */
+  /**
+   * Null means "never subscribed"; the controller serializes that as status 'none'. A row from
+   * a store this API does not honor reads as absent (story 6.15 D15), for the status read, the
+   * refresh answer and the checkout and portal guards alike.
+   */
   async getEntitlement(userId: string): Promise<EntitlementView | null> {
     const row = await this.prisma.premiumEntitlement.findUnique({
       where: { user_id: userId },
     })
-    if (!row) {
+    if (!row || !honorsEntitlementStore(row.store)) {
       return null
     }
     return {
@@ -230,9 +245,10 @@ export class PremiumEntitlementService {
   private async hasPaidAccess(userId: string): Promise<boolean> {
     const row = await this.prisma.premiumEntitlement.findUnique({
       where: { user_id: userId },
-      select: { status: true },
+      select: { status: true, store: true },
     })
-    return row?.status === 'active' || row?.status === 'grace_period'
+    if (!row || !honorsEntitlementStore(row.store)) return false
+    return row.status === 'active' || row.status === 'grace_period'
   }
 
   /**

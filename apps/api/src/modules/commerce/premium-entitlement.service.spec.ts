@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Prisma, PrismaClient } from '@prisma/client'
 import {
   PremiumEntitlementService,
@@ -259,4 +259,85 @@ describe('eraseProcessorData (Decision 7, Open question 5)', () => {
 
     await expect(service.eraseProcessorData('user-1')).rejects.toThrow()
   })
+})
+
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+describe('a test_store row is honored only under local and preview (story 6.15 D15)', () => {
+  const testStoreRow = existingRow({ store: 'test_store', synced_at: T0 })
+
+  function reader(
+    row: Record<string, unknown> | null,
+    complimentary = false
+  ): PremiumEntitlementService {
+    return new PremiumEntitlementService(
+      {
+        premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(row) },
+      } as unknown as PrismaClient,
+      new FakeRevenueCatClient(),
+      new FakeStripeBillingClient(),
+      {
+        isActive: () => Promise.resolve(complimentary),
+        check: () => Promise.resolve('not_granted' as const),
+      }
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it('serves the row and grants paid access', async () => {
+      const entitlements = reader(testStoreRow)
+      await expect(entitlements.getEntitlement('user-1')).resolves.toMatchObject({
+        status: 'active',
+        store: 'test_store',
+      })
+      await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(true)
+      await expect(entitlements.premiumAccessSource('user-1')).resolves.toBe(
+        'subscription'
+      )
+    })
+  })
+
+  // NODE_ENV is `test` here, which must not open the Test Store either; `qa` is any other value.
+  describe.each([undefined, 'staging', 'production', 'qa'])(
+    'with TEST_ENV %s',
+    (testEnv) => {
+      beforeEach(() => {
+        vi.stubEnv('TEST_ENV', testEnv as string)
+      })
+
+      it.each(['active', 'grace_period'])(
+        'reads a %s row as absent and grants no paid access',
+        async (status) => {
+          const entitlements = reader({ ...testStoreRow, status })
+          await expect(entitlements.getEntitlement('user-1')).resolves.toBeNull()
+          await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(false)
+          await expect(entitlements.premiumAccessSource('user-1')).resolves.toBe('none')
+        }
+      )
+
+      it('still answers a complimentary grant as complimentary access', async () => {
+        const entitlements = reader(testStoreRow, true)
+        await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(true)
+        await expect(entitlements.premiumAccessSource('user-1')).resolves.toBe(
+          'complimentary'
+        )
+      })
+
+      it('keeps honoring the stores we sell', async () => {
+        const entitlements = reader(existingRow({ store: 'app_store', synced_at: T0 }))
+        await expect(entitlements.getEntitlement('user-1')).resolves.toMatchObject({
+          store: 'app_store',
+        })
+        await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(true)
+      })
+    }
+  )
 })
