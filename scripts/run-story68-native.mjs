@@ -1093,8 +1093,7 @@ if (command === 'prebuild') {
           },
         })
       )
-      // Through the run's own XCUITest runner, never a bare second one (Codex RUNS-R4-01).
-      const hierarchy = hierarchyOutput()
+      const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
       if (hierarchy.includes('share-card-title'))
         run('xcrun', [
           'simctl',
