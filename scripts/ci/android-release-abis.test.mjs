@@ -176,36 +176,89 @@ test('the app config ships exactly the four checked ABIs', () => {
   assert.deepEqual(configuredAbiProblems(repository), [])
 })
 
-test('an app config that narrows the ABIs is reported', (t) => {
+/** A runnable Expo project root with the given files under apps/mobile. */
+function mobileFixture(t, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-abis-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  fs.mkdirSync(path.join(root, 'apps/mobile/plugins'), { recursive: true })
-  fs.mkdirSync(path.join(root, 'apps/mobile/android'), { recursive: true })
+  const mobile = path.join(root, 'apps/mobile')
+  fs.mkdirSync(path.join(mobile, 'plugins'), { recursive: true })
   fs.symlinkSync(
     path.join(repository, 'apps/mobile/node_modules'),
-    path.join(root, 'apps/mobile/node_modules')
+    path.join(mobile, 'node_modules')
   )
   fs.symlinkSync(path.join(repository, 'node_modules'), path.join(root, 'node_modules'))
-  fs.writeFileSync(path.join(root, 'apps/mobile/package.json'), '{}')
-  fs.writeFileSync(
-    path.join(root, 'apps/mobile/app.json'),
-    JSON.stringify({
+  const all = {
+    'package.json': '{"name":"abi-fixture","version":"1.0.0"}',
+    'app.json': JSON.stringify({ expo: { name: 'Fixture', slug: 'fixture' } }),
+    'app.config.ts': 'export default ({ config }: { config: object }) => config\n',
+    'plugins/noop.js': 'module.exports = (config) => config\n',
+    ...files,
+  }
+  for (const [file, text] of Object.entries(all)) {
+    fs.mkdirSync(path.dirname(path.join(mobile, file)), { recursive: true })
+    fs.writeFileSync(path.join(mobile, file), text)
+  }
+  return root
+}
+
+test('an app.json, a plugin source or a generated gradle.properties that narrows the ABIs is reported', (t) => {
+  const root = mobileFixture(t, {
+    'app.json': JSON.stringify({
       expo: {
-        plugins: [['expo-build-properties', { android: { buildArchs: ['arm64-v8a'] } }]],
+        name: 'Fixture',
+        slug: 'fixture',
+        plugins: [['./plugins/noop', { android: { buildArchs: ['arm64-v8a'] } }]],
       },
-    })
-  )
-  fs.writeFileSync(
-    path.join(root, 'apps/mobile/plugins/with-abis.js'),
-    "gradle.properties.reactNativeArchitectures = 'arm64-v8a'"
-  )
-  fs.writeFileSync(
-    path.join(root, 'apps/mobile/android/gradle.properties'),
-    'reactNativeArchitectures=arm64-v8a,x86_64\n'
-  )
+    }),
+    'plugins/with-abis.js': "gradle.properties.reactNativeArchitectures = 'arm64-v8a'",
+    'android/gradle.properties': 'reactNativeArchitectures=arm64-v8a,x86_64\n',
+  })
   assert.deepEqual(configuredAbiProblems(root), [
     'apps/mobile/android/gradle.properties sets reactNativeArchitectures=arm64-v8a,x86_64',
-    'app.json expo.plugins.0.1.android.buildArchs narrows the shipped ABIs',
+    'the resolved app config plugins.0.1.android.buildArchs narrows the shipped ABIs',
+    // Expo introspects from the generated file when one exists.
+    'the resolved gradle properties set reactNativeArchitectures=arm64-v8a,x86_64',
     'apps/mobile/plugins/with-abis.js sets the shipped ABIs',
   ])
+})
+
+// app.config.ts is TypeScript and can add plugins or inline ones, so it is resolved as Expo
+// resolves it rather than read as text.
+test('an app.config.ts that narrows the ABIs through a plugin or a gradle property is reported', (t) => {
+  const root = mobileFixture(t, {
+    'app.config.ts': `import { withAppBuildGradle, withGradleProperties } from 'expo/config-plugins'
+import type { ExpoConfig } from 'expo/config'
+
+const architectures = ['arm64', 'v8a'].join('-')
+const narrow = (config: ExpoConfig) =>
+  withGradleProperties(config, (next) => {
+    next.modResults.push({ type: 'property', key: 'reactNative' + 'Architectures', value: architectures })
+    return next
+  })
+const filters = (config: ExpoConfig) =>
+  withAppBuildGradle(config, (next) => {
+    next.modResults.contents += "\\nandroid { defaultConfig { ndk { abiFilters 'arm64-v8a' } } }"
+    return next
+  })
+
+export default ({ config }: { config: ExpoConfig }) => ({
+  ...config,
+  plugins: [...(config.plugins ?? []), ['./plugins/noop', { android: { buildArchs: ['x86_64'] } }], narrow, filters],
+})
+`,
+  })
+  assert.deepEqual(configuredAbiProblems(root), [
+    'the resolved app config plugins.0.1.android.buildArchs narrows the shipped ABIs',
+    'the resolved gradle properties set reactNativeArchitectures=arm64-v8a',
+    'apps/mobile/app.config.ts sets abiFilters',
+  ])
+})
+
+test('an app config Expo cannot resolve fails closed', (t) => {
+  const root = mobileFixture(t, {
+    'app.config.ts': 'export default () => { throw new Error("broken config") }\n',
+  })
+  const problems = configuredAbiProblems(root)
+  assert.equal(problems.length, 1)
+  assert.match(problems[0], /^the app config could not be resolved: /)
 })

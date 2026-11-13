@@ -13,9 +13,13 @@
 //   its package version), because the binary is what runs and package.json can drift from it. It
 //   must equal the installed `react-native` and be a stable release (F-00q).
 // The app ships the four ABIs because the Expo prebuild template sets them and nothing in the app
-// config narrows them; `configuredAbiProblems` checks that so the expectation follows the app.
+// config narrows them; `configuredAbiProblems` checks that so the expectation follows the app. It
+// resolves the app config as Expo does (`expo config --type introspect`, app.json through
+// app.config.ts with every plugin applied, under the production NODE_ENV of a release build), so
+// a narrowing from either file, a plugin's options or a gradle property a plugin writes is caught.
 //
 // Usage: node scripts/ci/android-release-abis.mjs <app-release.aab | app-release.apk>...
+import { spawnSync } from 'node:child_process'
 import fs, { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
@@ -399,6 +403,71 @@ function findKeys(value, keys, trail = []) {
   ])
 }
 
+const NARROWING_KEYS = ['buildArchs', 'reactNativeArchitectures', 'abiFilters']
+
+/**
+ * The app config as Expo resolves it for a release prebuild, with the gradle properties every
+ * plugin writes. It runs offline in about a second.
+ */
+export function resolvedAppConfig(root) {
+  const mobile = path.join(root, 'apps/mobile')
+  const result = spawnSync(
+    process.execPath,
+    [
+      mobileRequire(root).resolve('expo/bin/cli'),
+      'config',
+      '--json',
+      '--type',
+      'introspect',
+    ],
+    {
+      cwd: mobile,
+      env: {
+        ...process.env,
+        NODE_ENV: 'production',
+        EXPO_OFFLINE: '1',
+        EXPO_NO_TELEMETRY: '1',
+      },
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    }
+  )
+  if (result.status !== 0)
+    return {
+      error:
+        `expo config exited ${result.status}: ` +
+        ((result.stderr || result.error?.message || '').trim().split('\n').at(-1) ?? ''),
+    }
+  try {
+    return { config: JSON.parse(result.stdout) }
+  } catch {
+    return { error: 'expo config printed no JSON' }
+  }
+}
+
+/** Narrowings in the resolved app config: plugin options, fields and plugin-written gradle properties. */
+function resolvedConfigProblems(root) {
+  const problems = []
+  const resolved = resolvedAppConfig(root)
+  if (resolved.error)
+    problems.push(`the app config could not be resolved: ${resolved.error}`)
+  else {
+    const { _internal: internal, ...config } = resolved.config
+    for (const found of findKeys(config, NARROWING_KEYS))
+      problems.push(`the resolved app config ${found.path} narrows the shipped ABIs`)
+    const properties = internal?.modResults?.android?.gradleProperties ?? []
+    for (const property of properties)
+      if (property.type === 'property' && property.key === 'reactNativeArchitectures') {
+        const abis = gradleArchitectures(`reactNativeArchitectures=${property.value}`)
+        if (!sameAbis(abis))
+          problems.push(
+            `the resolved gradle properties set reactNativeArchitectures=${abis}`
+          )
+      }
+  }
+  return problems
+}
+
 /** Ways the app config would ship an ABI set other than SHIPPED_ABIS. */
 export function configuredAbiProblems(root) {
   const problems = []
@@ -421,15 +490,15 @@ export function configuredAbiProblems(root) {
         `apps/mobile/android/gradle.properties sets reactNativeArchitectures=${generatedAbis ?? '(none)'}`
       )
   }
-  const appJson = JSON.parse(
-    fs.readFileSync(path.join(root, 'apps/mobile/app.json'), 'utf8')
+  problems.push(...resolvedConfigProblems(root))
+  // An app/build.gradle edit (abiFilters) is a dangerous mod that only a prebuild applies, so the
+  // sources that can carry one are read instead.
+  if (
+    /abiFilters/.test(
+      fs.readFileSync(path.join(root, 'apps/mobile/app.config.ts'), 'utf8')
+    )
   )
-  for (const found of findKeys(appJson, [
-    'buildArchs',
-    'reactNativeArchitectures',
-    'abiFilters',
-  ]))
-    problems.push(`app.json ${found.path} narrows the shipped ABIs`)
+    problems.push('apps/mobile/app.config.ts sets abiFilters')
   const plugins = path.join(root, 'apps/mobile/plugins')
   for (const file of fs.readdirSync(plugins).filter((name) => /\.[cm]?js$/.test(name))) {
     if (/\.test\.[cm]?js$/.test(file)) continue
