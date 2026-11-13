@@ -23,9 +23,12 @@ function readMarker(id, { markers, jsScales, environments }) {
 /**
  * Text nodes with their parent's bounds. Android puts a TextView's string in `text`; iOS puts a
  * static text's label in `accessibilityText` when `text` is empty, so it falls back to that.
+ * A node whose id starts with a `volatile` prefix is dropped with its subtree and counted in
+ * `volatileDropped`: a region whose presence the app decides on grounds unrelated to text size.
  */
-export function flattenHierarchy(tree, { platform }) {
+export function flattenHierarchy(tree, { platform, volatile = [] }) {
   const nodes = []
+  let volatileDropped = 0
   const controls = []
   const markers = []
   const jsScales = []
@@ -35,6 +38,10 @@ export function flattenHierarchy(tree, { platform }) {
     const id = attrs['resource-id'] ?? ''
     const bounds = attrs.bounds
     readMarker(id, { markers, jsScales, environments })
+    if (id && volatile.some((prefix) => id.startsWith(prefix))) {
+      volatileDropped += countText(node, platform)
+      return
+    }
     const text = attrs.text || (platform === 'ios' ? (attrs.accessibilityText ?? '') : '')
     if (text && bounds)
       nodes.push({ text, id, bounds, ...(parentBounds ? { parent: parentBounds } : {}) })
@@ -52,7 +59,17 @@ export function flattenHierarchy(tree, { platform }) {
     markers: markers.sort(),
     jsFontScale,
     environment: environment.size === 1 ? parseEnvironment(environments[0]) : undefined,
+    volatileDropped,
   }
+}
+
+function countText(node, platform) {
+  const attrs = attributes(node)
+  const own = attrs.text || (platform === 'ios' ? attrs.accessibilityText : '') ? 1 : 0
+  return (node?.children ?? []).reduce(
+    (sum, child) => sum + countText(child, platform),
+    own
+  )
 }
 
 /** The mount markers joined in order: one string that changes when any marked mount changes. */

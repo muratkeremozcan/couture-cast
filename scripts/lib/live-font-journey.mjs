@@ -20,11 +20,17 @@ import {
 
 const TABS = ['tab-home', 'tab-community', 'tab-settings']
 
-/** Screens, anchors, required controls and measured probes (size in sp, as styled). */
+/**
+ * Screens, anchors, required controls and measured probes (size in sp, as styled). `volatile`
+ * lists id prefixes the capture drops with their subtrees (see flattenHierarchy).
+ */
 export const SCREENS = {
   home: {
     flow: 'open-home',
     anchors: ['current-temperature'],
+    // Shop this look renders only from a network-served ritual, never from the 15-minute cache
+    // (Decision 6), so whether a launch shows it depends on the cache's age, not on text size.
+    volatile: ['shop-this-look-'],
     controls: TABS,
     probes: [
       { id: 'current-temperature', sizeSp: 48 },

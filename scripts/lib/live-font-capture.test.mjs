@@ -63,6 +63,38 @@ describe('flattenHierarchy', () => {
       ['57°F', 'Cloudy']
     )
   })
+
+  test('drops a volatile region with everything under it and counts what it dropped', () => {
+    const page = node({ bounds: '[0,0][1080,2400]' }, [
+      node({ text: 'Create my outfit card', bounds: '[76,1519][1004,1597]' }),
+      node({
+        'resource-id': 'shop-this-look-offer-title',
+        text: 'Everyday Layering Tee',
+        bounds: '[81,1862][999,1915]',
+      }),
+      node({ 'resource-id': 'shop-this-look-cta', bounds: '[81,1936][999,2052]' }, [
+        node({ text: 'Shop this look', bounds: '[420,1968][659,2019]' }),
+      ]),
+      node({
+        'resource-id': 'shop-this-lookout',
+        text: 'Kept',
+        bounds: '[0,2100][9,2110]',
+      }),
+    ])
+    const kept = flattenHierarchy(page, {
+      platform: 'android',
+      volatile: ['shop-this-look-'],
+    })
+    assert.deepEqual(
+      kept.nodes.map((entry) => entry.text),
+      ['Create my outfit card', 'Kept']
+    )
+    assert.equal(kept.volatileDropped, 2)
+    assert.ok(!kept.controls.some((control) => control.id.startsWith('shop-this-look-')))
+    const all = flattenHierarchy(page, { platform: 'android' })
+    assert.equal(all.nodes.length, 4)
+    assert.equal(all.volatileDropped, 0)
+  })
 })
 
 describe('Android activity facts', () => {
