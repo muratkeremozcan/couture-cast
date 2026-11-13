@@ -77,6 +77,26 @@ export function rootIdentity(markers) {
   return markers.length ? markers.join(',') : undefined
 }
 
+/**
+ * The locales and layout direction the system last reported to MainActivity, read from its
+ * ActivityRecord in `dumpsys activity activities`: the configuration the Activity itself
+ * received, which a per-app locale change updates in place.
+ */
+export function activityConfiguration(dumpsys, component) {
+  // A record starts on a `* ... ActivityRecord{... <component> ...}` line and runs to the
+  // next `* ` line; other lines (topResumedActivity=, Resumed:) only mention the component.
+  const lines = String(dumpsys).split('\n')
+  const start = lines.findIndex(
+    (line) => /^\s*\* .*ActivityRecord\{/.test(line) && line.includes(` ${component} `)
+  )
+  if (start < 0) return undefined
+  const end = lines.findIndex((line, index) => index > start && /^\s*\* /.test(line))
+  const record = lines.slice(start, end < 0 ? undefined : end).join('\n')
+  const match = /CurrentConfiguration=\{[^[]*\[([^\]]*)\]\s+(ld(?:rtl|ltr))/.exec(record)
+  if (!match) return undefined
+  return { locales: match[1].split(','), rtl: match[2] === 'ldrtl' }
+}
+
 /** The resumed MainActivity's token from `dumpsys activity top -a`. */
 export function activityToken(dumpsys, component) {
   const pattern = new RegExp(

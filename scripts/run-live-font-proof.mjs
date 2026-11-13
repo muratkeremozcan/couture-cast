@@ -22,6 +22,7 @@ import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
 import {
+  activityConfiguration,
   activityToken,
   countOnCreate,
   flattenHierarchy,
@@ -444,7 +445,15 @@ const CONFIG_CHANGES = {
       const locales = /\[([^\]]*)\]/.exec(prior)?.[1] ?? ''
       adb('shell', 'cmd', 'locale', 'set-app-locales', appId, '--locales', locales)
     },
-    expect: (after) => after.environment?.direction === 'rtl',
+    // The app keeps its own language and React Native fixes the layout direction at startup,
+    // so the JavaScript markers cannot show this change; the Activity's own configuration can.
+    expect: () => {
+      const reported = activityConfiguration(
+        adb('shell', 'dumpsys', 'activity', 'activities'),
+        component
+      )
+      return reported?.locales[0] === 'ar_EG' && reported.rtl
+    },
     inPlace: true,
   },
   density: {

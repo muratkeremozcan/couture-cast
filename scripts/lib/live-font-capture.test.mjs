@@ -7,6 +7,7 @@ import {
   sameLayoutShifted,
   windowBounds,
   parseEnvironment,
+  activityConfiguration,
   activityToken,
   assertLiveProvenance,
   countOnCreate,
@@ -99,6 +100,37 @@ describe('flattenHierarchy', () => {
 
 describe('Android activity facts', () => {
   const component = 'com.couturecast.story68/.MainActivity'
+
+  test('reads the locales and layout direction last reported to MainActivity', () => {
+    const record = (pkg, locales, dir) =>
+      [
+        `    * ActivityRecord{6a1 u0 ${pkg}/.MainActivity t12}`,
+        '      mLastReportedConfigurations:',
+        '        mGlobalConfig={1.0 310mcc260mnc [en_US] ldltr sw411dp}',
+        `        mOverrideConfig={1.0 310mcc260mnc [${locales}] ${dir} sw411dp 420dpi}`,
+        `      CurrentConfiguration={1.0 310mcc260mnc [${locales}] ${dir} sw411dp}`,
+      ].join('\n')
+    const dump = [
+      '    topResumedActivity=ActivityRecord{6a1 u0 com.couturecast.story68/.MainActivity t12}',
+      record('com.android.settings', 'en_US', 'ldltr'),
+      record('com.couturecast.story68', 'ar_EG,en_US', 'ldrtl'),
+    ].join('\n')
+    assert.deepEqual(activityConfiguration(dump, component), {
+      locales: ['ar_EG', 'en_US'],
+      rtl: true,
+    })
+    assert.deepEqual(
+      activityConfiguration(
+        record('com.couturecast.story68', 'en_US', 'ldltr'),
+        component
+      ),
+      { locales: ['en_US'], rtl: false }
+    )
+    assert.equal(
+      activityConfiguration(record('com.other', 'ar_EG', 'ldrtl'), component),
+      undefined
+    )
+  })
 
   test('reads the one resumed MainActivity token', () => {
     const dump = `TASK 12\n  ACTIVITY ${component} 9f3a21c pid=19127\n    mResumed=true`
