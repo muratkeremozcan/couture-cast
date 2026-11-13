@@ -46,13 +46,24 @@ runs:
         printf '%s' "$HIT" > "$preload/hit"
         if [ "$HIT" = true ]; then
           # The same 150 s limit the start's own load has; `status` appears when it ends.
+          # The load's exit code goes to `exit` and its reason to load.log, which the start
+          # prints: PR 220 run 43415568990 showed only a pull that ran out of budget, and the
+          # cause was this load cut off at 150 s with three images in.
           nohup bash -c '
-            if [ -s "$1/images.tar.zst" ] && [ -s "$1/registry" ] &&
-              timeout --kill-after=10 150 bash -o pipefail -c "zstd -dc \"\$1\" | docker load" _ "$1/images.tar.zst"; then
-              echo loaded > "$2/status.tmp"
+            code=0
+            if [ -s "$1/images.tar.zst" ] && [ -s "$1/registry" ]; then
+              timeout --kill-after=10 150 bash -o pipefail -c "zstd -dc \"\$1\" | docker load" _ "$1/images.tar.zst" || code=$?
             else
-              echo failed > "$2/status.tmp"
+              code=66
             fi
+            case "$code" in
+              0) echo loaded > "$2/status.tmp" ;;
+              66) echo "The background image load found no image archive." ;;
+              124 | 137) echo "The background image load was cut off at its 150 s limit (exit $code)." ;;
+              *) echo "The background image load failed (exit $code)." ;;
+            esac
+            [ "$code" -eq 0 ] || echo failed > "$2/status.tmp"
+            echo "$code" > "$2/exit"
             mv "$2/status.tmp" "$2/status"' _ "$CACHE_DIR" "$preload" > "$preload/load.log" 2>&1 < /dev/null &
           echo "Loading the cached Supabase images in the background."
         else
