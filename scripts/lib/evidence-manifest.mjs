@@ -30,34 +30,42 @@ export const APP_INPUTS = [
   'app.json',
   'eas.json',
 ]
-const SERVER_INPUTS = ['apps/api', 'packages/db']
+// Legs that boot the local API read the server and its schema. Every leg takes the whole maestro/
+// tree (TEA, Antigravity r9: a false rerun is cheap, a false pass is not).
+const SERVER_INPUTS = ['apps/api', 'packages/db', 'supabase']
+const SHARED_INPUTS = [...APP_INPUTS, 'maestro']
+// Data the story68 native harness reads: the native Supabase bootstrap and Maestro flow budgets.
+const HARNESS_DATA = [
+  'scripts/lib/fixtures',
+  'scripts/ci/native-supabase-bootstrap.sql',
+  'scripts/maestro-flow-durations.json',
+]
 
 /**
- * Each leg's inputs: paths (a directory counts as its tree), globs over tracked files, and
- * harness entry files whose relative imports are followed.
+ * Each leg's inputs: paths (a directory counts as its tree), globs over tracked files (recursive:
+ * `dir/prefix*` matches every tracked file under `dir` whose path there starts with `prefix`), and
+ * harness entry files whose code closure is followed (relative imports and requires, and scripts
+ * named by repository path, which a harness spawns). Data a harness reads by repository path is
+ * listed here; evidence-manifest.test.mjs fails when a harness names one its leg does not cover.
  */
 export const LEGS = {
   'live-font': {
-    paths: [...APP_INPUTS, 'maestro/live-font', 'maestro/story65'],
+    paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: ['scripts/lib/live-font-*'],
-    entries: ['scripts/run-live-font-proof.mjs'],
+    entries: ['scripts/run-live-font-proof.mjs', 'scripts/run-story68-native.mjs'],
   },
   'ios-build': {
-    paths: [...APP_INPUTS],
+    paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: ['scripts/lib/story68-*'],
     entries: ['scripts/run-story68-native.mjs'],
   },
   'network-timeout': {
-    paths: [
-      ...APP_INPUTS,
-      'maestro/network-timeout',
-      'scripts/ci/android-network-timeout.sh',
-    ],
+    paths: [...SHARED_INPUTS, 'scripts/ci/android-network-timeout.sh'],
     globs: [],
     entries: ['scripts/lib/network-tarpit.mjs'],
   },
   'android-evidence': {
-    paths: [...APP_INPUTS],
+    paths: [...SHARED_INPUTS],
     globs: [],
     entries: [
       'scripts/lib/minified-debuggable-evidence.mjs',
@@ -65,15 +73,19 @@ export const LEGS = {
       'scripts/lib/cx06-reflection-mutant.mjs',
     ],
   },
+  // The Test Store journey driver joins these entries when it lands.
   'test-store': {
-    paths: [...APP_INPUTS, ...SERVER_INPUTS, 'maestro'],
+    paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: [],
-    entries: [],
+    entries: [
+      'scripts/run-story68-native.mjs',
+      'scripts/lib/minified-debuggable-evidence.mjs',
+    ],
   },
   upgrade: {
-    paths: [...APP_INPUTS, ...SERVER_INPUTS, 'maestro/story65'],
+    paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: [],
-    entries: [],
+    entries: ['scripts/run-story68-native.mjs'],
   },
 }
 
@@ -102,13 +114,56 @@ export function relativeImports(source) {
     /\bimport\s*['"](\.{1,2}\/[^'"]+)['"]/g,
     /\bimport\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
     /\bexport\s[^'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]/g,
+    // require('./x'), including a createRequire(import.meta.url) require.
+    /\brequire\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
   ]
   for (const pattern of patterns)
     for (const match of source.matchAll(pattern)) found.add(match[1])
   return [...found]
 }
 
-/** `entries` plus every file they reach through relative imports, at `rev`. */
+/** Top-level repository directories a harness may name files in. */
+const REPO_ROOTS = ['apps', 'packages', 'scripts', 'maestro', 'supabase', 'playwright']
+
+/**
+ * Repository paths a module names in string literals, whole ('scripts/lib/fixtures/x.json') or
+ * up to a template placeholder (`maestro/live-font/${flow}.yaml` names maestro/live-font), and
+ * root-relative path.join or path.resolve arguments (path.join(root, 'maestro', 'story65')).
+ */
+export function repoPathLiterals(source) {
+  const roots = REPO_ROOTS.join('|')
+  const found = new Set()
+  const literal = new RegExp(
+    `['"\`]((?:${roots})/[A-Za-z0-9_.@/-]*?)/?(?=['"\`]|\\$\\{)`,
+    'g'
+  )
+  for (const match of source.matchAll(literal)) if (match[1]) found.add(match[1])
+  const joined = /path\.(?:join|resolve)\(\s*\w+\s*,((?:\s*['"][^'"]+['"]\s*,?)+)/g
+  for (const match of source.matchAll(joined)) {
+    const parts = [...match[1].matchAll(/['"]([^'"]+)['"]/g)].map((part) => part[1])
+    const joinedPath = path.posix.normalize(parts.join('/'))
+    if (new RegExp(`^(?:${roots})/`).test(joinedPath)) found.add(joinedPath)
+  }
+  return [...found].sort()
+}
+
+/** Files a module at `file` names relative to itself: new URL('../x.json', import.meta.url). */
+export function moduleRelativeLiterals(source, file) {
+  const found = new Set()
+  for (const match of source.matchAll(
+    /new URL\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*,\s*import\.meta\.url\s*\)/g
+  ))
+    found.add(path.posix.normalize(path.posix.join(path.posix.dirname(file), match[1])))
+  // A URL to a directory (the repository root, for one) names no single input.
+  return [...found].filter((named) => !named.endsWith('/') && named !== '.').sort()
+}
+
+const isScript = (file) => /\.(?:mjs|cjs|js|sh)$/.test(file)
+
+/**
+ * `entries` plus every script they reach at `rev`: relative imports and requires, and scripts
+ * named by repository path, which a harness spawns (`node scripts/x.mjs`).
+ */
 export function importClosure(entries, rev, cwd) {
   const seen = new Set()
   const queue = [...entries]
@@ -125,6 +180,13 @@ export function importClosure(entries, rev, cwd) {
       // Installed packages are pinned by package-lock.json, which every leg records.
       if (!target.split('/').includes('node_modules')) queue.push(target)
     }
+    for (const named of repoPathLiterals(source))
+      if (
+        named.startsWith('scripts/') &&
+        isScript(named) &&
+        show(rev, named, cwd) !== null
+      )
+        queue.push(named)
   }
   return [...seen].sort()
 }
@@ -133,11 +195,34 @@ export function importClosure(entries, rev, cwd) {
 function globFiles(glob, rev, cwd) {
   const dir = path.posix.dirname(glob)
   const prefix = path.posix.basename(glob).replace(/\*$/, '')
-  const { out } = git(['ls-tree', '--name-only', `${rev}:${dir}`], cwd)
+  const { out } = git(['ls-tree', '-r', '--name-only', rev, '--', `${dir}/`], cwd)
   return out
     .split('\n')
-    .filter((name) => name && name.startsWith(prefix))
-    .map((name) => `${dir}/${name}`)
+    .filter((file) => file && file.slice(dir.length + 1).startsWith(prefix))
+}
+
+/** Whether `file` lies inside one of `inputs`: equal to it, or under a directory input. */
+export const covered = (file, inputs) =>
+  inputs.some((input) => file === input || file.startsWith(`${input}/`))
+
+/**
+ * Repository paths the leg's harness names, that exist at `rev`, and that its inputs do not
+ * cover, each with the file naming it. Empty for a complete leg.
+ */
+export function uncoveredReads(leg, rev = 'HEAD', cwd) {
+  const sha = git(['rev-parse', rev], cwd).out
+  const inputs = legInputs(leg, sha, cwd)
+  const misses = []
+  for (const file of importClosure(LEGS[leg].entries, sha, cwd)) {
+    const source = show(sha, file, cwd)
+    for (const named of [
+      ...repoPathLiterals(source),
+      ...moduleRelativeLiterals(source, file),
+    ])
+      if (objectId(sha, named, cwd) !== null && !covered(named, inputs))
+        misses.push(`${file} -> ${named}`)
+  }
+  return misses
 }
 
 /** Every input path of `leg` at `rev`, sorted. Absent optional paths are recorded as null. */
@@ -192,8 +277,9 @@ export function writeManifest({ leg, rev = 'HEAD', cwd, requireClean = true }) {
  * The inputs of `manifest` whose object ids differ at `rev`, plus files the leg reads at `rev`
  * that the manifest never recorded (a new harness import).
  */
-export function changedInputs(manifest, { rev = 'HEAD', cwd } = {}) {
-  const now = writeManifest({ leg: manifest.leg, rev, cwd, requireClean: false })
+export function changedInputs(manifest, { rev = 'HEAD', cwd, requireClean = true } = {}) {
+  // Verify refuses what write refuses (Antigravity r9): dirty inputs or a rev other than HEAD.
+  const now = writeManifest({ leg: manifest.leg, rev, cwd, requireClean })
   const paths = new Set([...Object.keys(manifest.inputs), ...Object.keys(now.inputs)])
   return [...paths]
     .filter((file) => manifest.inputs[file] !== now.inputs[file])

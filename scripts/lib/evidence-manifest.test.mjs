@@ -11,7 +11,11 @@ import {
   LEGS,
   changedInputs,
   importClosure,
+  legInputs,
+  moduleRelativeLiterals,
   relativeImports,
+  repoPathLiterals,
+  uncoveredReads,
   writeManifest,
 } from './evidence-manifest.mjs'
 
@@ -40,6 +44,7 @@ function fixtureRepo(t) {
   write('scripts/lib/live-font-journey.mjs', "import { a } from './helper.mjs'\n")
   write('scripts/lib/helper.mjs', 'export const a = 1\n')
   write('scripts/run-live-font-proof.mjs', "import './lib/live-font-journey.mjs'\n")
+  write('scripts/run-story68-native.mjs', '')
   const commit = (message) => {
     git('add', '-A')
     git('commit', '-q', '-m', message)
@@ -165,4 +170,87 @@ test('every leg resolves on this repository and covers the app inputs', () => {
   const liveFont = writeManifest({ leg: 'live-font', requireClean: false }).inputs
   assert.ok('scripts/lib/live-font-scale-proof.mjs' in liveFont)
   assert.ok('scripts/lib/live-font-capture.mjs' in liveFont)
+})
+
+// Antigravity r9 (P2-1): every leg covers every repository path its harness names, so evidence
+// can never match a head whose harness data changed.
+test('no harness reads a repository path outside its leg inputs', () => {
+  for (const leg of Object.keys(LEGS)) assert.deepEqual(uncoveredReads(leg), [], leg)
+})
+
+test('every leg takes the whole maestro tree; legs that boot the API take the server', () => {
+  for (const leg of Object.keys(LEGS)) assert.ok(LEGS[leg].paths.includes('maestro'), leg)
+  for (const leg of ['live-font', 'ios-build', 'test-store', 'upgrade'])
+    for (const input of ['apps/api', 'packages/db', 'supabase'])
+      assert.ok(LEGS[leg].paths.includes(input), `${leg}: ${input}`)
+  assert.ok(LEGS['live-font'].paths.includes('scripts/lib/fixtures'))
+})
+
+test('repository path literals, root joins and module-relative URLs are found', () => {
+  const source = [
+    "const a = path.join(root, 'scripts/lib/fixtures/live-font-residual-baselines.json')",
+    "run('maestro', [path.join(root, 'maestro/live-font', `${flow}.yaml`)])",
+    "const b = path.resolve(root, 'maestro', 'subflows', 'open.yaml')",
+    'const c = `maestro/story68/${name}.yaml`',
+    "spawn('node', ['scripts/ci/native-supabase.mjs'])",
+    "const d = '_bmad-output/test-artifacts/runs'",
+  ].join('\n')
+  assert.deepEqual(repoPathLiterals(source), [
+    'maestro/live-font',
+    'maestro/story68',
+    'maestro/subflows/open.yaml',
+    'scripts/ci/native-supabase.mjs',
+    'scripts/lib/fixtures/live-font-residual-baselines.json',
+  ])
+  assert.deepEqual(
+    moduleRelativeLiterals(
+      "new URL('./fixtures/x.json', import.meta.url); new URL('../../', import.meta.url)",
+      'scripts/lib/y.mjs'
+    ),
+    ['scripts/lib/fixtures/x.json']
+  )
+  assert.deepEqual(
+    relativeImports(
+      "const r = createRequire(import.meta.url); r('./x.cjs'); require('../y.js')"
+    ),
+    ['../y.js']
+  )
+})
+
+test('the closure follows requires and scripts a harness spawns by path; globs recurse', (t) => {
+  const repo = fixtureRepo(t)
+  repo.write(
+    'scripts/run-live-font-proof.mjs',
+    "import './lib/live-font-journey.mjs'\nspawn('node', ['scripts/spawned.mjs'])\n"
+  )
+  repo.write('scripts/spawned.mjs', "require('./lib/required.cjs')\n")
+  repo.write('scripts/lib/required.cjs', '')
+  repo.write('scripts/lib/live-font-nested/deep.json', '{}')
+  const sha = repo.commit('closure')
+  const inputs = legInputs('live-font', sha, repo.dir)
+  for (const file of [
+    'scripts/spawned.mjs',
+    'scripts/lib/required.cjs',
+    'scripts/lib/live-font-nested/deep.json',
+  ])
+    assert.ok(inputs.includes(file), file)
+})
+
+// Antigravity r9 (P2-2): verify refuses what write refuses.
+test('verify refuses a dirty input tree and a rev other than HEAD', (t) => {
+  const repo = fixtureRepo(t)
+  const first = repo.commit('build')
+  const manifest = writeManifest({ leg: 'live-font', cwd: repo.dir })
+  repo.write('scripts/lib/helper.mjs', 'export const a = 3\n')
+  assert.throws(() => changedInputs(manifest, { cwd: repo.dir }), {
+    message: /^evidence_manifest_dirty_inputs:/,
+  })
+  repo.commit('change')
+  assert.throws(() => changedInputs(manifest, { rev: first, cwd: repo.dir }), {
+    message: `evidence_manifest_rev_not_head:${first}`,
+  })
+  assert.deepEqual(
+    changedInputs(manifest, { cwd: repo.dir }).map((change) => change.path),
+    ['scripts/lib/helper.mjs']
+  )
 })
