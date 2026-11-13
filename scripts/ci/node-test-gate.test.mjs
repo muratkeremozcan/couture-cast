@@ -59,6 +59,17 @@ test('broken', () => { throw new Error('broken') })
 
 const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
+// Temporary roots a test keeps for its whole describe block; the file removes them at its end.
+const scratchRoots = []
+function scratchRoot(prefix) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+  scratchRoots.push(root)
+  return root
+}
+after(() => {
+  for (const root of scratchRoots) fs.rmSync(root, { recursive: true, force: true })
+})
+
 function temporary(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-test-gate-fixture-'))
   const remove = () => fs.rmSync(directory, { recursive: true, force: true })
@@ -159,16 +170,66 @@ describe('node-test-gate run', () => {
   })
 })
 
-// The background form starts suites in one detached process and a later step collects
-// them. Collect must apply the foreground pass rules and fail when a run is missing or
-// never finished.
+/**
+ * A pid these tests may signal as a group: a positive integer that is neither init nor this
+ * process, so a group signal can never become kill(-1) (every process of the user) or reach the
+ * test runner. Process groups are POSIX; the detached background runs need them.
+ */
+function checkedGroup(pid) {
+  if (process.platform === 'win32')
+    throw new Error('node-test-gate background tests need POSIX process groups')
+  if (!Number.isInteger(pid) || pid <= 1 || pid === process.pid)
+    throw new Error(`not a background process group: ${pid}`)
+  return pid
+}
+
+/**
+ * Live (non-zombie) members of the group led by `pid`. macOS answers a group signal with EPERM
+ * while the group holds only a zombie its parent has not reaped yet, so that case is read here.
+ */
+function liveMembers(pid) {
+  const listed = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
+  if (listed.status !== 0) throw new Error(`ps failed: ${listed.stderr}`)
+  return listed.stdout
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([, pgid, stat]) => Number(pgid) === pid && stat && !stat.startsWith('Z'))
+    .map(([member]) => Number(member))
+}
+
+/** True while any process of the group led by `pid` is alive; ESRCH means it is gone. */
+function groupAlive(pid) {
+  try {
+    process.kill(-checkedGroup(pid), 0)
+    return true
+  } catch (error) {
+    if (error.code === 'ESRCH') return false
+    if (error.code === 'EPERM') return liveMembers(pid).length > 0
+    throw error
+  }
+}
+
+/** Kills the group led by `pid`; a group that ended, or holds only a zombie, is not an error. */
+function killGroup(pid) {
+  try {
+    process.kill(-checkedGroup(pid), 'SIGKILL')
+  } catch (error) {
+    if (error.code === 'ESRCH') return
+    if (error.code === 'EPERM' && liveMembers(pid).length === 0) return
+    throw error
+  }
+}
+
 /**
  * A suite file that blocks until its release file appears. The background run is detached, so
  * nothing kills it with the test that started it: it gives up when that test's temporary
  * directory is gone, when the owning process is gone (a gate killed mid-test runs no cleanup),
- * and after two minutes in any case.
+ * and after two minutes in any case, removing that directory itself when it gives up. Once it
+ * has seen its owner alive from inside the wait loop, it writes `ready`.
  */
-function blockedSource({ release, temp, owner }) {
+function blockedSource({ release, temp, owner, ready }) {
+  if (!Number.isInteger(owner) || owner <= 1)
+    throw new Error(`not an owner pid: ${owner}`)
   return `import fs from 'node:fs'
 import { test } from 'node:test'
 const ownerAlive = () => {
@@ -176,46 +237,50 @@ const ownerAlive = () => {
     process.kill(${owner}, 0)
     return true
   } catch (error) {
-    return error.code !== 'ESRCH'
+    if (error.code === 'ESRCH') return false
+    throw error
   }
+}
+const giveUp = (reason) => {
+  fs.rmSync(${JSON.stringify(temp)}, { recursive: true, force: true })
+  throw new Error(reason)
 }
 test('waits for its release', async () => {
   const deadline = Date.now() + 120_000
   while (!fs.existsSync(${JSON.stringify(release)})) {
     if (!fs.existsSync(${JSON.stringify(temp)})) throw new Error('released by cleanup')
-    if (!ownerAlive()) throw new Error('released: its owner is gone')
-    if (Date.now() > deadline) throw new Error('released: two minutes passed')
+    if (!ownerAlive()) giveUp('released: its owner is gone')
+    if (Date.now() > deadline) giveUp('released: two minutes passed')
+    if (!fs.existsSync(${JSON.stringify(ready)})) fs.writeFileSync(${JSON.stringify(ready)}, '')
     await new Promise((done) => setTimeout(done, 25))
   }
 })
 `
 }
 
-/** True while any process of the group led by `pid` is alive. */
-function groupAlive(pid) {
-  try {
-    process.kill(-pid, 0)
-    return true
-  } catch (error) {
-    return error.code !== 'ESRCH'
-  }
+// Every background run these tests start leads its own process group. Each test settles its
+// group when it ends and drops it once gone, so no ended pid waits here to be reused; a group
+// still alive then stays listed, and the suite kills it and fails.
+const backgroundGroups = new Set()
+function trackStarted(suite, env) {
+  const { pid } = JSON.parse(
+    fs.readFileSync(path.join(backgroundDirectory(suite, env), 'started.json'), 'utf8')
+  )
+  backgroundGroups.add(checkedGroup(pid))
+  return pid
+}
+async function settleGroup(pid) {
+  for (let i = 0; i < 100 && groupAlive(pid); i++) await sleep(50)
+  if (!groupAlive(pid)) backgroundGroups.delete(pid)
 }
 
-// Every background run these tests start leads its own process group; none may outlive them.
-const backgroundGroups = new Set()
-const trackStarted = (suite, env) =>
-  backgroundGroups.add(
-    JSON.parse(
-      fs.readFileSync(path.join(backgroundDirectory(suite, env), 'started.json'), 'utf8')
-    ).pid
-  )
-
+// The background form starts suites in one detached process and a later step collects
+// them. Collect must apply the foreground pass rules and fail when a run is missing or
+// never finished.
 describe('node-test-gate background run', () => {
-  after(async () => {
-    for (let i = 0; i < 100 && [...backgroundGroups].some(groupAlive); i++)
-      await sleep(50)
-    const survivors = [...backgroundGroups].filter(groupAlive)
-    for (const group of survivors) process.kill(-group, 'SIGKILL')
+  after(() => {
+    const survivors = [...backgroundGroups]
+    for (const group of survivors) killGroup(group)
     assert.deepEqual(
       survivors,
       [],
@@ -238,7 +303,7 @@ describe('node-test-gate background run', () => {
     )
   const startAndCollect = async (directory, env, suites) => {
     startBackgroundSuites(suites, { root: directory, manifest, cwd: directory, env })
-    trackStarted(suites[0], env)
+    const group = trackStarted(suites[0], env)
     const logs = []
     try {
       return {
@@ -253,6 +318,8 @@ describe('node-test-gate background run', () => {
     } catch (error) {
       error.logs = logs
       throw error
+    } finally {
+      await settleGroup(group)
     }
   }
 
@@ -389,7 +456,12 @@ describe('node-test-gate background run', () => {
       const release = path.join(temp, 'release')
       fs.writeFileSync(
         path.join(directory, 'blocked.test.mjs'),
-        blockedSource({ release, temp, owner: process.pid })
+        blockedSource({
+          release,
+          temp,
+          owner: process.pid,
+          ready: path.join(temp, 'ready'),
+        })
       )
       const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
       const starter = `import { startBackgroundSuites } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'scripts/ci/node-test-gate.mjs')).href)}
@@ -410,29 +482,37 @@ startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifes
         'the starting process did not exit on its own'
       )
       assert.equal(started.status, 0, started.stderr)
-      trackStarted('blocked', env)
-      assert.equal(
-        fs.existsSync(path.join(backgroundDirectory('blocked', env), 'status.json')),
-        false,
-        'the suite finished before the starting process exited'
-      )
-      fs.writeFileSync(release, '')
-      const logs = []
-      const summaries = await collectBackgroundSuites(['blocked'], {
-        env,
-        timeoutMs: 60_000,
-        pollMs: 25,
-        log: (line) => logs.push(line),
-      })
-      assert.equal(summaries.blocked.passed, 1)
+      const group = trackStarted('blocked', env)
+      try {
+        assert.equal(
+          fs.existsSync(path.join(backgroundDirectory('blocked', env), 'status.json')),
+          false,
+          'the suite finished before the starting process exited'
+        )
+        fs.writeFileSync(release, '')
+        const logs = []
+        const summaries = await collectBackgroundSuites(['blocked'], {
+          env,
+          timeoutMs: 60_000,
+          pollMs: 25,
+          log: (line) => logs.push(line),
+        })
+        assert.equal(summaries.blocked.passed, 1)
+      } finally {
+        await settleGroup(group)
+      }
     }))
 
   // A gate killed mid-test runs no cleanup: 15 h after one, its blocked suite was still waiting
-  // (PPID 1). The fixture must end with the process that started it, not with its directory.
+  // (PPID 1). The fixture must end with the process that started it, not with its directory,
+  // and take that directory with it. The owner dies only once the suite is inside its wait loop.
   test('a blocked background suite ends when the process that started it dies', () =>
     temporary(async (temp) => {
       const directory = path.join(temp, 'repo')
       fs.mkdirSync(directory)
+      const scratch = path.join(temp, 'scratch')
+      fs.mkdirSync(scratch)
+      const ready = path.join(temp, 'ready')
       const owner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
         stdio: 'ignore',
       })
@@ -440,7 +520,12 @@ startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifes
       try {
         fs.writeFileSync(
           path.join(directory, 'blocked.test.mjs'),
-          blockedSource({ release: path.join(temp, 'release'), temp, owner: owner.pid })
+          blockedSource({
+            release: path.join(temp, 'release'),
+            temp: scratch,
+            owner: owner.pid,
+            ready,
+          })
         )
         const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
         startBackgroundSuites(['blocked'], {
@@ -449,22 +534,19 @@ startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifes
           cwd: directory,
           env,
         })
-        group = JSON.parse(
-          fs.readFileSync(
-            path.join(backgroundDirectory('blocked', env), 'started.json'),
-            'utf8'
-          )
-        ).pid
-        backgroundGroups.add(group)
-        // The suite file is running before its owner goes.
-        const events = path.join(backgroundDirectory('blocked', env), 'output.log')
-        for (let i = 0; i < 200 && !fs.existsSync(events); i++) await sleep(25)
+        group = trackStarted('blocked', env)
+        for (let i = 0; i < 400 && !fs.existsSync(ready); i++) await sleep(25)
+        assert.equal(fs.existsSync(ready), true, 'the suite never entered its wait loop')
         owner.kill('SIGKILL')
         for (let i = 0; i < 200 && groupAlive(group); i++) await sleep(50)
         assert.equal(groupAlive(group), false, 'the background suite outlived its owner')
+        assert.equal(fs.existsSync(scratch), false, 'the suite left its directory behind')
       } finally {
         owner.kill('SIGKILL')
-        if (group && groupAlive(group)) process.kill(-group, 'SIGKILL')
+        if (group) {
+          killGroup(group)
+          await settleGroup(group)
+        }
       }
     }))
 
@@ -1413,7 +1495,7 @@ describe('local mode', () => {
     },
   }
   const rootWith = (files) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-local-'))
+    const root = scratchRoot('gate-local-')
     for (const file of files) {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
       fs.writeFileSync(path.join(root, file), '')
@@ -1482,7 +1564,7 @@ describe('local mode preflight (PR 212 review)', () => {
     conditionNeeds: { plain: ['install'], vitest: [] },
   }
   const rootWith = (files) => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-preflight-'))
+    const root = scratchRoot('gate-preflight-')
     for (const file of files) {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
       fs.writeFileSync(path.join(root, file), '')
@@ -1514,7 +1596,7 @@ describe('local mode preflight (PR 212 review)', () => {
   })
 
   test('a fresh checkout without node_modules gets the install instruction', () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), 'gate-fresh-'))
+    const root = scratchRoot('gate-fresh-')
     const copy = (file) => {
       fs.mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
       fs.copyFileSync(path.join(repoRoot, file), path.join(root, file))
