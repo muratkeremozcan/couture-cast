@@ -629,16 +629,15 @@ describe('MobileCapsuleBuilderModal', () => {
 })
 
 describe('R52 MobileCapsuleBuilderModal over the system bars', () => {
-  // Story 6.15 review P3-1: iOS hides every view outside an accessibility modal view from the
-  // XCUITest hierarchy. This builder sets accessibilityViewIsModal on the Modal itself, which
-  // react-native's Modal does not apply to any view, and no content view sets it, so nothing
-  // hides the marker beside the content.
-  it('keeps the live-font marker beside content that has no accessibility modal view', () => {
+  // Story 6.15 review P3-1: the sheet is the accessibility modal view (react-native's Modal
+  // drops the prop, so on the Modal it left the Wardrobe screen reachable underneath), and the
+  // modal's live-font marker sits inside it, where iOS keeps it in the XCUITest hierarchy.
+  it('makes the sheet the accessibility modal and puts the live-font marker inside it', () => {
     renderModal()
-    expect(
-      document.querySelector('[data-testid^="live-font-mount-modal-"]')
-    ).not.toBeNull()
-    expect(liveFontMarkerPlacement()).toEqual({ markerInside: false, host: null })
+    expect(liveFontMarkerPlacement()).toEqual({
+      markerInside: true,
+      host: 'mobile-capsule-builder-container',
+    })
   })
 
   beforeAll(async () => {

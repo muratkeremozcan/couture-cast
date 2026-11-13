@@ -264,13 +264,15 @@ export function MobileCapsuleBuilderModal({
       visible={visible}
       animationType="slide"
       onRequestClose={onClose}
-      accessibilityViewIsModal
       scrim="rgba(0,0,0,0.5)"
     >
       <View style={styles.overlay}>
+        {/* The sheet is the accessibility modal view: react-native's Modal drops the prop, so
+            on the Modal it left the Wardrobe screen reachable by VoiceOver underneath. */}
         <View
           style={[styles.modalContainer, { paddingBottom: 16 + insets.bottom }]}
           testID="mobile-capsule-builder-container"
+          accessibilityViewIsModal
         >
           <View style={styles.header}>
             <Text
