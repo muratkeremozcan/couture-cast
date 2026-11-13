@@ -27,18 +27,18 @@ const action = parse(
 const startAction = parse(
   readFileSync(path.join(root, '.github/actions/start-local-supabase/action.yml'), 'utf8')
 )
+// GNU timeout's calling form (macOS has none): drop the options and the limit, run the rest.
+const GNU_TIMEOUT = 'while [[ "$1" == --* ]]; do shift; done; shift; exec "$@"'
 const step = (name) => action.runs.steps.find((candidate) => candidate.name === name)
 
-function runLoad(t, { hit, zstd, docker }) {
+function runLoad(t, { hit, zstd, docker, timeout = GNU_TIMEOUT, archive = 'images' }) {
   const temp = mkdtempSync(path.join(os.tmpdir(), 'preload-'))
   t.after(() => rmSync(temp, { recursive: true, force: true }))
   const bin = path.join(temp, 'bin')
   const cache = path.join(temp, 'cache')
   for (const dir of [bin, cache]) spawnSync('mkdir', ['-p', dir])
-  writeFileSync(path.join(cache, 'images.tar.zst'), 'images')
+  writeFileSync(path.join(cache, 'images.tar.zst'), archive)
   writeFileSync(path.join(cache, 'registry'), 'ghcr.io')
-  // GNU timeout's calling form (macOS has none): drop the options and the limit, run the rest.
-  const timeout = 'while [[ "$1" == --* ]]; do shift; done; shift; exec "$@"'
   for (const [name, body] of Object.entries({ zstd, docker, timeout }))
     writeFileSync(path.join(bin, name), `#!/bin/bash\n${body}\n`, { mode: 0o755 })
   const result = spawnSync(
@@ -65,7 +65,14 @@ function runLoad(t, { hit, zstd, docker }) {
     existsSync(path.join(preload, name))
       ? readFileSync(path.join(preload, name), 'utf8').trim()
       : null
-  return { result, key: read('key'), hit: read('hit'), status: read('status') }
+  return {
+    result,
+    key: read('key'),
+    hit: read('hit'),
+    status: read('status'),
+    exit: read('exit'),
+    log: read('load.log'),
+  }
 }
 
 test('a hit loads in the background and records the key and the outcome', (t) => {
@@ -78,12 +85,72 @@ test('a hit loads in the background and records the key and the outcome', (t) =>
   assert.equal(loaded.key, 'supabase-images-v2-key')
   assert.equal(loaded.hit, 'true')
   assert.equal(loaded.status, 'loaded')
+  assert.equal(loaded.exit, '0')
+  assert.equal(loaded.log, '')
   const failed = runLoad(t, {
     hit: 'true',
     zstd: 'cat "$2"',
     docker: 'cat > /dev/null; exit 1',
   })
   assert.equal(failed.status, 'failed')
+  assert.equal(failed.exit, '1')
+  assert.equal(failed.log, 'The background image load failed (exit 1).')
+})
+
+// PR 220 run 43415568990: the load hit its 150 s limit with three images in, and the start's
+// log said only that it pulled. The start prints load.log and the exit, so the cause is named.
+test('a load cut off at its limit, or with no archive, records why', (t) => {
+  for (const code of [124, 137]) {
+    const cut = runLoad(t, {
+      hit: 'true',
+      zstd: 'cat "$2"',
+      docker: 'cat > /dev/null',
+      timeout: `exit ${code}`,
+    })
+    assert.equal(cut.status, 'failed')
+    assert.equal(cut.exit, String(code))
+    assert.equal(
+      cut.log,
+      `The background image load was cut off at its 150 s limit (exit ${code}).`
+    )
+  }
+  const empty = runLoad(t, {
+    hit: 'true',
+    zstd: 'cat "$2"',
+    docker: 'cat > /dev/null',
+    archive: '',
+  })
+  assert.equal(empty.status, 'failed')
+  assert.equal(empty.exit, '66')
+  assert.equal(empty.log, 'The background image load found no image archive.')
+})
+
+test('the start names the preload exit when it pulls instead', () => {
+  const load = startAction.runs.steps.find((s) => s.id === 'cache-load')
+  assert.match(
+    load.run,
+    /did not load \(exit \$\(cat "\$preload\/exit" 2> \/dev\/null \|\| echo none\)\); pulling instead/
+  )
+  assert.match(load.run, /cat "\$preload\/load\.log"/)
+})
+
+test('the Storage proof runs only on a started Supabase', () => {
+  const workflow = parse(
+    readFileSync(path.join(root, '.github/workflows/pr-pw-e2e-local.yml'), 'utf8')
+  )
+  const steps = workflow.jobs['real-session-e2e'].steps
+  const start = steps.findIndex(
+    (s) => s.uses === './.github/actions/start-local-supabase'
+  )
+  const proof = steps.findIndex(
+    (s) => s.name === 'Prove Storage refuses a late community upload'
+  )
+  assert.equal(steps[start].id, 'supabase')
+  assert.ok(proof > start)
+  assert.equal(
+    steps[proof].if,
+    "${{ !cancelled() && steps.supabase.outcome == 'success' }}"
+  )
 })
 
 test('a miss records only the key, and the start pulls and saves', (t) => {

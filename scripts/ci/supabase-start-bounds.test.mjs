@@ -114,10 +114,10 @@ describe('start-local-supabase bounds', () => {
     assert.match(result.log, /The Supabase image cache did not load; pulling instead/)
   })
 
-  for (const [status, loaded, delay] of [
-    ['loaded', 'true', 2],
-    ['failed', 'false', 1],
-    [null, 'false', 0],
+  for (const [status, loaded, delay, exit] of [
+    ['loaded', 'true', 2, '0'],
+    ['failed', 'false', 1, '124'],
+    [null, 'false', 0, 'none'],
   ])
     test(`a background load that ${status ?? 'never ends'} is waited for, bounded, and used as ${loaded === 'true' ? 'a hit' : 'a miss'}`, (t) => {
       // preload-supabase-images loads the cache while the dependencies install; the start
@@ -129,7 +129,7 @@ describe('start-local-supabase bounds', () => {
         commands: {
           // The preload's status lands after a delay, as the background load ends.
           sleep: status
-            ? `[ -f "$RUNNER_TEMP/ticks" ] || echo 0 > "$RUNNER_TEMP/ticks"; n=$(( $(cat "$RUNNER_TEMP/ticks") + 1 )); echo $n > "$RUNNER_TEMP/ticks"; if [ "$n" -ge ${delay} ]; then mkdir -p "$RUNNER_TEMP/supabase-preload"; echo ${status} > "$RUNNER_TEMP/supabase-preload/status"; fi`
+            ? `[ -f "$RUNNER_TEMP/ticks" ] || echo 0 > "$RUNNER_TEMP/ticks"; n=$(( $(cat "$RUNNER_TEMP/ticks") + 1 )); echo $n > "$RUNNER_TEMP/ticks"; if [ "$n" -ge ${delay} ]; then mkdir -p "$RUNNER_TEMP/supabase-preload"; echo ${exit} > "$RUNNER_TEMP/supabase-preload/exit"; echo ${status} > "$RUNNER_TEMP/supabase-preload/status"; fi`
             : 'exit 0',
           docker: 'echo "a preloaded start must not load again" >&2; exit 1',
         },
@@ -139,9 +139,12 @@ describe('start-local-supabase bounds', () => {
       assert.match(result.output, new RegExp(`^loaded=${loaded}$`, 'm'))
       if (loaded === 'true') assert.match(result.output, /^registry=ghcr\.io$/m)
       else
+        // The preload's exit names why (124: its 150 s limit), or none when it never ended.
         assert.match(
           result.log,
-          /The preloaded Supabase image cache did not load; pulling instead/
+          new RegExp(
+            `The preloaded Supabase image cache did not load \\(exit ${exit}\\); pulling instead`
+          )
         )
       assert.match(
         result.log,
@@ -244,6 +247,12 @@ exit 0`,
     )
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
     assert.match(result.stdout, /Supabase startup was cut off after 3s/)
+    // A cut-off attempt is named as out of time: "pull failed" misled PR 220's triage.
+    assert.match(
+      result.stdout,
+      /The start on ghcr\.io ran out of time before its images were in \(exit 124\); the next attempt uses ghcr\.io\./
+    )
+    assert.doesNotMatch(result.stdout, /The pull from ghcr\.io failed/)
     assert.match(result.stdout, /attempt 2\/6/)
     assert.match(result.stdout, /Supabase services started successfully/)
   })

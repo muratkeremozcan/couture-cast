@@ -179,7 +179,7 @@ runs:
             echo "registry=$(cat "$CACHE_DIR/registry")" >> "$GITHUB_OUTPUT"
             echo "loaded=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::warning::The preloaded Supabase image cache did not load; pulling instead."
+            echo "::warning::The preloaded Supabase image cache did not load (exit $(cat "$preload/exit" 2> /dev/null || echo none)); pulling instead."
             echo "loaded=false" >> "$GITHUB_OUTPUT"
           fi
         elif [ -s "$CACHE_DIR/images.tar.zst" ] && [ -s "$CACHE_DIR/registry" ] &&
@@ -607,7 +607,14 @@ runs:
             echo "No start ran; the next attempt waits for the host ports again."
           elif pull_failed "$exit_code"; then
             registry_index=$(( registry_index + 1 ))
-            echo "The pull from ${registry} failed; the next attempt uses ${registries[$(( registry_index % ${#registries[@]} ))]}."
+            next_registry=${registries[$(( registry_index % ${#registries[@]} ))]}
+            # A cut-off attempt counts as a slow pull, but say so: "failed" sent PR 220's
+            # triage to the registry when the attempt had only run out of time.
+            if [ "$exit_code" -eq 124 ] || [ "$exit_code" -eq 137 ]; then
+              echo "The start on ${registry} ran out of time before its images were in (exit ${exit_code}); the next attempt uses ${next_registry}."
+            else
+              echo "The pull from ${registry} failed; the next attempt uses ${next_registry}."
+            fi
           else
             echo "The images from ${registry} are present; the next attempt keeps that registry."
           fi

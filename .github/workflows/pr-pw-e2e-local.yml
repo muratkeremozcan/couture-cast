@@ -302,7 +302,9 @@ jobs:
       # A fake cannot prove storage refuses an expired token, and this is the job with real Storage.
       # Its own isolated database, so a real-session failure neither hides this nor shares state with it.
       - name: Prove Storage refuses a late community upload
-        if: ${{ !cancelled() }}
+        # Runs when the real-session specs fail, never when Supabase did not start: with no
+        # Storage it can only fail again, which hid the one cause in PR 220 run 43415568990.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         env:
           INTEGRATION_TEST_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
         run: npm run test:community-storage -w apps/api
