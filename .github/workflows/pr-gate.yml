@@ -59,6 +59,7 @@ jobs:
             /scripts/ci/lanes.mjs
           sparse-checkout-cone-mode: false
       - name: Fail the gate when a workflow could post the iOS evidence status
+        id: guard
         if: always()
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -84,4 +85,28 @@ jobs:
             exit 1
           fi
           echo "main at $(git rev-parse HEAD) has no iOS evidence guard yet; the pull request that adds it runs before it merges"
+      # PR Gate's own verdict is already posted, so a guard step that failed, timed out or never ran
+      # turns the gate status on an open pull request's head to failure here. An unreadable pull
+      # request list still fails the gate.
+      - name: Fail the gate when the iOS evidence guard did not finish
+        if: always() && steps.guard.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+          OUTCOME: ${{ steps.guard.outcome }}
+          TARGET: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if ! echo "$HEAD_SHA" | grep -Eqx '[0-9a-f]{40}'; then
+            echo "::error::no head commit to fail the gate on ($HEAD_SHA)"
+            exit 1
+          fi
+          open=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")] | length' || echo unknown)
+          if [ "$open" = 0 ]; then
+            echo "No open pull request has head $HEAD_SHA; no gate to fail."
+            exit 0
+          fi
+          gh api -X POST "repos/$GH_REPO/statuses/$HEAD_SHA" -f state=failure -f context=gate \
+            -f description="The iOS evidence guard did not finish (${OUTCOME:-not run}); re-run PR Gate" -f target_url="$TARGET"
 #

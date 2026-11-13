@@ -10,8 +10,9 @@
 //                      except packages/db, each with everything it resolves and links.
 //   package.json       counts when a root field every install reads changed (workspaces,
 //                      overrides, engines, packageManager, dependencies, devDependencies), a
-//                      lifecycle script npm ci runs, or a root script the iOS jobs run, with its
-//                      pre and post hooks.
+//                      lifecycle script npm ci runs (preprepare and postprepare included), or a
+//                      root script the iOS jobs run, with its pre and post hooks, and every root
+//                      script any of those runs.
 //
 // apps/api and packages/db are left out: browser-acceptance in pr-share-card-native.yml builds
 // the API, runs node scripts/run-story68-native.mjs serve and the story68-api-entry guard on every
@@ -52,13 +53,15 @@ export const ROOT_FIELDS = [
   'devDependencies',
   'optionalDependencies',
 ]
-// The root scripts npm ci runs on its own.
+// The root scripts npm ci runs on its own, in its order (docs.npmjs.com, Scripts, "npm ci").
 export const LIFECYCLE_SCRIPTS = [
   'preinstall',
   'install',
   'postinstall',
-  'prepare',
   'prepublish',
+  'preprepare',
+  'prepare',
+  'postprepare',
 ]
 const COMMIT = /^[0-9a-f]{40}$/
 

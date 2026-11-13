@@ -71,6 +71,10 @@ export function dispatchedCommit(run) {
 // aliases resolve as GitHub reads them) and fail on statuses or checks write and write-all, and
 // any such file that names the status context fails too.
 //
+// The evidence workflow posts the status itself, so it may name the context and hold the grant;
+// its copy at the head fails when a trigger other than pull_request_target or
+// workflow_run could run it before the merge (those two run main's copy).
+//
 // Its boundary: it blocks a pull request that adds a status-capable grant or names the context in
 // a workflow or local action. It cannot read intent in a helper script a workflow calls, so the
 // workflows that already hold statuses: write stay limited to trusted code on their trusted
@@ -81,6 +85,9 @@ const GUARDED_FILE = /^\.github\/(workflows\/[^/]+|actions\/.+\/action)\.ya?ml$/
 const WORKFLOW_FILE_PATH = /^\.github\/workflows\/[^/]+\.ya?ml$/
 const CONTEXT = new RegExp(`(?<![\\w./-])${STATUS_CONTEXT}(?![\\w./-])`)
 const STATUS_SCOPES = ['statuses', 'checks']
+// The triggers that run main's copy of a workflow: pull_request_target runs the base branch's
+// file, workflow_run the default branch's.
+const MAIN_COPY_TRIGGERS = ['pull_request_target', 'workflow_run']
 
 /** A workflow as GitHub reads it, through yq on the runner: aliases and merge keys resolved. */
 export function yqParse(text) {
@@ -108,9 +115,33 @@ export function statusGrants(workflow) {
   return grants
 }
 
+/** The triggers of a parsed workflow, or null when its `on` has no shape GitHub reads. */
+export function workflowTriggers(workflow) {
+  // yq on the runner keeps the key `on`; a YAML 1.1 reader turns it into true.
+  const on = workflow?.on ?? workflow?.true
+  if (typeof on === 'string') return [on]
+  if (Array.isArray(on)) return on.every((name) => typeof name === 'string') ? on : null
+  if (on && typeof on === 'object') return Object.keys(on)
+  return null
+}
+
+/** Why the evidence workflow at the head could run before the merge. */
+function evidenceWorkflowProblems(workflow) {
+  const triggers = workflowTriggers(workflow)
+  if (!triggers?.length)
+    return [`${EVIDENCE_WORKFLOW} declares no trigger the guard can read`]
+  return triggers
+    .filter((name) => !MAIN_COPY_TRIGGERS.includes(name))
+    .map(
+      (name) =>
+        `${EVIDENCE_WORKFLOW} runs on ${name}; its triggers may only be ${MAIN_COPY_TRIGGERS.join(' and ')}`
+    )
+}
+
 /**
  * The workflow and local action files at the head commit whose content differs from main's at
- * the same path: added, edited and renamed ones. Each tree is a git trees API listing.
+ * the same path: added, edited and renamed ones, the evidence workflow included. Each tree is a
+ * git trees API listing.
  */
 export function changedGuardedFiles(headTree, mainTree) {
   const main = new Map(
@@ -122,7 +153,6 @@ export function changedGuardedFiles(headTree, mainTree) {
     (entry) =>
       entry.type === 'blob' &&
       GUARDED_FILE.test(entry.path) &&
-      entry.path !== EVIDENCE_WORKFLOW &&
       main.get(entry.path) !== entry.sha
   )
 }
@@ -131,7 +161,8 @@ export function changedGuardedFiles(headTree, mainTree) {
 export function workflowGuardProblems(files, { parseYaml = yqParse } = {}) {
   const problems = []
   for (const file of files) {
-    if (CONTEXT.test(file.text))
+    const evidence = file.path === EVIDENCE_WORKFLOW
+    if (!evidence && CONTEXT.test(file.text))
       problems.push(`${file.path} names the ${STATUS_CONTEXT} context`)
     if (!WORKFLOW_FILE_PATH.test(file.path)) continue
     let workflow
@@ -141,7 +172,9 @@ export function workflowGuardProblems(files, { parseYaml = yqParse } = {}) {
       problems.push(`${file.path} could not be parsed: ${error.message.split('\n')[0]}`)
       continue
     }
-    for (const grant of statusGrants(workflow)) problems.push(`${file.path}: ${grant}`)
+    if (evidence) problems.push(...evidenceWorkflowProblems(workflow))
+    else
+      for (const grant of statusGrants(workflow)) problems.push(`${file.path}: ${grant}`)
   }
   return problems
 }
@@ -463,7 +496,9 @@ async function openPullsWithHead({ repository, sha, ...options }) {
 /**
  * pr-gate.yml, after PR Gate posts its verdict: when an open pull request's head holds a workflow
  * that could post the evidence status, the gate status on that head turns to failure, so a job
- * that posts the evidence status after the judge still cannot unblock the merge.
+ * that posts the evidence status after the judge still cannot unblock the merge. A read that
+ * fails turns it to failure too, since PR Gate's own verdict may already be success; a failure
+ * this cannot post fails the step, and pr-gate.yml's fallback step posts it.
  */
 export async function gateGuard({ env = process.env, fetchImpl, parseYaml } = {}) {
   const sha = env.HEAD_SHA ?? ''
@@ -473,14 +508,37 @@ export async function gateGuard({ env = process.env, fetchImpl, parseYaml } = {}
     fetchImpl,
     parseYaml,
   }
-  if (!COMMIT.test(sha) || (await openPullsWithHead({ ...options, sha })).length === 0) {
-    console.log(`No open pull request has head ${sha}; nothing to guard.`)
+  const failGate = (description) =>
+    api(`/repos/${options.repository}/statuses/${sha}`, {
+      ...options,
+      method: 'POST',
+      body: {
+        state: 'failure',
+        context: GATE_STATUS,
+        description: fit(description),
+        target_url: `${env.GITHUB_SERVER_URL}/${options.repository}/actions/runs/${env.GITHUB_RUN_ID}`,
+      },
+    })
+  if (!COMMIT.test(sha)) {
+    console.log(`No head commit (${sha || 'none'}); nothing to guard.`)
     return []
   }
-  const trees = await snapshot({ ...options, headSha: sha })
-  const problems = trees.incomplete
-    ? [`the workflow files could not all be read: ${trees.incomplete}`]
-    : await guardProblems({ ...options, trees })
+  let problems
+  try {
+    if ((await openPullsWithHead({ ...options, sha })).length === 0) {
+      console.log(`No open pull request has head ${sha}; nothing to guard.`)
+      return []
+    }
+    const trees = await snapshot({ ...options, headSha: sha })
+    problems = trees.incomplete
+      ? [`the workflow files could not all be read: ${trees.incomplete}`]
+      : await guardProblems({ ...options, trees })
+  } catch (error) {
+    const reason = `The iOS evidence guard could not read the head: ${error.message}`
+    console.log(`::error::${reason}`)
+    await failGate(reason)
+    return [reason]
+  }
   if (problems.length === 0) {
     console.log(`No workflow at ${sha} can post ${STATUS_CONTEXT}.`)
     return []
@@ -488,16 +546,7 @@ export async function gateGuard({ env = process.env, fetchImpl, parseYaml } = {}
   console.log(
     `::error::Only ${EVIDENCE_WORKFLOW} may post ${STATUS_CONTEXT}: ${problems.join('; ')}`
   )
-  await api(`/repos/${options.repository}/statuses/${sha}`, {
-    ...options,
-    method: 'POST',
-    body: {
-      state: 'failure',
-      context: GATE_STATUS,
-      description: fit(`A workflow could post ${STATUS_CONTEXT}: ${problems.join('; ')}`),
-      target_url: `${env.GITHUB_SERVER_URL}/${options.repository}/actions/runs/${env.GITHUB_RUN_ID}`,
-    },
-  })
+  await failGate(`A workflow could post ${STATUS_CONTEXT}: ${problems.join('; ')}`)
   return problems
 }
 
