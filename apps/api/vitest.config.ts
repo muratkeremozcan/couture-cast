@@ -111,6 +111,11 @@ export default defineConfig({
       // sub-3 ms to p95 72.8 ms and exhausted the unchanged authorization budget.
       // Run it on an idle service pair, with one worker and no package builds.
       '**/community-realtime-revalidation.integration.spec.ts',
+      // Its own serial CI job and configuration too (vitest.append-latency.config.ts). The
+      // latency proxy runs in the test process, so in the parallel run CPU contention
+      // stretched its 31 and 100 ms round trips: 5 of 111 coverage runs (2026-11-11 to 13)
+      // failed here, 6.5-INT-033's cold retry row passing its 1 s budget among them.
+      '**/community-append-latency.integration.spec.ts',
       ...(process.env.RUN_GARMENT_TAGGING_SMOKE === 'true'
         ? []
         : ['**/garment-tagging.smoke.spec.ts']),

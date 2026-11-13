@@ -15,7 +15,7 @@
   },
   "conditionNeeds": {
     "startup-deadline": ["install"],
-    "browser-deps": [],
+    "browser-deps": ["install"],
     "share-card-plugins": ["install"],
     "native-harness": ["install"],
     "worklets-staging": ["prebuild"],
@@ -33,7 +33,7 @@
   },
   "pinnedReasons": {
     "startup-deadline": "Must pass before the job starts local Supabase.",
-    "browser-deps": "Must pass before the Android lane provisions pinned browsers.",
+    "browser-deps": "Must pass before the Android lane provisions pinned browsers. Its suite imports yaml and the provisioning runs the installed Playwright CLI, so it needs install.",
     "worklets-staging": "Needs the generated Android project, so it runs after prebuild.",
     "share-card-plugins": "apps/mobile/plugins also holds the watchOS, widget, background task and font-scale prebuild suites that other workflows own, so these two are listed instead of discovered.",
     "vitest": "Imports vitest, so node --test cannot run it; the vitest step gates it from its JSON report."

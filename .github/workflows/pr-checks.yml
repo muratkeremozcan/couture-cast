@@ -730,6 +730,72 @@ jobs:
           path: apps/api/.cache/realtime-budget/
           if-no-files-found: error
 
+  # The production-latency append proof (integration/community-append-latency.integration.spec.ts)
+  # runs here alone. Its latency proxy adds each round trip inside the test process, so in the
+  # parallel API coverage run other files' CPU work stretched those round trips: 5 of 111 runs
+  # (2026-11-11 to 13) failed it there, each green alone.
+  community-append-latency:
+    name: Community append at production database latency
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['community']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      NODE_OPTIONS: --conditions=development
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports: [5432:5432]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-node-env
+      - name: Prepare generated dependencies before the measured phase
+        run: |
+          npm run db:generate
+          npm run build:packages
+      # Cluster-scoped roles the isolated database's auth schema grants to.
+      - name: Provision isolated CI roles
+        run: |
+          psql "$DATABASE_URL" -q -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          SQL
+      # One test worker and no other suite or build on the runner.
+      - name: Run the append latency proof alone
+        id: proof
+        working-directory: apps/api
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/append-latency
+          npx vitest run --config vitest.append-latency.config.ts --reporter=default --reporter=json --outputFile=.cache/append-latency/run.json 2>&1 | tee .cache/append-latency/run.log
+      # A skipped or missing test passes vitest; the counts must show all ten ran and passed.
+      - name: Require every append latency test to run and pass
+        if: ${{ !cancelled() && (steps.proof.outcome == 'success' || steps.proof.outcome == 'failure') }}
+        working-directory: apps/api
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs'
+          const report = JSON.parse(fs.readFileSync('.cache/append-latency/run.json', 'utf8'))
+          if (report.numTotalTests !== 10 || report.numPassedTests !== 10 ||
+              report.numPendingTests !== 0 || report.numFailedTests !== 0 || report.numTodoTests !== 0)
+            throw new Error(`Incomplete append latency proof: ${report.numPassedTests} of ${report.numTotalTests} passed`)
+          JS
+      - name: Upload append latency results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: community-append-latency
+          path: apps/api/.cache/append-latency/
+          if-no-files-found: error
+
   community-screening-gates:
     name: Community corpus and mixed workload budgets
     needs: lanes

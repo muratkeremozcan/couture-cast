@@ -33,12 +33,13 @@ function runnerLabels(job) {
 }
 
 // A job needs the space when it builds the Android app, boots an emulator or
-// runs the story 6.8 disk guard through the share-card plugin suite.
+// runs the story 6.8 disk guard through the share-card plugin suite, in the
+// foreground or started in the background.
 const needsSpace = (job) =>
   (job.steps ?? []).some(
     (step) =>
       String(step.uses ?? '').startsWith('reactivecircus/android-emulator-runner') ||
-      /\bgradlew\b|run-story68-native\.mjs build|node-test-gate\.mjs share-card-plugins/.test(
+      /\bgradlew\b|run-story68-native\.mjs build|node-test-gate\.mjs (?:--start (?:\S+ )*)?share-card-plugins\b/.test(
         String(step.run ?? '')
       )
   )

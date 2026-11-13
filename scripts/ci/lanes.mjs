@@ -192,9 +192,13 @@ export const LANES = {
     inputs: MOBILE_READ_BY_WEB_AND_PACKAGE_TESTS,
   },
   community: {
-    title: 'Community realtime budget and screening gates',
+    title: 'Community realtime and append latency budgets and screening gates',
     workflow: 'pr-checks.yml',
-    jobs: ['community-realtime-budget', 'community-screening-gates'],
+    jobs: [
+      'community-realtime-budget',
+      'community-append-latency',
+      'community-screening-gates',
+    ],
     workspaces: ['api'],
     inputs: [SUPABASE],
   },

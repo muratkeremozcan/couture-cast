@@ -397,6 +397,57 @@ describe('browser dependency workflow', () => {
     assert.ok(iosSteps.indexOf(mac) < bridge(iosSteps))
   })
 
+  // A hit hands apt-install.sh every package file of the exact package list, so the step
+  // downloads none. Only a miss that provisioned successfully saves, and nothing restores
+  // by prefix, which could hand over files of another package list.
+  test('browser-acceptance restores the Ubuntu package files of its exact key and saves them only after a successful miss', async () => {
+    const steps = (await read()).jobs['browser-acceptance'].steps
+    const at = (predicate) => steps.findIndex(predicate)
+    const key = at((step) => step.id === 'ubuntu_packages_key')
+    const restore = at((step) => step.id === 'ubuntu_packages_cache')
+    const provisioning = at((step) => step.id === 'browser_deps')
+    const save = at((step) => step.uses === 'actions/cache/save@v4')
+    assert.ok(
+      at((step) => step.id === 'install') < key &&
+        key < restore &&
+        restore < provisioning &&
+        provisioning < save,
+      `${key} ${restore} ${provisioning} ${save}`
+    )
+    assert.equal(
+      steps[key].run,
+      'node scripts/ci/ubuntu-package-cache.mjs >> "$GITHUB_OUTPUT"'
+    )
+    assert.equal(
+      steps[key].if,
+      "${{ !cancelled() && steps.install.outcome == 'success' }}"
+    )
+    const cached = {
+      key: '${{ steps.ubuntu_packages_key.outputs.key }}',
+      path: '${{ steps.ubuntu_packages_key.outputs.path }}/*.deb',
+    }
+    assert.equal(steps[restore].uses, 'actions/cache/restore@v4')
+    assert.deepEqual(steps[restore].with, cached)
+    assert.equal(
+      steps[restore].if,
+      "${{ !cancelled() && steps.ubuntu_packages_key.outcome == 'success' }}"
+    )
+    assert.deepEqual(steps[save].with, cached)
+    assert.equal(
+      steps[save].if,
+      "${{ !cancelled() && steps.ubuntu_packages_key.outcome == 'success' && steps.ubuntu_packages_cache.outputs.cache-hit != 'true' && steps.browser_deps.outcome == 'success' }}"
+    )
+    assert.equal(
+      steps[provisioning].env?.APT_INSTALL_ARCHIVES,
+      '${{ steps.ubuntu_packages_key.outputs.path }}'
+    )
+    assertBounded(steps[provisioning])
+    assert.equal(
+      steps.filter((step) => String(step.uses).startsWith('actions/cache')).length,
+      2
+    )
+  })
+
   test('the independent browser acceptance job retains all three pinned engines and runs the bridge on pull requests', async () => {
     const steps = (await read()).jobs['browser-acceptance'].steps
     const provisioning = provisioningOf(steps)
