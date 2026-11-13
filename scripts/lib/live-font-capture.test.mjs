@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  restoreFailure,
   sameLayoutShifted,
   windowBounds,
   parseEnvironment,
@@ -449,5 +450,24 @@ test('sameLayoutShifted accepts one small vertical shift and nothing else', () =
   assert.equal(
     sameLayoutShifted(withTabs, [at('A', 106), at('B', 206), at('Home', 2277)]),
     true
+  )
+})
+
+test('restoreFailure tells a relayout on scroll from a lost scroll position', () => {
+  const box = (text, y, height = 40) => ({
+    id: '',
+    text,
+    bounds: `[0,${y}][100,${y + height}]`,
+  })
+  const settled = [box('Home', 166, 92), box('Cloudy', 685, 78)]
+  // The scroll-through made the screen measure its text again: heights changed.
+  assert.equal(
+    restoreFailure(settled, [box('Home', 176, 71), box('Cloudy', 678, 51)]),
+    'live_font_relayout_on_scroll'
+  )
+  // Same heights, moved: the screen came back somewhere else.
+  assert.equal(
+    restoreFailure(settled, [box('Home', 136, 92), box('Cloudy', 655, 78)]),
+    'live_font_scroll_not_restored'
   )
 })

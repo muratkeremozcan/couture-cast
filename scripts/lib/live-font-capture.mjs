@@ -388,3 +388,23 @@ export function sameLayoutShifted(a, b, maxShift = 12) {
   }
   return shift === undefined || Math.abs(shift) <= maxShift
 }
+
+/**
+ * Why the screen did not come back to the capture after the scroll-through. When a text the
+ * capture shows changed height, the scroll made the screen measure its text again: the settled
+ * capture was stale until an interaction (a relayout on scroll). Otherwise the content only
+ * moved: the scroll position was lost.
+ */
+export function restoreFailure(captured, after, tolerance = 2) {
+  const heights = new Map()
+  for (const node of captured) {
+    const [y, bottom] = edges(node)
+    heights.set(identityOf(node), bottom - y)
+  }
+  const relaid = after.some((node) => {
+    const before = heights.get(identityOf(node))
+    const [y, bottom] = edges(node)
+    return before !== undefined && Math.abs(bottom - y - before) > tolerance
+  })
+  return relaid ? 'live_font_relayout_on_scroll' : 'live_font_scroll_not_restored'
+}

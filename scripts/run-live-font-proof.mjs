@@ -27,6 +27,7 @@ import {
   countOnCreate,
   flattenHierarchy,
   readEnvironment,
+  restoreFailure,
   rootIdentity,
   sameLayout,
   sameLayoutShifted,
@@ -298,7 +299,9 @@ async function fullText(capture) {
         mode: 0o600,
       }
     )
-    throw new Error('live_font_scroll_not_restored')
+    // A stale settled screen that relays out on the first scroll is a failure of the fix
+    // itself; a lost scroll position is a failure of the run.
+    throw new Error(restoreFailure(capture.nodes, top))
   }
   fs.writeFileSync(path.join(out, `${capture.file}-pages.json`), JSON.stringify(pages), {
     mode: 0o600,
