@@ -11,8 +11,8 @@ private let shareCardDismissalTimeout: TimeInterval = 10
 private let shareCardLeavingWindow: TimeInterval = 2
 
 @MainActor
-private func shareCardCancel(_ app: XCUIApplication) -> XCUIElement {
-  app.descendants(matching: .any).matching(identifier: "share-card-cancel").firstMatch
+private func shareCardElement(_ app: XCUIApplication, _ id: String) -> XCUIElement {
+  app.descendants(matching: .any).matching(identifier: id).firstMatch
 }
 
 @MainActor
@@ -21,19 +21,22 @@ private func shareCardGone(_ element: XCUIElement, within timeout: TimeInterval)
   return XCTWaiter.wait(for: [gone], timeout: timeout) == .completed
 }
 
-/// Taps the open composer's Cancel and fails unless the composer is gone within 10 s.
+/// Taps the open composer's Cancel and fails unless its Cancel and its title are both gone within
+/// 10 s, so a dismissal that drops only Cancel and leaves the sheet up still fails here.
 @MainActor
 func closeShareCard(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-  let cancel = shareCardCancel(app)
+  let cancel = shareCardElement(app, "share-card-cancel")
+  let title = shareCardElement(app, "share-card-title")
   XCTAssertTrue(cancel.waitForExistence(timeout: 20), "share-card Cancel present", file: file, line: line)
   cancel.tap()
-  XCTAssertTrue(shareCardGone(cancel, within: shareCardDismissalTimeout), "share card closed", file: file, line: line)
+  XCTAssertTrue(shareCardGone(cancel, within: shareCardDismissalTimeout), "share-card Cancel gone", file: file, line: line)
+  XCTAssertTrue(shareCardGone(title, within: shareCardDismissalTimeout), "share-card title gone", file: file, line: line)
 }
 
 /// For setUp, tearDown and openers, which may find the composer open, leaving or closed.
 @MainActor
 func closeShareCardIfOpen(_ app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
-  let cancel = shareCardCancel(app)
+  let cancel = shareCardElement(app, "share-card-cancel")
   guard cancel.exists, !shareCardGone(cancel, within: shareCardLeavingWindow) else { return }
   closeShareCard(app, file: file, line: line)
 }

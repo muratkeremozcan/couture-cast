@@ -41,7 +41,7 @@ describe('share-card composer dismissal in the iOS XCUITests', () => {
     assert.equal([...close.matchAll(/\.tap\(\)/g)].length, 1)
     assert.match(
       close,
-      /cancel\.tap\(\)\n\s+XCTAssertTrue\(shareCardGone\(cancel, within: shareCardDismissalTimeout\)/
+      /cancel\.tap\(\)\n\s+XCTAssertTrue\(shareCardGone\(cancel, within: shareCardDismissalTimeout\)[^\n]*\n\s+XCTAssertTrue\(shareCardGone\(title, within: shareCardDismissalTimeout\)/
     )
     assert.match(helper, /shareCardDismissalTimeout: TimeInterval = 10\n/)
     const gone = /func shareCardGone\([\s\S]*?\n}/.exec(helper)[0]
@@ -87,7 +87,7 @@ describe('share-card composer dismissal in the iOS XCUITests', () => {
     const source = read('ShareCardAccessibilityUITests.swift')
     assert.match(
       source,
-      /if !opener\.waitForExistence\(timeout: 20\) \{\n\s+shareCardAuditContextLines\("opener-missing", app\)\.forEach \{ print\(\$0\) \}\n\s+\}\n\s+XCTAssertTrue\(opener\.exists, "outfit share-card opener present"\)/
+      /let found = opener\.waitForExistence\(timeout: 20\)\n\s+if !found \{ shareCardAuditContextLines\("opener-missing", app\)\.forEach \{ print\(\$0\) \} \}\n\s+XCTAssertTrue\(found, "outfit share-card opener present"\)/
     )
   })
 })

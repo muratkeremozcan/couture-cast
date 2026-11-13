@@ -79,10 +79,9 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     let opener = app.buttons.matching(identifier: "outfit-share-card-open").firstMatch
     for _ in 0..<8 where !opener.isHittable { app.swipeUp() }
     // Run 43494979286 lost the opener with no trace of the screen; name what it showed instead.
-    if !opener.waitForExistence(timeout: 20) {
-      shareCardAuditContextLines("opener-missing", app).forEach { print($0) }
-    }
-    XCTAssertTrue(opener.exists, "outfit share-card opener present")
+    let found = opener.waitForExistence(timeout: 20)
+    if !found { shareCardAuditContextLines("opener-missing", app).forEach { print($0) } }
+    XCTAssertTrue(found, "outfit share-card opener present")
     focusSequence = try baselineFocusSequence()
     opener.tap()
     if waitForPreview { XCTAssertTrue(loaded().waitForExistence(timeout: 20)) }
