@@ -267,9 +267,7 @@ function drag(size, up) {
       'test',
       '-e',
       `MAESTRO_APP_ID=${appId}`,
-      '-e',
-      `MAESTRO_SWIPE=${up ? 'UP' : 'DOWN'}`,
-      path.join(root, 'maestro/live-font/swipe.yaml'),
+      path.join(root, `maestro/live-font/swipe-${up ? 'up' : 'down'}.yaml`),
     ])
 }
 

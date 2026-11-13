@@ -1,0 +1,10 @@
+# Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
+# A slow drag from 70% to 35% of the screen height, the run-live-font-proof.mjs DRAG_FROM and
+# DRAG_TO: it stops where the finger lifts, so the page under the capture is the page the stitch
+# expects. A fast swipe flings on. Maestro cannot read env values in swipe coordinates.
+appId: ${MAESTRO_APP_ID}
+---
+- swipe:
+    start: '50%, 70%'
+    end: '50%, 35%'
+    duration: 1500
