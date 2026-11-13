@@ -28,7 +28,7 @@ import {
   deviceFingerprint,
   countOnCreate,
   flattenHierarchy,
-  missingMounts,
+  readWithMounts,
   readEnvironment,
   restoreFailure,
   rootIdentity,
@@ -217,13 +217,11 @@ function persist(capture) {
 function makeCapture(screenName, stage, scale) {
   // iOS drops a 1x1 marker view from a dump now and then. A marker still missing after three
   // reads stays missing in the capture, and the identity check fails the leg on it.
-  let tree
-  let flat
-  for (let attempt = 1; ; attempt += 1) {
-    tree = hierarchy()
-    flat = flattenHierarchy(tree, { platform, volatile: activeVolatile })
-    if (attempt >= 3 || missingMounts(flat.markers, activeMounts).length === 0) break
-  }
+  const { tree, flat } = readWithMounts(() => {
+    const read = hierarchy()
+    const flattened = flattenHierarchy(read, { platform, volatile: activeVolatile })
+    return { tree: read, flat: flattened, markers: flattened.markers }
+  }, activeMounts)
   sequence += 1
   const capture = {
     stage,

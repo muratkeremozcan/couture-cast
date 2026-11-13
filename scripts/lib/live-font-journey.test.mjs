@@ -21,7 +21,10 @@ import { expectedTextRatio } from './live-font-scale-proof.mjs'
  * the platform's text scaling, the update adds one line that persists across launches until
  * reverted (as the Settings locale does), and nothing remounts on the live launch. `breakAt` makes one live capture stale or makes a capture throw.
  */
-function fakeDevice(platform, { breakAt, throwAt, dropMountAt, remountOnRevert } = {}) {
+function fakeDevice(
+  platform,
+  { breakAt, throwAt, dropMountAt, remountOnRevert, noScreenMount } = {}
+) {
   const calls = []
   let launches = 0
   let launch = 'launch-0'
@@ -43,7 +46,7 @@ function fakeDevice(platform, { breakAt, throwAt, dropMountAt, remountOnRevert }
   const mounts = (stage, at) => {
     const tag = launch.replace(/[^a-z0-9]/g, '')
     const root = `live-font-mount-root-${tag}`
-    return dropMountAt === `${stage}:${at}`
+    return noScreenMount || dropMountAt === `${stage}:${at}`
       ? root
       : `live-font-mount-community-${screenMount}${tag},${root}`
   }
@@ -210,6 +213,15 @@ describe('runScreenJourney', () => {
     assert.equal(result.legs[0].checks.identity.rootKnown, false)
     assert.equal(result.legs[1].pass, true)
     assert.equal(aggregateVerdict([result], 'android').pass, false)
+  })
+
+  test('a screen that never shows its own marker fails every leg', async () => {
+    const result = await run('ios', fakeDevice('ios', { noScreenMount: true }))
+    assert.ok(result.legs.length > 0)
+    for (const leg of result.legs) {
+      assert.equal(leg.pass, false)
+      assert.equal(leg.checks.identity.rootKnown, false)
+    }
   })
 
   test('a screen remounted by the revert between legs fails the later leg', async () => {

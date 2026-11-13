@@ -149,6 +149,19 @@ export function missingMounts(markers, scopes) {
   return scopes.filter((scope) => !seen.has(scope))
 }
 
+/**
+ * Reads until a read carries every scope in `scopes`, at most `attempts` times; the last read is
+ * returned either way, so a marker still missing reaches the identity check. `read` returns an
+ * object with the flattened `markers`.
+ */
+export function readWithMounts(read, scopes, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    const result = read()
+    if (attempt >= attempts || missingMounts(result.markers, scopes).length === 0)
+      return result
+  }
+}
+
 /** The mount markers joined in order: one string that changes when any marked mount changes. */
 export function rootIdentity(markers) {
   return markers.length ? markers.join(',') : undefined

@@ -16,6 +16,7 @@ import {
   countOnCreate,
   flattenHierarchy,
   missingMounts,
+  readWithMounts,
   rootIdentity,
   sameLayout,
   stitchPages,
@@ -725,4 +726,23 @@ test('missingMounts names the required scopes no marker carries', () => {
   assert.deepEqual(missingMounts(markers, ['root', 'settings']), [])
   assert.deepEqual(missingMounts(markers, ['root', 'modal']), ['modal'])
   assert.deepEqual(missingMounts([], ['root']), ['root'])
+})
+
+test('readWithMounts rereads a dump that drops a required marker, three reads at most', () => {
+  const reads = (lists) => {
+    let index = 0
+    const read = () => ({ markers: lists[Math.min(index++, lists.length - 1)] })
+    return { read, count: () => index }
+  }
+  const whole = ['live-font-mount-root-r1', 'live-font-mount-settings-s1']
+  const dropped = ['live-font-mount-root-r1']
+  const second = reads([dropped, whole])
+  assert.deepEqual(readWithMounts(second.read, ['root', 'settings']).markers, whole)
+  assert.equal(second.count(), 2)
+  const never = reads([dropped])
+  assert.deepEqual(readWithMounts(never.read, ['root', 'settings']).markers, dropped)
+  assert.equal(never.count(), 3)
+  const first = reads([whole])
+  readWithMounts(first.read, ['root', 'settings'])
+  assert.equal(first.count(), 1)
 })
