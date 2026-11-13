@@ -124,6 +124,18 @@ export type PremiumAccessReadState = {
   readonly access: PremiumAccess | null
 }
 
+/**
+ * Manage entry by store: store-billed subscriptions open the native manage flow; Stripe-billed
+ * ones are managed on the web (the portal is the web surface's); promotional grants and RevenueCat
+ * Test Store purchases (story 6.15 D15, local and preview only) have no store subscription to
+ * manage.
+ */
+function manageEntryFor(store: Subscription['store']): 'store' | 'web' | 'none' {
+  if (store === 'stripe') return 'web'
+  if (store === 'promotional' || store === 'test_store') return 'none'
+  return 'store'
+}
+
 export function resolvePremiumSectionState(
   subscription: Subscription | null,
   didLoadFail: boolean,
@@ -169,15 +181,7 @@ export function resolvePremiumSectionState(
         productId: subscription.productId,
         currentPeriodEnd: subscription.currentPeriodEnd,
         showGraceBanner: subscription.status === 'grace_period',
-        // Manage entry by store: store-billed subscriptions open the native
-        // manage flow; Stripe-billed ones are managed on the web (the portal
-        // is the web surface's); promotional grants have nothing to manage.
-        manageEntry:
-          subscription.store === 'stripe'
-            ? 'web'
-            : subscription.store === 'promotional'
-              ? 'none'
-              : 'store',
+        manageEntry: manageEntryFor(subscription.store),
       }
   }
 }
