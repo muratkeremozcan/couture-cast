@@ -91,20 +91,12 @@ test('every restore that fails on a miss reads a protected handoff key', () => {
   }
   assert.ok(handoff.length >= 3, handoff.join(', '))
   // Each such key comes from scripts/ci/native-build-cache.mjs, directly or through
-  // ios-build's output, and that script names its keys under the protected prefix. The one
-  // exception is the client an ios-native.yml dispatch hands its own shards under
-  // `dispatch-<sha>-`: its run deletes it at the end, so it stays unprotected and a prune
-  // removes an orphan only once nothing has read it for STALE_AFTER_MS, long after any run.
+  // ios-build's output, and that script names its keys under the protected prefix.
   for (const key of handoff)
     assert.match(
       key,
-      /^(dispatch-\$\{\{ inputs\.sha \}\}-)?\$\{\{ (steps\.native_key\.outputs\.key|needs\.ios-build\.outputs\.app-key) \}\}$/
+      /^\$\{\{ (steps\.native_key\.outputs\.key|needs\.ios-build\.outputs\.app-key) \}\}$/
     )
-  assert.ok(!PROTECTED_KEY_PREFIXES.some((prefix) => 'dispatch-'.startsWith(prefix)))
-  assert.ok(
-    STALE_AFTER_MS >= 24 * 60 * 60 * 1000,
-    'a dispatch run ends well inside the idle limit'
-  )
   const source = readFileSync(new URL('scripts/ci/native-build-cache.mjs', root), 'utf8')
   assert.ok(
     PROTECTED_KEY_PREFIXES.some((prefix) => source.includes(`\`${prefix}\${platform}-`)),

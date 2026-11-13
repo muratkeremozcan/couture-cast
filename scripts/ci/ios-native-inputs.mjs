@@ -23,6 +23,8 @@ import { fileURLToPath } from 'node:url'
 import { matchesAny } from './lanes.mjs'
 
 export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
+// The jobs both iOS workflows call, whose root npm scripts an iOS run executes.
+export const IOS_JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const LOCKFILE = 'package-lock.json'
 export const ROOT_MANIFEST = 'package.json'
 export const MOBILE_WORKSPACE = 'apps/mobile'
@@ -115,13 +117,13 @@ export function mobileLockChanges(before, after) {
 }
 
 /** The root scripts ios-native.yml runs, and the root scripts those run in turn. */
-export function rootScriptsRun(workflowText, manifest) {
+export function rootScriptsRun(jobsText, manifest) {
   const runs = (text) =>
     [...String(text).matchAll(/\bnpm run ([\w:.-]+)([^\n&|;]*)/g)]
       .filter((match) => !/(?:^|\s)(--workspace|-w)\b/.test(match[2]))
       .map((match) => match[1])
   const names = new Set()
-  const stack = runs(workflowText)
+  const stack = runs(jobsText)
   while (stack.length) {
     const name = stack.pop()
     if (names.has(name)) continue
@@ -132,15 +134,12 @@ export function rootScriptsRun(workflowText, manifest) {
 }
 
 /** What changed in the root manifest that an iOS run reads; null when unreadable. */
-export function rootManifestChanges(before, after, workflowText) {
+export function rootManifestChanges(before, after, jobsText) {
   if (!before || !after) return null
   const differs = (a, b) => JSON.stringify(a) !== JSON.stringify(b)
   const fields = ROOT_FIELDS.filter((field) => differs(before[field], after[field]))
   const scripts = [
-    ...new Set([
-      ...rootScriptsRun(workflowText, before),
-      ...rootScriptsRun(workflowText, after),
-    ]),
+    ...new Set([...rootScriptsRun(jobsText, before), ...rootScriptsRun(jobsText, after)]),
   ]
     .filter((name) => differs(before.scripts?.[name], after.scripts?.[name]))
     .map((name) => `scripts.${name}`)
@@ -160,7 +159,7 @@ const parseJson = (text) => {
  * content before and after: `{ 'package-lock.json': boolean, 'package.json': boolean }`.
  * `read(side, file)` returns the text, or null when the file is missing or unreadable.
  */
-export async function dependencyChanges(read, workflowText) {
+export async function dependencyChanges(read, jobsText) {
   const [lockBefore, lockAfter, rootBefore, rootAfter] = await Promise.all([
     read('before', LOCKFILE),
     read('after', LOCKFILE),
@@ -168,11 +167,7 @@ export async function dependencyChanges(read, workflowText) {
     read('after', ROOT_MANIFEST),
   ])
   const lock = mobileLockChanges(parseJson(lockBefore), parseJson(lockAfter))
-  const root = rootManifestChanges(
-    parseJson(rootBefore),
-    parseJson(rootAfter),
-    workflowText
-  )
+  const root = rootManifestChanges(parseJson(rootBefore), parseJson(rootAfter), jobsText)
   return {
     [LOCKFILE]: lock === null || lock.length > 0,
     [ROOT_MANIFEST]: root === null || root.length > 0,
@@ -215,8 +210,7 @@ export async function pushChanges({ env = process.env, run = git } = {}) {
     const files = run(['diff', '--name-only', '--no-renames', before, 'HEAD'])
       .split('\n')
       .filter(Boolean)
-    const workflowText = readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')
-    const inputs = pushPaths(workflowText)
+    const inputs = pushPaths(readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
     const show = (side, file) => {
       try {
         return run(['show', `${side === 'before' ? before : 'HEAD'}:${file}`])
@@ -224,7 +218,10 @@ export async function pushChanges({ env = process.env, run = git } = {}) {
         return null
       }
     }
-    const dependencies = await dependencyChanges(show, workflowText)
+    const dependencies = await dependencyChanges(
+      show,
+      readFileSync(IOS_JOBS_WORKFLOW, 'utf8')
+    )
     const changed = nativeIosChanges(files, inputs, dependencies)
     return changed.length
       ? decide(true, `Native iOS inputs changed: ${changed.join(', ')}`)
