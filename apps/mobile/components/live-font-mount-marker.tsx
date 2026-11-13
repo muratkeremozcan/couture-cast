@@ -51,6 +51,20 @@ function reactNativeVersion() {
   return `${major}.${minor}.${patch}${prerelease ? `-${prerelease}` : ''}`
 }
 
+/**
+ * Keeps the marker away from assistive technology. On iOS, `aria-hidden` and
+ * `accessibilityElementsHidden` also remove the view from the XCUITest hierarchy Maestro reads,
+ * so on iOS the marker is a plain view that is not an accessibility element.
+ */
+export function markerAccessibilityProps(os: string) {
+  if (os === 'ios') return { accessible: false } as const
+  return {
+    'aria-hidden': true,
+    importantForAccessibility: 'no-hide-descendants',
+    accessibilityElementsHidden: true,
+  } as const
+}
+
 export function LiveFontMountMarker({ scope }: { scope: string }) {
   const { fontScale, scale } = useWindowDimensions()
   const scheme = useColorScheme() ?? 'light'
@@ -64,9 +78,7 @@ export function LiveFontMountMarker({ scope }: { scope: string }) {
   const hidden = {
     style: styles.marker,
     collapsable: false,
-    'aria-hidden': true,
-    importantForAccessibility: 'no-hide-descendants',
-    accessibilityElementsHidden: true,
+    ...markerAccessibilityProps(Platform.OS),
   } as const
   return (
     <>

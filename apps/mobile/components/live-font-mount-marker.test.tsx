@@ -16,6 +16,7 @@ vi.mock('expo-constants', () => ({
 import {
   LiveFontMountMarker,
   liveFontMountMarkersEnabled,
+  markerAccessibilityProps,
 } from './live-font-mount-marker'
 
 const marker = () =>
@@ -74,6 +75,20 @@ describe('LiveFontMountMarker', () => {
 
     expect(marker()?.getAttribute('aria-hidden')).toBe('true')
     expect(screen.queryAllByRole('img')).toHaveLength(0)
+  })
+
+  /**
+   * XCUITest, and so Maestro, leaves out a view whose accessibility elements are hidden, so on
+   * iOS the marker is a plain view that is not an accessibility element: VoiceOver skips it and
+   * the hierarchy still lists its identifier. Android and web keep it hidden.
+   */
+  it('stays visible to the iOS hierarchy without becoming an accessibility element', () => {
+    expect(markerAccessibilityProps('ios')).toEqual({ accessible: false })
+    expect(markerAccessibilityProps('android')).toMatchObject({
+      'aria-hidden': true,
+      importantForAccessibility: 'no-hide-descendants',
+    })
+    expect(markerAccessibilityProps('web')).toMatchObject({ 'aria-hidden': true })
   })
 
   it('renders in development builds and in native test builds only', () => {
