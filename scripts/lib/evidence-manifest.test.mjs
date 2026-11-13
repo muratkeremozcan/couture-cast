@@ -254,3 +254,43 @@ test('verify refuses a dirty input tree and a rev other than HEAD', (t) => {
     ['scripts/lib/helper.mjs']
   )
 })
+
+// Antigravity r10 (P3): shell entries are scanned for the paths they name bare.
+test('a shell entry names paths bare, and the network-timeout leg scans its script', () => {
+  const source = [
+    'node scripts/lib/network-tarpit.mjs --port 4010 &',
+    'maestro test "maestro/network-timeout/dev-client-timeout.yaml"',
+    'APK=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk',
+  ].join('\n')
+  assert.deepEqual(repoPathLiterals(source, { shell: true }), [
+    'apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk',
+    'maestro/network-timeout/dev-client-timeout.yaml',
+    'scripts/lib/network-tarpit.mjs',
+  ])
+  assert.ok(
+    LEGS['network-timeout'].entries.includes('scripts/ci/android-network-timeout.sh')
+  )
+})
+
+// Antigravity r10 (P3): an untracked file a leg glob would match makes the tree dirty.
+test('an untracked file matching a leg glob is a dirty input', (t) => {
+  const repo = fixtureRepo(t)
+  repo.commit('build')
+  repo.write('scripts/lib/live-font-new.mjs', '')
+  assert.throws(() => writeManifest({ leg: 'live-font', cwd: repo.dir }), {
+    message: /^evidence_manifest_dirty_inputs:.*scripts\/lib\/live-font-new\.mjs/,
+  })
+})
+
+// Antigravity r10 (P3): verify with no manifest is a usage error, never a pass.
+test('verify with no manifest exits 2 with usage', () => {
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/lib/evidence-manifest.mjs', 'verify'],
+    {
+      encoding: 'utf8',
+    }
+  )
+  assert.equal(result.status, 2)
+  assert.match(result.stderr, /usage: evidence-manifest\.mjs verify/)
+})

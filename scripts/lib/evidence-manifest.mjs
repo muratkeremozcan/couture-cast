@@ -60,9 +60,9 @@ export const LEGS = {
     entries: ['scripts/run-story68-native.mjs'],
   },
   'network-timeout': {
-    paths: [...SHARED_INPUTS, 'scripts/ci/android-network-timeout.sh'],
+    paths: [...SHARED_INPUTS],
     globs: [],
-    entries: ['scripts/lib/network-tarpit.mjs'],
+    entries: ['scripts/ci/android-network-timeout.sh', 'scripts/lib/network-tarpit.mjs'],
   },
   'android-evidence': {
     paths: [...SHARED_INPUTS],
@@ -130,9 +130,15 @@ const REPO_ROOTS = ['apps', 'packages', 'scripts', 'maestro', 'supabase', 'playw
  * up to a template placeholder (`maestro/live-font/${flow}.yaml` names maestro/live-font), and
  * root-relative path.join or path.resolve arguments (path.join(root, 'maestro', 'story65')).
  */
-export function repoPathLiterals(source) {
+export function repoPathLiterals(source, { shell = false } = {}) {
   const roots = REPO_ROOTS.join('|')
   const found = new Set()
+  // A shell script names paths bare: node scripts/lib/network-tarpit.mjs --port 4010.
+  if (shell)
+    for (const match of source.matchAll(
+      new RegExp(`(?:^|[\\s=("'])((?:${roots})/[A-Za-z0-9_.@/-]*[A-Za-z0-9_.@-])`, 'gm')
+    ))
+      found.add(match[1])
   const literal = new RegExp(
     `['"\`]((?:${roots})/[A-Za-z0-9_.@/-]*?)/?(?=['"\`]|\\$\\{)`,
     'g'
@@ -180,7 +186,7 @@ export function importClosure(entries, rev, cwd) {
       // Installed packages are pinned by package-lock.json, which every leg records.
       if (!target.split('/').includes('node_modules')) queue.push(target)
     }
-    for (const named of repoPathLiterals(source))
+    for (const named of repoPathLiterals(source, { shell: file.endsWith('.sh') }))
       if (
         named.startsWith('scripts/') &&
         isScript(named) &&
@@ -216,7 +222,7 @@ export function uncoveredReads(leg, rev = 'HEAD', cwd) {
   for (const file of importClosure(LEGS[leg].entries, sha, cwd)) {
     const source = show(sha, file, cwd)
     for (const named of [
-      ...repoPathLiterals(source),
+      ...repoPathLiterals(source, { shell: file.endsWith('.sh') }),
       ...moduleRelativeLiterals(source, file),
     ])
       if (objectId(sha, named, cwd) !== null && !covered(named, inputs))
@@ -261,7 +267,8 @@ export function writeManifest({ leg, rev = 'HEAD', cwd, requireClean = true }) {
   if (requireClean) {
     const head = git(['rev-parse', 'HEAD'], cwd).out
     if (sha !== head) throw new Error(`evidence_manifest_rev_not_head:${sha}`)
-    const dirty = dirtyInputs(legInputs(leg, sha, cwd), cwd)
+    // The globs go in as pathspecs too, so an untracked file a glob would match is seen.
+    const dirty = dirtyInputs([...legInputs(leg, sha, cwd), ...LEGS[leg].globs], cwd)
     if (dirty.length) throw new Error(`evidence_manifest_dirty_inputs:${dirty.join(';')}`)
   }
   return {
@@ -306,6 +313,12 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     const files = rest.filter(
       (arg, index) => !arg.startsWith('--') && rest[index - 1] !== '--rev'
     )
+    if (files.length === 0) {
+      console.error(
+        'usage: evidence-manifest.mjs verify <manifest.json>... [--rev <rev>]'
+      )
+      process.exit(2)
+    }
     let stale = 0
     for (const file of files) {
       const manifest = JSON.parse(fs.readFileSync(file, 'utf8'))
