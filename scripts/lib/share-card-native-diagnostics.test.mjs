@@ -270,6 +270,62 @@ describe('native flow diagnostics projection', () => {
 })
 
 describe('native flow diagnostics capture', () => {
+  // Story 6.15: a deadline kill on the iOS 26.5 simulator leaves Maestro no failure artifacts, so
+  // the after-failure screenshot and the app log are the only screen and app evidence; simctl
+  // answered in seconds on that host, and the old 1.5 s limit killed both.
+  test('the capture child outlives its platform capture limit: 50 s on iOS, 15 s on Android', async () => {
+    const { recordNativeFlowDiagnostics } = await helper()
+    const timeouts = {}
+    for (const platform of ['ios', 'android'])
+      recordNativeFlowDiagnostics(
+        { platform },
+        {
+          execute: (binary, args, options) => {
+            timeouts[platform] = options.timeout
+            return { status: 0 }
+          },
+        }
+      )
+    assert.deepEqual(timeouts, { ios: 50000, android: 15000 })
+  })
+
+  test('an iOS failure gives each simctl capture 15 s and the whole capture 45 s; Android keeps 1.5 s and 10 s', async (t) => {
+    const { collectNativeFlowDiagnostics, CAPTURE_LIMITS } = await helper()
+    assert.deepEqual(CAPTURE_LIMITS, {
+      android: { callMs: 1500, totalMs: 10000 },
+      ios: { callMs: 15000, totalMs: 45000 },
+    })
+    const directory = fixture(t)
+    const output = path.join(directory, 'maestro-current')
+    fs.mkdirSync(output)
+    const calls = []
+    await collectNativeFlowDiagnostics(
+      {
+        ...context,
+        flow: 'maestro/story65/open-app.yaml',
+        platform: 'ios',
+        exitCode: 124,
+        root,
+        directory,
+        output,
+        device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+        startedAt: Date.now() - 120000,
+      },
+      {
+        execute: (binary, args, options) => {
+          calls.push({ binary, args, options })
+          return { status: 1, stdout: '' }
+        },
+      }
+    )
+    const screenshot = calls.find(({ args }) => args.includes('screenshot'))
+    const appLog = calls.find(({ args }) => args.includes('log'))
+    assert.equal(screenshot?.binary, 'xcrun')
+    assert.equal(screenshot.options.timeout, 15000)
+    assert.equal(appLog?.binary, 'xcrun')
+    assert.ok(appLog.options.timeout > 1500 && appLog.options.timeout <= 15000)
+  })
+
   test('failed capture finds nested logs and paired deepest-command artifacts, collects read-only facts before device teardown', async (t) => {
     const { collectNativeFlowDiagnostics } = await helper()
     const directory = fixture(t)

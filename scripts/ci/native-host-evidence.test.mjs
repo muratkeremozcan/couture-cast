@@ -201,7 +201,7 @@ test('the command line appends to one closed record per platform', (t) => {
   fs.writeFileSync(path.join(directory, 'maestro-ios-1', 'maestro.log'), maestroLog)
   fs.writeFileSync(path.join(directory, 'metro.log'), 'iOS Bundled 900ms entry.js')
   const wall = {
-    timeoutMs: 120000,
+    timeoutMs: 240000,
     childMs: 50000,
     timedOut: false,
     killAfterMs: null,
@@ -521,20 +521,22 @@ test('a failed host snapshot records its exact error and the real shell proceeds
 
 test('first-flow evidence keeps child deadline, setup and worker bootstrap separate', () => {
   const wall = {
-    timeoutMs: 120000,
-    childMs: 120004,
+    timeoutMs: 240000,
+    childMs: 240004,
     timedOut: true,
-    killAfterMs: 120001,
-    wrapperMs: 120040,
+    killAfterMs: 240001,
+    wrapperMs: 240040,
     workerOverheadMs: 36,
     setupMs: 20,
-    harnessMs: 120060,
+    harnessMs: 240060,
   }
   const firstFlow = projectFirstFlow(maestroLog, 'failed', wall)
   assert.doesNotThrow(() => assertNativeHostEvidence(record({ firstFlow })))
-  assert.equal(firstFlow.wall.childMs, 120004)
+  assert.equal(firstFlow.wall.childMs, 240004)
   for (const bad of [
     { ...wall, timeoutMs: 148000 },
+    // The iOS 18.5-era budget is no longer the gate's.
+    { ...wall, timeoutMs: 120000 },
     { ...wall, timedOut: 'yes' },
     { ...wall, workerOverheadMs: -1 },
     { ...wall, env: 'private' },

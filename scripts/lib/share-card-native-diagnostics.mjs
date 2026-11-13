@@ -789,13 +789,24 @@ function readArtifacts(output) {
   }
   return { rows, hierarchy, screenshot, log }
 }
+/**
+ * Post-failure capture limits per platform. adb answers in well under a second, so Android keeps
+ * 1.5 s per call and 10 s in all. On the iOS 26.5 simulator a loaded host answered simctl calls
+ * in seconds and once took 54 s (story 6.15, dispatch 43371567368), so the 1.5 s screenshot was
+ * killed and two first-flow failures recorded no screen; iOS gets 15 s per call and 45 s in all.
+ */
+export const CAPTURE_LIMITS = Object.freeze({
+  android: Object.freeze({ callMs: 1500, totalMs: 10000 }),
+  ios: Object.freeze({ callMs: 15000, totalMs: 45000 }),
+})
 function captureCall(input, execute, started, privateDir) {
+  const { callMs, totalMs } = CAPTURE_LIMITS[input.platform]
   return (name, args, binary = input.adb) => {
-    if (Date.now() - started > 9000) return null
+    if (Date.now() - started > totalMs - 1000) return null
     try {
       const result = execute(binary, args, {
         encoding: 'utf8',
-        timeout: Math.min(1500, 10000 - (Date.now() - started)),
+        timeout: Math.min(callMs, totalMs - (Date.now() - started)),
         maxBuffer: 2 * 1024 * 1024,
         killSignal: 'SIGKILL',
       })
@@ -820,7 +831,7 @@ function fallbackScreenshot(input, execute, privateDir, screenshot) {
           : ['simctl', 'io', input.device, 'screenshot', file]
       const result = execute(binary, args, {
         encoding: undefined,
-        timeout: 1500,
+        timeout: CAPTURE_LIMITS[input.platform].callMs,
         maxBuffer: 12 * 1024 * 1024,
         killSignal: 'SIGKILL',
       })
@@ -930,13 +941,14 @@ export async function collectNativeFlowDiagnostics(input, { execute = spawnSync 
   return value
 }
 /** Failure-only bounded child keeps normal flow and product deadlines unchanged. */
-export function recordNativeFlowDiagnostics(input) {
+export function recordNativeFlowDiagnostics(input, { execute = spawnSync } = {}) {
   try {
     return (
-      spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--capture'], {
+      execute(process.execPath, [fileURLToPath(import.meta.url), '--capture'], {
         input: JSON.stringify(input),
         encoding: 'utf8',
-        timeout: 15000,
+        // The child's whole capture plus its own start and write.
+        timeout: (CAPTURE_LIMITS[input.platform]?.totalMs ?? 10000) + 5000,
         killSignal: 'SIGKILL',
         maxBuffer: 4096,
       }).status === 0

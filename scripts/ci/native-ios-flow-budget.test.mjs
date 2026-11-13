@@ -3,13 +3,22 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { DEFAULT_FLOW_TIMEOUT_MS, flowTimeoutMs } from '../lib/story68-flow-timeouts.mjs'
-import { nativeFlowTimeoutMs, OPEN_APP_FLOW } from './native-ios-flow-budget.mjs'
+import {
+  IOS_FIRST_FLOW_TIMEOUT_MS,
+  nativeFlowTimeoutMs,
+  OPEN_APP_FLOW,
+} from './native-ios-flow-budget.mjs'
 
 const OPEN_POST = 'maestro/story68/open-post.yaml'
 
-test('the iOS first flow keeps the fixed 120000 ms budget on every open-app run', () => {
+test('the iOS first flow keeps one fixed 240000 ms budget on every open-app run', () => {
+  // Story 6.15: measured on the iOS 26.5 simulator (native-ios-flow-budget.mjs header).
+  assert.equal(IOS_FIRST_FLOW_TIMEOUT_MS, 240_000)
+  assert.equal(nativeFlowTimeoutMs(OPEN_APP_FLOW, 'ios'), 240_000)
+  // The derived default for other flows is unchanged.
   assert.equal(DEFAULT_FLOW_TIMEOUT_MS, 120_000)
-  assert.equal(nativeFlowTimeoutMs(OPEN_APP_FLOW, 'ios'), 120_000)
+  // The fixed gate stays far below the derived open-app worst case, so it still fails fast.
+  assert.ok(flowTimeoutMs(OPEN_APP_FLOW) > 4 * IOS_FIRST_FLOW_TIMEOUT_MS)
 })
 
 test('other platforms and flows use their derived budget', () => {
@@ -23,7 +32,7 @@ test('other platforms and flows use their derived budget', () => {
   assert.equal(nativeFlowTimeoutMs('maestro/story68/cancel.yaml', 'ios'), 120_000)
 })
 
-test('the Expo Go proof opener takes its derived budget on iOS, not the first-flow 120000 ms', () => {
+test('the Expo Go proof opener takes its derived budget on iOS, not the first-flow budget', () => {
   const expoGoOpen = 'maestro/story68/expo-go-open.yaml'
   assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), flowTimeoutMs(expoGoOpen))
   assert.equal(nativeFlowTimeoutMs(expoGoOpen, 'ios'), 410_000)
@@ -74,7 +83,7 @@ test('a missing or unknown platform throws instead of reaching the derived open-
 
 test('the platform is normalised explicitly, so case and padding cannot bypass the first-flow budget', () => {
   for (const platform of ['IOS', 'iOS', ' ios ', 'Ios'])
-    assert.equal(nativeFlowTimeoutMs(OPEN_APP_FLOW, platform), 120_000, platform)
+    assert.equal(nativeFlowTimeoutMs(OPEN_APP_FLOW, platform), 240_000, platform)
   assert.equal(
     nativeFlowTimeoutMs(OPEN_APP_FLOW, 'ANDROID'),
     nativeFlowTimeoutMs(OPEN_APP_FLOW, 'android')
