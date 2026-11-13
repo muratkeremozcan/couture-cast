@@ -561,6 +561,17 @@ jobs:
           mkdir -p "$(dirname "$APP")"
           tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"
           test -d "$APP"
+      # Story 6.15 C-16: the client is built with Xcode 26 and runs on the selected runtime (iOS 18.5
+      # on macos-15), which holds only while its deployment target is at most that runtime.
+      - name: Compare the client's minimum iOS with the selected simulator runtime
+        id: client_fits
+        env:
+          APP: ${{ needs.ios-build.outputs.app-path }}
+        run: |
+          set -euo pipefail
+          min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"
       - name: iOS shard flows
         run: |
           shard='${{ matrix.shard }}/4'
@@ -811,6 +822,17 @@ jobs:
           mkdir -p "$(dirname "$APP")"
           tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"
           test -d "$APP"
+      # Story 6.15 C-16: the client is built with Xcode 26 and runs on the selected runtime (iOS 18.5
+      # on macos-15), which holds only while its deployment target is at most that runtime.
+      - name: Compare the client's minimum iOS with the selected simulator runtime
+        id: client_fits
+        env:
+          APP: ${{ needs.ios-build.outputs.app-path }}
+        run: |
+          set -euo pipefail
+          min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"
       - name: Expo Go proof on a fresh simulator
         run: |
           node scripts/e2e-share-card/warm-metro.mjs --platform ios

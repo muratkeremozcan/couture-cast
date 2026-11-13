@@ -841,6 +841,27 @@ function consumerProblems(jobs, check) {
         flows > unpack,
       `${name}: on a dispatch, download ${CLIENT_ARTIFACT} and unpack it at the path ios-build resolved, before the flows`
     )
+    // C-16: an Xcode 26 client runs on the macos-15 iOS 18.5 runtime only while its deployment
+    // target is at most that runtime, so every consumer checks it, on every event, before a flow.
+    const fits = stepIndex(
+      jobs[name],
+      (step) =>
+        step.if === undefined &&
+        step.env?.APP === restoredPath &&
+        String(step.run ?? '').includes(
+          'min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")'
+        ) &&
+        String(step.run ?? '').includes(
+          'sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)'
+        ) &&
+        String(step.run ?? '').includes(
+          'node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"'
+        )
+    )
+    check(
+      fits > restore && fits > unpack && flows > fits,
+      `${name}: check the client's MinimumOSVersion against the simulator runtime, on every event, before the flows`
+    )
     check(
       !rows.some((step) =>
         CLIENT_BUILD.some((command) => String(step.run ?? '').includes(command))

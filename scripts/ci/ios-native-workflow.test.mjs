@@ -944,6 +944,34 @@ describe('ios-native workflows validator', () => {
         )
       }
     )
+    // C-16: the Xcode 26 client must fit the macos-15 iOS 18.5 runtime.
+    const fits = (row) =>
+      String(row.run ?? '').includes('node scripts/ci/native-ios-runtime-fits.mjs')
+    rejected(
+      `${name} without the client runtime check`,
+      new RegExp(
+        `${name}: check the client's MinimumOSVersion against the simulator runtime`
+      ),
+      (jobs) => {
+        jobs[name].steps = jobs[name].steps.filter((row) => !fits(row))
+      }
+    )
+    rejected(
+      `${name} checking the runtime only on a dispatch`,
+      new RegExp(`${name}: check the client's MinimumOSVersion`),
+      (jobs) => {
+        step(jobs[name], fits).if = "github.event_name == 'workflow_dispatch'"
+      }
+    )
+    rejected(
+      `${name} checking the runtime after the flows start`,
+      new RegExp(`${name}: check the client's MinimumOSVersion .* before the flows`),
+      (jobs) => {
+        const rows = jobs[name].steps
+        const [check] = rows.splice(rows.findIndex(fits), 1)
+        rows.push(check)
+      }
+    )
     rejected(
       `${name} downloading another artifact`,
       new RegExp(
