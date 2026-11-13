@@ -532,53 +532,68 @@ function classify(checks) {
 
 const missId = (miss) => JSON.parse(miss.key.slice(0, miss.key.lastIndexOf('#')))[0]
 
-/**
- * A residual passes only as a reviewed baseline entry describes it: `staleIds` lists the ids
- * (`''` for text without one) allowed to keep their base-scale height, and `maxStaleMisses`
- * bounds how many nodes may. Anything outside it is a new regression until it is reviewed.
- */
-function residualApproved(checks, baseline) {
-  if (!baseline) return { pass: false, reason: 'no reviewed baseline' }
-  // An entry approves only with review facts that meet the six approval rules, so a proposal
-  // committed verbatim with a failing fact approves nothing.
+/** The review facts of an entry that break the six approval rules (TEA, 2026-11-13). */
+function brokenReviewFacts(baseline) {
   const review = baseline.review ?? {}
-  const broken = [
+  const staleIds = Array.isArray(baseline.staleIds) ? baseline.staleIds : []
+  const growthOutside = Array.isArray(review.growthFailing)
+    ? review.growthFailing.filter((id) => !staleIds.includes(id))
+    : null
+  return [
     review.verdict !== 'known-residual' && 'verdict',
     review.structuralPass !== true && 'structuralPass',
     review.everyMissStale !== true && 'everyMissStale',
     review.controlPass !== true && 'controlPass',
-    !Array.isArray(review.growthFailing)
-      ? 'growthFailing'
-      : review.growthFailing.some((id) => !baseline.staleIds.includes(id)) &&
-        `growthFailing(${review.growthFailing.filter((id) => !baseline.staleIds.includes(id)).join(',')})`,
+    growthOutside === null && 'growthFailing',
+    growthOutside?.length > 0 && `growthFailing(${growthOutside.join(',')})`,
   ].filter(Boolean)
+}
+
+/**
+ * Rule 6, ids and counts exact: the run's stale misses number exactly `maxStaleMisses`, every
+ * miss and failing growth probe is in `staleIds`, and every listed id is hit by one of them, so a
+ * hand edit carries no headroom.
+ */
+function exactnessProblem(checks, baseline) {
+  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
+  const failingProbes = checks.growth.probes
+    .filter((probe) => !probe.pass)
+    .map((probe) => probe.probe)
+  const growthOutside = failingProbes.filter((id) => !baseline.staleIds.includes(id))
+  if (growthOutside.length)
+    return `growth fails outside baseline: ${growthOutside.join(',')}`
+  const outside = misses.filter((miss) => !baseline.staleIds.includes(missId(miss)))
+  if (outside.length) return `stale outside baseline: ${outside.map(missId).join(',')}`
+  const hit = new Set([...misses.map(missId), ...failingProbes])
+  const unused = baseline.staleIds.filter((id) => !hit.has(id))
+  if (unused.length) return `baseline lists ids no miss hit: ${unused.join(',')}`
+  if (
+    !Number.isInteger(baseline.maxStaleMisses) ||
+    misses.length !== baseline.maxStaleMisses
+  )
+    return `${misses.length} stale nodes, baseline names ${baseline.maxStaleMisses}`
+  return null
+}
+
+/**
+ * A residual passes only as a reviewed baseline entry describes it: `staleIds` lists exactly the
+ * ids (`''` for text without one) that keep their base-scale height, and `maxStaleMisses` names
+ * exactly how many nodes do. Anything else is a new regression until it is reviewed.
+ */
+function residualApproved(checks, baseline) {
+  if (!baseline) return { pass: false, reason: 'no reviewed baseline' }
+  if (!Array.isArray(baseline.staleIds))
+    return { pass: false, reason: 'baseline staleIds must be a list' }
+  // An entry approves only with review facts that meet the six approval rules, so a proposal
+  // committed verbatim with a failing fact approves nothing.
+  const broken = brokenReviewFacts(baseline)
   if (broken.length)
     return {
       pass: false,
       reason: `baseline review facts break the approval rules: ${broken.join(',')}`,
     }
-  // Growth may fail only on a probe the entry names as stale.
-  const growthOutside = checks.growth.probes
-    .filter((probe) => !probe.pass && !baseline.staleIds.includes(probe.probe))
-    .map((probe) => probe.probe)
-  if (growthOutside.length)
-    return {
-      pass: false,
-      reason: `growth fails outside baseline: ${growthOutside.join(',')}`,
-    }
-  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
-  const outside = misses.filter((miss) => !baseline.staleIds.includes(missId(miss)))
-  if (outside.length)
-    return {
-      pass: false,
-      reason: `stale outside baseline: ${outside.map(missId).join(',')}`,
-    }
-  if (misses.length > baseline.maxStaleMisses)
-    return {
-      pass: false,
-      reason: `${misses.length} stale nodes, baseline allows ${baseline.maxStaleMisses}`,
-    }
-  return { pass: true }
+  const problem = exactnessProblem(checks, baseline)
+  return problem ? { pass: false, reason: problem } : { pass: true }
 }
 
 /**

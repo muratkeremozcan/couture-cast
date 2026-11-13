@@ -696,6 +696,46 @@ describe('assertLiveFontProof', () => {
     )
   })
 
+  // Antigravity r7 (P2): rule 6, ids and counts exact. Headroom, an unused id and a missing or
+  // non-integer count approve nothing.
+  test('an entry with headroom, an unused id or no exact count approves nothing', () => {
+    const attempt = (residualBaseline) => () =>
+      assertLiveFontProof({
+        reactNativeVersion: '0.81.5',
+        residualBaseline,
+        ...bugChange(),
+      })
+    const refused = (pattern) => (error) =>
+      error.code === 'live_font_residual_unapproved' && pattern.test(error.message)
+    assert.doesNotThrow(attempt(BASELINE))
+    assert.throws(
+      attempt({ ...BASELINE, maxStaleMisses: 999 }),
+      refused(/baseline names 999/)
+    )
+    assert.throws(
+      attempt({ ...BASELINE, maxStaleMisses: 42 }),
+      refused(/baseline names 42/)
+    )
+    assert.throws(
+      attempt({
+        ...BASELINE,
+        staleIds: [...BASELINE.staleIds, 'settings-language-title'],
+      }),
+      refused(/no miss hit: settings-language-title/)
+    )
+    const noCount = { ...BASELINE }
+    delete noCount.maxStaleMisses
+    assert.throws(attempt(noCount), refused(/baseline names undefined/))
+    assert.throws(
+      attempt({ ...BASELINE, maxStaleMisses: Number.NaN }),
+      refused(/baseline names NaN/)
+    )
+    assert.throws(
+      attempt({ ...BASELINE, maxStaleMisses: '41' }),
+      refused(/baseline names 41/)
+    )
+  })
+
   test('the version switch: the residual fails from 0.87, the healthy run passes on both sides', () => {
     assert.throws(
       () =>
