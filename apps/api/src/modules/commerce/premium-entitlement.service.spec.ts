@@ -341,3 +341,117 @@ describe('a test_store row is honored only under local and preview (story 6.15 D
     }
   )
 })
+
+// Learning path Step 55: story 6.15 D15 r6. The ledger writers read an unhonored test_store row as
+// absent, so a real activation over it audits and emits from `none`, its cursor cannot discard
+// the real event, and a null snapshot over it writes nothing.
+describe('the ledger writers over a test_store row (story 6.15 D15 r6)', () => {
+  // The stray row's cursor is newer than the real purchase that lands on it.
+  const strayRow = existingRow({
+    store: 'test_store',
+    last_event_occurred_at: new Date(T0.getTime() + 60_000),
+    last_event_id: 'evt-test-store',
+  })
+  const realPurchase = { ...activeState, store: 'app_store' as const }
+
+  function writer(tx: StubTx): PremiumEntitlementService {
+    return new PremiumEntitlementService(
+      {
+        $transaction: (work: (client: unknown) => unknown) => work(tx),
+      } as unknown as PrismaClient,
+      new FakeRevenueCatClient(),
+      new FakeStripeBillingClient(),
+      {
+        isActive: () => Promise.resolve(false),
+        check: () => Promise.resolve('not_granted' as const),
+      }
+    )
+  }
+
+  function applyRealPurchase(tx: StubTx): Promise<EntitlementTransition> {
+    return writer(tx).applyLedgerEvent(tx as unknown as Prisma.TransactionClient, {
+      userId: 'user-1',
+      state: realPurchase,
+      occurredAt: T0,
+      eventId: 'evt-real',
+      provider: 'revenuecat',
+    })
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each([undefined, 'staging', 'production'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv as string)
+    })
+
+    it('applies a real purchase from none, with its audit row, despite the newer cursor', async () => {
+      const tx = stubTx(strayRow)
+      await expect(applyRealPurchase(tx)).resolves.toEqual({
+        applied: true,
+        from: 'none',
+        to: 'active',
+        store: 'app_store',
+        productId: 'premium_monthly',
+      })
+      expect(tx.premiumEntitlement.upsert).toHaveBeenCalledTimes(1)
+      expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('a pulled real entitlement over it also starts from none', async () => {
+      const tx = stubTx(strayRow)
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', realPurchase, 'pull-1')
+      ).resolves.toMatchObject({ applied: true, from: 'none', to: 'active' })
+      expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('a null snapshot over it writes nothing', async () => {
+      const tx = stubTx(strayRow)
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+      ).resolves.toBeNull()
+      expect(tx.premiumEntitlement.upsert).not.toHaveBeenCalled()
+      expect(tx.premiumEntitlement.update).not.toHaveBeenCalled()
+      expect(tx.auditLog.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it('the newer test_store cursor drops the older event, as for any honored row', async () => {
+      const tx = stubTx(strayRow)
+      await expect(applyRealPurchase(tx)).resolves.toMatchObject({
+        applied: false,
+        from: 'active',
+        store: 'test_store',
+      })
+      expect(tx.premiumEntitlement.upsert).not.toHaveBeenCalled()
+    })
+
+    it('a pulled entitlement over it moves from active', async () => {
+      const tx = stubTx(strayRow)
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', realPurchase, 'pull-1')
+      ).resolves.toMatchObject({ applied: true, from: 'active', to: 'active' })
+      expect(tx.auditLog.create).not.toHaveBeenCalled()
+    })
+
+    it('a null snapshot over it expires the row', async () => {
+      const tx = stubTx(existingRow({ store: 'test_store' }))
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+      ).resolves.toMatchObject({
+        applied: true,
+        from: 'active',
+        to: 'expired',
+        store: 'test_store',
+      })
+    })
+  })
+})

@@ -903,6 +903,78 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
     }
   })
 
+  // Learning path Step 55: story 6.15 D15 r6. Outside local and preview a real purchase over a
+  // stray test_store row applies from `none`: its newer cursor cannot drop the purchase, and the
+  // audit row and activation telemetry are written.
+  describe('story 6.15 D15 r6: a real purchase over a test_store row', () => {
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'is ordered against' : 'replaces'} the row under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          const strayCursor = new Date(T0 + 365 * 86_400_000)
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: subscriberId,
+                status: 'active',
+                store: 'test_store',
+                currentPeriodEnd: PERIOD_END,
+                syncedAt: strayCursor,
+                lastEventOccurredAt: strayCursor,
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+          const before = await entitlementOf(subscriberId)
+          const auditsBefore = await auditCount(subscriberId)
+
+          const response = await postEvent(purchaseEvent({ store: 'APP_STORE' }))
+
+          expect(response.status).toBe(200)
+          if (open) {
+            expect(await entitlementOf(subscriberId)).toEqual(before)
+            expect(await auditCount(subscriberId)).toBe(auditsBefore)
+            expect(telemetry.captureEvent).not.toHaveBeenCalledWith(
+              subscriberId,
+              'premium_entitlement_activated',
+              expect.anything()
+            )
+          } else {
+            expect(await entitlementOf(subscriberId)).toMatchObject({
+              status: 'active',
+              store: 'app_store',
+            })
+            const audits = await prisma.auditLog.findMany({
+              where: { user_id: subscriberId, event_type: 'premium_entitlement_changed' },
+              orderBy: { timestamp: 'desc' },
+              take: 1,
+            })
+            expect(await auditCount(subscriberId)).toBe(auditsBefore + 1)
+            expect(audits[0]?.event_data).toMatchObject({ from: 'none', to: 'active' })
+            expect(telemetry.captureEvent).toHaveBeenCalledWith(
+              subscriberId,
+              'premium_entitlement_activated',
+              { store: 'app_store', productId: 'premium_monthly' }
+            )
+          }
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+  })
+
   describe('unknown subjects and degraded sinks', () => {
     it('5.2-INT-040: an unknown app_user_id answers 200, records user_id null, writes no entitlement, emits no api_error_occurred', async (context) => {
       if (!requireSchema(context)) return

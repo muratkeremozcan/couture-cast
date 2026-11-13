@@ -595,6 +595,64 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
   // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
   // Story 6.15 D15: a stray test_store row (a preview database served by an API whose TEST_ENV is
   // not local or preview, a restored dump) grants nothing and reads as absent there.
+  // Learning path Step 55: story 6.15 D15 r6. A ledger with no entitlement expires a test_store
+  // row only where it is honored; elsewhere the refresh writes nothing over it.
+  describe('a null ledger pull over a test_store row (story 6.15 D15 r6)', () => {
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'expires' : 'leaves'} the row under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: subscriberId,
+                status: 'active',
+                store: 'test_store',
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+          const before = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: subscriberId },
+          })
+          const auditsBefore = await prisma.auditLog.count({
+            where: { user_id: subscriberId, event_type: 'premium_entitlement_changed' },
+          })
+
+          const response = await postRefresh(subscriberId)
+
+          expect(response.status).toBe(200)
+          const after = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: subscriberId },
+          })
+          const auditsAfter = await prisma.auditLog.count({
+            where: { user_id: subscriberId, event_type: 'premium_entitlement_changed' },
+          })
+          if (open) {
+            expect(after).toMatchObject({ status: 'expired', store: 'test_store' })
+            expect(auditsAfter).toBe(auditsBefore + 1)
+          } else {
+            expect(after).toEqual(before)
+            expect(auditsAfter).toBe(auditsBefore)
+          }
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+  })
+
   describe('a test_store row on every reader (story 6.15 D15)', () => {
     async function seedTestStoreRow(): Promise<void> {
       await prisma.premiumEntitlement.create({

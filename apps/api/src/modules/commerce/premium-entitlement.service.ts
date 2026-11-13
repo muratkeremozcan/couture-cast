@@ -87,6 +87,16 @@ export function honorsEntitlementStore(store: EntitlementStore): boolean {
   return store !== 'test_store' || appliesRevenueCatTestStore()
 }
 
+/**
+ * The ledger writers' view of the existing mirror row: a row from a store this API does not
+ * honor counts as absent, so the next write starts from `none` (audit row and activation
+ * telemetry included), its ordering cursor cannot discard a real event, and a null snapshot
+ * over it writes nothing (story 6.15 D15 r6).
+ */
+function honoredRow(row: PremiumEntitlement | null): PremiumEntitlement | null {
+  return row !== null && honorsEntitlementStore(row.store) ? row : null
+}
+
 export type EntitlementTelemetryEmission =
   | {
       event: 'premium_entitlement_activated'
@@ -262,9 +272,9 @@ export class PremiumEntitlementService {
     tx: Prisma.TransactionClient,
     input: ApplyLedgerEventInput
   ): Promise<EntitlementTransition> {
-    const existing = await tx.premiumEntitlement.findUnique({
-      where: { user_id: input.userId },
-    })
+    const existing = honoredRow(
+      await tx.premiumEntitlement.findUnique({ where: { user_id: input.userId } })
+    )
 
     if (existing && !this.shouldApply(existing, input.occurredAt, input.eventId)) {
       return {
@@ -339,9 +349,9 @@ export class PremiumEntitlementService {
     const eventId = `pull:${pullId}`
 
     return interactiveTransaction(this.prisma, async (tx) => {
-      const existing = await tx.premiumEntitlement.findUnique({
-        where: { user_id: userId },
-      })
+      const existing = honoredRow(
+        await tx.premiumEntitlement.findUnique({ where: { user_id: userId } })
+      )
 
       if (!state) {
         if (!existing) {
