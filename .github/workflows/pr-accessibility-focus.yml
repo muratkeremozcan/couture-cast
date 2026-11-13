@@ -181,6 +181,8 @@ jobs:
 
   ios:
     name: iOS module tests
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -196,7 +198,7 @@ jobs:
   # Not on pull requests: the release build alone takes about 21 minutes.
   ios-app-build:
     name: iOS app build
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: macos-15
     timeout-minutes: 60
     steps:

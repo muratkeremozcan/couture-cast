@@ -118,7 +118,7 @@ test('an API-only pull request runs Maestro, whose journeys call the API, and sk
       'maestro',
     ])
       assert.ok(lanes.includes(id), `#${number} runs ${id}`)
-    for (const id of ['watchos', 'coverage-mobile', 'lighthouse'])
+    for (const id of ['coverage-mobile', 'lighthouse'])
       assert.ok(!lanes.includes(id), `#${number} skips ${id}`)
   }
 })
@@ -206,7 +206,6 @@ const STARTS = {
     'supabase/migrations/20260101000000_x.sql',
     'playwright/tests/share-card-export.spec.ts',
   ],
-  watchos: ['apps/mobile/plugins/with-watchos.js', 'apps/mobile/targets/watch/App.swift'],
 }
 
 // Per lane, the replayed pull requests it skips. The other 51 touched a shared or unclaimed
@@ -227,7 +226,6 @@ const EXPECTED_SKIPS = {
   'playwright-unit': [209, 199, 180],
   maestro: [199, 148],
   'share-card': [199],
-  watchos: [209, 208, 199, 180, 148],
 }
 
 test('each lane skips exactly the replayed pull requests reviewed for it', () => {
@@ -256,7 +254,6 @@ test('a mobile-only pull request skips the web, API and preview lanes (#204, #19
       'playwright-unit',
       'maestro',
       'share-card',
-      'watchos',
     ])
   }
 })
@@ -276,7 +273,7 @@ test('a shared package wakes every workspace that depends on it (#202: packages/
     assert.ok(config.includes(id), id)
   // Maestro runs on it: the API its journeys call reads the flag configuration.
   assert.ok(config.includes('maestro'))
-  for (const id of ['coverage-mobile', 'watchos'])
+  for (const id of ['coverage-mobile'])
     assert.ok(
       !config.includes(id),
       `apps/mobile does not depend on @couture/config: ${id}`
@@ -689,7 +686,6 @@ test('a rename wakes the lanes of both paths and a removed file wakes its own', 
     'playwright-unit',
     'maestro',
     'share-card',
-    'watchos',
   ]
   const lanes = (...sets) => allLanes.filter((id) => sets.some((set) => set.includes(id)))
   // Web source moved under docs: the destination wakes nothing, the source wakes web.

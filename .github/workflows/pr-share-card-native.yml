@@ -831,7 +831,8 @@ jobs:
   # the client and run their share of the matrix; ios-evidence proves every shard reported its exact
   # cases. The lanes gate requires all three; a skipped shard never passes.
   ios-build:
-    if: github.event_name != 'pull_request'
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
@@ -1072,7 +1073,8 @@ jobs:
   # runs at once.
   ios-shard:
     needs: ios-build
-    if: github.event_name != 'pull_request'
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -1273,7 +1275,8 @@ jobs:
   # client follow it.
   ios-expo-go:
     needs: ios-build
-    if: github.event_name != 'pull_request'
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
@@ -1534,7 +1537,7 @@ jobs:
           node scripts/ci/native-matrix-shards.mjs merge android-36 /tmp/android-matrix-shards
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
-    if: always() && github.event_name != 'pull_request'
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     needs: ios-shard
     runs-on: ubuntu-latest
     timeout-minutes: 5

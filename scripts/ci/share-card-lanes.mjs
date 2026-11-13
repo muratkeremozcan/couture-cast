@@ -51,10 +51,15 @@ const reservedContext = 'gate'
 // skipped on pull_request and successful on main, the nightly schedule and dispatch.
 export const deviceLaneCondition = `github.event_name != '${pullRequestEvent}'`
 export const evidenceCondition = `always() && ${deviceLaneCondition}`
+// The iOS lanes need macOS, which runs nightly and on demand only (owner rule, 2026-11-13: no
+// macOS job on a pull request or a merge to main).
+export const iosLaneCondition =
+  "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+export const iosEvidenceCondition = `always() && (${iosLaneCondition})`
 // The Expo Go proof runs alone on a fresh simulator, like every other device lane: skipped on a
 // pull request, required by share-card-lanes-gate on main, nightly and dispatch runs.
 export const expoGoJobName = 'ios-expo-go'
-export const expoGoLaneCondition = deviceLaneCondition
+export const expoGoLaneCondition = iosLaneCondition
 // The browser lane runs whenever the lane plan runs share-card: always off a pull request, and on
 // one whose diff touches a file the lane builds, runs or reads.
 const deviceLaneIf = (name) =>
@@ -200,16 +205,16 @@ function iosJobProblems(jobs, check) {
 
 function iosShapeProblems({ build, shard, evidence, expoGo }, check) {
   check(build?.needs === undefined, 'ios-build must start independently')
-  check(build?.if === deviceLaneCondition, 'ios-build must be skipped on pull_request')
-  check(shard?.if === deviceLaneCondition, 'ios-shard must be skipped on pull_request')
+  check(build?.if === iosLaneCondition, 'ios-build must run only nightly and on demand')
+  check(shard?.if === iosLaneCondition, 'ios-shard must run only nightly and on demand')
   check(
     JSON.stringify(needsList(shard)) === JSON.stringify(['ios-build']),
     'ios-shard must need exactly ios-build'
   )
   check(
     JSON.stringify(needsList(evidence)) === JSON.stringify(['ios-shard']) &&
-      evidence?.if === evidenceCondition,
-    'ios-evidence must run after any ios-shard result, except on pull_request'
+      evidence?.if === iosEvidenceCondition,
+    'ios-evidence must run after any ios-shard result, nightly and on demand only'
   )
   check(
     JSON.stringify(shard?.strategy?.matrix?.shard) === JSON.stringify(shardsOf('ios')) &&
@@ -238,7 +243,7 @@ function expoGoProblems({ shard, expoGo }, check) {
   const name = expoGoJobName
   check(
     expoGo?.if === expoGoLaneCondition,
-    `${name} must skip pull requests like the other device lanes`
+    `${name} must run only nightly and on demand like the other iOS lanes`
   )
   check(
     JSON.stringify(needsList(expoGo)) === JSON.stringify(['ios-build']),

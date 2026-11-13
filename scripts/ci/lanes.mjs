@@ -267,12 +267,6 @@ export const LANES = {
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },
-  watchos: {
-    title: 'watchOS native',
-    workflow: 'watchos-native.yml',
-    jobs: ['watchos-native'],
-    workspaces: ['mobile'],
-  },
 }
 
 /** A glob as a RegExp: `**` spans directories, `*` and `?` stay within one, dotfiles match. */

@@ -408,7 +408,14 @@ describe('deployment workflows', () => {
     for (const block of jobs) {
       const name = block.slice(2, block.indexOf(':'))
       const condition = ifOf(block)
-      if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
+      // The iOS jobs need macOS, which runs nightly and on demand only (owner rule, 2026-11-13).
+      if (
+        condition?.includes("github.event_name != 'pull_request'") ||
+        condition?.includes(
+          "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        )
+      )
+        skipped.add(name)
       else
         expect(['lanes', 'browser-acceptance', 'share-card-lanes-gate'], name).toContain(
           name
