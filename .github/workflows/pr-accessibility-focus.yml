@@ -7,9 +7,9 @@
 # (scripts/run-story67-talkback.mjs). PR Gate makes every job that runs here
 # required.
 #
-# The release iOS app build takes about 21 minutes alone, over the 20 minute PR
-# job limit, so it runs on pushes to main, nightly and on demand. PRs keep the
-# XCTest module tests, the Android module tests and build, and the TalkBack run.
+# Both iOS jobs (the XCTest module tests and the release iOS app build) need
+# macOS, which runs nightly and on demand only (owner rule, 2026-11-13). PRs and
+# pushes keep the Android module tests and build, and the TalkBack run.
 name: Accessibility focus module
 
 on:
@@ -55,7 +55,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: accessibility-focus-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a scheduled or dispatched run, the iOS jobs' only runs.
+  group: accessibility-focus-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -181,6 +182,8 @@ jobs:
 
   ios:
     name: iOS module tests
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: macos-15
     timeout-minutes: 20
     steps:
@@ -193,10 +196,11 @@ jobs:
           echo "Simulator: $device"
           xcodebuild test -scheme AccessibilityFocusTarget -destination "platform=iOS Simulator,name=$device"
 
-  # Not on pull requests: the release build alone takes about 21 minutes.
+  # macOS runs nightly and on demand only (owner rule, 2026-11-13); the release build alone takes
+  # about 21 minutes.
   ios-app-build:
     name: iOS app build
-    if: ${{ github.event_name != 'pull_request' }}
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
     runs-on: macos-15
     timeout-minutes: 60
     steps:

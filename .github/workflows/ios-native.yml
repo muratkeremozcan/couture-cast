@@ -1,122 +1,27 @@
-# Story 6.15 D6: the iOS jobs (ios-native-jobs.yml) on main. A merge runs them when it changed a
-# native iOS input, and the nightly run covers the rest. Both are trusted runs of main's own code,
-# so they keep the development client and native Supabase caches warm. A pull request's commit
-# runs them through ios-native-dispatch.yml, with a read-only cache.
+# Story 6.15 D6: the iOS jobs (ios-native-jobs.yml), nightly on main and by manual dispatch. No
+# macOS job runs on a pull request or gates a merge (owner rule, 2026-11-13): macOS queues are
+# unpredictable, so iOS native coverage comes from this run and the iOS 26.5 canary
+# (ios-native-canary.yml), and a red nightly run goes to TEA for triage. The nightly run is main's
+# own code, so it keeps the development client and native Supabase caches warm; a dispatch builds
+# its client in ios-build and hands it to the shards as an artifact, and saves no cache.
 name: iOS native
 run-name: iOS native ${{ github.sha }}
 
 on:
-  # A merge runs it only when a native iOS input changed, and ios-changes then skips it when only
-  # dependencies that apps/mobile does not install changed; the nightly run covers the rest.
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/ios-native.yml'
-      - '.github/workflows/ios-native-jobs.yml'
-      - '.github/actions/install/**'
-      - '.github/actions/node-dependencies/**'
-      - '.nvmrc'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'apps/mobile/package.json'
-      - 'apps/mobile/app.json'
-      - 'apps/mobile/app.config.ts'
-      - 'apps/mobile/plugins/**'
-      - '!apps/mobile/plugins/**/*.test.js'
-      - 'apps/mobile/modules/*/expo-module.config.json'
-      - 'apps/mobile/modules/*/ios/**'
-      - 'apps/mobile/targets/**'
-      - 'apps/mobile/locales/**'
-      - 'apps/mobile/assets/images/notification-icon.png'
-      - 'apps/mobile/native-tests/**'
-      - 'maestro/story65/**'
-      - 'maestro/story67/**'
-      - 'maestro/story68/**'
-      - 'scripts/ci/native-*'
-      - 'scripts/ci/android-talkback.sh'
-      - 'scripts/ci/check-accessibility-focus-builds.sh'
-      - 'scripts/ci/install-dependencies.sh'
-      - 'scripts/ci/maestro-check-flows.mjs'
-      - 'scripts/ci/node-test-gate.mjs'
-      - 'scripts/ci/node-test-suites.json'
-      - 'scripts/ci/share-card-header-semantics.sh'
-      - 'scripts/ci/verify-dependency-tree.mjs'
-      - 'scripts/ci/workflow-step-shadowing.mjs'
-      - 'scripts/e2e-real-session/**'
-      - 'scripts/e2e-share-card/**'
-      - 'scripts/lib/caller-owned-env.mjs'
-      - 'scripts/lib/database-tls.mjs'
-      - 'scripts/lib/expo-*.mjs'
-      - 'scripts/lib/local-supabase-ports.cjs'
-      - 'scripts/lib/local-supabase-ports.mjs'
-      - 'scripts/lib/maestro-*.mjs'
-      - 'scripts/lib/mobile-e2e-*.mjs'
-      - 'scripts/lib/native-*.mjs'
-      - 'scripts/lib/package-manager-readiness.mjs'
-      - 'scripts/lib/prisma-migrate-connection.mjs'
-      - 'scripts/lib/share-card-*.mjs'
-      - 'scripts/lib/story68-*.mjs'
-      - '!scripts/lib/story68-gradle-precondition.mjs'
-      - '!scripts/lib/story68-release-live-font-fixtures.mjs'
-      - 'scripts/lib/story69-share-sheet.mjs'
-      - 'scripts/lib/test-disk-space.mjs'
-      - 'scripts/lib/weather-provider-double-data.mjs'
-      - 'scripts/e2e-stack-pid.mjs'
-      - 'scripts/install-expo-go.mjs'
-      - 'scripts/local-e2e-database.mjs'
-      - 'scripts/local-storage-buckets.mjs'
-      - 'scripts/maestro-flow-durations.json'
-      - 'scripts/maestro-install.mjs'
-      - 'scripts/maestro-version.mjs'
-      - 'scripts/prisma-migrate-deploy.mjs'
-      - 'scripts/run-maestro.mjs'
-      - 'scripts/run-story68-native.mjs'
-      - 'scripts/start-api-e2e-with-workers.mjs'
-      - 'scripts/start-ios-simulator.sh'
-      - 'scripts/weather-provider-double.mjs'
-      - '!scripts/**/*.test.mjs'
   schedule:
     - cron: '23 3 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-# One run per event and commit, so a merge and the nightly run each finish.
+# One run per event and commit, so the nightly run and a dispatch each finish.
 concurrency:
   group: ios-native-${{ github.event_name }}-${{ github.sha }}
   cancel-in-progress: true
 
 jobs:
-  # A merge matches the push paths by name, and package-lock.json and package.json are shared by
-  # every workspace, so this job reads what the merge changed in them and lets the iOS jobs run only
-  # when it touched what apps/mobile installs (scripts/ci/ios-native-inputs.mjs). The nightly run
-  # always tests its commit.
-  ios-changes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      run: ${{ steps.changes.outputs.run }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.sha }}
-      # Every job proves it checked out exactly the commit the run name carries.
-      - name: Stop unless HEAD is the commit under test
-        env:
-          SHA: ${{ github.sha }}
-        run: |
-          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
-          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
-      - name: Decide whether this merge changed a native iOS input
-        id: changes
-        env:
-          EVENT: ${{ github.event_name }}
-          BEFORE: ${{ github.event.before }}
-        run: node scripts/ci/ios-native-inputs.mjs push-changes
-
   ios-native:
-    needs: ios-changes
-    if: ${{ github.event_name != 'push' || needs.ios-changes.outputs.run == 'true' }}
     uses: ./.github/workflows/ios-native-jobs.yml
     with:
       sha: ${{ github.sha }}

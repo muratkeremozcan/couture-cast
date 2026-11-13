@@ -828,14 +828,23 @@ describe('share-card parallel lane validator', () => {
         jobs['ios-evidence'].if = 'always()'
       }
     )
-    for (const name of ['ios-build', 'ios-shard'])
+    for (const name of ['ios-build', 'ios-shard']) {
       rejected(
         `${name} running on pull_request`,
-        new RegExp(`${name} must be skipped on pull_request`),
+        new RegExp(`${name} must run only nightly and on demand`),
         (jobs) => {
           delete jobs[name].if
         }
       )
+      // macOS runs nightly and on demand only (owner rule, 2026-11-13), so a merge skips it too.
+      rejected(
+        `${name} running on a merge to main`,
+        new RegExp(`${name} must run only nightly and on demand`),
+        (jobs) => {
+          jobs[name].if = "github.event_name != 'pull_request'"
+        }
+      )
+    }
     rejected(
       'an evidence job that does not check the shard result',
       /exact cases/,
@@ -898,17 +907,16 @@ describe('share-card parallel lane validator', () => {
     )
     rejected(
       'an ios-expo-go on pull_request',
-      /ios-expo-go must skip pull requests like the other device lanes/,
+      /ios-expo-go must run only nightly and on demand like the other iOS lanes/,
       (jobs) => {
         delete jobs['ios-expo-go'].if
       }
     )
     rejected(
-      'an ios-expo-go that skips main pushes',
-      /ios-expo-go must skip pull requests like the other device lanes/,
+      'an ios-expo-go that runs on a merge to main',
+      /ios-expo-go must run only nightly and on demand like the other iOS lanes/,
       (jobs) => {
-        jobs['ios-expo-go'].if =
-          "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
+        jobs['ios-expo-go'].if = "github.event_name != 'pull_request'"
       }
     )
     rejected(
@@ -1367,12 +1375,18 @@ describe('share native unit workflow', () => {
     assert.ok('workflow_dispatch' in on)
   })
 
-  test('every job is unconditional, visible on failure and within 20 minutes', () => {
+  // Swift needs macOS, which runs nightly and on demand only (owner rule, 2026-11-13).
+  test('Robolectric runs on pull requests, Swift nightly and on demand; both visible on failure and within 20 minutes', () => {
     const jobs = Object.entries(unit.jobs)
     assert.deepEqual(jobs.map(([name]) => name).sort(), ['robolectric', 'swift'])
+    const expected = {
+      robolectric: undefined,
+      swift:
+        "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'",
+    }
     for (const [name, job] of jobs) {
       assert.ok(job['timeout-minutes'] > 0 && job['timeout-minutes'] <= 20, name)
-      assert.equal(job.if, undefined, `${name} runs on pull requests`)
+      assert.equal(job.if, expected[name], `${name} condition`)
       assert.notEqual(job['continue-on-error'], true, name)
       assert.ok(
         job.steps.every((row) => row['continue-on-error'] !== true),

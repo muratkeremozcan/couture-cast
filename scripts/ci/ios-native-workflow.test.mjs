@@ -1,29 +1,24 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 D6, C-13 and IOS-01/02/03: the iOS jobs run off the pull request path, from
-// ios-native.yml on a merge and nightly and from ios-native-dispatch.yml for a commit that has not
-// merged, with a read-only cache. Each control below breaks one rule and must be rejected, each by
-// its own predicate; the committed workflows must pass all of them.
+// ios-native.yml nightly and on a manual dispatch, and from the nightly iOS 26.5 canary. No macOS
+// job runs on a pull request or gates a merge (owner rule, 2026-11-13). Each control below breaks
+// one rule and must be rejected, each by its own predicate; the committed workflows must pass all
+// of them.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
-import {
-  helperProblems,
-  inputCoverageProblems,
-  npmCalls,
-  scriptReads,
-} from './ios-native-helpers.mjs'
+import { helperProblems, npmCalls } from './ios-native-helpers.mjs'
 import {
   CANARY_WORKFLOW,
   CLIENT_ARTIFACT,
-  DISPATCH_WORKFLOW,
   JOBS_WORKFLOW,
   MANDATORY,
+  NIGHTLY_WORKFLOW,
   PROOF,
-  PUSH_WORKFLOW,
   TEST_JOBS,
   XCODE_CHOICES,
   disabledCondition,
@@ -35,8 +30,7 @@ import { CACHE_VERSION, cacheKey } from './native-build-cache.mjs'
 import { cacheOutputs } from './native-supabase.mjs'
 
 const source = readWorkflows()
-const P = PUSH_WORKFLOW
-const D = DISPATCH_WORKFLOW
+const P = NIGHTLY_WORKFLOW
 const J = JOBS_WORKFLOW
 const C = CANARY_WORKFLOW
 // A JSON round trip breaks the sharing YAML aliases create, so one job can be mutated alone.
@@ -221,13 +215,6 @@ function canaryFixtures() {
       files[P].jobs['ios-native'].with['ios26-canary'] = true
     }
   )
-  rejected(
-    'ios-native-dispatch.yml passing the canary switch',
-    /ios-native-dispatch.yml never passes ios26-canary/,
-    (_, files) => {
-      files[D].jobs['ios-native'].with['ios26-canary'] = true
-    }
-  )
   for (const [title, change] of [
     [
       'a canary switch on by default',
@@ -273,11 +260,10 @@ describe('ios-native workflows validator', () => {
     assert.equal(jobs['ios-expo-go'].needs, 'ios-build')
     assert.equal(jobs['ios-app-build'].needs, undefined)
     assert.equal(source[P].jobs['ios-native'].uses, `./${J}`)
-    assert.equal(source[D].jobs['ios-native'].uses, `./${J}`)
   })
 
   // Triggers and the commit a run tests.
-  for (const file of [P, D, J, C]) {
+  for (const file of [P, J, C]) {
     rejected(
       `a pull_request trigger on ${file}`,
       /never runs on a pull request/,
@@ -293,29 +279,32 @@ describe('ios-native workflows validator', () => {
       }
     )
   }
-  rejected(
-    'a dispatch trigger on ios-native.yml',
-    /only on a merge to main and nightly/,
-    (_, files) => {
-      onOf(files[P]).workflow_dispatch = {
-        inputs: { sha: { required: true, type: 'string' } },
-      }
-    }
-  )
-  rejected(
-    'an unfiltered merge trigger',
-    /filtered by its native iOS inputs/,
-    (_, files) => {
-      delete onOf(files[P]).push.paths
-    }
-  )
-  rejected(
-    'a merge filter without the jobs file',
-    /filtered by its native iOS inputs/,
-    (_, files) => {
-      onOf(files[P]).push.paths = onOf(files[P]).push.paths.filter((glob) => glob !== J)
-    }
-  )
+  // The owner rule: macOS jobs run nightly and on a manual dispatch, never on a merge.
+  for (const [title, change] of [
+    [
+      'a merge trigger on ios-native.yml',
+      (on) => {
+        on.push = { branches: ['main'] }
+      },
+    ],
+    [
+      'a dispatch input on ios-native.yml',
+      (on) => {
+        on.workflow_dispatch = { inputs: { sha: { required: true, type: 'string' } } }
+      },
+    ],
+    [
+      'no dispatch trigger on ios-native.yml',
+      (on) => {
+        delete on.workflow_dispatch
+      },
+    ],
+  ])
+    rejected(
+      title,
+      /runs only nightly and on a manual dispatch without inputs/,
+      (_, files) => change(onOf(files[P]))
+    )
   rejected('no nightly run', /one nightly schedule/, (_, files) => {
     delete onOf(files[P]).schedule
   })
@@ -324,21 +313,8 @@ describe('ios-native workflows validator', () => {
     rejected(`a schedule of ${cron}`, /one nightly schedule/, (_, files) => {
       onOf(files[P]).schedule = [{ cron }]
     })
-  rejected('an optional sha', /required sha input/, (_, files) => {
-    onOf(files[D]).workflow_dispatch.inputs.sha.required = false
-  })
-  rejected('a second dispatch input', /exactly one commit/, (_, files) => {
-    onOf(files[D]).workflow_dispatch.inputs.ref = { type: 'string', required: false }
-  })
   rejected(
-    'a dispatch run name without the commit',
-    /run name must be "iOS native \$\{\{ inputs.sha/,
-    (_, files) => {
-      files[D]['run-name'] = 'iOS native'
-    }
-  )
-  rejected(
-    'a merge run name without the commit',
+    'a nightly run name without the commit',
     /run name must be "iOS native \$\{\{ github.sha/,
     (_, files) => {
       files[P]['run-name'] = 'iOS native'
@@ -355,38 +331,6 @@ describe('ios-native workflows validator', () => {
     }
   )
 
-  // IOS-01: a dispatch runs a commit that has not merged, so GitHub must hand every job a
-  // read-only cache token.
-  rejected(
-    'a dispatch without a workflow cache-mode',
-    /cache-mode: read on the workflow and on every job/,
-    (_, files) => {
-      delete files[D]['cache-mode']
-    }
-  )
-  for (const job of ['ios-native', 'ios-cache-proof']) {
-    rejected(
-      `a dispatch job ${job} without its cache-mode`,
-      /cache-mode: read on the workflow and on every job/,
-      (_, files) => {
-        delete files[D].jobs[job]['cache-mode']
-      }
-    )
-    rejected(
-      `a dispatch job ${job} with write access`,
-      /cache-mode: read on the workflow and on every job/,
-      (_, files) => {
-        files[D].jobs[job]['cache-mode'] = 'write'
-      }
-    )
-  }
-  rejected(
-    'a third dispatch job that writes',
-    /cache-mode: read on the workflow and on every job/,
-    (_, files) => {
-      files[D].jobs.extra = { 'runs-on': 'ubuntu-latest', steps: [{ run: 'echo' }] }
-    }
-  )
   rejected('a cache-mode in the jobs file', /declares no cache-mode/, (_, files) => {
     files[J]['cache-mode'] = 'write'
   })
@@ -394,99 +338,29 @@ describe('ios-native workflows validator', () => {
     jobs['ios-build']['cache-mode'] = 'write'
   })
   rejected(
-    'a merge caller that limits the cache',
+    'a nightly caller that limits the cache',
     /contents: read only, the trusted cache default/,
     (_, files) => {
       files[P]['cache-mode'] = 'read'
     }
   )
   rejected(
-    'a dispatch that calls the jobs for another commit',
-    /call the jobs for inputs.sha/,
-    (_, files) => {
-      files[D].jobs['ios-native'].with.sha = '${{ github.sha }}'
-    }
-  )
-  rejected(
-    'a merge that calls the jobs for another commit',
-    /call the jobs for github.sha/,
+    'a nightly run that calls the jobs for another commit',
+    /call the jobs for github.sha on every run/,
     (_, files) => {
       files[P].jobs['ios-native'].with.sha = '${{ github.event.before }}'
     }
   )
   rejected(
-    'the merge call skipping a nightly run on ios-changes',
-    /skipping only a merge/,
+    'a nightly call behind a condition',
+    /call the jobs for github.sha on every run/,
     (_, files) => {
-      files[P].jobs['ios-native'].if = "${{ needs.ios-changes.outputs.run == 'true' }}"
+      files[P].jobs['ios-native'].if = "${{ github.event_name == 'schedule' }}"
     }
   )
-  rejected(
-    'ios-changes without the commit before the merge',
-    /ios-changes: decide from/,
-    (_, files) => {
-      delete step(files[P].jobs['ios-changes'], (row) => row.id === 'changes').env.BEFORE
-    }
-  )
-  rejected(
-    'ios-changes deciding from another script',
-    /ios-changes: decide from/,
-    (_, files) => {
-      step(files[P].jobs['ios-changes'], (row) => row.id === 'changes').run =
-        'echo run=true >> "$GITHUB_OUTPUT"'
-    }
-  )
-
-  // IOS-01: ios-cache-proof stands for the read-only token on every dispatch.
-  rejected('no cache proof', /holds the jobs call and ios-cache-proof/, (_, files) => {
-    delete files[D].jobs['ios-cache-proof']
+  rejected('a second nightly job', /holds only the jobs call/, (_, files) => {
+    files[P].jobs.extra = { 'runs-on': 'ubuntu-latest', steps: [{ run: 'echo' }] }
   })
-  rejected(
-    'a cache proof that checks out the commit',
-    /ios-cache-proof: actions: read only, no checkout/,
-    (_, files) => {
-      files[D].jobs['ios-cache-proof'].steps.unshift({ uses: 'actions/checkout@v4' })
-    }
-  )
-  rejected(
-    'a cache proof that may write',
-    /ios-cache-proof: actions: read only/,
-    (_, files) => {
-      files[D].jobs['ios-cache-proof'].permissions = { actions: 'write' }
-    }
-  )
-  rejected(
-    'a cache proof that never lists the entries after',
-    /then fail if any probe entry exists/,
-    (_, files) => {
-      files[D].jobs['ios-cache-proof'].steps[3].run = 'echo done'
-    }
-  )
-  rejected(
-    'a cache proof whose API write cannot fail it',
-    /then fail if any probe entry exists/,
-    (_, files) => {
-      const api = files[D].jobs['ios-cache-proof'].steps[2]
-      api.with.script = api.with.script.replace(
-        "core.setFailed('The cache service reserved",
-        "core.info('The cache service reserved"
-      )
-    }
-  )
-  rejected(
-    'a cache proof that tries no save',
-    /then fail if any probe entry exists/,
-    (_, files) => {
-      files[D].jobs['ios-cache-proof'].steps[1].uses = 'actions/cache/restore@v5.1.0'
-    }
-  )
-  rejected(
-    'a cache proof step that ignores its failure',
-    /ios-cache-proof: ".*" must run and be able to fail/,
-    (_, files) => {
-      files[D].jobs['ios-cache-proof'].steps[3].run += '\ntrue\n'
-    }
-  )
 
   // IOS-02: least privilege.
   rejected(
@@ -504,21 +378,7 @@ describe('ios-native workflows validator', () => {
     }
   )
   rejected(
-    'contents: write on the dispatch',
-    /call the jobs for inputs.sha with contents: read only/,
-    (_, files) => {
-      files[D].permissions = { contents: 'write' }
-    }
-  )
-  rejected(
-    'actions: write on the dispatch call',
-    /call the jobs for inputs.sha with contents: read only/,
-    (_, files) => {
-      files[D].jobs['ios-native'].permissions = { actions: 'write', contents: 'read' }
-    }
-  )
-  rejected(
-    'contents: write on the merge caller',
+    'contents: write on the nightly caller',
     /contents: read only, the trusted cache default/,
     (_, files) => {
       files[P].permissions = { contents: 'write' }
@@ -532,11 +392,6 @@ describe('ios-native workflows validator', () => {
       (files) => files[J].jobs[name],
       '${{ inputs.sha }}',
     ]),
-    [
-      'ios-native.yml ios-changes',
-      (files) => files[P].jobs['ios-changes'],
-      '${{ github.sha }}',
-    ],
   ]
   for (const [name, job, commit] of proofJobs) {
     const pattern = new RegExp(`${name}: the second step must fail unless HEAD`)
@@ -1248,6 +1103,17 @@ describe('cache steps behind the read-only dispatch', () => {
       ).with.cache = 'npm'
     }
   )
+  // Antigravity review of PR 224: a substring match let this cache on a dispatch.
+  rejected(
+    'an npm cache that the dispatch condition only seems to switch off',
+    /ios-app-build: .*setup-node.* caches on a dispatch/,
+    (jobs) => {
+      step(
+        jobs['ios-app-build'],
+        (item) => item.uses === 'actions/setup-node@v4'
+      ).with.cache = "${{ github.event_name != 'workflow_dispatch' || 'npm' }}"
+    }
+  )
   rejected(
     'setup-go with its default module cache',
     /ios-shard: .*setup-go.* caches on a dispatch/,
@@ -1428,89 +1294,6 @@ describe('the helpers the workflows call', () => {
   })
 })
 
-// SL-11: the push paths are the native iOS inputs of the merge trigger and the pull request gate,
-// so they must cover every script the iOS jobs run or read, and name no scripts/lib file they do
-// not read, or a shared helper change would cost a pull request a 75-minute dispatch.
-describe('the native iOS inputs cover what the iOS jobs read', () => {
-  const libraryFiles = fs.readdirSync('scripts/lib').map((name) => `scripts/lib/${name}`)
-  const reads = scriptReads(source[J])
-  const coverage = (workflow) => inputCoverageProblems(workflow, { reads, libraryFiles })
-
-  test('every script the iOS jobs read is a push path, and every scripts/lib push path is read', () => {
-    assert.deepEqual(coverage(source[P]), [])
-    assert.ok(reads.includes('scripts/run-story68-native.mjs'))
-    assert.ok(reads.includes('scripts/lib/story68-native-build.mjs'))
-    assert.ok(
-      reads.includes('scripts/ci/install-dependencies.sh'),
-      'a local action’s script'
-    )
-    assert.ok(!reads.some((file) => file.endsWith('.test.mjs')))
-  })
-
-  test('a missing script is reported', () => {
-    const files = fresh()
-    onOf(files[P]).push.paths = onOf(files[P]).push.paths.filter(
-      (glob) => glob !== 'scripts/e2e-real-session/**'
-    )
-    assert.ok(
-      coverage(files[P]).includes(
-        'the push paths miss scripts/e2e-real-session/run.mjs, which the iOS jobs read'
-      )
-    )
-  })
-
-  test('scripts/lib as a whole is reported for the helpers no iOS job reads', () => {
-    const files = fresh()
-    onOf(files[P]).push.paths.splice(-1, 0, 'scripts/lib/**')
-    const problems = coverage(files[P])
-    assert.ok(
-      problems.some((problem) => /name scripts\/lib\/community-/.test(problem)),
-      problems.join('\n')
-    )
-  })
-
-  test('the reads follow imports, scripts named by path, and a local action’s nested actions', () => {
-    const tree = {
-      '.github/actions/outer/action.yml':
-        'runs:\n  steps:\n    - uses: ./.github/actions/inner\n',
-      '.github/actions/inner/action.yml': 'run: bash scripts/ci/inner.sh\n',
-      'scripts/a.mjs': "import x from './lib/b.mjs'\nspawn('node', ['scripts/c.mjs'])\n",
-      'scripts/lib/b.mjs': "import t from './b.test.mjs'\n",
-      'scripts/lib/b.test.mjs': "import u from './unreached.mjs'\n",
-      'scripts/lib/unreached.mjs': '',
-      'scripts/c.mjs': "path.join(dir, 'sibling.mjs')\n",
-      'scripts/sibling.mjs': '',
-      'scripts/ci/inner.sh': '',
-      'scripts/d.json': '["scripts/data-only.mjs"]',
-      'scripts/data-only.mjs': '',
-    }
-    const workflow = {
-      jobs: {
-        'ios-build': {
-          steps: [
-            { run: 'node scripts/a.mjs && cat scripts/d.json' },
-            { uses: './.github/actions/outer' },
-          ],
-        },
-      },
-    }
-    assert.deepEqual(
-      scriptReads(workflow, {
-        read: (file) => tree[file] ?? null,
-        exists: (file) => file in tree,
-      }),
-      [
-        'scripts/a.mjs',
-        'scripts/c.mjs',
-        'scripts/ci/inner.sh',
-        'scripts/d.json',
-        'scripts/lib/b.mjs',
-        'scripts/sibling.mjs',
-      ]
-    )
-  })
-})
-
 // IOS-02: the committed proof of every job, run against a fake git.
 describe('the commit proof', () => {
   const run = (proof, head, sha) => {
@@ -1530,10 +1313,10 @@ describe('the commit proof', () => {
     }
   }
   const head = 'a'.repeat(40)
-  const jobs = [
-    ...TEST_JOBS.map((name) => [`ios-native-jobs.yml ${name}`, source[J].jobs[name]]),
-    ['ios-native.yml ios-changes', source[P].jobs['ios-changes']],
-  ]
+  const jobs = TEST_JOBS.map((name) => [
+    `ios-native-jobs.yml ${name}`,
+    source[J].jobs[name],
+  ])
   for (const [name, job] of jobs)
     test(`${name} passes only when HEAD is exactly the full commit named`, () => {
       const proof = job.steps[1]
@@ -1557,7 +1340,6 @@ describe('the commit proof', () => {
   })
 
   test('the run names carry the commit every job proves', () => {
-    assert.equal(source[D]['run-name'], 'iOS native ${{ inputs.sha }}')
     assert.equal(source[P]['run-name'], 'iOS native ${{ github.sha }}')
     for (const name of TEST_JOBS)
       assert.equal(source[J].jobs[name].steps[1].env.SHA, '${{ inputs.sha }}')

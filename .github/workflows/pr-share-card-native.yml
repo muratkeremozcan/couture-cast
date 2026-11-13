@@ -1,10 +1,12 @@
 name: Share-card native originals
 # Pull requests run the browser lane and the lanes gate only. Every device lane takes over an hour,
-# so it runs on main, nightly and on demand: the job-level condition skips it on pull_request, and
-# the gate requires a skip there and a success everywhere else.
+# so the Android lanes run on main, nightly and on demand, and the iOS lanes, which need macOS,
+# nightly and on demand only (owner rule, 2026-11-13). The gate requires each skip where its
+# condition skips it and a success everywhere else.
 on:
   pull_request:
-  # A merge to main runs every device lane (10 jobs, 4 on macOS, 41 to 118 minutes), which
+  # A merge to main runs every Android device lane (the iOS lanes are nightly and on demand only),
+  # once 10 jobs, 4 on macOS, 41 to 118 minutes, which
   # held half of the account's 20 concurrent jobs. It runs only when a file the lanes build,
   # run or read changed; the nightly run covers everything. scripts/ci/share-card-paths.test.mjs
   # checks the filter against representative inputs and the last 20 commits on main.
@@ -40,10 +42,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-# The nightly run has its own group: GitHub starts the 03:17 cron hours late, and a merge to main
-# during it cancelled it (scheduled run 41435261779), which kept the README badge from turning green.
+# Each event has its own group: GitHub starts the 03:17 cron hours late, and a merge to main during
+# it cancelled it (scheduled run 41435261779), which kept the README badge from turning green. A
+# dispatch needs its own too, since the iOS lanes run only nightly and on demand.
 concurrency:
-  group: share-card-native-${{ github.ref }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
+  group: share-card-native-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
@@ -861,7 +864,8 @@ jobs:
   # the client and run their share of the matrix; ios-evidence proves every shard reported its exact
   # cases. The lanes gate requires all three; a skipped shard never passes.
   ios-build:
-    if: github.event_name != 'pull_request'
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
@@ -1102,7 +1106,8 @@ jobs:
   # runs at once.
   ios-shard:
     needs: ios-build
-    if: github.event_name != 'pull_request'
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     strategy:
       fail-fast: false
       matrix:
@@ -1298,12 +1303,13 @@ jobs:
         if: always()
         run: node scripts/ci/native-ios-device-cleanup.mjs
 
-  # The Expo Go proof runs alone on a fresh simulator, skipped on pull requests like every other
-  # device lane and required by share-card-lanes-gate. The iOS checks that need no development
+  # The Expo Go proof runs alone on a fresh simulator, nightly and on demand only like the other
+  # iOS lanes, and required there by share-card-lanes-gate. The iOS checks that need no development
   # client follow it.
   ios-expo-go:
     needs: ios-build
-    if: github.event_name != 'pull_request'
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13).
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
@@ -1564,7 +1570,7 @@ jobs:
           node scripts/ci/native-matrix-shards.mjs merge android-36 /tmp/android-matrix-shards
   # A skipped shard has no report, so this job fails; the lanes gate also requires its result.
   ios-evidence:
-    if: always() && github.event_name != 'pull_request'
+    if: always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
     needs: ios-shard
     runs-on: ubuntu-latest
     timeout-minutes: 5

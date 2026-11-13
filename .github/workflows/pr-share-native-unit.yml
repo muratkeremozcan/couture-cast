@@ -1,5 +1,6 @@
 # Story 6.9: unit tests for the share-card native modules, without a prebuild. The native app
-# lanes skip pull requests, so this path-filtered workflow runs, on every PR that touches them:
+# lanes skip pull requests, so this path-filtered workflow runs, on every PR that touches them
+# (the Swift job nightly and on demand only, since it needs macOS):
 # - the share module's Swift package (activity mapper, outcome reducer, anchor configuration,
 #   ShareCardShareFile) and the photo-save package with its cross-prefix test (TEA RG3);
 # - the share module's Robolectric tests, from its standalone Gradle project, which compiles the
@@ -25,7 +26,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a scheduled or dispatched run, the Swift job's only runs.
+  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
@@ -34,6 +36,9 @@ permissions:
 jobs:
   swift:
     name: Swift packages (share and photo-save)
+    # macOS runs nightly and on demand only (owner rule, 2026-11-13); Robolectric below stays on
+    # pull requests.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: macos-15
     timeout-minutes: 20
     steps:
