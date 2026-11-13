@@ -339,29 +339,35 @@ export function readEnvironment(flat) {
 }
 
 /**
- * The window's bounds. Maestro's root node carries none, so this is the union of every bounded
- * node, which the full-screen root view spans.
+ * The window's bounds. Maestro's root node carries none, so this is the largest node anchored
+ * at the window's origin: the full-screen root view on Android, the application element on iOS,
+ * whose subtree also lists content scrolled off screen. Without one, the union of every node.
  */
 export function windowBounds(tree) {
-  let box
+  let union
+  let window
   const walk = (node) => {
     const match = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
       node?.attributes?.bounds ?? ''
     )
     if (match) {
       const [l, t, r, b] = match.slice(1).map(Number)
-      box = box
+      union = union
         ? [
-            Math.min(box[0], l),
-            Math.min(box[1], t),
-            Math.max(box[2], r),
-            Math.max(box[3], b),
+            Math.min(union[0], l),
+            Math.min(union[1], t),
+            Math.max(union[2], r),
+            Math.max(union[3], b),
           ]
         : [l, t, r, b]
+      const area = (box) => (box[2] - box[0]) * (box[3] - box[1])
+      if (l === 0 && t === 0 && (!window || area([l, t, r, b]) > area(window)))
+        window = [l, t, r, b]
     }
     for (const child of node?.children ?? []) walk(child)
   }
   walk(tree)
+  const box = window ?? union
   return box ? `[${box[0]},${box[1]}][${box[2]},${box[3]}]` : undefined
 }
 

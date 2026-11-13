@@ -450,6 +450,16 @@ test('flattenHierarchy reads the environment every marked window agrees on', () 
   assert.equal(parseEnvironment('live-font-env-home~0.81.5'), undefined)
 })
 
+test('windowBounds takes the app window over content scrolled off screen on iOS', () => {
+  const tree = node({}, [
+    node({ text: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
+      node({ bounds: '[34,-354][367,-300]' }),
+      node({ bounds: '[0,800][402,963]' }),
+    ]),
+  ])
+  assert.equal(windowBounds(tree), '[0,0][402,874]')
+})
+
 test('windowBounds spans every bounded node when the root has none', () => {
   const tree = node({}, [
     node({ bounds: '[0,0][1080,2400]' }, [node({ bounds: '[42,488][304,657]' })]),
