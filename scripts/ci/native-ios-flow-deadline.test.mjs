@@ -90,3 +90,50 @@ test('the timing log line names the flow while the timing file keeps its shape',
     iosFlowDeadline: { flow: 'maestro/story68/save.yaml', ...record },
   })
 })
+
+// Story 6.15: dispatch 43393247650 shard 2 and job 131221970170 lost the timing record and failed
+// with no cause. spawnSync past maxBuffer SIGTERMs the worker, which then died without its record
+// and left the owned Maestro group running.
+test('a worker stopped by its parent still kills the owned group and writes its record', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-sigterm-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const pidFile = path.join(dir, 'child.pid')
+  const result = spawnIosFlow(
+    process.execPath,
+    [
+      '-e',
+      `require('fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));process.stdout.write('x'.repeat(8192));setInterval(()=>{},1000)`,
+    ],
+    { cwd: process.cwd(), env: process.env, timeout: 5000, maxBuffer: 1024 },
+    path.join(dir, 'timing.json')
+  )
+  assert.equal(result.error?.code, 'ENOBUFS')
+  assert.equal(result.status, 143)
+  assert.equal(result.deadline.timedOut, false)
+  const pid = Number(fs.readFileSync(pidFile, 'utf8'))
+  let alive = true
+  for (let i = 0; i < 50 && alive; i++) {
+    try {
+      process.kill(pid, 0)
+      spawnSync('sleep', ['0.1'])
+    } catch {
+      alive = false
+    }
+  }
+  assert.equal(alive, false, 'the owned command must not outlive its worker')
+})
+
+test('a record that is still missing names how the worker ended', (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-unwritable-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  assert.throws(
+    () =>
+      spawnIosFlow(
+        process.execPath,
+        ['-e', 'process.exitCode=0'],
+        { cwd: process.cwd(), env: process.env, timeout: 2000, maxBuffer: 1024 * 1024 },
+        path.join(dir, 'missing-directory', 'timing.json')
+      ),
+    /^Error: ios_flow_deadline_record_missing:status=1:signal=null:error=null$/
+  )
+})

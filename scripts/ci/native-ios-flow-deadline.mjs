@@ -27,7 +27,13 @@ export function spawnIosFlow(binary, args, options, timingFile) {
   const child = fs.existsSync(timingFile)
     ? JSON.parse(fs.readFileSync(timingFile, 'utf8'))
     : null
-  if (!child) throw new Error('ios_flow_deadline_record_missing')
+  if (!child) {
+    // Story 6.15: say how the worker ended, so a missing record names its cause.
+    console.error(String(result.stderr ?? '').slice(-2000))
+    throw new Error(
+      `ios_flow_deadline_record_missing:status=${result.status}:signal=${result.signal}:error=${result.error?.code ?? null}`
+    )
+  }
   return {
     ...result,
     deadline: {
@@ -78,14 +84,41 @@ export async function runDeadlineWorker(request, timingFile) {
       }) + '\n',
       { mode: 0o600 }
     )
+  // Story 6.15: the worker never dies without its record or leaves the owned group running. A kill
+  // that fails is reported and retried on the child alone, never thrown from the timer; a SIGTERM
+  // from the parent (spawnSync past maxBuffer) or an uncaught error still kills the group and writes.
   const killOwned = () => {
     if (!child.pid) return
     try {
       process.kill(-child.pid, 'SIGKILL')
     } catch (error) {
-      if (error.code !== 'ESRCH') throw error
+      if (error.code === 'ESRCH') return
+      console.error(`owned_flow_group_kill_failed:${error.code ?? 'unknown'}`)
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // The record below still names the deadline.
+      }
     }
   }
+  let written = false
+  const writeOnce = () => {
+    if (written) return
+    written = true
+    write()
+  }
+  const abort = (code) => {
+    killOwned()
+    writeOnce()
+    process.exit(code)
+  }
+  process.once('SIGTERM', () => abort(143))
+  process.once('uncaughtException', (error) => {
+    console.error(
+      `owned_flow_worker_failed:${error?.code ?? error?.message ?? 'unknown'}`
+    )
+    abort(1)
+  })
   const timer = setTimeout(
     () => {
       timedOut = true
@@ -105,7 +138,7 @@ export async function runDeadlineWorker(request, timingFile) {
         resolve(timedOut ? 124 : (exitCode ?? (signal ? 1 : 0)))
       )
     })
-    write()
+    writeOnce()
     return code
   } finally {
     clearTimeout(timer)
