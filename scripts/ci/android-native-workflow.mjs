@@ -65,10 +65,14 @@ export const ARTIFACTS = {
 // The tarpit and Metro run in the background; the lines after them prove both are up.
 export const NETWORK_SERVICES = [
   'node scripts/lib/network-tarpit.mjs --port 4010 > "$evidence/tarpit.log" 2>&1 &',
-  '(cd apps/mobile && CI=1 EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &',
+  // Placeholder Supabase public env: without it the app's Supabase client throws before Home's
+  // request leaves the app (device run, 2026-11-13).
+  '(cd apps/mobile && CI=1 EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 EXPO_PUBLIC_SUPABASE_URL=http://10.0.2.2:4011 EXPO_PUBLIC_SUPABASE_ANON_KEY=network-timeout-placeholder npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &',
 ]
 export const NETWORK_LINES = [
   'set -euo pipefail',
+  // Each background service gets its own process group, so cleanup stops what it spawned.
+  'set -m',
   "curl -fsS --max-time 5 http://127.0.0.1:8081/status | grep -q 'packager-status:running'",
   'kill -0 "$tarpit"',
   'adb -s "$ANDROID_SERIAL" install -r "$apk"',
@@ -268,10 +272,11 @@ function networkProblems(job, script, check) {
     )
   for (const problem of requiredLineProblems(script, NETWORK_LINES))
     check(false, `${NETWORK_SCRIPT} ${problem}`)
-  // The services stop on exit; that cleanup is the one place a status may be ignored.
+  // The services stop on exit, by process group; that cleanup is the one place a status may be
+  // ignored.
   check(
     (script.match(/\|\| true/g) ?? []).length <= 1 &&
-      /kill "\$tarpit" "\$metro" 2> \/dev\/null \|\| true/.test(script) &&
+      /kill -- "-\$tarpit" "-\$metro" 2> \/dev\/null \|\| true/.test(script) &&
       /trap stop_services EXIT/.test(script),
     `${NETWORK_SCRIPT}: stop the tarpit and Metro on exit, and ignore no other status`
   )

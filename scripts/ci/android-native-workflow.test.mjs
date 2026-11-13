@@ -332,7 +332,11 @@ describe('android-network-timeout.sh', () => {
           }
         )
       stub(path.join(bin, 'node'), '[ -n "$TARPIT_DIES" ] && exit 1\nexec /bin/sleep 5')
-      stub(path.join(bin, 'npx'), 'exec /bin/sleep 5')
+      // Metro's stub records the env it got and leaves a grandchild, as npx and expo start do.
+      stub(
+        path.join(bin, 'npx'),
+        `echo "metro-env $EXPO_PUBLIC_API_BASE_URL $EXPO_PUBLIC_SUPABASE_URL $EXPO_PUBLIC_SUPABASE_ANON_KEY" >> "${dir}/calls"\n/bin/sleep 30 &\necho $! > "${dir}/metro-child"\nexec /bin/sleep 30`
+      )
       stub(
         path.join(bin, 'curl'),
         '[ -n "$METRO_DOWN" ] && exit 7\necho packager-status:running'
@@ -358,15 +362,35 @@ describe('android-network-timeout.sh', () => {
       const calls = fs.existsSync(path.join(dir, 'calls'))
         ? fs.readFileSync(path.join(dir, 'calls'), 'utf8')
         : ''
-      return { status: result.status, calls }
+      const childFile = path.join(dir, 'metro-child')
+      const child = fs.existsSync(childFile)
+        ? Number(fs.readFileSync(childFile, 'utf8').trim())
+        : undefined
+      let childAlive = false
+      if (child)
+        try {
+          process.kill(child, 0)
+          childAlive = true
+          process.kill(child, 'SIGKILL')
+        } catch {
+          childAlive = false
+        }
+      return { status: result.status, calls, childAlive }
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
     }
   }
 
   test('passes when the tarpit, Metro and the flow pass, with the documented arguments', () => {
-    const { status, calls } = run()
+    const { status, calls, childAlive } = run()
     assert.equal(status, 0)
+    // Device runner, leg 3: without a Supabase URL and key the app never sends Home's request.
+    assert.match(
+      calls,
+      /^metro-env http:\/\/10\.0\.2\.2:4010 http:\/\/10\.0\.2\.2:4011 network-timeout-placeholder$/m
+    )
+    // Stopping Metro stops what it spawned; the local run left expo start holding 8081.
+    assert.equal(childAlive, false)
     assert.match(calls, /^node scripts\/lib\/network-tarpit\.mjs --port 4010$/m)
     assert.match(calls, /^npx expo start --dev-client --port 8081$/m)
     assert.match(

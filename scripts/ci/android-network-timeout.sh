@@ -14,13 +14,21 @@ evidence="${NETWORK_TIMEOUT_EVIDENCE:?evidence directory required}"
 apk=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 mkdir -p "$evidence"
 
+# Job control gives each background service its own process group, so stopping a group also
+# stops the processes npx and expo start spawn under it.
+set -m
 node scripts/lib/network-tarpit.mjs --port 4010 > "$evidence/tarpit.log" 2>&1 &
 tarpit=$!
+# The app builds its Supabase client before it reads a session; without a URL and key that client
+# throws and Home's request never leaves the app. These are placeholders: the flow signs nobody
+# in, and the tarpit is the only server the run reaches.
 (cd apps/mobile && CI=1 EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 \
+  EXPO_PUBLIC_SUPABASE_URL=http://10.0.2.2:4011 \
+  EXPO_PUBLIC_SUPABASE_ANON_KEY=network-timeout-placeholder \
   npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &
 metro=$!
 stop_services() {
-  kill "$tarpit" "$metro" 2> /dev/null || true
+  kill -- "-$tarpit" "-$metro" 2> /dev/null || true
 }
 trap stop_services EXIT
 
