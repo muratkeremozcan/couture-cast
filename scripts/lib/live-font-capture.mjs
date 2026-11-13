@@ -12,6 +12,20 @@ function attributes(node) {
   return node?.attributes ?? {}
 }
 
+const matchesPrefix = (id, prefixes) =>
+  id !== '' && prefixes.some((prefix) => id.startsWith(prefix))
+
+/** iOS repeats a static text as an identical element inside the one that labels it. */
+function repeatsParent(entry, parentEntry) {
+  return (
+    entry !== undefined &&
+    parentEntry !== undefined &&
+    entry.text === parentEntry.text &&
+    entry.bounds === parentEntry.bounds &&
+    (entry.id === '' || entry.id === parentEntry.id)
+  )
+}
+
 /** UIKit's scroll indicators: their value text ("0%") changes as the page scrolls. */
 function iosSystemNode(attrs) {
   return /^(Vertical|Horizontal) scroll bar\b/.test(attrs.accessibilityText ?? '')
@@ -43,14 +57,18 @@ export function flattenHierarchy(
   const markers = []
   const jsScales = []
   const environments = []
-  const walk = (node, parentBounds, inVolatile) => {
+  const record = ({ entry, parentEntry, id, bounds, isVolatile }) => {
+    const repeat = platform === 'ios' && repeatsParent(entry, parentEntry)
+    if (entry && !repeat) nodes.push(entry)
+    if (id && bounds && !isVolatile) controls.push({ id, bounds })
+  }
+  const walk = (node, parentBounds, inVolatile, parentEntry) => {
     const attrs = attributes(node)
     if (platform === 'ios' && iosSystemNode(attrs)) return
     const id = attrs['resource-id'] ?? ''
     const bounds = attrs.bounds
     readMarker(id, { markers, jsScales, environments })
-    const isVolatile =
-      inVolatile || volatile.some((prefix) => id && id.startsWith(prefix))
+    const isVolatile = inVolatile || matchesPrefix(id, volatile)
     if (isVolatile && !markVolatile) {
       volatileDropped += countText(node, platform)
       return
@@ -63,10 +81,9 @@ export function flattenHierarchy(
       isVolatile,
       platform,
     })
-    if (entry) nodes.push(entry)
-    if (id && bounds && !isVolatile) controls.push({ id, bounds })
+    record({ entry, parentEntry, id, bounds, isVolatile })
     for (const child of node?.children ?? [])
-      walk(child, bounds ?? parentBounds, isVolatile)
+      walk(child, bounds ?? parentBounds, isVolatile, entry ?? parentEntry)
   }
   // On iOS the root's other windows (the status bar, under an empty-bounds container) are the
   // system's, so only windows with bounds are read.

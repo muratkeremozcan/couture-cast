@@ -659,3 +659,27 @@ describe('hierarchy source (two booted simulators)', () => {
     )
   })
 })
+
+test('iOS lists a static text once, not again as the identical element inside it', () => {
+  // XCUITest shows Settings' "Premium" heading as an element and, inside it, a static text
+  // with the same label and bounds; counted twice, neither copy could align scroll pages.
+  const tree = node({ bounds: '[0,0][0,0]' }, [
+    node({ accessibilityText: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
+      node({ accessibilityText: 'Premium', bounds: '[34,753][367,772]' }, [
+        node({ accessibilityText: 'Premium', bounds: '[34,753][367,772]' }),
+      ]),
+      node({ accessibilityText: 'Premium', bounds: '[34,900][367,919]' }),
+    ]),
+  ])
+  assert.deepEqual(
+    flattenHierarchy(tree, { platform: 'ios' }).nodes.map((entry) => [
+      entry.text,
+      entry.bounds,
+    ]),
+    [
+      ['CoutureCast Story68', '[0,0][402,874]'],
+      ['Premium', '[34,753][367,772]'],
+      ['Premium', '[34,900][367,919]'],
+    ]
+  )
+})
