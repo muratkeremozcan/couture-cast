@@ -1760,21 +1760,41 @@ describe('the Xcode selection', () => {
   })
 })
 
-// TEA, 2026-11-13: the canary starts only after the nightly run's ios-live-font job can have ended
-// (its timeout from the nightly start), so the two never share macOS concurrency.
-test('the iOS canary starts after the nightly ios-live-font job can have ended', () => {
+// TEA, 2026-11-13 (Antigravity r7): the canary starts only after every chain of the nightly run
+// can have ended at its timeouts (ios-live-font alone; ios-build, then the longer of ios-shard
+// and ios-expo-go), measured as the cyclic gap from the nightly start, so a schedule across UTC
+// midnight is judged right too.
+const minutesOfDay = (cron) => {
+  const [minute, hour] = cron.split(' ').map(Number)
+  return hour * 60 + minute
+}
+const cyclicGap = (from, to) => (((to - from) % 1440) + 1440) % 1440
+
+test('the iOS canary starts after every nightly job chain can have ended', () => {
   const read = (file) => parse(fs.readFileSync(`.github/workflows/${file}`, 'utf8'))
-  const minuteOfDay = (workflow) => {
-    const on = workflow.on ?? workflow[true]
-    const [minute, hour] = on.schedule[0].cron.split(' ').map(Number)
-    return hour * 60 + minute
+  const cronOf = (workflow) => (workflow.on ?? workflow[true]).schedule[0].cron
+  const jobs = read('ios-native-jobs.yml').jobs
+  const timeout = (id) => {
+    const value = jobs[id]?.['timeout-minutes']
+    assert.ok(Number.isInteger(value) && value > 0, `${id} has a timeout`)
+    return value
   }
-  const nightly = minuteOfDay(read('ios-native.yml'))
-  const canary = minuteOfDay(read('ios-native-canary.yml'))
-  const liveFont = read('ios-native-jobs.yml').jobs['ios-live-font']
-  assert.ok(liveFont['timeout-minutes'] > 0)
-  assert.ok(
-    canary >= nightly + liveFont['timeout-minutes'],
-    `canary at ${canary} min must start at or after ${nightly + liveFont['timeout-minutes']} min`
+  const longest = Math.max(
+    timeout('ios-live-font'),
+    timeout('ios-build') + Math.max(timeout('ios-shard'), timeout('ios-expo-go'))
   )
+  const gap = cyclicGap(
+    minutesOfDay(cronOf(read('ios-native.yml'))),
+    minutesOfDay(cronOf(read('ios-native-canary.yml')))
+  )
+  assert.ok(
+    gap >= longest,
+    `the canary starts ${gap} min after the nightly; chains need ${longest}`
+  )
+})
+
+test('the cyclic gap wraps across UTC midnight', () => {
+  assert.equal(cyclicGap(minutesOfDay('23 3 * * *'), minutesOfDay('37 6 * * *')), 194)
+  assert.equal(cyclicGap(minutesOfDay('0 23 * * *'), minutesOfDay('30 1 * * *')), 150)
+  assert.equal(cyclicGap(minutesOfDay('30 1 * * *'), minutesOfDay('0 23 * * *')), 1290)
 })
