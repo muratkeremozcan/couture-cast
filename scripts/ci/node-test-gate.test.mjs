@@ -34,7 +34,7 @@ const sources = {
 test('one', () => {})
 test('two', () => {})
 `,
-  'grouped.test.mjs': `import { after, describe, test } from 'node:test'
+  'grouped.test.mjs': `import { describe, test } from 'node:test'
 describe('group', () => { test('three', () => {}) })
 `,
   'empty.test.mjs': '// registers no test\n',
@@ -42,7 +42,7 @@ describe('group', () => { test('three', () => {}) })
 test('kept', () => {})
 test('skipped', { skip: true }, () => {})
 `,
-  'skipped-suite.test.mjs': `import { after, describe, test } from 'node:test'
+  'skipped-suite.test.mjs': `import { describe, test } from 'node:test'
 test('kept', () => {})
 describe.skip('dropped', () => { test('inner', () => {}) })
 `,
