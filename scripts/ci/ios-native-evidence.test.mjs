@@ -518,8 +518,17 @@ function fakeGitHub({
     ],
     [
       /\/git\/blobs\/(.+)$/,
-      (match) =>
-        reply({ content: Buffer.from(blobs[match[1]] ?? '').toString('base64') }),
+      // A string is the blob's text; an object is the API's answer as it stands.
+      (match) => {
+        const blob = blobs[match[1]] ?? ''
+        if (typeof blob === 'object') return reply(blob)
+        const bytes = Buffer.from(blob)
+        return reply({
+          content: bytes.toString('base64'),
+          encoding: 'base64',
+          size: bytes.length,
+        })
+      },
     ],
     [
       /\/contents\/(.+)$/,
@@ -726,6 +735,134 @@ describe('large and incomplete diffs', () => {
     )
     assert.equal(workflow.state, 'failure')
     assert.match(workflow.detail, /zz-late\.yml/)
+  })
+})
+
+// C14-01: main's copy of the judge reads the content of each changed mobile source file at the
+// head commit and the merge base, so a pull request that adds a native binding outside the lists,
+// and edits the lists in the same change, still needs its dispatch: the rules that judge it are
+// main's, and the pull request's edit to them is only data here.
+describe('native bindings read from the head commit and the merge base', () => {
+  const blob = (path, sha) => ({ path, sha, type: 'blob' })
+  const caller = 'apps/mobile/src/lib/new-native-contract.native.ts'
+  const screen = 'apps/mobile/app/(tabs)/index.tsx'
+  const texts = {
+    caller1:
+      "import { requireNativeModule } from 'expo-modules-core'\nexport default requireNativeModule('NewContract')\n",
+    plain1: 'export const Home = () => null\n',
+    plain2: 'export const Home = () => null // edited\n',
+    // The pull request's own list update, which main's judge never runs.
+    policy2: `export const EVIDENCE_JS_PATHS = ['${caller}']\n`,
+    policy1: 'export const EVIDENCE_JS_PATHS = []\n',
+    bound1:
+      "import { NativeModules } from 'react-native'\nexport const b = NativeModules.B\n",
+    test1: "import { NativeModules } from 'react-native'\nNativeModules.B\n",
+  }
+  const judged = (base, headTree, extra = {}) =>
+    judgeEvent(
+      fakeGitHub({
+        trees: { [older]: base, [head]: headTree },
+        blobs: { ...texts, ...extra.blobs },
+        ...extra,
+      })
+    )
+
+  test("Codex's two revisions: a new caller plus the pull request's list update fails without a dispatch", async () => {
+    const base = [
+      blob(screen, 'plain1'),
+      blob('scripts/ci/ios-native-inputs.mjs', 'policy1'),
+    ]
+    const headTree = [
+      blob(caller, 'caller1'),
+      blob(screen, 'plain2'),
+      blob('scripts/ci/ios-native-inputs.mjs', 'policy2'),
+    ]
+    assert.equal((await judged(base, headTree)).state, 'failure')
+    assert.equal((await judged(base, headTree, { runs: [run()] })).state, 'success')
+  })
+
+  test('a new caller outside every list fails on its content alone, and passes with a dispatch', async () => {
+    const base = [blob(screen, 'plain1')]
+    const headTree = [blob(caller, 'caller1'), blob(screen, 'plain2')]
+    const result = await judged(base, headTree)
+    assert.equal(result.state, 'failure')
+    assert.ok(result.detail.includes(`${caller} changed`), result.detail)
+    assert.equal((await judged(base, headTree, { runs: [run()] })).state, 'success')
+  })
+
+  test('a binding removed by an edit, a deletion or a rename counts from the merge base', async () => {
+    const bound = 'apps/mobile/src/lib/battery.ts'
+    for (const [name, base, headTree] of [
+      ['edited away', [blob(bound, 'bound1')], [blob(bound, 'plain1')]],
+      [
+        'deleted',
+        [blob(bound, 'bound1'), blob(screen, 'plain1')],
+        [blob(screen, 'plain1')],
+      ],
+      [
+        'renamed',
+        [blob(bound, 'bound1')],
+        [blob('apps/mobile/src/lib/power.ts', 'bound1')],
+      ],
+    ]) {
+      const result = await judged(base, headTree)
+      assert.equal(result.state, 'failure', name)
+      assert.ok(result.detail.includes(bound), `${name}: ${result.detail}`)
+    }
+  })
+
+  test('a test that mentions a native module, or a change with no binding, needs no dispatch', async () => {
+    const base = [blob(screen, 'plain1')]
+    for (const headTree of [
+      [blob(screen, 'plain2')],
+      [blob(screen, 'plain1'), blob('apps/mobile/src/lib/battery.test.ts', 'test1')],
+      [
+        blob(screen, 'plain1'),
+        blob('apps/mobile/src/test-utils/mocks/native.js', 'test1'),
+      ],
+      [blob(screen, 'plain1'), blob('apps/web/lib/native.ts', 'bound1')],
+    ])
+      assert.equal(
+        (await judged(base, headTree)).state,
+        'success',
+        JSON.stringify(headTree)
+      )
+  })
+
+  test('a blob it cannot read whole fails closed', async () => {
+    const base = [blob(screen, 'plain1')]
+    const headTree = [blob(screen, 'plain2')]
+    const bytes = Buffer.from(texts.plain2)
+    for (const [name, extra] of [
+      ['a 403', { deny: [/\/git\/blobs\//] }],
+      [
+        'a short read',
+        {
+          blobs: {
+            plain2: {
+              content: bytes.subarray(0, 5).toString('base64'),
+              encoding: 'base64',
+              size: bytes.length,
+            },
+          },
+        },
+      ],
+      [
+        'an oversized blob',
+        { blobs: { plain2: { content: '', encoding: 'none', size: 50_000_000 } } },
+      ],
+      [
+        'another encoding',
+        {
+          blobs: {
+            plain2: { content: texts.plain2, encoding: 'utf-8', size: bytes.length },
+          },
+        },
+      ],
+    ]) {
+      const result = await judged(base, headTree, extra)
+      assert.equal(result.state, 'failure', name)
+    }
   })
 })
 

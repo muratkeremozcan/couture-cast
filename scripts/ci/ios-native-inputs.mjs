@@ -66,23 +66,42 @@ export const PUSH_ONLY_PATHS = [
   '!packages/**/*.spec.*',
   '!packages/**/*.md',
 ]
-// The JavaScript a pull request needs a dispatch for: every top-level file of a native module (its
-// entries, its types.ts contract and its package.json autolinking entry), minus tests and
-// Markdown, which the push paths leave out too; the callers that bind a native module
-// (ios-native-inputs.test.mjs derives them from the tree and fails on a caller outside this
-// list); and the bundler configuration the iOS shards' Release bundle is built with. The list
-// comes after every negation of the push paths, so the last match still decides.
+// The JavaScript a pull request needs a dispatch for: every file of a native module (its entries,
+// its types.ts contract, its package.json autolinking entry and nested sources), minus its
+// Android half and the tests and Markdown the push paths leave out too, with ios/** whole as
+// before; the callers that bind a native module (ios-native-inputs.test.mjs derives them from
+// the tree and fails on a caller outside this list, and the judge reads every changed mobile
+// source for a binding, nativeBinding); and the bundler configuration the iOS shards' Release
+// bundle is built with. The list comes after every negation of the push paths, so the last
+// match still decides.
 export const EVIDENCE_JS_PATHS = [
-  'apps/mobile/modules/*/*',
-  '!apps/mobile/modules/*/*.test.*',
-  '!apps/mobile/modules/*/*.spec.*',
-  '!apps/mobile/modules/*/*.md',
+  'apps/mobile/modules/*/**',
+  '!apps/mobile/modules/*/android/**',
+  '!apps/mobile/modules/**/*.test.*',
+  '!apps/mobile/modules/**/*.spec.*',
+  '!apps/mobile/modules/**/*.md',
+  'apps/mobile/modules/*/ios/**',
   'apps/mobile/src/lib/share-card-save.native.ts',
   'apps/mobile/src/lib/share-card-share.native.ts',
   'apps/mobile/src/lib/widget-share.ts',
   'apps/mobile/metro.config.js',
   'apps/mobile/babel.config.cjs',
 ]
+// C14-01: the calls that bind JavaScript to a native module or view. The judge reads each changed
+// mobile source at the head commit and the merge base with main's copy of this rule, so a new
+// binding needs a dispatch even when its pull request also edits the lists above.
+export const NATIVE_BINDING =
+  /\b(requireNativeModule|requireOptionalNativeModule|requireNativeView|requireNativeViewManager|requireNativeComponent|NativeModules|TurboModuleRegistry)\b/
+
+/** A mobile source file that could bind a native module: JavaScript or TypeScript, no test. */
+export function bindingCandidate(file) {
+  return (
+    /^apps\/mobile\/.+\.(ts|tsx|js|jsx|cjs|mjs)$/.test(file) &&
+    !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+    !file.startsWith('apps/mobile/src/test-utils/')
+  )
+}
+
 // The workspaces whose dependency changes skip iOS evidence (see the header).
 export const EVIDENCE_EXEMPT_WORKSPACES = ['apps/web', 'apps/api', 'packages/db']
 export const ROOT_FIELDS = [

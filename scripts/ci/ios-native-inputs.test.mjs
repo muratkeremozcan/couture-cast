@@ -282,6 +282,24 @@ function nativeCallers(files, read) {
     .sort()
 }
 
+// TEA P3 and C14-02: the files of a native module that need evidence: every one but its Android
+// half, its tests and its Markdown, which the evidence inputs leave out too.
+const moduleFiles = (files) =>
+  files.filter(
+    (file) =>
+      /^apps\/mobile\/modules\/[^/]+\/.+$/.test(file) &&
+      !/^apps\/mobile\/modules\/[^/]+\/android\//.test(file) &&
+      !/\.(test|spec)\.[^/]*$/.test(file) &&
+      !file.endsWith('.md')
+  )
+
+/** The native module files a pull request could change without a dispatch. */
+function moduleFileProblems(files, evidence) {
+  return moduleFiles(files)
+    .filter((file) => !matchesAny(file, evidence))
+    .map((file) => `${file} belongs to a native module and is no evidence input`)
+}
+
 /** The native callers a pull request could change without a dispatch. */
 function nativeCallerProblems(files, read, evidence) {
   return nativeCallers(files, read)
@@ -681,6 +699,9 @@ describe('the push paths and the evidence inputs', () => {
       'packages/utils/src/index.ts',
       'packages/utils/package.json',
       'packages/config/tsconfig.json',
+      // A module's Android half runs no iOS job, so it needs no dispatch.
+      'apps/mobile/modules/share-card-native-share/android/src/main/java/ShareModule.kt',
+      'apps/mobile/modules/share-card-native-share/android/build.gradle',
     ],
     both: [
       'apps/mobile/modules/share-card-photo-save/index.native.ts',
@@ -703,6 +724,12 @@ describe('the push paths and the evidence inputs', () => {
       'apps/mobile/modules/share-card-native-share/expo-module.config.json',
       'apps/mobile/modules/new-module/constants.ts',
       'apps/mobile/native-tests/ShareCardShareSheetUITests.swift',
+      // TEA P3: a module's nested JavaScript is its contract too.
+      'apps/mobile/modules/share-card-photo-save/src/checksum.ts',
+      'apps/mobile/modules/new-module/src/bindings/index.ts',
+      // C14-01: the classifier and the judge themselves.
+      'scripts/ci/ios-native-inputs.mjs',
+      'scripts/ci/ios-native-evidence.mjs',
     ],
     neither: [
       'packages/db/src/client.ts',
@@ -718,6 +745,9 @@ describe('the push paths and the evidence inputs', () => {
       'apps/mobile/modules/share-card-photo-save/types.test.ts',
       'apps/mobile/modules/share-card-photo-save/index.spec.ts',
       'apps/mobile/modules/share-card-photo-save/README.md',
+      'apps/mobile/modules/share-card-photo-save/docs/save-flow.md',
+      'apps/mobile/modules/share-card-photo-save/src/checksum.test.ts',
+      'scripts/ci/ios-native-inputs.test.mjs',
       'apps/web/app/page.tsx',
       'apps/api/src/main.ts',
     ],
@@ -785,17 +815,47 @@ describe('the push paths and the evidence inputs', () => {
       callers.includes('apps/mobile/modules/share-card-photo-save/index.native.ts')
     )
     assert.deepEqual(nativeCallerProblems(tracked, read, evidence), [])
-    // C-14 P1: a module's top-level files hold its contract (types.ts) and its autolinking entry
-    // (package.json) without calling a require function, so each one is an evidence input too.
-    const moduleFiles = tracked.filter(
-      (file) =>
-        /^apps\/mobile\/modules\/[^/]+\/[^/]+$/.test(file) && !TEST_ONLY.test(file)
+    // C-14 P1 and TEA P3: a module's files hold its contract (types.ts, nested src) and its
+    // autolinking entry (package.json) without calling a require function, so each one is an
+    // evidence input too.
+    assert.ok(
+      moduleFiles(tracked).includes('apps/mobile/modules/share-card-photo-save/types.ts')
     )
-    assert.ok(moduleFiles.includes('apps/mobile/modules/share-card-photo-save/types.ts'))
-    assert.ok(moduleFiles.includes('apps/mobile/modules/modal-system-bars/package.json'))
+    assert.ok(
+      moduleFiles(tracked).includes('apps/mobile/modules/modal-system-bars/package.json')
+    )
+    assert.deepEqual(moduleFileProblems(tracked, evidence), [])
+  })
+
+  // C14-02: module documentation, tests and the Android half need no evidence; contracts and
+  // package metadata, nested ones included, stay covered.
+  test('the module guard leaves docs, tests and Android out, and covers every module contract', () => {
+    const tree = [
+      'apps/mobile/modules/share-card-photo-save/README.md',
+      'apps/mobile/modules/share-card-photo-save/docs/save-flow.md',
+      'apps/mobile/modules/share-card-photo-save/types.test.ts',
+      'apps/mobile/modules/share-card-photo-save/src/checksum.spec.ts',
+      'apps/mobile/modules/share-card-photo-save/android/src/main/java/SaveModule.kt',
+      'apps/mobile/modules/share-card-photo-save/types.ts',
+      'apps/mobile/modules/share-card-photo-save/package.json',
+      'apps/mobile/modules/share-card-photo-save/expo-module.config.json',
+      'apps/mobile/modules/share-card-photo-save/src/checksum.ts',
+      'apps/mobile/modules/share-card-photo-save/ios/SaveModule.swift',
+    ]
+    assert.deepEqual(moduleFiles(tree), tree.slice(5))
+    assert.deepEqual(moduleFileProblems(tree, evidence), [])
+    // Without the module entries, each contract the native push paths leave out is reported, and
+    // no doc or test: expo-module.config.json and ios/** stay native push paths of their own.
+    const narrowed = evidence.filter(
+      (glob) => !glob.startsWith('apps/mobile/modules/*/**')
+    )
     assert.deepEqual(
-      moduleFiles.filter((file) => !matchesAny(file, evidence)),
-      []
+      moduleFileProblems(tree, narrowed),
+      [
+        'apps/mobile/modules/share-card-photo-save/types.ts',
+        'apps/mobile/modules/share-card-photo-save/package.json',
+        'apps/mobile/modules/share-card-photo-save/src/checksum.ts',
+      ].map((file) => `${file} belongs to a native module and is no evidence input`)
     )
   })
 

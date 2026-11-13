@@ -29,7 +29,9 @@ import {
   IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
+  NATIVE_BINDING,
   ROOT_MANIFEST,
+  bindingCandidate,
   dependencyChanges,
   evidenceInputs,
   nativeIosChanges,
@@ -43,6 +45,8 @@ export const DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
 export const GATE_STATUS = 'gate'
 const WORKFLOW_FILE = 'ios-native-dispatch.yml'
 const COMMIT = /^[0-9a-f]{40}$/
+// The largest mobile source the judge reads for a native binding; a larger one fails closed.
+const BINDING_BLOB_LIMIT = 1024 * 1024
 // GitHub rejects a commit status description longer than this.
 export const DESCRIPTION_LIMIT = 140
 
@@ -205,7 +209,8 @@ const fit = (text) =>
  * exactly the head commit counts; the newest such run decides, and its own commit must be on
  * refs/heads/main (`fromMain`). `dependencies` says whether the shared dependency files changed
  * what iOS installs (scripts/ci/ios-native-inputs.mjs); `guard` lists the workflows at the head
- * that could post this status; `incomplete` says why the diff could not be read whole.
+ * that could post this status; `bindings` lists the changed mobile sources that bind a native
+ * module at the head or the merge base; `incomplete` says why the diff could not be read whole.
  * @returns {{ state: 'success' | 'pending' | 'failure', description: string, detail: string }}
  */
 export function evaluateEvidence({
@@ -215,6 +220,7 @@ export function evaluateEvidence({
   inputs,
   dependencies,
   guard = [],
+  bindings = [],
   incomplete = null,
 }) {
   const verdict = (state, detail, description = detail) => ({
@@ -238,7 +244,8 @@ export function evaluateEvidence({
       `Only ${EVIDENCE_WORKFLOW} may post ${STATUS_CONTEXT}: ${guard.join('; ')}`,
       guard.join('; ')
     )
-  const changed = nativeIosChanges(files, inputs, dependencies)
+  const listed = nativeIosChanges(files, inputs, dependencies)
+  const changed = [...listed, ...bindings.filter((file) => !listed.includes(file))]
   if (changed.length === 0) return verdict('success', 'No native iOS input changed')
   const what = `${changed.slice(0, 3).join(', ')}${changed.length > 3 ? ` and ${changed.length - 3} more` : ''} changed`
   const [latest] = (runs ?? [])
@@ -395,6 +402,49 @@ async function guardProblems({ repository, trees, parseYaml, ...options }) {
   return workflowGuardProblems(files, parseYaml ? { parseYaml } : {})
 }
 
+/** A blob's text, or null when the API did not return it whole or it is over the limit. */
+async function blobText({ repository, sha, ...options }) {
+  const blob = await api(`/repos/${repository}/git/blobs/${sha}`, options)
+  if (
+    blob?.encoding !== 'base64' ||
+    !Number.isInteger(blob.size) ||
+    blob.size > BINDING_BLOB_LIMIT
+  )
+    return null
+  const bytes = Buffer.from(blob.content ?? '', 'base64')
+  return bytes.length === blob.size ? bytes.toString('utf8') : null
+}
+
+/**
+ * C14-01: the changed mobile sources that bind a native module at the head commit or, for an
+ * edit, a deletion or the old path of a rename, at the merge base. The content is data read by
+ * blob through main's copy of NATIVE_BINDING, so a pull request that adds a binding and edits
+ * the lists needs its dispatch all the same. `incomplete` names a blob that could not be read.
+ */
+async function nativeBindings({ repository, trees, files, ...options }) {
+  const blobs = (tree) =>
+    new Map(
+      (tree ?? [])
+        .filter((entry) => entry.type === 'blob')
+        .map((entry) => [entry.path, entry.sha])
+    )
+  const sides = [blobs(trees.head), blobs(trees.base)]
+  const texts = new Map()
+  const bindings = []
+  for (const file of files.filter(bindingCandidate))
+    for (const sha of new Set(sides.map((side) => side.get(file)).filter(Boolean))) {
+      if (!texts.has(sha)) texts.set(sha, await blobText({ ...options, repository, sha }))
+      const text = texts.get(sha)
+      if (text === null)
+        return { bindings, incomplete: `the content of ${file} could not be read whole` }
+      if (NATIVE_BINDING.test(text)) {
+        bindings.push(file)
+        break
+      }
+    }
+  return { bindings, incomplete: null }
+}
+
 /**
  * Whether the shared dependency files changed what iOS installs, read at the merge base and the
  * head commit, the two ends of the pull request's own diff.
@@ -437,7 +487,20 @@ async function judge({ headSha, baseSha, ...options }) {
       files,
       jobsText,
     })
-    return evaluateEvidence({ headSha, files, runs, inputs, dependencies, guard })
+    // A listed input already needs the dispatch, so the content is read only when none changed.
+    const { bindings, incomplete } = nativeIosChanges(files, inputs, dependencies).length
+      ? { bindings: [], incomplete: null }
+      : await nativeBindings({ ...options, trees, files })
+    return evaluateEvidence({
+      headSha,
+      files,
+      runs,
+      inputs,
+      dependencies,
+      guard,
+      bindings,
+      incomplete,
+    })
   } catch (error) {
     console.log(`::error::Could not read the evidence: ${error.message}`)
     return evaluateEvidence({ headSha, files: null, runs: [], inputs })

@@ -11,7 +11,7 @@ on:
   # dependencies that apps/mobile does not install changed; the nightly run covers the rest. The
   # first block is the JavaScript of apps/mobile and packages/* (PUSH_ONLY_PATHS in
   # scripts/ci/ios-native-inputs.mjs), which needs no dispatch on a pull request; the rest are the
-  # native iOS inputs a pull request needs one for.
+  # native iOS inputs a pull request needs one for, the evidence classifier and judge among them.
   push:
     branches: [main]
     paths:
@@ -49,6 +49,8 @@ on:
       - 'scripts/ci/android-talkback.sh'
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/ci/install-dependencies.sh'
+      - 'scripts/ci/ios-native-evidence.mjs'
+      - 'scripts/ci/ios-native-inputs.mjs'
       - 'scripts/ci/maestro-check-flows.mjs'
       - 'scripts/ci/node-test-gate.mjs'
       - 'scripts/ci/node-test-suites.json'
