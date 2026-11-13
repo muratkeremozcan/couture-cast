@@ -511,10 +511,10 @@ jobs:
         run: npm run test:playwright-unit
 
   # Story 6.15 D15: a release export must carry no RevenueCat Test Store key. The scan exports
-  # both platforms in production mode with a Test Store key in the environment, as a laptop build
-  # with .env.local would have, and fails if any exported file holds that key or any test_ key.
-  # The key here is synthetic and not a secret: it only has a Test Store key's shape. About 40 s
-  # of export after the install.
+  # both platforms twice, in production mode and as a preview build with the preview profile's
+  # env, with a Test Store key in the environment as a laptop build with .env.local would have,
+  # and fails if any exported file holds that key or any test_ key. The key here is synthetic and
+  # not a secret: it only has a Test Store key's shape. About 60 s of export after the install.
   revenuecat-bundle-scan:
     name: RevenueCat Test Store key bundle scan
     needs: lanes
