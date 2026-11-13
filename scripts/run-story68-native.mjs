@@ -979,6 +979,7 @@ if (command === 'prebuild') {
     'ShareCardAccessibilityUITests.swift',
     'ShareCardHeaderSemantics.swift',
     'ShareCardHeaderQuery.swift',
+    'ShareCardComposerDismissal.swift',
   ])
     fs.copyFileSync(
       path.join(root, 'apps/mobile/native-tests', name),

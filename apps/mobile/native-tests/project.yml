@@ -9,6 +9,7 @@ targets:
     sources:
       - ShareCardHeaderSemantics.swift
       - ShareCardHeaderQuery.swift
+      - ShareCardComposerDismissal.swift
       - ShareCardAccessibilityUITests.swift
       - path: catalogs
         buildPhase: resources
