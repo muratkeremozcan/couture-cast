@@ -11,6 +11,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { parse } from 'yaml'
 import { helperProblems, npmCalls } from './ios-native-helpers.mjs'
 import {
   CANARY_WORKFLOW,
@@ -1757,4 +1758,23 @@ describe('the Xcode selection', () => {
       assert.deepEqual(row.env, { XCODE: choice }, name)
     }
   })
+})
+
+// TEA, 2026-11-13: the canary starts only after the nightly run's ios-live-font job can have ended
+// (its timeout from the nightly start), so the two never share macOS concurrency.
+test('the iOS canary starts after the nightly ios-live-font job can have ended', () => {
+  const read = (file) => parse(fs.readFileSync(`.github/workflows/${file}`, 'utf8'))
+  const minuteOfDay = (workflow) => {
+    const on = workflow.on ?? workflow[true]
+    const [minute, hour] = on.schedule[0].cron.split(' ').map(Number)
+    return hour * 60 + minute
+  }
+  const nightly = minuteOfDay(read('ios-native.yml'))
+  const canary = minuteOfDay(read('ios-native-canary.yml'))
+  const liveFont = read('ios-native-jobs.yml').jobs['ios-live-font']
+  assert.ok(liveFont['timeout-minutes'] > 0)
+  assert.ok(
+    canary >= nightly + liveFont['timeout-minutes'],
+    `canary at ${canary} min must start at or after ${nightly + liveFont['timeout-minutes']} min`
+  )
 })
