@@ -790,6 +790,37 @@ describe('native bindings read from the head commit and the merge base', () => {
     assert.equal((await judged(base, headTree, { runs: [run()] })).state, 'success')
   })
 
+  // C14-R2-01: each native binding API on its own, in a new caller no evidence path lists and with
+  // no classifier file changed, so only the content read can fail it.
+  const bindingCalls = {
+    requireNativeModule:
+      "import { requireNativeModule } from 'expo-modules-core'\nexport default requireNativeModule('NewCaller')\n",
+    requireOptionalNativeModule:
+      "import { requireOptionalNativeModule } from 'expo-modules-core'\nexport default requireOptionalNativeModule('NewCaller')\n",
+    requireNativeView:
+      "import { requireNativeView } from 'expo'\nexport const View = requireNativeView('NewCaller')\n",
+    requireNativeViewManager:
+      "import { requireNativeViewManager } from 'expo-modules-core'\nexport const View = requireNativeViewManager('NewCaller')\n",
+    requireNativeComponent:
+      "import { requireNativeComponent } from 'react-native'\nexport const View = requireNativeComponent('NewCaller')\n",
+    NativeModules:
+      "import { NativeModules } from 'react-native'\nexport default NativeModules.NewCaller\n",
+    TurboModuleRegistry:
+      "import { TurboModuleRegistry } from 'react-native'\nexport default TurboModuleRegistry.getEnforcing('NewCaller')\n",
+  }
+  for (const [call, text] of Object.entries(bindingCalls))
+    test(`a new caller of ${call} fails without a dispatch and passes with one`, async () => {
+      const newCaller = 'apps/mobile/src/lib/new-caller.ts'
+      const base = [blob(screen, 'plain1')]
+      const headTree = [blob(newCaller, 'new1'), blob(screen, 'plain1')]
+      const blobs = { new1: text }
+      const without = await judged(base, headTree, { blobs })
+      assert.equal(without.state, 'failure', without.detail)
+      assert.ok(without.detail.includes(`${newCaller} changed`), without.detail)
+      const dispatched = await judged(base, headTree, { blobs, runs: [run()] })
+      assert.equal(dispatched.state, 'success', dispatched.detail)
+    })
+
   test('a binding removed by an edit, a deletion or a rename counts from the merge base', async () => {
     const bound = 'apps/mobile/src/lib/battery.ts'
     for (const [name, base, headTree] of [
