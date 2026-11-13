@@ -42,6 +42,7 @@ import {
   runScreenJourney,
   SCALES,
   SCREENS,
+  screenRunSteps,
 } from './lib/live-font-journey.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -579,22 +580,13 @@ try {
   }
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
-    if (configChange) {
-      try {
-        results.push(await proveConfigChange(name, configChange))
-      } catch (error) {
-        results.push({
-          screen: name,
-          configChange,
-          pass: false,
-          error: { error: error.message },
-        })
-      }
-      continue
-    }
+    const steps = screenRunSteps({
+      configChange,
+      versionKnown: Boolean(reactNativeVersion),
+    })
     // The installed app reports its React Native version; read it once, on the screen the app
     // opens to, before any screen's flow (a modal can hide the root's markers).
-    if (!reactNativeVersion) {
+    if (steps.includes('read-version')) {
       try {
         launch()
         reactNativeVersion = readEnvironment(
@@ -606,10 +598,24 @@ try {
         // A failure before the journey still writes the report and fails the exit code.
         results.push({
           screen: name,
+          ...(configChange ? { configChange, pass: false } : {}),
           error: { error: error.message.split(':')[0], message: error.message },
         })
         continue
       }
+    }
+    if (steps.includes('config-change')) {
+      try {
+        results.push(await proveConfigChange(name, configChange))
+      } catch (error) {
+        results.push({
+          screen: name,
+          configChange,
+          pass: false,
+          error: { error: error.message },
+        })
+      }
+      continue
     }
     const report = await runScreenJourney({
       io: deviceIo(name),

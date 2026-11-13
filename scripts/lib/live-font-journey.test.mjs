@@ -11,6 +11,7 @@ import {
   numericScale,
   runScreenJourney,
   SCALES,
+  screenRunSteps,
   touchTarget,
 } from './live-font-journey.mjs'
 import { expectedTextRatio } from './live-font-scale-proof.mjs'
@@ -218,5 +219,22 @@ describe('touchTarget (F-16)', () => {
     assert.throws(() => touchTarget('android', () => undefined), {
       message: 'live_font_density_required',
     })
+  })
+})
+
+describe('screenRunSteps', () => {
+  test('a config-change run reads the installed React Native version first (review P2-2b)', () => {
+    assert.deepEqual(screenRunSteps({ configChange: 'locale', versionKnown: false }), [
+      'read-version',
+      'config-change',
+    ])
+    assert.deepEqual(screenRunSteps({ configChange: 'locale', versionKnown: true }), [
+      'config-change',
+    ])
+  })
+
+  test('a journey run reads it once, before the first journey', () => {
+    assert.deepEqual(screenRunSteps({ versionKnown: false }), ['read-version', 'journey'])
+    assert.deepEqual(screenRunSteps({ versionKnown: true }), ['journey'])
   })
 })

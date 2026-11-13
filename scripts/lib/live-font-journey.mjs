@@ -276,3 +276,15 @@ export function aggregateVerdict(results, platform) {
   if (!results.length) reasons.push('no screen ran')
   return { pass: reasons.length === 0, reasons }
 }
+
+/**
+ * What the driver does for one requested screen, in order. Every run, a config-change run
+ * included, first reads the React Native version the installed build reports, since every
+ * hierarchy is checked against it and the report records it.
+ */
+export function screenRunSteps({ configChange, versionKnown }) {
+  return [
+    ...(versionKnown ? [] : ['read-version']),
+    configChange ? 'config-change' : 'journey',
+  ]
+}
