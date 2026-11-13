@@ -1,0 +1,176 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+//
+// Where a RevenueCat Test Store key may live (story 6.15 D15, TEA-20). The SDK crashes on purpose
+// when a Test Store key runs in a release build, so the key belongs to local and test builds only:
+// - Every EAS build profile other than `development`, today's and any added later (the spec names
+//   `production-simulator` and preview), resolves no Test Store key: its env, `extends` chain
+//   included, names neither the Test Store variable nor any `test_` RevenueCat key; it does not
+//   pull the EAS `development` environment; and it is not a debug build (development client,
+//   Debug Gradle command or Debug iOS configuration), where `__DEV__` would select the key.
+// - The env files a release build loads hold no Test Store key. app.config.ts loads `.env.local`,
+//   then `.env.prod` when NODE_ENV is production (every Release export, laptop Gradle builds
+//   included) or `.env.preview` for every other NODE_ENV (development runs and the preview
+//   export), then `.env` from the repository root; Expo loads `.env.<NODE_ENV>[.local]`,
+//   `.env.local` and `.env` from apps/mobile. A file only a production or preview export loads
+//   must not name the Test Store variable at all. A file development runs also load may hold it
+//   in its own variable for local debug runs: revenueCatKeyEnv reads it only under `__DEV__`, and
+//   revenuecat-bundle-scan.mjs proves the production and preview exports drop it. A RevenueCat
+//   platform-key variable never holds a `test_` key anywhere, since those are inlined into every
+//   bundle.
+// Findings name the file or profile and the variable only; a key is never printed.
+import fs from 'node:fs'
+import path from 'node:path'
+
+export const TEST_STORE_KEY_VARIABLE = 'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY'
+export const DEVELOPMENT_PROFILE = 'development'
+const REVENUECAT_VARIABLE = /REVENUECAT/
+/** A RevenueCat Test Store key as it would appear inlined in a file. */
+export const TEST_KEY_PATTERN = /(?<![A-Za-z0-9_])test_[A-Za-z0-9]{16,}/
+
+/**
+ * The env files app.config.ts loads from the repository root, by scope: `release` files load only
+ * for a release export, `shared` files for development runs too.
+ */
+export const ROOT_ENV_FILES = {
+  '.env.local': 'shared',
+  '.env.prod': 'release',
+  '.env.preview': 'shared',
+  '.env': 'shared',
+}
+
+/** The scope of an env file Expo loads from apps/mobile, or undefined when Expo never loads it. */
+export function mobileEnvFileScope(name) {
+  if (name === '.env' || name === '.env.local') return 'shared'
+  if (/^\.env\.(production|preview)(\.local)?$/.test(name)) return 'release'
+  if (/^\.env\.(development|test)(\.local)?$/.test(name)) return 'debug'
+  return undefined
+}
+
+/** Every `NAME=value` assignment of a dotenv file, in order, with surrounding quotes removed. */
+export function readEnvEntries(file) {
+  const entries = []
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line)
+    if (match) entries.push([match[1], match[2].replace(/^(['"])(.*)\1$/, '$2')])
+  }
+  return entries
+}
+
+function mergeProfile(parent, child) {
+  const merged = { ...parent }
+  for (const [key, value] of Object.entries(child)) {
+    if (key === 'extends') continue
+    merged[key] =
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? mergeProfile(parent[key] ?? {}, value)
+        : value
+  }
+  return merged
+}
+
+/** A build profile with its `extends` chain applied, as EAS merges it, or undefined. */
+export function resolveBuildProfile(eas, name, trail = []) {
+  const profile = eas.build?.[name]
+  if (!profile) return undefined
+  if (trail.includes(name))
+    throw new Error(`eas.json build profile ${[...trail, name].join(' -> ')} is a cycle`)
+  if (!profile.extends) return mergeProfile({}, profile)
+  const parent = resolveBuildProfile(eas, profile.extends, [...trail, name])
+  if (!parent)
+    throw new Error(`eas.json build profile ${name} extends missing ${profile.extends}`)
+  return mergeProfile(parent, profile)
+}
+
+/** Every env block of a resolved profile: the shared one and each platform's. */
+export function profileEnvBlocks(profile) {
+  return [
+    ['env', profile.env],
+    ['android.env', profile.android?.env],
+    ['ios.env', profile.ios?.env],
+  ].filter(([, env]) => env && typeof env === 'object')
+}
+
+function envProblems(where, entries, { allowTestStoreVariable }) {
+  const problems = []
+  for (const [name, value] of entries) {
+    const text = String(value ?? '')
+    if (name === TEST_STORE_KEY_VARIABLE) {
+      if (!allowTestStoreVariable) problems.push(`${where} sets ${name}`)
+    } else if (
+      (REVENUECAT_VARIABLE.test(name) && text.startsWith('test_')) ||
+      TEST_KEY_PATTERN.test(text) ||
+      text.includes(TEST_STORE_KEY_VARIABLE)
+    )
+      problems.push(`${where} ${name} holds a RevenueCat Test Store key`)
+  }
+  return problems
+}
+
+/** Ways one non-development EAS build profile would resolve a Test Store key. */
+export function profileProblems(eas, name) {
+  const profile = resolveBuildProfile(eas, name)
+  const where = `eas.json build profile ${name}`
+  const problems = profileEnvBlocks(profile).flatMap(([block, env]) =>
+    envProblems(`${where} ${block}`, Object.entries(env), {
+      allowTestStoreVariable: false,
+    })
+  )
+  if (profile.environment === DEVELOPMENT_PROFILE)
+    problems.push(`${where} pulls the EAS development environment`)
+  if (profile.developmentClient === true)
+    problems.push(`${where} builds a development client, where __DEV__ selects the key`)
+  if (/debug/i.test(profile.android?.gradleCommand ?? ''))
+    problems.push(`${where} runs a Debug Gradle command, where __DEV__ selects the key`)
+  if (/^debug$/i.test(profile.ios?.buildConfiguration ?? ''))
+    problems.push(
+      `${where} builds the Debug iOS configuration, where __DEV__ selects the key`
+    )
+  return problems
+}
+
+/** The `.env*` file names app.config.ts loads, read from its source. */
+export function appConfigEnvFiles(source) {
+  return [
+    ...new Set([...source.matchAll(/['"](\.env(?:\.[\w.-]+)?)['"]/g)].map((m) => m[1])),
+  ]
+}
+
+function envFileProblems(file, label, scope) {
+  if (!scope || scope === 'debug' || !fs.existsSync(file)) return []
+  return envProblems(label, readEnvEntries(file), {
+    allowTestStoreVariable: scope === 'shared',
+  })
+}
+
+/** Every way a release, preview or non-development EAS build would resolve a Test Store key. */
+export function keyHygieneProblems(root) {
+  const problems = []
+  const mobile = path.join(root, 'apps/mobile')
+  const eas = JSON.parse(fs.readFileSync(path.join(mobile, 'eas.json'), 'utf8'))
+  for (const name of Object.keys(eas.build ?? {}))
+    if (name !== DEVELOPMENT_PROFILE) problems.push(...profileProblems(eas, name))
+
+  const loaded = appConfigEnvFiles(
+    fs.readFileSync(path.join(mobile, 'app.config.ts'), 'utf8')
+  )
+  for (const name of loaded)
+    if (!ROOT_ENV_FILES[name])
+      problems.push(`app.config.ts loads ${name}, which this spec does not scope`)
+  for (const [name, scope] of Object.entries(ROOT_ENV_FILES))
+    if (loaded.includes(name))
+      problems.push(...envFileProblems(path.join(root, name), name, scope))
+  problems.push(
+    ...envFileProblems(path.join(root, '.env.example'), '.env.example', 'shared')
+  )
+
+  for (const name of fs.readdirSync(mobile).filter((entry) => entry.startsWith('.env')))
+    problems.push(
+      ...envFileProblems(
+        path.join(mobile, name),
+        `apps/mobile/${name}`,
+        mobileEnvFileScope(name)
+      )
+    )
+  return problems
+}

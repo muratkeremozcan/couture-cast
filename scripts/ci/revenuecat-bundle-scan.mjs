@@ -15,8 +15,13 @@ import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const TEST_STORE_KEY_VARIABLE = 'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY'
-const TEST_KEY_PATTERN = /(?<![A-Za-z0-9_])test_[A-Za-z0-9]{16,}/
+import {
+  TEST_KEY_PATTERN,
+  TEST_STORE_KEY_VARIABLE,
+  readEnvEntries,
+} from './revenuecat-key-hygiene.mjs'
+
+export { TEST_STORE_KEY_VARIABLE }
 
 function* files(root) {
   for (const entry of fs.readdirSync(root, { withFileTypes: true })) {
@@ -39,11 +44,7 @@ export function scanExport(root, key) {
 
 /** Reads one variable from a dotenv file without exposing the rest. */
 export function readEnvValue(file, name) {
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-    const match = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=\\s*(.*)\\s*$`).exec(line)
-    if (match) return match[1].replace(/^(['"])(.*)\1$/, '$2')
-  }
-  return undefined
+  return readEnvEntries(file).find(([entry]) => entry === name)?.[1]
 }
 
 if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
