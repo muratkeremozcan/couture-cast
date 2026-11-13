@@ -452,6 +452,14 @@ test('flattenHierarchy reads the environment every marked window agrees on', () 
   assert.equal(parseEnvironment('live-font-env-home~0.81.5'), undefined)
 })
 
+test('windowBounds never takes an empty node at the origin (review P3-1)', () => {
+  const tree = node({}, [
+    node({ bounds: '[0,0][0,0]' }),
+    node({ bounds: '[10,20][392,860]' }),
+  ])
+  assert.equal(windowBounds(tree), '[10,20][392,860]')
+})
+
 test('windowBounds takes the app window over content scrolled off screen on iOS', () => {
   const tree = node({}, [
     node({ text: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
@@ -603,6 +611,24 @@ describe('hierarchy source (two booted simulators)', () => {
           fingerprint: deviceFingerprint(udidA),
         }),
       { message: /^live_font_hierarchy_wrong_device/ }
+    )
+  })
+
+  test('a battery level matches only as a whole number (review P3-1)', () => {
+    const print = { battery: 5, cellular: 1, wifi: 1 }
+    assert.throws(
+      () =>
+        assertHierarchySource(dump('0.81.5', { ...print, battery: 85 }), {
+          platform: 'ios',
+          fingerprint: print,
+        }),
+      { message: /^live_font_hierarchy_wrong_device/ }
+    )
+    assert.doesNotThrow(() =>
+      assertHierarchySource(dump('0.81.5', print), {
+        platform: 'ios',
+        fingerprint: print,
+      })
     )
   })
 

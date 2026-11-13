@@ -363,8 +363,10 @@ export function windowBounds(tree) {
     const match = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
       node?.attributes?.bounds ?? ''
     )
-    if (match) {
-      const [l, t, r, b] = match.slice(1).map(Number)
+    const box = match?.slice(1).map(Number)
+    // An empty box (iOS lists the status bar's container at [0,0][0,0]) is no window.
+    if (box && box[2] > box[0] && box[3] > box[1]) {
+      const [l, t, r, b] = box
       union = union
         ? [
             Math.min(union[0], l),
@@ -380,8 +382,8 @@ export function windowBounds(tree) {
     for (const child of node?.children ?? []) walk(child)
   }
   walk(tree)
-  const box = window ?? union
-  return box ? `[${box[0]},${box[1]}][${box[2]},${box[3]}]` : undefined
+  const found = window ?? union
+  return found ? `[${found[0]},${found[1]}][${found[2]},${found[3]}]` : undefined
 }
 
 /**
@@ -482,12 +484,17 @@ export function assertHierarchySource(
 ) {
   if (platform === 'ios' && fingerprint) {
     const texts = statusTexts(tree)
+    // Each number stands on its own: 5% must not match 85% on another simulator.
     const expected = [
       `${fingerprint.battery}% battery power`,
       `${fingerprint.cellular} of 4 bars`,
       `${fingerprint.wifi} of 3 Wi-Fi bars`,
     ]
-    const missing = expected.filter((part) => !texts.some((text) => text.includes(part)))
+    // The parts hold only digits, letters, spaces, % and -, none of them special in a pattern.
+    const whole = (part) => new RegExp(`(^|\\D)${part}`)
+    const missing = expected.filter(
+      (part) => !texts.some((text) => whole(part).test(text))
+    )
     if (missing.length)
       throw new Error(`live_font_hierarchy_wrong_device:${missing.join('|')}`)
   }
