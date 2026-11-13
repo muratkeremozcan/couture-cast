@@ -188,6 +188,28 @@ describe('stitchPages', () => {
     )
   })
 
+  test('counts a tall text once when the viewport clips it differently on each page', () => {
+    const box = (text, y, bottom) => ({ text, id: '', bounds: `[0,${y}][100,${bottom}]` })
+    // 240 px of disclosure, whole on the first page; on the last short scroll a sticky header
+    // clips its top, and the pages align 6 px off on the only other shared text.
+    const first = [box('A', 100, 140), box('C', 900, 940), box('Disclosure', 421, 661)]
+    const second = [box('C', 632, 672), box('Disclosure', 296, 399), box('B', 700, 740)]
+    assert.deepEqual(
+      stitchPages([first, second]).map((key) => JSON.parse(key)[1]),
+      ['A', 'C', 'Disclosure', 'B']
+    )
+    // Two copies of the same label that sit apart are both kept.
+    const third = [
+      box('C', 100, 140),
+      box('Disclosure', 300, 540),
+      box('Disclosure', 700, 940),
+    ]
+    assert.equal(
+      stitchPages([third]).filter((key) => JSON.parse(key)[1] === 'Disclosure').length,
+      2
+    )
+  })
+
   test('aligns pages on volatile text but leaves it out of the result', () => {
     const card = (text, y) => ({ ...at(text, y), volatile: true })
     const first = [at('Header', 100), card('Card 1', 500), card('Card 2', 900)]
@@ -195,6 +217,30 @@ describe('stitchPages', () => {
     assert.deepEqual(
       stitchPages([first, second]).map((key) => JSON.parse(key)[1]),
       ['Header', 'Footer']
+    )
+  })
+
+  test('steps over a page with no shared text by the drag length', () => {
+    // A tall image fills the middle page; the drags are 840 px each.
+    const first = [at('Header', 100), at('Caption 1', 300)]
+    const last = [at('Caption 2', 900), at('Caption 1', 300 - 1680)]
+    assert.throws(() => stitchPages([first, [], last]), {
+      message: 'live_font_scroll_pages_disjoint',
+    })
+    assert.deepEqual(
+      stitchPages([first, [], last], { expectedShift: 840 }).map(
+        (key) => JSON.parse(key)[1]
+      ),
+      ['Header', 'Caption 1', 'Caption 2']
+    )
+    // Once a step is measured, a later textless page reuses it.
+    const second = [at('Caption 1', -540), at('Footer', 1000)]
+    const afterGap = [at('Footer', 1000 - 1680)]
+    assert.deepEqual(
+      stitchPages([first, second, [], afterGap], { expectedShift: 5 }).map(
+        (key) => JSON.parse(key)[1]
+      ),
+      ['Header', 'Caption 1', 'Footer']
     )
   })
 

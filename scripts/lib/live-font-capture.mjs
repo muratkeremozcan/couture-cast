@@ -49,15 +49,15 @@ export function flattenHierarchy(
       volatileDropped += countText(node, platform)
       return
     }
-    const text = nodeText(attrs, platform)
-    if (text && bounds)
-      nodes.push({
-        text,
-        id,
-        bounds,
-        ...(parentBounds ? { parent: parentBounds } : {}),
-        ...(isVolatile ? { volatile: true } : {}),
-      })
+    const entry = textEntry({
+      attrs,
+      id,
+      bounds,
+      parentBounds,
+      isVolatile,
+      platform,
+    })
+    if (entry) nodes.push(entry)
     if (id && bounds && !isVolatile) controls.push({ id, bounds })
     for (const child of node?.children ?? [])
       walk(child, bounds ?? parentBounds, isVolatile)
@@ -74,6 +74,19 @@ export function flattenHierarchy(
     jsFontScale,
     environment: environment.size === 1 ? parseEnvironment(environments[0]) : undefined,
     volatileDropped,
+  }
+}
+
+/** The flattened node for a view with text: the text with the parent's bounds. */
+function textEntry({ attrs, id, bounds, parentBounds, isVolatile, platform }) {
+  const text = nodeText(attrs, platform)
+  if (!text || !bounds) return undefined
+  return {
+    text,
+    id,
+    bounds,
+    ...(parentBounds ? { parent: parentBounds } : {}),
+    ...(isVolatile ? { volatile: true } : {}),
   }
 }
 
@@ -164,15 +177,30 @@ const top = (node) => edges(node)[0]
 
 const identityOf = (node) => JSON.stringify([node.id ?? '', node.text])
 
+const median = (values) =>
+  [...values].sort((x, y) => x - y)[Math.floor(values.length / 2)]
+
+/**
+ * The step for two pages that share no moving text (a page of only a tall image): the median
+ * step measured so far in this stitch, since every drag is the same length, or the drag's own
+ * length before any was measured.
+ */
+function fallbackStep(steps, expectedShift) {
+  if (steps.length) return median(steps)
+  if (expectedShift > 0) return expectedShift
+  throw new Error('live_font_scroll_pages_disjoint')
+}
+
 /**
  * Joins scrolled pages into one text multiset. A node at the same identity and position on
  * every page is fixed chrome (tab bar, sticky header) and counts once. Each page is offset from
  * the previous one by the median shift of the moving identities that appear exactly once on
  * both pages; a node whose identity and shifted top or bottom match one already taken is the
  * same node seen again. Either edge counts because the hierarchy clips a node cut by the
- * viewport, so a node half off screen keeps only its visible edge.
+ * viewport, so a node half off screen keeps only its visible edge. Pages that share no moving
+ * text take the step from fallbackStep.
  */
-export function stitchPages(pages, { tolerance = 4 } = {}) {
+export function stitchPages(pages, { tolerance = 4, expectedShift } = {}) {
   if (!pages.length) return []
   const at = (page, node) =>
     page.some(
@@ -188,6 +216,7 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
       return { key: identityOf(node), y, bottom }
     })
   let offset = 0
+  const steps = []
   for (let index = 1; index < pages.length; index += 1) {
     const once = (page) => {
       const counts = new Map()
@@ -203,18 +232,21 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
     const shifts = [...a.keys()]
       .filter((key) => b.has(key))
       .map((key) => top(a.get(key)) - top(b.get(key)))
-    if (!shifts.length) throw new Error('live_font_scroll_pages_disjoint')
-    shifts.sort((x, y) => x - y)
-    offset += shifts[Math.floor(shifts.length / 2)]
+    const step = shifts.length ? median(shifts) : fallbackStep(steps, expectedShift)
+    steps.push(step)
+    offset += step
     for (const node of pages[index]) {
       if (chrome(node) || node.volatile) continue
       const key = identityOf(node)
       const [y, bottom] = edges(node).map((edge) => edge + offset)
+      // The same text whose box shares an edge with, or overlaps, one already taken is that node
+      // again: a viewport edge or a sticky header clips a tall text differently on each page.
       const seen = taken.some(
         (entry) =>
           entry.key === key &&
           (Math.abs(entry.y - y) <= tolerance ||
-            Math.abs(entry.bottom - bottom) <= tolerance)
+            Math.abs(entry.bottom - bottom) <= tolerance ||
+            (y < entry.bottom - tolerance && bottom > entry.y + tolerance))
       )
       if (!seen) taken.push({ key, y, bottom })
     }
