@@ -44,13 +44,26 @@ describe('the one macOS pull request job', () => {
     assert.deepEqual(mac, ['pr-apple-native.yml:apple-native'])
   })
 
-  test('runs when either of its lanes does, on macos-15 within the 20-minute ceiling', () => {
+  // The D6 queue probe (PR 215, run 43327728813): macos-26 queue p95 0.93 minutes, macos-15 7.50.
+  test('runs when either of its lanes does, on macos-26 within the 20-minute ceiling', () => {
     assert.equal(job.if, `${lane('ios-unit')} || ${lane('watchos')}`)
     assert.deepEqual([job.needs].flat(), ['lanes'])
-    assert.equal(job['runs-on'], 'macos-15')
+    assert.equal(job['runs-on'], 'macos-26')
     assert.ok(job['timeout-minutes'] > 0 && job['timeout-minutes'] <= 20)
     assert.equal(job['continue-on-error'], undefined)
     assert.ok(job.steps.every((step) => step['continue-on-error'] === undefined))
+  })
+
+  test('selects the Xcode ios-native.yml selects, before any Apple build or test', () => {
+    const xcode = job.steps.findIndex((step) => step.id === 'xcode')
+    const iosNative = workflows['ios-native.yml'].jobs['ios-native'].steps.find(
+      (step) => step.id === 'xcode'
+    )
+    assert.equal(xcode, 1, 'right after the checkout')
+    assert.equal(job.steps[xcode].run, iosNative.run)
+    for (const step of job.steps.slice(xcode + 1))
+      if (/swift test|xcodebuild test|test:watchos-prebuild/.test(step.run ?? ''))
+        assert.match(step.if, /steps\.xcode\.outcome == 'success'/, step.name)
   })
 
   test('each test step runs only for its own lane', () => {
@@ -177,7 +190,7 @@ describe('the watchOS prebuild suite', () => {
       'watchos-native.yml': {
         jobs: { 'watchos-native': { 'runs-on': 'ubuntu-latest', steps: [{ run }] } },
       },
-      'unflagged.yml': { jobs: { mac: { 'runs-on': 'macos-15', steps: [{ run }] } } },
+      'unflagged.yml': { jobs: { mac: { 'runs-on': 'macos-26', steps: [{ run }] } } },
       'linux-flagged.yml': {
         jobs: {
           linux: {
@@ -189,7 +202,7 @@ describe('the watchOS prebuild suite', () => {
       'flagged.yml': {
         jobs: {
           mac: {
-            'runs-on': 'macos-15',
+            'runs-on': 'macos-26',
             env: { WATCHOS_REQUIRE_BUILD: '1' },
             steps: [{ run }],
           },
