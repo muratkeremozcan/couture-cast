@@ -227,6 +227,11 @@ printf 'Package: %s\\nVersion: %s\\nArchitecture: %s\\n' "$p" "$v" "$a"`
   )
   writeFileSync(path.join(stubs, 'index'), index)
   stub('apt-cache', `echo "apt-cache $*" >> "${stubs}/calls"\ncat "${stubs}/index"`)
+  // Hashed in Node, so the tests do not depend on the host having sha256sum (older macOS).
+  stub(
+    'sha256sum',
+    `exec "${process.execPath}" -e "const f=process.argv[1];process.stdout.write(require('crypto').createHash('sha256').update(require('fs').readFileSync(f)).digest('hex')+'  '+f+'\\\\n')" "$1"`
+  )
   try {
     const result = spawnSync('bash', [path.join(repository, SCRIPT), ...args], {
       env: { PATH: `${stubs}:${process.env.PATH}`, APT_INSTALL_PAUSES: pauses, ...env },
