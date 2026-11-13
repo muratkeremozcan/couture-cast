@@ -236,6 +236,61 @@ describe('a passing iOS run on main for a commit', () => {
     await assert.rejects(find([run], jobs, { totals }), /listed \d+ of \d+ jobs/)
   })
 
+  // RUNS-01: the deciding run is the newest completed one that ran its iOS jobs; a gate-stopped
+  // dispatch or a run=false run never decides, and a cancelled run is never a pass.
+  test('a later run that ran its iOS jobs and failed or was cancelled decides: no pass', async () => {
+    const P = passing('dispatch', { created_at: '2026-11-13T09:00:00Z' })
+    for (const [conclusion, patch] of [
+      ['failure', { 'ios-native / ios-shard (2)': { conclusion: 'failure' } }],
+      ['cancelled', { 'ios-native / ios-evidence': { conclusion: 'cancelled' } }],
+      ['cancelled', {}],
+    ]) {
+      const later = iosRun('push', { created_at: '2026-11-13T10:00:00Z', conclusion })
+      assert.equal(
+        await find([later, P.run], { ...P.jobs, [later.id]: iosJobs('push', patch) }),
+        null,
+        `${conclusion} ${JSON.stringify(patch)}`
+      )
+    }
+  })
+
+  test('a later gate-stopped dispatch, run=false run or run in progress never decides', async () => {
+    const P = passing('dispatch', { created_at: '2026-11-13T09:00:00Z' })
+    const stopped = iosRun('dispatch', {
+      created_at: '2026-11-13T10:00:00Z',
+      conclusion: 'failure',
+    })
+    const skippedNightly = iosRun('schedule', { created_at: '2026-11-13T11:00:00Z' })
+    const running = iosRun('push', {
+      created_at: '2026-11-13T12:00:00Z',
+      status: 'in_progress',
+      conclusion: null,
+    })
+    const jobs = {
+      ...P.jobs,
+      [stopped.id]: iosJobs(
+        'dispatch',
+        Object.fromEntries(
+          iosJobs('dispatch').map((job) => [
+            job.name,
+            { conclusion: job.name === 'ios-dispatch-gate' ? 'failure' : 'skipped' },
+          ])
+        )
+      ),
+      [skippedNightly.id]: [
+        { name: 'ios-changes', conclusion: 'success' },
+        { name: 'ios-native', conclusion: 'skipped' },
+      ],
+      [running.id]: iosJobs('push', {
+        'ios-native / ios-evidence': { conclusion: null },
+      }),
+    }
+    assert.equal(
+      (await find([running, skippedNightly, stopped, P.run], jobs))?.id,
+      P.run.id
+    )
+  })
+
   test('the newest passing run is the one named', async () => {
     const older = passing('push', { created_at: '2026-11-13T08:00:00Z' })
     const newer = passing('dispatch', { created_at: '2026-11-13T12:00:00Z' })

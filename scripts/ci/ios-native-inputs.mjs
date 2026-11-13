@@ -487,6 +487,38 @@ export function runJobsPassed(jobs, required, { dispatch = false } = {}) {
   )
 }
 
+/** Whether a run ran its iOS jobs: one called job that was not skipped, finished or not. */
+export function ranNativeJobs(jobs) {
+  return jobs.some(
+    (job) =>
+      String(job?.name ?? '').startsWith('ios-native / ') && job.conclusion !== 'skipped'
+  )
+}
+
+/**
+ * The deciding run of a commit, shared by the dispatch gate, the nightly decision and the
+ * evidence judge: the newest run, from `runs` newest first, that ran its iOS jobs. A dispatch
+ * the gate stopped and a run whose ios-changes decided run=false ran none, so the run before
+ * them decides. A run in progress is skipped, or with `pending` it decides unless its gate
+ * already stopped it. `jobsOf(run)` reads a run's jobs. Returns `{ run, jobs }` or null.
+ */
+export async function decidingRun(runs, jobsOf, { pending = false } = {}) {
+  for (const run of runs) {
+    if (run.status !== 'completed' && !pending) continue
+    const jobs = await jobsOf(run)
+    if (run.status !== 'completed') {
+      const stopped = jobs.some(
+        (job) =>
+          job?.name === DISPATCH_GATE_JOB &&
+          job.conclusion &&
+          job.conclusion !== 'success'
+      )
+      if (!stopped) return { run, jobs }
+    } else if (ranNativeJobs(jobs)) return { run, jobs }
+  }
+  return null
+}
+
 /** Every run one workflow runs listing returns, page by page. */
 async function listRuns(path, options) {
   const runs = []
@@ -499,21 +531,19 @@ async function listRuns(path, options) {
 }
 
 /**
- * The newest passing iOS run on main for commit `sha`, or null: a push or schedule run of
- * ios-native.yml whose commit is `sha`, or a dispatch of ios-native-dispatch.yml from main named
- * "iOS native <sha>", from this repository, concluded success, with every job passed
- * (runJobsPassed). A push run that ios-changes stopped has no iOS job, so it never counts. A read
- * error throws; each caller then runs the iOS jobs.
+ * The deciding iOS run on main for commit `sha` when it passed, or null. The candidates are the
+ * push and schedule runs of ios-native.yml whose commit is `sha` and the dispatches of
+ * ios-native-dispatch.yml from main named "iOS native <sha>", from this repository; the newest
+ * completed one that ran its iOS jobs decides (decidingRun), so a later failure or cancellation
+ * is never hidden behind an earlier pass. It passed when it concluded success with every job
+ * passed (runJobsPassed). A read error throws; each caller then runs the iOS jobs.
  */
 export async function passingRun({ repository, sha, graphs = runGraphs(), ...options }) {
   if (!COMMIT.test(sha ?? '')) return null
   const ours = (run) =>
-    run?.head_branch === 'main' &&
-    run?.head_repository?.full_name === repository &&
-    run?.status === 'completed' &&
-    run?.conclusion === 'success'
+    run?.head_branch === 'main' && run?.head_repository?.full_name === repository
   const pushed = await listRuns(
-    `/repos/${repository}/actions/workflows/ios-native.yml/runs?head_sha=${sha}&status=success`,
+    `/repos/${repository}/actions/workflows/ios-native.yml/runs?head_sha=${sha}`,
     options
   )
   const commit = await githubApi(`/repos/${repository}/commits/${sha}`, options)
@@ -521,7 +551,7 @@ export async function passingRun({ repository, sha, graphs = runGraphs(), ...opt
   if (!Number.isFinite(date)) throw new Error(`the commit ${sha} has no date`)
   const since = new Date(date - 86_400_000).toISOString().slice(0, 10)
   const dispatched = await listRuns(
-    `/repos/${repository}/actions/workflows/ios-native-dispatch.yml/runs?event=workflow_dispatch&branch=main&status=success&created=${encodeURIComponent(`>=${since}`)}`,
+    `/repos/${repository}/actions/workflows/ios-native-dispatch.yml/runs?event=workflow_dispatch&branch=main&created=${encodeURIComponent(`>=${since}`)}`,
     options
   )
   const candidates = [
@@ -540,13 +570,16 @@ export async function passingRun({ repository, sha, graphs = runGraphs(), ...opt
         run.display_title === `iOS native ${sha}`
     ),
   ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-  for (const run of candidates) {
-    const jobs = await runJobs({ ...options, repository, id: run.id })
-    const dispatch = run.event === 'workflow_dispatch'
-    if (runJobsPassed(jobs, dispatch ? graphs.dispatch : graphs.push, { dispatch }))
-      return run
-  }
-  return null
+  const deciding = await decidingRun(candidates, (run) =>
+    runJobs({ ...options, repository, id: run.id })
+  )
+  if (!deciding || deciding.run.conclusion !== 'success') return null
+  const dispatch = deciding.run.event === 'workflow_dispatch'
+  return runJobsPassed(deciding.jobs, dispatch ? graphs.dispatch : graphs.push, {
+    dispatch,
+  })
+    ? deciding.run
+    : null
 }
 
 /**

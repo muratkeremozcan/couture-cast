@@ -33,6 +33,7 @@ import {
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
   ROOT_MANIFEST,
+  dispatchGate,
   evidenceInputs,
   nativeIosChanges,
   pushPaths,
@@ -66,6 +67,7 @@ const run = (patch = {}) => ({
   id: next++,
   event: 'workflow_dispatch',
   head_branch: 'main',
+  head_repository: { full_name: 'o/r' },
   path: DISPATCH_WORKFLOW,
   display_title: `iOS native ${head}`,
   head_sha: 'f'.repeat(40),
@@ -551,6 +553,8 @@ function fakeGitHub({
         return raw(contents[query.ref]?.[match[1]])
       },
     ],
+    // The gate also reads ios-native.yml's runs of the commit: none here.
+    [/\/actions\/workflows\/ios-native\.yml\/runs$/, () => reply({ workflow_runs: [] })],
     [
       /\/actions\/workflows\/ios-native-dispatch\.yml\/runs$/,
       (match, query) => {
@@ -1006,21 +1010,96 @@ describe('the evidence runs the pull_request_target job reads', () => {
     assert.equal(result.state, 'failure')
   })
 
+  // RUNS-01: the dispatch gate and the judge pick the same deciding run, the newest one that ran
+  // its iOS jobs, so a later real failure is never hidden behind an earlier pass: pass P, failed
+  // D, a fresh dispatch E in progress, then E passes.
+  test('pass, then a later real failure: a fresh dispatch runs, and its pass turns the evidence green', async () => {
+    const quietly = async (body) => {
+      const log = console.log
+      console.log = () => undefined
+      try {
+        return await body()
+      } finally {
+        console.log = log
+      }
+    }
+    const P = run({ created_at: '2026-11-13T09:00:00Z' })
+    const D = run({ created_at: '2026-11-13T10:00:00Z', conclusion: 'failure' })
+    const E = run({
+      created_at: '2026-11-13T11:00:00Z',
+      status: 'in_progress',
+      conclusion: null,
+    })
+    const failedJobs = dispatchJobs({
+      'ios-native / ios-shard (2)': { conclusion: 'failure' },
+    })
+    const runningJobs = dispatchJobs(
+      Object.fromEntries(
+        dispatchJobs()
+          .filter(
+            (job) => job.name.startsWith('ios-native / ') && job.conclusion !== 'skipped'
+          )
+          .map((job) => [job.name, { status: 'in_progress', conclusion: null }])
+      )
+    )
+    const state = (runs, jobs) => {
+      const github = fakeGitHub({ runs, jobs })
+      return Promise.all([
+        judgeEvent(github),
+        quietly(() =>
+          dispatchGate({
+            env: { SHA: head, GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 'token' },
+            fetchImpl: github.fetchImpl,
+          })
+        ),
+      ])
+    }
+    const [afterD, dispatchAfterD] = await state([D, P], { [D.id]: failedJobs })
+    assert.equal(afterD.state, 'failure', afterD.detail)
+    assert.equal(
+      dispatchAfterD,
+      true,
+      'the gate lets a fresh dispatch run after a real failure'
+    )
+    const [whileE] = await state([E, D, P], { [D.id]: failedJobs, [E.id]: runningJobs })
+    assert.equal(whileE.state, 'pending', whileE.detail)
+    const passedE = { ...E, status: 'completed', conclusion: 'success' }
+    const [afterE, dispatchAfterE] = await state([passedE, D, P], { [D.id]: failedJobs })
+    assert.equal(afterE.state, 'success', afterE.detail)
+    assert.ok(afterE.detail.includes(`run ${E.id} `), afterE.detail)
+    assert.equal(dispatchAfterE, false, 'the next dispatch is stopped')
+  })
+
+  test('a cancelled run is never a deciding pass', async () => {
+    const P = run({ created_at: '2026-11-13T09:00:00Z' })
+    const C = run({ created_at: '2026-11-13T10:00:00Z', conclusion: 'cancelled' })
+    const cancelledJobs = dispatchJobs({
+      'ios-native / ios-evidence': { conclusion: 'cancelled' },
+    })
+    const github = fakeGitHub({ runs: [C, P], jobs: { [C.id]: cancelledJobs } })
+    assert.equal((await judgeEvent(github)).state, 'failure')
+    const log = console.log
+    console.log = () => undefined
+    try {
+      assert.equal(
+        await dispatchGate({
+          env: { SHA: head, GITHUB_REPOSITORY: 'o/r', GITHUB_TOKEN: 'token' },
+          fetchImpl: github.fetchImpl,
+        }),
+        true
+      )
+    } finally {
+      console.log = log
+    }
+  })
+
   test('a dispatch the gate stopped passes over to the earlier pass, and alone is no evidence', async () => {
     const passed = run({ created_at: '2026-11-13T09:00:00Z' })
     const stopped = run({ created_at: '2026-11-13T11:00:00Z', conclusion: 'failure' })
+    // The gate failed, so every other job of the dispatch was skipped.
     const stoppedJobs = dispatchJobs(
       Object.fromEntries(
-        [
-          'ios-dispatch-gate',
-          'ios-cache-proof',
-          'ios-native / ios-build',
-          'ios-native / ios-shard (1)',
-          'ios-native / ios-shard (2)',
-          'ios-native / ios-expo-go',
-          'ios-native / iOS app build',
-          'ios-native / ios-evidence',
-        ].map((name) => [
+        dispatchJobs().map(({ name }) => [
           name,
           { conclusion: name === 'ios-dispatch-gate' ? 'failure' : 'skipped' },
         ])

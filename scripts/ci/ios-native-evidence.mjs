@@ -26,13 +26,13 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
-  DISPATCH_GATE_JOB,
   IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
   NATIVE_BINDING,
   ROOT_MANIFEST,
   bindingCandidate,
+  decidingRun,
   dependencyChanges,
   evidenceInputs,
   githubApi as api,
@@ -328,21 +328,17 @@ async function evidenceRuns(options) {
   const runs = (await dispatchRuns(options))
     .filter((run) => dispatchedCommit(run) === options.headSha)
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-  for (const run of runs) {
-    if (run.status === 'completed') {
-      const jobs = await runJobs({ ...options, id: run.id })
-      // The dispatch gate stops a dispatch of a commit that already passed: that run is no one's
-      // evidence, and the earlier one still decides.
-      if (
-        jobs.some((job) => job.name === DISPATCH_GATE_JOB && job.conclusion !== 'success')
-      )
-        continue
-      run.jobsPassed = runJobsPassed(jobs, options.graphs.dispatch, { dispatch: true })
-    }
-    run.fromMain = await onMain({ ...options, sha: run.head_sha })
-    return [run]
-  }
-  return []
+  // The dispatch gate's selection (decidingRun): a dispatch the gate stopped ran no iOS job and
+  // is no one's evidence, and one in progress past the gate keeps the verdict pending.
+  const deciding = await decidingRun(runs, (run) => runJobs({ ...options, id: run.id }), {
+    pending: true,
+  })
+  if (!deciding) return []
+  const { run, jobs } = deciding
+  if (run.status === 'completed')
+    run.jobsPassed = runJobsPassed(jobs, options.graphs.dispatch, { dispatch: true })
+  run.fromMain = await onMain({ ...options, sha: run.head_sha })
+  return [run]
 }
 
 /** A recursive git trees API listing, or null when it is missing or truncated. */
