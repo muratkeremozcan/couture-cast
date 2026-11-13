@@ -310,7 +310,36 @@ test('an idle mediaanalysisd is booted out, and a listed pid the manager does no
       options: { fatal: false },
     },
   ])
-  assert.equal(record.census.chronod.bootoutExit, null)
+  assert.deepEqual(record.census.chronod, { state: 'unowned', bootoutExit: null })
   assert.deepEqual(record.census.healthd, { state: 'absent', bootoutExit: null })
   assert.deepEqual(JSON.parse(lines.at(-1)).quietServices, record)
+})
+
+// Antigravity P3-1: launchctl list ran before ps, and a quiet service listed with a pid that
+// exited in between is still loaded, so launchd can start it again during the flows. A listed pid
+// ps no longer has counts as idle and is booted out; the census state matches what was done.
+test('a quiet service whose listed pid exited before ps is booted out as idle', () => {
+  const calls = []
+  const execute = (operation) => {
+    calls.push(operation)
+    return { exitCode: 0 }
+  }
+  const log = console.log
+  console.log = (line) => calls.push(`log:${typeof line}`)
+  let record
+  try {
+    record = bootoutQuietServices(
+      'owned-uuid',
+      ps,
+      simulatorJobs(jobsText),
+      100,
+      execute,
+      '9233 0 com.apple.mediaanalysisd'
+    )
+  } finally {
+    console.log = log
+  }
+  assert.deepEqual(record.census.mediaanalysisd, { state: 'idle', bootoutExit: 0 })
+  assert.deepEqual(record.stopped, ['mediaanalysisd'])
+  assert.deepEqual(calls, ['bootout-quiet-mediaanalysisd', 'log:string'])
 })
