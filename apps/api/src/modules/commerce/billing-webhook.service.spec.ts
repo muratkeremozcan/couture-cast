@@ -445,6 +445,99 @@ describe('the RevenueCat Test Store converges under local and preview (story 6.1
   })
 })
 
+// Learning path Step 55: story 6.15 D15. A TRANSFER that carries no store falls back to the
+// losing row's store, so a test_store row must not move outside local and preview.
+describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  async function transferTestStoreRow(): Promise<{
+    applied: { userId: string; status: string; store: string }[]
+    recorded: number
+  }> {
+    const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    try {
+      const create = vi.fn().mockResolvedValue({})
+      const losingRow = {
+        user_id: 'paid-member',
+        status: 'active',
+        store: 'test_store',
+        product_id: 'premium_monthly',
+        current_period_end: new Date(1_757_676_700_000),
+      }
+      const prisma = {
+        billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+        user: {
+          findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+            Promise.resolve({ id: where.id })
+          ),
+        },
+        $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+          work({
+            billingEvent: { create },
+            premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(losingRow) },
+          })
+        ),
+      }
+      const applyLedgerEvent = vi.fn().mockResolvedValue(null)
+      const service = new BillingWebhookService(
+        prisma as unknown as PrismaClient,
+        { applyLedgerEvent } as unknown as PremiumEntitlementService,
+        { emitTransition: vi.fn() } as unknown as SubscriptionService,
+        {} as RevenueCatClient
+      )
+      const body = {
+        event: rcEvent({
+          type: 'TRANSFER',
+          store: null,
+          product_id: null,
+          expiration_at_ms: null,
+          transferred_from: ['paid-member'],
+          transferred_to: ['other-member'],
+        }),
+      }
+
+      await service.handleRevenueCatWebhook({
+        authorization: buildTestOnlyRevenueCatWebhookAuth(),
+        rawBody: Buffer.from(JSON.stringify(body)),
+      })
+
+      const applied = applyLedgerEvent.mock.calls.map(([, input]) => {
+        const { userId, state } = input as {
+          userId: string
+          state: { status: string; store: string }
+        }
+        return { userId, status: state.status, store: state.store }
+      })
+      return { applied, recorded: create.mock.calls.length }
+    } finally {
+      if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+      else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+    }
+  }
+
+  it.each(['local', 'preview'])('with TEST_ENV %s moves the row', async (testEnv) => {
+    vi.stubEnv('TEST_ENV', testEnv)
+    await expect(transferTestStoreRow()).resolves.toEqual({
+      applied: [
+        { userId: 'paid-member', status: 'revoked', store: 'test_store' },
+        { userId: 'other-member', status: 'active', store: 'test_store' },
+      ],
+      recorded: 1,
+    })
+  })
+
+  it.each([undefined, 'staging', 'production', 'qa'])(
+    'with TEST_ENV %s records the event and revokes and grants no one',
+    async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv as string)
+      await expect(transferTestStoreRow()).resolves.toEqual({ applied: [], recorded: 1 })
+    }
+  )
+})
+
 describe('secret resolution (Decision 10: point of use, test-only fallbacks)', () => {
   const savedStripe = process.env.STRIPE_WEBHOOK_SECRET
   const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH

@@ -839,6 +839,70 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
     }
   })
 
+  // Learning path Step 55: story 6.15 D15. A TRANSFER with no store falls back to the losing
+  // row's store, so it moves a test_store row only under local and preview.
+  describe('story 6.15 D15: a store-less TRANSFER of a test_store row', () => {
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'moves' : 'leaves'} the row under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: subscriberId,
+                status: 'active',
+                store: 'test_store',
+                currentPeriodEnd: PERIOD_END,
+                syncedAt: SEED_OCCURRED_AT,
+                lastEventOccurredAt: SEED_OCCURRED_AT,
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+          const before = await entitlementOf(subscriberId)
+          const event = {
+            id: nextEventId(),
+            type: 'TRANSFER',
+            event_timestamp_ms: T0 + eventSequence * 1000,
+            store: null,
+            transferred_from: [subscriberId],
+            transferred_to: [gainerId],
+          }
+
+          const response = await postEvent(event)
+
+          expect(response.status).toBe(200)
+          expect(
+            await prisma.billingEvent.count({ where: { external_event_id: event.id } })
+          ).toBe(1)
+          if (open) {
+            expect(await entitlementOf(subscriberId)).toMatchObject({ status: 'revoked' })
+            expect(await entitlementOf(gainerId)).toMatchObject({
+              status: 'active',
+              store: 'test_store',
+            })
+          } else {
+            expect(await entitlementOf(subscriberId)).toEqual(before)
+            expect(await entitlementOf(gainerId)).toBeNull()
+          }
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+  })
+
   describe('unknown subjects and degraded sinks', () => {
     it('5.2-INT-040: an unknown app_user_id answers 200, records user_id null, writes no entitlement, emits no api_error_occurred', async (context) => {
       if (!requireSchema(context)) return

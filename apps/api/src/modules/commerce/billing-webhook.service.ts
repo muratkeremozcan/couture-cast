@@ -37,6 +37,7 @@ export {
 }
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
+  honorsEntitlementStore,
   PremiumEntitlementService,
   type EntitlementTransition,
   type LedgerEntitlementState,
@@ -325,11 +326,30 @@ export function planRevenueCatTransition(event: RevenueCatEvent): TransitionPlan
  * subscription, so the loser's record is the authoritative fallback. Neither
  * known → null, and the caller writes no entitlement.
  */
+function resolveTransferStore(
+  event: RevenueCatEvent,
+  losingRow: PremiumEntitlement | null
+): EntitlementStore | null {
+  return mapRevenueCatStore(event.store) ?? losingRow?.store ?? null
+}
+
+/**
+ * Story 6.15 D15: a TRANSFER whose resolved store this API does not honor (a `test_store` row
+ * moved by a store-less event outside local and preview) revokes no one and grants no one.
+ */
+function transfersUnhonoredStore(
+  event: RevenueCatEvent,
+  losingRow: PremiumEntitlement | null
+): boolean {
+  const store = resolveTransferStore(event, losingRow)
+  return store !== null && !honorsEntitlementStore(store)
+}
+
 function resolveTransferGainState(
   event: RevenueCatEvent,
   losingRow: PremiumEntitlement | null
 ): LedgerEntitlementState | null {
-  const store = mapRevenueCatStore(event.store) ?? losingRow?.store ?? null
+  const store = resolveTransferStore(event, losingRow)
   const productId = event.product_id ?? losingRow?.product_id ?? null
   const currentPeriodEnd =
     event.expiration_at_ms !== null && event.expiration_at_ms !== undefined
@@ -684,6 +704,7 @@ export class BillingWebhookService {
     let lossTransition: EntitlementTransition | null = null
     let gainTransition: EntitlementTransition | null = null
     let gainSkipped = false
+    let unhonoredSkipped = false
 
     try {
       await interactiveTransaction(this.prisma, async (tx) => {
@@ -691,6 +712,7 @@ export class BillingWebhookService {
         lossTransition = null
         gainTransition = null
         gainSkipped = false
+        unhonoredSkipped = false
         await tx.billingEvent.create({
           data: {
             provider: 'revenuecat',
@@ -712,6 +734,12 @@ export class BillingWebhookService {
             : await tx.premiumEntitlement.findUnique({
                 where: { user_id: losingUserId },
               })
+
+        // The event stays recorded; the ledger rows stay as they were.
+        if (transfersUnhonoredStore(event, losingRow)) {
+          unhonoredSkipped = true
+          return
+        }
 
         if (losingUserId !== null && losingRow !== null) {
           lossTransition = await this.entitlements.applyLedgerEvent(tx, {
@@ -751,6 +779,11 @@ export class BillingWebhookService {
       throw error
     }
 
+    if (unhonoredSkipped)
+      this.logger.info(
+        { eventId: event.id },
+        'TRANSFER recorded without transition: its store is not honored in this environment'
+      )
     if (gainSkipped)
       this.logger.warn(
         { eventId: event.id },
