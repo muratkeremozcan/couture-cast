@@ -371,6 +371,18 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(verdict, 'unexpected')
   })
 
+  test('a touch target centred over a shorter row is not clipped text', () => {
+    // iOS: a 44 pt icon button (About CoutureCast) centred on a 38 pt header row overflows it by
+    // 3 pt above and below; text that grows past its parent overflows at the bottom.
+    const change = fixedChange()
+    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
+    const [left, top, right, bottom] = parseBounds(node.bounds)
+    node.parent = `[${left},${top + 3}][${right},${bottom - 3}]`
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, true)
+    node.parent = `[${left},${top}][${right},${bottom - 6}]`
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+  })
+
   test('a height that matches neither the base nor the cold layout is unexpected', () => {
     const change = { ...fixedChange(), settled: correct(stage('settled'), {}, 1.3) }
     assert.equal(evaluateLiveFontChange(change).verdict, 'unexpected')

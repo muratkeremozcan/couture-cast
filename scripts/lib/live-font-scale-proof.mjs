@@ -208,11 +208,14 @@ function clipping(capture, tolerance) {
     if (node.parent === undefined) continue
     const [left, top, right, bottom] = parseBounds(node.bounds)
     const [pl, pt, pr, pb] = parseBounds(node.parent)
+    // A box that overflows its parent by the same amount above and below is a touch target
+    // centred on a shorter row (a 44 pt icon button on iOS); text that grows overflows below.
+    const centred =
+      pt - top > tolerance && Math.abs(pt - top - (bottom - pb)) <= tolerance
     if (
       left < pl - tolerance ||
-      top < pt - tolerance ||
       right > pr + tolerance ||
-      bottom > pb + tolerance
+      (!centred && (top < pt - tolerance || bottom > pb + tolerance))
     )
       clipped.push({ id: node.id ?? '', text: node.text })
   }
