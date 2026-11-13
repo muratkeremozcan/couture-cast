@@ -379,6 +379,9 @@ describe('Android KVM guard', () => {
     const check = script.indexOf('"$ANDROID_HOME/emulator/emulator" -accel-check')
     assert.ok(check > 0 && check < script.indexOf('adb -s "$ANDROID_SERIAL" install'))
     assert.match(script, /grep -q 'KVM .* is installed and usable'/)
+    // Concurrent runs on one machine (worktrees, reviewers) share /tmp; a fixed path there let a
+    // parallel unusable-KVM test fail a passing journey (native-harness flake, 2026-11-13).
+    assert.doesNotMatch(script, /\/tmp\//)
   })
 
   test('Android CI settles the KVM udev rule after the trigger and before the device test', async () => {
