@@ -129,6 +129,15 @@ Decisions (owner direction 2026-11-12; the rest delegated to the builder):
   | accessibility Android app build (Linux)    | 16   | n/a     | 17.7    | n/a       |
   | share-card `browser-acceptance` (Linux)    | 15   | n/a     | 17.7    | n/a       |
 
+  Queue probe (rule 5), PR #215, run `43327728813`, attempts 2 to 21 (20 runs each, 2026-11-12 5:50 to 6:16 PM CST), queue = job start minus attempt start:
+
+  | Runner     | Runs | Queue p50 | Queue p95 | Queue max |
+  | ---------- | ---- | --------- | --------- | --------- |
+  | `macos-26` | 20   | 0.08      | 0.93      | 1.63      |
+  | `macos-15` | 20   | 0.15      | 7.50      | 27.83     |
+
+  `macos-26` queues far less, so the one macOS PR job runs on `macos-26`. One evening window is a small sample; the 20 completed PR runs of that job remain the acceptance measure.
+
   Today's iOS app build and shard run past 20 minutes before any queue, so they leave the PR path (below). The macOS PR job keeps it only while 20 consecutive pull-request runs show queue plus run p95 of 15 minutes or less and a maximum of 20; a breach moves the failing check to `ios-native.yml`, and the story says so in the Plan Change Log with the numbers. Every p95 in this story comes from `scripts/ci/pr-job-p95.mjs` (with its test), which records queue as job start minus run creation, the owner's measure, and also job start minus job creation (TEA-09). It keeps failed, timed-out and cancelled jobs with their observed durations, and counts a job cancelled before it started as a queue-only lower bound; only jobs skipped without running are excluded, each with its reason (CX-11). A job whose queue plus run passes 20 minutes is a breach even when its `timeout-minutes`, which counts execution only, did not fire. Lane fixtures reject a second macOS job on a PR and macOS selection for a JS-only change.
   The Linux jobs above 15 minutes p95 come under 15 in this story (build the APK once and reuse it, Gradle and compiler caches, Maestro sharding); the browser-acceptance cuts PR in flight now counts toward that.
   Owner decision, 2026-11-12 5:35 PM (supersedes the all-or-nothing reading of rule 5 and the earlier "main plus nightly" call): shift left as far as the budget allows. Every check whose queue plus run fits p95 15 minutes and maximum 20 runs on the pull request; only checks that cannot fit leave it.
