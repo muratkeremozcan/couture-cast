@@ -32,9 +32,45 @@ export function iosRun(kind, patch = {}) {
   }
 }
 
+// The execution fields of a job in the jobs API: a runner and started steps once a runner took
+// it, neither while it waits or when it was skipped or cancelled before it started.
+const STARTED_AT = '2026-11-13T10:00:00Z'
+const RUNNER = { runner_id: 7, runner_name: 'GitHub Actions 7' }
+const executed = {
+  ...RUNNER,
+  steps: [{ number: 1, name: 'Set up job', status: 'completed', conclusion: 'success' }],
+}
+const unassigned = { runner_id: null, runner_name: null, steps: [] }
+// A job waiting for a runner: GitHub already sets started_at.
+export const QUEUED = {
+  status: 'queued',
+  conclusion: null,
+  started_at: STARTED_AT,
+  ...unassigned,
+}
+// A job cancelled before a runner took it.
+export const CANCELLED_BEFORE_START = {
+  status: 'completed',
+  conclusion: 'cancelled',
+  started_at: STARTED_AT,
+  ...unassigned,
+}
+// A job a runner is executing.
+export const STARTED = {
+  status: 'in_progress',
+  conclusion: null,
+  started_at: STARTED_AT,
+  ...RUNNER,
+  steps: [
+    { number: 1, name: 'Set up job', status: 'completed', conclusion: 'success' },
+    { number: 2, name: 'Run the shard', status: 'in_progress', conclusion: null },
+  ],
+}
+
 /**
- * The jobs of a run of `kind` whose every job passed, as the jobs API names them; a dispatch
- * skips ios-build. `patch` maps a job name to fields to change, and `extra` adds jobs.
+ * The jobs of a run of `kind` whose every job passed, as the jobs API lists them, runner and
+ * steps included; a dispatch skips ios-build. `patch` maps a job name to fields to change, and
+ * `extra` adds jobs.
  */
 export function iosJobs(kind, patch = {}, extra = []) {
   const dispatch = kind === 'dispatch'
@@ -50,12 +86,17 @@ export function iosJobs(kind, patch = {}, extra = []) {
     'ios-native / ios-evidence',
     ...extra,
   ]
-  return names.map((name) => ({
-    name,
-    status: 'completed',
-    conclusion: dispatch && name === 'ios-native / ios-build' ? 'skipped' : 'success',
-    ...patch[name],
-  }))
+  return names.map((name) => {
+    const skipped = dispatch && name === 'ios-native / ios-build'
+    return {
+      name,
+      status: 'completed',
+      conclusion: skipped ? 'skipped' : 'success',
+      started_at: STARTED_AT,
+      ...(skipped ? unassigned : executed),
+      ...patch[name],
+    }
+  })
 }
 
 export function runsApi({

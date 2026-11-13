@@ -498,11 +498,33 @@ export function ranNativeJobs(jobs) {
 }
 
 /**
+ * RUNS-R2-01: whether a job executed: a runner took it and one of its steps started. A queued job
+ * already carries started_at with no runner and no steps, and a job cancelled before a runner
+ * took it has neither, so neither executed.
+ */
+export function jobExecuted(job) {
+  return (
+    (job?.runner_id != null || job?.runner_name != null) &&
+    Array.isArray(job?.steps) &&
+    job.steps.some((step) => ['in_progress', 'completed'].includes(step?.status))
+  )
+}
+
+/** Whether one of a run's iOS jobs executed (jobExecuted). */
+export function executedNativeJobs(jobs) {
+  return jobs.some(
+    (job) => String(job?.name ?? '').startsWith('ios-native / ') && jobExecuted(job)
+  )
+}
+
+/**
  * The deciding run of a commit, shared by the dispatch gate, the nightly decision and the
  * evidence judge: the newest run, from `runs` newest first, that ran its iOS jobs. A dispatch
  * the gate stopped and a run whose ios-changes decided run=false ran none, so the run before
  * them decides. A run in progress is skipped, or with `pending` it decides unless its gate
- * already stopped it. `jobsOf(run)` reads a run's jobs. Returns `{ run, jobs }` or null.
+ * already stopped it: the evidence judge stays pending on a dispatch past the gate even while its
+ * iOS jobs are queued, since a pending verdict never passes a pull request. `jobsOf(run)` reads a
+ * run's jobs. Returns `{ run, jobs }` or null.
  */
 export async function decidingRun(runs, jobsOf, { pending = false } = {}) {
   for (const run of runs) {
@@ -618,10 +640,12 @@ export async function dispatchGate({ env = process.env, fetchImpl } = {}) {
 const BASE_PAGES = 3
 
 /**
- * RUNS-02: the newest ancestor of `sha` whose merge or nightly run of ios-native.yml ran its iOS
- * jobs, in progress included, or null. A completed run that was cancelled, by hand or otherwise,
- * never finished testing its change, so it is no base; one that failed is. A merge compares with it, so a
- * run that replaced a pending run in the group also tests that run's change. A read error throws.
+ * RUNS-02: the newest ancestor of `sha` whose merge or nightly run of ios-native.yml executed one
+ * of its iOS jobs (executedNativeJobs), in progress included, or null. A queued job or one
+ * cancelled before it started tested nothing, so its commit is no base (RUNS-R2-01). A completed
+ * run that was cancelled, by hand or otherwise, never finished testing its change, so it is no
+ * base either; one that failed is. A merge compares with it, so a run that replaced a pending run
+ * in the group also tests that run's change. A read error throws.
  */
 export async function testedBase({ repository, sha, runId, ...options }) {
   for (let page = 1; page <= BASE_PAGES; page++) {
@@ -643,7 +667,8 @@ export async function testedBase({ repository, sha, runId, ...options }) {
       )
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
     for (const run of runs) {
-      if (!ranNativeJobs(await runJobs({ ...options, repository, id: run.id }))) continue
+      if (!executedNativeJobs(await runJobs({ ...options, repository, id: run.id })))
+        continue
       const compare = await githubApi(
         `/repos/${repository}/compare/${run.head_sha}...${sha}`,
         options

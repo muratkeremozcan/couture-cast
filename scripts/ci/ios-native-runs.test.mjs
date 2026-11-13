@@ -10,8 +10,11 @@ import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
+  CANCELLED_BEFORE_START,
   DISPATCH_FILE,
+  QUEUED,
   REPO,
+  STARTED,
   SHA,
   iosJobs,
   iosRun,
@@ -541,6 +544,98 @@ describe('the merge decision', () => {
     assert.deepEqual(only.compared, [])
     assert.equal(only.result, true)
   })
+
+  // RUNS-R2-01: a commit is a tested base only once one of its iOS jobs executed: a runner took it
+  // and a step started. A queued job (started_at set, no runner, no steps) or one cancelled
+  // before it started tested nothing. O last executed, A changed mobile, C (HEAD) changed docs.
+  const native = (jobs, patch) =>
+    jobs.map((job) => (job.name.startsWith('ios-native / ') ? { ...job, ...patch } : job))
+  const history = {
+    [O]: ['apps/mobile/src/hooks/use-forecast.ts', 'docs/ci.md'],
+    [A]: ['docs/ci.md'],
+  }
+  const withCandidate = (t, candidate, jobs) => {
+    const o = tested(O, { created_at: '2026-11-13T07:00:00Z' })
+    return merge(t, {
+      runs: [candidate, o.run],
+      jobs: { ...o.jobs, [candidate.id]: jobs },
+      diffs: history,
+    })
+  }
+  test('a job executed only with a runner and a started step', async () => {
+    const { jobExecuted } = await import('./ios-native-inputs.mjs')
+    // The shape of a queued job in the jobs API (a public run, 2026-11-13).
+    const queued = {
+      status: 'queued',
+      conclusion: null,
+      started_at: '2026-11-13T07:22:19Z',
+      completed_at: null,
+      runner_id: null,
+      runner_name: null,
+      steps: [],
+    }
+    assert.equal(jobExecuted(queued), false)
+    assert.equal(jobExecuted({ ...queued, runner_id: 7 }), false)
+    assert.equal(jobExecuted({ ...queued, steps: STARTED.steps }), false)
+    assert.equal(
+      jobExecuted({ ...queued, runner_name: 'r', steps: [{ status: 'queued' }] }),
+      false
+    )
+    assert.equal(jobExecuted(CANCELLED_BEFORE_START), false)
+    assert.equal(jobExecuted(STARTED), true)
+    assert.equal(jobExecuted({ ...STARTED, runner_id: null }), true)
+  })
+
+  const candidate = (kind, patch) =>
+    iosRun(kind, { head_sha: A, created_at: '2026-11-13T09:00:00Z', ...patch })
+  const inProgress = { status: 'in_progress', conclusion: null }
+  const notStarted = [
+    [
+      'a queued concurrent nightly run',
+      () => [candidate('schedule', inProgress), native(iosJobs('schedule'), QUEUED)],
+    ],
+    [
+      'a queued merge run with started_at set',
+      () => [candidate('push', inProgress), native(iosJobs('push'), QUEUED)],
+    ],
+    [
+      'iOS jobs cancelled before they started',
+      () => [
+        candidate('push', { conclusion: 'failure' }),
+        native(iosJobs('push'), CANCELLED_BEFORE_START),
+      ],
+    ],
+  ]
+  for (const [name, build] of notStarted)
+    test(`${name} makes no tested base`, async (t) => {
+      const { result, compared } = await withCandidate(t, ...build())
+      assert.deepEqual(compared, [O])
+      assert.equal(result, true)
+    })
+  const started = [
+    [
+      'a started run in progress',
+      () => [
+        candidate('push', inProgress),
+        native(iosJobs('push'), QUEUED).map((job) =>
+          job.name === 'ios-native / ios-shard (1)' ? { ...job, ...STARTED } : job
+        ),
+      ],
+    ],
+    [
+      'a started run that failed',
+      () => [
+        candidate('push', { conclusion: 'failure' }),
+        iosJobs('push', { 'ios-native / ios-shard (2)': { conclusion: 'failure' } }),
+      ],
+    ],
+  ]
+  for (const [name, build] of started)
+    test(`${name} is a tested base`, async (t) => {
+      const { result, compared } = await withCandidate(t, ...build())
+      assert.deepEqual(compared, [A])
+      assert.equal(result, false)
+    })
 
   // A run cancelled by hand never finished testing its change, so it is no base; a run in
   // progress still is one.
