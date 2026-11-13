@@ -12,14 +12,17 @@ let coreSources = [
 ]
 let alwaysExcluded = [
   "ShareCardNativeShareModule.swift", "ShareCardActivityItem.swift", "ShareCardNativeShare.podspec", "Tests",
-  "Package.swift",
+  "Package.swift", "LinuxShims",
 ]
 
 #if os(Linux)
 let dependencies: [Package.Dependency] = [
   .package(url: "https://github.com/apple/swift-crypto.git", exact: "4.5.2"),
 ]
-let crypto: [Target.Dependency] = [.product(name: "Crypto", package: "swift-crypto")]
+// Foundation's CGRect stands in for CoreGraphics; LinuxShims/CoreGraphics re-exports it, so the
+// anchor source keeps its `import CoreGraphics`.
+let crypto: [Target.Dependency] = [.product(name: "Crypto", package: "swift-crypto"), "CoreGraphics"]
+let shims: [Target] = [.target(name: "CoreGraphics", path: "LinuxShims/CoreGraphics")]
 let sources = coreSources
 // Linux resolves swift-crypto, which writes Package.resolved beside the sources.
 let excluded = alwaysExcluded + ["ShareCardShareLinkMetadata.swift", "Package.resolved"]
@@ -27,6 +30,7 @@ let appleOnlyTests = ["ShareCardShareMetadataTests.swift"]
 #else
 let dependencies: [Package.Dependency] = []
 let crypto: [Target.Dependency] = []
+let shims: [Target] = []
 let sources = coreSources + ["ShareCardShareLinkMetadata.swift"]
 let excluded = alwaysExcluded
 let appleOnlyTests: [String] = []
@@ -51,5 +55,5 @@ let package = Package(
       path: "Tests",
       exclude: appleOnlyTests
     ),
-  ]
+  ] + shims
 )
