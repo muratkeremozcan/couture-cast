@@ -25,8 +25,12 @@ import path from 'node:path'
 export const TEST_STORE_KEY_VARIABLE = 'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY'
 export const DEVELOPMENT_PROFILE = 'development'
 const REVENUECAT_VARIABLE = /REVENUECAT/
-/** A RevenueCat Test Store key as it would appear inlined in a file. */
-export const TEST_KEY_PATTERN = /(?<![A-Za-z0-9_])test_[A-Za-z0-9]{16,}/
+/**
+ * A RevenueCat Test Store key as it would appear inlined in a file. No boundary is required before
+ * it: Hermes packs its string table without separators, so an inlined key can follow any
+ * character. A clean export has no match (2026-11-13, SDK 54 production export, all platforms).
+ */
+export const TEST_KEY_PATTERN = /test_[A-Za-z0-9]{16,}/
 
 /**
  * The env files app.config.ts loads from the repository root, by scope: `release` files load only
