@@ -204,8 +204,12 @@ function run(binary, args, env = {}, cwd = root, input) {
 // Codex RUNS-R4-01: the killed flow's runner may be wedged, so it is stopped and its reuse mark
 // cleared first; the read then starts one fresh runner on the owned port, as hierarchyOutput()
 // would, and the failure path's recordIosDriverFlow stops that one after.
+/** Whether the iOS flow deadline killed this flow, whatever the reads after it return. */
+function iosDeadlineKill(platform, result) {
+  return platform === 'ios' && result.deadline?.timedOut === true
+}
 function afterTimeoutHierarchy(platform, result, output) {
-  if (platform !== 'ios' || !result.deadline?.timedOut) return null
+  if (!iosDeadlineKill(platform, result)) return null
   recordIosDriverFlow({ platform, directory, device, ok: false })
   return captureIosTimeoutHierarchy({
     maestroBinary,
@@ -511,9 +515,12 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
   if (result.status !== 0 && !recoverSnapshot) {
     // A deadline kill leaves no failed-step screen; read it once more while the device lives.
+    // The deadline, not the read's success, decides which screen is current (Codex RUNS-R5-01).
+    const deadlineKilled = iosDeadlineKill(platform, result)
     const timeoutHierarchy = afterTimeoutHierarchy(platform, result, output)
     recordIosFlowProgress({
       timeoutHierarchy,
+      deadlineKilled,
       platform,
       flow,
       maestroLog: snapshotLog,
@@ -548,6 +555,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         adb,
         durationMs: failureDurationMs,
         exitCode: result.status,
+        deadlineKilled,
         signal: result.signal ?? null,
         sensitive: secret !== '',
         startedAt: started,

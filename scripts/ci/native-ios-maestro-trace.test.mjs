@@ -1126,6 +1126,7 @@ test('a killed flow falls back to the after-timeout hierarchy and records its so
     output,
     device: 'AFA0777F-372A-445A-B8D4-08C287947144',
     appId: 'com.couturecast.story68',
+    deadlineKilled: true,
     timeoutHierarchy: {
       attributes: {},
       children: [{ attributes: { 'resource-id': 'breadcrumb' }, children: [] }],
@@ -1145,9 +1146,12 @@ test('a killed flow falls back to the after-timeout hierarchy and records its so
 // Codex RUNS-R4-01: the runner's own helper, run with the real driver-argument functions.
 function runnerAfterTimeout({ platform, directory, events }) {
   const runner = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
-  const start = runner.indexOf('function afterTimeoutHierarchy(')
-  const end = runner.indexOf('\nfunction ', start + 1)
-  return vm.runInNewContext(`(${runner.slice(start, end)})`, {
+  // iosDeadlineKill and afterTimeoutHierarchy, exactly as the runner defines them.
+  const start = runner.indexOf('function iosDeadlineKill(')
+  const helper = runner.indexOf('function afterTimeoutHierarchy(')
+  const end = runner.indexOf('\nfunction ', helper + 1)
+  assert.ok(start > 0 && helper > start && end > helper)
+  return vm.runInNewContext(`${runner.slice(start, end)}\nafterTimeoutHierarchy`, {
     platform,
     directory,
     device: 'AFA0777F-372A-445A-B8D4-08C287947144',
@@ -1223,6 +1227,13 @@ test('the runner reads the after-timeout hierarchy before it records the failure
     'recordIosDriverFlow({ platform, directory, device, ok: result.status === 0 })'
   )
   assert.ok(read > 0 && progress > read && diagnostics > progress && stop > diagnostics)
+  // The deadline itself, not the read's success, reaches both consumers.
+  assert.match(body, /const deadlineKilled = iosDeadlineKill\(platform, result\)/)
+  assert.match(
+    body,
+    /recordIosFlowProgress\(\{\n\s+timeoutHierarchy,\n\s+deadlineKilled,/
+  )
+  assert.match(body, /recordNativeFlowDiagnostics\(\{[^}]*\n\s+deadlineKilled,\n/)
 })
 
 // Codex RUNS-R4-02: open-app.yaml retries, so a failed step beside the after-timeout read is an
@@ -1258,7 +1269,7 @@ test("after a deadline kill the after-timeout screen wins over an earlier retry'
       },
     ])
   )
-  const progress = (timeoutHierarchy) =>
+  const progress = (timeoutHierarchy, deadlineKilled = timeoutHierarchy !== null) =>
     recordIosFlowProgress({
       platform: 'ios',
       flow: 'maestro/story65/open-app.yaml',
@@ -1266,13 +1277,22 @@ test("after a deadline kill the after-timeout screen wins over an earlier retry'
       directory,
       output,
       timeoutHierarchy,
+      deadlineKilled,
       spawn: () => ({ status: 1, stdout: '' }),
       report: () => undefined,
     })
   const killed = progress({ attributes: {}, children: [] })
   assert.equal(killed.hierarchySource, 'after-timeout')
   assert.equal(killed.systemSurface.nodeCount, 1)
-  const ordinary = progress(null)
+  assert.equal(killed.earlierRetryHierarchy, true)
+  const ordinary = progress(null, false)
   assert.equal(ordinary.hierarchySource, 'failed-step')
   assert.equal(ordinary.systemSurface.nodeCount, 3)
+  assert.equal(ordinary.earlierRetryHierarchy, false)
+  // Codex RUNS-R5-01: a kill whose after-timeout read failed has no current screen; the earlier
+  // retry's failed step never stands in for it.
+  const unread = progress(null, true)
+  assert.equal(unread.hierarchySource, 'unavailable-after-timeout')
+  assert.equal(unread.systemSurface, null)
+  assert.equal(unread.earlierRetryHierarchy, true)
 })

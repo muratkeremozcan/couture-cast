@@ -400,6 +400,7 @@ describe('Maestro driver port', () => {
           recordIosFlowTiming: () => undefined,
           recordIosFlowProgress: () => undefined,
           afterTimeoutHierarchy: () => null,
+          iosDeadlineKill: () => false,
           scheduleIosInFlowSample: () => false,
           inMatrixSection: () => true,
           localesForShard: () => [...LOCALES],

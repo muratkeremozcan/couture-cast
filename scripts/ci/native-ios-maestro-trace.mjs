@@ -766,11 +766,18 @@ export function readIosAppProcess({ device, appId, spawn = spawnSync }) {
   }
 }
 
-// Codex RUNS-R4-02: the after-timeout read exists only after a deadline kill, and then it is the
-// screen at the kill; a failed-step hierarchy beside it is from an earlier retry of the flow.
-const hierarchySource = (failedStep, timeoutHierarchy) =>
-  timeoutHierarchy ? 'after-timeout' : failedStep ? 'failed-step' : null
-const orTimeout = (failedStep, timeoutHierarchy) => timeoutHierarchy ?? failedStep
+// Codex RUNS-R4-02 and RUNS-R5-01: the runner says whether the deadline killed the flow. After a
+// kill only the after-timeout read is the current screen, and when that read failed the screen is
+// unavailable: a failed-step hierarchy beside it is an earlier retry's, so it never stands in.
+// Ordinary failures keep the failed step.
+const hierarchySource = (deadlineKilled, failedStep, timeoutHierarchy) => {
+  if (deadlineKilled)
+    return timeoutHierarchy ? 'after-timeout' : 'unavailable-after-timeout'
+  return failedStep ? 'failed-step' : null
+}
+const earlierRetry = (deadlineKilled, failedStep) => deadlineKilled && failedStep !== null
+const currentHierarchy = (deadlineKilled, failedStep, timeoutHierarchy) =>
+  deadlineKilled ? timeoutHierarchy : failedStep
 const appProcessOf = ({ device, appId, spawn }) =>
   device && appId ? readIosAppProcess({ device, appId, spawn }) : null
 
@@ -788,6 +795,7 @@ export function recordIosFlowProgress({
   device = null,
   appId = null,
   timeoutHierarchy = null,
+  deadlineKilled = false,
   spawn = spawnSync,
   report = console.log,
 }) {
@@ -801,13 +809,15 @@ export function recordIosFlowProgress({
       : false
     // After a deadline kill the after-timeout read is the screen; else the failed step is.
     const failedStep = output ? failedStepHierarchy(output) : null
-    const hierarchy = orTimeout(failedStep, timeoutHierarchy)
+    const hierarchy = currentHierarchy(deadlineKilled, failedStep, timeoutHierarchy)
     const geometry = openerGeometry(hierarchy)
     if (geometry?.centreCoveredBy) report(JSON.stringify({ openerObstructed: geometry }))
     const entry = {
       flow,
       hostSampled,
-      hierarchySource: hierarchySource(failedStep, timeoutHierarchy),
+      hierarchySource: hierarchySource(deadlineKilled, failedStep, timeoutHierarchy),
+      // Provenance only: an earlier retry's failed step existed beside a deadline kill.
+      earlierRetryHierarchy: earlierRetry(deadlineKilled, failedStep),
       appProcess: appProcessOf({ device, appId, spawn }),
       systemSurface: systemSurfaceSummary(hierarchy),
       inputSurface: inputSurface(hierarchy),

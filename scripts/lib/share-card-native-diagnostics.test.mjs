@@ -94,6 +94,7 @@ function invokeMaestro(t, capture) {
     recordIosFlowTiming: () => undefined,
     recordIosFlowProgress: () => undefined,
     afterTimeoutHierarchy: () => null,
+    iosDeadlineKill: () => false,
     scheduleIosInFlowSample: () => false,
     inMatrixSection: () => true,
     localesForShard: () => [...LOCALES],
@@ -303,7 +304,8 @@ describe('native flow diagnostics capture', () => {
       ...context,
       flow: 'maestro/story65/open-app.yaml',
       platform: 'ios',
-      exitCode: 124,
+      exitCode: 1,
+      deadlineKilled: false,
       root,
       directory,
       output,
@@ -320,10 +322,32 @@ describe('native flow diagnostics capture', () => {
       path.join(output, 'after-timeout-hierarchy.json'),
       JSON.stringify({ attributes: {}, children: [] })
     )
-    const killed = await collectNativeFlowDiagnostics(input, { execute })
+    const deadline = { ...input, exitCode: 124, deadlineKilled: true }
+    const killed = await collectNativeFlowDiagnostics(deadline, { execute })
     assert.equal(killed.captures.hierarchy, true)
     assert.notEqual(killed.screen.source, 'maestro-failed-step')
     assert.notEqual(killed.screen.nodeCount, earlierNodes)
+    // Codex RUNS-R5-01: a kill whose after-timeout read failed or returned malformed output has no
+    // current hierarchy, and a fresh screenshot is tried; the earlier retry's artifacts stay out.
+    for (const written of [null, 'not json']) {
+      fs.rmSync(path.join(output, 'failure-private'), { recursive: true, force: true })
+      fs.rmSync(path.join(output, 'after-timeout-hierarchy.json'), { force: true })
+      if (written)
+        fs.writeFileSync(path.join(output, 'after-timeout-hierarchy.json'), written)
+      const calls = []
+      const unread = await collectNativeFlowDiagnostics(deadline, {
+        execute: (binary, args) => {
+          calls.push(args)
+          return { status: 1, stdout: '' }
+        },
+      })
+      assert.equal(unread.captures.hierarchy, false, String(written))
+      assert.notEqual(unread.screen.source, 'maestro-failed-step', String(written))
+      assert.ok(
+        calls.some((args) => args.includes('screenshot')),
+        String(written)
+      )
+    }
   })
 
   test('the capture child outlives its platform capture limit: 50 s on iOS, 15 s on Android', async () => {
@@ -357,6 +381,7 @@ describe('native flow diagnostics capture', () => {
         flow: 'maestro/story65/open-app.yaml',
         platform: 'ios',
         exitCode: 124,
+        deadlineKilled: true,
         root,
         directory,
         output,
