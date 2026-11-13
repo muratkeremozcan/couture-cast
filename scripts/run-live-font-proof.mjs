@@ -10,7 +10,11 @@
 //
 //   node scripts/run-live-font-proof.mjs --platform android|ios --device <serial|udid> \
 //     --build release|debug --screens home,community,settings,composer --out <dir> \
-//     [--label sdk54-release] [--app-id com.couturecast.story68]
+//     [--label sdk54-release] [--app-id com.couturecast.story68] [--scale-path settings|in-place]
+//   --scale-path settings (default) changes the live scale the way a user does: the app goes to
+//   the background behind the system Settings screen, the scale changes, and the app returns.
+//   React Native reads the new font scale on resume, so a foreground write (in-place) is a
+//   narrower path that only an accessibility shortcut takes.
 //   node scripts/run-live-font-proof.mjs ... --config-change theme|locale|density
 import fs from 'node:fs'
 import path from 'node:path'
@@ -49,6 +53,9 @@ const appId = option('app-id', 'com.couturecast.story68')
 const screens = option('screens', 'home,community,settings,composer').split(',')
 const configChange = option('config-change')
 const runLabel = option('label', build)
+const scalePath = option('scale-path', 'settings')
+if (!['settings', 'in-place'].includes(scalePath))
+  throw new Error('scale_path_settings_or_in_place_required')
 if (!['android', 'ios'].includes(platform) || !device || !option('out'))
   throw new Error('usage: --platform android|ios --device <id> --out <dir>')
 if (!['release', 'debug'].includes(build))
@@ -113,6 +120,26 @@ function setScale(scale) {
     adb('shell', 'settings', 'put', 'system', 'font_scale', String(scale))
   else run('xcrun', ['simctl', 'ui', device, 'content_size', scale])
 }
+/** The live scale change, taken through the system Settings screen unless --scale-path in-place. */
+async function changeLiveScale(scale) {
+  if (scalePath === 'in-place') return setScale(scale)
+  if (platform === 'android') {
+    adb('shell', 'am', 'start', '-W', '-a', 'android.settings.DISPLAY_SETTINGS')
+    await pause(1500)
+    setScale(scale)
+    await pause(1500)
+    // MainActivity is singleTask, so this resumes the running task instead of a new launch.
+    adb('shell', 'am', 'start', '-W', '-n', component)
+  } else {
+    run('xcrun', ['simctl', 'launch', device, 'com.apple.Preferences'])
+    await pause(1500)
+    setScale(scale)
+    await pause(1500)
+    // Without --terminate-running-process simctl brings the running app back to the front.
+    run('xcrun', ['simctl', 'launch', device, appId])
+  }
+}
+
 function pid() {
   if (platform === 'android') return adb('shell', 'pidof', appId).trim() || undefined
   const line = run('xcrun', ['simctl', 'spawn', device, 'launchctl', 'list'])
@@ -138,6 +165,9 @@ function nativeIdentity() {
   }
 }
 
+// The screen whose journey is running sets the regions every capture leaves out; screens run
+// one after another, so one module-level value is enough.
+let activeVolatile = []
 let launchCount = 0
 let launchId
 let sequence = 0
@@ -162,7 +192,7 @@ function persist(capture) {
 
 function makeCapture(screenName, stage, scale) {
   const tree = hierarchy()
-  const flat = flattenHierarchy(tree, { platform })
+  const flat = flattenHierarchy(tree, { platform, volatile: activeVolatile })
   sequence += 1
   const capture = {
     stage,
@@ -171,6 +201,7 @@ function makeCapture(screenName, stage, scale) {
     osScale: readScale(),
     jsFontScale: flat.jsFontScale,
     environment: flat.environment,
+    volatileDropped: flat.volatileDropped,
     pid: pid(),
     identity: { root: rootIdentity(flat.markers), ...nativeIdentity() },
     nodes: flat.nodes,
@@ -187,10 +218,16 @@ function makeCapture(screenName, stage, scale) {
 }
 
 async function stableNodes() {
-  let previous = flattenHierarchy(hierarchy(), { platform }).nodes
+  let previous = flattenHierarchy(hierarchy(), {
+    platform,
+    volatile: activeVolatile,
+  }).nodes
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await pause(500)
-    const current = flattenHierarchy(hierarchy(), { platform }).nodes
+    const current = flattenHierarchy(hierarchy(), {
+      platform,
+      volatile: activeVolatile,
+    }).nodes
     if (sameLayout(current, previous)) return current
     previous = current
   }
@@ -265,15 +302,40 @@ async function fullText(capture) {
   return capture
 }
 
+/**
+ * Drags a scrolling screen to its true top. A flow's scrollUntilVisible stops as soon as the
+ * anchor shows, a few dozen pixels short of the top, and fullText's scroll-back then lands on
+ * the real top and reads as a moved page. The composer is a modal and is left alone.
+ */
+async function scrollToTop(screenName) {
+  if (SCREENS[screenName].composer) return
+  const size = windowSize({ window: windowBounds(hierarchy()) })
+  if (!size) throw new Error('live_font_window_bounds_required')
+  let top = await stableNodes()
+  for (let drags = 0; drags < 4; drags += 1) {
+    drag(size, false)
+    const page = await stableNodes()
+    if (sameLayout(page, top) || sameLayoutShifted(top, page)) return
+    top = page
+  }
+  throw new Error('live_font_scroll_top_unreached')
+}
+
 async function settle(screenName, stage, scale) {
   // Two identical hierarchies at least a second apart, within 60 seconds: a cold Debug launch
   // keeps loading the teaser and the outfit images for a while after the anchors appear.
   const deadline = Date.now() + 60_000
-  let previous = flattenHierarchy(hierarchy(), { platform }).nodes
+  let previous = flattenHierarchy(hierarchy(), {
+    platform,
+    volatile: activeVolatile,
+  }).nodes
   let since = Date.now()
   while (Date.now() < deadline) {
     await pause(500)
-    const current = flattenHierarchy(hierarchy(), { platform }).nodes
+    const current = flattenHierarchy(hierarchy(), {
+      platform,
+      volatile: activeVolatile,
+    }).nodes
     if (!sameLayout(current, previous)) {
       previous = current
       since = Date.now()
@@ -329,11 +391,15 @@ function deviceIo(name) {
       setScale(scale)
       launch()
       maestro(flow)
+      await scrollToTop(name)
       return fullText(await settle(name, 'cold', scale))
     },
     launch: async () => launch(),
-    setScale: async (scale) => setScale(scale),
-    navigate: async () => maestro(flow),
+    setScale: async (scale) => changeLiveScale(scale),
+    navigate: async () => {
+      maestro(flow)
+      await scrollToTop(name)
+    },
     capture: async (stage, scale) => makeCapture(name, stage, scale),
     settle: async (stage, scale) => settle(name, stage, scale),
     fullText,
@@ -406,12 +472,19 @@ async function proveConfigChange(name, kind) {
     change.apply()
     const after = await settle(name, 'settled', SCALES[platform].base)
     const ids = new Set(after.nodes.map((node) => node.id).filter(Boolean))
-    const sameActivity = before.identity.activity === after.identity.activity
+    // Android keeps the ActivityRecord token across a configuration relaunch, so a relaunch
+    // shows as a rise in MainActivity onCreate calls; an unknown count proves nothing either way.
+    const counted =
+      Number.isInteger(before.identity.onCreate) &&
+      Number.isInteger(after.identity.onCreate)
+    const recreated =
+      before.identity.activity !== after.identity.activity ||
+      (counted && after.identity.onCreate > before.identity.onCreate)
     const checks = {
       applied: change.expect(after),
       routeKept: SCREENS[name].anchors.every((anchor) => ids.has(anchor)),
       processKept: before.pid === after.pid,
-      activity: change.inPlace ? sameActivity : !sameActivity,
+      activity: counted && (change.inPlace ? !recreated : recreated),
     }
     return {
       screen: name,
@@ -452,6 +525,7 @@ try {
       throw new Error('non_debuggable_release_required')
   }
   for (const name of screens) {
+    activeVolatile = SCREENS[name]?.volatile ?? []
     if (configChange) {
       try {
         results.push(await proveConfigChange(name, configChange))
@@ -471,7 +545,7 @@ try {
         launch()
         maestro(SCREENS[name].flow)
         reactNativeVersion = readEnvironment(
-          flattenHierarchy(hierarchy(), { platform })
+          flattenHierarchy(hierarchy(), { platform, volatile: activeVolatile })
         ).reactNativeVersion
         if (!reactNativeVersion)
           throw new Error('live_font_installed_rn_version_unreadable')
@@ -520,6 +594,7 @@ const report = {
   reactNativeVersion: reactNativeVersion ?? null,
   androidApi: androidApi ?? null,
   configChange: configChange ?? null,
+  scalePath,
   wallSeconds: Math.round((Date.now() - started) / 1000),
   verdict,
   results,
