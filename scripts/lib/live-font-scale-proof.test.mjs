@@ -597,6 +597,13 @@ describe('assertLiveFontProof', () => {
   const BASELINE = {
     staleIds: ['', 'current-condition', 'outfit-comfort-notes'],
     maxStaleMisses: 41,
+    review: {
+      verdict: 'known-residual',
+      structuralPass: true,
+      everyMissStale: true,
+      growthFailing: ['current-condition'],
+      controlPass: true,
+    },
   }
 
   test('below 0.87 a residual passes only inside its reviewed baseline', () => {
@@ -617,12 +624,12 @@ describe('assertLiveFontProof', () => {
       () =>
         assertLiveFontProof({
           reactNativeVersion: '0.81.5',
-          residualBaseline: { ...BASELINE, staleIds: [''] },
+          residualBaseline: { ...BASELINE, staleIds: ['', 'current-condition'] },
           ...bugChange(),
         }),
       (error) =>
         error.code === 'live_font_residual_unapproved' &&
-        /current-condition/.test(error.message)
+        /stale outside baseline: .*outfit-comfort-notes/.test(error.message)
     )
     assert.throws(
       () =>
@@ -632,6 +639,60 @@ describe('assertLiveFontProof', () => {
           ...bugChange(),
         }),
       { code: 'live_font_residual_unapproved' }
+    )
+  })
+
+  // TEA, 2026-11-13: a proposal committed verbatim approves nothing when one of its review facts
+  // breaks the six approval rules, and growth may fail only on a probe the entry names.
+  test('an entry whose review facts break an approval rule approves nothing', () => {
+    const broken = {
+      verdict: 'restored',
+      structuralPass: false,
+      everyMissStale: false,
+      controlPass: false,
+      growthFailing: ['current-temperature'],
+    }
+    for (const [fact, value] of Object.entries(broken))
+      assert.throws(
+        () =>
+          assertLiveFontProof({
+            reactNativeVersion: '0.81.5',
+            residualBaseline: {
+              ...BASELINE,
+              review: { ...BASELINE.review, [fact]: value },
+            },
+            ...bugChange(),
+          }),
+        (error) =>
+          error.code === 'live_font_residual_unapproved' &&
+          error.message.includes(`approval rules: ${fact}`),
+        fact
+      )
+    const withoutReview = { ...BASELINE }
+    delete withoutReview.review
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: withoutReview,
+          ...bugChange(),
+        }),
+      { code: 'live_font_residual_unapproved' }
+    )
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: {
+            ...BASELINE,
+            staleIds: ['', 'outfit-comfort-notes', 'current-condition-x'],
+            review: { ...BASELINE.review, growthFailing: [] },
+          },
+          ...bugChange(),
+        }),
+      (error) =>
+        error.code === 'live_font_residual_unapproved' &&
+        /growth fails outside/.test(error.message)
     )
   })
 

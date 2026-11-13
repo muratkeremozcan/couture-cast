@@ -539,6 +539,33 @@ const missId = (miss) => JSON.parse(miss.key.slice(0, miss.key.lastIndexOf('#'))
  */
 function residualApproved(checks, baseline) {
   if (!baseline) return { pass: false, reason: 'no reviewed baseline' }
+  // An entry approves only with review facts that meet the six approval rules, so a proposal
+  // committed verbatim with a failing fact approves nothing.
+  const review = baseline.review ?? {}
+  const broken = [
+    review.verdict !== 'known-residual' && 'verdict',
+    review.structuralPass !== true && 'structuralPass',
+    review.everyMissStale !== true && 'everyMissStale',
+    review.controlPass !== true && 'controlPass',
+    !Array.isArray(review.growthFailing)
+      ? 'growthFailing'
+      : review.growthFailing.some((id) => !baseline.staleIds.includes(id)) &&
+        `growthFailing(${review.growthFailing.filter((id) => !baseline.staleIds.includes(id)).join(',')})`,
+  ].filter(Boolean)
+  if (broken.length)
+    return {
+      pass: false,
+      reason: `baseline review facts break the approval rules: ${broken.join(',')}`,
+    }
+  // Growth may fail only on a probe the entry names as stale.
+  const growthOutside = checks.growth.probes
+    .filter((probe) => !probe.pass && !baseline.staleIds.includes(probe.probe))
+    .map((probe) => probe.probe)
+  if (growthOutside.length)
+    return {
+      pass: false,
+      reason: `growth fails outside baseline: ${growthOutside.join(',')}`,
+    }
   const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
   const outside = misses.filter((miss) => !baseline.staleIds.includes(missId(miss)))
   if (outside.length)
