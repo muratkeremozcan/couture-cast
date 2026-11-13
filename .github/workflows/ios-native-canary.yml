@@ -1,0 +1,29 @@
+# Story 6.15 C-16: the iOS jobs (ios-native-jobs.yml) on main's head, nightly, with the shards and
+# Expo Go back on the iOS 26.5 simulator of macos-26 (ios26-canary). They left it for macos-15's
+# iOS 18.5 simulator because it was not stable enough to gate merges; this run watches it.
+#
+# It gates nothing: no pull request status or merge reads it, and ios-native.yml and
+# ios-native-dispatch.yml never pass ios26-canary. A red canary goes to TEA for triage. The iOS
+# 26.5 lane returns to blocking after 20 straight green nights, or when the runner image changes.
+name: iOS native canary
+run-name: iOS 26.5 canary ${{ github.sha }}
+
+on:
+  # After the 03:23 UTC nightly run of ios-native.yml, so the two do not share macOS runners.
+  schedule:
+    - cron: '47 4 * * *'
+
+permissions:
+  contents: read
+
+# One canary at a time; a slow night finishes and the next one waits.
+concurrency:
+  group: ios-native-canary
+  cancel-in-progress: false
+
+jobs:
+  ios-native-canary:
+    uses: ./.github/workflows/ios-native-jobs.yml
+    with:
+      sha: ${{ github.sha }}
+      ios26-canary: true

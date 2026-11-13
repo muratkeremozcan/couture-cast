@@ -4,6 +4,10 @@ import fs from 'node:fs'
 import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 
+/** The worker's own stderr lines; everything else on that stream belongs to the flow. */
+const WORKER_DIAGNOSTIC =
+  /^(?:owned_flow_[a-z_]+(?::[A-Za-z0-9_.-]+)?|Timed out at the native flow deadline)$/gm
+
 /** Synchronous harness adapter. Credentials travel through a private stdin pipe. */
 export function spawnIosFlow(binary, args, options, timingFile) {
   const began = performance.now()
@@ -27,7 +31,15 @@ export function spawnIosFlow(binary, args, options, timingFile) {
   const child = fs.existsSync(timingFile)
     ? JSON.parse(fs.readFileSync(timingFile, 'utf8'))
     : null
-  if (!child) throw new Error('ios_flow_deadline_record_missing')
+  if (!child) {
+    // Story 6.15: say how the worker ended, so a missing record names its cause. The stderr also
+    // carries Maestro's own output (login email, OTP), so only the worker's closed lines print.
+    for (const line of String(result.stderr ?? '').match(WORKER_DIAGNOSTIC) ?? [])
+      console.error(line)
+    throw new Error(
+      `ios_flow_deadline_record_missing:status=${result.status}:signal=${result.signal}:error=${result.error?.code ?? null}`
+    )
+  }
   return {
     ...result,
     deadline: {
@@ -78,38 +90,86 @@ export async function runDeadlineWorker(request, timingFile) {
       }) + '\n',
       { mode: 0o600 }
     )
+  // Story 6.15: the worker never dies without its record or leaves the owned group running. A kill
+  // that fails is reported and retried on the child alone, never thrown from the timer. A SIGTERM
+  // from the parent (spawnSync past maxBuffer), the SIGINT a cancelled step sends first, a SIGHUP, or
+  // an uncaught error still kills the group and writes, before anything is logged.
   const killOwned = () => {
     if (!child.pid) return
     try {
       process.kill(-child.pid, 'SIGKILL')
     } catch (error) {
-      if (error.code !== 'ESRCH') throw error
+      if (error.code === 'ESRCH') return
+      report(`owned_flow_group_kill_failed:${error.code ?? 'unknown'}`)
+      try {
+        child.kill('SIGKILL')
+      } catch {
+        // The record below still names the deadline.
+      }
     }
   }
+  let written = false
+  const writeOnce = () => {
+    if (written) return
+    written = true
+    write()
+  }
+  const abort = (code) => {
+    killOwned()
+    writeOnce()
+    process.exit(code)
+  }
+  process.once('SIGTERM', () => abort(143))
+  process.once('SIGINT', () => abort(130))
+  process.once('SIGHUP', () => abort(129))
+  process.once('uncaughtException', (error) => {
+    killOwned()
+    try {
+      writeOnce()
+    } finally {
+      report(`owned_flow_worker_failed:${failureCode(error)}`)
+      process.exit(1)
+    }
+  })
   const timer = setTimeout(
     () => {
       timedOut = true
       killAfterMs = Math.round(performance.now() - began)
       killOwned()
-      console.error('Timed out at the native flow deadline')
+      report('Timed out at the native flow deadline')
     },
     Math.max(0, request.timeoutMs - (performance.now() - began))
   )
   try {
     const code = await new Promise((resolve) => {
       child.once('error', () => {
-        console.error('owned_flow_launch_failed')
+        report('owned_flow_launch_failed')
         resolve(127)
       })
       child.once('close', (exitCode, signal) =>
         resolve(timedOut ? 124 : (exitCode ?? (signal ? 1 : 0)))
       )
     })
-    write()
+    writeOnce()
     return code
   } finally {
     clearTimeout(timer)
   }
+}
+
+/** Worker diagnostics; a closed stderr (EPIPE) must not stop the kill, the record or the exit. */
+function report(line) {
+  try {
+    console.error(line)
+  } catch {
+    // Nothing left to tell.
+  }
+}
+
+/** A Node error code, or the worker's own snake_case message; never free text. */
+function failureCode(error) {
+  if (typeof error?.code === 'string') return error.code
+  return /^[a-z][a-z0-9_]*$/.test(error?.message ?? '') ? error.message : 'unknown'
 }
 
 if (

@@ -1,11 +1,15 @@
 # Story 6.15 D6: the iOS work that cannot fit a pull request. The iOS app build runs 31 minutes at
 # p95 and a share-card shard 44, against a 15-minute queue plus run budget for every pull request
-# job, so these jobs run off the pull request path, on macos-26 with Xcode 26.4 or later, which
-# SDK 56 needs. Two workflows call them for one commit, `sha`:
+# job, so these jobs run off the pull request path. The development client and the Release app
+# build on macos-26 with Xcode 26.4 or later, which SDK 56 needs; the shards and Expo Go run that
+# client on the iOS 18.5 simulator of macos-15 (Xcode 16.4), since the iOS 26.5 simulator of
+# macos-26 was not stable enough for them (C-16). Two workflows call them for one commit, `sha`:
 #
 #   ios-native.yml           a merge to main that changed a native iOS input, and the nightly run.
 #                            They keep the development client cache warm.
 #   ios-native-dispatch.yml  a pull request head commit, before it merges, with cache-mode: read.
+#   ios-native-canary.yml    nightly, with ios26-canary: the shards and Expo Go on macos-26's
+#                            iOS 26.5 simulator. It gates nothing.
 #
 # Shape: ios-build keys the development client by its native inputs and builds, scans and caches
 # it only on a miss; four ios-shard jobs and ios-expo-go restore exactly that scanned client and
@@ -15,10 +19,10 @@
 #
 # A dispatch runs a commit that has not merged, on ref main. Its caller grants the jobs
 # cache-mode: read, which GitHub enforces with a read-only cache token, so neither this file nor
-# anything the commit runs can save a cache main's runs restore. ios-build is skipped, each shard
-# and Expo Go builds its own client, and each client stays in its job. Every cache save also skips
-# a dispatch, a dispatch installs with npm alone and no local action, and setup caches are off for
-# it.
+# anything the commit runs can save a cache main's runs restore. On a dispatch ios-build always
+# builds the commit's own client, scans it and hands it to the shards and Expo Go as an artifact
+# of this run, kept for one day. Every cache save also skips a dispatch, a dispatch installs with
+# npm alone and no local action, and setup caches are off for it.
 #
 # Every job checks out `sha` and fails unless HEAD is exactly that commit, which the callers' run
 # names carry.
@@ -31,14 +35,19 @@ on:
         description: 'Full 40-character commit SHA to test'
         required: true
         type: string
+      # Only ios-native-canary.yml passes it: the shards and Expo Go then run on macos-26 with Xcode
+      # 26.4 or later, on the iOS 26.5 simulator they left for C-16.
+      ios26-canary:
+        description: 'Run the shards and Expo Go on the macos-26 iOS 26.5 simulator'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
-  # A dispatch has no cache to fill: its shards and Expo Go each build their own client.
   ios-build:
-    if: ${{ github.event_name != 'workflow_dispatch' }}
     runs-on: macos-26
     timeout-minutes: 60
     env: &runtime_env
@@ -62,23 +71,42 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
       - name: Select Xcode 26.4 or later
         id: xcode
-        run: |
+        env:
+          XCODE: '26.4+'
+        run: &select_xcode |
           set -eo pipefail
           # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
+          root="${XCODE_ROOT:-/Applications}"
           xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
+          case "$XCODE" in
+            16.4)
+              if [ -d "$root/Xcode_16.4.app" ]; then xcode="$root/Xcode_16.4.app"; fi
+              ;;
+            26.4+)
+              for app in "$root"/Xcode_26.*.app; do
+                if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
+                  xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
+                fi
+              done
+              ;;
+          esac
           if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
+            echo "::error::Xcode $XCODE is required; installed: $(echo "$root"/Xcode*.app)"
             exit 1
           fi
           sudo xcode-select -s "$xcode/Contents/Developer"
           echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
           xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+          # The startup probe boots the simulator runtime of this SDK version.
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          echo "iOS simulator SDK $sdk"
+          case "$XCODE:$sdk" in
+            16.4:18.5 | 26.4+:26.*) ;;
+            *)
+              echo "::error::Xcode $XCODE brought iOS simulator SDK $sdk"
+              exit 1
+              ;;
+          esac
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'
@@ -97,21 +125,34 @@ jobs:
           node-version: '22'
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
-      - uses: ./.github/actions/install
+      # A local action is the dispatched commit's own code, and the shared install saves caches.
+      - name: Install dependencies with the shared caches
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/install
+      - name: Set up Node without a download cache for a dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Install dependencies without a cache for a dispatch
         id: install
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: if [ "$DISPATCH" = true ]; then bash scripts/ci/install-dependencies.sh; fi
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs startup-deadline
       # Most commits change no native input. Then the client of this key is already cached, this
       # job ends here and the shards restore it. On a miss the steps below build, scan and save it.
+      # A dispatch skips the lookup and always builds the commit's own client.
       - name: Key the iOS development client by its native inputs
         id: native_key
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/native-build-cache.mjs key --platform ios >> "$GITHUB_OUTPUT"
       - name: Look up the development client of this fingerprint
         id: native_cache
-        if: ${{ !cancelled() && steps.native_key.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native_key.outcome == 'success' && github.event_name != 'workflow_dispatch' }}
         uses: actions/cache/restore@v5.1.0
         with:
           path: ${{ steps.native_key.outputs.path }}
@@ -119,7 +160,7 @@ jobs:
           lookup-only: true
       - uses: actions/setup-java@v4
         id: java
-        if: ${{ !cancelled() && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.native_key.outcome == 'success' && steps.native_cache.outcome != 'failure' && steps.native_cache.outputs.cache-hit != 'true' }}
         with:
           distribution: temurin
           java-version: '21'
@@ -142,7 +183,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build postgres
       - name: Save PostgreSQL
-        if: ${{ !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.postgres-path }}
@@ -159,7 +200,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build redis
       - name: Save Redis
-        if: ${{ !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.redis-path }}
@@ -180,12 +221,14 @@ jobs:
         with:
           go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
           cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+          # The module and build caches would save on a dispatch.
+          cache: ${{ github.event_name != 'workflow_dispatch' }}
       - name: Build GoTrue
         id: gotrue_build
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build gotrue
       - name: Save GoTrue
-        if: ${{ !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.gotrue-path }}
@@ -202,7 +245,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build storage
       - name: Save storage-api
-        if: ${{ !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native.outputs.storage-path }}
@@ -255,7 +298,7 @@ jobs:
         run: node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"
       - name: Save the scanned development client of this fingerprint
         id: native_save
-        if: ${{ !cancelled() && steps.app_scan.outcome == 'success' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}
         uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.native_key.outputs.path }}
@@ -263,13 +306,32 @@ jobs:
       # A save that lost a race to a concurrent run leaves no entry of this run's own; the shards
       # need one, so the job fails here, once, ahead of the four shards.
       - name: Require the saved development client for the shards
-        if: ${{ !cancelled() && steps.native_save.outcome == 'success' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.native_save.outcome == 'success' }}
         uses: actions/cache/restore@v5.1.0
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
           lookup-only: true
           fail-on-cache-miss: true
+      # A dispatch saves no cache, so the scanned client reaches the shards and Expo Go as an
+      # artifact of this run. A tar keeps the executable bit, which upload-artifact drops.
+      - name: Pack the scanned development client for this dispatch
+        id: client_pack
+        if: ${{ github.event_name == 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}
+        env:
+          APP: ${{ steps.native_key.outputs.path }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/ios-client"
+          tar -C "$(dirname "$APP")" -cf "$RUNNER_TEMP/ios-client/client.tar" "$(basename "$APP")"
+      - name: Hand the scanned development client to this dispatch's jobs
+        if: ${{ github.event_name == 'workflow_dispatch' && !cancelled() && steps.client_pack.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-dev-client
+          path: ${{ runner.temp }}/ios-client/client.tar
+          retention-days: 1
+          if-no-files-found: error
       - name: Report owned background service exits
         if: always()
         # Logs stay private: they can carry owned-runtime credentials.
@@ -307,18 +369,17 @@ jobs:
         run: node scripts/ci/native-supabase.mjs stop
   # Four shards balanced by measured minutes (scripts/ci/native-matrix-shards.mjs): nominal jobs of
   # 33.7 to 35.3 minutes, from per-flow times of runs 41352898854 and 41429581850, where the
-  # longest shard took 40.9 and 41.8. They run in parallel beside ios-expo-go, each restoring the
-  # scanned client ios-build cached.
+  # longest shard took 40.9 and 41.8. They run in parallel beside ios-expo-go, each installing the
+  # scanned client ios-build cached or, on a dispatch, handed over.
   ios-shard:
     needs: ios-build
-    if: ${{ !cancelled() && (needs.ios-build.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.ios-build.result == 'skipped')) }}
+    if: ${{ !cancelled() && needs.ios-build.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-    runs-on: macos-26
-    # A dispatch builds the client here first, up to 31 minutes at p95.
-    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 110 || 70 }}
+    runs-on: ${{ inputs.ios26-canary && 'macos-26' || 'macos-15' }}
+    timeout-minutes: 70
     env: *runtime_env
     steps:
       - uses: actions/checkout@v4
@@ -332,25 +393,14 @@ jobs:
         run: |
           echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
-      - name: Select Xcode 26.4 or later
+      # Xcode 16.4 on the macOS 15 image carries the iOS 18.5 simulator the flows run on: the iOS
+      # 26.5 simulator of macos-26 was not stable enough for them. The client built on macos-26
+      # runs there unchanged.
+      - name: Select Xcode 16.4 for the iOS 18.5 simulator, or 26.4 or later for the canary
         id: xcode
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+        env:
+          XCODE: ${{ inputs.ios26-canary && '26.4+' || '16.4' }}
+        run: *select_xcode
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'
@@ -486,23 +536,6 @@ jobs:
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
-      # A dispatch tests a commit that has not merged, under a read-only cache, so the client is
-      # built here and stays in this job.
-      - name: Generate the native development client for this dispatch
-        id: prebuild
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/run-story68-native.mjs prebuild --platform ios
-      - name: Mark the owned iOS build-service window
-        id: build_window
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/ci/native-build-daemons.mjs mark
-      - name: Build the native development client for this dispatch
-        id: native_build
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/run-story68-native.mjs build --platform ios
-      - name: Release the owned iOS build services
-        if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
-        run: node scripts/ci/native-build-daemons.mjs stop
       - name: Restore the development client of this fingerprint
         if: github.event_name != 'workflow_dispatch'
         uses: actions/cache/restore@v5.1.0
@@ -510,6 +543,35 @@ jobs:
           path: ${{ needs.ios-build.outputs.app-path }}
           key: ${{ needs.ios-build.outputs.app-key }}
           fail-on-cache-miss: true
+      # A dispatch saves no cache: ios-build built and scanned this commit's client and handed it
+      # over as an artifact of this run.
+      - name: Download the scanned development client of this dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-dev-client
+          path: ${{ runner.temp }}/ios-client
+      - name: Unpack the scanned development client of this dispatch
+        id: client_unpack
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          APP: ${{ needs.ios-build.outputs.app-path }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$APP")"
+          tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"
+          test -d "$APP"
+      # Story 6.15 C-16: the client is built with Xcode 26 and runs on the selected runtime (iOS 18.5
+      # on macos-15), which holds only while its deployment target is at most that runtime.
+      - name: Compare the client's minimum iOS with the selected simulator runtime
+        id: client_fits
+        env:
+          APP: ${{ needs.ios-build.outputs.app-path }}
+        run: |
+          set -euo pipefail
+          min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"
       - name: iOS shard flows
         run: |
           shard='${{ matrix.shard }}/4'
@@ -576,10 +638,9 @@ jobs:
   # client follow it.
   ios-expo-go:
     needs: ios-build
-    if: ${{ !cancelled() && (needs.ios-build.result == 'success' || (github.event_name == 'workflow_dispatch' && needs.ios-build.result == 'skipped')) }}
-    runs-on: macos-26
-    # A dispatch builds the client here first, up to 31 minutes at p95.
-    timeout-minutes: ${{ github.event_name == 'workflow_dispatch' && 95 || 60 }}
+    if: ${{ !cancelled() && needs.ios-build.result == 'success' }}
+    runs-on: ${{ inputs.ios26-canary && 'macos-26' || 'macos-15' }}
+    timeout-minutes: 60
     env: *runtime_env
     steps:
       - uses: actions/checkout@v4
@@ -593,25 +654,14 @@ jobs:
         run: |
           echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
-      - name: Select Xcode 26.4 or later
+      # Xcode 16.4 on the macOS 15 image carries the iOS 18.5 simulator the flows run on: the iOS
+      # 26.5 simulator of macos-26 was not stable enough for them. The client built on macos-26
+      # runs there unchanged.
+      - name: Select Xcode 16.4 for the iOS 18.5 simulator, or 26.4 or later for the canary
         id: xcode
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+        env:
+          XCODE: ${{ inputs.ios26-canary && '26.4+' || '16.4' }}
+        run: *select_xcode
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'
@@ -747,23 +797,6 @@ jobs:
           (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
-      # A dispatch tests a commit that has not merged, under a read-only cache, so the client is
-      # built here and stays in this job.
-      - name: Generate the native development client for this dispatch
-        id: prebuild
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/run-story68-native.mjs prebuild --platform ios
-      - name: Mark the owned iOS build-service window
-        id: build_window
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/ci/native-build-daemons.mjs mark
-      - name: Build the native development client for this dispatch
-        id: native_build
-        if: github.event_name == 'workflow_dispatch'
-        run: node scripts/run-story68-native.mjs build --platform ios
-      - name: Release the owned iOS build services
-        if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
-        run: node scripts/ci/native-build-daemons.mjs stop
       - name: Restore the development client of this fingerprint
         if: github.event_name != 'workflow_dispatch'
         uses: actions/cache/restore@v5.1.0
@@ -771,6 +804,35 @@ jobs:
           path: ${{ needs.ios-build.outputs.app-path }}
           key: ${{ needs.ios-build.outputs.app-key }}
           fail-on-cache-miss: true
+      # A dispatch saves no cache: ios-build built and scanned this commit's client and handed it
+      # over as an artifact of this run.
+      - name: Download the scanned development client of this dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/download-artifact@v4
+        with:
+          name: ios-dev-client
+          path: ${{ runner.temp }}/ios-client
+      - name: Unpack the scanned development client of this dispatch
+        id: client_unpack
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          APP: ${{ needs.ios-build.outputs.app-path }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$(dirname "$APP")"
+          tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"
+          test -d "$APP"
+      # Story 6.15 C-16: the client is built with Xcode 26 and runs on the selected runtime (iOS 18.5
+      # on macos-15), which holds only while its deployment target is at most that runtime.
+      - name: Compare the client's minimum iOS with the selected simulator runtime
+        id: client_fits
+        env:
+          APP: ${{ needs.ios-build.outputs.app-path }}
+        run: |
+          set -euo pipefail
+          min=$(plutil -extract MinimumOSVersion raw "$APP/Info.plist")
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          node scripts/ci/native-ios-runtime-fits.mjs "$min" "$sdk"
       - name: Expo Go proof on a fresh simulator
         run: |
           node scripts/e2e-share-card/warm-metro.mjs --platform ios
@@ -880,23 +942,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
       - name: Select Xcode 26.4 or later
         id: xcode
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+        env:
+          XCODE: '26.4+'
+        run: *select_xcode
 
       - name: Setup Node
         id: node

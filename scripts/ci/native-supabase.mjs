@@ -84,15 +84,21 @@ export function nativeRoot(env) {
 /**
  * The `<name>-key=` and `<name>-path=` output lines for each component's cache.
  *
- * @param {{ root: string, platform: string, arch: string }} options
+ * PostgreSQL and Redis compile against the host SDK without MACOSX_DEPLOYMENT_TARGET, so a build
+ * from a macOS 26 runner (Darwin 25) does not run on a macOS 15 runner (Darwin 24). Every key names
+ * the kernel major of `release` (os.release()), so each runner image restores only its own builds.
+ *
+ * @param {{ root: string, platform: string, arch: string, release: string }} options
  */
-export function cacheOutputs({ root, platform, arch }) {
+export function cacheOutputs({ root, platform, arch, release }) {
+  const kernel = /^(\d+)\./.exec(String(release ?? ''))?.[1]
+  if (!kernel) throw new Error(`native_supabase_kernel_release_required: '${release}'`)
   return COMPONENTS.flatMap((name) => {
     const pin = PINS[name]
     const recipe = createHash('sha256').update(JSON.stringify(pin)).digest('hex')
     const version = 'version' in pin ? pin.version : pin.tag
     return [
-      `${name}-key=native-supabase-${platform}-${arch}-${name}-${version}-${recipe.slice(0, 16)}`,
+      `${name}-key=native-supabase-${platform}${kernel}-${arch}-${name}-${version}-${recipe.slice(0, 16)}`,
       `${name}-path=${path.join(root, name)}`,
     ]
   })
@@ -973,7 +979,12 @@ if (
   }
   if (command === 'cache-keys') {
     console.log(
-      cacheOutputs({ root, platform: process.platform, arch: process.arch }).join('\n')
+      cacheOutputs({
+        root,
+        platform: process.platform,
+        arch: process.arch,
+        release: os.release(),
+      }).join('\n')
     )
   } else if (command === 'build' && component in builds) {
     const began = Date.now()
