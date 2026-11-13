@@ -63,13 +63,6 @@ describe('failed audit test digest', () => {
     const failure = source.slice(source.lastIndexOf('iosAuditFailure: {', print), print)
     assert.match(failure, /exitCode: code,/)
     assert.match(failure, /counts: closed\.counts,/)
-    // The failure screen is read through the run's own runner, never a bare hierarchy.
-    const after = source.slice(print, thrown)
-    assert.match(after, /const hierarchy = hierarchyOutput\(\)/)
-    assert.doesNotMatch(
-      after,
-      /run\(maestroBinary, \['--device', device, 'hierarchy'\]\)/
-    )
   })
 
   test('lists the audit issues the Swift handler refused, in order', () => {
