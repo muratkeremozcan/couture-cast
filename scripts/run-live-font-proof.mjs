@@ -28,6 +28,7 @@ import {
   deviceFingerprint,
   countOnCreate,
   flattenHierarchy,
+  missingMounts,
   readEnvironment,
   restoreFailure,
   rootIdentity,
@@ -189,6 +190,8 @@ function nativeIdentity() {
 // The screen whose journey is running sets the regions every capture leaves out; screens run
 // one after another, so one module-level value is enough.
 let activeVolatile = []
+// The marker scopes every capture of the active screen must carry: the root and the screen's own.
+let activeMounts = ['root']
 let launchCount = 0
 let launchId
 let sequence = 0
@@ -212,8 +215,15 @@ function persist(capture) {
 }
 
 function makeCapture(screenName, stage, scale) {
-  const tree = hierarchy()
-  const flat = flattenHierarchy(tree, { platform, volatile: activeVolatile })
+  // iOS drops a 1x1 marker view from a dump now and then. A marker still missing after three
+  // reads stays missing in the capture, and the identity check fails the leg on it.
+  let tree
+  let flat
+  for (let attempt = 1; ; attempt += 1) {
+    tree = hierarchy()
+    flat = flattenHierarchy(tree, { platform, volatile: activeVolatile })
+    if (attempt >= 3 || missingMounts(flat.markers, activeMounts).length === 0) break
+  }
   sequence += 1
   const capture = {
     stage,
@@ -589,6 +599,7 @@ try {
   }
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
+    activeMounts = ['root', ...(SCREENS[name]?.mount ? [SCREENS[name].mount] : [])]
     const steps = screenRunSteps({
       configChange,
       versionKnown: Boolean(reactNativeVersion),

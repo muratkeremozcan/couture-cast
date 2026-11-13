@@ -27,6 +27,7 @@ const TABS = ['tab-home', 'tab-community', 'tab-settings']
 export const SCREENS = {
   home: {
     flow: 'open-home',
+    mount: 'home',
     anchors: ['current-temperature'],
     // Shop this look renders only from a network-served ritual, never from the 15-minute cache
     // (Decision 6), so whether a launch shows it depends on the cache's age, not on text size.
@@ -39,6 +40,7 @@ export const SCREENS = {
   },
   community: {
     flow: 'open-community',
+    mount: 'community',
     anchors: ['community-new-post-label'],
     // Feed and spotlight cards change between launches on their own: ranking, the climate pill
     // each card derives, and images that fail to load and show a retry. The filter chips sit in
@@ -54,12 +56,15 @@ export const SCREENS = {
   },
   settings: {
     flow: 'open-settings',
+    mount: 'settings',
     anchors: ['settings-language-title'],
     controls: TABS,
     probes: [{ id: 'settings-language-title', sizeSp: 16 }],
   },
   composer: {
     flow: 'open-composer',
+    // The composer's EdgeToEdgeModal carries the modal marker.
+    mount: 'modal',
     anchors: ['share-card-title'],
     controls: ['share-card-save', 'share-card-share', 'share-card-cancel'],
     probes: [{ id: 'share-card-title', sizeSp: 26 }],
@@ -214,6 +219,7 @@ export async function runScreenJourney({
         anchors: screen.anchors,
         probes: screen.probes,
         requiredControls: screen.controls,
+        mount: screen.mount,
       }
       const residualBaseline = residualBaselines.find(
         (entry) =>

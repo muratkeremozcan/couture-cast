@@ -272,42 +272,59 @@ function controlsOnScreen(capture, ids) {
  * marker stands for it.
  */
 /**
- * The mount ids a capture's markers carry, by scope (`live-font-mount-<scope>-<id>`). A root
- * identity that is not marker-shaped (a fixture) is one root mount.
+ * The mount ids a capture's markers carry, by scope (`live-font-mount-<scope>-<id>`), every id
+ * kept: two mounts of one scope in one capture are two mounts. A root identity that is not
+ * marker-shaped (a fixture) is a root mount.
  */
 function mountsOf(root) {
   if (typeof root !== 'string' || root === '') return undefined
   const scopes = new Map()
   for (const item of root.split(',')) {
     const match = /^live-font-mount-([a-z]+)-([a-z0-9]+)$/.exec(item)
-    if (match) scopes.set(match[1], match[2])
-    else scopes.set('root', item)
+    const [scope, id] = match ? [match[1], match[2]] : ['root', item]
+    scopes.set(scope, (scopes.get(scope) ?? new Set()).add(id))
   }
   return scopes
 }
 
 /**
- * Kept when every scope shows one mount id across the captures that show it. A screen marker
- * the hierarchy leaves out of one dump (iOS drops a 1x1 view now and then) is no remount; the
- * root marker must be in every capture (rootKnown).
+ * Whether the stages carry enough mount evidence to judge identity: the root marker and the
+ * screen's own scope (`mount`: home, community, settings, or modal for the composer) in every
+ * stage, and every other scope any stage shows in every stage too. A marker left out of one
+ * capture could hide a remount whose fresh render passes every height check; the runner rereads
+ * a dump that drops one (iOS drops a 1x1 view now and then) before it records the capture.
+ */
+function mountsKnown(mounts, mount) {
+  const required = ['root', ...(mount ? [mount] : [])]
+  if (!mounts.every((scopes) => scopes && required.every((scope) => scopes.has(scope))))
+    return false
+  const scopes = new Set(mounts.flatMap((stage) => [...stage.keys()]))
+  return [...scopes].every((scope) => mounts.every((stage) => stage.has(scope)))
+}
+
+/**
+ * Kept when every scope shows exactly one mount id across every capture that shows it,
+ * including the captures of the launch's earlier legs, so a remount during one leg or its
+ * revert is caught by the next.
  */
 function sameMounts(mounts) {
   const ids = new Map()
   for (const scopes of mounts)
-    for (const [scope, id] of scopes)
-      ids.set(scope, (ids.get(scope) ?? new Set()).add(id))
+    for (const [scope, set] of scopes ?? [])
+      ids.set(scope, new Set([...(ids.get(scope) ?? []), ...set]))
   return [...ids.values()].every((set) => set.size === 1)
 }
 
-function identityCheck(platform, stages) {
+function identityCheck(platform, stages, earlier = [], mount) {
   const pids = new Set(stages.map((capture) => String(capture.pid)))
   const roots = stages.map((capture) => capture.identity?.root)
   const activities = stages.map((capture) => capture.identity?.activity)
   const onCreate = stages.map((capture) => capture.identity?.onCreate)
   const processKept = pids.size === 1 && !pids.has('undefined')
   const mounts = roots.map(mountsOf)
-  const rootKnown = mounts.every((scopes) => scopes?.has('root'))
-  const rootKept = rootKnown && sameMounts(mounts)
+  const rootKnown = mountsKnown(mounts, mount)
+  const earlierMounts = earlier.map((capture) => mountsOf(capture?.identity?.root))
+  const rootKept = rootKnown && sameMounts([...earlierMounts, ...mounts])
   const nativeKnown =
     platform !== 'android' ||
     (activities.every((value) => typeof value === 'string' && value !== '') &&
@@ -358,7 +375,8 @@ function assertChangeInputs({
  * The AC3 checks for one screen and one scale change. `anchors` are testIDs that sit above the
  * fold at every scale; `probes` ({ id, sizeSp }) are single-line text whose box should follow
  * the platform's text scaling. `earlier` holds the captures of the same launch's previous legs,
- * the heights a measurement cache could hand back. `coldBefore`, the cold launch at the leg's
+ * the heights a measurement cache could hand back, and the mounts every leg of the launch must
+ * share. `mount` is the screen's own marker scope, required in every capture. `coldBefore`, the cold launch at the leg's
  * starting scale, is where growth is measured from when given: a leg that starts on a stale screen (the return
  * after a residual) would otherwise read correct text as text that failed to change.
  */
@@ -372,6 +390,7 @@ export function evaluateLiveFontChange({
   coldBefore,
   coldBase,
   earlier = [],
+  mount,
   updated,
   coldUpdated,
   anchors,
@@ -437,12 +456,12 @@ export function evaluateLiveFontChange({
       before: multiset(before).length,
       settled: multiset(settled).length,
     },
-    identity: identityCheck(platform, [
-      before,
-      immediate,
-      settled,
-      ...(updated ? [updated] : []),
-    ]),
+    identity: identityCheck(
+      platform,
+      [before, immediate, settled, ...(updated ? [updated] : [])],
+      earlier,
+      mount
+    ),
     coldParity: parity(settled, cold, before, tolerance, earlier),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
     clipping: clipping(settled, tolerance, coldBase),

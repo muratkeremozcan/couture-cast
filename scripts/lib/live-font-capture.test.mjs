@@ -15,6 +15,7 @@ import {
   assertLiveProvenance,
   countOnCreate,
   flattenHierarchy,
+  missingMounts,
   rootIdentity,
   sameLayout,
   stitchPages,
@@ -682,4 +683,46 @@ test('iOS lists a static text once, not again as the identical element inside it
       ['Premium', '[34,900][367,919]'],
     ]
   )
+})
+
+// Antigravity handover R1 (P3): a skipped copy with no id hands its descendants the element it
+// repeats, so a deeper copy carrying that element's id is skipped too.
+test('iOS skips a deeper copy with the labelled id below a skipped copy without one', () => {
+  const tree = node({ bounds: '[0,0][0,0]' }, [
+    node({ accessibilityText: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
+      node(
+        {
+          accessibilityText: 'Premium',
+          bounds: '[34,753][367,772]',
+          'resource-id': 'settings-premium-title',
+        },
+        [
+          node({ accessibilityText: 'Premium', bounds: '[34,753][367,772]' }, [
+            node({
+              accessibilityText: 'Premium',
+              bounds: '[34,753][367,772]',
+              'resource-id': 'settings-premium-title',
+            }),
+          ]),
+        ]
+      ),
+    ]),
+  ])
+  assert.deepEqual(
+    flattenHierarchy(tree, { platform: 'ios' }).nodes.map((entry) => [
+      entry.id,
+      entry.text,
+    ]),
+    [
+      ['', 'CoutureCast Story68'],
+      ['settings-premium-title', 'Premium'],
+    ]
+  )
+})
+
+test('missingMounts names the required scopes no marker carries', () => {
+  const markers = ['live-font-mount-root-r1', 'live-font-mount-settings-s1']
+  assert.deepEqual(missingMounts(markers, ['root', 'settings']), [])
+  assert.deepEqual(missingMounts(markers, ['root', 'modal']), ['modal'])
+  assert.deepEqual(missingMounts([], ['root']), ['root'])
 })

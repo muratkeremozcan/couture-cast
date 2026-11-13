@@ -21,7 +21,7 @@ import { expectedTextRatio } from './live-font-scale-proof.mjs'
  * the platform's text scaling, the update adds one line that persists across launches until
  * reverted (as the Settings locale does), and nothing remounts on the live launch. `breakAt` makes one live capture stale or makes a capture throw.
  */
-function fakeDevice(platform, { breakAt, throwAt } = {}) {
+function fakeDevice(platform, { breakAt, throwAt, dropMountAt, remountOnRevert } = {}) {
   const calls = []
   let launches = 0
   let launch = 'launch-0'
@@ -38,6 +38,15 @@ function fakeDevice(platform, { breakAt, throwAt } = {}) {
           to: numericScale(platform, at),
         })
     )
+  // The community screen's mount id; remountOnRevert gives it a new one at the first revert.
+  let screenMount = 's1'
+  const mounts = (stage, at) => {
+    const tag = launch.replace(/[^a-z0-9]/g, '')
+    const root = `live-font-mount-root-${tag}`
+    return dropMountAt === `${stage}:${at}`
+      ? root
+      : `live-font-mount-community-${screenMount}${tag},${root}`
+  }
   const screen = (stage, at, stale) => {
     const h = stale ? height(SCALES[platform].base) : height(at)
     const nodes = [
@@ -66,8 +75,8 @@ function fakeDevice(platform, { breakAt, throwAt } = {}) {
       pid: launch === 'live' ? '500' : `cold-${launches}`,
       identity:
         platform === 'android'
-          ? { root: `root-${launch}`, activity: `act-${launch}`, onCreate: 1 }
-          : { root: `root-${launch}` },
+          ? { root: mounts(stage, at), activity: `act-${launch}`, onCreate: 1 }
+          : { root: mounts(stage, at) },
       nodes,
       controls: ['tab-home', 'tab-community', 'tab-settings'].map((id, index) => ({
         id,
@@ -109,6 +118,7 @@ function fakeDevice(platform, { breakAt, throwAt } = {}) {
       },
       revert: async () => {
         updated = false
+        if (remountOnRevert && launch === 'live') screenMount = 's2'
         step('revert')
       },
     },
@@ -189,6 +199,26 @@ describe('runScreenJourney', () => {
     const verdict = aggregateVerdict([result], 'android')
     assert.equal(verdict.pass, false)
     assert.match(verdict.reasons.join(' '), /1->1\.5 live_font_fix_missing/)
+  })
+
+  // Antigravity handover R1 (P2-1): the screen's own marker is required in every capture, and
+  // its id is compared across the legs of one launch.
+  test('a capture without the screen marker fails its leg', async () => {
+    const fake = fakeDevice('android', { dropMountAt: 'immediate:1.5' })
+    const result = await run('android', fake)
+    assert.equal(result.legs[0].pass, false)
+    assert.equal(result.legs[0].checks.identity.rootKnown, false)
+    assert.equal(result.legs[1].pass, true)
+    assert.equal(aggregateVerdict([result], 'android').pass, false)
+  })
+
+  test('a screen remounted by the revert between legs fails the later leg', async () => {
+    const fake = fakeDevice('ios', { remountOnRevert: true })
+    const result = await run('ios', fake)
+    assert.equal(result.legs[0].pass, true)
+    assert.equal(result.legs[1].pass, false)
+    assert.equal(result.legs[1].checks.identity.rootKept, false)
+    assert.equal(aggregateVerdict([result], 'ios').pass, false)
   })
 
   test('a capture failure fails the run and reports the missing legs (F-13)', async () => {

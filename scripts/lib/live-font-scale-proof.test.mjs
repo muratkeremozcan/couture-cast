@@ -334,15 +334,11 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(evaluateLiveFontChange(change).verdict, 'fixed')
   })
 
-  test('a screen marker the hierarchy left out is not a remount; a changed one is', () => {
-    // iOS: the Settings screen's 1x1 marker drops out of some XCUITest dumps while its mount
-    // (h16mcs3) stays the same; the root marker is in every capture.
+  test('one screen mount across the stages is kept; a changed one is not', () => {
     const both = 'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
-    const rootOnly = 'live-font-mount-root-h16mcs1'
     const change = fixedChange()
-    change.before.identity.root = both
-    change.immediate.identity.root = both
-    change.settled.identity.root = rootOnly
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = both
     assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
     change.settled.identity.root =
       'live-font-mount-root-h16mcs1,live-font-mount-settings-k77abc3'
@@ -351,6 +347,69 @@ describe('evaluateLiveFontChange', () => {
     const noRoot = evaluateLiveFontChange(change).checks.identity
     assert.equal(noRoot.rootKnown, false)
     assert.equal(noRoot.rootKept, false)
+  })
+
+  // Antigravity handover R1 (P2-1): a marker left out of any capture could hide a remount whose
+  // fresh render passes every height check, so it leaves identity unknown.
+  test('a screen marker missing from any stage leaves identity unknown', () => {
+    const both = 'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
+    const rootOnly = 'live-font-mount-root-h16mcs1'
+    for (const dropped of ['before', 'immediate', 'settled', 'updated']) {
+      const change = fixedChange()
+      change.updated = correct(stage('settled'))
+      change.coldUpdated = cold()
+      for (const name of ['before', 'immediate', 'settled', 'updated'])
+        change[name].identity.root = name === dropped ? rootOnly : both
+      const { verdict, checks } = evaluateLiveFontChange(change)
+      assert.equal(checks.identity.rootKnown, false, dropped)
+      assert.equal(checks.identity.rootKept, false, dropped)
+      assert.equal(verdict, 'unexpected', dropped)
+    }
+  })
+
+  test("the screen's own marker is required even when no stage shows it", () => {
+    const change = fixedChange()
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = 'live-font-mount-root-h16mcs1'
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
+    const { verdict, checks } = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(checks.identity.rootKnown, false)
+    assert.equal(verdict, 'unexpected')
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root =
+        'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
+    assert.equal(
+      evaluateLiveFontChange({ ...change, mount: 'settings' }).checks.identity.rootKept,
+      true
+    )
+  })
+
+  test('two mounts of one scope in one capture are no kept identity', () => {
+    const change = fixedChange()
+    const one = 'live-font-mount-modal-m2,live-font-mount-root-r1'
+    change.before.identity.root = one
+    change.immediate.identity.root = one
+    change.settled.identity.root =
+      'live-font-mount-modal-m1,live-font-mount-modal-m2,live-font-mount-root-r1'
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.identity.rootKept, false)
+    assert.notEqual(verdict, 'fixed')
+  })
+
+  test('a remount between legs of one launch is caught by the later leg', () => {
+    const change = fixedChange()
+    const later = 'live-font-mount-root-r1,live-font-mount-settings-s2'
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = later
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
+    const earlierLeg = correct(stage('settled'))
+    earlierLeg.identity.root = 'live-font-mount-root-r1,live-font-mount-settings-s1'
+    const { verdict, checks } = evaluateLiveFontChange({
+      ...change,
+      earlier: [earlierLeg],
+    })
+    assert.equal(checks.identity.rootKept, false)
+    assert.notEqual(verdict, 'fixed')
   })
 
   test('a capture without the mount marker cannot pass identity', () => {

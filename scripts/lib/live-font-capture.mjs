@@ -61,6 +61,7 @@ export function flattenHierarchy(
     const repeat = platform === 'ios' && repeatsParent(entry, parentEntry)
     if (entry && !repeat) nodes.push(entry)
     if (id && bounds && !isVolatile) controls.push({ id, bounds })
+    return repeat
   }
   const walk = (node, parentBounds, inVolatile, parentEntry) => {
     const attrs = attributes(node)
@@ -81,9 +82,16 @@ export function flattenHierarchy(
       isVolatile,
       platform,
     })
-    record({ entry, parentEntry, id, bounds, isVolatile })
+    // A skipped repeat hands its descendants the entry it repeats, so a deeper copy with that
+    // entry's id still matches it.
+    const repeat = record({ entry, parentEntry, id, bounds, isVolatile })
     for (const child of node?.children ?? [])
-      walk(child, bounds ?? parentBounds, isVolatile, entry ?? parentEntry)
+      walk(
+        child,
+        bounds ?? parentBounds,
+        isVolatile,
+        repeat ? parentEntry : (entry ?? parentEntry)
+      )
   }
   // On iOS the root's other windows (the status bar, under an empty-bounds container) are the
   // system's, so only windows with bounds are read.
@@ -131,6 +139,14 @@ function countText(node, platform) {
     (sum, child) => sum + countText(child, platform),
     own
   )
+}
+
+/** The scopes among `scopes` that no mount marker in `markers` carries. */
+export function missingMounts(markers, scopes) {
+  const seen = new Set(
+    markers.map((marker) => /^live-font-mount-([a-z]+)-/.exec(marker)?.[1])
+  )
+  return scopes.filter((scope) => !seen.has(scope))
 }
 
 /** The mount markers joined in order: one string that changes when any marked mount changes. */
