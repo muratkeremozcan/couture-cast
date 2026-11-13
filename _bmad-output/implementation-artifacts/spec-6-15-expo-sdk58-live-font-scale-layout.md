@@ -440,7 +440,7 @@ The builder fork implements the oracle and driver; TEA owns the test IDs and the
   - P0-05 to P0-07, and P0-08, which covers the simulator's retained state only. P0-09, the physical-iPhone registration, scheduler and worker, is a D11 gate that holds iOS releases.
   - U-01 on the Android emulator.
   - S0-01, the structural prebuild diff (`f108b625`), with its mutants: a `gradle.properties` value, a build-phase order swap, a retargeted configuration, a real-project phase swap, and `objectVersion` and `archiveVersion` changes (R3-04).
-  - C-06: the queue cutover decision from probe queue p95 alone at 4:59, 5:00 and 5:01, independent of the combined budget (TD-08).
+  - Shift-left CI (D6), C-04 and C-06 to C-12: the one macOS PR job, placement by combined queue plus run (p95 15:00 and 15:01, max 20:00 and 20:01; TD-08 folded in once D6 dropped the 5-minute cutover), the Apple-free Linux Swift build with an import ban, one seeded mutant per extracted decision, lane and read-guard coverage, test-name parity, the head-SHA `ios-native.yml` evidence gate, and the watchOS require-build guard with its red proofs.
   - C-01 timing units (failed, timed-out, cancelled, queue-only lower bound, skipped with reason, queue-inclusive breach; an in-flight lower bound never passes; acceptance needs 20 completed observations, failed and cancelled kept; R3-05; grouped per stable job identity with exact `--job` matching, mixed cohorts rejected, and a fast-job dilution fixture; R4-08) and the C-01b lane fixtures after the owner's go.
 - Every step from Step 0, the RevenueCat Test Store (D15):
   - S4-12 journey in debuggable builds on the emulator and simulator, with a fresh member and reset RevenueCat and server state per run (TD-03).
