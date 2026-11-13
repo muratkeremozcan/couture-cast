@@ -141,11 +141,46 @@ function countText(node, platform) {
   )
 }
 
+/** The marker scopes `markers` carry. */
+export function mountScopes(markers) {
+  return [
+    ...new Set(
+      markers
+        .map((marker) => /^live-font-mount-([a-z]+)-/.exec(marker)?.[1])
+        .filter(Boolean)
+    ),
+  ]
+}
+
+/**
+ * `scopes` plus every scope `markers` carry. After a leg's before capture the runner rereads
+ * for each scope that capture showed (Home kept mounted under Community or Settings, Home under
+ * the composer's modal), since the identity check requires each of them in every stage.
+ */
+export function widenMounts(scopes, markers) {
+  return [...new Set([...scopes, ...mountScopes(markers)])]
+}
+
+/**
+ * The scopes the runner rereads for on one screen: `base` (root and the screen's own) at each
+ * launch, widened by every scope a before capture shows until the next launch.
+ */
+export function mountTracker(base) {
+  let scopes = [...base]
+  return {
+    launched() {
+      scopes = [...base]
+    },
+    captured(stage, markers) {
+      if (stage === 'before') scopes = widenMounts(scopes, markers)
+    },
+    scopes: () => scopes,
+  }
+}
+
 /** The scopes among `scopes` that no mount marker in `markers` carries. */
 export function missingMounts(markers, scopes) {
-  const seen = new Set(
-    markers.map((marker) => /^live-font-mount-([a-z]+)-/.exec(marker)?.[1])
-  )
+  const seen = new Set(mountScopes(markers))
   return scopes.filter((scope) => !seen.has(scope))
 }
 

@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
+import { readWithMounts, rootIdentity, widenMounts } from './live-font-capture.mjs'
 
 import {
   androidScaledSize,
@@ -382,6 +383,36 @@ describe('evaluateLiveFontChange', () => {
       evaluateLiveFontChange({ ...change, mount: 'settings' }).checks.identity.rootKept,
       true
     )
+  })
+
+  // Antigravity handover r2 (P2): Home stays mounted under Settings, so the before capture
+  // carries its marker and every stage must. The runner widens its reread to each scope the
+  // before capture showed: one dropped Home dump is reread and passes, three fail the leg.
+  test('a scope the before capture showed is reread, and fails only after three drops', () => {
+    const before = [
+      'live-font-mount-home-h1',
+      'live-font-mount-root-r1',
+      'live-font-mount-settings-s1',
+    ]
+    const dropped = ['live-font-mount-root-r1', 'live-font-mount-settings-s1']
+    const scopes = widenMounts(['root', 'settings'], before)
+    assert.deepEqual(scopes, ['root', 'settings', 'home'])
+    const settledWith = (dumps) => {
+      let index = 0
+      const read = () => ({ markers: dumps[Math.min(index++, dumps.length - 1)] })
+      return rootIdentity(readWithMounts(read, scopes).markers)
+    }
+    const change = fixedChange()
+    change.before.identity.root = rootIdentity(before)
+    change.immediate.identity.root = rootIdentity(before)
+    change.settled.identity.root = settledWith([dropped, before])
+    const once = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(once.checks.identity.rootKept, true)
+    assert.equal(once.verdict, 'fixed')
+    change.settled.identity.root = settledWith([dropped, dropped, dropped, before])
+    const thrice = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(thrice.checks.identity.rootKnown, false)
+    assert.equal(thrice.verdict, 'unexpected')
   })
 
   test('two mounts of one scope in one capture are no kept identity', () => {

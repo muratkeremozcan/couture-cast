@@ -16,6 +16,9 @@ import {
   countOnCreate,
   flattenHierarchy,
   missingMounts,
+  mountScopes,
+  mountTracker,
+  widenMounts,
   readWithMounts,
   rootIdentity,
   sameLayout,
@@ -745,4 +748,28 @@ test('readWithMounts rereads a dump that drops a required marker, three reads at
   const first = reads([whole])
   readWithMounts(first.read, ['root', 'settings'])
   assert.equal(first.count(), 1)
+})
+
+test('widenMounts adds every scope the markers carry, once', () => {
+  const markers = ['live-font-mount-home-h1', 'live-font-mount-root-r1', 'other-id']
+  assert.deepEqual(mountScopes(markers), ['home', 'root'])
+  assert.deepEqual(widenMounts(['root', 'settings'], markers), [
+    'root',
+    'settings',
+    'home',
+  ])
+  assert.deepEqual(widenMounts(['root'], []), ['root'])
+})
+
+test('mountTracker widens after a before capture and resets at each launch', () => {
+  const tracker = mountTracker(['root', 'settings'])
+  const before = ['live-font-mount-home-h1', 'live-font-mount-root-r1']
+  tracker.captured('cold', before)
+  assert.deepEqual(tracker.scopes(), ['root', 'settings'])
+  tracker.captured('before', before)
+  assert.deepEqual(tracker.scopes(), ['root', 'settings', 'home'])
+  tracker.captured('settled', ['live-font-mount-modal-m1'])
+  assert.deepEqual(tracker.scopes(), ['root', 'settings', 'home'])
+  tracker.launched()
+  assert.deepEqual(tracker.scopes(), ['root', 'settings'])
 })

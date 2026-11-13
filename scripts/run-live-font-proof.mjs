@@ -29,6 +29,7 @@ import {
   countOnCreate,
   flattenHierarchy,
   readWithMounts,
+  mountTracker,
   readEnvironment,
   restoreFailure,
   rootIdentity,
@@ -190,8 +191,9 @@ function nativeIdentity() {
 // The screen whose journey is running sets the regions every capture leaves out; screens run
 // one after another, so one module-level value is enough.
 let activeVolatile = []
-// The marker scopes every capture of the active screen must carry: the root and the screen's own.
-let activeMounts = ['root']
+// The marker scopes every capture of the active screen must carry: the root and the screen's own,
+// widened after each before capture by every scope it showed, until the next launch.
+let mounts = mountTracker(['root'])
 let launchCount = 0
 let launchId
 let sequence = 0
@@ -221,7 +223,8 @@ function makeCapture(screenName, stage, scale) {
     const read = hierarchy()
     const flattened = flattenHierarchy(read, { platform, volatile: activeVolatile })
     return { tree: read, flat: flattened, markers: flattened.markers }
-  }, activeMounts)
+  }, mounts.scopes())
+  mounts.captured(stage, flat.markers)
   sequence += 1
   const capture = {
     stage,
@@ -387,6 +390,7 @@ async function settle(screenName, stage, scale) {
 
 function launch() {
   launchCount += 1
+  mounts.launched()
   launchId = `launch-${launchCount}`
   if (platform === 'android') {
     adb('shell', 'am', 'force-stop', appId)
@@ -597,7 +601,10 @@ try {
   }
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
-    activeMounts = ['root', ...(SCREENS[name]?.mount ? [SCREENS[name].mount] : [])]
+    mounts = mountTracker([
+      'root',
+      ...(SCREENS[name]?.mount ? [SCREENS[name].mount] : []),
+    ])
     const steps = screenRunSteps({
       configChange,
       versionKnown: Boolean(reactNativeVersion),
