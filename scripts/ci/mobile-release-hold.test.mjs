@@ -4,9 +4,11 @@
 // S2-08 and S3-02 (D12, R2-06, R3-02): deploy-mobile refuses a production build from SDK 56
 // until a committed measurement artifact on the current SDK clears the hold.
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
 
 import { evaluateReleaseHold, readReleaseHold } from './mobile-release-hold.mjs'
 
@@ -269,5 +271,26 @@ describe('evaluateReleaseHold', () => {
   test('the repository today is consistent with its SDK', () => {
     const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
     assert.equal(evaluateReleaseHold(readReleaseHold(root)).allowed, true)
+  })
+})
+
+describe('deploy-mobile', () => {
+  const workflow = parse(fs.readFileSync('.github/workflows/deploy-mobile.yml', 'utf8'))
+  const steps = Object.values(workflow.jobs).flatMap((job) => job.steps)
+  const index = (pattern) => steps.findIndex((step) => pattern.test(step.run ?? ''))
+
+  test('runs the release hold before any EAS build, unconditionally, with full history', () => {
+    const hold = index(/^node scripts\/ci\/mobile-release-hold\.mjs$/)
+    const builds = steps
+      .map((step, at) => (/eas build/.test(step.run ?? '') ? at : -1))
+      .filter((at) => at >= 0)
+    assert.ok(hold >= 0, 'hold step')
+    assert.ok(builds.length > 0, 'an EAS build')
+    for (const build of builds) assert.ok(hold < build, `hold before step ${build}`)
+    assert.equal(steps[hold].if, undefined)
+    assert.equal(steps[hold]['continue-on-error'], undefined)
+    const checkout = steps.find((step) => /actions\/checkout@/.test(step.uses ?? ''))
+    assert.equal(checkout.with?.['fetch-depth'], 0)
+    assert.equal(Object.keys(workflow.jobs).length, 1)
   })
 })
