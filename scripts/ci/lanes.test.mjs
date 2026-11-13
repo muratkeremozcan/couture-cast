@@ -245,9 +245,10 @@ const EXPECTED_SKIPS = {
   'playwright-unit': [209, 199, 180],
   maestro: [199, 148],
   'share-card': [199],
-  watchos: [209, 208, 199, 180, 148],
-  // No replayed pull request touched the Test Store key's sources or the export configuration.
-  'revenuecat-bundle': [209, 208, 204, 202, 199, 192, 180, 173, 148],
+  // Only #204's watchOS plugin suite touched what the watchOS fixture copies.
+  watchos: [209, 208, 202, 199, 192, 180, 173, 148],
+  // Every replayed pull request that changed the mobile workspace or a package it imports.
+  'revenuecat-bundle': [209, 208, 199, 180, 148],
   // Only the Swift packages and the XCTest target wake it; no replayed pull request touched them.
   'ios-unit': [209, 208, 204, 202, 199, 192, 180, 173, 148],
   // Its lane plan is informational on a pull request (it runs on main, nightly and dispatch);
@@ -274,16 +275,55 @@ test('every lane wakes on each file of what it starts or builds', () => {
 })
 
 test('a mobile-only pull request skips the web, API and preview lanes (#204, #192)', () => {
-  for (const number of [204, 192]) {
-    assert.deepEqual(running(pullRequest(number)), [
-      'typecheck',
-      'coverage-mobile',
-      'playwright-unit',
-      'maestro',
-      'share-card',
-      'watchos',
-    ])
+  const mobile = [
+    'typecheck',
+    'coverage-mobile',
+    'playwright-unit',
+    'maestro',
+    'share-card',
+    'revenuecat-bundle',
+  ]
+  // #204 changed the watchOS plugin suite, which the watchOS lane copies; #192 changed only
+  // apps/mobile/.gitignore, so it wakes no macOS job.
+  assert.deepEqual(running(pullRequest(204)), [...mobile, 'watchos'])
+  assert.deepEqual(running(pullRequest(192)), mobile)
+})
+
+// Story 6.15 D6: the one macOS PR job runs only for native iOS inputs. The watchOS suite copies
+// apps/mobile's app.json, package.json, plugins, targets and assets into its fixture
+// (prebuild-test-helpers.js), and the Swift packages build from the modules' ios directories.
+test('a JavaScript-only mobile change or a package change wakes no macOS job', () => {
+  for (const file of [
+    'apps/mobile/src/screens/home.tsx',
+    'apps/mobile/app/(tabs)/index.tsx',
+    'apps/mobile/components/share-card-composer.tsx',
+    'packages/utils/src/index.ts',
+    'packages/api-client/src/index.ts',
+  ]) {
+    const lanes = running([file])
+    for (const id of ['watchos', 'ios-unit'])
+      assert.ok(!lanes.includes(id), `${file}: ${id}`)
   }
+  for (const file of [
+    'apps/mobile/app.json',
+    'apps/mobile/package.json',
+    'apps/mobile/plugins/with-watchos.js',
+    'apps/mobile/plugins/prebuild-test-helpers.js',
+    'apps/mobile/targets/watchos/WatchWidgetData.swift',
+    'apps/mobile/assets/images/icon.png',
+  ])
+    assert.ok(running([file]).includes('watchos'), file)
+})
+
+// Story 6.15 D15: the scan exports the whole app, so any mobile source can carry a Test Store key.
+test('any mobile source wakes the RevenueCat bundle scan', () => {
+  for (const file of [
+    'apps/mobile/src/lib/new-paywall.ts',
+    'apps/mobile/src/lib/revenuecat-key.ts',
+    'apps/mobile/app/(tabs)/index.tsx',
+    'packages/utils/src/index.ts',
+  ])
+    assert.ok(running([file]).includes('revenuecat-bundle'), file)
 })
 
 test('a shared package wakes every workspace that depends on it (#202: packages/testing)', () => {
@@ -714,7 +754,7 @@ test('a rename wakes the lanes of both paths and a removed file wakes its own', 
     'playwright-unit',
     'maestro',
     'share-card',
-    'watchos',
+    'revenuecat-bundle',
   ]
   const lanes = (...sets) => allLanes.filter((id) => sets.some((set) => set.includes(id)))
   // Web source moved under docs: the destination wakes nothing, the source wakes web.

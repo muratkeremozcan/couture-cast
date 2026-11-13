@@ -268,16 +268,9 @@ export const LANES = {
     title: 'RevenueCat Test Store key bundle scan',
     workflow: 'pr-checks.yml',
     jobs: ['revenuecat-bundle-scan'],
-    // Where the Test Store key is read and kept out of release builds, and what decides how the
-    // export inlines it; scripts/ci/revenuecat-bundle-scan.mjs is under SHARED.
-    inputs: [
-      'apps/mobile/src/lib/revenuecat-key.ts',
-      'apps/mobile/src/lib/premium.ts',
-      'apps/mobile/app.config.ts',
-      'apps/mobile/app.json',
-      'apps/mobile/metro.config.js',
-      'apps/mobile/package.json',
-    ],
+    // The scan exports and searches the whole app, so any file the export bundles is an input:
+    // a new source can read the key outside __DEV__ or carry a test_ literal.
+    workspaces: ['mobile'],
   },
   // The one macOS job a pull request may run (story 6.15 D6) holds two lanes, each gating its
   // own steps: the job runs when either lane does.
@@ -296,7 +289,16 @@ export const LANES = {
     title: 'watchOS native (macOS)',
     workflow: 'pr-apple-native.yml',
     jobs: ['apple-native'],
-    workspaces: ['mobile'],
+    // What the watchOS suite copies into its prebuild fixture (plugins/prebuild-test-helpers.js),
+    // the watch Swift sources under targets included; the Expo tooling it runs comes from the root
+    // install, which SHARED covers. JavaScript and package changes wake no macOS job.
+    inputs: [
+      'apps/mobile/app.json',
+      'apps/mobile/package.json',
+      'apps/mobile/plugins/**',
+      'apps/mobile/targets/**',
+      'apps/mobile/assets/**',
+    ],
   },
   // Off the pull request path (story 6.15 D6): the iOS app builds, the share-card iOS journeys
   // and the Expo Go proof cannot fit the 15-minute queue plus run budget, so ios-native.yml runs
