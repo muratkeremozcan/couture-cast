@@ -218,11 +218,17 @@ function makeCapture(screenName, stage, scale) {
   return capture
 }
 
-/** Two identical pages half a second apart; `markVolatile` keeps volatile text, flagged. */
-async function stableNodes({ markVolatile = false } = {}) {
+/**
+ * Two identical pages half a second apart. A scroll page (`page: true`) keeps volatile text,
+ * flagged, so stitchPages can line pages up through a feed of volatile cards.
+ */
+async function stableNodes({ page = false } = {}) {
   const read = () =>
-    flattenHierarchy(hierarchy(), { platform, volatile: activeVolatile, markVolatile })
-      .nodes
+    flattenHierarchy(hierarchy(), {
+      platform,
+      volatile: activeVolatile,
+      markVolatile: page,
+    }).nodes
   let previous = read()
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await pause(500)
@@ -237,9 +243,10 @@ function windowSize(capture) {
   const match = /\[(\d+),(\d+)\]\[(\d+),(\d+)\]/.exec(capture.window ?? '')
   return match ? { width: Number(match[3]), height: Number(match[4]) } : undefined
 }
+const [DRAG_FROM, DRAG_TO] = [0.7, 0.35]
 function drag(size, up) {
   const x = String(Math.round(size.width / 2))
-  const [from, to] = up ? [0.7, 0.35] : [0.35, 0.7]
+  const [from, to] = up ? [DRAG_FROM, DRAG_TO] : [DRAG_TO, DRAG_FROM]
   if (platform === 'android')
     // A slow drag stops where the finger lifts; a fast one flings on after the capture.
     adb(
@@ -269,13 +276,11 @@ function drag(size, up) {
 async function fullText(capture) {
   const size = windowSize(capture)
   if (!size) throw new Error('live_font_window_bounds_required')
-  // Pages keep volatile text, flagged, so a feed of volatile cards still overlaps from one page
-  // to the next; stitchPages leaves that text out of the result.
-  const pages = [await stableNodes({ markVolatile: true })]
+  const pages = [await stableNodes({ page: true })]
   let drags = 0
   for (; drags < 12; drags += 1) {
     drag(size, true)
-    const page = await stableNodes({ markVolatile: true })
+    const page = await stableNodes({ page: true })
     if (sameLayout(page, pages.at(-1))) break
     pages.push(page)
   }
@@ -298,7 +303,14 @@ async function fullText(capture) {
   fs.writeFileSync(path.join(out, `${capture.file}-pages.json`), JSON.stringify(pages), {
     mode: 0o600,
   })
-  capture.fullText = pages.length > 1 ? stitchPages(pages) : undefined
+  // A page of only a tall image shares no text with its neighbors; the stitch then steps by
+  // the drag's length.
+  capture.fullText =
+    pages.length > 1
+      ? stitchPages(pages, {
+          expectedShift: Math.round(size.height * (DRAG_FROM - DRAG_TO)),
+        })
+      : undefined
   persist(capture)
   return capture
 }
