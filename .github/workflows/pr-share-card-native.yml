@@ -42,10 +42,11 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
-# The nightly run has its own group: GitHub starts the 03:17 cron hours late, and a merge to main
-# during it cancelled it (scheduled run 41435261779), which kept the README badge from turning green.
+# Each event has its own group: GitHub starts the 03:17 cron hours late, and a merge to main during
+# it cancelled it (scheduled run 41435261779), which kept the README badge from turning green. A
+# dispatch needs its own too, since the iOS lanes run only nightly and on demand.
 concurrency:
-  group: share-card-native-${{ github.ref }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
+  group: share-card-native-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 jobs:
   # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and

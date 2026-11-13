@@ -55,7 +55,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: accessibility-focus-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a scheduled or dispatched run, the iOS jobs' only runs.
+  group: accessibility-focus-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:

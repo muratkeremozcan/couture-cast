@@ -26,7 +26,8 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a scheduled or dispatched run, the Swift job's only runs.
+  group: share-native-unit-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
 
 permissions:
