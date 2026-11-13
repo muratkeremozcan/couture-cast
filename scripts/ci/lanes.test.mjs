@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Change-based lane selection (scripts/ci/lanes.mjs): real merged pull requests replayed against
 // the map, the glob matcher held to minimatch, and every repository file a test reads checked
 // to wake the lanes that run that test.
