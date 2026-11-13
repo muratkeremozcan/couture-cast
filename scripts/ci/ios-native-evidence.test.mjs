@@ -16,23 +16,28 @@ import {
   DESCRIPTION_LIMIT,
   DISPATCH_WORKFLOW,
   EVIDENCE_WORKFLOW,
+  GATE_STATUS,
   STATUS_CONTEXT,
+  changedGuardedFiles,
   dispatchCompleted,
   dispatchedCommit,
   evaluateEvidence,
+  gateGuard,
   pullRequest,
   runCommit,
-  statusGuardProblems,
+  workflowGuardProblems,
 } from './ios-native-evidence.mjs'
 import {
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
   ROOT_MANIFEST,
+  evidenceInputs,
   nativeIosChanges,
   pushPaths,
 } from './ios-native-inputs.mjs'
 
-const inputs = pushPaths(fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
+const pushInputs = pushPaths(fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
+const inputs = evidenceInputs(pushInputs)
 const head = 'a'.repeat(40)
 const older = 'b'.repeat(40)
 const file = (filename, patch = '@@ -1 +1 @@\n-a\n+b', extra = {}) => ({
@@ -53,6 +58,8 @@ const run = (patch = {}) => ({
   head_branch: 'main',
   path: DISPATCH_WORKFLOW,
   display_title: `iOS native ${head}`,
+  head_sha: 'f'.repeat(40),
+  fromMain: true,
   status: 'completed',
   conclusion: 'success',
   created_at: '2026-11-13T10:00:00Z',
@@ -65,7 +72,21 @@ const verdict = (runs, files = native) =>
 describe('the native iOS inputs', () => {
   test('are the push paths of ios-native.yml, read without a YAML parser', () => {
     const workflow = parse(fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
-    assert.deepEqual(inputs, workflow.on.push.paths)
+    assert.deepEqual(pushInputs, workflow.on.push.paths)
+  })
+
+  // Code review 4: a dispatch runs main's copy of the iOS workflows and no local action
+  // (ios-native-workflow.test.mjs refuses a local action a dispatch can reach), so a pull
+  // request's edits to them are tested by the validator on its Linux jobs and by the first
+  // push run on main.
+  test('a pull request that edits only the iOS workflows or the install action needs no dispatch', () => {
+    for (const files of [
+      [file('.github/workflows/ios-native-jobs.yml')],
+      [file('.github/workflows/ios-native.yml')],
+      [file('.github/actions/install/action.yml')],
+      [file('.github/actions/node-dependencies/action.yml')],
+    ])
+      assert.equal(verdict([], files).state, 'success', files[0].filename)
   })
 
   test('include the old path of a renamed file', () => {
@@ -105,14 +126,16 @@ describe('the iOS evidence a pull request head needs', () => {
     'a failed run': [run({ conclusion: 'failure' })],
     'a cancelled run': [run({ conclusion: 'cancelled' })],
     'a timed-out run': [run({ conclusion: 'timed_out' })],
-    // The pull request's own branch copy of the workflow ran, not main's.
+    // The pull request's own branch copy of the workflow ran.
     'a dispatch from another branch': [run({ head_branch: 'feat/x' })],
     'a run name that is not this commit': [run({ display_title: `iOS native ${head}x` })],
     'a run name without the commit': [run({ display_title: 'iOS native' })],
     'a pull_request run in place of the dispatch': [run({ event: 'pull_request' })],
     'a push run in place of the dispatch': [run({ event: 'push' })],
     'a nightly run in place of the dispatch': [run({ event: 'schedule' })],
-    // IOS-01: ios-native.yml writes main's caches and never tests a pull request commit.
+    // Code review 5: head_branch main also names a tag called main.
+    'a dispatch from a tag named main': [run({ fromMain: false })],
+    // IOS-01: ios-native.yml writes main's caches and tests main's commits alone.
     'a dispatch of ios-native.yml in place of ios-native-dispatch.yml': [
       run({ path: '.github/workflows/ios-native.yml' }),
     ],
@@ -183,45 +206,64 @@ describe('the iOS evidence a pull request head needs', () => {
   })
 })
 
+// Code review 3: every workflow and local action file at the head that differs from main's is
+// read whole, renamed ones included.
 describe('only the evidence workflow may post its status', () => {
-  const added = (lines) =>
-    `@@ -1,1 +1,3 @@\n ${'unchanged'}\n${lines.map((line) => `+${line}`).join('\n')}`
+  const blob = (path, sha) => ({ path, sha, type: 'blob' })
+  const mainTree = [
+    blob('.github/workflows/pr-gate.yml', 'gate1'),
+    blob('.github/workflows/pr-checks.yml', 'checks1'),
+    blob('.github/workflows/old.yml', 'old1'),
+    blob(EVIDENCE_WORKFLOW, 'evidence1'),
+    blob('.github/actions/install/action.yml', 'install1'),
+    blob('docs/ci.md', 'docs1'),
+  ]
+
+  test('the files read are the workflows and local actions that differ from main, renames included', () => {
+    const headTree = [
+      blob('.github/workflows/pr-gate.yml', 'gate1'),
+      blob('.github/workflows/pr-checks.yml', 'checks2'),
+      // A zero-change rename: the same blob at a new path.
+      blob('.github/workflows/renamed.yml', 'old1'),
+      blob(EVIDENCE_WORKFLOW, 'evidence2'),
+      blob('.github/actions/install/action.yml', 'install2'),
+      blob('.github/actions/new/action.yaml', 'new1'),
+      blob('docs/ci.md', 'docs2'),
+    ]
+    assert.deepEqual(
+      changedGuardedFiles(headTree, mainTree).map((entry) => entry.path),
+      [
+        '.github/workflows/pr-checks.yml',
+        '.github/workflows/renamed.yml',
+        '.github/actions/install/action.yml',
+        '.github/actions/new/action.yaml',
+      ]
+    )
+  })
+
   const fixtures = {
-    'a new workflow that posts the context': file(
-      '.github/workflows/sneaky.yml',
-      added([
-        '      - run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence -f state=success',
-      ]),
-      { status: 'added' }
-    ),
-    'an edited workflow that adds statuses: write': file(
-      '.github/workflows/pr-checks.yml',
-      added(['    permissions:', '      statuses: write'])
-    ),
-    'an edited workflow that adds a quoted statuses write': file(
-      '.github/workflows/pr-checks.yml',
-      added(["    permissions: { contents: read, statuses: 'write' }"])
-    ),
-    'an edited workflow that grants write-all': file(
-      '.github/workflows/pr-checks.yml',
-      added(['permissions: write-all'])
-    ),
-    'a local action that posts the context': file(
-      '.github/actions/install/action.yml',
-      added(['        context: ios-native-evidence'])
-    ),
-    'a workflow diff too large to read': file(
-      '.github/workflows/pr-checks.yml',
-      undefined,
-      {
-        patch: undefined,
-      }
-    ),
+    'a zero-change rename of a workflow that holds statuses: write':
+      'permissions:\n  statuses: write\n',
+    'a quoted statuses key': "permissions: { contents: read, 'statuses': 'write' }\n",
+    'a double-quoted statuses key': 'permissions:\n  "statuses": "write"\n',
+    'write-all': 'permissions: write-all\n',
+    'checks: write': 'permissions:\n  checks: write\n',
+    'the context string':
+      'run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence -f state=success\n',
   }
-  for (const [name, entry] of Object.entries(fixtures))
-    test(`${name} fails, even with no native iOS input`, () => {
-      assert.equal(statusGuardProblems([entry]).length, 1, name)
-      const result = verdict([run()], [entry])
+  for (const [name, text] of Object.entries(fixtures))
+    test(`a workflow with ${name} fails, even with no native iOS input`, () => {
+      const problems = workflowGuardProblems([
+        { path: '.github/workflows/sneaky.yml', text },
+      ])
+      assert.equal(problems.length, 1, name)
+      const result = evaluateEvidence({
+        headSha: head,
+        files: [],
+        runs: [],
+        inputs,
+        guard: problems,
+      })
       assert.equal(result.state, 'failure', name)
       assert.match(
         result.detail,
@@ -229,29 +271,39 @@ describe('only the evidence workflow may post its status', () => {
       )
     })
 
-  test('the evidence workflow itself, removed lines and unchanged renames pass', () => {
+  test('a file name with the context, read permissions and an unreadable tree are told apart', () => {
     assert.deepEqual(
-      statusGuardProblems([
-        file(
-          EVIDENCE_WORKFLOW,
-          added(['      statuses: write', '-f context=ios-native-evidence'])
-        ),
-        file(
-          '.github/workflows/pr-gate.yml',
-          '@@ -1,2 +1,1 @@\n-      statuses: write\n context'
-        ),
-        file('.github/workflows/old.yml', undefined, {
-          status: 'renamed',
-          changes: 0,
-          patch: undefined,
-        }),
-        file('.github/workflows/gone.yml', undefined, {
-          status: 'removed',
-          patch: undefined,
-        }),
-        file('docs/ci.md', added(['statuses: write ios-native-evidence'])),
+      workflowGuardProblems([
+        {
+          path: 'a.yml',
+          text: 'run: node scripts/ci/ios-native-evidence.mjs\npermissions:\n  statuses: read\n  checks: read\n',
+        },
       ]),
       []
+    )
+    assert.equal(
+      evaluateEvidence({ headSha: head, files: [], runs: [], inputs, guard: null }).state,
+      'failure'
+    )
+  })
+
+  test('main itself holds no other workflow that could post the status', () => {
+    const files = fs
+      .readdirSync('.github/workflows')
+      .map((name) => `.github/workflows/${name}`)
+      .filter(
+        (path) => path !== EVIDENCE_WORKFLOW && path !== '.github/workflows/pr-gate.yml'
+      )
+      .map((path) => ({ path, text: fs.readFileSync(path, 'utf8') }))
+    assert.deepEqual(workflowGuardProblems(files), [])
+    // pr-gate.yml publishes the gate status; a pull request that edits it is read whole.
+    assert.ok(
+      workflowGuardProblems([
+        {
+          path: '.github/workflows/pr-gate.yml',
+          text: fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'),
+        },
+      ]).includes('.github/workflows/pr-gate.yml holds statuses: write')
     )
   })
 })
@@ -271,46 +323,95 @@ describe('the completed run a status follows', () => {
   })
 })
 
-// The jobs against a fake GitHub API: open pull requests, their files, the ios-native runs, and
-// the statuses posted.
+// The jobs against a fake GitHub API: open pull requests, their files, the trees at the head and
+// at main, the dispatch runs (100 a page), the commits on main, and the statuses posted.
+const MAIN_SHA = 'd'.repeat(40)
 function fakeGitHub({
   pulls = [],
   files = {},
   runs = [],
   contents = {},
   mergeBase = older,
+  trees = {},
+  blobs = {},
+  onMain = () => 'behind',
 }) {
   const posted = []
+  const requested = []
+  const reply = (body) => ({ ok: true, status: 200, json: async () => body })
+  const raw = (text) =>
+    text == null
+      ? { ok: false, status: 404, text: async () => '' }
+      : { ok: true, status: 200, text: async () => text }
+  // Each route: a path pattern and its answer from the match, the query and the request.
+  const routes = [
+    [
+      /\/statuses\/([0-9a-f]{40})$/,
+      (match, query, init) => {
+        posted.push({ sha: match[1], ...JSON.parse(init.body) })
+        return { ok: true, status: 201, json: async () => ({}) }
+      },
+    ],
+    [
+      /\/pulls\/(\d+)\/files$/,
+      (match, query) => reply(query.page === 1 ? (files[match[1]] ?? []) : []),
+    ],
+    [/\/pulls$/, (match, query) => reply(query.page === 1 ? pulls : [])],
+    [
+      /\/compare\/refs\/heads\/main\.\.\.([0-9a-f]{40})$/,
+      (match) => reply({ status: onMain(match[1]) }),
+    ],
+    [
+      /\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/,
+      () => reply({ merge_base_commit: { sha: mergeBase } }),
+    ],
+    [
+      /\/commits\/[0-9a-f]{40}$/,
+      () => reply({ commit: { committer: { date: '2026-11-12T08:00:00Z' } } }),
+    ],
+    [/\/git\/ref\/heads\/main$/, () => reply({ object: { sha: MAIN_SHA } })],
+    [
+      /\/git\/trees\/([0-9a-f]{40})$/,
+      (match) => reply({ tree: trees[match[1]] ?? [], truncated: false }),
+    ],
+    [
+      /\/git\/blobs\/(.+)$/,
+      (match) =>
+        reply({ content: Buffer.from(blobs[match[1]] ?? '').toString('base64') }),
+    ],
+    [
+      /\/contents\/(.+)$/,
+      (match, query, init) => {
+        assert.equal(init.headers.accept, 'application/vnd.github.raw+json')
+        return raw(contents[query.ref]?.[match[1]])
+      },
+    ],
+    [
+      /\/actions\/workflows\/ios-native-dispatch\.yml\/runs$/,
+      (match, query) => {
+        assert.equal(query.event, 'workflow_dispatch')
+        assert.equal(query.created, '>=2026-11-11')
+        return reply({
+          workflow_runs: runs.slice((query.page - 1) * 100, query.page * 100),
+        })
+      },
+    ],
+  ]
   const fetchImpl = async (url, init = {}) => {
     const { pathname, searchParams } = new URL(url)
-    const reply = (body) => ({ ok: true, status: 200, json: async () => body })
-    if (init.method === 'POST' && /\/statuses\//.test(pathname)) {
-      posted.push({ sha: pathname.split('/').pop(), ...JSON.parse(init.body) })
-      return { ok: true, status: 201, json: async () => ({}) }
+    requested.push(`${pathname}?${searchParams}`)
+    const query = {
+      ...Object.fromEntries(searchParams),
+      page: Number(searchParams.get('page') ?? 1),
     }
-    if (/\/pulls\/\d+\/files$/.test(pathname)) {
-      const number = Number(pathname.split('/').at(-2))
-      return reply(searchParams.get('page') === '1' ? (files[number] ?? []) : [])
-    }
-    if (/\/pulls$/.test(pathname))
-      return reply(searchParams.get('page') === '1' ? pulls : [])
-    if (/\/compare\/[0-9a-f]{40}\.\.\.[0-9a-f]{40}$/.test(pathname))
-      return reply({ merge_base_commit: { sha: mergeBase } })
-    const content = /\/contents\/(.+)$/.exec(pathname)
-    if (content) {
-      assert.equal(init.headers.accept, 'application/vnd.github.raw+json')
-      const text = contents[searchParams.get('ref')]?.[content[1]]
-      return text == null
-        ? { ok: false, status: 404, text: async () => '' }
-        : { ok: true, status: 200, text: async () => text }
-    }
-    if (pathname.endsWith('/actions/workflows/ios-native-dispatch.yml/runs')) {
-      assert.equal(searchParams.get('event'), 'workflow_dispatch')
-      return reply({ workflow_runs: runs })
+    for (const [pattern, answer] of routes) {
+      const match = pattern.exec(pathname)
+      if (match && (init.method === 'POST') === pattern.source.includes('statuses'))
+        return answer(match, query, init)
     }
     return { ok: false, status: 404, json: async () => ({}) }
   }
-  return { fetchImpl, posted }
+  return { fetchImpl, posted, requested }
 }
 
 function withEvent(payload, body) {
@@ -362,12 +463,123 @@ describe('the pull_request_target job', () => {
   })
 })
 
+describe('the evidence runs the pull_request_target job reads', () => {
+  const judgeWith = (github) =>
+    withEvent({ pull_request: { number: 5, head: { sha: head } } }, (env) =>
+      pullRequest({ env, fetchImpl: github.fetchImpl })
+    )
+
+  // Code review 5: the run's own commit must be on the branch main.
+  test('a dispatch whose commit is not on refs/heads/main fails', async () => {
+    for (const status of ['diverged', 'ahead']) {
+      const github = fakeGitHub({
+        files: { 5: native },
+        runs: [run()],
+        onMain: () => status,
+      })
+      assert.equal((await judgeWith(github)).state, 'failure', status)
+    }
+    const github = fakeGitHub({
+      files: { 5: native },
+      runs: [run()],
+      onMain: () => 'identical',
+    })
+    assert.equal((await judgeWith(github)).state, 'success')
+  })
+
+  // Code review 6: no cap on how far back the evidence is.
+  test('evidence past the third page of runs is found', async () => {
+    const others = Array.from({ length: 350 }, (_, index) =>
+      run({ display_title: `iOS native ${index.toString(16).padStart(40, '0')}` })
+    )
+    const github = fakeGitHub({ files: { 5: native }, runs: [...others, run()] })
+    assert.equal((await judgeWith(github)).state, 'success')
+    assert.ok(github.requested.some((request) => /page=4/.test(request)))
+  })
+
+  test('a workflow at the head that could post the status fails the head', async () => {
+    const github = fakeGitHub({
+      files: { 5: [file('README.md')] },
+      runs: [],
+      trees: {
+        [head]: [{ path: '.github/workflows/renamed.yml', sha: 'old1', type: 'blob' }],
+        [MAIN_SHA]: [{ path: '.github/workflows/old.yml', sha: 'old1', type: 'blob' }],
+      },
+      blobs: { old1: 'permissions:\n  statuses: write\n' },
+    })
+    const result = await judgeWith(github)
+    assert.equal(result.state, 'failure')
+    assert.match(result.detail, /renamed\.yml holds statuses: write/)
+  })
+})
+
+// Code review 3: PR Gate runs the same guard, from main, after its own verdict, so a job that
+// posts the evidence status after the judge cannot unblock the merge.
+describe('the PR Gate guard', () => {
+  const rogue = {
+    trees: {
+      [head]: [{ path: '.github/workflows/rogue.yml', sha: 'rogue1', type: 'blob' }],
+      [MAIN_SHA]: [],
+    },
+    blobs: {
+      rogue1: 'run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence\n',
+    },
+  }
+  const guard = async (github, sha = head) =>
+    withEvent({}, (env) =>
+      gateGuard({ env: { ...env, HEAD_SHA: sha }, fetchImpl: github.fetchImpl })
+    )
+
+  test('fails the gate status of an open pull request whose head could post the evidence', async () => {
+    const github = fakeGitHub({ pulls: [{ number: 5, head: { sha: head } }], ...rogue })
+    assert.deepEqual(await guard(github), [
+      '.github/workflows/rogue.yml holds the ios-native-evidence context',
+    ])
+    assert.deepEqual(
+      github.posted.map(({ sha, state, context }) => ({ sha, state, context })),
+      [{ sha: head, state: 'failure', context: GATE_STATUS }]
+    )
+  })
+
+  test('posts nothing for a clean head, or a commit no open pull request heads', async () => {
+    const clean = fakeGitHub({ pulls: [{ number: 5, head: { sha: head } }] })
+    assert.deepEqual(await guard(clean), [])
+    assert.deepEqual(clean.posted, [])
+    const orphan = fakeGitHub({ pulls: [{ number: 5, head: { sha: older } }], ...rogue })
+    assert.deepEqual(await guard(orphan), [])
+    assert.deepEqual(orphan.posted, [])
+  })
+
+  test("pr-gate.yml runs main's guard after its verdict, on every event", () => {
+    const workflow = parse(fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'))
+    const job = workflow.jobs.watch
+    const names = job.steps.map((row) => row.uses ?? row.name)
+    const gate = names.findIndex((name) =>
+      String(name).startsWith('muratkeremozcan/pr-gate')
+    )
+    const [checkout, run] = job.steps.slice(gate + 1)
+    assert.ok(gate >= 0 && job.steps.length === gate + 3)
+    assert.equal(checkout.if, 'always()')
+    assert.equal(checkout.with.ref, '${{ github.event.repository.default_branch }}')
+    assert.equal(checkout.with['persist-credentials'], false)
+    assert.equal(run.if, 'always()')
+    assert.match(run.run, /node scripts\/ci\/ios-native-evidence\.mjs gate-guard/)
+    assert.equal(
+      run.env.HEAD_SHA,
+      '${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}'
+    )
+    assert.equal(job.permissions['pull-requests'], 'read')
+    assert.equal(job.permissions.statuses, 'write')
+  })
+})
+
 // SL-11: the shared dependency files count only for what apps/mobile installs, read at the merge
 // base and the head commit, the two ends of the pull request's own diff.
 describe('a pull request that changes the shared dependency files', () => {
   const lock = (expo, next) => ({
     lockfileVersion: 3,
     packages: {
+      '': { workspaces: ['apps/*'] },
       'apps/mobile': { dependencies: { expo: '*' } },
       'apps/web': { dependencies: { next: '*' } },
       'node_modules/expo': { version: expo },

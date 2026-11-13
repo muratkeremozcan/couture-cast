@@ -1,8 +1,8 @@
 # Story 6.15 D6 and IOS-01: the iOS jobs (ios-native-jobs.yml) on one commit before it merges.
 # Dispatch it from main with `sha` set to a pull request head commit; the run name carries that
 # commit, every job fails unless it checked out exactly that commit, and the pull request's
-# ios-native-evidence status accepts only a successful run of this file, dispatched from main,
-# whose name carries the head commit (scripts/ci/ios-native-evidence.mjs).
+# evidence status accepts only a successful run of this file, dispatched from main, whose name
+# carries the head commit (scripts/ci/ios-native-evidence.mjs).
 #
 # A dispatch is a trusted trigger, so GitHub would grant it write access to main's cache scope,
 # while the jobs run code that has not merged. cache-mode: read, here and on each job, makes GitHub

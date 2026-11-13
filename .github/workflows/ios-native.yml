@@ -1,7 +1,7 @@
 # Story 6.15 D6: the iOS jobs (ios-native-jobs.yml) on main. A merge runs them when it changed a
 # native iOS input, and the nightly run covers the rest. Both are trusted runs of main's own code,
-# so they keep the development client and native Supabase caches warm; a pull request's commit runs
-# them through ios-native-dispatch.yml instead, with a read-only cache.
+# so they keep the development client and native Supabase caches warm. A pull request's commit
+# runs them through ios-native-dispatch.yml, with a read-only cache.
 name: iOS native
 run-name: iOS native ${{ github.sha }}
 
@@ -81,7 +81,7 @@ on:
 permissions:
   contents: read
 
-# One run per event and commit, so a merge never cancels the nightly run.
+# One run per event and commit, so a merge and the nightly run each finish.
 concurrency:
   group: ios-native-${{ github.event_name }}-${{ github.sha }}
   cancel-in-progress: true

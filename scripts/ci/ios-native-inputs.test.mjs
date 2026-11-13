@@ -1,22 +1,26 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 SL-11: package-lock.json and the root package.json are shared by every workspace, so
-// a change to them is a native iOS change only when it touches what apps/mobile installs, or a
-// root field or script an iOS run reads. An Expo bump or a native dependency under mobile must
-// count; a web-only or API-only bump must not.
+// a change to them is a native iOS change when it touches what the iOS jobs install and run (the
+// root tools, apps/mobile and the packages except packages/db), or a root field or script an iOS
+// run reads. An Expo bump, a native dependency under mobile and a root playwright or prisma bump
+// count. A web-only bump skips; an API-only or packages/db bump skips while browser-acceptance
+// boots the same API on pull requests, which the pin below holds.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
+import { readWorkspaceDependencies, selectLanes } from './lanes.mjs'
 import {
   IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
   ROOT_MANIFEST,
   dependencyChanges,
-  mobileClosure,
-  mobileLockChanges,
+  evidenceInputs,
+  nativeClosure,
   nativeIosChanges,
+  nativeLockChanges,
   pushChanges,
   pushPaths,
   rootManifestChanges,
@@ -36,7 +40,13 @@ const lock = {
     '': {
       name: 'root',
       workspaces: ['apps/*', 'packages/*'],
-      devDependencies: { eslint: '^9' },
+      dependencies: { '@prisma/client': '^6' },
+      devDependencies: {
+        eslint: '^9',
+        '@playwright/test': '^1',
+        prisma: '^6',
+        tsx: '^4',
+      },
     },
     'apps/mobile': {
       dependencies: { expo: '^58.0.0', react: '19.1.0', '@couture/utils': '*' },
@@ -45,6 +55,8 @@ const lock = {
     'apps/web': { dependencies: { next: '^15', react: '19.1.0', '@couture/utils': '*' } },
     'apps/api': { dependencies: { '@nestjs/core': '^11' } },
     'packages/utils': { dependencies: { zod: '^3' } },
+    'packages/config': { devDependencies: { tsup: '^8' } },
+    'packages/db': { dependencies: { '@prisma/adapter-pg': '^6' } },
     'node_modules/@couture/utils': { resolved: 'packages/utils', link: true },
     'node_modules/expo': {
       version: '58.0.1',
@@ -60,6 +72,12 @@ const lock = {
     'node_modules/styled-jsx': { version: '5.1.6' },
     'node_modules/@nestjs/core': { version: '11.2.0' },
     'node_modules/eslint': { version: '9.0.0', dev: true },
+    'node_modules/@playwright/test': { version: '1.50.0', dev: true },
+    'node_modules/prisma': { version: '6.1.0', dev: true },
+    'node_modules/@prisma/client': { version: '6.1.0' },
+    'node_modules/tsx': { version: '4.19.0', dev: true },
+    'node_modules/tsup': { version: '8.3.0', dev: true },
+    'node_modules/@prisma/adapter-pg': { version: '6.1.0' },
   },
 }
 const bump = (key, patch) => {
@@ -69,16 +87,24 @@ const bump = (key, patch) => {
 }
 
 describe('what apps/mobile installs, from the lockfile alone', () => {
-  test('the workspace, what it resolves, nested installs first, and linked workspaces', () => {
-    assert.deepEqual([...mobileClosure(lock)].sort(), [
+  test('the root, mobile and the packages but packages/db, what they resolve, nested installs first', () => {
+    assert.deepEqual([...nativeClosure(lock)].sort(), [
+      '',
       'apps/mobile',
       'node_modules/@couture/utils',
+      'node_modules/@playwright/test',
+      'node_modules/@prisma/client',
+      'node_modules/eslint',
       'node_modules/expo',
       'node_modules/expo-modules-core',
       'node_modules/expo/node_modules/babel-preset-expo',
       'node_modules/jest-expo',
+      'node_modules/prisma',
       'node_modules/react',
+      'node_modules/tsup',
+      'node_modules/tsx',
       'node_modules/zod',
+      'packages/config',
       'packages/utils',
     ])
   })
@@ -101,6 +127,15 @@ describe('what apps/mobile installs, from the lockfile alone', () => {
     'a dependency of a workspace mobile links': bump('node_modules/zod', {
       version: '3.25.1',
     }),
+    'a root playwright bump': bump('node_modules/@playwright/test', {
+      version: '1.51.0',
+    }),
+    'a root prisma bump': bump('node_modules/prisma', { version: '6.2.0' }),
+    'a root tsx bump': bump('node_modules/tsx', { version: '4.20.0' }),
+    'a root development tool bump': bump('node_modules/eslint', { version: '9.1.0' }),
+    'a development tool of a package the iOS jobs build': bump('node_modules/tsup', {
+      version: '8.4.0',
+    }),
     'a new dependency of the mobile workspace': bump('apps/mobile', {
       dependencies: {
         ...lock.packages['apps/mobile'].dependencies,
@@ -110,7 +145,7 @@ describe('what apps/mobile installs, from the lockfile alone', () => {
   }
   for (const [name, after] of Object.entries(fires))
     test(`${name} counts`, () => {
-      assert.ok(mobileLockChanges(lock, after).length > 0, name)
+      assert.ok(nativeLockChanges(lock, after).length > 0, name)
     })
 
   const quiet = {
@@ -120,51 +155,94 @@ describe('what apps/mobile installs, from the lockfile alone', () => {
       after.packages['apps/web'].dependencies.next = '^15.5.1'
       return after
     })(),
-    'an API-only bump': (() => {
+    // browser-acceptance boots the same API on the pull request (pinned below).
+    'an API-only bump, which browser-acceptance runs': (() => {
       const after = bump('node_modules/@nestjs/core', { version: '11.2.1' })
       after.packages['apps/api'].dependencies['@nestjs/core'] = '^11.2.1'
       return after
     })(),
-    'a root development tool bump': bump('node_modules/eslint', { version: '9.1.0' }),
+    'a packages/db-only bump, which browser-acceptance runs': bump(
+      'node_modules/@prisma/adapter-pg',
+      { version: '6.2.0' }
+    ),
     'the hoisted copy mobile does not resolve': bump('node_modules/babel-preset-expo', {
       version: '54.0.1',
     }),
   }
   for (const [name, after] of Object.entries(quiet))
     test(`${name} does not count`, () => {
-      assert.deepEqual(mobileLockChanges(lock, after), [], name)
+      assert.deepEqual(nativeLockChanges(lock, after), [], name)
     })
 
   test('a dependency mobile drops counts, since it was installed before', () => {
     const after = clone(lock)
     delete after.packages['node_modules/expo-modules-core']
     delete after.packages['node_modules/expo'].dependencies['expo-modules-core']
-    assert.deepEqual(mobileLockChanges(lock, after), [
+    assert.deepEqual(nativeLockChanges(lock, after), [
       'node_modules/expo',
       'node_modules/expo-modules-core',
     ])
   })
 
   test('a lockfile this cannot read counts as unknown', () => {
-    assert.equal(mobileLockChanges(lock, { lockfileVersion: 1, dependencies: {} }), null)
-    assert.equal(mobileLockChanges(null, lock), null)
+    assert.equal(nativeLockChanges(lock, { lockfileVersion: 1, dependencies: {} }), null)
+    assert.equal(nativeLockChanges(null, lock), null)
   })
 
-  test('the repository lockfile: mobile installs Expo and React Native, never Next or Nest', () => {
-    const closure = mobileClosure(JSON.parse(fs.readFileSync(LOCKFILE, 'utf8')))
+  test('the repository lockfile: the iOS jobs install Expo, React Native and the root tools', () => {
+    const closure = nativeClosure(JSON.parse(fs.readFileSync(LOCKFILE, 'utf8')))
     for (const key of [
       'node_modules/expo',
       'node_modules/react-native',
+      'node_modules/@playwright/test',
+      'node_modules/prisma',
+      'node_modules/tsx',
       'packages/utils',
     ])
       assert.ok(closure.has(key), key)
     for (const key of [
       'node_modules/next',
-      'node_modules/@nestjs/core',
+      'node_modules/stripe',
       'apps/web',
       'apps/api',
+      'packages/db',
     ])
       assert.ok(!closure.has(key), key)
+  })
+})
+
+// apps/api and packages/db skip iOS evidence only while a Linux pull request job boots the same
+// API path: browser-acceptance builds the API, runs node scripts/run-story68-native.mjs serve
+// and the story68-api-entry guard, under the share-card lane those workspaces wake.
+describe('the API pin', () => {
+  const unpinned =
+    'apps/api and packages/db must return to the iOS evidence inputs (scripts/ci/ios-native-inputs.mjs)'
+  test('browser-acceptance boots the API on every pull request apps/api or packages/db wakes', () => {
+    const workflow = parse(
+      fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
+    )
+    const job = workflow.jobs['browser-acceptance']
+    const runs = (job?.steps ?? []).map((row) => String(row.run ?? '')).join('\n')
+    assert.ok(job && job['runs-on'] === 'ubuntu-latest', unpinned)
+    assert.match(String(job.if), /\['share-card'\]/, unpinned)
+    for (const command of [
+      'npm run build --workspace api',
+      'node scripts/run-story68-native.mjs serve',
+      'scripts/lib/story68-api-entry.test.mjs',
+    ])
+      assert.ok(
+        runs.includes(command),
+        `${unpinned}: browser-acceptance no longer runs ${command}`
+      )
+    const dependencies = readWorkspaceDependencies('.')
+    for (const file of ['apps/api/src/main.ts', 'packages/db/package.json']) {
+      const plan = selectLanes({ event: 'pull_request', files: [file], dependencies })
+      assert.equal(
+        plan['share-card'].run,
+        true,
+        `${unpinned}: the share-card lane skips ${file}`
+      )
+    }
   })
 })
 
@@ -211,12 +289,31 @@ describe('what the root manifest changes for an iOS run', () => {
     )
   })
 
-  test('a web script or a root dependency does not count; the lockfile decides dependencies', () => {
+  test('a root dependency, a lifecycle script, or a hook of a script the run uses counts', () => {
+    assert.deepEqual(change({ devDependencies: { eslint: '^10' } }), ['devDependencies'])
+    assert.deepEqual(change({ dependencies: { '@prisma/client': '^7' } }), [
+      'dependencies',
+    ])
+    for (const name of ['preinstall', 'install', 'postinstall', 'prepare', 'prepublish'])
+      assert.deepEqual(
+        change({ scripts: { ...root.scripts, [name]: 'node scripts/setup.mjs' } }),
+        [`scripts.${name}`],
+        name
+      )
+    for (const name of ['predb:generate', 'postbuild:packages', 'prebuild:config'])
+      assert.deepEqual(
+        change({ scripts: { ...root.scripts, [name]: 'node scripts/hook.mjs' } }),
+        [`scripts.${name}`],
+        name
+      )
+  })
+
+  test('a web script or a hook of a script no iOS job runs does not count', () => {
     assert.deepEqual(
       change({ scripts: { ...root.scripts, 'lint:web': 'eslint apps/web' } }),
       []
     )
-    assert.deepEqual(change({ devDependencies: { eslint: '^10' } }), [])
+    assert.deepEqual(change({ scripts: { ...root.scripts, 'prelint:web': 'echo' } }), [])
     assert.equal(rootManifestChanges(null, root, text), null)
   })
 })
@@ -281,6 +378,26 @@ describe('a native iOS change', () => {
       ),
       ['scripts/lib/story68-native-build.mjs']
     )
+  })
+
+  test("a dispatch runs main's workflows and no local action, so their edits are no evidence input", () => {
+    const evidence = evidenceInputs(inputs)
+    for (const glob of [
+      '.github/workflows/ios-native.yml',
+      '.github/workflows/ios-native-jobs.yml',
+      '.github/actions/install/**',
+    ]) {
+      assert.ok(inputs.includes(glob), `a merge still runs on ${glob}`)
+      assert.ok(!evidence.includes(glob), glob)
+    }
+    assert.deepEqual(
+      nativeIosChanges(
+        ['.github/workflows/ios-native-jobs.yml', '.github/actions/install/action.yml'],
+        evidence
+      ),
+      []
+    )
+    assert.ok(evidence.includes('apps/mobile/package.json'))
   })
 
   test('the push paths parse the same without a YAML parser', () => {

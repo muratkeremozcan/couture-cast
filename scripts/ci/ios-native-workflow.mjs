@@ -8,11 +8,11 @@
 //                            Trusted main code, so they may write the caches.
 //   ios-native-dispatch.yml  a commit that has not merged. cache-mode: read on the workflow and on
 //                            every job makes GitHub issue a read-only cache token, so the code it
-//                            runs cannot save a cache main's runs restore; the jobs build the client
-//                            in each consumer instead, and ios-cache-proof shows nothing was stored.
+//                            runs cannot save a cache main's runs restore; each consumer job builds
+//                            its own client, and ios-cache-proof shows nothing was stored.
 //
 // The rules check that each control is present, eligible to run (no disabled or bypassable
-// condition) and able to fail its job, not only that its text appears somewhere.
+// condition) and able to fail its job.
 import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
@@ -85,8 +85,8 @@ export const DISPATCH_BUILD = [
   },
 ]
 
-// IOS-02: the checks a run must not lose, each with the one condition it may carry (none means
-// it runs whenever every earlier step passed). Each must exist exactly once.
+// IOS-02: the checks every run keeps, each with the one condition it may carry (none means it
+// runs whenever every earlier step passed). Each must exist exactly once.
 const runs = (command) => (step) => String(step.run ?? '').includes(command)
 export const MANDATORY = [
   [
@@ -107,7 +107,7 @@ export const MANDATORY = [
   [
     'ios-build',
     (step) => step.id === 'native_save',
-    `\${{ ${NOT_DISPATCH} && !cancelled() && steps.app_scan.outcome == 'success' }}`,
+    "${{ !cancelled() && steps.app_scan.outcome == 'success' }}",
   ],
   ['ios-shard', runs('native-ios-shards.mjs commands'), undefined],
   ['ios-expo-go', runs('run-story68-native.mjs expo-go-proof'), undefined],
@@ -476,6 +476,11 @@ function shapeProblems(jobs, check) {
   check(
     build?.needs === undefined && build?.if === `\${{ ${NOT_DISPATCH} }}`,
     'ios-build fills the cache: it starts the run, and a dispatch skips it'
+  )
+  // A dispatch skips the whole job, so a step-level dispatch branch in it is dead code.
+  check(
+    !JSON.stringify(steps(build)).includes('workflow_dispatch'),
+    'ios-build: no step branches on a dispatch, which never runs the job'
   )
   check(
     jobs['ios-app-build']?.needs === undefined && jobs['ios-app-build']?.if === undefined,
