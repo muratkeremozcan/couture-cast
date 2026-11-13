@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { describe, test } from 'node:test'
+import { after, describe, test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { evaluateApprovedCondition, matrixRows } from './workflow-step-shadowing.mjs'
@@ -34,7 +34,7 @@ const sources = {
 test('one', () => {})
 test('two', () => {})
 `,
-  'grouped.test.mjs': `import { describe, test } from 'node:test'
+  'grouped.test.mjs': `import { after, describe, test } from 'node:test'
 describe('group', () => { test('three', () => {}) })
 `,
   'empty.test.mjs': '// registers no test\n',
@@ -42,7 +42,7 @@ describe('group', () => { test('three', () => {}) })
 test('kept', () => {})
 test('skipped', { skip: true }, () => {})
 `,
-  'skipped-suite.test.mjs': `import { describe, test } from 'node:test'
+  'skipped-suite.test.mjs': `import { after, describe, test } from 'node:test'
 test('kept', () => {})
 describe.skip('dropped', () => { test('inner', () => {}) })
 `,
@@ -56,6 +56,8 @@ test('broken', () => { throw new Error('broken') })
 `,
   'crashing.test.mjs': "throw new Error('load failure')\n",
 }
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
 function temporary(run) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'node-test-gate-fixture-'))
@@ -160,7 +162,67 @@ describe('node-test-gate run', () => {
 // The background form starts suites in one detached process and a later step collects
 // them. Collect must apply the foreground pass rules and fail when a run is missing or
 // never finished.
+/**
+ * A suite file that blocks until its release file appears. The background run is detached, so
+ * nothing kills it with the test that started it: it gives up when that test's temporary
+ * directory is gone, when the owning process is gone (a gate killed mid-test runs no cleanup),
+ * and after two minutes in any case.
+ */
+function blockedSource({ release, temp, owner }) {
+  return `import fs from 'node:fs'
+import { test } from 'node:test'
+const ownerAlive = () => {
+  try {
+    process.kill(${owner}, 0)
+    return true
+  } catch (error) {
+    return error.code !== 'ESRCH'
+  }
+}
+test('waits for its release', async () => {
+  const deadline = Date.now() + 120_000
+  while (!fs.existsSync(${JSON.stringify(release)})) {
+    if (!fs.existsSync(${JSON.stringify(temp)})) throw new Error('released by cleanup')
+    if (!ownerAlive()) throw new Error('released: its owner is gone')
+    if (Date.now() > deadline) throw new Error('released: two minutes passed')
+    await new Promise((done) => setTimeout(done, 25))
+  }
+})
+`
+}
+
+/** True while any process of the group led by `pid` is alive. */
+function groupAlive(pid) {
+  try {
+    process.kill(-pid, 0)
+    return true
+  } catch (error) {
+    return error.code !== 'ESRCH'
+  }
+}
+
+// Every background run these tests start leads its own process group; none may outlive them.
+const backgroundGroups = new Set()
+const trackStarted = (suite, env) =>
+  backgroundGroups.add(
+    JSON.parse(
+      fs.readFileSync(path.join(backgroundDirectory(suite, env), 'started.json'), 'utf8')
+    ).pid
+  )
+
 describe('node-test-gate background run', () => {
+  after(async () => {
+    for (let i = 0; i < 100 && [...backgroundGroups].some(groupAlive); i++)
+      await sleep(50)
+    const survivors = [...backgroundGroups].filter(groupAlive)
+    for (const group of survivors) process.kill(-group, 'SIGKILL')
+    assert.deepEqual(
+      survivors,
+      [],
+      'a background suite outlived the tests that started it'
+    )
+  })
+
   const suitesOf = {
     good: ['passing.test.mjs', 'grouped.test.mjs'],
     empty: ['passing.test.mjs', 'empty.test.mjs'],
@@ -176,6 +238,7 @@ describe('node-test-gate background run', () => {
     )
   const startAndCollect = async (directory, env, suites) => {
     startBackgroundSuites(suites, { root: directory, manifest, cwd: directory, env })
+    trackStarted(suites[0], env)
     const logs = []
     try {
       return {
@@ -326,16 +389,7 @@ describe('node-test-gate background run', () => {
       const release = path.join(temp, 'release')
       fs.writeFileSync(
         path.join(directory, 'blocked.test.mjs'),
-        `import fs from 'node:fs'
-import { test } from 'node:test'
-test('waits for its release', async () => {
-  // Gives up when the test's temporary directory is gone, so a failed test leaks no process.
-  while (!fs.existsSync(${JSON.stringify(release)})) {
-    if (!fs.existsSync(${JSON.stringify(temp)})) throw new Error('released by cleanup')
-    await new Promise((done) => setTimeout(done, 25))
-  }
-})
-`
+        blockedSource({ release, temp, owner: process.pid })
       )
       const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
       const starter = `import { startBackgroundSuites } from ${JSON.stringify(pathToFileURL(path.join(repoRoot, 'scripts/ci/node-test-gate.mjs')).href)}
@@ -356,6 +410,7 @@ startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifes
         'the starting process did not exit on its own'
       )
       assert.equal(started.status, 0, started.stderr)
+      trackStarted('blocked', env)
       assert.equal(
         fs.existsSync(path.join(backgroundDirectory('blocked', env), 'status.json')),
         false,
@@ -370,6 +425,47 @@ startBackgroundSuites(['blocked'], { root: ${JSON.stringify(directory)}, manifes
         log: (line) => logs.push(line),
       })
       assert.equal(summaries.blocked.passed, 1)
+    }))
+
+  // A gate killed mid-test runs no cleanup: 15 h after one, its blocked suite was still waiting
+  // (PPID 1). The fixture must end with the process that started it, not with its directory.
+  test('a blocked background suite ends when the process that started it dies', () =>
+    temporary(async (temp) => {
+      const directory = path.join(temp, 'repo')
+      fs.mkdirSync(directory)
+      const owner = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], {
+        stdio: 'ignore',
+      })
+      let group
+      try {
+        fs.writeFileSync(
+          path.join(directory, 'blocked.test.mjs'),
+          blockedSource({ release: path.join(temp, 'release'), temp, owner: owner.pid })
+        )
+        const env = { ...process.env, RUNNER_TEMP: path.join(temp, 'runner') }
+        startBackgroundSuites(['blocked'], {
+          root: directory,
+          manifest: { suites: { blocked: ['blocked.test.mjs'] } },
+          cwd: directory,
+          env,
+        })
+        group = JSON.parse(
+          fs.readFileSync(
+            path.join(backgroundDirectory('blocked', env), 'started.json'),
+            'utf8'
+          )
+        ).pid
+        backgroundGroups.add(group)
+        // The suite file is running before its owner goes.
+        const events = path.join(backgroundDirectory('blocked', env), 'output.log')
+        for (let i = 0; i < 200 && !fs.existsSync(events); i++) await sleep(25)
+        owner.kill('SIGKILL')
+        for (let i = 0; i < 200 && groupAlive(group); i++) await sleep(50)
+        assert.equal(groupAlive(group), false, 'the background suite outlived its owner')
+      } finally {
+        owner.kill('SIGKILL')
+        if (group && groupAlive(group)) process.kill(-group, 'SIGKILL')
+      }
     }))
 
   test('start refuses an unknown suite before launching anything', () =>
