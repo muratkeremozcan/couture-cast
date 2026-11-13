@@ -470,6 +470,7 @@ function fakeGitHub({
   onMain = () => 'behind',
   deny = [],
   jobs = {},
+  jobTotals = {},
 }) {
   const posted = []
   const requested = []
@@ -519,7 +520,7 @@ function fakeGitHub({
       (match, query) => {
         const all = jobs[match[1]] ?? dispatchJobs()
         return reply({
-          total_count: all.length,
+          total_count: jobTotals[match[1]] ?? all.length,
           jobs: all.slice((query.page - 1) * 100, query.page * 100),
         })
       },
@@ -999,6 +1000,20 @@ describe('the evidence runs the pull_request_target job reads', () => {
       (await judgeEvent(fakeGitHub({ runs: [failed, passed] }))).state,
       'failure'
     )
+  })
+
+  // The jobs pages together hold fewer jobs than total_count says: a job the listing lost could
+  // be one that failed, so the judge fails closed.
+  test('a jobs listing shorter than its total_count fails', async () => {
+    const dispatched = run()
+    const result = await judgeEvent(
+      fakeGitHub({
+        runs: [dispatched],
+        jobTotals: { [dispatched.id]: dispatchJobs().length + 1 },
+      })
+    )
+    assert.equal(result.state, 'failure')
+    assert.match(result.detail, /could not be read/)
   })
 
   test('a read error on the jobs fails', async () => {

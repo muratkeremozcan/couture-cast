@@ -24,6 +24,7 @@ import {
   dispatchGate,
   passingRun,
   pushChanges,
+  runJobs,
   runJobsPassed,
 } from './ios-native-inputs.mjs'
 
@@ -147,6 +148,18 @@ describe('a passing iOS run on main for a commit', () => {
     )
   })
 
+  // The pages together hold fewer jobs than total_count: a lost job could be one that failed.
+  test('a jobs listing shorter than its total_count throws', async () => {
+    const { run, jobs } = passing('push')
+    const totals = { [run.id]: jobs[run.id].length + 1 }
+    const api = runsApi({ runs: [run], jobs, totals })
+    await assert.rejects(
+      runJobs({ repository: REPO, id: run.id, token: 't', fetchImpl: api.fetchImpl }),
+      new RegExp(`run ${run.id} listed ${jobs[run.id].length} of ${totals[run.id]} jobs`)
+    )
+    await assert.rejects(find([run], jobs, { totals }), /listed \d+ of \d+ jobs/)
+  })
+
   test('the newest passing run is the one named', async () => {
     const older = passing('push', { created_at: '2026-11-13T08:00:00Z' })
     const newer = passing('dispatch', { created_at: '2026-11-13T12:00:00Z' })
@@ -182,7 +195,12 @@ describe('a passing iOS run on main for a commit', () => {
   })
 })
 
-// Both callers run the iOS jobs unless a whole pass is found.
+// Both callers run the iOS jobs unless a whole pass is found: a passing run whose jobs listing is
+// shorter than its total_count is no whole pass.
+const shortListing = () => {
+  const { run, jobs } = passing('push')
+  return runsApi({ runs: [run], jobs, totals: { [run.id]: jobs[run.id].length + 1 } })
+}
 const env = { GITHUB_REPOSITORY: REPO, GITHUB_TOKEN: 'token', SHA }
 const quietly = async (t, body) => {
   const lines = []
@@ -229,6 +247,7 @@ describe('ios-dispatch-gate', () => {
         },
       }),
       runsApi({ runs: [stopped], deny: [/\/jobs$/] }),
+      shortListing(),
     ]
     for (const api of fixtures) {
       const { result } = await quietly(t, () =>
@@ -277,6 +296,7 @@ describe('the nightly decision', () => {
         },
       }),
       runsApi({ runs: [stopped], deny: [/\/runs$/] }),
+      shortListing(),
     ])
       assert.equal((await nightly(t, api)).result, true)
   })
