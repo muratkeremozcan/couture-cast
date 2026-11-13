@@ -1,8 +1,8 @@
 # Story 6.15 D6 and C-14: the iOS jobs (ios-native-jobs.yml) on main. A merge runs them when it
 # changed a native iOS input or JavaScript the Release bundle holds, and the nightly run covers
-# the rest. Both are trusted runs of main's own code,
-# so they keep the development client and native Supabase caches warm. A pull request's commit
-# runs them through ios-native-dispatch.yml, with a read-only cache.
+# the rest unless its commit already passed. Both are trusted runs of main's own code, so they
+# keep the development client and native Supabase caches warm. A pull request's commit runs them
+# through ios-native-dispatch.yml, with a read-only cache.
 name: iOS native
 run-name: iOS native ${{ github.sha }}
 
@@ -100,10 +100,15 @@ jobs:
   # A merge matches the push paths by name, and package-lock.json and package.json are shared by
   # every workspace, so this job reads what the merge changed in them and lets the iOS jobs run only
   # when it touched what apps/mobile installs (scripts/ci/ios-native-inputs.mjs). The nightly run
-  # always tests its commit.
+  # tests its commit unless an iOS run on main already passed on it: a merge or nightly run, or a
+  # dispatch naming it.
   ios-changes:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # actions: read lets the nightly run find a passing iOS run on its commit.
+    permissions:
+      actions: read
+      contents: read
     outputs:
       run: ${{ steps.changes.outputs.run }}
     steps:
@@ -122,6 +127,8 @@ jobs:
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/ci/ios-native-inputs.mjs push-changes
 
   # Only a run whose ios-changes decided run=true joins a group, so ios-changes itself runs

@@ -28,6 +28,7 @@ export const MACOS_JOBS = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-bui
 export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence']
 export const DECISION_JOB = 'ios-changes'
 export const PROBE_JOB = 'ios-cache-proof'
+export const GATE_JOB = 'ios-dispatch-gate'
 export const HARNESS_DIRECTORY = '_bmad-output/test-artifacts/story-6-8/runtime'
 export const EVIDENCE_PATH = `${HARNESS_DIRECTORY}/public-evidence/`
 export const IOS_CLIENT =
@@ -360,19 +361,25 @@ function pushJobProblems(push, check) {
   )
   const decision = jobs[DECISION_JOB]
   check(
-    decision?.['runs-on'] === 'ubuntu-latest' && decision?.['timeout-minutes'] === 5,
-    'ios-changes: a 5-minute Linux job'
+    decision?.['runs-on'] === 'ubuntu-latest' &&
+      decision?.['timeout-minutes'] === 5 &&
+      same(decision?.permissions, { actions: 'read', contents: 'read' }),
+    'ios-changes: a 5-minute Linux job with actions: read and contents: read only'
   )
   commitProblems(`ios-native.yml ${DECISION_JOB}`, decision, PUSH_COMMIT, check)
   const step = steps(decision).find((row) => row.id === 'changes')
   check(
     decision?.outputs?.run === '${{ steps.changes.outputs.run }}' &&
       step?.run === 'node scripts/ci/ios-native-inputs.mjs push-changes' &&
-      step.env?.EVENT === '${{ github.event_name }}' &&
-      step.env?.BEFORE === '${{ github.event.before }}' &&
+      same(step.env, {
+        EVENT: '${{ github.event_name }}',
+        BEFORE: '${{ github.event.before }}',
+        SHA: PUSH_COMMIT,
+        GITHUB_TOKEN: '${{ github.token }}',
+      }) &&
       step.if === undefined &&
       steps(decision).at(-1) === step,
-    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event and the commit before the merge'
+    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event, the commit before the merge, the commit and a token'
   )
 }
 
@@ -399,8 +406,8 @@ function dispatchProblems(dispatch, check) {
     'ios-native-dispatch.yml: cache-mode: read on the workflow and on every job, so no job can save a cache'
   )
   check(
-    same(Object.keys(jobs).sort(), ['ios-cache-proof', 'ios-native']),
-    'ios-native-dispatch.yml holds the jobs call and ios-cache-proof'
+    same(Object.keys(jobs).sort(), [PROBE_JOB, GATE_JOB, 'ios-native']),
+    'ios-native-dispatch.yml holds ios-dispatch-gate, the jobs call and ios-cache-proof'
   )
   const call = jobs['ios-native']
   check(
@@ -409,10 +416,55 @@ function dispatchProblems(dispatch, check) {
       same(call?.with, { sha: COMMIT }) &&
       call?.permissions === undefined &&
       call?.if === undefined &&
-      call?.needs === undefined,
-    'ios-native-dispatch.yml: call the jobs for inputs.sha with contents: read only'
+      call?.needs === GATE_JOB,
+    'ios-native-dispatch.yml: call the jobs for inputs.sha with contents: read only, after ios-dispatch-gate'
   )
+  check(
+    jobs[PROBE_JOB]?.needs === GATE_JOB && jobs[PROBE_JOB]?.if === undefined,
+    'ios-cache-proof runs after ios-dispatch-gate'
+  )
+  gateProblems(jobs[GATE_JOB], check)
   probeProblems(jobs[PROBE_JOB], check)
+}
+
+/** A 5-minute Linux job, first in the dispatch, with actions: read and contents: read only. */
+const gateJob = (gate) =>
+  gate?.['runs-on'] === 'ubuntu-latest' &&
+  gate?.['timeout-minutes'] === 5 &&
+  gate?.if === undefined &&
+  gate?.needs === undefined &&
+  same(gate?.permissions, { actions: 'read', contents: 'read' })
+
+/** main's rules: a checkout of the default branch without credentials, then Node. */
+const mainRules = ([checkout = {}, node = {}]) =>
+  String(checkout.uses).startsWith('actions/checkout@') &&
+  checkout.with?.ref === '${{ github.event.repository.default_branch }}' &&
+  checkout.with?.['persist-credentials'] === false &&
+  String(node.uses).startsWith('actions/setup-node@')
+
+/**
+ * ios-dispatch-gate fails a dispatch of a commit that already passed: main's rules from a sparse
+ * checkout, actions: read, and a last step that runs and can fail.
+ */
+function gateProblems(gate, check) {
+  const rows = steps(gate)
+  const decide = rows[2] ?? {}
+  check(
+    gateJob(gate) &&
+      rows.length === 3 &&
+      mainRules(rows) &&
+      decide.run === 'node scripts/ci/ios-native-inputs.mjs dispatch-gate' &&
+      same(decide.env, { GITHUB_TOKEN: '${{ github.token }}', SHA: COMMIT }),
+    "ios-dispatch-gate: main's sparse rules, actions: read and contents: read, then dispatch-gate for inputs.sha"
+  )
+  for (const row of rows)
+    check(
+      !disabledCondition(row.if) &&
+        row.if === undefined &&
+        row['continue-on-error'] === undefined &&
+        !neutralizedRun(row.run),
+      `ios-dispatch-gate: "${row.name ?? row.uses}" must run and be able to fail`
+    )
 }
 
 /** ios-cache-proof tries a save and a direct cache API write, and fails if either stored anything. */

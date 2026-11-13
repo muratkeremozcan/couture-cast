@@ -13,6 +13,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
+import { runsApi } from './fixtures/ios-runs-github.mjs'
 import { matchesAny, readWorkspaceDependencies, selectLanes } from './lanes.mjs'
 import {
   disabledCondition,
@@ -903,7 +904,7 @@ describe('the ios-changes job', () => {
       }
       throw new Error(`unexpected git ${args.join(' ')}`)
     }
-    const answer = await pushChanges({ env, run })
+    const answer = await pushChanges({ env, run, fetchImpl: runsApi().fetchImpl })
     return { answer, calls }
   }
   const sides = (after) => ({
@@ -911,6 +912,7 @@ describe('the ios-changes job', () => {
     after: { [LOCKFILE]: JSON.stringify(after), [ROOT_MANIFEST]: '{}' },
   })
 
+  // A nightly run with no passing run on its commit; ios-native-runs.test.mjs covers the rest.
   test('a dispatch or a nightly run always runs, without reading the diff', async () => {
     for (const EVENT of ['workflow_dispatch', 'schedule']) {
       const { answer, calls } = await decide({ EVENT, BEFORE: '' }, { files: [] })

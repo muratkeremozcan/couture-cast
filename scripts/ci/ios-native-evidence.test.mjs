@@ -70,6 +70,7 @@ const run = (patch = {}) => ({
   display_title: `iOS native ${head}`,
   head_sha: 'f'.repeat(40),
   fromMain: true,
+  jobsPassed: true,
   status: 'completed',
   conclusion: 'success',
   created_at: '2026-11-13T10:00:00Z',
@@ -468,6 +469,7 @@ function fakeGitHub({
   blobs = {},
   onMain = () => 'behind',
   deny = [],
+  jobs = {},
 }) {
   const posted = []
   const requested = []
@@ -511,6 +513,17 @@ function fakeGitHub({
       () => reply({ commit: { committer: { date: '2026-11-12T08:00:00Z' } } }),
     ],
     [/\/git\/ref\/heads\/main$/, () => reply({ object: { sha: MAIN_SHA } })],
+    // A run's jobs, 100 a page: a passing dispatch unless `jobs` names the run.
+    [
+      /\/actions\/runs\/(\d+)\/jobs$/,
+      (match, query) => {
+        const all = jobs[match[1]] ?? dispatchJobs()
+        return reply({
+          total_count: all.length,
+          jobs: all.slice((query.page - 1) * 100, query.page * 100),
+        })
+      },
+    ],
     [
       /\/git\/trees\/([0-9a-f]{40})$/,
       (match) =>
@@ -567,6 +580,22 @@ function fakeGitHub({
   }
   return { fetchImpl, posted, requested }
 }
+// The jobs of a dispatch whose every iOS job passed; ios-build is skipped on a dispatch.
+const dispatchJobs = (patch = {}) =>
+  [
+    'ios-dispatch-gate',
+    'ios-cache-proof',
+    'ios-native / ios-build',
+    'ios-native / ios-shard (1)',
+    'ios-native / ios-shard (2)',
+    'ios-native / ios-expo-go',
+    'ios-native / iOS app build',
+    'ios-native / ios-evidence',
+  ].map((name) => ({
+    name,
+    conclusion: name === 'ios-native / ios-build' ? 'skipped' : 'success',
+    ...patch[name],
+  }))
 const pullEvent = (sha = head) => ({
   pull_request: { number: 5, head: { sha }, base: { sha: BASE } },
 })
@@ -910,6 +939,73 @@ describe('native bindings read from the head commit and the merge base', () => {
 })
 
 describe('the evidence runs the pull_request_target job reads', () => {
+  // A dispatch can conclude success with jobs skipped; only one whose every iOS job passed counts,
+  // and a dispatch ios-dispatch-gate stopped is no one's evidence, so an earlier pass still
+  // decides.
+  test('a successful dispatch whose iOS jobs were skipped, cancelled or missing fails', async () => {
+    for (const patch of [
+      { 'ios-native / ios-shard (1)': { conclusion: 'skipped' } },
+      { 'ios-native / ios-expo-go': { conclusion: 'cancelled' } },
+      { 'ios-native / ios-evidence': { conclusion: 'skipped' } },
+      { 'ios-cache-proof': { conclusion: 'skipped' } },
+    ]) {
+      const dispatched = run()
+      const result = await judgeEvent(
+        fakeGitHub({ runs: [dispatched], jobs: { [dispatched.id]: dispatchJobs(patch) } })
+      )
+      assert.equal(result.state, 'failure', JSON.stringify(patch))
+      assert.match(result.detail, /an iOS job that did not pass/)
+    }
+    const empty = run()
+    const result = await judgeEvent(
+      fakeGitHub({ runs: [empty], jobs: { [empty.id]: [] } })
+    )
+    assert.equal(result.state, 'failure')
+  })
+
+  test('a dispatch the gate stopped passes over to the earlier pass, and alone is no evidence', async () => {
+    const passed = run({ created_at: '2026-11-13T09:00:00Z' })
+    const stopped = run({ created_at: '2026-11-13T11:00:00Z', conclusion: 'failure' })
+    const stoppedJobs = dispatchJobs(
+      Object.fromEntries(
+        [
+          'ios-dispatch-gate',
+          'ios-cache-proof',
+          'ios-native / ios-build',
+          'ios-native / ios-shard (1)',
+          'ios-native / ios-shard (2)',
+          'ios-native / ios-expo-go',
+          'ios-native / iOS app build',
+          'ios-native / ios-evidence',
+        ].map((name) => [
+          name,
+          { conclusion: name === 'ios-dispatch-gate' ? 'failure' : 'skipped' },
+        ])
+      )
+    )
+    const both = await judgeEvent(
+      fakeGitHub({ runs: [stopped, passed], jobs: { [stopped.id]: stoppedJobs } })
+    )
+    assert.equal(both.state, 'success', both.detail)
+    assert.ok(both.detail.includes(`run ${passed.id} `), both.detail)
+    const alone = await judgeEvent(
+      fakeGitHub({ runs: [stopped], jobs: { [stopped.id]: stoppedJobs } })
+    )
+    assert.equal(alone.state, 'failure')
+    assert.match(alone.detail, /no ios-native run tested/)
+    // A newer dispatch that failed on its own still decides.
+    const failed = run({ created_at: '2026-11-13T11:00:00Z', conclusion: 'failure' })
+    assert.equal(
+      (await judgeEvent(fakeGitHub({ runs: [failed, passed] }))).state,
+      'failure'
+    )
+  })
+
+  test('a read error on the jobs fails', async () => {
+    const result = await judgeEvent(fakeGitHub({ runs: [run()], deny: [/\/jobs$/] }))
+    assert.equal(result.state, 'failure')
+  })
+
   // Code review 5: the run's own commit must be on the branch main.
   test('a dispatch whose commit is not on refs/heads/main fails', async () => {
     for (const status of ['diverged', 'ahead']) {

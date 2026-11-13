@@ -2,7 +2,8 @@
 # Dispatch it from main with `sha` set to a pull request head commit; the run name carries that
 # commit, every job fails unless it checked out exactly that commit, and the pull request's
 # evidence status accepts only a successful run of this file, dispatched from main, whose name
-# carries the head commit (scripts/ci/ios-native-evidence.mjs).
+# carries the head commit (scripts/ci/ios-native-evidence.mjs). A dispatch of a commit that
+# already has a passing iOS run on main fails in ios-dispatch-gate, naming that run.
 #
 # A dispatch is a trusted trigger, so GitHub would grant it write access to main's cache scope,
 # while the jobs run code that has not merged. cache-mode: read, here and on each job, makes GitHub
@@ -32,7 +33,39 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # A commit that already has a passing iOS run on main needs no second one. This job fails the
+  # dispatch, naming that run, so a stopped dispatch never concludes success and the evidence
+  # judge passes over it. It runs main's rules from a sparse checkout, and a read error lets the
+  # dispatch run (scripts/ci/ios-native-inputs.mjs dispatch-gate).
+  ios-dispatch-gate:
+    cache-mode: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - name: Fetch main's iOS run rules
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            /.nvmrc
+            /scripts/ci/ios-native-inputs.mjs
+            /scripts/ci/lanes.mjs
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Stop when an iOS run on main already passed on this commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SHA: ${{ inputs.sha }}
+        run: node scripts/ci/ios-native-inputs.mjs dispatch-gate
+
   ios-native:
+    needs: ios-dispatch-gate
     cache-mode: read
     uses: ./.github/workflows/ios-native-jobs.yml
     with:
@@ -41,6 +74,7 @@ jobs:
   # Runs no repository code: it tries to store a cache entry two ways and fails the run if either
   # lands in main's scope.
   ios-cache-proof:
+    needs: ios-dispatch-gate
     cache-mode: read
     runs-on: ubuntu-latest
     timeout-minutes: 5

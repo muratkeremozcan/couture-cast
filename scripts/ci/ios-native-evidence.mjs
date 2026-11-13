@@ -26,6 +26,7 @@ import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
+  DISPATCH_GATE_JOB,
   IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
@@ -34,8 +35,11 @@ import {
   bindingCandidate,
   dependencyChanges,
   evidenceInputs,
+  githubApi as api,
   nativeIosChanges,
   pushPaths,
+  runJobs,
+  runJobsPassed,
 } from './ios-native-inputs.mjs'
 
 export const EVIDENCE_WORKFLOW = '.github/workflows/ios-native-evidence.yml'
@@ -276,32 +280,14 @@ export function evaluateEvidence({
       `${what}; ${where} (${latest.html_url}) ended ${latest.conclusion}`,
       `${where} ended ${latest.conclusion}: fix it and dispatch ios-native-dispatch.yml again`
     )
+  // A run can succeed with skipped jobs; only one whose every iOS job passed is evidence.
+  if (latest.jobsPassed !== true)
+    return verdict(
+      'failure',
+      `${what}; ${where} (${latest.html_url}) succeeded with an iOS job that did not pass`,
+      `${where} succeeded with an iOS job skipped or missing: dispatch ios-native-dispatch.yml again`
+    )
   return verdict('success', `${what}; ${where} (${latest.html_url}) passed on ${headSha}`)
-}
-
-async function api(
-  path,
-  { token, fetchImpl = fetch, method = 'GET', body, raw = false }
-) {
-  for (let attempt = 1; ; attempt++) {
-    const response = await fetchImpl(`https://api.github.com${path}`, {
-      method,
-      headers: {
-        accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
-        authorization: `Bearer ${token}`,
-        'x-github-api-version': '2022-11-28',
-        ...(body ? { 'content-type': 'application/json' } : {}),
-      },
-      ...(body ? { body: JSON.stringify(body) } : {}),
-      signal: AbortSignal.timeout(30_000),
-    })
-    if (response.ok)
-      return response.status === 204 ? null : raw ? response.text() : response.json()
-    if (raw && response.status === 404) return null
-    if (attempt >= 3 || ![429, 500, 502, 503, 504].includes(response.status))
-      throw new Error(`${method} ${path} answered ${response.status}`)
-    await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt))
-  }
 }
 
 /**
@@ -323,8 +309,7 @@ async function dispatchRuns({ repository, headSha, ...options }) {
     )
     const entries = body.workflow_runs ?? []
     runs.push(...entries)
-    if (entries.some((run) => dispatchedCommit(run) === headSha) || entries.length < 100)
-      return runs
+    if (entries.length < 100) return runs
   }
 }
 
@@ -339,12 +324,24 @@ async function onMain({ repository, sha, ...options }) {
 
 /** The newest dispatch of `headSha`, marked with whether it ran from refs/heads/main. */
 async function evidenceRuns(options) {
-  const runs = await dispatchRuns(options)
-  const [latest] = runs
+  const runs = (await dispatchRuns(options))
     .filter((run) => dispatchedCommit(run) === options.headSha)
     .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-  if (latest) latest.fromMain = await onMain({ ...options, sha: latest.head_sha })
-  return latest ? [latest] : []
+  for (const run of runs) {
+    if (run.status === 'completed') {
+      const jobs = await runJobs({ ...options, id: run.id })
+      // The dispatch gate stops a dispatch of a commit that already passed: that run is no one's
+      // evidence, and the earlier one still decides.
+      if (
+        jobs.some((job) => job.name === DISPATCH_GATE_JOB && job.conclusion !== 'success')
+      )
+        continue
+      run.jobsPassed = runJobsPassed(jobs, { dispatch: true })
+    }
+    run.fromMain = await onMain({ ...options, sha: run.head_sha })
+    return [run]
+  }
+  return []
 }
 
 /** A recursive git trees API listing, or null when it is missing or truncated. */

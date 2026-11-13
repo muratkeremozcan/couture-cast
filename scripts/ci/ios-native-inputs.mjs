@@ -35,17 +35,37 @@
 // helper tests that node-test-gate native-harness runs on the Linux pull request jobs, then the
 // first push run on main.
 //
-//   push-changes  (ios-changes job) writes run=true unless a merge to main changed no push path
-//                 (dependency files by their closure); every nightly run tests its commit.
+// It also answers one question both iOS workflows skip on (passingRun): has an iOS run on main
+// already passed on this commit? A merge or nightly run of ios-native.yml for the commit, or a
+// dispatch of ios-native-dispatch.yml naming it, counts when the run and every one of its jobs
+// succeeded. Both uses are skips, so a read error answers no and the iOS jobs run.
+//
+//   push-changes   (ios-changes job) writes run=true unless a merge to main changed no push path
+//                  (dependency files by their closure), or the nightly commit already passed.
+//   dispatch-gate  (ios-native-dispatch.yml) fails the dispatch, naming the run, when the commit
+//                  already passed, so a second run is never started and never reads as evidence.
 //
 // It imports Node built-ins and the lane map, which imports Node built-ins only, so it runs from a
-// sparse checkout with no install.
+// sparse checkout with no install, as ios-native-evidence.mjs and PR Gate's guard import it.
 import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { matchesAny } from './lanes.mjs'
 
 export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
+export const IOS_DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
+// The dispatch's first job: it stops a dispatch of a commit that already passed.
+export const DISPATCH_GATE_JOB = 'ios-dispatch-gate'
+// The jobs ios-native-jobs.yml runs, as the jobs API names them under the ios-native call
+// ("ios-native / ios-shard (2)" for a matrix job). ios-native-runs.test.mjs pins them to the file.
+export const IOS_RUN_JOBS = [
+  'ios-build',
+  'ios-shard',
+  'ios-expo-go',
+  'iOS app build',
+  'ios-evidence',
+]
+const CALL_PREFIX = 'ios-native / '
 // The jobs both iOS workflows call, whose root npm scripts an iOS run executes.
 export const IOS_JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const LOCKFILE = 'package-lock.json'
@@ -344,12 +364,194 @@ export function nativeIosChanges(files, inputs, dependencies = {}) {
 const git = (args) =>
   execFileSync('git', args, { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 })
 
-/** The ios-changes job: run=true unless a merge to main changed no native iOS input. */
-export async function pushChanges({ env = process.env, run = git } = {}) {
+/** One GitHub API call, retried on 429 and 5xx; with `raw`, a 404 answers null. */
+export async function githubApi(
+  path,
+  { token, fetchImpl = fetch, method = 'GET', body, raw = false }
+) {
+  for (let attempt = 1; ; attempt++) {
+    const response = await fetchImpl(`https://api.github.com${path}`, {
+      method,
+      headers: {
+        accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json',
+        authorization: `Bearer ${token}`,
+        'x-github-api-version': '2022-11-28',
+        ...(body ? { 'content-type': 'application/json' } : {}),
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+      signal: AbortSignal.timeout(30_000),
+    })
+    if (response.ok)
+      return response.status === 204 ? null : raw ? response.text() : response.json()
+    if (raw && response.status === 404) return null
+    if (attempt >= 3 || ![429, 500, 502, 503, 504].includes(response.status))
+      throw new Error(`${method} ${path} answered ${response.status}`)
+    await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt))
+  }
+}
+
+/** Every job of one run, the latest attempt of each, read page by page. */
+export async function runJobs({ repository, id, ...options }) {
+  const jobs = []
+  for (let page = 1; ; page++) {
+    const body = await githubApi(
+      `/repos/${repository}/actions/runs/${id}/jobs?filter=latest&per_page=100&page=${page}`,
+      options
+    )
+    const entries = body?.jobs ?? []
+    jobs.push(...entries)
+    if (entries.length < 100) {
+      if (Number.isInteger(body?.total_count) && jobs.length !== body.total_count)
+        throw new Error(`run ${id} listed ${jobs.length} of ${body.total_count} jobs`)
+      return jobs
+    }
+  }
+}
+
+/**
+ * Whether every job of a completed iOS run passed, each iOS job among them: a skipped, cancelled
+ * or failed job never counts. A dispatch skips ios-build by design, since each consumer builds
+ * its own client.
+ */
+export function runJobsPassed(jobs, { dispatch = false } = {}) {
+  const called = (job) => String(job?.name ?? '').startsWith(CALL_PREFIX)
+  const base = (job) =>
+    String(job.name)
+      .slice(CALL_PREFIX.length)
+      .replace(/ \(.*\)$/, '')
+  const passed = (job) =>
+    job?.conclusion === 'success' ||
+    (dispatch && called(job) && base(job) === 'ios-build' && job.conclusion === 'skipped')
+  return (
+    jobs.length > 0 &&
+    jobs.every(passed) &&
+    IOS_RUN_JOBS.every((name) => jobs.some((job) => called(job) && base(job) === name))
+  )
+}
+
+/** Every run one workflow runs listing returns, page by page. */
+async function listRuns(path, options) {
+  const runs = []
+  for (let page = 1; ; page++) {
+    const body = await githubApi(`${path}&per_page=100&page=${page}`, options)
+    const entries = body?.workflow_runs ?? []
+    runs.push(...entries)
+    if (entries.length < 100) return runs
+  }
+}
+
+/**
+ * The newest passing iOS run on main for commit `sha`, or null: a push or schedule run of
+ * ios-native.yml whose commit is `sha`, or a dispatch of ios-native-dispatch.yml from main named
+ * "iOS native <sha>", from this repository, concluded success, with every job passed
+ * (runJobsPassed). A push run that ios-changes stopped has no iOS job, so it never counts. A read
+ * error throws; each caller then runs the iOS jobs.
+ */
+export async function passingRun({ repository, sha, ...options }) {
+  if (!COMMIT.test(sha ?? '')) return null
+  const ours = (run) =>
+    run?.head_branch === 'main' &&
+    run?.head_repository?.full_name === repository &&
+    run?.status === 'completed' &&
+    run?.conclusion === 'success'
+  const pushed = await listRuns(
+    `/repos/${repository}/actions/workflows/ios-native.yml/runs?head_sha=${sha}&status=success`,
+    options
+  )
+  const commit = await githubApi(`/repos/${repository}/commits/${sha}`, options)
+  const date = Date.parse(commit?.commit?.committer?.date ?? '')
+  if (!Number.isFinite(date)) throw new Error(`the commit ${sha} has no date`)
+  const since = new Date(date - 86_400_000).toISOString().slice(0, 10)
+  const dispatched = await listRuns(
+    `/repos/${repository}/actions/workflows/ios-native-dispatch.yml/runs?event=workflow_dispatch&branch=main&status=success&created=${encodeURIComponent(`>=${since}`)}`,
+    options
+  )
+  const candidates = [
+    ...pushed.filter(
+      (run) =>
+        ours(run) &&
+        run.path === IOS_NATIVE_WORKFLOW &&
+        ['push', 'schedule'].includes(run.event) &&
+        run.head_sha === sha
+    ),
+    ...dispatched.filter(
+      (run) =>
+        ours(run) &&
+        run.path === IOS_DISPATCH_WORKFLOW &&
+        run.event === 'workflow_dispatch' &&
+        run.display_title === `iOS native ${sha}`
+    ),
+  ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+  for (const run of candidates) {
+    const jobs = await runJobs({ ...options, repository, id: run.id })
+    if (runJobsPassed(jobs, { dispatch: run.event === 'workflow_dispatch' })) return run
+  }
+  return null
+}
+
+/**
+ * ios-native-dispatch.yml's first job: false, which fails the dispatch, when an iOS run on main
+ * already passed on the commit; true otherwise, a read error included.
+ */
+export async function dispatchGate({ env = process.env, fetchImpl } = {}) {
+  const sha = env.SHA ?? ''
+  let passed
+  try {
+    passed = await passingRun({
+      repository: env.GITHUB_REPOSITORY,
+      sha,
+      token: env.GITHUB_TOKEN,
+      fetchImpl,
+    })
+  } catch (error) {
+    console.log(
+      `::warning::Could not read the iOS runs of ${sha} (${error.message}); the dispatch runs.`
+    )
+    return true
+  }
+  if (!passed) {
+    console.log(`No iOS run on main passed on ${sha}; the dispatch runs.`)
+    return true
+  }
+  console.log(
+    `::error::iOS run ${passed.id} (${passed.html_url}) already passed on ${sha}, so this dispatch stops here; that run is the commit's iOS evidence.`
+  )
+  return false
+}
+
+/**
+ * The ios-changes job: run=true unless a merge to main changed no native iOS input, or the
+ * nightly commit already has a passing iOS run.
+ */
+export async function pushChanges({ env = process.env, run = git, fetchImpl } = {}) {
   const decide = (answer, why) => {
     console.log(why)
     if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `run=${answer}\n`)
     return answer
+  }
+  if (env.EVENT === 'schedule') {
+    try {
+      const passed = await passingRun({
+        repository: env.GITHUB_REPOSITORY,
+        sha: env.SHA,
+        token: env.GITHUB_TOKEN,
+        fetchImpl,
+      })
+      if (passed)
+        return decide(
+          false,
+          `iOS run ${passed.id} (${passed.html_url}) already passed on ${env.SHA}; the nightly run skips it.`
+        )
+      return decide(
+        true,
+        `No iOS run on main passed on ${env.SHA}; the nightly run tests it.`
+      )
+    } catch (error) {
+      return decide(
+        true,
+        `Could not read the iOS runs of ${env.SHA} (${error.message}); the nightly run tests it.`
+      )
+    }
   }
   if (env.EVENT !== 'push') return decide(true, `A ${env.EVENT} run tests its commit.`)
   const before = env.BEFORE ?? ''
@@ -389,8 +591,10 @@ export async function pushChanges({ env = process.env, run = git } = {}) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === realpathSync(process.argv[1])) {
   if (process.argv[2] === 'push-changes') await pushChanges()
-  else {
-    console.error('usage: ios-native-inputs.mjs push-changes')
+  else if (process.argv[2] === 'dispatch-gate') {
+    if (!(await dispatchGate())) process.exitCode = 1
+  } else {
+    console.error('usage: ios-native-inputs.mjs push-changes | dispatch-gate')
     process.exitCode = 2
   }
 }

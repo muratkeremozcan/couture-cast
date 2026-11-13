@@ -324,9 +324,108 @@ describe('ios-native workflows validator', () => {
   )
 
   // IOS-01: ios-cache-proof stands for the read-only token on every dispatch.
-  rejected('no cache proof', /holds the jobs call and ios-cache-proof/, (_, files) => {
-    delete files[D].jobs['ios-cache-proof']
+  describe('ios-dispatch-gate and ios-changes reads', () => {
+    // ios-dispatch-gate stops a dispatch of a commit that already passed, before any iOS job.
+    for (const [title, change] of [
+      ['no dispatch gate', (files) => delete files[D].jobs['ios-dispatch-gate']],
+      [
+        'a jobs call that skips the gate',
+        (files) => delete files[D].jobs['ios-native'].needs,
+      ],
+    ])
+      rejected(title, /ios-dispatch-gate/, (_, files) => change(files))
+    rejected(
+      'a cache proof that skips the gate',
+      /ios-cache-proof runs after ios-dispatch-gate/,
+      (_, files) => {
+        delete files[D].jobs['ios-cache-proof'].needs
+      }
+    )
+    const gate = (files) => files[D].jobs['ios-dispatch-gate']
+    for (const [title, change] of [
+      [
+        'a gate that checks out the commit',
+        (files) => {
+          gate(files).steps[0].with.ref = '${{ inputs.sha }}'
+        },
+      ],
+      [
+        'a gate for another commit',
+        (files) => {
+          gate(files).steps[2].env.SHA = '${{ github.sha }}'
+        },
+      ],
+      [
+        'a gate with write access',
+        (files) => {
+          gate(files).permissions.actions = 'write'
+        },
+      ],
+      [
+        'a gate that runs another mode',
+        (files) => {
+          gate(files).steps[2].run = 'node scripts/ci/ios-native-inputs.mjs push-changes'
+        },
+      ],
+    ])
+      rejected(title, /ios-dispatch-gate: main's sparse rules/, (_, files) =>
+        change(files)
+      )
+    for (const [title, change] of [
+      [
+        'a gate step that continues on error',
+        (files) => {
+          gate(files).steps[2]['continue-on-error'] = true
+        },
+      ],
+      [
+        'a disabled gate step',
+        (files) => {
+          gate(files).steps[2].if = 'false'
+        },
+      ],
+      [
+        'a gate step that swallows its failure',
+        (files) => {
+          gate(files).steps[2].run += ' || true'
+        },
+      ],
+    ])
+      rejected(
+        title,
+        /ios-dispatch-gate: ".+" must run and be able to fail/,
+        (_, files) => change(files)
+      )
+    for (const [title, change] of [
+      [
+        'ios-changes without actions: read',
+        (files) => {
+          delete files[P].jobs['ios-changes'].permissions
+        },
+      ],
+      [
+        'ios-changes with actions: write',
+        (files) => {
+          files[P].jobs['ios-changes'].permissions.actions = 'write'
+        },
+      ],
+    ])
+      rejected(
+        title,
+        /ios-changes: a 5-minute Linux job with actions: read/,
+        (_, files) => change(files)
+      )
+    rejected('ios-changes without its commit', /ios-changes: decide from/, (_, files) => {
+      delete step(files[P].jobs['ios-changes'], (row) => row.id === 'changes').env.SHA
+    })
   })
+  rejected(
+    'no cache proof',
+    /holds ios-dispatch-gate, the jobs call and ios-cache-proof/,
+    (_, files) => {
+      delete files[D].jobs['ios-cache-proof']
+    }
+  )
   rejected(
     'a cache proof that checks out the commit',
     /ios-cache-proof: actions: read only, no checkout/,
