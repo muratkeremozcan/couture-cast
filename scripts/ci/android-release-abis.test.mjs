@@ -10,6 +10,7 @@ import path from 'node:path'
 import { test } from 'node:test'
 import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
+import { spawnSync } from 'node:child_process'
 import { zipSync } from 'fflate'
 
 import {
@@ -261,4 +262,65 @@ test('an app config Expo cannot resolve fails closed', (t) => {
   const problems = configuredAbiProblems(root)
   assert.equal(problems.length, 1)
   assert.match(problems[0], /^the app config could not be resolved: /)
+})
+
+// P3-1 (Antigravity r8): the verdict comes from a minimal environment. The fixture is the real app
+// config. STORY68_NATIVE_TEST_BUILD=1 without local origins makes app.config.ts throw, so if it
+// reached the resolve, from the shell or from the repository's .env.local, the check would report
+// an unresolvable config.
+test("a developer's shell or .env.local cannot change the ABI verdict", (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-abis-env-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const mobile = path.join(root, 'apps/mobile')
+  fs.mkdirSync(mobile, { recursive: true })
+  for (const entry of [
+    'app.json',
+    'app.config.ts',
+    'package.json',
+    'plugins',
+    'targets',
+    'assets',
+  ])
+    fs.cpSync(path.join(repository, 'apps/mobile', entry), path.join(mobile, entry), {
+      recursive: true,
+    })
+  fs.symlinkSync(
+    path.join(repository, 'apps/mobile/node_modules'),
+    path.join(mobile, 'node_modules')
+  )
+  fs.symlinkSync(path.join(repository, 'node_modules'), path.join(root, 'node_modules'))
+  fs.writeFileSync(path.join(root, '.env.local'), 'STORY68_NATIVE_TEST_BUILD=1\n')
+
+  // The seed is real: an expo config that loads the env files fails on it.
+  const loaded = spawnSync(
+    process.execPath,
+    [
+      path.join(repository, 'node_modules/expo/bin/cli'),
+      'config',
+      '--json',
+      '--type',
+      'introspect',
+    ],
+    {
+      cwd: mobile,
+      encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH,
+        HOME: process.env.HOME,
+        NODE_ENV: 'production',
+        EXPO_OFFLINE: '1',
+        EXPO_NO_TELEMETRY: '1',
+      },
+    }
+  )
+  // (`expo config --json` exits 1 here and, piped, prints nothing.)
+  assert.equal(loaded.status, 1)
+
+  const ambient = process.env.STORY65_NATIVE_TEST_BUILD
+  process.env.STORY65_NATIVE_TEST_BUILD = '1'
+  t.after(() => {
+    if (ambient === undefined) delete process.env.STORY65_NATIVE_TEST_BUILD
+    else process.env.STORY65_NATIVE_TEST_BUILD = ambient
+  })
+  assert.deepEqual(configuredAbiProblems(root), [])
 })

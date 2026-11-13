@@ -9,8 +9,12 @@ const rootEnvFiles = [
   '.env',
 ]
 
-for (const file of rootEnvFiles) {
-  loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
+// scripts/lib/resolved-app-config.mjs sets COUTURE_CONFIG_NO_ENV_FILES so the release config its
+// checks judge cannot pick up a developer's .env.local.
+if (process.env.COUTURE_CONFIG_NO_ENV_FILES !== '1') {
+  for (const file of rootEnvFiles) {
+    loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
+  }
 }
 
 const story68Native = process.env.STORY68_NATIVE_TEST_BUILD === '1'

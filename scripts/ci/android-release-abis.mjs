@@ -17,15 +17,17 @@
 // resolves the app config as Expo does (`expo config --type introspect`, app.json through
 // app.config.ts with every plugin applied, under the production NODE_ENV of a release build), so
 // a narrowing from either file, a plugin's options or a gradle property a plugin writes is caught.
+// That resolve (scripts/lib/resolved-app-config.mjs) runs in a minimal environment with no env
+// files, so a developer's shell or .env.local cannot change the verdict.
 //
 // Usage: node scripts/ci/android-release-abis.mjs <app-release.aab | app-release.apk>...
-import { spawnSync } from 'node:child_process'
 import fs, { realpathSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import zlib from 'node:zlib'
 import { unzipSync } from 'fflate'
+import { resolvedAppConfig } from '../lib/resolved-app-config.mjs'
 
 export const SHIPPED_ABIS = ['arm64-v8a', 'armeabi-v7a', 'x86', 'x86_64']
 export const REQUIRED_LIBRARIES = [
@@ -404,46 +406,6 @@ function findKeys(value, keys, trail = []) {
 }
 
 const NARROWING_KEYS = ['buildArchs', 'reactNativeArchitectures', 'abiFilters']
-
-/**
- * The app config as Expo resolves it for a release prebuild, with the gradle properties every
- * plugin writes. It runs offline in about a second.
- */
-export function resolvedAppConfig(root) {
-  const mobile = path.join(root, 'apps/mobile')
-  const result = spawnSync(
-    process.execPath,
-    [
-      mobileRequire(root).resolve('expo/bin/cli'),
-      'config',
-      '--json',
-      '--type',
-      'introspect',
-    ],
-    {
-      cwd: mobile,
-      env: {
-        ...process.env,
-        NODE_ENV: 'production',
-        EXPO_OFFLINE: '1',
-        EXPO_NO_TELEMETRY: '1',
-      },
-      encoding: 'utf8',
-      maxBuffer: 64 * 1024 * 1024,
-    }
-  )
-  if (result.status !== 0)
-    return {
-      error:
-        `expo config exited ${result.status}: ` +
-        ((result.stderr || result.error?.message || '').trim().split('\n').at(-1) ?? ''),
-    }
-  try {
-    return { config: JSON.parse(result.stdout) }
-  } catch {
-    return { error: 'expo config printed no JSON' }
-  }
-}
 
 /** Narrowings in the resolved app config: plugin options, fields and plugin-written gradle properties. */
 function resolvedConfigProblems(root) {
