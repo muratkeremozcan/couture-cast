@@ -685,6 +685,90 @@ export function scheduleIosInFlowSample(
   }
 }
 
+/** Where a deadline-killed iOS flow's after-timeout hierarchy is kept, inside its Maestro output. */
+export const TIMEOUT_HIERARCHY_FILE = 'after-timeout-hierarchy.json'
+
+/**
+ * Story 6.15 (Codex RUNS-R3-01): a flow the deadline killed leaves no failed-step artifacts, so
+ * the screen at the kill was unknown. This reads the hierarchy once more through Maestro (its JVM
+ * and driver start took 37 to 59 s on the iOS 26.5 simulator, hence 120 s) and keeps it beside
+ * the flow's output. Returns the parsed hierarchy or null; never throws.
+ */
+export function captureIosTimeoutHierarchy({
+  maestroBinary,
+  device,
+  output,
+  spawn = spawnSync,
+  report = console.log,
+  timeoutMs = 120000,
+}) {
+  const began = Date.now()
+  let exitCode = null
+  try {
+    const result = spawn(maestroBinary, ['--device', device, 'hierarchy'], {
+      encoding: 'utf8',
+      timeout: timeoutMs,
+      killSignal: 'SIGKILL',
+      maxBuffer: 30 * 1024 * 1024,
+    })
+    exitCode = result.status ?? null
+    if (result.status !== 0) return null
+    const hierarchy = JSON.parse(result.stdout)
+    fs.writeFileSync(
+      path.join(output, TIMEOUT_HIERARCHY_FILE),
+      JSON.stringify(hierarchy),
+      {
+        mode: 0o600,
+      }
+    )
+    return hierarchy
+  } catch {
+    return null
+  } finally {
+    report(
+      JSON.stringify({
+        iosTimeoutHierarchy: { exitCode, durationMs: Math.max(0, Date.now() - began) },
+      })
+    )
+  }
+}
+
+/**
+ * Whether the app under test is a running process in the simulator, from launchd's list:
+ * `{ running, pid, lastExitStatus }`, `{ running: false }` when launchd has no such job, or null
+ * when the list could not be read. Only numbers leave here, never the label.
+ */
+export function readIosAppProcess({ device, appId, spawn = spawnSync }) {
+  try {
+    const result = spawn('xcrun', ['simctl', 'spawn', device, 'launchctl', 'list'], {
+      encoding: 'utf8',
+      timeout: 15000,
+      killSignal: 'SIGKILL',
+      maxBuffer: 8 * 1024 * 1024,
+    })
+    if (result.status !== 0) return null
+    const row = String(result.stdout)
+      .split('\n')
+      .map((line) => line.split('\t'))
+      .find(
+        (fields) =>
+          fields.length >= 3 && fields[2].trim().startsWith(`UIKitApplication:${appId}[`)
+      )
+    if (!row) return { running: false }
+    const pid = /^\d+$/.test(row[0].trim()) ? Number(row[0].trim()) : null
+    const status = /^-?\d+$/.test(row[1].trim()) ? Number(row[1].trim()) : null
+    return { running: pid !== null, pid, lastExitStatus: status }
+  } catch {
+    return null
+  }
+}
+
+const hierarchySource = (failedStep, timeoutHierarchy) =>
+  failedStep ? 'failed-step' : timeoutHierarchy ? 'after-timeout' : null
+const orTimeout = (failedStep, timeoutHierarchy) => failedStep ?? timeoutHierarchy
+const appProcessOf = ({ device, appId, spawn }) =>
+  device && appId ? readIosAppProcess({ device, appId, spawn }) : null
+
 /** Append a failed flow's progress to the run's receipt (nonfatal, iOS only). */
 export function recordIosFlowProgress({
   platform,
@@ -698,6 +782,7 @@ export function recordIosFlowProgress({
   root = process.cwd(),
   device = null,
   appId = null,
+  timeoutHierarchy = null,
   spawn = spawnSync,
   report = console.log,
 }) {
@@ -709,12 +794,16 @@ export function recordIosFlowProgress({
     const hostSampled = output
       ? recordIosHostSample('flow-failure', { root, spawn, report })
       : false
-    const hierarchy = output ? failedStepHierarchy(output) : null
+    // A deadline kill leaves no failed step, so the after-timeout read stands in for it.
+    const failedStep = output ? failedStepHierarchy(output) : null
+    const hierarchy = orTimeout(failedStep, timeoutHierarchy)
     const geometry = openerGeometry(hierarchy)
     if (geometry?.centreCoveredBy) report(JSON.stringify({ openerObstructed: geometry }))
     const entry = {
       flow,
       hostSampled,
+      hierarchySource: hierarchySource(failedStep, timeoutHierarchy),
+      appProcess: appProcessOf({ device, appId, spawn }),
       systemSurface: systemSurfaceSummary(hierarchy),
       inputSurface: inputSurface(hierarchy),
       ...expoGoScreen(appId, hierarchy),

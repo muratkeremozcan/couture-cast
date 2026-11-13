@@ -8,6 +8,9 @@ import {
   shareCardApiRows,
   recordIosCommandTimings,
   recordIosFlowProgress,
+  captureIosTimeoutHierarchy,
+  readIosAppProcess,
+  TIMEOUT_HIERARCHY_FILE,
   openerGeometry,
   expoGoScreenSummary,
   readIosAppLogSummary,
@@ -988,4 +991,142 @@ test('a zero threshold keeps every command of the flow', (t) => {
       ['assertConditionCommand', 700],
     ]
   )
+})
+
+// Story 6.15 (Codex RUNS-R3-01): a deadline kill leaves no failed-step artifacts, so the screen
+// and the app process at the kill are read after it.
+test('an iOS deadline kill reads the hierarchy once more and keeps it beside the flow output', (t) => {
+  const output = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-timeout-hierarchy-'))
+  t.after(() => fs.rmSync(output, { recursive: true, force: true }))
+  const reports = []
+  const calls = []
+  const hierarchy = {
+    attributes: {},
+    children: [{ attributes: { resource_id: 'tab-home' } }],
+  }
+  const read = captureIosTimeoutHierarchy({
+    maestroBinary: '/owned/maestro',
+    device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+    output,
+    spawn: (binary, args, options) => {
+      calls.push({ binary, args, options })
+      return { status: 0, stdout: JSON.stringify(hierarchy) }
+    },
+    report: (line) => reports.push(JSON.parse(line)),
+  })
+  assert.deepEqual(read, hierarchy)
+  assert.deepEqual(calls[0].args, [
+    '--device',
+    'AFA0777F-372A-445A-B8D4-08C287947144',
+    'hierarchy',
+  ])
+  assert.equal(calls[0].options.timeout, 120000)
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(path.join(output, TIMEOUT_HIERARCHY_FILE), 'utf8')),
+    hierarchy
+  )
+  assert.equal(reports[0].iosTimeoutHierarchy.exitCode, 0)
+  // A failed or unparsable read keeps nothing and never throws.
+  for (const result of [
+    { status: 1, stdout: '' },
+    { status: 0, stdout: 'not json' },
+  ]) {
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-timeout-hierarchy-'))
+    t.after(() => fs.rmSync(empty, { recursive: true, force: true }))
+    assert.equal(
+      captureIosTimeoutHierarchy({
+        maestroBinary: '/owned/maestro',
+        device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+        output: empty,
+        spawn: () => result,
+        report: () => undefined,
+      }),
+      null
+    )
+    assert.equal(fs.existsSync(path.join(empty, TIMEOUT_HIERARCHY_FILE)), false)
+  }
+})
+
+test('the app process comes from launchd as numbers only', () => {
+  const list = (rows) => () => ({
+    status: 0,
+    stdout: ['PID\tStatus\tLabel', ...rows].join('\n'),
+  })
+  const appId = 'com.couturecast.story68'
+  assert.deepEqual(
+    readIosAppProcess({
+      device: 'D',
+      appId,
+      spawn: list([
+        `4242\t0\tUIKitApplication:${appId}[1a2b][rb-legacy]`,
+        '-\t0\tcom.apple.x',
+      ]),
+    }),
+    { running: true, pid: 4242, lastExitStatus: 0 }
+  )
+  assert.deepEqual(
+    readIosAppProcess({
+      device: 'D',
+      appId,
+      spawn: list([`-\t-9\tUIKitApplication:${appId}[1a2b][rb-legacy]`]),
+    }),
+    { running: false, pid: null, lastExitStatus: -9 }
+  )
+  assert.deepEqual(
+    readIosAppProcess({
+      device: 'D',
+      appId,
+      spawn: list([`1\t0\tUIKitApplication:${appId}.other[x]`]),
+    }),
+    { running: false }
+  )
+  assert.equal(
+    readIosAppProcess({ device: 'D', appId, spawn: () => ({ status: 1 }) }),
+    null
+  )
+})
+
+test('a killed flow falls back to the after-timeout hierarchy and records its source and the app process', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-progress-'))
+  const output = path.join(directory, 'maestro-ios-1')
+  fs.mkdirSync(output)
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const entry = recordIosFlowProgress({
+    platform: 'ios',
+    flow: 'maestro/story65/open-app.yaml',
+    maestroLog: '',
+    directory,
+    output,
+    device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+    appId: 'com.couturecast.story68',
+    timeoutHierarchy: {
+      attributes: {},
+      children: [{ attributes: { 'resource-id': 'breadcrumb' }, children: [] }],
+    },
+    spawn: (binary, args) =>
+      args.includes('launchctl')
+        ? { status: 0, stdout: 'PID\tStatus\tLabel\n-\t0\tcom.apple.x' }
+        : { status: 1, stdout: '' },
+    report: () => undefined,
+  })
+  assert.equal(entry.hierarchySource, 'after-timeout')
+  // The summaries read that hierarchy, not an empty failed step.
+  assert.equal(entry.systemSurface.nodeCount, 2)
+  assert.deepEqual(entry.appProcess, { running: false })
+})
+
+test('the runner reads the after-timeout hierarchy only for an iOS deadline kill and hands it on', () => {
+  const runner = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
+  const helper = runner.slice(runner.indexOf('function afterTimeoutHierarchy('))
+  assert.match(
+    helper,
+    /if \(platform !== 'ios' \|\| !result\.deadline\?\.timedOut\) return null\n\s+return captureIosTimeoutHierarchy\(\{ maestroBinary, device, output \}\)/
+  )
+  const body = runner.slice(runner.indexOf('function maestro('))
+  const read = body.indexOf(
+    'const timeoutHierarchy = afterTimeoutHierarchy(platform, result, output)'
+  )
+  const progress = body.indexOf('recordIosFlowProgress({\n      timeoutHierarchy,')
+  const diagnostics = body.indexOf('recordNativeFlowDiagnostics({')
+  assert.ok(read > 0 && progress > read && diagnostics > progress)
 })

@@ -93,6 +93,7 @@ function invokeMaestro(t, capture) {
     logSize: () => 0,
     recordIosFlowTiming: () => undefined,
     recordIosFlowProgress: () => undefined,
+    afterTimeoutHierarchy: () => null,
     scheduleIosInFlowSample: () => false,
     inMatrixSection: () => true,
     localesForShard: () => [...LOCALES],
@@ -273,6 +274,49 @@ describe('native flow diagnostics capture', () => {
   // Story 6.15: a deadline kill on the iOS 26.5 simulator leaves Maestro no failure artifacts, so
   // the after-failure screenshot and the app log are the only screen and app evidence; simctl
   // answered in seconds on that host, and the old 1.5 s limit killed both.
+  test('the capture child outlives its platform capture limit: 50 s on iOS, 15 s on Android', async () => {
+    const { recordNativeFlowDiagnostics } = await helper()
+    const timeouts = {}
+    for (const platform of ['ios', 'android'])
+      recordNativeFlowDiagnostics(
+        { platform },
+        {
+          execute: (binary, args, options) => {
+            timeouts[platform] = options.timeout
+            return { status: 0 }
+          },
+        }
+      )
+    assert.deepEqual(timeouts, { ios: 50000, android: 15000 })
+  })
+
+  test('an iOS deadline kill takes its screen from the after-timeout hierarchy', async (t) => {
+    const { collectNativeFlowDiagnostics } = await helper()
+    const directory = fixture(t)
+    const output = path.join(directory, 'maestro-current')
+    fs.mkdirSync(output)
+    fs.writeFileSync(
+      path.join(output, 'after-timeout-hierarchy.json'),
+      JSON.stringify(hierarchy)
+    )
+    const result = await collectNativeFlowDiagnostics(
+      {
+        ...context,
+        flow: 'maestro/story65/open-app.yaml',
+        platform: 'ios',
+        exitCode: 124,
+        root,
+        directory,
+        output,
+        device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+        startedAt: Date.now() - 240000,
+      },
+      { execute: () => ({ status: 1, stdout: '' }) }
+    )
+    assert.equal(result.captures.hierarchy, true)
+    assert.ok(result.screen.nodeCount > 0)
+  })
+
   test('an iOS failure gives each simctl capture 15 s and the whole capture 45 s; Android keeps 1.5 s and 10 s', async (t) => {
     const { collectNativeFlowDiagnostics, CAPTURE_LIMITS } = await helper()
     assert.deepEqual(CAPTURE_LIMITS, {

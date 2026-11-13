@@ -887,6 +887,13 @@ function captureSystem(input, call) {
   }
   return { system, logcat }
 }
+function afterTimeoutHierarchy(output) {
+  try {
+    return JSON.parse(textFile(path.join(output, 'after-timeout-hierarchy.json')))
+  } catch {
+    return undefined
+  }
+}
 export async function collectNativeFlowDiagnostics(input, { execute = spawnSync } = {}) {
   if (
     !['android', 'ios'].includes(input.platform) ||
@@ -904,7 +911,9 @@ export async function collectNativeFlowDiagnostics(input, { execute = spawnSync 
     privateDir = path.join(input.output, 'failure-private')
   fs.mkdirSync(privateDir, { mode: 0o700 })
   const artifacts = readArtifacts(input.output)
-  const { rows, hierarchy, log } = artifacts
+  const { rows, log } = artifacts
+  // A deadline kill leaves no failed-step hierarchy; the runner's after-timeout read stands in.
+  const hierarchy = artifacts.hierarchy ?? afterTimeoutHierarchy(input.output)
   let { screenshot } = artifacts
   const call = captureCall(input, execute, started, privateDir)
   screenshot = fallbackScreenshot(input, execute, privateDir, screenshot)
@@ -941,13 +950,14 @@ export async function collectNativeFlowDiagnostics(input, { execute = spawnSync 
   return value
 }
 /** Failure-only bounded child keeps normal flow and product deadlines unchanged. */
-export function recordNativeFlowDiagnostics(input) {
+export function recordNativeFlowDiagnostics(input, { execute = spawnSync } = {}) {
   try {
     return (
-      spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--capture'], {
+      execute(process.execPath, [fileURLToPath(import.meta.url), '--capture'], {
         input: JSON.stringify(input),
         encoding: 'utf8',
-        timeout: 15000,
+        // The child's whole capture plus its own start and write.
+        timeout: (CAPTURE_LIMITS[input.platform]?.totalMs ?? 10000) + 5000,
         killSignal: 'SIGKILL',
         maxBuffer: 4096,
       }).status === 0

@@ -35,6 +35,7 @@ import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
   recordIosFlowProgress,
+  captureIosTimeoutHierarchy,
   recordIosHostSample,
   scheduleIosInFlowSample,
   logSize,
@@ -198,6 +199,11 @@ function run(binary, args, env = {}, cwd = root, input) {
       `owned_command_failed:${path.basename(binary)}:${result.status}:${result.stderr.slice(-1500)}`
     )
   return result.stdout
+}
+/** The screen after an iOS deadline kill, which leaves no failed-step hierarchy; else null. */
+function afterTimeoutHierarchy(platform, result, output) {
+  if (platform !== 'ios' || !result.deadline?.timedOut) return null
+  return captureIosTimeoutHierarchy({ maestroBinary, device, output })
 }
 function requireDevice() {
   if (!device || !['android', 'ios'].includes(platform))
@@ -490,7 +496,10 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
   if (result.status !== 0 && !recoverSnapshot) {
+    // A deadline kill leaves no failed-step screen; read it once more while the device lives.
+    const timeoutHierarchy = afterTimeoutHierarchy(platform, result, output)
     recordIosFlowProgress({
+      timeoutHierarchy,
       platform,
       flow,
       maestroLog: snapshotLog,
