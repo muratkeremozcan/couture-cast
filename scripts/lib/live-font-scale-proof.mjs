@@ -201,17 +201,26 @@ function parity(live, cold, base, tolerance, earlier = []) {
   return { pass: compared > 0 && misses.length === 0, compared, misses }
 }
 
-/** A text box that leaves its parent view is clipped, whatever its own height says. */
-function clipping(capture, tolerance) {
+/**
+ * A text box that leaves its parent view is clipped, whatever its own height says. One box is
+ * exempt: a touch target centred on a shorter row (a 44 pt icon button on iOS), which overflows
+ * by the same amount above and below and kept its height from `base`, the capture at the base
+ * scale. Grown text that a fixed row centres overflows the same way, so a box that grew, or one
+ * `base` does not show, is never exempt.
+ */
+function clipping(capture, tolerance, base) {
+  const baseNodes = base ? keyed(base) : new Map()
   const clipped = []
-  for (const node of appNodes(capture)) {
+  for (const [key, node] of keyed(capture)) {
     if (node.parent === undefined) continue
     const [left, top, right, bottom] = parseBounds(node.bounds)
     const [pl, pt, pr, pb] = parseBounds(node.parent)
-    // A box that overflows its parent by the same amount above and below is a touch target
-    // centred on a shorter row (a 44 pt icon button on iOS); text that grows overflows below.
+    const before = baseNodes.get(key)
     const centred =
-      pt - top > tolerance && Math.abs(pt - top - (bottom - pb)) <= tolerance
+      before !== undefined &&
+      Math.abs(height(before) - (bottom - top)) <= tolerance &&
+      pt - top > tolerance &&
+      Math.abs(pt - top - (bottom - pb)) <= tolerance
     if (
       left < pl - tolerance ||
       right > pr + tolerance ||
@@ -389,7 +398,7 @@ export function evaluateLiveFontChange({
     ]),
     coldParity: parity(settled, cold, before, tolerance, earlier),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
-    clipping: clipping(settled, tolerance),
+    clipping: clipping(settled, tolerance, before),
     controls: controlsOnScreen(settled, requiredControls),
   }
   if (updated) {
@@ -415,7 +424,7 @@ export function evaluateLiveFontChange({
       ),
     }
     checks.postUpdateControls = controlsOnScreen(updated, requiredControls)
-    checks.postUpdateClipping = clipping(updated, tolerance)
+    checks.postUpdateClipping = clipping(updated, tolerance, before)
   }
   return { checks, verdict: classify(checks) }
 }
@@ -544,7 +553,7 @@ export function assertColdControl({ platform, androidApi, base, target, probes }
     fail('live_font_control_growth_probe_required')
   if (ratios.some(({ pass }) => !pass))
     fail('live_font_control_ratio_mismatch', JSON.stringify(ratios))
-  const clipped = clipping(target, HEIGHT_TOLERANCE[platform])
+  const clipped = clipping(target, HEIGHT_TOLERANCE[platform], base)
   if (!clipped.pass) fail('live_font_control_clipped', JSON.stringify(clipped.clipped))
   return { ratios }
 }

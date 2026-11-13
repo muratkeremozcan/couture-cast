@@ -373,14 +373,25 @@ describe('evaluateLiveFontChange', () => {
 
   test('a touch target centred over a shorter row is not clipped text', () => {
     // iOS: a 44 pt icon button (About CoutureCast) centred on a 38 pt header row overflows it by
-    // 3 pt above and below; text that grows past its parent overflows at the bottom.
+    // 3 pt above and below at every text size. The temperature keeps its height at 1.5 here.
     const change = fixedChange()
-    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
+    const node = change.settled.nodes.find((n) => n.id === 'current-temperature')
     const [left, top, right, bottom] = parseBounds(node.bounds)
     node.parent = `[${left},${top + 3}][${right},${bottom - 3}]`
     assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, true)
     node.parent = `[${left},${top}][${right},${bottom - 6}]`
     assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+  })
+
+  test('text that grew past a row that centres it is clipped (P2-1)', () => {
+    // Yoga centres the overflow of grown text equally above and below a fixed-height row.
+    const change = fixedChange()
+    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
+    const [left, top, right, bottom] = parseBounds(node.bounds)
+    node.parent = `[${left},${top + 6}][${right},${bottom - 6}]`
+    const { checks, verdict } = evaluateLiveFontChange(change)
+    assert.equal(checks.clipping.pass, false)
+    assert.notEqual(verdict, 'fixed')
   })
 
   test('a height that matches neither the base nor the cold layout is unexpected', () => {
