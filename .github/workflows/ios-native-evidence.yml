@@ -1,0 +1,79 @@
+# Story 6.15 D1, D6 and test design C-11: a pull request that changes a native iOS input merges
+# only with iOS evidence on its exact head commit, a successful ios-native.yml run dispatched from
+# main with `sha` set to that commit (scripts/ci/ios-native-evidence.mjs). The check runs on every
+# head; a new push needs a new dispatch. When a dispatch completes, rerun-evidence re-runs the
+# failed check of each open pull request whose head it tested, so the check turns green without a
+# new push. PR Gate requires the check like every other.
+name: iOS native evidence
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ['iOS native']
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-native-evidence-${{ github.event.pull_request.number || github.event.workflow_run.id }}
+  cancel-in-progress: true
+
+jobs:
+  ios-native-evidence:
+    name: iOS native evidence
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      # The base branch's copy of the check, so a pull request cannot loosen the check it must
+      # pass. The first pull request that adds it has no base copy and runs its own, with a warning.
+      - name: Checkout the base branch's evidence check
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          sparse-checkout: |
+            scripts/ci/ios-native-evidence.mjs
+            scripts/ci/lanes.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Fall back to this pull request's check when the base has none
+        if: hashFiles('scripts/ci/ios-native-evidence.mjs') == ''
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          echo "::warning::The base branch has no scripts/ci/ios-native-evidence.mjs yet; running this pull request's copy."
+          git fetch --depth=1 origin "$HEAD_SHA"
+          git restore --source=FETCH_HEAD -- scripts/ci/ios-native-evidence.mjs scripts/ci/lanes.mjs
+
+      - name: Require iOS evidence on the head commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/ios-native-evidence.mjs check
+
+  rerun-evidence:
+    name: Re-run the evidence check after a dispatch
+    if: github.event_name == 'workflow_run'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout the evidence check
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            scripts/ci/ios-native-evidence.mjs
+            scripts/ci/lanes.mjs
+          sparse-checkout-cone-mode: false
+
+      - name: Re-run the failed check of each pull request this dispatch tested
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/ios-native-evidence.mjs rerun

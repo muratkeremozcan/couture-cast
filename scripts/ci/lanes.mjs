@@ -313,7 +313,9 @@ export const LANES = {
   // and the Expo Go proof cannot fit the 15-minute queue plus run budget, so ios-native.yml runs
   // on main, nightly and by dispatch for one commit. A merge to main runs it only when one of
   // these native iOS inputs changed (its push filter is exactly this list); the nightly run covers
-  // the rest, JavaScript included, which the Android lanes gate on every pull request.
+  // the rest, JavaScript included, which the Android lanes gate on every pull request. A pull
+  // request that changes one of these inputs needs a dispatch on its head commit
+  // (scripts/ci/ios-native-evidence.mjs, ios-native-evidence.yml).
   'ios-native': {
     title: 'iOS native builds and journeys (main, nightly, dispatch)',
     workflow: 'ios-native.yml',
