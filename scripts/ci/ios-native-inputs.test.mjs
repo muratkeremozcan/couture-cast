@@ -7,7 +7,10 @@
 // count. A web-only bump skips; an API-only or packages/db bump skips while browser-acceptance
 // boots the same API on pull requests, which the pin below holds.
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import { readWorkspaceDependencies, selectLanes } from './lanes.mjs'
@@ -238,6 +241,33 @@ const SERVICE_EXITS = [
 ]
 
 /**
+ * Whether a report body fails with no owned service exit marker, with one for the API, one for
+ * auth, and with both. The body runs in a temporary directory that stands in for /tmp.
+ */
+function reportFails(run) {
+  const failed = {}
+  for (const [name, services] of Object.entries({
+    none: [],
+    api: ['api'],
+    auth: ['auth'],
+    both: ['api', 'auth'],
+  })) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-report-'))
+    try {
+      for (const service of services) {
+        fs.writeFileSync(path.join(dir, `cc68-${service}.exit`), '1\n')
+        fs.writeFileSync(path.join(dir, `cc68-${service}.log`), 'harmless\n')
+      }
+      const body = String(run).replaceAll('/tmp/', `${dir}/`)
+      failed[name] = spawnSync('bash', ['-e', '-c', body], { cwd: dir }).status !== 0
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  return failed
+}
+
+/**
  * A step body without the text its here-documents carry, which the shell reads as data, and
  * without their `<<` openers.
  */
@@ -292,7 +322,15 @@ function apiPinProblems(workflow) {
         index > serve.index &&
         row.if === 'always()' &&
         requiredLineProblems(run, SERVICE_EXITS).length === 0 &&
-        executedLines(run).some((entry) => entry.line === 'status=1')
+        executedLines(run).some((entry) => entry.line === 'status=1') &&
+        // IOS-R4-02: and it does: run with harmless exit markers, it fails for each service.
+        JSON.stringify(reportFails(row.run)) ===
+          JSON.stringify({
+            none: false,
+            api: true,
+            auth: true,
+            both: true,
+          })
     )
   )
     problems.push('no later step that always runs fails on the API exit status')
@@ -356,8 +394,26 @@ describe('the API pin', () => {
     'a job that continues on error': (job) =>
       Object.assign(job, { 'continue-on-error': true }),
     'no step that fails on the API exit status': edit('exit "$status"', 'exit 0'),
+    // IOS-R4-02: a report that resets its status before it exits keeps every structural line.
+    'a report that resets its status': edit('exit "$status"', 'status=0\nexit "$status"'),
     'a disabled exit status report': patch('exit "$status"', { if: false }),
   }
+  // IOS-R4-02: the real report body, run with harmless exit markers in a temporary directory in
+  // place of /tmp, exits 0 with no service exit and nonzero for each one.
+  test('the report step fails for each owned service that exited, and only then', () => {
+    const job = read().jobs['browser-acceptance']
+    const report = job.steps.find((row) =>
+      String(row.run ?? '').includes('exit "$status"')
+    )
+    assert.equal(report.if, 'always()')
+    assert.deepEqual(reportFails(report.run), {
+      none: false,
+      api: true,
+      auth: true,
+      both: true,
+    })
+  })
+
   for (const [name, mutate] of Object.entries(mutants))
     test(`${name} unpins the API`, () => {
       const workflow = read()

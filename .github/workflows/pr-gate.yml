@@ -86,8 +86,9 @@ jobs:
           fi
           echo "main at $(git rev-parse HEAD) has no iOS evidence guard yet; the pull request that adds it runs before it merges"
       # PR Gate's own verdict is already posted, so a guard step that failed, timed out or never ran
-      # turns the gate status on an open pull request's head to failure here. An unreadable pull
-      # request list still fails the gate.
+      # turns the gate status on an open pull request's head to failure here. It skips only when
+      # every page of the open pull requests was read and none has this head; an unreadable list
+      # fails the gate.
       - name: Fail the gate when the iOS evidence guard did not finish
         if: always() && steps.guard.outcome != 'success'
         env:
@@ -102,8 +103,10 @@ jobs:
             echo "::error::no head commit to fail the gate on ($HEAD_SHA)"
             exit 1
           fi
-          open=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/pulls" --jq '[.[] | select(.state == "open")] | length' || echo unknown)
-          if [ "$open" = 0 ]; then
+          if ! heads=$(gh api --paginate "repos/$GH_REPO/pulls?state=open&per_page=100" \
+            --jq ".[] | select(.head.sha == \"$HEAD_SHA\") | .number"); then
+            echo "::warning::the open pull requests could not be listed; failing the gate on $HEAD_SHA"
+          elif [ -z "$heads" ]; then
             echo "No open pull request has head $HEAD_SHA; no gate to fail."
             exit 0
           fi
