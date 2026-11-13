@@ -8,6 +8,7 @@ import { describe, test } from 'node:test'
 
 import {
   aggregateVerdict,
+  proposedBaselines,
   numericScale,
   runScreenJourney,
   SCALES,
@@ -231,6 +232,58 @@ describe('runScreenJourney', () => {
     assert.equal(result.legs[1].pass, false)
     assert.equal(result.legs[1].checks.identity.rootKept, false)
     assert.equal(aggregateVerdict([result], 'ios').pass, false)
+  })
+
+  // TEA, 2026-11-13: an unapproved known residual writes the entry a reviewer would approve.
+  test('an unapproved known-residual leg proposes its exact baseline entry', async () => {
+    const fake = fakeDevice('android', { breakAt: 'settled:1.5' })
+    const result = await run('android', fake, {
+      reactNativeVersion: '0.81.5',
+      label: 'sdk54-release',
+    })
+    const [leg, back] = result.legs
+    assert.equal(leg.error, 'live_font_residual_unapproved')
+    assert.equal(leg.verdict, 'known-residual')
+    assert.deepEqual(leg.residualProposal, {
+      platform: 'android',
+      build: 'sdk54-release',
+      screen: 'community',
+      from: '1',
+      to: '1.5',
+      staleIds: ['community-new-post-label'],
+      maxStaleMisses: 1,
+      review: {
+        verdict: 'known-residual',
+        structuralPass: true,
+        everyMissStale: true,
+        growthFailing: ['community-new-post-label'],
+        controlPass: true,
+      },
+    })
+    assert.equal(back.residualProposal, undefined)
+    const current = { about: 'reviewed', entries: [{ screen: 'home' }] }
+    const proposed = proposedBaselines(current, [result])
+    assert.equal(proposed.about, 'reviewed')
+    assert.deepEqual(proposed.entries[0], { screen: 'home' })
+    assert.deepEqual(proposed.entries[1], {
+      ...leg.residualProposal,
+      evidence: leg.evidence,
+    })
+    assert.equal(
+      proposedBaselines(current, [await run('android', fakeDevice('android'))]),
+      null
+    )
+    // The proposal, committed as the baseline, approves exactly that leg.
+    const approved = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5' }),
+      {
+        reactNativeVersion: '0.81.5',
+        label: 'sdk54-release',
+        residualBaselines: [leg.residualProposal],
+      }
+    )
+    assert.equal(approved.legs[0].pass, true)
   })
 
   test('a capture failure fails the run and reports the missing legs (F-13)', async () => {

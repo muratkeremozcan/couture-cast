@@ -555,6 +555,28 @@ function residualApproved(checks, baseline) {
 }
 
 /**
+ * TEA, 2026-11-13: what a reviewer needs to approve a known-residual leg, in the baseline entry's
+ * own shape. `staleIds` and `maxStaleMisses` are exact (no headroom), and the facts the six
+ * approval rules read ride beside them under `review`; the runner adds the leg's identity and
+ * evidence. Approval is then a reviewed diff of the baselines file.
+ */
+export function proposedResidualEntry(checks) {
+  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
+  return {
+    staleIds: [...new Set(misses.map(missId))].sort(),
+    maxStaleMisses: misses.length,
+    review: {
+      verdict: classify(checks),
+      structuralPass: !structural(checks),
+      everyMissStale: misses.length > 0 && misses.every((miss) => miss.stale),
+      growthFailing: checks.growth.probes
+        .filter((probe) => !probe.pass)
+        .map((probe) => probe.probe),
+    },
+  }
+}
+
+/**
  * The proof's pass rule. With the fix bundled the screen must relayout in place. Without it an
  * early correct relayout passes with `baselineReview` set, and a residual passes only within its
  * reviewed baseline; a restored screen or any other failure is red.

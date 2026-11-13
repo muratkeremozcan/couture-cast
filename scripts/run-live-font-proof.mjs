@@ -42,6 +42,7 @@ import {
 import {
   aggregateVerdict,
   numericScale,
+  proposedBaselines,
   runScreenJourney,
   SCALES,
   SCREENS,
@@ -556,12 +557,13 @@ async function proveConfigChange(name, kind) {
   }
 }
 
-const residualBaselines = JSON.parse(
+const residualBaselineFile = JSON.parse(
   fs.readFileSync(
     path.join(root, 'scripts/lib/fixtures/live-font-residual-baselines.json'),
     'utf8'
   )
-).entries
+)
+const residualBaselines = residualBaselineFile.entries
 const androidApi =
   platform === 'android'
     ? Number(adb('shell', 'getprop', 'ro.build.version.sdk').trim())
@@ -684,5 +686,15 @@ fs.writeFileSync(
     mode: 0o600,
   }
 )
+// Approval of a known residual is a reviewed diff: diff this file against
+// scripts/lib/fixtures/live-font-residual-baselines.json and commit only entries that meet the
+// six approval rules.
+const proposed = proposedBaselines(residualBaselineFile, results)
+if (proposed)
+  fs.writeFileSync(
+    path.join(out, 'live-font-residual-baselines.proposed.json'),
+    `${JSON.stringify(proposed, null, 2)}\n`,
+    { mode: 0o600 }
+  )
 console.log(JSON.stringify({ verdict, wallSeconds: report.wallSeconds }))
 process.exitCode = verdict.pass ? 0 : 1

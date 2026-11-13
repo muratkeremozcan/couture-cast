@@ -16,6 +16,7 @@ import {
   assertComposerControls,
   assertLiveFontProof,
   evaluateLiveFontChange,
+  proposedResidualEntry,
 } from './live-font-scale-proof.mjs'
 
 const TABS = ['tab-home', 'tab-community', 'tab-settings']
@@ -123,12 +124,15 @@ function judgeLeg({ platform, reactNativeVersion, residualBaseline, change }) {
     } catch {
       evaluated = {}
     }
-    return {
+    const leg = {
       pass: false,
       ...failure(error),
       verdict: evaluated.verdict ?? null,
       checks: evaluated.checks,
     }
+    if (leg.error === 'live_font_residual_unapproved' && leg.verdict === 'known-residual')
+      leg.residualProposal = proposedResidualEntry(evaluated.checks)
+    return leg
   }
 }
 
@@ -245,6 +249,20 @@ export async function runScreenJourney({
         if (!leg.composer.pass) leg.pass = false
       }
       leg.evidence = { before, immediate, settled, updated }
+      if (leg.residualProposal)
+        leg.residualProposal = {
+          platform,
+          build: label,
+          screen: name,
+          from: String(from),
+          to: String(to),
+          ...leg.residualProposal,
+          review: {
+            ...leg.residualProposal.review,
+            controlPass:
+              report.controls.length > 0 && report.controls.every((c) => c.pass),
+          },
+        }
       report.legs.push(leg)
       earlier.push(before, immediate, settled, updated)
       await io.revert()
@@ -294,4 +312,19 @@ export function screenRunSteps({ configChange, versionKnown }) {
     ...(versionKnown ? [] : ['read-version']),
     configChange ? 'config-change' : 'journey',
   ]
+}
+
+/**
+ * The baselines file a reviewer would commit to approve every unapproved known-residual leg of
+ * `results`: the current entries plus one proposal per leg, each with its evidence capture names.
+ * Null when no leg proposes one.
+ */
+export function proposedBaselines(current, results) {
+  const proposals = results.flatMap((result) =>
+    result.legs
+      .filter((leg) => leg.residualProposal)
+      .map((leg) => ({ ...leg.residualProposal, evidence: leg.evidence }))
+  )
+  if (proposals.length === 0) return null
+  return { ...current, entries: [...current.entries, ...proposals] }
 }
