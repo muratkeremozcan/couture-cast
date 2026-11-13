@@ -55,9 +55,21 @@ describe('failed audit test digest', () => {
 
   test('the runner prints the digest before it throws', () => {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
-    const print = source.indexOf('tests: failedAuditTestDigest(auditText)')
+    const print = source.indexOf('...xcodebuildFailureReport(auditText)')
     const thrown = source.indexOf("throw new Error('ios_accessibility_audit_failed')")
     assert.ok(print > 0 && print < thrown)
+    // A run with no failed test case still says why (dispatch 43393273500 shard 3 printed three
+    // empty arrays): the exit code and the xcresult counts sit beside the log tail.
+    const failure = source.slice(source.lastIndexOf('iosAuditFailure: {', print), print)
+    assert.match(failure, /exitCode: code,/)
+    assert.match(failure, /counts: closed\.counts,/)
+    // The failure screen is read through the run's own runner, never a bare hierarchy.
+    const after = source.slice(print, thrown)
+    assert.match(after, /const hierarchy = hierarchyOutput\(\)/)
+    assert.doesNotMatch(
+      after,
+      /run\(maestroBinary, \['--device', device, 'hierarchy'\]\)/
+    )
   })
 
   test('lists the audit issues the Swift handler refused, in order', () => {

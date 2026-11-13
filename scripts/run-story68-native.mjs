@@ -21,9 +21,7 @@ import {
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
-  failedAuditContext,
-  failedAuditIssues,
-  failedAuditTestDigest,
+  xcodebuildFailureReport,
 } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
@@ -1085,14 +1083,18 @@ if (command === 'prebuild') {
     if (code !== 0 || !closed.passed) {
       console.log(
         JSON.stringify({
+          // Story 6.15 (dispatch 43393273500 shard 3): a run with no failed test case printed
+          // three empty arrays, so the exit code, the xcresult counts and the log tail say why.
           iosAuditFailure: {
-            issues: failedAuditIssues(auditText),
-            context: failedAuditContext(auditText),
-            tests: failedAuditTestDigest(auditText),
+            exitCode: code,
+            counts: closed.counts,
+            failedTestIDs: closed.failedTestIDs,
+            ...xcodebuildFailureReport(auditText),
           },
         })
       )
-      const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
+      // Through the run's own XCUITest runner, never a bare second one (Codex RUNS-R4-01).
+      const hierarchy = hierarchyOutput()
       if (hierarchy.includes('share-card-title'))
         run('xcrun', [
           'simctl',
