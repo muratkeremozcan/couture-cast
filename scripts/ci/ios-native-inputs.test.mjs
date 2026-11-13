@@ -7,13 +7,13 @@
 // count. A web-only bump skips; an API-only or packages/db bump skips while browser-acceptance
 // boots the same API on pull requests, which the pin below holds.
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
-import { readWorkspaceDependencies, selectLanes } from './lanes.mjs'
+import { matchesAny, readWorkspaceDependencies, selectLanes } from './lanes.mjs'
 import {
   disabledCondition,
   executedLines,
@@ -25,6 +25,7 @@ import {
   IOS_NATIVE_WORKFLOW,
   LIFECYCLE_SCRIPTS,
   LOCKFILE,
+  PUSH_ONLY_PATHS,
   ROOT_MANIFEST,
   dependencyChanges,
   evidenceInputs,
@@ -265,6 +266,27 @@ function reportFails(run) {
     }
   }
   return failed
+}
+
+// C-14 B: the calls that bind JavaScript to a native module or view.
+const NATIVE_CALL =
+  /\b(requireNativeModule|requireOptionalNativeModule|requireNativeView|requireNativeViewManager|requireNativeComponent|NativeModules|TurboModuleRegistry)\b/
+const SOURCE = /^apps\/mobile\/.+\.(ts|tsx|js|jsx|cjs|mjs)$/
+const TEST_ONLY = /(\.(test|spec)\.[cm]?[jt]sx?$)|^apps\/mobile\/src\/test-utils\//
+
+/** The non-test source files under apps/mobile that call a native module. */
+function nativeCallers(files, read) {
+  return files
+    .filter((file) => SOURCE.test(file) && !TEST_ONLY.test(file))
+    .filter((file) => NATIVE_CALL.test(read(file) ?? ''))
+    .sort()
+}
+
+/** The native callers a pull request could change without a dispatch. */
+function nativeCallerProblems(files, read, evidence) {
+  return nativeCallers(files, read)
+    .filter((file) => !matchesAny(file, evidence))
+    .map((file) => `${file} calls a native module and is no evidence input`)
 }
 
 /**
@@ -639,6 +661,148 @@ describe('a native iOS change', () => {
   })
 })
 
+// C-14: a merge to main runs iOS for any JavaScript the Release bundle holds, while a pull request
+// needs a head-commit dispatch only for a native input, the JavaScript half of a native contract,
+// or the bundler configuration. Probe PR 218 changed apps/mobile/metro.config.js alone and passed
+// the evidence gate.
+describe('the push paths and the evidence inputs', () => {
+  const evidence = evidenceInputs(inputs)
+  const wakes = (file) => ({
+    push: matchesAny(file, inputs),
+    evidence: matchesAny(file, evidence),
+  })
+  const fixtures = {
+    'push only': [
+      'apps/mobile/app/(tabs)/index.tsx',
+      'apps/mobile/components/forecast-card.tsx',
+      'apps/mobile/src/hooks/use-forecast.ts',
+      'apps/mobile/src/screens/home.tsx',
+      'apps/mobile/src/lib/share-card-save.ts',
+      'packages/utils/src/index.ts',
+      'packages/utils/package.json',
+      'packages/config/tsconfig.json',
+    ],
+    both: [
+      'apps/mobile/modules/share-card-photo-save/index.native.ts',
+      'apps/mobile/modules/accessibility-focus/index.native.ts',
+      'apps/mobile/modules/modal-system-bars/index.native.ts',
+      'apps/mobile/modules/share-card-native-share/index.native.ts',
+      'apps/mobile/src/lib/share-card-save.native.ts',
+      'apps/mobile/src/lib/share-card-share.native.ts',
+      'apps/mobile/src/lib/widget-share.ts',
+      'apps/mobile/metro.config.js',
+      'apps/mobile/babel.config.cjs',
+      'apps/mobile/modules/share-card-photo-save/ios/ShareCardPhotoSaveModule.swift',
+      'apps/mobile/app.json',
+      'apps/mobile/package.json',
+    ],
+    neither: [
+      'packages/db/src/client.ts',
+      'packages/db/package.json',
+      'packages/db/prisma/schema.prisma',
+      'apps/mobile/src/lib/share-card-save.native.spec.ts',
+      'apps/mobile/src/hooks/use-forecast.test.tsx',
+      'apps/mobile/components/forecast-card.spec.tsx',
+      'packages/utils/src/index.test.ts',
+      'apps/mobile/README.md',
+      'packages/utils/README.md',
+      'apps/web/app/page.tsx',
+      'apps/api/src/main.ts',
+    ],
+  }
+  const expected = {
+    'push only': { push: true, evidence: false },
+    both: { push: true, evidence: true },
+    neither: { push: false, evidence: false },
+  }
+  for (const [name, files] of Object.entries(fixtures))
+    test(`${name}: ${files.length} fixtures`, () => {
+      for (const file of files) assert.deepEqual(wakes(file), expected[name], file)
+    })
+
+  test('the shared dependency files keep their lockfile closure rule on both', () => {
+    for (const globs of [inputs, evidence]) {
+      assert.deepEqual(
+        nativeIosChanges([LOCKFILE, ROOT_MANIFEST], globs, {
+          [LOCKFILE]: false,
+          [ROOT_MANIFEST]: false,
+        }),
+        []
+      )
+      assert.deepEqual(
+        nativeIosChanges([LOCKFILE, ROOT_MANIFEST], globs, {
+          [LOCKFILE]: true,
+          [ROOT_MANIFEST]: true,
+        }),
+        [LOCKFILE, ROOT_MANIFEST]
+      )
+    }
+  })
+
+  // C-14 C: whatever needs a dispatch on a pull request also runs iOS on its merge.
+  test('the push paths hold every evidence input, on every tracked file and fixture', () => {
+    const tracked = execFileSync('git', ['ls-files'], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    })
+      .split('\n')
+      .filter(Boolean)
+    const files = [...tracked, ...Object.values(fixtures).flat()]
+    assert.ok(tracked.length > 1000)
+    assert.deepEqual(
+      files.filter((file) => matchesAny(file, evidence) && !matchesAny(file, inputs)),
+      []
+    )
+    for (const glob of PUSH_ONLY_PATHS)
+      assert.ok(inputs.includes(glob), `the push paths miss ${glob}`)
+  })
+
+  // C-14 B: every file that binds a native module is an evidence input, so a new caller outside
+  // the set fails here before it can skip the dispatch.
+  test('every non-test caller of a native module under apps/mobile is an evidence input', () => {
+    const tracked = execFileSync('git', ['ls-files', 'apps/mobile'], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    })
+      .split('\n')
+      .filter(Boolean)
+    const read = (file) => fs.readFileSync(file, 'utf8')
+    const callers = nativeCallers(tracked, read)
+    assert.ok(callers.includes('apps/mobile/src/lib/widget-share.ts'), callers.join('\n'))
+    assert.ok(
+      callers.includes('apps/mobile/modules/share-card-photo-save/index.native.ts')
+    )
+    assert.deepEqual(nativeCallerProblems(tracked, read, evidence), [])
+  })
+
+  test('a new caller outside the evidence inputs fails the guard; tests and test helpers do not', () => {
+    const tree = {
+      'apps/mobile/src/lib/haptics.native.ts':
+        "import { requireNativeModule } from 'expo-modules-core'\nexport default requireNativeModule('Haptics')\n",
+      'apps/mobile/components/map-view.tsx':
+        "import { requireNativeView } from 'expo'\nexport const Map = requireNativeView('Map')\n",
+      'apps/mobile/src/lib/battery.ts':
+        "import { NativeModules } from 'react-native'\nexport const b = NativeModules.Battery\n",
+      'apps/mobile/src/lib/optional.ts':
+        "import { requireOptionalNativeModule } from 'expo-modules-core'\nrequireOptionalNativeModule('X')\n",
+      'apps/mobile/src/lib/haptics.test.ts': "requireNativeModule('Haptics')\n",
+      'apps/mobile/src/lib/haptics.spec.tsx': 'NativeModules.Battery\n',
+      'apps/mobile/src/test-utils/mocks/native.js': 'export const NativeModules = {}\n',
+      'apps/mobile/src/lib/plain.ts': 'export const nativeModulesCount = 1\n',
+      'apps/mobile/src/lib/widget-share.ts': 'NativeModules.WidgetSharedModule\n',
+    }
+    assert.deepEqual(
+      nativeCallerProblems(Object.keys(tree), (file) => tree[file], evidence),
+      [
+        'apps/mobile/components/map-view.tsx calls a native module and is no evidence input',
+        'apps/mobile/src/lib/battery.ts calls a native module and is no evidence input',
+        'apps/mobile/src/lib/haptics.native.ts calls a native module and is no evidence input',
+        'apps/mobile/src/lib/optional.ts calls a native module and is no evidence input',
+      ]
+    )
+  })
+})
+
 describe('the ios-changes job', () => {
   const before = 'b'.repeat(40)
   const decide = async (env, repo) => {
@@ -748,6 +912,33 @@ describe('the ios-changes job', () => {
         )
         assert.equal(answer, true, `${hook} ${name}`)
       }
+  })
+
+  // C-14: a merge of JavaScript the Release bundle holds runs them; a test, Markdown or
+  // packages/db merge does not.
+  test('a merge of mobile or shared package JavaScript alone runs them', async () => {
+    for (const file of [
+      'apps/mobile/src/hooks/use-forecast.ts',
+      'apps/mobile/metro.config.js',
+      'packages/utils/src/index.ts',
+    ]) {
+      const { answer } = await decide(
+        { EVENT: 'push', BEFORE: before },
+        { files: [file], ...sides(lock) }
+      )
+      assert.equal(answer, true, file)
+    }
+    for (const file of [
+      'apps/mobile/src/hooks/use-forecast.test.ts',
+      'apps/mobile/README.md',
+      'packages/db/src/client.ts',
+    ]) {
+      const { answer } = await decide(
+        { EVENT: 'push', BEFORE: before },
+        { files: [file], ...sides(lock) }
+      )
+      assert.equal(answer, false, file)
+    }
   })
 
   test('a merge with no earlier commit, or a diff that fails, runs them', async () => {

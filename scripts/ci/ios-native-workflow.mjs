@@ -17,6 +17,7 @@ import fs from 'node:fs'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { helperProblems } from './ios-native-helpers.mjs'
+import { PUSH_ONLY_PATHS } from './ios-native-inputs.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
 
 export const PUSH_WORKFLOW = '.github/workflows/ios-native.yml'
@@ -305,6 +306,12 @@ function pushProblems(push, check) {
       on.push.paths.includes(PUSH_WORKFLOW) &&
       on.push.paths.includes(JOBS_WORKFLOW),
     'ios-native runs on a merge to main, filtered by its native iOS inputs, its own file and the jobs'
+  )
+  // C-14: the JavaScript block leads the list, so the native entries after it keep their tests.
+  const paths = Array.isArray(on?.push?.paths) ? on.push.paths : []
+  check(
+    same(paths.slice(0, PUSH_ONLY_PATHS.length), PUSH_ONLY_PATHS),
+    'ios-native.yml: the push paths start with PUSH_ONLY_PATHS (scripts/ci/ios-native-inputs.mjs), so a JavaScript-only merge runs iOS'
   )
   const crons = [on?.schedule ?? []].flat().map((entry) => entry?.cron)
   check(

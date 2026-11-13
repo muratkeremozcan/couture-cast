@@ -1,8 +1,17 @@
 #!/usr/bin/env node
-// Story 6.15 D6 and SL-11: which changes are native iOS changes, the ones the iOS jobs must test
-// before a merge (scripts/ci/ios-native-evidence.mjs) and after (ios-native.yml's push trigger).
-// The list is the push paths of ios-native.yml. Two of them are shared with every workspace, so a
-// path match alone would send a web-only dependency bump through a 75-minute iOS run:
+// Story 6.15 D6, SL-11 and C-14: which changes the iOS jobs must test after a merge
+// (ios-native.yml's push trigger) and before it (scripts/ci/ios-native-evidence.mjs).
+//
+//   push paths       ios-native.yml's list: the native iOS inputs, and every file of apps/mobile
+//                    and packages/* the Release bundle can hold (PUSH_ONLY_PATHS), so a
+//                    JavaScript-only merge runs iOS on main.
+//   evidence inputs  what a pull request needs a head-commit dispatch for (evidenceInputs): the
+//                    push paths without PUSH_ONLY_PATHS and the workflow and action files, plus the
+//                    JavaScript half of each native contract and the bundler configuration
+//                    (EVIDENCE_JS_PATHS). Every evidence input is a push path.
+//
+// Two of the paths are shared with every workspace, so a path match alone would send a web-only
+// dependency bump through a 75-minute iOS run:
 //
 //   package-lock.json  counts when an entry it changed is one the iOS jobs install and run, which
 //                      the lockfile alone tells: the root dependencies and development tools
@@ -26,8 +35,8 @@
 // helper tests that node-test-gate native-harness runs on the Linux pull request jobs, then the
 // first push run on main.
 //
-//   push-changes  (ios-changes job) writes run=true unless a merge to main changed no native iOS
-//                 input; every nightly run tests its commit.
+//   push-changes  (ios-changes job) writes run=true unless a merge to main changed no push path
+//                 (dependency files by their closure); every nightly run tests its commit.
 //
 // It imports Node built-ins and the lane map, which imports Node built-ins only, so it runs from a
 // sparse checkout with no install.
@@ -42,6 +51,33 @@ export const IOS_JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const LOCKFILE = 'package-lock.json'
 export const ROOT_MANIFEST = 'package.json'
 export const MOBILE_WORKSPACE = 'apps/mobile'
+// The JavaScript of apps/mobile and the shared packages, minus packages/db, tests and Markdown: a
+// merge that changes it runs iOS, and a pull request that changes it needs no dispatch unless the
+// file is also an evidence input. It comes first in the push paths, so the native entries after
+// it still count their own tests (apps/mobile/native-tests).
+export const PUSH_ONLY_PATHS = [
+  'apps/mobile/**',
+  'packages/**',
+  '!packages/db/**',
+  '!apps/mobile/**/*.test.*',
+  '!apps/mobile/**/*.spec.*',
+  '!apps/mobile/**/*.md',
+  '!packages/**/*.test.*',
+  '!packages/**/*.spec.*',
+  '!packages/**/*.md',
+]
+// The JavaScript a pull request needs a dispatch for: each native module's JavaScript contract,
+// the callers that bind a native module (ios-native-inputs.test.mjs derives them from the tree
+// and fails on a caller outside this list), and the bundler configuration the iOS shards'
+// Release bundle is built with.
+export const EVIDENCE_JS_PATHS = [
+  'apps/mobile/modules/*/index.native.ts',
+  'apps/mobile/src/lib/share-card-save.native.ts',
+  'apps/mobile/src/lib/share-card-share.native.ts',
+  'apps/mobile/src/lib/widget-share.ts',
+  'apps/mobile/metro.config.js',
+  'apps/mobile/babel.config.cjs',
+]
 // The workspaces whose dependency changes skip iOS evidence (see the header).
 export const EVIDENCE_EXEMPT_WORKSPACES = ['apps/web', 'apps/api', 'packages/db']
 export const ROOT_FIELDS = [
@@ -252,11 +288,19 @@ export async function dependencyChanges(read, jobsText) {
 }
 
 /**
- * The native iOS inputs a pull request needs a dispatch for: the push paths without the workflow
- * and local action files, since a dispatch runs main's copy of the workflows and no local action.
+ * The inputs a pull request needs a dispatch for: the push paths without PUSH_ONLY_PATHS and
+ * without the workflow and local action files, since a dispatch runs main's copy of the workflows
+ * and no local action, then EVIDENCE_JS_PATHS.
  */
 export function evidenceInputs(inputs) {
-  return inputs.filter((glob) => !/^!?\.github\/(workflows|actions)\//.test(glob))
+  return [
+    ...inputs.filter(
+      (glob) =>
+        !PUSH_ONLY_PATHS.includes(glob) &&
+        !/^!?\.github\/(workflows|actions)\//.test(glob)
+    ),
+    ...EVIDENCE_JS_PATHS,
+  ]
 }
 
 /**

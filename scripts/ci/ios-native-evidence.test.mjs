@@ -120,6 +120,20 @@ describe('the iOS evidence a pull request head needs', () => {
     assert.equal(verdict([run()]).state, 'success')
   })
 
+  // C-14: probe PR 218 changed apps/mobile/metro.config.js alone and passed. The iOS shards build
+  // the Release bundle, so the bundler configuration needs the dispatch.
+  test('a metro.config.js-only change needs a dispatch of its head commit', async () => {
+    const github = fakeGitHub({ diff: ['apps/mobile/metro.config.js'] })
+    const result = await judgeEvent(github)
+    assert.equal(result.state, 'failure')
+    assert.match(result.detail, /apps\/mobile\/metro\.config\.js changed/)
+    const dispatched = fakeGitHub({
+      diff: ['apps/mobile/metro.config.js'],
+      runs: [run()],
+    })
+    assert.equal((await judgeEvent(dispatched)).state, 'success')
+  })
+
   test('a pull request that changes no native iOS input needs none', () => {
     const result = verdict(
       [],

@@ -114,6 +114,24 @@ describe('ios-native workflows validator', () => {
       onOf(files[P]).push.paths = onOf(files[P]).push.paths.filter((glob) => glob !== J)
     }
   )
+  // C-14: a JavaScript-only merge runs iOS only while the push paths start with that block.
+  rejected(
+    'push paths without apps/mobile/**',
+    /start with PUSH_ONLY_PATHS/,
+    (_, files) => {
+      onOf(files[P]).push.paths = onOf(files[P]).push.paths.filter(
+        (glob) => glob !== 'apps/mobile/**'
+      )
+    }
+  )
+  rejected(
+    'the JavaScript block after the native entries, so its test exclusions drop native tests',
+    /start with PUSH_ONLY_PATHS/,
+    (_, files) => {
+      const paths = onOf(files[P]).push.paths
+      onOf(files[P]).push.paths = [...paths.slice(9), ...paths.slice(0, 9)]
+    }
+  )
   rejected('no nightly run', /one nightly schedule/, (_, files) => {
     delete onOf(files[P]).schedule
   })
