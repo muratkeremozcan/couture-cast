@@ -619,7 +619,8 @@ const BASE_PAGES = 3
 
 /**
  * RUNS-02: the newest ancestor of `sha` whose merge or nightly run of ios-native.yml ran its iOS
- * jobs, whatever it concluded and in progress included, or null. A merge compares with it, so a
+ * jobs, in progress included, or null. A completed run that was cancelled, by hand or otherwise,
+ * never finished testing its change, so it is no base; one that failed is. A merge compares with it, so a
  * run that replaced a pending run in the group also tests that run's change. A read error throws.
  */
 export async function testedBase({ repository, sha, runId, ...options }) {
@@ -637,7 +638,8 @@ export async function testedBase({ repository, sha, runId, ...options }) {
           run.head_repository?.full_name === repository &&
           run.path === IOS_NATIVE_WORKFLOW &&
           ['push', 'schedule'].includes(run.event) &&
-          COMMIT.test(run.head_sha ?? '')
+          COMMIT.test(run.head_sha ?? '') &&
+          !(run.status === 'completed' && run.conclusion === 'cancelled')
       )
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
     for (const run of runs) {

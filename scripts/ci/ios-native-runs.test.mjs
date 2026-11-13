@@ -542,6 +542,27 @@ describe('the merge decision', () => {
     assert.equal(only.result, true)
   })
 
+  // A run cancelled by hand never finished testing its change, so it is no base; a run in
+  // progress still is one.
+  test('a cancelled run is no base: the decision goes back to the commit before it', async (t) => {
+    const a = tested(A, { created_at: '2026-11-13T08:00:00Z' })
+    const cancelled = tested(
+      B,
+      { created_at: '2026-11-13T09:00:00Z', conclusion: 'cancelled' },
+      { 'ios-native / ios-shard (2)': { conclusion: 'cancelled' } }
+    )
+    const { result, compared } = await merge(t, {
+      runs: [cancelled.run, a.run],
+      jobs: { ...a.jobs, ...cancelled.jobs },
+      diffs: {
+        [A]: ['apps/mobile/src/hooks/use-forecast.ts', 'docs/ci.md'],
+        [B]: ['docs/ci.md'],
+      },
+    })
+    assert.deepEqual(compared, [A])
+    assert.equal(result, true)
+  })
+
   // A re-run lists the iOS jobs its first attempt ran, so without its own exclusion it would be
   // its own, identical base and decide run=false.
   test('a re-run of a merge whose first attempt ran its iOS jobs is no base of itself', async (t) => {

@@ -107,7 +107,8 @@ concurrency:
 
 jobs:
   # A merge runs the iOS jobs when something changed since the newest ancestor a merge or nightly
-  # run tested, read from the runs, so a pending run that was replaced loses no change. Of
+  # run tested, read from the runs, so a pending run that was replaced, or a run cancelled by hand,
+  # loses no change. Of
   # package-lock.json and package.json, shared by every workspace, only what apps/mobile installs
   # counts (scripts/ci/ios-native-inputs.mjs). The nightly run tests its commit unless the
   # deciding iOS run on it, a merge or nightly run or a dispatch naming it, passed.
