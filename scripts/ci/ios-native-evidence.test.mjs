@@ -829,6 +829,21 @@ describe('native bindings read from the head commit and the merge base', () => {
       )
   })
 
+  // Each fixture breaks one condition and keeps the others valid, so each check is the one that
+  // fails it: the content is plain, whole base64 with a matching size unless the case says so.
+  const MIB = 1024 * 1024
+  const sized = (bytes, patch = {}) => ({
+    content: bytes.toString('base64'),
+    encoding: 'base64',
+    size: bytes.length,
+    ...patch,
+  })
+  const padded = (head, length) =>
+    Buffer.concat([
+      Buffer.from(head),
+      Buffer.alloc(length - Buffer.byteLength(head), 'a'),
+    ])
+
   test('a blob it cannot read whole fails closed', async () => {
     const base = [blob(screen, 'plain1')]
     const headTree = [blob(screen, 'plain2')]
@@ -837,32 +852,29 @@ describe('native bindings read from the head commit and the merge base', () => {
       ['a 403', { deny: [/\/git\/blobs\//] }],
       [
         'a short read',
-        {
-          blobs: {
-            plain2: {
-              content: bytes.subarray(0, 5).toString('base64'),
-              encoding: 'base64',
-              size: bytes.length,
-            },
-          },
-        },
+        { blobs: { plain2: sized(bytes.subarray(0, 5), { size: bytes.length }) } },
       ],
-      [
-        'an oversized blob',
-        { blobs: { plain2: { content: '', encoding: 'none', size: 50_000_000 } } },
-      ],
-      [
-        'another encoding',
-        {
-          blobs: {
-            plain2: { content: texts.plain2, encoding: 'utf-8', size: bytes.length },
-          },
-        },
-      ],
+      ['a blob over 1 MiB', { blobs: { plain2: sized(padded('// ', MIB + 1)) } }],
+      ['another encoding', { blobs: { plain2: sized(bytes, { encoding: 'utf-8' }) } }],
     ]) {
       const result = await judged(base, headTree, extra)
       assert.equal(result.state, 'failure', name)
+      assert.match(result.detail, /could not (all )?be read/, name)
     }
+  })
+
+  test('a blob of exactly 1 MiB is read: plain passes, a binding needs a dispatch', async () => {
+    const base = [blob(screen, 'plain1')]
+    const headTree = [blob(screen, 'plain2')]
+    const plain = await judged(base, headTree, {
+      blobs: { plain2: sized(padded('// ', MIB)) },
+    })
+    assert.equal(plain.state, 'success', plain.detail)
+    const bound = await judged(base, headTree, {
+      blobs: { plain2: sized(padded('NativeModules.B\n// ', MIB)) },
+    })
+    assert.equal(bound.state, 'failure')
+    assert.ok(bound.detail.includes(`${screen} changed`), bound.detail)
   })
 })
 
