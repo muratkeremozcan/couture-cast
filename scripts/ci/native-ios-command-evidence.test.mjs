@@ -192,10 +192,10 @@ test('apsd is stopped only after the accepted level change fails to quiet diagno
 test('quiet services are stopped by exact listed label, only when owned by the simulator manager', () => {
   const quietPs =
     ps +
-    '\n110 100 1 /s/chronod\n111 100 1 /s/healthd\n112 100 1 /s/tccd\n113 100 1 /s/searchd\n300 1 1 /host/chronod'
+    '\n110 100 1 /s/chronod\n111 100 1 /s/healthd\n112 100 1 /s/tccd\n113 100 1 /s/searchd\n114 100 230 /s/mediaanalysisd\n300 1 1 /host/chronod\n301 1 1 /host/mediaanalysisd'
   const quietJobs = simulatorJobs(
     jobsText +
-      '\n110 0 com.apple.chronod\n111 0 com.apple.healthd\n112 0 com.apple.tccd\n113 0 com.apple.searchd\n300 0 host.chronod'
+      '\n110 0 com.apple.chronod\n111 0 com.apple.healthd\n112 0 com.apple.tccd\n113 0 com.apple.searchd\n114 0 com.apple.mediaanalysisd\n300 0 host.chronod'
   )
   const calls = []
   const execute = (operation, binary, args, options) => {
@@ -212,13 +212,14 @@ test('quiet services are stopped by exact listed label, only when owned by the s
   } finally {
     console.log = log
   }
-  assert.deepEqual(record.stopped, ['chronod'])
+  assert.deepEqual(record.stopped, ['chronod', 'mediaanalysisd'])
   assert.deepEqual(record.policy, [
     'chronod',
     'healthd',
     'triald',
     'amsengagementd',
     'siriactionsd',
+    'mediaanalysisd',
   ])
   assert.deepEqual(JSON.parse(lines.at(-1)).quietServices, record)
   assert.deepEqual(record.census.chronod, { state: 'running', bootoutExit: 0 })
@@ -227,8 +228,9 @@ test('quiet services are stopped by exact listed label, only when owned by the s
   assert.deepEqual(record.census.siriactionsd, { state: 'absent', bootoutExit: null })
   assert.deepEqual(
     calls.map((c) => c.operation),
-    ['bootout-quiet-chronod', 'bootout-quiet-healthd']
+    ['bootout-quiet-chronod', 'bootout-quiet-healthd', 'bootout-quiet-mediaanalysisd']
   )
+  assert.equal(calls[2].args.at(-1), 'system/com.apple.mediaanalysisd')
   assert.deepEqual(calls[0].args, [
     'simctl',
     'spawn',

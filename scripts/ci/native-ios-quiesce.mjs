@@ -318,6 +318,13 @@ export function bootoutOwnedEmitter(device, manager, emitter, execute) {
  * Run 23 also stopped searchd, suggestd, siriknowledged, assistantd and assistant_cdmd and then
  * failed waiting for the photo picker's Cancel button; those five stay running until that is
  * understood. SpringBoard, tccd and the permission alert path are not listed.
+ *
+ * Story 6.15: on the iOS 26.5 simulator the simulator's own mediaanalysisd (Photos analysis) ran
+ * at 224 to 235 percent CPU of the 3-CPU host in every failed macos-26 shard: both first flows
+ * killed at 120 s (dispatch 43371567368 shard 3, push 43371494463 shard 1) and the community
+ * preferences reads that hit the API's 1950 ms authorization budget as 503s (dispatch
+ * 43385098696 shard 4). No iOS 18.5 job ran it. It was already running after boot, so it is
+ * stopped here with the rest; no flow reads its analysis.
  */
 export const QUIET_SERVICES = Object.freeze([
   'chronod',
@@ -325,6 +332,7 @@ export const QUIET_SERVICES = Object.freeze([
   'triald',
   'amsengagementd',
   'siriactionsd',
+  'mediaanalysisd',
 ])
 
 /** Labels the simulator lists, running or idle. */
