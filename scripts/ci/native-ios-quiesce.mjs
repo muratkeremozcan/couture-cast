@@ -335,38 +335,69 @@ export const QUIET_SERVICES = Object.freeze([
   'mediaanalysisd',
 ])
 
-/** Labels the simulator lists, running or idle. */
+/** Labels the simulator lists, running or idle, each with its pid, or null when idle. */
 const listedLabels = (listed) =>
-  new Set(
+  new Map(
     String(listed)
       .split('\n')
       .flatMap((line) => {
-        const m = line.trim().match(/^(?:\d+|-)\s+-?\d+\s+(\S+)$/)
-        return m ? [m[1]] : []
+        const m = line.trim().match(/^(\d+|-)\s+-?\d+\s+(\S+)$/)
+        return m ? [[m[2], m[1] === '-' ? null : Number(m[1])]] : []
       })
   )
 
+/** The pids ps reported. */
+const psPids = (ps) =>
+  new Set(
+    String(ps)
+      .split('\n')
+      .flatMap((line) => {
+        const m = line.trim().match(/^(\d+)\s/)
+        return m ? [Number(m[1])] : []
+      })
+  )
+
+/** What the quiesce found for one quiet service, which decides whether it is booted out. */
+function quietState(service, labels, label, pids) {
+  if (service) return 'running'
+  if (!labels.has(label)) return 'absent'
+  const pid = labels.get(label)
+  // launchctl list runs before ps: a listed pid ps no longer has exited in between, still loaded.
+  return pid === null || !pids.has(pid) ? 'idle' : 'unowned'
+}
+
 /**
- * Stop each running owned job from the list; every attempt is recorded and nonfatal. The census
- * names, per entry, whether the runtime ran it ('running'), listed it idle ('idle') or does not
- * have it ('absent'), and the exit code of the boot-out, so the next run shows which labels exist.
+ * Stop each job from the list that runs owned by the simulator manager, or that the simulator
+ * lists idle (no pid, or a pid that exited before ps ran): launchd starts an idle job on demand,
+ * as mediaanalysisd did after the quiesce in dispatch 43393247650 shard 3. A listed pid that ps
+ * shows under another manager is left alone. Every attempt is recorded and nonfatal. The census
+ * names, per entry, whether the runtime ran it ('running'), listed it idle ('idle'), listed a pid
+ * it does not own ('unowned') or does not have it ('absent'), and the exit code of the boot-out,
+ * so the next run shows which labels exist.
  */
 export function bootoutQuietServices(device, ps, jobs, manager, execute, listed = '') {
   const labels = listedLabels(listed)
+  const pids = psPids(ps)
   const stopped = []
   const census = {}
   for (const name of QUIET_SERVICES) {
     const service = ownedService(ps, jobs, manager, name)
-    census[name] = {
-      state: service ? 'running' : labels.has(`com.apple.${name}`) ? 'idle' : 'absent',
-      bootoutExit: null,
-    }
-    if (!service) continue
+    const label = `com.apple.${name}`
+    const state = quietState(service, labels, label, pids)
+    census[name] = { state, bootoutExit: null }
+    if (state !== 'running' && state !== 'idle') continue
     // The system form is the one the simulator accepts (apsd, run 9).
     const result = execute(
       `bootout-quiet-${name}`,
       'xcrun',
-      ['simctl', 'spawn', device, 'launchctl', 'bootout', `system/${service.label}`],
+      [
+        'simctl',
+        'spawn',
+        device,
+        'launchctl',
+        'bootout',
+        `system/${service?.label ?? label}`,
+      ],
       { fatal: false }
     )
     census[name].bootoutExit = result.exitCode ?? null

@@ -395,14 +395,11 @@ describe('Story 6.9 share flow timeouts', () => {
     )
     assert.equal(
       SHARE_SHEET_LANE_HEADROOM_MS.ios,
-      // Shard 4 runs share-sheet, in ios-native-jobs.yml's ios-shard job; its merge-path limit,
-      // since a dispatch adds only its client build on top.
-      Number(
-        /\|\| (\d+) \}\}$/.exec(
-          parse(fs.readFileSync(`${root}.github/workflows/ios-native-jobs.yml`, 'utf8'))
-            .jobs['ios-shard']['timeout-minutes']
-        )[1]
-      ) *
+      // Shard 4 runs share-sheet, in ios-native-jobs.yml's ios-shard job, whose fixed limit holds
+      // on every run since ios-build hands each run its client.
+      parse(fs.readFileSync(`${root}.github/workflows/ios-native-jobs.yml`, 'utf8')).jobs[
+        'ios-shard'
+      ]['timeout-minutes'] *
         60_000 -
         IOS_SHARE_LANE_BASE_MS
     )

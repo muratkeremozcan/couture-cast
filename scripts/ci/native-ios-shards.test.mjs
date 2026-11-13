@@ -61,11 +61,11 @@ test('the shards are balanced by measured minutes and fit their job limit on a r
     Math.max(...minutes) - Math.min(...minutes) <= 3,
     `shard minutes ${minutes.join(', ')}`
   )
-  // A merge and the nightly run restore the client and keep the shard's 70 minutes; a dispatch
-  // adds its own client build on top, so the shard's flows still have the merge-path limit.
-  const timeout = parse(fs.readFileSync('.github/workflows/ios-native-jobs.yml', 'utf8'))
+  // Every run gets the client from ios-build (a merge and the nightly run from the cache, a
+  // dispatch as an artifact), so the shard has one fixed limit for its flows.
+  const limit = parse(fs.readFileSync('.github/workflows/ios-native-jobs.yml', 'utf8'))
     .jobs['ios-shard']['timeout-minutes']
-  const limit = Number(/\|\| (\d+) \}\}$/.exec(timeout)[1])
+  assert.ok(Number.isInteger(limit), `ios-shard timeout-minutes ${limit}`)
   for (const shard of shards) {
     assert.ok(
       nominalMinutes(shard) * 1.5 < limit,

@@ -61,6 +61,8 @@ describe('the one macOS pull request job', () => {
     )
     assert.equal(xcode, 1, 'right after the checkout')
     assert.equal(job.steps[xcode].run, iosNative.run)
+    assert.deepEqual(job.steps[xcode].env, iosNative.env)
+    assert.deepEqual(job.steps[xcode].env, { XCODE: '26.4+' })
     for (const step of job.steps.slice(xcode + 1))
       if (/swift test|xcodebuild test|test:watchos-prebuild/.test(step.run ?? ''))
         assert.match(step.if, /steps\.xcode\.outcome == 'success'/, step.name)
