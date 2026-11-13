@@ -262,10 +262,34 @@ function identityCheck(platform, stages) {
   }
 }
 
+function assertChangeInputs({
+  before,
+  settled,
+  cold,
+  coldBefore,
+  updated,
+  coldUpdated,
+  anchors,
+  probes,
+}) {
+  if (!anchors?.length) fail('live_font_anchors_required')
+  if (!probes?.length) fail('live_font_probes_required')
+  if (Number(settled.fontScale) === Number(before.fontScale))
+    fail('live_font_scale_change_required')
+  if (Number(cold.fontScale) !== Number(settled.fontScale))
+    fail('live_font_cold_scale_mismatch')
+  if (coldBefore && Number(coldBefore.fontScale) !== Number(before.fontScale))
+    fail('live_font_cold_before_scale_mismatch')
+  if ((updated === undefined) !== (coldUpdated === undefined))
+    fail('live_font_update_pair_required')
+}
+
 /**
  * The AC3 checks for one screen and one scale change. `anchors` are testIDs that sit above the
  * fold at every scale; `probes` ({ id, sizeSp }) are single-line text whose box should follow
- * the platform's text scaling.
+ * the platform's text scaling. `coldBefore`, the cold launch at the leg's starting scale, is
+ * where growth is measured from when given: a leg that starts on a stale screen (the return
+ * after a residual) would otherwise read correct text as text that failed to change.
  */
 export function evaluateLiveFontChange({
   platform,
@@ -274,6 +298,7 @@ export function evaluateLiveFontChange({
   immediate,
   settled,
   cold,
+  coldBefore,
   updated,
   coldUpdated,
   anchors,
@@ -282,14 +307,16 @@ export function evaluateLiveFontChange({
 }) {
   const tolerance = HEIGHT_TOLERANCE[platform]
   if (tolerance === undefined) fail('live_font_platform_required', String(platform))
-  if (!anchors?.length) fail('live_font_anchors_required')
-  if (!probes?.length) fail('live_font_probes_required')
-  if (Number(settled.fontScale) === Number(before.fontScale))
-    fail('live_font_scale_change_required')
-  if (Number(cold.fontScale) !== Number(settled.fontScale))
-    fail('live_font_cold_scale_mismatch')
-  if ((updated === undefined) !== (coldUpdated === undefined))
-    fail('live_font_update_pair_required')
+  assertChangeInputs({
+    before,
+    settled,
+    cold,
+    coldBefore,
+    updated,
+    coldUpdated,
+    anchors,
+    probes,
+  })
 
   const missingAnchors = []
   for (const [stage, capture] of Object.entries({ before, immediate, settled })) {
@@ -298,7 +325,7 @@ export function evaluateLiveFontChange({
       if (!ids.has(anchor)) missingAnchors.push(`${stage}:${anchor}`)
   }
 
-  const base = keyed(before)
+  const base = keyed(coldBefore ?? before)
   const live = keyed(settled)
   const coldNodes = keyed(cold)
   const growth = probes.map((probe) => {

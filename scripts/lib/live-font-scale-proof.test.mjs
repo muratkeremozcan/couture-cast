@@ -166,6 +166,41 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(condition.ratio, 1)
   })
 
+  test('a leg that starts from a stale screen measures growth from the cold reference', () => {
+    // The 1.5 -> 1.0 leg after a residual: `before` reads 1.5 but kept its 1.0 heights, and the
+    // return to 1.0 lands exactly on the 1.0 cold layout.
+    const staleBefore = stage('settled')
+    const backAtBase = (name) => ({ ...stage('before'), stage: name })
+    const reverse = {
+      platform: 'android',
+      before: staleBefore,
+      immediate: backAtBase('immediate'),
+      settled: backAtBase('settled'),
+      cold: backAtBase('cold'),
+      coldBefore: cold(),
+      anchors: ANCHORS,
+      probes: PROBES,
+    }
+    const { checks, verdict } = evaluateLiveFontChange(reverse)
+    assert.equal(checks.coldParity.pass, true)
+    assert.equal(checks.growth.pass, true, JSON.stringify(checks.growth.probes))
+    assert.equal(verdict, 'fixed')
+    // Without the cold reference the stale start reads as text that failed to shrink.
+    const withoutColdBefore = { ...reverse }
+    delete withoutColdBefore.coldBefore
+    assert.equal(evaluateLiveFontChange(withoutColdBefore).checks.growth.pass, false)
+    // Text stuck at the 1.5 size after the return still fails, with or without it.
+    const stuck = { ...reverse, settled: { ...cold(), stage: 'settled', fontScale: 1 } }
+    const judged = evaluateLiveFontChange(stuck)
+    assert.equal(judged.checks.growth.pass, false)
+    assert.equal(judged.checks.coldParity.pass, false)
+    assert.throws(
+      () =>
+        evaluateLiveFontChange({ ...reverse, coldBefore: { ...cold(), fontScale: 2 } }),
+      { code: 'live_font_cold_before_scale_mismatch' }
+    )
+  })
+
   test('a live change that matches the cold layout is fixed, with large text unchanged', () => {
     const { verdict, checks } = evaluateLiveFontChange(fixedChange())
     assert.equal(verdict, 'fixed')

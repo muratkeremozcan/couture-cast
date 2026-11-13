@@ -187,6 +187,7 @@ export async function runScreenJourney({
         immediate,
         settled,
         cold: cold[to].reference,
+        coldBefore: cold[from].reference,
         updated,
         coldUpdated: cold[to].updated,
         anchors: screen.anchors,
