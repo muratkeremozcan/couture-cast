@@ -271,14 +271,43 @@ function controlsOnScreen(capture, ids) {
  * window identity in the hierarchy; a new scene or window mounts a new React root, so the mount
  * marker stands for it.
  */
+/**
+ * The mount ids a capture's markers carry, by scope (`live-font-mount-<scope>-<id>`). A root
+ * identity that is not marker-shaped (a fixture) is one root mount.
+ */
+function mountsOf(root) {
+  if (typeof root !== 'string' || root === '') return undefined
+  const scopes = new Map()
+  for (const item of root.split(',')) {
+    const match = /^live-font-mount-([a-z]+)-([a-z0-9]+)$/.exec(item)
+    if (match) scopes.set(match[1], match[2])
+    else scopes.set('root', item)
+  }
+  return scopes
+}
+
+/**
+ * Kept when every scope shows one mount id across the captures that show it. A screen marker
+ * the hierarchy leaves out of one dump (iOS drops a 1x1 view now and then) is no remount; the
+ * root marker must be in every capture (rootKnown).
+ */
+function sameMounts(mounts) {
+  const ids = new Map()
+  for (const scopes of mounts)
+    for (const [scope, id] of scopes)
+      ids.set(scope, (ids.get(scope) ?? new Set()).add(id))
+  return [...ids.values()].every((set) => set.size === 1)
+}
+
 function identityCheck(platform, stages) {
   const pids = new Set(stages.map((capture) => String(capture.pid)))
   const roots = stages.map((capture) => capture.identity?.root)
   const activities = stages.map((capture) => capture.identity?.activity)
   const onCreate = stages.map((capture) => capture.identity?.onCreate)
   const processKept = pids.size === 1 && !pids.has('undefined')
-  const rootKnown = roots.every((root) => typeof root === 'string' && root !== '')
-  const rootKept = rootKnown && new Set(roots).size === 1
+  const mounts = roots.map(mountsOf)
+  const rootKnown = mounts.every((scopes) => scopes?.has('root'))
+  const rootKept = rootKnown && sameMounts(mounts)
   const nativeKnown =
     platform !== 'android' ||
     (activities.every((value) => typeof value === 'string' && value !== '') &&

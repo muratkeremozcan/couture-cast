@@ -334,6 +334,25 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(evaluateLiveFontChange(change).verdict, 'fixed')
   })
 
+  test('a screen marker the hierarchy left out is not a remount; a changed one is', () => {
+    // iOS: the Settings screen's 1x1 marker drops out of some XCUITest dumps while its mount
+    // (h16mcs3) stays the same; the root marker is in every capture.
+    const both = 'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
+    const rootOnly = 'live-font-mount-root-h16mcs1'
+    const change = fixedChange()
+    change.before.identity.root = both
+    change.immediate.identity.root = both
+    change.settled.identity.root = rootOnly
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
+    change.settled.identity.root =
+      'live-font-mount-root-h16mcs1,live-font-mount-settings-k77abc3'
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, false)
+    change.settled.identity.root = 'live-font-mount-settings-h16mcs3'
+    const noRoot = evaluateLiveFontChange(change).checks.identity
+    assert.equal(noRoot.rootKnown, false)
+    assert.equal(noRoot.rootKept, false)
+  })
+
   test('a capture without the mount marker cannot pass identity', () => {
     const change = fixedChange()
     delete change.settled.identity.root
