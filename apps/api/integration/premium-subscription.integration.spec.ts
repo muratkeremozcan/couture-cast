@@ -62,6 +62,9 @@ const databaseUrl =
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+// A year from the real clock: the database compares Test Store expiries with now() (date bomb
+// guard, src/testing/integration-clock-literals.guard.spec.ts).
+const TEST_STORE_EXPIRY = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
 
 let schemaReady = false
 
@@ -405,7 +408,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
       [
         'a Test Store monthly entitlement',
         {
-          expires_date: '2031-01-01T00:00:00.000Z',
+          expires_date: TEST_STORE_EXPIRY,
           product_identifier: 'premium_monthly',
         },
         { premium_monthly: { store: 'test_store' } },
@@ -432,7 +435,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
       ],
       [
         'a missing product',
-        { expires_date: '2031-01-01T00:00:00.000Z', product_identifier: null },
+        { expires_date: TEST_STORE_EXPIRY, product_identifier: null },
         {},
       ],
     ] as const)
@@ -508,7 +511,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
                   subscriber: {
                     entitlements: {
                       premium: {
-                        expires_date: '2031-01-01T00:00:00.000Z',
+                        expires_date: TEST_STORE_EXPIRY,
                         product_identifier: 'premium_monthly',
                       },
                     },
@@ -532,7 +535,7 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
             status: 'active',
             store: 'test_store',
             productId: 'premium_monthly',
-            currentPeriodEnd: '2031-01-01T00:00:00.000Z',
+            currentPeriodEnd: TEST_STORE_EXPIRY,
           })
           expect(
             await prisma.premiumEntitlement.findUnique({
