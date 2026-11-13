@@ -501,3 +501,26 @@ test('restoreFailure tells a relayout on scroll from a lost scroll position', ()
     'live_font_scroll_not_restored'
   )
 })
+
+test('iOS leaves out the status bar window and the scroll bars', () => {
+  const tree = node({ bounds: '[0,0][0,0]' }, [
+    node({ accessibilityText: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
+      node({ accessibilityText: 'Cloudy', bounds: '[16,160][80,180]' }),
+      node({
+        accessibilityText: 'Vertical scroll bar, 2 pages',
+        text: '0%',
+        bounds: '[369,108][399,152]',
+      }),
+      node({ text: '45%', bounds: '[16,200][60,220]' }),
+    ]),
+    node({ bounds: '[0,0][0,0]' }, [
+      node({ bounds: '[0,0][402,54]' }, [
+        node({ accessibilityText: '6:57 AM', bounds: '[55,22][92,42]' }),
+      ]),
+    ]),
+  ])
+  assert.deepEqual(
+    flattenHierarchy(tree, { platform: 'ios' }).nodes.map((entry) => entry.text),
+    ['CoutureCast Story68', 'Cloudy', '45%']
+  )
+})

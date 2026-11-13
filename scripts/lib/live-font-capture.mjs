@@ -12,6 +12,11 @@ function attributes(node) {
   return node?.attributes ?? {}
 }
 
+/** UIKit's scroll indicators: their value text ("0%") changes as the page scrolls. */
+function iosSystemNode(attrs) {
+  return /^(Vertical|Horizontal) scroll bar\b/.test(attrs.accessibilityText ?? '')
+}
+
 /** Sorts a test-build marker id into the reading it carries. */
 function readMarker(id, { markers, jsScales, environments }) {
   if (MARKER.test(id)) markers.push(id)
@@ -40,6 +45,7 @@ export function flattenHierarchy(
   const environments = []
   const walk = (node, parentBounds, inVolatile) => {
     const attrs = attributes(node)
+    if (platform === 'ios' && iosSystemNode(attrs)) return
     const id = attrs['resource-id'] ?? ''
     const bounds = attrs.bounds
     readMarker(id, { markers, jsScales, environments })
@@ -62,7 +68,14 @@ export function flattenHierarchy(
     for (const child of node?.children ?? [])
       walk(child, bounds ?? parentBounds, isVolatile)
   }
-  walk(tree, undefined, false)
+  // On iOS the root's other windows (the status bar, under an empty-bounds container) are the
+  // system's, so only windows with bounds are read.
+  if (platform === 'ios')
+    for (const child of tree?.children ?? []) {
+      if (!/^\[0,0\]\[0,0\]$/.test(attributes(child).bounds ?? '[0,0][0,0]'))
+        walk(child, undefined, false)
+    }
+  else walk(tree, undefined, false)
   // Every marked window reads the same scale; disagreeing readings are no reading.
   const jsFontScale =
     jsScales.length && new Set(jsScales).size === 1 ? jsScales[0] : undefined
