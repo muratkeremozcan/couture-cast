@@ -17,13 +17,13 @@ import {
   scriptReads,
 } from './ios-native-helpers.mjs'
 import {
+  CANARY_WORKFLOW,
   CLIENT_ARTIFACT,
   DISPATCH_WORKFLOW,
   JOBS_WORKFLOW,
   MANDATORY,
   PROOF,
   PUSH_WORKFLOW,
-  RUNNERS,
   TEST_JOBS,
   XCODE_CHOICES,
   disabledCondition,
@@ -38,6 +38,7 @@ const source = readWorkflows()
 const P = PUSH_WORKFLOW
 const D = DISPATCH_WORKFLOW
 const J = JOBS_WORKFLOW
+const C = CANARY_WORKFLOW
 // A JSON round trip breaks the sharing YAML aliases create, so one job can be mutated alone.
 const fresh = () => JSON.parse(JSON.stringify(source))
 const step = (job, predicate) => job.steps.find(predicate)
@@ -64,15 +65,20 @@ const commentOut = (run, line) =>
 // Go run on macos-15's iOS 18.5 simulator from Xcode 16.4.
 function runnerAndXcodeFixtures() {
   for (const [name, choice] of Object.entries(XCODE_CHOICES)) {
-    const label = choice === '16.4' ? '16.4' : '26.4 or later'
-    const other = { 'macos-26': 'macos-15', 'macos-15': 'macos-26' }[RUNNERS[name]]
-    rejected(
-      `${name} on ${other}`,
-      new RegExp(`${name}: ${RUNNERS[name]} runner required`),
-      (jobs) => {
-        jobs[name]['runs-on'] = other
-      }
-    )
+    const consumer = choice !== '26.4+'
+    const label = consumer ? '16.4, or 26.4 or later under the canary,' : '26.4 or later'
+    // A consumer on either fixed runner drops the canary switch; a builder may not leave macos-26.
+    const runners = consumer
+      ? ['macos-26', 'macos-15', "${{ inputs.ios26-canary && 'macos-15' || 'macos-26' }}"]
+      : ['macos-15', "${{ inputs.ios26-canary && 'macos-26' || 'macos-15' }}"]
+    for (const runner of runners)
+      rejected(
+        `${name} on ${runner}`,
+        new RegExp(`${name}: .* runner required`),
+        (jobs) => {
+          jobs[name]['runs-on'] = runner
+        }
+      )
     rejected(
       `${name} on the image default Xcode`,
       new RegExp(`${name}: select Xcode ${label} by name`),
@@ -80,14 +86,16 @@ function runnerAndXcodeFixtures() {
         jobs[name].steps = jobs[name].steps.filter((row) => row.id !== 'xcode')
       }
     )
-    rejected(
-      `${name} choosing the other Xcode`,
-      new RegExp(`${name}: select Xcode ${label} by name`),
-      (jobs) => {
-        step(jobs[name], (item) => item.id === 'xcode').env.XCODE =
-          choice === '16.4' ? '26.4+' : '16.4'
-      }
-    )
+    for (const other of consumer
+      ? ['26.4+', '16.4']
+      : ['16.4', XCODE_CHOICES['ios-shard']])
+      rejected(
+        `${name} choosing Xcode ${other}`,
+        new RegExp(`${name}: select Xcode ${label} by name`),
+        (jobs) => {
+          step(jobs[name], (item) => item.id === 'xcode').env.XCODE = other
+        }
+      )
     for (const [what, from, to] of [
       ['accepting Xcode 26.3', '-ge 4 ]', '-ge 3 ]'],
       ['taking Xcode 16.4 from elsewhere', '"$root/Xcode_16.4.app"', '"/tmp/Xcode.app"'],
@@ -102,6 +110,154 @@ function runnerAndXcodeFixtures() {
         }
       )
   }
+}
+
+// C-16: the nightly canary alone turns on the iOS 26.5 simulator, and it gates nothing.
+function canaryFixtures() {
+  for (const [title, expected, change] of [
+    [
+      'a canary on a merge',
+      /runs only on its own nightly schedule/,
+      (on) => {
+        on.push = { branches: ['main'] }
+      },
+    ],
+    [
+      'a canary at the nightly minute of ios-native.yml',
+      /apart from ios-native.yml/,
+      (on, files) => {
+        on.schedule = [...onOf(files[P]).schedule]
+      },
+    ],
+    [
+      'a weekly canary',
+      /runs only on its own nightly schedule/,
+      (on) => {
+        on.schedule = [{ cron: '47 4 * * 1' }]
+      },
+    ],
+    [
+      'a canary on a dispatch',
+      /runs only on its own nightly schedule/,
+      (on) => {
+        on.workflow_dispatch = {}
+      },
+    ],
+  ])
+    rejected(title, expected, (_, files) => change(onOf(files[C]), files))
+  for (const [title, change] of [
+    [
+      'a canary that cancels the running one',
+      (canary) => {
+        canary.concurrency['cancel-in-progress'] = true
+      },
+    ],
+    [
+      'a canary sharing the nightly queue',
+      (canary) => {
+        canary.concurrency.group = 'ios-native-${{ github.event_name }}-${{ github.sha }}'
+      },
+    ],
+    [
+      'a canary with write access',
+      (canary) => {
+        canary.permissions = { contents: 'write' }
+      },
+    ],
+    [
+      'a canary with a read-only cache',
+      (canary) => {
+        canary['cache-mode'] = 'read'
+      },
+    ],
+    [
+      'a canary run named like the gating runs',
+      (canary) => {
+        canary['run-name'] = 'iOS native ${{ github.sha }}'
+      },
+    ],
+  ])
+    rejected(title, /ios-native-canary.yml: run name .* one queued canary/, (_, files) =>
+      change(files[C])
+    )
+  for (const [title, change] of [
+    [
+      'a canary that runs the gating simulator',
+      (call) => {
+        call.with['ios26-canary'] = false
+      },
+    ],
+    [
+      'a canary without the switch',
+      (call) => {
+        delete call.with['ios26-canary']
+      },
+    ],
+    [
+      'a canary of another commit',
+      (call) => {
+        call.with.sha = '${{ github.event.before }}'
+      },
+    ],
+    [
+      'a canary behind a condition',
+      (call) => {
+        call.if = "${{ github.ref == 'refs/heads/main' }}"
+      },
+    ],
+  ])
+    rejected(
+      title,
+      /one call of the jobs for github.sha with ios26-canary: true/,
+      (_, files) => change(files[C].jobs['ios-native-canary'])
+    )
+  rejected('a second canary job', /one call of the jobs/, (_, files) => {
+    files[C].jobs.extra = { 'runs-on': 'ubuntu-latest', steps: [{ run: 'echo' }] }
+  })
+  rejected(
+    'ios-native.yml passing the canary switch',
+    /ios-native.yml never passes ios26-canary/,
+    (_, files) => {
+      files[P].jobs['ios-native'].with['ios26-canary'] = true
+    }
+  )
+  rejected(
+    'ios-native-dispatch.yml passing the canary switch',
+    /ios-native-dispatch.yml never passes ios26-canary/,
+    (_, files) => {
+      files[D].jobs['ios-native'].with['ios26-canary'] = true
+    }
+  )
+  for (const [title, change] of [
+    [
+      'a canary switch on by default',
+      (input) => {
+        input.default = true
+      },
+    ],
+    [
+      'a required canary switch',
+      (input) => {
+        input.required = true
+      },
+    ],
+    [
+      'a canary switch as a string',
+      (input) => {
+        input.type = 'string'
+      },
+    ],
+  ])
+    rejected(title, /ios26-canary is an optional boolean, off unless/, (_, files) =>
+      change(onOf(files[J]).workflow_call.inputs['ios26-canary'])
+    )
+  rejected(
+    'a third jobs input',
+    /runs only when called, for one required sha/,
+    (_, files) => {
+      onOf(files[J]).workflow_call.inputs.runner = { type: 'string', required: false }
+    }
+  )
 }
 
 describe('ios-native workflows validator', () => {
@@ -121,7 +277,7 @@ describe('ios-native workflows validator', () => {
   })
 
   // Triggers and the commit a run tests.
-  for (const file of [P, D, J]) {
+  for (const file of [P, D, J, C]) {
     rejected(
       `a pull_request trigger on ${file}`,
       /never runs on a pull request/,
@@ -425,6 +581,7 @@ describe('ios-native workflows validator', () => {
   }
 
   runnerAndXcodeFixtures()
+  canaryFixtures()
 
   // IOS-02: each mandatory check exists once, on its own condition, and can fail its job.
   for (const [name, predicate, , required] of MANDATORY) {

@@ -1,4 +1,4 @@
-// Story 6.15 D6, C-13 and IOS-01/02: the rules the three iOS native workflows keep.
+// Story 6.15 D6, C-13 and IOS-01/02: the rules the four iOS native workflows keep.
 //
 //   ios-native-jobs.yml      the iOS jobs, called for one commit `sha`: a client scanned before it
 //                            is cached and installed only from that scan, every shard with its own
@@ -12,6 +12,9 @@
 //                            scans the commit's own client and hands it to the shards and Expo Go
 //                            as an artifact of the run, and ios-cache-proof shows nothing was
 //                            stored.
+//   ios-native-canary.yml    nightly on main with ios26-canary: the shards and Expo Go on the iOS
+//                            26.5 simulator of macos-26. Only it passes the input, and it gates
+//                            nothing.
 //
 // The rules check that each control is present, eligible to run (no disabled or bypassable
 // condition) and able to fail its job.
@@ -24,24 +27,41 @@ import { shardsOf } from './native-matrix-shards.mjs'
 export const PUSH_WORKFLOW = '.github/workflows/ios-native.yml'
 export const DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
 export const JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
-export const WORKFLOW_FILES = [PUSH_WORKFLOW, DISPATCH_WORKFLOW, JOBS_WORKFLOW]
+export const CANARY_WORKFLOW = '.github/workflows/ios-native-canary.yml'
+export const WORKFLOW_FILES = [
+  PUSH_WORKFLOW,
+  DISPATCH_WORKFLOW,
+  JOBS_WORKFLOW,
+  CANARY_WORKFLOW,
+]
+export const CANARY_INPUT = 'ios26-canary'
+export const CANARY_JOB = 'ios-native-canary'
+export const CANARY_RUN_NAME = 'iOS 26.5 canary ${{ github.sha }}'
+const CANARY_CONCURRENCY = { group: 'ios-native-canary', 'cancel-in-progress': false }
+const NIGHTLY = /^([0-5]?\d) ([01]?\d|2[0-3]) \* \* \*$/
 export const MACOS_JOBS = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-build']
 // The client and the Release app build on macos-26 with Xcode 26.4 or later, which SDK 56 needs;
-// the shards and Expo Go run that client on macos-15's iOS 18.5 simulator, from Xcode 16.4.
+// the shards and Expo Go run that client on macos-15's iOS 18.5 simulator, from Xcode 16.4, and
+// only under the nightly canary on macos-26's iOS 26.5 simulator.
+const CONSUMER_RUNNER = "${{ inputs.ios26-canary && 'macos-26' || 'macos-15' }}"
+const CONSUMER_XCODE = "${{ inputs.ios26-canary && '26.4+' || '16.4' }}"
 export const RUNNERS = {
   'ios-build': 'macos-26',
-  'ios-shard': 'macos-15',
-  'ios-expo-go': 'macos-15',
+  'ios-shard': CONSUMER_RUNNER,
+  'ios-expo-go': CONSUMER_RUNNER,
   'ios-app-build': 'macos-26',
   'ios-evidence': 'ubuntu-latest',
 }
 export const XCODE_CHOICES = {
   'ios-build': '26.4+',
-  'ios-shard': '16.4',
-  'ios-expo-go': '16.4',
+  'ios-shard': CONSUMER_XCODE,
+  'ios-expo-go': CONSUMER_XCODE,
   'ios-app-build': '26.4+',
 }
-const XCODE_LABELS = { '26.4+': '26.4 or later', 16.4: '16.4' }
+const XCODE_LABELS = {
+  '26.4+': '26.4 or later',
+  [CONSUMER_XCODE]: '16.4, or 26.4 or later under the canary,',
+}
 export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence']
 export const DECISION_JOB = 'ios-changes'
 export const PROBE_JOB = 'ios-cache-proof'
@@ -341,7 +361,7 @@ function pushProblems(push, check) {
   )
   const crons = [on?.schedule ?? []].flat().map((entry) => entry?.cron)
   check(
-    crons.length === 1 && /^([0-5]?\d) ([01]?\d|2[0-3]) \* \* \*$/.test(String(crons[0])),
+    crons.length === 1 && NIGHTLY.test(String(crons[0])),
     'ios-native needs one nightly schedule: a fixed minute and hour, every day'
   )
   check(
@@ -365,6 +385,10 @@ function pushJobProblems(push, check) {
     'ios-native.yml holds ios-changes and the jobs call'
   )
   const call = jobs['ios-native']
+  check(
+    call?.with?.[CANARY_INPUT] === undefined,
+    `ios-native.yml never passes ${CANARY_INPUT}: only the nightly canary runs the iOS 26.5 simulator`
+  )
   check(
     call?.uses === `./${JOBS_WORKFLOW}` &&
       same(call?.with, { sha: PUSH_COMMIT }) &&
@@ -419,6 +443,10 @@ function dispatchProblems(dispatch, check) {
     'ios-native-dispatch.yml holds the jobs call and ios-cache-proof'
   )
   const call = jobs['ios-native']
+  check(
+    call?.with?.[CANARY_INPUT] === undefined,
+    `ios-native-dispatch.yml never passes ${CANARY_INPUT}: the pull request evidence runs the gating simulator`
+  )
   check(
     same(dispatch?.permissions, { contents: 'read' }) &&
       call?.uses === `./${JOBS_WORKFLOW}` &&
@@ -481,15 +509,54 @@ function probeStepProblems(rows, check) {
     )
 }
 
+/**
+ * C-16: the nightly canary runs the jobs on main's head with the shards and Expo Go on the iOS
+ * 26.5 simulator. Schedule only, its own nightly slot and queue, and nothing else in it.
+ */
+function canaryProblems(canary, push, check) {
+  const on = onOf(canary)
+  const crons = [on?.schedule ?? []].flat().map((entry) => entry?.cron)
+  const nightly = [onOf(push)?.schedule ?? []].flat().map((entry) => entry?.cron)
+  check(
+    same(Object.keys(on ?? {}), ['schedule']) &&
+      crons.length === 1 &&
+      NIGHTLY.test(String(crons[0])) &&
+      !nightly.includes(crons[0]),
+    'ios-native-canary.yml runs only on its own nightly schedule, apart from ios-native.yml'
+  )
+  check(
+    canary?.['run-name'] === CANARY_RUN_NAME &&
+      same(canary?.permissions, { contents: 'read' }) &&
+      canary?.['cache-mode'] === undefined &&
+      same(canary?.concurrency, CANARY_CONCURRENCY),
+    `ios-native-canary.yml: run name "${CANARY_RUN_NAME}", contents: read only, and one queued canary at a time`
+  )
+  const jobs = canary?.jobs ?? {}
+  const call = jobs[CANARY_JOB]
+  check(
+    same(Object.keys(jobs), [CANARY_JOB]) &&
+      same(Object.keys(call ?? {}).sort(), ['uses', 'with']) &&
+      call.uses === `./${JOBS_WORKFLOW}` &&
+      same(call.with, { sha: PUSH_COMMIT, [CANARY_INPUT]: true }),
+    `ios-native-canary.yml: one call of the jobs for github.sha with ${CANARY_INPUT}: true`
+  )
+}
+
 /** The jobs file: called only, with read-only contents and no cache-mode of its own. */
 function jobsFileProblems(jobsFile, check) {
   const on = onOf(jobsFile)
+  const inputs = on?.workflow_call?.inputs ?? {}
   check(
     same(Object.keys(on ?? {}), ['workflow_call']) &&
-      same(Object.keys(on.workflow_call?.inputs ?? {}), ['sha']) &&
-      on.workflow_call.inputs.sha.required === true &&
-      on.workflow_call.inputs.sha.type === 'string',
+      same(Object.keys(inputs).sort(), [CANARY_INPUT, 'sha']) &&
+      inputs.sha.required === true &&
+      inputs.sha.type === 'string',
     'ios-native-jobs.yml runs only when called, for one required sha'
+  )
+  const canary = inputs[CANARY_INPUT]
+  check(
+    canary?.type === 'boolean' && canary.required === false && canary.default === false,
+    `ios-native-jobs.yml: ${CANARY_INPUT} is an optional boolean, off unless a caller turns it on`
   )
   const jobs = jobsFile?.jobs ?? {}
   check(
@@ -911,6 +978,7 @@ export function iosNativeProblems(files) {
   pushProblems(files[PUSH_WORKFLOW], check)
   pushJobProblems(files[PUSH_WORKFLOW], check)
   dispatchProblems(files[DISPATCH_WORKFLOW], check)
+  canaryProblems(files[CANARY_WORKFLOW], files[PUSH_WORKFLOW], check)
   jobsFileProblems(jobsFile, check)
   eligibilityProblems(files, check)
   shapeProblems(jobs, check)
@@ -923,7 +991,7 @@ export function iosNativeProblems(files) {
   return problems
 }
 
-/** The three workflows, parsed, by file name. */
+/** The four workflows, parsed, by file name. */
 export function readWorkflows(read = (file) => fs.readFileSync(file, 'utf8')) {
   return Object.fromEntries(WORKFLOW_FILES.map((file) => [file, parse(read(file))]))
 }

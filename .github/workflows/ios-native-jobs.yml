@@ -8,6 +8,8 @@
 #   ios-native.yml           a merge to main that changed a native iOS input, and the nightly run.
 #                            They keep the development client cache warm.
 #   ios-native-dispatch.yml  a pull request head commit, before it merges, with cache-mode: read.
+#   ios-native-canary.yml    nightly, with ios26-canary: the shards and Expo Go on macos-26's
+#                            iOS 26.5 simulator. It gates nothing.
 #
 # Shape: ios-build keys the development client by its native inputs and builds, scans and caches
 # it only on a miss; four ios-shard jobs and ios-expo-go restore exactly that scanned client and
@@ -33,6 +35,13 @@ on:
         description: 'Full 40-character commit SHA to test'
         required: true
         type: string
+      # Only ios-native-canary.yml passes it: the shards and Expo Go then run on macos-26 with Xcode
+      # 26.4 or later, on the iOS 26.5 simulator they left for C-16.
+      ios26-canary:
+        description: 'Run the shards and Expo Go on the macos-26 iOS 26.5 simulator'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -369,7 +378,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-    runs-on: macos-15
+    runs-on: ${{ inputs.ios26-canary && 'macos-26' || 'macos-15' }}
     timeout-minutes: 70
     env: *runtime_env
     steps:
@@ -387,10 +396,10 @@ jobs:
       # Xcode 16.4 on the macOS 15 image carries the iOS 18.5 simulator the flows run on: the iOS
       # 26.5 simulator of macos-26 was not stable enough for them. The client built on macos-26
       # runs there unchanged.
-      - name: Select Xcode 16.4 for the iOS 18.5 simulator
+      - name: Select Xcode 16.4 for the iOS 18.5 simulator, or 26.4 or later for the canary
         id: xcode
         env:
-          XCODE: '16.4'
+          XCODE: ${{ inputs.ios26-canary && '26.4+' || '16.4' }}
         run: *select_xcode
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
@@ -619,7 +628,7 @@ jobs:
   ios-expo-go:
     needs: ios-build
     if: ${{ !cancelled() && needs.ios-build.result == 'success' }}
-    runs-on: macos-15
+    runs-on: ${{ inputs.ios26-canary && 'macos-26' || 'macos-15' }}
     timeout-minutes: 60
     env: *runtime_env
     steps:
@@ -637,10 +646,10 @@ jobs:
       # Xcode 16.4 on the macOS 15 image carries the iOS 18.5 simulator the flows run on: the iOS
       # 26.5 simulator of macos-26 was not stable enough for them. The client built on macos-26
       # runs there unchanged.
-      - name: Select Xcode 16.4 for the iOS 18.5 simulator
+      - name: Select Xcode 16.4 for the iOS 18.5 simulator, or 26.4 or later for the canary
         id: xcode
         env:
-          XCODE: '16.4'
+          XCODE: ${{ inputs.ios26-canary && '26.4+' || '16.4' }}
         run: *select_xcode
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
