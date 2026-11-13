@@ -64,6 +64,26 @@ export async function settleHostLoad({
   return record
 }
 
+/** The development client ios-build builds and the shards install. */
+export const DEV_CLIENT_APP =
+  '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app'
+/** The Story 6.8 Release simulator app ios-live-font builds with the same derived data path. */
+export const RELEASE_APP =
+  '/tmp/cc68-ios-build/Build/Products/Release-iphonesimulator/CoutureCastStory68.app'
+
+/**
+ * The app a native-flow probe installs: the development client, or with `--app` the Release app,
+ * the only other build the iOS jobs make. Any other value fails before a simulator exists.
+ */
+export function probeAppPath(argv) {
+  const at = argv.indexOf('--app')
+  if (at < 0) return DEV_CLIENT_APP
+  const app = argv[at + 1]
+  if (![DEV_CLIENT_APP, RELEASE_APP].includes(app))
+    throw new Error('owned_story68_app_path_required')
+  return app
+}
+
 export async function finishOwnedStartup({
   device,
   command,
@@ -124,6 +144,7 @@ async function main() {
   const directory = path.resolve(
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
   )
+  const appPath = probeAppPath(process.argv.slice(2))
   const command = simulatorCommandRecorder(directory)
   const sample = (label) =>
     command(
@@ -213,8 +234,7 @@ async function main() {
     prepareForFlow,
     afterBoot,
     cleanup: () => cleanupOwnedDevice(device, directory, command),
-    appPath:
-      '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app',
+    appPath,
   })
   console.log(
     JSON.stringify({
