@@ -1,17 +1,12 @@
-// Story 6.15 C-13, SL-11 and IOS-03: what the iOS workflows call and read.
+// Story 6.15 C-13 and IOS-03: what the iOS workflows call.
 //
-//   helperProblems         every script, local action, reusable workflow and npm script the
-//                          workflows call exists at this commit: an `npm run` resolves against the
-//                          package.json of its workspace or working directory, and the scripts it
-//                          runs in turn, and a local action's own steps and nested actions count.
-//   scriptReads            every file under scripts/ the iOS jobs run or read, through imports
-//                          and named paths.
-//   inputCoverageProblems  the push paths of ios-native.yml cover what scriptReads finds, and name
-//                          no scripts/lib file it does not.
+//   helperProblems  every script, local action, reusable workflow and npm script the workflows
+//                   call exists at this commit: an `npm run` resolves against the package.json of
+//                   its workspace or working directory, and the scripts it runs in turn, and a
+//                   local action's own steps and nested actions count.
 import fs from 'node:fs'
 import path from 'node:path'
 import { parse } from 'yaml'
-import { matchesAny } from './lanes.mjs'
 
 const readText = (file) => {
   try {
@@ -34,7 +29,6 @@ const DEFAULT_FS = {
 }
 const LOCAL_ACTION = /^\.\/(\.github\/actions\/[\w.-]+)$/
 const REUSABLE = /^\.\/(\.github\/workflows\/[\w.-]+\.ya?ml)$/
-const isTest = (file) => /\.test\.[cm]?js$/.test(file)
 
 /** The script paths a shell text names, resolved against its directory and its action's. */
 function scriptPaths(text, directory, actionDirectory) {
@@ -152,81 +146,4 @@ export function helperProblems(workflows, files = DEFAULT_FS) {
       }
     }
   return problems
-}
-
-/** The repository files a script text names: relative imports, `scripts/` paths, sibling names. */
-function namedScripts(text, directory, exists) {
-  const found = []
-  for (const match of text.matchAll(
-    /(?:from\s*|import\s*\(\s*|require\s*\(\s*|import\s+)['"](\.{1,2}\/[^'"]+)['"]/g
-  ))
-    found.push(path.posix.normalize(path.posix.join(directory, match[1])))
-  for (const match of text.matchAll(
-    /(?:^|[\s"'`(=])(scripts\/[\w./-]+?\.(?:mjs|cjs|js|sh|json))(?=[\s"'`),;]|$)/gm
-  ))
-    found.push(match[1])
-  // A script that joins its own directory with a file name, such as path.join(dir, 'run.mjs').
-  for (const match of text.matchAll(/['"`]([\w.-]+\.(?:mjs|cjs|sh))['"`]/g)) {
-    const sibling = path.posix.join(directory, match[1])
-    if (directory !== '.' && exists(sibling)) found.push(sibling)
-  }
-  return found
-}
-
-/**
- * Every file under scripts/ that the iOS jobs run or read: the scripts their steps and local
- * actions name, and everything those import, require or name in turn. Test files are left out
- * and not followed: node-test-gate runs them on pull requests as well.
- * @param {object} workflow the parsed ios-native-jobs.yml
- */
-export function scriptReads(workflow, files = DEFAULT_FS) {
-  const { read, exists } = { ...DEFAULT_FS, ...files }
-  const texts = []
-  const actions = new Set()
-  const useAction = (uses) => {
-    const local = LOCAL_ACTION.exec(String(uses ?? '').trim())
-    if (!local || actions.has(local[1])) return
-    actions.add(local[1])
-    const text = read(`${local[1]}/action.yml`) ?? ''
-    texts.push(text)
-    for (const nested of text.matchAll(/uses: (\.\/\.github\/actions\/[\w.-]+)/g))
-      useAction(nested[1])
-  }
-  for (const job of Object.values(workflow.jobs ?? {}))
-    for (const step of job?.steps ?? []) {
-      texts.push(String(step.run ?? ''))
-      useAction(step.uses)
-    }
-  const seen = new Set()
-  const stack = texts.flatMap((text) => namedScripts(text, '.', exists))
-  while (stack.length) {
-    const file = stack.pop()
-    if (seen.has(file) || isTest(file) || !exists(file)) continue
-    seen.add(file)
-    // A JSON file is data: the paths it lists are not files the jobs run.
-    if (!file.endsWith('.json'))
-      stack.push(...namedScripts(read(file) ?? '', path.posix.dirname(file), exists))
-  }
-  return [...seen].filter((file) => file.startsWith('scripts/')).sort()
-}
-
-/**
- * SL-11: the push paths, which are the native iOS inputs, cover every script the iOS jobs run or
- * read, and name no scripts/lib file they do not.
- * @param {object} workflow the parsed ios-native.yml
- * @param {{ reads: string[], libraryFiles: string[] }} files what scriptReads found, and every
- *   file under scripts/lib
- */
-export function inputCoverageProblems(workflow, { reads, libraryFiles }) {
-  const inputs = workflow.on?.push?.paths ?? []
-  const read = new Set(reads)
-  const uncovered = reads.filter((file) => !matchesAny(file, inputs))
-  const unread = libraryFiles.filter(
-    (file) =>
-      !/\.(test\.mjs|d\.mts)$/.test(file) && matchesAny(file, inputs) && !read.has(file)
-  )
-  return [
-    ...uncovered.map((file) => `the push paths miss ${file}, which the iOS jobs read`),
-    ...unread.map((file) => `the push paths name ${file}, which no iOS job reads`),
-  ]
 }

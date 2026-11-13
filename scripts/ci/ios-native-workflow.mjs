@@ -1,17 +1,13 @@
-// Story 6.15 D6, C-13 and IOS-01/02: the rules the four iOS native workflows keep.
+// Story 6.15 D6, C-13 and IOS-01/02: the rules the three iOS native workflows keep. No macOS job
+// runs on a pull request or gates a merge (owner rule, 2026-11-13).
 //
 //   ios-native-jobs.yml      the iOS jobs, called for one commit `sha`: a client scanned before it
 //                            is cached and installed only from that scan, every shard with its own
-//                            runtime, budget and fail-closed evidence, a merge that fails on a
+//                            runtime, budget and fail-closed evidence, a run that fails on a
 //                            skipped or partial shard, and every job proving it checked out `sha`.
-//   ios-native.yml           a merge to main that changed a native iOS input, and the nightly run.
-//                            Trusted main code, so they may write the caches.
-//   ios-native-dispatch.yml  a commit that has not merged. cache-mode: read on the workflow and on
-//                            every job makes GitHub issue a read-only cache token, so the code it
-//                            runs cannot save a cache main's runs restore; ios-build builds and
-//                            scans the commit's own client and hands it to the shards and Expo Go
-//                            as an artifact of the run, and ios-cache-proof shows nothing was
-//                            stored.
+//   ios-native.yml           nightly on main, which may write the caches, and a manual dispatch,
+//                            which saves none: ios-build builds and scans the dispatched commit's
+//                            own client and hands it to the shards and Expo Go as an artifact.
 //   ios-native-canary.yml    nightly on main with ios26-canary: the shards and Expo Go on the iOS
 //                            26.5 simulator of macos-26. Only it passes the input, and it gates
 //                            nothing.
@@ -24,16 +20,10 @@ import { parse } from 'yaml'
 import { helperProblems } from './ios-native-helpers.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
 
-export const PUSH_WORKFLOW = '.github/workflows/ios-native.yml'
-export const DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
+export const NIGHTLY_WORKFLOW = '.github/workflows/ios-native.yml'
 export const JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const CANARY_WORKFLOW = '.github/workflows/ios-native-canary.yml'
-export const WORKFLOW_FILES = [
-  PUSH_WORKFLOW,
-  DISPATCH_WORKFLOW,
-  JOBS_WORKFLOW,
-  CANARY_WORKFLOW,
-]
+export const WORKFLOW_FILES = [NIGHTLY_WORKFLOW, JOBS_WORKFLOW, CANARY_WORKFLOW]
 export const CANARY_INPUT = 'ios26-canary'
 export const CANARY_JOB = 'ios-native-canary'
 export const CANARY_RUN_NAME = 'iOS 26.5 canary ${{ github.sha }}'
@@ -63,16 +53,13 @@ const XCODE_LABELS = {
   [CONSUMER_XCODE]: '16.4, or 26.4 or later under the canary,',
 }
 export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence']
-export const DECISION_JOB = 'ios-changes'
-export const PROBE_JOB = 'ios-cache-proof'
 export const HARNESS_DIRECTORY = '_bmad-output/test-artifacts/story-6-8/runtime'
 export const EVIDENCE_PATH = `${HARNESS_DIRECTORY}/public-evidence/`
 export const IOS_CLIENT =
   '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app'
 export const COMMIT = '${{ inputs.sha }}'
-export const PUSH_COMMIT = '${{ github.sha }}'
-export const RUN_NAME = 'iOS native ${{ inputs.sha }}'
-export const PUSH_RUN_NAME = 'iOS native ${{ github.sha }}'
+export const NIGHTLY_COMMIT = '${{ github.sha }}'
+export const NIGHTLY_RUN_NAME = 'iOS native ${{ github.sha }}'
 // The one shell body every job runs right after its checkout: SHA syntax, then HEAD equality.
 export const PROOF = [
   'echo "$SHA" | grep -Eqx \'[0-9a-f]{40}\' || { echo "::error::sha must be a full 40-character commit SHA, got \'$SHA\'"; exit 1; }',
@@ -81,8 +68,12 @@ export const PROOF = [
 ].join('\n')
 const ON_DISPATCH = "github.event_name == 'workflow_dispatch'"
 const NOT_DISPATCH = "github.event_name != 'workflow_dispatch'"
-const RUN_RULE = "github.event_name != 'push' || needs.ios-changes.outputs.run == 'true'"
-export const RUN_IF = `\${{ ${RUN_RULE} }}`
+// The only cache values that are off on a dispatch: the condition itself, or a cache name chosen
+// only when it holds. A substring match let `${{ NOT_DISPATCH || 'npm' }}` cache on a dispatch.
+const DISPATCH_FREE_CACHE = new RegExp(
+  `^\\$\\{\\{ ${NOT_DISPATCH.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?: && '[a-z]+' \\|\\| '')? \\}\\}$`
+)
+
 export const CONSUMER_IF = "${{ !cancelled() && needs.ios-build.result == 'success' }}"
 // A dispatch saves no cache, so ios-build hands the scanned client to the consumers of its run as
 // this artifact: a tar, since upload-artifact drops the executable bit.
@@ -359,19 +350,14 @@ export function requiredConditions(condition) {
 }
 const requires = (holder, condition) => requiredConditions(holder?.if).includes(condition)
 
-/** The push and nightly caller: main's own code, which may write the caches. */
-function pushProblems(push, check) {
-  const on = onOf(push)
+/** The nightly and dispatch caller: main's nightly run may write the caches; a dispatch saves none. */
+function nightlyProblems(nightly, check) {
+  const on = onOf(nightly)
   check(
-    same(Object.keys(on ?? {}).sort(), ['push', 'schedule']),
-    'ios-native.yml runs only on a merge to main and nightly; a pull request commit runs ios-native-dispatch.yml'
-  )
-  check(
-    same(on?.push?.branches, ['main']) &&
-      Array.isArray(on?.push?.paths) &&
-      on.push.paths.includes(PUSH_WORKFLOW) &&
-      on.push.paths.includes(JOBS_WORKFLOW),
-    'ios-native runs on a merge to main, filtered by its native iOS inputs, its own file and the jobs'
+    same(Object.keys(on ?? {}).sort(), ['schedule', 'workflow_dispatch']) &&
+      (on.workflow_dispatch === null ||
+        Object.keys(on.workflow_dispatch ?? {}).length === 0),
+    'ios-native.yml runs only nightly and on a manual dispatch without inputs: no macOS job runs on a pull request or a merge'
   )
   const crons = [on?.schedule ?? []].flat().map((entry) => entry?.cron)
   check(
@@ -379,24 +365,24 @@ function pushProblems(push, check) {
     'ios-native needs one nightly schedule: a fixed minute and hour, every day'
   )
   check(
-    push?.['run-name'] === PUSH_RUN_NAME,
-    `ios-native.yml: the run name must be "${PUSH_RUN_NAME}"`
+    nightly?.['run-name'] === NIGHTLY_RUN_NAME,
+    `ios-native.yml: the run name must be "${NIGHTLY_RUN_NAME}"`
   )
   check(
-    same(push?.permissions, { contents: 'read' }) &&
-      push?.['cache-mode'] === undefined &&
-      String(push?.concurrency?.group ?? '').includes('${{ github.event_name }}') &&
-      String(push?.concurrency?.group ?? '').includes(PUSH_COMMIT),
+    same(nightly?.permissions, { contents: 'read' }) &&
+      nightly?.['cache-mode'] === undefined &&
+      String(nightly?.concurrency?.group ?? '').includes('${{ github.event_name }}') &&
+      String(nightly?.concurrency?.group ?? '').includes(NIGHTLY_COMMIT),
     'ios-native.yml: contents: read only, the trusted cache default, and one run per event and commit'
   )
 }
 
-/** The merge caller's jobs: ios-changes decides, then the jobs run for github.sha. */
-function pushJobProblems(push, check) {
-  const jobs = push?.jobs ?? {}
+/** The nightly caller's one job: the jobs call for github.sha, never the canary. */
+function nightlyCallProblems(nightly, check) {
+  const jobs = nightly?.jobs ?? {}
   check(
-    same(Object.keys(jobs).sort(), [DECISION_JOB, 'ios-native']),
-    'ios-native.yml holds ios-changes and the jobs call'
+    same(Object.keys(jobs), ['ios-native']),
+    'ios-native.yml holds only the jobs call'
   )
   const call = jobs['ios-native']
   check(
@@ -405,137 +391,28 @@ function pushJobProblems(push, check) {
   )
   check(
     call?.uses === `./${JOBS_WORKFLOW}` &&
-      same(call?.with, { sha: PUSH_COMMIT }) &&
-      call?.needs === DECISION_JOB &&
-      call?.if === RUN_IF &&
+      same(call?.with, { sha: NIGHTLY_COMMIT }) &&
+      call?.needs === undefined &&
+      call?.if === undefined &&
       call?.['cache-mode'] === undefined &&
       call?.permissions === undefined,
-    'ios-native.yml must call the jobs for github.sha, skipping only a merge that changed no native iOS input'
+    'ios-native.yml must call the jobs for github.sha on every run'
   )
-  const decision = jobs[DECISION_JOB]
-  check(
-    decision?.['runs-on'] === 'ubuntu-latest' && decision?.['timeout-minutes'] === 5,
-    'ios-changes: a 5-minute Linux job'
-  )
-  commitProblems(`ios-native.yml ${DECISION_JOB}`, decision, PUSH_COMMIT, check)
-  const step = steps(decision).find((row) => row.id === 'changes')
-  check(
-    decision?.outputs?.run === '${{ steps.changes.outputs.run }}' &&
-      step?.run === 'node scripts/ci/ios-native-inputs.mjs push-changes' &&
-      step.env?.EVENT === '${{ github.event_name }}' &&
-      step.env?.BEFORE === '${{ github.event.before }}' &&
-      step.if === undefined &&
-      steps(decision).at(-1) === step,
-    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event and the commit before the merge'
-  )
-}
-
-/** IOS-01: the dispatch caller grants read-only cache access to every job, enforced by GitHub. */
-function dispatchProblems(dispatch, check) {
-  const on = onOf(dispatch)
-  const sha = on?.workflow_dispatch?.inputs?.sha
-  check(
-    same(Object.keys(on ?? {}), ['workflow_dispatch']) &&
-      sha?.required === true &&
-      sha.type === 'string' &&
-      Object.keys(on.workflow_dispatch.inputs).length === 1,
-    'ios-native-dispatch.yml runs only on a dispatch naming exactly one commit, by a required sha input'
-  )
-  check(
-    dispatch?.['run-name'] === RUN_NAME,
-    `ios-native-dispatch.yml: the run name must be "${RUN_NAME}"`
-  )
-  const jobs = dispatch?.jobs ?? {}
-  check(
-    dispatch?.['cache-mode'] === 'read' &&
-      Object.values(jobs).length > 0 &&
-      Object.values(jobs).every((job) => job?.['cache-mode'] === 'read'),
-    'ios-native-dispatch.yml: cache-mode: read on the workflow and on every job, so no job can save a cache'
-  )
-  check(
-    same(Object.keys(jobs).sort(), ['ios-cache-proof', 'ios-native']),
-    'ios-native-dispatch.yml holds the jobs call and ios-cache-proof'
-  )
-  const call = jobs['ios-native']
-  check(
-    call?.with?.[CANARY_INPUT] === undefined,
-    `ios-native-dispatch.yml never passes ${CANARY_INPUT}: the pull request evidence runs the gating simulator`
-  )
-  check(
-    same(dispatch?.permissions, { contents: 'read' }) &&
-      call?.uses === `./${JOBS_WORKFLOW}` &&
-      same(call?.with, { sha: COMMIT }) &&
-      call?.permissions === undefined &&
-      call?.if === undefined &&
-      call?.needs === undefined,
-    'ios-native-dispatch.yml: call the jobs for inputs.sha with contents: read only'
-  )
-  probeProblems(jobs[PROBE_JOB], check)
-}
-
-/** ios-cache-proof tries a save and a direct cache API write, and fails if either stored anything. */
-function probeProblems(probe, check) {
-  const rows = steps(probe)
-  check(
-    same(probe?.permissions, { actions: 'read' }) &&
-      probe?.['runs-on'] === 'ubuntu-latest' &&
-      rows.length === 4 &&
-      !rows.some((row) => /^actions\/checkout|^\.\//.test(String(row.uses ?? ''))) &&
-      String(probe?.env?.PROBE ?? '').startsWith(
-        'ios-native-dispatch-probe-${{ github.run_id }}'
-      ),
-    'ios-cache-proof: actions: read only, no checkout and no local action, four steps'
-  )
-  probeStepProblems(rows, check)
-}
-
-/** The four probe steps: list, save, reserve through the API, list again and fail on any entry. */
-function probeStepProblems(rows, check) {
-  const [before = {}, save = {}, api = {}, after = {}] = rows.map((row) => row ?? {})
-  const script = String(api.with?.script ?? '')
-  const saves =
-    CACHE_ACTION.test(String(save.uses)) &&
-    String(save.uses).startsWith('actions/cache/save') &&
-    save.with?.key === '${{ env.PROBE }}-save'
-  const reserves =
-    String(api.uses).startsWith('actions/github-script@') &&
-    [
-      /CreateCacheEntry/,
-      /ACTIONS_CACHE_MODE/,
-      /core\.setFailed\('The cache service reserved a writable entry/,
-    ].every((pattern) => pattern.test(script))
-  check(
-    /gh api -X GET "repos\/\$GH_REPO\/actions\/caches" -f key="\$PROBE"/.test(
-      String(before.run)
-    ) &&
-      saves &&
-      reserves &&
-      after.if === '${{ !cancelled() }}' &&
-      /if \[ -n "\$entries" \]; then[\s\S]*exit 1/.test(String(after.run)),
-    'ios-cache-proof: list, save, reserve through the API, then fail if any probe entry exists'
-  )
-  for (const row of rows)
-    check(
-      !disabledCondition(row.if) &&
-        row['continue-on-error'] === undefined &&
-        !neutralizedRun(row.run),
-      `ios-cache-proof: "${row.name}" must run and be able to fail`
-    )
 }
 
 /**
  * C-16: the nightly canary runs the jobs on main's head with the shards and Expo Go on the iOS
  * 26.5 simulator. Schedule only, its own nightly slot and queue, and nothing else in it.
  */
-function canaryProblems(canary, push, check) {
+function canaryProblems(canary, nightly, check) {
   const on = onOf(canary)
   const crons = [on?.schedule ?? []].flat().map((entry) => entry?.cron)
-  const nightly = [onOf(push)?.schedule ?? []].flat().map((entry) => entry?.cron)
+  const nightlyCrons = [onOf(nightly)?.schedule ?? []].flat().map((entry) => entry?.cron)
   check(
     same(Object.keys(on ?? {}), ['schedule']) &&
       crons.length === 1 &&
       NIGHTLY.test(String(crons[0])) &&
-      !nightly.includes(crons[0]),
+      !nightlyCrons.includes(crons[0]),
     'ios-native-canary.yml runs only on its own nightly schedule, apart from ios-native.yml'
   )
   check(
@@ -551,7 +428,7 @@ function canaryProblems(canary, push, check) {
     same(Object.keys(jobs), [CANARY_JOB]) &&
       same(Object.keys(call ?? {}).sort(), ['uses', 'with']) &&
       call.uses === `./${JOBS_WORKFLOW}` &&
-      same(call.with, { sha: PUSH_COMMIT, [CANARY_INPUT]: true }),
+      same(call.with, { sha: NIGHTLY_COMMIT, [CANARY_INPUT]: true }),
     `ios-native-canary.yml: one call of the jobs for github.sha with ${CANARY_INPUT}: true`
   )
 }
@@ -982,7 +859,7 @@ function cacheStepProblems(name, job, step, check) {
     check(
       (cache === undefined && !uses.startsWith('actions/setup-go')) ||
         reach.neverDispatch ||
-        String(cache).includes(NOT_DISPATCH),
+        DISPATCH_FREE_CACHE.test(String(cache)),
       `${label}: ${uses.split('@')[0].split('/')[1]} caches on a dispatch; set its cache from ${NOT_DISPATCH}`
     )
   }
@@ -1000,13 +877,12 @@ export function iosNativeProblems(files) {
     const on = onOf(files[file])
     check(
       on && !('pull_request' in on) && !('pull_request_target' in on),
-      `${file} never runs on a pull request: a run must test main’s copy of these workflows`
+      `${file} never runs on a pull request: no macOS job runs on a pull request or gates a merge`
     )
   }
-  pushProblems(files[PUSH_WORKFLOW], check)
-  pushJobProblems(files[PUSH_WORKFLOW], check)
-  dispatchProblems(files[DISPATCH_WORKFLOW], check)
-  canaryProblems(files[CANARY_WORKFLOW], files[PUSH_WORKFLOW], check)
+  nightlyProblems(files[NIGHTLY_WORKFLOW], check)
+  nightlyCallProblems(files[NIGHTLY_WORKFLOW], check)
+  canaryProblems(files[CANARY_WORKFLOW], files[NIGHTLY_WORKFLOW], check)
   jobsFileProblems(jobsFile, check)
   eligibilityProblems(files, check)
   shapeProblems(jobs, check)
@@ -1019,7 +895,7 @@ export function iosNativeProblems(files) {
   return problems
 }
 
-/** The four workflows, parsed, by file name. */
+/** The three workflows, parsed, by file name. */
 export function readWorkflows(read = (file) => fs.readFileSync(file, 'utf8')) {
   return Object.fromEntries(WORKFLOW_FILES.map((file) => [file, parse(read(file))]))
 }
