@@ -134,6 +134,20 @@ describe('the iOS evidence a pull request head needs', () => {
     assert.equal((await judgeEvent(dispatched)).state, 'success')
   })
 
+  // C-14 P1: a module's types.ts is the contract index.native.ts casts the native module to, and
+  // its package.json is the autolinking entry, so a change to either alone needs the dispatch.
+  for (const changed of [
+    'apps/mobile/modules/share-card-photo-save/types.ts',
+    'apps/mobile/modules/modal-system-bars/package.json',
+  ])
+    test(`a change to ${changed} alone needs a dispatch of its head commit`, async () => {
+      const result = await judgeEvent(fakeGitHub({ diff: [changed] }))
+      assert.equal(result.state, 'failure')
+      assert.ok(result.detail.includes(`${changed} changed`), result.detail)
+      const dispatched = fakeGitHub({ diff: [changed], runs: [run()] })
+      assert.equal((await judgeEvent(dispatched)).state, 'success')
+    })
+
   test('a pull request that changes no native iOS input needs none', () => {
     const result = verdict(
       [],

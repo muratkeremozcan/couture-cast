@@ -66,12 +66,17 @@ export const PUSH_ONLY_PATHS = [
   '!packages/**/*.spec.*',
   '!packages/**/*.md',
 ]
-// The JavaScript a pull request needs a dispatch for: each native module's JavaScript contract,
-// the callers that bind a native module (ios-native-inputs.test.mjs derives them from the tree
-// and fails on a caller outside this list), and the bundler configuration the iOS shards'
-// Release bundle is built with.
+// The JavaScript a pull request needs a dispatch for: every top-level file of a native module (its
+// entries, its types.ts contract and its package.json autolinking entry), minus tests and
+// Markdown, which the push paths leave out too; the callers that bind a native module
+// (ios-native-inputs.test.mjs derives them from the tree and fails on a caller outside this
+// list); and the bundler configuration the iOS shards' Release bundle is built with. The list
+// comes after every negation of the push paths, so the last match still decides.
 export const EVIDENCE_JS_PATHS = [
-  'apps/mobile/modules/*/index.native.ts',
+  'apps/mobile/modules/*/*',
+  '!apps/mobile/modules/*/*.test.*',
+  '!apps/mobile/modules/*/*.spec.*',
+  '!apps/mobile/modules/*/*.md',
   'apps/mobile/src/lib/share-card-save.native.ts',
   'apps/mobile/src/lib/share-card-share.native.ts',
   'apps/mobile/src/lib/widget-share.ts',

@@ -695,6 +695,14 @@ describe('the push paths and the evidence inputs', () => {
       'apps/mobile/modules/share-card-photo-save/ios/ShareCardPhotoSaveModule.swift',
       'apps/mobile/app.json',
       'apps/mobile/package.json',
+      // C-14 P1: every top-level file of a native module is its contract or autolinking entry.
+      'apps/mobile/modules/share-card-photo-save/types.ts',
+      'apps/mobile/modules/accessibility-focus/types.ts',
+      'apps/mobile/modules/modal-system-bars/package.json',
+      'apps/mobile/modules/modal-system-bars/index.ts',
+      'apps/mobile/modules/share-card-native-share/expo-module.config.json',
+      'apps/mobile/modules/new-module/constants.ts',
+      'apps/mobile/native-tests/ShareCardShareSheetUITests.swift',
     ],
     neither: [
       'packages/db/src/client.ts',
@@ -706,6 +714,10 @@ describe('the push paths and the evidence inputs', () => {
       'packages/utils/src/index.test.ts',
       'apps/mobile/README.md',
       'packages/utils/README.md',
+      'apps/mobile/plugins/with-share-card-permissions.test.js',
+      'apps/mobile/modules/share-card-photo-save/types.test.ts',
+      'apps/mobile/modules/share-card-photo-save/index.spec.ts',
+      'apps/mobile/modules/share-card-photo-save/README.md',
       'apps/web/app/page.tsx',
       'apps/api/src/main.ts',
     ],
@@ -773,6 +785,18 @@ describe('the push paths and the evidence inputs', () => {
       callers.includes('apps/mobile/modules/share-card-photo-save/index.native.ts')
     )
     assert.deepEqual(nativeCallerProblems(tracked, read, evidence), [])
+    // C-14 P1: a module's top-level files hold its contract (types.ts) and its autolinking entry
+    // (package.json) without calling a require function, so each one is an evidence input too.
+    const moduleFiles = tracked.filter(
+      (file) =>
+        /^apps\/mobile\/modules\/[^/]+\/[^/]+$/.test(file) && !TEST_ONLY.test(file)
+    )
+    assert.ok(moduleFiles.includes('apps/mobile/modules/share-card-photo-save/types.ts'))
+    assert.ok(moduleFiles.includes('apps/mobile/modules/modal-system-bars/package.json'))
+    assert.deepEqual(
+      moduleFiles.filter((file) => !matchesAny(file, evidence)),
+      []
+    )
   })
 
   test('a new caller outside the evidence inputs fails the guard; tests and test helpers do not', () => {
