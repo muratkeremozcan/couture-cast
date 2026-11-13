@@ -47,6 +47,7 @@ jobs:
       # permission to, main's guard turns the gate status on that head to failure, after PR Gate's
       # own verdict.
       - name: Fetch main's iOS evidence guard
+        id: guard_checkout
         if: always()
         uses: actions/checkout@v4
         with:
@@ -62,11 +63,25 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
-        # The pull request that adds the guard runs before main has it.
+          CHECKOUT: ${{ steps.guard_checkout.outcome }}
+        # It fails unless main's copy was checked out, and it skips only when main's commit holds
+        # no guard yet, which happens on the pull request that adds it. ls-tree reads the tree,
+        # which the sparse checkout has whole, so a missing blob cannot pass for an absent file.
         run: |
-          if [ -f scripts/ci/ios-native-evidence.mjs ]; then
-            node scripts/ci/ios-native-evidence.mjs gate-guard
-          else
-            echo "main has no iOS evidence guard yet"
+          set -euo pipefail
+          guard=scripts/ci/ios-native-evidence.mjs
+          if [ "$CHECKOUT" != success ]; then
+            echo "::error::main's iOS evidence guard could not be checked out ($CHECKOUT)"
+            exit 1
           fi
+          if [ -f "$guard" ]; then
+            node "$guard" gate-guard
+            exit 0
+          fi
+          listed=$(git ls-tree --name-only HEAD -- "$guard")
+          if [ -n "$listed" ]; then
+            echo "::error::$guard is on main at $(git rev-parse HEAD) but missing from the checkout"
+            exit 1
+          fi
+          echo "main at $(git rev-parse HEAD) has no iOS evidence guard yet; the pull request that adds it runs before it merges"
 #

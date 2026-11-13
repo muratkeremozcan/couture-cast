@@ -730,6 +730,72 @@ describe('the PR Gate guard', () => {
     assert.deepEqual(orphan.posted, [])
   })
 
+  // TEA P2: the guard step fails closed. It skips only when main's commit holds no guard.
+  const guardStep = () => {
+    const workflow = parse(fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'))
+    return workflow.jobs.watch.steps.at(-1)
+  }
+  const runGuardStep = ({ checkout, file, listed, gitFails = false }) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pr-gate-guard-'))
+    try {
+      const bin = path.join(dir, 'bin')
+      fs.mkdirSync(bin)
+      fs.writeFileSync(
+        path.join(bin, 'git'),
+        `#!/usr/bin/env bash\n${gitFails ? 'exit 128' : ''}\nif [ "$1" = ls-tree ]; then ${listed ? 'echo scripts/ci/ios-native-evidence.mjs' : 'true'}; else echo ${MAIN_SHA}; fi\n`,
+        { mode: 0o755 }
+      )
+      fs.writeFileSync(
+        path.join(bin, 'node'),
+        '#!/usr/bin/env bash\necho "guard ran: $*"\n',
+        { mode: 0o755 }
+      )
+      if (file) {
+        fs.mkdirSync(path.join(dir, 'scripts/ci'), { recursive: true })
+        fs.writeFileSync(path.join(dir, 'scripts/ci/ios-native-evidence.mjs'), '')
+      }
+      return spawnSync('bash', ['-e', '-c', guardStep().run], {
+        cwd: dir,
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, CHECKOUT: checkout },
+      })
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }
+
+  test('a checkout that failed, was skipped or was cancelled fails the guard step', () => {
+    assert.equal(guardStep().env.CHECKOUT, '${{ steps.guard_checkout.outcome }}')
+    for (const checkout of ['failure', 'skipped', 'cancelled', ''])
+      assert.notEqual(
+        runGuardStep({ checkout, file: false, listed: false }).status,
+        0,
+        checkout
+      )
+  })
+
+  test('a guard on main that is missing from the checkout fails the guard step', () => {
+    const result = runGuardStep({ checkout: 'success', file: false, listed: true })
+    assert.notEqual(result.status, 0)
+    assert.match(result.stdout, /is on main at .* but missing from the checkout/)
+    assert.notEqual(
+      runGuardStep({ checkout: 'success', file: false, gitFails: true }).status,
+      0
+    )
+  })
+
+  test('only a main without the guard, the pull request that adds it, skips with a message', () => {
+    const result = runGuardStep({ checkout: 'success', file: false, listed: false })
+    assert.equal(result.status, 0)
+    assert.match(result.stdout, /has no iOS evidence guard yet/)
+    const ran = runGuardStep({ checkout: 'success', file: true, listed: true })
+    assert.equal(ran.status, 0)
+    assert.match(
+      ran.stdout,
+      /guard ran: scripts\/ci\/ios-native-evidence\.mjs gate-guard/
+    )
+  })
+
   test("pr-gate.yml runs main's guard after its verdict, on every event", () => {
     const workflow = parse(fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'))
     const job = workflow.jobs.watch
@@ -740,10 +806,11 @@ describe('the PR Gate guard', () => {
     const [checkout, run] = job.steps.slice(gate + 1)
     assert.ok(gate >= 0 && job.steps.length === gate + 3)
     assert.equal(checkout.if, 'always()')
+    assert.equal(checkout.id, 'guard_checkout')
     assert.equal(checkout.with.ref, '${{ github.event.repository.default_branch }}')
     assert.equal(checkout.with['persist-credentials'], false)
     assert.equal(run.if, 'always()')
-    assert.match(run.run, /node scripts\/ci\/ios-native-evidence\.mjs gate-guard/)
+    assert.match(run.run, /node "\$guard" gate-guard/)
     assert.equal(
       run.env.HEAD_SHA,
       '${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}'
