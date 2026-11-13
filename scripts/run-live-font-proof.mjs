@@ -30,6 +30,7 @@ import {
   flattenHierarchy,
   readWithMounts,
   mountTracker,
+  settleCapture,
   readEnvironment,
   restoreFailure,
   rootIdentity,
@@ -368,25 +369,16 @@ async function scrollToTop(screenName) {
 async function settle(screenName, stage, scale) {
   // Two identical hierarchies at least a second apart, within 60 seconds: a cold Debug launch
   // keeps loading the teaser and the outfit images for a while after the anchors appear.
-  // Every read of a before settle widens the mount tracker, so a scope one dump drops (iOS loses
-  // a 1x1 marker view now and then) is still reread for when the capture is taken.
-  const read = () => {
-    const flat = flattenHierarchy(hierarchy(), { platform, volatile: activeVolatile })
-    mounts.captured(stage, flat.markers)
-    return flat.nodes
-  }
-  const deadline = Date.now() + 60_000
-  let previous = read()
-  let since = Date.now()
-  while (Date.now() < deadline) {
-    await pause(500)
-    const current = read()
-    if (!sameLayout(current, previous)) {
-      previous = current
-      since = Date.now()
-    } else if (Date.now() - since >= 1000) return makeCapture(screenName, stage, scale)
-  }
-  throw new Error(`live_font_stable_state_deadline:${screenName}:${stage}`)
+  // Every read of a before settle widens the mount tracker (settleCapture).
+  return settleCapture({
+    read: () => flattenHierarchy(hierarchy(), { platform, volatile: activeVolatile }),
+    capture: () => makeCapture(screenName, stage, scale),
+    mounts,
+    stage,
+    pause,
+    now: () => Date.now(),
+    deadlineError: `live_font_stable_state_deadline:${screenName}:${stage}`,
+  })
 }
 
 function launch() {

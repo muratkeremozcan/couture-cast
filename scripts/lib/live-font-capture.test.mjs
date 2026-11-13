@@ -18,6 +18,7 @@ import {
   missingMounts,
   mountScopes,
   mountTracker,
+  settleCapture,
   widenMounts,
   readWithMounts,
   rootIdentity,
@@ -775,4 +776,94 @@ test('mountTracker widens after a before capture and resets at each launch', () 
   assert.deepEqual(tracker.scopes(), ['root', 'settings', 'home'])
   tracker.launched()
   assert.deepEqual(tracker.scopes(), ['root', 'settings'])
+})
+
+// Antigravity handover r4 (P3): the settle's own reads widen the tracker, so a Home marker the
+// first read shows and every later read drops is still reread for by the capture.
+describe('settleCapture', () => {
+  const clock = () => {
+    let time = 0
+    return { now: () => time, pause: async (ms) => void (time += ms) }
+  }
+  const nodes = [{ id: 'title', text: 'Settings', bounds: '[0,0][100,20]' }]
+  const home = [
+    'live-font-mount-home-h1',
+    'live-font-mount-root-r1',
+    'live-font-mount-settings-s1',
+  ]
+  const dropped = ['live-font-mount-root-r1', 'live-font-mount-settings-s1']
+
+  test('a scope only the first settle read showed is reread for by the capture', async () => {
+    const mounts = mountTracker(['root', 'settings'])
+    const settleReads = [home, dropped, dropped, dropped, dropped]
+    let index = 0
+    const read = () => ({
+      nodes,
+      markers: settleReads[Math.min(index++, settleReads.length - 1)],
+    })
+    const captureReads = [dropped, home]
+    let captureIndex = 0
+    const { now, pause } = clock()
+    const captured = await settleCapture({
+      read,
+      capture: () =>
+        readWithMounts(
+          () => ({ markers: captureReads[captureIndex++] }),
+          mounts.scopes()
+        ),
+      mounts,
+      stage: 'before',
+      pause,
+      now,
+      deadlineError: 'deadline',
+    })
+    assert.deepEqual(mounts.scopes(), ['root', 'settings', 'home'])
+    assert.equal(captureIndex, 2, 'the capture reread once for home')
+    assert.deepEqual(captured.markers, home)
+  })
+
+  test('only a before settle widens, and the capture waits for a stable layout', async () => {
+    const mounts = mountTracker(['root', 'settings'])
+    const layouts = [[], nodes, nodes, nodes, nodes]
+    let index = 0
+    const read = () => ({
+      nodes: layouts[Math.min(index++, layouts.length - 1)],
+      markers: home,
+    })
+    const { now, pause } = clock()
+    let at
+    await settleCapture({
+      read,
+      capture: () => (at = now()),
+      mounts,
+      stage: 'settled',
+      pause,
+      now,
+      deadlineError: 'deadline',
+    })
+    assert.deepEqual(mounts.scopes(), ['root', 'settings'])
+    // Changed at 500 ms, identical at 1000 and 1500 ms: stable for 1000 ms at 1500 ms.
+    assert.equal(at, 1500)
+  })
+
+  test('a screen that never settles throws the deadline error', async () => {
+    let index = 0
+    const read = () => ({
+      nodes: [{ id: 'n', text: String(index++), bounds: '[0,0][1,1]' }],
+      markers: [],
+    })
+    const { now, pause } = clock()
+    await assert.rejects(
+      settleCapture({
+        read,
+        capture: () => assert.fail('no capture'),
+        mounts: mountTracker(['root']),
+        stage: 'before',
+        pause,
+        now,
+        deadlineError: 'live_font_stable_state_deadline:home:before',
+      }),
+      { message: 'live_font_stable_state_deadline:home:before' }
+    )
+  })
 })

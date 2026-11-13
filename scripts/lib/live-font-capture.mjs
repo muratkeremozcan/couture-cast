@@ -587,3 +587,41 @@ export function assertHierarchySource(
       throw new Error(`live_font_hierarchy_wrong_build:${seen ?? 'missing'}`)
   }
 }
+
+/**
+ * Waits for two identical hierarchies at least `stableMs` apart, within `timeoutMs`, then takes
+ * the capture. `read` returns a flattened hierarchy ({ nodes, markers }); every read feeds the
+ * mount tracker, so a scope one dump of a before settle drops (iOS loses a 1x1 marker view now
+ * and then) is still reread for when `capture` is taken. Throws `deadlineError` when the screen
+ * never settles.
+ */
+export async function settleCapture({
+  read,
+  capture,
+  mounts,
+  stage,
+  pause,
+  now,
+  deadlineError,
+  timeoutMs = 60_000,
+  stableMs = 1000,
+  intervalMs = 500,
+}) {
+  const nodes = () => {
+    const flat = read()
+    mounts.captured(stage, flat.markers)
+    return flat.nodes
+  }
+  const deadline = now() + timeoutMs
+  let previous = nodes()
+  let since = now()
+  while (now() < deadline) {
+    await pause(intervalMs)
+    const current = nodes()
+    if (!sameLayout(current, previous)) {
+      previous = current
+      since = now()
+    } else if (now() - since >= stableMs) return capture()
+  }
+  throw new Error(deadlineError)
+}
