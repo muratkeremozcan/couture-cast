@@ -1,79 +1,130 @@
 # Story 6.15 D1, D6 and test design C-11: a pull request that changes a native iOS input merges
 # only with iOS evidence on its exact head commit, a successful ios-native.yml run dispatched from
-# main with `sha` set to that commit (scripts/ci/ios-native-evidence.mjs). The check runs on every
-# head; a new push needs a new dispatch. When a dispatch completes, rerun-evidence re-runs the
-# failed check of each open pull request whose head it tested, so the check turns green without a
-# new push. PR Gate requires the check like every other.
+# main with `sha` set to that commit (scripts/ci/ios-native-evidence.mjs). The verdict is the
+# `ios-native-evidence` commit status on that head commit, which the branch ruleset requires.
+#
+# The judge must be main's, never the pull request's: a pull_request workflow runs the pull
+# request's own copy of this file, which it could edit to pass. So the pull request job runs on
+# pull_request_target, checks out main and nothing of the pull request, uses no secret, and judges
+# the head commit named in the event payload through the API. A pull_request_target run belongs
+# to the base commit, so its own check run never reaches the pull request head; the job posts the
+# status on the head commit itself, in a step that always runs, so a crash or a timeout ends in
+# failure and never in a status that stays pending. When an ios-native.yml dispatch completes,
+# the workflow_run job judges every open pull request whose head that dispatch tested and posts
+# the status again, so it turns green without a new push.
 name: iOS native evidence
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
   workflow_run:
     workflows: ['iOS native']
     types: [completed]
 
-permissions:
-  contents: read
+permissions: {}
 
+# Both jobs judge one head commit at a time, in order, so an older verdict never lands last.
 concurrency:
-  group: ios-native-evidence-${{ github.event.pull_request.number || github.event.workflow_run.id }}
-  cancel-in-progress: true
+  group: ios-native-evidence-${{ github.event.pull_request.head.sha && format('iOS native {0}', github.event.pull_request.head.sha) || github.event.workflow_run.display_title }}
+  cancel-in-progress: false
 
 jobs:
-  ios-native-evidence:
-    name: iOS native evidence
-    if: github.event_name == 'pull_request'
+  pull-request:
+    name: Judge the pull request head
+    if: github.event_name == 'pull_request_target'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: read
       actions: read
+      contents: read
+      pull-requests: read
+      statuses: write
     steps:
-      # The base branch's copy of the check, so a pull request cannot loosen the check it must
-      # pass. The first pull request that adds it has no base copy and runs its own, with a warning.
-      - name: Checkout the base branch's evidence check
+      - name: Fetch main's evidence rules
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
           sparse-checkout: |
-            scripts/ci/ios-native-evidence.mjs
-            scripts/ci/lanes.mjs
+            /.nvmrc
+            /.github/workflows/ios-native.yml
+            /scripts/ci/ios-native-evidence.mjs
+            /scripts/ci/ios-native-inputs.mjs
+            /scripts/ci/lanes.mjs
           sparse-checkout-cone-mode: false
-
-      - name: Fall back to this pull request's check when the base has none
-        if: hashFiles('scripts/ci/ios-native-evidence.mjs') == ''
-        env:
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          echo "::warning::The base branch has no scripts/ci/ios-native-evidence.mjs yet; running this pull request's copy."
-          git fetch --depth=1 origin "$HEAD_SHA"
-          git restore --source=FETCH_HEAD -- scripts/ci/ios-native-evidence.mjs scripts/ci/lanes.mjs
-
-      - name: Require iOS evidence on the head commit
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Judge the head commit
+        id: verdict
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/ci/ios-native-evidence.mjs check
+        run: node scripts/ci/ios-native-evidence.mjs pull-request
+      - name: Post the ios-native-evidence status on the head commit
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SHA: ${{ github.event.pull_request.head.sha }}
+          STATE: ${{ steps.verdict.outputs.state }}
+          DESCRIPTION: ${{ steps.verdict.outputs.description }}
+          TARGET: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          case "$STATE" in
+            success | pending | failure) description="$DESCRIPTION" ;;
+            *) STATE=failure description='The iOS native evidence check did not finish; re-run it' ;;
+          esac
+          gh api -X POST "repos/$GH_REPO/statuses/$SHA" -f state="$STATE" \
+            -f context=ios-native-evidence -f description="${description:0:140}" -f target_url="$TARGET"
 
-  rerun-evidence:
-    name: Re-run the evidence check after a dispatch
+  dispatch-completed:
+    name: Judge the pull requests a dispatch tested
     if: github.event_name == 'workflow_run'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      actions: write
+      actions: read
       contents: read
       pull-requests: read
+      statuses: write
     steps:
-      - name: Checkout the evidence check
+      - name: Fetch main's evidence rules
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
           sparse-checkout: |
-            scripts/ci/ios-native-evidence.mjs
-            scripts/ci/lanes.mjs
+            /.nvmrc
+            /.github/workflows/ios-native.yml
+            /scripts/ci/ios-native-evidence.mjs
+            /scripts/ci/ios-native-inputs.mjs
+            /scripts/ci/lanes.mjs
           sparse-checkout-cone-mode: false
-
-      - name: Re-run the failed check of each pull request this dispatch tested
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Post the status of each open pull request whose head this dispatch tested
         env:
           GITHUB_TOKEN: ${{ github.token }}
-        run: node scripts/ci/ios-native-evidence.mjs rerun
+        run: node scripts/ci/ios-native-evidence.mjs dispatch-completed
+      # A crash or a timeout must not leave the dispatched commit pending on an older verdict.
+      - name: Post failure on the dispatched commit when judging did not finish
+        if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event.workflow_run.event }}
+          BRANCH: ${{ github.event.workflow_run.head_branch }}
+          TITLE: ${{ github.event.workflow_run.display_title }}
+          TARGET: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          sha="${TITLE#iOS native }"
+          if [ "$EVENT" != workflow_dispatch ] || [ "$BRANCH" != main ] || [ "iOS native $sha" != "$TITLE" ] ||
+            ! echo "$sha" | grep -Eqx '[0-9a-f]{40}'; then
+            echo 'Not a dispatch from main naming a commit; no status to post.'
+            exit 0
+          fi
+          gh api -X POST "repos/$GH_REPO/statuses/$sha" -f state=failure -f context=ios-native-evidence \
+            -f description='Judging this dispatch did not finish; re-run iOS native evidence' -f target_url="$TARGET"

@@ -3,21 +3,38 @@
 // macOS jobs it carries already proved (a client scanned before it is cached and installed only
 // from that scan, every shard with its own runtime, budget and fail-closed evidence, a merge that
 // fails on a skipped or partial shard), and what makes a run usable as a pull request's evidence:
-// the run name carries the commit, and every job checks out exactly that commit first.
+// the run name carries the commit, and every job checks out exactly that commit first. A dispatch
+// runs an unmerged commit on ref main, so it saves nothing in main's cache scope except its own
+// client under a prefix no push or nightly key reaches, and a final job deletes that.
 import fs from 'node:fs'
+import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
+import { matchesAny } from './lanes.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
 
 export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
 export const MACOS_JOBS = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-build']
-export const JOBS = [...MACOS_JOBS, 'ios-evidence']
+// The jobs that check out the commit; ios-dispatch-cleanup checks out nothing.
+export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence', 'ios-changes']
 export const HARNESS_DIRECTORY = '_bmad-output/test-artifacts/story-6-8/runtime'
 export const EVIDENCE_PATH = `${HARNESS_DIRECTORY}/public-evidence/`
 export const IOS_CLIENT =
   '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app'
 export const COMMIT = '${{ inputs.sha || github.sha }}'
 export const RUN_NAME = `iOS native ${COMMIT}`
+export const CLEANUP_JOB = 'ios-dispatch-cleanup'
+export const DECISION_JOB = 'ios-changes'
+// A merge runs the iOS jobs only when ios-changes says it changed a native iOS input; a dispatch or
+// a nightly run never asks, so the commit it names cannot skip its own tests.
+const RUN_RULE = "github.event_name != 'push' || needs.ios-changes.outputs.run == 'true'"
+export const RUN_IF = `\${{ ${RUN_RULE} }}`
+export const JOBS = [...TEST_JOBS, CLEANUP_JOB]
+export const DISPATCH_PREFIX = 'dispatch-${{ inputs.sha }}-'
+const ON_DISPATCH = "github.event_name == 'workflow_dispatch'"
+const NOT_DISPATCH = "github.event_name != 'workflow_dispatch'"
+// The client a dispatch built itself travels under the prefix; everything else is main's key.
+export const APP_KEY = `\${{ ${ON_DISPATCH} && steps.native_cache.outputs.cache-hit != 'true' && format('dispatch-{0}-{1}', inputs.sha, steps.native_key.outputs.key) || steps.native_key.outputs.key }}`
 // GitHub-hosted runners stop any job at 360 minutes; the shards keep the 70 their budget assumes.
 const HOSTED_JOB_LIMIT = 360
 const SHARD_LIMIT = 70
@@ -100,7 +117,7 @@ function jobProblems(workflow, check) {
     JSON.stringify(Object.keys(jobs).sort()) === JSON.stringify([...JOBS].sort()),
     `ios-native holds exactly ${JOBS.join(', ')}`
   )
-  for (const name of JOBS) {
+  for (const name of TEST_JOBS) {
     const job = jobs[name]
     const macos = MACOS_JOBS.includes(name)
     check(
@@ -124,16 +141,14 @@ function jobProblems(workflow, check) {
 
 /** One build, then the four shards and Expo Go in parallel on what it cached. */
 function shapeProblems(jobs, check) {
-  const { 'ios-build': build, 'ios-shard': shard, 'ios-expo-go': expoGo } = jobs
+  const { 'ios-shard': shard, 'ios-expo-go': expoGo } = jobs
   const evidence = jobs['ios-evidence']
-  check(
-    build?.needs === undefined && build?.if === undefined,
-    'ios-build starts the run and depends on nothing'
-  )
-  check(
-    jobs['ios-app-build']?.needs === undefined && jobs['ios-app-build']?.if === undefined,
-    'ios-app-build runs beside the client build'
-  )
+  for (const name of ['ios-build', 'ios-app-build'])
+    check(
+      jobs[name]?.needs === DECISION_JOB && jobs[name]?.if === RUN_IF,
+      `${name} must need only ios-changes, and skip only a merge that changed no native iOS input`
+    )
+  decisionProblems(jobs[DECISION_JOB], check)
   for (const [name, job] of [
     ['ios-shard', shard],
     ['ios-expo-go', expoGo],
@@ -162,11 +177,24 @@ function shapeProblems(jobs, check) {
   expoGoProblems(expoGo, check)
 }
 
+/** ios-changes answers for a merge only, from main's own diff of the commit it checked out. */
+function decisionProblems(decision, check) {
+  const step = (decision?.steps ?? []).find((row) => row.id === 'changes')
+  check(
+    decision?.outputs?.run === '${{ steps.changes.outputs.run }}' &&
+      step?.run === 'node scripts/ci/ios-native-inputs.mjs push-changes' &&
+      step.env?.EVENT === '${{ github.event_name }}' &&
+      step.env?.BEFORE === '${{ github.event.before }}' &&
+      decision.steps.at(-1) === step,
+    'ios-changes: decide from scripts/ci/ios-native-inputs.mjs with the event and the commit before the merge'
+  )
+}
+
 /** ios-evidence runs after any shard result and fails unless every shard reported its exact cases. */
 function evidenceProblems(evidence, check) {
   check(
-    JSON.stringify(needsList(evidence)) === JSON.stringify(['ios-shard']) &&
-      evidence?.if === 'always()' &&
+    JSON.stringify(needsList(evidence)) === JSON.stringify([DECISION_JOB, 'ios-shard']) &&
+      evidence?.if === `\${{ always() && (${RUN_RULE}) }}` &&
       includesRun(evidence?.steps ?? [], 'native-ios-shards.mjs merge') &&
       includesRun(evidence?.steps ?? [], 'test "$CC68_SHARD_RESULT" = success'),
     'ios-evidence must run after any shard result and require every shard’s exact cases'
@@ -204,9 +232,12 @@ function clientProblems(build, check) {
     'ios-build: the client must be keyed by scripts/ci/native-build-cache.mjs'
   )
   check(
-    build?.outputs?.['app-key'] === keyOutput &&
-      build?.outputs?.['app-path'] === pathOutput,
-    'ios-build: publish the key and path the shards restore'
+    build?.outputs?.['app-path'] === pathOutput,
+    'ios-build: publish the path the shards restore'
+  )
+  check(
+    build?.outputs?.['app-key'] === APP_KEY,
+    'ios-build: app-key must be the main key except on a dispatch that built its own client'
   )
   const lookup = stepIndex(
     build,
@@ -241,14 +272,31 @@ function clientProblems(build, check) {
       steps[save].if?.includes("steps.app_scan.outcome == 'success'"),
     'ios-build: the client must be secret-scanned before it is cached'
   )
+  const dispatchKey = `${DISPATCH_PREFIX}${keyOutput}`
+  const dispatchSave = stepIndex(
+    build,
+    (step) =>
+      step.id === 'dispatch_save' &&
+      step.uses === 'actions/cache/save@v4' &&
+      step.with?.key === dispatchKey &&
+      step.with?.path === pathOutput
+  )
   check(
+    dispatchSave > scan &&
+      steps[dispatchSave].if?.includes("steps.app_scan.outcome == 'success'"),
+    'ios-build: a dispatch saves only the scanned client, under the dispatch prefix'
+  )
+  const proves = (key) =>
     stepIndex(
       build,
       (step) =>
         step.uses === 'actions/cache/restore@v4' &&
+        step.with?.key === key &&
         step.with?.['lookup-only'] === true &&
         step.with?.['fail-on-cache-miss'] === true
-    ) > save,
+    )
+  check(
+    save >= 0 && proves(keyOutput) > save && proves(dispatchKey) > dispatchSave,
     'ios-build: prove the saved key exists before the shards need it'
   )
 }
@@ -314,6 +362,211 @@ function runtimeProblems(jobs, check) {
   )
 }
 
+/**
+ * The conditions an `if` requires, or none when it has an `||` that could satisfy it another way.
+ * A conjunct listed here holds whenever the step or job runs.
+ */
+export function requiredConditions(condition) {
+  const body = String(condition ?? '')
+    .trim()
+    .replace(/^\$\{\{\s*/, '')
+    .replace(/\s*\}\}$/, '')
+  if (!body || body.includes('||')) return []
+  return body.split('&&').map((part) => part.trim())
+}
+
+const requires = (holder, condition) => requiredConditions(holder?.if).includes(condition)
+const stepOutputKey =
+  /^\$\{\{ (steps\.[\w-]+\.outputs\.[\w-]+|needs\.ios-build\.outputs\.app-key) \}\}$/
+
+/** Where a step can run: only on a dispatch, never on one, or either. */
+function dispatchReach(job, step) {
+  return {
+    dispatchOnly: requires(job, ON_DISPATCH) || requires(step, ON_DISPATCH),
+    neverDispatch: requires(job, NOT_DISPATCH) || requires(step, NOT_DISPATCH),
+  }
+}
+
+/** One actions/cache step: saves stay off a dispatch, or under its prefix; restores stay exact. */
+function cacheActionProblems(label, uses, step, reach, check) {
+  check(
+    !/^actions\/cache@/.test(uses),
+    `${label}: a combined actions/cache step saves after any run; restore and save apart`
+  )
+  if (!uses.startsWith('actions/cache/')) return
+  check(
+    step.with?.['restore-keys'] === undefined,
+    `${label}: no restore-keys on any cache step`
+  )
+  const key = String(step.with?.key ?? '')
+  if (uses.startsWith('actions/cache/save'))
+    check(
+      reach.neverDispatch || (reach.dispatchOnly && key.startsWith(DISPATCH_PREFIX)),
+      `${label} is reachable from a dispatch: guard it with ${NOT_DISPATCH}, or save only on a dispatch under ${DISPATCH_PREFIX}`
+    )
+  else
+    check(
+      reach.dispatchOnly || stepOutputKey.test(key),
+      `${label}: a push or nightly run restores only exact keys from a step output`
+    )
+}
+
+/** Local actions and setup-* download caches: the dispatched commit's code, or a hidden save. */
+function dispatchCodeProblems(label, uses, step, reach, check) {
+  if (uses.startsWith('./'))
+    check(
+      reach.neverDispatch,
+      `${label}: a local action runs the dispatched commit's own code; skip it on a dispatch`
+    )
+  if (!/^actions\/setup-/.test(uses)) return
+  const cache = step.with?.cache
+  const cachesByDefault = uses.startsWith('actions/setup-go')
+  check(
+    (cache === undefined && !cachesByDefault) ||
+      reach.neverDispatch ||
+      String(cache).includes(NOT_DISPATCH),
+    `${label}: ${uses.split('@')[0].split('/')[1]} caches on a dispatch; set its cache from ${NOT_DISPATCH}`
+  )
+}
+
+/** Only ios-dispatch-cleanup may write to the Actions cache, and it runs no repository code. */
+function cleanupProblems(workflow, check) {
+  const jobs = workflow.jobs ?? {}
+  const cleanup = jobs[CLEANUP_JOB]
+  check(
+    JSON.stringify(workflow.permissions) === JSON.stringify({ contents: 'read' }) &&
+      Object.entries(jobs).every(([name, job]) =>
+        name === CLEANUP_JOB
+          ? JSON.stringify(job?.permissions) === JSON.stringify({ actions: 'write' })
+          : job?.permissions === undefined
+      ),
+    'only the cleanup holds actions: write, and nothing else in this workflow writes'
+  )
+  check(
+    JSON.stringify([...needsList(cleanup)].sort()) ===
+      JSON.stringify(['ios-build', 'ios-expo-go', 'ios-shard']) &&
+      cleanup?.if === `\${{ always() && ${ON_DISPATCH} }}`,
+    'ios-dispatch-cleanup: the cleanup must run after every job that reads the dispatch client, on a dispatch only'
+  )
+  const steps = cleanup?.steps ?? []
+  check(
+    cleanup?.['runs-on'] === 'ubuntu-latest' &&
+      steps.length === 1 &&
+      steps[0].uses === undefined &&
+      steps[0].env?.SHA === '${{ inputs.sha }}' &&
+      steps[0].run?.includes('prefix="dispatch-$SHA-"') &&
+      steps[0].run.includes('gh api -X DELETE') &&
+      !/\b(node|npm|npx|bash|sh) /.test(steps[0].run.replace('set -euo pipefail', '')),
+    'ios-dispatch-cleanup: the cleanup runs no repository code: one gh step, no checkout, no action'
+  )
+}
+
+/** AP-01 and AP-03: what a dispatch may write, and which runs may cancel each other. */
+function dispatchProblems(workflow, check) {
+  for (const [name, job] of Object.entries(workflow.jobs ?? {}))
+    for (const step of job?.steps ?? []) {
+      const uses = String(step.uses ?? '')
+      const label = `${name}: "${step.name ?? uses}"`
+      const reach = dispatchReach(job, step)
+      cacheActionProblems(label, uses, step, reach, check)
+      dispatchCodeProblems(label, uses, step, reach, check)
+    }
+  cleanupProblems(workflow, check)
+  const group = String(workflow.concurrency?.group ?? '')
+  check(
+    group.includes('${{ github.event_name }}') && group.includes(COMMIT),
+    'a dispatch and a push of one commit must not cancel each other: key the group by event and commit'
+  )
+}
+
+/**
+ * Every file under scripts/ that the iOS jobs run or read: the scripts their steps and local
+ * actions name, and everything those import, require or name in turn. Test files are left out
+ * and not followed: node-test-gate runs them on pull requests as well. The ios-changes job only decides whether a
+ * merge runs the rest, so what it reads is not an iOS input.
+ * @param {object} workflow the parsed ios-native.yml
+ */
+export function scriptReads(workflow, { read = readText, exists = fs.existsSync } = {}) {
+  const texts = []
+  const actions = new Set()
+  const useAction = (uses) => {
+    const action = /^\.\/(\.github\/actions\/[\w-]+)$/.exec(String(uses ?? '').trim())
+    if (!action || actions.has(action[1])) return
+    actions.add(action[1])
+    const text = read(`${action[1]}/action.yml`) ?? ''
+    texts.push(text)
+    for (const nested of text.matchAll(/uses: (\.\/\.github\/actions\/[\w-]+)/g))
+      useAction(nested[1])
+  }
+  for (const [name, job] of Object.entries(workflow.jobs ?? {})) {
+    if (name === DECISION_JOB) continue
+    for (const step of job?.steps ?? []) {
+      texts.push(String(step.run ?? ''))
+      useAction(step.uses)
+    }
+  }
+  const seen = new Set()
+  const stack = texts.flatMap((text) => namedScripts(text, '.'))
+  while (stack.length) {
+    const file = stack.pop()
+    if (seen.has(file) || isTest(file) || !exists(file)) continue
+    seen.add(file)
+    // A JSON file is data: the paths it lists are not files the jobs run.
+    if (!file.endsWith('.json'))
+      stack.push(...namedScripts(read(file) ?? '', path.posix.dirname(file), exists))
+  }
+  return [...seen].filter((file) => file.startsWith('scripts/')).sort()
+}
+
+const isTest = (file) => /\.test\.[cm]?js$/.test(file)
+const readText = (file) => {
+  try {
+    return fs.readFileSync(file, 'utf8')
+  } catch {
+    return null
+  }
+}
+
+/** The repository files a script text names: relative imports, `scripts/` paths, sibling names. */
+function namedScripts(text, directory, exists = fs.existsSync) {
+  const found = []
+  for (const match of text.matchAll(
+    /(?:from\s*|import\s*\(\s*|require\s*\(\s*|import\s+)['"](\.{1,2}\/[^'"]+)['"]/g
+  ))
+    found.push(path.posix.normalize(path.posix.join(directory, match[1])))
+  for (const match of text.matchAll(
+    /(?:^|[\s"'`(=])(scripts\/[\w./-]+?\.(?:mjs|cjs|js|sh|json))(?=[\s"'`),;]|$)/gm
+  ))
+    found.push(match[1])
+  // A script that joins its own directory with a file name, such as path.join(dir, 'run.mjs').
+  for (const match of text.matchAll(/['"`]([\w.-]+\.(?:mjs|cjs|sh))['"`]/g)) {
+    const sibling = path.posix.join(directory, match[1])
+    if (directory !== '.' && exists(sibling)) found.push(sibling)
+  }
+  return found
+}
+
+/**
+ * SL-11: the push paths, which are the native iOS inputs, cover every script the iOS jobs run or
+ * read, and name no scripts/lib file they do not.
+ * @param {object} workflow the parsed ios-native.yml
+ * @param {{ reads: string[], libraryFiles: string[] }} files what scriptReads found, and every
+ *   file under scripts/lib
+ */
+export function inputCoverageProblems(workflow, { reads, libraryFiles }) {
+  const inputs = workflow.on?.push?.paths ?? []
+  const read = new Set(reads)
+  const uncovered = reads.filter((file) => !matchesAny(file, inputs))
+  const unread = libraryFiles.filter(
+    (file) =>
+      !/\.(test\.mjs|d\.mts)$/.test(file) && matchesAny(file, inputs) && !read.has(file)
+  )
+  return [
+    ...uncovered.map((file) => `the push paths miss ${file}, which the iOS jobs read`),
+    ...unread.map((file) => `the push paths name ${file}, which no iOS job reads`),
+  ]
+}
+
 /** Every repository script and local action the workflow calls exists. */
 export function missingHelpers(text, exists = (file) => fs.existsSync(file)) {
   const named = new Set()
@@ -339,6 +592,7 @@ export function iosNativeProblems(workflow) {
   clientProblems(jobs['ios-build'], check)
   consumerProblems(jobs, check)
   runtimeProblems(jobs, check)
+  dispatchProblems(workflow, check)
   return problems
 }
 
