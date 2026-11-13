@@ -50,6 +50,13 @@ const rejected = (title, expected, change) =>
     )
   })
 const onOf = (workflow) => workflow.on ?? workflow[true]
+// The body with every line that carries `line` commented out, continuations included.
+const commentOut = (run, line) =>
+  run
+    .replace(/\s*\\\n\s*/g, ' ')
+    .split('\n')
+    .map((row) => (row.trim() === line ? `# ${row}` : row))
+    .join('\n')
 
 describe('ios-native workflows validator', () => {
   test('the committed workflows pass', () => {
@@ -397,7 +404,7 @@ describe('ios-native workflows validator', () => {
   }
 
   // IOS-02: each mandatory check exists once, on its own condition, and can fail its job.
-  for (const [name, predicate] of MANDATORY) {
+  for (const [name, predicate, , required] of MANDATORY) {
     const label = (jobs) => {
       const row = jobs[name].steps.find(predicate)
       return row.name ?? row.id
@@ -434,7 +441,38 @@ describe('ios-native workflows validator', () => {
         row.run = `${row.run}\ntrue\n`
       }
     )
+    // IOS-R2-04: each required line commented out, with output that looks like success.
+    for (const line of required)
+      rejected(
+        `"${title}" in ${name} with ${line.slice(0, 40)} commented out and a printf`,
+        new RegExp(`${name}: ".*" does not execute`),
+        (jobs) => {
+          const row = jobs[name].steps.find(predicate)
+          row.run = `${commentOut(row.run, line)}printf 'ok\\n'\n`
+        }
+      )
+    if (required.some((line) => !line.startsWith('set ') && !line.startsWith('if ')))
+      rejected(
+        `"${title}" in ${name} inside an if block that never runs`,
+        new RegExp(`${name}: ".*" does not execute`),
+        (jobs) => {
+          const row = jobs[name].steps.find(predicate)
+          row.run = `if false; then\n${row.run}\nfi\n`
+        }
+      )
   }
+  rejected(
+    'the PNG guards without pipefail',
+    /hides a failure in its pipeline/,
+    (jobs) => {
+      const row = step(jobs['ios-expo-go'], (item) => item.id === 'png_file_guards')
+      row.run = row.run.replace('set -euo pipefail\n', 'set -eu\n')
+    }
+  )
+  rejected('a mandatory check sent to the background', /does not execute/, (jobs) => {
+    const row = step(jobs['ios-expo-go'], (item) => item.run?.includes('bridge-a11y.mjs'))
+    row.run = 'node scripts/e2e-share-card/bridge-a11y.mjs &\n'
+  })
   rejected('a job disabled with if: false', /the job's condition disables it/, (jobs) => {
     jobs['ios-app-build'].if = false
   })
@@ -671,6 +709,151 @@ describe('ios-native workflows validator', () => {
       }
     )
   }
+})
+
+// IOS-R2-04 at the shell boundary: each mandatory step, run as GitHub runs it (bash -e) with
+// every command it calls stubbed, passes when its checks pass and fails when any one fails.
+describe('mandatory checks fail their step', () => {
+  // The failing stub for each required line: [command, argument pattern, environment].
+  const FAILS = {
+    ['node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"']:
+      ['node', 'native-ios-app-secret-scan.mjs'],
+    'test -n "$commands"': [null, null, { EMPTY_COMMANDS: '1' }],
+    ['xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -destination \'generic/platform=iOS Simulator\' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build']:
+      ['xcodebuild', '-configuration Release'],
+    'node scripts/ci/node-test-gate.mjs startup-deadline': [
+      'node',
+      'node-test-gate.mjs startup-deadline',
+    ],
+    'node scripts/ci/native-build-cache.mjs key --platform ios >> "$GITHUB_OUTPUT"': [
+      'node',
+      'native-build-cache.mjs key',
+    ],
+    'commands=$(node scripts/ci/native-ios-shards.mjs commands "$shard")': [
+      'node',
+      'native-ios-shards.mjs commands',
+    ],
+    'node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"':
+      ['node', 'run-story68-native.mjs share-sheet'],
+    'node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"':
+      ['node', 'expo-go-proof'],
+    'node scripts/ci/node-test-gate.mjs share-card-plugins': [
+      'node',
+      'node-test-gate.mjs share-card-plugins',
+    ],
+    'node scripts/ci/node-test-gate.mjs native-harness': [
+      'node',
+      'node-test-gate.mjs native-harness',
+    ],
+    'node scripts/ci/maestro-check-flows.mjs': ['node', 'maestro-check-flows.mjs'],
+    'node scripts/e2e-share-card/bridge-a11y.mjs': ['node', 'bridge-a11y.mjs'],
+    'bash scripts/ci/share-card-header-semantics.sh': [
+      'bash',
+      'share-card-header-semantics.sh',
+    ],
+    'swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee "$RUNNER_TEMP/cc68-png-file-tests.log"':
+      ['swift', 'test --package-path'],
+    'bash scripts/ci/check-accessibility-focus-builds.sh ios-app "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios':
+      ['bash', 'check-accessibility-focus-builds.sh ios-app'],
+    'test "$CC68_SHARD_RESULT" = success': [null, null, { CC68_SHARD_RESULT: 'failure' }],
+    'node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards': [
+      'node',
+      'native-ios-shards.mjs merge',
+    ],
+    'node scripts/run-story68-native.mjs prebuild --platform ios': [
+      'node',
+      'run-story68-native.mjs prebuild',
+    ],
+    'node scripts/ci/native-build-daemons.mjs mark': [
+      'node',
+      'native-build-daemons.mjs mark',
+    ],
+    'node scripts/run-story68-native.mjs build --platform ios': [
+      'node',
+      'run-story68-native.mjs build',
+    ],
+  }
+  const RUN_AS_SCRIPT = ['node', 'bash', 'swift', 'xcodebuild']
+  // The other commands the mandatory steps call, stubbed to succeed quietly.
+  const QUIET = [
+    'cat',
+    'mv',
+    'find',
+    'head',
+    'xcrun',
+    'mkdir',
+    'rm',
+    'cp',
+    'sleep',
+    'npx',
+    'npm',
+  ]
+  const runStep = (body, [failing, pattern, env] = []) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-mandatory-'))
+    try {
+      const bin = path.join(dir, 'bin')
+      fs.mkdirSync(bin)
+      for (const command of RUN_AS_SCRIPT) {
+        const output =
+          command === 'swift'
+            ? 'echo "Executed 3 tests, with 0 failures"'
+            : command === 'node'
+              ? 'case " $* " in *"native-ios-shards.mjs commands"*) [ -n "$EMPTY_COMMANDS" ] || echo share-sheet;; esac'
+              : ''
+        const fail =
+          command === failing ? `case " $* " in *"${pattern}"*) exit 1;; esac` : ''
+        fs.writeFileSync(
+          path.join(bin, command),
+          `#!/bin/sh\n${fail}\n${output}\nexit 0\n`,
+          { mode: 0o755 }
+        )
+      }
+      for (const command of QUIET)
+        fs.writeFileSync(path.join(bin, command), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+      for (const tool of ['grep', 'tail', 'tee'])
+        fs.symlinkSync(
+          spawnSync('/usr/bin/which', [tool], { encoding: 'utf8' }).stdout.trim(),
+          path.join(bin, tool)
+        )
+      for (const file of ['env', 'output']) fs.writeFileSync(path.join(dir, file), '')
+      const result = spawnSync('/bin/bash', ['--noprofile', '--norc', '-e', '-c', body], {
+        encoding: 'utf8',
+        env: {
+          PATH: bin,
+          HOME: dir,
+          RUNNER_TEMP: dir,
+          GITHUB_ENV: path.join(dir, 'env'),
+          GITHUB_OUTPUT: path.join(dir, 'output'),
+          CC68_SHARD_RESULT: 'success',
+          ...env,
+        },
+      })
+      return result.status
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  for (const [name, predicate, , required] of MANDATORY) {
+    const row = source[J].jobs[name].steps.find(predicate)
+    const lines = required.filter((line) => FAILS[line])
+    if (!row.run || lines.length === 0) continue
+    test(`${name}: "${row.name ?? row.id}" fails when its check fails`, () => {
+      assert.equal(runStep(row.run), 0, 'every check passing')
+      for (const line of lines) {
+        assert.notEqual(runStep(row.run, FAILS[line]), 0, line)
+      }
+    })
+  }
+
+  test('every required line of a mandatory command has a failing stub here', () => {
+    const lines = MANDATORY.flatMap(([, , , required]) => required).filter(
+      (line) => !line.startsWith('set ') && !line.startsWith('if ')
+    )
+    assert.deepEqual(
+      lines.filter((line) => !FAILS[line]),
+      []
+    )
+  })
 })
 
 // No save is reachable on a dispatch, even before the read-only token refuses it.

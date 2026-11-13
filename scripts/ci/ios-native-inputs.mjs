@@ -181,25 +181,41 @@ export function rootScriptsRun(jobsText, manifest) {
 }
 
 /**
- * What changed in the root manifest that an iOS run reads: the install-wide fields, the lifecycle
- * scripts npm ci runs, and each root script the jobs run with its pre and post hooks. Null when
- * unreadable.
+ * Every root script an iOS run executes: the lifecycle scripts npm ci runs, the root scripts the
+ * jobs run, the pre and post hooks of each, and the root scripts any of those run in turn.
+ */
+export function rootScriptClosure(jobsText, manifest) {
+  const scripts = manifest?.scripts ?? {}
+  const names = new Set()
+  const stack = [...LIFECYCLE_SCRIPTS, ...rootScriptsRun(jobsText, {})]
+  while (stack.length) {
+    const name = stack.pop()
+    if (names.has(name)) continue
+    names.add(name)
+    // npm runs pre<name> and post<name> around a script it runs; a missing name runs nothing.
+    if (!LIFECYCLE_SCRIPTS.includes(name) && name in scripts)
+      stack.push(`pre${name}`, `post${name}`)
+    stack.push(...rootScriptsRun(scripts[name] ?? '', {}))
+  }
+  return [...names].sort()
+}
+
+/**
+ * What changed in the root manifest that an iOS run reads: the install-wide fields and every
+ * root script rootScriptClosure finds on either side. Null when unreadable.
  */
 export function rootManifestChanges(before, after, jobsText) {
   if (!before || !after) return null
   const differs = (a, b) => JSON.stringify(a) !== JSON.stringify(b)
   const fields = ROOT_FIELDS.filter((field) => differs(before[field], after[field]))
-  const run = new Set([
-    ...rootScriptsRun(jobsText, before),
-    ...rootScriptsRun(jobsText, after),
-  ])
   const scripts = [
     ...new Set([
-      ...LIFECYCLE_SCRIPTS,
-      ...[...run].flatMap((name) => [`pre${name}`, name, `post${name}`]),
+      ...rootScriptClosure(jobsText, before),
+      ...rootScriptClosure(jobsText, after),
     ]),
   ]
     .filter((name) => differs(before.scripts?.[name], after.scripts?.[name]))
+    .sort()
     .map((name) => `scripts.${name}`)
   return [...fields, ...scripts]
 }

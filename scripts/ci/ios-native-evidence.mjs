@@ -22,6 +22,7 @@
 //
 // The jobs run this file from a sparse checkout of main with no install: it imports Node
 // built-ins and scripts/ci/ios-native-inputs.mjs, which decides what a native iOS change is.
+import { execFileSync } from 'node:child_process'
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
@@ -64,20 +65,48 @@ export function dispatchedCommit(run) {
   return runCommit(run)
 }
 
-// Only the evidence workflow may post the status or hold a permission that could. A pull
-// request's own workflows run with its edits (pr-gate.yml on pull_request among them), so every
-// workflow and local action file at its head that differs from main's, renamed ones included, is
-// read whole.
+// Only the evidence workflow may post the status or hold a permission that could. The guard reads
+// every workflow and local action file at the head that differs from main's, renamed ones
+// included, whole: a workflow's permissions are parsed as YAML (quoted keys, flow mappings and
+// aliases resolve as GitHub reads them) and fail on statuses or checks write and write-all, and
+// any such file that names the status context fails too.
+//
+// Its boundary: it blocks a pull request that adds a status-capable grant or names the context in
+// a workflow or local action. It cannot read intent in a helper script a workflow calls, so the
+// workflows that already hold statuses: write stay limited to trusted code on their trusted
+// paths: ios-native-evidence.yml runs main's copy (pull_request_target and workflow_run), and
+// pr-gate.yml's workflow_run path runs main's copy. pr-gate.yml's pull_request path runs the pull
+// request's copy, so a pull request that edits pr-gate.yml differs from main and fails this guard.
 const GUARDED_FILE = /^\.github\/(workflows\/[^/]+|actions\/.+\/action)\.ya?ml$/
-const GRANTS = [
-  [/["']?\bstatuses\b["']?\s*:\s*["']?write\b/, 'statuses: write'],
-  [/["']?\bchecks\b["']?\s*:\s*["']?write\b/, 'checks: write'],
-  [/\bwrite-all\b/, 'write-all'],
-  [
-    new RegExp(`(?<![\\w./-])${STATUS_CONTEXT}(?![\\w./-])`),
-    `the ${STATUS_CONTEXT} context`,
-  ],
-]
+const WORKFLOW_FILE_PATH = /^\.github\/workflows\/[^/]+\.ya?ml$/
+const CONTEXT = new RegExp(`(?<![\\w./-])${STATUS_CONTEXT}(?![\\w./-])`)
+const STATUS_SCOPES = ['statuses', 'checks']
+
+/** A workflow as GitHub reads it, through yq on the runner: aliases and merge keys resolved. */
+export function yqParse(text) {
+  return JSON.parse(
+    execFileSync('yq', ['-o=json', 'explode(.)', '-'], { input: text, encoding: 'utf8' })
+  )
+}
+
+/** The status-capable grants in one parsed workflow: workflow and job permissions. */
+export function statusGrants(workflow) {
+  const grants = []
+  const blocks = [
+    ['the workflow', workflow?.permissions],
+    ...Object.entries(workflow?.jobs ?? {}).map(([name, job]) => [
+      `job ${name}`,
+      job?.permissions,
+    ]),
+  ]
+  for (const [where, permissions] of blocks) {
+    if (permissions === 'write-all') grants.push(`${where} grants write-all`)
+    if (permissions && typeof permissions === 'object')
+      for (const scope of STATUS_SCOPES)
+        if (permissions[scope] === 'write') grants.push(`${where} grants ${scope}: write`)
+  }
+  return grants
+}
 
 /**
  * The workflow and local action files at the head commit whose content differs from main's at
@@ -99,12 +128,40 @@ export function changedGuardedFiles(headTree, mainTree) {
 }
 
 /** Why these whole files could post the evidence status; `files` holds `{ path, text }`. */
-export function workflowGuardProblems(files) {
+export function workflowGuardProblems(files, { parseYaml = yqParse } = {}) {
   const problems = []
-  for (const file of files)
-    for (const [pattern, what] of GRANTS)
-      if (pattern.test(file.text)) problems.push(`${file.path} holds ${what}`)
+  for (const file of files) {
+    if (CONTEXT.test(file.text))
+      problems.push(`${file.path} names the ${STATUS_CONTEXT} context`)
+    if (!WORKFLOW_FILE_PATH.test(file.path)) continue
+    let workflow
+    try {
+      workflow = parseYaml(file.text)
+    } catch (error) {
+      problems.push(`${file.path} could not be parsed: ${error.message.split('\n')[0]}`)
+      continue
+    }
+    for (const grant of statusGrants(workflow)) problems.push(`${file.path}: ${grant}`)
+  }
   return problems
+}
+
+/**
+ * The paths that differ between two git trees API listings: added, removed and edited files, and
+ * both paths of a rename.
+ */
+export function treeChanges(baseTree, headTree) {
+  const files = (tree) =>
+    new Map(
+      (tree ?? [])
+        .filter((entry) => entry.type !== 'tree')
+        .map((entry) => [entry.path, entry.sha])
+    )
+  const base = files(baseTree)
+  const head = files(headTree)
+  return [...new Set([...base.keys(), ...head.keys()])]
+    .filter((path) => base.get(path) !== head.get(path))
+    .sort()
 }
 
 const fit = (text) =>
@@ -115,7 +172,7 @@ const fit = (text) =>
  * exactly the head commit counts; the newest such run decides, and its own commit must be on
  * refs/heads/main (`fromMain`). `dependencies` says whether the shared dependency files changed
  * what iOS installs (scripts/ci/ios-native-inputs.mjs); `guard` lists the workflows at the head
- * that could post this status.
+ * that could post this status; `incomplete` says why the diff could not be read whole.
  * @returns {{ state: 'success' | 'pending' | 'failure', description: string, detail: string }}
  */
 export function evaluateEvidence({
@@ -125,6 +182,7 @@ export function evaluateEvidence({
   inputs,
   dependencies,
   guard = [],
+  incomplete = null,
 }) {
   const verdict = (state, detail, description = detail) => ({
     state,
@@ -132,6 +190,13 @@ export function evaluateEvidence({
     detail,
   })
   if (!COMMIT.test(headSha ?? '')) return verdict('failure', 'The head commit is unknown')
+  // An incomplete diff could hide a native or workflow change, so it never passes.
+  if (incomplete)
+    return verdict(
+      'failure',
+      `The changed files of ${headSha} could not all be read: ${incomplete}`,
+      `The changed files could not all be read: ${incomplete}`
+    )
   if (!files) return verdict('failure', 'The changed files could not be read')
   if (guard === null) return verdict('failure', 'The workflow files could not be read')
   if (guard.length)
@@ -199,21 +264,6 @@ async function api(
   }
 }
 
-/** Every file of a pull request with its patch; GitHub lists at most 3000. */
-async function pullFiles({ repository, number, ...options }) {
-  const files = []
-  for (let page = 1; page <= 30; page++) {
-    const entries = await api(
-      `/repos/${repository}/pulls/${number}/files?per_page=100&page=${page}`,
-      options
-    )
-    files.push(...entries)
-    if (entries.length < 100) return files
-  }
-  // Past 3000 files the list stops; judge the rest as a native iOS change with an unread diff.
-  return [...files, { filename: 'package-lock.json', status: 'modified' }]
-}
-
 /**
  * The dispatch runs of ios-native-dispatch.yml, newest first, down to the newest one whose name
  * carries `headSha`. A dispatch of a commit comes after the commit, so the search starts a day
@@ -257,80 +307,108 @@ async function evidenceRuns(options) {
   return latest ? [latest] : []
 }
 
-/** The workflows and local actions at `headSha` that could post the evidence status. */
-async function guardProblems({ repository, headSha, ...options }) {
+/** A recursive git trees API listing, or null when it is missing or truncated. */
+async function wholeTree({ repository, sha, ...options }) {
+  if (!COMMIT.test(sha ?? '')) return null
+  const body = await api(`/repos/${repository}/git/trees/${sha}?recursive=1`, options)
+  return body && !body.truncated ? body.tree : null
+}
+
+/**
+ * The immutable trees one judgment reads: the head commit the event names, main, and, with a base
+ * commit, the merge base of base...head. Every one is addressed by commit, so a later push to the
+ * pull request cannot change what this judgment sees.
+ */
+async function snapshot({ repository, baseSha, headSha, ...options }) {
   const main = await api(`/repos/${repository}/git/ref/heads/main`, options)
-  const [headTree, mainTree] = await Promise.all(
-    [headSha, main?.object?.sha].map((sha) =>
-      api(`/repos/${repository}/git/trees/${sha}?recursive=1`, options)
+  const mergeBase =
+    baseSha === undefined
+      ? undefined
+      : (await api(`/repos/${repository}/compare/${baseSha}...${headSha}`, options))
+          ?.merge_base_commit?.sha
+  const [head, mainTree, base] = await Promise.all(
+    [headSha, main?.object?.sha, mergeBase].map((sha) =>
+      wholeTree({ ...options, repository, sha })
     )
   )
-  if (!headTree || !mainTree || headTree.truncated || mainTree.truncated)
-    return ['the workflow files at the head commit could not all be listed']
+  const unread = [
+    ['the head commit', head],
+    ['main', mainTree],
+    ...(baseSha === undefined ? [] : [['the merge base', base]]),
+  ]
+    .filter(([, tree]) => tree === null)
+    .map(([name]) => name)
+  return {
+    mergeBase,
+    head,
+    main: mainTree,
+    base,
+    incomplete: unread.length
+      ? `the trees of ${unread.join(', ')} are missing or truncated`
+      : null,
+  }
+}
+
+/** The workflows and local actions at the head that could post the evidence status. */
+async function guardProblems({ repository, trees, parseYaml, ...options }) {
   const files = []
-  for (const entry of changedGuardedFiles(headTree.tree, mainTree.tree)) {
+  for (const entry of changedGuardedFiles(trees.head, trees.main)) {
     const blob = await api(`/repos/${repository}/git/blobs/${entry.sha}`, options)
     files.push({
       path: entry.path,
       text: Buffer.from(blob?.content ?? '', 'base64').toString('utf8'),
     })
   }
-  return workflowGuardProblems(files)
+  return workflowGuardProblems(files, parseYaml ? { parseYaml } : {})
 }
 
 /**
- * Whether the shared dependency files changed what iOS installs, comparing the merge base with
- * the head commit, as the pull request's file list does.
+ * Whether the shared dependency files changed what iOS installs, read at the merge base and the
+ * head commit, the two ends of the pull request's own diff.
  */
-async function pullDependencies({
+async function headDependencies({
   repository,
-  baseSha,
+  mergeBase,
   headSha,
   files,
   jobsText,
   ...options
 }) {
-  const names = files.flatMap((file) => [file.filename, file.previous_filename])
-  if (!names.includes(LOCKFILE) && !names.includes(ROOT_MANIFEST)) return {}
-  const compare = await api(
-    `/repos/${repository}/compare/${baseSha}...${headSha}`,
-    options
-  )
-  const sides = { before: compare?.merge_base_commit?.sha, after: headSha }
+  if (!files.includes(LOCKFILE) && !files.includes(ROOT_MANIFEST)) return {}
+  const sides = { before: mergeBase, after: headSha }
   const read = (side, file) =>
-    sides[side]
-      ? api(`/repos/${repository}/contents/${file}?ref=${sides[side]}`, {
-          ...options,
-          raw: true,
-        })
-      : null
+    api(`/repos/${repository}/contents/${file}?ref=${sides[side]}`, {
+      ...options,
+      raw: true,
+    })
   return dependencyChanges(read, jobsText)
 }
 
-/** The verdict for one pull request head, from main's copy of the rules. */
-async function judge({ headSha, baseSha, number, ...options }) {
+/** The verdict for one pull request head, from main's copy of the rules and immutable reads. */
+async function judge({ headSha, baseSha, ...options }) {
   const jobsText = readFileSync(IOS_JOBS_WORKFLOW, 'utf8')
-  let files = null
-  let runs = []
-  let dependencies = {}
-  let guard = null
+  const inputs = evidenceInputs(pushPaths(readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')))
   try {
-    files = await pullFiles({ ...options, number })
-    guard = await guardProblems({ ...options, headSha })
-    runs = await evidenceRuns({ ...options, headSha })
-    dependencies = await pullDependencies({
+    if (!COMMIT.test(baseSha ?? ''))
+      throw new Error(`the base commit ${baseSha} is unknown`)
+    const trees = await snapshot({ ...options, baseSha, headSha })
+    if (trees.incomplete)
+      return evaluateEvidence({ headSha, inputs, incomplete: trees.incomplete })
+    const files = treeChanges(trees.base, trees.head)
+    const guard = await guardProblems({ ...options, trees })
+    const runs = await evidenceRuns({ ...options, headSha })
+    const dependencies = await headDependencies({
       ...options,
-      baseSha,
+      mergeBase: trees.mergeBase,
       headSha,
       files,
       jobsText,
     })
+    return evaluateEvidence({ headSha, files, runs, inputs, dependencies, guard })
   } catch (error) {
     console.log(`::error::Could not read the evidence: ${error.message}`)
-    files = null
+    return evaluateEvidence({ headSha, files: null, runs: [], inputs })
   }
-  const inputs = evidenceInputs(pushPaths(readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')))
-  return evaluateEvidence({ headSha, files, runs, inputs, dependencies, guard })
 }
 
 function report(env, number, headSha, verdict) {
@@ -348,17 +426,17 @@ const oneLine = (text) => text.replace(/[\r\n]+/g, ' ')
  * pull_request_target: the verdict for the head commit the event names, as the step outputs
  * `state` and `description`. The live head may have moved since; that push gets its own event.
  */
-export async function pullRequest({ env = process.env, fetchImpl } = {}) {
+export async function pullRequest({ env = process.env, fetchImpl, parseYaml } = {}) {
   const payload = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
   const pull = payload.pull_request
   const headSha = pull?.head?.sha
   const verdict = await judge({
     headSha,
     baseSha: pull?.base?.sha,
-    number: pull?.number,
     repository: env.GITHUB_REPOSITORY,
     token: env.GITHUB_TOKEN,
     fetchImpl,
+    parseYaml,
   })
   report(env, pull?.number, headSha, verdict)
   if (env.GITHUB_OUTPUT)
@@ -387,18 +465,22 @@ async function openPullsWithHead({ repository, sha, ...options }) {
  * that could post the evidence status, the gate status on that head turns to failure, so a job
  * that posts the evidence status after the judge still cannot unblock the merge.
  */
-export async function gateGuard({ env = process.env, fetchImpl } = {}) {
+export async function gateGuard({ env = process.env, fetchImpl, parseYaml } = {}) {
   const sha = env.HEAD_SHA ?? ''
   const options = {
     repository: env.GITHUB_REPOSITORY,
     token: env.GITHUB_TOKEN,
     fetchImpl,
+    parseYaml,
   }
   if (!COMMIT.test(sha) || (await openPullsWithHead({ ...options, sha })).length === 0) {
     console.log(`No open pull request has head ${sha}; nothing to guard.`)
     return []
   }
-  const problems = await guardProblems({ ...options, headSha: sha })
+  const trees = await snapshot({ ...options, headSha: sha })
+  const problems = trees.incomplete
+    ? [`the workflow files could not all be read: ${trees.incomplete}`]
+    : await guardProblems({ ...options, trees })
   if (problems.length === 0) {
     console.log(`No workflow at ${sha} can post ${STATUS_CONTEXT}.`)
     return []
@@ -424,7 +506,11 @@ export async function gateGuard({ env = process.env, fetchImpl } = {}) {
  * main naming a commit, judge each open pull request whose head is that commit again and post its
  * status. Any other run is no one's evidence and posts nothing.
  */
-export async function dispatchCompleted({ env = process.env, fetchImpl } = {}) {
+export async function dispatchCompleted({
+  env = process.env,
+  fetchImpl,
+  parseYaml,
+} = {}) {
   const payload = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))
   const sha = dispatchedCommit(payload.workflow_run)
   if (!sha) {
@@ -435,6 +521,7 @@ export async function dispatchCompleted({ env = process.env, fetchImpl } = {}) {
     repository: env.GITHUB_REPOSITORY,
     token: env.GITHUB_TOKEN,
     fetchImpl,
+    parseYaml,
   }
   const posted = []
   for (const pull of await openPullsWithHead({ ...options, sha })) {
@@ -442,7 +529,6 @@ export async function dispatchCompleted({ env = process.env, fetchImpl } = {}) {
       ...options,
       headSha: sha,
       baseSha: pull.base?.sha,
-      number: pull.number,
     })
     report(env, pull.number, sha, verdict)
     await api(`/repos/${options.repository}/statuses/${sha}`, {
