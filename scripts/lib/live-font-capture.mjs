@@ -25,30 +25,44 @@ function readMarker(id, { markers, jsScales, environments }) {
  * static text's label in `accessibilityText` when `text` is empty, so it falls back to that.
  * A node whose id starts with a `volatile` prefix is dropped with its subtree and counted in
  * `volatileDropped`: a region whose presence the app decides on grounds unrelated to text size.
+ * With `markVolatile` the region's text stays, flagged `volatile: true`, so scroll pages can
+ * still be aligned on it (stitchPages leaves it out of the result).
  */
-export function flattenHierarchy(tree, { platform, volatile = [] }) {
+export function flattenHierarchy(
+  tree,
+  { platform, volatile = [], markVolatile = false }
+) {
   const nodes = []
   let volatileDropped = 0
   const controls = []
   const markers = []
   const jsScales = []
   const environments = []
-  const walk = (node, parentBounds) => {
+  const walk = (node, parentBounds, inVolatile) => {
     const attrs = attributes(node)
     const id = attrs['resource-id'] ?? ''
     const bounds = attrs.bounds
     readMarker(id, { markers, jsScales, environments })
-    if (id && volatile.some((prefix) => id.startsWith(prefix))) {
+    const isVolatile =
+      inVolatile || volatile.some((prefix) => id && id.startsWith(prefix))
+    if (isVolatile && !markVolatile) {
       volatileDropped += countText(node, platform)
       return
     }
-    const text = attrs.text || (platform === 'ios' ? (attrs.accessibilityText ?? '') : '')
+    const text = nodeText(attrs, platform)
     if (text && bounds)
-      nodes.push({ text, id, bounds, ...(parentBounds ? { parent: parentBounds } : {}) })
-    if (id && bounds) controls.push({ id, bounds })
-    for (const child of node?.children ?? []) walk(child, bounds ?? parentBounds)
+      nodes.push({
+        text,
+        id,
+        bounds,
+        ...(parentBounds ? { parent: parentBounds } : {}),
+        ...(isVolatile ? { volatile: true } : {}),
+      })
+    if (id && bounds && !isVolatile) controls.push({ id, bounds })
+    for (const child of node?.children ?? [])
+      walk(child, bounds ?? parentBounds, isVolatile)
   }
-  walk(tree, undefined)
+  walk(tree, undefined, false)
   // Every marked window reads the same scale; disagreeing readings are no reading.
   const jsFontScale =
     jsScales.length && new Set(jsScales).size === 1 ? jsScales[0] : undefined
@@ -63,9 +77,13 @@ export function flattenHierarchy(tree, { platform, volatile = [] }) {
   }
 }
 
+/** Android's `text`; on iOS a static text's `accessibilityText` when `text` is empty. */
+function nodeText(attrs, platform) {
+  return attrs.text || (platform === 'ios' ? (attrs.accessibilityText ?? '') : '')
+}
+
 function countText(node, platform) {
-  const attrs = attributes(node)
-  const own = attrs.text || (platform === 'ios' ? attrs.accessibilityText : '') ? 1 : 0
+  const own = nodeText(attributes(node), platform) ? 1 : 0
   return (node?.children ?? []).reduce(
     (sum, child) => sum + countText(child, platform),
     own
@@ -163,10 +181,12 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
         Math.abs(top(other) - top(node)) <= tolerance
     )
   const chrome = (node) => pages.length > 1 && pages.every((page) => at(page, node))
-  const taken = pages[0].map((node) => {
-    const [y, bottom] = edges(node)
-    return { key: identityOf(node), y, bottom }
-  })
+  const taken = pages[0]
+    .filter((node) => !node.volatile)
+    .map((node) => {
+      const [y, bottom] = edges(node)
+      return { key: identityOf(node), y, bottom }
+    })
   let offset = 0
   for (let index = 1; index < pages.length; index += 1) {
     const once = (page) => {
@@ -187,7 +207,7 @@ export function stitchPages(pages, { tolerance = 4 } = {}) {
     shifts.sort((x, y) => x - y)
     offset += shifts[Math.floor(shifts.length / 2)]
     for (const node of pages[index]) {
-      if (chrome(node)) continue
+      if (chrome(node) || node.volatile) continue
       const key = identityOf(node)
       const [y, bottom] = edges(node).map((edge) => edge + offset)
       const seen = taken.some(

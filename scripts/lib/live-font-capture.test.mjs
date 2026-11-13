@@ -188,6 +188,38 @@ describe('stitchPages', () => {
     )
   })
 
+  test('aligns pages on volatile text but leaves it out of the result', () => {
+    const card = (text, y) => ({ ...at(text, y), volatile: true })
+    const first = [at('Header', 100), card('Card 1', 500), card('Card 2', 900)]
+    const second = [card('Card 2', 100), card('Card 3', 500), at('Footer', 900)]
+    assert.deepEqual(
+      stitchPages([first, second]).map((key) => JSON.parse(key)[1]),
+      ['Header', 'Footer']
+    )
+  })
+
+  test('marks a volatile region instead of dropping it when asked', () => {
+    const page = node({ bounds: '[0,0][1080,2400]' }, [
+      node({ text: 'Header', bounds: '[0,100][500,140]' }),
+      node({ 'resource-id': 'community-post-card-1', bounds: '[0,500][1080,900]' }, [
+        node({ text: 'Card 1', bounds: '[0,500][500,540]' }),
+      ]),
+    ])
+    const { nodes, volatileDropped } = flattenHierarchy(page, {
+      platform: 'android',
+      volatile: ['community-post-card-'],
+      markVolatile: true,
+    })
+    assert.deepEqual(
+      nodes.map((entry) => [entry.text, Boolean(entry.volatile)]),
+      [
+        ['Header', false],
+        ['Card 1', true],
+      ]
+    )
+    assert.equal(volatileDropped, 0)
+  })
+
   test('counts chrome that sits still on every page once', () => {
     const tabs = (y) => [at('Home', y), at('Settings', y)]
     const first = [at('Top', 100), at('A', 300), at('B', 500), ...tabs(2300)]
