@@ -1,0 +1,105 @@
+# Story 6.15 D6 and IOS-01: the iOS jobs (ios-native-jobs.yml) on one commit before it merges.
+# Dispatch it from main with `sha` set to a pull request head commit; the run name carries that
+# commit, every job fails unless it checked out exactly that commit, and the pull request's
+# evidence status accepts only a successful run of this file, dispatched from main, whose name
+# carries the head commit (scripts/ci/ios-native-evidence.mjs).
+#
+# A dispatch is a trusted trigger, so GitHub would grant it write access to main's cache scope,
+# while the jobs run code that has not merged. cache-mode: read, here and on each job, makes GitHub
+# issue a read-only cache token, so nothing the commit runs can save a cache that main's runs
+# restore; it may still restore what they saved. ios-cache-proof shows on every dispatch that a
+# save and a direct cache API write both store nothing.
+# https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching#controlling-cache-access-with-cache-mode
+name: iOS native dispatch
+run-name: iOS native ${{ inputs.sha }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 'Full 40-character commit SHA to test, such as a pull request head commit'
+        required: true
+        type: string
+
+cache-mode: read
+
+permissions:
+  contents: read
+
+# One run per commit.
+concurrency:
+  group: ios-native-dispatch-${{ inputs.sha }}
+  cancel-in-progress: true
+
+jobs:
+  ios-native:
+    cache-mode: read
+    uses: ./.github/workflows/ios-native-jobs.yml
+    with:
+      sha: ${{ inputs.sha }}
+
+  # Runs no repository code: it tries to store a cache entry two ways and fails the run if either
+  # lands in main's scope.
+  ios-cache-proof:
+    cache-mode: read
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+    env:
+      PROBE: ios-native-dispatch-probe-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Require no probe entry before the attempts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          count=$(gh api -X GET "repos/$GH_REPO/actions/caches" -f key="$PROBE" -f ref="$REF" --jq .total_count)
+          test "$count" = 0 || { echo "::error::$count cache entries already start with $PROBE"; exit 1; }
+          echo "probe" > "$RUNNER_TEMP/ios-native-cache-probe"
+      - name: Try to save a cache entry
+        uses: actions/cache/save@v5.1.0
+        with:
+          path: ${{ runner.temp }}/ios-native-cache-probe
+          key: ${{ env.PROBE }}-save
+      - name: Try to reserve a cache entry through the cache API
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const mode = process.env.ACTIONS_CACHE_MODE
+            if (mode !== 'read') core.setFailed(`ACTIONS_CACHE_MODE is '${mode}', not read`)
+            const base = process.env.ACTIONS_RESULTS_URL
+            if (!base) return core.setFailed('ACTIONS_RESULTS_URL is not set; the write cannot be tried')
+            const url = new URL('/twirp/github.actions.results.api.v1.CacheService/CreateCacheEntry', base)
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'content-type': 'application/json',
+                authorization: `Bearer ${process.env.ACTIONS_RUNTIME_TOKEN}`,
+              },
+              body: JSON.stringify({ key: `${process.env.PROBE}-api`, version: 'f'.repeat(64) }),
+            })
+            const text = await response.text()
+            let body = {}
+            try {
+              body = JSON.parse(text)
+            } catch {}
+            core.info(`CreateCacheEntry answered ${response.status}: ${String(body.message ?? body.msg ?? '').slice(0, 200)}`)
+            if (response.ok && body.ok === true)
+              core.setFailed('The cache service reserved a writable entry for a dispatch')
+      - name: Require that nothing was stored
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          entries=$(gh api -X GET "repos/$GH_REPO/actions/caches" -f key="$PROBE" -f ref="$REF" --jq '[.actions_caches[].key] | join(", ")')
+          if [ -n "$entries" ]; then
+            echo "::error::a read-only dispatch stored cache entries: $entries"
+            exit 1
+          fi
+          echo "No cache entry starts with $PROBE: the dispatch stored nothing."

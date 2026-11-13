@@ -36,9 +36,80 @@ jobs:
       checks: read
       statuses: write
       actions: read
+      pull-requests: read
     steps:
       - uses: muratkeremozcan/pr-gate@main
         with:
           mode: watch
           publish: status
+      # Story 6.15 SL-10: only ios-native-evidence.yml may post the iOS evidence status. When a
+      # workflow or local action at an open pull request's head could post it, or holds the
+      # permission to, main's guard turns the gate status on that head to failure, after PR Gate's
+      # own verdict.
+      - name: Fetch main's iOS evidence guard
+        id: guard_checkout
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: |
+            /scripts/ci/ios-native-evidence.mjs
+            /scripts/ci/ios-native-inputs.mjs
+            /scripts/ci/lanes.mjs
+          sparse-checkout-cone-mode: false
+      - name: Fail the gate when a workflow could post the iOS evidence status
+        id: guard
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+          CHECKOUT: ${{ steps.guard_checkout.outcome }}
+        # It fails unless main's copy was checked out, and it skips only when main's commit holds
+        # no guard yet, which happens on the pull request that adds it. ls-tree reads the tree,
+        # which the sparse checkout has whole, so a missing blob cannot pass for an absent file.
+        run: |
+          set -euo pipefail
+          guard=scripts/ci/ios-native-evidence.mjs
+          if [ "$CHECKOUT" != success ]; then
+            echo "::error::main's iOS evidence guard could not be checked out ($CHECKOUT)"
+            exit 1
+          fi
+          if [ -f "$guard" ]; then
+            node "$guard" gate-guard
+            exit 0
+          fi
+          listed=$(git ls-tree --name-only HEAD -- "$guard")
+          if [ -n "$listed" ]; then
+            echo "::error::$guard is on main at $(git rev-parse HEAD) but missing from the checkout"
+            exit 1
+          fi
+          echo "main at $(git rev-parse HEAD) has no iOS evidence guard yet; the pull request that adds it runs before it merges"
+      # PR Gate's own verdict is already posted, so a guard step that failed, timed out or never ran
+      # turns the gate status on an open pull request's head to failure here. It skips only when
+      # every page of the open pull requests was read and none has this head; an unreadable list
+      # fails the gate.
+      - name: Fail the gate when the iOS evidence guard did not finish
+        if: always() && steps.guard.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha || github.event.pull_request.head.sha }}
+          OUTCOME: ${{ steps.guard.outcome }}
+          TARGET: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if ! echo "$HEAD_SHA" | grep -Eqx '[0-9a-f]{40}'; then
+            echo "::error::no head commit to fail the gate on ($HEAD_SHA)"
+            exit 1
+          fi
+          if ! heads=$(gh api --paginate "repos/$GH_REPO/pulls?state=open&per_page=100" \
+            --jq ".[] | select(.head.sha == \"$HEAD_SHA\") | .number"); then
+            echo "::warning::the open pull requests could not be listed; failing the gate on $HEAD_SHA"
+          elif [ -z "$heads" ]; then
+            echo "No open pull request has head $HEAD_SHA; no gate to fail."
+            exit 0
+          fi
+          gh api -X POST "repos/$GH_REPO/statuses/$HEAD_SHA" -f state=failure -f context=gate \
+            -f description="The iOS evidence guard did not finish (${OUTCOME:-not run}); re-run PR Gate" -f target_url="$TARGET"
 #
