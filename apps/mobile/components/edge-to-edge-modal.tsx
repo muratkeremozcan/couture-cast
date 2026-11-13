@@ -1,6 +1,6 @@
 // R52 owner: every overlay Modal spans the whole screen and keeps its content clear of the
 // system bars. R57/R61: it also lifts that content above the software keyboard.
-import React, { useEffect, useRef, useState } from 'react'
+import React, { cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -83,6 +83,30 @@ type EdgeToEdgeModalProps = Omit<
  * R57/R61: the content sits in a keyboard view, so a focused field and the controls
  * below it stay above the software keyboard on both platforms.
  */
+/**
+ * The modal is its own window, so it carries its own mount marker (Story 6.15). A content view
+ * with accessibilityViewIsModal hides every other view from VoiceOver and from the XCUITest
+ * hierarchy, so the marker goes inside that view when the content is one; otherwise it sits
+ * beside the content.
+ */
+function withModalMarker(children: React.ReactNode) {
+  const marker = <LiveFontMountMarker key="live-font-mount-marker" scope="modal" />
+  if (
+    isValidElement<{
+      accessibilityViewIsModal?: boolean
+      children?: React.ReactNode
+    }>(children) &&
+    children.props.accessibilityViewIsModal
+  )
+    return cloneElement(children, undefined, marker, children.props.children)
+  return (
+    <>
+      {marker}
+      {children}
+    </>
+  )
+}
+
 export function EdgeToEdgeModal({
   scrim,
   scrimTestID,
@@ -93,14 +117,12 @@ export function EdgeToEdgeModal({
   return (
     <Modal transparent {...props} statusBarTranslucent navigationBarTranslucent>
       <View testID={scrimTestID} style={[styles.fill, { backgroundColor: scrim }]}>
-        {/* The modal is its own window, so it carries its own mount marker (Story 6.15). */}
-        <LiveFontMountMarker scope="modal" />
         <KeyboardAvoidingView
           testID="edge-to-edge-modal-keyboard-view"
           style={styles.fill}
           {...modalKeyboardAvoiding(keyboardOpen)}
         >
-          {children}
+          {withModalMarker(children)}
         </KeyboardAvoidingView>
       </View>
     </Modal>

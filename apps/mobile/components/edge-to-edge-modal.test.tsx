@@ -128,6 +128,36 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
     })
   })
 
+  /**
+   * Story 6.15 review P2-2: a view with accessibilityViewIsModal hides every other view from
+   * VoiceOver and from the XCUITest hierarchy Maestro reads, so the modal's mount marker goes
+   * inside it; next to it, the iOS composer capture saw no marker at all.
+   */
+  it('puts the mount marker inside the content view that is the accessibility modal', () => {
+    render(
+      <EdgeToEdgeModal visible>
+        <ReactNative.View testID="sheet" accessibilityViewIsModal>
+          <Text>Composer</Text>
+        </ReactNative.View>
+      </EdgeToEdgeModal>
+    )
+    const marker = document.querySelector('[data-testid^="live-font-mount-modal-"]')
+    expect(marker).not.toBeNull()
+    expect(screen.getByTestId('sheet').contains(marker)).toBe(true)
+    expect(screen.getByText('Composer')).toBeTruthy()
+  })
+
+  it('keeps the mount marker beside content that is not an accessibility modal', () => {
+    render(
+      <EdgeToEdgeModal visible>
+        <ReactNative.View testID="plain" />
+      </EdgeToEdgeModal>
+    )
+    expect(
+      document.querySelector('[data-testid^="live-font-mount-modal-"]')
+    ).not.toBeNull()
+  })
+
   it('puts the content, its fields included, inside the keyboard view', () => {
     render(
       <EdgeToEdgeModal visible>
