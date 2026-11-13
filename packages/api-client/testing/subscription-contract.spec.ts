@@ -101,7 +101,13 @@ describe('subscription status response', () => {
   })
 
   it('5.2-CONTRACT-07 accepts every store the ledger can report', () => {
-    for (const store of ['app_store', 'play_store', 'stripe', 'promotional'] as const) {
+    for (const store of [
+      'app_store',
+      'play_store',
+      'stripe',
+      'promotional',
+      'test_store',
+    ] as const) {
       expect(
         subscriptionSchema.safeParse({ ...entitledSubscription, store }).success
       ).toBe(true)

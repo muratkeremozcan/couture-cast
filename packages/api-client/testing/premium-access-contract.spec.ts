@@ -16,6 +16,27 @@ import { SubscriptionApi } from '../src/generated/apis/SubscriptionApi'
 
 const packageRoot = resolve(__dirname, '..')
 
+const BASELINE_STORES = ['app_store', 'play_store', 'stripe', 'promotional']
+
+/** A deep copy of `input` with `test_store` appended to every exact 1.7.0 store enum. */
+function withTestStore<T>(input: T): { value: T; patched: number } {
+  let patched = 0
+  const value = JSON.parse(JSON.stringify(input), (_key, node: unknown) => {
+    if (
+      node !== null &&
+      typeof node === 'object' &&
+      Array.isArray((node as { enum?: unknown }).enum) &&
+      JSON.stringify((node as { enum: unknown[] }).enum) ===
+        JSON.stringify(BASELINE_STORES)
+    ) {
+      patched += 1
+      return { ...node, enum: [...BASELINE_STORES, 'test_store'] }
+    }
+    return node
+  }) as T
+  return { value, patched }
+}
+
 type OpenApiDocument = {
   paths: Record<string, Record<string, Record<string, unknown>>>
   components: { schemas: Record<string, unknown> }
@@ -87,7 +108,10 @@ describe('premium access contract', () => {
     )
   })
 
-  it('U-C-SUBSCRIPTION-FROZEN: the subscription response schemas are unchanged from main', () => {
+  // Learning path Step 55: story 6.15 D15 adds one store, `test_store`, which the API writes only
+  // under an explicit local or preview TEST_ENV. Production never serves it, so installed
+  // production builds never parse it; every other byte of the 1.7.0 baseline still holds.
+  it('U-C-SUBSCRIPTION-FROZEN: the subscription response schemas are main plus only test_store', () => {
     const current = generateHttpOpenApiDocument() as unknown as OpenApiDocument
     const names = Object.keys(baseline.schemas)
     expect(names.sort()).toEqual([
@@ -96,13 +120,20 @@ describe('premium access contract', () => {
       'SubscriptionResponse',
       'SubscriptionStatus',
     ])
+    const expected = withTestStore({
+      schemas: baseline.schemas,
+      statusResponses: baseline.statusResponses,
+    })
+    // One store enum in the component, one inline in the status response: the patch must find
+    // both, or the comparison below would prove nothing about the store.
+    expect(expected.patched).toBe(2)
     for (const name of names)
       expect({ name, schema: current.components.schemas[name] }).toEqual({
         name,
-        schema: baseline.schemas[name],
+        schema: expected.value.schemas[name],
       })
     expect(current.paths['/api/v1/commerce/subscription']!.get!.responses).toEqual(
-      baseline.statusResponses
+      expected.value.statusResponses
     )
   })
 })

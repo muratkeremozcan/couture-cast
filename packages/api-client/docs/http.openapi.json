@@ -7200,7 +7200,8 @@
           "app_store",
           "play_store",
           "stripe",
-          "promotional"
+          "promotional",
+          "test_store"
         ]
       },
       "SubscriptionStatus": {
@@ -7273,7 +7274,8 @@
                   "app_store",
                   "play_store",
                   "stripe",
-                  "promotional"
+                  "promotional",
+                  "test_store"
                 ]
               },
               "productId": {
@@ -7376,7 +7378,8 @@
                       "app_store",
                       "play_store",
                       "stripe",
-                      "promotional"
+                      "promotional",
+                      "test_store"
                     ]
                   },
                   "productId": {

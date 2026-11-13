@@ -35,12 +35,17 @@ import {
  */
 export const subscriptionPlanSchema = z.enum(['premium_monthly', 'premium_annual'])
 
-/** Mirrors the EntitlementStore database enum; `promotional` = operator grants. */
+/**
+ * Mirrors the EntitlementStore database enum; `promotional` = operator grants. `test_store` is
+ * the RevenueCat Test Store, which the API writes only under an explicit local or preview
+ * `TEST_ENV` (story 6.15 D15).
+ */
 export const entitlementStoreSchema = z.enum([
   'app_store',
   'play_store',
   'stripe',
   'promotional',
+  'test_store',
 ])
 
 /**
