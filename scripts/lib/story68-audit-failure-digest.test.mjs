@@ -45,14 +45,16 @@ describe('failed audit test digest', () => {
   test('caps the digest size', () => {
     const noisy = [
       "Test Case '-[A.B testX]' started.",
-      ...Array.from({ length: 200 }, (_, i) => `    t = ${i}s ${'x'.repeat(900)}`),
+      // Short words, so no token mask can shrink a line below the cap (agy re-check P3-1).
+      ...Array.from({ length: 200 }, (_, i) => `    t = ${i}s ${'step '.repeat(180)}`),
       '/a/b/C.swift:1: error: boom',
-      ...Array.from({ length: 200 }, () => 'y'.repeat(900)),
+      ...Array.from({ length: 200 }, () => 'wait '.repeat(180)),
       "Test Case '-[A.B testX]' failed (1.0 seconds).",
     ].join('\n')
     const [digest] = failedAuditTestDigest(noisy)
     assert.ok(digest.lines.length <= 24)
     assert.ok(digest.lines.every((line) => line.length <= 300))
+    assert.ok(digest.lines.some((line) => line.length === 300))
   })
 
   test('the runner prints the digest before it throws', () => {
@@ -146,10 +148,12 @@ describe('failed audit test digest', () => {
 
   test('caps the issue list and each issue line', () => {
     const issues = failedAuditIssues(
-      Array.from({ length: 100 }, () => `CC68_AUDIT_ISSUE ${'z'.repeat(900)}`).join('\n')
+      Array.from({ length: 100 }, () => `CC68_AUDIT_ISSUE ${'zone '.repeat(180)}`).join(
+        '\n'
+      )
     )
     assert.equal(issues.length, 40)
-    assert.ok(issues.every((line) => line.length <= 400))
+    assert.ok(issues.every((line) => line.length === 400))
   })
 
   test('the Swift issue line keeps the CC68_AUDIT_ISSUE prefix and five pipe separated fields', () => {
@@ -232,6 +236,39 @@ describe('failed audit test digest', () => {
 
 // Antigravity audit-diag P3: xcodebuild footers carry runner paths, DerivedData, simulator UDIDs and
 // can echo a token; the public job log gets the line with each masked, or withheld.
+// Antigravity re-check P2-1 and P3-1: each 5-field record is masked field by field, a secret
+// line is withheld before any mask, and long camelCase test names stay readable.
+test('public log lines mask each record field and withhold secrets first', () => {
+  assert.deepEqual(
+    failedAuditIssues(
+      [
+        'CC68_AUDIT_ISSUE open|1|/Users/murat/project/x.png|Today|Contrast',
+        'CC68_AUDIT_ISSUE open|2|none|a@b.example|Contrast',
+        'CC68_AUDIT_ISSUE open|3|[/private/var/x]|id:AFA0777F-372A-445A-B8D4-08C287947144|Label',
+        'CC68_AUDIT_ISSUE home|4|share-card-cancel|testAllLocalesAndWatermarkOFFFullLabelsAndMore|Trait',
+      ].join('\n')
+    ),
+    [
+      'open|1|<path>|Today|Contrast',
+      'open|2|none|<email>|Contrast',
+      'open|3|[<path>]|id:<uuid>|Label',
+      'home|4|share-card-cancel|testAllLocalesAndWatermarkOFFFullLabelsAndMore|Trait',
+    ]
+  )
+  const { tail } = xcodebuildFailureReport(
+    [
+      'Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH',
+      'token abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH|end',
+      '\tresult path:/Users/runner/x.xcresult; DerivedData=/tmp/dd',
+    ].join('\n')
+  )
+  assert.deepEqual(tail, [
+    '[withheld: secret-shaped line]',
+    'token <token>|end',
+    'result path:<path>; DerivedData=<path>',
+  ])
+})
+
 test('a public failure report masks paths, UDIDs, emails and tokens in every section', () => {
   const log = [
     'CC68_AUDIT_ISSUE open|1|/Users/runner/work/couture-cast/couture-cast/x.png|a@b.example|Contrast',

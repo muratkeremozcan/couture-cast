@@ -57,22 +57,44 @@ const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/
 
 /**
  * One xcodebuild or harness log line made fit for the public job log (story 6.15, Antigravity
- * audit-diag P3): Swift sources keep their file name, every other local path, UUID (simulator
- * UDIDs), email and long token is masked, and a line that still looks like a secret is withheld.
+ * audit-diag P3 and its re-check): a secret-shaped line is withheld whole; otherwise each token
+ * between separators (whitespace and | , ; [ ] { } < > ( ) = and quotes) is masked on its own:
+ * Swift sources keep their file name, every other local path or URL, email, UUID (simulator UDIDs)
+ * and long token with a digit or token symbol is masked.
  */
 export function publicLogLine(text, limit = 300) {
-  const masked = String(text)
+  const line = String(text)
+    .replace(/\t/g, ' ')
     .replace(/[^\x20-\x7e]/g, '?')
-    .replace(/\S*\/(?=[^/\s]+\.swift)/g, '')
-    .replace(/file:\/\/\S+/g, '<path>')
-    .replace(/(^|[\s=:('"])(?:~\/|\/)[^\s'"),]+/g, '$1<path>')
-    .replace(new RegExp(UUID.source, 'gi'), '<uuid>')
-    .replace(new RegExp(EMAIL.source, 'g'), '<email>')
-    .replace(new RegExp(LONG_TOKEN.source, 'g'), '<token>')
+  // A secret-shaped line is withheld whole, before any mask could hide what it was.
+  if (SECRET_TEXT.test(line)) return '[withheld: secret-shaped line]'
+  return line
+    .split(LOG_BOUNDARY)
+    .map((part, index) => (index % 2 ? part : publicLogToken(part)))
+    .join('')
     .trim()
-  return SECRET_TEXT.test(masked)
-    ? '[withheld: secret-shaped line]'
-    : masked.slice(0, limit)
+    .slice(0, limit)
+}
+
+// Separators that end a token in xcodebuild output and in CC68 records (`a|b|c`), kept as is.
+const LOG_BOUNDARY = /([\s|,;[\]{}<>()='"]+)/
+// A long run that is an identifier, not a token, has no digit or token symbol (camelCase test names).
+const LOG_TOKEN = /^(?=[^\s]*[0-9+/_=-])[A-Za-z0-9+/_=-]{40,}$/
+const SWIFT_SOURCE = /^(?:file:\/\/|~\/|\/).*\/([^/]+\.swift)(:.*)?$/
+
+/** One token between separators: Swift sources keep their name, paths and identifiers are masked. */
+function publicLogToken(token) {
+  if (!token) return token
+  const swift = token.match(SWIFT_SOURCE)
+  if (swift) return `${swift[1]}${swift[2] ?? ''}`
+  if (/^(?:file:\/\/|~\/|\/)/.test(token) || /^[A-Za-z]+:\/\//.test(token))
+    return '<path>'
+  if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(token)) return '<email>'
+  if (LOG_TOKEN.test(token)) return '<token>'
+  // A root path inside a token (key:/Users/x, id=/tmp/y) is masked from where it starts.
+  return token
+    .replace(/(:)(?:~\/|\/)\S*/, '$1<path>')
+    .replace(new RegExp(UUID.source, 'gi'), '<uuid>')
 }
 
 const STRING_RULES = [
