@@ -68,6 +68,7 @@ export function markerAccessibilityProps(os: string) {
 export function LiveFontMountMarker({ scope }: { scope: string }) {
   const { fontScale, scale } = useWindowDimensions()
   const scheme = useColorScheme() ?? 'light'
+  // A test double of useTranslation may return only `t`; the marker still renders.
   const { i18n } = useTranslation()
   const id = useRef<string | null>(null)
   if (id.current === null) {
@@ -85,7 +86,7 @@ export function LiveFontMountMarker({ scope }: { scope: string }) {
       <View testID={`live-font-mount-${scope}-${id.current}`} {...hidden} />
       <View testID={`live-font-scale-${scope}-${fontScale}`} {...hidden} />
       <View
-        testID={`live-font-env-${scope}~${reactNativeVersion()}~${scheme}~${I18nManager.isRTL ? 'rtl' : 'ltr'}~${scale}~${i18n.language}`}
+        testID={`live-font-env-${scope}~${reactNativeVersion()}~${scheme}~${I18nManager.isRTL ? 'rtl' : 'ltr'}~${scale}~${i18n?.language ?? 'unknown'}`}
         {...hidden}
       />
     </>
