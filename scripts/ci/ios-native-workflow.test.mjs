@@ -1,37 +1,33 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
-// Story 6.15 D6: the one iOS job on main, nightly and dispatch keeps every guard the five macOS
-// jobs it replaced had. Each control below breaks one rule and must be rejected.
+// Story 6.15 D6 and C-13: ios-native.yml runs the iOS work that cannot fit a pull request, on
+// main, nightly and on demand for one commit. Each control below breaks one rule and must be
+// rejected; the committed workflow must pass all of them.
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
-  IOS_NATIVE_JOB,
   IOS_NATIVE_WORKFLOW,
-  RUNTIME_SCRIPT,
+  JOBS,
+  RUN_NAME,
   iosNativeProblems,
+  missingHelpers,
 } from './ios-native-workflow.mjs'
-import { runWithStubs, xctestSummary } from './workflow-step-stubs.mjs'
-import { shardsOf } from './native-matrix-shards.mjs'
 
-const source = parse(fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
-const runtimeScript = fs.readFileSync(RUNTIME_SCRIPT, 'utf8')
+const text = fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')
+const source = parse(text)
+// A JSON round trip breaks the sharing YAML aliases create, so one job can be mutated alone.
 const fresh = () => JSON.parse(JSON.stringify(source))
-const mutate = (change, script = runtimeScript) => {
-  const workflow = fresh()
-  change(workflow.jobs[IOS_NATIVE_JOB].steps, workflow)
-  return iosNativeProblems(workflow, { runtimeScript: script })
-}
-/** A control that changes only the runtime script. */
-const unchanged = (steps) => steps
-const byId = (steps, id) => steps.find((step) => step.id === id)
-const byRun = (steps, text) => steps.find((step) => step.run?.includes(text))
-const rejected = (title, expected, change, script) =>
+const step = (job, predicate) => job.steps.find(predicate)
+const rejected = (title, expected, change) =>
   test(`${title} is rejected`, () => {
-    const problems = mutate(change, script)
+    const workflow = fresh()
+    change(workflow.jobs, workflow)
+    const problems = iosNativeProblems(workflow)
     assert.ok(
       problems.some((problem) => expected.test(problem)),
       problems.join('\n') || 'no problem raised'
@@ -40,256 +36,341 @@ const rejected = (title, expected, change, script) =>
 
 describe('ios-native workflow validator', () => {
   test('the committed workflow passes', () => {
-    assert.deepEqual(iosNativeProblems(source, { runtimeScript }), [])
+    assert.deepEqual(iosNativeProblems(source), [])
   })
 
-  rejected('a pull_request trigger', /stay off pull requests/, (_, workflow) => {
-    workflow.on.pull_request = {}
+  // C-13: every script and local action the workflow calls exists at this commit, so a push or
+  // a scheduled run cannot fail on a helper only a later change adds.
+  test('every helper the workflow calls exists at this commit', () => {
+    assert.deepEqual(missingHelpers(text), [])
+    assert.deepEqual(
+      missingHelpers(
+        'run: node scripts/ci/not-here.mjs\nuses: ./.github/actions/not-here\n'
+      ),
+      ['scripts/ci/not-here.mjs', './.github/actions/not-here/action.yml']
+    )
+  })
+
+  test('one build, four parallel shards and Expo Go on its client, and the Release app beside them', () => {
+    assert.deepEqual(Object.keys(source.jobs).sort(), [...JOBS].sort())
+    assert.equal(source.jobs['ios-build'].needs, undefined)
+    assert.deepEqual(source.jobs['ios-shard'].strategy.matrix.shard, [1, 2, 3, 4])
+    assert.deepEqual(source.jobs['ios-shard'].needs, 'ios-build')
+    assert.deepEqual(source.jobs['ios-expo-go'].needs, 'ios-build')
+    assert.equal(source.jobs['ios-app-build'].needs, undefined)
+  })
+
+  // Triggers and the commit a run tests.
+  rejected('a pull_request trigger', /never runs on a pull request/, (_, w) => {
+    w.on.pull_request = {}
+  })
+  rejected('a pull_request_target trigger', /never runs on a pull request/, (_, w) => {
+    w.on.pull_request_target = {}
   })
   rejected('an unfiltered merge trigger', /filtered by its native iOS inputs/, (_, w) => {
     delete w.on.push.paths
   })
-  rejected('no nightly run', /nightly schedule/, (_, workflow) => {
-    delete workflow.on.schedule
+  rejected('no nightly run', /nightly schedule/, (_, w) => {
+    delete w.on.schedule
   })
-  rejected('a dispatch without a ref', /optional ref/, (_, workflow) => {
-    workflow.on.workflow_dispatch = null
+  rejected('an optional sha', /required sha input/, (_, w) => {
+    w.on.workflow_dispatch.inputs.sha.required = false
   })
-  rejected('a second job', /exactly one job/, (_, workflow) => {
-    workflow.jobs.extra = { 'runs-on': 'macos-26', steps: [] }
+  rejected('a second dispatch input', /exactly one commit/, (_, w) => {
+    w.on.workflow_dispatch.inputs.ref = { type: 'string', required: false }
   })
-  rejected('the macos-15 runner', /macos-26 runner required/, (_, workflow) => {
-    workflow.jobs[IOS_NATIVE_JOB]['runs-on'] = 'macos-15'
+  rejected('a run name without the commit', /run name must be/, (_, w) => {
+    w['run-name'] = 'iOS native'
   })
-  rejected('a limit past the hosted job limit', /hosted job limit/, (_, workflow) => {
-    workflow.jobs[IOS_NATIVE_JOB]['timeout-minutes'] = 400
-  })
-  rejected('a hidden step failure', /failures must remain visible/, (steps) => {
-    byId(steps, 'shard_2')['continue-on-error'] = true
-  })
-  rejected('a checkout of the default ref', /dispatched ref/, (steps) => {
-    delete steps[0].with
-  })
-  rejected('the image default Xcode', /Xcode 26.4 or later/, (steps) => {
-    byId(steps, 'xcode').run = 'xcodebuild -version'
-  })
-  rejected('Xcode 26.3 accepted', /Xcode 26.4 or later/, (steps) => {
-    byId(steps, 'xcode').run = byId(steps, 'xcode').run.replace('-ge 4', '-ge 3')
-  })
-  rejected(
-    'a build before the Xcode selection',
-    /selected before anything builds/,
-    (steps) => {
-      const at = steps.findIndex((step) => step.id === 'xcode')
-      const [xcode] = steps.splice(at, 1)
-      steps.splice(steps.findIndex((step) => step.id === 'release_build') + 1, 0, xcode)
-    }
-  )
-  rejected('a second prebuild', /prebuild the iOS project once/, (steps) => {
-    steps.splice(
-      steps.findIndex((step) => step.id === 'native_build'),
-      0,
-      { run: 'node scripts/run-story68-native.mjs prebuild --platform ios' }
-    )
-  })
-  rejected('a Debug build for the focus check', /Release app build/, (steps) => {
-    byId(steps, 'release_build').run = byId(steps, 'release_build').run.replace(
-      ' --configuration Release',
-      ''
-    )
-  })
-  rejected('no accessibility-focus check', /Release app build/, (steps) => {
-    steps.splice(
-      steps.findIndex((step) => step.id === 'focus_check'),
-      1
-    )
-  })
-  rejected('a client keyed by something else', /keyed by scripts/, (steps) => {
-    byId(steps, 'native_key').run =
-      'echo "key=cc68-ios-${{ github.sha }}" >> "$GITHUB_OUTPUT"'
-  })
-  rejected('a build that ignores the cache', /build it only on a miss/, (steps) => {
-    byId(steps, 'native_build').if =
-      "${{ !cancelled() && steps.build_window.outcome == 'success' }}"
-  })
-  rejected('a lookup that restores nothing', /build it only on a miss/, (steps) => {
-    byId(steps, 'native_cache').with['lookup-only'] = true
-  })
-  rejected('saving the client before the scan', /secret-scanned before/, (steps) => {
-    const at = steps.findIndex(
-      (step) =>
-        step.uses === 'actions/cache/save@v4' && step.with?.key?.includes('native_key')
-    )
-    const [save] = steps.splice(at, 1)
-    steps.splice(
-      steps.findIndex((step) => step.id === 'app_scan'),
-      0,
-      save
-    )
-  })
-  rejected('a scan without the harness directory', /secret-scanned before/, (steps) => {
-    byId(steps, 'app_scan').run = byId(steps, 'app_scan').run.replace(
-      ' "$CC68_HARNESS_DIR"',
-      ''
-    )
-  })
-  rejected('installing an unscanned client', /only a restored client/, (steps) => {
-    byId(steps, 'client').if =
-      "${{ !cancelled() && (steps.native_cache.outputs.cache-hit == 'true' || steps.native_build.outcome == 'success') }}"
-  })
-  rejected('uploading the client', /only closed evidence is uploaded/, (steps) => {
-    steps.push({
-      if: 'always()',
-      uses: 'actions/upload-artifact@v4',
-      with: { name: 'cc68-ios-app', path: '/tmp/cc68-ios-build' },
-    })
-  })
-  for (const shard of shardsOf('ios')) {
+  for (const name of JOBS) {
     rejected(
-      `shard ${shard} removed`,
-      new RegExp(`shard ${shard}: every command`),
-      (steps) => {
-        steps.splice(
-          steps.findIndex((step) => step.id === `shard_${shard}`),
-          1
-        )
+      `${name} checking out the default ref`,
+      new RegExp(`${name}: check out the dispatched commit`),
+      (jobs) => {
+        delete jobs[name].steps[0].with
       }
     )
     rejected(
-      `shard ${shard} without its shard`,
-      new RegExp(`shard ${shard}: every command`),
-      (steps) => {
-        byId(steps, `shard_${shard}`).run = byId(steps, `shard_${shard}`).run.replace(
-          ' --shard "$shard"',
-          ''
-        )
+      `${name} without the commit proof`,
+      new RegExp(`${name}: the second step must fail unless HEAD`),
+      (jobs) => {
+        jobs[name].steps.splice(1, 1)
       }
     )
     rejected(
-      `shard ${shard} on a shorter budget`,
-      new RegExp(`shard ${shard}: the flows keep`),
-      (steps) => {
-        byId(steps, `shard_${shard}`)['timeout-minutes'] = 45
-      }
-    )
-    rejected(
-      `shard ${shard} sharing the previous runtime`,
-      new RegExp(`shard ${shard}: start its own runtime`),
-      (steps) => {
-        steps.splice(
-          steps.findIndex((step) => step.id === `shard_${shard}_runtime`),
-          1
-        )
-      }
-    )
-    rejected(
-      `shard ${shard} evidence that may be missing`,
-      new RegExp(`shard ${shard}: evidence upload must fail closed`),
-      (steps) => {
-        steps.find((step) => step.with?.name === `share-card-ios-shard-${shard}`).with[
-          'if-no-files-found'
-        ] = 'warn'
-      }
-    )
-    rejected(
-      `shard ${shard} cleanup skipped after a failure`,
-      new RegExp(`shard ${shard}: owned cleanup must always run`),
-      (steps) => {
-        byRun(steps, `native-ios-runtime.sh stop shard-${shard}`).if =
-          '${{ steps.shard_' + shard + ".outcome == 'success' }}"
+      `${name} proving another commit`,
+      new RegExp(`${name}: the second step must fail unless HEAD`),
+      (jobs) => {
+        jobs[name].steps[1].env.SHA = '${{ github.sha }}'
       }
     )
   }
+  for (const name of ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-build']) {
+    rejected(
+      `${name} on macos-15`,
+      new RegExp(`${name}: macos-26 runner required`),
+      (jobs) => {
+        jobs[name]['runs-on'] = 'macos-15'
+      }
+    )
+    rejected(
+      `${name} on the image default Xcode`,
+      new RegExp(`${name}: select Xcode 26.4 or later`),
+      (jobs) => {
+        jobs[name].steps = jobs[name].steps.filter((row) => row.id !== 'xcode')
+      }
+    )
+    rejected(
+      `${name} accepting Xcode 26.3`,
+      new RegExp(`${name}: select Xcode 26.4`),
+      (jobs) => {
+        const row = step(jobs[name], (item) => item.id === 'xcode')
+        row.run = row.run.replace('-ge 4 ]', '-ge 3 ]')
+      }
+    )
+  }
+
+  // Shape.
   rejected(
-    'a shard running the Expo Go proof',
-    /must not run the Expo Go proof/,
-    (steps) => {
-      byId(steps, 'shard_3').run +=
-        '\nnode scripts/run-story68-native.mjs expo-go-proof --platform ios\n'
+    'a shard that waits on nothing',
+    /ios-shard must need exactly ios-build/,
+    (jobs) => {
+      delete jobs['ios-shard'].needs
     }
   )
-  rejected('a merge that accepts a skipped shard', /every shard must run/, (steps) => {
-    const merge = byRun(steps, 'native-ios-shards.mjs merge')
-    merge.env.CC68_SHARD_OUTCOMES = '${{ steps.shard_1.outcome }}'
+  rejected(
+    'Expo Go after the shards',
+    /ios-expo-go must need exactly ios-build/,
+    (jobs) => {
+      jobs['ios-expo-go'].needs = ['ios-build', 'ios-shard']
+    }
+  )
+  rejected('a build that waits on something', /ios-build starts the run/, (jobs) => {
+    jobs['ios-build'].needs = ['ios-app-build']
   })
-  rejected('a merge that ignores shard outcomes', /every shard must run/, (steps) => {
-    const merge = byRun(steps, 'native-ios-shards.mjs merge')
-    merge.run = 'node scripts/ci/native-ios-shards.mjs merge "$RUNNER_TEMP/ios-shards"'
-  })
-  rejected('an Expo Go proof with a shard', /without a shard/, (steps) => {
-    byId(steps, 'expo_go').run = byId(steps, 'expo_go').run.replace(
-      '--device "$device"',
-      '--device "$device" --shard 2/4'
-    )
-  })
-  rejected('an Expo Go job without the PNG guards', /PNG guards/, (steps) => {
-    steps.splice(
-      steps.findIndex((step) => step.id === 'png_file_guards'),
-      1
-    )
-  })
-  rejected('a Supabase stack left running', /always stops last/, (steps) => {
-    steps.pop()
+  rejected('two shards', /every shard of the iOS plan/, (jobs) => {
+    jobs['ios-shard'].strategy.matrix.shard = [1, 2]
   })
   rejected(
-    'a Metro start without its platform in the runtime script',
-    /pass --platform ios/,
-    unchanged,
-    runtimeScript.replace(
-      'node scripts/run-story68-native.mjs metro --platform ios >',
-      'node scripts/run-story68-native.mjs metro >'
-    )
+    'a shard matrix that cancels its siblings',
+    /every shard of the iOS plan/,
+    (jobs) => {
+      delete jobs['ios-shard'].strategy['fail-fast']
+    }
+  )
+  rejected('a shorter shard limit', /keeps its 70-minute limit/, (jobs) => {
+    jobs['ios-shard']['timeout-minutes'] = 45
+  })
+  rejected('a shard command without its shard', /receive its shard/, (jobs) => {
+    const row = step(jobs['ios-shard'], (item) => item.run?.includes('--shard "$shard"'))
+    row.run = row.run.replace('--shard "$shard"', '')
+  })
+  rejected(
+    'a shard running the Expo Go proof',
+    /no shard runs the Expo Go proof/,
+    (jobs) => {
+      const row = step(jobs['ios-shard'], (item) => item.name === 'iOS shard flows')
+      row.run += '\nnode scripts/run-story68-native.mjs expo-go-proof --platform ios\n'
+    }
   )
   rejected(
-    'a runtime script that never cleans up',
-    /provisions, cleans up and deletes/,
-    unchanged,
-    runtimeScript.replace('node scripts/e2e-share-card/cleanup.mjs', 'true')
+    'evidence skipped after a failed shard',
+    /ios-evidence must run after any/,
+    (jobs) => {
+      delete jobs['ios-evidence'].if
+    }
   )
+  rejected(
+    'evidence that ignores the shard result',
+    /ios-evidence must run after any/,
+    (jobs) => {
+      jobs['ios-evidence'].steps = jobs['ios-evidence'].steps.filter(
+        (row) => !row.run?.includes('CC68_SHARD_RESULT')
+      )
+    }
+  )
+  rejected('Expo Go without its proof', /runs the proof once/, (jobs) => {
+    jobs['ios-expo-go'].steps = jobs['ios-expo-go'].steps.filter(
+      (row) => !row.run?.includes('expo-go-proof')
+    )
+  })
+  rejected('Expo Go without the PNG guards', /PNG guards/, (jobs) => {
+    jobs['ios-expo-go'].steps = jobs['ios-expo-go'].steps.filter(
+      (row) => !row.run?.includes('swift test --package-path')
+    )
+  })
+  rejected(
+    'a Debug app for the focus check',
+    /Release app and its accessibility-focus/,
+    (jobs) => {
+      const row = step(jobs['ios-app-build'], (item) =>
+        item.run?.includes('-configuration Release')
+      )
+      row.run = row.run.replace('-configuration Release', '-configuration Debug')
+    }
+  )
+
+  // The client.
+  rejected(
+    'a client keyed by something else',
+    /keyed by scripts\/ci\/native-build-cache/,
+    (jobs) => {
+      step(jobs['ios-build'], (row) => row.id === 'native_key').run =
+        'echo "key=cc68-ios-${{ github.sha }}" >> "$GITHUB_OUTPUT"'
+    }
+  )
+  rejected(
+    'a build that ignores the cache',
+    /build only when the key is not cached/,
+    (jobs) => {
+      step(jobs['ios-build'], (row) => row.id === 'java').if = '${{ !cancelled() }}'
+    }
+  )
+  rejected(
+    'caching the client before its scan',
+    /secret-scanned before it is cached/,
+    (jobs) => {
+      const steps = jobs['ios-build'].steps
+      steps.splice(
+        steps.findIndex((row) => row.id === 'app_scan'),
+        1
+      )
+    }
+  )
+  rejected(
+    'a scan without the harness directory',
+    /secret-scanned before it is cached/,
+    (jobs) => {
+      const row = step(jobs['ios-build'], (item) => item.id === 'app_scan')
+      row.run = row.run.replace(' "$CC68_HARNESS_DIR"', '')
+    }
+  )
+  rejected(
+    'a build that does not prove its saved key',
+    /prove the saved key exists/,
+    (jobs) => {
+      const steps = jobs['ios-build'].steps
+      steps.splice(
+        steps.findIndex((row) => row.with?.['fail-on-cache-miss'] === true),
+        1
+      )
+    }
+  )
+  for (const name of ['ios-shard', 'ios-expo-go'])
+    rejected(
+      `${name} restoring without failing on a miss`,
+      new RegExp(`${name}: restore exactly the key ios-build resolved`),
+      (jobs) => {
+        delete step(jobs[name], (row) => row.with?.['fail-on-cache-miss'] === true).with[
+          'fail-on-cache-miss'
+        ]
+      }
+    )
+  rejected('the client as an artifact', /upload only closed evidence/, (jobs) => {
+    jobs['ios-build'].steps.push({
+      if: 'always()',
+      uses: 'actions/upload-artifact@v4',
+      with: { name: 'client', path: '/tmp/cc68-ios-build', 'if-no-files-found': 'error' },
+    })
+  })
+  rejected('a shard downloading an artifact', /travels by cache only/, (jobs) => {
+    jobs['ios-shard'].steps.push({ uses: 'actions/download-artifact@v4' })
+  })
+
+  // Runtimes.
+  for (const name of ['ios-build', 'ios-shard', 'ios-expo-go']) {
+    rejected(
+      `${name} without the harness env`,
+      new RegExp(`${name}: the harness directory`),
+      (jobs) => {
+        delete jobs[name].env
+      }
+    )
+    rejected(
+      `${name} skipping cleanup after a failure`,
+      new RegExp(`${name}: .*cleanup.mjs must always run`),
+      (jobs) => {
+        step(
+          jobs[name],
+          (row) => row.run === 'node scripts/e2e-share-card/cleanup.mjs'
+        ).if = 'success()'
+      }
+    )
+    rejected(
+      `${name} starting Metro without its platform`,
+      /every Metro start must pass/,
+      (jobs) => {
+        jobs[name].steps.push({
+          run: 'node scripts/run-story68-native.mjs metro > /tmp/m.log',
+        })
+      }
+    )
+  }
 })
 
-describe('ios-native photo-save guard', () => {
-  const guard = byId(source.jobs[IOS_NATIVE_JOB].steps, 'png_file_guards')
+describe('the commit proof', () => {
+  const proof = source.jobs['ios-build'].steps[1]
+  const run = (head, sha) => {
+    const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-native-proof-'))
+    try {
+      const bin = path.join(scratch, 'bin')
+      fs.mkdirSync(bin)
+      fs.writeFileSync(path.join(bin, 'git'), `#!/usr/bin/env bash\necho ${head}\n`, {
+        mode: 0o755,
+      })
+      return spawnSync('bash', ['-e', '-c', proof.run], {
+        encoding: 'utf8',
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, SHA: sha },
+      }).status
+    } finally {
+      fs.rmSync(scratch, { recursive: true, force: true })
+    }
+  }
+  const head = 'a'.repeat(40)
 
-  test('passes on any nonzero count and fails on zero tests, a skip or a failure', () => {
-    // A literal count breaks the lane whenever the suite grows.
-    assert.doesNotMatch(guard.run, /Executed \d+ tests/)
-    for (const count of [1, 4, 5, 21])
-      assert.equal(
-        runWithStubs(guard, { swift: xctestSummary(count) }),
-        0,
-        `${count} tests`
-      )
-    const skipped =
-      'echo "\t Executed 5 tests, with 1 test skipped and 0 failures (0 unexpected) in 0.1 (0.1) seconds"'
-    for (const body of [xctestSummary(0), 'echo "no summary"', 'exit 0', skipped])
-      assert.notEqual(runWithStubs(guard, { swift: body }), 0, body)
-    assert.notEqual(runWithStubs(guard, { swift: xctestSummary(5, 1) }), 0, 'failure')
-    // A failure summary from a tool that still exits zero.
-    assert.notEqual(
-      runWithStubs(guard, { swift: xctestSummary(5, 1).replace(/exit \d+$/, 'exit 0') }),
-      0,
-      'failure with exit 0'
-    )
+  test('passes only when HEAD is exactly the full commit named', () => {
+    assert.equal(run(head, head), 0)
+    assert.notEqual(run(head, 'b'.repeat(40)), 0, 'another commit checked out')
+    assert.notEqual(run(head, 'a'.repeat(7)), 0, 'a short SHA')
+    assert.notEqual(run(head, 'main'), 0, 'a branch name')
+    assert.notEqual(run(head, ''), 0, 'nothing')
+  })
+
+  test('the run name carries the same commit the jobs prove', () => {
+    assert.equal(source['run-name'], RUN_NAME)
+    for (const name of JOBS)
+      assert.equal(source.jobs[name].steps[1].env.SHA, '${{ inputs.sha || github.sha }}')
   })
 })
 
 describe('the Xcode selection', () => {
-  const step = byId(source.jobs[IOS_NATIVE_JOB].steps, 'xcode')
-  // Runs the step over fake Xcode bundles with stub sudo, xcodebuild and xcrun; returns its
-  // status and what it wrote to GITHUB_ENV.
+  const xcode = step(source.jobs['ios-build'], (row) => row.id === 'xcode')
   const select = (installed) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'xcode-select-'))
     try {
+      const bin = path.join(root, 'bin')
+      fs.mkdirSync(bin)
+      for (const [name, body] of Object.entries({
+        sudo: 'exit 0',
+        xcodebuild: 'echo Xcode',
+        xcrun: 'echo 26.4',
+      }))
+        fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
+          mode: 0o755,
+        })
       for (const name of installed) fs.mkdirSync(path.join(root, name))
       const env = path.join(root, 'github-env')
       fs.writeFileSync(env, '')
-      const status = runWithStubs(
-        step,
-        { sudo: 'exit 0', xcodebuild: 'echo Xcode', xcrun: 'echo 26.4' },
-        { env: { XCODE_ROOT: root, GITHUB_ENV: env } }
-      )
-      return { status, env: fs.readFileSync(env, 'utf8').replaceAll(root, '') }
+      const status = spawnSync('bash', ['-c', xcode.run], {
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          XCODE_ROOT: root,
+          GITHUB_ENV: env,
+        },
+      }).status
+      return { status, env: fs.readFileSync(env, 'utf8').replaceAll(root, '').trim() }
     } finally {
       fs.rmSync(root, { recursive: true, force: true })
     }
@@ -305,13 +386,22 @@ describe('the Xcode selection', () => {
       'Xcode_27.0.app',
     ])
     assert.equal(picked.status, 0)
-    assert.equal(picked.env.trim(), 'DEVELOPER_DIR=/Xcode_26.10.app/Contents/Developer')
+    assert.equal(picked.env, 'DEVELOPER_DIR=/Xcode_26.10.app/Contents/Developer')
     assert.equal(
-      select(['Xcode_26.4.app', 'Xcode_26.4.1.app']).env.trim(),
+      select(['Xcode_26.4.app', 'Xcode_26.4.1.app']).env,
       'DEVELOPER_DIR=/Xcode_26.4.1.app/Contents/Developer'
     )
     assert.notEqual(select(['Xcode_16.4.app', 'Xcode_26.3.app']).status, 0)
     assert.notEqual(select(['Xcode_27.0.app']).status, 0)
     assert.notEqual(select([]).status, 0)
+  })
+
+  test('every macOS job runs the same selection', () => {
+    for (const name of ['ios-shard', 'ios-expo-go', 'ios-app-build'])
+      assert.equal(
+        step(source.jobs[name], (row) => row.id === 'xcode').run,
+        xcode.run,
+        name
+      )
   })
 })

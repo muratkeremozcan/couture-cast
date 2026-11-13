@@ -56,7 +56,7 @@ describe('the one macOS pull request job', () => {
 
   test('selects the Xcode ios-native.yml selects, before any Apple build or test', () => {
     const xcode = job.steps.findIndex((step) => step.id === 'xcode')
-    const iosNative = workflows['ios-native.yml'].jobs['ios-native'].steps.find(
+    const iosNative = workflows['ios-native.yml'].jobs['ios-build'].steps.find(
       (step) => step.id === 'xcode'
     )
     assert.equal(xcode, 1, 'right after the checkout')

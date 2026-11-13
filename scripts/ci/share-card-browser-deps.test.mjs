@@ -385,7 +385,7 @@ describe('browser dependency workflow', () => {
     // ios-native.yml runs the client-free iOS checks after the Expo Go proof, whatever the
     // proof's outcome.
     const iosSteps = parse(await readFile('.github/workflows/ios-native.yml', 'utf8'))
-      .jobs['ios-native'].steps
+      .jobs['ios-expo-go'].steps
     const mac = iosSteps.find((item) =>
       item.run?.includes('npx --no-install playwright install chromium')
     )

@@ -1,19 +1,25 @@
-# Story 6.15 D6: the iOS work that cannot fit a pull request. The iOS app build alone runs 31
-# minutes at p95 and a share-card shard 44 on macos-15, against a 15-minute queue plus run budget,
-# so this one macOS job runs on main, nightly and on demand, and the Android lanes are the pull
-# request gate. It holds what five macOS jobs ran before: the accessibility-focus Release app
-# build and its check (pr-accessibility-focus.yml ios-app-build), and the share-card iOS
-# development client, its four journey shards with their merged evidence, and the Expo Go proof
-# with the iOS checks that need no client (pr-share-card-native.yml ios-build, ios-shard,
-# ios-evidence and ios-expo-go). The checks that fit a pull request run in pr-apple-native.yml.
+# Story 6.15 D6: the iOS work that cannot fit a pull request. The iOS app build runs 31 minutes at
+# p95 and a share-card shard 44, against a 15-minute queue plus run budget for every pull request
+# job, so this workflow runs on main (when a native iOS input changes), nightly, and on demand for
+# one commit. It holds the iOS jobs of pr-share-card-native.yml (ios-build, ios-shard, ios-expo-go,
+# ios-evidence) and pr-accessibility-focus.yml (ios-app-build) on macos-26 with Xcode 26.4 or later,
+# which SDK 56 needs; story 6.15 then removes them from those workflows.
 #
-# Every upgrade pull request dispatches this workflow on its exact head SHA (the ref input) as its
-# iOS evidence before merge (spec 6.15, CX-10); the nightly run on main gates opening the next step.
+# Shape: ios-build keys the development client by its native inputs and builds, scans and caches it
+# only on a miss; four ios-shard jobs and ios-expo-go restore exactly that scanned client and run in
+# parallel; ios-evidence proves every shard reported its exact cases; ios-app-build builds the
+# Release app beside them. Wall time about 75 minutes (client build up to 31 when its key misses,
+# then the longest shard, 44 at p95).
+#
+# Pre-merge evidence for a pull request: dispatch this workflow from main with `sha` set to the pull
+# request's head commit. The run name carries that SHA, every job fails unless it checked out exactly
+# that commit, and the pull request's gate accepts only a successful workflow_dispatch run from main
+# whose name carries its current head SHA.
 name: iOS native
+run-name: iOS native ${{ inputs.sha || github.sha }}
 
 on:
-  # A merge runs it only when a native iOS input changed: exactly the ios-native lane's inputs
-  # in scripts/ci/lanes.mjs (scripts/ci/lanes-wiring.test.mjs holds the two equal).
+  # A merge runs it only when a native iOS input changed; the nightly run covers the rest.
   push:
     branches: [main]
     paths:
@@ -53,48 +59,42 @@ on:
     - cron: '23 3 * * *'
   workflow_dispatch:
     inputs:
-      ref:
-        description: 'Commit SHA or ref to test, such as a pull request head SHA (default: the dispatching ref)'
-        required: false
-        default: ''
+      sha:
+        description: 'Full 40-character commit SHA to test, such as a pull request head commit'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
-# The nightly run has its own group, so a merge to main during it cannot cancel it.
+# One run per commit; the nightly run has its own group, so a merge to main cannot cancel it.
 concurrency:
-  group: ios-native-${{ inputs.ref || github.ref }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
+  group: ios-native-${{ inputs.sha || github.sha }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
   cancel-in-progress: true
 
 jobs:
-  ios-native:
-    name: iOS native builds and journeys
+  ios-build:
     runs-on: macos-26
-    # Sum of the p95s these steps had as separate jobs (D6 table, 2026-11-12): about 15 minutes
-    # of setup, the Release app build 31, the development client build 31 when its key misses,
-    # four shards of about 39 each without their per-job setup, and the Expo Go proof 27: about
-    # 260 minutes. 330 leaves a quarter of margin and stays under the 360-minute hosted job limit.
-    timeout-minutes: 330
-    env:
+    timeout-minutes: 60
+    env: &runtime_env
       PLAYWRIGHT_SKIP_DB_RESET: 'true'
       CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
       MAESTRO_CLI_NO_ANALYTICS: '1'
+    outputs:
+      app-key: ${{ steps.native_key.outputs.key }}
+      app-path: ${{ steps.native_key.outputs.path }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref || github.sha }}
-      - name: Disable Spotlight indexing on the disposable iOS runner
+          ref: ${{ inputs.sha || github.sha }}
+      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Require the commit under test
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
         run: |
-          test "$GITHUB_ACTIONS" = 'true'
-          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
-          test "$RUNNER_OS" = 'macOS'
-          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
-          sudo mdutil -a -s
-          sudo mdutil -a -i off
-          sudo mdutil -s /System/Volumes/Data
-          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
-      # SDK 56 needs Xcode 26.4 (spec 6.15 TEA-04). The newest installed Xcode 26.x at 26.4 or
-      # later is selected by name, never the image default, and the build identity is logged.
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
       - name: Select Xcode 26.4 or later
         id: xcode
         run: |
@@ -114,6 +114,16 @@ jobs:
           echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
           xcodebuild -version
           xcrun --sdk iphonesimulator --show-sdk-version
+      - name: Disable Spotlight indexing on the disposable iOS runner
+        run: |
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
       # storage-api runs on the Node major its Dockerfile pins; the repo's own Node
       # comes from the install step after this one and stays first on PATH.
       - name: Provision Node 22 for the native storage-api
@@ -128,33 +138,32 @@ jobs:
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs startup-deadline
-      # Most commits change no native input: then the development client of this key is restored
-      # and the build below is skipped. The client loads its JavaScript from each segment's Metro,
-      # so the journeys still test this commit.
+      # Most commits change no native input. Then the client of this key is already cached, this
+      # job ends here and the shards restore it. On a miss the steps below build, scan and save it.
       - name: Key the iOS development client by its native inputs
         id: native_key
-        if: ${{ !cancelled() && steps.xcode.outcome == 'success' && steps.install.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/native-build-cache.mjs key --platform ios >> "$GITHUB_OUTPUT"
-      - name: Restore the development client of this fingerprint
+      - name: Look up the development client of this fingerprint
         id: native_cache
         if: ${{ !cancelled() && steps.native_key.outcome == 'success' }}
         uses: actions/cache/restore@v4
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
+          lookup-only: true
       - uses: actions/setup-java@v4
         id: java
+        if: ${{ !cancelled() && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         with:
           distribution: temurin
           java-version: '21'
-      - name: Install the iOS project generator
-        run: brew install xcodegen
       # The macOS lane runs Supabase as native processes built from pinned,
       # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
       # saved to the cache as soon as it exists, so a failed job still keeps it.
       - name: Pin the native Supabase build inputs
+        if: ${{ !cancelled() && steps.java.outcome == 'success' }}
         id: native
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
       - name: Restore PostgreSQL
         if: ${{ !cancelled() && steps.native.outcome == 'success' }}
@@ -242,335 +251,491 @@ jobs:
         id: buckets
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
         run: node scripts/local-storage-buckets.mjs provision
-      # Shared by every segment: the Prisma client, the built packages and API, and the built
-      # renderer check. No account or runtime state.
-      - name: Build the API and the renderer the runtimes share
-        id: build_outputs
+      - name: Prepare isolated UUID runtime and built renderer
+        id: runtime
         if: ${{ !cancelled() && steps.buckets.outcome == 'success' }}
         run: |
           npm run db:generate
           npm run build:packages
           npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
           node scripts/lib/story68-built-render.mjs
-
-      # Build segment: one prebuild of the isolated Story 6.8 project, then its Release build
-      # (the accessibility-focus check) and, on a key miss, its Debug development client (the
-      # journeys). The two configurations are two different binaries: the check proves the
-      # optimized, stripped Release app links and registers the module, and the journeys need the
-      # Debug client that loads its JavaScript from Metro.
-      - name: Start the build segment owned runtime
-        id: build_runtime
-        if: ${{ !cancelled() && steps.build_outputs.outcome == 'success' }}
-        run: bash scripts/ci/native-ios-runtime.sh start
-      - name: Generate the native iOS project once
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      - name: Generate native development client
         id: prebuild
-        if: ${{ !cancelled() && steps.build_runtime.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs prebuild --platform ios
       - name: Mark the owned iOS build-service window
         id: build_window
         if: ${{ !cancelled() && steps.prebuild.outcome == 'success' }}
         run: node scripts/ci/native-build-daemons.mjs mark
-      # Its own derived data, deleted after the check, so the journeys keep their disk.
-      - name: Build the Release simulator app for the accessibility-focus check
-        id: release_build
-        if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
-        run: node scripts/run-story68-native.mjs build --platform ios --configuration Release --derived-data "$RUNNER_TEMP/release-build"
-      # The XCTest target in pr-apple-native.yml leaves out AccessibilityFocusModule.swift, which
-      # needs ExpoModulesCore; this app build compiles it with its Expo dependency.
-      - name: Check the app links and registers the accessibility-focus module
-        id: focus_check
-        if: ${{ !cancelled() && steps.release_build.outcome == 'success' }}
-        run: |
-          bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
-            "$RUNNER_TEMP/release-build/Build/Products/Release-iphonesimulator/CoutureCastStory68.app/CoutureCastStory68" apps/mobile/ios
-      - name: Delete the Release build
-        if: ${{ always() && steps.release_build.outcome != 'skipped' }}
-        run: rm -rf "$RUNNER_TEMP/release-build"
       - name: Build native development client
         id: native_build
-        if: ${{ !cancelled() && steps.build_window.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs build --platform ios
       - name: Release the owned iOS build services
         if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
         run: node scripts/ci/native-build-daemons.mjs stop
       # The repository is public, and a fork's pull request can restore this cache. The client may
-      # carry the anon key of this segment's loopback stack (a client key, signed by a secret that
-      # dies with the job) and nothing else: no service role key, no owned environment value.
+      # carry the anon key of this job's loopback stack (a client key, signed by a secret that dies
+      # with the job) and nothing else: no service role key, no owned environment value.
       - name: Refuse to cache a development client that embeds a secret
         id: app_scan
         if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
         run: node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"
       - name: Save the scanned development client of this fingerprint
+        id: native_save
         if: ${{ !cancelled() && steps.app_scan.outcome == 'success' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
-      # Every segment after this one installs this client: one restored from the cache, which only
-      # ever holds a scanned client, or the one this job built and scanned.
-      - name: Require the scanned development client
-        id: client
-        if: ${{ !cancelled() && (steps.native_cache.outputs.cache-hit == 'true' || steps.app_scan.outcome == 'success') }}
-        run: test -d "${{ steps.native_key.outputs.path }}"
-      - name: Report the build segment owned background service exits
-        id: build_exits
-        if: ${{ always() && steps.build_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh exits
-      - name: Select and scan the build segment closed evidence
-        if: ${{ always() && steps.build_runtime.outcome != 'skipped' }}
+      # A save that lost a race to a concurrent run leaves no entry of this run's own; the shards
+      # need one, so the job fails here instead of in four shards.
+      - name: Require the saved development client for the shards
+        if: ${{ !cancelled() && steps.native_save.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: ${{ steps.native_key.outputs.key }}
+          lookup-only: true
+          fail-on-cache-miss: true
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
         env:
           CC68_CI_PLATFORM: ios
           CC68_CI_API: 0
-          CC68_CI_JOB_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || ((steps.focus_check.outcome == 'success' && steps.client.outcome == 'success') && steps.build_exits.outcome == 'success') && 'success' || 'failure' }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
         run: node scripts/e2e-share-card/public-evidence.mjs
-      - name: Collect the build segment evidence
-        if: ${{ always() && steps.build_runtime.outcome != 'skipped' }}
+      - name: Collect build evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: share-card-ios-build
           path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
           if-no-files-found: error
-      - name: Clean the build segment owned runtime and simulator
-        if: ${{ always() && steps.build_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh stop build
-      # Shard 1 of 4 (scripts/ci/native-ios-shards.mjs): its own runtime, account and simulator.
-      - name: Start the shard 1 owned runtime
-        id: shard_1_runtime
-        if: ${{ !cancelled() && steps.client.outcome == 'success' }}
-        run: bash scripts/ci/native-ios-runtime.sh start
-      - name: iOS shard 1 flows
-        id: shard_1
-        if: ${{ !cancelled() && steps.shard_1_runtime.outcome == 'success' }}
-        # The budget each shard job had (native-ios-shards.test.mjs: 1.5x its nominal minutes fits).
-        timeout-minutes: 70
-        run: |
-          shard='1/4'
-          node scripts/e2e-share-card/warm-metro.mjs --platform ios
-          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
-          device=$(cat /tmp/cc68-simulator)
-          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
-          node scripts/run-story68-native.mjs open --platform ios --device "$device"
-          node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-          node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
-          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
-            node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
-          done
-      - name: Record closed iOS host, first-flow and Metro diagnostics of shard 1
-        if: ${{ !cancelled() && steps.shard_1.outcome == 'failure' }}
-        run: |
-          node scripts/ci/native-host-evidence.mjs sample failure --platform ios
-          node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-      - name: Report the shard 1 owned background service exits
-        id: shard_1_exits
-        if: ${{ always() && steps.shard_1_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh exits
-      - name: Select and scan the shard 1 closed evidence
-        if: ${{ always() && steps.shard_1_runtime.outcome != 'skipped' }}
-        env:
-          CC68_CI_PLATFORM: ios
-          CC68_CI_API: 0
-          CC68_CI_JOB_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || ((steps.shard_1.outcome == 'success') && steps.shard_1_exits.outcome == 'success') && 'success' || 'failure' }}
-        run: node scripts/e2e-share-card/public-evidence.mjs
-      - name: Collect the shard 1 evidence
-        if: ${{ always() && steps.shard_1_runtime.outcome != 'skipped' }}
-        uses: actions/upload-artifact@v4
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+      - name: Show the native Supabase service logs
+        if: ${{ !cancelled() && failure() }}
+        run: node scripts/ci/native-supabase.mjs logs
+      - name: Stop the owned native Supabase stack
+        if: always()
+        run: node scripts/ci/native-supabase.mjs stop
+  # Four shards balanced by measured minutes (scripts/ci/native-matrix-shards.mjs): nominal jobs of
+  # 33.7 to 35.3 minutes, from per-flow times of runs 41352898854 and 41429581850, where the
+  # longest shard took 40.9 and 41.8. They run in parallel beside ios-expo-go, each restoring the
+  # scanned client ios-build cached.
+  ios-shard:
+    needs: ios-build
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    runs-on: macos-26
+    timeout-minutes: 70
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
         with:
-          name: share-card-ios-shard-1
-          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
-          if-no-files-found: error
-      - name: Keep the shard 1 evidence for the shard merge
-        if: ${{ always() && steps.shard_1_runtime.outcome != 'skipped' }}
+          ref: ${{ inputs.sha || github.sha }}
+      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Require the commit under test
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
         run: |
-          mkdir -p "$RUNNER_TEMP/ios-shards/shard-1"
-          cp -R "$CC68_HARNESS_DIR/public-evidence/." "$RUNNER_TEMP/ios-shards/shard-1/"
-      - name: Clean the shard 1 owned runtime and simulator
-        if: ${{ always() && steps.shard_1_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh stop shard-1
-      # Shard 2 of 4 (scripts/ci/native-ios-shards.mjs): its own runtime, account and simulator.
-      - name: Start the shard 2 owned runtime
-        id: shard_2_runtime
-        if: ${{ !cancelled() && steps.client.outcome == 'success' }}
-        run: bash scripts/ci/native-ios-runtime.sh start
-      - name: iOS shard 2 flows
-        id: shard_2
-        if: ${{ !cancelled() && steps.shard_2_runtime.outcome == 'success' }}
-        # The budget each shard job had (native-ios-shards.test.mjs: 1.5x its nominal minutes fits).
-        timeout-minutes: 70
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
+      - name: Select Xcode 26.4 or later
+        id: xcode
         run: |
-          shard='2/4'
-          node scripts/e2e-share-card/warm-metro.mjs --platform ios
-          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
-          device=$(cat /tmp/cc68-simulator)
-          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
-          node scripts/run-story68-native.mjs open --platform ios --device "$device"
-          node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-          node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
-          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
-            node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
+          set -eo pipefail
+          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
+          xcode=''
+          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
+            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
+              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
+            fi
           done
-      - name: Record closed iOS host, first-flow and Metro diagnostics of shard 2
-        if: ${{ !cancelled() && steps.shard_2.outcome == 'failure' }}
+          if [ -z "$xcode" ]; then
+            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+      - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
-          node scripts/ci/native-host-evidence.mjs sample failure --platform ios
-          node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-      - name: Report the shard 2 owned background service exits
-        id: shard_2_exits
-        if: ${{ always() && steps.shard_2_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh exits
-      - name: Select and scan the shard 2 closed evidence
-        if: ${{ always() && steps.shard_2_runtime.outcome != 'skipped' }}
-        env:
-          CC68_CI_PLATFORM: ios
-          CC68_CI_API: 0
-          CC68_CI_JOB_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || ((steps.shard_2.outcome == 'success') && steps.shard_2_exits.outcome == 'success') && 'success' || 'failure' }}
-        run: node scripts/e2e-share-card/public-evidence.mjs
-      - name: Collect the shard 2 evidence
-        if: ${{ always() && steps.shard_2_runtime.outcome != 'skipped' }}
-        uses: actions/upload-artifact@v4
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
+      # storage-api runs on the Node major its Dockerfile pins; the repo's own Node
+      # comes from the install step after this one and stays first on PATH.
+      - name: Provision Node 22 for the native storage-api
+        uses: actions/setup-node@v4
         with:
-          name: share-card-ios-shard-2
-          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
-          if-no-files-found: error
-      - name: Keep the shard 2 evidence for the shard merge
-        if: ${{ always() && steps.shard_2_runtime.outcome != 'skipped' }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/ios-shards/shard-2"
-          cp -R "$CC68_HARNESS_DIR/public-evidence/." "$RUNNER_TEMP/ios-shards/shard-2/"
-      - name: Clean the shard 2 owned runtime and simulator
-        if: ${{ always() && steps.shard_2_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh stop shard-2
-      # Shard 3 of 4 (scripts/ci/native-ios-shards.mjs): its own runtime, account and simulator.
-      - name: Start the shard 3 owned runtime
-        id: shard_3_runtime
-        if: ${{ !cancelled() && steps.client.outcome == 'success' }}
-        run: bash scripts/ci/native-ios-runtime.sh start
-      - name: iOS shard 3 flows
-        id: shard_3
-        if: ${{ !cancelled() && steps.shard_3_runtime.outcome == 'success' }}
-        # The budget each shard job had (native-ios-shards.test.mjs: 1.5x its nominal minutes fits).
-        timeout-minutes: 70
-        run: |
-          shard='3/4'
-          node scripts/e2e-share-card/warm-metro.mjs --platform ios
-          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
-          device=$(cat /tmp/cc68-simulator)
-          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
-          node scripts/run-story68-native.mjs open --platform ios --device "$device"
-          node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-          node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
-          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
-            node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
-          done
-      - name: Record closed iOS host, first-flow and Metro diagnostics of shard 3
-        if: ${{ !cancelled() && steps.shard_3.outcome == 'failure' }}
-        run: |
-          node scripts/ci/native-host-evidence.mjs sample failure --platform ios
-          node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-      - name: Report the shard 3 owned background service exits
-        id: shard_3_exits
-        if: ${{ always() && steps.shard_3_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh exits
-      - name: Select and scan the shard 3 closed evidence
-        if: ${{ always() && steps.shard_3_runtime.outcome != 'skipped' }}
-        env:
-          CC68_CI_PLATFORM: ios
-          CC68_CI_API: 0
-          CC68_CI_JOB_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || ((steps.shard_3.outcome == 'success') && steps.shard_3_exits.outcome == 'success') && 'success' || 'failure' }}
-        run: node scripts/e2e-share-card/public-evidence.mjs
-      - name: Collect the shard 3 evidence
-        if: ${{ always() && steps.shard_3_runtime.outcome != 'skipped' }}
-        uses: actions/upload-artifact@v4
+          node-version: '22'
+      - name: Record the Node 22 binary for the native storage-api
+        run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/install
+        id: install
+      - uses: actions/setup-java@v4
         with:
-          name: share-card-ios-shard-3
-          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
-          if-no-files-found: error
-      - name: Keep the shard 3 evidence for the shard merge
-        if: ${{ always() && steps.shard_3_runtime.outcome != 'skipped' }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/ios-shards/shard-3"
-          cp -R "$CC68_HARNESS_DIR/public-evidence/." "$RUNNER_TEMP/ios-shards/shard-3/"
-      - name: Clean the shard 3 owned runtime and simulator
-        if: ${{ always() && steps.shard_3_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh stop shard-3
-      # Shard 4 of 4 (scripts/ci/native-ios-shards.mjs): its own runtime, account and simulator.
-      - name: Start the shard 4 owned runtime
-        id: shard_4_runtime
-        if: ${{ !cancelled() && steps.client.outcome == 'success' }}
-        run: bash scripts/ci/native-ios-runtime.sh start
-      - name: iOS shard 4 flows
-        id: shard_4
-        if: ${{ !cancelled() && steps.shard_4_runtime.outcome == 'success' }}
-        # The budget each shard job had (native-ios-shards.test.mjs: 1.5x its nominal minutes fits).
-        timeout-minutes: 70
-        run: |
-          shard='4/4'
-          node scripts/e2e-share-card/warm-metro.mjs --platform ios
-          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
-          device=$(cat /tmp/cc68-simulator)
-          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
-          node scripts/run-story68-native.mjs open --platform ios --device "$device"
-          node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-          node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
-          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
-            node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
-          done
-      - name: Record closed iOS host, first-flow and Metro diagnostics of shard 4
-        if: ${{ !cancelled() && steps.shard_4.outcome == 'failure' }}
-        run: |
-          node scripts/ci/native-host-evidence.mjs sample failure --platform ios
-          node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
-          node scripts/ci/native-host-evidence.mjs metro --platform ios
-      - name: Report the shard 4 owned background service exits
-        id: shard_4_exits
-        if: ${{ always() && steps.shard_4_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh exits
-      - name: Select and scan the shard 4 closed evidence
-        if: ${{ always() && steps.shard_4_runtime.outcome != 'skipped' }}
-        env:
-          CC68_CI_PLATFORM: ios
-          CC68_CI_API: 0
-          CC68_CI_JOB_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || ((steps.shard_4.outcome == 'success') && steps.shard_4_exits.outcome == 'success') && 'success' || 'failure' }}
-        run: node scripts/e2e-share-card/public-evidence.mjs
-      - name: Collect the shard 4 evidence
-        if: ${{ always() && steps.shard_4_runtime.outcome != 'skipped' }}
-        uses: actions/upload-artifact@v4
+          distribution: temurin
+          java-version: '21'
+      - name: Install the iOS project generator
+        run: brew install xcodegen
+      # The macOS lane runs Supabase as native processes built from pinned,
+      # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
+      # saved to the cache as soon as it exists, so a failed job still keeps it.
+      - name: Pin the native Supabase build inputs
+        id: native
+        run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
+      - name: Restore PostgreSQL
+        id: postgres-cache
+        uses: actions/cache/restore@v4
         with:
-          name: share-card-ios-shard-4
-          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
-          if-no-files-found: error
-      - name: Keep the shard 4 evidence for the shard merge
-        if: ${{ always() && steps.shard_4_runtime.outcome != 'skipped' }}
-        run: |
-          mkdir -p "$RUNNER_TEMP/ios-shards/shard-4"
-          cp -R "$CC68_HARNESS_DIR/public-evidence/." "$RUNNER_TEMP/ios-shards/shard-4/"
-      - name: Clean the shard 4 owned runtime and simulator
-        if: ${{ always() && steps.shard_4_runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh stop shard-4
-      # Every shard ran and reported exactly its cases; a skipped or partial shard fails here.
-      - name: Require every iOS shard to report its exact cases
-        if: ${{ !cancelled() }}
-        env:
-          CC68_SHARD_OUTCOMES: ${{ steps.shard_1.outcome }} ${{ steps.shard_2.outcome }} ${{ steps.shard_3.outcome }} ${{ steps.shard_4.outcome }}
-        run: |
-          for outcome in $CC68_SHARD_OUTCOMES; do test "$outcome" = success; done
-          node scripts/ci/native-ios-shards.mjs merge "$RUNNER_TEMP/ios-shards"
-
-      # The Expo Go proof runs alone on a fresh simulator after the shards (it has never passed
-      # inside a shard). The iOS checks that need no development client follow it.
-      - name: Start the Expo Go owned runtime
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Build PostgreSQL from its verified source
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build postgres
+      - name: Save PostgreSQL
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Restore Redis
+        id: redis-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Build Redis from its verified source
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build redis
+      - name: Save Redis
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Restore GoTrue
+        id: gotrue-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Fetch the pinned GoTrue source
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs fetch gotrue
+      - name: Provision Go for GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
+          cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+      - name: Build GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build gotrue
+      - name: Save GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Restore storage-api
+        id: storage-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Build storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build storage
+      - name: Save storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Start the native Supabase stack
+        timeout-minutes: 8
+        run: node scripts/ci/native-supabase.mjs start
+      - name: Provision the local Storage buckets
+        run: node scripts/local-storage-buckets.mjs provision
+      - name: Prepare isolated UUID runtime and built renderer
         id: runtime
-        if: ${{ !cancelled() && steps.client.outcome == 'success' }}
-        run: bash scripts/ci/native-ios-runtime.sh start
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
+      - name: Restore the development client of this fingerprint
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.ios-build.outputs.app-path }}
+          key: ${{ needs.ios-build.outputs.app-key }}
+          fail-on-cache-miss: true
+      - name: iOS shard flows
+        run: |
+          shard='${{ matrix.shard }}/4'
+          node scripts/e2e-share-card/warm-metro.mjs --platform ios
+          node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
+          device=$(cat /tmp/cc68-simulator)
+          node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
+          node scripts/run-story68-native.mjs open --platform ios --device "$device"
+          node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
+          node scripts/ci/native-host-evidence.mjs metro --platform ios
+          node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
+          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
+            node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
+          done
+      - name: Record closed iOS host, first-flow and Metro diagnostics
+        if: ${{ !cancelled() && failure() }}
+        run: |
+          node scripts/ci/native-host-evidence.mjs sample failure --platform ios
+          node scripts/ci/native-host-evidence.mjs first-flow failed --platform ios
+          node scripts/ci/native-host-evidence.mjs metro --platform ios
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
+        env:
+          CC68_CI_PLATFORM: ios
+          CC68_CI_API: 0
+          CC68_CI_JOB_STATUS: ${{ job.status }}
+        run: node scripts/e2e-share-card/public-evidence.mjs
+      - name: Collect shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: share-card-ios-shard-${{ matrix.shard }}
+          path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
+          if-no-files-found: error
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
+      - name: Show the native Supabase service logs
+        if: ${{ !cancelled() && failure() }}
+        run: node scripts/ci/native-supabase.mjs logs
+      - name: Stop the owned native Supabase stack
+        if: always()
+        run: node scripts/ci/native-supabase.mjs stop
+      - name: Delete owned CI simulator
+        if: always()
+        run: node scripts/ci/native-ios-device-cleanup.mjs
+
+  # The Expo Go proof runs alone on a fresh simulator. The iOS checks that need no development
+  # client follow it.
+  ios-expo-go:
+    needs: ios-build
+    runs-on: macos-26
+    timeout-minutes: 60
+    env: *runtime_env
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Require the commit under test
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
+      - name: Select Xcode 26.4 or later
+        id: xcode
+        run: |
+          set -eo pipefail
+          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
+          xcode=''
+          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
+            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
+              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
+            fi
+          done
+          if [ -z "$xcode" ]; then
+            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+      - name: Disable Spotlight indexing on the disposable iOS runner
+        run: |
+          test "$GITHUB_ACTIONS" = 'true'
+          test "$RUNNER_ENVIRONMENT" = 'github-hosted'
+          test "$RUNNER_OS" = 'macOS'
+          node scripts/ci/native-host-evidence.mjs sample before-indexing-disable --platform ios
+          sudo mdutil -a -s
+          sudo mdutil -a -i off
+          sudo mdutil -s /System/Volumes/Data
+          node scripts/ci/native-host-evidence.mjs sample after-indexing-disable --platform ios
+      # storage-api runs on the Node major its Dockerfile pins; the repo's own Node
+      # comes from the install step after this one and stays first on PATH.
+      - name: Provision Node 22 for the native storage-api
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Record the Node 22 binary for the native storage-api
+        run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
+      - uses: ./.github/actions/install
+        id: install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install the iOS project generator
+        run: brew install xcodegen
+      # The macOS lane runs Supabase as native processes built from pinned,
+      # checksum-verified sources (scripts/ci/native-supabase.mjs). Each build is
+      # saved to the cache as soon as it exists, so a failed job still keeps it.
+      - name: Pin the native Supabase build inputs
+        id: native
+        run: node scripts/ci/native-supabase.mjs cache-keys >> "$GITHUB_OUTPUT"
+      - name: Restore PostgreSQL
+        id: postgres-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Build PostgreSQL from its verified source
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build postgres
+      - name: Save PostgreSQL
+        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.postgres-path }}
+          key: ${{ steps.native.outputs.postgres-key }}
+      - name: Restore Redis
+        id: redis-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Build Redis from its verified source
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build redis
+      - name: Save Redis
+        if: steps.redis-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.redis-path }}
+          key: ${{ steps.native.outputs.redis-key }}
+      - name: Restore GoTrue
+        id: gotrue-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Fetch the pinned GoTrue source
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs fetch gotrue
+      - name: Provision Go for GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
+          cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+      - name: Build GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build gotrue
+      - name: Save GoTrue
+        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.gotrue-path }}
+          key: ${{ steps.native.outputs.gotrue-key }}
+      - name: Restore storage-api
+        id: storage-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Build storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        run: node scripts/ci/native-supabase.mjs build storage
+      - name: Save storage-api
+        if: steps.storage-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native.outputs.storage-path }}
+          key: ${{ steps.native.outputs.storage-key }}
+      - name: Start the native Supabase stack
+        timeout-minutes: 8
+        run: node scripts/ci/native-supabase.mjs start
+      - name: Provision the local Storage buckets
+        run: node scripts/local-storage-buckets.mjs provision
+      - name: Prepare isolated UUID runtime and built renderer
+        id: runtime
+        run: |
+          npm run db:generate
+          npm run build:packages
+          npm run build --workspace api
+          node scripts/e2e-share-card/prepare.mjs
+          node scripts/lib/story68-built-render.mjs
+          # Each long-running service records its exit status so an early crash is
+          # reported by name instead of surfacing as an unrelated later failure.
+          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          node scripts/maestro-install.mjs
+      # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
+      - name: Restore the development client of this fingerprint
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ needs.ios-build.outputs.app-path }}
+          key: ${{ needs.ios-build.outputs.app-key }}
+          fail-on-cache-miss: true
       - name: Expo Go proof on a fresh simulator
-        id: expo_go
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: |
           node scripts/e2e-share-card/warm-metro.mjs --platform ios
           node scripts/ci/native-ios-startup-probe.mjs --for-native-flow
@@ -578,12 +743,14 @@ jobs:
           node scripts/ci/native-host-evidence.mjs sample before-first-flow --platform ios
           node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"
       - name: Record closed iOS host and Metro diagnostics
-        if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
+        if: ${{ !cancelled() }}
         run: |
-          if [ "${{ steps.expo_go.outcome }}" = failure ]; then
+          if [ "${{ job.status }}" = failure ]; then
             node scripts/ci/native-host-evidence.mjs sample failure --platform ios
           fi
           node scripts/ci/native-host-evidence.mjs metro --platform ios
+      # The iOS checks that need no development client run here, after the proof, so ios-build
+      # stays a key lookup on most runs and the shards start minutes after the workflow does.
       - name: Provision pinned iOS accessibility browser
         id: ios_browser
         if: ${{ !cancelled() }}
@@ -617,30 +784,155 @@ jobs:
           failures=$(echo "$summary" | grep -Eo 'with [0-9]+' | grep -Eo '[0-9]+' || true)
           if [ "${count:-0}" -eq 0 ] || [ "${failures:-1}" -ne 0 ]; then echo "::error::swift test ran zero tests or had failures"; exit 1; fi
           echo "swift test ran $count tests"
-      - name: Report the Expo Go owned background service exits
-        id: expo_go_exits
-        if: ${{ always() && steps.runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh exits
-      - name: Select and scan the Expo Go closed evidence
-        if: ${{ always() && steps.runtime.outcome != 'skipped' }}
+      - name: Report owned background service exits
+        if: always()
+        # Logs stay private: they can carry owned-runtime credentials.
+        run: |
+          status=0
+          for service in auth api metro; do
+            if [ -f "/tmp/cc68-$service.exit" ]; then
+              echo "::error::owned $service service exited early with status $(cat "/tmp/cc68-$service.exit"); its private log has $(wc -l < "/tmp/cc68-$service.log") lines"
+              status=1
+            fi
+          done
+          exit "$status"
+      - name: Select and scan closed evidence
+        if: always()
         env:
           CC68_CI_PLATFORM: ios
           CC68_CI_API: 0
-          CC68_CI_JOB_STATUS: ${{ job.status == 'cancelled' && 'cancelled' || ((steps.expo_go.outcome == 'success') && steps.expo_go_exits.outcome == 'success') && 'success' || 'failure' }}
+          CC68_CI_JOB_STATUS: ${{ job.status }}
         run: node scripts/e2e-share-card/public-evidence.mjs
-      - name: Collect the Expo Go evidence
-        if: ${{ always() && steps.runtime.outcome != 'skipped' }}
+      - name: Collect Expo Go evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: share-card-ios-expo-go
           path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
           if-no-files-found: error
-      - name: Clean the Expo Go owned runtime and simulator
-        if: ${{ always() && steps.runtime.outcome != 'skipped' }}
-        run: bash scripts/ci/native-ios-runtime.sh stop expo-go
+      - name: Clean exact owned runtime
+        if: always()
+        run: node scripts/e2e-share-card/cleanup.mjs
       - name: Show the native Supabase service logs
         if: ${{ !cancelled() && failure() }}
         run: node scripts/ci/native-supabase.mjs logs
       - name: Stop the owned native Supabase stack
         if: always()
         run: node scripts/ci/native-supabase.mjs stop
+      - name: Delete owned CI simulator
+        if: always()
+        run: node scripts/ci/native-ios-device-cleanup.mjs
+
+  # The accessibility-focus module in a Release simulator app: the build alone takes 25 to 31
+  # minutes, so it runs in parallel with the client build and the shards.
+  ios-app-build:
+    name: iOS app build
+    runs-on: macos-26
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        id: checkout
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Require the commit under test
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
+      - name: Select Xcode 26.4 or later
+        id: xcode
+        run: |
+          set -eo pipefail
+          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
+          xcode=''
+          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
+            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
+              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
+            fi
+          done
+          if [ -z "$xcode" ]; then
+            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
+            exit 1
+          fi
+          sudo xcode-select -s "$xcode/Contents/Developer"
+          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
+          xcodebuild -version
+          xcrun --sdk iphonesimulator --show-sdk-version
+
+      - name: Setup Node
+        id: node
+        if: ${{ !cancelled() && steps.checkout.outcome == 'success' }}
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: npm
+
+      - name: Install dependencies
+        id: deps
+        if: ${{ !cancelled() && steps.node.outcome == 'success' }}
+        run: npm ci
+
+      # The AccessibilityFocusTarget XCTest leaves out AccessibilityFocusModule.swift, which
+      # needs ExpoModulesCore; the app build compiles it with its Expo dependency.
+      - name: Generate the iOS project
+        id: ios_project
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform ios
+
+      - name: Build the release simulator app
+        id: app_build
+        if: ${{ !cancelled() && steps.ios_project.outcome == 'success' }}
+        working-directory: apps/mobile/ios
+        env:
+          NODE_ENV: production
+        run: |
+          workspace=$(find . -maxdepth 1 -name '*.xcworkspace' | head -1)
+          workspace=${workspace#./}
+          scheme=${workspace%.xcworkspace}
+          echo "scheme=$scheme" >> "$GITHUB_ENV"
+          xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Check the app links and registers the module
+        if: ${{ !cancelled() && steps.app_build.outcome == 'success' }}
+        run: |
+          bash scripts/ci/check-accessibility-focus-builds.sh ios-app \
+            "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios
+
+  # A skipped shard has no report, so this job fails.
+  ios-evidence:
+    if: always()
+    needs: ios-shard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      # The run name carries this commit, which a pull request's gate matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Require the commit under test
+        env:
+          SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: share-card-ios-shard-*
+          path: /tmp/ios-shards
+      - name: Require every iOS shard to report its exact cases
+        env:
+          CC68_SHARD_RESULT: ${{ needs.ios-shard.result }}
+        run: |
+          test "$CC68_SHARD_RESULT" = success
+          for artifact in /tmp/ios-shards/share-card-ios-shard-*; do mv "$artifact" "/tmp/ios-shards/shard-${artifact##*-}"; done
+          node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards

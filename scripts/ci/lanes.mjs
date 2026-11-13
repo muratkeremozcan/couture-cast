@@ -311,13 +311,13 @@ export const LANES = {
   },
   // Off the pull request path (story 6.15 D6): the iOS app builds, the share-card iOS journeys
   // and the Expo Go proof cannot fit the 15-minute queue plus run budget, so ios-native.yml runs
-  // on main, nightly and on demand. A merge to main runs it only when one of these native iOS
-  // inputs changed (its push filter is exactly this list); the nightly run covers the rest,
-  // JavaScript included, which the Android lanes gate on every pull request.
+  // on main, nightly and by dispatch for one commit. A merge to main runs it only when one of
+  // these native iOS inputs changed (its push filter is exactly this list); the nightly run covers
+  // the rest, JavaScript included, which the Android lanes gate on every pull request.
   'ios-native': {
     title: 'iOS native builds and journeys (main, nightly, dispatch)',
     workflow: 'ios-native.yml',
-    jobs: ['ios-native'],
+    jobs: ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-evidence', 'ios-app-build'],
     pullRequest: false,
     inputs: [
       '.github/workflows/ios-native.yml',

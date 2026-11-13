@@ -30,9 +30,8 @@ const report = (shard, patch = {}) => ({
 })
 const all = () => Object.fromEntries(shards.map((shard) => [shard, report(shard)]))
 
-// The four shards ran as five macOS jobs with ios-expo-go; since story 6.15 D6 they run in turn
-// in ios-native.yml's one job, each still on its own runtime and within its own budget.
-test('four shards, each a segment of the one iOS job', () => {
+// The four shards run as parallel macOS jobs beside ios-expo-go in ios-native.yml (story 6.15 D6).
+test('four shards, each its own job beside the Expo Go job', () => {
   assert.equal(SHARD_COUNT, 4)
   assert.deepEqual(shards, [1, 2, 3, 4])
 })
@@ -61,10 +60,10 @@ test('the shards are balanced by measured minutes and fit their job limit on a r
     Math.max(...minutes) - Math.min(...minutes) <= 3,
     `shard minutes ${minutes.join(', ')}`
   )
-  const { steps } = parse(fs.readFileSync('.github/workflows/ios-native.yml', 'utf8'))
-    .jobs['ios-native']
+  const limit = parse(fs.readFileSync('.github/workflows/ios-native.yml', 'utf8')).jobs[
+    'ios-shard'
+  ]['timeout-minutes']
   for (const shard of shards) {
-    const limit = steps.find((step) => step.id === `shard_${shard}`)['timeout-minutes']
     assert.ok(
       nominalMinutes(shard) * 1.5 < limit,
       `shard ${shard}: ${nominalMinutes(shard)} min against ${limit}`

@@ -395,10 +395,10 @@ describe('Story 6.9 share flow timeouts', () => {
     )
     assert.equal(
       SHARE_SHEET_LANE_HEADROOM_MS.ios,
-      // Shard 4 runs share-sheet, in its own segment of ios-native.yml.
+      // Shard 4 runs share-sheet, in ios-native.yml's ios-shard job.
       parse(fs.readFileSync(`${root}.github/workflows/ios-native.yml`, 'utf8')).jobs[
-        'ios-native'
-      ].steps.find((step) => step.id === 'shard_4')['timeout-minutes'] *
+        'ios-shard'
+      ]['timeout-minutes'] *
         60_000 -
         IOS_SHARE_LANE_BASE_MS
     )

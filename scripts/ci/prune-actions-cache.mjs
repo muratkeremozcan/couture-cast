@@ -11,11 +11,10 @@ import { fileURLToPath } from 'node:url'
 export const STALE_AFTER_MS = 48 * 60 * 60 * 1000
 
 /**
- * The native development clients of scripts/ci/native-build-cache.mjs, each a 15-minute iOS or
- * 8 to 10 minute Android build. A job that finds one skips its build, so a prune that deletes one
- * it has just listed as idle costs the next run that build, and when a job hands a client to later
- * jobs (fail-on-cache-miss), fails them. These stay; GitHub's own 7-day eviction removes them once
- * nothing reads them.
+ * Keys a job hands to later jobs, which restore them with fail-on-cache-miss: the native
+ * development clients of scripts/ci/native-build-cache.mjs. ios-build can find one a
+ * prune has just listed as idle and skip its build, so deleting it fails both downstream
+ * restores. These stay; GitHub's own 7-day eviction removes them once nothing reads them.
  */
 export const PROTECTED_KEY_PREFIXES = ['cc68-native-']
 
