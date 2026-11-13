@@ -56,16 +56,8 @@ export const IOS_NATIVE_WORKFLOW = '.github/workflows/ios-native.yml'
 export const IOS_DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
 // The dispatch's first job: it stops a dispatch of a commit that already passed.
 export const DISPATCH_GATE_JOB = 'ios-dispatch-gate'
-// The jobs ios-native-jobs.yml runs, as the jobs API names them under the ios-native call
-// ("ios-native / ios-shard (2)" for a matrix job). ios-native-runs.test.mjs pins them to the file.
-export const IOS_RUN_JOBS = [
-  'ios-build',
-  'ios-shard',
-  'ios-expo-go',
-  'iOS app build',
-  'ios-evidence',
-]
-const CALL_PREFIX = 'ios-native / '
+// A dispatch builds each consumer's client in the consumer, so it skips this one called job.
+const DISPATCH_SKIPPED_JOB = 'ios-native / ios-build'
 // The jobs both iOS workflows call, whose root npm scripts an iOS run executes.
 export const IOS_JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const LOCKFILE = 'package-lock.json'
@@ -409,23 +401,89 @@ export async function runJobs({ repository, id, ...options }) {
 }
 
 /**
- * Whether every job of a completed iOS run passed, each iOS job among them: a skipped, cancelled
- * or failed job never counts. A dispatch skips ios-build by design, since each consumer builds
- * its own client.
+ * The jobs of a workflow file, read without a YAML parser from its top-level `jobs:`: each job's
+ * id, display name, the workflow it calls and the values of a one-key list matrix. A matrix of
+ * another shape throws, so a caller fails closed.
  */
-export function runJobsPassed(jobs, { dispatch = false } = {}) {
-  const called = (job) => String(job?.name ?? '').startsWith(CALL_PREFIX)
-  const base = (job) =>
-    String(job.name)
-      .slice(CALL_PREFIX.length)
-      .replace(/ \(.*\)$/, '')
+export function workflowJobs(text) {
+  const lines = String(text).split('\n')
+  const start = lines.indexOf('jobs:')
+  if (start < 0) throw new Error('the workflow has no jobs')
+  const jobs = []
+  let job = null
+  let matrix = false
+  for (const line of lines.slice(start + 1)) {
+    if (/^[\w-]+:/.test(line)) break
+    const id = /^ {2}([\w-]+):\s*$/.exec(line)
+    if (id) {
+      job = { id: id[1], name: id[1], uses: null, matrix: null }
+      jobs.push(job)
+      matrix = false
+      continue
+    }
+    if (!job) continue
+    const field = /^ {4}(name|uses): ['"]?(.+?)['"]?\s*$/.exec(line)
+    if (field) job[field[1]] = field[2]
+    if (/^ {6}matrix:\s*$/.test(line)) matrix = true
+    else if (matrix && /^ {8}\S/.test(line)) {
+      const values = /^ {8}[\w-]+: \[([^\]]*)\]\s*$/.exec(line)
+      if (!values || job.matrix)
+        throw new Error(`job ${job.id} has a matrix this reader cannot list`)
+      job.matrix = values[1]
+        .split(',')
+        .map((value) => value.trim())
+        .filter(Boolean)
+    } else if (matrix && /^ {0,6}\S/.test(line)) matrix = false
+  }
+  return jobs
+}
+
+/**
+ * The name of every job a whole run of `callerText` shows in the jobs API: the caller's own jobs,
+ * then each job of ios-native-jobs.yml under the call ("ios-native / ios-shard (2)"), one per
+ * matrix value.
+ */
+export function requiredJobs(callerText, jobsText) {
+  const caller = workflowJobs(callerText)
+  const calls = caller.filter((job) => job.uses === `./${IOS_JOBS_WORKFLOW}`)
+  if (calls.length !== 1)
+    throw new Error(`the workflow calls ${IOS_JOBS_WORKFLOW} ${calls.length} times`)
+  const prefix = `${calls[0].name} / `
+  return [
+    ...caller.filter((job) => job !== calls[0]).map((job) => job.name),
+    ...workflowJobs(jobsText).flatMap((job) =>
+      job.matrix
+        ? job.matrix.map((value) => `${prefix}${job.name} (${value})`)
+        : [`${prefix}${job.name}`]
+    ),
+  ]
+}
+
+/**
+ * The jobs a whole run shows, from the trusted copies of the three iOS workflows in the
+ * checkout: `push` for ios-native.yml, `dispatch` for ios-native-dispatch.yml.
+ */
+export function runGraphs(read = (file) => readFileSync(file, 'utf8')) {
+  const jobsText = read(IOS_JOBS_WORKFLOW)
+  return {
+    push: requiredJobs(read(IOS_NATIVE_WORKFLOW), jobsText),
+    dispatch: requiredJobs(read(IOS_DISPATCH_WORKFLOW), jobsText),
+  }
+}
+
+/**
+ * Whether a completed iOS run is a whole pass: every job in `required` is listed, and every listed
+ * job succeeded. A skipped, cancelled, failed or missing job never counts; a dispatch skips
+ * ios-build by design.
+ */
+export function runJobsPassed(jobs, required, { dispatch = false } = {}) {
   const passed = (job) =>
     job?.conclusion === 'success' ||
-    (dispatch && called(job) && base(job) === 'ios-build' && job.conclusion === 'skipped')
+    (dispatch && job?.name === DISPATCH_SKIPPED_JOB && job.conclusion === 'skipped')
   return (
-    jobs.length > 0 &&
+    required.length > 0 &&
     jobs.every(passed) &&
-    IOS_RUN_JOBS.every((name) => jobs.some((job) => called(job) && base(job) === name))
+    required.every((name) => jobs.some((job) => job?.name === name))
   )
 }
 
@@ -447,7 +505,7 @@ async function listRuns(path, options) {
  * (runJobsPassed). A push run that ios-changes stopped has no iOS job, so it never counts. A read
  * error throws; each caller then runs the iOS jobs.
  */
-export async function passingRun({ repository, sha, ...options }) {
+export async function passingRun({ repository, sha, graphs = runGraphs(), ...options }) {
   if (!COMMIT.test(sha ?? '')) return null
   const ours = (run) =>
     run?.head_branch === 'main' &&
@@ -484,7 +542,9 @@ export async function passingRun({ repository, sha, ...options }) {
   ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
   for (const run of candidates) {
     const jobs = await runJobs({ ...options, repository, id: run.id })
-    if (runJobsPassed(jobs, { dispatch: run.event === 'workflow_dispatch' })) return run
+    const dispatch = run.event === 'workflow_dispatch'
+    if (runJobsPassed(jobs, dispatch ? graphs.dispatch : graphs.push, { dispatch }))
+      return run
   }
   return null
 }

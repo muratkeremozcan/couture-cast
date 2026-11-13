@@ -38,6 +38,7 @@ import {
   githubApi as api,
   nativeIosChanges,
   pushPaths,
+  runGraphs,
   runJobs,
   runJobsPassed,
 } from './ios-native-inputs.mjs'
@@ -336,7 +337,7 @@ async function evidenceRuns(options) {
         jobs.some((job) => job.name === DISPATCH_GATE_JOB && job.conclusion !== 'success')
       )
         continue
-      run.jobsPassed = runJobsPassed(jobs, { dispatch: true })
+      run.jobsPassed = runJobsPassed(jobs, options.graphs.dispatch, { dispatch: true })
     }
     run.fromMain = await onMain({ ...options, sha: run.head_sha })
     return [run]
@@ -476,7 +477,8 @@ async function judge({ headSha, baseSha, ...options }) {
       return evaluateEvidence({ headSha, inputs, incomplete: trees.incomplete })
     const files = treeChanges(trees.base, trees.head)
     const guard = await guardProblems({ ...options, trees })
-    const runs = await evidenceRuns({ ...options, headSha })
+    // The jobs a whole dispatch runs, from main's copies of the dispatch and jobs files.
+    const runs = await evidenceRuns({ ...options, headSha, graphs: runGraphs() })
     const dependencies = await headDependencies({
       ...options,
       mergeBase: trees.mergeBase,

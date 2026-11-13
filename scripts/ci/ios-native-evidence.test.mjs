@@ -581,7 +581,8 @@ function fakeGitHub({
   }
   return { fetchImpl, posted, requested }
 }
-// The jobs of a dispatch whose every iOS job passed; ios-build is skipped on a dispatch.
+// The jobs of a dispatch whose every iOS job passed, as the real workflows list them: the gate,
+// the cache proof and the four shards; ios-build is skipped on a dispatch.
 const dispatchJobs = (patch = {}) =>
   [
     'ios-dispatch-gate',
@@ -589,6 +590,8 @@ const dispatchJobs = (patch = {}) =>
     'ios-native / ios-build',
     'ios-native / ios-shard (1)',
     'ios-native / ios-shard (2)',
+    'ios-native / ios-shard (3)',
+    'ios-native / ios-shard (4)',
     'ios-native / ios-expo-go',
     'ios-native / iOS app build',
     'ios-native / ios-evidence',
@@ -960,6 +963,45 @@ describe('the evidence runs the pull_request_target job reads', () => {
     const empty = run()
     const result = await judgeEvent(
       fakeGitHub({ runs: [empty], jobs: { [empty.id]: [] } })
+    )
+    assert.equal(result.state, 'failure')
+  })
+
+  // RUNS-03: a dispatch shows every job main's dispatch file and jobs file run, each shard of
+  // the matrix included; a partial graph is no evidence. A dispatch from before a matrix change
+  // fails, so it needs a new dispatch.
+  test('a dispatch missing a shard, the cache proof or the gate fails', async () => {
+    for (const missing of [
+      'ios-native / ios-shard (3)',
+      'ios-cache-proof',
+      'ios-dispatch-gate',
+      'ios-native / ios-build',
+    ]) {
+      const dispatched = run()
+      const jobs = dispatchJobs().filter((job) => job.name !== missing)
+      const result = await judgeEvent(
+        fakeGitHub({ runs: [dispatched], jobs: { [dispatched.id]: jobs } })
+      )
+      assert.equal(result.state, 'failure', missing)
+    }
+    const whole = run()
+    assert.equal(
+      (
+        await judgeEvent(
+          fakeGitHub({ runs: [whole], jobs: { [whole.id]: dispatchJobs() } })
+        )
+      ).state,
+      'success'
+    )
+  })
+
+  test('a dispatch from before a matrix change fails and needs a new dispatch', async () => {
+    const before = run()
+    const threeShards = dispatchJobs().filter(
+      (job) => job.name !== 'ios-native / ios-shard (4)'
+    )
+    const result = await judgeEvent(
+      fakeGitHub({ runs: [before], jobs: { [before.id]: threeShards } })
     )
     assert.equal(result.state, 'failure')
   })
@@ -1615,6 +1657,9 @@ describe('ios-native-evidence.yml', () => {
       const sparse = job.steps[0].with['sparse-checkout'].trim().split('\n')
       for (const file of imported) assert.ok(sparse.includes(`/${file}`), file)
       assert.ok(sparse.includes(`/${IOS_NATIVE_WORKFLOW}`))
+      // runGraphs reads main's dispatch and jobs files for the jobs a whole dispatch runs.
+      assert.ok(sparse.includes('/.github/workflows/ios-native-dispatch.yml'))
+      assert.ok(sparse.includes('/.github/workflows/ios-native-jobs.yml'))
       assert.ok(!job.steps.some((step) => /npm (ci|install)/.test(step.run ?? '')))
     }
   })

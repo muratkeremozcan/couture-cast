@@ -20,7 +20,7 @@ import {
 import {
   IOS_DISPATCH_WORKFLOW,
   IOS_JOBS_WORKFLOW,
-  IOS_RUN_JOBS,
+  IOS_NATIVE_WORKFLOW,
   dispatchGate,
   passingRun,
   pushChanges,
@@ -58,6 +58,81 @@ describe('a passing iOS run on main for a commit', () => {
     assert.equal(await find([run], jobs), null)
   })
 
+  // RUNS-03: the required jobs come from main's workflow files, every matrix instance included.
+  test("the required jobs are main's workflow files, each shard included", async () => {
+    const { requiredJobs } = await import('./ios-native-inputs.mjs')
+    const called = [
+      'ios-native / ios-build',
+      'ios-native / ios-shard (1)',
+      'ios-native / ios-shard (2)',
+      'ios-native / ios-shard (3)',
+      'ios-native / ios-shard (4)',
+      'ios-native / ios-expo-go',
+      'ios-native / iOS app build',
+      'ios-native / ios-evidence',
+    ]
+    const read = (file) => fs.readFileSync(file, 'utf8')
+    assert.deepEqual(
+      requiredJobs(read(IOS_NATIVE_WORKFLOW), read(IOS_JOBS_WORKFLOW)).sort(),
+      ['ios-changes', ...called].sort()
+    )
+    assert.deepEqual(
+      requiredJobs(read(IOS_DISPATCH_WORKFLOW), read(IOS_JOBS_WORKFLOW)).sort(),
+      ['ios-cache-proof', 'ios-dispatch-gate', ...called].sort()
+    )
+    // The same jobs a YAML parser reads, the matrix included.
+    const jobs = parse(read(IOS_JOBS_WORKFLOW)).jobs
+    assert.deepEqual(jobs['ios-shard'].strategy.matrix.shard, [1, 2, 3, 4])
+  })
+
+  test('a matrix this reader cannot list throws, so each caller fails closed', async () => {
+    const { requiredJobs } = await import('./ios-native-inputs.mjs')
+    const caller =
+      'jobs:\n  ios-native:\n    uses: ./.github/workflows/ios-native-jobs.yml\n'
+    for (const matrix of [
+      '        include:\n          - shard: 1\n',
+      '        shard: ${{ fromJSON(inputs.shards) }}\n',
+    ])
+      assert.throws(
+        () =>
+          requiredJobs(
+            caller,
+            `jobs:\n  ios-shard:\n    strategy:\n      matrix:\n${matrix}    runs-on: macos-15\n`
+          ),
+        /cannot list/
+      )
+    assert.throws(() => requiredJobs('jobs:\n  other:\n    runs-on: x\n', ''), /calls/)
+  })
+
+  test('a run missing one required job never counts', async () => {
+    for (const [kind, missing] of [
+      ['dispatch', 'ios-native / ios-shard (3)'],
+      ['dispatch', 'ios-cache-proof'],
+      ['dispatch', 'ios-dispatch-gate'],
+      ['push', 'ios-changes'],
+      ['push', 'ios-native / ios-shard (2)'],
+      ['schedule', 'ios-native / ios-build'],
+    ]) {
+      const run = iosRun(kind)
+      const jobs = iosJobs(kind).filter((job) => job.name !== missing)
+      assert.equal(
+        await find([run], { [run.id]: jobs }),
+        null,
+        `${kind} without ${missing}`
+      )
+    }
+  })
+
+  // A run from before a matrix change shows another shard count: the predicate fails, which
+  // only costs a rerun.
+  test('a run from before a matrix change never counts', async () => {
+    const run = iosRun('push')
+    const jobs = iosJobs('push').filter(
+      (job) => job.name !== 'ios-native / ios-shard (4)'
+    )
+    assert.equal(await find([run], { [run.id]: jobs }), null)
+  })
+
   test('a skipped, cancelled, failed or missing job never counts', async () => {
     const broken = {
       push: [
@@ -92,7 +167,8 @@ describe('a passing iOS run on main for a commit', () => {
         `${kind} without ios-evidence`
       )
     }
-    assert.equal(runJobsPassed([]), false)
+    assert.equal(runJobsPassed([], []), false)
+    assert.equal(runJobsPassed([], ['ios-changes']), false)
   })
 
   test('a cancelled run, another commit, branch, repository or workflow never counts', async () => {
@@ -183,16 +259,6 @@ describe('a passing iOS run on main for a commit', () => {
         String(deny)
       )
   })
-
-  test('the job names are the jobs ios-native-jobs.yml runs', () => {
-    const workflow = parse(fs.readFileSync(IOS_JOBS_WORKFLOW, 'utf8'))
-    assert.deepEqual(
-      Object.entries(workflow.jobs)
-        .map(([id, job]) => job.name ?? id)
-        .sort(),
-      [...IOS_RUN_JOBS].sort()
-    )
-  })
 })
 
 // Both callers run the iOS jobs unless a whole pass is found: a passing run whose jobs listing is
@@ -220,6 +286,9 @@ describe('ios-dispatch-gate', () => {
         imported.add(path.posix.join('scripts/ci', match[1]))
     for (const file of imported) assert.ok(sparse.includes(`/${file}`), file)
     assert.ok(sparse.includes('/.nvmrc'))
+    // runGraphs reads the three workflow files from main's checkout.
+    for (const file of [IOS_NATIVE_WORKFLOW, IOS_DISPATCH_WORKFLOW, IOS_JOBS_WORKFLOW])
+      assert.ok(sparse.includes(`/${file}`), file)
     assert.ok(!gate.steps.some((row) => /npm (ci|install)/.test(row.run ?? '')))
   })
 

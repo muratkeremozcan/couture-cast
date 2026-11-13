@@ -52,6 +52,9 @@ jobs:
           persist-credentials: false
           sparse-checkout: |
             /.nvmrc
+            /.github/workflows/ios-native.yml
+            /.github/workflows/ios-native-dispatch.yml
+            /.github/workflows/ios-native-jobs.yml
             /scripts/ci/ios-native-inputs.mjs
             /scripts/ci/lanes.mjs
           sparse-checkout-cone-mode: false
