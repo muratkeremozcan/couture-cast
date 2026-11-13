@@ -18,7 +18,8 @@ import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
 export const INSTALL_CLIENT_TIMEOUT_MS = 300000
 
 /**
- * The first native flow opens the app on a 120 s deadline, so it must not start while the host is
+ * The first native flow opens the app on a fixed deadline (IOS_FIRST_FLOW_TIMEOUT_MS in
+ * native-ios-flow-budget.mjs, 120 s until story 6.15), so it must not start while the host is
  * saturated. The CPU gate above settles three named simulator daemons, yet the hosted VM can still
  * carry a 1-minute load of 130 or more from boot, install and Metro work: every failed first flow
  * on record started at load1 136 to 156 (runs 41297785476 and 41352898854, burn-in 41426869137),
