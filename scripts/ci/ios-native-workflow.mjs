@@ -85,68 +85,167 @@ export const DISPATCH_BUILD = [
   },
 ]
 
-// IOS-02: the checks every run keeps, each with the one condition it may carry (none means it
-// runs whenever every earlier step passed). Each must exist exactly once.
+// IOS-02 and IOS-R2-04: the checks every run keeps. Each entry names the job, how to find the
+// step, the one condition it may carry (none means it runs whenever every earlier step passed),
+// and the exact lines it must execute: on a line of their own, outside comments, here-documents
+// and conditional blocks, with nothing after them that can swallow a failure. Each must exist
+// exactly once.
 const runs = (command) => (step) => String(step.run ?? '').includes(command)
+const INSTALLED = "${{ !cancelled() && steps.install.outcome == 'success' }}"
 export const MANDATORY = [
   [
     'ios-build',
     (step) => step.id === 'deadline_controls',
-    "${{ !cancelled() && steps.install.outcome == 'success' }}",
+    INSTALLED,
+    ['node scripts/ci/node-test-gate.mjs startup-deadline'],
   ],
   [
     'ios-build',
     (step) => step.id === 'native_key',
-    "${{ !cancelled() && steps.install.outcome == 'success' }}",
+    INSTALLED,
+    ['node scripts/ci/native-build-cache.mjs key --platform ios >> "$GITHUB_OUTPUT"'],
   ],
   [
     'ios-build',
     (step) => step.id === 'app_scan',
     "${{ !cancelled() && steps.native_build.outcome == 'success' }}",
+    [`node scripts/ci/native-ios-app-secret-scan.mjs ${IOS_CLIENT} "$CC68_HARNESS_DIR"`],
   ],
   [
     'ios-build',
     (step) => step.id === 'native_save',
     "${{ !cancelled() && steps.app_scan.outcome == 'success' }}",
+    [],
   ],
-  ['ios-shard', runs('native-ios-shards.mjs commands'), undefined],
-  ['ios-expo-go', runs('run-story68-native.mjs expo-go-proof'), undefined],
+  [
+    'ios-shard',
+    runs('native-ios-shards.mjs commands'),
+    undefined,
+    [
+      'commands=$(node scripts/ci/native-ios-shards.mjs commands "$shard")',
+      'test -n "$commands"',
+      'node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"',
+    ],
+  ],
+  [
+    'ios-expo-go',
+    runs('run-story68-native.mjs expo-go-proof'),
+    undefined,
+    [
+      'node scripts/run-story68-native.mjs expo-go-proof --platform ios --device "$device"',
+    ],
+  ],
   [
     'ios-expo-go',
     runs('node scripts/ci/node-test-gate.mjs native-harness'),
-    "${{ !cancelled() && steps.install.outcome == 'success' }}",
+    INSTALLED,
+    [
+      'node scripts/ci/node-test-gate.mjs share-card-plugins',
+      'node scripts/ci/node-test-gate.mjs native-harness',
+    ],
   ],
   [
     'ios-expo-go',
     runs('maestro-check-flows.mjs'),
     "${{ !cancelled() && steps.runtime.outcome == 'success' }}",
+    ['node scripts/ci/maestro-check-flows.mjs'],
   ],
   [
     'ios-expo-go',
     runs('e2e-share-card/bridge-a11y.mjs'),
     "${{ !cancelled() && steps.runtime.outcome == 'success' && steps.ios_browser.outcome == 'success' }}",
+    ['node scripts/e2e-share-card/bridge-a11y.mjs'],
   ],
-  ['ios-expo-go', runs('share-card-header-semantics.sh'), '${{ !cancelled() }}'],
-  ['ios-expo-go', runs('swift test --package-path'), '${{ !cancelled() }}'],
+  [
+    'ios-expo-go',
+    runs('share-card-header-semantics.sh'),
+    '${{ !cancelled() }}',
+    ['bash scripts/ci/share-card-header-semantics.sh'],
+  ],
+  [
+    'ios-expo-go',
+    runs('swift test --package-path'),
+    '${{ !cancelled() }}',
+    [
+      'set -euo pipefail',
+      'swift test --package-path apps/mobile/modules/share-card-photo-save/ios 2>&1 | tee "$RUNNER_TEMP/cc68-png-file-tests.log"',
+      'if [ "${count:-0}" -eq 0 ] || [ "${failures:-1}" -ne 0 ]; then echo "::error::swift test ran zero tests or had failures"; exit 1; fi',
+    ],
+  ],
   [
     'ios-app-build',
     (step) => step.id === 'app_build',
     "${{ !cancelled() && steps.ios_project.outcome == 'success' }}",
+    [
+      'xcodebuild -workspace "$workspace" -scheme "$scheme" -configuration Release -destination \'generic/platform=iOS Simulator\' -derivedDataPath build CODE_SIGNING_ALLOWED=NO build',
+    ],
   ],
   [
     'ios-app-build',
     runs('check-accessibility-focus-builds.sh ios-app'),
     "${{ !cancelled() && steps.app_build.outcome == 'success' }}",
+    [
+      'bash scripts/ci/check-accessibility-focus-builds.sh ios-app "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios',
+    ],
   ],
-  ['ios-evidence', runs('native-ios-shards.mjs merge'), undefined],
+  [
+    'ios-evidence',
+    runs('native-ios-shards.mjs merge'),
+    undefined,
+    [
+      'test "$CC68_SHARD_RESULT" = success',
+      'node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards',
+    ],
+  ],
   ...['ios-shard', 'ios-expo-go'].flatMap((job) =>
-    DISPATCH_BUILD.map(({ id, if: condition }) => [
+    DISPATCH_BUILD.map(({ id, if: condition, run }) => [
       job,
       (step) => step.id === id,
       condition,
+      [run],
     ])
   ),
 ]
+
+/**
+ * The lines a shell body executes: continuations joined, comments and blank lines dropped, each
+ * marked when it sits inside an if or case block (where a failure may not stop the step).
+ */
+export function executedLines(run) {
+  const lines = []
+  const blocks = []
+  for (const raw of String(run ?? '')
+    .replace(/\s*\\\n\s*/g, ' ')
+    .split('\n')) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    lines.push({ line, conditional: blocks.some((block) => block !== 'loop') })
+    if (/^(if|case)\b/.test(line) && !/\b(fi|esac)$/.test(line)) blocks.push('branch')
+    else if (/^(for|while|until)\b/.test(line) && !/\bdone$/.test(line))
+      blocks.push('loop')
+    else if (/^(fi|esac|done)\b/.test(line)) blocks.pop()
+    else if (/^\w+\s*\(\)\s*\{?$|^function\b/.test(line)) blocks.push('function')
+    else if (line === '}' && blocks.at(-1) === 'function') blocks.pop()
+  }
+  return lines
+}
+
+/** Why a shell body may not execute each required line, or may swallow its failure. */
+export function requiredLineProblems(run, required) {
+  const lines = executedLines(run)
+  const pipefail = lines.findIndex(({ line }) => /^set -[a-z]*o pipefail\b/.test(line))
+  const problems = []
+  for (const want of required) {
+    const index = lines.findIndex(
+      ({ line, conditional }) => line === want && !conditional
+    )
+    if (index < 0) problems.push(`does not execute: ${want}`)
+    else if (/(\||&)\s*$/.test(want)) problems.push(`cannot fail its step: ${want}`)
+    else if (/[^|]\|[^|]/.test(` ${want} `) && !(pipefail >= 0 && pipefail < index))
+      problems.push(`hides a failure in its pipeline: ${want}`)
+  }
+  return problems
+}
 
 /** A condition no run can satisfy, or one that ignores everything before it. */
 export function disabledCondition(condition) {
@@ -456,17 +555,21 @@ function eligibilityProblems(files, check) {
 
 /** IOS-02: each mandatory check exists once, on its one condition, and can fail its job. */
 function mandatoryProblems(jobs, check) {
-  for (const [name, predicate, condition] of MANDATORY) {
+  for (const [name, predicate, condition, required] of MANDATORY) {
     const found = steps(jobs[name]).filter(predicate)
     const [step] = found
+    const label = `${name}: "${step?.name ?? step?.id ?? 'a mandatory check'}"`
     check(
       found.length === 1 &&
         step.if === condition &&
         step.shell === undefined &&
         step['continue-on-error'] === undefined &&
         !neutralizedRun(step.run),
-      `${name}: "${step?.name ?? step?.id ?? 'a mandatory check'}" must exist once, run on ${condition ?? 'every earlier success'} and fail its job`
+      `${label} must exist once, run on ${condition ?? 'every earlier success'} and fail its job`
     )
+    if (found.length === 1)
+      for (const problem of requiredLineProblems(step.run, required))
+        check(false, `${label} ${problem}`)
   }
 }
 

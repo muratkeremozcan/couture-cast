@@ -24,6 +24,7 @@ import {
   pushChanges,
   pushPaths,
   rootManifestChanges,
+  rootScriptClosure,
   rootScriptsRun,
 } from './ios-native-inputs.mjs'
 
@@ -308,6 +309,34 @@ describe('what the root manifest changes for an iOS run', () => {
       )
   })
 
+  // IOS-R2-03: the root scripts a lifecycle script or a hook runs count too.
+  test('a root script a lifecycle script or a hook runs counts', () => {
+    const hooked = {
+      ...root,
+      scripts: {
+        ...root.scripts,
+        prepare: 'npm run setup:git',
+        'setup:git': 'husky',
+        'prebuild:packages': 'npm run clean',
+        clean: 'rimraf dist',
+      },
+    }
+    const edit = (name) =>
+      rootManifestChanges(
+        hooked,
+        { ...hooked, scripts: { ...hooked.scripts, [name]: 'changed' } },
+        text
+      )
+    assert.deepEqual(edit('setup:git'), ['scripts.setup:git'])
+    assert.deepEqual(edit('clean'), ['scripts.clean'])
+    assert.deepEqual(
+      rootScriptClosure(text, hooked).filter((name) =>
+        ['setup:git', 'clean', 'prepare'].includes(name)
+      ),
+      ['clean', 'prepare', 'setup:git']
+    )
+  })
+
   test('a web script or a hook of a script no iOS job runs does not count', () => {
     assert.deepEqual(
       change({ scripts: { ...root.scripts, 'lint:web': 'eslint apps/web' } }),
@@ -454,6 +483,40 @@ describe('the ios-changes job', () => {
       { files: [LOCKFILE], ...sides(bump('node_modules/expo', { version: '58.1.0' })) }
     )
     assert.equal(answer, true)
+  })
+
+  // IOS-R2-03: a merge that changes only the root prepare script runs them.
+  test('a merge of a root prepare script alone runs them', async () => {
+    const { answer } = await decide(
+      { EVENT: 'push', BEFORE: before },
+      {
+        files: [ROOT_MANIFEST],
+        before: {
+          [LOCKFILE]: JSON.stringify(lock),
+          [ROOT_MANIFEST]: '{"scripts":{"prepare":"husky"}}',
+        },
+        after: {
+          [LOCKFILE]: JSON.stringify(lock),
+          [ROOT_MANIFEST]: '{"scripts":{"prepare":"husky install"}}',
+        },
+      }
+    )
+    assert.equal(answer, true)
+    const quiet = await decide(
+      { EVENT: 'push', BEFORE: before },
+      {
+        files: [ROOT_MANIFEST],
+        before: {
+          [LOCKFILE]: JSON.stringify(lock),
+          [ROOT_MANIFEST]: '{"scripts":{"lint:web":"a"}}',
+        },
+        after: {
+          [LOCKFILE]: JSON.stringify(lock),
+          [ROOT_MANIFEST]: '{"scripts":{"lint:web":"b"}}',
+        },
+      }
+    )
+    assert.equal(quiet.answer, false)
   })
 
   test('a merge with no earlier commit, or a diff that fails, runs them', async () => {

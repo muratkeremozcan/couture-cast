@@ -521,7 +521,10 @@ jobs:
           node scripts/ci/native-host-evidence.mjs first-flow passed --platform ios
           node scripts/ci/native-host-evidence.mjs metro --platform ios
           node scripts/ci/native-host-evidence.mjs sample after-first-flow --platform ios
-          for command in $(node scripts/ci/native-ios-shards.mjs commands "$shard"); do
+          # The assignment fails the step when the command list fails.
+          commands=$(node scripts/ci/native-ios-shards.mjs commands "$shard")
+          test -n "$commands"
+          for command in $commands; do
             node scripts/run-story68-native.mjs "$command" --platform ios --device "$device" --shard "$shard"
           done
       - name: Record closed iOS host, first-flow and Metro diagnostics

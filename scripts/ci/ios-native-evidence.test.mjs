@@ -25,6 +25,8 @@ import {
   gateGuard,
   pullRequest,
   runCommit,
+  statusGrants,
+  treeChanges,
   workflowGuardProblems,
 } from './ios-native-evidence.mjs'
 import {
@@ -40,6 +42,11 @@ const pushInputs = pushPaths(fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
 const inputs = evidenceInputs(pushInputs)
 const head = 'a'.repeat(40)
 const older = 'b'.repeat(40)
+const newer = 'e'.repeat(40)
+const BASE = 'c'.repeat(40)
+// The guard reads workflows the way yq does on the runner; the tests use the yaml package.
+const parseYaml = (text) => parse(text, { merge: true })
+const nativePaths = ['apps/mobile/package.json', 'apps/mobile/src/screens/home.tsx']
 const file = (filename, patch = '@@ -1 +1 @@\n-a\n+b', extra = {}) => ({
   filename,
   status: 'modified',
@@ -241,22 +248,44 @@ describe('only the evidence workflow may post its status', () => {
     )
   })
 
+  const sneaky = (text) =>
+    workflowGuardProblems([{ path: '.github/workflows/sneaky.yml', text }], { parseYaml })
   const fixtures = {
-    'a zero-change rename of a workflow that holds statuses: write':
+    'a zero-change rename of a workflow that holds statuses: write': [
       'permissions:\n  statuses: write\n',
-    'a quoted statuses key': "permissions: { contents: read, 'statuses': 'write' }\n",
-    'a double-quoted statuses key': 'permissions:\n  "statuses": "write"\n',
-    'write-all': 'permissions: write-all\n',
-    'checks: write': 'permissions:\n  checks: write\n',
-    'the context string':
-      'run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence -f state=success\n',
+      'the workflow grants statuses: write',
+    ],
+    'a quoted statuses key in a flow mapping': [
+      'permissions: {"statuses": "write"}\njobs: {}\n',
+      'the workflow grants statuses: write',
+    ],
+    'a single-quoted statuses key': [
+      "permissions: { contents: read, 'statuses': 'write' }\n",
+      'the workflow grants statuses: write',
+    ],
+    'a grant through an alias': [
+      'x-grant: &grant\n  statuses: write\njobs:\n  a:\n    permissions: *grant\n',
+      'job a grants statuses: write',
+    ],
+    'a grant through a merge key': [
+      'x-grant: &grant\n  checks: write\njobs:\n  a:\n    permissions:\n      <<: *grant\n      contents: read\n',
+      'job a grants checks: write',
+    ],
+    'write-all': ['permissions: write-all\n', 'the workflow grants write-all'],
+    'checks: write on a job': [
+      'jobs:\n  a:\n    permissions:\n      checks: write\n',
+      'job a grants checks: write',
+    ],
+    'the context string': [
+      'jobs:\n  a:\n    steps:\n      - run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence -f state=success\n',
+      'names the ios-native-evidence context',
+    ],
   }
-  for (const [name, text] of Object.entries(fixtures))
+  for (const [name, [text, message]] of Object.entries(fixtures))
     test(`a workflow with ${name} fails, even with no native iOS input`, () => {
-      const problems = workflowGuardProblems([
-        { path: '.github/workflows/sneaky.yml', text },
-      ])
-      assert.equal(problems.length, 1, name)
+      const problems = sneaky(text)
+      assert.equal(problems.length, 1, problems.join('\n'))
+      assert.ok(problems[0].includes(message), problems[0])
       const result = evaluateEvidence({
         headSha: head,
         files: [],
@@ -271,16 +300,26 @@ describe('only the evidence workflow may post its status', () => {
       )
     })
 
-  test('a file name with the context, read permissions and an unreadable tree are told apart', () => {
+  test('a local action naming the context fails; read grants, file paths and an unreadable tree are told apart', () => {
     assert.deepEqual(
-      workflowGuardProblems([
-        {
-          path: 'a.yml',
-          text: 'run: node scripts/ci/ios-native-evidence.mjs\npermissions:\n  statuses: read\n  checks: read\n',
-        },
-      ]),
+      workflowGuardProblems(
+        [
+          {
+            path: '.github/actions/x/action.yml',
+            text: 'runs:\n  steps:\n    - run: echo ios-native-evidence\n',
+          },
+        ],
+        { parseYaml }
+      ),
+      ['.github/actions/x/action.yml names the ios-native-evidence context']
+    )
+    assert.deepEqual(
+      sneaky(
+        'jobs:\n  a:\n    permissions:\n      statuses: read\n      checks: read\n    steps:\n      - run: node scripts/ci/ios-native-evidence.mjs\n'
+      ),
       []
     )
+    assert.match(sneaky('jobs: [unclosed\n')[0], /could not be parsed/)
     assert.equal(
       evaluateEvidence({ headSha: head, files: [], runs: [], inputs, guard: null }).state,
       'failure'
@@ -295,17 +334,24 @@ describe('only the evidence workflow may post its status', () => {
         (path) => path !== EVIDENCE_WORKFLOW && path !== '.github/workflows/pr-gate.yml'
       )
       .map((path) => ({ path, text: fs.readFileSync(path, 'utf8') }))
-    assert.deepEqual(workflowGuardProblems(files), [])
+    assert.deepEqual(workflowGuardProblems(files, { parseYaml }), [])
     // pr-gate.yml publishes the gate status; a pull request that edits it is read whole.
-    assert.ok(
-      workflowGuardProblems([
-        {
-          path: '.github/workflows/pr-gate.yml',
-          text: fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'),
-        },
-      ]).includes('.github/workflows/pr-gate.yml holds statuses: write')
+    assert.deepEqual(
+      statusGrants(parseYaml(fs.readFileSync('.github/workflows/pr-gate.yml', 'utf8'))),
+      ['job watch grants statuses: write']
     )
   })
+
+  const yq = spawnSync('yq', ['--version']).status === 0
+  test(
+    'yq on the runner reads permissions as the yaml package does',
+    { skip: !yq && 'no yq here' },
+    async () => {
+      const { yqParse } = await import('./ios-native-evidence.mjs')
+      for (const [text] of Object.values(fixtures))
+        assert.deepEqual(statusGrants(yqParse(text)), statusGrants(parseYaml(text)))
+    }
+  )
 })
 
 describe('the completed run a status follows', () => {
@@ -323,21 +369,36 @@ describe('the completed run a status follows', () => {
   })
 })
 
-// The jobs against a fake GitHub API: open pull requests, their files, the trees at the head and
-// at main, the dispatch runs (100 a page), the commits on main, and the statuses posted.
+// The jobs against a fake GitHub API: open pull requests, the live pull request file list (which
+// the judge must not read), the trees at the merge base, each head and main, the dispatch runs
+// (100 a page), the commits on main, and the statuses posted.
 const MAIN_SHA = 'd'.repeat(40)
 function fakeGitHub({
   pulls = [],
-  files = {},
+  diff = nativePaths,
+  diffs = {},
+  liveFiles = () => [],
   runs = [],
   contents = {},
   mergeBase = older,
   trees = {},
+  truncated = [],
   blobs = {},
   onMain = () => 'behind',
 }) {
   const posted = []
   const requested = []
+  const everyPath = [...new Set([diff, ...Object.values(diffs)].flat())]
+  const treeOf = (sha) => {
+    if (trees[sha]) return trees[sha]
+    if (sha === MAIN_SHA) return []
+    const changed = new Set(sha === mergeBase ? [] : (diffs[sha] ?? diff))
+    return everyPath.map((path) => ({
+      path,
+      sha: changed.has(path) ? `head-${sha}` : 'base',
+      type: 'blob',
+    }))
+  }
   const reply = (body) => ({ ok: true, status: 200, json: async () => body })
   const raw = (text) =>
     text == null
@@ -352,10 +413,7 @@ function fakeGitHub({
         return { ok: true, status: 201, json: async () => ({}) }
       },
     ],
-    [
-      /\/pulls\/(\d+)\/files$/,
-      (match, query) => reply(query.page === 1 ? (files[match[1]] ?? []) : []),
-    ],
+    [/\/pulls\/(\d+)\/files$/, (match, query) => reply(liveFiles(query.page))],
     [/\/pulls$/, (match, query) => reply(query.page === 1 ? pulls : [])],
     [
       /\/compare\/refs\/heads\/main\.\.\.([0-9a-f]{40})$/,
@@ -372,7 +430,8 @@ function fakeGitHub({
     [/\/git\/ref\/heads\/main$/, () => reply({ object: { sha: MAIN_SHA } })],
     [
       /\/git\/trees\/([0-9a-f]{40})$/,
-      (match) => reply({ tree: trees[match[1]] ?? [], truncated: false }),
+      (match) =>
+        reply({ tree: treeOf(match[1]), truncated: truncated.includes(match[1]) }),
     ],
     [
       /\/git\/blobs\/(.+)$/,
@@ -413,6 +472,13 @@ function fakeGitHub({
   }
   return { fetchImpl, posted, requested }
 }
+const pullEvent = (sha = head) => ({
+  pull_request: { number: 5, head: { sha }, base: { sha: BASE } },
+})
+const judgeEvent = (github, sha = head) =>
+  withEvent(pullEvent(sha), (env) =>
+    pullRequest({ env, fetchImpl: github.fetchImpl, parseYaml })
+  )
 
 function withEvent(payload, body) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-native-evidence-'))
@@ -434,57 +500,158 @@ function withEvent(payload, body) {
 }
 
 describe('the pull_request_target job', () => {
-  test('judges the head commit named in the event payload, never the live head', async () => {
-    // The live pull request has moved to another commit; the event's head has its evidence.
-    const github = fakeGitHub({
-      pulls: [{ number: 5, head: { sha: older } }],
-      files: { 5: native },
-      runs: [run()],
+  test('judges the head commit named in the event payload, from immutable trees', async () => {
+    const github = fakeGitHub({ runs: [run()] })
+    await withEvent(pullEvent(), async (env, output) => {
+      const result = await pullRequest({ env, fetchImpl: github.fetchImpl, parseYaml })
+      assert.equal(result.state, 'success')
+      assert.match(output(), /^state=success\ndescription=.+\n$/)
     })
-    await withEvent(
-      { pull_request: { number: 5, head: { sha: head } } },
-      async (env, output) => {
-        const result = await pullRequest({ env, fetchImpl: github.fetchImpl })
-        assert.equal(result.state, 'success')
-        assert.match(output(), /^state=success\ndescription=.+\n$/)
-      }
-    )
+    assert.ok(!github.requested.some((request) => /\/pulls\/\d+\/files/.test(request)))
   })
 
   test('a new head with no dispatch yet fails', async () => {
-    const github = fakeGitHub({ files: { 5: native }, runs: [run()] })
-    await withEvent(
-      { pull_request: { number: 5, head: { sha: older } } },
-      async (env, output) => {
-        await pullRequest({ env, fetchImpl: github.fetchImpl })
-        assert.match(output(), /^state=failure\n/)
-      }
+    const github = fakeGitHub({ runs: [run()] })
+    await withEvent(pullEvent(newer), async (env, output) => {
+      await pullRequest({ env, fetchImpl: github.fetchImpl, parseYaml })
+      assert.match(output(), /^state=failure\n/)
+    })
+  })
+
+  test('an event without its base commit fails', async () => {
+    const github = fakeGitHub({ runs: [run()] })
+    const result = await withEvent(
+      { pull_request: { number: 5, head: { sha: head } } },
+      (env) => pullRequest({ env, fetchImpl: github.fetchImpl, parseYaml })
+    )
+    assert.equal(result.state, 'failure')
+  })
+})
+
+// IOS-R2-01: the diff belongs to the commit the event names. A delayed judgment of A, after the
+// pull request moved to a docs-only B, still judges A's native change.
+describe('the diff of the judged commit', () => {
+  test('a delayed judgment of A reads A, while the live pull request shows B docs-only', async () => {
+    const github = fakeGitHub({
+      pulls: [{ number: 5, head: { sha: newer } }],
+      diffs: { [head]: nativePaths, [newer]: ['docs/readme.md'] },
+      liveFiles: () => [file('docs/readme.md')],
+    })
+    const result = await judgeEvent(github)
+    assert.equal(result.state, 'failure')
+    assert.match(result.detail, /apps\/mobile\/package\.json/)
+  })
+
+  test('a head change while the live file list pages makes no difference', async () => {
+    const pages = {
+      1: Array.from({ length: 100 }, (_, index) => file(`docs/${index}.md`)),
+      2: [file('README.md')],
+    }
+    const github = fakeGitHub({
+      pulls: [{ number: 5, head: { sha: newer } }],
+      liveFiles: (page) => pages[page] ?? [],
+    })
+    assert.equal((await judgeEvent(github)).state, 'failure')
+    assert.ok(!github.requested.some((request) => /\/pulls\/\d+\/files/.test(request)))
+  })
+
+  test('the changed paths of two trees: added, removed, edited, and both ends of a rename', () => {
+    const blob = (path, sha) => ({ path, sha, type: 'blob' })
+    assert.deepEqual(
+      treeChanges(
+        [
+          blob('a', '1'),
+          blob('b', '1'),
+          blob('old', '7'),
+          { path: 'dir', sha: 't', type: 'tree' },
+        ],
+        [
+          blob('a', '1'),
+          blob('b', '2'),
+          blob('new', '7'),
+          blob('c', '3'),
+          { path: 'dir', sha: 'u', type: 'tree' },
+        ]
+      ),
+      ['b', 'c', 'new', 'old']
     )
   })
 })
 
-describe('the evidence runs the pull_request_target job reads', () => {
-  const judgeWith = (github) =>
-    withEvent({ pull_request: { number: 5, head: { sha: head } } }, (env) =>
-      pullRequest({ env, fetchImpl: github.fetchImpl })
-    )
+// IOS-R2-02: a diff that cannot be read whole never passes, and a large one has no cap.
+describe('large and incomplete diffs', () => {
+  const docs = Array.from({ length: 3500 }, (_, index) => `docs/page-${index}.md`)
+  const sameDependencies = {
+    contents: {
+      [older]: {
+        [LOCKFILE]: '{"lockfileVersion":3,"packages":{"":{},"apps/mobile":{}}}',
+        [ROOT_MANIFEST]: '{}',
+      },
+      [head]: {
+        [LOCKFILE]: '{"lockfileVersion":3,"packages":{"":{},"apps/mobile":{}}}',
+        [ROOT_MANIFEST]: '{}',
+      },
+    },
+  }
 
+  test('a truncated tree fails with unchanged dependency files', async () => {
+    for (const sha of [head, older, MAIN_SHA]) {
+      const github = fakeGitHub({
+        diff: [LOCKFILE, ROOT_MANIFEST, 'docs/a.md'],
+        truncated: [sha],
+        ...sameDependencies,
+      })
+      const result = await judgeEvent(github)
+      assert.equal(result.state, 'failure', sha)
+      assert.match(result.detail, /could not all be read/)
+    }
+  })
+
+  test('3,000 and 3,500 changed docs pass; a native or workflow file after them needs its check', async () => {
+    assert.equal(
+      (await judgeEvent(fakeGitHub({ diff: docs.slice(0, 3000), ...sameDependencies })))
+        .state,
+      'success'
+    )
+    assert.equal(
+      (await judgeEvent(fakeGitHub({ diff: docs, ...sameDependencies }))).state,
+      'success'
+    )
+    const native = await judgeEvent(
+      fakeGitHub({
+        diff: [...docs, LOCKFILE, 'apps/mobile/modules/x/ios/Late.swift'],
+        ...sameDependencies,
+      })
+    )
+    assert.equal(native.state, 'failure')
+    assert.match(native.detail, /Late\.swift/)
+    const workflow = await judgeEvent(
+      fakeGitHub({
+        diff: docs,
+        trees: {
+          [head]: [
+            ...docs.map((path) => ({ path, sha: 'h', type: 'blob' })),
+            { path: '.github/workflows/zz-late.yml', sha: 'late1', type: 'blob' },
+          ],
+        },
+        blobs: { late1: 'permissions:\n  statuses: write\n' },
+        ...sameDependencies,
+      })
+    )
+    assert.equal(workflow.state, 'failure')
+    assert.match(workflow.detail, /zz-late\.yml/)
+  })
+})
+
+describe('the evidence runs the pull_request_target job reads', () => {
   // Code review 5: the run's own commit must be on the branch main.
   test('a dispatch whose commit is not on refs/heads/main fails', async () => {
     for (const status of ['diverged', 'ahead']) {
-      const github = fakeGitHub({
-        files: { 5: native },
-        runs: [run()],
-        onMain: () => status,
-      })
-      assert.equal((await judgeWith(github)).state, 'failure', status)
+      const github = fakeGitHub({ runs: [run()], onMain: () => status })
+      assert.equal((await judgeEvent(github)).state, 'failure', status)
     }
-    const github = fakeGitHub({
-      files: { 5: native },
-      runs: [run()],
-      onMain: () => 'identical',
-    })
-    assert.equal((await judgeWith(github)).state, 'success')
+    const github = fakeGitHub({ runs: [run()], onMain: () => 'identical' })
+    assert.equal((await judgeEvent(github)).state, 'success')
   })
 
   // Code review 6: no cap on how far back the evidence is.
@@ -492,24 +659,23 @@ describe('the evidence runs the pull_request_target job reads', () => {
     const others = Array.from({ length: 350 }, (_, index) =>
       run({ display_title: `iOS native ${index.toString(16).padStart(40, '0')}` })
     )
-    const github = fakeGitHub({ files: { 5: native }, runs: [...others, run()] })
-    assert.equal((await judgeWith(github)).state, 'success')
+    const github = fakeGitHub({ runs: [...others, run()] })
+    assert.equal((await judgeEvent(github)).state, 'success')
     assert.ok(github.requested.some((request) => /page=4/.test(request)))
   })
 
   test('a workflow at the head that could post the status fails the head', async () => {
     const github = fakeGitHub({
-      files: { 5: [file('README.md')] },
-      runs: [],
+      diff: ['README.md'],
       trees: {
         [head]: [{ path: '.github/workflows/renamed.yml', sha: 'old1', type: 'blob' }],
         [MAIN_SHA]: [{ path: '.github/workflows/old.yml', sha: 'old1', type: 'blob' }],
       },
       blobs: { old1: 'permissions:\n  statuses: write\n' },
     })
-    const result = await judgeWith(github)
+    const result = await judgeEvent(github)
     assert.equal(result.state, 'failure')
-    assert.match(result.detail, /renamed\.yml holds statuses: write/)
+    assert.match(result.detail, /renamed\.yml: the workflow grants statuses: write/)
   })
 })
 
@@ -522,23 +688,37 @@ describe('the PR Gate guard', () => {
       [MAIN_SHA]: [],
     },
     blobs: {
-      rogue1: 'run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence\n',
+      rogue1:
+        'jobs:\n  a:\n    steps:\n      - run: gh api repos/o/r/statuses/$SHA -f context=ios-native-evidence\n',
     },
   }
   const guard = async (github, sha = head) =>
     withEvent({}, (env) =>
-      gateGuard({ env: { ...env, HEAD_SHA: sha }, fetchImpl: github.fetchImpl })
+      gateGuard({
+        env: { ...env, HEAD_SHA: sha },
+        fetchImpl: github.fetchImpl,
+        parseYaml,
+      })
     )
 
   test('fails the gate status of an open pull request whose head could post the evidence', async () => {
     const github = fakeGitHub({ pulls: [{ number: 5, head: { sha: head } }], ...rogue })
     assert.deepEqual(await guard(github), [
-      '.github/workflows/rogue.yml holds the ios-native-evidence context',
+      '.github/workflows/rogue.yml names the ios-native-evidence context',
     ])
     assert.deepEqual(
       github.posted.map(({ sha, state, context }) => ({ sha, state, context })),
       [{ sha: head, state: 'failure', context: GATE_STATUS }]
     )
+  })
+
+  test('a head tree it cannot read whole fails the gate too', async () => {
+    const github = fakeGitHub({
+      pulls: [{ number: 5, head: { sha: head } }],
+      truncated: [head],
+    })
+    assert.match((await guard(github))[0], /could not all be read/)
+    assert.equal(github.posted[0].state, 'failure')
   })
 
   test('posts nothing for a clean head, or a commit no open pull request heads', async () => {
@@ -586,21 +766,21 @@ describe('a pull request that changes the shared dependency files', () => {
       'node_modules/next': { version: next },
     },
   })
-  const judge = async (after) => {
+  const judge = async (after, manifest = {}) => {
     const github = fakeGitHub({
-      files: { 5: [file(LOCKFILE), file(ROOT_MANIFEST)] },
+      diff: [LOCKFILE, ROOT_MANIFEST],
       contents: {
         [older]: {
           [LOCKFILE]: JSON.stringify(lock('58.0.0', '15.0.0')),
           [ROOT_MANIFEST]: '{}',
         },
-        [head]: { [LOCKFILE]: JSON.stringify(after), [ROOT_MANIFEST]: '{}' },
+        [head]: {
+          [LOCKFILE]: JSON.stringify(after),
+          [ROOT_MANIFEST]: JSON.stringify(manifest),
+        },
       },
     })
-    return withEvent(
-      { pull_request: { number: 5, head: { sha: head }, base: { sha: 'c'.repeat(40) } } },
-      (env) => pullRequest({ env, fetchImpl: github.fetchImpl })
-    )
+    return judgeEvent(github)
   }
 
   test('a web-only bump needs no iOS evidence', async () => {
@@ -615,26 +795,29 @@ describe('a pull request that changes the shared dependency files', () => {
 
   test('a lockfile it cannot read at either end needs it', async () => {
     const github = fakeGitHub({
-      files: { 5: [file(LOCKFILE)] },
+      diff: [LOCKFILE],
       contents: { [head]: { [LOCKFILE]: '{}' } },
     })
-    const result = await withEvent(
-      { pull_request: { number: 5, head: { sha: head }, base: { sha: 'c'.repeat(40) } } },
-      (env) => pullRequest({ env, fetchImpl: github.fetchImpl })
-    )
-    assert.equal(result.state, 'failure')
+    assert.equal((await judgeEvent(github)).state, 'failure')
+  })
+
+  // IOS-R2-03: a root lifecycle script alone, or a root script one runs, needs the evidence.
+  test('a root prepare script alone needs it, and so does a root script a hook runs', async () => {
+    const same = lock('58.0.0', '15.0.0')
+    assert.equal((await judge(same, { scripts: { prepare: 'husky' } })).state, 'failure')
+    assert.equal((await judge(same, { scripts: { lint: 'eslint .' } })).state, 'success')
   })
 })
 
 describe('the workflow_run job', () => {
   const pulls = [
-    { number: 5, head: { sha: head } },
-    { number: 6, head: { sha: older } },
+    { number: 5, head: { sha: head }, base: { sha: BASE } },
+    { number: 6, head: { sha: newer }, base: { sha: BASE } },
   ]
   const after = async (completed, runs = [completed]) => {
-    const github = fakeGitHub({ pulls, files: { 5: native, 6: native }, runs })
+    const github = fakeGitHub({ pulls, runs })
     await withEvent({ workflow_run: completed }, (env) =>
-      dispatchCompleted({ env, fetchImpl: github.fetchImpl })
+      dispatchCompleted({ env, fetchImpl: github.fetchImpl, parseYaml })
     )
     return github.posted
   }
@@ -664,7 +847,7 @@ describe('the workflow_run job', () => {
     'a dispatch from another branch': run({ head_branch: 'feat/x' }),
     'a run whose name is not a commit': run({ display_title: 'iOS native main' }),
     'a dispatch of a commit no open pull request heads': run({
-      display_title: `iOS native ${'e'.repeat(40)}`,
+      display_title: `iOS native ${'9'.repeat(40)}`,
     }),
   }
   for (const [name, completed] of Object.entries(silent))
