@@ -12,6 +12,7 @@ import {
   coverageShardOf,
   mergeShardResults,
   plannedShards,
+  shardResult,
 } from './coverage-shards.mjs'
 import { LANES, coverageShards } from './lanes.mjs'
 
@@ -77,10 +78,32 @@ test("a shard's recorded outcome includes the mobile plugin prebuild suites", ()
   const record = steps.find((step) => step.name === "Record this shard's result")
   assert.equal(plugins.id, 'plugins')
   assert.ok(steps.indexOf(plugins) < steps.indexOf(record))
-  assert.equal(
-    record.env.OUTCOME,
-    "${{ steps.plugins.outcome == 'failure' && 'failure' || steps.tests.outcome }}"
-  )
+  assert.equal(record.env.OUTCOME, '${{ steps.tests.outcome }}')
+  assert.equal(record.env.PLUGINS_OUTCOME, '${{ steps.plugins.outcome }}')
+})
+
+// Antigravity handover r2 (P3): a cancelled plugin step must not record a passed shard.
+test('a plugin outcome other than success or skipped fails the shard and names the step', () => {
+  for (const plugins of [undefined, '', 'skipped', 'success'])
+    assert.deepEqual(shardResult({ outcome: 'success', plugins, dirs: ['d'] }), {
+      outcome: 'success',
+      dirs: ['d'],
+      failures: [],
+    })
+  assert.equal(shardResult({ outcome: 'failure', plugins: 'success' }).outcome, 'failure')
+  for (const plugins of ['failure', 'cancelled']) {
+    const result = shardResult({ outcome: 'success', plugins })
+    assert.equal(result.outcome, 'failure', plugins)
+    assert.deepEqual(
+      result.failures.map((failure) => failure.workspace),
+      ['mobile plugin prebuild suites'],
+      plugins
+    )
+    assert.equal(
+      mergeShardResults({ api: passing([]), mobile: result, other: passing([]) }).outcome,
+      'failure'
+    )
+  }
 })
 
 test('the job other checks read keeps its name and waits for every shard', () => {

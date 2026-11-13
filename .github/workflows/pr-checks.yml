@@ -371,8 +371,10 @@ jobs:
         if: ${{ !cancelled() && steps.tests.outcome != 'skipped' }}
         env:
           SHARD: ${{ matrix.shard }}
-          # A red plugin prebuild suite fails the shard in the coverage comment too.
-          OUTCOME: ${{ steps.plugins.outcome == 'failure' && 'failure' || steps.tests.outcome }}
+          OUTCOME: ${{ steps.tests.outcome }}
+          # A plugin prebuild outcome other than success or skipped fails the shard in the
+          # coverage comment too (coverage-shards.mjs shardResult).
+          PLUGINS_OUTCOME: ${{ steps.plugins.outcome }}
           DIRS: ${{ steps.tests.outputs.coverage_dirs }}
           FAILURES: ${{ steps.tests.outputs.failures }}
         run: node scripts/ci/coverage-shards.mjs record
