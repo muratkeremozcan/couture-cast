@@ -218,17 +218,15 @@ function makeCapture(screenName, stage, scale) {
   return capture
 }
 
-async function stableNodes() {
-  let previous = flattenHierarchy(hierarchy(), {
-    platform,
-    volatile: activeVolatile,
-  }).nodes
+/** Two identical pages half a second apart; `markVolatile` keeps volatile text, flagged. */
+async function stableNodes({ markVolatile = false } = {}) {
+  const read = () =>
+    flattenHierarchy(hierarchy(), { platform, volatile: activeVolatile, markVolatile })
+      .nodes
+  let previous = read()
   for (let attempt = 0; attempt < 20; attempt += 1) {
     await pause(500)
-    const current = flattenHierarchy(hierarchy(), {
-      platform,
-      volatile: activeVolatile,
-    }).nodes
+    const current = read()
     if (sameLayout(current, previous)) return current
     previous = current
   }
@@ -271,11 +269,13 @@ function drag(size, up) {
 async function fullText(capture) {
   const size = windowSize(capture)
   if (!size) throw new Error('live_font_window_bounds_required')
-  const pages = [capture.nodes]
+  // Pages keep volatile text, flagged, so a feed of volatile cards still overlaps from one page
+  // to the next; stitchPages leaves that text out of the result.
+  const pages = [await stableNodes({ markVolatile: true })]
   let drags = 0
   for (; drags < 12; drags += 1) {
     drag(size, true)
-    const page = await stableNodes()
+    const page = await stableNodes({ markVolatile: true })
     if (sameLayout(page, pages.at(-1))) break
     pages.push(page)
   }
@@ -404,8 +404,16 @@ function deviceIo(name) {
     capture: async (stage, scale) => makeCapture(name, stage, scale),
     settle: async (stage, scale) => settle(name, stage, scale),
     fullText,
-    update: async () => maestro(`update-${name}`),
-    revert: async () => maestro(`revert-${name}`),
+    // An update flow scrolls to its control (Settings' locale buttons sit mid-page), so the
+    // screen goes back to its top before the next capture starts the scroll-through there.
+    update: async () => {
+      maestro(`update-${name}`)
+      await scrollToTop(name)
+    },
+    revert: async () => {
+      maestro(`revert-${name}`)
+      await scrollToTop(name)
+    },
   }
 }
 
