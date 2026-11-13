@@ -129,7 +129,7 @@ Decisions (owner direction 2026-11-12; the rest delegated to the builder):
   | accessibility Android app build (Linux)    | 16   | n/a     | 17.7    | n/a       |
   | share-card `browser-acceptance` (Linux)    | 15   | n/a     | 17.7    | n/a       |
 
-  Queue probe (rule 5), PR #215, run `43327728813`, attempts 2 to 21 (20 runs each, 2026-11-12 5:50 to 6:16 PM CST), queue = job start minus attempt start:
+  Queue probe (rule 5), PR #215, run `43327728813`, attempts 2 to 21 (20 runs each, 2026-11-12 5:26 to 6:15 PM CST), queue = job start minus attempt start:
 
   | Runner     | Runs | Queue p50 | Queue p95 | Queue max |
   | ---------- | ---- | --------- | --------- | --------- |
