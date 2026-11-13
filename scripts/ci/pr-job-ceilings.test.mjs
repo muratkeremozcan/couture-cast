@@ -155,6 +155,20 @@ const withInputs = (text, inputs) =>
  * caller forwards from its own inputs resolved against them.
  */
 function inputsFor(called, job, parentInputs = {}) {
+  // A caller's matrix value stands for every value that matrix key takes.
+  const matrix = job.strategy?.matrix ?? {}
+  const matrixValues = (key) =>
+    [
+      ...[matrix[key] ?? []].flat(),
+      ...(matrix.include ?? []).map((entry) => entry?.[key]),
+    ]
+      .filter((value) => value !== undefined)
+      .join(' ')
+  const resolve = (value) =>
+    withInputs(value, parentInputs).replace(
+      /\$\{\{\s*matrix\.([A-Za-z_][\w-]*)\s*\}\}/g,
+      (_, key) => matrixValues(key)
+    )
   const declared = (called.on ?? called[true])?.workflow_call?.inputs ?? {}
   return {
     ...Object.fromEntries(
@@ -165,7 +179,7 @@ function inputsFor(called, job, parentInputs = {}) {
     ...Object.fromEntries(
       Object.entries(job.with ?? {}).map(([key, value]) => [
         key,
-        typeof value === 'string' ? withInputs(value, parentInputs) : value,
+        typeof value === 'string' ? resolve(value) : value,
       ])
     ),
   }
@@ -210,6 +224,49 @@ function macosOnPullRequestOrPush(directory = dir) {
   }
   return offenders
 }
+
+// CodeRabbit on PR 224: a push to main shared the cancel-in-progress group of a scheduled or
+// dispatched run, so a merge could cancel the only run of a nightly-only job.
+/** Workflows whose nightly-only jobs share a cancelling concurrency group with push or PR runs. */
+function nightlyRunsCancelledByOthers(directory = dir) {
+  const offenders = []
+  for (const file of readdirSync(directory).filter(isWorkflow)) {
+    const workflow = load(directory, file)
+    const events = eventsOf(workflow.on ?? workflow[true])
+    if (!events.some((event) => ['pull_request', 'push'].includes(event))) continue
+    const nightly = Object.values(workflow.jobs ?? {}).some((job) =>
+      NIGHTLY_CONDITIONS.includes(conditionOf(job))
+    )
+    const group = workflow.concurrency?.group ?? workflow.concurrency
+    if (
+      nightly &&
+      group &&
+      workflow.concurrency?.['cancel-in-progress'] !== false &&
+      !String(group).includes('${{ github.event_name }}')
+    )
+      offenders.push(file)
+  }
+  return offenders
+}
+
+test('a nightly-only job never shares a cancelling concurrency group with a push or PR run', () => {
+  assert.deepEqual(nightlyRunsCancelledByOthers(), [])
+})
+
+test('a shared cancelling group is caught; an event-scoped or non-cancelling one passes', (t) => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'pr-job-nightly-group-'))
+  t.after(() => rmSync(directory, { recursive: true, force: true }))
+  const nightlyJob = `jobs:\n  mac:\n    if: \${{ ${NIGHTLY_ONLY} }}\n    runs-on: macos-15\n    timeout-minutes: 10\n    steps: [{ run: echo }]\n`
+  const files = {
+    'shared.yml': `on: [push, schedule]\nconcurrency:\n  group: x-\${{ github.ref }}\n  cancel-in-progress: true\n${nightlyJob}`,
+    'scoped.yml': `on: [push, schedule]\nconcurrency:\n  group: x-\${{ github.ref }}-\${{ github.event_name }}\n  cancel-in-progress: true\n${nightlyJob}`,
+    'queued.yml': `on: [push, schedule]\nconcurrency:\n  group: x-\${{ github.ref }}\n  cancel-in-progress: false\n${nightlyJob}`,
+    'nightly-only.yml': `on: [schedule, workflow_dispatch]\nconcurrency:\n  group: x-\${{ github.ref }}\n  cancel-in-progress: true\n${nightlyJob}`,
+  }
+  for (const [name, body] of Object.entries(files))
+    writeFileSync(path.join(directory, name), body)
+  assert.deepEqual(nightlyRunsCancelledByOthers(directory), ['shared.yml'])
+})
 
 test('no macOS job runs on a pull request or a merge to main', () => {
   assert.deepEqual(macosOnPullRequestOrPush(), [])
@@ -282,6 +339,28 @@ test('a macOS job on a pull request, a merge or a matrix is caught; nightly-only
       '    steps: [{ run: echo }]',
       '',
     ].join('\n'),
+    // CodeRabbit on PR 224: a caller's matrix value passed as the runner input.
+    'caller-matrix.yml': [
+      'on: pull_request',
+      'jobs:',
+      '  call:',
+      '    strategy:',
+      '      matrix: { os: [ubuntu-latest, macos-15] }',
+      '    uses: ./.github/workflows/runner-input.yml',
+      "    with: { runner: '${{ matrix.os }}' }",
+      '',
+    ].join('\n'),
+    'caller-include.yml': [
+      'on: push',
+      'jobs:',
+      '  call:',
+      '    strategy:',
+      '      matrix:',
+      '        include: [{ runner: ubuntu-latest }, { runner: macos-26 }]',
+      '    uses: ./.github/workflows/runner-input.yml',
+      "    with: { runner: '${{ matrix.runner }}' }",
+      '',
+    ].join('\n'),
     'runner-input.yml': [
       'on:',
       '  workflow_call:',
@@ -300,6 +379,8 @@ test('a macOS job on a pull request, a merge or a matrix is caught; nightly-only
   assert.deepEqual(macosOnPullRequestOrPush(directory).sort(), [
     'by-default.yml:call > runner-input.yml:work',
     'by-input.yml:call > runner-input.yml:work',
+    'caller-include.yml:call > runner-input.yml:work',
+    'caller-matrix.yml:call > runner-input.yml:work',
     'caller.yml:call > called.yml:mac',
     'forward.yml:call > forwarder.yml:pass > runner-input.yml:work',
     'matrix-input.yml:call > matrix-runner.yml:legs',
