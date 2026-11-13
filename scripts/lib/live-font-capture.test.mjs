@@ -614,6 +614,21 @@ describe('hierarchy source (two booted simulators)', () => {
     )
   })
 
+  test('a dump with no environment marker fails once the build is known (review P2-2c)', () => {
+    const bare = dump('0.81.5', deviceFingerprint(udidA))
+    bare.children[0].children = []
+    assert.throws(
+      () =>
+        assertHierarchySource(bare, {
+          platform: 'android',
+          reactNativeVersion: '0.81.5',
+        }),
+      { message: 'live_font_hierarchy_wrong_build:missing' }
+    )
+    // Before the first read there is nothing to compare with.
+    assert.doesNotThrow(() => assertHierarchySource(bare, { platform: 'android' }))
+  })
+
   test('a battery level matches only as a whole number (review P3-1)', () => {
     const print = { battery: 5, cellular: 1, wifi: 1 }
     assert.throws(

@@ -115,12 +115,21 @@ const fingerprint = platform === 'ios' ? deviceFingerprint(device) : undefined
 // Read from the installed app on the first launch; every later hierarchy must agree with it.
 let reactNativeVersion
 function hierarchy() {
-  const raw = run('maestro', ['--device', device, 'hierarchy'])
-  const start = raw.indexOf('{')
-  if (start < 0) throw new Error('live_font_hierarchy_invalid')
-  const tree = JSON.parse(raw.slice(start))
-  assertHierarchySource(tree, { platform, fingerprint, reactNativeVersion })
-  return tree
+  // An Activity relaunch or a window change can leave one read between mounts with no marker;
+  // a marker still missing after three reads, a wrong build or a wrong device fails at once.
+  for (let attempt = 1; ; attempt += 1) {
+    const raw = run('maestro', ['--device', device, 'hierarchy'])
+    const start = raw.indexOf('{')
+    if (start < 0) throw new Error('live_font_hierarchy_invalid')
+    const tree = JSON.parse(raw.slice(start))
+    try {
+      assertHierarchySource(tree, { platform, fingerprint, reactNativeVersion })
+      return tree
+    } catch (error) {
+      if (attempt >= 3 || error.message !== 'live_font_hierarchy_wrong_build:missing')
+        throw error
+    }
+  }
 }
 function readScale() {
   return platform === 'android'

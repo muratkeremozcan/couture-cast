@@ -499,8 +499,10 @@ export function assertHierarchySource(
       throw new Error(`live_font_hierarchy_wrong_device:${missing.join('|')}`)
   }
   if (reactNativeVersion) {
+    // A dump without the environment marker cannot show the build, and on Android this is the
+    // only source check, so it fails closed.
     const seen = flattenHierarchy(tree, { platform }).environment?.reactNativeVersion
-    if (seen && seen !== reactNativeVersion)
-      throw new Error(`live_font_hierarchy_wrong_build:${seen}`)
+    if (seen !== reactNativeVersion)
+      throw new Error(`live_font_hierarchy_wrong_build:${seen ?? 'missing'}`)
   }
 }
