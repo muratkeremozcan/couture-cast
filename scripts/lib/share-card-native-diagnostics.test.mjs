@@ -273,6 +273,22 @@ describe('native flow diagnostics capture', () => {
   // Story 6.15: a deadline kill on the iOS 26.5 simulator leaves Maestro no failure artifacts, so
   // the after-failure screenshot and the app log are the only screen and app evidence; simctl
   // answered in seconds on that host, and the old 1.5 s limit killed both.
+  test('the capture child outlives its platform capture limit: 50 s on iOS, 15 s on Android', async () => {
+    const { recordNativeFlowDiagnostics } = await helper()
+    const timeouts = {}
+    for (const platform of ['ios', 'android'])
+      recordNativeFlowDiagnostics(
+        { platform },
+        {
+          execute: (binary, args, options) => {
+            timeouts[platform] = options.timeout
+            return { status: 0 }
+          },
+        }
+      )
+    assert.deepEqual(timeouts, { ios: 50000, android: 15000 })
+  })
+
   test('an iOS failure gives each simctl capture 15 s and the whole capture 45 s; Android keeps 1.5 s and 10 s', async (t) => {
     const { collectNativeFlowDiagnostics, CAPTURE_LIMITS } = await helper()
     assert.deepEqual(CAPTURE_LIMITS, {

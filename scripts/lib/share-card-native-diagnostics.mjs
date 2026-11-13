@@ -941,13 +941,14 @@ export async function collectNativeFlowDiagnostics(input, { execute = spawnSync 
   return value
 }
 /** Failure-only bounded child keeps normal flow and product deadlines unchanged. */
-export function recordNativeFlowDiagnostics(input) {
+export function recordNativeFlowDiagnostics(input, { execute = spawnSync } = {}) {
   try {
     return (
-      spawnSync(process.execPath, [fileURLToPath(import.meta.url), '--capture'], {
+      execute(process.execPath, [fileURLToPath(import.meta.url), '--capture'], {
         input: JSON.stringify(input),
         encoding: 'utf8',
-        timeout: 15000,
+        // The child's whole capture plus its own start and write.
+        timeout: (CAPTURE_LIMITS[input.platform]?.totalMs ?? 10000) + 5000,
         killSignal: 'SIGKILL',
         maxBuffer: 4096,
       }).status === 0
