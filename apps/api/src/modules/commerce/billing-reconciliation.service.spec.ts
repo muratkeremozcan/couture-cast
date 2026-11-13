@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type { PremiumEntitlementService } from './premium-entitlement.service.js'
@@ -171,5 +171,35 @@ describe('BillingReconciliationService', () => {
       'premium_entitlement_deactivated',
       { store: 'stripe', productId: 'premium_monthly', reason: 'expired' }
     )
+  })
+
+  // Learning path Step 55: story 6.15 D15 r6. A test_store row this API does not honor never enters
+  // the drift batch; under local and preview it does.
+  describe('the drift query and test_store rows', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    function driftWhere(): Record<string, unknown> {
+      const [args] = premiumEntitlement.findMany.mock.calls[0] as [
+        { where: Record<string, unknown> },
+      ]
+      return args.where
+    }
+
+    it.each([undefined, 'staging', 'production'])(
+      'with TEST_ENV %s excludes them',
+      async (testEnv) => {
+        vi.stubEnv('TEST_ENV', testEnv as string)
+        await service.sweep()
+        expect(driftWhere()).toMatchObject({ store: { not: 'test_store' } })
+      }
+    )
+
+    it.each(['local', 'preview'])('with TEST_ENV %s keeps them', async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv)
+      await service.sweep()
+      expect(driftWhere()).not.toHaveProperty('store')
+    })
   })
 })

@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import {
+  honorsEntitlementStore,
   resolveEntitlementEmission,
   type EntitlementTransition,
   type PremiumEntitlementService,
@@ -178,7 +179,12 @@ export class BillingReconciliationService {
   private async correctDrift(result: BillingReconciliationSweepResult): Promise<void> {
     const staleBefore = new Date(Date.now() - DRIFT_STALENESS_HOURS * 60 * 60 * 1000)
     const staleRows = await this.prisma.premiumEntitlement.findMany({
-      where: { synced_at: { lt: staleBefore } },
+      where: {
+        synced_at: { lt: staleBefore },
+        // Story 6.15 D15 r6: a test_store row this API does not honor reads as absent, and its
+        // pull is refused, so it would warn every sweep and pin the head of the batch.
+        ...(honorsEntitlementStore('test_store') ? {} : { store: { not: 'test_store' } }),
+      },
       orderBy: { synced_at: 'asc' },
       take: DRIFT_CORRECTION_BATCH_SIZE,
       select: { user_id: true },

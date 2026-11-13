@@ -479,6 +479,69 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
     })
   }
 
+  // Learning path Step 55: story 6.15 D15 r6. Against real Postgres, the drift query skips a stale
+  // test_store row outside local and preview, so it is never pulled; under local and preview it is.
+  for (const testEnv of [
+    undefined,
+    'staging',
+    'production',
+    'local',
+    'preview',
+  ] as const) {
+    const open = testEnv === 'local' || testEnv === 'preview'
+    it(`${open ? 'pulls' : 'never pulls'} a stale test_store row (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+      if (!requireSchema(context)) return
+      const savedEnv = process.env.TEST_ENV
+      if (testEnv === undefined) delete process.env.TEST_ENV
+      else process.env.TEST_ENV = testEnv
+      const subscriberUrl = `/subscribers/${encodeURIComponent(userId)}`
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith(subscriberUrl)
+            ? new Response(JSON.stringify({ subscriber: {} }), { status: 200 })
+            : new Response('out of scope', { status: 503 })
+        )
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      try {
+        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+        const sweeper = new BillingReconciliationService(
+          prisma,
+          realLedger,
+          new PremiumEntitlementService(
+            prisma,
+            realLedger,
+            new FakeStripeBillingClient(),
+            noComplimentaryGrants
+          ),
+          telemetry as unknown as TelemetryService
+        )
+        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+        await prisma.premiumEntitlement.create({
+          data: buildPremiumEntitlementCreateInput(
+            createPremiumEntitlement({
+              userId,
+              status: 'active',
+              store: 'test_store',
+              syncedAt: staleSyncedAt,
+              lastEventOccurredAt: staleSyncedAt,
+              lastEventId: `${namespace}-test-store-drift-seed`,
+            })
+          ),
+        })
+
+        await sweeper.sweep()
+
+        const pulled = fetchMock.mock.calls.some(([url]) => url.endsWith(subscriberUrl))
+        expect(pulled).toBe(open)
+      } finally {
+        vi.unstubAllGlobals()
+        if (savedEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = savedEnv
+      }
+    })
+  }
+
   it('leaves a freshly-synced entitlement alone (staleness bound respected)', async (context) => {
     if (!requireSchema(context)) return
 
