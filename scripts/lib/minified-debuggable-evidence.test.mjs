@@ -405,3 +405,29 @@ test('collectReleaseR8 resolves the app config: the baseline, then app.config.ts
   })
   assert.throws(() => collectReleaseR8(files(broken)), /app_config_unresolved/)
 })
+
+// Antigravity r9 (P3-2): an omitted output fails closed without Node's DEP0187 warning for
+// fs.existsSync(undefined).
+test('an omitted usage.txt fails closed without a deprecation warning', async () => {
+  const warnings = []
+  const listen = (warning) => warnings.push(warning.code ?? warning.name)
+  process.on('warning', listen)
+  try {
+    assert.throws(
+      () =>
+        collectEvidence({
+          apk: undefined,
+          mapping: undefined,
+          usage: undefined,
+          aapt2: '/usr/bin/false',
+        }),
+      {
+        message: 'minified_debuggable_output_missing: undefined',
+      }
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+  } finally {
+    process.off('warning', listen)
+  }
+  assert.ok(!warnings.includes('DEP0187'), warnings.join(','))
+})

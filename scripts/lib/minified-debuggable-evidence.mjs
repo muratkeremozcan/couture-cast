@@ -271,7 +271,7 @@ export function collectEvidence({
 }) {
   // usage.txt is the only record of what R8 removed; without it a stripped RevenueCat would pass.
   for (const file of [apk, mapping, usage])
-    if (!fs.existsSync(file))
+    if (!file || !fs.existsSync(file))
       throw new Error(`minified_debuggable_output_missing: ${file}`)
   const badging = run(aapt2, ['dump', 'badging', apk])
   if (!badgingDebuggable(badging))
