@@ -40,6 +40,10 @@ export const SCREENS = {
   community: {
     flow: 'open-community',
     anchors: ['community-new-post-label'],
+    // Feed and spotlight cards change between launches on their own: ranking, the climate pill
+    // each card derives, and images that fail to load and show a retry. The screen's own text
+    // (header, filters, band notice, New post) stays measured.
+    volatile: ['community-post-card-', 'community-spotlight'],
     controls: TABS,
     probes: [{ id: 'community-new-post-label', sizeSp: 13 }],
   },
