@@ -10,6 +10,7 @@ Updated: 2026-11-12: CI creates previews and Vercel's git integration deploys pr
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
+Updated: 2026-11-13 (Story 6.15 Step 0): release hold, Test Store isolation, debug signing and the macOS nightly shape.
 Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
@@ -249,7 +250,11 @@ The mobile app is configured under [apps/mobile](../../apps/mobile/). Its
 - an empty production submit profile exists.
 
 [Deploy mobile](../../.github/workflows/deploy-mobile.yml) is manual only. It verifies `EXPO_TOKEN`,
-checks EAS identity, and starts an Android production build with `--no-wait`. It does not:
+runs the Story 6.15 release hold
+([mobile-release-hold.mjs](../../scripts/ci/mobile-release-hold.mjs)), checks EAS identity, and
+starts an Android production build with `--no-wait`. The hold refuses the build while
+`apps/mobile/release-hold.json` holds the app's SDK (SDK 56's Hermes memory regression) and no
+committed measurement lifts it; the file is required from SDK 56 on. It does not:
 
 - build iOS;
 - wait for the Android build result;
@@ -272,6 +277,31 @@ The native identity and active EAS project are recorded in
 PostHog settings. API calls require `EXPO_PUBLIC_API_BASE_URL` or `API_BASE_URL`, as enforced by the
 [mobile API client](../../apps/mobile/src/lib/api-client.ts); the EAS profile does not define that
 value in the repository, so it must come from the build environment.
+
+### Story 6.15 upgrade path (Expo SDK 54 to 58)
+
+Story 6.15 moves the app one Expo SDK per pull request, each merged green before the next opens.
+Step 0 (PR #226) stays on SDK 54 and readies the app and CI:
+
+- **Background refresh.** The ritual refresh runs on `expo-background-task` under a new task name;
+  the old `expo-background-fetch` task is unregistered tolerantly on first launch after the update.
+- **RevenueCat Test Store.** The Test Store lives in its own RevenueCat project. Its public key is
+  in `.env.local` and `.env.preview` only. Its secret key and webhook auth are Vercel preview
+  variables on the API, with `TEST_ENV=preview`, and are absent from production. The API applies a
+  `test_store` entitlement only when `TEST_ENV` is `local` or `preview`; elsewhere such a row is
+  no paid access. Preview uses its own Supabase database. A release export is scanned on every
+  mobile pull request for any Test Store key, in production and preview modes.
+- **Debug signing.** A committed test-only keystore
+  (`apps/mobile/plugins/test-signing/couturecast-test-only.keystore`) signs the Android `debug` and
+  `minifiedDebuggable` builds so paid over-installs keep their certificate. A development client
+  installed before this change needs one uninstall. The Release signing key is unchanged.
+- **`minifiedDebuggable`.** An Android build type derived from `release`, minified by R8 and
+  debuggable, runs the Test Store journey under R8. Release itself runs no R8 on SDK 54; Step 4
+  turns on `android.enableMinifyInReleaseBuilds`.
+- **macOS CI shape.** No macOS job runs on a pull request or a merge. iOS and watchOS native run
+  nightly (`ios-native.yml` at 03:23 UTC, with the `ios-live-font` live font-scale proof on the
+  Release test build) and on manual dispatch; the iOS 26.5 canary runs at 06:37 UTC. Pre-merge iOS
+  evidence is a recorded local run on the pull request's exact head SHA.
 
 ### Root Expo configuration conflict
 

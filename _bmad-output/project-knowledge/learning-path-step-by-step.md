@@ -10921,7 +10921,7 @@ Story/Task mapping:
 - Task 4 (Step 0: `expo-background-task`, tolerant unregister, prebuild test, in-place upgrade)
 - Task 5 (Step 0: `app.json` keys removed under the semantic prebuild diff)
 - Task 6 (Step 0: CI shape: Linux Swift rules on PRs, macOS nightly only, `pr-job-p95.mjs`,
-  release hold in `deploy-mobile`), with the nightly iOS live font legs open
+  release hold in `deploy-mobile`, the nightly `ios-live-font` job, the canary at 06:37 UTC)
 - Task 7 (every step's merge gate: Expo Go pin, React parity, all-ABI check, native evidence on
   the head SHA, upgrade smoke, network-timeout check, Test Store journey), guards landed, device
   checks open
@@ -11155,13 +11155,22 @@ Evidence boundaries:
   The rerun on the merged head, P0-08 retained state on one simulator and the capsule builder
   hierarchy check have not run.
 - **Still in progress for Step 0.**
-  The D15 RevenueCat Test Store journey on `debug` and `minifiedDebuggable` with the reflection
-  mutant has not run, and the `minifiedDebuggable` build type is not in the tree yet.
-  The `test_store` ledger value for `TEST_ENV` `local` and `preview` has not landed; the server
-  partition that keeps the Test Store out of production has.
-  The Maestro network-timeout check has no flow yet.
-  No workflow runs `scripts/run-live-font-proof.mjs`: wiring the iOS live font legs into the
-  nightly `ios-native.yml` is still in progress.
+  The D15 RevenueCat Test Store journey on `debug` and `minifiedDebuggable` has not run on a
+  device. The `minifiedDebuggable` build type, the `test_store` ledger value for `TEST_ENV`
+  `local` and `preview`, and the server rules that make a `test_store` row no paid access
+  elsewhere have landed with tests.
+  The CX-06 reflection mutant on `ModalSystemBarsModule` drops the class's constructor in a local
+  `minifiedDebuggable` build; the launch failure it should cause is inferred from Expo's eager
+  module registration and counts only once seen on a device with the control build green.
+  RevenueCat ships `-keep class com.revenuecat.** { *; }`, so the story records no targeted R8
+  evidence for RevenueCat; the evidence script checks its classes survive shrinking.
+  The Maestro network-timeout flow passes its syntax check and has not run on a device.
+  The nightly `ios-native.yml` now runs `scripts/run-live-font-proof.mjs` in `ios-live-font`; it
+  has not run on a real runner yet, and it stays red until TEA approves residual baselines from
+  the proposals the driver writes.
+- **Development client reinstall.**
+  A committed test-only keystore now signs Android `debug` and `minifiedDebuggable`, so a
+  development client installed before Step 0 needs one uninstall. The Release key is unchanged.
 - **No macOS job runs on a pull request (owner rule, 2026-11-13).**
   The iOS evidence for this PR is a recorded local run of the iOS native suites on the exact head
   SHA, with the build identity.
