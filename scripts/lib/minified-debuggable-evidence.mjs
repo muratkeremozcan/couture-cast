@@ -18,6 +18,17 @@
 //
 // The third fact, JS `__DEV__` true, is a property of the bundle Metro serves at runtime, so the
 // journey asserts it on the device; no build output can show it.
+//
+// Two more facts go with every record:
+//
+// - RevenueCat survives shrinking. `purchases` ships `-keep class com.revenuecat.** { *; }` in its
+//   AAR's proguard.txt, so this build gives no targeted R8 evidence for RevenueCat (spec D4); what
+//   it can show is that no RevenueCat class or member was removed, so a later SDK that drops the
+//   blanket rule turns this red instead of shipping a stripped billing client.
+// - Whether Release runs R8. On SDK 54 the app config leaves `android.enableMinifyInReleaseBuilds`
+//   unset, so Release is not minified and the record states that as a baseline fact. Once the
+//   config turns it on (expo-build-properties in app.json, or the prebuilt gradle.properties), a
+//   Release build with no `mapping.txt` fails.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -107,6 +118,74 @@ export function r8Evidence({ mapping, usage = '', probeClass }) {
   }
 }
 
+// RevenueCat classes the React Native bridge reaches; each must survive with its own name.
+export const REVENUECAT_REQUIRED_CLASSES = Object.freeze([
+  'com.revenuecat.purchases.Purchases',
+  'com.revenuecat.purchases.hybridcommon.CommonKt',
+])
+
+/**
+ * Throws unless R8 left RevenueCat whole: the mapping (every class in the dex) holds RevenueCat
+ * classes, the required ones keep their names, and `usage.txt` lists no RevenueCat class or member
+ * as removed.
+ */
+export function revenueCatSurvival({
+  mapping,
+  usage = '',
+  required = REVENUECAT_REQUIRED_CLASSES,
+  classes = parseMappingClasses(mapping),
+}) {
+  const kept = [...classes.keys()].filter((name) => name.startsWith('com.revenuecat.'))
+  if (kept.length === 0) throw new Error('minified_debuggable_revenuecat_absent')
+  for (const name of required)
+    if (classes.get(name) !== name)
+      throw new Error(`minified_debuggable_revenuecat_class_missing: ${name}`)
+  const shrunk = usage.split('\n').find((line) => line.startsWith('com.revenuecat.'))
+  if (shrunk) throw new Error(`minified_debuggable_revenuecat_shrunk: ${shrunk}`)
+  return { keptClasses: kept.length, required: [...required] }
+}
+
+const MINIFY_PROPERTY = 'android.enableMinifyInReleaseBuilds'
+
+/**
+ * Whether the app config turns R8 on for Release: expo-build-properties in app.json
+ * (`android.enableMinifyInReleaseBuilds`, or its older name `enableProguardInReleaseBuilds`) or
+ * the prebuilt `gradle.properties` the template's build.gradle reads. The two must agree when both
+ * are given, or the native project is stale.
+ */
+export function releaseMinifyConfig({ appJson, gradleProperties }) {
+  const plugin = (appJson?.expo?.plugins ?? []).find(
+    (entry) => Array.isArray(entry) && entry[0] === 'expo-build-properties'
+  )
+  const android = plugin?.[1]?.android ?? {}
+  const fromApp =
+    android.enableMinifyInReleaseBuilds === true ||
+    android.enableProguardInReleaseBuilds === true
+  if (gradleProperties === undefined) return { enabled: fromApp, source: 'app.json' }
+  const line = gradleProperties
+    .split('\n')
+    .map((entry) => entry.trim())
+    .find((entry) => entry.startsWith(`${MINIFY_PROPERTY}=`))
+  const fromGradle = line?.slice(MINIFY_PROPERTY.length + 1).trim() === 'true'
+  if (fromApp && !fromGradle)
+    throw new Error('minified_debuggable_release_minify_config_stale')
+  return {
+    enabled: fromGradle,
+    source: fromGradle && !fromApp ? 'gradle.properties' : 'app.json',
+  }
+}
+
+/**
+ * The Release R8 fact. Without minify it is the recorded baseline, never a failure; with minify a
+ * missing Release `mapping.txt` fails.
+ */
+export function releaseR8Status({ minifyEnabled, mappingExists }) {
+  if (!minifyEnabled)
+    return { r8: false, fact: 'Release runs no R8', mappingPresent: mappingExists }
+  if (!mappingExists) throw new Error('minified_debuggable_release_mapping_missing')
+  return { r8: true, fact: 'Release ran R8', mappingPresent: true }
+}
+
 /** Newest build-tools aapt2 under ANDROID_HOME (or ANDROID_SDK_ROOT). */
 export function findAapt2(env = process.env) {
   const sdk = env.ANDROID_HOME || env.ANDROID_SDK_ROOT
@@ -139,6 +218,26 @@ export function variantOutputs(androidRoot) {
     apk: path.join(outputs, `apk/${VARIANT}/app-${VARIANT}.apk`),
     mapping: path.join(outputs, `mapping/${VARIANT}/mapping.txt`),
     usage: path.join(outputs, `mapping/${VARIANT}/usage.txt`),
+    releaseMapping: path.join(outputs, 'mapping/release/mapping.txt'),
+    gradleProperties: path.join(androidRoot, 'gradle.properties'),
+  }
+}
+
+/** The Release R8 record from the app config and the Release build's outputs. */
+export function collectReleaseR8({ appJsonPath, gradlePropertiesPath, releaseMapping }) {
+  const config = releaseMinifyConfig({
+    appJson: JSON.parse(fs.readFileSync(appJsonPath, 'utf8')),
+    gradleProperties:
+      gradlePropertiesPath && fs.existsSync(gradlePropertiesPath)
+        ? fs.readFileSync(gradlePropertiesPath, 'utf8')
+        : undefined,
+  })
+  return {
+    configSource: config.source,
+    ...releaseR8Status({
+      minifyEnabled: config.enabled,
+      mappingExists: fs.existsSync(releaseMapping),
+    }),
   }
 }
 
@@ -172,14 +271,17 @@ export function collectEvidence({
       throw new Error('minified_debuggable_installed_not_debuggable')
     installed = { serial, packageName, flagDebuggable: true }
   }
+  const mappingText = fs.readFileSync(mapping, 'utf8')
+  const usageText = usage && fs.existsSync(usage) ? fs.readFileSync(usage, 'utf8') : ''
   return {
     variant: VARIANT,
     nativeDebuggable: { apkManifest: true, installed },
     r8: r8Evidence({
-      mapping: fs.readFileSync(mapping, 'utf8'),
-      usage: usage && fs.existsSync(usage) ? fs.readFileSync(usage, 'utf8') : '',
+      mapping: mappingText,
+      usage: usageText,
       probeClass: probeClass ?? defaultProbeClass(apkPackage),
     }),
+    revenueCat: revenueCatSurvival({ mapping: mappingText, usage: usageText }),
     jsDev: 'asserted at runtime by the D15 journey',
   }
 }
@@ -209,6 +311,11 @@ if (
       probeClass: options.probe,
       serial: options.serial,
       packageName: options.package,
+    })
+    evidence.release = collectReleaseR8({
+      appJsonPath: options['app-json'] ?? 'apps/mobile/app.json',
+      gradlePropertiesPath: defaults.gradleProperties,
+      releaseMapping: options['release-mapping'] ?? defaults.releaseMapping,
     })
     console.log(JSON.stringify(evidence, null, 2))
   } catch (error) {

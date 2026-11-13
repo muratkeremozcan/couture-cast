@@ -13,6 +13,10 @@ import {
   badgingDebuggable,
   badgingPackage,
   collectEvidence,
+  collectReleaseR8,
+  releaseMinifyConfig,
+  releaseR8Status,
+  revenueCatSurvival,
   defaultProbeClass,
   dumpsysDebuggable,
   r8Evidence,
@@ -50,6 +54,8 @@ com.revenuecat.purchases.common.Backend -> com.revenuecat.purchases.common.Backe
     1:3:void <init>():10:12 -> <init>
 androidx.collection.LongListKt -> R8$$REMOVED$$CLASS$$0:
 com.couturecast.app.MainActivity -> com.couturecast.app.MainActivity:
+com.revenuecat.purchases.Purchases -> com.revenuecat.purchases.Purchases:
+com.revenuecat.purchases.hybridcommon.CommonKt -> com.revenuecat.purchases.hybridcommon.CommonKt:
 `
 const SHRUNK_USAGE = `com.couturecast.app.OutfitWidgetProviderKt
 com.couturecast.app.R$drawable
@@ -83,7 +89,7 @@ test('a shrink-only build counts as R8 by a removed probe and reports no obfusca
     probeClass: PROBE,
   })
   assert.deepEqual(evidence, {
-    mappedClasses: 3,
+    mappedClasses: 5,
     renamedClasses: 0,
     removedClasses: 3,
     obfuscated: false,
@@ -161,6 +167,10 @@ test('collectEvidence runs the tools on the variant outputs and records the thre
     },
   })
   assert.equal(evidence.r8.probe.class, PROBE)
+  assert.deepEqual(evidence.revenueCat.required, [
+    'com.revenuecat.purchases.Purchases',
+    'com.revenuecat.purchases.hybridcommon.CommonKt',
+  ])
   assert.equal(evidence.jsDev, 'asserted at runtime by the D15 journey')
 
   assert.throws(
@@ -182,4 +192,133 @@ test('collectEvidence runs the tools on the variant outputs and records the thre
     () => collectEvidence({ ...outputs, aapt2: tool('aapt2-again', BADGING) }),
     /output_missing/
   )
+})
+
+test('RevenueCat survives: its classes keep their names and usage.txt removes none of it', () => {
+  assert.deepEqual(revenueCatSurvival({ mapping: SHRUNK_MAPPING, usage: SHRUNK_USAGE }), {
+    keptClasses: 3,
+    required: [
+      'com.revenuecat.purchases.Purchases',
+      'com.revenuecat.purchases.hybridcommon.CommonKt',
+    ],
+  })
+  // A later SDK without the blanket keep rule: a class or a member goes, and the check fails.
+  assert.throws(
+    () =>
+      revenueCatSurvival({
+        mapping: SHRUNK_MAPPING,
+        usage: `${SHRUNK_USAGE}com.revenuecat.purchases.amazon.AmazonBilling\n`,
+      }),
+    /revenuecat_shrunk: com\.revenuecat\.purchases\.amazon\.AmazonBilling/
+  )
+  assert.throws(
+    () =>
+      revenueCatSurvival({
+        mapping: SHRUNK_MAPPING,
+        usage: 'com.revenuecat.purchases.common.Backend:\n    public void unused()\n',
+      }),
+    /revenuecat_shrunk/
+  )
+  assert.throws(
+    () =>
+      revenueCatSurvival({
+        mapping: SHRUNK_MAPPING.replace(
+          'com.revenuecat.purchases.Purchases -> com.revenuecat.purchases.Purchases:',
+          'com.revenuecat.purchases.Purchases -> a.a:'
+        ),
+      }),
+    /revenuecat_class_missing: com\.revenuecat\.purchases\.Purchases/
+  )
+  assert.throws(
+    () => revenueCatSurvival({ mapping: RENAMED_MAPPING }),
+    /revenuecat_absent/
+  )
+})
+
+const APP_JSON = { expo: { plugins: ['expo-router'] } }
+const withBuildProperties = (android) => ({
+  expo: { plugins: ['expo-router', ['expo-build-properties', { android }]] },
+})
+const GRADLE_SDK54 = 'android.useAndroidX=true\nhermesEnabled=true\n'
+const GRADLE_MINIFY = `${GRADLE_SDK54}android.enableMinifyInReleaseBuilds=true\n`
+
+test('the Release minify switch is read from the app config and the prebuilt gradle.properties', () => {
+  assert.deepEqual(
+    releaseMinifyConfig({ appJson: APP_JSON, gradleProperties: GRADLE_SDK54 }),
+    {
+      enabled: false,
+      source: 'app.json',
+    }
+  )
+  assert.equal(
+    releaseMinifyConfig({
+      appJson: withBuildProperties({ enableMinifyInReleaseBuilds: true }),
+      gradleProperties: GRADLE_MINIFY,
+    }).enabled,
+    true
+  )
+  assert.equal(
+    releaseMinifyConfig({
+      appJson: withBuildProperties({ enableProguardInReleaseBuilds: true }),
+    }).enabled,
+    true
+  )
+  assert.deepEqual(
+    releaseMinifyConfig({ appJson: APP_JSON, gradleProperties: GRADLE_MINIFY }),
+    {
+      enabled: true,
+      source: 'gradle.properties',
+    }
+  )
+  // The config turned minify on but the native project was not prebuilt again.
+  assert.throws(
+    () =>
+      releaseMinifyConfig({
+        appJson: withBuildProperties({ enableMinifyInReleaseBuilds: true }),
+        gradleProperties: GRADLE_SDK54,
+      }),
+    /release_minify_config_stale/
+  )
+})
+
+test('Release without minify is a recorded baseline; with minify a missing mapping fails', () => {
+  assert.deepEqual(releaseR8Status({ minifyEnabled: false, mappingExists: false }), {
+    r8: false,
+    fact: 'Release runs no R8',
+    mappingPresent: false,
+  })
+  assert.deepEqual(releaseR8Status({ minifyEnabled: true, mappingExists: true }), {
+    r8: true,
+    fact: 'Release ran R8',
+    mappingPresent: true,
+  })
+  assert.throws(
+    () => releaseR8Status({ minifyEnabled: true, mappingExists: false }),
+    /release_mapping_missing/
+  )
+})
+
+test('collectReleaseR8 reads the files: the SDK 54 baseline, then minify on without a mapping', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-release-r8-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const outputs = variantOutputs(path.join(root, 'android'))
+  const appJsonPath = path.join(root, 'app.json')
+  fs.mkdirSync(path.dirname(outputs.gradleProperties), { recursive: true })
+  fs.writeFileSync(appJsonPath, JSON.stringify(APP_JSON))
+  fs.writeFileSync(outputs.gradleProperties, GRADLE_SDK54)
+  const files = {
+    appJsonPath,
+    gradlePropertiesPath: outputs.gradleProperties,
+    releaseMapping: outputs.releaseMapping,
+  }
+  assert.equal(collectReleaseR8(files).fact, 'Release runs no R8')
+  fs.writeFileSync(
+    appJsonPath,
+    JSON.stringify(withBuildProperties({ enableMinifyInReleaseBuilds: true }))
+  )
+  fs.writeFileSync(outputs.gradleProperties, GRADLE_MINIFY)
+  assert.throws(() => collectReleaseR8(files), /release_mapping_missing/)
+  fs.mkdirSync(path.dirname(outputs.releaseMapping), { recursive: true })
+  fs.writeFileSync(outputs.releaseMapping, SHRUNK_MAPPING)
+  assert.equal(collectReleaseR8(files).fact, 'Release ran R8')
 })
