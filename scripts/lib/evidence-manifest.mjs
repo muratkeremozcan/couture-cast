@@ -153,8 +153,32 @@ export function legInputs(leg, rev, cwd) {
   ].sort()
 }
 
-export function writeManifest({ leg, rev = 'HEAD', cwd }) {
+/**
+ * Changed or untracked files under `paths` in the working tree. A device build compiles the
+ * working tree, so an uncommitted edit in a leg's input would ship unrecorded (TEA, 2026-11-13).
+ */
+export function dirtyInputs(paths, cwd) {
+  const present = paths.filter((file) => file)
+  const { out } = git(
+    ['status', '--porcelain', '--untracked-files=all', '--', ...present],
+    cwd
+  )
+  return out.split('\n').filter(Boolean)
+}
+
+/**
+ * The manifest of `leg` at `rev`. Writing one for a build (`requireClean`, the default) refuses
+ * a working tree with any change or untracked file under the leg's inputs, and refuses a `rev`
+ * other than the checked-out HEAD, since the build compiles what is checked out.
+ */
+export function writeManifest({ leg, rev = 'HEAD', cwd, requireClean = true }) {
   const sha = git(['rev-parse', rev], cwd).out
+  if (requireClean) {
+    const head = git(['rev-parse', 'HEAD'], cwd).out
+    if (sha !== head) throw new Error(`evidence_manifest_rev_not_head:${sha}`)
+    const dirty = dirtyInputs(legInputs(leg, sha, cwd), cwd)
+    if (dirty.length) throw new Error(`evidence_manifest_dirty_inputs:${dirty.join(';')}`)
+  }
   return {
     leg,
     sha,
@@ -169,7 +193,7 @@ export function writeManifest({ leg, rev = 'HEAD', cwd }) {
  * that the manifest never recorded (a new harness import).
  */
 export function changedInputs(manifest, { rev = 'HEAD', cwd } = {}) {
-  const now = writeManifest({ leg: manifest.leg, rev, cwd })
+  const now = writeManifest({ leg: manifest.leg, rev, cwd, requireClean: false })
   const paths = new Set([...Object.keys(manifest.inputs), ...Object.keys(now.inputs)])
   return [...paths]
     .filter((file) => manifest.inputs[file] !== now.inputs[file])

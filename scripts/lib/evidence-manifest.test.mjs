@@ -110,6 +110,36 @@ test('imports into node_modules are left to package-lock.json', (t) => {
   ])
 })
 
+// TEA, 2026-11-13: the build compiles the working tree, so a manifest refuses uncommitted or
+// untracked input files, and a revision other than the checked-out HEAD.
+test('writing a manifest refuses a dirty or untracked input and a non-HEAD revision', (t) => {
+  const repo = fixtureRepo(t)
+  const first = repo.commit('build')
+  repo.write('apps/mobile/app.json', '{"edited":true}')
+  assert.throws(() => writeManifest({ leg: 'live-font', cwd: repo.dir }), {
+    message: /^evidence_manifest_dirty_inputs:.*apps\/mobile\/app\.json/,
+  })
+  repo.commit('edit')
+  repo.write('scripts/lib/new-helper.mjs', '')
+  repo.write('scripts/lib/helper.mjs', "import './new-helper.mjs'\nexport const a = 1\n")
+  assert.throws(() => writeManifest({ leg: 'live-font', cwd: repo.dir }), {
+    message: /^evidence_manifest_dirty_inputs:/,
+  })
+  repo.commit('import')
+  // An untracked file inside an input directory counts too.
+  repo.write('packages/utils/stray.ts', 'export {}')
+  assert.throws(() => writeManifest({ leg: 'live-font', cwd: repo.dir }), {
+    message: /^evidence_manifest_dirty_inputs:.*packages\/utils\/stray\.ts/,
+  })
+  repo.commit('stray')
+  // A change outside the inputs is fine; an older revision is refused.
+  repo.write('docs/notes.md', 'notes')
+  assert.equal(writeManifest({ leg: 'live-font', cwd: repo.dir }).leg, 'live-font')
+  assert.throws(() => writeManifest({ leg: 'live-font', rev: first, cwd: repo.dir }), {
+    message: `evidence_manifest_rev_not_head:${first}`,
+  })
+})
+
 test('a missing harness entry fails loudly', (t) => {
   const repo = fixtureRepo(t)
   repo.write('scripts/lib/helper.mjs', "import './gone.mjs'\n")
@@ -121,7 +151,7 @@ test('a missing harness entry fails loudly', (t) => {
 
 test('every leg resolves on this repository and covers the app inputs', () => {
   for (const leg of Object.keys(LEGS)) {
-    const manifest = writeManifest({ leg })
+    const manifest = writeManifest({ leg, requireClean: false })
     for (const file of ['apps/mobile', 'packages', 'package.json', 'package-lock.json'])
       assert.match(manifest.inputs[file], /^[0-9a-f]{40}$/, `${leg}: ${file}`)
     assert.ok(
@@ -129,10 +159,10 @@ test('every leg resolves on this repository and covers the app inputs', () => {
       leg
     )
   }
-  const server = writeManifest({ leg: 'test-store' }).inputs
+  const server = writeManifest({ leg: 'test-store', requireClean: false }).inputs
   assert.match(server['apps/api'], /^[0-9a-f]{40}$/)
   assert.match(server['packages/db'], /^[0-9a-f]{40}$/)
-  const liveFont = writeManifest({ leg: 'live-font' }).inputs
+  const liveFont = writeManifest({ leg: 'live-font', requireClean: false }).inputs
   assert.ok('scripts/lib/live-font-scale-proof.mjs' in liveFont)
   assert.ok('scripts/lib/live-font-capture.mjs' in liveFont)
 })
