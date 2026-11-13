@@ -30,6 +30,7 @@ const parse = (...args) => createRequire(import.meta.url)('yaml').parse(...args)
 import {
   evaluateApprovedCondition,
   isExplicitPrerequisiteCondition,
+  parseApprovedCondition,
   matrixReferenceProblems,
   matrixRows,
 } from './workflow-step-shadowing.mjs'
@@ -412,7 +413,7 @@ function gateStepProblems(manifest, step, matrix, startIds) {
           `step ${name} sets continue-on-error (${JSON.stringify(step['continue-on-error'])}), which hides a gate failure`,
         ]
       : []),
-    ...collectStepProblems(step, lines),
+    ...collectStepProblems(step, lines, matrix),
     ...needsProblems(manifest, step, lines, startIds),
     ...rowProblems(manifest, step, lines, matrix),
   ]
@@ -423,7 +424,7 @@ function gateStepProblems(manifest, step, matrix, startIds) {
  * that skips it, and it states `!cancelled()`, so an unrelated failed step cannot skip it
  * through the implicit `success()`. needsProblems then limits its outcomes to start steps.
  */
-function collectStepProblems(step, lines) {
+function collectStepProblems(step, lines, matrix) {
   const collected = collectedSuites(lines)
   if (!collected.length) return []
   const name = step.name ?? step.id ?? 'unnamed'
@@ -435,7 +436,9 @@ function collectStepProblems(step, lines) {
     problems.push(
       `step ${name} collects ${collected.join(' and ')} but also runs ${JSON.stringify(others[0])}; a collect step runs only collect lines`
     )
-  if (!/!\s*cancelled\(\)/.test(String(step.if ?? '')))
+  // Read from the parsed condition, so a quoted value that spells !cancelled() is not it.
+  const terms = parseApprovedCondition(step.if, { matrix }) ?? []
+  if (!terms.some((item) => item.kind === 'notCancelled'))
     problems.push(
       `step ${name} collects ${collected.join(' and ')} without an explicit !cancelled() condition, so an unrelated failure skips it`
     )

@@ -345,7 +345,7 @@ describe('apt-install.sh', () => {
       })
       assert.equal(status, 0)
       assert.deepEqual(calls, [
-        'sudo apt-get update',
+        'sudo apt-get -o APT::Update::Error-Mode=any update',
         'apt-cache show libone=1.0 libtwo=2.0',
         'npx --no-install playwright install-deps chromium holding 2',
         'npx --no-install playwright install-deps chromium holding 0',
@@ -391,7 +391,7 @@ describe('apt-install.sh', () => {
           .sort(),
         ['libany_5.0_all.deb', 'libone_1.0_amd64.deb']
       )
-      assert.equal(calls[0], 'sudo apt-get update')
+      assert.equal(calls[0], 'sudo apt-get -o APT::Update::Error-Mode=any update')
       assert.equal(
         calls.at(-1),
         'npx --no-install playwright install-deps chromium holding 2'
@@ -415,7 +415,7 @@ describe('apt-install.sh', () => {
       })
       assert.equal(status, 0)
       assert.deepEqual(calls, [
-        'sudo apt-get update',
+        'sudo apt-get -o APT::Update::Error-Mode=any update',
         'npx --no-install playwright install-deps chromium holding 0',
       ])
     } finally {

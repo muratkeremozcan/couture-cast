@@ -1071,6 +1071,21 @@ describe('node-test-gate discovery and coverage', () => {
       )
     })
 
+    // PR 216 delta review: the rule reads the parsed condition, so a quoted matrix value
+    // that spells the function does not count.
+    test('a collect condition that only quotes !cancelled() as a matrix value fails', () => {
+      const quoted = [
+        '      - name: collect suites',
+        "        if: ${{ matrix.platform == '!cancelled()' }}",
+        '        run: node scripts/ci/node-test-gate.mjs --collect outside default',
+      ]
+      assert.ok(
+        check([...setup, ...start(), ...runtime, ...quoted]).includes(
+          'step collect suites collects outside and default without an explicit !cancelled() condition, so an unrelated failure skips it'
+        )
+      )
+    })
+
     test('the collect step may wait only on the step that started its suites', () => {
       assert.deepEqual(
         check([

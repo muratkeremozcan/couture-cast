@@ -59,12 +59,13 @@ drop_archives() {
 # package, version and architecture; a file the index does not list, or whose hash differs, is
 # dropped and apt downloads it again.
 verify_archives() {
-  local debs=() deb
+  # Plain indexed arrays and a lookup file, so the script runs on macOS's Bash 3.2, where the
+  # harness that tests it also runs.
+  local debs=() ids=() specs=() deb fields package version arch
   while IFS= read -r -d '' deb; do debs+=("$deb"); done \
     < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
   (( ${#debs[@]} > 0 )) || return 0
-  local -A ids=()
-  local specs=() fields package version arch
+  local kept_debs=()
   for deb in "${debs[@]}"; do
     if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
       rm -f "$deb"
@@ -77,28 +78,31 @@ verify_archives() {
       rm -f "$deb"
       continue
     fi
-    ids[$deb]="$package|$arch|$version"
+    kept_debs+=("$deb")
+    ids+=("$package|$arch|$version")
     specs+=("$package=$version")
   done
-  if (( ${#specs[@]} == 0 )) || ! sudo -n apt-get update; then
-    echo "::warning::Could not check the restored package files against the package index; dropping them."
+  # Error-Mode any: an index that fails to refresh fails the update, so no file is accepted
+  # against an index apt kept from before.
+  if (( ${#specs[@]} == 0 )) ||
+    ! sudo -n apt-get -o APT::Update::Error-Mode=any update; then
+    echo "::warning::Could not check the restored package files against a fully refreshed package index; dropping them."
     drop_archives
     return 0
   fi
-  local -A expected=()
-  local id hash
-  # One record per package, version and architecture the index knows; versions it no longer
-  # lists print nothing and are dropped below.
-  while read -r id hash; do
-    expected[$id]=$hash
-  done < <(apt-cache show "${specs[@]}" 2>/dev/null | awk '
+  local index
+  index=$(mktemp) || { drop_archives; return 0; }
+  # One line per package, architecture and version the index knows, with its SHA256; versions
+  # it no longer lists print nothing and are dropped below.
+  apt-cache show "${specs[@]}" 2>/dev/null | awk '
     /^Package: / { p = $2 } /^Version: / { v = $2 } /^Architecture: / { a = $2 }
     /^SHA256: / { h = $2 }
-    /^$/ { if (p && v && a && h) print p "|" a "|" v, h; p = v = a = h = "" }
-    END { if (p && v && a && h) print p "|" a "|" v, h }')
-  local kept=0 dropped=0
-  for deb in "${!ids[@]}"; do
-    hash=${expected[${ids[$deb]}]:-}
+    /^$/ { if (p && v && a && h) print p "|" a "|" v " " h; p = v = a = h = "" }
+    END { if (p && v && a && h) print p "|" a "|" v " " h }' > "$index"
+  local i hash kept=0 dropped=0
+  for (( i = 0; i < ${#kept_debs[@]}; i++ )); do
+    deb=${kept_debs[i]}
+    hash=$(awk -v id="${ids[i]}" '$1 == id { print $2; exit }' "$index")
     if [[ -n "$hash" && "$(sha256sum "$deb" | cut -d ' ' -f 1)" == "$hash" ]]; then
       kept=$((kept + 1))
     else
@@ -106,6 +110,7 @@ verify_archives() {
       dropped=$((dropped + 1))
     fi
   done
+  rm -f "$index"
   echo "Checked the restored package files against the package index: kept $kept, dropped $dropped."
 }
 
