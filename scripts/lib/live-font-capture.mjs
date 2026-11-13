@@ -240,15 +240,19 @@ export function stitchPages(pages, { tolerance = 4, expectedShift } = {}) {
       const key = identityOf(node)
       const [y, bottom] = edges(node).map((edge) => edge + offset)
       // The same text whose box shares an edge with, or overlaps, one already taken is that node
-      // again: a viewport edge or a sticky header clips a tall text differently on each page.
-      const seen = taken.some(
+      // again: a viewport edge or a sticky header clips a tall text differently on each page,
+      // so the taken box grows to everything any page has shown of it.
+      const seen = taken.find(
         (entry) =>
           entry.key === key &&
           (Math.abs(entry.y - y) <= tolerance ||
             Math.abs(entry.bottom - bottom) <= tolerance ||
             (y < entry.bottom - tolerance && bottom > entry.y + tolerance))
       )
-      if (!seen) taken.push({ key, y, bottom })
+      if (seen) {
+        seen.y = Math.min(seen.y, y)
+        seen.bottom = Math.max(seen.bottom, bottom)
+      } else taken.push({ key, y, bottom })
     }
   }
   return taken.map(({ key }) => key)

@@ -221,6 +221,26 @@ describe('stitchPages', () => {
     )
   })
 
+  test('grows a taken box as later pages show more of it', () => {
+    // Settings' disclosure: cut by the bottom edge, whole, whole, then cut by the sticky header.
+    const box = (text, y, bottom) => ({ text, id: '', bounds: `[0,${y}][100,${bottom}]` })
+    const pages = [
+      [box('Locations', 1762, 1813), box('Disclosure', 2111, 2190)],
+      [
+        box('Locations', 916, 967),
+        box('Disclosure', 1265, 1505),
+        box('Status', 1536, 1587),
+      ],
+      [box('Premium', 336, 393), box('Disclosure', 419, 659), box('Status', 690, 741)],
+      [box('Disclosure', 296, 399), box('Status', 430, 481)],
+    ]
+    pages[1].push(box('Premium', 1182, 1239))
+    assert.deepEqual(
+      stitchPages(pages).map((key) => JSON.parse(key)[1]),
+      ['Locations', 'Disclosure', 'Status', 'Premium']
+    )
+  })
+
   test('steps over a page with no shared text by the drag length', () => {
     // A tall image fills the middle page; the drags are 840 px each.
     const first = [at('Header', 100), at('Caption 1', 300)]
