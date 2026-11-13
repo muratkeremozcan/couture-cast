@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
+  IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
   ROOT_MANIFEST,
@@ -24,6 +25,7 @@ import {
 
 const workflowText = fs.readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')
 const inputs = pushPaths(workflowText)
+const jobsText = fs.readFileSync(IOS_JOBS_WORKFLOW, 'utf8')
 const clone = (value) => JSON.parse(JSON.stringify(value))
 
 // A small lockfile of the shape npm writes: three workspaces, a linked shared package, hoisted
@@ -192,7 +194,7 @@ describe('what the root manifest changes for an iOS run', () => {
     ])
     assert.ok(
       rootScriptsRun(
-        workflowText,
+        jobsText,
         JSON.parse(fs.readFileSync(ROOT_MANIFEST, 'utf8'))
       ).includes('build:packages')
     )
@@ -232,7 +234,7 @@ describe('a native iOS change', () => {
         before: contents(lock),
         after: contents(bump('node_modules/next', { version: '16' })),
       }),
-      workflowText
+      jobsText
     )
     assert.deepEqual(web, { [LOCKFILE]: false, [ROOT_MANIFEST]: false })
     assert.deepEqual(
@@ -244,7 +246,7 @@ describe('a native iOS change', () => {
         before: contents(lock),
         after: contents(bump('node_modules/expo', { version: '58.1.0' })),
       }),
-      workflowText
+      jobsText
     )
     assert.deepEqual(
       nativeIosChanges([LOCKFILE, 'apps/mobile/package.json'], inputs, expo),
@@ -255,7 +257,7 @@ describe('a native iOS change', () => {
   test('an unreadable side counts', async () => {
     const unknown = await dependencyChanges(
       read({ before: {}, after: contents(lock) }),
-      workflowText
+      jobsText
     )
     assert.deepEqual(unknown, { [LOCKFILE]: true, [ROOT_MANIFEST]: true })
   })

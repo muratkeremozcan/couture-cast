@@ -1,7 +1,8 @@
 # Story 6.15 D1, D6 and test design C-11: a pull request that changes a native iOS input merges
-# only with iOS evidence on its exact head commit, a successful ios-native.yml run dispatched from
-# main with `sha` set to that commit (scripts/ci/ios-native-evidence.mjs). The verdict is the
-# `ios-native-evidence` commit status on that head commit, which the branch ruleset requires.
+# only with iOS evidence on its exact head commit, a successful ios-native-dispatch.yml run
+# dispatched from main with `sha` set to that commit (scripts/ci/ios-native-evidence.mjs). The
+# verdict is the `ios-native-evidence` commit status on that head commit, which the branch ruleset
+# requires.
 #
 # The judge must be main's, never the pull request's: a pull_request workflow runs the pull
 # request's own copy of this file, which it could edit to pass. So the pull request job runs on
@@ -9,7 +10,7 @@
 # the head commit named in the event payload through the API. A pull_request_target run belongs
 # to the base commit, so its own check run never reaches the pull request head; the job posts the
 # status on the head commit itself, in a step that always runs, so a crash or a timeout ends in
-# failure and never in a status that stays pending. When an ios-native.yml dispatch completes,
+# failure and never in a status that stays pending. When an ios-native-dispatch.yml run completes,
 # the workflow_run job judges every open pull request whose head that dispatch tested and posts
 # the status again, so it turns green without a new push.
 name: iOS native evidence
@@ -18,7 +19,7 @@ on:
   pull_request_target:
     types: [opened, synchronize, reopened]
   workflow_run:
-    workflows: ['iOS native']
+    workflows: ['iOS native dispatch']
     types: [completed]
 
 permissions: {}
@@ -48,6 +49,7 @@ jobs:
           sparse-checkout: |
             /.nvmrc
             /.github/workflows/ios-native.yml
+            /.github/workflows/ios-native-jobs.yml
             /scripts/ci/ios-native-evidence.mjs
             /scripts/ci/ios-native-inputs.mjs
             /scripts/ci/lanes.mjs
@@ -97,6 +99,7 @@ jobs:
           sparse-checkout: |
             /.nvmrc
             /.github/workflows/ios-native.yml
+            /.github/workflows/ios-native-jobs.yml
             /scripts/ci/ios-native-evidence.mjs
             /scripts/ci/ios-native-inputs.mjs
             /scripts/ci/lanes.mjs
@@ -115,13 +118,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           EVENT: ${{ github.event.workflow_run.event }}
+          WORKFLOW: ${{ github.event.workflow_run.path }}
           BRANCH: ${{ github.event.workflow_run.head_branch }}
           TITLE: ${{ github.event.workflow_run.display_title }}
           TARGET: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
           sha="${TITLE#iOS native }"
-          if [ "$EVENT" != workflow_dispatch ] || [ "$BRANCH" != main ] || [ "iOS native $sha" != "$TITLE" ] ||
+          if [ "$WORKFLOW" != .github/workflows/ios-native-dispatch.yml ] || [ "$EVENT" != workflow_dispatch ] ||
+            [ "$BRANCH" != main ] || [ "iOS native $sha" != "$TITLE" ] ||
             ! echo "$sha" | grep -Eqx '[0-9a-f]{40}'; then
             echo 'Not a dispatch from main naming a commit; no status to post.'
             exit 0

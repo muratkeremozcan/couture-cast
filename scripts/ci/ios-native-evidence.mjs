@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 // Story 6.15 D1 and D6, test design C-11: a pull request that changes a native iOS input merges
 // only with iOS evidence on its exact head commit. That evidence is a successful run of
-// ios-native.yml dispatched from main (so main's copy of the workflow ran, never one the pull
-// request edited) with `sha` set to the head commit. The runs API does not return dispatch inputs,
-// so the run name carries the commit ("iOS native <sha>"), and every job of the run fails unless it
-// checked out exactly that commit.
+// ios-native-dispatch.yml dispatched from main (so main's copy of the workflow ran, never one the
+// pull request edited, under a read-only cache) with `sha` set to the head commit. Only that file
+// counts: ios-native.yml's merge and nightly runs test main. The runs API does not return dispatch
+// inputs, so the run name carries the commit ("iOS native <sha>"), and every job of the run fails
+// unless it checked out exactly that commit.
 //
 // ios-native-evidence.yml runs this file from main, never from the pull request: on
 // pull_request_target it judges the head commit named in the event payload and posts the verdict
-// as the `ios-native-evidence` commit status on that commit; when an ios-native.yml dispatch
+// as the `ios-native-evidence` commit status on that commit; when an ios-native-dispatch.yml run
 // completes, it judges every open pull request whose head that dispatch tested and posts the same
 // status again. A new push moves the head, which has no status until it is judged.
 //
@@ -20,6 +21,7 @@
 import { appendFileSync, readFileSync, realpathSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import {
+  IOS_JOBS_WORKFLOW,
   IOS_NATIVE_WORKFLOW,
   LOCKFILE,
   ROOT_MANIFEST,
@@ -31,7 +33,8 @@ import {
 export const EVIDENCE_WORKFLOW = '.github/workflows/ios-native-evidence.yml'
 export const STATUS_CONTEXT = 'ios-native-evidence'
 export const RUN_NAME_PREFIX = 'iOS native '
-const WORKFLOW_FILE = 'ios-native.yml'
+export const DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
+const WORKFLOW_FILE = 'ios-native-dispatch.yml'
 const COMMIT = /^[0-9a-f]{40}$/
 // GitHub rejects a commit status description longer than this.
 export const DESCRIPTION_LIMIT = 140
@@ -46,7 +49,12 @@ export function runCommit(run) {
 
 /** The commit a completed run tested when it is evidence at all: a dispatch from main naming one. */
 export function dispatchedCommit(run) {
-  if (run?.event !== 'workflow_dispatch' || run?.head_branch !== 'main') return null
+  if (
+    run?.path !== DISPATCH_WORKFLOW ||
+    run?.event !== 'workflow_dispatch' ||
+    run?.head_branch !== 'main'
+  )
+    return null
   return runCommit(run)
 }
 
@@ -113,8 +121,8 @@ export function evaluateEvidence({ headSha, files, runs, inputs, dependencies })
   if (!latest)
     return verdict(
       'failure',
-      `${what}; no ios-native run tested ${headSha}: dispatch ios-native.yml from main with sha ${headSha}`,
-      `Dispatch ios-native.yml from main with sha ${headSha}`
+      `${what}; no ios-native run tested ${headSha}: dispatch ios-native-dispatch.yml from main with sha ${headSha}`,
+      `Dispatch ios-native-dispatch.yml from main with sha ${headSha}`
     )
   const where = `ios-native run ${latest.id}`
   if (latest.status !== 'completed')
@@ -127,7 +135,7 @@ export function evaluateEvidence({ headSha, files, runs, inputs, dependencies })
     return verdict(
       'failure',
       `${what}; ${where} (${latest.html_url}) ended ${latest.conclusion}`,
-      `${where} ended ${latest.conclusion}: fix it and dispatch ios-native.yml again`
+      `${where} ended ${latest.conclusion}: fix it and dispatch ios-native-dispatch.yml again`
     )
   return verdict('success', `${what}; ${where} (${latest.html_url}) passed on ${headSha}`)
 }
@@ -172,7 +180,7 @@ async function pullFiles({ repository, number, ...options }) {
   return [...files, { filename: 'package-lock.json', status: 'modified' }]
 }
 
-/** The newest dispatch runs of ios-native.yml on main, up to 300. */
+/** The newest dispatch runs of ios-native-dispatch.yml on main, up to 300. */
 async function dispatchRuns({ repository, ...options }) {
   const runs = []
   for (let page = 1; page <= 3; page++) {
@@ -186,8 +194,6 @@ async function dispatchRuns({ repository, ...options }) {
   return runs
 }
 
-const workflowText = () => readFileSync(IOS_NATIVE_WORKFLOW, 'utf8')
-
 /**
  * Whether the shared dependency files changed what iOS installs, comparing the merge base with
  * the head commit, as the pull request's file list does.
@@ -197,7 +203,7 @@ async function pullDependencies({
   baseSha,
   headSha,
   files,
-  text,
+  jobsText,
   ...options
 }) {
   const names = files.flatMap((file) => [file.filename, file.previous_filename])
@@ -214,24 +220,31 @@ async function pullDependencies({
           raw: true,
         })
       : null
-  return dependencyChanges(read, text)
+  return dependencyChanges(read, jobsText)
 }
 
 /** The verdict for one pull request head, from main's copy of the rules. */
 async function judge({ headSha, baseSha, number, ...options }) {
-  const text = workflowText()
+  const jobsText = readFileSync(IOS_JOBS_WORKFLOW, 'utf8')
   let files = null
   let runs = []
   let dependencies = {}
   try {
     files = await pullFiles({ ...options, number })
     runs = await dispatchRuns(options)
-    dependencies = await pullDependencies({ ...options, baseSha, headSha, files, text })
+    dependencies = await pullDependencies({
+      ...options,
+      baseSha,
+      headSha,
+      files,
+      jobsText,
+    })
   } catch (error) {
     console.log(`::error::Could not read the evidence: ${error.message}`)
     files = null
   }
-  return evaluateEvidence({ headSha, files, runs, inputs: pushPaths(text), dependencies })
+  const inputs = pushPaths(readFileSync(IOS_NATIVE_WORKFLOW, 'utf8'))
+  return evaluateEvidence({ headSha, files, runs, inputs, dependencies })
 }
 
 function report(env, number, headSha, verdict) {
@@ -271,9 +284,9 @@ export async function pullRequest({ env = process.env, fetchImpl } = {}) {
 }
 
 /**
- * workflow_run of ios-native.yml: when the completed run is a dispatch from main naming a commit,
- * judge each open pull request whose head is that commit again and post its status. Any other
- * run is no one's evidence and posts nothing.
+ * workflow_run of ios-native-dispatch.yml: when the completed run is a dispatch of that file from
+ * main naming a commit, judge each open pull request whose head is that commit again and post its
+ * status. Any other run is no one's evidence and posts nothing.
  */
 export async function dispatchCompleted({ env = process.env, fetchImpl } = {}) {
   const payload = JSON.parse(readFileSync(env.GITHUB_EVENT_PATH, 'utf8'))

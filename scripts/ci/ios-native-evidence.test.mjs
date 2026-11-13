@@ -14,6 +14,7 @@ import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
   DESCRIPTION_LIMIT,
+  DISPATCH_WORKFLOW,
   EVIDENCE_WORKFLOW,
   STATUS_CONTEXT,
   dispatchCompleted,
@@ -50,6 +51,7 @@ const run = (patch = {}) => ({
   id: next++,
   event: 'workflow_dispatch',
   head_branch: 'main',
+  path: DISPATCH_WORKFLOW,
   display_title: `iOS native ${head}`,
   status: 'completed',
   conclusion: 'success',
@@ -110,6 +112,13 @@ describe('the iOS evidence a pull request head needs', () => {
     'a pull_request run in place of the dispatch': [run({ event: 'pull_request' })],
     'a push run in place of the dispatch': [run({ event: 'push' })],
     'a nightly run in place of the dispatch': [run({ event: 'schedule' })],
+    // IOS-01: ios-native.yml writes main's caches and never tests a pull request commit.
+    'a dispatch of ios-native.yml in place of ios-native-dispatch.yml': [
+      run({ path: '.github/workflows/ios-native.yml' }),
+    ],
+    'a dispatch of another workflow with the same run name': [
+      run({ path: '.github/workflows/sneaky.yml' }),
+    ],
   }
   for (const [name, runs] of Object.entries(failures))
     test(`${name} fails`, () => {
@@ -155,7 +164,7 @@ describe('the iOS evidence a pull request head needs', () => {
     const result = verdict([])
     assert.match(
       result.description,
-      new RegExp(`dispatch ios-native.yml from main with sha ${head}`, 'i')
+      new RegExp(`dispatch ios-native-dispatch.yml from main with sha ${head}`, 'i')
     )
     for (const runs of Object.values(failures))
       assert.ok(verdict(runs).description.length <= DESCRIPTION_LIMIT)
@@ -254,6 +263,10 @@ describe('the completed run a status follows', () => {
     assert.equal(dispatchedCommit(run({ event: 'schedule' })), null)
     assert.equal(dispatchedCommit(run({ head_branch: 'feat/x' })), null)
     assert.equal(dispatchedCommit(run({ display_title: 'iOS native main' })), null)
+    assert.equal(
+      dispatchedCommit(run({ path: '.github/workflows/ios-native.yml' })),
+      null
+    )
     assert.equal(runCommit({ display_title: `iOS native ${head}` }), head)
   })
 })
@@ -291,7 +304,7 @@ function fakeGitHub({
         ? { ok: false, status: 404, text: async () => '' }
         : { ok: true, status: 200, text: async () => text }
     }
-    if (pathname.endsWith('/actions/workflows/ios-native.yml/runs')) {
+    if (pathname.endsWith('/actions/workflows/ios-native-dispatch.yml/runs')) {
       assert.equal(searchParams.get('event'), 'workflow_dispatch')
       return reply({ workflow_runs: runs })
     }
@@ -435,6 +448,7 @@ describe('the workflow_run job', () => {
   const silent = {
     'a push run': run({ event: 'push' }),
     'a nightly run': run({ event: 'schedule' }),
+    'a dispatch of ios-native.yml': run({ path: '.github/workflows/ios-native.yml' }),
     'a dispatch from another branch': run({ head_branch: 'feat/x' }),
     'a run whose name is not a commit': run({ display_title: 'iOS native main' }),
     'a dispatch of a commit no open pull request heads': run({
@@ -457,7 +471,11 @@ describe('ios-native-evidence.yml', () => {
 
   test('runs on pull_request_target and workflow_run only, never on pull_request', () => {
     assert.deepEqual(Object.keys(on).sort(), ['pull_request_target', 'workflow_run'])
-    assert.deepEqual(on.workflow_run.workflows, ['iOS native'])
+    assert.deepEqual(on.workflow_run.workflows, ['iOS native dispatch'])
+    assert.equal(
+      parse(fs.readFileSync(DISPATCH_WORKFLOW, 'utf8')).name,
+      'iOS native dispatch'
+    )
   })
 
   test('checks out main only, keeps no credentials and reads no secret', () => {
@@ -564,6 +582,7 @@ describe('ios-native-evidence.yml', () => {
     const row = runJob.steps.at(-1)
     assert.equal(row.if, 'failure() || cancelled()')
     const base = {
+      WORKFLOW: DISPATCH_WORKFLOW,
       EVENT: 'workflow_dispatch',
       BRANCH: 'main',
       TITLE: `iOS native ${head}`,
@@ -572,6 +591,7 @@ describe('ios-native-evidence.yml', () => {
     assert.ok(call.includes(`repos/o/r/statuses/${head}`))
     assert.ok(call.includes('state=failure'))
     for (const patch of [
+      { WORKFLOW: '.github/workflows/ios-native.yml' },
       { EVENT: 'push' },
       { EVENT: 'schedule' },
       { BRANCH: 'feat/x' },
