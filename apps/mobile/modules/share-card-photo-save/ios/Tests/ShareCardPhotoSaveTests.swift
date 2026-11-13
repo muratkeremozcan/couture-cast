@@ -76,6 +76,23 @@ final class ShareCardPhotoSaveTests: XCTestCase {
     }
   }
 
+  /// Only a checksum is wrong, so every structural guard passes and the CRC check alone rejects it.
+  func testRejectsAChunkWhoseCrcDoesNotMatchItsBytes() throws {
+    let valid = [UInt8](png())
+    XCTAssertNoThrow(try ShareCardPngFile.validatePng(Data(valid)))
+    // IHDR's CRC is bytes 29 to 32: signature (8), length (4), type (4), payload (13).
+    var badCrc = valid
+    badCrc[32] ^= 0x01
+    // A payload byte changed under an unchanged CRC.
+    var badPayload = valid
+    badPayload[valid.count - 17] ^= 0x01
+    for corrupted in [Data(badCrc), Data(badPayload)] {
+      XCTAssertThrowsError(try ShareCardPngFile.validatePng(corrupted))
+      let cached = try cacheFile(corrupted)
+      XCTAssertThrowsError(try ShareCardPngFile.validateFile(cached.file.absoluteString, cached.digest, cached.root))
+    }
+  }
+
   func testCacheFileRejectsOversizeOriginalWithMatchingDigest() throws {
     let limit = 3 * 1024 * 1024
     let accepted = png(idat: [UInt8](repeating: 0, count: limit - 57))
