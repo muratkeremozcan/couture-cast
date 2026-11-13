@@ -178,12 +178,14 @@ enum BillingProvider {
 }
 
 /// Mirrors RevenueCat store values; `promotional` covers RC promotional grants
-/// (the operator break-glass path in the premium runbook).
+/// (the operator break-glass path in the premium runbook). `test_store` is the RevenueCat
+/// Test Store, written only when `TEST_ENV` is explicitly `local` or `preview` (story 6.15 D15).
 enum EntitlementStore {
   app_store
   play_store
   stripe
   promotional
+  test_store
 }
 
 enum PremiumEntitlementStatus {
