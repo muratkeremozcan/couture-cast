@@ -15,6 +15,13 @@
 # request's head commit. The run name carries that SHA, every job fails unless it checked out exactly
 # that commit, and the pull request's gate accepts only a successful workflow_dispatch run from main
 # whose name carries its current head SHA.
+#
+# A dispatch runs that commit before it merges, on ref main, so anything it saved would land in the
+# cache scope every later push and nightly run restores from. It therefore saves nothing there:
+# every cache save skips a dispatch, it installs through no local action and with no download
+# cache, and the client it builds for its own shards is saved only under `dispatch-<sha>-`, which
+# no push or nightly key can reach, and deleted by ios-dispatch-cleanup when the run ends. It may
+# restore what push and nightly runs saved, which is main's own output.
 name: iOS native
 run-name: iOS native ${{ inputs.sha || github.sha }}
 
@@ -67,9 +74,9 @@ on:
 permissions:
   contents: read
 
-# One run per commit; the nightly run has its own group, so a merge to main cannot cancel it.
+# One run per event and commit: a dispatch, a merge and the nightly run never cancel each other.
 concurrency:
-  group: ios-native-${{ inputs.sha || github.sha }}-${{ github.event_name == 'schedule' && 'nightly' || 'run' }}
+  group: ios-native-${{ github.event_name }}-${{ inputs.sha || github.sha }}
   cancel-in-progress: true
 
 jobs:
@@ -81,7 +88,9 @@ jobs:
       CC68_HARNESS_DIR: _bmad-output/test-artifacts/story-6-8/runtime
       MAESTRO_CLI_NO_ANALYTICS: '1'
     outputs:
-      app-key: ${{ steps.native_key.outputs.key }}
+      # A dispatch that built its own client hands it over under the dispatch prefix; every other run,
+      # and a dispatch whose key main already cached, restores main's entry of that key.
+      app-key: ${{ github.event_name == 'workflow_dispatch' && steps.native_cache.outputs.cache-hit != 'true' && format('dispatch-{0}-{1}', inputs.sha, steps.native_key.outputs.key) || steps.native_key.outputs.key }}
       app-path: ${{ steps.native_key.outputs.path }}
     steps:
       - uses: actions/checkout@v4
@@ -132,8 +141,20 @@ jobs:
           node-version: '22'
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
-      - uses: ./.github/actions/install
+      # A local action is the dispatched commit's own code, and the shared install saves caches.
+      - name: Install dependencies with the shared caches
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/install
+      - name: Set up Node without a download cache for a dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Install dependencies without a cache for a dispatch
         id: install
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: if [ "$DISPATCH" = true ]; then bash scripts/ci/install-dependencies.sh; fi
       - name: Verify startup deadline controls
         id: deadline_controls
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
@@ -177,7 +198,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build postgres
       - name: Save PostgreSQL
-        if: ${{ !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.postgres_build.outcome == 'success' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.postgres-path }}
@@ -194,7 +215,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build redis
       - name: Save Redis
-        if: ${{ !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.redis_build.outcome == 'success' && steps.redis-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.redis-path }}
@@ -215,12 +236,14 @@ jobs:
         with:
           go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
           cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+          # The module and build caches would save on a dispatch.
+          cache: ${{ github.event_name != 'workflow_dispatch' }}
       - name: Build GoTrue
         id: gotrue_build
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build gotrue
       - name: Save GoTrue
-        if: ${{ !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.gotrue_build.outcome == 'success' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.gotrue-path }}
@@ -237,7 +260,7 @@ jobs:
         if: ${{ !cancelled() && steps.native.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
         run: node scripts/ci/native-supabase.mjs build storage
       - name: Save storage-api
-        if: ${{ !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.storage_build.outcome == 'success' && steps.storage-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.storage-path }}
@@ -290,19 +313,34 @@ jobs:
         run: node scripts/ci/native-ios-app-secret-scan.mjs /tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app "$CC68_HARNESS_DIR"
       - name: Save the scanned development client of this fingerprint
         id: native_save
-        if: ${{ !cancelled() && steps.app_scan.outcome == 'success' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
+      - name: Save the scanned development client for this dispatch's shards
+        id: dispatch_save
+        if: ${{ github.event_name == 'workflow_dispatch' && !cancelled() && steps.app_scan.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: dispatch-${{ inputs.sha }}-${{ steps.native_key.outputs.key }}
       # A save that lost a race to a concurrent run leaves no entry of this run's own; the shards
       # need one, so the job fails here instead of in four shards.
       - name: Require the saved development client for the shards
-        if: ${{ !cancelled() && steps.native_save.outcome == 'success' }}
+        if: ${{ github.event_name != 'workflow_dispatch' && !cancelled() && steps.native_save.outcome == 'success' }}
         uses: actions/cache/restore@v4
         with:
           path: ${{ steps.native_key.outputs.path }}
           key: ${{ steps.native_key.outputs.key }}
+          lookup-only: true
+          fail-on-cache-miss: true
+      - name: Require the saved development client for this dispatch's shards
+        if: ${{ github.event_name == 'workflow_dispatch' && !cancelled() && steps.dispatch_save.outcome == 'success' }}
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.native_key.outputs.path }}
+          key: dispatch-${{ inputs.sha }}-${{ steps.native_key.outputs.key }}
           lookup-only: true
           fail-on-cache-miss: true
       - name: Report owned background service exits
@@ -402,8 +440,20 @@ jobs:
           node-version: '22'
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
-      - uses: ./.github/actions/install
+      # A local action is the dispatched commit's own code, and the shared install saves caches.
+      - name: Install dependencies with the shared caches
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/install
+      - name: Set up Node without a download cache for a dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Install dependencies without a cache for a dispatch
         id: install
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: if [ "$DISPATCH" = true ]; then bash scripts/ci/install-dependencies.sh; fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -426,7 +476,7 @@ jobs:
         if: steps.postgres-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build postgres
       - name: Save PostgreSQL
-        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.postgres-path }}
@@ -441,7 +491,7 @@ jobs:
         if: steps.redis-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build redis
       - name: Save Redis
-        if: steps.redis-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.redis-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.redis-path }}
@@ -461,11 +511,13 @@ jobs:
         with:
           go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
           cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+          # The module and build caches would save on a dispatch.
+          cache: ${{ github.event_name != 'workflow_dispatch' }}
       - name: Build GoTrue
         if: steps.gotrue-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build gotrue
       - name: Save GoTrue
-        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.gotrue-path }}
@@ -480,7 +532,7 @@ jobs:
         if: steps.storage-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build storage
       - name: Save storage-api
-        if: steps.storage-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.storage-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.storage-path }}
@@ -626,8 +678,20 @@ jobs:
           node-version: '22'
       - name: Record the Node 22 binary for the native storage-api
         run: echo "NATIVE_SUPABASE_NODE=$(command -v node)" >> "$GITHUB_ENV"
-      - uses: ./.github/actions/install
+      # A local action is the dispatched commit's own code, and the shared install saves caches.
+      - name: Install dependencies with the shared caches
+        if: github.event_name != 'workflow_dispatch'
+        uses: ./.github/actions/install
+      - name: Set up Node without a download cache for a dispatch
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Install dependencies without a cache for a dispatch
         id: install
+        env:
+          DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+        run: if [ "$DISPATCH" = true ]; then bash scripts/ci/install-dependencies.sh; fi
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -650,7 +714,7 @@ jobs:
         if: steps.postgres-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build postgres
       - name: Save PostgreSQL
-        if: steps.postgres-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.postgres-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.postgres-path }}
@@ -665,7 +729,7 @@ jobs:
         if: steps.redis-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build redis
       - name: Save Redis
-        if: steps.redis-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.redis-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.redis-path }}
@@ -685,11 +749,13 @@ jobs:
         with:
           go-version-file: ${{ runner.temp }}/native-supabase/sources/auth/go.mod
           cache-dependency-path: ${{ runner.temp }}/native-supabase/sources/auth/go.sum
+          # The module and build caches would save on a dispatch.
+          cache: ${{ github.event_name != 'workflow_dispatch' }}
       - name: Build GoTrue
         if: steps.gotrue-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build gotrue
       - name: Save GoTrue
-        if: steps.gotrue-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.gotrue-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.gotrue-path }}
@@ -704,7 +770,7 @@ jobs:
         if: steps.storage-cache.outputs.cache-hit != 'true'
         run: node scripts/ci/native-supabase.mjs build storage
       - name: Save storage-api
-        if: steps.storage-cache.outputs.cache-hit != 'true'
+        if: ${{ github.event_name != 'workflow_dispatch' && steps.storage-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.native.outputs.storage-path }}
@@ -868,7 +934,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-          cache: npm
+          cache: ${{ github.event_name != 'workflow_dispatch' && 'npm' || '' }}
 
       - name: Install dependencies
         id: deps
@@ -936,3 +1002,43 @@ jobs:
           test "$CC68_SHARD_RESULT" = success
           for artifact in /tmp/ios-shards/share-card-ios-shard-*; do mv "$artifact" "/tmp/ios-shards/shard-${artifact##*-}"; done
           node scripts/ci/native-ios-shards.mjs merge /tmp/ios-shards
+
+  # The client a dispatch handed its shards is the only entry it saves; it goes when the run ends,
+  # so unmerged builds never fill the 10 GB cache and evict main's. No repository code runs here,
+  # which is why this is the one job that may delete caches.
+  ios-dispatch-cleanup:
+    if: ${{ always() && github.event_name == 'workflow_dispatch' }}
+    needs: [ios-build, ios-shard, ios-expo-go]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Delete this dispatch's development client from main's cache
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          REF: ${{ github.ref }}
+          SHA: ${{ inputs.sha }}
+        run: |
+          set -euo pipefail
+          if ! echo "$SHA" | grep -Eqx '[0-9a-f]{40}'; then
+            echo "sha '$SHA' is not a commit SHA, so this dispatch saved nothing"
+            exit 0
+          fi
+          prefix="dispatch-$SHA-"
+          entries() {
+            gh api --paginate -X GET "repos/$GH_REPO/actions/caches" -f key="$prefix" -f ref="$REF" \
+              --jq '.actions_caches[] | "\(.id) \(.key)"' | while read -r id key; do
+              if [[ "$key" == "$prefix"* ]]; then echo "$id $key"; fi
+            done
+          }
+          entries | while read -r id key; do
+            echo "deleting $key"
+            gh api -X DELETE "repos/$GH_REPO/actions/caches/$id"
+          done
+          left=$(entries)
+          if [ -n "$left" ]; then
+            echo "::error::dispatch cache entries survived their delete: $left"
+            exit 1
+          fi
