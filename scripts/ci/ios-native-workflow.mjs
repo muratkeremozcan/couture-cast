@@ -26,6 +26,22 @@ export const DISPATCH_WORKFLOW = '.github/workflows/ios-native-dispatch.yml'
 export const JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
 export const WORKFLOW_FILES = [PUSH_WORKFLOW, DISPATCH_WORKFLOW, JOBS_WORKFLOW]
 export const MACOS_JOBS = ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-build']
+// The client and the Release app build on macos-26 with Xcode 26.4 or later, which SDK 56 needs;
+// the shards and Expo Go run that client on macos-15's iOS 18.5 simulator, from Xcode 16.4.
+export const RUNNERS = {
+  'ios-build': 'macos-26',
+  'ios-shard': 'macos-15',
+  'ios-expo-go': 'macos-15',
+  'ios-app-build': 'macos-26',
+  'ios-evidence': 'ubuntu-latest',
+}
+export const XCODE_CHOICES = {
+  'ios-build': '26.4+',
+  'ios-shard': '16.4',
+  'ios-expo-go': '16.4',
+  'ios-app-build': '26.4+',
+}
+const XCODE_LABELS = { '26.4+': '26.4 or later', 16.4: '16.4' }
 export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence']
 export const DECISION_JOB = 'ios-changes'
 export const PROBE_JOB = 'ios-cache-proof'
@@ -495,18 +511,14 @@ function jobsFileProblems(jobsFile, check) {
 
 /** One called job: its runner, its limit, the commit proof and, on macOS, the Xcode choice. */
 function calledJobProblems(name, job, check) {
-  const macos = MACOS_JOBS.includes(name)
-  check(
-    job?.['runs-on'] === (macos ? 'macos-26' : 'ubuntu-latest'),
-    `${name}: ${macos ? 'macos-26' : 'ubuntu-latest'} runner required`
-  )
+  check(job?.['runs-on'] === RUNNERS[name], `${name}: ${RUNNERS[name]} runner required`)
   const limit = job?.['timeout-minutes']
   check(
     Number.isInteger(limit) && limit > 0 && limit <= HOSTED_JOB_LIMIT,
     `${name}: limit must be a fixed number of minutes within the hosted job limit`
   )
   commitProblems(name, job, COMMIT, check)
-  if (macos) xcodeProblems(name, job, check)
+  if (MACOS_JOBS.includes(name)) xcodeProblems(name, job, check)
 }
 
 /** IOS-02: each job's first steps check out the commit and run the exact shared proof. */
@@ -530,19 +542,29 @@ function commitProblems(name, job, commit, check) {
   )
 }
 
-/** Xcode 26.4 or later, chosen by name right after the commit proof, before anything builds. */
+/**
+ * The job's Xcode, chosen by name right after the commit proof, before anything builds: 26.4 or
+ * later, or 16.4, whose iOS 18.5 simulator SDK the startup probe boots the runtime of.
+ */
 function xcodeProblems(name, job, check) {
   const xcode = stepIndex(job, (step) => step.id === 'xcode')
-  const run = steps(job)[xcode]?.run ?? ''
+  const row = steps(job)[xcode]
+  const run = String(row?.run ?? '')
+  const choice = XCODE_CHOICES[name]
   check(
     xcode === 2 &&
-      steps(job)[xcode].if === undefined &&
-      run.includes('/Xcode_26.*.app') &&
-      run.includes('[ "${BASH_REMATCH[1]}" -ge 4 ]') &&
-      run.includes('sudo xcode-select -s') &&
-      run.includes('DEVELOPER_DIR=') &&
-      run.includes('xcodebuild -version'),
-    `${name}: select Xcode 26.4 or later by name, right after the commit proof`
+      row.if === undefined &&
+      same(row.env, { XCODE: choice }) &&
+      [
+        '/Xcode_26.*.app',
+        '[ "${BASH_REMATCH[1]}" -ge 4 ]',
+        '"$root/Xcode_16.4.app"',
+        'sudo xcode-select -s',
+        'DEVELOPER_DIR=',
+        'xcodebuild -version',
+        '16.4:18.5 | 26.4+:26.*) ;;',
+      ].every((fragment) => run.includes(fragment)),
+    `${name}: select Xcode ${XCODE_LABELS[choice]} by name, right after the commit proof, and require its iOS simulator SDK`
   )
 }
 

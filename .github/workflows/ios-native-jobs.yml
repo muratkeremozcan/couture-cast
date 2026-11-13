@@ -1,7 +1,9 @@
 # Story 6.15 D6: the iOS work that cannot fit a pull request. The iOS app build runs 31 minutes at
 # p95 and a share-card shard 44, against a 15-minute queue plus run budget for every pull request
-# job, so these jobs run off the pull request path, on macos-26 with Xcode 26.4 or later, which
-# SDK 56 needs. Two workflows call them for one commit, `sha`:
+# job, so these jobs run off the pull request path. The development client and the Release app
+# build on macos-26 with Xcode 26.4 or later, which SDK 56 needs; the shards and Expo Go run that
+# client on the iOS 18.5 simulator of macos-15 (Xcode 16.4), since the iOS 26.5 simulator of
+# macos-26 was not stable enough for them (C-16). Two workflows call them for one commit, `sha`:
 #
 #   ios-native.yml           a merge to main that changed a native iOS input, and the nightly run.
 #                            They keep the development client cache warm.
@@ -60,23 +62,42 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
       - name: Select Xcode 26.4 or later
         id: xcode
-        run: |
+        env:
+          XCODE: '26.4+'
+        run: &select_xcode |
           set -eo pipefail
           # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
+          root="${XCODE_ROOT:-/Applications}"
           xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
+          case "$XCODE" in
+            16.4)
+              if [ -d "$root/Xcode_16.4.app" ]; then xcode="$root/Xcode_16.4.app"; fi
+              ;;
+            26.4+)
+              for app in "$root"/Xcode_26.*.app; do
+                if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
+                  xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
+                fi
+              done
+              ;;
+          esac
           if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
+            echo "::error::Xcode $XCODE is required; installed: $(echo "$root"/Xcode*.app)"
             exit 1
           fi
           sudo xcode-select -s "$xcode/Contents/Developer"
           echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
           xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+          # The startup probe boots the simulator runtime of this SDK version.
+          sdk=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          echo "iOS simulator SDK $sdk"
+          case "$XCODE:$sdk" in
+            16.4:18.5 | 26.4+:26.*) ;;
+            *)
+              echo "::error::Xcode $XCODE brought iOS simulator SDK $sdk"
+              exit 1
+              ;;
+          esac
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'
@@ -348,7 +369,7 @@ jobs:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-    runs-on: macos-26
+    runs-on: macos-15
     timeout-minutes: 70
     env: *runtime_env
     steps:
@@ -363,25 +384,14 @@ jobs:
         run: |
           echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
-      - name: Select Xcode 26.4 or later
+      # Xcode 16.4 on the macOS 15 image carries the iOS 18.5 simulator the flows run on: the iOS
+      # 26.5 simulator of macos-26 was not stable enough for them. The client built on macos-26
+      # runs there unchanged.
+      - name: Select Xcode 16.4 for the iOS 18.5 simulator
         id: xcode
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+        env:
+          XCODE: '16.4'
+        run: *select_xcode
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'
@@ -609,7 +619,7 @@ jobs:
   ios-expo-go:
     needs: ios-build
     if: ${{ !cancelled() && needs.ios-build.result == 'success' }}
-    runs-on: macos-26
+    runs-on: macos-15
     timeout-minutes: 60
     env: *runtime_env
     steps:
@@ -624,25 +634,14 @@ jobs:
         run: |
           echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
-      - name: Select Xcode 26.4 or later
+      # Xcode 16.4 on the macOS 15 image carries the iOS 18.5 simulator the flows run on: the iOS
+      # 26.5 simulator of macos-26 was not stable enough for them. The client built on macos-26
+      # runs there unchanged.
+      - name: Select Xcode 16.4 for the iOS 18.5 simulator
         id: xcode
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+        env:
+          XCODE: '16.4'
+        run: *select_xcode
       - name: Disable Spotlight indexing on the disposable iOS runner
         run: |
           test "$GITHUB_ACTIONS" = 'true'
@@ -912,23 +911,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
       - name: Select Xcode 26.4 or later
         id: xcode
-        run: |
-          set -eo pipefail
-          # XCODE_ROOT exists for scripts/ci/ios-native-workflow.test.mjs; the runner uses /Applications.
-          xcode=''
-          for app in "${XCODE_ROOT:-/Applications}"/Xcode_26.*.app; do
-            if [[ "$app" =~ /Xcode_26\.([0-9]+)(\.[0-9]+)?\.app$ ]] && [ "${BASH_REMATCH[1]}" -ge 4 ]; then
-              xcode=$(printf '%s\n%s\n' "$xcode" "$app" | sed '/^$/d' | sort -V | tail -1)
-            fi
-          done
-          if [ -z "$xcode" ]; then
-            echo "::error::Xcode 26.4 or later is required; installed: $(echo "${XCODE_ROOT:-/Applications}"/Xcode*.app)"
-            exit 1
-          fi
-          sudo xcode-select -s "$xcode/Contents/Developer"
-          echo "DEVELOPER_DIR=$xcode/Contents/Developer" >> "$GITHUB_ENV"
-          xcodebuild -version
-          xcrun --sdk iphonesimulator --show-sdk-version
+        env:
+          XCODE: '26.4+'
+        run: *select_xcode
 
       - name: Setup Node
         id: node

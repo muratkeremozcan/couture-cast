@@ -23,7 +23,9 @@ import {
   MANDATORY,
   PROOF,
   PUSH_WORKFLOW,
+  RUNNERS,
   TEST_JOBS,
+  XCODE_CHOICES,
   disabledCondition,
   iosNativeProblems,
   neutralizedRun,
@@ -57,6 +59,50 @@ const commentOut = (run, line) =>
     .split('\n')
     .map((row) => (row.trim() === line ? `# ${row}` : row))
     .join('\n')
+
+// The client and the Release app build on macos-26 with Xcode 26.4 or later; the shards and Expo
+// Go run on macos-15's iOS 18.5 simulator from Xcode 16.4.
+function runnerAndXcodeFixtures() {
+  for (const [name, choice] of Object.entries(XCODE_CHOICES)) {
+    const label = choice === '16.4' ? '16.4' : '26.4 or later'
+    const other = { 'macos-26': 'macos-15', 'macos-15': 'macos-26' }[RUNNERS[name]]
+    rejected(
+      `${name} on ${other}`,
+      new RegExp(`${name}: ${RUNNERS[name]} runner required`),
+      (jobs) => {
+        jobs[name]['runs-on'] = other
+      }
+    )
+    rejected(
+      `${name} on the image default Xcode`,
+      new RegExp(`${name}: select Xcode ${label} by name`),
+      (jobs) => {
+        jobs[name].steps = jobs[name].steps.filter((row) => row.id !== 'xcode')
+      }
+    )
+    rejected(
+      `${name} choosing the other Xcode`,
+      new RegExp(`${name}: select Xcode ${label} by name`),
+      (jobs) => {
+        step(jobs[name], (item) => item.id === 'xcode').env.XCODE =
+          choice === '16.4' ? '26.4+' : '16.4'
+      }
+    )
+    for (const [what, from, to] of [
+      ['accepting Xcode 26.3', '-ge 4 ]', '-ge 3 ]'],
+      ['taking Xcode 16.4 from elsewhere', '"$root/Xcode_16.4.app"', '"/tmp/Xcode.app"'],
+      ['without the simulator SDK check', '16.4:18.5 | 26.4+:26.*) ;;', '*) ;;'],
+    ])
+      rejected(
+        `${name} ${what}`,
+        new RegExp(`${name}: select Xcode ${label}`),
+        (jobs) => {
+          const row = step(jobs[name], (item) => item.id === 'xcode')
+          row.run = row.run.replaceAll(from, to)
+        }
+      )
+  }
+}
 
 describe('ios-native workflows validator', () => {
   test('the committed workflows pass', () => {
@@ -378,30 +424,7 @@ describe('ios-native workflows validator', () => {
     )
   }
 
-  for (const name of ['ios-build', 'ios-shard', 'ios-expo-go', 'ios-app-build']) {
-    rejected(
-      `${name} on macos-15`,
-      new RegExp(`${name}: macos-26 runner required`),
-      (jobs) => {
-        jobs[name]['runs-on'] = 'macos-15'
-      }
-    )
-    rejected(
-      `${name} on the image default Xcode`,
-      new RegExp(`${name}: select Xcode 26.4 or later`),
-      (jobs) => {
-        jobs[name].steps = jobs[name].steps.filter((row) => row.id !== 'xcode')
-      }
-    )
-    rejected(
-      `${name} accepting Xcode 26.3`,
-      new RegExp(`${name}: select Xcode 26.4`),
-      (jobs) => {
-        const row = step(jobs[name], (item) => item.id === 'xcode')
-        row.run = row.run.replace('-ge 4 ]', '-ge 3 ]')
-      }
-    )
-  }
+  runnerAndXcodeFixtures()
 
   // IOS-02: each mandatory check exists once, on its own condition, and can fail its job.
   for (const [name, predicate, , required] of MANDATORY) {
@@ -1358,7 +1381,7 @@ describe('the commit proof', () => {
 
 describe('the Xcode selection', () => {
   const xcode = step(source[J].jobs['ios-build'], (row) => row.id === 'xcode')
-  const select = (installed) => {
+  const select = (installed, choice, sdk) => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), 'xcode-select-'))
     try {
       const bin = path.join(root, 'bin')
@@ -1366,7 +1389,7 @@ describe('the Xcode selection', () => {
       for (const [name, body] of Object.entries({
         sudo: 'exit 0',
         xcodebuild: 'echo Xcode',
-        xcrun: 'echo 26.4',
+        xcrun: `echo ${sdk}`,
       }))
         fs.writeFileSync(path.join(bin, name), `#!/usr/bin/env bash\n${body}\n`, {
           mode: 0o755,
@@ -1380,6 +1403,7 @@ describe('the Xcode selection', () => {
           ...process.env,
           PATH: `${bin}:${process.env.PATH}`,
           XCODE_ROOT: root,
+          XCODE: choice,
           GITHUB_ENV: env,
         },
       }).status
@@ -1388,33 +1412,51 @@ describe('the Xcode selection', () => {
       fs.rmSync(root, { recursive: true, force: true })
     }
   }
+  const everything = [
+    'Xcode_16.4.app',
+    'Xcode_26.3.app',
+    'Xcode_26.4.app',
+    'Xcode_26.10.app',
+    'Xcode_26.4.1.app',
+    'Xcode_27.0.app',
+  ]
 
-  test('selects the newest Xcode 26.x at 26.4 or later and refuses older ones', () => {
-    const picked = select([
-      'Xcode_16.4.app',
-      'Xcode_26.3.app',
-      'Xcode_26.4.app',
-      'Xcode_26.10.app',
-      'Xcode_26.4.1.app',
-      'Xcode_27.0.app',
-    ])
+  test('26.4+ selects the newest Xcode 26.x at 26.4 or later and refuses older ones', () => {
+    const picked = select(everything, '26.4+', '26.4')
     assert.equal(picked.status, 0)
     assert.equal(picked.env, 'DEVELOPER_DIR=/Xcode_26.10.app/Contents/Developer')
     assert.equal(
-      select(['Xcode_26.4.app', 'Xcode_26.4.1.app']).env,
+      select(['Xcode_26.4.app', 'Xcode_26.4.1.app'], '26.4+', '26.4').env,
       'DEVELOPER_DIR=/Xcode_26.4.1.app/Contents/Developer'
     )
-    assert.notEqual(select(['Xcode_16.4.app', 'Xcode_26.3.app']).status, 0)
-    assert.notEqual(select(['Xcode_27.0.app']).status, 0)
-    assert.notEqual(select([]).status, 0)
+    assert.notEqual(
+      select(['Xcode_16.4.app', 'Xcode_26.3.app'], '26.4+', '26.4').status,
+      0
+    )
+    assert.notEqual(select(['Xcode_27.0.app'], '26.4+', '26.4').status, 0)
+    assert.notEqual(select([], '26.4+', '26.4').status, 0)
+    assert.notEqual(select(everything, '26.4+', '18.5').status, 0, 'an iOS 18 SDK')
   })
 
-  test('every macOS job runs the same selection', () => {
-    for (const name of ['ios-shard', 'ios-expo-go', 'ios-app-build'])
-      assert.equal(
-        step(source[J].jobs[name], (row) => row.id === 'xcode').run,
-        xcode.run,
-        name
-      )
+  test('16.4 selects exactly Xcode 16.4 with the iOS 18.5 simulator SDK, or fails', () => {
+    const picked = select(everything, '16.4', '18.5')
+    assert.equal(picked.status, 0)
+    assert.equal(picked.env, 'DEVELOPER_DIR=/Xcode_16.4.app/Contents/Developer')
+    assert.notEqual(
+      select(['Xcode_16.3.app', 'Xcode_26.4.app'], '16.4', '18.5').status,
+      0
+    )
+    assert.notEqual(select(everything, '16.4', '18.4').status, 0, 'another SDK')
+    assert.notEqual(select(everything, '16.4', '26.4').status, 0, 'an iOS 26 SDK')
+    assert.notEqual(select(everything, '', '26.4').status, 0, 'no choice')
+    assert.notEqual(select(everything, '15.4', '18.5').status, 0, 'an unknown choice')
+  })
+
+  test('every macOS job runs the same selection, with its own choice', () => {
+    for (const [name, choice] of Object.entries(XCODE_CHOICES)) {
+      const row = step(source[J].jobs[name], (item) => item.id === 'xcode')
+      assert.equal(row.run, xcode.run, name)
+      assert.deepEqual(row.env, { XCODE: choice }, name)
+    }
   })
 })
