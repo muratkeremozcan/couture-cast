@@ -336,7 +336,7 @@ async function evidenceRuns(options) {
   if (!deciding) return []
   const { run, jobs } = deciding
   if (run.status === 'completed')
-    run.jobsPassed = runJobsPassed(jobs, options.graphs.dispatch, { dispatch: true })
+    run.jobsPassed = runJobsPassed(jobs, options.graphs.dispatch)
   run.fromMain = await onMain({ ...options, sha: run.head_sha })
   return [run]
 }
