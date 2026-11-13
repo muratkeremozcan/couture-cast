@@ -21,6 +21,7 @@ import {
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
+  readAuditResult,
   xcodebuildFailureReport,
 } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
@@ -1071,13 +1072,14 @@ if (command === 'prebuild') {
   )
   try {
     const code = await new Promise((resolve) => audit.once('exit', resolve))
-    const summary = JSON.parse(
-      run('xcrun', ['xcresulttool', 'get', 'test-results', 'summary', '--path', result])
-    )
-    const tree = JSON.parse(
-      run('xcrun', ['xcresulttool', 'get', 'test-results', 'tests', '--path', result])
-    )
+    // The log first, then the result bundle, which a failed run may not have written.
     const auditText = fs.readFileSync(auditLog).subarray(offset).toString()
+    const { summary, tree, resultError } = readAuditResult({
+      result,
+      exists: fs.existsSync,
+      read: (kind) =>
+        run('xcrun', ['xcresulttool', 'get', 'test-results', kind, '--path', result]),
+    })
     const closed = closedShareCardAuditReport(summary, tree, auditText)
     privateJson('accessibility-ios.json', closed)
     if (code !== 0 || !closed.passed) {
@@ -1087,21 +1089,30 @@ if (command === 'prebuild') {
           // three empty arrays, so the exit code, the xcresult counts and the log tail say why.
           iosAuditFailure: {
             exitCode: code,
+            resultError,
             counts: closed.counts,
             failedTestIDs: closed.failedTestIDs,
             ...xcodebuildFailureReport(auditText),
           },
         })
       )
-      const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
-      if (hierarchy.includes('share-card-title'))
-        run('xcrun', [
-          'simctl',
-          'io',
-          device,
-          'screenshot',
-          path.join(directory, 'native-ios-audit-failure.png'),
-        ])
+      // Antigravity audit-diag P2: earlier flows left the owned driver on its port and the
+      // XCUITest bundle may have displaced it, so it is stopped and cleared first and the screen
+      // is read through the owned port (one fresh runner, as after a deadline kill). Nothing here
+      // may replace the audit failure.
+      try {
+        recordIosDriverFlow({ platform, directory, device, ok: false })
+        if (hierarchyOutput().includes('share-card-title'))
+          run('xcrun', [
+            'simctl',
+            'io',
+            device,
+            'screenshot',
+            path.join(directory, 'native-ios-audit-failure.png'),
+          ])
+      } catch {
+        console.log(JSON.stringify({ iosAuditFailureScreen: 'unavailable' }))
+      }
       throw new Error('ios_accessibility_audit_failed')
     }
   } finally {

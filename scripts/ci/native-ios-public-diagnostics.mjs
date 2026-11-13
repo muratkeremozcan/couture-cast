@@ -55,6 +55,26 @@ const LOCAL_PATH =
 const LONG_TOKEN = /[A-Za-z0-9+/_=-]{40,}/
 const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/
 
+/**
+ * One xcodebuild or harness log line made fit for the public job log (story 6.15, Antigravity
+ * audit-diag P3): Swift sources keep their file name, every other local path, UUID (simulator
+ * UDIDs), email and long token is masked, and a line that still looks like a secret is withheld.
+ */
+export function publicLogLine(text, limit = 300) {
+  const masked = String(text)
+    .replace(/[^\x20-\x7e]/g, '?')
+    .replace(/\S*\/(?=[^/\s]+\.swift)/g, '')
+    .replace(/file:\/\/\S+/g, '<path>')
+    .replace(/(^|[\s=:('"])(?:~\/|\/)[^\s'"),]+/g, '$1<path>')
+    .replace(new RegExp(UUID.source, 'gi'), '<uuid>')
+    .replace(new RegExp(EMAIL.source, 'g'), '<email>')
+    .replace(new RegExp(LONG_TOKEN.source, 'g'), '<token>')
+    .trim()
+  return SECRET_TEXT.test(masked)
+    ? '[withheld: secret-shaped line]'
+    : masked.slice(0, limit)
+}
+
 const STRING_RULES = [
   [(text) => text.length > MAX_STRING, 'string_too_long'],
   [(text) => !PRINTABLE.test(text), 'non_printable_string'],

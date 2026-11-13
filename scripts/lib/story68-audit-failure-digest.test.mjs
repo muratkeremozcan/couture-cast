@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import {
+  closedShareCardAuditReport,
+  readAuditResult,
   failedAuditContext,
   failedAuditIssues,
   failedAuditTestDigest,
@@ -63,6 +65,48 @@ describe('failed audit test digest', () => {
     const failure = source.slice(source.lastIndexOf('iosAuditFailure: {', print), print)
     assert.match(failure, /exitCode: code,/)
     assert.match(failure, /counts: closed\.counts,/)
+    assert.match(failure, /resultError,/)
+    // Antigravity audit-diag P1: the log is read before the result bundle, which may be absent.
+    const log = source.indexOf('const auditText = fs.readFileSync(auditLog)')
+    const bundle = source.indexOf('readAuditResult({')
+    assert.ok(log > 0 && bundle > log)
+    assert.equal(
+      source.includes("JSON.parse(\n      run('xcrun', ['xcresulttool'"),
+      false
+    )
+  })
+
+  test('a missing or unreadable result bundle still yields a failing report', () => {
+    const read = (text) => () => text
+    const missing = readAuditResult({
+      result: '/r.xcresult',
+      exists: () => false,
+      read: read('{}'),
+    })
+    assert.deepEqual(missing, { summary: {}, tree: {}, resultError: 'missing' })
+    const broken = readAuditResult({
+      result: '/r.xcresult',
+      exists: () => true,
+      read: () => {
+        throw new Error('owned_command_failed:xcrun:64')
+      },
+    })
+    assert.equal(broken.resultError, 'unreadable')
+    const ok = readAuditResult({
+      result: '/r.xcresult',
+      exists: () => true,
+      read: read('{"result":"Passed"}'),
+    })
+    assert.deepEqual(ok, {
+      summary: { result: 'Passed' },
+      tree: { result: 'Passed' },
+      resultError: null,
+    })
+    for (const { summary, tree } of [missing, broken]) {
+      const closed = closedShareCardAuditReport(summary, tree, '')
+      assert.equal(closed.passed, false)
+      assert.equal(closed.counts.total, 0)
+    }
   })
 
   test('lists the audit issues the Swift handler refused, in order', () => {
@@ -184,4 +228,50 @@ describe('failed audit test digest', () => {
     )
     assert.match(query, /func shareCardAuditIssueLine\(/)
   })
+})
+
+// Antigravity audit-diag P3: xcodebuild footers carry runner paths, DerivedData, simulator UDIDs and
+// can echo a token; the public job log gets the line with each masked, or withheld.
+test('a public failure report masks paths, UDIDs, emails and tokens in every section', () => {
+  const log = [
+    'CC68_AUDIT_ISSUE open|1|/Users/runner/work/couture-cast/couture-cast/x.png|a@b.example|Contrast',
+    "Test Case '-[ShareCardAccessibilityUITests testOpen]' started.",
+    '    /Users/runner/work/couture-cast/couture-cast/apps/mobile/native-tests/ShareCardAccessibilityUITests.swift:42: error: -[ShareCardAccessibilityUITests testOpen] : failed',
+    "Test Case '-[ShareCardAccessibilityUITests testOpen]' failed (3.1 seconds).",
+  ].join('\n')
+  const failed = xcodebuildFailureReport(log)
+  assert.equal(failed.tests[0].test, 'testOpen')
+  assert.ok(
+    failed.tests[0].lines.some((line) =>
+      line.startsWith('ShareCardAccessibilityUITests.swift:42: error:')
+    )
+  )
+  const footer = [
+    'Ineligible destinations for the "ShareCardAccessibility" scheme:',
+    '\t{ platform:iOS Simulator, id:AFA0777F-372A-445A-B8D4-08C287947144, OS:26.5, name:cc68-startup-probe }',
+    'Testing failed:',
+    '\tShareCardAccessibilityUITests encountered an error (Failed to install or launch the test runner. If you believe this error represents a bug, please attach the result bundle at /Users/runner/work/couture-cast/couture-cast/_bmad-output/test-artifacts/story-6-8/runtime/accessibility-ios-1731500000000.xcresult)',
+    'Writing result bundle at path: /Users/runner/Library/Developer/Xcode/DerivedData/ShareCardAccessibility-abcdef/Logs/Test/Run.xcresult',
+    'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0',
+    'owner contact ops@couturecast.example in file:///private/var/folders/x/y',
+    '** TEST FAILED **',
+  ].join('\n')
+  const report = xcodebuildFailureReport(footer)
+  const text = JSON.stringify(report)
+  for (const leaked of [
+    /\/Users\//,
+    /DerivedData/,
+    /AFA0777F/,
+    /@couturecast/,
+    /eyJ/,
+    /file:\/\//,
+    /\/private\//,
+  ])
+    assert.doesNotMatch(text, leaked, String(leaked))
+  assert.ok(report.tail.includes('** TEST FAILED **'))
+  assert.ok(report.tail.some((line) => line.includes('<uuid>')))
+  assert.ok(report.tail.some((line) => line.includes('<path>')))
+  assert.ok(report.tail.includes('[withheld: secret-shaped line]'))
+  for (const section of [failed.issues, failed.context])
+    assert.doesNotMatch(JSON.stringify(section), /\/Users\/|@b\.example/)
 })
