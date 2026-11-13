@@ -8,7 +8,17 @@
 // reviewed into the list, however a workflow would reach it.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { chmodSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
@@ -181,9 +191,13 @@ describe('CI installs Ubuntu packages only through apt-install.sh', () => {
 /**
  * Runs apt-install.sh with stub `sudo`, `npx` and `sleep` on PATH. `statuses` are the exit codes of
  * successive install commands (0 once they run out). Returns the exit status, the commands run,
- * the pauses taken and what was written to apt's configuration.
+ * the pauses taken and what was written to apt's configuration. With APT_INSTALL_ARCHIVES in
+ * `env`, each recorded install also says how many package files that directory held.
  */
-function runScript(args, { statuses = [], teeStatus = 0, pauses = '1 2' } = {}) {
+function runScript(
+  args,
+  { statuses = [], teeStatus = 0, pauses = '1 2', env = {}, index = '' } = {}
+) {
   const stubs = mkdtempSync(path.join(os.tmpdir(), 'apt-install-'))
   const stub = (name, body) => {
     const file = path.join(stubs, name)
@@ -199,11 +213,23 @@ if [ "$1" = tee ]; then cat > "${stubs}/tee"; exit ${teeStatus}; fi
 echo "sudo $*" >> "${stubs}/calls"
 ${next}`
   )
-  stub('npx', `echo "npx $*" >> "${stubs}/calls"\n${next}`)
+  const held =
+    '${APT_INSTALL_ARCHIVES:+ holding $(find "$APT_INSTALL_ARCHIVES" -maxdepth 1 -name "*.deb" | wc -l | tr -d " ")}'
+  stub('npx', `echo "npx $*${held}" >> "${stubs}/calls"\n${next}`)
   stub('sleep', `echo "$1" >> "${stubs}/sleeps"`)
+  // A package file is named <package>_<version>_<architecture>.deb; one named broken_* is not
+  // a readable archive. The package index is the `index` text.
+  stub(
+    'dpkg-deb',
+    `f=$(basename "$2" .deb); IFS=_ read -r p v a <<< "$f"
+[ "$p" = broken ] && exit 2
+printf 'Package: %s\\nVersion: %s\\nArchitecture: %s\\n' "$p" "$v" "$a"`
+  )
+  writeFileSync(path.join(stubs, 'index'), index)
+  stub('apt-cache', `echo "apt-cache $*" >> "${stubs}/calls"\ncat "${stubs}/index"`)
   try {
     const result = spawnSync('bash', [path.join(repository, SCRIPT), ...args], {
-      env: { PATH: `${stubs}:${process.env.PATH}`, APT_INSTALL_PAUSES: pauses },
+      env: { PATH: `${stubs}:${process.env.PATH}`, APT_INSTALL_PAUSES: pauses, ...env },
       encoding: 'utf8',
     })
     const read = (name) => {
@@ -219,12 +245,22 @@ ${next}`
       calls: lines('calls'),
       sleeps: lines('sleeps'),
       config: read('tee'),
+      stdout: result.stdout,
       stderr: result.stderr,
     }
   } finally {
     rmSync(stubs, { recursive: true, force: true })
   }
 }
+
+/** Package index records, as `apt-cache show` prints them, for [package, version, arch, bytes]. */
+const indexOf = (packages) =>
+  packages
+    .map(
+      ([name, version, arch, bytes]) =>
+        `Package: ${name}\nArchitecture: ${arch}\nVersion: ${version}\nFilename: pool/main/${name}_${version}_${arch}.deb\nSHA256: ${createHash('sha256').update(bytes).digest('hex')}\n`
+    )
+    .join('\n')
 
 describe('apt-install.sh', () => {
   test("writes apt's own retries and timeouts before installing", () => {
@@ -266,6 +302,136 @@ describe('apt-install.sh', () => {
       'sudo apt-get update',
       'sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq curl',
     ])
+  })
+
+  // browser-acceptance restores the package files of its last miss into this directory, so a
+  // cache hit downloads none of them again.
+  test('keeps downloaded package files in APT_INSTALL_ARCHIVES when it is set', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      const { status, config, calls } = runScript(['--playwright', 'chromium'], {
+        env: { APT_INSTALL_ARCHIVES: archives },
+      })
+      assert.equal(status, 0)
+      assert.equal(
+        config,
+        `Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\nDir::Cache::Archives "${archives}/";\n`
+      )
+      assert.ok(existsSync(path.join(archives, 'partial')))
+      assert.deepEqual(calls, [
+        'npx --no-install playwright install-deps chromium holding 0',
+      ])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('a failed install drops the restored package files, so the retry downloads them all', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
+      writeFileSync(path.join(archives, 'libtwo_2.0_amd64.deb'), 'two')
+      writeFileSync(path.join(archives, 'notes.txt'), 'restored')
+      const { status, calls, sleeps } = runScript(['--playwright', 'chromium'], {
+        statuses: [0, 100, 0],
+        env: { APT_INSTALL_ARCHIVES: archives },
+        index: indexOf([
+          ['libone', '1.0', 'amd64', 'one'],
+          ['libtwo', '2.0', 'amd64', 'two'],
+        ]),
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(calls, [
+        'sudo apt-get -o APT::Update::Error-Mode=any update',
+        'apt-cache show libone=1.0 libtwo=2.0',
+        'npx --no-install playwright install-deps chromium holding 2',
+        'npx --no-install playwright install-deps chromium holding 0',
+      ])
+      assert.deepEqual(sleeps, ['1'])
+      assert.ok(existsSync(path.join(archives, 'notes.txt')))
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  // apt reuses a restored file whose name and size match the index without checking its hash
+  // (reproduced on Ubuntu 26.04 in the PR 216 review), so the script checks the hash itself.
+  test('drops a restored file whose hash, version or archive the current index does not vouch for', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      const files = {
+        'libone_1.0_amd64.deb': 'one',
+        // Same size as the indexed bytes, different content.
+        'libthr_3.0_amd64.deb': 'tri',
+        // A version the index no longer lists.
+        'libold_0.9_amd64.deb': 'old',
+        'broken_1.0_amd64.deb': 'not an archive',
+        'libany_5.0_all.deb': 'any',
+      }
+      for (const [name, body] of Object.entries(files))
+        writeFileSync(path.join(archives, name), body)
+      const { status, calls, stdout } = runScript(['--playwright', 'chromium'], {
+        env: { APT_INSTALL_ARCHIVES: archives },
+        index: indexOf([
+          ['libone', '1.0', 'amd64', 'one'],
+          ['libthr', '3.0', 'amd64', 'thr'],
+          ['libold', '1.0', 'amd64', 'old'],
+          ['libany', '5.0', 'all', 'any'],
+        ]),
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(
+        readdirSync(archives)
+          .filter((name) => name.endsWith('.deb'))
+          .sort(),
+        ['libany_5.0_all.deb', 'libone_1.0_amd64.deb']
+      )
+      assert.equal(calls[0], 'sudo apt-get -o APT::Update::Error-Mode=any update')
+      assert.equal(
+        calls.at(-1),
+        'npx --no-install playwright install-deps chromium holding 2'
+      )
+      assert.match(stdout, /kept 2, dropped 2\./)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('drops every restored file when the package index cannot be updated', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
+      const { status, calls } = runScript(['--playwright', 'chromium'], {
+        statuses: [100, 0],
+        env: { APT_INSTALL_ARCHIVES: archives },
+        index: indexOf([['libone', '1.0', 'amd64', 'one']]),
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(calls, [
+        'sudo apt-get -o APT::Update::Error-Mode=any update',
+        'npx --no-install playwright install-deps chromium holding 0',
+      ])
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('refuses an archive directory that is relative or has characters apt would misread', () => {
+    for (const archives of ['relative/packages', '/tmp/with space', '/tmp/quote"d']) {
+      const { status, calls, config } = runScript(['jq'], {
+        env: { APT_INSTALL_ARCHIVES: archives },
+      })
+      assert.equal(status, 2, archives)
+      assert.deepEqual(calls, [], archives)
+      assert.equal(config, '', archives)
+    }
   })
 
   test('refuses missing arguments and malformed pauses, and stops when apt cannot be configured', () => {
