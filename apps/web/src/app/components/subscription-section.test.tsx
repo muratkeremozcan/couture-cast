@@ -210,6 +210,40 @@ describe('SubscriptionSection', () => {
     expect(portalCalled).not.toHaveBeenCalled()
   })
 
+  // Learning path Step 55: story 6.15 D15. A RevenueCat Test Store purchase (served only by a local
+  // or preview API) and a promotional grant have no store subscription, so neither the store hint
+  // nor the portal entry renders, matching mobile's manageEntryFor.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  it.each(['test_store', 'promotional'])(
+    'shows no manage entry for active %s Premium',
+    async (store) => {
+      signIn()
+      const portalCalled = vi.fn()
+      useMswHandlers(
+        http.get(SUBSCRIPTION_PATH, () =>
+          HttpResponse.json({ data: entitledSubscription({ store }) })
+        ),
+        http.post(PORTAL_PATH, () => {
+          portalCalled()
+          return HttpResponse.json({
+            data: { url: 'https://portal.stripe.test/session' },
+          })
+        })
+      )
+
+      renderSection()
+
+      await waitFor(() =>
+        expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+          'Premium is active: Premium Monthly.'
+        )
+      )
+      expect(screen.queryByTestId('premium-manage-in-store')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('premium-manage-button')).not.toBeInTheDocument()
+      expect(portalCalled).not.toHaveBeenCalled()
+    }
+  )
+
   /** Grace period keeps access and shows the payment-issue banner. */
   it('5.2-WEB-SEC-06 renders the grace banner with the manage entry still available', async () => {
     signIn()

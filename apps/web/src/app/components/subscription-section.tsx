@@ -164,10 +164,17 @@ function SubscribeControls({
 }
 
 /**
- * The manage entry for an entitled subscription: the Customer Portal when the
- * subscription is web-managed, otherwise the store hint — the server would
- * answer that call with a 409, so the client does not make it.
+ * Manage entry by store, matching mobile's `manageEntryFor`: Stripe-billed subscriptions open
+ * the Customer Portal; App Store and Play Store ones get the store hint, since the server answers
+ * the portal call with a 409; promotional grants and RevenueCat Test Store purchases (story 6.15
+ * D15, local and preview only) have no store subscription to manage, so they get neither.
  */
+function manageEntryFor(store: string): 'web' | 'store' | 'none' {
+  if (store === 'stripe') return 'web'
+  if (store === 'promotional' || store === 'test_store') return 'none'
+  return 'store'
+}
+
 function ManageControls({
   store,
   isRedirecting,
@@ -178,7 +185,9 @@ function ManageControls({
   onManage: () => void
 }) {
   const { t } = useTranslation()
-  if (store !== 'stripe') {
+  const entry = manageEntryFor(store)
+  if (entry === 'none') return null
+  if (entry === 'store') {
     return (
       <p className="mt-6 text-sm text-neutral-300" data-testid="premium-manage-in-store">
         {t('commerce.premium.manageInStore')}
