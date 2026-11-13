@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  sameLayoutShifted,
   windowBounds,
   parseEnvironment,
   activityToken,
@@ -293,4 +294,18 @@ test('windowBounds spans every bounded node when the root has none', () => {
   ])
   assert.equal(windowBounds(tree), '[0,0][1080,2400]')
   assert.equal(windowBounds(node({})), undefined)
+})
+
+test('sameLayoutShifted accepts one small vertical shift and nothing else', () => {
+  const at = (text, y) => ({ id: '', text, bounds: `[0,${y}][100,${y + 40}]` })
+  const page = [at('A', 100), at('B', 200)]
+  assert.equal(sameLayoutShifted(page, [at('A', 106), at('B', 206)]), true)
+  assert.equal(sameLayoutShifted(page, [at('A', 120), at('B', 220)]), false)
+  assert.equal(sameLayoutShifted(page, [at('A', 106), at('B', 208)]), false)
+  assert.equal(sameLayoutShifted(page, [at('A', 100)]), false)
+  const withTabs = [...page, at('Home', 2277)]
+  assert.equal(
+    sameLayoutShifted(withTabs, [at('A', 106), at('B', 206), at('Home', 2277)]),
+    true
+  )
 })

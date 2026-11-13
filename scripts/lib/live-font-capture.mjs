@@ -271,3 +271,31 @@ export function windowBounds(tree) {
   walk(tree)
   return box ? `[${box[0]},${box[1]}][${box[2]},${box[3]}]` : undefined
 }
+
+/**
+ * The same layout up to one vertical shift of at most `maxShift` for the scrolled app nodes,
+ * with fixed chrome unmoved. Returning
+ * to the top of a scroll view on Android can leave the content a few pixels off after the
+ * stretch overscroll, with nothing else changed.
+ */
+export function sameLayoutShifted(a, b, maxShift = 12) {
+  const app = (nodes) =>
+    nodes.filter((node) => !/^com\.android\.systemui:/.test(node.id ?? ''))
+  const [left, right] = [app(a), app(b)]
+  if (left.length !== right.length || !left.length) return false
+  const box = (node) =>
+    /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(node.bounds)?.slice(1).map(Number)
+  let shift
+  for (let index = 0; index < left.length; index += 1) {
+    const [x, y] = [left[index], right[index]]
+    if (x.id !== y.id || x.text !== y.text) return false
+    const [p, q] = [box(x), box(y)]
+    if (!p || !q || p[0] !== q[0] || p[2] !== q[2]) return false
+    // Fixed chrome (header, chips, tab bar) does not move; scrolled content moves together.
+    const top = q[1] - p[1]
+    if (top === 0) continue
+    shift ??= top
+    if (top !== shift) return false
+  }
+  return shift === undefined || Math.abs(shift) <= maxShift
+}

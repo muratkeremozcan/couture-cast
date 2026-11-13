@@ -24,6 +24,7 @@ import {
   readEnvironment,
   rootIdentity,
   sameLayout,
+  sameLayoutShifted,
   stitchPages,
   windowBounds,
 } from './lib/live-font-capture.mjs'
@@ -242,7 +243,7 @@ async function fullText(capture) {
     drag(size, false)
     top = await stableNodes()
   }
-  if (!sameLayout(top, capture.nodes)) {
+  if (!sameLayout(top, capture.nodes) && !sameLayoutShifted(capture.nodes, top)) {
     fs.writeFileSync(
       path.join(out, `${capture.file}-not-restored.json`),
       JSON.stringify(top),
