@@ -27,12 +27,14 @@
 //   blanket rule turns this red instead of shipping a stripped billing client.
 // - Whether Release runs R8. On SDK 54 the app config leaves `android.enableMinifyInReleaseBuilds`
 //   unset, so Release is not minified and the record states that as a baseline fact. Once the
-//   config turns it on (expo-build-properties in app.json, or the prebuilt gradle.properties), a
-//   Release build with no `mapping.txt` fails.
+//   resolved app config turns it on (app.json or app.config.ts, expo-build-properties or a plugin's
+//   gradle property, or the prebuilt gradle.properties), a Release build with no `mapping.txt`
+//   fails.
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { resolvedAppConfig, resolvedGradleProperties } from './resolved-app-config.mjs'
 
 export const VARIANT = 'minifiedDebuggable'
 const REMOVED_PLACEHOLDER = /^R8\$\$REMOVED\$\$CLASS\$\$\d+$/
@@ -148,30 +150,33 @@ export function revenueCatSurvival({
 const MINIFY_PROPERTY = 'android.enableMinifyInReleaseBuilds'
 
 /**
- * Whether the app config turns R8 on for Release: expo-build-properties in app.json
- * (`android.enableMinifyInReleaseBuilds`, or its older name `enableProguardInReleaseBuilds`) or
- * the prebuilt `gradle.properties` the template's build.gradle reads. The two must agree when both
- * are given, or the native project is stale.
+ * Whether the resolved app config turns R8 on for Release (scripts/lib/resolved-app-config.mjs:
+ * app.json through app.config.ts with every plugin applied). It counts expo-build-properties'
+ * `android.enableMinifyInReleaseBuilds` (or its older name `enableProguardInReleaseBuilds`) and
+ * the `android.enableMinifyInReleaseBuilds` gradle property any plugin writes, the one the
+ * template's build.gradle reads. A prebuilt `gradle.properties`, when given, must agree, or the
+ * native project is stale.
  */
-export function releaseMinifyConfig({ appJson, gradleProperties }) {
-  const plugin = (appJson?.expo?.plugins ?? []).find(
+export function releaseMinifyConfig({ resolvedConfig, gradleProperties }) {
+  const plugin = (resolvedConfig?.plugins ?? []).find(
     (entry) => Array.isArray(entry) && entry[0] === 'expo-build-properties'
   )
   const android = plugin?.[1]?.android ?? {}
-  const fromApp =
+  const fromConfig =
     android.enableMinifyInReleaseBuilds === true ||
-    android.enableProguardInReleaseBuilds === true
-  if (gradleProperties === undefined) return { enabled: fromApp, source: 'app.json' }
+    android.enableProguardInReleaseBuilds === true ||
+    resolvedGradleProperties(resolvedConfig)[MINIFY_PROPERTY] === 'true'
+  if (gradleProperties === undefined) return { enabled: fromConfig, source: 'app config' }
   const line = gradleProperties
     .split('\n')
     .map((entry) => entry.trim())
     .find((entry) => entry.startsWith(`${MINIFY_PROPERTY}=`))
   const fromGradle = line?.slice(MINIFY_PROPERTY.length + 1).trim() === 'true'
-  if (fromApp && !fromGradle)
+  if (fromConfig && !fromGradle)
     throw new Error('minified_debuggable_release_minify_config_stale')
   return {
     enabled: fromGradle,
-    source: fromGradle && !fromApp ? 'gradle.properties' : 'app.json',
+    source: fromGradle && !fromConfig ? 'gradle.properties' : 'app config',
   }
 }
 
@@ -223,10 +228,18 @@ export function variantOutputs(androidRoot) {
   }
 }
 
-/** The Release R8 record from the app config and the Release build's outputs. */
-export function collectReleaseR8({ appJsonPath, gradlePropertiesPath, releaseMapping }) {
+/** The Release R8 record from the resolved app config and the Release build's outputs. */
+export function collectReleaseR8({
+  root,
+  gradlePropertiesPath,
+  releaseMapping,
+  resolve = resolvedAppConfig,
+}) {
+  const resolved = resolve(root)
+  if (resolved.error)
+    throw new Error(`minified_debuggable_app_config_unresolved: ${resolved.error}`)
   const config = releaseMinifyConfig({
-    appJson: JSON.parse(fs.readFileSync(appJsonPath, 'utf8')),
+    resolvedConfig: resolved.config,
     gradleProperties:
       gradlePropertiesPath && fs.existsSync(gradlePropertiesPath)
         ? fs.readFileSync(gradlePropertiesPath, 'utf8')
@@ -256,7 +269,8 @@ export function collectEvidence({
   aapt2 = findAapt2(),
   adb = 'adb',
 }) {
-  for (const file of [apk, mapping])
+  // usage.txt is the only record of what R8 removed; without it a stripped RevenueCat would pass.
+  for (const file of [apk, mapping, usage])
     if (!fs.existsSync(file))
       throw new Error(`minified_debuggable_output_missing: ${file}`)
   const badging = run(aapt2, ['dump', 'badging', apk])
@@ -272,7 +286,7 @@ export function collectEvidence({
     installed = { serial, packageName, flagDebuggable: true }
   }
   const mappingText = fs.readFileSync(mapping, 'utf8')
-  const usageText = usage && fs.existsSync(usage) ? fs.readFileSync(usage, 'utf8') : ''
+  const usageText = fs.readFileSync(usage, 'utf8')
   return {
     variant: VARIANT,
     nativeDebuggable: { apkManifest: true, installed },
@@ -313,7 +327,7 @@ if (
       packageName: options.package,
     })
     evidence.release = collectReleaseR8({
-      appJsonPath: options['app-json'] ?? 'apps/mobile/app.json',
+      root: options.root ?? '.',
       gradlePropertiesPath: defaults.gradleProperties,
       releaseMapping: options['release-mapping'] ?? defaults.releaseMapping,
     })

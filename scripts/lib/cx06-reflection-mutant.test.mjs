@@ -131,3 +131,24 @@ test("dexState reads the target's own constructor, never the next class's", () =
     constructor: false,
   })
 })
+
+// P3-2 (Antigravity r8): a harness that copies android/ alone gets a named error, not a
+// createRequire stack.
+test('an android copy without its app root fails with a named error', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-cx06-root-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  assert.throws(
+    () => expoModulesCoreRules(root),
+    /cx06_app_root_missing: .* has no package\.json/
+  )
+  fs.writeFileSync(path.join(root, 'package.json'), '{"name":"copy"}')
+  assert.throws(
+    () => expoModulesCoreRules(root),
+    /cx06_app_root_missing: no node_modules above .* has expo-modules-core/
+  )
+  fs.symlinkSync(path.join(repoRoot, 'node_modules'), path.join(root, 'node_modules'))
+  assert.match(
+    expoModulesCoreRules(root),
+    /expo-modules-core\/android\/proguard-rules\.pro$/
+  )
+})

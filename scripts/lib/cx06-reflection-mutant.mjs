@@ -59,12 +59,27 @@ project(':expo-modules-core') { p ->
 `
 }
 
-/** expo-modules-core's shipped consumer rules, resolved from the app. */
+/**
+ * expo-modules-core's shipped consumer rules, resolved from the app root that holds the copied
+ * android/ directory. A copy of android/ alone has no package.json or node_modules to resolve
+ * from, so that layout fails with a named error.
+ */
 export function expoModulesCoreRules(appRoot) {
-  const pkg = createRequire(path.join(appRoot, 'package.json')).resolve(
-    'expo-modules-core/package.json'
-  )
-  return path.join(path.dirname(pkg), 'android/proguard-rules.pro')
+  if (!fs.existsSync(path.join(appRoot, 'package.json')))
+    throw new Error(`cx06_app_root_missing: ${appRoot} has no package.json`)
+  let pkg
+  try {
+    pkg = createRequire(path.join(appRoot, 'package.json')).resolve(
+      'expo-modules-core/package.json'
+    )
+  } catch {
+    throw new Error(
+      `cx06_app_root_missing: no node_modules above ${appRoot} has expo-modules-core`
+    )
+  }
+  const rules = path.join(path.dirname(pkg), 'android/proguard-rules.pro')
+  if (!fs.existsSync(rules)) throw new Error(`cx06_rules_missing: ${rules}`)
+  return rules
 }
 
 /** Applies the mutant to a prebuilt android/ directory that is not part of a git checkout. */

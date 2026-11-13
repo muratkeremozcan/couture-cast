@@ -9,6 +9,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   badgingDebuggable,
   badgingPackage,
@@ -22,6 +23,8 @@ import {
   r8Evidence,
   variantOutputs,
 } from './minified-debuggable-evidence.mjs'
+
+const repository = fileURLToPath(new URL('../../', import.meta.url))
 
 const BADGING = `package: name='com.couturecast.app' versionCode='6' versionName='1.0.0' platformBuildVersionName='16'
 sdkVersion:'24'
@@ -187,6 +190,31 @@ test('collectEvidence runs the tools on the variant outputs and records the thre
       }),
     /installed_not_debuggable/
   )
+  // P2-1 (Antigravity r8): RevenueCat stripped down to the two required names passes the mapping
+  // check, so a missing usage.txt must fail rather than read as "nothing removed".
+  const stripped = { ...outputs, usage: path.join(root, 'missing-usage.txt') }
+  fs.writeFileSync(
+    outputs.mapping,
+    [
+      'com.couturecast.app.MainActivity -> com.couturecast.app.MainActivity:',
+      'com.revenuecat.purchases.Purchases -> com.revenuecat.purchases.Purchases:',
+      'com.revenuecat.purchases.hybridcommon.CommonKt -> com.revenuecat.purchases.hybridcommon.CommonKt:',
+      '',
+    ].join('\n')
+  )
+  assert.throws(
+    () => collectEvidence({ ...stripped, aapt2: tool('aapt2-usage', BADGING) }),
+    /output_missing: .*missing-usage\.txt/
+  )
+  assert.throws(
+    () =>
+      collectEvidence({
+        ...outputs,
+        usage: undefined,
+        aapt2: tool('aapt2-no-usage', BADGING),
+      }),
+    /output_missing/
+  )
   fs.rmSync(outputs.mapping)
   assert.throws(
     () => collectEvidence({ ...outputs, aapt2: tool('aapt2-again', BADGING) }),
@@ -235,46 +263,54 @@ test('RevenueCat survives: its classes keep their names and usage.txt removes no
   )
 })
 
-const APP_JSON = { expo: { plugins: ['expo-router'] } }
-const withBuildProperties = (android) => ({
-  expo: { plugins: ['expo-router', ['expo-build-properties', { android }]] },
+const resolved = ({ plugins = ['expo-router'], gradleProperties = [] } = {}) => ({
+  plugins,
+  _internal: { modResults: { android: { gradleProperties } } },
 })
+const withBuildProperties = (android) =>
+  resolved({ plugins: ['expo-router', ['expo-build-properties', { android }]] })
+const MINIFY_PROPERTY = {
+  type: 'property',
+  key: 'android.enableMinifyInReleaseBuilds',
+  value: 'true',
+}
 const GRADLE_SDK54 = 'android.useAndroidX=true\nhermesEnabled=true\n'
 const GRADLE_MINIFY = `${GRADLE_SDK54}android.enableMinifyInReleaseBuilds=true\n`
 
-test('the Release minify switch is read from the app config and the prebuilt gradle.properties', () => {
+test('the Release minify switch is read from the resolved app config and the prebuilt gradle.properties', () => {
   assert.deepEqual(
-    releaseMinifyConfig({ appJson: APP_JSON, gradleProperties: GRADLE_SDK54 }),
-    {
-      enabled: false,
-      source: 'app.json',
-    }
+    releaseMinifyConfig({ resolvedConfig: resolved(), gradleProperties: GRADLE_SDK54 }),
+    { enabled: false, source: 'app config' }
   )
   assert.equal(
     releaseMinifyConfig({
-      appJson: withBuildProperties({ enableMinifyInReleaseBuilds: true }),
+      resolvedConfig: withBuildProperties({ enableMinifyInReleaseBuilds: true }),
       gradleProperties: GRADLE_MINIFY,
     }).enabled,
     true
   )
   assert.equal(
     releaseMinifyConfig({
-      appJson: withBuildProperties({ enableProguardInReleaseBuilds: true }),
+      resolvedConfig: withBuildProperties({ enableProguardInReleaseBuilds: true }),
     }).enabled,
     true
   )
+  // A plugin, from app.json or app.config.ts, that writes the gradle property.
   assert.deepEqual(
-    releaseMinifyConfig({ appJson: APP_JSON, gradleProperties: GRADLE_MINIFY }),
-    {
-      enabled: true,
-      source: 'gradle.properties',
-    }
+    releaseMinifyConfig({
+      resolvedConfig: resolved({ gradleProperties: [MINIFY_PROPERTY] }),
+    }),
+    { enabled: true, source: 'app config' }
+  )
+  assert.deepEqual(
+    releaseMinifyConfig({ resolvedConfig: resolved(), gradleProperties: GRADLE_MINIFY }),
+    { enabled: true, source: 'gradle.properties' }
   )
   // The config turned minify on but the native project was not prebuilt again.
   assert.throws(
     () =>
       releaseMinifyConfig({
-        appJson: withBuildProperties({ enableMinifyInReleaseBuilds: true }),
+        resolvedConfig: resolved({ gradleProperties: [MINIFY_PROPERTY] }),
         gradleProperties: GRADLE_SDK54,
       }),
     /release_minify_config_stale/
@@ -298,27 +334,74 @@ test('Release without minify is a recorded baseline; with minify a missing mappi
   )
 })
 
-test('collectReleaseR8 reads the files: the SDK 54 baseline, then minify on without a mapping', (t) => {
+/** A resolvable Expo project root whose apps/mobile holds the given files. */
+function mobileFixture(t, files) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'couture-release-r8-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
-  const outputs = variantOutputs(path.join(root, 'android'))
-  const appJsonPath = path.join(root, 'app.json')
-  fs.mkdirSync(path.dirname(outputs.gradleProperties), { recursive: true })
-  fs.writeFileSync(appJsonPath, JSON.stringify(APP_JSON))
-  fs.writeFileSync(outputs.gradleProperties, GRADLE_SDK54)
-  const files = {
-    appJsonPath,
-    gradlePropertiesPath: outputs.gradleProperties,
-    releaseMapping: outputs.releaseMapping,
-  }
-  assert.equal(collectReleaseR8(files).fact, 'Release runs no R8')
-  fs.writeFileSync(
-    appJsonPath,
-    JSON.stringify(withBuildProperties({ enableMinifyInReleaseBuilds: true }))
+  const mobile = path.join(root, 'apps/mobile')
+  fs.mkdirSync(mobile, { recursive: true })
+  fs.symlinkSync(
+    path.join(repository, 'apps/mobile/node_modules'),
+    path.join(mobile, 'node_modules')
   )
-  fs.writeFileSync(outputs.gradleProperties, GRADLE_MINIFY)
-  assert.throws(() => collectReleaseR8(files), /release_mapping_missing/)
-  fs.mkdirSync(path.dirname(outputs.releaseMapping), { recursive: true })
-  fs.writeFileSync(outputs.releaseMapping, SHRUNK_MAPPING)
-  assert.equal(collectReleaseR8(files).fact, 'Release ran R8')
+  fs.symlinkSync(path.join(repository, 'node_modules'), path.join(root, 'node_modules'))
+  const all = {
+    'package.json': '{"name":"r8-fixture","version":"1.0.0"}',
+    'app.json': JSON.stringify({ expo: { name: 'Fixture', slug: 'fixture' } }),
+    'app.config.ts': 'export default ({ config }: { config: object }) => config\n',
+    ...files,
+  }
+  for (const [file, text] of Object.entries(all)) {
+    fs.mkdirSync(path.dirname(path.join(mobile, file)), { recursive: true })
+    fs.writeFileSync(path.join(mobile, file), text)
+  }
+  return root
+}
+
+// P3-2 (Antigravity r8): an app.config.ts that turns minify on is seen before any prebuild.
+const MINIFY_APP_CONFIG = `import { withGradleProperties } from 'expo/config-plugins'
+import type { ExpoConfig } from 'expo/config'
+
+const minify = (config: ExpoConfig) =>
+  withGradleProperties(config, (next) => {
+    next.modResults.push({ type: 'property', key: 'android.enableMinifyInReleaseBuilds', value: 'true' })
+    return next
+  })
+
+export default ({ config }: { config: ExpoConfig }) => ({
+  ...config,
+  plugins: [...(config.plugins ?? []), minify],
+})
+`
+
+test('collectReleaseR8 resolves the app config: the baseline, then app.config.ts minify before prebuild', (t) => {
+  const baseline = mobileFixture(t, {})
+  const outputs = variantOutputs(path.join(baseline, 'apps/mobile/android'))
+  const files = (root) => ({
+    root,
+    gradlePropertiesPath: path.join(root, 'apps/mobile/android/gradle.properties'),
+    releaseMapping: path.join(
+      root,
+      'apps/mobile/android/app/build/outputs/mapping/release/mapping.txt'
+    ),
+  })
+  assert.deepEqual(collectReleaseR8(files(baseline)), {
+    configSource: 'app config',
+    r8: false,
+    fact: 'Release runs no R8',
+    mappingPresent: false,
+  })
+  assert.equal(outputs.releaseMapping, files(baseline).releaseMapping)
+
+  const minified = mobileFixture(t, { 'app.config.ts': MINIFY_APP_CONFIG })
+  assert.throws(() => collectReleaseR8(files(minified)), /release_mapping_missing/)
+  const mapping = files(minified).releaseMapping
+  fs.mkdirSync(path.dirname(mapping), { recursive: true })
+  fs.writeFileSync(mapping, SHRUNK_MAPPING)
+  assert.equal(collectReleaseR8(files(minified)).fact, 'Release ran R8')
+
+  const broken = mobileFixture(t, {
+    'app.config.ts': 'export default () => { throw new Error("broken config") }\n',
+  })
+  assert.throws(() => collectReleaseR8(files(broken)), /app_config_unresolved/)
 })
