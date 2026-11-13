@@ -42,6 +42,7 @@
     },
     "plugins": [
       "./plugins/with-font-scale-config-changes",
+      "./plugins/with-minified-debuggable",
       "expo-router",
       "expo-localization",
       "expo-background-task",

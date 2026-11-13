@@ -28,6 +28,7 @@
   "runElsewhere": {
     "apps/mobile/plugins/background-task-prebuild.test.js": "apps/mobile npm test (test:background-task-prebuild) and pr-checks.yml tests-shard (mobile)",
     "apps/mobile/plugins/font-scale-config-changes.test.js": "apps/mobile npm test (test:font-scale-config-changes-prebuild) and pr-checks.yml tests-shard (mobile)",
+    "apps/mobile/plugins/with-minified-debuggable.test.js": "apps/mobile npm test (test:minified-debuggable-prebuild) and pr-checks.yml tests-shard (mobile)",
     "apps/mobile/plugins/with-watchos.test.js": "apps/mobile npm test (test:watchos-prebuild) and watchos-native.yml (nightly), on macOS with WATCHOS_REQUIRE_BUILD=1",
     "apps/mobile/plugins/with-widgets.test.js": "apps/mobile npm test (test:widget-prebuild) and pr-checks.yml tests-shard (mobile)"
   },
