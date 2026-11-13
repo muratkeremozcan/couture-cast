@@ -225,3 +225,212 @@ describe('the watchOS prebuild suite', () => {
     )
   })
 })
+
+// Story 6.15 C-07: the Linux Swift targets import no Apple-only framework, so a new import is
+// caught here, by name, before the Linux build fails on it. Each package's Linux sources come
+// from the `#if os(Linux)` branch of its Package.swift.
+const APPLE_ONLY = [
+  'UIKit',
+  'AppKit',
+  'Photos',
+  'PhotosUI',
+  'SwiftUI',
+  'AVFoundation',
+  'UniformTypeIdentifiers',
+  'LinkPresentation',
+  'ExpoModulesCore',
+  'CryptoKit',
+  'CoreGraphics',
+]
+const MODULES = 'apps/mobile/modules'
+
+/** The string literals of `let <name> = [...]` in a manifest fragment. */
+const listNamed = (text, name) => {
+  const match = new RegExp(`let ${name}(?::[^=]+)? = \\[([^\\]]*)\\]`).exec(text)
+  return match ? [...match[1].matchAll(/"([^"]+)"/g)].map((m) => m[1]) : null
+}
+
+/** The Swift files each package compiles on Linux, and whether it builds the CoreGraphics shim. */
+function linuxSources(packageDir) {
+  const manifest = fs.readFileSync(path.join(packageDir, 'Package.swift'), 'utf8')
+  const linux = /#if os\(Linux\)\n([\s\S]*?)\n#else/.exec(manifest)?.[1] ?? ''
+  const swiftIn = (dir) =>
+    fs
+      .readdirSync(path.join(packageDir, dir), { recursive: true })
+      .filter((file) => file.endsWith('.swift'))
+      .map((file) => path.join(dir, file))
+  let sources
+  let tests
+  if (packageDir.endsWith('share-card-native-share/ios')) {
+    sources = listNamed(manifest, 'coreSources')
+    const appleOnly = listNamed(linux, 'appleOnlyTests')
+    tests = swiftIn('Tests').filter((file) => !appleOnly.includes(path.basename(file)))
+  } else if (packageDir.endsWith('share-card-photo-save/ios')) {
+    sources = [...manifest.matchAll(/(?<![a-z])sources: \[([^\]]*)\]/g)].flatMap((m) =>
+      [...m[1].matchAll(/"([^"]+)"/g)].map((s) => s[1])
+    )
+    tests = swiftIn('Tests')
+  } else {
+    sources = listNamed(linux, 'targetSources')
+    tests = swiftIn('Tests/AccessibilityFocusRulesTests')
+  }
+  const shim = /\.target\(name: "CoreGraphics", path: "LinuxShims\/CoreGraphics"\)/.test(
+    linux
+  )
+  return {
+    files: [...sources, ...tests, ...(shim ? swiftIn('LinuxShims') : [])],
+    shim,
+  }
+}
+
+/** Apple-only imports outside a `#if canImport(<same module>)` block. */
+function appleOnlyImports(source, { shim }) {
+  const found = []
+  const guards = []
+  for (const line of source.split('\n')) {
+    const trimmed = line.trim()
+    const condition = /^#if (.*)$/.exec(trimmed)
+    if (condition) guards.push(condition[1])
+    else if (trimmed.startsWith('#else')) guards.push(`!${guards.pop()}`)
+    else if (trimmed.startsWith('#endif')) guards.pop()
+    const imported = /^(?:@testable |@_exported )?import (\w+)/.exec(trimmed)?.[1]
+    if (!imported || !APPLE_ONLY.includes(imported)) continue
+    if (guards.includes(`canImport(${imported})`)) continue
+    if (imported === 'CoreGraphics' && shim) continue
+    found.push(imported)
+  }
+  return found
+}
+
+describe('the Linux Swift targets', () => {
+  const packages = [
+    'share-card-native-share',
+    'share-card-photo-save',
+    'accessibility-focus',
+  ].map((name) => path.join(MODULES, name, 'ios'))
+
+  test('import no Apple-only framework outside its canImport guard', () => {
+    const banned = []
+    let files = 0
+    for (const dir of packages) {
+      const { files: sources, shim } = linuxSources(dir)
+      assert.ok(sources.length >= 2, dir)
+      for (const file of sources) {
+        files++
+        const text = fs.readFileSync(path.join(dir, file), 'utf8')
+        for (const name of appleOnlyImports(text, { shim }))
+          banned.push(`${dir}/${file}: ${name}`)
+      }
+    }
+    assert.deepEqual(banned, [])
+    assert.ok(files >= 12, `${files} Linux sources read`)
+  })
+
+  test('the Linux source lists leave out the Apple glue', () => {
+    const share = linuxSources(packages[0]).files
+    assert.ok(!share.includes('ShareCardShareLinkMetadata.swift'))
+    assert.ok(!share.includes('Tests/ShareCardShareMetadataTests.swift'))
+    assert.ok(share.includes('ShareCardShareFile.swift'))
+    const focus = linuxSources(packages[2]).files
+    assert.deepEqual(
+      focus.filter((file) => !file.startsWith('Tests/')),
+      ['AccessibilityFocusRules.swift']
+    )
+  })
+
+  test('the rule catches an unguarded or wrongly guarded Apple import', () => {
+    assert.deepEqual(
+      appleOnlyImports('import Foundation\nimport UIKit\n', { shim: false }),
+      ['UIKit']
+    )
+    assert.deepEqual(appleOnlyImports('import CryptoKit\n', { shim: false }), [
+      'CryptoKit',
+    ])
+    assert.deepEqual(
+      appleOnlyImports(
+        '#if canImport(CryptoKit)\nimport CryptoKit\n#else\nimport Crypto\n#endif\n',
+        {
+          shim: false,
+        }
+      ),
+      []
+    )
+    // Guarded by another module's availability: still an Apple import on Linux.
+    assert.deepEqual(
+      appleOnlyImports('#if canImport(Darwin)\nimport Photos\n#endif\n', { shim: false }),
+      ['Photos']
+    )
+    // The else branch of its own guard is the Linux side.
+    assert.deepEqual(
+      appleOnlyImports('#if canImport(UIKit)\n#else\nimport UIKit\n#endif\n', {
+        shim: false,
+      }),
+      ['UIKit']
+    )
+    assert.deepEqual(
+      appleOnlyImports('@testable import LinkPresentation\n', { shim: false }),
+      ['LinkPresentation']
+    )
+    assert.deepEqual(appleOnlyImports('import CoreGraphics\n', { shim: false }), [
+      'CoreGraphics',
+    ])
+    assert.deepEqual(appleOnlyImports('import CoreGraphics\n', { shim: true }), [])
+  })
+})
+
+// Story 6.15 C-12: the watchOS prebuild test must assert its native builds ran; without that call
+// a deleted build block passes in silence even with WATCHOS_REQUIRE_BUILD=1.
+const WATCH_TEST = 'apps/mobile/plugins/with-watchos.test.js'
+
+/** The problems in the watchOS prebuild test's body: what it must call for the flag to bite. */
+function watchBuildProblems(source) {
+  const start = source.indexOf(
+    "'clean Expo prebuild generates watchOS app and complication targets'"
+  )
+  const end = source.indexOf('\ntest(', start + 1)
+  const body = start < 0 ? '' : source.slice(start, end < 0 ? undefined : end)
+  const problems = []
+  if (!body) problems.push('prebuild test missing')
+  if (!/\n\s+assertNativeBuildsRan\(builds\)\n/.test(body))
+    problems.push('assertNativeBuildsRan(builds) not called')
+  for (const target of ['WatchWidget', 'WatchApp'])
+    if (!body.includes(`buildWatchTarget(t, fixtureRoot, '${target}'`))
+      problems.push(`${target} build missing`)
+  if (!/if \(nativeBuildsRun\(\)\) \{/.test(body))
+    problems.push('nativeBuildsRun() gate missing')
+  return problems
+}
+
+describe('the watchOS suite under WATCHOS_REQUIRE_BUILD', () => {
+  const source = fs.readFileSync(WATCH_TEST, 'utf8')
+
+  test('builds both watch targets and asserts that they ran', () => {
+    assert.deepEqual(watchBuildProblems(source), [])
+    // The Swift behavior tests use the same gate.
+    assert.match(
+      source,
+      /if \(!nativeBuildsRun\(\)\) \{\n\s+t\.skip\('Swift behavior tests require macOS'\)/
+    )
+  })
+
+  test('deleting the build block and its assertion is caught', () => {
+    const withoutAssertion = source.replace(
+      /\n\s+assertNativeBuildsRan\(builds\)\n/,
+      '\n'
+    )
+    assert.ok(
+      watchBuildProblems(withoutAssertion).includes(
+        'assertNativeBuildsRan(builds) not called'
+      )
+    )
+    const start = source.indexOf('    const builds = []')
+    const end = source.indexOf('    assertNativeBuildsRan(builds)\n')
+    const withoutBlock =
+      source.slice(0, start) +
+      source.slice(end + '    assertNativeBuildsRan(builds)\n'.length)
+    assert.ok(
+      watchBuildProblems(withoutBlock).length >= 3,
+      watchBuildProblems(withoutBlock).join(', ')
+    )
+  })
+})

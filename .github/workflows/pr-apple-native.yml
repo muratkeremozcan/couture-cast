@@ -153,8 +153,10 @@ jobs:
         run: npm run test:watchos-prebuild --workspace mobile
 
   # The Foundation-only Swift rules on Linux, in the Swift 6.1.2 toolchain. The packages declare
-  # tools version 5.9, so this toolchain and apple-native's Xcode 26.4 or later compile them in
-  # the same Swift 5 language mode. swift-crypto stands in for CryptoKit here (each Package.swift).
+  # tools version 5.9, so this compiler and the Swift 6.3 of apple-native's Xcode 26.4 or later
+  # both build them in the Swift 5 language mode; 6.1.2 stays because the mutant runs (27 of 27
+  # killed) and the hang study below used it. swift-crypto stands in for CryptoKit here (each
+  # Package.swift), and apple-native-workflow.test.mjs bans Apple-only imports from these sources.
   # The tests run on one CPU (taskset): on a multi-core Linux host the XCTest runner of Swift
   # 6.1.2 and 6.2.1 hung inside a test in 20 to 40% of runs (main thread in ppoll, local Docker
   # on arm64, 2026-11-12), even for the six pure focus rules; pinned to one CPU it passed every
