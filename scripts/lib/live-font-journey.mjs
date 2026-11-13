@@ -180,6 +180,8 @@ export async function runScreenJourney({
     await io.navigate()
     let before = await io.fullText(await io.settle('before', base))
     let from = base
+    // Every capture of this launch's earlier legs: heights a measurement cache could hand back.
+    const earlier = []
     for (const to of sequence) {
       await io.setScale(to)
       const immediate = await io.capture('immediate', to)
@@ -194,6 +196,7 @@ export async function runScreenJourney({
         settled,
         cold: cold[to].reference,
         coldBefore: cold[from].reference,
+        earlier: [...earlier],
         updated,
         coldUpdated: cold[to].updated,
         anchors: screen.anchors,
@@ -225,6 +228,7 @@ export async function runScreenJourney({
       }
       leg.evidence = { before, immediate, settled, updated }
       report.legs.push(leg)
+      earlier.push(before, immediate, settled, updated)
       await io.revert()
       before = await io.fullText(await io.settle('before', to))
       from = to

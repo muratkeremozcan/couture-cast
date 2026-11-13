@@ -166,11 +166,16 @@ function findProbe(map, probe) {
   return [...map.values()].find((node) => node.id === probe.id)
 }
 
-/** Live against cold heights for every node both show; a miss is stale when live kept `base`. */
-function parity(live, cold, base, tolerance) {
+/**
+ * Live against cold heights for every node both show. A miss is stale when live kept `base`'s
+ * height, or a height an `earlier` capture of the same launch measured for that text: the
+ * measurement cache hands back a box it made at another scale.
+ */
+function parity(live, cold, base, tolerance, earlier = []) {
   const liveNodes = keyed(live)
   const coldNodes = keyed(cold)
   const baseNodes = keyed(base)
+  const earlierNodes = earlier.map(keyed)
   const misses = []
   let compared = 0
   for (const [key, node] of liveNodes) {
@@ -178,12 +183,19 @@ function parity(live, cold, base, tolerance) {
     if (!counterpart) continue
     compared += 1
     if (Math.abs(height(node) - height(counterpart)) <= tolerance) continue
-    const before = baseNodes.get(key)
+    const kept = (other) =>
+      other !== undefined && Math.abs(height(node) - height(other)) <= tolerance
+    const staleFrom = kept(baseNodes.get(key))
+      ? 'before'
+      : earlierNodes.some((nodes) => kept(nodes.get(key)))
+        ? 'earlier'
+        : undefined
     misses.push({
       key,
       live: height(node),
       cold: height(counterpart),
-      stale: before !== undefined && Math.abs(height(node) - height(before)) <= tolerance,
+      stale: staleFrom !== undefined,
+      ...(staleFrom ? { staleFrom } : {}),
     })
   }
   return { pass: compared > 0 && misses.length === 0, compared, misses }
@@ -287,8 +299,9 @@ function assertChangeInputs({
 /**
  * The AC3 checks for one screen and one scale change. `anchors` are testIDs that sit above the
  * fold at every scale; `probes` ({ id, sizeSp }) are single-line text whose box should follow
- * the platform's text scaling. `coldBefore`, the cold launch at the leg's starting scale, is
- * where growth is measured from when given: a leg that starts on a stale screen (the return
+ * the platform's text scaling. `earlier` holds the captures of the same launch's previous legs,
+ * the heights a measurement cache could hand back. `coldBefore`, the cold launch at the leg's
+ * starting scale, is where growth is measured from when given: a leg that starts on a stale screen (the return
  * after a residual) would otherwise read correct text as text that failed to change.
  */
 export function evaluateLiveFontChange({
@@ -299,6 +312,7 @@ export function evaluateLiveFontChange({
   settled,
   cold,
   coldBefore,
+  earlier = [],
   updated,
   coldUpdated,
   anchors,
@@ -370,7 +384,7 @@ export function evaluateLiveFontChange({
       settled,
       ...(updated ? [updated] : []),
     ]),
-    coldParity: parity(settled, cold, before, tolerance),
+    coldParity: parity(settled, cold, before, tolerance, earlier),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
     clipping: clipping(settled, tolerance),
     controls: controlsOnScreen(settled, requiredControls),
@@ -380,7 +394,7 @@ export function evaluateLiveFontChange({
     // full comparison with the cold launch that made the same update.
     const coldKeys = [...keyed(coldUpdated).keys()].sort()
     const liveKeys = [...keyed(updated).keys()].sort()
-    const postParity = parity(updated, coldUpdated, before, tolerance)
+    const postParity = parity(updated, coldUpdated, before, tolerance, earlier)
     checks.postUpdateParity = {
       ...postParity,
       pass: postParity.pass && JSON.stringify(coldKeys) === JSON.stringify(liveKeys),

@@ -288,6 +288,45 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(verdict, 'unexpected')
   })
 
+  test('text measured at an earlier scale on the same launch is stale too', () => {
+    // The return leg's update brings back a label the 1.5 leg measured; it keeps that height.
+    const label = { text: 'Collapse', id: '', bounds: '[831,807][1017,872]' }
+    const reverse = {
+      platform: 'android',
+      before: stage('settled'),
+      immediate: { ...stage('before'), stage: 'immediate' },
+      settled: { ...stage('before'), stage: 'settled' },
+      cold: { ...stage('before'), stage: 'cold' },
+      coldBefore: cold(),
+      anchors: ANCHORS,
+      probes: PROBES,
+    }
+    reverse.updated = {
+      ...reverse.settled,
+      stage: 'updated',
+      nodes: [...reverse.settled.nodes, label],
+    }
+    reverse.coldUpdated = {
+      ...reverse.cold,
+      nodes: [...reverse.cold.nodes, { ...label, bounds: '[894,818][1017,861]' }],
+    }
+    const unexplained = evaluateLiveFontChange(reverse)
+    assert.equal(unexplained.verdict, 'unexpected')
+    assert.equal(unexplained.checks.postUpdateParity.misses[0].stale, false)
+    const earlier = [{ ...stage('settled'), nodes: [label] }]
+    const explained = evaluateLiveFontChange({ ...reverse, earlier })
+    assert.equal(explained.verdict, 'known-residual')
+    assert.equal(explained.checks.postUpdateParity.misses[0].staleFrom, 'earlier')
+    // A height no earlier capture showed stays unexplained.
+    const other = [
+      { ...stage('settled'), nodes: [{ ...label, bounds: '[831,807][1017,900]' }] },
+    ]
+    assert.equal(
+      evaluateLiveFontChange({ ...reverse, earlier: other }).verdict,
+      'unexpected'
+    )
+  })
+
   test('a whole, same-mount update that matches its cold reference stays fixed', () => {
     const change = fixedChange()
     change.updated = correct(stage('settled'))
