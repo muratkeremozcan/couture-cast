@@ -24,7 +24,7 @@ import { expectedTextRatio } from './live-font-scale-proof.mjs'
  */
 function fakeDevice(
   platform,
-  { breakAt, throwAt, dropMountAt, remountOnRevert, noScreenMount } = {}
+  { breakAt, throwAt, dropMountAt, remountOnRevert, noScreenMount, staleColdAt } = {}
 ) {
   const calls = []
   let launches = 0
@@ -101,7 +101,7 @@ function fakeDevice(
         launches += 1
         launch = `cold-${launches}`
         scale = at
-        return step(`cold:${at}`, screen('cold', at))
+        return step(`cold:${at}`, screen('cold', at, staleColdAt === String(at)))
       },
       launch: async () => {
         launch = 'live'
@@ -284,6 +284,30 @@ describe('runScreenJourney', () => {
       }
     )
     assert.equal(approved.legs[0].pass, true)
+  })
+
+  // TEA, 2026-11-13: a control that fails on this run fails it, whatever an approved entry's
+  // stored controlPass says.
+  test('a live control failure fails the run even with an approved residual entry', async () => {
+    const first = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5' }),
+      {
+        reactNativeVersion: '0.81.5',
+        label: 'sdk54-release',
+      }
+    )
+    const entry = first.legs[0].residualProposal
+    assert.equal(entry.review.controlPass, true)
+    const result = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5', staleColdAt: '1.5' }),
+      { reactNativeVersion: '0.81.5', label: 'sdk54-release', residualBaselines: [entry] }
+    )
+    assert.ok(result.controls.some((control) => !control.pass))
+    const verdict = aggregateVerdict([result], 'android')
+    assert.equal(verdict.pass, false)
+    assert.match(verdict.reasons.join(' '), /control/)
   })
 
   test('a capture failure fails the run and reports the missing legs (F-13)', async () => {
