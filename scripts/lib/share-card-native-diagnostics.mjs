@@ -912,9 +912,12 @@ export async function collectNativeFlowDiagnostics(input, { execute = spawnSync 
   fs.mkdirSync(privateDir, { mode: 0o700 })
   const artifacts = readArtifacts(input.output)
   const { rows, log } = artifacts
-  // A deadline kill leaves no failed-step hierarchy; the runner's after-timeout read stands in.
-  const hierarchy = artifacts.hierarchy ?? afterTimeoutHierarchy(input.output)
-  let { screenshot } = artifacts
+  // Codex RUNS-R4-02: the runner's after-timeout read exists only after a deadline kill, and
+  // then it and a fresh screenshot show the screen at the kill; a failed-step hierarchy or
+  // screenshot beside them is from an earlier retry. Ordinary failures keep the failed step.
+  const timedOut = afterTimeoutHierarchy(input.output)
+  const hierarchy = timedOut ?? artifacts.hierarchy
+  let screenshot = timedOut ? undefined : artifacts.screenshot
   const call = captureCall(input, execute, started, privateDir)
   screenshot = fallbackScreenshot(input, execute, privateDir, screenshot)
   const { system, logcat } = captureSystem(input, call)

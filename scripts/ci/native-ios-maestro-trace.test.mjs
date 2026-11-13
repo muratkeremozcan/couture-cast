@@ -3,6 +3,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
+import vm from 'node:vm'
+import {
+  iosDriverGlobalArgs,
+  iosDriverTestArgs,
+  recordIosDriverFlow,
+} from './native-ios-maestro-driver.mjs'
 import {
   maestroFlowProgress,
   shareCardApiRows,
@@ -995,6 +1001,14 @@ test('a zero threshold keeps every command of the flow', (t) => {
 
 // Story 6.15 (Codex RUNS-R3-01): a deadline kill leaves no failed-step artifacts, so the screen
 // and the app process at the kill are read after it.
+const OWNED_ARGS = [
+  '--device',
+  'AFA0777F-372A-445A-B8D4-08C287947144',
+  '--driver-host-port',
+  '17101',
+  'hierarchy',
+]
+
 test('an iOS deadline kill reads the hierarchy once more and keeps it beside the flow output', (t) => {
   const output = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-timeout-hierarchy-'))
   t.after(() => fs.rmSync(output, { recursive: true, force: true }))
@@ -1006,7 +1020,7 @@ test('an iOS deadline kill reads the hierarchy once more and keeps it beside the
   }
   const read = captureIosTimeoutHierarchy({
     maestroBinary: '/owned/maestro',
-    device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+    args: OWNED_ARGS,
     output,
     spawn: (binary, args, options) => {
       calls.push({ binary, args, options })
@@ -1015,17 +1029,30 @@ test('an iOS deadline kill reads the hierarchy once more and keeps it beside the
     report: (line) => reports.push(JSON.parse(line)),
   })
   assert.deepEqual(read, hierarchy)
-  assert.deepEqual(calls[0].args, [
-    '--device',
-    'AFA0777F-372A-445A-B8D4-08C287947144',
-    'hierarchy',
-  ])
+  assert.deepEqual(calls[0].args, OWNED_ARGS)
   assert.equal(calls[0].options.timeout, 120000)
   assert.deepEqual(
     JSON.parse(fs.readFileSync(path.join(output, TIMEOUT_HIERARCHY_FILE), 'utf8')),
     hierarchy
   )
   assert.equal(reports[0].iosTimeoutHierarchy.exitCode, 0)
+  // Without the runner's own argument list nothing is spawned: no bare `hierarchy` call.
+  const bare = []
+  for (const args of [undefined, ['--device', 'AFA0777F-372A-445A-B8D4-08C287947144']])
+    assert.equal(
+      captureIosTimeoutHierarchy({
+        maestroBinary: '/owned/maestro',
+        args,
+        output,
+        spawn: (binary, spawned) => {
+          bare.push(spawned)
+          return { status: 0, stdout: '{}' }
+        },
+        report: () => undefined,
+      }),
+      null
+    )
+  assert.deepEqual(bare, [])
   // A failed or unparsable read keeps nothing and never throws.
   for (const result of [
     { status: 1, stdout: '' },
@@ -1036,7 +1063,7 @@ test('an iOS deadline kill reads the hierarchy once more and keeps it beside the
     assert.equal(
       captureIosTimeoutHierarchy({
         maestroBinary: '/owned/maestro',
-        device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+        args: OWNED_ARGS,
         output: empty,
         spawn: () => result,
         report: () => undefined,
@@ -1115,18 +1142,137 @@ test('a killed flow falls back to the after-timeout hierarchy and records its so
   assert.deepEqual(entry.appProcess, { running: false })
 })
 
-test('the runner reads the after-timeout hierarchy only for an iOS deadline kill and hands it on', () => {
+// Codex RUNS-R4-01: the runner's own helper, run with the real driver-argument functions.
+function runnerAfterTimeout({ platform, directory, events }) {
   const runner = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
-  const helper = runner.slice(runner.indexOf('function afterTimeoutHierarchy('))
-  assert.match(
-    helper,
-    /if \(platform !== 'ios' \|\| !result\.deadline\?\.timedOut\) return null\n\s+return captureIosTimeoutHierarchy\(\{ maestroBinary, device, output \}\)/
+  const start = runner.indexOf('function afterTimeoutHierarchy(')
+  const end = runner.indexOf('\nfunction ', start + 1)
+  return vm.runInNewContext(`(${runner.slice(start, end)})`, {
+    platform,
+    directory,
+    device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+    maestroBinary: '/owned/maestro',
+    iosDriverGlobalArgs,
+    iosDriverTestArgs,
+    recordIosDriverFlow: (options) => {
+      events.push({ step: 'driver', ok: options.ok })
+      return recordIosDriverFlow({ ...options, spawn: () => ({ stdout: '' }) })
+    },
+    captureIosTimeoutHierarchy: ({ args, output }) => {
+      // The args array is built in the vm realm; compare it as plain data.
+      events.push({ step: 'capture', args: [...args], output })
+      return { attributes: {}, children: [] }
+    },
+  })
+}
+
+test('after an iOS deadline kill the runner stops the failed runner, then reads through the owned port', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-after-timeout-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  // An earlier flow passed, so the runner was marked reusable.
+  recordIosDriverFlow({
+    platform: 'ios',
+    directory,
+    device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+    ok: true,
+  })
+  assert.deepEqual(
+    iosDriverTestArgs({
+      platform: 'ios',
+      directory,
+      device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+    }),
+    ['--no-reinstall-driver']
   )
+  const events = []
+  const read = runnerAfterTimeout({ platform: 'ios', directory, events })
+  const hierarchy = read('ios', { status: null, deadline: { timedOut: true } }, '/out')
+  assert.deepEqual(hierarchy, { attributes: {}, children: [] })
+  // Stop first, so the read starts one fresh runner on the pinned port with no reuse flag.
+  assert.deepEqual(events, [
+    { step: 'driver', ok: false },
+    { step: 'capture', args: OWNED_ARGS, output: '/out' },
+  ])
+  for (const [where, result] of [
+    ['android', { status: null, deadline: { timedOut: true } }],
+    ['ios', { status: 1, deadline: { timedOut: false } }],
+    ['ios', { status: 1 }],
+  ]) {
+    const quiet = []
+    assert.equal(
+      runnerAfterTimeout({ platform: where, directory, events: quiet })(
+        where,
+        result,
+        '/out'
+      ),
+      null
+    )
+    assert.deepEqual(quiet, [])
+  }
+})
+
+test('the runner reads the after-timeout hierarchy before it records the failure', () => {
+  const runner = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
   const body = runner.slice(runner.indexOf('function maestro('))
   const read = body.indexOf(
     'const timeoutHierarchy = afterTimeoutHierarchy(platform, result, output)'
   )
   const progress = body.indexOf('recordIosFlowProgress({\n      timeoutHierarchy,')
   const diagnostics = body.indexOf('recordNativeFlowDiagnostics({')
-  assert.ok(read > 0 && progress > read && diagnostics > progress)
+  const stop = body.indexOf(
+    'recordIosDriverFlow({ platform, directory, device, ok: result.status === 0 })'
+  )
+  assert.ok(read > 0 && progress > read && diagnostics > progress && stop > diagnostics)
+})
+
+// Codex RUNS-R4-02: open-app.yaml retries, so a failed step beside the after-timeout read is an
+// earlier attempt's screen.
+test("after a deadline kill the after-timeout screen wins over an earlier retry's failed step; otherwise the failed step stands", (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-precedence-'))
+  const output = path.join(directory, 'maestro-ios-1')
+  fs.mkdirSync(path.join(output, 'screen-hierarchy'), { recursive: true })
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const earlier = {
+    attributes: {},
+    children: [
+      { attributes: { 'resource-id': 'breadcrumb' }, children: [] },
+      { attributes: {}, children: [] },
+    ],
+  }
+  fs.writeFileSync(
+    path.join(output, 'screen-hierarchy/failure.json'),
+    JSON.stringify(earlier)
+  )
+  fs.writeFileSync(
+    path.join(output, 'commands.json'),
+    JSON.stringify([
+      {
+        metadata: {
+          status: 'FAILED',
+          depth: 1,
+          sequenceNumber: 3,
+          artifacts: [
+            { type: 'SCREEN_HIERARCHY', path: 'screen-hierarchy/failure.json' },
+          ],
+        },
+      },
+    ])
+  )
+  const progress = (timeoutHierarchy) =>
+    recordIosFlowProgress({
+      platform: 'ios',
+      flow: 'maestro/story65/open-app.yaml',
+      maestroLog: '',
+      directory,
+      output,
+      timeoutHierarchy,
+      spawn: () => ({ status: 1, stdout: '' }),
+      report: () => undefined,
+    })
+  const killed = progress({ attributes: {}, children: [] })
+  assert.equal(killed.hierarchySource, 'after-timeout')
+  assert.equal(killed.systemSurface.nodeCount, 1)
+  const ordinary = progress(null)
+  assert.equal(ordinary.hierarchySource, 'failed-step')
+  assert.equal(ordinary.systemSurface.nodeCount, 3)
 })

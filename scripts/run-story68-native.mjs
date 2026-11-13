@@ -201,9 +201,23 @@ function run(binary, args, env = {}, cwd = root, input) {
   return result.stdout
 }
 /** The screen after an iOS deadline kill, which leaves no failed-step hierarchy; else null. */
+// Codex RUNS-R4-01: the killed flow's runner may be wedged, so it is stopped and its reuse mark
+// cleared first; the read then starts one fresh runner on the owned port, as hierarchyOutput()
+// would, and the failure path's recordIosDriverFlow stops that one after.
 function afterTimeoutHierarchy(platform, result, output) {
   if (platform !== 'ios' || !result.deadline?.timedOut) return null
-  return captureIosTimeoutHierarchy({ maestroBinary, device, output })
+  recordIosDriverFlow({ platform, directory, device, ok: false })
+  return captureIosTimeoutHierarchy({
+    maestroBinary,
+    output,
+    args: [
+      '--device',
+      device,
+      ...iosDriverGlobalArgs(platform),
+      'hierarchy',
+      ...iosDriverTestArgs({ platform, directory, device }),
+    ],
+  })
 }
 function requireDevice() {
   if (!device || !['android', 'ios'].includes(platform))

@@ -690,13 +690,15 @@ export const TIMEOUT_HIERARCHY_FILE = 'after-timeout-hierarchy.json'
 
 /**
  * Story 6.15 (Codex RUNS-R3-01): a flow the deadline killed leaves no failed-step artifacts, so
- * the screen at the kill was unknown. This reads the hierarchy once more through Maestro (its JVM
- * and driver start took 37 to 59 s on the iOS 26.5 simulator, hence 120 s) and keeps it beside
- * the flow's output. Returns the parsed hierarchy or null; never throws.
+ * the screen at the kill was unknown. This reads the hierarchy once more through Maestro and keeps
+ * it beside the flow's output. `args` are the runner's own (Codex RUNS-R4-01): the pinned
+ * `--driver-host-port` and its reuse flag, never a bare `hierarchy`, which cold-starts a second
+ * runner (run 40938852299 shard 2). JVM and driver start took 37 to 59 s on the iOS 26.5
+ * simulator, hence 120 s. Returns the parsed hierarchy or null; never throws.
  */
 export function captureIosTimeoutHierarchy({
   maestroBinary,
-  device,
+  args,
   output,
   spawn = spawnSync,
   report = console.log,
@@ -705,7 +707,8 @@ export function captureIosTimeoutHierarchy({
   const began = Date.now()
   let exitCode = null
   try {
-    const result = spawn(maestroBinary, ['--device', device, 'hierarchy'], {
+    if (!Array.isArray(args) || !args.includes('hierarchy')) return null
+    const result = spawn(maestroBinary, args, {
       encoding: 'utf8',
       timeout: timeoutMs,
       killSignal: 'SIGKILL',
@@ -763,9 +766,11 @@ export function readIosAppProcess({ device, appId, spawn = spawnSync }) {
   }
 }
 
+// Codex RUNS-R4-02: the after-timeout read exists only after a deadline kill, and then it is the
+// screen at the kill; a failed-step hierarchy beside it is from an earlier retry of the flow.
 const hierarchySource = (failedStep, timeoutHierarchy) =>
-  failedStep ? 'failed-step' : timeoutHierarchy ? 'after-timeout' : null
-const orTimeout = (failedStep, timeoutHierarchy) => failedStep ?? timeoutHierarchy
+  timeoutHierarchy ? 'after-timeout' : failedStep ? 'failed-step' : null
+const orTimeout = (failedStep, timeoutHierarchy) => timeoutHierarchy ?? failedStep
 const appProcessOf = ({ device, appId, spawn }) =>
   device && appId ? readIosAppProcess({ device, appId, spawn }) : null
 
@@ -794,7 +799,7 @@ export function recordIosFlowProgress({
     const hostSampled = output
       ? recordIosHostSample('flow-failure', { root, spawn, report })
       : false
-    // A deadline kill leaves no failed step, so the after-timeout read stands in for it.
+    // After a deadline kill the after-timeout read is the screen; else the failed step is.
     const failedStep = output ? failedStepHierarchy(output) : null
     const hierarchy = orTimeout(failedStep, timeoutHierarchy)
     const geometry = openerGeometry(hierarchy)
