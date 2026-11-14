@@ -1,6 +1,8 @@
 # F-00i text layout probe: design for TEA review
 
-Updated: 2026-11-14. Story 6.15, TD-01 and F-00i. Learning path Step 55.
+Updated: 2026-11-14. Story 6.15, TD-01 and F-00i. Learning path Step 55. The r44 TEA rulings
+(offWindow by translation, non-clipping and inverted scroll views, opacity refusal, ReactSwitch,
+accessibilityAncestor) are in the wire contract below.
 
 ## Problem
 
@@ -133,11 +135,13 @@ Each record carries these rect and visibility fields (rects `[left, top, right, 
 | `visibleRect`  | `viewRect` cut by every clipping ancestor and the window; null when nothing shows                                                          |
 | `clipRect`     | `viewRect` cut by its reach (below); null when no part of it can be brought into view                                                      |
 | `scrolledAway` | `visibleRect` null and `clipRect` not null: only a scroll position hides it, on the window or wholly off it                                |
-| `offWindow`    | `viewRect` lies wholly outside the window (a zero-size view by its origin) and no scroll view can bring it in, so `clipRect` is null       |
+| `offWindow`    | a translation put it wholly outside the window and out of reach: the rule below (r44 P1-1)                                                 |
 | `opacity`      | the effective opacity, unrounded on both platforms; only exactly 0 is invisible. iOS records hidden views too, at 0, as Android does alpha |
 
 Reach, per axis, from the window inward: every clipping ancestor cuts the band so far, and a
-scroll view that can move on that axis then widens it by its travel. With `cur` its offset and
+scroll view that can move on that axis then widens it by its travel, whether or not it clips
+(r44 P2-1: an iOS scroll view with `clipsToBounds` false cuts nothing but still moves its
+content; an Android scroll view always cuts to its viewport). With `cur` its offset and
 `max` its largest offset (Android: child extent less the padded viewport; iOS: `contentSize`
 plus the adjusted insets less the bounds; no travel when that is 0 or less, or scrolling is
 disabled: `getScrollEnabled()` false on React Native's Android scroll views, `isScrollEnabled`
@@ -147,8 +151,61 @@ the content up, so at offset 0 only content below V can scroll in and at `max` o
 above. Nested scroll views compose inner to outer, each with its own travel. A text only partly
 off the window with no scroll view above is cut by the window on every edge.
 
+Inverted scroll views (r44 P2-2). A scroll view is inverted on an axis when its content is
+flipped on screen there: on Android the product of the scale (`getScaleX`, `getScaleY`) of the
+scroll view and every ancestor above it is negative on that axis; on iOS the linear parts of the
+layer transforms of the scroll view and every ancestor above it, composed, have a negative `a`
+(x) or `d` (y). The composition matters: React Native's inverted list sets `scaleY: -1` on the
+iOS component view that holds the UIScrollView and `scale: -1` (both axes) on Android's
+ReactScrollView, and a flip inside a flip scrolls the usual way. An inverted scroll view's larger
+offset moves its content down (or right) on screen, so its band mirrors:
+`[V.start - (max - cur), V.end + cur]`. Android boxes come from the four corners of the view
+mapped through every matrix on the way (`transformMatrixToGlobal`), anchored at
+`getLocationOnScreen`, so a flipped scroll view's own box is where it is laid out.
+
+offWindow (r44 P1-1). A record is `offWindow` when all three hold: its `clipRect` is null; its
+`viewRect` lies wholly outside the window (a zero-size view by its origin); and the reach
+computed again with every translation removed is not null. Removing translations: each view
+on the way, the text view included, has a translation (Android `translationX`/`translationY`;
+iOS the layer transform's `tx`/`ty`) applied after its own scale, so it moves the view and
+everything inside it rigidly by that translation mapped through the linear parts (scale, flip;
+rotation on iOS) of the views outside it. Each rect, the text's and every ancestor's cut, moves
+back by the sum of those mapped translations from itself outward; scroll offsets, travel, the
+linear parts and the window stay. So a sheet or drawer parked off the window by a translation is
+`offWindow`, while a text wholly off the window by layout alone (a non-scrolling footer pushed
+past the bottom, a row item pushed past the right) has no reach either way and is not: it has
+`visibleRect` null, `clipRect` null, `scrolledAway` false and `offWindow` false, a full clip the
+harness fails in every stage and in the cold control. A text that the translation does not hide
+(off the window even untranslated, or cut to nothing by a clipper) is not `offWindow` either.
+
+Opacity refusal (r44 P3-1). A record whose effective opacity is not a number from 0 to 1 (NaN,
+from a NaN alpha anywhere up the chain) is never coerced or dropped: the whole answer is a
+refusal in place of the windows and records, written and delivered as any answer (chunked and
+hashed in logcat on Android, `<token>.json` on iOS):
+
+```json
+{"version":1,"token":"<token>","platform":"android","error":{"code":"text_probe_opacity_invalid","record":3,"kind":"ReactTextView"}}
+```
+
+`record` is the index the first such record has among the records, `kind` its kind. iOS writes
+the same shape with `"platform":"ios"` and sorted keys. The harness fails the leg on it.
+
+ReactSwitch (r44 3, Android). `com.facebook.react.views.switchview.ReactSwitch` (a
+SwitchCompat) is the known kind `ReactSwitch` when `showText` is false: its text is reported as
+the empty string, with no layout (`contentRect` = `viewRect`, `lineCount` 0, `maxLines` and
+`unlimitedLineCount` null). With `showText` true, or when `showText` cannot be read, it stays
+`unknown:<class>` and fails the leg: the thumb text has its own layout, which the TextView
+`Layout` does not describe.
+
+accessibilityAncestor (r44 4, iOS only). Each iOS record carries `accessibilityAncestor`:
+`{"identifier": "<accessibilityIdentifier>", "rect": [left, top, right, bottom]}` with `rect` in
+window points to a thousandth like `viewRect`, naming the text view itself or else its nearest
+ancestor below the window that is an accessibility element (`isAccessibilityElement`) with a
+non-empty `accessibilityIdentifier` (React Native's `testID`); `null` when none is. Android
+records omit the field.
+
 Harness invariants: `scrolledAway` implies `visibleRect` null; `offWindow` implies
 `visibleRect` null, `clipRect` null and `scrolledAway` false; a record with `visibleRect` null
 that is not `scrolledAway` has `clipRect` null. A text wholly below the fold that a scroll view
 reaches is `scrolledAway`; one no band reaches (no scroll view above, or too little travel) is
-`offWindow`.
+cut to nothing unless a translation put it off the window, which makes it `offWindow`.
