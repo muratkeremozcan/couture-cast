@@ -247,6 +247,24 @@ describe('the node commands a run block executes', () => {
     )
   })
 
+  test('a node heredoc keeps its code past a trailing comment or pipe, and its preloads (r16)', (t) => {
+    const root = fixture(t, {})
+    const inline = (run) => nodeLoads(root, run).inline
+    assert.deepEqual(
+      inline("node --input-type=module <<'EOF' # build the list\nimport 'yaml'\nEOF"),
+      ['yaml']
+    )
+    assert.deepEqual(
+      inline("node --input-type=module <<'EOF' | tee out.txt\nimport 'yaml'\nEOF"),
+      ['yaml']
+    )
+    assert.deepEqual(inline("node -r yaml <<'EOF'\nconsole.log(1)\nEOF"), ['yaml'])
+    assert.deepEqual(
+      inline("node --import yaml - <<'EOF' > out.json\nconsole.log(1)\nEOF"),
+      ['yaml']
+    )
+  })
+
   test('a relative import in a heredoc fed to node is followed (r14)', (t) => {
     const root = fixture(t, { 'scripts/a.mjs': yamlScript })
     const run = "node --input-type=module <<'EOF'\nimport './scripts/a.mjs'\nEOF"

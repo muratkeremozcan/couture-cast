@@ -488,8 +488,12 @@ function heredocs(run) {
   for (let i = 0; i < lines.length; i += 1) {
     const header = lines[i]
     kept.push(header)
+    let from = 0
     const opened = commands(header)
-      .map((command) => ({ command, marker: heredocMarker(command) }))
+      .map((command) => {
+        from = header.indexOf(command, from) + command.length
+        return { command, end: from, marker: heredocMarker(command) }
+      })
       .find(({ marker }) => marker)
     if (!opened) continue
     const body = []
@@ -501,9 +505,11 @@ function heredocs(run) {
     }
     const [program] = programOf(opened.command)
     if (program === 'node') {
-      // The node command gets a marker word, so its code is read where the command runs (after
-      // any cd before it).
-      kept[kept.length - 1] = `${header} ${STDIN_MARK}${nodeCode.length}`
+      // The node command gets a marker word right after its own text (before a trailing comment
+      // or a pipe), so its code is read where the command runs, after any cd before it.
+      const mark = ` ${STDIN_MARK}${nodeCode.length}`
+      kept[kept.length - 1] =
+        header.slice(0, opened.end) + mark + header.slice(opened.end)
       nodeCode.push(body.join('\n'))
     }
   }
@@ -543,12 +549,19 @@ export function nodeLoads(root, run, cwd = '.', depth = 0) {
     if (program === 'cd' && typeof args[0] === 'string')
       dir = path.relative(root, path.resolve(root, dir, args[0])) || '.'
     else if (program === 'node') {
-      const stdin = args.find(
-        (arg) => typeof arg === 'string' && arg.startsWith(STDIN_MARK)
-      )
+      const marked = (arg) => typeof arg === 'string' && arg.startsWith(STDIN_MARK)
+      const stdin = args.find(marked)
       if (stdin)
         stdinLoads(root, dir, nodeCode[Number(stdin.slice(STDIN_MARK.length))], loads)
-      else nodeCommand(root, dir, args, loads, programOf(command, { raw: true }).slice(1))
+      // Flags still apply to stdin code: node -r yaml <<'EOF' preloads yaml.
+      const unmarked = (list) => list.filter((arg) => !marked(arg))
+      nodeCommand(
+        root,
+        dir,
+        unmarked(args),
+        loads,
+        unmarked(programOf(command, { raw: true }).slice(1))
+      )
     } else if (depth >= 5) continue
     else if (program === 'bash' || program === 'sh') {
       const file = shellScript(root, dir, args)
