@@ -13,8 +13,12 @@ import fs from 'node:fs'
 import net from 'node:net'
 import { fileURLToPath } from 'node:url'
 
-/** Starts the tarpit; resolves once it listens. `port: 0` picks a free port. */
-export function startTarpit({ port = 0, host = '0.0.0.0' } = {}) {
+/**
+ * Starts the tarpit; resolves once it listens. `port: 0` picks a free port. It listens on
+ * loopback only: the Android emulator reaches it at 10.0.2.2 and the iOS simulator at
+ * 127.0.0.1, and a socket that holds every connection open has no business on other networks.
+ */
+export function startTarpit({ port = 0, host = '127.0.0.1' } = {}) {
   const sockets = new Set()
   let accepted = 0
   const server = net.createServer((socket) => {
