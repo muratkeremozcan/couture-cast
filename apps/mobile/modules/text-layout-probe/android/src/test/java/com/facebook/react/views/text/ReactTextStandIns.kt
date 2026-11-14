@@ -21,8 +21,16 @@ class PreparedLayout(
   val verticalOffset: Float
 )
 
+/** A prepared layout whose accessors are gone (renamed or minified), so only its fields read. */
+class FieldOnlyPreparedLayout(
+  @JvmField val layout: Layout,
+  @JvmField val maximumNumberOfLines: Int,
+  @JvmField val verticalOffset: Float
+)
+
 class PreparedLayoutTextView(context: Context) : ViewGroup(context), ReactCompoundView {
-  var preparedLayout: PreparedLayout? = null
+  /** A PreparedLayout, or any object that holds a Layout. */
+  var preparedLayout: Any? = null
 
   override fun onLayout(changed: Boolean, l: Int, t: Int, r: Int, b: Int) = Unit
 

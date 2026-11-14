@@ -74,7 +74,8 @@ class TextLayoutProbeWireTest {
     assertEquals(
       setOf(
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
-        "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "opacity"
+        "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
+        "opacity"
       ),
       first.keys().asSequence().toSet()
     )
@@ -83,18 +84,37 @@ class TextLayoutProbeWireTest {
     assertTrue(first.isNull("maxLines"))
     assertEquals(60, first.getJSONArray("contentRect").getInt(3))
     assertFalse(first.getBoolean("scrolledAway"))
+    assertFalse(first.getBoolean("offWindow"))
     assertEquals(0.25, first.getDouble("opacity"), 0.0)
     assertTrue(json.contains("\"opacity\":0.25}"))
   }
 
+  // TEA ruling 2026-11-14 (r43 P2): the raw opacity, so only an exact 0 reads as invisible.
   @Test
-  fun opacityIsWrittenInPlainNotationToFourDecimals() {
+  fun opacityIsWrittenUnroundedInPlainNotation() {
     assertEquals("1", TextLayoutProbeWire.number(1.0))
     assertEquals("0", TextLayoutProbeWire.number(0.0))
     assertEquals("0.25", TextLayoutProbeWire.number(0.25))
     assertEquals("0.0001", TextLayoutProbeWire.number(0.0001))
-    assertEquals("0", TextLayoutProbeWire.number(0.00001))
-    assertEquals("0.3333", TextLayoutProbeWire.number(1.0 / 3))
+    assertEquals("0.00001", TextLayoutProbeWire.number(0.00001))
+    assertEquals("0.3333333333333333", TextLayoutProbeWire.number(1.0 / 3))
+    // A view alpha is a float: its double reads back exactly.
+    for (alpha in listOf(4e-5f, 0.01f, 0.999f)) {
+      val written = TextLayoutProbeWire.number(alpha.toDouble())
+      assertFalse(written, written.contains('E') || written.contains('e'))
+      assertEquals(alpha.toDouble(), written.toDouble(), 0.0)
+    }
+  }
+
+  @Test
+  fun aFaintAndAnOffWindowRecordKeepTheirFieldsOnTheWire() {
+    val faint = record("Faint").copy(opacity = 4e-5f.toDouble(), offWindow = true)
+    val first = JSONObject(TextLayoutProbeWire.json("f", ProbeSnapshot(windows, listOf(faint))))
+      .getJSONArray("records").getJSONObject(0)
+    assertTrue(first.getDouble("opacity") > 0)
+    assertEquals(4e-5f.toDouble(), first.getDouble("opacity"), 0.0)
+    assertTrue(first.getBoolean("offWindow"))
+    assertFalse(first.getBoolean("scrolledAway"))
   }
 
   @Test

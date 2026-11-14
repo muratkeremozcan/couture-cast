@@ -47,6 +47,7 @@ object TextLayoutProbeWire {
       out.append(",\"unlimitedLineCount\":").append(record.unlimitedLineCount?.toString() ?: "null")
       out.append(",\"window\":").append(record.window)
       out.append(",\"scrolledAway\":").append(record.scrolledAway)
+      out.append(",\"offWindow\":").append(record.offWindow)
       out.append(",\"opacity\":").append(number(record.opacity))
       out.append('}')
     }
@@ -69,10 +70,12 @@ object TextLayoutProbeWire {
   fun sha256(bytes: ByteArray): String =
     MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
 
-  /** 0..1 to four decimals, in plain notation (no exponent), trailing zeros dropped. */
+  /**
+   * 0..1 unrounded (the shortest decimal that reads back as the same double), in plain notation
+   * (no exponent), trailing zeros dropped, so only an exact 0 reads as invisible.
+   */
   fun number(value: Double): String =
-    java.math.BigDecimal(value.coerceIn(0.0, 1.0))
-      .setScale(4, java.math.RoundingMode.HALF_UP)
+    java.math.BigDecimal(value.coerceIn(0.0, 1.0).toString())
       .stripTrailingZeros()
       .toPlainString()
 

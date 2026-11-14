@@ -31,6 +31,25 @@ data class ProbeRect(val left: Int, val top: Int, val right: Int, val bottom: In
   fun offset(dx: Int, dy: Int) = ProbeRect(left + dx, top + dy, right + dx, bottom + dy)
 }
 
+/** A scroll view's travel on one axis: its current offset and the largest one, in pixels. */
+data class ScrollTravel(val offset: Int, val maximum: Int)
+
+data class ProbeCuts(
+  val visible: ProbeRect?,
+  val clip: ProbeRect?,
+  val scrolledAway: Boolean,
+  val offWindow: Boolean
+)
+
+/** One axis of a rect. */
+data class Span(val lo: Int, val hi: Int) {
+  /** The overlap with lo..hi, or null when it is empty. */
+  fun narrow(lo: Int, hi: Int): Span? {
+    val cut = Span(maxOf(this.lo, lo), minOf(this.hi, hi))
+    return if (cut.hi > cut.lo) cut else null
+  }
+}
+
 data class ProbeWindow(val id: Int, val rect: ProbeRect, val z: Int, val focused: Boolean)
 
 data class ProbeRecord(
@@ -46,6 +65,7 @@ data class ProbeRecord(
   val unlimitedLineCount: Int?,
   val window: Int,
   val scrolledAway: Boolean,
+  val offWindow: Boolean = false,
   val opacity: Double = 1.0
 )
 
@@ -139,6 +159,7 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       unlimitedLineCount = reading.unlimitedLineCount,
       window = window,
       scrolledAway = cuts.scrolledAway,
+      offWindow = cuts.offWindow,
       opacity = effectiveOpacity(view)
     )
   }
@@ -222,42 +243,32 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
     return null
   }
 
-  private class Cuts(val visible: ProbeRect?, val clip: ProbeRect?, val scrolledAway: Boolean)
+  /** One ancestor on the way up: the rects it cuts its descendants to and its scroll travel. */
+  class Level(
+    val cuts: List<ProbeRect>,
+    val scrollX: ScrollTravel? = null,
+    val scrollY: ScrollTravel? = null
+  )
 
-  /**
-   * visibleRect: the view's own rect cut by every ancestor that clips its descendants and by the
-   * window. clipRect: the same, except on a scroll axis. A ScrollView scrolls vertically and a
-   * HorizontalScrollView horizontally; on its scroll axis neither the scroll view nor anything
-   * above it (the root views that clip at the screen edge, the window) cuts clipRect, since
-   * content cut there is only scrolled off and can be scrolled into the viewport. On the other
-   * axis the scroll view (its bounds, padding and clip bounds) and everything above it cut as any
-   * clipping ancestor does.
-   */
-  private fun clips(view: View, viewRect: ProbeRect, windowRect: ProbeRect): Cuts {
-    var visible: ProbeRect? = viewRect
-    var clip: ProbeRect? = viewRect
-    // The scroll axes passed on the way up, open for clipRect from there to the window.
-    var openX = false
-    var openY = false
+  private fun clips(view: View, viewRect: ProbeRect, windowRect: ProbeRect): ProbeCuts {
+    val levels = mutableListOf<Level>()
     var parent = view.parent
     while (parent is View) {
       val ancestor = parent as View
       val bounds = screenRect(ancestor)
-      val scrollsX = ancestor is HorizontalScrollView
-      val scrollsY = ancestor is ScrollView
+      val scrollView = ancestor is ScrollView || ancestor is HorizontalScrollView
       // A scroll view always cuts its content to its viewport, whatever its parent's flags.
-      val cuts = ancestorClips(ancestor, bounds) + if (scrollsX || scrollsY) listOf(bounds) else emptyList()
-      for (cut in cuts) {
-        visible = visible?.intersect(cut)
-        clip = clip?.intersect(openAxes(cut, openX || scrollsX, openY || scrollsY))
-      }
-      openX = openX || scrollsX
-      openY = openY || scrollsY
+      val cuts = ancestorClips(ancestor, bounds) + if (scrollView) listOf(bounds) else emptyList()
+      levels.add(
+        Level(
+          cuts,
+          scrollX = (ancestor as? HorizontalScrollView)?.let { travel(it) },
+          scrollY = (ancestor as? ScrollView)?.let { travel(it) }
+        )
+      )
       parent = ancestor.parent
     }
-    visible = visible?.intersect(windowRect)
-    clip = clip?.intersect(openAxes(windowRect, openX, openY))
-    return Cuts(visible, clip, scrolledAway(viewRect, visible, clip, windowRect))
+    return cuts(viewRect, levels, windowRect)
   }
 
   /** The rects in screen space that [ancestor] cuts its descendants' drawing to. */
@@ -296,24 +307,83 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
   }
 
   companion object {
+    /**
+     * visibleRect: [viewRect] cut by every level's cuts and the window. clipRect: the text's
+     * reach. On each axis, from the window inward, every level's cuts narrow the band so far and
+     * a scroll view that can move on that axis then widens it by its own travel ([widen]). So a
+     * scroll view's band is its padded viewport cut by everything above it (outer scroll views'
+     * bands included) widened by its travel, nested scroll views compose, and a scroll view with
+     * no travel (no overflow, scrolling disabled) cuts as any clipper does. Levels run nearest
+     * first. offWindow: the view lies wholly outside the window; scrolledAway: not off the
+     * window, not visible, yet within reach.
+     */
+    fun cuts(viewRect: ProbeRect, levels: List<Level>, windowRect: ProbeRect): ProbeCuts {
+      var visible: ProbeRect? = viewRect
+      for (level in levels) for (cut in level.cuts) visible = visible?.intersect(cut)
+      visible = visible?.intersect(windowRect)
+      var x: Span? = Span(windowRect.left, windowRect.right)
+      var y: Span? = Span(windowRect.top, windowRect.bottom)
+      for (level in levels.asReversed()) {
+        for (cut in level.cuts) {
+          x = x?.narrow(cut.left, cut.right)
+          y = y?.narrow(cut.top, cut.bottom)
+        }
+        x = widen(x, level.scrollX)
+        y = widen(y, level.scrollY)
+      }
+      val clip =
+        if (x != null && y != null) viewRect.intersect(ProbeRect(x.lo, y.lo, x.hi, y.hi)) else null
+      val off = offWindow(viewRect, windowRect)
+      return ProbeCuts(
+        visible,
+        clip,
+        scrolledAway = !off && visible == null && clip != null,
+        offWindow = off
+      )
+    }
+
+    /**
+     * The band of positions a scroll view can bring into [span]. A larger scroll offset moves the
+     * content up (or left), so a text now at p shows after a further scroll by d when p - d lies
+     * in span, for d from -offset (back to the start) to maximum - offset (to the end): the band
+     * runs from span start minus offset to span end plus (maximum minus offset).
+     */
+    private fun widen(span: Span?, travel: ScrollTravel?): Span? {
+      if (span == null || travel == null) return span
+      return Span(span.lo - travel.offset, span.hi + travel.maximum - travel.offset)
+    }
+
+    /**
+     * A scroll view's travel on its axis: the child's extent less the padded viewport, the current
+     * offset clamped into it; null when the content does not overflow or scrolling is disabled
+     * (React Native's scroll views carry scrollEnabled, read by name).
+     */
+    fun travel(scroll: ViewGroup): ScrollTravel? {
+      val child = scroll.getChildAt(0) ?: return null
+      val horizontal = scroll is HorizontalScrollView
+      val enabled =
+        try {
+          scroll.javaClass.getMethod("getScrollEnabled").invoke(scroll) as? Boolean ?: true
+        } catch (_: ReflectiveOperationException) {
+          true
+        }
+      if (!enabled) return null
+      val maximum =
+        if (horizontal) child.width - (scroll.width - scroll.paddingLeft - scroll.paddingRight)
+        else child.height - (scroll.height - scroll.paddingTop - scroll.paddingBottom)
+      if (maximum <= 0) return null
+      val offset = if (horizontal) scroll.scrollX else scroll.scrollY
+      return ScrollTravel(offset.coerceIn(0, maximum), maximum)
+    }
+
+    /** Off the window: wholly outside it (a zero-size view by its corner), reported apart. */
+    fun offWindow(viewRect: ProbeRect, windowRect: ProbeRect): Boolean = disjoint(viewRect, windowRect)
+
     fun screenRect(view: View): ProbeRect {
       val at = IntArray(2)
       view.getLocationOnScreen(at)
       return ProbeRect(at[0], at[1], at[0] + view.width, at[1] + view.height)
     }
-
-    /**
-     * Scrolled away: outside the window, or cut to nothing only once scroll viewports cut it (its
-     * clipRect, which no scroll view cuts, is left). A text that a non-scroll ancestor or a
-     * zero-size container cuts to nothing is not. So scrolledAway implies no visibleRect, and a
-     * text with no visibleRect that is not scrolled away has no clipRect either.
-     */
-    fun scrolledAway(
-      viewRect: ProbeRect,
-      visible: ProbeRect?,
-      clip: ProbeRect?,
-      windowRect: ProbeRect
-    ): Boolean = disjoint(viewRect, windowRect) || (visible == null && clip != null)
 
     /**
      * Whether [rect] lies entirely outside [area]: no shared area, or for a zero-size rect, its
@@ -325,16 +395,6 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       } else {
         rect.intersect(area) == null
       }
-
-    private const val OPEN = 1 shl 29
-
-    /** [cut] with both edges of each open axis opened. */
-    fun openAxes(cut: ProbeRect, openX: Boolean, openY: Boolean) = ProbeRect(
-      if (openX) -OPEN else cut.left,
-      if (openY) -OPEN else cut.top,
-      if (openX) OPEN else cut.right,
-      if (openY) OPEN else cut.bottom
-    )
 
     /**
      * The opacity the view draws with: the product of its own and every ancestor's alpha up to the
@@ -379,37 +439,70 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       if (layout == null) return null
       if (maxLines == null) return layout.lineCount
       val text = textView.text ?: return null
-      return relaidLines(text, layout, textView.includeFontPadding, textView)
+      return relaidLines(text, layout, textView.includeFontPadding, BreakSettings.of(textView))
     }
 
     /**
      * A prepared layout keeps only its Layout. With ellipsizeMode clip its text is the source text
-     * and is laid out again without the cap; an ellipsizing Layout holds its text with the
-     * ellipsis in place (Layout.Ellipsizer), which cannot be laid out again, so that is null.
+     * and is laid out again without the cap, with the break settings the Layout itself carries;
+     * an ellipsizing Layout holds its text with the ellipsis in place (Layout.Ellipsizer), which
+     * cannot be laid out again, so that is null.
      */
     fun preparedUnlimitedLines(layout: Layout, maxLines: Int?): Int? {
       if (maxLines == null) return layout.lineCount
       val text = layout.text ?: return null
       if (text.javaClass.name.contains("Ellipsizer")) return null
-      return relaidLines(text, layout, layout.topPadding != 0 || layout.bottomPadding != 0, null)
+      return relaidLines(
+        text,
+        layout,
+        layout.topPadding != 0 || layout.bottomPadding != 0,
+        BreakSettings.of(layout)
+      )
+    }
+
+    /**
+     * The line breaking a re-layout must repeat. A TextView carries it; a Layout alone exposes it
+     * from API 35 (Layout.getBreakStrategy and its siblings), and below that StaticLayout's
+     * defaults are what a PreparedLayoutTextView's layout was built with unless React Native set
+     * them, which cannot be read.
+     */
+    class BreakSettings(
+      val breakStrategy: Int,
+      val hyphenationFrequency: Int,
+      val justificationMode: Int?
+    ) {
+      companion object {
+        fun of(textView: TextView) = BreakSettings(
+          textView.breakStrategy,
+          textView.hyphenationFrequency,
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) textView.justificationMode else null
+        )
+
+        fun of(layout: Layout): BreakSettings? =
+          if (Build.VERSION.SDK_INT >= 35) {
+            BreakSettings(layout.breakStrategy, layout.hyphenationFrequency, layout.justificationMode)
+          } else {
+            null
+          }
+      }
     }
 
     /** The line count of [text] laid out at [layout]'s width, paint and spacing, with no cap. */
-    private fun relaidLines(
+    fun relaidLines(
       text: CharSequence,
       layout: Layout,
       includePad: Boolean,
-      textView: TextView?
+      settings: BreakSettings?
     ): Int {
       val builder = StaticLayout.Builder.obtain(text, 0, text.length, layout.paint, layout.width)
         .setAlignment(layout.alignment)
         .setLineSpacing(layout.spacingAdd, layout.spacingMultiplier)
         .setIncludePad(includePad)
-      if (textView != null) {
-        builder.setBreakStrategy(textView.breakStrategy)
-        builder.setHyphenationFrequency(textView.hyphenationFrequency)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          builder.setJustificationMode(textView.justificationMode)
+      if (settings != null) {
+        builder.setBreakStrategy(settings.breakStrategy)
+        builder.setHyphenationFrequency(settings.hyphenationFrequency)
+        settings.justificationMode?.let {
+          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) builder.setJustificationMode(it)
         }
       }
       return builder.build().lineCount
@@ -486,14 +579,25 @@ class PreparedLayoutRead(
       try {
         prepared.javaClass.getMethod("getVerticalOffset").invoke(prepared) as Float
       } catch (_: ReflectiveOperationException) {
-        0f
+        field(prepared, "verticalOffset") as? Float ?: 0f
       }
 
     private fun maxLinesOf(prepared: Any): Int =
       try {
         prepared.javaClass.getMethod("getMaximumNumberOfLines").invoke(prepared) as Int
       } catch (_: ReflectiveOperationException) {
-        -1
+        field(prepared, "maximumNumberOfLines") as? Int ?: -1
       }
+
+    /** A declared field's value by name, as layoutOf falls back to a field when the getter is gone. */
+    private fun field(prepared: Any, name: String): Any? {
+      val found = prepared.javaClass.declaredFields.firstOrNull { it.name == name } ?: return null
+      return try {
+        found.isAccessible = true
+        found.get(prepared)
+      } catch (_: ReflectiveOperationException) {
+        null
+      }
+    }
   }
 }

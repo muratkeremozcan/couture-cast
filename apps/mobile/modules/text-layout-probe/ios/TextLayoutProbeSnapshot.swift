@@ -20,20 +20,21 @@ enum TextLayoutProbeSnapshot {
     return try TextLayoutProbeWire.json(token: token, windows: windows, records: records)
   }
 
+  /// Every text view, hidden and faded ones included, with the opacity it draws with.
   private static func collect(
     _ view: UIView,
     in window: UIWindow,
     id: Int,
     into records: inout [TextLayoutProbeWire.Record]
   ) {
-    if view.isHidden || view.alpha <= 0.01 { return }
-    if var record = record(view, in: window, id: id) {
-      record.opacity = opacity(view)
-      records.append(record)
+    TextLayoutProbeWire.collect(
+      view,
+      layer: { .init(alpha: $0.alpha, opacity: $0.layer.opacity, hidden: $0.isHidden) },
+      children: { $0.subviews },
+      read: { record($0, in: window, id: id) },
       // A UIKit text control draws its own internals (placeholder labels, field editors).
-      if !TLPParagraphReader.isParagraphLikeView(view) { return }
-    }
-    for subview in view.subviews { collect(subview, in: window, id: id, into: &records) }
+      descends: { TLPParagraphReader.isParagraphLikeView($0) },
+      into: &records)
   }
 
   private static func record(_ view: UIView, in window: UIWindow, id: Int)
@@ -72,7 +73,8 @@ enum TextLayoutProbeSnapshot {
         ellipsized: measure.ellipsized,
         unlimitedLineCount: measure.unlimitedLineCount,
         window: id,
-        scrolledAway: cuts.scrolledAway)
+        scrolledAway: cuts.scrolledAway,
+        offWindow: cuts.offWindow)
     }
     // Any other text renderer is reported, so a renderer change cannot hide text from the probe.
     let text: String?
@@ -136,7 +138,8 @@ enum TextLayoutProbeSnapshot {
       kind: "RCTTextInputComponentView", text: shown.string, viewRect: viewRect,
       visibleRect: cuts.visible, clipRect: cuts.clip, contentRect: content,
       lineCount: input.lineCount, maxLines: input.maxLines, ellipsized: input.ellipsized,
-      unlimitedLineCount: input.unlimitedLineCount, window: id, scrolledAway: cuts.scrolledAway)
+      unlimitedLineCount: input.unlimitedLineCount, window: id, scrolledAway: cuts.scrolledAway,
+      offWindow: cuts.offWindow)
   }
 
   /// The UITextField or UITextView inside a text input component view, nearest first.
@@ -157,7 +160,8 @@ enum TextLayoutProbeSnapshot {
     return .init(
       kind: "unknown:\(className)", text: text, viewRect: viewRect, visibleRect: cuts.visible,
       clipRect: cuts.clip, contentRect: viewRect, lineCount: 0, maxLines: nil, ellipsized: 0,
-      unlimitedLineCount: nil, window: id, scrolledAway: cuts.scrolledAway)
+      unlimitedLineCount: nil, window: id, scrolledAway: cuts.scrolledAway,
+      offWindow: cuts.offWindow)
   }
 
   private static func clip(_ view: UIView, _ viewRect: CGRect, _ window: UIWindow)
@@ -171,31 +175,27 @@ enum TextLayoutProbeSnapshot {
           rect: ancestor.convert(ancestor.bounds, to: window),
           clips: ancestor.clipsToBounds || ancestor.layer.masksToBounds
             || ancestor.layer.mask != nil,
-          scrollsX: scrolls(ancestor, horizontally: true),
-          scrollsY: scrolls(ancestor, horizontally: false)))
+          scrollX: travel(ancestor, horizontally: true),
+          scrollY: travel(ancestor, horizontally: false)))
       parent = ancestor.superview
     }
     return TextLayoutProbeWire.cuts(viewRect: viewRect, ancestors: ancestors, window: window.bounds)
   }
 
-  /// Whether a view is a scroll view that can scroll on the axis: its content, with the insets,
-  /// is larger than its bounds there (a horizontal React Native ScrollView has wider content).
-  private static func scrolls(_ view: UIView, horizontally: Bool) -> Bool {
-    guard let scroll = view as? UIScrollView, !(view is UITextView) else { return false }
+  /// A scroll view's travel on one axis: nil unless it is a scroll view with scrolling enabled
+  /// whose content, with the adjusted insets, is larger than its bounds there (a horizontal React
+  /// Native ScrollView has wider content).
+  private static func travel(_ view: UIView, horizontally: Bool) -> TextLayoutProbeWire.Scroll? {
+    guard let scroll = view as? UIScrollView, !(view is UITextView) else { return nil }
     let inset = scroll.adjustedContentInset
     return horizontally
-      ? scroll.contentSize.width + inset.left + inset.right > scroll.bounds.width + 0.5
-      : scroll.contentSize.height + inset.top + inset.bottom > scroll.bounds.height + 0.5
-  }
-
-  /// The view and every ancestor up to and including its window, for its effective opacity.
-  private static func opacity(_ view: UIView) -> Double {
-    var chain: [TextLayoutProbeWire.Layer] = []
-    var current: UIView? = view
-    while let layer = current {
-      chain.append(.init(alpha: layer.alpha, opacity: layer.layer.opacity, hidden: layer.isHidden))
-      current = layer.superview
-    }
-    return TextLayoutProbeWire.effectiveOpacity(chain)
+      ? TextLayoutProbeWire.travel(
+        content: scroll.contentSize.width, insetStart: inset.left, insetEnd: inset.right,
+        bounds: scroll.bounds.width, offset: scroll.contentOffset.x,
+        enabled: scroll.isScrollEnabled)
+      : TextLayoutProbeWire.travel(
+        content: scroll.contentSize.height, insetStart: inset.top, insetEnd: inset.bottom,
+        bounds: scroll.bounds.height, offset: scroll.contentOffset.y,
+        enabled: scroll.isScrollEnabled)
   }
 }

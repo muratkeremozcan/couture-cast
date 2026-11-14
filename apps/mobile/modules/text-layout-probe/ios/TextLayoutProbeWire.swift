@@ -28,6 +28,7 @@ enum TextLayoutProbeWire {
     let unlimitedLineCount: Int?
     let window: Int
     let scrolledAway: Bool
+    let offWindow: Bool
     var opacity: Double = 1
   }
 
@@ -47,6 +48,33 @@ enum TextLayoutProbeWire {
       opacity *= min(max(Double(layer.alpha), 0), 1) * min(max(Double(layer.opacity), 0), 1)
     }
     return opacity
+  }
+
+  /// Walks a view tree from its window and records every text view, hidden or faded ones
+  /// included, each with the opacity it draws with (`effectiveOpacity` of it and its ancestors):
+  /// the harness counts only an exact 0 as invisible, so nothing is skipped here. `read` gives a
+  /// node's record, if it renders text; `descends` says whether the walk goes on below a node
+  /// that gave one (a UIKit text control draws its own internals).
+  static func collect<Node>(
+    _ node: Node,
+    layer: (Node) -> Layer,
+    children: (Node) -> [Node],
+    read: (Node) -> Record?,
+    descends: (Node) -> Bool,
+    above: [Layer] = [],
+    into records: inout [Record]
+  ) {
+    let chain = above + [layer(node)]
+    if var record = read(node) {
+      record.opacity = effectiveOpacity(chain)
+      records.append(record)
+      if !descends(node) { return }
+    }
+    for child in children(node) {
+      collect(
+        child, layer: layer, children: children, read: read, descends: descends, above: chain,
+        into: &records)
+    }
   }
 
   /// Tokens name the answer file, so they carry no path separator or whitespace.
@@ -72,64 +100,92 @@ enum TextLayoutProbeWire {
     return cut(rect, area) == nil
   }
 
+  /// How far a scroll view's content can move on one axis: `offset` is the current scroll
+  /// position from the start of the range (clamped into it) and `maximum` the largest one.
+  struct Scroll {
+    let offset: CGFloat
+    let maximum: CGFloat
+  }
+
+  /// The travel of a scroll view on one axis, or nil when it cannot move there: scrolling is
+  /// disabled, or the content with its adjusted insets is no larger than the bounds. `offset` is
+  /// the raw contentOffset, which starts at minus the leading inset.
+  static func travel(
+    content: CGFloat, insetStart: CGFloat, insetEnd: CGFloat, bounds: CGFloat, offset: CGFloat,
+    enabled: Bool
+  ) -> Scroll? {
+    guard enabled else { return nil }
+    let maximum = content + insetStart + insetEnd - bounds
+    guard maximum > 0.5 else { return nil }
+    return Scroll(offset: min(max(offset + insetStart, 0), maximum), maximum: maximum)
+  }
+
   /// One ancestor on the way from a text view to its window.
   struct Ancestor {
     let rect: CGRect
     let clips: Bool
-    /// A scroll view that can scroll on that axis: its content is larger than its bounds there.
-    var scrollsX = false
-    var scrollsY = false
+    /// A scroll view's travel on each axis it can scroll; nil on an axis it cannot.
+    var scrollX: Scroll? = nil
+    var scrollY: Scroll? = nil
   }
 
   struct Cuts {
     let visible: CGRect?
     let clip: CGRect?
     let scrolledAway: Bool
+    let offWindow: Bool
   }
 
-  /// Scrolled away: outside the window, or cut to nothing only once scroll viewports cut it (its
-  /// clipRect, which no scroll view cuts, is left). A text that a non-scroll ancestor or a
-  /// zero-size container cuts to nothing is not. So scrolledAway implies no visibleRect, and a
-  /// text with no visibleRect that is not scrolled away has no clipRect either.
-  static func scrolledAway(_ viewRect: CGRect, _ visible: CGRect?, _ clip: CGRect?, _ window: CGRect)
-    -> Bool
-  {
-    disjoint(viewRect, window) || (visible == nil && clip != nil)
+  /// Off the window: the view lies wholly outside it (a zero-size one by its origin), whatever
+  /// the scroll views above could do. Reported apart from scrolledAway, which it excludes.
+  static func offWindow(_ viewRect: CGRect, _ window: CGRect) -> Bool {
+    disjoint(viewRect, window)
   }
 
-  /// visibleRect: cut by every clipping ancestor and the window. clipRect: the same, except on a
-  /// scroll axis: on the axis a clipping scroll view scrolls, neither it nor anything above it
-  /// (screen containers, the window) cuts clipRect, since content cut there is only scrolled off
-  /// and can be scrolled into the viewport. On the other axis the scroll view and everything
-  /// above it cut as any clipping ancestor does. Ancestors run nearest first.
+  /// One axis of a rect, or nil when it is empty.
+  private typealias Span = (lo: CGFloat, hi: CGFloat)
+
+  private static func narrow(_ span: Span?, _ lo: CGFloat, _ hi: CGFloat) -> Span? {
+    guard let span else { return nil }
+    let cut: Span = (max(span.lo, lo), min(span.hi, hi))
+    return cut.hi > cut.lo ? cut : nil
+  }
+
+  /// The band of positions a scroll view can bring into `span`. A larger offset moves the content
+  /// up (or left), so text now at p shows after a further scroll by d when p - d lies in span, for
+  /// d from -offset (back to the start) to maximum - offset (to the end): the band runs from
+  /// span start minus offset to span end plus (maximum minus offset).
+  private static func widen(_ span: Span?, _ scroll: Scroll?) -> Span? {
+    guard let span, let scroll else { return span }
+    return (span.lo - scroll.offset, span.hi + scroll.maximum - scroll.offset)
+  }
+
+  /// visibleRect: cut by every clipping ancestor and the window. clipRect: the text's reach. On
+  /// each axis, from the window inward, every clipping ancestor cuts the band so far, and each
+  /// scroll view that can move on that axis then widens it by its own travel (`widen`). So a
+  /// scroll view's band is its viewport cut by everything above it (outer scroll views' bands
+  /// included) widened by its travel, nested scroll views compose, and an axis with no travel
+  /// cuts as any clipper does. scrolledAway: not off the window, not visible, yet within reach.
   static func cuts(viewRect: CGRect, ancestors: [Ancestor], window: CGRect) -> Cuts {
     var visible: CGRect? = viewRect
-    var clip: CGRect? = viewRect
-    // The scroll axes passed on the way up, open for clipRect from there to the window. Only a
-    // clipping scroll view opens one.
-    var openX = false
-    var openY = false
-    for ancestor in ancestors {
-      guard ancestor.clips else { continue }
-      visible = cut(visible, ancestor.rect)
-      clip = cut(
-        clip, openAxes(ancestor.rect, x: openX || ancestor.scrollsX, y: openY || ancestor.scrollsY))
-      openX = openX || ancestor.scrollsX
-      openY = openY || ancestor.scrollsY
-    }
+    for ancestor in ancestors where ancestor.clips { visible = cut(visible, ancestor.rect) }
     visible = cut(visible, window)
-    clip = cut(clip, openAxes(window, x: openX, y: openY))
-    return Cuts(visible: visible, clip: clip, scrolledAway: scrolledAway(viewRect, visible, clip, window))
-  }
-
-  /// `rect` with both edges of each open axis opened.
-  static func openAxes(_ rect: CGRect, x: Bool, y: Bool) -> CGRect {
-    let open = CGFloat(1 << 29)
-    let left = x ? -open : rect.minX
-    let top = y ? -open : rect.minY
-    let right = x ? open : rect.maxX
-    let bottom = y ? open : rect.maxY
-    return CGRect(x: left, y: top, width: right - left, height: bottom - top)
+    var x: Span? = (window.minX, window.maxX)
+    var y: Span? = (window.minY, window.maxY)
+    // Ancestors run nearest first, so the reach is built from the outermost one in.
+    // A scroll view that does not clip cuts nothing and so widens nothing.
+    for ancestor in ancestors.reversed() where ancestor.clips {
+      x = widen(narrow(x, ancestor.rect.minX, ancestor.rect.maxX), ancestor.scrollX)
+      y = widen(narrow(y, ancestor.rect.minY, ancestor.rect.maxY), ancestor.scrollY)
+    }
+    var clip: CGRect? = nil
+    if let x, let y {
+      clip = cut(viewRect, CGRect(x: x.lo, y: y.lo, width: x.hi - x.lo, height: y.hi - y.lo))
+    }
+    let off = offWindow(viewRect, window)
+    return Cuts(
+      visible: visible, clip: clip, scrolledAway: !off && visible == nil && clip != nil,
+      offWindow: off)
   }
 
   /// Window stacking: by windowLevel, then by scene order; z counts up from 0 at the bottom.
@@ -162,7 +218,9 @@ enum TextLayoutProbeWire {
           "unlimitedLineCount": record.unlimitedLineCount.map { $0 as Any } ?? NSNull(),
           "window": record.window,
           "scrolledAway": record.scrolledAway,
-          "opacity": (record.opacity * 10000).rounded() / 10000,
+          "offWindow": record.offWindow,
+          // Raw, so only an exact 0 reads as invisible.
+          "opacity": record.opacity,
         ]
       },
     ]

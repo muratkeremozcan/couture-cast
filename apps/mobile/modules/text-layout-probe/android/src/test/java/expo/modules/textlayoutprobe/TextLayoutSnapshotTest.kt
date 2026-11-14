@@ -71,7 +71,12 @@ class TextLayoutSnapshotTest {
       assertTrue("$record names a listed window", record.window in ids)
       if (record.scrolledAway) assertNull("$record scrolled away", record.visibleRect)
       if (record.visibleRect != null) assertNotNull("$record has a clipRect", record.clipRect)
-      if (record.visibleRect == null && !record.scrolledAway) {
+      if (record.offWindow) {
+        assertNull("$record off the window", record.visibleRect)
+        assertFalse("$record off the window is not scrolled away", record.scrolledAway)
+      }
+      // Off the window, a text may still lie within a scroll view's reach.
+      if (record.visibleRect == null && !record.scrolledAway && !record.offWindow) {
         assertNull("$record is cut to nothing", record.clipRect)
       }
     }
@@ -300,6 +305,7 @@ class TextLayoutSnapshotTest {
     assertNull(record.visibleRect)
     // Off the top of the window too, but only scrolling hides it.
     assertEquals(record.viewRect, record.clipRect)
+    assertFalse(record.offWindow)
   }
 
   /** Puts [text] at its natural height with its top 10 px above the window bottom. */
@@ -359,6 +365,11 @@ class TextLayoutSnapshotTest {
     }
     nearTheWindowBottom(spacer, text)
     val record = only(snapshot())
+    val window = TextLayoutSnapshot.screenRect((spacer.context as Activity).window.decorView)
+    // Partly off with no scroll view above: the window cuts it, and it is not off the window.
+    assertEquals(window.bottom, record.clipRect!!.bottom)
+    assertFalse(record.offWindow)
+    assertFalse(record.scrolledAway)
     assertTrue(record.viewRect.bottom > record.clipRect!!.bottom)
     assertTrue(
       "content ${record.contentRect} past clip ${record.clipRect}",
@@ -374,7 +385,9 @@ class TextLayoutSnapshotTest {
         column(
           context,
           View(context).apply { layoutParams = LinearLayout.LayoutParams(300, 40) },
-          label(context).apply { layoutParams = LinearLayout.LayoutParams(300, WRAP_CONTENT) }
+          label(context).apply { layoutParams = LinearLayout.LayoutParams(300, WRAP_CONTENT) },
+          // Content past the viewport, so the scroll view has travel to bring the label in.
+          View(context).apply { layoutParams = LinearLayout.LayoutParams(300, 400) }
         )
       )
       // A 150 x 60 hidden-overflow container holding a 300 x 100 vertical scroll view.
@@ -453,6 +466,8 @@ class TextLayoutSnapshotTest {
               LinearLayout(context).apply {
                 addView(spacer, LinearLayout.LayoutParams(0, 30))
                 addView(label(context, "Edge"), LinearLayout.LayoutParams(60, 30))
+                // Content past the viewport, so the scroll view has travel to bring "Edge" in.
+                addView(View(context), LinearLayout.LayoutParams(100, 30))
               }
             )
           },
@@ -701,5 +716,333 @@ class TextLayoutSnapshotTest {
       )
     }
     assertEquals(listOf("Shown"), snapshot().records.map { it.text })
+  }
+
+  // TEA ruling 2026-11-14 (r43 P1): on its axis a scroll view reaches its viewport cut by
+  // everything above it, widened by its travel to [V start - offset, V end + (maximum - offset)].
+
+  /**
+   * Scroll content [height] px tall holding [children] at their margins. A ScrollView measures its
+   * child unbounded, ignoring the child's own height, so a spacer of that height sets the extent.
+   */
+  private fun content(context: Context, height: Int, vararg children: Pair<View, FrameLayout.LayoutParams>) =
+    FrameLayout(context).apply {
+      clipChildren = false
+      addView(View(context), FrameLayout.LayoutParams(1, height))
+      for ((child, params) in children) addView(child, params)
+    }
+
+  private fun at(top: Int, width: Int, height: Int) =
+    FrameLayout.LayoutParams(width, height).apply { topMargin = top }
+
+  /**
+   * A 60 px hidden-overflow container at [CONTAINER_TOP] holding a 100 px scroll view placed 20 px
+   * above it, so V (the viewport cut by the container) is content 20..80 at offset 0. The content
+   * is 300 px (travel 200) with 20 px labels named by their content top.
+   */
+  private fun banded(offset: Int, vararg tops: Int): Pair<OverflowViewGroup, Map<Int, ProbeRecord>> {
+    lateinit var container: OverflowViewGroup
+    lateinit var scroll: ScrollView
+    host { context ->
+      scroll = ScrollView(context)
+      scroll.addView(
+        content(context, 300, *tops.map { label(context, "Row $it") to at(it, 300, 20) }.toTypedArray())
+      )
+      container = OverflowViewGroup(context, "hidden").apply {
+        addView(scroll, FrameLayout.LayoutParams(300, 100).apply { topMargin = -20 })
+      }
+      FrameLayout(context).apply {
+        addView(container, FrameLayout.LayoutParams(300, 60).apply { topMargin = CONTAINER_TOP })
+      }
+    }
+    scroll.scrollTo(0, offset)
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(offset, scroll.scrollY)
+    val records = snapshot().records
+    return container to tops.associateWith { top -> records.single { it.text == "Row $top" } }
+  }
+
+  @Test
+  fun atOffsetZeroOnlyTheContentBelowCanScrollIn() {
+    val (container, rows) = banded(0, 0, 80)
+    val v = TextLayoutSnapshot.screenRect(container)
+    // Above V with no travel back: closed.
+    assertNull(rows.getValue(0).clipRect)
+    assertFalse(rows.getValue(0).scrolledAway)
+    // Below V within the 200 px ahead: open, scrolled away.
+    val below = rows.getValue(80)
+    assertEquals(v.bottom, below.viewRect.top)
+    assertEquals(below.viewRect, below.clipRect)
+    assertTrue(below.scrolledAway)
+  }
+
+  @Test
+  fun atTheLargestOffsetOnlyTheContentAboveCanScrollIn() {
+    val (container, rows) = banded(200, 200, 280)
+    val v = TextLayoutSnapshot.screenRect(container)
+    val above = rows.getValue(200)
+    assertEquals(v.top, above.viewRect.bottom)
+    assertEquals(above.viewRect, above.clipRect)
+    assertTrue(above.scrolledAway)
+    // Below V with no travel ahead: closed.
+    assertEquals(v.bottom, rows.getValue(280).viewRect.top)
+    assertNull(rows.getValue(280).clipRect)
+    assertFalse(rows.getValue(280).scrolledAway)
+  }
+
+  @Test
+  fun aMiddleOffsetOpensEachSideByItsOwnRemainingTravel() {
+    // Offset 100: 100 px back, 100 px ahead; the band is content 20..280.
+    val (container, rows) = banded(100, 0, 10, 100, 180, 270)
+    val v = TextLayoutSnapshot.screenRect(container)
+    assertNull(rows.getValue(0).clipRect)
+    val top = rows.getValue(10)
+    assertEquals(v.top - 100, top.clipRect!!.top)
+    assertEquals(top.viewRect.bottom, top.clipRect!!.bottom)
+    assertEquals(rows.getValue(100).viewRect, rows.getValue(100).clipRect)
+    assertTrue(rows.getValue(100).scrolledAway)
+    assertEquals(rows.getValue(180).viewRect, rows.getValue(180).clipRect)
+    assertTrue(rows.getValue(180).scrolledAway)
+    val bottom = rows.getValue(270)
+    assertEquals(v.bottom + 100, bottom.clipRect!!.bottom)
+    assertEquals(bottom.viewRect.top, bottom.clipRect!!.top)
+  }
+
+  /** Antigravity r43 probe 1: a 60 px clipper over a 100 px scroll view with 5 px of travel. */
+  @Test
+  fun anOuterClipperCutsAtTheScrollViewsSmallTravel() {
+    lateinit var container: View
+    host { context ->
+      val scroll = ScrollView(context)
+      scroll.addView(content(context, 105, label(context, "Probe one") to at(40, 200, 50)))
+      container = OverflowViewGroup(context, "hidden").apply {
+        addView(scroll, FrameLayout.LayoutParams(300, 100))
+      }
+      FrameLayout(context).apply {
+        addView(container, FrameLayout.LayoutParams(300, 60).apply { topMargin = CONTAINER_TOP })
+      }
+    }
+    val record = only(snapshot(), "Probe one")
+    val top = TextLayoutSnapshot.screenRect(container).top
+    assertEquals(ProbeRect(record.viewRect.left, top + 40, record.viewRect.right, top + 60), record.visibleRect)
+    assertEquals(ProbeRect(record.viewRect.left, top + 40, record.viewRect.right, top + 65), record.clipRect)
+    assertFalse(record.scrolledAway)
+  }
+
+  /** Antigravity r43 probe 2: a scroll view taller than the window with 10 px of travel. */
+  @Test
+  fun aScrollViewTallerThanTheWindowReachesOnlyItsTravelPastTheWindow() {
+    lateinit var scroll: ScrollView
+    lateinit var spacer: View
+    host { context ->
+      scroll = ScrollView(context)
+      scroll.addView(content(context, 0).also { spacer = it.getChildAt(0) })
+      FrameLayout(context).apply { addView(scroll, FrameLayout.LayoutParams(MATCH_PARENT, 0)) }
+    }
+    val window = TextLayoutSnapshot.screenRect((scroll.context as Activity).window.decorView)
+    val scrollTop = TextLayoutSnapshot.screenRect(scroll.parent as View).top
+    val height = window.bottom - scrollTop + 500
+    scroll.layoutParams.height = height
+    spacer.layoutParams.height = height + 10
+    val holder = spacer.parent as FrameLayout
+    holder.addView(label(scroll.context, "Far"), at(window.bottom - scrollTop + 100, 200, 40))
+    holder.addView(label(scroll.context, "Edge"), at(window.bottom - scrollTop - 10, 200, 40))
+    holder.addView(label(scroll.context, "Reachable"), at(window.bottom - scrollTop + 2, 200, 6))
+    scroll.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    val records = snapshot().records
+    val far = records.single { it.text == "Far" }
+    assertNull(far.visibleRect)
+    assertNull(far.clipRect)
+    assertFalse(far.scrolledAway)
+    assertTrue(far.offWindow)
+    val edge = records.single { it.text == "Edge" }
+    assertEquals(window.bottom + 10, edge.clipRect!!.bottom)
+    assertFalse(edge.offWindow)
+    // Wholly below the window but within the 10 px of travel: off the window, not scrolled away.
+    val reachable = records.single { it.text == "Reachable" }
+    assertTrue(reachable.offWindow)
+    assertEquals(reachable.viewRect, reachable.clipRect)
+    assertNull(reachable.visibleRect)
+    assertFalse(reachable.scrolledAway)
+  }
+
+  /**
+   * Antigravity r43 probe 3: content that does not overflow, and a React Native scroll view with
+   * scrolling disabled, give no travel; the 60 px clipper above cuts as a plain clipper.
+   */
+  @Test
+  fun noOverflowAndScrollingDisabledGiveNoTravel() {
+    host { context ->
+      fun probe(text: String, scroll: ScrollView, contentHeight: Int) =
+        OverflowViewGroup(context, "hidden").apply {
+          scroll.addView(content(context, contentHeight, label(context, text) to at(35, 200, 50)))
+          addView(scroll, FrameLayout.LayoutParams(300, 200))
+          layoutParams = LinearLayout.LayoutParams(300, 60)
+        }
+      column(
+        context,
+        probe("Fits", ScrollView(context), 180),
+        probe("Disabled", com.facebook.react.views.scroll.ReactScrollView(context).apply { scrollEnabled = false }, 400),
+        probe("Enabled", com.facebook.react.views.scroll.ReactScrollView(context), 400)
+      )
+    }
+    val records = snapshot().records
+    for (text in listOf("Fits", "Disabled")) {
+      val record = records.single { it.text == text }
+      assertEquals(text, record.viewRect.top + 25, record.clipRect!!.bottom)
+      assertEquals(text, record.visibleRect, record.clipRect)
+    }
+    // The same scroll view with scrolling on reaches the whole label.
+    val enabled = records.single { it.text == "Enabled" }
+    assertEquals(enabled.viewRect, enabled.clipRect)
+  }
+
+  @Test
+  fun aParagraphTallerThanItsScrollViewportKeepsItsWholeClipRect() {
+    lateinit var scroll: ScrollView
+    val paragraph = (1..12).joinToString("\n") { "Paragraph line $it" }
+    host { context ->
+      scroll = ScrollView(context)
+      scroll.addView(
+        column(context, label(context, paragraph).apply { layoutParams = LinearLayout.LayoutParams(300, WRAP_CONTENT) })
+      )
+      FrameLayout(context).apply {
+        addView(scroll, FrameLayout.LayoutParams(300, 100).apply { topMargin = 50 })
+      }
+    }
+    val record = only(snapshot(), paragraph)
+    val viewport = TextLayoutSnapshot.screenRect(scroll)
+    assertTrue(record.viewRect.bottom - record.viewRect.top > 2 * (viewport.bottom - viewport.top))
+    assertEquals(record.viewRect, record.clipRect)
+    assertTrue(record.contentRect.bottom <= record.clipRect!!.bottom)
+    assertEquals(viewport.bottom, record.visibleRect!!.bottom)
+    assertFalse(record.scrolledAway)
+  }
+
+  @Test
+  fun nestedScrollViewsComposeEachWithItsOwnTravel() {
+    lateinit var outer: ScrollView
+    host { context ->
+      // The inner viewport sits at outer content 250..350, past the outer 300 px viewport; the
+      // outer travel brings it in, and the inner travel of 30 reaches its last 30 px.
+      val inner = ScrollView(context).apply {
+        addView(content(context, 130, label(context, "Inner") to at(90, 200, 40)))
+      }
+      outer = ScrollView(context).apply { addView(content(context, 550, inner to at(250, 300, 100))) }
+      FrameLayout(context).apply {
+        addView(outer, FrameLayout.LayoutParams(300, 300).apply { topMargin = 20 })
+      }
+    }
+    val record = only(snapshot(), "Inner")
+    val top = TextLayoutSnapshot.screenRect(outer).top
+    assertEquals(top + 340, record.viewRect.top)
+    assertEquals(record.viewRect, record.clipRect)
+    assertTrue(record.scrolledAway)
+  }
+
+  @Test
+  fun aParkedSheetBelowTheScreenIsOffWindowAndNotScrolledAway() {
+    lateinit var sheet: View
+    host { context ->
+      sheet = inside(OverflowViewGroup(context, "hidden"), label(context, "Parked sheet"))
+      FrameLayout(context).apply { addView(sheet, FrameLayout.LayoutParams(300, 200)) }
+    }
+    val window = TextLayoutSnapshot.screenRect((sheet.context as Activity).window.decorView)
+    (sheet.layoutParams as FrameLayout.LayoutParams).topMargin = window.bottom + 50
+    sheet.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Parked sheet")
+    assertTrue(record.viewRect.top > window.bottom)
+    assertTrue(record.offWindow)
+    assertFalse(record.scrolledAway)
+    assertNull(record.visibleRect)
+  }
+
+  // Antigravity r43 P3: a prepared layout's uncapped count and its field fallbacks.
+
+  @Test
+  fun aPreparedLayoutCappedBelowItsTextIsLaidOutAgain() {
+    val sentence = "A prepared single line layout holding a sentence that wraps at this width"
+    lateinit var boring: android.text.BoringLayout
+    host { context ->
+      val paint = label(context).paint
+      val metrics = android.text.BoringLayout.isBoring(sentence, paint)
+      assertNotNull(metrics)
+      boring = android.text.BoringLayout.make(
+        sentence, paint, 200, android.text.Layout.Alignment.ALIGN_NORMAL, 1f, 0f, metrics, false
+      )
+      column(
+        context,
+        PreparedLayoutTextView(context).apply {
+          preparedLayout = PreparedLayout(boring, 1, 0f)
+          layoutParams = LinearLayout.LayoutParams(200, 30)
+        }
+      )
+    }
+    val record = snapshot().records.single()
+    assertEquals(1, record.lineCount)
+    val relaid = StaticLayout.Builder.obtain(sentence, 0, sentence.length, boring.paint, 200).build().lineCount
+    assertTrue("relaid $relaid", relaid >= 3)
+    assertEquals(relaid, record.unlimitedLineCount)
+  }
+
+  @Test
+  fun aPreparedLayoutIsLaidOutAgainWithItsOwnBreakSettings() {
+    val text = "go an go the at ax in it paragraph paragraph an in me so extraordinary or we ax if be"
+    lateinit var hyphenated: StaticLayout
+    lateinit var plain: StaticLayout
+    host { context ->
+      val paint = label(context).paint
+      fun build(strategy: Int, frequency: Int) =
+        StaticLayout.Builder.obtain(text, 0, text.length, paint, 150)
+          .setBreakStrategy(strategy)
+          .setHyphenationFrequency(frequency)
+          .setMaxLines(2)
+          .build()
+      hyphenated = build(
+        android.graphics.text.LineBreaker.BREAK_STRATEGY_HIGH_QUALITY,
+        android.text.Layout.HYPHENATION_FREQUENCY_FULL
+      )
+      plain = build(
+        android.graphics.text.LineBreaker.BREAK_STRATEGY_SIMPLE,
+        android.text.Layout.HYPHENATION_FREQUENCY_NONE
+      )
+      column(
+        context,
+        PreparedLayoutTextView(context).apply {
+          preparedLayout = PreparedLayout(hyphenated, 2, 0f)
+          layoutParams = LinearLayout.LayoutParams(150, 60)
+        }
+      )
+    }
+    // StaticLayout.Builder's own defaults break this text into more lines.
+    assertTrue("${hyphenated.lineCount} vs ${plain.lineCount}", hyphenated.lineCount < plain.lineCount)
+    assertEquals(hyphenated.lineCount, snapshot().records.single().unlimitedLineCount)
+  }
+
+  @Test
+  fun aPreparedLayoutWithoutAccessorsIsReadFromItsFields() {
+    lateinit var layout: StaticLayout
+    host { context ->
+      layout = preparedLayout(context, "One\nTwo\nThree\nFour", 2, null)
+      column(
+        context,
+        PreparedLayoutTextView(context).apply {
+          preparedLayout = com.facebook.react.views.text.FieldOnlyPreparedLayout(layout, 2, 7.4f)
+          setPadding(0, 3, 0, 0)
+          layoutParams = LinearLayout.LayoutParams(300, 120)
+        }
+      )
+    }
+    val record = snapshot().records.single()
+    assertEquals("PreparedLayoutTextView", record.kind)
+    assertEquals(2, record.maxLines)
+    assertEquals(4, record.unlimitedLineCount)
+    assertEquals(record.viewRect.top + 3 + 7, record.contentRect.top)
+  }
+
+  private companion object {
+    const val CONTAINER_TOP = 200
   }
 }
