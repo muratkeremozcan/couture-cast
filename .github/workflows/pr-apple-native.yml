@@ -19,7 +19,10 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: apple-native-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a dispatch or schedule from cancelling a push run on main.
+  group: >-
+    apple-native-${{ github.event.pull_request.number || github.ref }}-${{
+    github.event_name }}
   cancel-in-progress: true
 
 permissions:
