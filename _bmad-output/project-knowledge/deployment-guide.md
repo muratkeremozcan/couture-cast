@@ -319,7 +319,7 @@ evidence manifest.
 node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
   --build debug --server local --artifact apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
   --over-install apps/mobile/android/app/build/outputs/apk/minifiedDebuggable/app-minifiedDebuggable.apk \
-  --over-install-build minifiedDebuggable --reinstall --out /tmp/test-store-android-debug
+  --over-install-build minifiedDebuggable --out /tmp/test-store-android-debug
 node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
   --build debug --server local --scenario restore --artifact <same apk> --out /tmp/test-store-restore
 # minifiedDebuggable adds the native debuggable and R8 record (minified-debuggable-evidence.mjs).
@@ -329,10 +329,19 @@ node scripts/run-test-store-journey.mjs --platform ios --device <udid> --build d
   --server local --artifact <CoutureCast.app> --out <dir>
 ```
 
-The proxy logs each request's method, path and status, never a header, query or body. On the
-local leg the entitlement must come from the app's refresh (the API's ledger pull), since no
-RevenueCat webhook reaches a loopback API. On the preview leg the proxy refuses every refresh, so
-an entitlement that still arrives came by webhook.
+The proxy logs each request's method, path and status. It drops headers, query strings and
+bodies, and writes id-shaped path segments as `:id` (`:subscriber` after `subscribers`). The
+report names the member only by a hash; the user id sits in a private `.member.private.json`
+beside it. On the local leg the entitlement must come from the app's refresh (the API's ledger
+pull), since no RevenueCat webhook reaches a loopback API. On the preview leg the proxy refuses
+every refresh, so an entitlement that still arrives came by webhook.
+
+The purchase scenario runs cancel, then failure, then success, and ends with TD-04's sign-in
+recovery: after a reinstall the app shows the server's entitlement on sign-in, and the paywall
+offers no restore while entitled. The restore scenario is TD-04's restore assertion: a purchase
+the server never hears of (every refresh refused), a reinstall, and a restore from the paywall.
+The restore's own refresh is the only one that reaches the API, so the entitlement it brings
+back is the restore's result.
 
 Preview webhook setup, done once by an operator (the scripts change nothing on Vercel or
 RevenueCat):
@@ -350,8 +359,8 @@ RevenueCat):
 4. `node scripts/test-store-preview-webhook.mjs probe --api-url <preview API origin>`: two
    unauthenticated POSTs through the bypass must get the handler's own JSON 401.
 5. `node scripts/run-test-store-journey.mjs --server preview --api-url <origin> ...`, then
-   `node scripts/test-store-preview-webhook.mjs verify --report <run report> --api-url <origin>`
-   re-reads the member on the preview API's read endpoints and checks the run's proxy log.
+   `node scripts/test-store-preview-webhook.mjs verify --report <run report> --member-file
+   <run .member.private.json> --api-url <origin>` re-reads the member on the preview API's read endpoints and checks the run's proxy log.
 
 `scripts/test-store-preview-webhook.mjs steps --api-url <origin>` prints these steps for an origin.
 
