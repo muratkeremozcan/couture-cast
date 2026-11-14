@@ -11,6 +11,16 @@
 // One read outside the composer drives no layout: `LiveFontMountMarker` reports the scale
 // JavaScript sees to the live font-scale proof (Codex R2-03), in development and isolated
 // native test builds only.
+// Story 6.15 F-00i adds three layout rules that size a box to the text it holds, none of which
+// wraps or rescales app text:
+// - `glyphScale`, `glyphBoxSide` and `useGlyphBox` (glyph-box.ts): a fixed box around one glyph
+//   grows by the scale the glyph is drawn at, capped by the glyph's own maxFontSizeMultiplier;
+// - `tabBarGrowth`, `recordTabLabelHeight`, `tallestTabLabel` and `TabBarLabel`
+//   (tab-bar-label.tsx), with `TabLayout` (app/(tabs)/_layout.tsx): the tab bar grows by what its
+//   labels grew, and a label fits its tab; on iOS the label keeps React Navigation's
+//   allowFontScaling false, since the tab's Large Content Viewer shows it at the user's size.
+// Banned names (allowFontScaling, maxFontSizeMultiplier, getFontScale) pass only in the functions
+// BANNED_ALLOWED lists.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -32,6 +42,18 @@ const ALLOWED = {
     'ComposerFeedback',
   ],
   'components/live-font-mount-marker.tsx': ['LiveFontMountMarker'],
+  'components/glyph-box.ts': ['glyphScale', 'glyphBoxSide', 'useGlyphBox'],
+  'components/tab-bar-label.tsx': [
+    'tabBarGrowth',
+    'recordTabLabelHeight',
+    'tallestTabLabel',
+    'TabBarLabel',
+  ],
+  'app/(tabs)/_layout.tsx': ['TabLayout'],
+}
+const BANNED_ALLOWED = {
+  'components/glyph-box.ts': ['glyphScale', 'glyphBoxSide', 'useGlyphBox'],
+  'components/tab-bar-label.tsx': ['TabBarLabel'],
 }
 
 function sourceFiles(root) {
@@ -68,8 +90,10 @@ export function fontScaleReads(files) {
     const names = enclosingNames(lines)
     lines.forEach((line, index) => {
       if (/^\s*(\/\/|\*)/.test(line)) return
-      if (BANNED.test(line)) problems.push(`${file}:${index + 1} ${line.trim()}`)
-      else if (FONT_SCALE.test(line) && !(ALLOWED[file] ?? []).includes(names[index]))
+      if (BANNED.test(line)) {
+        if (!(BANNED_ALLOWED[file] ?? []).includes(names[index]))
+          problems.push(`${file}:${index + 1} ${line.trim()}`)
+      } else if (FONT_SCALE.test(line) && !(ALLOWED[file] ?? []).includes(names[index]))
         problems.push(`${file}:${index + 1} ${line.trim()}`)
     })
   }
@@ -99,6 +123,21 @@ describe('font-scale reads in app code', () => {
     assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': appText }), [
       'components/app-text.tsx:3 const { fontScale } = useWindowDimensions()',
       'components/app-text.tsx:4 return <Text {...props} allowFontScaling={false} style={[style, { fontSize: 16 * fontScale }]} />',
+    ])
+  })
+
+  test('a banned name outside the functions allowed to use it is caught', () => {
+    // Story 6.15: tabBarGrowth may read the scale, but only TabBarLabel may set allowFontScaling.
+    const label = [
+      'export function tabBarGrowth(heights, fontScale) {',
+      '  return <Text allowFontScaling={false} />',
+      '}',
+      'export function TabBarLabel() {',
+      "  return <Text allowFontScaling={Platform.OS === 'ios' ? false : undefined} />",
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/tab-bar-label.tsx': label }), [
+      'components/tab-bar-label.tsx:2 return <Text allowFontScaling={false} />',
     ])
   })
 
