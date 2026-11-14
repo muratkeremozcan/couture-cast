@@ -445,6 +445,81 @@ describe('the RevenueCat Test Store converges under local and preview (story 6.1
   })
 })
 
+type AppliedTransferWrite = {
+  userId: string
+  state: {
+    status: string
+    store: string
+    productId: string
+    willRenew: boolean
+    currentPeriodEnd: Date
+  }
+}
+
+/**
+ * Runs one authenticated TRANSFER from `paid-member`, who holds a `test_store` row, to
+ * `other-member` through the webhook rail and returns every ledger write it asked for.
+ */
+async function transferOverTestStoreRow(
+  eventOverrides: Partial<RevenueCatEvent>
+): Promise<{ applied: AppliedTransferWrite[]; recorded: number }> {
+  const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+  delete process.env.REVENUECAT_WEBHOOK_AUTH
+  try {
+    const create = vi.fn().mockResolvedValue({})
+    const losingRow = {
+      user_id: 'paid-member',
+      status: 'active',
+      store: 'test_store',
+      product_id: 'premium_monthly',
+      current_period_end: new Date(1_757_676_700_000),
+    }
+    const prisma = {
+      billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+      user: {
+        findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+          Promise.resolve({ id: where.id })
+        ),
+      },
+      $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+        work({
+          billingEvent: { create },
+          premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(losingRow) },
+        })
+      ),
+    }
+    const applyLedgerEvent = vi.fn().mockResolvedValue(null)
+    const service = new BillingWebhookService(
+      prisma as unknown as PrismaClient,
+      { applyLedgerEvent } as unknown as PremiumEntitlementService,
+      { emitTransition: vi.fn() } as unknown as SubscriptionService,
+      {} as RevenueCatClient
+    )
+    const body = {
+      event: rcEvent({
+        type: 'TRANSFER',
+        transferred_from: ['paid-member'],
+        transferred_to: ['other-member'],
+        ...eventOverrides,
+      }),
+    }
+
+    await service.handleRevenueCatWebhook({
+      authorization: buildTestOnlyRevenueCatWebhookAuth(),
+      rawBody: Buffer.from(JSON.stringify(body)),
+    })
+
+    const applied = applyLedgerEvent.mock.calls.map(([, input]) => {
+      const { userId, state } = input as AppliedTransferWrite
+      return { userId, state }
+    })
+    return { applied, recorded: create.mock.calls.length }
+  } finally {
+    if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+    else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+  }
+}
+
 // Learning path Step 55: story 6.15 D15. A TRANSFER that carries no store falls back to the
 // losing row's store, so a test_store row must not move outside local and preview.
 describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
@@ -456,65 +531,18 @@ describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
     applied: { userId: string; status: string; store: string }[]
     recorded: number
   }> {
-    const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
-    delete process.env.REVENUECAT_WEBHOOK_AUTH
-    try {
-      const create = vi.fn().mockResolvedValue({})
-      const losingRow = {
-        user_id: 'paid-member',
-        status: 'active',
-        store: 'test_store',
-        product_id: 'premium_monthly',
-        current_period_end: new Date(1_757_676_700_000),
-      }
-      const prisma = {
-        billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
-        user: {
-          findUnique: vi.fn(({ where }: { where: { id: string } }) =>
-            Promise.resolve({ id: where.id })
-          ),
-        },
-        $transaction: vi.fn((work: (tx: unknown) => unknown) =>
-          work({
-            billingEvent: { create },
-            premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(losingRow) },
-          })
-        ),
-      }
-      const applyLedgerEvent = vi.fn().mockResolvedValue(null)
-      const service = new BillingWebhookService(
-        prisma as unknown as PrismaClient,
-        { applyLedgerEvent } as unknown as PremiumEntitlementService,
-        { emitTransition: vi.fn() } as unknown as SubscriptionService,
-        {} as RevenueCatClient
-      )
-      const body = {
-        event: rcEvent({
-          type: 'TRANSFER',
-          store: null,
-          product_id: null,
-          expiration_at_ms: null,
-          transferred_from: ['paid-member'],
-          transferred_to: ['other-member'],
-        }),
-      }
-
-      await service.handleRevenueCatWebhook({
-        authorization: buildTestOnlyRevenueCatWebhookAuth(),
-        rawBody: Buffer.from(JSON.stringify(body)),
-      })
-
-      const applied = applyLedgerEvent.mock.calls.map(([, input]) => {
-        const { userId, state } = input as {
-          userId: string
-          state: { status: string; store: string }
-        }
-        return { userId, status: state.status, store: state.store }
-      })
-      return { applied, recorded: create.mock.calls.length }
-    } finally {
-      if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
-      else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+    const { applied, recorded } = await transferOverTestStoreRow({
+      store: null,
+      product_id: null,
+      expiration_at_ms: null,
+    })
+    return {
+      applied: applied.map(({ userId, state }) => ({
+        userId,
+        status: state.status,
+        store: state.store,
+      })),
+      recorded,
     }
   }
 
@@ -534,6 +562,102 @@ describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
     async (testEnv) => {
       vi.stubEnv('TEST_ENV', testEnv as string)
       await expect(transferTestStoreRow()).resolves.toEqual({ applied: [], recorded: 1 })
+    }
+  )
+})
+
+// Story 6.15 D15: an honored event store does not make the losing test_store row honored.
+// Outside local and preview that row counts as absent: the TRANSFER revokes no one (no
+// none-to-revoked audit row, no deactivation event) and builds the gain from the event alone.
+describe('an APP_STORE TRANSFER over a test_store losing row (story 6.15 D15)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  const eventPeriodEndMs = 1_760_000_000_000
+
+  it.each([undefined, 'staging', 'production', 'qa'])(
+    'with TEST_ENV %s grants the gainer from the event alone and revokes no one',
+    async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv as string)
+      await expect(
+        transferOverTestStoreRow({
+          store: 'APP_STORE',
+          product_id: 'premium_annual',
+          expiration_at_ms: eventPeriodEndMs,
+        })
+      ).resolves.toEqual({
+        applied: [
+          {
+            userId: 'other-member',
+            state: {
+              status: 'active',
+              store: 'app_store',
+              productId: 'premium_annual',
+              willRenew: true,
+              currentPeriodEnd: new Date(eventPeriodEndMs),
+            },
+          },
+        ],
+        recorded: 1,
+      })
+    }
+  )
+
+  it.each([
+    ['no product', { product_id: null }],
+    ['no expiry', { expiration_at_ms: null }],
+  ] as const)(
+    'with TEST_ENV production and %s on the event skips the gain and revokes no one',
+    async (_label, missing) => {
+      vi.stubEnv('TEST_ENV', 'production')
+      await expect(
+        transferOverTestStoreRow({
+          store: 'APP_STORE',
+          product_id: 'premium_annual',
+          expiration_at_ms: eventPeriodEndMs,
+          ...missing,
+        })
+      ).resolves.toEqual({ applied: [], recorded: 1 })
+    }
+  )
+
+  it.each(['local', 'preview'])(
+    'with TEST_ENV %s revokes the test_store row and falls back to it, as before',
+    async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv)
+      const losingPeriodEnd = new Date(1_757_676_700_000)
+      await expect(
+        transferOverTestStoreRow({
+          store: 'APP_STORE',
+          product_id: null,
+          expiration_at_ms: null,
+        })
+      ).resolves.toEqual({
+        applied: [
+          {
+            userId: 'paid-member',
+            state: {
+              status: 'revoked',
+              store: 'test_store',
+              productId: 'premium_monthly',
+              willRenew: false,
+              currentPeriodEnd: losingPeriodEnd,
+            },
+          },
+          {
+            userId: 'other-member',
+            state: {
+              status: 'active',
+              store: 'app_store',
+              productId: 'premium_monthly',
+              willRenew: true,
+              currentPeriodEnd: losingPeriodEnd,
+            },
+          },
+        ],
+        recorded: 1,
+      })
     }
   )
 })

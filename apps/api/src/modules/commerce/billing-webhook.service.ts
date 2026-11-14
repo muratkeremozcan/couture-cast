@@ -741,15 +741,21 @@ export class BillingWebhookService {
           return
         }
 
-        if (losingUserId !== null && losingRow !== null) {
+        // An honored event store can still meet a losing row this environment does not honor
+        // (an APP_STORE TRANSFER over a test_store row in production). That row counts as absent:
+        // nothing revokes it, and the gain comes only from the event's own fields.
+        const honoredLosingRow =
+          losingRow !== null && honorsEntitlementStore(losingRow.store) ? losingRow : null
+
+        if (losingUserId !== null && honoredLosingRow !== null) {
           lossTransition = await this.entitlements.applyLedgerEvent(tx, {
             userId: losingUserId,
             state: {
               status: 'revoked',
-              store: losingRow.store,
-              productId: losingRow.product_id,
+              store: honoredLosingRow.store,
+              productId: honoredLosingRow.product_id,
               willRenew: false,
-              currentPeriodEnd: losingRow.current_period_end,
+              currentPeriodEnd: honoredLosingRow.current_period_end,
             },
             occurredAt,
             eventId: event.id,
@@ -758,7 +764,7 @@ export class BillingWebhookService {
         }
 
         if (gainingUserId !== null) {
-          const gainState = resolveTransferGainState(event, losingRow)
+          const gainState = resolveTransferGainState(event, honoredLosingRow)
           if (gainState !== null) {
             gainTransition = await this.entitlements.applyLedgerEvent(tx, {
               userId: gainingUserId,
