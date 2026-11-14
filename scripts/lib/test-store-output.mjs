@@ -85,13 +85,23 @@ export function needleVariants(needle) {
   ].filter((variant) => variant.length >= 8)
 }
 
-/** Every file under `dir` whose contents hold one of `needles` in any form: [{ file, needle }]. */
-export function scanForLeaks(dir, needles) {
-  const wanted = needles
+const variantPairs = (needles) =>
+  needles
     .filter(Boolean)
     .flatMap((needle) =>
       needleVariants(needle).map((variant) => [variant, String(needle)])
     )
+
+/** The needles `text` holds in any form, each once. */
+export function leaksInText(text, needles) {
+  const wanted = variantPairs(needles)
+  return [
+    ...new Set(wanted.filter(([variant]) => text.includes(variant)).map(([, n]) => n)),
+  ]
+}
+
+/** Every file under `dir` whose contents hold one of `needles` in any form: [{ file, needle }]. */
+export function scanForLeaks(dir, needles) {
   const hits = []
   const walk = (current) => {
     for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
@@ -99,10 +109,8 @@ export function scanForLeaks(dir, needles) {
       if (entry.isDirectory()) walk(file)
       else {
         const text = fs.readFileSync(file).toString('latin1')
-        const found = new Set(
-          wanted.filter(([variant]) => text.includes(variant)).map(([, needle]) => needle)
-        )
-        for (const needle of found) hits.push({ file: path.relative(dir, file), needle })
+        for (const needle of leaksInText(text, needles))
+          hits.push({ file: path.relative(dir, file), needle })
       }
     }
   }
@@ -110,24 +118,36 @@ export function scanForLeaks(dir, needles) {
   return hits
 }
 
-/** Throws, naming files but never the ids, when the evidence dir holds any of `needles`. */
+/**
+ * Throws, naming files but never the ids, when the evidence dir holds any of `needles`. A file
+ * that leaks is first moved into `<private>/quarantine/`, so an always-run upload of the
+ * evidence dir never carries it (Antigravity r13 P2).
+ */
 export function assertEvidenceClean(dirs, needles) {
-  const hits = scanForLeaks(dirs.evidence, needles)
-  if (hits.length)
-    throw new JourneyError(
-      'test_store_evidence_leak',
-      [...new Set(hits.map((hit) => hit.file))].join(', ')
-    )
+  const files = [...new Set(scanForLeaks(dirs.evidence, needles).map((hit) => hit.file))]
+  if (!files.length) return
+  for (const file of files) {
+    const target = privatePath(dirs, path.join('quarantine', file))
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 })
+    fs.renameSync(path.join(dirs.evidence, file), target)
+  }
+  throw new JourneyError('test_store_evidence_leak', files.join(', '))
 }
 
 /**
- * The run's closing writes: the redacted report to the evidence dir, the member side file to
- * the private dir, then the leak scan over the evidence dir. Returns the written paths.
+ * The run's closing writes. The member side file goes to the private dir; the report is
+ * serialized and scanned in memory, and reaches the evidence dir only when it holds no id in any
+ * form; then the whole evidence dir is scanned. Returns the written paths.
  */
 export function writeRunOutputs({ dirs, label, report, member, extraIds = [] }) {
-  const written = { report: writeEvidence(dirs, `${label}.json`, report) }
+  const needles = [member?.userId, ...extraIds]
+  const written = {}
   if (member)
     written.member = writePrivate(dirs, `${label}.member.json`, { userId: member.userId })
-  assertEvidenceClean(dirs, [member?.userId, ...extraIds])
+  const text = `${JSON.stringify(report, null, 2)}\n`
+  if (leaksInText(text, needles).length)
+    throw new JourneyError('test_store_evidence_leak', `${label}.json (not written)`)
+  written.report = writeEvidence(dirs, `${label}.json`, text)
+  assertEvidenceClean(dirs, needles)
   return written
 }

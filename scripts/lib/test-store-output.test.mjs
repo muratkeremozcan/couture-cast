@@ -128,3 +128,42 @@ test('the leak scan finds an id in base64url, base64, double URL, case-changed a
   assert.ok(!hits.some((hit) => hit.file === 'clean.json'))
   assert.ok(!scanForLeaks(dirs.evidence, IDS).some((hit) => hit.file === 'clean.json'))
 })
+
+// Antigravity r13 P2: a leaking report never lands in the evidence dir, so an always-run upload
+// of that dir carries nothing; the member file still reaches the private dir.
+test('a leaking report leaves no file in the evidence dir', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  assert.throws(
+    () =>
+      writeRunOutputs({
+        dirs,
+        label: 'leaky',
+        report: { note: `member ${Buffer.from(MEMBER).toString('base64url')}` },
+        member: { userId: MEMBER },
+      }),
+    (error) =>
+      error.code === 'test_store_evidence_leak' && !error.message.includes(MEMBER)
+  )
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+  // Refused in memory: it was never written, so nothing had to be quarantined either.
+  assert.ok(!fs.existsSync(privatePath(dirs, 'quarantine')))
+  assert.equal(
+    JSON.parse(fs.readFileSync(privatePath(dirs, 'leaky.member.json'), 'utf8')).userId,
+    MEMBER
+  )
+})
+
+test('a leaking file already in the evidence dir is moved to the private quarantine', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  writeEvidence(dirs, path.join('maestro', 'step.json'), `{"u":"${MEMBER}"}`)
+  writeEvidence(dirs, 'clean.json', { ok: true })
+  assert.throws(
+    () => assertEvidenceClean(dirs, [MEMBER]),
+    (error) => error.code === 'test_store_evidence_leak'
+  )
+  assert.deepEqual(scanForLeaks(dirs.evidence, [MEMBER]), [])
+  assert.ok(fs.existsSync(path.join(dirs.evidence, 'clean.json')))
+  assert.ok(
+    fs.existsSync(privatePath(dirs, path.join('quarantine', 'maestro', 'step.json')))
+  )
+})
