@@ -228,14 +228,29 @@ const exists = (file) => {
 export const TEARDOWN_WAIT_MS = 3_000
 
 /**
- * The pids (a negative pid: every member of that process group) still running. A child the
+ * Live (non-zombie) processes as [{ pid, pgid }], or null when `ps` cannot run. A child the
  * driver spawned stays a zombie until Node reaps it, which cannot happen while the exit path
- * holds the thread, so a zombie counts as exited; `ps` reports it with state Z.
+ * holds the thread, so a zombie counts as exited.
  */
-export function stillRunning(pids) {
+export function readPsTable() {
+  const table = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat='], {
+    encoding: 'utf8',
+    timeout: 5_000,
+    killSignal: 'SIGKILL',
+  })
+  if (table.status !== 0) return null
+  return table.stdout
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([pid, , stat]) => pid && stat && !stat.startsWith('Z'))
+    .map(([pid, pgid]) => ({ pid: Number(pid), pgid: Number(pgid) }))
+}
+
+/** The pids (a negative pid: every member of that process group) still running. */
+export function stillRunning(pids, psTable = readPsTable) {
   if (!pids.length) return []
-  const table = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
-  if (table.status !== 0)
+  const live = psTable()
+  if (live === null)
     // No ps: fall back to signal 0, which counts a zombie as running (the wait just runs long).
     return pids.filter((pid) => {
       try {
@@ -245,11 +260,6 @@ export function stillRunning(pids) {
         return error.code === 'EPERM'
       }
     })
-  const live = table.stdout
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/))
-    .filter(([pid, , stat]) => pid && stat && !stat.startsWith('Z'))
-    .map(([pid, pgid]) => ({ pid: Number(pid), pgid: Number(pgid) }))
   return pids.filter((pid) =>
     live.some((entry) => (pid < 0 ? entry.pgid === -pid : entry.pid === pid))
   )
@@ -301,6 +311,7 @@ export function installEvidenceGuard({
   proc = process,
   waitMs = TEARDOWN_WAIT_MS,
   kill = (pid, signal) => process.kill(pid, signal),
+  psTable = readPsTable,
 }) {
   const teardowns = []
   let exiting = false
@@ -357,13 +368,33 @@ export function installEvidenceGuard({
      */
     child: (name, child, { group = false } = {}) => {
       const pid = child.pid
+      // A spawn that failed (ENOENT) has no pid: nothing to stop, nothing to signal.
+      if (!Number.isInteger(pid)) return
       let exited = false
-      child.once('exit', () => {
+      // Group mode: the members seen when the leader exited. Empty means the group is gone,
+      // and a later group with the same id is someone else's (Antigravity r20).
+      let snapshot = null
+      const onChildExit = () => {
         exited = true
-      })
+        if (group) {
+          const live = psTable()
+          snapshot = live === null ? null : live.filter((entry) => entry.pgid === pid)
+        }
+      }
+      // A child registered after it already exited never emits again.
+      if (child.exitCode !== null || child.signalCode !== null) onChildExit()
+      else child.once('exit', onChildExit)
       const target = () => {
-        if (group) return stillRunning([-pid]).length ? [-pid] : []
-        return exited ? [] : [pid]
+        if (!group) return exited ? [] : [pid]
+        // The leader has not been reaped, so the group id is still ours.
+        if (!exited) return [-pid]
+        if (snapshot === null) return stillRunning([-pid], psTable).length ? [-pid] : []
+        if (!snapshot.length) return []
+        const live = psTable() ?? []
+        const member = snapshot.some((seen) =>
+          live.some((entry) => entry.pid === seen.pid && entry.pgid === pid)
+        )
+        return member ? [-pid] : []
       }
       let targets = []
       teardowns.push({

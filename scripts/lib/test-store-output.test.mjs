@@ -696,3 +696,133 @@ test('a process group is signalled only while ps shows a member of it', async (t
   guard.runTeardowns()
   assert.deepEqual(signalled, [[-alive.pid, 'SIGTERM']])
 })
+
+// Antigravity r20 M5: guard.child with the real kill escalates to SIGKILL within waitMs.
+test('guard.child SIGKILLs a TERM-trapping child within waitMs, with the real kill', async (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const guard = installEvidenceGuard({ dirs, ids: [], proc: fakeProcess(), waitMs: 300 })
+  const child = stubborn(t)
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  guard.child('stubborn', child)
+  const exited = exitOf(child)
+  const started = Date.now()
+  guard.runTeardowns()
+  assert.ok(Date.now() - started < 2_000)
+  assert.equal(await exited, 'SIGKILL')
+})
+
+// Antigravity r20 (2): a failed spawn has no pid; nothing is registered or signalled.
+test('guard.child ignores a child whose spawn failed (no pid)', async (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const signalled = []
+  const guard = installEvidenceGuard({
+    dirs,
+    ids: [],
+    proc: fakeProcess(),
+    kill: (pid, signal) => signalled.push([pid, signal]),
+  })
+  const missing = spawn(path.join(os.tmpdir(), `no-such-binary-${process.pid}`), [], {
+    stdio: 'ignore',
+  })
+  const failed = new Promise((resolve) => missing.once('error', resolve))
+  assert.equal(missing.pid, undefined)
+  guard.child('missing', missing)
+  guard.child('missing-group', missing, { group: true })
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [])
+  assert.equal((await failed).code, 'ENOENT')
+})
+
+// Antigravity r20 (3): a stand-in leader and ps table, so a reused group id can be staged.
+const PGID = 2 ** 30
+function fakeLeader() {
+  const child = new EventEmitter()
+  child.pid = PGID
+  child.exitCode = null
+  child.signalCode = null
+  return child
+}
+function groupGuard(t, table) {
+  const signalled = []
+  const guard = installEvidenceGuard({
+    dirs: outputDirs(tempOut(t)),
+    ids: [],
+    proc: fakeProcess(),
+    kill: (pid, signal) => signalled.push([pid, signal]),
+    psTable: () => table.rows,
+    waitMs: 0,
+  })
+  return { guard, signalled }
+}
+
+test('a Metro group with no member at the leader exit is dropped, even if the id comes back', (t) => {
+  const table = { rows: [] }
+  const { guard, signalled } = groupGuard(t, table)
+  const leader = fakeLeader()
+  guard.child('metro', leader, { group: true })
+  leader.emit('exit', 0, null)
+  // Someone else's group now carries the same id.
+  table.rows = [{ pid: 4242, pgid: PGID }]
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [])
+})
+
+test('a Metro group is signalled while a member from the exit snapshot is alive in it', (t) => {
+  const table = { rows: [{ pid: 4242, pgid: PGID }] }
+  const { guard, signalled } = groupGuard(t, table)
+  const leader = fakeLeader()
+  guard.child('metro', leader, { group: true })
+  leader.emit('exit', 0, null)
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [[-PGID, 'SIGTERM']])
+  // The same snapshot member, now in another group, is no reason to signal this one.
+  const moved = { rows: [{ pid: 4242, pgid: PGID }] }
+  const other = groupGuard(t, moved)
+  const second = fakeLeader()
+  other.guard.child('metro', second, { group: true })
+  second.emit('exit', 0, null)
+  moved.rows = [
+    { pid: 4242, pgid: 77 },
+    { pid: 5151, pgid: PGID },
+  ]
+  other.guard.runTeardowns()
+  assert.deepEqual(other.signalled, [])
+})
+
+test('a Metro group whose leader still runs is signalled', (t) => {
+  const { guard, signalled } = groupGuard(t, { rows: [{ pid: PGID, pgid: PGID }] })
+  guard.child('metro', fakeLeader(), { group: true })
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [[-PGID, 'SIGTERM']])
+})
+
+// Antigravity r20 (4): no tool the driver runs can hang it past its bound.
+test('every spawnSync in the driver passes a timeout and SIGKILL', () => {
+  const source = fs.readFileSync('scripts/run-test-store-journey.mjs', 'utf8')
+  const bounded = /const BOUNDED = \{ timeout: [\d_]+, killSignal: 'SIGKILL' \}/.test(
+    source
+  )
+  const calls = []
+  for (
+    let at = source.indexOf('spawnSync(');
+    at >= 0;
+    at = source.indexOf('spawnSync(', at + 1)
+  ) {
+    if (/import|\/\//.test(source.slice(source.lastIndexOf('\n', at), at))) continue
+    let depth = 0
+    let end = at + 'spawnSync'.length
+    do {
+      if (source[end] === '(') depth += 1
+      if (source[end] === ')') depth -= 1
+      end += 1
+    } while (depth > 0)
+    calls.push(source.slice(at, end))
+  }
+  assert.ok(calls.length >= 7, String(calls.length))
+  for (const call of calls)
+    assert.ok(
+      (/\btimeout\b/.test(call) && /killSignal: 'SIGKILL'/.test(call)) ||
+        (bounded && /\bBOUNDED\b/.test(call)),
+      call
+    )
+})

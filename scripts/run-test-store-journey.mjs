@@ -116,8 +116,15 @@ const metroPort = Number(option('metro-port', '8081'))
 if ([build, overInstallBuild].includes('minifiedDebuggable') && metroPort !== 8081)
   throw new JourneyError('test_store_metro_port_fixed', String(metroPort))
 const proxyPort = Number(option('proxy-port', '4011'))
+// Every spawnSync in this file is bounded and killed hard at its bound, so no stuck tool can hold
+// the run (or its exit path) past a CI kill (Antigravity r20).
+const BOUNDED = { timeout: 30_000, killSignal: 'SIGKILL' }
 const rev = (value) =>
-  spawnSync('git', ['rev-parse', value], { cwd: root, encoding: 'utf8' }).stdout.trim()
+  spawnSync('git', ['rev-parse', value], {
+    cwd: root,
+    encoding: 'utf8',
+    ...BOUNDED,
+  }).stdout.trim()
 const buildSha = rev(option('build-sha', 'HEAD'))
 
 const adbBinary = process.env.ANDROID_HOME
@@ -226,7 +233,7 @@ async function launch() {
           })
       })
     }
-    spawnSync(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId])
+    spawnSync(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId], BOUNDED)
     // minifiedDebuggable has no dev launcher: React Native loads from Metro at localhost:8081.
     if (installedBuild === 'minifiedDebuggable')
       adb('shell', 'am', 'start', '-n', `${appId}/.MainActivity`)
@@ -242,7 +249,7 @@ async function launch() {
         appId
       )
   } else {
-    spawnSync('xcrun', ['simctl', 'terminate', device, appId])
+    spawnSync('xcrun', ['simctl', 'terminate', device, appId], BOUNDED)
     simctl('openurl', device, devClientUrl)
   }
 }
@@ -276,8 +283,9 @@ function install(file) {
 }
 
 function uninstall() {
-  if (platform === 'android') spawnSync(adbBinary, ['-s', device, 'uninstall', appId])
-  else spawnSync('xcrun', ['simctl', 'uninstall', device, appId])
+  if (platform === 'android')
+    spawnSync(adbBinary, ['-s', device, 'uninstall', appId], BOUNDED)
+  else spawnSync('xcrun', ['simctl', 'uninstall', device, appId], BOUNDED)
 }
 
 /** The installed APK's signer certificate SHA-256 (TEA-19). */
@@ -479,6 +487,7 @@ if (platform === 'android') {
   const logcat = spawnSync(adbBinary, ['-s', device, 'logcat', '-d', '-v', 'time'], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    ...BOUNDED,
   })
   if (logcat.status === 0) writePrivate(dirs, 'device.log', logcat.stdout)
 }
