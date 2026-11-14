@@ -290,7 +290,7 @@ export function registerSubscriptionContracts(
     path: '/api/v1/commerce/subscription/refresh',
     tags: ['subscription'],
     summary: 'Refresh the subscription from the entitlement ledger',
-    description: `Synchronously pulls the RevenueCat ledger and applies the snapshot, beating webhook latency after a purchase. Rate limited per user (10-second minimum interval; inside the window the local state is served — syncedAt tells the caller which happened). A ledger entitlement this API can never represent (an unsupported store, no product, or no or invalid expiry) also serves the local state, with syncedAt unchanged. A transient ledger failure returns 503 ("${SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE}") rather than stale-as-fresh.`,
+    description: `Synchronously pulls the RevenueCat ledger and applies the snapshot, beating webhook latency after a purchase. Rate limited per user (10-second minimum interval; inside the window the local state is served — syncedAt tells the caller which happened). A ledger entitlement this API can never represent (an unsupported store, no product, no or invalid expiry, or a one-time purchase) also serves the local state, with syncedAt unchanged. A transient ledger failure returns 503 ("${SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE}") rather than stale-as-fresh.`,
     security: [{ bearerAuth: [] }],
     responses: {
       200: {
