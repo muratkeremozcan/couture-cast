@@ -455,7 +455,11 @@ function filesNamed(source, file, modules = new Set()) {
       path.posix.normalize(literal),
       path.posix.join(path.posix.dirname(file), literal),
     ]) {
-      const withExtension = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js']
+      // A directory resolves to its index only through an import; a directory literal elsewhere
+      // is a path spec ('apps/mobile' in vercel-preview-inputs.mjs), never a read of its index.
+      const suffixes = ['', '.ts', '.tsx', '.js', '.mjs']
+      if (imported || !trackedDirs.has(candidate)) suffixes.push('/index.ts', '/index.js')
+      const withExtension = suffixes
         .map((suffix) => `${candidate}${suffix}`)
         .find((name) => trackedSet.has(name))
       if (withExtension) {
@@ -502,6 +506,21 @@ function filesRead(file) {
   }
   return [...read]
 }
+
+test('a directory literal reads its index only when imported', () => {
+  // vercel-preview-inputs.mjs lists 'apps/mobile' as a path spec; apps/mobile/index.ts exists.
+  assert.ok(
+    !filesNamed("const outside = ['apps/mobile']", 'scripts/x.mjs').includes(
+      'apps/mobile/index.ts'
+    )
+  )
+  assert.ok(
+    filesNamed(
+      "import { withHeadlessJsTimers } from '../../modules/headless-js-timers'",
+      'apps/mobile/src/lib/background-task.ts'
+    ).includes('apps/mobile/modules/headless-js-timers/index.ts')
+  )
+})
 
 test('the read guard follows imports to the files an imported module reads', () => {
   // db-reset-policy.spec.ts names no web file; it imports playwright/config/environments.ts,
