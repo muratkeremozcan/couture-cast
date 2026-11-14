@@ -4,6 +4,7 @@ import {
   permanentLedgerProjectionFailure,
   RealRevenueCatClient,
   RevenueCatRequestError,
+  RevenueCatResponseShapeError,
   RevenueCatUnrepresentableEntitlementError,
   RevenueCatUnsupportedStoreError,
 } from './revenuecat-client.js'
@@ -35,7 +36,9 @@ describe('RealRevenueCatClient', () => {
   }
 
   it('sends the Bearer key and the encoded app user id on the subscriber GET', async () => {
-    fetchMock.mockResolvedValueOnce(subscriberResponse({}))
+    fetchMock.mockResolvedValueOnce(
+      subscriberResponse({ entitlements: {}, subscriptions: {} })
+    )
 
     await client.getSubscriberEntitlement('user/with special')
 
@@ -301,6 +304,94 @@ describe('RealRevenueCatClient', () => {
     }
   )
 
+  // Story 6.15 r38 P3-1: RevenueCat renaming or dropping a key the projection reads is a change
+  // in its response, not a fact about the member. Each case would otherwise raise one of the
+  // permanent projection errors and settle the row, so each must fail the shape check instead.
+  // A renamed key reads as missing; every shape here is a 200.
+  it.each([
+    [
+      'a renamed product_identifier',
+      {
+        entitlements: { premium: { expires_date: null, product_id: 'premium_life' } },
+        subscriptions: {},
+      },
+      ['subscriber.entitlements.premium.product_identifier: invalid_type'],
+    ],
+    [
+      'a renamed expires_date',
+      {
+        entitlements: {
+          premium: {
+            expiry: '2026-09-12T12:00:00.000Z',
+            product_identifier: 'premium_monthly',
+          },
+        },
+        subscriptions: { premium_monthly: { store: 'play_store' } },
+      },
+      ['subscriber.entitlements.premium.expires_date: invalid_type'],
+    ],
+    [
+      'a renamed subscriptions',
+      {
+        entitlements: {
+          premium: {
+            expires_date: '2026-09-12T12:00:00.000Z',
+            product_identifier: 'premium_monthly',
+          },
+        },
+        subscription_records: { premium_monthly: { store: 'play_store' } },
+      },
+      ['subscriber.subscriptions: invalid_type'],
+    ],
+    [
+      'a renamed store',
+      {
+        entitlements: {
+          premium: {
+            expires_date: '2026-09-12T12:00:00.000Z',
+            product_identifier: 'premium_monthly',
+          },
+        },
+        subscriptions: { premium_monthly: { store_name: 'play_store' } },
+      },
+      ['subscriber.subscriptions.premium_monthly.store: invalid_type'],
+    ],
+    ['no subscriber at all', null, ['subscriber: invalid_type']],
+  ])('fails the shape check, transiently, on %s', async (_label, subscriber, issues) => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(JSON.stringify(subscriber === null ? {} : { subscriber }), {
+        status: 200,
+      })
+    )
+
+    const caught: unknown = await client
+      .getSubscriberEntitlement('user-1')
+      .catch((error: unknown) => error)
+
+    expect(caught).toBeInstanceOf(RevenueCatResponseShapeError)
+    expect((caught as RevenueCatResponseShapeError).issues).toEqual(issues)
+    expect(permanentLedgerProjectionFailure(caught)).toBeNull()
+  })
+
+  it('names the failing paths only, never a response value', async () => {
+    fetchMock.mockResolvedValueOnce(
+      subscriberResponse({
+        entitlements: { premium: { expires_date: 42, product_identifier: 'secret-sku' } },
+        subscriptions: {},
+        subscriber_attributes: { $email: { value: 'person@example.com' } },
+      })
+    )
+
+    const caught = (await client
+      .getSubscriberEntitlement('user-1')
+      .catch((error: unknown) => error)) as Error
+
+    expect(caught).toBeInstanceOf(RevenueCatResponseShapeError)
+    expect(caught.message).not.toContain('example.com')
+    expect(caught.message).not.toContain('secret-sku')
+    expect(caught.message).not.toContain('42')
+  })
+
   it('returns null when the subscriber has no premium entitlement', async () => {
     fetchMock.mockResolvedValueOnce(
       subscriberResponse({ entitlements: {}, subscriptions: {} })
@@ -413,6 +504,7 @@ describe('permanentLedgerProjectionFailure', () => {
     new RevenueCatRequestError(429, 'subscriber GET'),
     new Error('RevenueCat ledger pull timed out'),
     new TypeError('fetch failed'),
+    new RevenueCatResponseShapeError(['subscriber.subscriptions: invalid_type']),
     'not an error',
   ])('classifies %s as transient', (error) => {
     expect(permanentLedgerProjectionFailure(error)).toBeNull()

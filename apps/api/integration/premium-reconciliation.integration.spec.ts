@@ -18,6 +18,7 @@ import {
   FakeRevenueCatClient,
   RealRevenueCatClient,
   RevenueCatRequestError,
+  RevenueCatResponseShapeError,
   RevenueCatUnrepresentableEntitlementError,
   RevenueCatUnsupportedStoreError,
 } from '../src/modules/commerce/revenuecat-client.js'
@@ -388,17 +389,20 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
             expect.stringContaining(encodeURIComponent(userId)),
             expect.anything()
           )
-          // The ledger answer is permanent, so only synced_at moves (story 6.15): the row leaves
-          // the head of the drift batch and its state stays exactly as it was.
+          // The ledger answer is permanent, so only drift_settled_at moves (story 6.15 r38): the
+          // row leaves the head of the drift batch, its state stays exactly as it was, and
+          // synced_at still names the last confirmed sync.
           const after = await prisma.premiumEntitlement.findUnique({
             where: { user_id: userId },
           })
+          expect(before?.drift_settled_at).toBeNull()
           expect(after).toEqual({
             ...before,
-            synced_at: expect.any(Date) as Date,
+            drift_settled_at: expect.any(Date) as Date,
             updated_at: expect.any(Date) as Date,
           })
-          expect(after!.synced_at.getTime()).toBeGreaterThan(
+          expect(after!.synced_at).toEqual(before!.synced_at)
+          expect(after!.drift_settled_at!.getTime()).toBeGreaterThan(
             Date.now() - DRIFT_STALENESS_HOURS * 60 * 60 * 1000
           )
         } finally {
@@ -577,6 +581,14 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
       () => new RevenueCatRequestError(503, 'subscriber GET'),
       2,
     ],
+    [
+      'a member behind a RevenueCat response-shape change still leads the next sweep',
+      () =>
+        new RevenueCatResponseShapeError([
+          'subscriber.entitlements.premium.product_identifier: invalid_type',
+        ]),
+      2,
+    ],
   ] as const) {
     it(label, async (context) => {
       if (!requireSchema(context)) return
@@ -621,16 +633,125 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
       const after = await prisma.premiumEntitlement.findUnique({
         where: { user_id: userId },
       })
-      // Either way the ledger state is untouched; only a permanent answer moves synced_at.
-      expect({ ...after, synced_at: null, updated_at: null }).toEqual({
+      // Either way the ledger state and synced_at are untouched (r38 P3-1); only a permanent
+      // answer records a settle.
+      expect({ ...after, drift_settled_at: null, updated_at: null }).toEqual({
         ...before,
-        synced_at: null,
+        drift_settled_at: null,
         updated_at: null,
       })
+      expect(after!.synced_at).toEqual(staleSyncedAt)
       if (pullsAcrossTwoSweeps === 1) {
-        expect(after!.synced_at.getTime()).toBeGreaterThan(staleSyncedAt.getTime())
+        expect(after!.drift_settled_at!.getTime()).toBeGreaterThan(
+          staleSyncedAt.getTime()
+        )
       } else {
-        expect(after!.synced_at).toEqual(staleSyncedAt)
+        expect(after!.drift_settled_at).toBeNull()
+      }
+      // What the status and refresh responses serialize: the last confirmed sync, never the
+      // settle, so a settled row is never shown as freshly synced.
+      const view = await new PremiumEntitlementService(
+        prisma,
+        ledger,
+        new FakeStripeBillingClient(),
+        noComplimentaryGrants
+      ).getEntitlement(userId)
+      expect(view?.syncedAt).toEqual(staleSyncedAt)
+    })
+  }
+
+  // Story 6.15 r38 P3-1: a 200 whose shape changed (a key the projection reads renamed or gone)
+  // used to raise the permanent projection errors and settle the row for a day. Through the real
+  // client it now fails the shape check: transient, no settle, and the next sweep pulls again.
+  for (const [shape, subscriber] of [
+    [
+      'a renamed product_identifier',
+      {
+        entitlements: { premium: { expires_date: null, product_id: 'premium_life' } },
+        subscriptions: {},
+      },
+    ],
+    [
+      'a renamed expires_date',
+      {
+        entitlements: {
+          premium: { expiry: null, product_identifier: 'premium_monthly' },
+        },
+        subscriptions: { premium_monthly: { store: 'play_store' } },
+      },
+    ],
+    [
+      'a renamed subscriptions',
+      {
+        entitlements: {
+          premium: { expires_date: null, product_identifier: 'premium_life' },
+        },
+        subscription_records: { premium_life: { store: 'play_store' } },
+      },
+    ],
+    [
+      'a renamed store',
+      {
+        entitlements: {
+          premium: { expires_date: null, product_identifier: 'premium_life' },
+        },
+        subscriptions: { premium_life: { store_name: 'play_store' } },
+      },
+    ],
+  ] as const) {
+    it(`a ledger response with ${shape} settles nothing and is pulled again next sweep`, async (context) => {
+      if (!requireSchema(context)) return
+      const subscriberUrl = `/subscribers/${encodeURIComponent(userId)}`
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith(subscriberUrl)
+            ? new Response(JSON.stringify({ subscriber }), { status: 200 })
+            : new Response('out of scope', { status: 503 })
+        )
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      try {
+        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+        const sweeper = new BillingReconciliationService(
+          prisma,
+          realLedger,
+          new PremiumEntitlementService(
+            prisma,
+            realLedger,
+            new FakeStripeBillingClient(),
+            noComplimentaryGrants
+          ),
+          telemetry as unknown as TelemetryService
+        )
+        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+        await prisma.premiumEntitlement.create({
+          data: buildPremiumEntitlementCreateInput(
+            createPremiumEntitlement({
+              userId,
+              status: 'active',
+              store: 'play_store',
+              syncedAt: staleSyncedAt,
+              lastEventOccurredAt: staleSyncedAt,
+              lastEventId: `${namespace}-shape-seed`,
+            })
+          ),
+        })
+        const before = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: userId },
+        })
+        const ownPulls = () =>
+          fetchMock.mock.calls.filter(([url]) => url.endsWith(subscriberUrl)).length
+
+        await sweeper.sweep()
+        expect(ownPulls()).toBe(1)
+        await sweeper.sweep()
+        expect(ownPulls()).toBe(2)
+
+        expect(
+          await prisma.premiumEntitlement.findUnique({ where: { user_id: userId } })
+        ).toEqual(before)
+      } finally {
+        vi.unstubAllGlobals()
       }
     })
   }

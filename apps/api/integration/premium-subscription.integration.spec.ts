@@ -503,6 +503,80 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
         })
       }
 
+    // Story 6.15 r38 P3-1: a 200 whose shape changed (a key the projection reads renamed or gone)
+    // says nothing about the member, so it is not one of the permanent answers above: refresh
+    // stays an honest 503 and the row is untouched.
+    for (const [shape, subscriber] of [
+      [
+        'a renamed product_identifier',
+        {
+          entitlements: { premium: { expires_date: null, product_id: 'premium_life' } },
+          subscriptions: {},
+        },
+      ],
+      [
+        'a renamed expires_date',
+        {
+          entitlements: {
+            premium: { expiry: null, product_identifier: 'premium_monthly' },
+          },
+          subscriptions: { premium_monthly: { store: 'play_store' } },
+        },
+      ],
+      [
+        'a renamed subscriptions',
+        {
+          entitlements: {
+            premium: { expires_date: null, product_identifier: 'premium_life' },
+          },
+          subscription_records: { premium_life: { store: 'play_store' } },
+        },
+      ],
+      [
+        'a renamed store',
+        {
+          entitlements: {
+            premium: { expires_date: null, product_identifier: 'premium_life' },
+          },
+          subscriptions: { premium_life: { store_name: 'play_store' } },
+        },
+      ],
+    ] as const) {
+      it(`answers 503 and keeps a paid row when the ledger response has ${shape}`, async (context) => {
+        if (!requireSchema(context)) return
+
+        await seedEntitlement(subscriberId, 'active')
+        const before = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: subscriberId },
+        })
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(() =>
+            Promise.resolve(new Response(JSON.stringify({ subscriber }), { status: 200 }))
+          )
+        )
+        const real = new RealRevenueCatClient('sk_test_rc_key')
+        const pull = vi
+          .spyOn(fakeLedger, 'getSubscriberEntitlement')
+          .mockImplementation((userId) => real.getSubscriberEntitlement(userId))
+        try {
+          const response = await postRefresh(subscriberId)
+
+          expect(response.status).toBe(503)
+          expect(envelope(response).message).toBe(SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE)
+          expect(pull).toHaveBeenCalledTimes(1)
+          expect(
+            await prisma.premiumEntitlement.findUnique({
+              where: { user_id: subscriberId },
+            })
+          ).toEqual(before)
+        } finally {
+          pull.mockRestore()
+          vi.unstubAllGlobals()
+        }
+      })
+    }
+
     // Learning path Step 55: story 6.15 D15. Under an explicit local or preview TEST_ENV a Test
     // Store entitlement on the ledger converges on refresh: the row, the status read and the
     // access read all report test_store premium.

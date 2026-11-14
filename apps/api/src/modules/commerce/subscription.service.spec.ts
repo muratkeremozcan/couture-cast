@@ -10,6 +10,7 @@ import type {
 import {
   type RevenueCatClient,
   RevenueCatRequestError,
+  RevenueCatResponseShapeError,
   RevenueCatUnrepresentableEntitlementError,
   RevenueCatUnsupportedStoreError,
 } from './revenuecat-client.js'
@@ -199,6 +200,13 @@ describe('refreshSubscription', () => {
   it.each([
     ['a non-2xx ledger response', new RevenueCatRequestError(503, 'subscriber GET')],
     ['a ledger timeout', new Error('RevenueCat ledger pull timed out')],
+    // r38 P3-1: a renamed key on a 200 is RevenueCat's response changing, not the member.
+    [
+      'a RevenueCat response-shape change',
+      new RevenueCatResponseShapeError([
+        'subscriber.entitlements.premium.product_identifier: invalid_type',
+      ]),
+    ],
   ])('%s still answers 503 and applies nothing', async (_label, error) => {
     const { service, entitlements } = build({
       entitlement: entitledView,

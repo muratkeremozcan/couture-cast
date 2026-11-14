@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common'
+import { z } from 'zod'
 import {
   allowsTestOnlySecrets,
   appliesRevenueCatTestStore,
 } from '../../config/runtime-environment.js'
+import { createBaseLogger } from '../../logger/pino.config.js'
 import type { LedgerEntitlementState } from './premium-entitlement.service.js'
 
 /**
@@ -139,28 +141,41 @@ export class FakeRevenueCatClient extends RevenueCatClient {
 const REVENUECAT_API_BASE_URL = 'https://api.revenuecat.com/v1'
 const REVENUECAT_ENTITLEMENT_ID = 'premium'
 
-/** The narrow slice of RC's subscriber response this client reads. */
-type RevenueCatSubscriberResponse = {
-  subscriber?: {
-    entitlements?: Record<
-      string,
-      {
-        expires_date?: string | null
-        purchase_date?: string | null
-        product_identifier?: string | null
-      }
-    >
-    subscriptions?: Record<
-      string,
-      {
-        store?: string | null
-        unsubscribe_detected_at?: string | null
-        billing_issues_detected_at?: string | null
-        expires_date?: string | null
-      }
-    >
-  }
-}
+const nullableString = z.string().nullable()
+
+/**
+ * The slice of RC's v1 subscriber response this client reads, as a schema (story 6.15). Every key
+ * whose value decides the projection must be present, null where RC documents null: a renamed or
+ * missing key is RevenueCat changing its response, not a fact about the member, so it fails as a
+ * transient {@link RevenueCatResponseShapeError} and never as one of the permanent projection
+ * errors below. Unknown sibling keys pass, so an additive RC change is never a failure.
+ */
+const revenueCatSubscriberResponseSchema = z
+  .object({
+    subscriber: z
+      .object({
+        entitlements: z.record(
+          z.string(),
+          z
+            .object({ expires_date: nullableString, product_identifier: nullableString })
+            .passthrough()
+        ),
+        subscriptions: z.record(
+          z.string(),
+          z
+            .object({
+              store: nullableString,
+              unsubscribe_detected_at: nullableString.optional(),
+              billing_issues_detected_at: nullableString.optional(),
+            })
+            .passthrough()
+        ),
+      })
+      .passthrough(),
+  })
+  .passthrough()
+
+type RevenueCatSubscriberResponse = z.infer<typeof revenueCatSubscriberResponseSchema>
 
 const restStoreMap: Readonly<Record<string, LedgerEntitlementState['store']>> = {
   app_store: 'app_store',
@@ -210,10 +225,23 @@ export type PermanentLedgerProjectionFailure = {
 }
 
 /**
+ * A 200 subscriber response that does not match {@link revenueCatSubscriberResponseSchema}.
+ * Transient: it says RevenueCat's response changed, nothing about the member. It carries the
+ * failing paths only, never a value, because the body can hold subscriber attributes.
+ */
+export class RevenueCatResponseShapeError extends Error {
+  constructor(readonly issues: readonly string[]) {
+    super(`RevenueCat subscriber response failed the shape check at ${issues.join('; ')}`)
+    this.name = 'RevenueCatResponseShapeError'
+  }
+}
+
+/**
  * Story 6.15: classifies a ledger pull failure. The projection errors above describe what the
- * ledger holds (a store we do not sell, a lifetime grant, a missing product), so they come back
- * the same on every retry; any other error (a non-2xx response, a timeout, a network failure)
- * is transient and returns null.
+ * ledger holds (a store we do not sell, a lifetime grant, a missing product) and are raised only
+ * from a response that passed the shape check, so they come back the same on every retry. Any
+ * other error (a non-2xx response, a shape failure, a timeout, a network failure) is transient
+ * and returns null.
  */
 export function permanentLedgerProjectionFailure(
   error: unknown
@@ -240,6 +268,8 @@ export class RevenueCatRequestError extends Error {
 }
 
 export class RealRevenueCatClient extends RevenueCatClient {
+  private readonly logger = createBaseLogger().child({ feature: 'revenuecat-client' })
+
   constructor(private readonly secretApiKey: string) {
     super()
   }
@@ -254,8 +284,18 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (!response.ok) {
       throw new RevenueCatRequestError(response.status, 'subscriber GET')
     }
-    const body = (await response.json()) as RevenueCatSubscriberResponse
-    return this.projectSubscriber(body)
+    const parsed = revenueCatSubscriberResponseSchema.safeParse(await response.json())
+    if (!parsed.success) {
+      const issues = parsed.error.issues.map(
+        (issue) => `${issue.path.join('.') || 'response'}: ${issue.code}`
+      )
+      this.logger.error(
+        { issues },
+        'RevenueCat subscriber response failed the shape check'
+      )
+      throw new RevenueCatResponseShapeError(issues)
+    }
+    return this.projectSubscriber(parsed.data)
   }
 
   async forwardStripeSubscription(
@@ -305,7 +345,11 @@ export class RealRevenueCatClient extends RevenueCatClient {
   private projectSubscriber(
     body: RevenueCatSubscriberResponse
   ): RevenueCatSubscriberEntitlement {
-    const entitlement = body.subscriber?.entitlements?.[REVENUECAT_ENTITLEMENT_ID]
+    const { entitlements, subscriptions } = body.subscriber
+    // Own keys only, as for stores: an inherited name is not an entitlement or a subscription.
+    const entitlement = Object.hasOwn(entitlements, REVENUECAT_ENTITLEMENT_ID)
+      ? entitlements[REVENUECAT_ENTITLEMENT_ID]
+      : undefined
     if (!entitlement) {
       return null
     }
@@ -313,11 +357,13 @@ export class RealRevenueCatClient extends RevenueCatClient {
     // permanent error, so refresh serves the member's local state and reconciliation leaves the
     // row's state as it is. Answering null here would read as "no entitlement" and expire a
     // paying member (story 6.15 R4-01).
-    const productId = entitlement.product_identifier ?? null
+    const productId = entitlement.product_identifier
     if (productId === null) {
       throw new RevenueCatUnrepresentableEntitlementError('missing_product')
     }
-    const subscription = body.subscriber?.subscriptions?.[productId]
+    const subscription = Object.hasOwn(subscriptions, productId)
+      ? subscriptions[productId]
+      : undefined
     const store = mapRevenueCatRestStore(subscription?.store)
     if (store === undefined) {
       // A store we do not sell (AMAZON, a RevenueCat Test Store purchase outside an explicit local

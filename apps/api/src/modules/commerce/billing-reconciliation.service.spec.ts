@@ -6,6 +6,7 @@ import { BillingReconciliationService } from './billing-reconciliation.service.j
 import {
   FakeRevenueCatClient,
   RevenueCatRequestError,
+  RevenueCatResponseShapeError,
   RevenueCatUnrepresentableEntitlementError,
   RevenueCatUnsupportedStoreError,
 } from './revenuecat-client.js'
@@ -191,7 +192,7 @@ describe('BillingReconciliationService', () => {
         { reason: 'invalid_expiry' },
       ],
     ] as const)(
-      'with %s stamps only synced_at, applies nothing, warns once, and moves on',
+      'with %s stamps only drift_settled_at, applies nothing, warns once, and moves on',
       async (_label, error, logged) => {
         premiumEntitlement.findMany.mockResolvedValue([
           { user_id: 'user-1' },
@@ -206,21 +207,26 @@ describe('BillingReconciliationService', () => {
         expect(premiumEntitlement.updateMany).toHaveBeenCalledTimes(1)
         const [stamp] = premiumEntitlement.updateMany.mock.calls[0] as [
           {
-            where: { user_id: string; synced_at: { lt: Date } }
+            where: { user_id: string; synced_at: { lt: Date }; OR: unknown }
             data: Record<string, unknown>
           },
         ]
-        expect(stamp.where.user_id).toBe('user-1')
-        // The stamp is guarded on the same staleness bound the scan used.
         const [scan] = premiumEntitlement.findMany.mock.calls[0] as [
-          { where: { synced_at: { lt: Date } } },
+          { where: { synced_at: { lt: Date }; OR: unknown } },
         ]
-        expect(stamp.where.synced_at.lt).toEqual(scan.where.synced_at.lt)
-        // Only synced_at moves: status, store, product and period end stay as they were.
-        expect(Object.keys(stamp.data)).toEqual(['synced_at'])
-        expect(stamp.data.synced_at).toBeInstanceOf(Date)
-        expect((stamp.data.synced_at as Date).getTime()).toBeGreaterThan(
-          stamp.where.synced_at.lt.getTime()
+        const staleBefore = scan.where.synced_at.lt
+        // The stamp is guarded on the scan's own filter: still stale and not settled since.
+        expect(stamp.where).toEqual({
+          user_id: 'user-1',
+          synced_at: { lt: staleBefore },
+          OR: [{ drift_settled_at: null }, { drift_settled_at: { lt: staleBefore } }],
+        })
+        // r38 P3-1: synced_at keeps meaning a confirmed sync, so the settle writes only its own
+        // column; status, store, product, period end and synced_at stay as they were.
+        expect(Object.keys(stamp.data)).toEqual(['drift_settled_at'])
+        expect(stamp.data.drift_settled_at).toBeInstanceOf(Date)
+        expect((stamp.data.drift_settled_at as Date).getTime()).toBeGreaterThan(
+          staleBefore.getTime()
         )
         expect(entitlements.applyLedgerSnapshot).toHaveBeenCalledTimes(1)
         expect(entitlements.applyLedgerSnapshot).toHaveBeenCalledWith(
@@ -241,9 +247,34 @@ describe('BillingReconciliationService', () => {
       }
     )
 
+    it('logs no settle when the stamp counted no row (a concurrent write got there first)', async () => {
+      premiumEntitlement.findMany.mockResolvedValue([{ user_id: 'user-1' }])
+      premiumEntitlement.updateMany.mockResolvedValue({ count: 0 })
+      vi.spyOn(ledger, 'getSubscriberEntitlement').mockRejectedValueOnce(
+        new RevenueCatUnrepresentableEntitlementError('no_expiry')
+      )
+      const warn = warnSpy()
+
+      await service.sweep()
+
+      expect(premiumEntitlement.updateMany).toHaveBeenCalledTimes(1)
+      expect(
+        warn.mock.calls.filter(
+          ([, message]) =>
+            message === 'billing_reconciliation_drift_entitlement_unrepresentable'
+        )
+      ).toEqual([])
+    })
+
     it.each([
       ['a non-2xx ledger response', new RevenueCatRequestError(503, 'subscriber GET')],
       ['a ledger outage', new Error('network down')],
+      [
+        'a RevenueCat response-shape change',
+        new RevenueCatResponseShapeError([
+          'subscriber.entitlements.premium.product_identifier: invalid_type',
+        ]),
+      ],
     ])(
       'a transient %s leaves the row stale for the next sweep',
       async (_label, error) => {
@@ -282,6 +313,25 @@ describe('BillingReconciliationService', () => {
       'premium_entitlement_deactivated',
       { store: 'stripe', productId: 'premium_monthly', reason: 'expired' }
     )
+  })
+
+  // Story 6.15 r38 P3-1: the scan filters out a row settled within the staleness window and puts
+  // never-settled rows first, oldest confirmed sync first, so a settled row cannot lead a batch.
+  it('scans stale rows not settled within the window, never-settled first', async () => {
+    await service.sweep()
+
+    const [scan] = premiumEntitlement.findMany.mock.calls[0] as [
+      { where: { synced_at: { lt: Date }; OR: unknown }; orderBy: unknown },
+    ]
+    const staleBefore = scan.where.synced_at.lt
+    expect(scan.where.OR).toEqual([
+      { drift_settled_at: null },
+      { drift_settled_at: { lt: staleBefore } },
+    ])
+    expect(scan.orderBy).toEqual([
+      { drift_settled_at: { sort: 'asc', nulls: 'first' } },
+      { synced_at: 'asc' },
+    ])
   })
 
   // Learning path Step 55: story 6.15 D15 r6. A test_store row this API does not honor never enters
