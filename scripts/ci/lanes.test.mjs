@@ -466,10 +466,12 @@ function filesNamed(source, file, modules = new Set()) {
     ]) {
       // A directory resolves to its index only through an import, require.resolve or new URL;
       // a directory literal elsewhere is a path spec ('apps/mobile' in vercel-preview-inputs.mjs),
-      // never a read of its index. Known gap: an index reached by a variable import, or by
-      // path.join(dir, 'index.ts') on a two-segment directory literal, counts as no read (a
-      // directory of three or more segments still names every file inside it); no spec does
-      // either today.
+      // never a read of its index. Known gaps, where an index of a two-segment directory counts
+      // as no read (a directory of three or more segments still names every file inside it):
+      // a variable import; import.meta.resolve; createRequire(...)(dir); path.join or
+      // path.resolve onto the directory; more than 20 characters, or an inline comment, between
+      // the call and the literal; an index.tsx, index.mjs or index.cjs. No spec does any of
+      // these today. An over-match only wakes an extra lane, the safe direction.
       const suffixes = ['', '.ts', '.tsx', '.js', '.mjs']
       if (indexable || !trackedDirs.has(candidate))
         suffixes.push('/index.ts', '/index.js')
