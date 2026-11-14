@@ -167,3 +167,72 @@ test('a leaking file already in the evidence dir is moved to the private quarant
     fs.existsSync(privatePath(dirs, path.join('quarantine', 'maestro', 'step.json')))
   )
 })
+
+// Antigravity r14: a leaking report must not stop the quarantine of another leaking file.
+test('a leaking report still quarantines every other leak already in the evidence dir', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  writeEvidence(dirs, 'earlier.json', `{"u":"${MEMBER}"}`)
+  assert.throws(
+    () =>
+      writeRunOutputs({
+        dirs,
+        label: 'leaky',
+        report: { note: MEMBER },
+        member: { userId: MEMBER },
+      }),
+    (error) =>
+      error.code === 'test_store_evidence_leak' &&
+      error.message.includes('earlier.json') &&
+      error.message.includes('leaky.json (not written)')
+  )
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+  assert.ok(fs.existsSync(privatePath(dirs, path.join('quarantine', 'earlier.json'))))
+})
+
+// Antigravity r14: --out on its own mount makes rename fail with EXDEV.
+test('quarantine copies across mounts, keeping mode 600 and moving a symlink as a link', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  writeEvidence(dirs, 'leak.json', `{"u":"${MEMBER}"}`)
+  fs.chmodSync(path.join(dirs.evidence, 'leak.json'), 0o644)
+  fs.symlinkSync('/etc/hosts', path.join(dirs.evidence, 'hosts-link'))
+  const exdev = () => {
+    throw Object.assign(new Error('cross-device link not permitted'), { code: 'EXDEV' })
+  }
+  assert.throws(
+    () => assertEvidenceClean(dirs, [MEMBER], { rename: exdev }),
+    (error) => error.code === 'test_store_evidence_leak'
+  )
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+  const moved = privatePath(dirs, path.join('quarantine', 'leak.json'))
+  assert.equal(fs.statSync(moved).mode & 0o777, 0o600)
+  assert.ok(fs.readFileSync(moved, 'utf8').includes(MEMBER))
+  const link = privatePath(dirs, path.join('quarantine', 'hosts-link'))
+  assert.ok(fs.lstatSync(link).isSymbolicLink())
+  assert.equal(fs.readlinkSync(link), '/etc/hosts')
+  // Any other rename failure is not swallowed.
+  writeEvidence(dirs, 'again.json', MEMBER)
+  const denied = () => {
+    throw Object.assign(new Error('denied'), { code: 'EACCES' })
+  }
+  assert.throws(() => assertEvidenceClean(dirs, [MEMBER], { rename: denied }), /denied/)
+})
+
+// Antigravity r14: a symlinked dir under evidence is never followed; the link itself moves out.
+test('a symlinked dir under the evidence dir is quarantined, not followed', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  writePrivate(dirs, path.join('raw', 'device.log'), `app user ${APP_USER}`)
+  fs.symlinkSync(privatePath(dirs, 'raw'), path.join(dirs.evidence, 'logs'))
+  writeEvidence(dirs, 'report.json', { ok: true })
+  const hits = scanForLeaks(dirs.evidence, IDS)
+  assert.deepEqual(hits, [{ file: 'logs', needle: null, kind: 'non-regular' }])
+  assert.throws(
+    () => assertEvidenceClean(dirs, IDS),
+    (error) => error.code === 'test_store_evidence_leak'
+  )
+  assert.deepEqual(fs.readdirSync(dirs.evidence), ['report.json'])
+  assert.ok(
+    fs.lstatSync(privatePath(dirs, path.join('quarantine', 'logs'))).isSymbolicLink()
+  )
+  // The private file the link pointed at is untouched.
+  assert.ok(fs.existsSync(privatePath(dirs, path.join('raw', 'device.log'))))
+})

@@ -104,14 +104,19 @@ export function leaksInText(text, needles) {
 export function scanForLeaks(dir, needles) {
   const hits = []
   const walk = (current) => {
+    // Dirents come from lstat: a symlink is never followed, into a dir or out of the tree.
     for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
       const file = path.join(current, entry.name)
+      const relative = path.relative(dir, file)
       if (entry.isDirectory()) walk(file)
-      else {
+      else if (entry.isFile()) {
         const text = fs.readFileSync(file).toString('latin1')
         for (const needle of leaksInText(text, needles))
-          hits.push({ file: path.relative(dir, file), needle })
-      }
+          hits.push({ file: relative, needle })
+      } else
+        // A symlink (or any other non-regular entry) could expose what it points at; it is
+        // quarantined whatever it names (Antigravity r14).
+        hits.push({ file: relative, needle: null, kind: 'non-regular' })
     }
   }
   if (fs.existsSync(dir)) walk(dir)
@@ -119,35 +124,63 @@ export function scanForLeaks(dir, needles) {
 }
 
 /**
- * Throws, naming files but never the ids, when the evidence dir holds any of `needles`. A file
- * that leaks is first moved into `<private>/quarantine/`, so an always-run upload of the
- * evidence dir never carries it (Antigravity r13 P2).
+ * Moves `from` to `to`. Across mounts (EXDEV: the evidence dir on its own volume) it copies,
+ * keeping mode 600 for a file and recreating a symlink as a symlink, then removes the source.
  */
-export function assertEvidenceClean(dirs, needles) {
-  const files = [...new Set(scanForLeaks(dirs.evidence, needles).map((hit) => hit.file))]
-  if (!files.length) return
-  for (const file of files) {
-    const target = privatePath(dirs, path.join('quarantine', file))
-    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 })
-    fs.renameSync(path.join(dirs.evidence, file), target)
+export function moveAcrossMounts(from, to, rename = fs.renameSync) {
+  try {
+    rename(from, to)
+  } catch (error) {
+    if (error?.code !== 'EXDEV') throw error
+    if (fs.lstatSync(from).isSymbolicLink()) fs.symlinkSync(fs.readlinkSync(from), to)
+    else {
+      fs.copyFileSync(from, to)
+      fs.chmodSync(to, 0o600)
+    }
+    fs.unlinkSync(from)
   }
-  throw new JourneyError('test_store_evidence_leak', files.join(', '))
 }
 
 /**
- * The run's closing writes. The member side file goes to the private dir; the report is
- * serialized and scanned in memory, and reaches the evidence dir only when it holds no id in any
- * form; then the whole evidence dir is scanned. Returns the written paths.
+ * Moves every leaking or non-regular entry under the evidence dir into
+ * `<private>/quarantine/`, so an always-run upload of the evidence dir never carries it
+ * (Antigravity r13 P2). Returns the moved paths, relative to the evidence dir.
  */
-export function writeRunOutputs({ dirs, label, report, member, extraIds = [] }) {
+export function quarantineLeaks(dirs, needles, { rename = fs.renameSync } = {}) {
+  const files = [...new Set(scanForLeaks(dirs.evidence, needles).map((hit) => hit.file))]
+  for (const file of files) {
+    const target = privatePath(dirs, path.join('quarantine', file))
+    fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 })
+    moveAcrossMounts(path.join(dirs.evidence, file), target, rename)
+  }
+  return files
+}
+
+/** Throws, naming files but never the ids, after quarantining every leak under the evidence dir. */
+export function assertEvidenceClean(dirs, needles, options) {
+  const files = quarantineLeaks(dirs, needles, options)
+  if (files.length) throw new JourneyError('test_store_evidence_leak', files.join(', '))
+}
+
+/**
+ * The run's closing writes. The member side file goes to the private dir. Every leak already
+ * under the evidence dir is quarantined first; the report is serialized and scanned in memory and
+ * reaches the evidence dir only when it and the dir are clean. Returns the written paths.
+ */
+export function writeRunOutputs({ dirs, label, report, member, extraIds = [], rename }) {
   const needles = [member?.userId, ...extraIds]
   const written = {}
   if (member)
     written.member = writePrivate(dirs, `${label}.member.json`, { userId: member.userId })
+  const moved = quarantineLeaks(dirs, needles, { rename })
   const text = `${JSON.stringify(report, null, 2)}\n`
-  if (leaksInText(text, needles).length)
-    throw new JourneyError('test_store_evidence_leak', `${label}.json (not written)`)
+  const reportLeaks = leaksInText(text, needles).length > 0
+  if (moved.length || reportLeaks)
+    throw new JourneyError(
+      'test_store_evidence_leak',
+      [...moved, ...(reportLeaks ? [`${label}.json (not written)`] : [])].join(', ')
+    )
   written.report = writeEvidence(dirs, `${label}.json`, text)
-  assertEvidenceClean(dirs, needles)
+  assertEvidenceClean(dirs, needles, { rename })
   return written
 }
