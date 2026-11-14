@@ -14,6 +14,7 @@ import { spawnSync } from 'node:child_process'
 import fs, { realpathSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { boundOf } from './spawn-bound.mjs'
 
 /** What every app build reads: the app, its packages, the install and the root build config. */
 export const APP_INPUTS = [
@@ -96,34 +97,86 @@ export const LEGS = {
   },
 }
 
-// A git call killed at its bound reads as a failed one (status null), the same as before.
-const GIT_TIMEOUT_MS = 30_000
+// Antigravity r24: every git call is bounded, and one that is killed at its bound, fails to
+// spawn or exits nonzero fails the manifest. Read as success, a timed-out `git status` passed a
+// dirty tree and a timed-out `ls-tree` dropped a glob's files; read as absent, a timed-out
+// lookup recorded an input as null. The override exists for the hung-git tests.
+const GIT_TIMEOUT_MS = boundOf(
+  process.env.EVIDENCE_MANIFEST_GIT_TIMEOUT_MS ?? '30000',
+  'evidence_git_timeout_invalid'
+)
+// git's messages are matched below, so they must not be translated.
+const GIT_ENV = { ...process.env, LC_ALL: 'C', LANGUAGE: '' }
 
-function git(args, cwd) {
+/**
+ * A failed git call as an error naming the subcommand and how it ended: the spawn error code
+ * (ETIMEDOUT at the bound), the signal, or the exit status. Never git's output, which can hold
+ * file contents.
+ */
+function gitFailed(args, result) {
+  const how =
+    result.status === 0
+      ? 'not_an_object_id'
+      : (result.error?.code ?? result.signal ?? `exit_${result.status}`)
+  return Object.assign(new Error(`evidence_git_failed:${args[0]}:${how}`), {
+    code: 'evidence_git_failed',
+  })
+}
+
+function spawnGit(args, cwd) {
   const result = spawnSync('git', args, {
     cwd,
+    env: GIT_ENV,
     encoding: 'utf8',
     timeout: GIT_TIMEOUT_MS,
     killSignal: 'SIGKILL',
   })
-  return { ok: result.status === 0, out: result.stdout.trim() }
+  // A spawn error (ETIMEDOUT at the bound, ENOENT, ENOBUFS) fails whatever status came back.
+  if (result.error) throw gitFailed(args, { ...result, status: null })
+  return result
 }
 
-/** The object id of `path` at `rev`, or null when the path does not exist there. */
+/** The trimmed output of a git call that must succeed. */
+function git(args, cwd) {
+  const result = spawnGit(args, cwd)
+  if (result.status !== 0) throw gitFailed(args, result)
+  return result.stdout.trim()
+}
+
+const OBJECT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
+
+/** The commit `rev` names. A success that prints anything but an object id throws. */
+function revParse(rev, cwd) {
+  const args = ['rev-parse', '--verify', '--end-of-options', `${rev}^{commit}`]
+  const sha = git(args, cwd)
+  if (!OBJECT_ID.test(sha)) throw gitFailed(args, { status: 0 })
+  return sha
+}
+
+/**
+ * The object id of `path` at `rev`, or null when the path does not exist there: `--quiet` makes
+ * that exit 1 with nothing on stderr. Any other ending throws.
+ */
 export function objectId(rev, file, cwd) {
-  const { ok, out } = git(['rev-parse', '--verify', '--quiet', `${rev}:${file}`], cwd)
-  return ok ? out : null
+  const args = ['rev-parse', '--verify', '--quiet', `${rev}:${file}`]
+  const result = spawnGit(args, cwd)
+  if (result.status === 1 && result.stdout === '' && result.stderr === '') return null
+  const id = result.stdout.trim()
+  if (result.status !== 0 || !OBJECT_ID.test(id)) throw gitFailed(args, result)
+  return id
 }
 
-/** The file at `rev`, or null. */
+// What `git show <rev>:<path>` prints, and exits 128 with, for a path absent at <rev>.
+const NOT_AT_REV =
+  /^fatal: path '[^\n]*' (?:does not exist in|exists on disk, but not in) '[^\n]*'\n?$/
+
+/** The file at `rev`, or null when it does not exist there. Any other ending throws. */
 function show(rev, file, cwd) {
-  const result = spawnSync('git', ['show', `${rev}:${file}`], {
-    cwd,
-    encoding: 'utf8',
-    timeout: GIT_TIMEOUT_MS,
-    killSignal: 'SIGKILL',
-  })
-  return result.status === 0 ? result.stdout : null
+  const args = ['show', `${rev}:${file}`]
+  const result = spawnGit(args, cwd)
+  if (result.status === 0) return result.stdout
+  if (result.status === 128 && NOT_AT_REV.test(result.stderr)) return null
+  throw gitFailed(args, result)
 }
 
 /** Relative `.mjs`/`.js` specifiers a module imports statically or dynamically with a literal. */
@@ -222,8 +275,7 @@ export function importClosure(entries, rev, cwd) {
 function globFiles(glob, rev, cwd) {
   const dir = path.posix.dirname(glob)
   const prefix = path.posix.basename(glob).replace(/\*$/, '')
-  const { out } = git(['ls-tree', '-r', '--name-only', rev, '--', `${dir}/`], cwd)
-  return out
+  return git(['ls-tree', '-r', '--name-only', rev, '--', `${dir}/`], cwd)
     .split('\n')
     .filter((file) => file && file.slice(dir.length + 1).startsWith(prefix))
 }
@@ -237,7 +289,7 @@ export const covered = (file, inputs) =>
  * cover, each with the file naming it. Empty for a complete leg.
  */
 export function uncoveredReads(leg, rev = 'HEAD', cwd) {
-  const sha = git(['rev-parse', rev], cwd).out
+  const sha = revParse(rev, cwd)
   const inputs = legInputs(leg, sha, cwd)
   const misses = []
   for (const file of importClosure(LEGS[leg].entries, sha, cwd)) {
@@ -271,11 +323,9 @@ export function legInputs(leg, rev, cwd) {
  */
 export function dirtyInputs(paths, cwd) {
   const present = paths.filter((file) => file)
-  const { out } = git(
-    ['status', '--porcelain', '--untracked-files=all', '--', ...present],
-    cwd
-  )
-  return out.split('\n').filter(Boolean)
+  return git(['status', '--porcelain', '--untracked-files=all', '--', ...present], cwd)
+    .split('\n')
+    .filter(Boolean)
 }
 
 /**
@@ -284,9 +334,9 @@ export function dirtyInputs(paths, cwd) {
  * other than the checked-out HEAD, since the build compiles what is checked out.
  */
 export function writeManifest({ leg, rev = 'HEAD', cwd, requireClean = true }) {
-  const sha = git(['rev-parse', rev], cwd).out
+  const sha = revParse(rev, cwd)
   if (requireClean) {
-    const head = git(['rev-parse', 'HEAD'], cwd).out
+    const head = revParse('HEAD', cwd)
     if (sha !== head) throw new Error(`evidence_manifest_rev_not_head:${sha}`)
     // The globs go in as pathspecs too, so an untracked file a glob would match is seen.
     const dirty = dirtyInputs([...legInputs(leg, sha, cwd), ...LEGS[leg].globs], cwd)
@@ -319,8 +369,8 @@ export function changedInputs(manifest, { rev = 'HEAD', cwd, requireClean = true
     }))
 }
 
-if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const [command, ...rest] = process.argv.slice(2)
+/** The CLI. A failure, a hung or failed git call included, prints its code and exits 1. */
+function main(command, rest) {
   const flag = (name) => {
     const at = rest.indexOf(`--${name}`)
     return at < 0 ? undefined : rest[at + 1]
@@ -330,7 +380,9 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
     const manifest = writeManifest({ leg: flag('leg'), rev })
     fs.writeFileSync(flag('out'), `${JSON.stringify(manifest, null, 2)}\n`)
     console.log(`evidence-manifest: ${manifest.leg} at ${manifest.sha}`)
-  } else if (command === 'verify') {
+    return 0
+  }
+  if (command === 'verify') {
     const files = rest.filter(
       (arg, index) => !arg.startsWith('--') && rest[index - 1] !== '--rev'
     )
@@ -338,7 +390,7 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
       console.error(
         'usage: evidence-manifest.mjs verify <manifest.json>... [--rev <rev>]'
       )
-      process.exit(2)
+      return 2
     }
     let stale = 0
     for (const file of files) {
@@ -354,11 +406,20 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
           `OK ${manifest.leg} (${file}): inputs unchanged since ${manifest.sha}`
         )
     }
-    process.exitCode = stale ? 1 : 0
-  } else {
-    console.error(
-      'usage: evidence-manifest.mjs write --leg <leg> --out <file> | verify <file>...'
-    )
-    process.exitCode = 2
+    return stale ? 1 : 0
+  }
+  console.error(
+    'usage: evidence-manifest.mjs write --leg <leg> --out <file> | verify <file>...'
+  )
+  return 2
+}
+
+if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const [command, ...rest] = process.argv.slice(2)
+  try {
+    process.exitCode = main(command, rest)
+  } catch (error) {
+    console.error(`evidence-manifest: ${error.message}`)
+    process.exitCode = 1
   }
 }

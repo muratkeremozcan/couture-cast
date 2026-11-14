@@ -9,20 +9,17 @@
 // not installed, terminate of an app that is not running).
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
+import * as spawnBound from './spawn-bound.mjs'
 import { JourneyError } from './test-store-journey.mjs'
 
 export const SPAWN_TIMEOUT_MS = 30_000
 
 /**
- * A spawn bound in milliseconds: a positive safe integer, given as a number or the text of one.
- * 0 would turn the bound off and text such as `abc` would reach spawnSync as NaN (Antigravity
- * r22), so anything else throws test_store_spawn_timeout_invalid.
+ * A spawn bound in milliseconds (spawn-bound.mjs): a positive safe integer, or the run fails as
+ * test_store_spawn_timeout_invalid (Antigravity r22).
  */
 export function boundOf(value) {
-  const ms = typeof value === 'string' && value.trim() !== '' ? Number(value) : value
-  if (typeof ms !== 'number' || !Number.isSafeInteger(ms) || ms <= 0)
-    throw new JourneyError('test_store_spawn_timeout_invalid', String(value))
-  return ms
+  return spawnBound.boundOf(value, 'test_store_spawn_timeout_invalid')
 }
 
 export function boundedSpawn(

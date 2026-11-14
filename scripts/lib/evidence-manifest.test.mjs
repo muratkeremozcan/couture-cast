@@ -1,11 +1,13 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { execFile, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import {
   APP_INPUTS,
   LEGS,
@@ -13,11 +15,14 @@ import {
   importClosure,
   legInputs,
   moduleRelativeLiterals,
+  objectId,
   relativeImports,
   repoPathLiterals,
   uncoveredReads,
   writeManifest,
 } from './evidence-manifest.mjs'
+
+const execFileAsync = promisify(execFile)
 
 /** A throwaway repository holding the live-font leg's inputs. */
 function fixtureRepo(t) {
@@ -302,4 +307,206 @@ test('verify with no manifest exits 2 with usage', () => {
   )
   assert.equal(result.status, 2)
   assert.match(result.stderr, /usage: evidence-manifest\.mjs verify/)
+})
+
+// Antigravity r24 (P2): a git call killed at its bound, failing to spawn or exiting nonzero fails
+// the manifest. Each case runs the module in a child against a stub git on PATH that hangs past
+// a short bound (or exits 2) for one call and hands every other call to the real git.
+const MODULE = new URL('./evidence-manifest.mjs', import.meta.url).href
+const REAL_GIT = spawnSync('sh', ['-c', 'command -v git'], {
+  encoding: 'utf8',
+  timeout: 10_000,
+  killSignal: 'SIGKILL',
+}).stdout.trim()
+const STUB_GIT = `#!/bin/sh
+case " $* " in
+  *"$STUB_MATCH"*)
+    if [ "$STUB_MODE" = fail ]; then echo "fatal: stub" >&2; exit 2; fi
+    if [ "$STUB_MODE" = garbage ]; then echo "not-an-object-id"; exit 0; fi
+    exec sleep 30 ;;
+esac
+exec "$REAL_GIT" "$@"
+`
+
+/** Runs `call` (an expression over the module's exports `m` and `sha`) under the stub git. */
+async function underStubGit(t, repo, { match, mode = 'hang', call, path: PATH }) {
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-git-stub-'))
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true }))
+  fs.writeFileSync(path.join(bin, 'git'), STUB_GIT, { mode: 0o755 })
+  const script = `
+    const m = await import(${JSON.stringify(MODULE)})
+    const sha = ${JSON.stringify(repo.git('rev-parse', 'HEAD'))}
+    try { console.log(JSON.stringify({ value: await (${call}) ?? null })) }
+    catch (error) { console.log(JSON.stringify({ error: error.message, code: error.code })) }`
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ['--input-type=module', '-e', script],
+    {
+      cwd: repo.dir,
+      timeout: 20_000,
+      killSignal: 'SIGKILL',
+      env: {
+        ...process.env,
+        PATH: PATH ?? `${bin}:${process.env.PATH}`,
+        REAL_GIT,
+        STUB_MATCH: match ?? '',
+        STUB_MODE: mode,
+        EVIDENCE_MANIFEST_GIT_TIMEOUT_MS: '1500',
+      },
+    }
+  )
+  return JSON.parse(stdout)
+}
+
+const STRICT_PATHS = [
+  // The dirty check: a timed-out status passed a dirty tree under requireClean.
+  ['dirty check', 'status', "m.writeManifest({ leg: 'live-font' })", 'status'],
+  // The glob: a timed-out ls-tree dropped every file the glob names.
+  ['glob', 'ls-tree', "m.legInputs('live-font', sha)", 'ls-tree'],
+  // rev-parse of the build revision: a timed-out one gave an empty sha.
+  ['rev-parse', '--end-of-options', "m.writeManifest({ leg: 'live-font' })", 'rev-parse'],
+  // objectId: a timed-out lookup recorded the input as absent.
+  ['objectId', '--quiet', "m.objectId(sha, 'package.json')", 'rev-parse'],
+  // show: a timed-out read dropped a harness import from the closure.
+  ['show', ' show ', "m.importClosure(['scripts/run-live-font-proof.mjs'], sha)", 'show'],
+]
+
+test('a hung or failing git call throws evidence_git_failed on every path', async (t) => {
+  const repo = fixtureRepo(t)
+  repo.commit('build')
+  // Dirty, so a status that read as clean would be caught passing.
+  repo.write('apps/mobile/app.json', '{"edited":true}')
+  // A success that prints no object id, from either rev-parse, throws too.
+  const garbage = STRICT_PATHS.filter(
+    ([name]) => name === 'rev-parse' || name === 'objectId'
+  )
+  await Promise.all([
+    ...garbage.map(async ([name, match, call, subcommand]) =>
+      assert.deepEqual(
+        await underStubGit(t, repo, { match, mode: 'garbage', call }),
+        {
+          error: `evidence_git_failed:${subcommand}:not_an_object_id`,
+          code: 'evidence_git_failed',
+        },
+        `${name} (garbage)`
+      )
+    ),
+    ...STRICT_PATHS.flatMap(([name, match, call, subcommand]) =>
+      [
+        ['hang', 'ETIMEDOUT'],
+        ['fail', 'exit_2'],
+      ].map(async ([mode, how]) => {
+        const result = await underStubGit(t, repo, { match, mode, call })
+        assert.deepEqual(
+          result,
+          {
+            error: `evidence_git_failed:${subcommand}:${how}`,
+            code: 'evidence_git_failed',
+          },
+          `${name} (${mode})`
+        )
+      })
+    ),
+  ])
+})
+
+test('a git that cannot spawn throws evidence_git_failed', async (t) => {
+  const repo = fixtureRepo(t)
+  repo.commit('build')
+  const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-no-git-'))
+  t.after(() => fs.rmSync(empty, { recursive: true, force: true }))
+  const result = await underStubGit(t, repo, {
+    call: "m.writeManifest({ leg: 'live-font' })",
+    path: empty,
+  })
+  assert.deepEqual(result, {
+    error: 'evidence_git_failed:rev-parse:ENOENT',
+    code: 'evidence_git_failed',
+  })
+})
+
+test('a git bound of 0 or text refuses to load', async () => {
+  for (const value of ['0', 'abc', '-1']) {
+    const result = await execFileAsync(
+      process.execPath,
+      ['--input-type=module', '-e', `await import(${JSON.stringify(MODULE)})`],
+      {
+        timeout: 20_000,
+        killSignal: 'SIGKILL',
+        env: { ...process.env, EVIDENCE_MANIFEST_GIT_TIMEOUT_MS: value },
+      }
+    ).then(
+      () => ({ code: 0 }),
+      (error) => error
+    )
+    assert.equal(result.code, 1, value)
+    assert.match(
+      result.stderr,
+      new RegExp(`evidence_git_timeout_invalid: ${value}`),
+      value
+    )
+  }
+})
+
+test('only a clean not-found exit reads as absent', (t) => {
+  const repo = fixtureRepo(t)
+  const sha = repo.commit('build')
+  assert.equal(objectId(sha, 'scripts/absent.mjs', repo.dir), null)
+  assert.match(objectId(sha, 'package.json', repo.dir), /^[0-9a-f]{40}$/)
+  // show's not-found exit: an entry absent at the revision, present only on disk too.
+  repo.write('scripts/on-disk-only.mjs', '')
+  for (const entry of ['scripts/absent.mjs', 'scripts/on-disk-only.mjs'])
+    assert.throws(() => importClosure([entry], sha, repo.dir), {
+      message: `evidence_manifest_entry_missing:${entry}`,
+    })
+  // Outside a repository git exits 128 with its own message: that throws, never null.
+  const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-no-repo-'))
+  t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
+  assert.throws(() => objectId(sha, 'package.json', outside), {
+    message: 'evidence_git_failed:rev-parse:exit_128',
+  })
+  assert.throws(() => importClosure(['scripts/run-live-font-proof.mjs'], sha, outside), {
+    message: 'evidence_git_failed:show:exit_128',
+  })
+})
+
+test('write and verify exit 1 with the code on stderr when git hangs', async (t) => {
+  const repo = fixtureRepo(t)
+  repo.commit('build')
+  const manifest = path.join(repo.dir, 'manifest.json')
+  fs.writeFileSync(
+    manifest,
+    JSON.stringify(writeManifest({ leg: 'live-font', cwd: repo.dir }))
+  )
+  const bin = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-git-stub-'))
+  t.after(() => fs.rmSync(bin, { recursive: true, force: true }))
+  fs.writeFileSync(path.join(bin, 'git'), STUB_GIT, { mode: 0o755 })
+  const cli = fileURLToPath(MODULE)
+  for (const args of [
+    ['write', '--leg', 'live-font', '--out', path.join(repo.dir, 'out.json')],
+    ['verify', manifest],
+  ]) {
+    const result = await execFileAsync(process.execPath, [cli, ...args], {
+      cwd: repo.dir,
+      timeout: 20_000,
+      killSignal: 'SIGKILL',
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        REAL_GIT,
+        STUB_MATCH: 'status',
+        EVIDENCE_MANIFEST_GIT_TIMEOUT_MS: '1500',
+      },
+    }).then(
+      () => ({ code: 0 }),
+      (error) => error
+    )
+    assert.equal(result.code, 1, args[0])
+    assert.equal(
+      result.stderr,
+      'evidence-manifest: evidence_git_failed:status:ETIMEDOUT\n',
+      args[0]
+    )
+  }
+  assert.equal(fs.existsSync(path.join(repo.dir, 'out.json')), false)
 })

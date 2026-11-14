@@ -2,10 +2,15 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
 import ts from 'typescript'
-import { moduleRelativeLiterals, relativeImports } from './evidence-manifest.mjs'
+import {
+  moduleRelativeLiterals,
+  relativeImports,
+  repoPathLiterals,
+} from './evidence-manifest.mjs'
 import { boundedSpawn, boundOf } from './test-store-spawn.mjs'
 
 // Antigravity r21 (1): a side call killed at its bound fails the run with its code.
@@ -43,6 +48,8 @@ test('a hung call past its bound throws its code; a tolerated nonzero exit does 
 // Out of scope (TEA, r23): spawn functions reached through createRequire, a dynamic import or a
 // shadowing local binding; the check stops at the static import forms below.
 const SPAWN_FUNCTIONS = new Set(['spawnSync', 'execFileSync', 'execSync'])
+// Where boundOf, the validated-bound function, is defined (spawn-bound.mjs) or re-exported.
+const BOUND_MODULES = ['spawn-bound.mjs', 'test-store-spawn.mjs']
 const CHILD_PROCESS = new Set(['node:child_process', 'child_process'])
 const propName = (property) =>
   property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
@@ -73,7 +80,9 @@ function readImports(tree, file) {
   const found = {
     spawnNames: new Set(),
     moduleNames: new Set(),
-    boundOfName: path.basename(file) === 'test-store-spawn.mjs' ? 'boundOf' : null,
+    boundOfName: BOUND_MODULES.some((name) => path.basename(file) === name)
+      ? 'boundOf'
+      : null,
   }
   for (const statement of tree.statements) {
     const clause = ts.isImportDeclaration(statement) ? statement.importClause : undefined
@@ -82,7 +91,7 @@ function readImports(tree, file) {
     if (CHILD_PROCESS.has(from)) childProcessNames(clause, found)
     const bindings = clause.namedBindings
     if (
-      from.endsWith('test-store-spawn.mjs') &&
+      BOUND_MODULES.some((name) => from.endsWith(name)) &&
       bindings &&
       ts.isNamedImports(bindings)
     ) {
@@ -193,25 +202,40 @@ export function unboundedCalls(file, source = fs.readFileSync(file, 'utf8')) {
   return { misses }
 }
 
-// Antigravity r21 (3): the driver and every Test Store helper it loads, read as syntax.
+// The manifest writer's repository path literals are its leg input table, data it hashes; it
+// spawns only git (checked below), so the closure does not follow them.
+const LEG_TABLE = 'scripts/lib/evidence-manifest.mjs'
+const SCRIPT = /\.(?:mjs|cjs|js|sh)$/
+
+// Antigravity r21 (3) and r24 (P3): the driver and every script it loads or spawns.
 /**
- * The scripts `entries` load, followed through relative imports and module-relative URLs
- * (`new URL('./x.mjs', import.meta.url)`, how the driver loads the manifest writer), from disk.
+ * The scripts `entries` reach, read from disk under `root`: relative imports, module-relative
+ * URLs (`new URL('./x.mjs', import.meta.url)`, how the driver loads the manifest writer), and
+ * scripts named by repository path, which a harness spawns (`node scripts/x.mjs`), followed as
+ * importClosure in evidence-manifest.mjs follows them.
  */
-export function driverClosure(entries) {
+export function driverClosure(entries, root = '.') {
   const seen = new Set()
   const queue = [...entries]
   while (queue.length) {
     const file = queue.shift()
     if (seen.has(file)) continue
     seen.add(file)
-    const source = fs.readFileSync(file, 'utf8')
+    const source = fs.readFileSync(path.join(root, file), 'utf8')
     for (const specifier of relativeImports(source))
       queue.push(
         path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier))
       )
     for (const named of moduleRelativeLiterals(source, file))
       if (/\.(?:mjs|cjs|js)$/.test(named)) queue.push(named)
+    if (file === LEG_TABLE) continue
+    for (const named of repoPathLiterals(source, { shell: file.endsWith('.sh') }))
+      if (
+        named.startsWith('scripts/') &&
+        SCRIPT.test(named) &&
+        fs.existsSync(path.join(root, named))
+      )
+        queue.push(named)
   }
   return [...seen].sort()
 }
@@ -240,7 +264,44 @@ test('every spawnSync, execFileSync and execSync the Test Store driver loads is 
       []
     ).length
   }
-  assert.ok(calls >= 9, String(calls))
+  assert.ok(calls >= 8, String(calls))
+})
+
+test('the closure follows scripts named by repository path, from scripts and shell', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'driver-closure-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const write = (file, text) => {
+    fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true })
+    fs.writeFileSync(path.join(root, file), text)
+  }
+  write(
+    'scripts/entry.mjs',
+    "spawnSync('node', [path.join(root, 'scripts/spawned.mjs')])\n" +
+      "const gone = 'scripts/absent.mjs'\n"
+  )
+  write('scripts/spawned.mjs', "spawnSync('bash', ['scripts/ci/step.sh'])\n")
+  write('scripts/ci/step.sh', 'node scripts/ci/leaf.mjs\n')
+  write('scripts/ci/leaf.mjs', '')
+  write(LEG_TABLE, "export const LEGS = { x: ['scripts/data-only.mjs'] }\n")
+  write('scripts/data-only.mjs', '')
+  write('scripts/uses-table.mjs', "import './lib/evidence-manifest.mjs'\n")
+  assert.deepEqual(driverClosure(['scripts/entry.mjs'], root), [
+    'scripts/ci/leaf.mjs',
+    'scripts/ci/step.sh',
+    'scripts/entry.mjs',
+    'scripts/spawned.mjs',
+  ])
+  // The leg table's literals are data, and it spawns nothing but git.
+  assert.deepEqual(driverClosure(['scripts/uses-table.mjs'], root), [
+    LEG_TABLE,
+    'scripts/uses-table.mjs',
+  ])
+  const table = fs.readFileSync(LEG_TABLE, 'utf8')
+  assert.deepEqual(
+    [...table.matchAll(/\bspawnSync\(\s*([^,]*),/g)].map((match) => match[1]),
+    ["'git'"]
+  )
+  assert.doesNotMatch(table, /\b(?:execFileSync|execSync|spawn|exec|execFile|fork)\(/)
 })
 
 test('the bound check rejects every bypass', () => {
