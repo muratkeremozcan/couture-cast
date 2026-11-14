@@ -80,6 +80,7 @@ import {
 } from '@/components/hero/garment-item-tile'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useGlyphBox } from '@/components/glyph-box'
 import { MobileChipNavigation, type ChipCategory } from '@/components/chip-navigation'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
@@ -262,6 +263,7 @@ export default function TabOneScreen() {
     resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
     defaultSupportedLocale
   const palette = useHeroPalette()
+  const errorMarkBox = useGlyphBox(52, true)
   const modalInsets = useModalInsets()
   const { announce } = useAccessibilityAnnouncer()
   const reduceMotion = useReducedMotion()
@@ -829,7 +831,9 @@ export default function TabOneScreen() {
             ]}
             testID="hero-error-state"
           >
-            <View style={[styles.errorMark, { borderColor: palette.divider }]}>
+            <View
+              style={[styles.errorMark, errorMarkBox, { borderColor: palette.divider }]}
+            >
               <Text style={[styles.errorMarkText, { color: palette.text }]}>!</Text>
             </View>
             <Text style={[styles.errorText, { color: palette.text }]}>

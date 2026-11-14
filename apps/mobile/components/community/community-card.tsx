@@ -9,6 +9,7 @@ import type {
   CommunitySponsoredFeedItem as CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useGlyphBox } from '@/components/glyph-box'
 import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
 import { useSponsoredCtaShown } from '@/src/features/community/sponsored-cta-shown'
 import { CommunitySponsoredShop, withDisclosure } from './community-sponsored-shop'
@@ -285,6 +286,7 @@ export function CommunityCard({
 }: CommunityCardProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const avatarBox = useGlyphBox(32, true)
 
   const itemId = item.id
   const expiresAt = item.imageAccess.expiresAt
@@ -439,7 +441,11 @@ export function CommunityCard({
       <View style={styles.header}>
         <View style={styles.authorRow}>
           <View
-            style={[styles.avatarPlaceholder, { backgroundColor: palette.subtleSurface }]}
+            style={[
+              styles.avatarPlaceholder,
+              avatarBox,
+              { backgroundColor: palette.subtleSurface },
+            ]}
           >
             <Text style={[styles.avatarText, { color: palette.text }]}>
               {authorName.charAt(0).toUpperCase()}

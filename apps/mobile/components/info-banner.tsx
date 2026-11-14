@@ -2,6 +2,7 @@
 import React, { forwardRef, useState } from 'react'
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import { useGlyphBox } from '@/components/glyph-box'
 
 export interface InfoBannerProps {
   message: string
@@ -23,6 +24,7 @@ export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
   ref
 ) {
   const { t } = useTranslation()
+  const iconBox = useGlyphBox(22, true)
   const [dismissedMessage, setDismissedMessage] = useState<string | null>(null)
 
   if (dismissedMessage === message) {
@@ -52,7 +54,7 @@ export const InfoBanner = forwardRef<View, InfoBannerProps>(function InfoBanner(
         {...(Platform.OS === 'web' ? { tabIndex: -1 as const } : {})}
         style={styles.content}
       >
-        <View style={styles.iconContainer}>
+        <View style={[styles.iconContainer, iconBox]}>
           <Text style={styles.iconText}>i</Text>
         </View>
         <Text style={styles.messageText}>{message}</Text>
