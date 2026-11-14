@@ -661,7 +661,7 @@ export function coveredWindows(windows, tolerance) {
 }
 
 /** Each record's class (see matchTextProbe) and, for one in a volatile region, the region's index. */
-function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
+function classifyRecords(records, coveredIds, volatileRegions, tolerance, window) {
   const classes = {
     empty: [],
     covered: [],
@@ -677,7 +677,7 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
   const regionOf = new Map()
   const kinds = []
   for (const record of records) {
-    const region = regionOfRecord(record, volatileRegions)
+    const region = regionOfRecord(record, volatileRegions, window, tolerance)
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
@@ -737,22 +737,29 @@ const volatileRegionOf = (record, volatileRegions) => {
  * A record scrolled out sideways past a volatile region's edge, its centre within the region's
  * height (a filter chip the row scrolled off screen, Android 6c85bbb4 Community cold 1.5 "Cold
  * and dry" at x 1315): the region's index, or -1. The hierarchy cuts a region to what shows, so
- * the chip's own centre lies outside it.
+ * the chip's own centre lies outside it. Since r48 P3-1 the record lies wholly past a window
+ * edge the region reaches (within the tolerance), so the region is cut there by the window and
+ * the record continues its row; a record beside a region that stops inside the window (another
+ * column) is none of its own, and with no window known none is.
  */
-const overflowRegionOf = (record, volatileRegions) => {
+const overflowRegionOf = (record, volatileRegions, window, tolerance) => {
+  if (!window) return -1
   const rect = recordRect(record)
   const [, y] = centre(rect)
   return volatileRegions.findIndex(
     (region) =>
-      y >= region[1] && y <= region[3] && (rect[0] >= region[2] || rect[2] <= region[0])
+      y >= region[1] &&
+      y <= region[3] &&
+      ((rect[0] >= window[2] - tolerance && region[2] >= window[2] - tolerance) ||
+        (rect[2] <= window[0] + tolerance && region[0] <= window[0] + tolerance))
   )
 }
 
 /** The volatile region a record belongs to: by its centre, or, scrolled away, by overflow. */
-const regionOfRecord = (record, volatileRegions) => {
+const regionOfRecord = (record, volatileRegions, window, tolerance) => {
   const region = volatileRegionOf(record, volatileRegions)
   return region < 0 && record.scrolledAway
-    ? overflowRegionOf(record, volatileRegions)
+    ? overflowRegionOf(record, volatileRegions, window, tolerance)
     : region
 }
 
@@ -996,20 +1003,42 @@ const normalized = (text) => text.replace(/\s+/g, ' ').trim()
 const gap = (a, b) =>
   Math.hypot(Math.max(0, a[0] - b[2], b[0] - a[2]), Math.max(0, a[1] - b[3], b[1] - a[3]))
 
+/** Whether `label` holds `text` as whole words: no letter or digit on either side. */
+function holdsWords(label, text) {
+  const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(?<![\\p{L}\\p{N}])${escaped}(?![\\p{L}\\p{N}])`, 'u').test(label)
+}
+
+/**
+ * How far from an element's frame a flagged record may sit and still be that element's (r48
+ * P2-2): one of its own lines, or the tolerance when that is more. The iOS 6c85bbb4 Home
+ * teaser's pill sits 3 px below the link it belongs to (a line of 13 px) and its in-app browser
+ * caption 6 px below the shop button (a line of 16 px); a "cast" 460 px from "Forecast
+ * details" is no part of it.
+ */
+function bordersReach(record, rect, tolerance) {
+  const lines =
+    Number.isInteger(record.lineCount) && record.lineCount > 0 ? record.lineCount : 1
+  return Math.max(tolerance, (rect[3] - rect[1]) / lines)
+}
+
 /**
  * The one element and node a flagged accessibility-hidden record joins (attachHiddenRecords):
  * `{ element, node }`, `{ ambiguous }` with the tied element or node indexes, or null.
  */
-function hiddenOwner(record, { nodes, elements }) {
+function hiddenOwner(record, { nodes, elements, tolerance }) {
   const text = normalized(record.text)
   if (text === '') return null
   const rect = recordRect(record)
+  const reach = bordersReach(record, rect, tolerance)
   const nearest = best(
     elements
       .map((element, index) => ({ element, index }))
       .filter(
         ({ element }) =>
-          element.identifier !== null && normalized(element.label).includes(text)
+          element.identifier !== null &&
+          holdsWords(normalized(element.label), text) &&
+          gap(element.rect, rect) <= reach
       ),
     ({ element }) => gap(element.rect, rect)
   )
@@ -1032,9 +1061,10 @@ function hiddenOwner(record, { nodes, elements }) {
 /**
  * TEA ruling r49: a record native flags `accessibilityHidden` (a decorative pill or caption whose
  * words an accessible parent's label carries) that is still free after every other pairing joins
- * the nearest identified accessibility element (an identifier, not null) whose label contains
- * its text, whitespace normalized; nearest by the gap between the element's frame and the
- * record's rect, and two elements at one gap are ambiguous. It joins the hierarchy node of that
+ * the nearest identified accessibility element (an identifier, not null) whose label holds its
+ * text as whole words, whitespace normalized, and whose frame holds or borders the record
+ * (bordersReach, r48 P2-2); nearest by the gap between the element's frame and the record's
+ * rect, and two elements at one gap are ambiguous. It joins the hierarchy node of that
  * element (its testID and label, frames overlapping; of several, the best overlap, a tie
  * ambiguous): the node's group when the node is one, else its attached records, so each node
  * keeps one member list. It is keyed as that node's key, `>`, then its own `["",text]#n`, and
@@ -1051,11 +1081,12 @@ function attachHiddenRecords({
   attached,
   free,
   recordRank,
+  tolerance,
 }) {
   const placed = []
   const ambiguous = []
   for (const record of leftover.filter((each) => each.accessibilityHidden === true)) {
-    const owner = hiddenOwner(record, { nodes, elements })
+    const owner = hiddenOwner(record, { nodes, elements, tolerance })
     if (owner === null) continue
     free.delete(record.index)
     if (owner.ambiguous) {
@@ -1149,7 +1180,8 @@ export function matchTextProbe({
     records,
     covers,
     volatileRegions,
-    tolerance
+    tolerance,
+    window
   )
   const indexed = nodes.map((node, index) => ({ ...node, index }))
   const windowNodes =
@@ -1223,6 +1255,7 @@ export function matchTextProbe({
     attached,
     free,
     recordRank,
+    tolerance,
   })
   pairs.push(...memberPairs({ groups, attached, hidden: hidden.placed }))
   const unmatchedRecords = classes.visible

@@ -20,8 +20,9 @@
 //   its tab; on iOS the label keeps React Navigation's allowFontScaling false, since the tab's
 //   Large Content Viewer shows it at the user's size.
 // A banned name (allowFontScaling, maxFontSizeMultiplier, getFontScale) passes only in the one
-// function BANNED_ALLOWED gives it, and only on a line matching its pattern there. Names are scoped
-// by real function bodies (brace depth), so code after a function never inherits its allowance.
+// function BANNED_ALLOWED gives it, and only in the form its test there accepts. Names are scoped
+// by the TypeScript AST's function bodies, so code after a function never inherits its
+// allowance, and a name spelled as a string (`dimensions['fontScale']`) counts as the name.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -143,6 +144,26 @@ function scopeOf(node) {
   return names.length > 0 ? names.join('.') : typeName
 }
 
+/**
+ * The name a node reads or binds: an identifier, or a string a property is named by (r48 P2-4),
+ * as an element access (`dimensions['fontScale']`, a template without substitutions too), a
+ * computed property name, or a quoted property name in an object or a destructuring. Null for
+ * any other node, so a string that names no property (a log line, a test ID) passes.
+ */
+function nameOf(node) {
+  if (ts.isIdentifier(node)) return node.text
+  if (!ts.isStringLiteral(node) && !ts.isNoSubstitutionTemplateLiteral(node)) return null
+  const parent = node.parent
+  const named =
+    (ts.isElementAccessExpression(parent) && parent.argumentExpression === node) ||
+    ts.isComputedPropertyName(parent) ||
+    (ts.isBindingElement(parent) && parent.propertyName === node) ||
+    ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent)) &&
+      parent.name === node) ||
+    (ts.isJsxAttribute(parent) && parent.name === node)
+  return named ? node.text : null
+}
+
 export function fontScaleReads(files) {
   const problems = []
   for (const [file, text] of Object.entries(files)) {
@@ -156,9 +177,9 @@ export function fontScaleReads(files) {
     const lines = text.split('\n')
     const flagged = new Set()
     const visit = (node) => {
-      if (ts.isIdentifier(node)) {
+      const name = nameOf(node)
+      if (name !== null) {
         const scope = scopeOf(node)
-        const name = node.text
         const allowed = BANNED_NAMES.has(name)
           ? (BANNED_ALLOWED[file]?.[scope]?.[name]?.(node, source) ?? false)
           : name === FONT_SCALE
@@ -306,6 +327,32 @@ describe('font-scale reads in app code', () => {
     assert.deepEqual(fontScaleReads({ 'components/tab-bar-label.tsx': nested }), [
       'components/tab-bar-label.tsx:4 return <Text style={{ fontSize: 16 * fontScale }} />',
     ])
+  })
+
+  // r48 P2-4 (probe R47_F1_string_bracket): a read by string or template element access passed.
+  test('a font-scale name spelled as a string property is caught', () => {
+    const reads = [
+      'export function AppText() {',
+      "  const scale = useWindowDimensions()['fontScale']",
+      '  const cap = props[`maxFontSizeMultiplier`]',
+      "  const { 'fontScale': quoted } = useWindowDimensions()",
+      "  const style = { ['allowFontScaling']: false }",
+      "  const label = 'fontScale is read by the composer only'",
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': reads }), [
+      "components/app-text.tsx:2 const scale = useWindowDimensions()['fontScale']",
+      'components/app-text.tsx:3 const cap = props[`maxFontSizeMultiplier`]',
+      "components/app-text.tsx:4 const { 'fontScale': quoted } = useWindowDimensions()",
+      "components/app-text.tsx:5 const style = { ['allowFontScaling']: false }",
+    ])
+    // Inside an allowed function the string form passes as the identifier does.
+    const glyph = [
+      'export function glyphBoxSide(base) {',
+      "  return base * useWindowDimensions()['fontScale']",
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': glyph }), [])
   })
 
   test('the scan covers every app source under apps/mobile, not three folders', () => {

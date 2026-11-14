@@ -3059,9 +3059,18 @@ describe('text layout clipping (F-00i)', () => {
       'cold at another scale': (capture, run, stage) => {
         if (stage === 'cold') capture.fontScale = 1.3
       },
+      // r48 P2-4 (probe R47_F4_wrong_before_settled_scales): every stage, not the cold ones only.
+      'before at another scale': (capture, run, stage) => {
+        if (stage === 'before') capture.fontScale = 999
+      },
+      'settled at another scale': (capture, run, stage) => {
+        if (stage === 'settled') capture.fontScale = 1
+      },
     }
     const patterns = {
-      'cold at another scale': /is no cold launch at cold's scale 1\.5/,
+      'cold at another scale': /is no capture at cold's scale 1\.5/,
+      'before at another scale': /is no capture at before's scale 1(?!\.)/,
+      'settled at another scale': /is no capture at settled's scale 1\.5/,
     }
     for (const [name, edit] of Object.entries(cases)) {
       const { entry, repo, proveWith } = proofCase()
@@ -3627,6 +3636,7 @@ describe('text layout clipping (F-00i)', () => {
       ['settled', shown(606)],
     ]) {
       const capture = change[name]
+      capture.window = '[0,0][1080,2400]'
       capture.volatileRegions = ['[0,475][1080,645]']
       capture.volatileRegionIds = [CHIPS]
       capture.textProbe.records.push(record)
@@ -4000,6 +4010,29 @@ describe('text layout clipping (F-00i)', () => {
     const regional = leg([submit, star], [star])
     regional.cold.volatileRegions = ['[0,1490][1080,1570]']
     assert.equal(evaluateLiveFontChangeRaw(regional).checks.textLost.pass, true)
+    // r48 P3-1: copies count. Two copies at the cold launch and one live lose one; a copy the
+    // live screen keeps only scrolled away still counts.
+    const second = ['Submit', [40, 1610, 200, 1650]]
+    const twice = evaluateLiveFontChangeRaw(leg([submit, second, star], [submit, star]))
+    assert.deepEqual(twice.checks.textLost.lost, [{ stage: 'settled', text: 'Submit' }])
+    assert.equal(
+      evaluateLiveFontChangeRaw(
+        leg(
+          [submit, second, star],
+          [
+            submit,
+            [...second, { visibleRect: null, clipRect: null, scrolledAway: true }],
+            star,
+          ]
+        )
+      ).checks.textLost.pass,
+      true
+    )
+    assert.equal(
+      evaluateLiveFontChangeRaw(leg([submit, star], [submit, second, star])).checks
+        .textLost.pass,
+      true
+    )
     // Scrolled away at the cold launch on every page, it may be a volatile card's text below the
     // region's visible cut (the hierarchy cuts a region to what shows): not compared.
     assert.equal(

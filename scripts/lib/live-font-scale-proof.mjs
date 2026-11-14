@@ -1408,39 +1408,46 @@ function hiddenText(platform, stages) {
 const COMPARED_KINDS = new Set(['visible', 'hidden', 'regional'])
 
 /**
- * The masked texts of a capture's probe records over all its pages: those of COMPARED_KINDS
- * when `compared`, else of any record but an empty one.
+ * The masked texts of a capture's probe records with their copies (r48 P3-1): of each text, the
+ * most records any one page holds, those of COMPARED_KINDS when `compared`, else of any record
+ * but an empty one. A page's probe answer holds every text view laid out, scrolled away ones too,
+ * so the pages of one scroll-through repeat the same records, and the copies are the most one
+ * page holds, never a sum over pages.
  */
 function recordTexts(capture, platform, compared) {
-  const texts = new Set()
+  const texts = new Map()
   const pages = [capture, ...pageCaptures(capture).map((page) => page.capture)]
   for (const page of pages) {
     const { match } = textLayout(page, platform)
     if (!match) continue
+    const counts = new Map()
     page.textProbe.records.forEach((record, index) => {
       if (record.text === '') return
       if (compared && !COMPARED_KINDS.has(match.kinds[index])) return
-      texts.add(maskText(record.text))
+      const text = maskText(record.text)
+      counts.set(text, (counts.get(text) ?? 0) + 1)
     })
+    for (const [text, count] of counts)
+      texts.set(text, Math.max(texts.get(text) ?? 0, count))
   }
   return texts
 }
 
 /**
  * TEA ruling on Antigravity r47 P2 (R47_F3B): a text the cold launch at the same scale shows as a
- * compared record (COMPARED_KINDS) that the live capture has no record of at all, on any page,
- * is lost: live_font_text_lost, whatever the hierarchy or a group's composite label says. A text
- * the live capture still has a record of, drawn nowhere or only behind a label, is the hidden
- * text check's (hiddenText). `stages` holds [stage, live capture, cold capture] triples; a
- * missing capture is skipped.
+ * compared record (COMPARED_KINDS) that the live capture has fewer records of, on any page, is
+ * lost (r48 P3-1: two copies at the cold launch and one live lose one): live_font_text_lost,
+ * whatever the hierarchy or a group's composite label says. A text the live capture still has a
+ * record of, drawn nowhere or only behind a label, is the hidden text check's (hiddenText).
+ * `stages` holds [stage, live capture, cold capture] triples; a missing capture is skipped.
  */
 function lostText(platform, stages) {
   const lost = []
   for (const [stage, live, cold] of stages) {
     if (!live?.textProbe || !cold?.textProbe) continue
     const now = recordTexts(live, platform, false)
-    for (const text of recordTexts(cold, platform, true))
-      if (!now.has(text)) lost.push({ stage, text })
+    for (const [text, copies] of recordTexts(cold, platform, true))
+      if ((now.get(text) ?? 0) < copies) lost.push({ stage, text })
   }
   return { pass: lost.length === 0, lost }
 }

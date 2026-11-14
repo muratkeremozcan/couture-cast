@@ -1299,9 +1299,81 @@ describe('matchTextProbe, accessibility-hidden records (TEA ruling r49)', () => 
     ]
     assert.equal(teaser(records(), nearer).pass, true)
   })
+
+  // r48 P2-2 (probe F3): a flagged "cast" far down the screen joined "Forecast details" 460 px
+  // above it, by substring.
+  test('a flagged record joins only an element that holds or borders it, by whole words', () => {
+    const forecast = {
+      hasText: true,
+      identifier: 'home-forecast-details',
+      label: 'Forecast details',
+      rect: [16, 100, 386, 150],
+      window: 1,
+    }
+    const castNode = node('Forecast details', [16, 100, 386, 150], forecast.identifier)
+    const probe = (rect, elementList) =>
+      matchTextProbe({
+        platform: 'ios',
+        nodes: [castNode],
+        answer: answerFor('t', [iosRecord('cast', rect, { accessibilityHidden: true })], {
+          platform: 'ios',
+          windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+          elements: elementList,
+        }),
+        window: [0, 0, 402, 874],
+        tolerance: 1,
+      })
+    const far = probe([16, 610, 120, 640], [forecast])
+    assert.deepEqual(
+      [far.code, far.hiddenAttached],
+      ['live_font_text_probe_unmatched', []]
+    )
+    // Right under the element, "cast" is only part of the word "Forecast".
+    const inside = probe([16, 152, 120, 166], [forecast])
+    assert.deepEqual(
+      [inside.code, inside.hiddenAttached],
+      ['live_font_text_probe_unmatched', []]
+    )
+    // A label that holds "cast" as a word takes it beside its frame, never 460 px away.
+    const cast = { ...forecast, label: 'Forecast details, cast list' }
+    const castLabelNode = node(cast.label, [16, 100, 386, 150], cast.identifier)
+    const withLabel = (rect) =>
+      matchTextProbe({
+        platform: 'ios',
+        nodes: [castLabelNode],
+        answer: answerFor('t', [iosRecord('cast', rect, { accessibilityHidden: true })], {
+          platform: 'ios',
+          windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+          elements: [cast],
+        }),
+        window: [0, 0, 402, 874],
+        tolerance: 1,
+      })
+    assert.deepEqual(withLabel([16, 152, 120, 166]).hiddenAttached, [
+      { record: 0, element: 0, node: 0 },
+    ])
+    assert.deepEqual(withLabel([16, 610, 120, 640]).hiddenAttached, [])
+  })
 })
 
 describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () => {
+  // r48 P3-1 (probe F6_overflowRegionOf_left_col): a scrolled-away record in the right column,
+  // its centre in the band of a volatile region on the left, was taken as that region's chip.
+  test('a scrolled-away record joins a region sideways only past the window edge the region reaches', () => {
+    const away = (text, rect) =>
+      record(text, rect, { visibleRect: null, scrolledAway: true })
+    const kindOf = (rect, regions) =>
+      match([], [away('Cold and dry', rect)], { volatileRegions: regions }).kinds[0]
+    // The 6c85bbb4 chip row: the region reaches the right window edge, the chip lies past it.
+    assert.equal(kindOf([1315, 545, 1615, 616], [[0, 475, 1080, 645]]), 'volatile')
+    // Past the left edge too.
+    assert.equal(kindOf([-400, 545, -100, 616], [[0, 475, 1080, 645]]), 'volatile')
+    // A left-column region, a record in the right column on the window.
+    assert.equal(kindOf([500, 120, 620, 160], [[0, 100, 200, 180]]), 'scrolled')
+    // Past the right window edge, but the region stops mid-window.
+    assert.equal(kindOf([1315, 120, 1615, 160], [[0, 100, 200, 180]]), 'scrolled')
+  })
+
   test('a scrolled-away record is listed offscreen and passes; a visible one would not', () => {
     const scrolled = record('Shoes', [16, 2600, 386, 2660], {
       visibleRect: null,
