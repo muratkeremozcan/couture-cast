@@ -7,9 +7,9 @@
 // webhook delivery through the preview API's own read endpoints.
 //
 //   node scripts/test-store-preview-webhook.mjs steps --api-url <preview API origin>
-//   node scripts/test-store-preview-webhook.mjs probe --api-url <origin> [--env-file .env.preview]
+//   node scripts/test-store-preview-webhook.mjs probe --api-url <origin> [--secrets-env .env.preview]
 //   node scripts/test-store-preview-webhook.mjs verify --report <run-test-store-journey report> \
-//     --api-url <origin> [--env-file .env.preview]
+//     --api-url <origin> [--secrets-env .env.preview]
 //
 // `probe` reads REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET from the env file by name and sends
 // two unauthenticated POSTs through it; both must get the handler's own 401. `verify` re-reads
@@ -36,7 +36,7 @@ const option = (name, fallback) => {
   return at < 0 ? fallback : argv[at + 1]
 }
 const apiUrl = option('api-url')
-const envFile = path.resolve(option('env-file', path.join(root, '.env.preview')))
+const envFile = path.resolve(option('secrets-env', path.join(root, '.env.preview')))
 
 try {
   if (!apiUrl)

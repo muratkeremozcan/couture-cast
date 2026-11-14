@@ -10,8 +10,9 @@
 //   node scripts/run-test-store-journey.mjs --platform android|ios --device <serial|udid> \
 //     --build debug|minifiedDebuggable --server local|preview --out <dir> \
 //     [--scenario purchase|restore] [--api-url <origin>] [--artifact <apk|app>] \
-//     [--over-install <apk|app>] [--over-install-sha <sha>] [--build-sha <sha>] [--reinstall] \
-//     [--env-file <file>] [--app-id com.couturecast.app] [--metro-port 8081] [--proxy-port 4011]
+//     [--over-install <apk|app>] [--over-install-build debug|minifiedDebuggable] \
+//     [--over-install-sha <sha>] [--build-sha <sha>] [--reinstall] \
+//     [--secrets-env <file>] [--app-id com.couturecast.app] [--metro-port 8081] [--proxy-port 4011]
 //
 // Before it runs: the debuggable build (--artifact, or already installed) on a booted emulator or
 // simulator; for --server local, the local API (default http://127.0.0.1:4000) started with
@@ -21,7 +22,7 @@
 // What the run does: signs up a fresh member (a plain member: no grant, no entitlement), starts
 // the proxy in front of the API and a Metro that bakes that member's mobile E2E bearer, the
 // proxy origin and the Test Store public key into the development bundle, opens the app, and
-// runs the scenario. Secrets are read by name from --env-file and passed to Metro's env or the
+// runs the scenario. Secrets are read by name from --secrets-env and passed to Metro's env or the
 // proxy's header; they are never printed or written to the evidence.
 import { spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
@@ -75,17 +76,26 @@ const out = path.resolve(option('out'))
 fs.mkdirSync(out, { recursive: true, mode: 0o700 })
 const artifact = option('artifact') && path.resolve(option('artifact'))
 const overInstallArtifact = option('over-install') && path.resolve(option('over-install'))
+// The over-install may be the other Android debuggable type (debug over minifiedDebuggable or the
+// reverse); it decides how the app is opened afterwards.
+const overInstallBuild = option('over-install-build', build)
+if (!['debug', 'minifiedDebuggable'].includes(overInstallBuild))
+  throw new JourneyError('test_store_build_invalid', overInstallBuild)
+let installedBuild = build
 if ((scenario === 'restore' || flag('reinstall')) && !artifact)
   throw new JourneyError('test_store_artifact_required', 'reinstall needs --artifact')
 const apiOrigin = new URL(
   option('api-url', server === 'local' ? 'http://127.0.0.1:4000' : '')
 ).origin
 const envFile = path.resolve(
-  option('env-file', path.join(root, server === 'local' ? '.env.local' : '.env.preview'))
+  option(
+    'secrets-env',
+    path.join(root, server === 'local' ? '.env.local' : '.env.preview')
+  )
 )
 const metroPort = Number(option('metro-port', '8081'))
 // minifiedDebuggable has no dev launcher and loads its bundle from localhost:8081.
-if (build === 'minifiedDebuggable' && metroPort !== 8081)
+if ([build, overInstallBuild].includes('minifiedDebuggable') && metroPort !== 8081)
   throw new JourneyError('test_store_metro_port_fixed', String(metroPort))
 const proxyPort = Number(option('proxy-port', '4011'))
 const rev = (value) =>
@@ -184,7 +194,7 @@ async function launch() {
     adb('reverse', `tcp:${proxy.port}`, `tcp:${proxy.port}`)
     spawnSync(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId])
     // minifiedDebuggable has no dev launcher: React Native loads from Metro at localhost:8081.
-    if (build === 'minifiedDebuggable')
+    if (installedBuild === 'minifiedDebuggable')
       adb('shell', 'am', 'start', '-n', `${appId}/.MainActivity`)
     else
       adb(
@@ -343,15 +353,18 @@ const io = {
     if (!overInstallArtifact) throw new JourneyError('test_store_over_install_missing')
     const before = platform === 'android' ? installedSigner() : null
     install(overInstallArtifact)
+    installedBuild = overInstallBuild
     if (platform !== 'android') return { artifact: path.basename(overInstallArtifact) }
     return {
       artifact: path.basename(overInstallArtifact),
+      build: overInstallBuild,
       ...assertSameSigner(before, installedSigner()),
     }
   },
   async reinstall() {
     uninstall()
     install(artifact)
+    installedBuild = build
     return { artifact: path.basename(artifact), uninstalled: true }
   },
   deviceLog: async () => deviceLog(),

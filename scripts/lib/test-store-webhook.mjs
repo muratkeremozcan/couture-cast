@@ -6,8 +6,8 @@
 // RevenueCat's webhook settings hold one URL and one Authorization value, so:
 //
 // - the Vercel bypass rides in the URL as the `x-vercel-protection-bypass` query parameter, from
-//   a Protection Bypass for Automation secret made only for this webhook (revocable alone, and
-//   never the one Playwright and CI use);
+//   a Protection Bypass for Automation secret made only for this webhook, so it can be revoked
+//   without touching the one Playwright and CI use;
 // - the Authorization value stays REVENUECAT_WEBHOOK_AUTH, which the handler still requires.
 //
 // The probe proves both from outside without a real event: through the bypass, a POST with no

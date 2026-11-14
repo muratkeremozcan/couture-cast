@@ -11,7 +11,7 @@
 //   purchases-android 10.16 `SimulatedStoreBillingWrapper` and RevenueCat iOS 5.83
 //   `SimulatedStorePurchaseUI`) appears only after `getOfferings()` returned the tapped plan's
 //   package, so the sheet is the offerings proof.
-// - The app renders the server's subscription, never CustomerInfo. A purchase that the SDK
+// - The Premium section renders from our API's subscription alone. A purchase that the SDK
 //   reports as success shows `premium-activating`; the entitled status line comes from our API.
 // - Which server path delivered the entitlement (TEA-18) is decided from the journey proxy's
 //   request log: the app reaches our API only through that proxy, the API's ledger pull runs only
