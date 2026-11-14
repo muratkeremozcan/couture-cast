@@ -21,6 +21,7 @@
 // Findings name the file or profile and the variable only; a key is never printed.
 import fs from 'node:fs'
 import path from 'node:path'
+import dotenv from 'dotenv'
 
 export const TEST_STORE_KEY_VARIABLE = 'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY'
 export const DEVELOPMENT_PROFILE = 'development'
@@ -51,14 +52,13 @@ export function mobileEnvFileScope(name) {
   return undefined
 }
 
-/** Every `NAME=value` assignment of a dotenv file, in order, with surrounding quotes removed. */
+/**
+ * Every assignment of a dotenv file as `[name, value]`, read by dotenv itself, the parser Expo and
+ * app.config.ts load the files with, so `NAME: value`, `export NAME=value` and quoted or
+ * multi-line values count exactly as they would at build time.
+ */
 export function readEnvEntries(file) {
-  const entries = []
-  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
-    const match = /^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/.exec(line)
-    if (match) entries.push([match[1], match[2].replace(/^(['"])(.*)\1$/, '$2')])
-  }
-  return entries
+  return Object.entries(dotenv.parse(fs.readFileSync(file, 'utf8')))
 }
 
 function mergeProfile(parent, child) {

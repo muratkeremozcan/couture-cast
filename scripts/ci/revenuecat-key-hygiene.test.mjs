@@ -132,12 +132,15 @@ test('only a release-only env file is refused the Test Store variable; platform 
       '.env.local': `EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY="${TEST_KEY}"\n`,
       '.env.example': 'EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=test_placeholder\n',
       'apps/mobile/.env.production.local': key,
+      // dotenv also reads `NAME: value` (Codex Security W3-01).
+      'apps/mobile/.env.production': `${TEST_STORE_KEY_VARIABLE}: ${TEST_KEY}\n`,
     },
   })
   assert.deepEqual(keyHygieneProblems(leaking), [
     '.env.local EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY holds a RevenueCat Test Store key',
     `.env.prod sets ${TEST_STORE_KEY_VARIABLE}`,
     '.env.example EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+    `apps/mobile/.env.production sets ${TEST_STORE_KEY_VARIABLE}`,
     `apps/mobile/.env.production.local sets ${TEST_STORE_KEY_VARIABLE}`,
   ])
 })
