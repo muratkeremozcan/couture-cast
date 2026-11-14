@@ -252,7 +252,7 @@ jobs:
         run: |
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran (at least two cases), and none was skipped, failed or errored.
-          node ../../../scripts/ci/junit-report-check.mjs ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml 2
+          node ../../../scripts/ci/junit-report-check.mjs ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml expo.modules.modalsystembars.ModalSystemBarsTest 2
       # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
       # only the publishable anon key of this job's loopback stack may ride along.
       - name: Refuse to cache a development client that embeds a secret
@@ -491,7 +491,7 @@ jobs:
         run: |
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran (at least two cases), and none was skipped, failed or errored.
-          node ../../../scripts/ci/junit-report-check.mjs ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml 2
+          node ../../../scripts/ci/junit-report-check.mjs ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml expo.modules.modalsystembars.ModalSystemBarsTest 2
       # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
       # only the publishable anon key of this job's loopback stack may ride along.
       - name: Refuse to cache a development client that embeds a secret

@@ -94,7 +94,8 @@ jobs:
           # Both SDK branches ran (at least two cases), and none was skipped, failed or errored.
           report=../modules/modal-system-bars/android/build/test-results/testDebugUnitTest
           report="$report/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml"
-          node ../../../scripts/ci/junit-report-check.mjs "$report" 2
+          node ../../../scripts/ci/junit-report-check.mjs "$report" \
+            expo.modules.modalsystembars.ModalSystemBarsTest 2
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}

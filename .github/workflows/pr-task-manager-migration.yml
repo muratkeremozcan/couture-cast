@@ -88,7 +88,8 @@ jobs:
           # At least the three cases ran, and none was skipped, failed or errored.
           report="$project/build/test-results/testDebugUnitTest"
           report="$report/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml"
-          node scripts/ci/junit-report-check.mjs "$report" 3
+          node scripts/ci/junit-report-check.mjs "$report" \
+            expo.modules.taskmanagermigration.PersistedTaskConsumersTest 3
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}
