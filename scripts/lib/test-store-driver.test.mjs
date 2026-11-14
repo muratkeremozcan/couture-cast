@@ -86,7 +86,7 @@ const killQuietly = (pid, signal = 'SIGKILL') => {
   }
 }
 
-async function runDriver(t, mode, platform = 'ios') {
+async function runDriver(t, mode, platform = 'ios', { hang = '' } = {}) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'test-store-driver-'))
   t.after(() => fs.rmSync(base, { recursive: true, force: true }))
   const bin = path.join(base, 'bin')
@@ -100,16 +100,26 @@ async function runDriver(t, mode, platform = 'ios') {
   fs.writeFileSync(path.join(stubDir, 'member'), member)
   const port = await stubServer(t, stubDir, member)
   writeStub(bin, 'npx', 'echo $$ > "$STUB_DIR/metro.pid"\nexec sleep 300')
+  // STUB_HANG makes one side call hang past the driver's shortened bound.
   writeStub(
     bin,
     'xcrun',
-    'case "$*" in *" stream "*) echo $$ > "$STUB_DIR/stream.pid"; exec sleep 300;; esac\nexit 0'
+    [
+      'case "$*" in *" stream "*) echo $$ > "$STUB_DIR/stream.pid"; exec sleep 300;; esac',
+      'case "$*" in *"simctl $STUB_HANG "*) exec sleep 300;; esac',
+      'exit 0',
+    ].join('\n')
   )
+  if (hang === 'git') writeStub(bin, 'git', 'exec sleep 300')
   // adb records every reverse and reverse --remove it is asked for, one line each.
   writeStub(
     path.join(androidHome, 'platform-tools'),
     'adb',
-    'case "$*" in *" reverse "*) echo "$*" >> "$STUB_DIR/adb-reverse.log";; esac\nexit 0'
+    [
+      'case "$*" in *" reverse "*) echo "$*" >> "$STUB_DIR/adb-reverse.log";; esac',
+      'case "$*" in *" $STUB_HANG "*) exec sleep 300;; esac',
+      'exit 0',
+    ].join('\n')
   )
   writeStub(
     bin,
@@ -140,6 +150,7 @@ async function runDriver(t, mode, platform = 'ios') {
       ...['--server', 'local', '--api-url', `http://127.0.0.1:${port}`],
       ...['--metro-port', String(port), '--proxy-port', '0'],
       ...['--artifact', artifact, '--secrets-env', secrets, '--out', out],
+      ...(hang ? ['--spawn-timeout-ms', '300'] : []),
     ],
     {
       cwd: repo,
@@ -150,6 +161,7 @@ async function runDriver(t, mode, platform = 'ios') {
         STUB_DIR: stubDir,
         STUB_EVIDENCE: out,
         STUB_MODE: mode,
+        STUB_HANG: hang || 'none-hangs',
       },
     }
   )
@@ -295,3 +307,19 @@ test('Android: the crash path removes the reverse of the actual proxy and Metro 
   assert.deepEqual([...removed].sort(), [...new Set(added)].sort())
   await assertCleaned(result)
 })
+
+// Antigravity r21 (1): each bounded side call that hangs fails the run with its own code.
+for (const [platform, hang, code, where] of [
+  ['ios', 'git', 'test_store_rev_failed', 'stderr'],
+  ['ios', 'uninstall', 'test_store_uninstall_failed', 'stderr'],
+  ['android', 'uninstall', 'test_store_uninstall_failed', 'stderr'],
+  ['ios', 'terminate', 'test_store_stop_failed', 'stdout'],
+  ['android', 'force-stop', 'test_store_stop_failed', 'stdout'],
+])
+  test(`${platform}: a hung ${hang} fails the run as ${code}`, async (t) => {
+    const result = await runDriver(t, 'crash', platform, { hang })
+    assert.notEqual(result.code, 0)
+    assert.match(result[where], new RegExp(code), `${result.stdout}\n${result.stderr}`)
+    for (const pid of result.pids)
+      assert.equal(await goneWithin(pid), true, `stub process ${pid} is gone`)
+  })

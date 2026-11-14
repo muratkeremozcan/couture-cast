@@ -58,6 +58,7 @@ import {
   writeRunOutputs,
 } from './lib/test-store-output.mjs'
 import { startApiProxy } from './lib/test-store-proxy.mjs'
+import { boundedSpawn, SPAWN_TIMEOUT_MS } from './lib/test-store-spawn.mjs'
 import {
   memberRef,
   runJourney,
@@ -119,12 +120,17 @@ const proxyPort = Number(option('proxy-port', '4011'))
 // Every spawnSync in this file is bounded and killed hard at its bound, so no stuck tool can hold
 // the run (or its exit path) past a CI kill (Antigravity r20).
 const BOUNDED = { timeout: 30_000, killSignal: 'SIGKILL' }
-const rev = (value) =>
-  spawnSync('git', ['rev-parse', value], {
+// A test may shorten the bound of the side calls to prove a hung one fails the run.
+const spawnTimeout = Number(option('spawn-timeout-ms', String(SPAWN_TIMEOUT_MS)))
+const rev = (value) => {
+  const sha = boundedSpawn('git', ['rev-parse', value], {
+    code: 'test_store_rev_failed',
     cwd: root,
-    encoding: 'utf8',
-    ...BOUNDED,
+    timeout: spawnTimeout,
   }).stdout.trim()
+  if (!/^[0-9a-f]{40}$/.test(sha)) throw new JourneyError('test_store_rev_failed', value)
+  return sha
+}
 const buildSha = rev(option('build-sha', 'HEAD'))
 
 const adbBinary = process.env.ANDROID_HOME
@@ -233,7 +239,11 @@ async function launch() {
           })
       })
     }
-    spawnSync(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId], BOUNDED)
+    boundedSpawn(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId], {
+      code: 'test_store_stop_failed',
+      tolerateStatus: true,
+      timeout: spawnTimeout,
+    })
     // minifiedDebuggable has no dev launcher: React Native loads from Metro at localhost:8081.
     if (installedBuild === 'minifiedDebuggable')
       adb('shell', 'am', 'start', '-n', `${appId}/.MainActivity`)
@@ -249,7 +259,12 @@ async function launch() {
         appId
       )
   } else {
-    spawnSync('xcrun', ['simctl', 'terminate', device, appId], BOUNDED)
+    // terminate exits nonzero when the app is not running; only a hung or failed spawn throws.
+    boundedSpawn('xcrun', ['simctl', 'terminate', device, appId], {
+      code: 'test_store_stop_failed',
+      tolerateStatus: true,
+      timeout: spawnTimeout,
+    })
     simctl('openurl', device, devClientUrl)
   }
 }
@@ -283,9 +298,16 @@ function install(file) {
 }
 
 function uninstall() {
+  // A nonzero exit is an app that was not installed; a hung or failed spawn throws, since going on
+  // would turn the fresh install into an in-place upgrade.
+  const options = {
+    code: 'test_store_uninstall_failed',
+    tolerateStatus: true,
+    timeout: spawnTimeout,
+  }
   if (platform === 'android')
-    spawnSync(adbBinary, ['-s', device, 'uninstall', appId], BOUNDED)
-  else spawnSync('xcrun', ['simctl', 'uninstall', device, appId], BOUNDED)
+    boundedSpawn(adbBinary, ['-s', device, 'uninstall', appId], options)
+  else boundedSpawn('xcrun', ['simctl', 'uninstall', device, appId], options)
 }
 
 /** The installed APK's signer certificate SHA-256 (TEA-19). */

@@ -390,7 +390,9 @@ export function installEvidenceGuard({
         if (!exited) return [-pid]
         if (snapshot === null) return stillRunning([-pid], psTable).length ? [-pid] : []
         if (!snapshot.length) return []
-        const live = psTable() ?? []
+        const live = psTable()
+        // No ps now: decide as if there were no snapshot, by signal 0 on the group.
+        if (live === null) return stillRunning([-pid], psTable).length ? [-pid] : []
         const member = snapshot.some((seen) =>
           live.some((entry) => entry.pid === seen.pid && entry.pgid === pid)
         )

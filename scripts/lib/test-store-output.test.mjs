@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   assertEvidenceClean,
   awaitExit,
+  readPsTable,
   stillRunning,
   FS_OPS,
   installEvidenceGuard,
@@ -796,33 +797,34 @@ test('a Metro group whose leader still runs is signalled', (t) => {
   assert.deepEqual(signalled, [[-PGID, 'SIGTERM']])
 })
 
-// Antigravity r20 (4): no tool the driver runs can hang it past its bound.
-test('every spawnSync in the driver passes a timeout and SIGKILL', () => {
-  const source = fs.readFileSync('scripts/run-test-store-journey.mjs', 'utf8')
-  const bounded = /const BOUNDED = \{ timeout: [\d_]+, killSignal: 'SIGKILL' \}/.test(
-    source
-  )
-  const calls = []
-  for (
-    let at = source.indexOf('spawnSync(');
-    at >= 0;
-    at = source.indexOf('spawnSync(', at + 1)
-  ) {
-    if (/import|\/\//.test(source.slice(source.lastIndexOf('\n', at), at))) continue
-    let depth = 0
-    let end = at + 'spawnSync'.length
-    do {
-      if (source[end] === '(') depth += 1
-      if (source[end] === ')') depth -= 1
-      end += 1
-    } while (depth > 0)
-    calls.push(source.slice(at, end))
-  }
-  assert.ok(calls.length >= 7, String(calls.length))
-  for (const call of calls)
-    assert.ok(
-      (/\btimeout\b/.test(call) && /killSignal: 'SIGKILL'/.test(call)) ||
-        (bounded && /\bBOUNDED\b/.test(call)),
-      call
-    )
+// Antigravity r21 (2): with a snapshot, no ps at teardown decides by signal 0 on the group.
+test('a Metro group is still signalled when ps fails at teardown', async (t) => {
+  const leader = spawn('sh', ['-c', 'sleep 30 & exit 0'], {
+    stdio: 'ignore',
+    detached: true,
+  })
+  t.after(() => {
+    try {
+      process.kill(-leader.pid, 'SIGKILL')
+    } catch {
+      // Already gone.
+    }
+  })
+  await new Promise((resolve) => leader.once('exit', resolve))
+  // The leader is gone and its sleep lives on in the group.
+  assert.deepEqual(stillRunning([-leader.pid]), [-leader.pid])
+  let psWorks = true
+  const signalled = []
+  const guard = installEvidenceGuard({
+    dirs: outputDirs(tempOut(t)),
+    ids: [],
+    proc: fakeProcess(),
+    kill: (pid, signal) => signalled.push([pid, signal]),
+    psTable: () => (psWorks ? readPsTable() : null),
+    waitMs: 0,
+  })
+  guard.child('metro', leader, { group: true })
+  psWorks = false
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [[-leader.pid, 'SIGTERM']])
 })
