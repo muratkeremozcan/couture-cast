@@ -406,9 +406,16 @@ try {
 }
 
 const label = `test-store-${platform}-${build}-${server}-${scenario}`
+// Loaded by URL: the manifest writer is a recorded input of the leg (evidence-manifest.mjs
+// lists it as a path), and its own literals name every other leg's harness, which the
+// test-store leg does not read.
+const { writeManifest } = await import(
+  new URL('./lib/evidence-manifest.mjs', import.meta.url).href
+)
 const manifests = writeArtifactManifests({
   out,
   cwd: root,
+  manifest: writeManifest,
   artifacts: [
     { name: `${label}-installed`, file: artifact, rev: buildSha },
     ...(overInstallArtifact

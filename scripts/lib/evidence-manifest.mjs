@@ -74,7 +74,13 @@ export const LEGS = {
     ],
   },
   'test-store': {
-    paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
+    // The journey loads the manifest writer by URL, so it is recorded here as a path.
+    paths: [
+      ...SHARED_INPUTS,
+      ...SERVER_INPUTS,
+      ...HARNESS_DATA,
+      'scripts/lib/evidence-manifest.mjs',
+    ],
     globs: [],
     entries: [
       'scripts/run-story68-native.mjs',

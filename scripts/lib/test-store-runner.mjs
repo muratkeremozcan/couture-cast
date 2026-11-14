@@ -23,7 +23,6 @@
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import path from 'node:path'
-import { writeManifest } from './evidence-manifest.mjs'
 import {
   assertEntitlementPreserved,
   assertNonComplimentary,
@@ -280,13 +279,14 @@ export function artifactSha256(file) {
 /**
  * CX-10: one `test-store` evidence manifest per device artifact, naming the commit it was built
  * from and each input's object id there, plus the artifact itself. `artifacts` is
- * [{ name, file, rev }]; returns the written paths.
+ * [{ name, file, rev }]; `manifest` is evidence-manifest.mjs's writeManifest, passed in so the
+ * measuring tool stays out of the leg's code closure. Returns the written paths.
  */
 export function writeArtifactManifests({
   out,
   artifacts,
   cwd,
-  manifest = writeManifest,
+  manifest,
   hash = artifactSha256,
   write = fs.writeFileSync,
 }) {
