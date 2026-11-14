@@ -24,9 +24,11 @@
 //    made visible.
 import {
   premiumAccessResponseSchema,
+  subscriptionManageEntry,
   subscriptionResponseSchema,
   type PremiumAccess,
   type Subscription,
+  type SubscriptionManageEntry,
   type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
 import { Platform } from 'react-native'
@@ -112,7 +114,7 @@ export type PremiumSectionRenderState =
       productId: string
       currentPeriodEnd: string
       showGraceBanner: boolean
-      manageEntry: 'store' | 'web' | 'none'
+      manageEntry: SubscriptionManageEntry
     }
 
 /**
@@ -122,18 +124,6 @@ export type PremiumSectionRenderState =
 export type PremiumAccessReadState = {
   readonly accessSettled: boolean
   readonly access: PremiumAccess | null
-}
-
-/**
- * Manage entry by store: store-billed subscriptions open the native manage flow; Stripe-billed
- * ones are managed on the web (the portal is the web surface's); promotional grants and RevenueCat
- * Test Store purchases (story 6.15 D15, local and preview only) have no store subscription to
- * manage.
- */
-function manageEntryFor(store: Subscription['store']): 'store' | 'web' | 'none' {
-  if (store === 'stripe') return 'web'
-  if (store === 'promotional' || store === 'test_store') return 'none'
-  return 'store'
 }
 
 export function resolvePremiumSectionState(
@@ -181,7 +171,7 @@ export function resolvePremiumSectionState(
         productId: subscription.productId,
         currentPeriodEnd: subscription.currentPeriodEnd,
         showGraceBanner: subscription.status === 'grace_period',
-        manageEntry: manageEntryFor(subscription.store),
+        manageEntry: subscriptionManageEntry(subscription.store),
       }
   }
 }

@@ -4,11 +4,13 @@ import {
   checkoutSessionRequestSchema,
   checkoutSessionResponseSchema,
   conflictHttpErrorSchema,
+  entitlementStoreSchema,
   notFoundHttpErrorSchema,
   portalSessionResponseSchema,
   serviceUnavailableHttpErrorSchema,
   subscriptionPlanSchema,
   subscriptionResponseSchema,
+  subscriptionManageEntry,
   subscriptionSchema,
   unauthorizedHttpErrorSchema,
   BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE,
@@ -247,5 +249,24 @@ describe('error envelopes and messages', () => {
     for (const source of registeredPathSources) {
       expect(source).not.toMatch(/\{userId\}|\{id\}/)
     }
+  })
+})
+
+describe('subscriptionManageEntry', () => {
+  // Story 6.15: web and mobile both read this, so every store is decided once.
+  it('sends Stripe to the web, the stores to the store, and grants and Test Store nowhere', () => {
+    const entries = Object.fromEntries(
+      entitlementStoreSchema.options.map((store) => [
+        store,
+        subscriptionManageEntry(store),
+      ])
+    )
+    expect(entries).toEqual({
+      app_store: 'store',
+      play_store: 'store',
+      stripe: 'web',
+      promotional: 'none',
+      test_store: 'none',
+    })
   })
 })

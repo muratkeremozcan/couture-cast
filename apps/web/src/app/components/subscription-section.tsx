@@ -19,10 +19,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import type {
-  PremiumAccess,
-  Subscription,
-  SubscriptionPlan,
+import {
+  subscriptionManageEntry,
+  type EntitlementStore,
+  type PremiumAccess,
+  type Subscription,
+  type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
 import { trackPremiumSubscribeTapped } from '@couture/api-client'
 import { browserAnalytics } from '../../analytics/browser-analytics'
@@ -163,29 +165,17 @@ function SubscribeControls({
   )
 }
 
-/**
- * Manage entry by store, matching mobile's `manageEntryFor`: Stripe-billed subscriptions open
- * the Customer Portal; App Store and Play Store ones get the store hint, since the server answers
- * the portal call with a 409; promotional grants and RevenueCat Test Store purchases (story 6.15
- * D15, local and preview only) have no store subscription to manage, so they get neither.
- */
-function manageEntryFor(store: string): 'web' | 'store' | 'none' {
-  if (store === 'stripe') return 'web'
-  if (store === 'promotional' || store === 'test_store') return 'none'
-  return 'store'
-}
-
 function ManageControls({
   store,
   isRedirecting,
   onManage,
 }: {
-  store: string
+  store: EntitlementStore
   isRedirecting: boolean
   onManage: () => void
 }) {
   const { t } = useTranslation()
-  const entry = manageEntryFor(store)
+  const entry = subscriptionManageEntry(store)
   if (entry === 'none') return null
   if (entry === 'store') {
     return (

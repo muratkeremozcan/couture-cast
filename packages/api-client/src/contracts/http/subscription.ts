@@ -153,6 +153,30 @@ export const billingWebhookResponseSchema = z.object({
 
 export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
 export type EntitlementStore = z.infer<typeof entitlementStoreSchema>
+
+/** Where a member manages a subscription, by the store that bills it. */
+export type SubscriptionManageEntry = 'web' | 'store' | 'none'
+
+/**
+ * Stripe-billed subscriptions are managed on the web (the Customer Portal); App Store and Play
+ * Store ones in the store's own flow; promotional grants and RevenueCat Test Store purchases
+ * (story 6.15 D15, local and preview only) have no store subscription to manage. Web and mobile
+ * both read this, so a new store is decided once.
+ */
+export function subscriptionManageEntry(
+  store: EntitlementStore
+): SubscriptionManageEntry {
+  switch (store) {
+    case 'stripe':
+      return 'web'
+    case 'promotional':
+    case 'test_store':
+      return 'none'
+    case 'app_store':
+    case 'play_store':
+      return 'store'
+  }
+}
 export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>
 export type Subscription = z.infer<typeof subscriptionSchema>
 export type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>
