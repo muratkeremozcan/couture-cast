@@ -178,6 +178,11 @@ const premiumSubscriptionSchema = z
   })
   .passthrough()
 
+/** The premium product's one-time purchase records: at least one, each with its date and store. */
+const premiumNonSubscriptionSchema = z
+  .array(z.object({ purchase_date: z.string(), store: z.string() }).passthrough())
+  .nonempty()
+
 type RevenueCatSubscriberResponse = z.infer<typeof revenueCatSubscriberEnvelopeSchema>
 
 /** Zod issues as `path: code` under `prefix`, never a value: the body can hold attributes. */
@@ -391,7 +396,16 @@ export class RealRevenueCatClient extends RevenueCatClient {
     }
     const rawSubscription = ownEntry(subscriptions, productId)
     if (rawSubscription === undefined) {
-      if (ownEntry(non_subscriptions, productId) !== undefined) {
+      const rawPurchases = ownEntry(non_subscriptions, productId)
+      if (rawPurchases !== undefined) {
+        // Only a real purchase record proves a one-time purchase (r42 probe B): an empty or
+        // malformed entry is RevenueCat's response changing, so it stays transient.
+        const purchases = premiumNonSubscriptionSchema.safeParse(rawPurchases)
+        if (!purchases.success) {
+          throw this.shapeError(
+            shapeIssues(purchases.error, ['subscriber', 'non_subscriptions', productId])
+          )
+        }
         // A one-time purchase (a lifetime unlock) is a fact about the member: our model holds
         // subscriptions only, and retrying cannot change that.
         throw new RevenueCatUnrepresentableEntitlementError('non_subscription')

@@ -459,6 +459,52 @@ describe('RealRevenueCatClient', () => {
     })
   })
 
+  // r42 probe B: only a real purchase record proves a one-time purchase. An empty or malformed
+  // entry is RevenueCat's response changing, so it must stay transient and settle nothing.
+  it.each([
+    [
+      'an empty purchase list (r42 probe B)',
+      [],
+      ['subscriber.non_subscriptions.premium_lifetime: too_small'],
+    ],
+    [
+      'a record with no purchase_date',
+      [{ id: 'np-1', store: 'app_store' }],
+      ['subscriber.non_subscriptions.premium_lifetime.0.purchase_date: invalid_type'],
+    ],
+    [
+      'a record with a renamed store',
+      [{ id: 'np-1', purchase_date: '2026-08-01T00:00:00Z', store_name: 'app_store' }],
+      ['subscriber.non_subscriptions.premium_lifetime.0.store: invalid_type'],
+    ],
+    [
+      'an object instead of a list',
+      { id: 'np-1', purchase_date: '2026-08-01T00:00:00Z', store: 'app_store' },
+      ['subscriber.non_subscriptions.premium_lifetime: invalid_type'],
+    ],
+  ])(
+    'fails the shape check, transiently, on a non_subscriptions entry that is %s',
+    async (_label, purchases, issues) => {
+      fetchMock.mockResolvedValueOnce(
+        subscriberResponse({
+          entitlements: {
+            premium: { expires_date: null, product_identifier: 'premium_lifetime' },
+          },
+          subscriptions: {},
+          non_subscriptions: { premium_lifetime: purchases },
+        })
+      )
+
+      const caught = await client
+        .getSubscriberEntitlement('user-1')
+        .catch((error: unknown) => error)
+
+      expect(caught).toBeInstanceOf(RevenueCatResponseShapeError)
+      expect((caught as RevenueCatResponseShapeError).issues).toEqual(issues)
+      expect(permanentLedgerProjectionFailure(caught)).toBeNull()
+    }
+  )
+
   it('holds the premium subscription record to its schema', async () => {
     fetchMock.mockResolvedValueOnce(
       subscriberResponse({
