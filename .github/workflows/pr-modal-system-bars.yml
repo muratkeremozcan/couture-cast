@@ -12,6 +12,13 @@ on:
       - 'apps/mobile/modules/modal-system-bars/**'
       - 'package-lock.json'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/app.config.ts'
+      - 'apps/mobile/app.json'
+      - 'apps/mobile/plugins/**'
+      - '.nvmrc'
+      - '.github/actions/install/**'
+      - '.github/actions/free-runner-disk/**'
       - '.github/workflows/pr-modal-system-bars.yml'
   push:
     branches: [main]
@@ -19,11 +26,21 @@ on:
       - 'apps/mobile/modules/modal-system-bars/**'
       - 'package-lock.json'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - 'apps/mobile/package.json'
+      - 'apps/mobile/app.config.ts'
+      - 'apps/mobile/app.json'
+      - 'apps/mobile/plugins/**'
+      - '.nvmrc'
+      - '.github/actions/install/**'
+      - '.github/actions/free-runner-disk/**'
       - '.github/workflows/pr-modal-system-bars.yml'
   workflow_dispatch:
 
 concurrency:
-  group: modal-system-bars-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a dispatched run.
+  group: >-
+    modal-system-bars-${{ github.event.pull_request.number || github.ref }}-${{
+    github.event_name }}
   cancel-in-progress: true
 
 permissions:

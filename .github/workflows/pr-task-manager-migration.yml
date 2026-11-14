@@ -13,17 +13,24 @@ on:
     paths:
       - 'apps/mobile/modules/task-manager-migration/**'
       - 'package-lock.json'
+      - '.nvmrc'
+      - '.github/actions/install/**'
       - '.github/workflows/pr-task-manager-migration.yml'
   push:
     branches: [main]
     paths:
       - 'apps/mobile/modules/task-manager-migration/**'
       - 'package-lock.json'
+      - '.nvmrc'
+      - '.github/actions/install/**'
       - '.github/workflows/pr-task-manager-migration.yml'
   workflow_dispatch:
 
 concurrency:
-  group: task-manager-migration-${{ github.event.pull_request.number || github.ref }}
+  # The event keeps a push from cancelling a dispatched run.
+  group: >-
+    task-manager-migration-${{ github.event.pull_request.number || github.ref }}-${{
+    github.event_name }}
   cancel-in-progress: true
 
 permissions:
