@@ -549,7 +549,10 @@ signals the group only while the leader runs or a snapshot member is still alive
 group. A member that exits, and whose pid the OS gives to a new process in a new group that reuses
 Metro's group id before teardown, passes that check, so the guard would signal a group that is no
 longer Metro's. It needs a recycled pid and group id that match within one run. Closing it needs a
-process handle (a Linux pidfd), which Node does not expose.
+process handle (a Linux pidfd), which Node does not expose. When `ps` fails at teardown, the guard
+decides by signal 0 on the group (Antigravity r21). A second gap (r21): if a snapshot member starts
+a child after the snapshot and then exits, and no snapshot member is left by teardown, the guard
+drops the group and that later child keeps running unsignalled.
 
 ### CI timing (`scripts/ci/pr-job-p95.mjs` and test)
 
