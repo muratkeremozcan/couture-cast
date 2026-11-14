@@ -77,18 +77,39 @@ enum TextLayoutProbeWire {
   }
 
   /// visibleRect: cut by every clipping ancestor and the window. clipRect: the same without
-  /// scroll views, whose viewport cuts are not layout clips. Ancestors run nearest first.
+  /// scroll views, whose viewport cuts are not layout clips. Above a scroll view, an ancestor or
+  /// the window cuts clipRect only on the edges where it cuts into that scroll view's viewport:
+  /// scroll content past the screen is only scrolled off, while a container smaller than the
+  /// scroll view it holds is a real clip. A text outside every scroll view is cut by the window
+  /// whole. Ancestors run nearest first.
   static func cuts(viewRect: CGRect, ancestors: [Ancestor], window: CGRect) -> Cuts {
     var visible: CGRect? = viewRect
     var clip: CGRect? = viewRect
+    // The viewport of the scroll view passed last on the way up, once there is one.
+    var viewport: CGRect?
     for ancestor in ancestors {
+      if ancestor.isScrollView {
+        if ancestor.clips { visible = cut(visible, ancestor.rect) }
+        viewport = ancestor.rect
+        continue
+      }
       guard ancestor.clips else { continue }
       visible = cut(visible, ancestor.rect)
-      if !ancestor.isScrollView { clip = cut(clip, ancestor.rect) }
+      clip = cut(clip, viewport.map { cutInto(ancestor.rect, $0) } ?? ancestor.rect)
     }
     visible = cut(visible, window)
-    clip = cut(clip, window)
+    clip = cut(clip, viewport.map { cutInto(window, $0) } ?? window)
     return Cuts(visible: visible, clip: clip, scrolledAway: scrolledAway(viewRect, visible, clip, window))
+  }
+
+  /// `rect` with every edge that does not cut into `viewport` opened.
+  static func cutInto(_ rect: CGRect, _ viewport: CGRect) -> CGRect {
+    let open = CGFloat(1 << 29)
+    let left = rect.minX > viewport.minX ? rect.minX : -open
+    let top = rect.minY > viewport.minY ? rect.minY : -open
+    let right = rect.maxX < viewport.maxX ? rect.maxX : open
+    let bottom = rect.maxY < viewport.maxY ? rect.maxY : open
+    return CGRect(x: left, y: top, width: right - left, height: bottom - top)
   }
 
   /// Window stacking: by windowLevel, then by scene order; z counts up from 0 at the bottom.

@@ -110,6 +110,38 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     }
   }
 
+  func testAScrollChildHalfPastTheWindowBottomKeepsItsWholeClipRect() {
+    let text = CGRect(x: 10, y: 824, width: 200, height: 40)
+    let cuts = Wire.cuts(
+      viewRect: text,
+      ancestors: [
+        .init(rect: CGRect(x: 0, y: 0, width: 390, height: 844), clips: true, isScrollView: true),
+        // A screen container that clips at the window edge, above the scroll view.
+        .init(rect: window, clips: true, isScrollView: false),
+      ],
+      window: window)
+    XCTAssertEqual(cuts.clip, text)
+    XCTAssertEqual(cuts.visible, CGRect(x: 10, y: 824, width: 200, height: 20))
+    XCTAssertFalse(cuts.scrolledAway)
+  }
+
+  func testAFixedTextHalfPastTheWindowBottomIsCut() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 824, width: 200, height: 40), ancestors: [], window: window)
+    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 824, width: 200, height: 20))
+  }
+
+  func testAClipperSmallerThanTheScrollViewItHoldsCutsTheClipRect() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 140, width: 200, height: 40),
+      ancestors: [
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 100), clips: true, isScrollView: true),
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 60), clips: true, isScrollView: false),
+      ],
+      window: window)
+    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 140, width: 200, height: 20))
+  }
+
   func testWindowsStackByLevelThenOrder() {
     XCTAssertEqual(Wire.zOrder(levels: [0, 0, 2000, 1]), [0, 1, 3, 2])
   }

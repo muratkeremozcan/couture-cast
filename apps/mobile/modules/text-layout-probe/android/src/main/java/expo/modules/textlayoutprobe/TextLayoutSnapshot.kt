@@ -223,26 +223,33 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
   /**
    * visibleRect: the view's own rect cut by every ancestor that clips its descendants and by the
    * window. clipRect: the same without scroll views, whose viewport cuts are not layout clips.
+   * Above a scroll view, an ancestor or the window cuts clipRect only on the edges where it cuts
+   * into that scroll view's viewport: scroll content that runs past the screen (and so past the
+   * root views that clip at it) is only scrolled off, while a container smaller than the scroll
+   * view it holds is a real clip. A text outside every scroll view is cut by the window whole.
    */
   private fun clips(view: View, viewRect: ProbeRect, windowRect: ProbeRect): Cuts {
     var visible: ProbeRect? = viewRect
     var clip: ProbeRect? = viewRect
+    // The viewport of the scroll view passed last on the way up, once there is one.
+    var viewport: ProbeRect? = null
     var parent = view.parent
     while (parent is View) {
       val ancestor = parent as View
       val bounds = screenRect(ancestor)
       if (isScrollView(ancestor)) {
+        viewport = bounds
         visible = visible?.intersect(bounds)
       } else {
         for (cut in ancestorClips(ancestor, bounds)) {
           visible = visible?.intersect(cut)
-          clip = clip?.intersect(cut)
+          clip = clip?.intersect(viewport?.let { cutInto(cut, it) } ?: cut)
         }
       }
       parent = ancestor.parent
     }
     visible = visible?.intersect(windowRect)
-    clip = clip?.intersect(windowRect)
+    clip = clip?.intersect(viewport?.let { cutInto(windowRect, it) } ?: windowRect)
     return Cuts(visible, clip, scrolledAway(viewRect, visible, clip, windowRect))
   }
 
@@ -311,6 +318,16 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       } else {
         rect.intersect(area) == null
       }
+
+    private const val OPEN = 1 shl 29
+
+    /** [cut] with every edge that does not cut into [viewport] opened. */
+    fun cutInto(cut: ProbeRect, viewport: ProbeRect) = ProbeRect(
+      if (cut.left > viewport.left) cut.left else -OPEN,
+      if (cut.top > viewport.top) cut.top else -OPEN,
+      if (cut.right < viewport.right) cut.right else OPEN,
+      if (cut.bottom < viewport.bottom) cut.bottom else OPEN
+    )
 
     fun isScrollView(view: View) = view is ScrollView || view is HorizontalScrollView
 

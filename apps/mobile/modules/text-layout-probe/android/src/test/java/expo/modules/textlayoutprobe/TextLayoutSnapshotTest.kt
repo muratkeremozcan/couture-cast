@@ -297,7 +297,94 @@ class TextLayoutSnapshotTest {
     assertTrue(record.viewRect.bottom > 0)
     assertTrue(record.scrolledAway)
     assertNull(record.visibleRect)
-    assertEquals(record.viewRect.intersect(TextLayoutSnapshot.screenRect(scroll.rootView)), record.clipRect)
+    // Off the top of the window too, but only scrolling hides it.
+    assertEquals(record.viewRect, record.clipRect)
+  }
+
+  /** Puts [text] at its natural height with its top 10 px above the window bottom. */
+  private fun nearTheWindowBottom(spacer: View, text: View) {
+    val activity = spacer.context as Activity
+    val window = TextLayoutSnapshot.screenRect(activity.window.decorView)
+    spacer.layoutParams.height = window.bottom - TextLayoutSnapshot.screenRect(spacer).top - 10
+    text.layoutParams.height = natural(text)
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+  }
+
+  @Test
+  fun scrollContentRunningPastTheWindowBottomKeepsItsWholeClipRect() {
+    lateinit var spacer: View
+    lateinit var text: View
+    host { context ->
+      spacer = View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      text = label(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      ScrollView(context).apply {
+        addView(
+          column(
+            context,
+            spacer,
+            text,
+            View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 400) }
+          )
+        )
+      }
+    }
+    nearTheWindowBottom(spacer, text)
+    val record = only(snapshot())
+    val window = TextLayoutSnapshot.screenRect((spacer.context as Activity).window.decorView)
+    assertTrue("half past the window bottom", record.viewRect.bottom > window.bottom)
+    assertTrue(record.viewRect.top < window.bottom)
+    // The root views clip at the window edge, as the scroll view's own viewport does: scrolled off.
+    assertEquals(record.viewRect, record.clipRect)
+    assertTrue(record.contentRect.bottom <= record.clipRect!!.bottom)
+    assertFalse(record.scrolledAway)
+  }
+
+  @Test
+  fun aFixedTextRunningPastTheWindowBottomIsCut() {
+    lateinit var spacer: View
+    lateinit var text: View
+    host { context ->
+      spacer = View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      text = label(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      column(context, spacer, text)
+    }
+    // No ancestor clips, so the window is the only cut (the Activity's content frame and decor
+    // would clip at the same edge otherwise).
+    var ancestor = text.parent
+    while (ancestor is android.view.ViewGroup) {
+      ancestor.clipChildren = false
+      ancestor = ancestor.parent
+    }
+    nearTheWindowBottom(spacer, text)
+    val record = only(snapshot())
+    assertTrue(record.viewRect.bottom > record.clipRect!!.bottom)
+    assertTrue(
+      "content ${record.contentRect} past clip ${record.clipRect}",
+      record.contentRect.bottom > record.clipRect!!.bottom + 2
+    )
+  }
+
+  @Test
+  fun aClippingContainerSmallerThanItsScrollViewCutsTheClipRect() {
+    host { context ->
+      val scroll = ScrollView(context)
+      scroll.addView(
+        column(
+          context,
+          View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 40) },
+          label(context)
+        )
+      )
+      // A one-line-tall hidden-overflow container holding a 100 px scroll view.
+      OverflowViewGroup(context, "hidden").apply {
+        addView(scroll, FrameLayout.LayoutParams(MATCH_PARENT, 100))
+        layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, 60)
+      }.let { container -> FrameLayout(context).apply { addView(container) } }
+    }
+    val record = only(snapshot())
+    val container = record.viewRect.top - 40 + 60
+    assertEquals(container, record.clipRect!!.bottom)
   }
 
   @Test
