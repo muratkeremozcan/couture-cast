@@ -495,6 +495,16 @@ function volatileKeys(facts) {
   })
 }
 
+/** How many records each volatile `region` and text group holds in a capture, its pages too. */
+function volatileCounts(capture, platform) {
+  const counts = new Map()
+  for (const key of captureVolatileKeys(capture, platform)) {
+    const group = key.slice(0, key.lastIndexOf('#'))
+    counts.set(group, (counts.get(group) ?? 0) + 1)
+  }
+  return counts
+}
+
 /** The sorted, distinct volatile keys of a capture and its pages. */
 export function captureVolatileKeys(capture, platform) {
   if (!capture?.textProbe) return []
@@ -718,21 +728,38 @@ function verticalClip(record, tolerance) {
  * whether its box misses the target launch's height, the stale miss of a text no parity key
  * names.
  */
+/** Content past its clipRect at the left or the right by more than `tolerance`. */
+function horizontalClip(record, tolerance) {
+  const clip = record.clipRect
+  if (clip === null) return false
+  const [left, , right] = record.contentRect
+  return left < clip[0] - tolerance || right > clip[2] + tolerance
+}
+
 function faces(record, { start, target, before }, tolerance) {
   const height = rectHeight(record.viewRect)
   const boxMiss =
     target !== undefined && !near(height, rectHeight(target.viewRect), tolerance)
-  const none = { staleBox: false, staleContent: false, staleContentFrom: null, boxMiss }
+  const none = {
+    staleBox: false,
+    staleContent: false,
+    staleContentFrom: null,
+    boxMiss,
+    contentAtTarget: false,
+  }
   if (target === undefined || record.clipRect === null) return none
   const targetBox = rectHeight(target.viewRect)
   const targetContent = rectHeight(target.contentRect)
   const content = rectHeight(record.contentRect)
   const freshBox = near(height, targetBox, tolerance)
+  // TEA ruling r47 (r45 P2-2): the kept layout has its source's line count too.
   const keptFrom = (source) =>
     source !== undefined &&
     !near(rectHeight(source.contentRect), targetContent, tolerance) &&
-    near(content, rectHeight(source.contentRect), tolerance)
-  const second = verticalClip(record, tolerance) && freshBox
+    near(content, rectHeight(source.contentRect), tolerance) &&
+    record.lineCount === source.lineCount
+  const second =
+    verticalClip(record, tolerance) && !horizontalClip(record, tolerance) && freshBox
   const staleContentFrom = !second
     ? null
     : keptFrom(start)
@@ -748,6 +775,8 @@ function faces(record, { start, target, before }, tolerance) {
     staleContent: staleContentFrom !== null,
     staleContentFrom,
     boxMiss,
+    // The content has the target launch's height: grown text in a stale box (the first face).
+    contentAtTarget: near(content, targetContent, tolerance),
   }
 }
 
@@ -757,11 +786,14 @@ function faces(record, { start, target, before }, tolerance) {
  * when both cold launches and the before capture hold it too; missing in any, it is a clip with
  * no face, so it fails.
  */
-function clipOf(fact, { content, cut, start, target, before }, tolerance) {
+function clipOf(fact, { content, cut, start, target, before, sameCount }, tolerance) {
   const { record } = fact
   const comparable =
     !fact.volatile ||
-    (start !== undefined && target !== undefined && before !== undefined)
+    (start !== undefined &&
+      target !== undefined &&
+      before !== undefined &&
+      sameCount === true)
   const shown = faces(record, { start, target, before }, tolerance)
   return {
     reason: 'clipped_by_layout',
@@ -784,6 +816,7 @@ function clipOf(fact, { content, cut, start, target, before }, tolerance) {
           staleContent: false,
           staleContentFrom: null,
           boxMiss: shown.boxMiss,
+          contentAtTarget: false,
         }),
   }
 }
@@ -795,6 +828,15 @@ function layoutClips(capture, platform, { cold, base, before } = {}) {
     recordsByKey(base, platform),
     recordsByKey(before, platform),
   ]
+  // TEA ruling r47 (r45 P2-1): a volatile key's ordinal means one record only when its region
+  // shows that text as often in both cold launches, the before capture and the judged one.
+  const counts = [capture, cold, base, before].map((each) =>
+    volatileCounts(each, platform)
+  )
+  const sameCount = (key) => {
+    const group = key.slice(0, key.lastIndexOf('#'))
+    return counts.every((each) => each.get(group) === counts[0].get(group))
+  }
   const clips = []
   const byKey = new Map()
   for (const fact of allFacts(capture, platform)) {
@@ -820,6 +862,7 @@ function layoutClips(capture, platform, { cold, base, before } = {}) {
         start: counterpart(baseRecords),
         target: counterpart(coldRecords),
         before: counterpart(beforeRecords),
+        sameCount: fact.volatile && keyed ? sameCount(fact.key) : true,
       },
       tolerance
     )
@@ -1243,11 +1286,12 @@ function markStaleClips(checks) {
       if (entry.reason !== 'clipped_by_layout') continue
       // Parity reads page 0 only, so a text only later pages show (keyed, no parity key) is a
       // stale miss by its own record: its box kept the starting launch's height (staleBox) and
-      // misses the target launch's (boxMiss).
+      // misses the target launch's (boxMiss), and its content has the target launch's content
+      // height (TEA ruling r47, r45 P2-2: a box that is fixed at both scales is no stale box).
       entry.stale =
         entry.parityKey !== null
           ? stale.has(entry.parityKey)
-          : entry.key !== null && entry.staleBox && entry.boxMiss
+          : entry.key !== null && entry.staleBox && entry.boxMiss && entry.contentAtTarget
       // Which face of the bug the clip is, or null (residualClip).
       entry.face =
         entry.stale && entry.staleBox
@@ -1511,7 +1555,18 @@ function splitClipKey(key) {
  * the run's clip keys must equal `clippedKeys` exactly, as a multiset, faces included. The run's
  * clips reach this point only when each shows a face (classify makes any other clip structural).
  */
-function clipProblem(checks, baseline, captures) {
+/**
+ * TEA ruling r47 (r45 P2-1): a volatile key may be listed only when two committed runs prove the
+ * region data deterministic. `verify` (createVolatileProofCheck, live-font-volatile-proof.mjs)
+ * reads the runs `baseline.volatileProof` names from the repository and recomputes their keys;
+ * nothing the entry states is trusted. A run without a verifier approves no volatile key.
+ */
+function volatileProofProblem(baseline, captures, verify) {
+  if (typeof verify !== 'function') return 'no volatile proof check in this run'
+  return verify(baseline.volatileProof, legVolatileKeys(captures))
+}
+
+function clipProblem(checks, baseline, captures, verify) {
   const run = clipKeys(checks)
   if (!Array.isArray(baseline.clippedKeys))
     return 'baseline clippedKeys must be a list of clip keys'
@@ -1520,7 +1575,7 @@ function clipProblem(checks, baseline, captures) {
     return `baseline clippedKeys must be a list of clip keys: ${JSON.stringify(bad)}`
   const volatileKey = baseline.clippedKeys.find((key) => splitClipKey(key).volatile)
   const unproven =
-    volatileKey === undefined ? null : volatileProofProblem(baseline, captures)
+    volatileKey === undefined ? null : volatileProofProblem(baseline, captures, verify)
   if (unproven) return `volatile clipped key ${volatileKey}: ${unproven}`
   const stale = new Set(baseline.staleKeys)
   // A first-face clip of a text only later pages show has no parity key, so no stale key can
@@ -1549,45 +1604,12 @@ function clipProblem(checks, baseline, captures) {
 }
 
 /** A leg's volatile keys by stage in one canonical form: stages and keys sorted. */
-const canonicalVolatileKeys = (byStage) =>
+export const canonicalVolatileKeys = (byStage) =>
   JSON.stringify(
     Object.keys(byStage)
       .sort()
       .map((stage) => [stage, [...byStage[stage]].sort()])
   )
-
-/**
- * TEA ruling r45: a volatile key may be listed only when the region data is proven
- * deterministic. The entry carries `volatileProof: { runs: [{ run, volatileKeys }, ...] }`: at
- * least two runs with distinct ids, each run's `volatileKeys` (its proposal's, by stage) equal
- * to every other's and to this run's (legVolatileKeys), stages and keys alike. Why it fails, or
- * null.
- */
-function volatileProofProblem(baseline, captures) {
-  const runs = baseline.volatileProof?.runs
-  if (!Array.isArray(runs) || runs.length < 2)
-    return 'no volatileProof listing two runs or more'
-  const ids = runs.map((entry) => entry?.run)
-  if (
-    ids.some((id) => typeof id !== 'string' || id === '') ||
-    new Set(ids).size !== ids.length
-  )
-    return 'volatileProof runs need distinct run ids'
-  const shaped = (byStage) =>
-    byStage !== null &&
-    typeof byStage === 'object' &&
-    !Array.isArray(byStage) &&
-    Object.values(byStage).every(
-      (keys) => Array.isArray(keys) && keys.every((key) => typeof key === 'string')
-    )
-  if (!runs.every((entry) => shaped(entry.volatileKeys)))
-    return 'volatileProof runs need volatileKeys by stage'
-  const current = canonicalVolatileKeys(legVolatileKeys(captures))
-  const differs = runs.find(
-    (entry) => canonicalVolatileKeys(entry.volatileKeys) !== current
-  )
-  return differs ? `volatile keys of run ${differs.run} differ from this run's` : null
-}
 
 /**
  * Rule 6, keys exact: every failing growth probe is an id `staleKeys` names, the run's failing
@@ -1732,7 +1754,7 @@ function residualApproved(checks, baseline, environment) {
     )
   const problem =
     exactnessProblem(checks, baseline, environment.captures) ??
-    clipProblem(checks, baseline, environment.captures)
+    clipProblem(checks, baseline, environment.captures, environment.volatileProofCheck)
   return problem ? unapproved(problem) : { pass: true }
 }
 
@@ -1778,6 +1800,7 @@ export function assertLiveFontProof({
   residualBaseline,
   timezone,
   weatherBanner,
+  volatileProofCheck,
   ...change
 }) {
   const fixExpected = fixExpectedFor(reactNativeVersion)
@@ -1814,6 +1837,7 @@ export function assertLiveFontProof({
       timezone,
       weatherBanner,
       captures: change,
+      volatileProofCheck,
     })
     if (!approved.pass) fail(approved.code, approved.reason)
   }

@@ -126,6 +126,7 @@ function judgeLeg({
   residualBaseline,
   timezone,
   weatherBanner,
+  volatileProofCheck,
   change,
 }) {
   try {
@@ -135,6 +136,7 @@ function judgeLeg({
       residualBaseline,
       timezone,
       weatherBanner,
+      volatileProofCheck,
       ...change,
     })
     return {
@@ -227,6 +229,7 @@ export async function runScreenJourney({
   timezone,
   weatherBanner,
   androidDensity = () => undefined,
+  volatileProofCheck,
 }) {
   const screen = SCREENS[name]
   if (!screen) throw new Error(`live_font_unknown_screen:${name}`)
@@ -326,6 +329,7 @@ export async function runScreenJourney({
           residualBaseline,
           timezone,
           weatherBanner,
+          volatileProofCheck,
           change,
         }),
       }
@@ -333,7 +337,17 @@ export async function runScreenJourney({
         leg.composer = composerGeometry(platform, androidDensity, [settled, updated])
         if (!leg.composer.pass) leg.pass = false
       }
-      leg.evidence = { before, immediate, settled, updated }
+      // The cold launches too, so a later volatile proof can name every capture the leg read.
+      leg.evidence = {
+        before,
+        immediate,
+        settled,
+        updated,
+        coldBefore: cold[from].reference,
+        cold: cold[to].reference,
+        coldBeforeUpdated: cold[from].updated,
+        coldUpdated: cold[to].updated,
+      }
       // Every listed clip names the screenshot of each page it shows on, for review.
       attachClipImages(leg.checks, { settled, updated })
       if (leg.residualProposal) leg.residualProposal.clipImages = clipImagesOf(leg.checks)

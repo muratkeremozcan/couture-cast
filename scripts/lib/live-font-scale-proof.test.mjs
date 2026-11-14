@@ -4,6 +4,7 @@
 // F-00: the oracle judged on recorded and derived hierarchies before it judges any device run.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
   mountTracker,
@@ -40,6 +41,7 @@ import {
   WEATHER_STALE_TEXT,
   weatherBannerState,
 } from './live-font-scale-proof.mjs'
+import { createVolatileProofCheck } from './live-font-volatile-proof.mjs'
 
 // F-00i: every capture these specs build gets the healthy probe answer for its nodes, as the
 // nodes stand when the oracle judges them; the text probe specs give their own answers.
@@ -2533,6 +2535,21 @@ describe('text layout clipping (F-00i)', () => {
     )
   })
 
+  // TEA ruling r47 (r45 P2-2, PROBE_1C): a later-page stale box needs its content at the target
+  // launch's content height; content past that (a box fixed at both scales) is no stale box.
+  test('PROBE_1C: a later-page box at the start height whose content is not the target content is no first face', () => {
+    const change = pageOnlyChange()
+    overflowRecord(pageRecord(change.settled, BELOW.text), 40)
+    const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual(
+      [clip.staleBox, clip.boxMiss, clip.contentAtTarget, clip.stale, clip.face],
+      [true, true, false, false, null]
+    )
+    assert.throws(prove(change, { ...ENTRY, clippedKeys: [PAGE_ONLY] }), {
+      code: 'live_font_baseline_unexpected',
+    })
+  })
+
   test('a later-page clip whose box is the target launch box is no stale miss', () => {
     const change = pageOnlyChange(50)
     const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
@@ -2704,6 +2721,28 @@ describe('text layout clipping (F-00i)', () => {
     ])
   })
 
+  // TEA ruling r47 (r45 P2-2, PROBE_1B): beside the earlier guards, the second face needs its
+  // source's line count and no cut at the side.
+  test('PROBE_1B: a carried-over height with a side cut or another line count is no second face', () => {
+    const sideways = carriedOver()
+    const cut = recordFor(sideways.settled, CONDITION)
+    cut.contentRect = [
+      cut.contentRect[0],
+      cut.contentRect[1],
+      cut.viewRect[2] + 40,
+      cut.contentRect[3],
+    ]
+    assert.deepEqual(sourceOf(sideways), [[CONDITION, null, null]])
+    assert.throws(prove(sideways), { code: 'live_font_baseline_unexpected' })
+    const relaid = carriedOver()
+    recordFor(relaid.settled, CONDITION).lineCount = 2
+    assert.deepEqual(sourceOf(relaid), [[CONDITION, null, null]])
+    // The same from the starting launch's layout.
+    const fromStart = secondFace()
+    recordFor(fromStart.settled, CONDITION).lineCount = 3
+    assert.deepEqual(faceOf(fromStart), [[CONDITION, false, false, null]])
+  })
+
   // TEA ruling r45: volatile records keyed by region testID, masked text and screen order,
   // judged for a face only when both cold launches and the before capture hold the key.
   const REGION = 'community-spotlight'
@@ -2766,44 +2805,247 @@ describe('text layout clipping (F-00i)', () => {
     }
   })
 
-  test('a listed volatile key approves only with a determinism proof two runs make', () => {
+  // TEA ruling r47 (r45 P2-1): the proof names committed runs; the harness reads them at HEAD
+  // and recomputes their keys, so nothing the entry states is trusted.
+  const SHA_A = 'a'.repeat(40)
+  /** A fake repository at HEAD: path to bytes, and the manifests whose inputs changed. */
+  const repository = () => {
+    const files = new Map()
+    const changedShas = new Set()
+    return {
+      files,
+      changedShas,
+      read: (file) => (files.has(file) ? Buffer.from(files.get(file)) : null),
+      changed: (manifest) =>
+        changedShas.has(manifest.sha) ? [{ path: 'apps/mobile' }] : [],
+    }
+  }
+  /** Commits `change`'s captures as one run under `dir`, as launch `launch`, at `sha`. */
+  const commitRun = (
+    repo,
+    change,
+    dir,
+    { launch, sha = SHA_A, manifestAt = 'root' } = {}
+  ) => {
+    const evidence = {}
+    for (const [index, stage] of ['before', 'settled', 'coldBefore', 'cold'].entries()) {
+      const name = `community-${String(index + 1).padStart(3, '0')}-${stage.toLowerCase()}-1`
+      evidence[stage] = name
+      const capture = {
+        ...change[stage],
+        pid: `${launch}-${stage}`,
+        identity: { root: `root-${launch}-${stage}` },
+      }
+      repo.files.set(`${dir}/${name}.json`, JSON.stringify(capture))
+    }
+    const manifest = JSON.stringify({ leg: 'live-font', sha, inputs: {} })
+    repo.files.set(
+      manifestAt === 'root'
+        ? `${path.posix.dirname(dir)}/manifest.json`
+        : `${dir}/manifest.json`,
+      manifest
+    )
+    return { dir, evidence }
+  }
+  const RUN_A = '_bmad-output/test-artifacts/story-6-15/runs/run-a/driver-community'
+  const RUN_B = '_bmad-output/test-artifacts/story-6-15/runs/run-b/driver-community'
+  const proofCase = () => {
     const change = volatileChange()
-    const { checks } = evaluateLiveFontChangeRaw(change)
-    const { volatileKeys } = proposedResidualEntry(checks, change)
-    const entry = { ...ENTRY, clippedKeys: [VOLATILE_CLIP] }
-    assert.throws(
-      prove(change, entry),
-      refused(/volatile clipped key .*no volatileProof/)
-    )
-    const runs = (...list) => ({ ...entry, volatileProof: { runs: list } })
-    const run = (id, keys = volatileKeys) => ({ run: id, volatileKeys: keys })
-    assert.equal(
-      prove(change, runs(run('run-a'), run('run-b')))().verdict,
-      'known-residual'
-    )
-    assert.throws(prove(change, runs(run('run-a'))), refused(/two runs or more/))
-    assert.throws(
-      prove(change, runs(run('run-a'), run('run-a'))),
-      refused(/distinct run ids/)
-    )
-    assert.throws(prove(change, runs(run('run-a'), run(''))), refused(/distinct run ids/))
-    assert.throws(
-      prove(change, runs(run('run-a'), run('run-b', { ...volatileKeys, settled: [] }))),
-      refused(/volatile keys of run run-b differ/)
-    )
-    assert.throws(
-      prove(change, runs(run('run-a'), run('run-b', { ...volatileKeys, extra: [] }))),
-      refused(/volatile keys of run run-b differ/)
-    )
-    assert.throws(
-      prove(change, runs(run('run-a'), run('run-b', 'all'))),
-      refused(/volatileKeys by stage/)
-    )
+    const repo = repository()
+    const runs = [
+      commitRun(repo, change, RUN_A, { launch: 'a' }),
+      commitRun(repo, change, RUN_B, { launch: 'b', manifestAt: 'dir' }),
+    ]
+    const check = createVolatileProofCheck({
+      platform: 'android',
+      read: repo.read,
+      changed: repo.changed,
+    })
+    const entry = { ...ENTRY, clippedKeys: [VOLATILE_CLIP], volatileProof: { runs } }
+    const proveWith =
+      (baseline, verify = check) =>
+      () =>
+        assertLiveFontProofRaw({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: baseline,
+          timezone: 'America/Chicago',
+          weatherBanner: 'out-of-date',
+          volatileProofCheck: verify,
+          ...change,
+        })
+    return { change, repo, runs, check, entry, proveWith }
+  }
+
+  test('a listed volatile key approves with two committed runs that recompute its keys', () => {
+    const { entry, proveWith } = proofCase()
+    assert.equal(proveWith(entry)().verdict, 'known-residual')
+    // A run with no verifier approves no volatile key, whatever the entry says.
+    assert.throws(proveWith(entry, null), refused(/no volatile proof check in this run/))
     // Unlisted, the clip is outside clippedKeys.
     assert.throws(
-      prove(change, ENTRY),
+      proveWith(ENTRY),
       refused(/clip outside clippedKeys: staleBox:cold:volatile:/)
     )
+  })
+
+  test('PROBE_1A: one run copied under two dirs, or two runs of one launch, prove nothing', () => {
+    const { change, repo, entry, proveWith } = proofCase()
+    // The same files under a second dir: every capture hashes alike.
+    for (const [file, bytes] of [...repo.files])
+      if (file.includes('/run-a/'))
+        repo.files.set(file.replace('/run-a/', '/run-copy/'), bytes)
+    const copied = {
+      ...entry,
+      volatileProof: {
+        runs: [
+          entry.volatileProof.runs[0],
+          { ...entry.volatileProof.runs[0], dir: RUN_A.replace('run-a', 'run-copy') },
+        ],
+      },
+    }
+    assert.throws(proveWith(copied), refused(/share a capture \(copied run\)/))
+    // Other bytes, one launch.
+    const sameLaunch = repository()
+    const runs = [
+      commitRun(sameLaunch, change, RUN_A, { launch: 'x' }),
+      commitRun(
+        sameLaunch,
+        // Every capture rewritten (other bytes), the launch the same.
+        Object.fromEntries(
+          Object.entries(change).map(([stage, value]) => [
+            stage,
+            value && typeof value === 'object' && !Array.isArray(value)
+              ? { ...value, rewritten: true }
+              : value,
+          ])
+        ),
+        RUN_B,
+        { launch: 'x' }
+      ),
+    ]
+    const check = createVolatileProofCheck({
+      platform: 'android',
+      read: sameLaunch.read,
+      changed: sameLaunch.changed,
+    })
+    assert.throws(
+      proveWith({ ...entry, volatileProof: { runs } }, check),
+      refused(/share a launch/)
+    )
+  })
+
+  test('a proof run that is not committed, not at one head, changed since, or of other keys fails', () => {
+    const cases = {
+      'one run': ({ entry }) => ({
+        ...entry,
+        volatileProof: { runs: [entry.volatileProof.runs[0]] },
+      }),
+      'old self-attested shape': ({ entry }) => ({
+        ...entry,
+        volatileProof: {
+          runs: [
+            { run: 'copied-run-1', volatileKeys: {} },
+            { run: 'copied-run-2', volatileKeys: {} },
+          ],
+        },
+      }),
+      'a dir leaving the repository': ({ entry }) => ({
+        ...entry,
+        volatileProof: {
+          runs: [
+            entry.volatileProof.runs[0],
+            { ...entry.volatileProof.runs[1], dir: '../elsewhere' },
+          ],
+        },
+      }),
+      'a stage left out': ({ entry }) => {
+        const { cold, ...rest } = entry.volatileProof.runs[1].evidence
+        void cold
+        return {
+          ...entry,
+          volatileProof: {
+            runs: [
+              entry.volatileProof.runs[0],
+              { ...entry.volatileProof.runs[1], evidence: rest },
+            ],
+          },
+        }
+      },
+      'an uncommitted capture': ({ entry, repo }) => {
+        repo.files.delete(`${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`)
+        return entry
+      },
+      'no manifest': ({ entry, repo }) => {
+        repo.files.delete(`${RUN_B}/manifest.json`)
+        return entry
+      },
+      'another head': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'live-font', sha: 'b'.repeat(40), inputs: {} })
+        )
+        return entry
+      },
+      'a manifest of another leg': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'ios-build', sha: SHA_A, inputs: {} })
+        )
+        return entry
+      },
+      'inputs changed since the build': ({ entry, repo }) => {
+        repo.changedShas.add(SHA_A)
+        return entry
+      },
+      'other volatile keys': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        const capture = JSON.parse(repo.files.get(file))
+        capture.textProbe.records = capture.textProbe.records.filter(
+          (record) => record.text !== 'Partnered'
+        )
+        repo.files.set(file, JSON.stringify(capture))
+        return entry
+      },
+    }
+    const REASONS = {
+      'one run': /two runs or more/,
+      'old self-attested shape': /must be \{ dir, evidence \}/,
+      'a dir leaving the repository': /must be \{ dir, evidence \}/,
+      'a stage left out': /evidence must name a capture/,
+      'an uncommitted capture': /is not committed/,
+      'no manifest': /no committed manifest/,
+      'another head': /different heads/,
+      'a manifest of another leg': /no live-font manifest/,
+      'inputs changed since the build': /inputs changed since/,
+      'other volatile keys': /volatile keys of run 1 .* differ/,
+    }
+    for (const [name, mutate] of Object.entries(cases)) {
+      const context = proofCase()
+      assert.throws(
+        context.proveWith(mutate(context)),
+        (error) =>
+          error.code === 'live_font_residual_unapproved' &&
+          REASONS[name].test(error.message),
+        name
+      )
+    }
+  })
+
+  // PROBE_1D: an extra row of one text in a volatile region shifts every later ordinal.
+  test('PROBE_1D: a region whose count of a text differs between the captures shows no face', () => {
+    const change = volatileChange()
+    // The inserted row above takes ordinal #0 and is cut like the stale row: without the count
+    // check it would borrow the cold launches' #0 and show the first face.
+    withSpotlight(change.settled, 40, { top: 3020, by: 20 })
+    const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.ok(clips.length > 0)
+    for (const clip of clips)
+      assert.deepEqual(
+        [clip.volatile, clip.comparable, clip.face],
+        [true, false, null],
+        clip.key
+      )
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
   })
 
   test('volatile keys count in screen order and one record on two pages keeps one key', () => {

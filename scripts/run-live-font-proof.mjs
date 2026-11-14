@@ -69,6 +69,7 @@ import {
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
 import { createTextProbe } from './lib/live-font-text-probe.mjs'
+import { createVolatileProofCheck } from './lib/live-font-volatile-proof.mjs'
 import { ageWeatherSnapshot } from './lib/live-font-weather.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
@@ -810,6 +811,7 @@ try {
       timezone: pinned.timezone,
       weatherBanner: weather.weatherBanner,
       androidDensity,
+      volatileProofCheck: createVolatileProofCheck({ platform, repoRoot: root }),
     })
     for (const leg of report.legs) {
       for (const [stage, capture] of Object.entries(leg.evidence))

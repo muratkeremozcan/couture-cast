@@ -1384,41 +1384,94 @@ describe('matchTextProbe, iOS accessibility groups (TEA rulings 2026-11-14)', ()
     assert.deepEqual([open.groups, open.attached], [[{ node: 1, records: [0] }], []])
   })
 
-  test('an ancestor identifier decides before geometry, and one no node carries fails', () => {
+  // TEA ruling r47 (r45 P2-6): identity first with containment; an ancestor with no node
+  // falls back to geometry among the nodes that hold both the record and the ancestor.
+  test('an ancestor identifier decides before geometry, and the named node must hold the record', () => {
     // The ancestor names the tile, though the tab is the smaller holder.
     const named = ios([TAB, TILE], tabRecords({ identifier: TILE.id, rect: TILE.box }))
     assert.equal(named.pass, true)
     assert.deepEqual(attachedOf(named), [[1, [2]]])
-    // An identifier no node carries: unmatched, even though the tab holds it.
-    const missing = ios(
-      [TAB, TILE],
-      tabRecords({ identifier: 'tab-gone', rect: TAB.box })
+    // Nodes carry the identifier, but none holds the record: unmatched, never geometry.
+    const outside = ios(
+      [TAB, TILE, node('Settings', [301, 784, 402, 840], 'tab-settings')],
+      [
+        ...tabRecords({ identifier: 'tab-settings', rect: [30, 786, 70, 824] }),
+        iosRecord('Settings', [320, 822, 390, 838]),
+      ]
     )
     assert.deepEqual(
-      [missing.code, missing.unmatchedRecords],
+      [outside.code, outside.unmatchedRecords],
       ['live_font_text_probe_unmatched', [2]]
     )
-    // A node with that identifier whose box misses the ancestor's rect is no such node.
-    const far = ios(
-      [TAB, TILE],
-      tabRecords({ identifier: 'tab-home', rect: [300, 0, 400, 50] })
-    )
-    assert.equal(far.code, 'live_font_text_probe_unmatched')
-    // Two nodes of that identifier: the better overlap with the ancestor's rect; a tie is ambiguous.
-    const rows = [
-      node('8 PM', [16, 100, 86, 180], 'hourly-item'),
-      node('9 PM', [90, 100, 160, 180], 'hourly-item'),
+  })
+
+  test('R4D: one testID twice resolves by containment, then the smallest', () => {
+    const pills = [
+      node('A', [10, 100, 110, 140], 'pill'),
+      node('B', [15, 100, 115, 140], 'pill'),
     ]
-    const rowRecords = (rect) => [
-      iosRecord('8 PM', [20, 102, 80, 120]),
-      iosRecord('9 PM', [94, 102, 154, 120]),
-      iosRecord('☀️', [94, 130, 154, 160], {
-        accessibilityAncestor: { identifier: 'hourly-item', rect },
+    const records = (rect, ancestor = [16, 100, 116, 140]) => [
+      iosRecord('A', [40, 120, 80, 138]),
+      iosRecord('B', [60, 120, 100, 138]),
+      iosRecord('•', rect, {
+        accessibilityAncestor: { identifier: 'pill', rect: ancestor },
       }),
     ]
-    assert.deepEqual(attachedOf(ios(rows, rowRecords([90, 100, 160, 180]))), [[1, [2]]])
-    const tie = ios(rows, rowRecords([16, 100, 160, 180]))
-    assert.equal(tie.code, 'live_font_text_probe_ambiguous')
+    // Only pill A holds the dot at 12..24, whatever rect the ancestor reports.
+    assert.deepEqual(attachedOf(ios(pills, records([12, 102, 24, 114]))), [[0, [2]]])
+    // Both hold it: the smaller one.
+    const nested = [
+      node('A', [10, 100, 110, 140], 'pill'),
+      node('B', [15, 101, 100, 139], 'pill'),
+    ]
+    assert.deepEqual(attachedOf(ios(nested, records([20, 102, 30, 114]))), [[1, [2]]])
+    // Two holders of one size: ambiguous.
+    const twins = [
+      node('A', [10, 100, 110, 140], 'pill'),
+      node('B', [10, 100, 110, 140], 'pill'),
+    ]
+    assert.equal(
+      ios(twins, records([20, 102, 30, 114])).code,
+      'live_font_text_probe_ambiguous'
+    )
+  })
+
+  test('R4E: an ancestor XCUITest flattened away falls back to the nodes holding it and the record', () => {
+    // icon-box has no node; the tab holds the icon and the box, the card under the bar only
+    // the icon's rect partly, so the tab takes it.
+    const flattened = ios(
+      [TAB, TILE],
+      tabRecords({ identifier: 'icon-box', rect: [30, 786, 70, 824] })
+    )
+    assert.equal(flattened.pass, true, JSON.stringify(flattened.unmatchedRecords))
+    assert.deepEqual(attachedOf(flattened), [[0, [2]]])
+    // No node holds both: unmatched.
+    const nowhere = ios(
+      [TAB, TILE],
+      tabRecords({ identifier: 'icon-box', rect: [30, 600, 70, 824] })
+    )
+    assert.deepEqual(
+      [nowhere.code, nowhere.unmatchedRecords],
+      ['live_font_text_probe_unmatched', [2]]
+    )
+  })
+
+  test('R4C: a reported ancestor beats a smaller sibling that also holds the record; none, the smallest', () => {
+    const card = node('Card, Partnered, Shop', [16, 400, 386, 600], 'card')
+    const button = node('Shop', [200, 540, 380, 590], 'card-shop')
+    const records = (ancestor) => [
+      iosRecord('Shop', [210, 550, 370, 580]),
+      iosRecord('Partnered', [220, 545, 330, 560], { accessibilityAncestor: ancestor }),
+    ]
+    const named = ios([card, button], records({ identifier: 'card', rect: card.box }))
+    assert.deepEqual(
+      [named.pass, named.groups, named.attached],
+      [true, [{ node: 0, records: [1] }], []]
+    )
+    // With no ancestor only geometry decides: the smallest holder, the button.
+    const unnamed = ios([card, button], records(null))
+    assert.deepEqual(attachedOf(unnamed), [[1, [1]]])
+    assert.deepEqual(unnamed.unmatchedNodes, [0], 'the card then holds no record')
   })
 
   test('an ancestor naming an open node makes it a group', () => {

@@ -772,9 +772,11 @@ function best(nodes, score) {
 /**
  * IOS_ACCESSIBILITY_GROUPS with the attachment rule (TEA ruling r45, identity first). Each
  * leftover record, in screen order:
- *   1. with an `accessibilityAncestor`, joins the node with that identifier whose box overlaps
- *      the ancestor's rect best (ties are ambiguous); a record whose identifier no such node
- *      carries stays free, so a visible one is unmatched. Geometry never decides it.
+ *   1. with an `accessibilityAncestor` (TEA ruling r47), joins the smallest node with that
+ *      identifier whose box holds the record's rect (ties ambiguous); when nodes carry the
+ *      identifier but none holds the record, it stays free, so a visible one is unmatched. An
+ *      identifier no node carries (an ancestor XCUITest flattened into its accessible parent)
+ *      falls back to the smallest node that holds both the record and the ancestor's rect.
  *   2. without one, joins the smallest node of any kind (by area; open, or one exact text
  *      took) whose rect holds its rect within the tolerance; two smallest of one area are
  *      ambiguous. The smallest holder is the most specific element: an icon in a tab button
@@ -814,14 +816,27 @@ function resolveLeftovers({
       geometric.push(record)
       continue
     }
-    const named = placeable.filter(
-      (node) =>
-        node.id === ancestor.identifier && overlapRatio(node.box, ancestor.rect) > 0
+    // TEA ruling r47 (r45 P2-6): the named node must hold the record; of several such nodes
+    // (one testID twice), the smallest.
+    const named = placeable.filter((node) => node.id === ancestor.identifier)
+    const holding = holdingOf(record, named)
+    if (named.length) {
+      if (holding.length)
+        place(
+          record,
+          best(holding, (node) => area(node.box))
+        )
+      continue
+    }
+    // An ancestor XCUITest flattened away has no node: the smallest node that holds both the
+    // record and the ancestor's rect.
+    const around = holdingOf(record, placeable).filter((node) =>
+      contains(node.box, ancestor.rect, tolerance)
     )
-    if (named.length)
+    if (around.length)
       place(
         record,
-        best(named, (node) => -overlapRatio(node.box, ancestor.rect))
+        best(around, (node) => area(node.box))
       )
   }
   const opened = new Set(open)
