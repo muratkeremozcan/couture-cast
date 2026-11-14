@@ -78,14 +78,24 @@ const alive = (pid) => {
   }
 }
 
-async function runDriver(t, mode) {
+const killQuietly = (pid, signal = 'SIGKILL') => {
+  try {
+    process.kill(pid, signal)
+  } catch {
+    // Already gone.
+  }
+}
+
+async function runDriver(t, mode, platform = 'ios') {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'test-store-driver-'))
   t.after(() => fs.rmSync(base, { recursive: true, force: true }))
   const bin = path.join(base, 'bin')
   const stubDir = path.join(base, 'stub')
+  const androidHome = path.join(base, 'android')
   const out = path.join(base, 'evidence')
   fs.mkdirSync(bin)
   fs.mkdirSync(stubDir)
+  fs.mkdirSync(path.join(androidHome, 'platform-tools'), { recursive: true })
   const member = `stub-member-${randomUUID()}`
   fs.writeFileSync(path.join(stubDir, 'member'), member)
   const port = await stubServer(t, stubDir, member)
@@ -94,6 +104,12 @@ async function runDriver(t, mode) {
     bin,
     'xcrun',
     'case "$*" in *" stream "*) echo $$ > "$STUB_DIR/stream.pid"; exec sleep 300;; esac\nexit 0'
+  )
+  // adb records every reverse and reverse --remove it is asked for, one line each.
+  writeStub(
+    path.join(androidHome, 'platform-tools'),
+    'adb',
+    'case "$*" in *" reverse "*) echo "$*" >> "$STUB_DIR/adb-reverse.log";; esac\nexit 0'
   )
   writeStub(
     bin,
@@ -111,14 +127,16 @@ async function runDriver(t, mode) {
     secrets,
     'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY=test_stubkey000000\nREVENUECAT_SECRET_API_KEY=sk_stub\n'
   )
-  const artifact = path.join(base, 'CoutureCast.app')
+  const artifact = path.join(
+    base,
+    platform === 'ios' ? 'CoutureCast.app' : 'app-debug.apk'
+  )
   fs.writeFileSync(artifact, 'stub app')
-  // The evidence dir must exist before the maestro stub writes into it; the driver creates it.
   const child = spawn(
     process.execPath,
     [
       driver,
-      ...['--platform', 'ios', '--device', 'stub-udid', '--build', 'debug'],
+      ...['--platform', platform, '--device', 'stub-device', '--build', 'debug'],
       ...['--server', 'local', '--api-url', `http://127.0.0.1:${port}`],
       ...['--metro-port', String(port), '--proxy-port', '0'],
       ...['--artifact', artifact, '--secrets-env', secrets, '--out', out],
@@ -128,32 +146,76 @@ async function runDriver(t, mode) {
       env: {
         ...process.env,
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+        ANDROID_HOME: androidHome,
         STUB_DIR: stubDir,
         STUB_EVIDENCE: out,
         STUB_MODE: mode,
       },
     }
   )
+  const stubPids = () =>
+    ['metro.pid', 'stream.pid']
+      .map((name) => path.join(stubDir, name))
+      .filter((file) => fs.existsSync(file))
+      .map((file) => Number(fs.readFileSync(file, 'utf8')))
+  // A failing test leaves nothing running: the driver and every stub it started.
+  t.after(() => {
+    killQuietly(child.pid)
+    for (const pid of stubPids()) killQuietly(pid)
+  })
   let stdout = ''
   let stderr = ''
+  let exited = false
   child.stdout.on('data', (chunk) => (stdout += chunk))
   child.stderr.on('data', (chunk) => (stderr += chunk))
+  const closed = new Promise((resolve) =>
+    child.on('close', (code) => {
+      exited = true
+      resolve(code)
+    })
+  )
   if (mode === 'sigterm') {
     // Once the leak is planted the driver waits on a subscription read that never answers.
+    // The wait ends early if the driver already exited, so a broken run fails fast.
     const deadline = Date.now() + 60_000
-    while (!fs.existsSync(path.join(stubDir, 'planted')) && Date.now() < deadline)
+    while (
+      !exited &&
+      !fs.existsSync(path.join(stubDir, 'planted')) &&
+      Date.now() < deadline
+    )
       await new Promise((resolve) => setTimeout(resolve, 100))
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    child.kill('SIGTERM')
+    if (!exited) {
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      child.kill('SIGTERM')
+    }
   }
-  const code = await new Promise((resolve) => child.on('close', resolve))
-  const pids = ['metro.pid', 'stream.pid'].map((name) =>
-    Number(fs.readFileSync(path.join(stubDir, name), 'utf8'))
-  )
-  return { code, stdout, stderr, out, member, pids }
+  const code = await closed
+  const reverseLog = path.join(stubDir, 'adb-reverse.log')
+  return {
+    code,
+    stdout,
+    stderr,
+    out,
+    member,
+    pids: stubPids(),
+    reverse: fs.existsSync(reverseLog) ? fs.readFileSync(reverseLog, 'utf8') : '',
+  }
 }
 
-function assertCleaned({ out, member, pids, stderr }) {
+/**
+ * Resolves true once `pid` has exited, or false at the deadline. A stub that got SIGTERM can
+ * outlive the driver's close by a moment on a loaded runner (TEA r18), so one check is not proof.
+ */
+export async function goneWithin(pid, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs
+  while (alive(pid)) {
+    if (Date.now() >= deadline) return false
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+  return true
+}
+
+async function assertCleaned({ out, member, pids, stderr }) {
   assert.deepEqual(scanForLeaks(out, [member]), [], stderr)
   assert.ok(!fs.existsSync(path.join(out, 'leak.json')))
   const quarantine = path.join(`${out}.private`, 'quarantine')
@@ -161,22 +223,75 @@ function assertCleaned({ out, member, pids, stderr }) {
     .readdirSync(quarantine)
     .some((entry) => fs.existsSync(path.join(quarantine, entry, 'leak.json')))
   assert.ok(held, 'the quarantine holds the planted file')
-  for (const pid of pids) assert.equal(alive(pid), false, `stub process ${pid} is gone`)
+  for (const pid of pids)
+    assert.equal(await goneWithin(pid), true, `stub process ${pid} is gone`)
 }
 
 test('the driver crashing mid-run quarantines the planted leak and keeps the failure', async (t) => {
   const result = await runDriver(t, 'crash')
   assert.equal(result.code, 1, result.stderr)
+  assert.equal(result.pids.length, 2, 'Metro and the log stream both started')
   // The run's own failure is reported before any evidence write: the open step's command failed.
   assert.match(result.stdout, /"failed":\["open"\]/)
   assert.match(result.stdout, /test_store_command_failed/)
   assert.match(result.stderr, /test_store_evidence_leak/)
   assert.ok(!result.stdout.includes(result.member))
-  assertCleaned(result)
+  await assertCleaned(result)
 })
 
 test('SIGTERM mid-run exits 143 with the leak quarantined and Metro and the log stream stopped', async (t) => {
   const result = await runDriver(t, 'sigterm')
   assert.equal(result.code, 143, result.stderr)
-  assertCleaned(result)
+  assert.equal(result.pids.length, 2, 'Metro and the log stream both started')
+  await assertCleaned(result)
+})
+
+/** A shell that exits `delay` seconds after SIGTERM, or never (it ignores SIGTERM). */
+function lingering(t, delay) {
+  const trap = delay === null ? "trap '' TERM" : `trap 'sleep ${delay}; exit 0' TERM`
+  const child = spawn('sh', ['-c', `${trap}; while :; do sleep 0.05; done`], {
+    stdio: 'ignore',
+  })
+  t.after(() => {
+    try {
+      process.kill(child.pid, 'SIGKILL')
+    } catch {
+      // Already gone.
+    }
+  })
+  return child
+}
+
+test('the gone check polls: a stub exiting 1 s after SIGTERM passes, one that never exits fails', async (t) => {
+  const slow = lingering(t, 1)
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  slow.kill('SIGTERM')
+  // A single check right away still sees it.
+  assert.equal(alive(slow.pid), true)
+  assert.equal(await goneWithin(slow.pid), true)
+  const stuck = lingering(t, null)
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  stuck.kill('SIGTERM')
+  const started = Date.now()
+  assert.equal(await goneWithin(stuck.pid, 1_500), false)
+  assert.ok(Date.now() - started >= 1_500)
+})
+
+// Antigravity r18 C30: Android removes the adb reverse of the proxy port it really bound.
+test('Android: the crash path removes the reverse of the actual proxy and Metro ports', async (t) => {
+  const result = await runDriver(t, 'crash', 'android')
+  assert.equal(result.code, 1, result.stderr)
+  assert.equal(result.pids.length, 1, 'Metro started')
+  const lines = result.reverse.trim().split('\n')
+  const added = lines
+    .filter((line) => !line.includes('--remove'))
+    .map((line) => line.split(' ').at(-1))
+  const removed = lines
+    .filter((line) => line.includes('--remove'))
+    .map((line) => line.split(' ').at(-1))
+  // The proxy bound a real port for --proxy-port 0; the remove names that port, never tcp:0.
+  assert.equal(added.length, 2, result.reverse)
+  assert.ok(!added.includes('tcp:0'))
+  assert.deepEqual([...removed].sort(), [...new Set(added)].sort())
+  await assertCleaned(result)
 })

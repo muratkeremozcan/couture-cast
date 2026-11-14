@@ -10,6 +10,7 @@ import { test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   assertEvidenceClean,
+  awaitExit,
   FS_OPS,
   installEvidenceGuard,
   outputDirs,
@@ -458,6 +459,11 @@ test('the driver installs the exit guard right after its dirs and feeds it every
     'scanIds.push(member.userId, member.token)',
   ])
     assert.ok(driver.includes(push), push)
+  // adb reverse --remove cannot hang the exit path (Antigravity r18).
+  assert.match(
+    driver,
+    /'reverse', '--remove', `tcp:\$\{port\}`\], \{\s*timeout: 5_000,\s*killSignal: 'SIGKILL',/
+  )
 })
 
 // Antigravity r17 (1): a second Ctrl-C during the exit scan must not kill the run mid-scan.
@@ -488,7 +494,7 @@ test('a second SIGINT (or a SIGTERM) during the exit scan is ignored: evidence c
   assert.deepEqual(fs.readdirSync(dirs.evidence), [])
 })
 
-test('teardowns run once each, after the scan, and a failing one does not stop the rest', (t) => {
+test('teardowns run once each, and a failing one does not stop the rest', (t) => {
   const dirs = outputDirs(tempOut(t))
   const proc = fakeProcess()
   const order = []
@@ -563,4 +569,57 @@ test('each registered teardown runs on throw, process.exit, SIGINT and SIGTERM',
     for (const name of ['metro', 'log-stream', 'adb-reverse'])
       assert.ok(fs.existsSync(`${out}.private/${name}.done`), `${mode}: ${name}`)
   }
+})
+
+// TEA r18 (2): a child still running at the scan could write into evidence after it.
+test('teardowns stop their children before the exit scan, so a late write is quarantined too', async (t) => {
+  const lib = pathToFileURL(
+    fileURLToPath(new URL('./test-store-output.mjs', import.meta.url))
+  )
+  const out = tempOut(t)
+  const script = [
+    'import { spawn } from "node:child_process"',
+    `import { installEvidenceGuard, outputDirs } from ${JSON.stringify(lib.href)}`,
+    `const dirs = outputDirs(${JSON.stringify(out)})`,
+    `const guard = installEvidenceGuard({ dirs, ids: [${JSON.stringify(MEMBER)}] })`,
+    // A writer that keeps leaking into evidence and leaks once more when told to stop.
+    'const writer = spawn("sh", ["-c", `trap \'echo $ID > "$EV/late.json"; exit 0\' TERM; while :; do echo $ID > "$EV/loop.json"; sleep 0.05; done`], {',
+    `  env: { ...process.env, ID: ${JSON.stringify(MEMBER)}, EV: dirs.evidence },`,
+    '  stdio: "ignore",',
+    '})',
+    'guard.teardown("writer", () => writer.kill("SIGTERM"), { pids: [writer.pid] })',
+    'setTimeout(() => console.log("ready"), 300)',
+    'setInterval(() => {}, 1000)',
+  ].join('\n')
+  const result = await runChild(script, { onReady: (child) => child.kill('SIGTERM') })
+  assert.equal(result.code, 143, result.stderr)
+  // Anything still running would have written by now.
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  assert.deepEqual(scanForLeaks(out, [MEMBER]), [])
+  assert.ok(quarantined({ private: `${out}.private` }, 'late.json'))
+})
+
+// Antigravity r18 C26: on a signal, with no runTeardowns call first, teardown runs before scan.
+test('the exit path tears down before it scans', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const proc = fakeProcess()
+  const seen = []
+  const guard = installEvidenceGuard({ dirs, ids: [MEMBER], proc })
+  writeEvidence(dirs, 'leak.json', MEMBER)
+  guard.teardown('metro', () => seen.push(fs.readdirSync(dirs.evidence).length))
+  proc.emit('SIGTERM')
+  // The leak was still in evidence when the teardown ran, so the scan came after it.
+  assert.deepEqual(seen, [1])
+  assert.equal(proc.exitCode, 143)
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+})
+
+// A child that exited while the exit path holds the thread is a zombie until Node reaps it; the
+// teardown wait must count it as exited, or every exit would sit out the whole deadline.
+test('the teardown wait treats an exited, unreaped child as gone', () => {
+  const child = spawn('sh', ['-c', 'sleep 0.2'], { stdio: 'ignore' })
+  const started = Date.now()
+  const left = awaitExit([child.pid], 3_000)
+  assert.deepEqual(left, [])
+  assert.ok(Date.now() - started < 2_000, `waited ${Date.now() - started} ms`)
 })

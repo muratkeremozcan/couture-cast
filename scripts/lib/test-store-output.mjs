@@ -7,6 +7,7 @@
 // log, the device log (logcat or the simulator's log stream, which can carry the RevenueCat app
 // user id, our user id), Maestro's debug output and any APK pulled off the device. The run
 // fails if any member, app user or subscriber id is found anywhere under the evidence dir.
+import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { JourneyError } from './test-store-journey.mjs'
@@ -224,6 +225,57 @@ const exists = (file) => {
   }
 }
 
+export const TEARDOWN_WAIT_MS = 3_000
+
+/**
+ * The pids (a negative pid: every member of that process group) still running. A child the
+ * driver spawned stays a zombie until Node reaps it, which cannot happen while the exit path
+ * holds the thread, so a zombie counts as exited; `ps` reports it with state Z.
+ */
+function stillRunning(pids) {
+  if (!pids.length) return []
+  const table = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
+  if (table.status !== 0)
+    // No ps: fall back to signal 0, which counts a zombie as running (the wait just runs long).
+    return pids.filter((pid) => {
+      try {
+        process.kill(pid, 0)
+        return true
+      } catch (error) {
+        return error.code === 'EPERM'
+      }
+    })
+  const live = table.stdout
+    .split('\n')
+    .map((line) => line.trim().split(/\s+/))
+    .filter(([pid, , stat]) => pid && stat && !stat.startsWith('Z'))
+    .map(([pid, pgid]) => ({ pid: Number(pid), pgid: Number(pgid) }))
+  return pids.filter((pid) =>
+    live.some((entry) => (pid < 0 ? entry.pgid === -pid : entry.pid === pid))
+  )
+}
+
+/** Sleeps the thread: the exit path cannot wait on timers. */
+const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+/** Waits, synchronously, for `pids` to exit; SIGKILLs whatever is left at the deadline. */
+export function awaitExit(pids, waitMs = TEARDOWN_WAIT_MS) {
+  const deadline = Date.now() + waitMs
+  let left = stillRunning(pids)
+  while (left.length && Date.now() < deadline) {
+    sleepSync(50)
+    left = stillRunning(left)
+  }
+  for (const pid of left) {
+    try {
+      process.kill(pid, 'SIGKILL')
+    } catch {
+      // Gone between the check and the kill.
+    }
+  }
+  return left
+}
+
 /**
  * Scans and quarantines the evidence dir on every exit of the process (Antigravity r16): a
  * normal end, an uncaught exception, process.exit, and SIGINT or SIGTERM (which exit 130 or 143
@@ -234,27 +286,41 @@ const exists = (file) => {
  * Signal handlers stay installed (`on`, with an exiting flag): with `once`, Node restores the
  * default action after the first signal, and a second Ctrl-C during the scan would kill the
  * process with leaks left behind (Antigravity r17). Teardowns (Metro's process group, a log
- * stream, adb reverse) registered with `teardown` run synchronously on exit after the scan, and
- * at most once, so the normal path can call `runTeardowns` too.
+ * stream, adb reverse) registered with `teardown` run synchronously on exit before the scan, so
+ * no child can write into the evidence dir after it was scanned (TEA, r18). A teardown may name
+ * the pids (a negative pid is a process group) it stops; the guard waits for them to exit, up to
+ * TEARDOWN_WAIT_MS, then sends SIGKILL. Each teardown runs at most once, so the normal path can
+ * call `runTeardowns` before its own scan too.
  *
- * Returns { teardown(name, fn), runTeardowns(), uninstall() }.
+ * Returns { teardown(name, fn, { pids }), runTeardowns(), uninstall() }.
  */
-export function installEvidenceGuard({ dirs, ids, ops, proc = process }) {
+export function installEvidenceGuard({
+  dirs,
+  ids,
+  ops,
+  proc = process,
+  waitMs = TEARDOWN_WAIT_MS,
+}) {
   const teardowns = []
   let exiting = false
   const runTeardowns = () => {
+    const pids = []
     for (const entry of teardowns) {
       if (entry.done) continue
       entry.done = true
+      pids.push(...entry.pids)
       try {
         entry.fn()
       } catch (error) {
         proc.stderr.write(`test_store_teardown_failed: ${entry.name}: ${error.message}\n`)
       }
     }
+    awaitExit(pids, waitMs)
   }
   const onExit = (code) => {
     exiting = true
+    // Stop every child first: one still running could write into evidence after the scan.
+    runTeardowns()
     try {
       const moved = quarantineLeaks(dirs, [...ids], { ops })
       if (moved.length) {
@@ -265,7 +331,6 @@ export function installEvidenceGuard({ dirs, ids, ops, proc = process }) {
       proc.stderr.write(`${error.message}\n`)
       if (!code) proc.exitCode = 1
     }
-    runTeardowns()
   }
   const onSignal = (code) => () => {
     // A repeat signal while the exit path runs is ignored; the first one decided the code.
@@ -279,8 +344,8 @@ export function installEvidenceGuard({ dirs, ids, ops, proc = process }) {
   proc.on('SIGINT', onSigint)
   proc.on('SIGTERM', onSigterm)
   return {
-    teardown: (name, fn) => {
-      teardowns.push({ name, fn, done: false })
+    teardown: (name, fn, { pids = [] } = {}) => {
+      teardowns.push({ name, fn, pids, done: false })
     },
     runTeardowns,
     uninstall: () => {

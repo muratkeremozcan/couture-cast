@@ -61,6 +61,7 @@ import { startApiProxy } from './lib/test-store-proxy.mjs'
 import {
   memberRef,
   runJourney,
+  stdoutSummary,
   writeArtifactManifests,
 } from './lib/test-store-runner.mjs'
 import { READ_BYPASS_ENV } from './lib/test-store-webhook.mjs'
@@ -204,13 +205,17 @@ async function startMetro() {
   )
   // Metro runs in its own process group; the whole group goes on any exit, signals included.
   const metroPid = metro.pid
-  guard.teardown('metro', () => {
-    try {
-      process.kill(-metroPid, 'SIGTERM')
-    } catch {
-      // Metro already exited.
-    }
-  })
+  guard.teardown(
+    'metro',
+    () => {
+      try {
+        process.kill(-metroPid, 'SIGTERM')
+      } catch {
+        // Metro already exited.
+      }
+    },
+    { pids: [-metroPid] }
+  )
   await waitForExpoStatus(`http://127.0.0.1:${metroPort}`, 180_000)
 }
 
@@ -226,7 +231,10 @@ async function launch() {
       const ports = [metroPort, proxy.port]
       guard.teardown('adb-reverse', () => {
         for (const port of ports)
-          spawnSync(adbBinary, ['-s', device, 'reverse', '--remove', `tcp:${port}`])
+          spawnSync(adbBinary, ['-s', device, 'reverse', '--remove', `tcp:${port}`], {
+            timeout: 5_000,
+            killSignal: 'SIGKILL',
+          })
       })
     }
     spawnSync(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId])
@@ -329,7 +337,7 @@ function startDeviceLog() {
     { stdio: ['ignore', file, file] }
   )
   const stream = logStream
-  guard.teardown('log-stream', () => stream.kill('SIGTERM'))
+  guard.teardown('log-stream', () => stream.kill('SIGTERM'), { pids: [stream.pid] })
 }
 
 function deviceLog() {
@@ -427,17 +435,13 @@ try {
   }
   result = await runJourney({ steps, io, server, platform, appId, metroEnv })
 } finally {
-  // The same teardowns the exit guard runs on a signal or crash; each runs once.
+  // The same teardowns the exit guard runs on a signal or crash, each once, and like there
+  // before the evidence scan (writeRunOutputs below): no child writes into evidence after it.
   guard.runTeardowns()
   await proxy?.close()
 }
 // The run's outcome, before any evidence write can fail: step names and codes only, no ids.
-console.log(
-  JSON.stringify({
-    verdict: result.verdict,
-    errors: result.records.filter((record) => !record.pass).map((record) => record.error),
-  })
-)
+console.log(JSON.stringify(stdoutSummary(result)))
 
 const label = `test-store-${platform}-${build}-${server}-${scenario}`
 // Loaded by URL: the manifest writer is a recorded input of the leg (evidence-manifest.mjs

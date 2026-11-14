@@ -311,3 +311,22 @@ export function writeArtifactManifests({
     return target
   })
 }
+
+/** A coded error: lowercase snake case, as every JourneyError code is. */
+export const ERROR_CODE = /^[a-z][a-z0-9_]*$/
+
+/**
+ * The line the driver prints to stdout before any evidence write: the verdict and each failing
+ * step's error code. An error that is not a code prints as `uncoded_error`, so free text (which
+ * could name a member) never reaches stdout (Antigravity r18).
+ */
+export function stdoutSummary(result) {
+  return {
+    verdict: result.verdict,
+    errors: result.records
+      .filter((record) => !record.pass)
+      .map((record) =>
+        ERROR_CODE.test(String(record.error ?? '')) ? record.error : 'uncoded_error'
+      ),
+  }
+}

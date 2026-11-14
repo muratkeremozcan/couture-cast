@@ -14,6 +14,7 @@ import {
 } from './test-store-journey.mjs'
 import {
   artifactSha256,
+  stdoutSummary,
   memberRef,
   TD04,
   runJourney,
@@ -448,4 +449,17 @@ test('a refresh during the unpaid failure fails that step', async () => {
     [records.at(-1).step, records.at(-1).error],
     ['unpaid-failure', 'test_store_unpaid_refresh_forwarded']
   )
+})
+
+test('stdout carries error codes only: an uncoded message prints uncoded_error', () => {
+  const summary = stdoutSummary({
+    verdict: { pass: false, failed: ['open', 'js-dev'], missing: [] },
+    records: [
+      { step: 'preflight', pass: true },
+      { step: 'open', pass: false, error: 'test_store_command_failed' },
+      { step: 'js-dev', pass: false, error: 'Error for stub-member-7b2c4e8a boom' },
+    ],
+  })
+  assert.deepEqual(summary.errors, ['test_store_command_failed', 'uncoded_error'])
+  assert.ok(!JSON.stringify(summary).includes('stub-member'))
 })
