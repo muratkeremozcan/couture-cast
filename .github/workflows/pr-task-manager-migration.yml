@@ -1,0 +1,85 @@
+# Story 6.15 P0-07: the persisted task cleanup (apps/mobile/modules/task-manager-migration). An
+# install upgraded from SDK 54 persists a task whose consumer, expo-background-fetch's, the app no
+# longer ships; the cleanup drops it before expo-task-manager's TaskService restores it. The
+# native app lanes skip pull requests, so this path-filtered workflow runs the Robolectric
+# regression on every PR that touches the module or the lockfile (a task manager bump changes
+# the restore code), from the module's standalone Gradle project: the cleanup, then the
+# installed expo-task-manager's own TaskService restore, with no prebuild. PR Gate makes every
+# job that runs here required.
+name: Task manager migration module
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/modules/task-manager-migration/**'
+      - 'package-lock.json'
+      - '.github/workflows/pr-task-manager-migration.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/modules/task-manager-migration/**'
+      - 'package-lock.json'
+      - '.github/workflows/pr-task-manager-migration.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: task-manager-migration-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  robolectric:
+    name: Persisted task cleanup against the TaskService restore
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Gradle project resolves expo-task-manager, its app loader and expo-modules-core from
+      # the installed packages.
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      # Robolectric's SDK 35+ runtimes need Java 21.
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-36
+
+      # The version the app's React Native 0.81 wrapper pins; AGP 8.11 does not support Gradle 9.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Cache Robolectric Android runtimes
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('apps/mobile/modules/task-manager-migration/android/unit-tests/build.gradle') }}
+
+      - name: Robolectric regression for the persisted task cleanup
+        run: |
+          set -euo pipefail
+          project=apps/mobile/modules/task-manager-migration/android/unit-tests
+          gradle -p "$project" testDebugUnitTest --console=plain
+          # All three cases ran, none skipped.
+          grep -q 'tests="3" skipped="0" failures="0" errors="0"' "$project/build/test-results/testDebugUnitTest/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml"
+
+      - name: Upload Robolectric reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: task-manager-migration-robolectric-reports
+          path: apps/mobile/modules/task-manager-migration/android/unit-tests/build/reports/tests
+          if-no-files-found: warn
