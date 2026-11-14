@@ -1,0 +1,22 @@
+# Story 6.15 D15: the member has no entitlement in the app, and the store controls are offered.
+# The subscribe controls render only once `ensurePurchasesConfigured` answered `ready`, so the
+# Test Store key was resolved (it is read only inside the `__DEV__` branch of revenuecat-key.ts).
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+      text: ${PREMIUM_STATUS_NONE}
+    direction: UP
+    centerElement: true
+    timeout: 30000
+    label: 'The app shows no Premium subscription'
+- scrollUntilVisible:
+    element:
+      id: premium-subscribe-monthly
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+    label: 'The monthly subscribe control is offered'
+- assertVisible:
+    id: premium-restore

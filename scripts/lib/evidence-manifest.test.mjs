@@ -167,6 +167,15 @@ test('every leg resolves on this repository and covers the app inputs', () => {
   const server = writeManifest({ leg: 'test-store', requireClean: false }).inputs
   assert.match(server['apps/api'], /^[0-9a-f]{40}$/)
   assert.match(server['packages/db'], /^[0-9a-f]{40}$/)
+  // The Test Store driver and every helper it imports, so a harness change reruns the leg.
+  for (const file of [
+    'scripts/run-test-store-journey.mjs',
+    'scripts/test-store-preview-webhook.mjs',
+    'scripts/lib/test-store-runner.mjs',
+    'scripts/lib/test-store-proxy.mjs',
+    'scripts/lib/minified-debuggable-evidence.mjs',
+  ])
+    assert.match(server[file], /^[0-9a-f]{40}$/, file)
   const liveFont = writeManifest({ leg: 'live-font', requireClean: false }).inputs
   assert.ok('scripts/lib/live-font-scale-proof.mjs' in liveFont)
   assert.ok('scripts/lib/live-font-capture.mjs' in liveFont)

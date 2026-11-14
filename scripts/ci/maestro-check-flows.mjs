@@ -51,6 +51,18 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/story68/share-sheet.yaml',
   // Story 6.15 S2-06: the dev-client network-timeout check, run on a device outside the suite.
   'maestro/network-timeout/dev-client-timeout.yaml',
+  // Story 6.15 D15: the RevenueCat Test Store journey (scripts/run-test-store-journey.mjs).
+  'maestro/test-store/assert-entitled.yaml',
+  'maestro/test-store/assert-unpaid.yaml',
+  'maestro/test-store/open-premium.yaml',
+  'maestro/test-store/open-sheet.yaml',
+  'maestro/test-store/purchase-cancel.yaml',
+  'maestro/test-store/purchase-failure.yaml',
+  'maestro/test-store/purchase-success-webhook.yaml',
+  'maestro/test-store/purchase-success.yaml',
+  'maestro/test-store/purchase-unsynced.yaml',
+  'maestro/test-store/restore-rejected.yaml',
+  'maestro/test-store/restore-success.yaml',
 ])
 
 // The pinned install on CI, the PATH binary on a developer machine.

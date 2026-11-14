@@ -73,13 +73,14 @@ export const LEGS = {
       'scripts/lib/cx06-reflection-mutant.mjs',
     ],
   },
-  // The Test Store journey driver joins these entries when it lands.
   'test-store': {
     paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: [],
     entries: [
       'scripts/run-story68-native.mjs',
       'scripts/lib/minified-debuggable-evidence.mjs',
+      'scripts/run-test-store-journey.mjs',
+      'scripts/test-store-preview-webhook.mjs',
     ],
   },
   upgrade: {

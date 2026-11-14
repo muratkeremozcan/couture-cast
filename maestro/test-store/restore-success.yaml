@@ -1,0 +1,17 @@
+# Story 6.15 D15 (TD-04): the restore runs `Purchases.restorePurchases()` (the driver reads the
+# SDK's own log line for it), then the refresh pulls the ledger and the entitlement returns.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- tapOn:
+    id: premium-restore
+    label: 'Restore purchases'
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+      text: ${PREMIUM_STATUS_ACTIVE}
+    direction: UP
+    centerElement: true
+    timeout: 60000
+    label: 'The restored entitlement is shown'
+- runFlow: assert-entitled.yaml

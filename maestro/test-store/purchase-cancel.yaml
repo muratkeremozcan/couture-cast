@@ -1,0 +1,15 @@
+# Story 6.15 D15 (S4-12): an unpaid cancel returns quietly to the offer and creates no entitlement.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- runFlow: open-sheet.yaml
+- tapOn:
+    text: '(?i)Cancel'
+    label: 'Cancel the purchase in the Test Store sheet'
+- waitForAnimationToEnd
+- assertNotVisible: '(?i)Test Store Purchase'
+- runFlow: assert-unpaid.yaml
+- assertNotVisible:
+    id: premium-purchase-error
+- assertNotVisible:
+    id: premium-activating
