@@ -28,7 +28,8 @@ export function resolveEnv(env = process.env) {
 
 /** `{ config }` or `{ error }` for the app under `<root>/apps/mobile`. Offline, about a second. */
 export function resolvedAppConfig(root) {
-  const mobile = path.join(root, 'apps/mobile')
+  // A relative root (the evidence CLI's default '.') resolves against the working directory.
+  const mobile = path.resolve(root, 'apps/mobile')
   const cli = createRequire(path.join(mobile, 'package.json')).resolve('expo/bin/cli')
   const result = spawnSync(
     process.execPath,

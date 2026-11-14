@@ -47,3 +47,12 @@ test('resolved gradle properties are read from the introspected mod results', ()
   )
   assert.deepEqual(resolvedGradleProperties({}), {})
 })
+
+// Device runner, leg 4: the evidence CLI passes its default root '.', and createRequire needs an
+// absolute path; a relative root resolves against the working directory.
+test('a relative root resolves against the working directory', async () => {
+  const { resolvedAppConfig } = await import('./resolved-app-config.mjs')
+  const result = resolvedAppConfig('.')
+  assert.ok(result.config || result.error, JSON.stringify(Object.keys(result)))
+  assert.ok(result.config, `relative root resolves the app config: ${result.error}`)
+})
