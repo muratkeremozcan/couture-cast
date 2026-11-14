@@ -8,6 +8,7 @@ import { createMobileApiClient } from './api-client'
 import { mobileApplicationUserId, resolveMobileAccessToken } from './mobile-auth'
 import { loadWidgetAlertPreferences } from './widget-alert-preferences'
 import { isWidgetCacheFresh } from './widget-cache-freshness'
+import { withHeadlessJsTimers } from '../../modules/headless-js-timers'
 import {
   defaultSupportedLocale,
   ritualResponseSchema,
@@ -18,11 +19,19 @@ const RITUAL_BACKGROUND_TASK = 'RITUAL_BACKGROUND_TASK'
  * The name SDK 54 builds registered through expo-background-fetch. expo-task-manager persists a
  * registered task with its consumer, and registration below skips a name that is already
  * registered, so reusing this name would leave an upgraded install bound to the removed fetch
- * consumer. The new task takes a new name and the old one is unregistered on launch.
+ * consumer. The new task takes a new name and the old one is unregistered on launch. Android
+ * restores persisted tasks natively before any JS runs, so modules/task-manager-migration drops
+ * the old entry there first.
  */
 const RETIRED_BACKGROUND_FETCH_TASK = 'RITUAL_BACKGROUND_FETCH_TASK'
 
-TaskManager.defineTask(RITUAL_BACKGROUND_TASK, async () => {
+// A wake after a reboot or a WorkManager run may have no resumed Activity, where React Native
+// holds JS timers (and so every fetch response) until the app opens; the scope keeps them live.
+TaskManager.defineTask(RITUAL_BACKGROUND_TASK, () =>
+  withHeadlessJsTimers(refreshRitualCache)
+)
+
+async function refreshRitualCache() {
   try {
     const settings = await getSavedSettings()
     const locale = settings.locale ?? defaultSupportedLocale
@@ -65,7 +74,7 @@ TaskManager.defineTask(RITUAL_BACKGROUND_TASK, async () => {
     console.error('[BackgroundTask] task execution failed', error)
     return BackgroundTask.BackgroundTaskResult.Failed
   }
-})
+}
 
 async function retireBackgroundFetchTask() {
   try {
