@@ -2743,6 +2743,75 @@ describe('text layout clipping (F-00i)', () => {
     assert.deepEqual(faceOf(fromStart), [[CONDITION, false, false, null]])
   })
 
+  // TEA ruling r48, Android Release 0027bf63 Home 1.5 to 1.0: the cloud glyph and the swap
+  // glyph keep their whole 1.5 layout, width and height, inside the fresh 1.0 box, so they are
+  // cut at the side and at the bottom. A side cut is the second face only when the content keeps
+  // its source's width, height and line count.
+  const GLYPHS = {
+    // [settled view, settled content, cold 1.5 view and content, before view, before content]
+    '\u2601\ufe0f': [
+      [100, 999, 166, 1070],
+      [100, 999, 186, 1091],
+      [90, 1054, 176, 1146],
+      [100, 999, 166, 1070],
+      [100, 999, 186, 1091],
+    ],
+    '\u21c4': [
+      [940, 1987, 977, 2038],
+      [940, 1987, 998, 2066],
+      [910, 2344, 968, 2423],
+      [910, 1992, 968, 2071],
+      [910, 1992, 968, 2071],
+    ],
+  }
+  const asBounds = ([l, t, r, b]) => `[${l},${t}][${r},${b}]`
+  /** The return leg with both glyphs as each capture of the 0027bf63 run shows them. */
+  const glyphLeg = (settledContent = (text) => GLYPHS[text][1]) => {
+    const change = returnLeg()
+    for (const [text, [view, , start, beforeView, beforeContent]] of Object.entries(
+      GLYPHS
+    )) {
+      const place = (capture, box, content) => {
+        capture.nodes.push({ id: '', text, bounds: asBounds(box) })
+        capture.textProbe.records.push(
+          probeRecord('android', text, box, { contentRect: content })
+        )
+      }
+      place(change.before, beforeView, beforeContent)
+      place(change.settled, view, settledContent(text))
+      for (const capture of [change.cold, change.coldBase]) place(capture, view, view)
+      place(change.coldBefore, start, start)
+    }
+    return change
+  }
+  const glyphFaces = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).map((entry) => [
+      entry.text,
+      entry.face,
+      entry.staleContentFrom,
+    ])
+
+  test('the cloud and swap glyphs that keep their whole 1.5 layout are the second face, side cut and all', () => {
+    const change = glyphLeg()
+    assert.deepEqual(glyphFaces(change), [
+      ['\u2601\ufe0f', 'staleContent', 'startCold'],
+      ['\u21c4', 'staleContent', 'startCold'],
+    ])
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'known-residual')
+  })
+
+  test('a side cut with a fresh width, or another line count, is no second face', () => {
+    // The cloud's content keeps the 1.5 height but takes a width neither launch laid out.
+    const fresh = glyphLeg((text) =>
+      text === '\u2601\ufe0f' ? [100, 999, 200, 1091] : GLYPHS[text][1]
+    )
+    assert.deepEqual(glyphFaces(fresh)[0], ['\u2601\ufe0f', null, null])
+    assert.throws(prove(fresh), { code: 'live_font_baseline_unexpected' })
+    const relaid = glyphLeg()
+    recordFor(relaid.settled, '\u21c4').lineCount = 2
+    assert.deepEqual(glyphFaces(relaid)[1], ['\u21c4', null, null])
+  })
+
   // TEA ruling r45: volatile records keyed by region testID, masked text and screen order,
   // judged for a face only when both cold launches and the before capture hold the key.
   const REGION = 'community-spotlight'

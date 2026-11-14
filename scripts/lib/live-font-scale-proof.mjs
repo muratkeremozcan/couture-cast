@@ -259,6 +259,7 @@ function clipping(capture, tolerance, reference) {
 }
 
 const rectHeight = (rect) => rect[3] - rect[1]
+const rectWidth = (rect) => rect[2] - rect[0]
 /** A text input of more than one line (maxLines other than 1): it scrolls its own content. */
 const multilineInput = (record) => INPUT_KINDS.has(record.kind) && record.maxLines !== 1
 /** The one masking residual entry keys and the hidden-text count share: hour labels to HOUR_TOKEN. */
@@ -752,14 +753,18 @@ function faces(record, { start, target, before }, tolerance) {
   const targetContent = rectHeight(target.contentRect)
   const content = rectHeight(record.contentRect)
   const freshBox = near(height, targetBox, tolerance)
-  // TEA ruling r47 (r45 P2-2): the kept layout has its source's line count too.
+  // TEA ruling r47 (r45 P2-2): the kept layout has its source's line count too. TEA ruling r48:
+  // a side cut is allowed only when the content keeps its whole source layout, its width as
+  // well as its height (the 1.5 cloud glyph in a fresh 1.0 box, Android 0027bf63).
+  const sideCut = horizontalClip(record, tolerance)
   const keptFrom = (source) =>
     source !== undefined &&
     !near(rectHeight(source.contentRect), targetContent, tolerance) &&
     near(content, rectHeight(source.contentRect), tolerance) &&
-    record.lineCount === source.lineCount
-  const second =
-    verticalClip(record, tolerance) && !horizontalClip(record, tolerance) && freshBox
+    record.lineCount === source.lineCount &&
+    (!sideCut ||
+      near(rectWidth(record.contentRect), rectWidth(source.contentRect), tolerance))
+  const second = verticalClip(record, tolerance) && freshBox
   const staleContentFrom = !second
     ? null
     : keptFrom(start)
