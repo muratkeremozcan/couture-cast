@@ -16,6 +16,7 @@ import {
   keyHygieneProblems,
   mobileEnvFileScope,
   readEnvEntries,
+  resolveBuildEnv,
   resolveBuildProfile,
 } from './revenuecat-key-hygiene.mjs'
 
@@ -143,12 +144,17 @@ test('only a release-only env file is refused the Test Store variable; platform 
     '.env.example EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
     `apps/mobile/.env.production sets ${TEST_STORE_KEY_VARIABLE}`,
     `apps/mobile/.env.production.local sets ${TEST_STORE_KEY_VARIABLE}`,
+    // The same .env.local key, as each release build resolves it.
+    'the resolved production build env EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY holds a RevenueCat Test Store key',
+    'the resolved preview build env EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY holds a RevenueCat Test Store key',
   ])
 })
 
-// Story 6.15 r38 P3-2: Expo reads env files with dotenv and then dotenv-expand, so a release
-// file can assemble a Test Store key from shorter variables that no single assignment shows.
-test('a Test Store key assembled through ${} references is seen as Expo expands it', (t) => {
+// Story 6.15 r38 P3-2 and r40 P2: a release build resolves its env through app.config.ts
+// (dotenv, root files in source order, first file wins, no expansion) and @expo/env (apps/mobile
+// files for the mode, expanded against what is already set, never overwriting it). The check
+// runs those loaders, so a key assembled from shorter variables is seen as the build sees it.
+test('a Test Store key assembled through ${} references is seen as the build resolves it', (t) => {
   const probe = repo(t, {
     files: {
       // The r38 probe: neither half is a key on its own.
@@ -157,56 +163,95 @@ test('a Test Store key assembled through ${} references is seen as Expo expands 
       // A platform slot that takes its value from a test_ variable.
       'apps/mobile/.env.preview':
         'RC_A=test_AbCd\nEXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_A}\n',
-      // A reference resolved from another file the same build loads.
-      '.env': 'RC_PART=test_AbCdEfGhIjKl\n',
-      '.env.prod': 'SPLIT_KEY=${RC_PART}MnOpQrSt\n',
     },
   })
   const problems = keyHygieneProblems(probe)
   assert.deepEqual(problems, [
-    '.env.prod SPLIT_KEY holds a RevenueCat Test Store key',
-    'apps/mobile/.env.preview EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
-    'apps/mobile/.env.production EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY holds a RevenueCat Test Store key',
+    'the resolved production build env EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY holds a RevenueCat Test Store key',
+    'the resolved preview build env EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
   ])
   assert.ok(
     problems.every((problem) => !problem.includes('test_')),
     'never prints the key'
   )
 
-  // An escaped reference stays literal for Expo too, and an unresolved one expands to nothing.
+  // An escaped reference stays literal for Expo too, an unresolved one expands to nothing, and
+  // app.config.ts never expands a root file, so a root reference stays the literal text.
   const literal = repo(t, {
     files: {
       'apps/mobile/.env.production':
         'RC_A=test_AbCdEfGh\nEXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY=\\${RC_A}IjKlMnOpQrSt\nOTHER=${MISSING}\n',
+      '.env': 'RC_PART=test_AbCdEfGhIjKl\n',
+      '.env.prod': 'SPLIT_KEY=${RC_PART}MnOpQrSt\n',
     },
   })
   assert.deepEqual(keyHygieneProblems(literal), [])
 })
 
-test('readEnvEntries expands within the file and from its context, the file winning', (t) => {
-  const root = repo(t, {
+// r40 P2: the first root file to set a variable wins, and the root environment is set before a
+// mobile file can set it, so a later live value never hides an earlier test_ value.
+test('a test_ part that wins by build precedence is caught (r40 probes 3A and 3D)', (t) => {
+  // 3A: .env.local wins over .env for the reference a mobile release file expands.
+  const probe3A = repo(t, {
     files: {
-      '.env.x': 'R38_A=1\nR38_B=${R38_A}-${R38_C}-${R38_D}\nR38_C=own\n',
+      '.env.local': 'RC_PART=test_12345678\n',
+      '.env': 'RC_PART=live_12345678\n',
+      'apps/mobile/.env.production':
+        'EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_PART}90abcdef\n',
     },
   })
+  assert.deepEqual(keyHygieneProblems(probe3A), [
+    'the resolved production build env EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+  ])
+  // 3D: the root .env.prod value wins over apps/mobile/.env's own RC_PART.
+  const probe3D = repo(t, {
+    files: {
+      '.env.prod': 'RC_PART=test_12345678\n',
+      'apps/mobile/.env':
+        'RC_PART=live_12345678\nEXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_PART}90abcdef\n',
+    },
+  })
+  assert.deepEqual(keyHygieneProblems(probe3D), [
+    'the resolved production build env EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+  ])
+})
+
+test('resolveBuildEnv follows each loader order and never touches the process env', (t) => {
+  const root = repo(t, {
+    files: {
+      '.env.local': 'R40_A=local\n',
+      '.env.prod': 'R40_A=prod\nR40_B=prod\n',
+      '.env': 'R40_B=env\nR40_C=env\n',
+      'apps/mobile/.env': 'R40_C=mobile\nR40_D=${R40_A}-${R40_C}\n',
+    },
+  })
+  const rootFiles = ['.env.local', '.env.prod', '.env']
+  // app.config.ts first: the root values are set when @expo/env expands and are not overwritten.
+  assert.deepEqual(
+    resolveBuildEnv(root, { mode: 'production', order: 'app-config-first', rootFiles }),
+    { R40_A: 'local', R40_B: 'prod', R40_C: 'env', R40_D: 'local-env' }
+  )
+  // Expo CLI first: apps/mobile expands alone, and the root files fill only what is unset.
+  assert.deepEqual(
+    resolveBuildEnv(root, { mode: 'production', order: 'expo-cli-first', rootFiles }),
+    { R40_A: 'local', R40_B: 'prod', R40_C: 'mobile', R40_D: '-mobile' }
+  )
+  assert.equal(process.env.R40_A, undefined)
+  assert.equal(process.env.R40_D, undefined)
+})
+
+test('readEnvEntries expands one file alone and never reads the process env', (t) => {
+  const root = repo(t, {
+    files: { '.env.x': 'R38_A=1\nR38_B=${R38_A}-${R38_C}-${R38_D}\nR38_C=own\n' },
+  })
   const file = path.join(root, '.env.x')
+  t.after(() => delete process.env.R38_D)
+  process.env.R38_D = 'from-process'
   assert.deepEqual(readEnvEntries(file), [
     ['R38_A', '1'],
     ['R38_B', '1-own-'],
     ['R38_C', 'own'],
   ])
-  assert.deepEqual(
-    readEnvEntries(file, { R38_A: 'context', R38_C: 'context', R38_D: 'shared' }),
-    [
-      ['R38_A', '1'],
-      ['R38_B', '1-own-shared'],
-      ['R38_C', 'own'],
-    ]
-  )
-  // Neither reads nor writes the caller's environment.
-  t.after(() => delete process.env.R38_D)
-  process.env.R38_D = 'from-process'
-  assert.deepEqual(readEnvEntries(file)[1], ['R38_B', '1-own-'])
   assert.equal(process.env.R38_A, undefined)
   assert.equal(process.env.R38_B, undefined)
 })

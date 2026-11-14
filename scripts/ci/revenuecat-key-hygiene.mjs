@@ -21,6 +21,7 @@
 // Findings name the file or profile and the variable only; a key is never printed.
 import fs from 'node:fs'
 import path from 'node:path'
+import { getEnvFiles, loadEnvFiles, LOADED_ENV_NAME } from '@expo/env'
 import dotenv from 'dotenv'
 import { expand } from 'dotenv-expand'
 
@@ -58,19 +59,58 @@ function parseEnvFile(file) {
 }
 
 /**
- * Every assignment of a dotenv file as `[name, value]`, read the way Expo's `@expo/env` reads it:
- * dotenv parses the file, so `NAME: value`, `export NAME=value` and quoted or multi-line values
- * count exactly as they would at build time, and dotenv-expand then resolves `${NAME}` and `$NAME`
- * references (story 6.15 r38 P3-2), so a key assembled from shorter variables is seen whole.
- * `context` holds the variables of the other env files a build loads beside this one; Expo
- * expands across its loaded files, so a reference may resolve to one of them. The file's own
- * assignments win over `context`, and the caller's process environment is never read.
+ * Every assignment of one dotenv file as `[name, value]`: dotenv parses it, so `NAME: value`,
+ * `export NAME=value` and quoted or multi-line values count as they would at build time, and
+ * dotenv-expand resolves `${NAME}` references within the file. The caller's process environment
+ * is never read. The hygiene check judges whole builds through {@link resolveBuildEnv}; this
+ * reads one value out of one file.
  */
-export function readEnvEntries(file, context = {}) {
-  const parsed = parseEnvFile(file)
-  const processEnv = { ...context }
-  for (const name of Object.keys(parsed)) delete processEnv[name]
-  return Object.entries(expand({ parsed: { ...parsed }, processEnv }).parsed)
+export function readEnvEntries(file) {
+  return Object.entries(expand({ parsed: parseEnvFile(file), processEnv: {} }).parsed)
+}
+
+/** The release modes a build exports in, with the root env file each loads beside `.env.local`. */
+export const RELEASE_MODES = { production: '.env.prod', preview: '.env.preview' }
+
+/**
+ * The environment a release export resolves from the env files alone, computed by running the
+ * build's own loaders against a clean object (story 6.15 r40 P2), so precedence and expansion
+ * match the build exactly:
+ * - app.config.ts: dotenv loads the root files in its source order with `override: false`, so
+ *   the first file to set a variable wins and nothing is expanded;
+ * - Expo CLI: `@expo/env` loads apps/mobile's files for the mode, expands them against the
+ *   environment already present, and never overwrites a variable that is already set.
+ * Which loader runs first depends on the entry point (Expo CLI loads its env before it reads the
+ * config; a config evaluated first fills the environment before `@expo/env` expands), so
+ * `order` picks one and the check runs both.
+ */
+export function resolveBuildEnv(root, { mode, order, rootFiles }) {
+  const env = {}
+  const mobile = path.join(root, 'apps/mobile')
+  const loadRoot = () => {
+    for (const name of rootFiles)
+      dotenv.config({
+        path: path.join(root, name),
+        override: false,
+        quiet: true,
+        processEnv: env,
+      })
+  }
+  const loadMobile = () => {
+    const files = getEnvFiles({ mode, silent: true }).map((name) =>
+      path.join(mobile, name)
+    )
+    loadEnvFiles(files, { force: true, silent: true, systemEnv: env })
+    delete env[LOADED_ENV_NAME]
+  }
+  if (order === 'app-config-first') {
+    loadRoot()
+    loadMobile()
+  } else {
+    loadMobile()
+    loadRoot()
+  }
+  return env
 }
 
 function mergeProfile(parent, child) {
@@ -153,32 +193,37 @@ export function appConfigEnvFiles(source) {
 }
 
 /**
- * Each assignment is checked as written and as expanded: the written text catches a reference to
- * the Test Store variable itself, the expanded value a key assembled from other variables.
+ * One env file as written: the must-not-name rule for a release-only file, a `test_` key typed
+ * into a variable, and a reference to the Test Store variable itself.
  */
-function envFileProblems(file, label, scope, context) {
+function envFileProblems(file, label, scope) {
   if (!scope || scope === 'debug' || !fs.existsSync(file)) return []
-  const writtenValues = parseEnvFile(file)
-  const written = Object.entries(writtenValues)
-  const expanded = readEnvEntries(file, context).filter(
-    ([name, value]) => value !== writtenValues[name]
-  )
-  return [
-    ...new Set(
-      envProblems(label, [...written, ...expanded], {
-        allowTestStoreVariable: scope === 'shared',
-      })
-    ),
-  ]
+  return envProblems(label, Object.entries(parseEnvFile(file)), {
+    allowTestStoreVariable: scope === 'shared',
+  })
 }
 
-/** The written variables of every env file a release or preview build may load. */
-function buildEnvContext(files) {
-  const context = {}
-  for (const [file, scope] of files)
-    if ((scope === 'shared' || scope === 'release') && fs.existsSync(file))
-      Object.assign(context, parseEnvFile(file))
-  return context
+/**
+ * Every variable a release export resolves to a Test Store key, by mode and loader order. The
+ * Test Store variable itself may resolve from a shared file: revenueCatKeyEnv reads it only under
+ * `__DEV__`, and revenuecat-bundle-scan.mjs proves release exports drop it.
+ */
+function resolvedEnvProblems(root, loaded) {
+  const problems = new Set()
+  for (const [mode, modeFile] of Object.entries(RELEASE_MODES)) {
+    const otherModeFiles = Object.values(RELEASE_MODES).filter(
+      (file) => file !== modeFile
+    )
+    const rootFiles = loaded.filter((name) => !otherModeFiles.includes(name))
+    for (const order of ['app-config-first', 'expo-cli-first'])
+      for (const problem of envProblems(
+        `the resolved ${mode} build env`,
+        Object.entries(resolveBuildEnv(root, { mode, order, rootFiles })),
+        { allowTestStoreVariable: true }
+      ))
+        problems.add(problem)
+  }
+  return [...problems]
 }
 
 /** Every way a release, preview or non-development EAS build would resolve a Test Store key. */
@@ -195,27 +240,20 @@ export function keyHygieneProblems(root) {
   for (const name of loaded)
     if (!ROOT_ENV_FILES[name])
       problems.push(`app.config.ts loads ${name}, which this spec does not scope`)
-  const rootFiles = Object.entries(ROOT_ENV_FILES)
-    .filter(([name]) => loaded.includes(name))
-    .map(([name, scope]) => [path.join(root, name), name, scope])
-  const mobileFiles = fs
-    .readdirSync(mobile)
-    .filter((entry) => entry.startsWith('.env'))
-    .map((name) => [
-      path.join(mobile, name),
-      `apps/mobile/${name}`,
-      mobileEnvFileScope(name),
-    ])
-  const context = buildEnvContext(
-    [...rootFiles, ...mobileFiles].map(([file, , scope]) => [file, scope])
-  )
-
-  for (const [file, label, scope] of rootFiles)
-    problems.push(...envFileProblems(file, label, scope, context))
+  for (const [name, scope] of Object.entries(ROOT_ENV_FILES))
+    if (loaded.includes(name))
+      problems.push(...envFileProblems(path.join(root, name), name, scope))
   problems.push(
-    ...envFileProblems(path.join(root, '.env.example'), '.env.example', 'shared', {})
+    ...envFileProblems(path.join(root, '.env.example'), '.env.example', 'shared')
   )
-  for (const [file, label, scope] of mobileFiles)
-    problems.push(...envFileProblems(file, label, scope, context))
+  for (const name of fs.readdirSync(mobile).filter((entry) => entry.startsWith('.env')))
+    problems.push(
+      ...envFileProblems(
+        path.join(mobile, name),
+        `apps/mobile/${name}`,
+        mobileEnvFileScope(name)
+      )
+    )
+  problems.push(...resolvedEnvProblems(root, loaded))
   return problems
 }

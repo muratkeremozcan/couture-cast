@@ -136,6 +136,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@couture/eslint-config": "workspace:*",
+    "@expo/env": "2.0.12",
     "@faker-js/faker": "10.1.0",
     "@lhci/cli": "0.15.1",
     "@openapitools/openapi-generator-cli": "2.31.0",
