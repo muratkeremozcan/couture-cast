@@ -63,6 +63,8 @@ export const CHECKED_FLOWS = Object.freeze([
   'maestro/test-store/purchase-unsynced.yaml',
   'maestro/test-store/restore-rejected.yaml',
   'maestro/test-store/restore-success.yaml',
+  // Story 6.15 F-00i: the text layout probe fixture (scripts/run-live-font-proof.mjs).
+  'maestro/live-font/text-clip-fixture.yaml',
 ])
 
 // The pinned install on CI, the PATH binary on a developer machine.
