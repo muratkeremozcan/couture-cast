@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 P0-07: the JS half of modules/headless-js-timers.
 import { describe, expect, it, vi } from 'vitest'
 
