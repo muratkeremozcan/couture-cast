@@ -10,6 +10,6 @@ import expo.modules.core.interfaces.ApplicationLifecycleListener
  */
 class TaskManagerMigrationLifecycleListener : ApplicationLifecycleListener {
   override fun onCreate(application: Application) {
-    PersistedTaskConsumers.dropUnloadable(application)
+    Unit // RED PROOF: cleanup disabled
   }
 }
