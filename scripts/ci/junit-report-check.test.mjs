@@ -128,3 +128,33 @@ test('importing the module from stdin does not throw', () => {
   assert.equal(result.status, 0, result.stderr)
   assert.equal(result.stdout.trim(), 'ok')
 })
+
+// The r40 probes.
+test('reads no element out of a comment or CDATA', () => {
+  const output =
+    '<system-out><![CDATA[<testcase name="x"/> </testsuite> <failure/>]]></system-out>'
+  const withOutput = suite(3).replace('</testsuite>', `${output}</testsuite>`)
+  assert.deepEqual(junitReportProblems(report(withOutput), SUITE, 3), [])
+  const commented = suite(3, { cases: 2 }).replace(
+    '</testsuite>',
+    '<!-- <testcase name="padding"/> <testsuite name="x"> --></testsuite>'
+  )
+  assert.deepEqual(junitReportProblems(report(commented), SUITE, 3), [
+    '2 <testcase> elements, but tests says 3',
+  ])
+})
+
+test('fails a case with a failure, error or skipped child whatever the counts say', () => {
+  const xml = report(
+    `<testsuite name="${SUITE}" tests="3" skipped="0" failures="0" errors="0">` +
+      `<testcase name="a" classname="${SUITE}"><failure message="boom"/></testcase>` +
+      `<testcase name="b" classname="${SUITE}"><skipped/></testcase>` +
+      `<testcase name="c" classname="${SUITE}"><error/></testcase>` +
+      '</testsuite>'
+  )
+  assert.deepEqual(junitReportProblems(xml, SUITE, 3), [
+    'case a: failure',
+    'case b: skipped',
+    'case c: error',
+  ])
+})

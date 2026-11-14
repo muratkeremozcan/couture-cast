@@ -13,8 +13,45 @@ import { fileURLToPath } from 'node:url'
 
 const attribute = (tag, name) => new RegExp(`\\s${name}="([^"]*)"`).exec(tag)?.[1]
 
+/** One suite tag's problems and its tests count (null when it has none). */
+function suiteTagProblems(tag, suiteName) {
+  const problems = []
+  const name = attribute(tag, 'name')
+  if (name !== suiteName)
+    problems.push(`suite ${name ?? '(unnamed)'} is not ${suiteName}`)
+  const count = (field) => {
+    const value = attribute(tag, field)
+    return value !== undefined && /^\d+$/.test(value) ? Number(value) : null
+  }
+  const tests = count('tests')
+  if (tests === null) problems.push(`suite ${name}: no tests count`)
+  for (const field of ['skipped', 'failures', 'errors']) {
+    const value = count(field)
+    if (value === null) problems.push(`suite ${name}: no ${field} count`)
+    else if (value > 0) problems.push(`suite ${name}: ${value} ${field}`)
+  }
+  return { problems, tests }
+}
+
+/** A case that failed, errored or was skipped fails the report whatever the counts say. */
+function caseProblems(xml) {
+  const problems = []
+  for (const [, tag, body] of xml.matchAll(
+    /<testcase\b([^>]*?)(?<!\/)>([\s\S]*?)<\/testcase>/g
+  )) {
+    const outcome = /<(failure|error|skipped)\b/.exec(body)?.[1]
+    if (outcome)
+      problems.push(`case ${attribute(tag, 'name') ?? '(unnamed)'}: ${outcome}`)
+  }
+  return problems
+}
+
 /** The problems with a report's text for one suite class and a minimum test count. */
-export function junitReportProblems(xml, suiteName, minimum) {
+export function junitReportProblems(report, suiteName, minimum) {
+  // Comments and CDATA (test output in <system-out>) are text, never elements.
+  const xml = report
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
   const opens = [...xml.matchAll(/<testsuite\b[^>]*>/g)].map((match) => match[0])
   if (opens.length === 0) return ['no <testsuite> element']
   const problems = []
@@ -25,23 +62,12 @@ export function junitReportProblems(xml, suiteName, minimum) {
     problems.push(`${opens.length} <testsuite> opened, ${closes} closed`)
   let tests = 0
   for (const tag of opens) {
-    const name = attribute(tag, 'name')
-    if (name !== suiteName)
-      problems.push(`suite ${name ?? '(unnamed)'} is not ${suiteName}`)
-    const count = (field) => {
-      const value = attribute(tag, field)
-      return value !== undefined && /^\d+$/.test(value) ? Number(value) : null
-    }
-    const ran = count('tests')
-    if (ran === null) problems.push(`suite ${name}: no tests count`)
-    else tests += ran
-    for (const field of ['skipped', 'failures', 'errors']) {
-      const value = count(field)
-      if (value === null) problems.push(`suite ${name}: no ${field} count`)
-      else if (value > 0) problems.push(`suite ${name}: ${value} ${field}`)
-    }
+    const suite = suiteTagProblems(tag, suiteName)
+    problems.push(...suite.problems)
+    tests += suite.tests ?? 0
   }
   if (tests < minimum) problems.push(`ran ${tests} tests, expected at least ${minimum}`)
+  problems.push(...caseProblems(xml))
   const cases = (xml.match(/<testcase\b/g) ?? []).length
   if (cases !== tests)
     problems.push(`${cases} <testcase> elements, but tests says ${tests}`)
