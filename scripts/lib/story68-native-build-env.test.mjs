@@ -16,6 +16,7 @@ import {
   nativeBuildCommand,
   nativeBuildEnv,
   nativeProjectDirectory,
+  MOBILE_DIRECTORY,
 } from './story68-native-build.mjs'
 import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { describe, test } from 'node:test'
@@ -277,6 +278,7 @@ describe('Android build environment', () => {
         fs.mkdirSync(path.join(directory, 'apps/mobile/android'), { recursive: true })
         let observed
         let selected
+        let probeModeCheck
         const events = []
         vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
           ownedEnv: () => undefined,
@@ -290,10 +292,16 @@ describe('Android build environment', () => {
           process: { arch: 'arm64', env: explicit ? { ANDROID_HOME: explicit } : {} },
           read: () => ({ STORY68_NATIVE_TEST_BUILD: '1' }),
           IOS_DERIVED_DATA,
+          MOBILE_DIRECTORY,
           buildSelection,
           nativeBuildCommand,
           nativeBuildEnv,
           nativeProjectDirectory,
+          // Story 6.15 F-00i: the probe mode check runs on the build's own environment.
+          assertNativeProbeMode: (input) => {
+            events.push('probe-mode')
+            probeModeCheck = input
+          },
           prepareWorkletsStaging: (input) => {
             events.push('prepare')
             selected = prepareWorkletsStaging(input)
@@ -346,7 +354,13 @@ describe('Android build environment', () => {
           },
         })
         assert.equal(observed.ANDROID_HOME, explicit ?? '/owned/android-sdk')
-        assert.deepEqual(events, ['prepare', 'build', 'verify'])
+        assert.deepEqual(events, ['prepare', 'probe-mode', 'build', 'verify'])
+        assert.equal(probeModeCheck.platform, 'android')
+        assert.equal(
+          probeModeCheck.mobileDirectory,
+          path.join(directory, MOBILE_DIRECTORY)
+        )
+        assert.equal(probeModeCheck.env, observed)
       } finally {
         fs.rmSync(directory, { recursive: true, force: true })
       }
