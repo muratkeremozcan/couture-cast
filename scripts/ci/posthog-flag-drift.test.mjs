@@ -403,6 +403,24 @@ test('the CLI refuses to run without the definition read key', () => {
   assert.match(run.stderr, /POSTHOG_FLAG_READ_KEY is not set/)
 })
 
+// The CLI reads the declared flags from packages/config/src/flags.ts before it checks the read
+// key. That package has no "type" because its dist is CommonJS while its source is ES module
+// TypeScript, so a plain import of the source logged MODULE_TYPELESS_PACKAGE_JSON in every run.
+test('the CLI loads the declared flags without a module-type warning', () => {
+  const run = spawnSync(process.execPath, ['scripts/ci/posthog-flag-drift.mjs'], {
+    env: { PATH: process.env.PATH, POSTHOG_PROD_PROJECT_TOKEN: 'phc_synthetic' },
+    encoding: 'utf8',
+  })
+  assert.equal(run.status, 2)
+  assert.doesNotMatch(run.stderr, /MODULE_TYPELESS_PACKAGE_JSON|Warning/)
+})
+
+test('the declared flags module imports nothing, so a standalone copy of it loads', () => {
+  const source = readFileSync('packages/config/src/flags.ts', 'utf8')
+  assert.doesNotMatch(source, /^\s*(import|export)\s[^;]*\sfrom\s/m)
+  assert.doesNotMatch(source, /\bimport\s*\(|\brequire\s*\(/)
+})
+
 test('red: early exit is rejected, since the first matching group decides and groups no longer combine', () => {
   const earlyExit = withFilters(released('community_read_enabled', true), {
     early_exit: true,

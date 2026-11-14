@@ -89,6 +89,16 @@ gradle.projectsEvaluated {
 }
 `
 
+// The ABIs each configuration may stage. Debug covers the emulator and device clients. Release
+// (the RelWithDebInfo native tasks) also covers armeabi-v7a and x86, because a release AAB ships
+// every ABI and its Reanimated build reads the same legacy path (Story 6.15 TEA ruling,
+// 2026-11-13). A release-derived build type such as minifiedDebuggable links each library's
+// release variant, so one Release staging covers it in the same Gradle invocation.
+export const STAGED_ABIS = Object.freeze({
+  Debug: Object.freeze(['arm64-v8a', 'x86_64']),
+  Release: Object.freeze(['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64']),
+})
+
 export function prepareWorkletsStaging({
   projectRoot,
   configuration,
@@ -99,7 +109,7 @@ export function prepareWorkletsStaging({
   if (
     !['Debug', 'Release'].includes(configuration) ||
     abis.length === 0 ||
-    abis.some((abi) => !['arm64-v8a', 'x86_64'].includes(abi)) ||
+    abis.some((abi) => !STAGED_ABIS[configuration].includes(abi)) ||
     new Set(abis).size !== abis.length
   )
     throw new Error('worklets_build_selection_required')

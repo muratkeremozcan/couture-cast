@@ -1,4 +1,9 @@
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+// Linux: swift-crypto's Crypto module has the same SHA256 API (Package.swift, story 6.15 D6).
+import Crypto
+#endif
 import Foundation
 
 /// Native gate before any handoff. Accepts only

@@ -4,12 +4,17 @@ import type { PrismaClient } from '@prisma/client'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import {
+  honorsEntitlementStore,
   resolveEntitlementEmission,
   type EntitlementTransition,
   type PremiumEntitlementService,
 } from './premium-entitlement.service.js'
 import type { BillingEventPayloadProjection } from './billing-webhook.service.js'
-import type { RevenueCatClient } from './revenuecat-client.js'
+import {
+  permanentLedgerProjectionFailure,
+  type PermanentLedgerProjectionFailure,
+  type RevenueCatClient,
+} from './revenuecat-client.js'
 
 /**
  * Story 5.2 Decision 4a: the 15-minute billing reconciliation sweep, run as a
@@ -32,7 +37,9 @@ import type { RevenueCatClient } from './revenuecat-client.js'
  *      entitlements whose `synced_at` is older than
  *      {@link DRIFT_STALENESS_HOURS} get a fresh ledger pull applied through
  *      the same snapshot path the refresh endpoint uses. The mirror follows
- *      the ledger; it never argues.
+ *      the ledger; it never argues. A row whose ledger entitlement this API
+ *      cannot represent is settled through `drift_settled_at` and sits out the
+ *      same window; `synced_at` moves only on a confirmed sync.
  *
  * Constructed manually in `workers/bootstrap.ts` (no Nest DI there, like every
  * sibling); integration tests invoke {@link sweep} directly, which is what
@@ -42,6 +49,13 @@ import type { RevenueCatClient } from './revenuecat-client.js'
 export const FORWARD_REDRIVE_BATCH_SIZE = 100
 export const DRIFT_CORRECTION_BATCH_SIZE = 500
 export const DRIFT_STALENESS_HOURS = 24
+
+/** A row the drift sweep has not settled since `staleBefore` (story 6.15 r38). */
+function notSettledSince(staleBefore: Date) {
+  return {
+    OR: [{ drift_settled_at: null }, { drift_settled_at: { lt: staleBefore } }],
+  }
+}
 
 /**
  * A due row younger than this is left to its inline attempt and Stripe's own
@@ -178,8 +192,19 @@ export class BillingReconciliationService {
   private async correctDrift(result: BillingReconciliationSweepResult): Promise<void> {
     const staleBefore = new Date(Date.now() - DRIFT_STALENESS_HOURS * 60 * 60 * 1000)
     const staleRows = await this.prisma.premiumEntitlement.findMany({
-      where: { synced_at: { lt: staleBefore } },
-      orderBy: { synced_at: 'asc' },
+      where: {
+        synced_at: { lt: staleBefore },
+        ...notSettledSince(staleBefore),
+        // Story 6.15 D15 r6: a test_store row this API does not honor reads as absent, and its
+        // pull is refused, so it would warn every sweep and pin the head of the batch.
+        ...(honorsEntitlementStore('test_store') ? {} : { store: { not: 'test_store' } }),
+      },
+      // Never-settled rows first, oldest confirmed sync first; a row settled more than
+      // DRIFT_STALENESS_HOURS ago comes back behind them, oldest settle first.
+      orderBy: [
+        { drift_settled_at: { sort: 'asc', nulls: 'first' } },
+        { synced_at: 'asc' },
+      ],
       take: DRIFT_CORRECTION_BATCH_SIZE,
       select: { user_id: true },
     })
@@ -192,6 +217,11 @@ export class BillingReconciliationService {
           result.entitlementsCorrected += 1
         }
       } catch (error) {
+        const permanent = permanentLedgerProjectionFailure(error)
+        if (permanent !== null) {
+          await this.settleUnrepresentableRow(row.user_id, staleBefore, permanent)
+          continue
+        }
         // One user's ledger failure must not stall the rest of the batch; the
         // row stays stale and the next sweep retries it.
         this.logger.warn(
@@ -200,6 +230,38 @@ export class BillingReconciliationService {
         )
       }
     }
+  }
+
+  /**
+   * The ledger answered with an entitlement our model cannot represent, and every retry would
+   * answer the same. The row's state and `synced_at` stay exactly as they are, so the status and
+   * refresh responses never report it as freshly synced; only `drift_settled_at` moves, which
+   * keeps the row out of the drift batch for {@link DRIFT_STALENESS_HOURS} instead of leading
+   * every sweep and starving drift correction for everyone behind it. Logged only when the stamp
+   * landed, so once per settle.
+   */
+  private async settleUnrepresentableRow(
+    userId: string,
+    staleBefore: Date,
+    failure: PermanentLedgerProjectionFailure
+  ): Promise<void> {
+    // Guarded on the scan's own filter: a webhook or refresh that wrote the row since the scan
+    // moved `synced_at`, a concurrent sweep may have settled it, and the stamp must touch neither.
+    const settled = await this.prisma.premiumEntitlement.updateMany({
+      where: {
+        user_id: userId,
+        synced_at: { lt: staleBefore },
+        ...notSettledSince(staleBefore),
+      },
+      data: { drift_settled_at: new Date() },
+    })
+    if (settled.count === 0) {
+      return
+    }
+    this.logger.warn(
+      { userId, ...failure },
+      'billing_reconciliation_drift_entitlement_unrepresentable'
+    )
   }
 
   /**

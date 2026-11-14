@@ -1,0 +1,18 @@
+# Story 6.15 D15 (TD-04): restore from the paywall in the lost-mirror state. The member is not
+# entitled before the tap and entitled after it. Every refresh before the tap was refused at the
+# journey proxy, so the restore's own refresh is the one that pulled the ledger.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- tapOn:
+    id: premium-restore
+    label: 'Restore purchases'
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+      text: ${PREMIUM_STATUS_ACTIVE}
+    direction: UP
+    centerElement: true
+    timeout: 60000
+    label: 'The restored entitlement is shown'
+- runFlow: assert-entitled.yaml

@@ -10,6 +10,7 @@ Updated: 2026-11-12: CI creates previews and Vercel's git integration deploys pr
 Updated: 2026-11-10 (database egress): the community worker's idle backoff, parked analytics delivery and session pooler.
 Updated: 2026-11-11 (X-DISPATCH): PostHog production project split, flag drift guard, third dispatch attempt and record.
 Updated: 2026-11-11 (append): community append runs in one database statement; the stalled-append alert.
+Updated: 2026-11-13 (Story 6.15 Step 0): release hold, Test Store isolation, debug signing and the macOS nightly shape.
 Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
@@ -249,7 +250,11 @@ The mobile app is configured under [apps/mobile](../../apps/mobile/). Its
 - an empty production submit profile exists.
 
 [Deploy mobile](../../.github/workflows/deploy-mobile.yml) is manual only. It verifies `EXPO_TOKEN`,
-checks EAS identity, and starts an Android production build with `--no-wait`. It does not:
+runs the Story 6.15 release hold
+([mobile-release-hold.mjs](../../scripts/ci/mobile-release-hold.mjs)), checks EAS identity, and
+starts an Android production build with `--no-wait`. The hold refuses the build while
+`apps/mobile/release-hold.json` holds the app's SDK (SDK 56's Hermes memory regression) and no
+committed measurement lifts it; the file is required from SDK 56 on. It does not:
 
 - build iOS;
 - wait for the Android build result;
@@ -272,6 +277,97 @@ The native identity and active EAS project are recorded in
 PostHog settings. API calls require `EXPO_PUBLIC_API_BASE_URL` or `API_BASE_URL`, as enforced by the
 [mobile API client](../../apps/mobile/src/lib/api-client.ts); the EAS profile does not define that
 value in the repository, so it must come from the build environment.
+
+### Story 6.15 upgrade path (Expo SDK 54 to 58)
+
+Story 6.15 moves the app one Expo SDK per pull request, each merged green before the next opens.
+Step 0 (PR #226) stays on SDK 54 and readies the app and CI:
+
+- **Background refresh.** The ritual refresh runs on `expo-background-task` under a new task name;
+  the old `expo-background-fetch` task is unregistered tolerantly on first launch after the update.
+- **RevenueCat Test Store.** The Test Store lives in its own RevenueCat project. Its public key is
+  in `.env.local` and `.env.preview` only. Its secret key and webhook auth are Vercel preview
+  variables on the API, with `TEST_ENV=preview`, and are absent from production. The API applies a
+  `test_store` entitlement only when `TEST_ENV` is `local` or `preview`; elsewhere such a row is
+  no paid access. Preview uses its own Supabase database. A release export is scanned on every
+  mobile pull request for any Test Store key, in production and preview modes.
+- **Debug signing.** A committed test-only keystore
+  (`apps/mobile/plugins/test-signing/couturecast-test-only.keystore`) signs the Android `debug` and
+  `minifiedDebuggable` builds so paid over-installs keep their certificate. A development client
+  installed before this change needs one uninstall. The Release signing key is unchanged.
+- **`minifiedDebuggable`.** An Android build type derived from `release`, minified by R8 and
+  debuggable, runs the Test Store journey under R8. Release itself runs no R8 on SDK 54; Step 4
+  turns on `android.enableMinifyInReleaseBuilds`.
+- **macOS CI shape.** No macOS job runs on a pull request or a merge. iOS and watchOS native run
+  nightly (`ios-native.yml` at 03:23 UTC, with the `ios-live-font` live font-scale proof on the
+  Release test build) and on manual dispatch; the iOS 26.5 canary runs at 06:37 UTC. Pre-merge iOS
+  evidence is a recorded local run on the pull request's exact head SHA.
+
+### Story 6.15 Test Store journey and preview webhook (D15)
+
+`scripts/run-test-store-journey.mjs` runs the RevenueCat Test Store journey on an emulator or
+simulator in a debuggable build (Android `debug` and `minifiedDebuggable`, iOS Debug). It signs up a
+fresh plain member, puts a loopback proxy in front of the API, starts Metro with that member's
+mobile E2E bearer, the proxy origin and the Test Store public key, and drives
+`maestro/test-store/`. Every evidence record names its server leg and the delivery path it proves
+(TEA-18): `local-reconciliation` or `preview-webhook`. Each installed artifact gets a `test-store`
+evidence manifest.
+
+```bash
+# Local leg: API on 127.0.0.1:4000 with TEST_ENV=local and the Test Store project's
+# REVENUECAT_SECRET_API_KEY (both from .env.local). Purchase, then the lost-mirror restore.
+node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
+  --build debug --server local --artifact apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
+  --over-install apps/mobile/android/app/build/outputs/apk/minifiedDebuggable/app-minifiedDebuggable.apk \
+  --over-install-build minifiedDebuggable --out /tmp/test-store-android-debug
+node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
+  --build debug --server local --scenario restore --artifact <same apk> --out /tmp/test-store-restore
+# minifiedDebuggable adds the native debuggable and R8 record (minified-debuggable-evidence.mjs).
+node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
+  --build minifiedDebuggable --server local --artifact <app-minifiedDebuggable.apk> --out <dir>
+node scripts/run-test-store-journey.mjs --platform ios --device <udid> --build debug \
+  --server local --artifact <CoutureCast.app> --out <dir>
+```
+
+The proxy logs each request's method, path and status. It drops headers, query strings and
+bodies, and writes id-shaped path segments as `:id` (`:subscriber` after `subscribers`). The
+report names the member only by a hash. The `--out` dir holds redacted records only (the report
+and the manifests); the member side file `<label>.member.json`, Metro's log, the device log
+(logcat or the simulator's log stream, which can carry the RevenueCat app user id), Maestro's
+debug output and any pulled APK go to the sibling `<out>.private/` (mode 700, files 600). The run
+fails with `test_store_evidence_leak` if the member id appears anywhere under `--out`. On the
+local leg the entitlement must come from the app's refresh (the API's ledger
+pull), since no RevenueCat webhook reaches a loopback API. On the preview leg the proxy refuses
+every refresh, so an entitlement that still arrives came by webhook.
+
+The purchase scenario runs cancel, then failure, then success, and ends with TD-04's sign-in
+recovery: after a reinstall the app shows the server's entitlement on sign-in, and the paywall
+offers no restore while entitled. The restore scenario is TD-04's restore assertion: a purchase
+the server never hears of (every refresh refused), a reinstall, and a restore from the paywall.
+The restore's own refresh is the only one that reaches the API, so the entitlement it brings
+back is the restore's result.
+
+Preview webhook setup, done once by an operator (the scripts change nothing on Vercel or
+RevenueCat):
+
+1. Vercel, API project, Settings, Deployment Protection, Protection Bypass for Automation: add a
+   secret noted `revenuecat-test-store-webhook`. Store it as
+   `REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET` in `.env.preview`. It is separate from
+   `VERCEL_AUTOMATION_BYPASS_SECRET`, so it can be revoked without touching CI.
+2. Confirm the API preview environment names `TEST_ENV=preview`, `REVENUECAT_WEBHOOK_AUTH` and
+   `REVENUECAT_SECRET_API_KEY`.
+3. RevenueCat, the Test Store project only, Integrations, Webhooks: URL
+   `https://<api-project>-git-<branch-slug>-<team>.vercel.app/api/v1/commerce/subscription/webhooks/revenuecat?x-vercel-protection-bypass=<REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET>`;
+   Authorization header value: the preview `REVENUECAT_WEBHOOK_AUTH`. RevenueCat sends one
+   Authorization value, which the handler still checks, so the Vercel bypass rides in the query.
+4. `node scripts/test-store-preview-webhook.mjs probe --api-url <preview API origin>`: two
+   unauthenticated POSTs through the bypass must get the handler's own JSON 401.
+5. `node scripts/run-test-store-journey.mjs --server preview --api-url <origin> ...`, then
+   `node scripts/test-store-preview-webhook.mjs verify --report <run report> --member-file
+<out>.private/<label>.member.json --api-url <origin>` re-reads the member on the preview
+   API's read endpoints and checks the run's proxy log.
+
+`scripts/test-store-preview-webhook.mjs steps --api-url <origin>` prints these steps for an origin.
 
 ### Root Expo configuration conflict
 
@@ -372,14 +468,28 @@ adds it merges, add the key for project 329012 (the `POSTHOG_API_KEY` value in `
 # Vercel couture-cast-web, Production only; preview and development stay without a key.
 vercel env add POSTHOG_API_KEY -e production --no-sensitive \
   --project couture-cast-web --scope muratkeremozcans-projects < key-file
-# EAS production environment, from apps/mobile.
-eas env:create --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
+# EAS production environment, from apps/mobile. env:set creates or updates; env:create is
+# deprecated.
+eas env:set --environment production --name POSTHOG_API_KEY --value <phc key for 329012> \
   --visibility plaintext --scope project --type string --non-interactive
 ```
 
-Web picks up the key on its next production deployment, so redeploy production web after adding
-it. Mobile binaries read the key at build time, so a shipped binary starts sending analytics only
-from its next production EAS build.
+Then redeploy production web. Vercel fixes a deployment's environment variables when the
+deployment is created, so adding a key changes nothing the current production deployment serves.
+After #207, production web shipped an empty PostHog token until a redeploy. The same holds for
+every Vercel environment key added or changed:
+
+```bash
+# The newest Ready production deployment of couture-cast-web.
+vercel ls couture-cast-web --environment production --status READY \
+  --scope muratkeremozcans-projects
+vercel redeploy <that deployment's URL> --environment production \
+  --scope muratkeremozcans-projects
+```
+
+Then confirm the deployed client carries the key, for example by loading the production site and
+checking that PostHog requests leave the browser. Mobile binaries read the key at build time, so a
+shipped binary starts sending analytics only from its next production EAS build.
 
 ## Environment separation
 

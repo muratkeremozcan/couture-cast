@@ -15,6 +15,7 @@ import {
   type EntitlementView,
 } from './premium-entitlement.service.js'
 import {
+  permanentLedgerProjectionFailure,
   RevenueCatClient,
   type RevenueCatSubscriberEntitlement,
 } from './revenuecat-client.js'
@@ -78,7 +79,9 @@ export class SubscriptionService {
    * Pull the ledger, apply the snapshot, and return the resulting state.
    * Inside the rate-limit window the LOCAL state is served instead — the
    * response carries `syncedAt`, so a caller can tell which happened. A ledger
-   * failure is an honest 503, never stale-state-as-fresh.
+   * failure is an honest 503, never stale-state-as-fresh. A ledger entitlement
+   * this API cannot represent is not a failure: the local state is served with
+   * its old `syncedAt`.
    */
   async refreshSubscription(userId: string): Promise<Subscription> {
     const last = this.lastPulledAt.get(userId)
@@ -107,6 +110,19 @@ export class SubscriptionService {
         LEDGER_TIMEOUT_MS
       )
     } catch (error) {
+      const permanent = permanentLedgerProjectionFailure(error)
+      if (permanent !== null) {
+        // The ledger answered, with an entitlement our model cannot represent (a lifetime grant,
+        // a store we do not sell). Retrying cannot change that, so a 503 would fail every refresh
+        // forever: the member's local state is served instead, unchanged, and syncedAt does not
+        // advance. The window starts as after any answered pull.
+        this.lastPulledAt.set(userId, Date.now())
+        this.logger.warn(
+          { userId, ...permanent },
+          'RevenueCat ledger entitlement is not representable; serving local state'
+        )
+        return
+      }
       this.logger.warn({ error, userId }, 'RevenueCat ledger pull failed')
       throw new ServiceUnavailableException(SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE)
     }

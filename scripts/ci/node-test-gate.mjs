@@ -93,6 +93,10 @@ export const LOCAL_NEEDS = {
     probe: 'apps/mobile/android/gradlew',
     how: 'node scripts/run-story68-native.mjs prebuild --platform android (needs Temurin 21)',
   },
+  packages: {
+    probe: 'packages/testing/dist/index.js',
+    how: 'npm run db:generate && npm run build:packages',
+  },
   runtime: {
     probe: 'apps/api/dist/src/load-env.js',
     how: 'npm run db:generate && npm run build:packages && npm run build --workspace api',
@@ -575,9 +579,10 @@ export function summarizeNodeTestEvents(events, files, cwd = process.cwd()) {
   return summary
 }
 
-export function assertNodeTestGate(summary, { status }) {
+export function assertNodeTestGate(summary, { status, signal }) {
   const problems = []
-  if (status !== 0) problems.push(`node --test exited ${status}`)
+  // A runner killed by a signal has no status; name the signal so the cause is on record.
+  if (status !== 0) problems.push(`node --test exited ${status ?? `by ${signal}`}`)
   if (summary.failed) problems.push(`${summary.failed} failed`)
   if (summary.skipped) problems.push(`${summary.skipped} skipped`)
   if (summary.todo) problems.push(`${summary.todo} todo`)
@@ -599,7 +604,7 @@ const nodeTestArguments = (files, events) => [
 const childEnv = (env) => ({ ...env, NODE_TEST_CONTEXT: undefined })
 
 /** The foreground and background runs share these pass rules. */
-function gateEvents(events, files, cwd, status) {
+function gateEvents(events, files, cwd, status, signal) {
   const lines = fs.existsSync(events)
     ? fs.readFileSync(events, 'utf8').split('\n').filter(Boolean)
     : []
@@ -608,7 +613,7 @@ function gateEvents(events, files, cwd, status) {
     files,
     cwd
   )
-  return assertNodeTestGate(summary, { status })
+  return assertNodeTestGate(summary, { status, signal })
 }
 
 export function runNodeTestGate({
@@ -628,7 +633,7 @@ export function runNodeTestGate({
       stdio,
     })
     if (result.error) throw result.error
-    return gateEvents(events, files, cwd, result.status)
+    return gateEvents(events, files, cwd, result.status, result.signal)
   } finally {
     fs.rmSync(directory, { recursive: true, force: true })
   }
@@ -802,7 +807,8 @@ export async function collectBackgroundSuites(
         backgroundFile(suite, env, 'events.jsonl'),
         files,
         cwd,
-        result.status
+        result.status,
+        result.signal
       )
       reportSummary(suite, summary, log)
       summaries[suite] = summary

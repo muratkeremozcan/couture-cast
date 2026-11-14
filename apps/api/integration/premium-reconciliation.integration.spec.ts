@@ -9,11 +9,22 @@ import {
   createBillingEvent,
   createPremiumEntitlement,
 } from '@couture/testing'
-import { BillingReconciliationService } from '../src/modules/commerce/billing-reconciliation.service.js'
+import {
+  BillingReconciliationService,
+  DRIFT_STALENESS_HOURS,
+} from '../src/modules/commerce/billing-reconciliation.service.js'
 import { PremiumEntitlementService } from '../src/modules/commerce/premium-entitlement.service.js'
-import { FakeRevenueCatClient } from '../src/modules/commerce/revenuecat-client.js'
+import {
+  FakeRevenueCatClient,
+  RealRevenueCatClient,
+  RevenueCatRequestError,
+  RevenueCatResponseShapeError,
+  RevenueCatUnrepresentableEntitlementError,
+  RevenueCatUnsupportedStoreError,
+} from '../src/modules/commerce/revenuecat-client.js'
 import { FakeStripeBillingClient } from '../src/modules/commerce/stripe-client.js'
 import type { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
+import { interactiveTransaction } from '../src/prisma/prisma-client.js'
 
 /**
  * Story 5.2 Decision 4a: the reconciliation sweep against real PostgreSQL —
@@ -262,6 +273,587 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
       expect.objectContaining({ reason: 'expired' })
     )
   })
+
+  // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  // Story 6.15 R3-01: the REST projection of a RevenueCat Test Store entitlement used to become an
+  // active Stripe snapshot. Through the real client, the paid row now stays exactly as it was.
+  // R4-01 adds the shapes that used to read as "no entitlement": a lifetime or malformed
+  // entitlement, from a store we do not sell or one we do, and a missing product.
+  const ledgerShapes = [
+    [
+      'Test Store monthly',
+      { expires_date: 'FUTURE', product_identifier: 'premium_monthly' },
+      { premium_monthly: { store: 'test_store' } },
+    ],
+    [
+      'Test Store lifetime',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'test_store' } },
+    ],
+    [
+      'Amazon lifetime',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'amazon' } },
+    ],
+    [
+      'supported lifetime',
+      { expires_date: null, product_identifier: 'premium_life' },
+      { premium_life: { store: 'play_store' } },
+    ],
+    [
+      'malformed expiry',
+      { expires_date: 'soon', product_identifier: 'premium_monthly' },
+      { premium_monthly: { store: 'stripe' } },
+    ],
+    ['missing product', { expires_date: 'FUTURE', product_identifier: null }, {}],
+  ] as const
+  // `qa` stands for any TEST_ENV other than local and preview. Under the D15 local and preview
+  // values every shape but the Test Store monthly one must still leave the paid row as it was.
+  for (const testEnv of [
+    undefined,
+    'staging',
+    'production',
+    'qa',
+    'local',
+    'preview',
+  ] as const)
+    for (const [shape, premium, subscriptions] of ledgerShapes) {
+      if (
+        (testEnv === 'local' || testEnv === 'preview') &&
+        shape === 'Test Store monthly'
+      ) {
+        continue
+      }
+      it(`a ${shape} ledger entitlement leaves a paid row unchanged (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        const fetchMock = vi.fn((url: string) =>
+          Promise.resolve(
+            url.endsWith(`/subscribers/${encodeURIComponent(userId)}`)
+              ? new Response(
+                  JSON.stringify({
+                    subscriber: {
+                      entitlements: {
+                        premium: {
+                          ...premium,
+                          expires_date:
+                            premium.expires_date === 'FUTURE'
+                              ? new Date(Date.now() + 30 * 86_400_000).toISOString()
+                              : premium.expires_date,
+                        },
+                      },
+                      subscriptions,
+                    },
+                  }),
+                  { status: 200 }
+                )
+              : new Response('out of scope', { status: 503 })
+          )
+        )
+        vi.stubGlobal('fetch', fetchMock)
+        try {
+          const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+          const sweeper = new BillingReconciliationService(
+            prisma,
+            realLedger,
+            new PremiumEntitlementService(
+              prisma,
+              realLedger,
+              new FakeStripeBillingClient(),
+              noComplimentaryGrants
+            ),
+            telemetry as unknown as TelemetryService
+          )
+          const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId,
+                status: 'active',
+                store: 'play_store',
+                syncedAt: staleSyncedAt,
+                lastEventOccurredAt: staleSyncedAt,
+                lastEventId: `${namespace}-paid-seed`,
+              })
+            ),
+          })
+          const before = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: userId },
+          })
+
+          await sweeper.sweep()
+
+          expect(fetchMock).toHaveBeenCalledWith(
+            expect.stringContaining(encodeURIComponent(userId)),
+            expect.anything()
+          )
+          // The ledger answer is permanent, so only drift_settled_at moves (story 6.15 r38): the
+          // row leaves the head of the drift batch, its state stays exactly as it was, and
+          // synced_at still names the last confirmed sync.
+          const after = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: userId },
+          })
+          expect(before?.drift_settled_at).toBeNull()
+          expect(after).toEqual({
+            ...before,
+            drift_settled_at: expect.any(Date) as Date,
+            updated_at: expect.any(Date) as Date,
+          })
+          expect(after!.synced_at).toEqual(before!.synced_at)
+          expect(after!.drift_settled_at!.getTime()).toBeGreaterThan(
+            Date.now() - DRIFT_STALENESS_HOURS * 60 * 60 * 1000
+          )
+        } finally {
+          vi.unstubAllGlobals()
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+
+  // Learning path Step 55: story 6.15 D15. Under an explicit local or preview TEST_ENV the sweep
+  // converges a stale Test Store row to the ledger through the real REST projection.
+  for (const testEnv of ['local', 'preview'] as const) {
+    it(`converges a stale test_store row to the Test Store ledger (TEST_ENV ${testEnv})`, async (context) => {
+      if (!requireSchema(context)) return
+      const savedEnv = process.env.TEST_ENV
+      process.env.TEST_ENV = testEnv
+      const renewedEnd = new Date(Date.now() + 30 * 86_400_000)
+      renewedEnd.setUTCMilliseconds(0)
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith(`/subscribers/${encodeURIComponent(userId)}`)
+            ? new Response(
+                JSON.stringify({
+                  subscriber: {
+                    entitlements: {
+                      premium: {
+                        expires_date: renewedEnd.toISOString(),
+                        product_identifier: 'premium_monthly',
+                      },
+                    },
+                    subscriptions: {
+                      premium_monthly: {
+                        store: 'test_store',
+                        unsubscribe_detected_at: null,
+                      },
+                    },
+                  },
+                }),
+                { status: 200 }
+              )
+            : new Response('out of scope', { status: 503 })
+        )
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      try {
+        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+        const sweeper = new BillingReconciliationService(
+          prisma,
+          realLedger,
+          new PremiumEntitlementService(
+            prisma,
+            realLedger,
+            new FakeStripeBillingClient(),
+            noComplimentaryGrants
+          ),
+          telemetry as unknown as TelemetryService
+        )
+        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+        await prisma.premiumEntitlement.create({
+          data: buildPremiumEntitlementCreateInput(
+            createPremiumEntitlement({
+              userId,
+              status: 'active',
+              store: 'test_store',
+              productId: 'premium_monthly',
+              willRenew: false,
+              currentPeriodEnd: new Date(Date.now() + 86_400_000),
+              syncedAt: staleSyncedAt,
+              lastEventOccurredAt: staleSyncedAt,
+              lastEventId: `${namespace}-test-store-seed`,
+            })
+          ),
+        })
+
+        await sweeper.sweep()
+
+        const after = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: userId },
+        })
+        expect(after).toMatchObject({
+          status: 'active',
+          store: 'test_store',
+          product_id: 'premium_monthly',
+          will_renew: true,
+          current_period_end: renewedEnd,
+        })
+        expect(after?.synced_at.getTime()).toBeGreaterThan(staleSyncedAt.getTime())
+      } finally {
+        vi.unstubAllGlobals()
+        if (savedEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = savedEnv
+      }
+    })
+  }
+
+  // Learning path Step 55: story 6.15 D15 r6. Against real Postgres, the drift query skips a stale
+  // test_store row outside local and preview, so it is never pulled; under local and preview it is.
+  for (const testEnv of [
+    undefined,
+    'staging',
+    'production',
+    'local',
+    'preview',
+  ] as const) {
+    const open = testEnv === 'local' || testEnv === 'preview'
+    it(`${open ? 'pulls' : 'never pulls'} a stale test_store row (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+      if (!requireSchema(context)) return
+      const savedEnv = process.env.TEST_ENV
+      if (testEnv === undefined) delete process.env.TEST_ENV
+      else process.env.TEST_ENV = testEnv
+      const subscriberUrl = `/subscribers/${encodeURIComponent(userId)}`
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith(subscriberUrl)
+            ? new Response(JSON.stringify({ subscriber: {} }), { status: 200 })
+            : new Response('out of scope', { status: 503 })
+        )
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      try {
+        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+        const sweeper = new BillingReconciliationService(
+          prisma,
+          realLedger,
+          new PremiumEntitlementService(
+            prisma,
+            realLedger,
+            new FakeStripeBillingClient(),
+            noComplimentaryGrants
+          ),
+          telemetry as unknown as TelemetryService
+        )
+        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+        await prisma.premiumEntitlement.create({
+          data: buildPremiumEntitlementCreateInput(
+            createPremiumEntitlement({
+              userId,
+              status: 'active',
+              store: 'test_store',
+              syncedAt: staleSyncedAt,
+              lastEventOccurredAt: staleSyncedAt,
+              lastEventId: `${namespace}-test-store-drift-seed`,
+            })
+          ),
+        })
+
+        await sweeper.sweep()
+
+        const pulled = fetchMock.mock.calls.some(([url]) => url.endsWith(subscriberUrl))
+        expect(pulled).toBe(open)
+      } finally {
+        vi.unstubAllGlobals()
+        if (savedEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = savedEnv
+      }
+    })
+  }
+
+  // Story 6.15: the drift batch takes the oldest synced_at first. A row whose ledger entitlement
+  // our model cannot represent fails its pull the same way on every retry, so left stale it would
+  // lead every batch and starve drift correction. A transient failure must still be retried.
+  for (const [label, failure, pullsAcrossTwoSweeps] of [
+    [
+      'a permanently unrepresentable member does not lead the next sweep',
+      () => new RevenueCatUnrepresentableEntitlementError('no_expiry'),
+      1,
+    ],
+    [
+      'an unsupported-store member does not lead the next sweep',
+      () => new RevenueCatUnsupportedStoreError('amazon'),
+      1,
+    ],
+    [
+      'a transiently failing member still leads the next sweep',
+      () => new RevenueCatRequestError(503, 'subscriber GET'),
+      2,
+    ],
+    [
+      'a member behind a RevenueCat response-shape change still leads the next sweep',
+      () =>
+        new RevenueCatResponseShapeError([
+          'subscriber.entitlements.premium.product_identifier: invalid_type',
+        ]),
+      2,
+    ],
+  ] as const) {
+    it(label, async (context) => {
+      if (!requireSchema(context)) return
+
+      const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+      await prisma.premiumEntitlement.create({
+        data: buildPremiumEntitlementCreateInput(
+          createPremiumEntitlement({
+            userId,
+            status: 'active',
+            store: 'play_store',
+            syncedAt: staleSyncedAt,
+            lastEventOccurredAt: staleSyncedAt,
+            lastEventId: `${namespace}-unrepresentable-seed`,
+          })
+        ),
+      })
+      const before = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      const pull = vi
+        .spyOn(ledger, 'getSubscriberEntitlement')
+        .mockImplementation((appUserId) =>
+          Promise.reject(
+            appUserId === userId
+              ? failure()
+              : new Error('out-of-scope subscriber pull; row belongs to another suite')
+          )
+        )
+      const ownPulls = () =>
+        pull.mock.calls.filter(([appUserId]) => appUserId === userId).length
+
+      try {
+        await service.sweep()
+        expect(ownPulls()).toBe(1)
+        await service.sweep()
+        expect(ownPulls()).toBe(pullsAcrossTwoSweeps)
+      } finally {
+        pull.mockRestore()
+      }
+
+      const after = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      // Either way the ledger state and synced_at are untouched (r38 P3-1); only a permanent
+      // answer records a settle.
+      expect({ ...after, drift_settled_at: null, updated_at: null }).toEqual({
+        ...before,
+        drift_settled_at: null,
+        updated_at: null,
+      })
+      expect(after!.synced_at).toEqual(staleSyncedAt)
+      if (pullsAcrossTwoSweeps === 1) {
+        expect(after!.drift_settled_at!.getTime()).toBeGreaterThan(
+          staleSyncedAt.getTime()
+        )
+      } else {
+        expect(after!.drift_settled_at).toBeNull()
+      }
+      // What the status and refresh responses serialize: the last confirmed sync, never the
+      // settle, so a settled row is never shown as freshly synced.
+      const view = await new PremiumEntitlementService(
+        prisma,
+        ledger,
+        new FakeStripeBillingClient(),
+        noComplimentaryGrants
+      ).getEntitlement(userId)
+      expect(view?.syncedAt).toEqual(staleSyncedAt)
+    })
+  }
+
+  // Story 6.15 r38 P3-1: a 200 whose shape changed (a key the projection reads renamed or gone)
+  // used to raise the permanent projection errors and settle the row for a day. Through the real
+  // client it now fails the shape check: transient, no settle, and the next sweep pulls again.
+  for (const [shape, subscriber] of [
+    [
+      'a renamed product_identifier',
+      {
+        entitlements: { premium: { expires_date: null, product_id: 'premium_life' } },
+        subscriptions: {},
+      },
+    ],
+    [
+      'a renamed expires_date',
+      {
+        entitlements: {
+          premium: { expiry: null, product_identifier: 'premium_monthly' },
+        },
+        subscriptions: { premium_monthly: { store: 'play_store' } },
+      },
+    ],
+    [
+      'a renamed subscriptions',
+      {
+        entitlements: {
+          premium: { expires_date: null, product_identifier: 'premium_life' },
+        },
+        subscription_records: { premium_life: { store: 'play_store' } },
+      },
+    ],
+    [
+      'a renamed store',
+      {
+        entitlements: {
+          premium: { expires_date: null, product_identifier: 'premium_life' },
+        },
+        subscriptions: { premium_life: { store_name: 'play_store' } },
+      },
+    ],
+  ] as const) {
+    it(`a ledger response with ${shape} settles nothing and is pulled again next sweep`, async (context) => {
+      if (!requireSchema(context)) return
+      const subscriberUrl = `/subscribers/${encodeURIComponent(userId)}`
+      const fetchMock = vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith(subscriberUrl)
+            ? new Response(JSON.stringify({ subscriber }), { status: 200 })
+            : new Response('out of scope', { status: 503 })
+        )
+      )
+      vi.stubGlobal('fetch', fetchMock)
+      try {
+        const realLedger = new RealRevenueCatClient('sk_test_rc_key')
+        const sweeper = new BillingReconciliationService(
+          prisma,
+          realLedger,
+          new PremiumEntitlementService(
+            prisma,
+            realLedger,
+            new FakeStripeBillingClient(),
+            noComplimentaryGrants
+          ),
+          telemetry as unknown as TelemetryService
+        )
+        const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+        await prisma.premiumEntitlement.create({
+          data: buildPremiumEntitlementCreateInput(
+            createPremiumEntitlement({
+              userId,
+              status: 'active',
+              store: 'play_store',
+              syncedAt: staleSyncedAt,
+              lastEventOccurredAt: staleSyncedAt,
+              lastEventId: `${namespace}-shape-seed`,
+            })
+          ),
+        })
+        const before = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: userId },
+        })
+        const ownPulls = () =>
+          fetchMock.mock.calls.filter(([url]) => url.endsWith(subscriberUrl)).length
+
+        await sweeper.sweep()
+        expect(ownPulls()).toBe(1)
+        await sweeper.sweep()
+        expect(ownPulls()).toBe(2)
+
+        expect(
+          await prisma.premiumEntitlement.findUnique({ where: { user_id: userId } })
+        ).toEqual(before)
+      } finally {
+        vi.unstubAllGlobals()
+      }
+    })
+  }
+
+  // Story 6.15 r38: a non-null drift_settled_at must always mean "currently unrepresentable".
+  // Each confirmed sync clears it in the same write; left set, a settled row that became
+  // representable would sit behind every never-settled stale row, or out of the batch entirely.
+  for (const path of ['webhook apply', 'refresh snapshot', 'drift pull'] as const) {
+    it(`a ${path} after a settle clears drift_settled_at and the row is drift-checked by synced_at`, async (context) => {
+      if (!requireSchema(context)) return
+
+      const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+      await prisma.premiumEntitlement.create({
+        data: buildPremiumEntitlementCreateInput(
+          createPremiumEntitlement({
+            userId,
+            status: 'active',
+            store: 'play_store',
+            syncedAt: staleSyncedAt,
+            lastEventOccurredAt: staleSyncedAt,
+            lastEventId: `${namespace}-settle-seed`,
+          })
+        ),
+      })
+      const renewed = {
+        status: 'active' as const,
+        store: 'play_store' as const,
+        productId: 'premium_annual',
+        willRenew: true,
+        currentPeriodEnd: new Date(Date.now() + 300 * 86_400_000),
+      }
+      // 1. The sweep settles the row: the ledger holds a lifetime grant. Later it holds `renewed`.
+      let unrepresentable = true
+      const ownPull = vi
+        .spyOn(ledger, 'getSubscriberEntitlement')
+        .mockImplementation((appUserId) =>
+          appUserId !== userId
+            ? Promise.reject(
+                new Error('out-of-scope subscriber pull; row belongs to another suite')
+              )
+            : unrepresentable
+              ? Promise.reject(new RevenueCatUnrepresentableEntitlementError('no_expiry'))
+              : Promise.resolve(renewed)
+        )
+      const ownPulls = () =>
+        ownPull.mock.calls.filter(([appUserId]) => appUserId === userId).length
+      await service.sweep()
+      unrepresentable = false
+      const settled = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      expect(settled?.drift_settled_at).toBeInstanceOf(Date)
+
+      // 2. The member becomes representable and a confirmed sync lands.
+      const entitlements = new PremiumEntitlementService(
+        prisma,
+        ledger,
+        new FakeStripeBillingClient(),
+        noComplimentaryGrants
+      )
+      if (path === 'webhook apply') {
+        await interactiveTransaction(prisma, (tx) =>
+          entitlements.applyLedgerEvent(tx, {
+            userId,
+            state: renewed,
+            occurredAt: new Date(),
+            eventId: `${namespace}-renewal`,
+            provider: 'revenuecat',
+          })
+        )
+      } else if (path === 'refresh snapshot') {
+        await entitlements.applyLedgerSnapshot(userId, renewed, randomUUID())
+      } else {
+        // The settle has aged out of the window, so the next sweep pulls the row again.
+        await prisma.premiumEntitlement.update({
+          where: { user_id: userId },
+          data: { drift_settled_at: staleSyncedAt },
+        })
+        await service.sweep()
+      }
+
+      const synced = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      expect(synced).toMatchObject({
+        product_id: 'premium_annual',
+        drift_settled_at: null,
+      })
+      expect(synced!.synced_at.getTime()).toBeGreaterThan(staleSyncedAt.getTime())
+
+      // 3. A day later the row is stale again and is drift-checked by its synced_at alone.
+      await prisma.premiumEntitlement.update({
+        where: { user_id: userId },
+        data: { synced_at: staleSyncedAt },
+      })
+      const pullsBefore = ownPulls()
+      await service.sweep()
+      expect(ownPulls()).toBe(pullsBefore + 1)
+      ownPull.mockRestore()
+    })
+  }
 
   it('leaves a freshly-synced entitlement alone (staleness bound respected)', async (context) => {
     if (!requireSchema(context)) return

@@ -14,13 +14,7 @@ export const requiredShareCardJobs = Object.freeze([
   'android36-controls',
   'android36-interaction',
   'android36-release-font',
-  // The iOS journey: one build, two shards (a matrix job succeeds only when both legs do) and
-  // the job that proves both shards reported their exact cases.
-  'ios-build',
-  'ios-shard',
-  'ios-evidence',
-  // The Expo Go proof on its own fresh simulator.
-  'ios-expo-go',
+  // The iOS journey, its evidence and the Expo Go proof run in ios-native-jobs.yml (story 6.15 D6).
 ])
 
 // The lanes that run on a pull request. Every other required job drives a device or an emulator
@@ -28,15 +22,6 @@ export const requiredShareCardJobs = Object.freeze([
 // and on demand.
 export const pullRequestShareCardJobs = Object.freeze(['browser-acceptance'])
 export const pullRequestEvent = 'pull_request'
-// The iOS lanes need macOS runners, which run nightly and on demand only (owner rule, 2026-11-13:
-// no macOS job on a pull request or a merge). A merge to main skips them, and must.
-export const iosShareCardJobs = Object.freeze([
-  'ios-build',
-  'ios-shard',
-  'ios-evidence',
-  'ios-expo-go',
-])
-export const pushEvent = 'push'
 
 // The job that plans the lanes (scripts/ci/lanes.mjs), and the lane that gates the browser job.
 // On a pull request that changes nothing the browser lane builds, runs or reads, the plan skips
@@ -60,9 +45,8 @@ function browserLaneRuns(plan) {
 /**
  * Missing, skipped, cancelled and failed jobs all prevent aggregate success, so a skipped shard
  * never counts. Only a pull_request run expects the device lanes to be skipped (and requires
- * it), and only there may the lane plan skip the browser lane, which then must be skipped. A push
- * requires the iOS lanes skipped and every other lane successful; any other event, an unknown one
- * included, needs every job to succeed whatever the plan says.
+ * it), and only there may the lane plan skip the browser lane, which then must be skipped. Any
+ * other event, an unknown one included, needs every job to succeed whatever the plan says.
  */
 export function assertShareCardJobs(results, eventName, plan) {
   if (
@@ -76,8 +60,6 @@ export function assertShareCardJobs(results, eventName, plan) {
   const deviceLanesSkipped = eventName === pullRequestEvent
   const browserRuns = deviceLanesSkipped ? browserLaneRuns(plan) : true
   const expected = (name) => {
-    if (eventName === pushEvent)
-      return iosShareCardJobs.includes(name) ? 'skipped' : 'success'
     if (!deviceLanesSkipped) return 'success'
     if (!pullRequestShareCardJobs.includes(name)) return 'skipped'
     return browserRuns ? 'success' : 'skipped'

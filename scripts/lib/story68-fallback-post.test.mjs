@@ -2,7 +2,11 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
-import { withUnavailableOwnedFallbackPost } from './story68-fallback-post.mjs'
+import fs from 'node:fs'
+import {
+  CC68_SEEDED_POST_ID,
+  withUnavailableOwnedFallbackPost,
+} from './story68-fallback-post.mjs'
 
 const owner = 'cc68-native-11111111-1111-4111-8111-111111111111'
 const id = 'cc68-native-22222222-2222-4222-8222-222222222222'
@@ -281,5 +285,37 @@ describe('withUnavailableOwnedFallbackPost', () => {
       /owned_fallback_post_write_mismatch/
     )
     assert.deepEqual(f.row, before)
+  })
+})
+
+// Android 6c85bbb4 Community: a random post id gave every prepared harness new volatile keys.
+describe('the seeded cc68 post id', () => {
+  test('is one fixed id of the shape every reader checks, and prepare seeds it', () => {
+    assert.equal(CC68_SEEDED_POST_ID, 'cc68-native-7756b8d9-4e43-4afa-bcce-a79bbe01e969')
+    assert.match(
+      CC68_SEEDED_POST_ID,
+      /^cc68-native-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/
+    )
+    const prepare = fs.readFileSync(
+      new URL('../e2e-share-card/prepare.mjs', import.meta.url),
+      'utf8'
+    )
+    assert.match(prepare, /^const postId = CC68_SEEDED_POST_ID$/m)
+    // The image path under it stays unique per prepare and matches what cleanup removes.
+    assert.match(
+      prepare,
+      /^const objectPath = `community\/\$\{postId\}\/\$\{randomUUID\(\)\}\.png`$/m
+    )
+    const cleanup = fs.readFileSync(
+      new URL('../e2e-share-card/cleanup.mjs', import.meta.url),
+      'utf8'
+    )
+    assert.ok(
+      cleanup.includes(String.raw`/^community\/cc68-native-[a-f0-9-]+\/[a-f0-9-]+\.png$/`)
+    )
+    assert.match(
+      `community/${CC68_SEEDED_POST_ID}/${'a'.repeat(8)}-0000.png`,
+      /^community\/cc68-native-[a-f0-9-]+\/[a-f0-9-]+\.png$/
+    )
   })
 })

@@ -382,8 +382,11 @@ describe('browser dependency workflow', () => {
     }
     const original = workflow.jobs['original-resource'].steps
     assert.equal(provisioningOf(original)[0].if, "matrix.platform == 'android'")
-    // ios-expo-go runs the client-free iOS checks after its proof, whatever the proof's outcome.
-    const iosSteps = workflow.jobs['ios-expo-go'].steps
+    // ios-native-jobs.yml runs the client-free iOS checks after the Expo Go proof, whatever the
+    // proof's outcome.
+    const iosSteps = parse(
+      await readFile('.github/workflows/ios-native-jobs.yml', 'utf8')
+    ).jobs['ios-expo-go'].steps
     const mac = iosSteps.find((item) =>
       item.run?.includes('npx --no-install playwright install chromium')
     )

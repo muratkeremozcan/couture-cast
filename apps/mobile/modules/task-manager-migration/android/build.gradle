@@ -1,0 +1,13 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'com.couturecast'
+version = '1.0.0'
+android {
+  namespace 'expo.modules.taskmanagermigration'
+  defaultConfig { versionCode 1; versionName '1.0.0' }
+}
+
+// The Robolectric regression (src/test) runs in the standalone unit-tests project only
+// (pr-task-manager-migration.yml), so the app build carries no test wiring for it.

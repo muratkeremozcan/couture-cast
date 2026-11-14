@@ -1,0 +1,13 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+group = 'com.couturecast'
+version = '1.0.0'
+android {
+  namespace 'expo.modules.textlayoutprobe'
+  defaultConfig { versionCode 1; versionName '1.0.0' }
+}
+
+// The Robolectric tests (src/test) run in the standalone unit-tests project only
+// (pr-text-layout-probe.yml), so the app build carries no test wiring for them.

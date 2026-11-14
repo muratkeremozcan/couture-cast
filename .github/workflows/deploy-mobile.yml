@@ -23,13 +23,21 @@ jobs:
             exit 1
           fi
 
+      # Full history: the release hold reads lift artifacts and lockfiles at their commits.
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node
         uses: ./.github/actions/setup-node-env
         with:
           use-npm-ci: 'true'
+
+      # Story 6.15 D12: no production build while apps/mobile/release-hold.json holds the app's
+      # SDK (the SDK 56 Hermes memory regression) and no measured lift releases it.
+      - name: Refuse a production build under the release hold
+        run: node scripts/ci/mobile-release-hold.mjs
 
       - name: Install EAS CLI
         run: npm install --global eas-cli@latest

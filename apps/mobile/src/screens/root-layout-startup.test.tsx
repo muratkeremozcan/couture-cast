@@ -54,6 +54,7 @@ vi.mock('@/components/android-share-card-presentation', () => ({
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: { font: {} } }))
 vi.mock('@expo-google-fonts/playfair-display', () => ({
   PlayfairDisplay_400Regular: 1,
+  PlayfairDisplay_400Regular_Italic: 1,
   PlayfairDisplay_700Bold: 1,
 }))
 vi.mock('@expo-google-fonts/space-grotesk', () => ({
@@ -110,8 +111,8 @@ vi.mock('@/src/analytics/track-events', () => ({
   trackMobileAlertReceived: () => undefined,
 }))
 vi.mock('@/src/lib/i18n', () => ({ initI18n: () => Promise.resolve() }))
-vi.mock('@/src/lib/background-fetch', () => ({
-  registerBackgroundFetchAsync: () => Promise.resolve(),
+vi.mock('@/src/lib/background-task', () => ({
+  registerRitualBackgroundTaskAsync: () => Promise.resolve(),
 }))
 vi.mock('@/src/hooks/use-accessibility-announcer', () => ({
   AccessibilityAnnouncerProvider: ({ children }: { children: ReactNode }) => children,

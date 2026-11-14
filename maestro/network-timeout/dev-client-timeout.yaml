@@ -1,0 +1,88 @@
+# Story 6.15 S2-06 (TEA-12): a network timeout shows Home's error state on the dev client.
+# Learning path Step 55. Runs from Step 0 and at every step, so the SDK 56 `expo/fetch` change
+# meets a check that already passed on SDK 54.
+#
+# Home aborts its ritual request after 15 s (`ritualRequestTimeoutMs` in app/(tabs)/index.tsx)
+# and, with no cached ritual, shows `hero-error-state`. The API stand-in is
+# scripts/lib/network-tarpit.mjs: it accepts every connection and never answers, so only the
+# app's AbortController can end the request. A refused port or airplane mode fails at once and
+# would never reach that path, so the flow first proves the request is still pending well after
+# it started, then that the error state arrives once the timeout fires.
+#
+# The flow lives outside maestro/'s top level so the Expo Go suite (run-maestro.mjs) never
+# discovers it: that suite runs against a live API. Run it on an Android emulator:
+#
+#   node scripts/lib/network-tarpit.mjs --port 4010 &
+#   cd apps/mobile && EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 npx expo start --dev-client
+#   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+#   MAESTRO_APP_ID=com.couturecast.app \
+#     APP_URL='mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081' \
+#     maestro test maestro/network-timeout/dev-client-timeout.yaml
+#
+# On `minifiedDebuggable` (no dev launcher; React Native loads from Metro directly), install
+# app-minifiedDebuggable.apk, run `adb reverse tcp:8081 tcp:8081` and pass APP_URL='mobile://'.
+appId: ${MAESTRO_APP_ID}
+name: 'Network timeout shows the Home error state'
+tags:
+  - network-timeout
+  - dev-client
+---
+# clearState: no ritual cache, so the timeout cannot fall back to the stale-cache banner.
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: ../subflows/open-app.yaml
+
+# The first load: it may already have timed out while the app was opening, so only its end state
+# is asserted here.
+- extendedWaitUntil:
+    visible:
+      id: 'hero-error-state'
+    timeout: 45000
+    label: 'The first ritual request ended in the error state'
+- assertVisible: 'Unable to load daily recommendations'
+- assertNotVisible:
+    id: 'stale-cache-banner'
+- assertNotVisible:
+    id: 'outfit-recommendation-card'
+
+# The timed leg starts at the Retry tap, which the flow controls.
+- tapOn:
+    id: 'hero-retry'
+    label: 'Retry the ritual request against the API that never answers'
+- assertVisible:
+    id: 'weather-header-skeleton'
+    label: 'The retried request is pending'
+
+# Nothing ever shows this id; the wait is an 8 s pause.
+- extendedWaitUntil:
+    visible:
+      id: 'network-timeout-pause-never-visible'
+    timeout: 8000
+    optional: true
+    label: 'Let 8 s of the 15 s timeout pass'
+- assertVisible:
+    id: 'weather-header-skeleton'
+    label: 'Still pending 8 s after Retry: the request hangs and has not failed fast'
+- assertNotVisible:
+    id: 'hero-error-state'
+
+# The abort fires 15 s after the tap, about 7 s from here. If the abort signal stopped reaching
+# the request (the `expo/fetch` regression this guards), the skeleton would stay forever.
+- extendedWaitUntil:
+    visible:
+      id: 'hero-error-state'
+    timeout: 20000
+    label: 'The 15 s timeout aborted the request and the error state shows'
+- assertVisible: 'Unable to load daily recommendations'
+- assertVisible:
+    id: 'hero-retry'
+- assertNotVisible:
+    id: 'weather-header-skeleton'
+- assertNotVisible:
+    id: 'stale-cache-banner'
+
+- takeScreenshot:
+    path: maestro/artifacts/network-timeout-error-state

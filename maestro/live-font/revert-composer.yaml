@@ -1,0 +1,10 @@
+# Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
+# Undoes update-composer.yaml: the watermark toggles back.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: share-card-watermark
+- extendedWaitUntil:
+    visible:
+      id: share-card-preview-loaded.*
+    timeout: 30000

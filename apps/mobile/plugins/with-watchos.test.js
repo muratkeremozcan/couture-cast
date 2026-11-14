@@ -29,6 +29,79 @@ function timed(t, label, run) {
   return result
 }
 
+/**
+ * Whether the native watchOS builds run on this host. They need macOS and Xcode; elsewhere they
+ * are left out. The nightly macOS job that owns this suite (watchos-native.yml) sets
+ * WATCHOS_REQUIRE_BUILD=1, and there a host that would leave them out is a failure, never a
+ * silent pass.
+ */
+function nativeBuildsRun({ platform = process.platform, env = process.env } = {}) {
+  if (platform === 'darwin') return true
+  if (env.WATCHOS_REQUIRE_BUILD === '1')
+    assert.fail(
+      `WATCHOS_REQUIRE_BUILD=1, but the native watchOS builds need macOS and this host is ${platform}`
+    )
+  return false
+}
+
+/** With WATCHOS_REQUIRE_BUILD=1, both native builds must have run, in order. */
+function assertNativeBuildsRan(builds, env = process.env) {
+  if (env.WATCHOS_REQUIRE_BUILD !== '1') return
+  assert.deepEqual(
+    builds,
+    ['WatchWidget', 'WatchApp'],
+    'WATCHOS_REQUIRE_BUILD=1 requires the WatchWidget complication and WatchApp builds to run'
+  )
+}
+
+/** One generated watch target built for the watchOS simulator, timed under its name. */
+function buildWatchTarget(t, fixtureRoot, target, label) {
+  assertCommand(
+    timed(t, label, () =>
+      spawnSync(
+        'xcodebuild',
+        [
+          '-project',
+          path.join(fixtureRoot, 'ios/CoutureCast.xcodeproj'),
+          '-target',
+          target,
+          '-configuration',
+          'Debug',
+          '-sdk',
+          'watchsimulator',
+          '-destination',
+          'generic/platform=watchOS Simulator',
+          `SYMROOT=${path.join(fixtureRoot, 'build/products')}`,
+          `OBJROOT=${path.join(fixtureRoot, 'build/intermediates')}`,
+          'CODE_SIGNING_ALLOWED=NO',
+          'build',
+          '-quiet',
+        ],
+        { encoding: 'utf8', timeout: 300_000 }
+      )
+    ),
+    `Generated ${target} target build failed`
+  )
+}
+
+test('WATCHOS_REQUIRE_BUILD=1 turns a left-out native build into a failure', () => {
+  const required = { WATCHOS_REQUIRE_BUILD: '1' }
+  assert.throws(
+    () => nativeBuildsRun({ platform: 'linux', env: required }),
+    /WATCHOS_REQUIRE_BUILD=1, but the native watchOS builds need macOS/
+  )
+  assert.equal(nativeBuildsRun({ platform: 'linux', env: {} }), false)
+  assert.equal(nativeBuildsRun({ platform: 'darwin', env: required }), true)
+  // A build branch that no longer runs, or runs only one target, fails under the flag.
+  assert.throws(() => assertNativeBuildsRan([], required), /requires the WatchWidget/)
+  assert.throws(
+    () => assertNativeBuildsRan(['WatchApp'], required),
+    /requires the WatchWidget/
+  )
+  assert.doesNotThrow(() => assertNativeBuildsRan(['WatchWidget', 'WatchApp'], required))
+  assert.doesNotThrow(() => assertNativeBuildsRan([], {}))
+})
+
 function buildPhaseFiles(project, target, sectionName) {
   const phases = project.hash.project.objects[sectionName] ?? {}
   const buildFiles = project.pbxBuildFileSection()
@@ -40,7 +113,8 @@ function buildPhaseFiles(project, target, sectionName) {
 
 test(
   'clean Expo prebuild generates watchOS app and complication targets',
-  // The build is most of it: 37 to 103 s on macos-15 (3 cores, Xcode 16.4), 2026-11-11.
+  // The native builds are most of it: 37 to 103 s on a macos-15 runner (3 cores, Xcode 16.4),
+  // measured 2026-11-11. The nightly job in watchos-native.yml runs this suite.
   { timeout: 360_000 },
   (t) => {
     const fixtureRoot = createExpoPrebuildFixture(t, {
@@ -178,43 +252,25 @@ test(
       fs.existsSync(path.join(fixtureRoot, 'ios/WatchWidget/WatchWidget.entitlements'))
     )
 
-    if (process.platform === 'darwin') {
-      // The build compiles both targets with their real settings: the complication as an
-      // extension (APPLICATION_EXTENSION_API_ONLY) and both at the watchOS 9 deployment
-      // target, so separate swiftc type-checks only paid for the SDK modules twice more.
-      // On a fresh runner each pass compiles them cold: 12 to 28 s apiece on macos-15.
-      assertCommand(
-        timed(t, 'WatchApp build', () =>
-          spawnSync(
-            'xcodebuild',
-            [
-              '-project',
-              path.join(fixtureRoot, 'ios/CoutureCast.xcodeproj'),
-              '-target',
-              'WatchApp',
-              '-configuration',
-              'Debug',
-              '-sdk',
-              'watchsimulator',
-              '-destination',
-              'generic/platform=watchOS Simulator',
-              `SYMROOT=${path.join(fixtureRoot, 'build/products')}`,
-              `OBJROOT=${path.join(fixtureRoot, 'build/intermediates')}`,
-              'CODE_SIGNING_ALLOWED=NO',
-              'build',
-              '-quiet',
-            ],
-            { encoding: 'utf8', timeout: 300_000 }
-          )
-        ),
-        'Generated WatchApp target build failed'
-      )
+    const builds = []
+    if (nativeBuildsRun()) {
+      // Both targets build with their real settings: the complication as an extension
+      // (APPLICATION_EXTENSION_API_ONLY) and both at the watchOS 9 deployment target, so
+      // separate swiftc type-checks only paid for the SDK modules twice more. Each pass compiles
+      // cold on a fresh host: 12 to 28 s apiece on a macos-15 runner, measured 2026-11-11. The
+      // complication builds first and WatchApp, which depends on it, reuses its products, so the
+      // log names each build with its own duration.
+      buildWatchTarget(t, fixtureRoot, 'WatchWidget', 'WatchWidget complication build')
+      builds.push('WatchWidget')
+      buildWatchTarget(t, fixtureRoot, 'WatchApp', 'WatchApp build')
+      builds.push('WatchApp')
     }
+    assertNativeBuildsRan(builds)
   }
 )
 
 test('watch payload and transfer support pass native behavior tests', (t) => {
-  if (process.platform !== 'darwin') {
+  if (!nativeBuildsRun()) {
     t.skip('Swift behavior tests require macOS')
     return
   }

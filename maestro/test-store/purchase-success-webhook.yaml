@@ -1,0 +1,25 @@
+# Story 6.15 D15 (S4-12, TEA-18), preview leg: a successful Test Store purchase while the journey
+# proxy refuses every refresh. The SDK's success shows `premium-activating`; the refresh fails, the
+# app polls GET subscription (5 s interval, 2 min cap), and the entitlement can arrive only through
+# RevenueCat's webhook to the preview API.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- runFlow: open-sheet.yaml
+- tapOn:
+    text: '(?i)Test valid purchase'
+    label: 'Simulate a successful purchase'
+- extendedWaitUntil:
+    visible:
+      id: premium-activating
+    timeout: 30000
+    label: 'The SDK reported success; the app waits for the server'
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+      text: ${PREMIUM_STATUS_ACTIVE}
+    direction: UP
+    centerElement: true
+    timeout: 150000
+    label: 'The webhook-delivered entitlement reached the app'
+- runFlow: assert-entitled.yaml

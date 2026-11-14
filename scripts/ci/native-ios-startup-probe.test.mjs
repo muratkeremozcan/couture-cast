@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import {
+  DEV_CLIENT_APP,
   HOST_LOAD_POLICY,
   INSTALL_CLIENT_TIMEOUT_MS,
+  RELEASE_APP,
   finishOwnedStartup,
+  probeAppPath,
   settleHostLoad,
 } from './native-ios-startup-probe.mjs'
 
@@ -174,4 +177,18 @@ test('startup-only probes never wait on host load', async () => {
     f.events.some((e) => e.operation === 'host-load'),
     false
   )
+})
+
+// Story 6.15 AC3: ios-live-font installs the Release app it built; the shards keep the client.
+test('a native-flow probe installs the client unless --app names the Release app', () => {
+  assert.equal(probeAppPath(['--for-native-flow']), DEV_CLIENT_APP)
+  assert.equal(probeAppPath(['--for-native-flow', '--app', RELEASE_APP]), RELEASE_APP)
+  assert.match(DEV_CLIENT_APP, /\/Debug-iphonesimulator\/CoutureCastStory68\.app$/)
+  assert.match(RELEASE_APP, /\/Release-iphonesimulator\/CoutureCastStory68\.app$/)
+  for (const argv of [
+    ['--for-native-flow', '--app'],
+    ['--for-native-flow', '--app', '/tmp/other.app'],
+    ['--for-native-flow', '--app', `${RELEASE_APP}/../../Debug-iphonesimulator/x.app`],
+  ])
+    assert.throws(() => probeAppPath(argv), /owned_story68_app_path_required/)
 })

@@ -7,14 +7,18 @@ export const OPEN_APP_FLOW = 'maestro/story65/open-app.yaml'
  * open-app.yaml is the first flow of the iOS startup gate, so on iOS every run of it keeps one
  * fixed child budget the gate measures against. Other flows use their derived budget.
  *
- * Story 6.15 moved the iOS shards from macos-15 (Xcode 16.4, iOS 18.5 simulator) to macos-26
- * (Xcode 26.6, iOS 26.5 simulator) on the same 3-CPU, 7 GB host. The old 120000 ms had no
- * headroom even on iOS 18.5: the first open-app of 13 macos-15 shard jobs (2026-11-12 and 13)
- * took 47 to 118 s. On iOS 26.5 the simulator boots in 107 to 179 s instead of 64 to 93, and
- * the first open-app ran 80 s once and was killed at 120 s twice (dispatch 43371567368 shard 3,
- * push 43371494463 shard 1), each stopped in the dev-client open after Metro had served the
- * bundle; a later open-app took 102 s. 240000 ms is that 118 s worst case at the roughly 2x
- * iOS 26.5 slowdown with no further margin; a first flow over 192 s (80 percent) is a finding.
+ * Story 6.15 first moved the iOS shards from macos-15 (Xcode 16.4, iOS 18.5 simulator) to
+ * macos-26 (Xcode 26.6, iOS 26.5 simulator) on the same 3-CPU, 7 GB host; option (a) (PR 220)
+ * moved them back to macos-15 and iOS 18.5, so this cap now matters mostly for the nightly
+ * iOS 26.5 canary (ios-native-canary.yml). The old 120000 ms had no headroom even on iOS 18.5:
+ * the first open-app of 13 macos-15 shard jobs (2026-11-12 and 13) took 47 to 118 s. On iOS 26.5 the simulator boots in 107 to 179 s instead of 64 to 93, and the
+ * first open-app passed at 79, 80, 92 and 102 s and was killed at 120 s twice (dispatch
+ * 43371567368 shard 3, push 43371494463 shard 1). Those two are lower bounds: JVM plus driver
+ * start took 37 and 59 s against 28 to 51 s on iOS 18.5, and the flow phase was interrupted after
+ * Metro had served the bundle with no app log and no screen captured, so slow recovery and a stall
+ * are not yet told apart. 240000 ms is a bounded cap for that experiment, not a measured cost
+ * (C-15): an iOS 26.5 first flow that times out now records the screen after the kill and whether
+ * the app process lives; one over 192 s (80 percent) is a finding.
  */
 export const IOS_FIRST_FLOW_TIMEOUT_MS = 240_000
 

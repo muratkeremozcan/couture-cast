@@ -1,5 +1,10 @@
 import Foundation
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+// Linux: swift-crypto's Crypto module has the same SHA256 API (Package.swift, story 6.15 D6).
+import Crypto
+#endif
 
 enum ShareCardPngFile {
   static func validateFile(_ uri: String, _ digest: String, _ cacheRoot: URL?) throws -> URL {

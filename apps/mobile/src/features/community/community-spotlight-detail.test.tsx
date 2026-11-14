@@ -52,6 +52,7 @@ import {
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
   paddingBottomOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 
 const FOCUSED = 'Focused on the highlighted look.'
@@ -205,6 +206,13 @@ describe('CommunitySpotlightDetail focus and announcement (Story 6.6 R20)', () =
 })
 
 describe('R52 CommunitySpotlightDetail over the system bars', () => {
+  // Story 6.15 review P3-1: iOS hides every view outside the accessibility modal view from the
+  // XCUITest hierarchy, so the modal's live-font marker must sit inside it.
+  it('puts the live-font marker inside the detail that is the accessibility modal', async () => {
+    await render(<Harness item={look(1)} />)
+    expect(liveFontMarkerPlacement().markerInside).toBe(true)
+  })
+
   beforeAll(async () => {
     await initI18n()
     await i18n.changeLanguage('en-US')

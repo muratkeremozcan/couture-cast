@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type Stripe from 'stripe'
 import type { PrismaClient } from '@prisma/client'
 import { abortFirstRun } from '../../testing/pldbgapi2.js'
@@ -212,6 +212,487 @@ describe('the Decision 4 transition table (planning half)', () => {
       planRevenueCatTransition(rcEvent({ type: 'RENEWAL', product_id: null }))
     ).toEqual({ kind: 'record-only' })
   })
+})
+
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+describe('unsupported stores never reach the ledger (story 6.15 R3-01)', () => {
+  // Each case runs under every TEST_ENV that must keep the production partition, so the D15
+  // Test Store path, open only under an explicit local or preview TEST_ENV, cannot open
+  // production by accident. NODE_ENV is `test` here, which must not open it either.
+  const environments = [undefined, 'staging', 'production', 'qa'] as const
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each(environments)('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      if (testEnv === undefined) vi.stubEnv('TEST_ENV', undefined as unknown as string)
+      else vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it.each(['INITIAL_PURCHASE', 'RENEWAL', 'EXPIRATION', 'TRANSFER'])(
+      'a TEST_STORE %s is record-only',
+      (type) => {
+        expect(planRevenueCatTransition(rcEvent({ type, store: 'TEST_STORE' }))).toEqual({
+          kind: 'record-only',
+        })
+      }
+    )
+
+    it('TEST_STORE maps to no store and its payload projection names none', () => {
+      expect(mapRevenueCatStore('TEST_STORE')).toBeNull()
+      expect(
+        projectRevenueCatEventPayload(rcEvent({ store: 'TEST_STORE' })).store
+      ).toBeNull()
+    })
+
+    it('a TRANSFER from any store we do not sell is record-only, so no paid row is revoked', () => {
+      expect(
+        planRevenueCatTransition(
+          rcEvent({
+            type: 'TRANSFER',
+            store: 'AMAZON',
+            transferred_from: ['paid-member'],
+            transferred_to: ['other-member'],
+          })
+        )
+      ).toEqual({ kind: 'record-only' })
+    })
+  })
+
+  it('a TRANSFER with no store still moves the losing row, as before', () => {
+    expect(planRevenueCatTransition(rcEvent({ type: 'TRANSFER', store: null }))).toEqual({
+      kind: 'transfer',
+    })
+  })
+
+  it('a TEST_STORE TRANSFER touching a paid member writes the event and no entitlement', async () => {
+    const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    try {
+      const create = vi.fn().mockResolvedValue({})
+      const prisma = {
+        billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+        user: { findUnique: vi.fn().mockResolvedValue({ id: 'paid-member' }) },
+        $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+          work({ billingEvent: { create }, premiumEntitlement: { findUnique: vi.fn() } })
+        ),
+      }
+      const applyLedgerEvent = vi.fn()
+      const service = new BillingWebhookService(
+        prisma as unknown as PrismaClient,
+        { applyLedgerEvent } as unknown as PremiumEntitlementService,
+        { emitTransition: vi.fn() } as unknown as SubscriptionService,
+        {} as RevenueCatClient
+      )
+      const body = {
+        event: rcEvent({
+          type: 'TRANSFER',
+          store: 'TEST_STORE',
+          transferred_from: ['paid-member'],
+          transferred_to: ['other-member'],
+        }),
+      }
+
+      await service.handleRevenueCatWebhook({
+        authorization: buildTestOnlyRevenueCatWebhookAuth(),
+        rawBody: Buffer.from(JSON.stringify(body)),
+      })
+
+      expect(applyLedgerEvent).not.toHaveBeenCalled()
+    } finally {
+      if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+      else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+    }
+  })
+})
+
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+describe('the RevenueCat Test Store converges under local and preview (story 6.15 D15)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it('maps TEST_STORE to test_store, in any case, and records it in the payload', () => {
+      expect(mapRevenueCatStore('TEST_STORE')).toBe('test_store')
+      expect(mapRevenueCatStore('test_store')).toBe('test_store')
+      expect(projectRevenueCatEventPayload(rcEvent({ store: 'TEST_STORE' })).store).toBe(
+        'test_store'
+      )
+    })
+
+    it.each([
+      ['INITIAL_PURCHASE', 'active', true],
+      ['RENEWAL', 'active', true],
+      ['CANCELLATION', 'active', false],
+      ['EXPIRATION', 'expired', false],
+    ] as const)('a TEST_STORE %s applies as test_store', (type, status, willRenew) => {
+      expect(planRevenueCatTransition(rcEvent({ type, store: 'TEST_STORE' }))).toEqual({
+        kind: 'apply',
+        state: {
+          status,
+          store: 'test_store',
+          productId: 'premium_monthly',
+          willRenew,
+          currentPeriodEnd: new Date(1_757_676_700_000),
+        },
+      })
+    })
+
+    it('a TEST_STORE TRANSFER moves the entitlement', () => {
+      expect(
+        planRevenueCatTransition(
+          rcEvent({
+            type: 'TRANSFER',
+            store: 'TEST_STORE',
+            transferred_from: ['paid-member'],
+            transferred_to: ['other-member'],
+          })
+        )
+      ).toEqual({ kind: 'transfer' })
+    })
+
+    it('every other store we do not sell stays record-only, a TRANSFER included', () => {
+      for (const type of ['INITIAL_PURCHASE', 'TRANSFER']) {
+        expect(planRevenueCatTransition(rcEvent({ type, store: 'AMAZON' }))).toEqual({
+          kind: 'record-only',
+        })
+      }
+    })
+
+    it('real stores keep their mappings', () => {
+      expect(mapRevenueCatStore('APP_STORE')).toBe('app_store')
+      expect(mapRevenueCatStore('PLAY_STORE')).toBe('play_store')
+      expect(mapRevenueCatStore('STRIPE')).toBe('stripe')
+    })
+  })
+
+  it('a TEST_STORE TRANSFER under local revokes the loser and grants the gainer test_store', async () => {
+    vi.stubEnv('TEST_ENV', 'local')
+    const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+    delete process.env.REVENUECAT_WEBHOOK_AUTH
+    try {
+      const create = vi.fn().mockResolvedValue({})
+      const losingRow = {
+        user_id: 'paid-member',
+        status: 'active',
+        store: 'test_store',
+        product_id: 'premium_monthly',
+        current_period_end: new Date(1_757_676_700_000),
+      }
+      const prisma = {
+        billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+        user: {
+          findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+            Promise.resolve({ id: where.id })
+          ),
+        },
+        $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+          work({
+            billingEvent: { create },
+            premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(losingRow) },
+          })
+        ),
+      }
+      const applyLedgerEvent = vi.fn().mockResolvedValue(null)
+      const service = new BillingWebhookService(
+        prisma as unknown as PrismaClient,
+        { applyLedgerEvent } as unknown as PremiumEntitlementService,
+        { emitTransition: vi.fn() } as unknown as SubscriptionService,
+        {} as RevenueCatClient
+      )
+      const body = {
+        event: rcEvent({
+          type: 'TRANSFER',
+          store: 'TEST_STORE',
+          transferred_from: ['paid-member'],
+          transferred_to: ['other-member'],
+        }),
+      }
+
+      await service.handleRevenueCatWebhook({
+        authorization: buildTestOnlyRevenueCatWebhookAuth(),
+        rawBody: Buffer.from(JSON.stringify(body)),
+      })
+
+      const recordedStores = create.mock.calls.map(
+        ([input]) => (input as { data: { store: unknown } }).data.store
+      )
+      expect(recordedStores).toEqual(['test_store'])
+      const applied = applyLedgerEvent.mock.calls.map(([, input]) => {
+        const { userId, state } = input as {
+          userId: string
+          state: { status: string; store: string }
+        }
+        return { userId, status: state.status, store: state.store }
+      })
+      expect(applied).toEqual([
+        { userId: 'paid-member', status: 'revoked', store: 'test_store' },
+        { userId: 'other-member', status: 'active', store: 'test_store' },
+      ])
+    } finally {
+      if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+      else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+    }
+  })
+})
+
+type AppliedTransferWrite = {
+  userId: string
+  state: {
+    status: string
+    store: string
+    productId: string
+    willRenew: boolean
+    currentPeriodEnd: Date
+  }
+}
+
+/**
+ * Runs one authenticated TRANSFER from `paid-member`, who holds a `test_store` row, to
+ * `other-member` through the webhook rail and returns every ledger write it asked for.
+ */
+const TRANSFER_UNHONORED_LOG =
+  'TRANSFER recorded without transition: its store is not honored in this environment'
+const TRANSFER_GAIN_SKIPPED_LOG =
+  'TRANSFER gain skipped: no store/product/period derivable from the event or the losing row'
+
+/** One TRANSFER log line the rail wrote, as `[level, message]`. */
+type TransferLog = ['info' | 'warn', string]
+
+async function transferOverTestStoreRow(
+  eventOverrides: Partial<RevenueCatEvent>
+): Promise<{ applied: AppliedTransferWrite[]; recorded: number; logged: TransferLog[] }> {
+  const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
+  delete process.env.REVENUECAT_WEBHOOK_AUTH
+  try {
+    const create = vi.fn().mockResolvedValue({})
+    const losingRow = {
+      user_id: 'paid-member',
+      status: 'active',
+      store: 'test_store',
+      product_id: 'premium_monthly',
+      current_period_end: new Date(1_757_676_700_000),
+    }
+    const prisma = {
+      billingEvent: { findUnique: vi.fn().mockResolvedValue(null), create },
+      user: {
+        findUnique: vi.fn(({ where }: { where: { id: string } }) =>
+          Promise.resolve({ id: where.id })
+        ),
+      },
+      $transaction: vi.fn((work: (tx: unknown) => unknown) =>
+        work({
+          billingEvent: { create },
+          premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(losingRow) },
+        })
+      ),
+    }
+    const applyLedgerEvent = vi.fn().mockResolvedValue(null)
+    const service = new BillingWebhookService(
+      prisma as unknown as PrismaClient,
+      { applyLedgerEvent } as unknown as PremiumEntitlementService,
+      { emitTransition: vi.fn() } as unknown as SubscriptionService,
+      {} as RevenueCatClient
+    )
+    const logger = (
+      service as unknown as {
+        logger: Record<'info' | 'warn', (fields: unknown, message: string) => void>
+      }
+    ).logger
+    const logged: TransferLog[] = []
+    for (const level of ['info', 'warn'] as const)
+      vi.spyOn(logger, level).mockImplementation((_fields, message) => {
+        if (message.startsWith('TRANSFER ')) logged.push([level, message])
+      })
+    const body = {
+      event: rcEvent({
+        type: 'TRANSFER',
+        transferred_from: ['paid-member'],
+        transferred_to: ['other-member'],
+        ...eventOverrides,
+      }),
+    }
+
+    await service.handleRevenueCatWebhook({
+      authorization: buildTestOnlyRevenueCatWebhookAuth(),
+      rawBody: Buffer.from(JSON.stringify(body)),
+    })
+
+    const applied = applyLedgerEvent.mock.calls.map(([, input]) => {
+      const { userId, state } = input as AppliedTransferWrite
+      return { userId, state }
+    })
+    return { applied, recorded: create.mock.calls.length, logged }
+  } finally {
+    if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
+    else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
+  }
+}
+
+// Learning path Step 55: story 6.15 D15. A TRANSFER that carries no store falls back to the
+// losing row's store, so a test_store row must not move outside local and preview.
+describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  async function transferTestStoreRow(): Promise<{
+    applied: { userId: string; status: string; store: string }[]
+    recorded: number
+    logged: TransferLog[]
+  }> {
+    const { applied, recorded, logged } = await transferOverTestStoreRow({
+      store: null,
+      product_id: null,
+      expiration_at_ms: null,
+    })
+    return {
+      applied: applied.map(({ userId, state }) => ({
+        userId,
+        status: state.status,
+        store: state.store,
+      })),
+      recorded,
+      logged,
+    }
+  }
+
+  it.each(['local', 'preview'])('with TEST_ENV %s moves the row', async (testEnv) => {
+    vi.stubEnv('TEST_ENV', testEnv)
+    await expect(transferTestStoreRow()).resolves.toEqual({
+      applied: [
+        { userId: 'paid-member', status: 'revoked', store: 'test_store' },
+        { userId: 'other-member', status: 'active', store: 'test_store' },
+      ],
+      recorded: 1,
+      logged: [],
+    })
+  })
+
+  // r38 P3-3: the store gate, not the later gain fallback, must stop this TRANSFER, which shows
+  // only in the log: one info line naming the unhonored store and no gain-skipped warning.
+  it.each([undefined, 'staging', 'production', 'qa'])(
+    'with TEST_ENV %s records the event, revokes and grants no one, and says why',
+    async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv as string)
+      await expect(transferTestStoreRow()).resolves.toEqual({
+        applied: [],
+        recorded: 1,
+        logged: [['info', TRANSFER_UNHONORED_LOG]],
+      })
+    }
+  )
+})
+
+// Story 6.15 D15: an honored event store does not make the losing test_store row honored.
+// Outside local and preview that row counts as absent: the TRANSFER revokes no one (no
+// none-to-revoked audit row, no deactivation event) and builds the gain from the event alone.
+describe('an APP_STORE TRANSFER over a test_store losing row (story 6.15 D15)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  const eventPeriodEndMs = 1_760_000_000_000
+
+  it.each([undefined, 'staging', 'production', 'qa'])(
+    'with TEST_ENV %s grants the gainer from the event alone and revokes no one',
+    async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv as string)
+      await expect(
+        transferOverTestStoreRow({
+          store: 'APP_STORE',
+          product_id: 'premium_annual',
+          expiration_at_ms: eventPeriodEndMs,
+        })
+      ).resolves.toEqual({
+        applied: [
+          {
+            userId: 'other-member',
+            state: {
+              status: 'active',
+              store: 'app_store',
+              productId: 'premium_annual',
+              willRenew: true,
+              currentPeriodEnd: new Date(eventPeriodEndMs),
+            },
+          },
+        ],
+        recorded: 1,
+        logged: [],
+      })
+    }
+  )
+
+  it.each([
+    ['no product', { product_id: null }],
+    ['no expiry', { expiration_at_ms: null }],
+  ] as const)(
+    'with TEST_ENV production and %s on the event skips the gain and revokes no one',
+    async (_label, missing) => {
+      vi.stubEnv('TEST_ENV', 'production')
+      await expect(
+        transferOverTestStoreRow({
+          store: 'APP_STORE',
+          product_id: 'premium_annual',
+          expiration_at_ms: eventPeriodEndMs,
+          ...missing,
+        })
+      ).resolves.toEqual({
+        applied: [],
+        recorded: 1,
+        logged: [['warn', TRANSFER_GAIN_SKIPPED_LOG]],
+      })
+    }
+  )
+
+  it.each(['local', 'preview'])(
+    'with TEST_ENV %s revokes the test_store row and falls back to it, as before',
+    async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv)
+      const losingPeriodEnd = new Date(1_757_676_700_000)
+      await expect(
+        transferOverTestStoreRow({
+          store: 'APP_STORE',
+          product_id: null,
+          expiration_at_ms: null,
+        })
+      ).resolves.toEqual({
+        applied: [
+          {
+            userId: 'paid-member',
+            state: {
+              status: 'revoked',
+              store: 'test_store',
+              productId: 'premium_monthly',
+              willRenew: false,
+              currentPeriodEnd: losingPeriodEnd,
+            },
+          },
+          {
+            userId: 'other-member',
+            state: {
+              status: 'active',
+              store: 'app_store',
+              productId: 'premium_monthly',
+              willRenew: true,
+              currentPeriodEnd: losingPeriodEnd,
+            },
+          },
+        ],
+        recorded: 1,
+        logged: [],
+      })
+    }
+  )
 })
 
 describe('secret resolution (Decision 10: point of use, test-only fallbacks)', () => {

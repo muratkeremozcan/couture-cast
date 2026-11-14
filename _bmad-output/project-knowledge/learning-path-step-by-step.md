@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-10.
-Added Steps 40 to 54:
+Updated: 2026-11-13.
+Added Steps 40 to 55:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -18,6 +18,7 @@ Added Steps 40 to 54:
 - Step 52: Story 6.12, SLA monitoring and escalation, `56509fa8` (PR #196), merged on 2026-11-05.
 - Step 53: Story 6.13, immutable moderation history, `63bd6fcd` (PR #197), merged on 2026-11-06.
 - Step 54: Story 6.14, complimentary full access, `1fa40089` (PR #198), merged on 2026-11-10.
+- Step 55: Story 6.15, Expo SDK 58 upgrade for live font-scale layout, in progress: Step 0 of five on draft PR #226, nothing merged yet.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -25,6 +26,10 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 55 for Story 6.15 while its Step 0 is in progress on draft PR #226, with Step 55 in `Current position` and `The whole project in plain English`.
+Step 55 departs from instruction 2 the same way Steps 38, 39 and 49 did, because Steps 1 to 4 of the story have not started.
+Step 55 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Pointed Steps 23 and 43 at `apps/mobile/src/lib/background-task.ts` and its test, which replace `background-fetch.ts` on the Story 6.15 branch.
 Recorded the second `X-DISPATCH` attempt, the guard pool fix and the date bomb guard in Step 54's `Evidence boundaries` and test map.
 Moved Step 54 to completed after PR #198 merged as `1fa40089`, and recorded the post-merge production checks in its `Evidence boundaries`.
 Step 54 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -117,6 +122,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
+- In progress: Step 55, Story 6.15, Expo SDK 58 upgrade for live font-scale layout, status `drafted` in `sprint-status.yaml`.
+  Step 0 of five is a draft, PR #226 on `feat/story-6-15-expo-sdk-58`, still on SDK 54; Steps 1 to 4 have not started.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`.
+  Step 55 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 - Latest completed step: Step 54, Story 6.14, complimentary full access, status `done`, merged as `1fa40089` (PR #198) on 2026-11-10.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-14-complimentary-full-access.md`.
   Step 54 was written before review and merge, and its `Evidence boundaries` section records the production checks run after merge.
@@ -141,7 +150,6 @@ Read it before changing or adding a numbered step.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-9-native-platform-sharing.md`.
   Step 49 was written from the PR head `37a00d33` before merge, and its `Evidence boundaries` section says so.
   Production stays dark because `share_card_native_share_enabled` defaults to false.
-- Next in `backlog` under epic 6, which is `in-progress`: Story 6.15 (Expo SDK 58 live font-scale layout).
 - Step 48, Story 6.8, Safe branded share-card export, status `done`, merged as `67806196` (PR #162) with native-lane fixes in `3112efbd` (PR #165) and `185e827c` (PR #166).
   Its plan is `_bmad-output/implementation-artifacts/spec-6-8-safe-branded-share-card-export.md`.
 - Step 47, Story 6.7b, Sponsored community highlights, status `done`, merged as `1d7b9848` (PR #161).
@@ -269,6 +277,7 @@ Read it before changing or adding a numbered step.
 |   52 | Warn before a case goes late. Escalate when it does.                         |
 |   53 | Lock moderation history. Erasure may remove only who was involved.           |
 |   54 | Let the owner give a member everything free. Keep the gift out of billing.   |
+|   55 | Climb one SDK at a time to the fix. Make text grow live with no restart.     |
 
 ## Special feature: AI garment tagging
 
@@ -2853,7 +2862,8 @@ Key takeaways:
 1. Native widget code in Kotlin and Swift only presents data.
    The JavaScript/TypeScript layer makes the API calls, formats the state, and syncs it to the widget.
 2. A custom bridge (`WidgetSharedModule`) persists weather and outfit state to SharedPreferences on Android and App Group UserDefaults on iOS.
-3. A lightweight `expo-background-fetch` task keeps widget state fresh while the app is suspended, within the system's battery limits.
+3. A lightweight background task keeps widget state fresh while the app is suspended, within the system's battery limits.
+   It ran on `expo-background-fetch` until Story 6.15 moved it to `expo-background-task` (Step 55).
 4. A widget tap hydrates the active scenario and fires a telemetry capture.
 
 Story/Task mapping:
@@ -2880,7 +2890,7 @@ Sequence to follow:
 2. Trace the widget-sharing hook inside `saveRitualCache` in `apps/mobile/src/lib/ritual-cache.ts`.
 3. Check the custom bridge package and widget providers under `apps/mobile/targets/widgets/android/java/`.
 4. Review the SwiftUI widget views and the iOS App Group entitlements config in `apps/mobile/targets/widgets/OutfitWidget.swift` and `apps/mobile/plugins/with-widgets.js`.
-5. Trace the background fetch registration on app start in `apps/mobile/app/_layout.tsx` and the task logic in `apps/mobile/src/lib/background-fetch.ts`.
+5. Trace the background task registration on app start in `apps/mobile/app/_layout.tsx` and the task logic in `apps/mobile/src/lib/background-task.ts`.
 6. Inspect the parameter parsing and PostHog capture triggers in `apps/mobile/app/(tabs)/index.tsx`.
 7. Check the deep-link routing assertions in `apps/mobile/src/screens/widget-deep-link.test.tsx` and the E2E flows in `maestro/widget-deep-link.yaml`.
 
@@ -2891,7 +2901,7 @@ Task owner map:
 - Story 3.3 Task 2 step 1 owner: implement base OutfitWidgetProvider update and deep-link launcher logic in `apps/mobile/targets/widgets/android/java/OutfitWidgetProvider.kt`
 - Story 3.3 Task 2 step 2 owner: configure iOS App Group entitlements and Swift bridge files copy during prebuilds in `apps/mobile/plugins/with-widgets.js`
 - Story 3.3 Task 2 step 3 owner: define SwiftUI small and medium layouts in `apps/mobile/targets/widgets/OutfitWidget.swift`
-- Story 3.3 Task 3 step 1 owner: define background fetch task using task manager in `apps/mobile/src/lib/background-fetch.ts`
+- Story 3.3 Task 3 step 1 owner: define the ritual background task using task manager in `apps/mobile/src/lib/background-task.ts`
 - Story 3.3 Task 4 step 1 owner: read deep link query parameters to hydrate active scenario in `apps/mobile/app/(tabs)/index.tsx`
 - Story 3.3 Task 5 step 1 owner: verify widget deep link hydration and telemetry triggers in screen tests in `apps/mobile/src/screens/widget-deep-link.test.tsx`
 - Story 3.3 Task 5 step 2 owner: define E2E Maestro routing verification scenarios in `maestro/widget-deep-link.yaml`
@@ -2905,7 +2915,7 @@ Native generation integration test:
 
 Mobile client unit and component tests:
 
-- [`apps/mobile/src/lib/background-fetch.test.ts`](../../apps/mobile/src/lib/background-fetch.test.ts):
+- [`apps/mobile/src/lib/background-task.test.ts`](../../apps/mobile/src/lib/background-task.test.ts):
   proves freshness boundaries, task registration, refresh and publication, locale reuse, degraded preferences, and failure preservation.
 - [`apps/mobile/src/lib/native-file-storage.test.ts`](../../apps/mobile/src/lib/native-file-storage.test.ts):
   proves durable Ritual and settings storage plus cache preservation when widget publication fails.
@@ -7461,7 +7471,7 @@ Mobile unit and screen tests:
 - [`apps/mobile/src/lib/native-notification-fixture.test.ts`](../../apps/mobile/src/lib/native-notification-fixture.test.ts), [`native-notification-fixture-gating.test.ts`](../../apps/mobile/src/lib/native-notification-fixture-gating.test.ts) and [`native-intent.test.ts`](../../apps/mobile/src/lib/native-intent.test.ts): the debug OS injection exists only in the isolated build, and the router drops its fixture URL.
 - [`apps/mobile/src/screens/notification-settings-screen.test.tsx`](../../apps/mobile/src/screens/notification-settings-screen.test.tsx) and [`notification-settings-recovery.test.tsx`](../../apps/mobile/src/screens/notification-settings-recovery.test.tsx): native settings journeys, failures, retry and cleanup.
 - [`apps/mobile/src/screens/community-session-recovery.test.tsx`](../../apps/mobile/src/screens/community-session-recovery.test.tsx): concurrent cold verification resolves to the member or to a retryable state.
-- [`apps/mobile/src/screens/hero-identity-cache.test.tsx`](../../apps/mobile/src/screens/hero-identity-cache.test.tsx) and [`apps/mobile/src/lib/background-fetch.test.ts`](../../apps/mobile/src/lib/background-fetch.test.ts): after an account switch, Home and background fetch read and store only the current member's ritual.
+- [`apps/mobile/src/screens/hero-identity-cache.test.tsx`](../../apps/mobile/src/screens/hero-identity-cache.test.tsx) and [`apps/mobile/src/lib/background-task.test.ts`](../../apps/mobile/src/lib/background-task.test.ts): after an account switch, Home and the background task read and store only the current member's ritual.
 - [`apps/mobile/src/screens/hero-session-restore.test.tsx`](../../apps/mobile/src/screens/hero-session-restore.test.tsx): Home loads once a cold-start identity is ready.
 
 Pact contract tests:
@@ -10707,3 +10717,509 @@ CodeRabbit reviewing alongside the builder.
    Burn-in, deployed E2E and Maestro shard by duration (#200), and the watchOS prebuild stopped
    compiling SDK modules three times (#204). Operator commands verify production TLS from macOS
    (#201), and the integration tier runs at `privacy_version` 1 like production (#202).
+
+## Step 55: Expo SDK 58 upgrade for live font-scale layout
+
+User/business impact:
+
+On Expo SDK 54 with React Native 0.81.5, Fabric keeps the font scale a text node was first
+measured with.
+A member who raises the system text size while the app runs sees bigger glyphs drawn into boxes of
+the old height.
+Home, Community, Settings and the share-card composer clip text until the next cold launch.
+Story 6.8 recorded that failure and ruled out a renderer patch, so the fix has to come from
+upstream.
+React Native commit `45904c8` fixes it and first ships in 0.87.0.
+Expo SDK 57 pins 0.86.3, so SDK 58 (React Native 0.88.1, React 19.3.0) is the first SDK that
+carries the fix.
+The story climbs from SDK 54 through 55, 56 and 57 to 58 in five pull requests, one SDK at a time,
+and `main` holds a green, shippable Android app after each one.
+Step 0, PR #226, stays on SDK 54.
+It moves the app off the deprecated background fetch API and two retired `app.json` keys, adds a
+live font-scale proof that runs on a device, and reshapes CI, so each later step is a version bump
+with a proof attached.
+Members see one change, and only when Step 4 lands: text that follows a live size change with no
+restart.
+Every other visible change is a regression.
+
+Key takeaways:
+
+1. **Classify the result by the React Native version the app bundles.**
+   The proof reads the version the installed app reports through its test-build marker, so the
+   host's `node_modules` cannot mislabel a build.
+   From 0.87.0 only `fixed` passes.
+   Below it a run is `fixed`, `known-residual`, `restored` or a failure.
+   A residual passes only inside a reviewed entry in
+   `scripts/lib/fixtures/live-font-residual-baselines.json` that names the platform, build, screen
+   and the exact stale nodes.
+   An entry can relax stale heights and the growth of named probes; clipping, lost text and lost
+   reachability always fail.
+   No step needs a skip, an expected failure or `continue-on-error` to stay green, and Step 4
+   deletes the below-0.87 branch.
+2. **Test the text tree that survived the change.**
+   A recreated Activity or a remounted screen measures its text afresh at the new scale and keeps
+   the process id, so it would read as a fix.
+   `LiveFontMountMarker` renders invisible views whose testIDs carry a per-mount id, the font scale
+   JavaScript sees, and the React Native version with the applied theme, layout direction, density
+   and language.
+   The proof requires the same mount ids and the same Android Activity token before and after the
+   change, and classifies a change in either as `restored`.
+   Production builds render no marker; `app.config.ts` turns markers on for isolated native test
+   builds through `extra.liveFontMountMarkers`.
+3. **Judge growth by the platform's own conversion.**
+   Android 14 and later scale text nonlinearly, so `scripts/lib/live-font-scale-proof.mjs` carries
+   the AOSP `FontScaleConverterFactory` tables.
+   A small-text probe must grow, and a large-text probe correctly stays nearly unchanged.
+   iOS has no 1.5 step, so the proof walks the content-size categories `large` (1.0),
+   `extra-extra-extra-large` (1.353) and `accessibility-medium` (1.786), then back.
+   Live heights must equal cold-launch heights at the same scale within 2 px on Android and 1 pt on
+   iOS, and a cold base launch against a cold target launch proves the oracle on each screen first.
+   After the change a React update re-renders the screen, so a stale clone on a later commit shows.
+4. **Let Android keep its Activity on a font change.**
+   The Expo template's `MainActivity` `configChanges` lacks `fontScale` on SDK 54 and on SDK 58, so
+   every font change recreated the Activity and Android AC3 could never pass.
+   `apps/mobile/plugins/with-font-scale-config-changes.js` appends the token.
+   It is listed first in `app.json`, because Expo runs manifest mods in reverse order and the token
+   then lands after `expo-localization`'s `locale|layoutDirection`.
+   Its prebuild test compares the whole manifest and allows that one token on `MainActivity` only.
+5. **Rename a persisted background task when its consumer changes.**
+   `expo-task-manager` persists a registered task with its consumer, and registration skips a name
+   already registered, so reusing the old name would bind an upgraded install to the removed fetch
+   consumer.
+   The ritual task moved to `expo-background-task` as `RITUAL_BACKGROUND_TASK`.
+   Each launch first unregisters `RITUAL_BACKGROUND_FETCH_TASK` and logs a failure without throwing,
+   so a missing consumer cannot cost the member the new task.
+   `minimumInterval` is 15 minutes in the new API, where the fetch API took 900 seconds.
+6. **Compare generated native trees by structure.**
+   Prebuild draws `project.pbxproj` object IDs at random, so two prebuilds always differ byte for
+   byte.
+   `scripts/lib/prebuild-semantic-diff.mjs` labels each object by its fields and the labels of the
+   objects it references, refined until stable: renamed IDs match, while a retargeted reference or
+   a reordered build phase fails.
+   Every other file must be byte-identical apart from the deletions the caller names.
+   That rule let `newArchEnabled` and `edgeToEdgeEnabled` leave `app.json` with the New
+   Architecture and edge-to-edge still on.
+7. **Refuse a release in code while a known regression applies.**
+   SDK 56 ships a Hermes memory regression for apps that import Worklets or Reanimated, and this
+   app imports both.
+   `deploy-mobile.yml` runs `scripts/ci/mobile-release-hold.mjs` before EAS.
+   From SDK 56 a missing `apps/mobile/release-hold.json` refuses, so deleting the file releases
+   nothing.
+   Only a committed measurement artifact releases a build: the check recomputes peak and settled
+   memory ratios against the SDK 55 control and needs each within 10%.
+8. **Keep a key that crashes release builds out of every release bundle.**
+   The RevenueCat SDK crashes on purpose when a Test Store key runs in a non-debuggable build, and
+   Expo inlines `EXPO_PUBLIC_` values at export.
+   `selectRevenueCatApiKey` in `apps/mobile/src/lib/revenuecat-key.ts` refuses any `test_` key
+   outside `__DEV__`.
+   `scripts/ci/revenuecat-bundle-scan.mjs` exports both platforms in production mode with a
+   synthetic Test Store key present and fails on any hit, naming files only.
+   On the server, an event from a store we do not sell is record-only before any transition,
+   `TRANSFER` included.
+   The REST pull throws for an unsupported store or an entitlement it cannot represent, so refresh
+   answers 503 and reconciliation leaves the paid row as it is.
+9. **Count queue time and every outcome when timing a PR job.**
+   The owner's budget for each PR job is queue plus run: p95 15 minutes and a maximum of 20.
+   `scripts/ci/pr-job-p95.mjs` counts queue from the run attempt's creation and keeps failed,
+   timed-out and cancelled durations.
+   A job cancelled before it started counts its queue as a lower bound, and a verdict needs 20
+   completed observations of one job identity.
+10. **Put on pull requests only what Linux can run.**
+    The owner ruled on 2026-11-13 that no macOS runner job runs on a pull request or gates a merge.
+    The Foundation-only decision rules of the share, photo-save and accessibility-focus Swift
+    modules now live in files that build on Linux.
+    `.github/workflows/pr-apple-native.yml` runs them with `swift test` on ubuntu, beside the iOS
+    Maestro flow syntax check.
+    The Apple-framework glue, the iOS app build, the shards, Expo Go and watchOS run nightly and on
+    dispatch.
+    Each step's pre-merge iOS evidence is a recorded local run on the exact head SHA, with the build
+    identity.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- **Without `fontScale`, SDK 58 looked fixed for the wrong reason.**
+  On SDK 58 with no plugin, Home and the composer showed correct text with 0 misses, because the
+  recreated Activity measured everything afresh: `onCreate` went from 1 to 2.
+  The mount markers classified it as `restored`, and the TEA-16 spike (`8c9c181f`) moved the plugin
+  into Step 0.
+  On SDK 54 the plugin is no worse than the recreation it replaces: the same stale counts per
+  screen, with the Activity, React root and navigation state kept.
+- **A foreground scale write left JavaScript at the old scale.**
+  React Native reads the new font scale on resume.
+  The proof changes the scale through the system Settings screen by default
+  (`--scale-path settings`), the way a member does.
+- **SDK 58 with the plugin still settles stale in some runs.**
+  Home's return leg settled with the 1.5 heights in 3 of 5 runs (Cloudy 78 px against 51) at
+  JavaScript scale 1, and relaid out only on the first scroll.
+  Settings did the same at the settled 1.5 capture.
+  The proof names it `live_font_relayout_on_scroll`, and Step 4 must close it before AC3 can pass.
+- **R8 removed WorkManager's database constructor on SDK 58.**
+  The first SDK 58 Release APKs crashed at launch with
+  `NoSuchMethodException: androidx.work.impl.WorkDatabase_Impl.<init>`.
+  A keep rule for `androidx.room.RoomDatabase` subclasses fixed the spike, and Step 4 ships it
+  through a config plugin.
+- **React Native's `Modal` drops `accessibilityViewIsModal`.**
+  Set on the capsule builder's `EdgeToEdgeModal`, the prop did nothing, and VoiceOver could reach
+  the Wardrobe screen under the sheet.
+  It moved onto the sheet view (`66de9e80`).
+  The same prop hides every other view from the XCUITest hierarchy, so `EdgeToEdgeModal` puts the
+  modal's mount marker inside the first `accessibilityViewIsModal` view it finds (`d55a6ce8`,
+  `2561c69c`).
+- **Hiding the marker from assistive technology hid it from the proof on iOS.**
+  `aria-hidden` and `accessibilityElementsHidden` also remove a view from the XCUITest hierarchy
+  that Maestro reads, so on iOS the marker is a plain view with `accessible={false}`.
+  UiAutomator leaves out views under the translucent status bar, so the marker sits at mid-height
+  on the left edge.
+- **iOS captures needed three corrections.**
+  iOS repeats a static text as an identical element inside the one that labels it, so the reader
+  counts it once (`b3bfd15e`).
+  The status bar and scroll indicators change between captures, so the reader leaves them out
+  (`85036706`).
+  A hierarchy read can come from another simulator or build, so each read checks the device
+  fingerprint and the build marker, and retries `live_font_hierarchy_wrong_build:missing` 3 times
+  for that error only (`e23216b4`, `13873a7d`).
+- **Some screen regions appear and vanish with the network.**
+  Home's Shop this look block is served only from the network, and Community's cards and
+  horizontal filter-chip row change between launches.
+  Each screen declares such regions, and the capture drops them with their subtrees (`d8c600e5`).
+  Mount markers are compared by scope, so a screen that drops its own marker cannot read as a
+  remount (`a4505d81`).
+- **The REST pull gave an unknown store a real store's identity.**
+  `RealRevenueCatClient` mapped a store it did not know to `stripe`, so a Test Store purchase could
+  have entitled a member as a paying Stripe customer.
+  It also answered `null` for a lifetime or malformed entitlement, which reconciliation reads as
+  no entitlement, so a paying member could expire (Codex R3-01 and R4-01).
+  Both cases now throw, and real-Postgres tests prove the paid row unchanged with `TEST_ENV` unset,
+  `staging` and `production`.
+- **Success-only timing hid a breach.**
+  The first live run of `pr-job-p95.mjs` on `watchos-native.yml` found a cancelled job at 20.5
+  minutes and a queue-inclusive p95 of 17.8, which the success-only table in spec D6 could not
+  show.
+- **The mobile plugin prebuild suites ran in no workflow.**
+  The widget and background-task prebuild suites ran only through `apps/mobile` `npm test`.
+  `pr-checks.yml` now runs them with the font-scale suite in the mobile coverage shard, and a red
+  suite fails that shard in the coverage comment (`41ef1b75`).
+- **`expo-task-manager` kept declaring the old iOS background mode.**
+  Its plugin adds the iOS `fetch` mode whenever the package is installed, and Expo applies the
+  `expo-background-task` plugin only when `app.json` lists it.
+  `app.json` lists it, and `apps/mobile/plugins/with-background-modes.js` removes `fetch`.
+- **The macOS queue made pull-request evidence unworkable.**
+  On 2026-11-13 native dispatch evidence waited 30 to 70 minutes behind a shared cap of 5
+  concurrent macOS jobs.
+  The owner moved every macOS job to the nightly cron and dispatch (#224, #225), and the story
+  dropped its own PR evidence judge and dispatch gate when it merged that `main`.
+
+Story/Task mapping:
+
+- Story 6.15
+- Task numbers follow the order of the spec's Execution checklist, which has none.
+- Task 1 (Step 0: live font-scale proof keyed on the bundled React Native version, with markers,
+  identity check, growth, clipping and post-change update), Android runs done, iOS legs open
+- Task 2 (Step 0: TEA-16 spike and `with-font-scale-config-changes.js` with its whole-manifest
+  test)
+- Task 3 (Step 0: font-scale reads guard)
+- Task 4 (Step 0: `expo-background-task`, tolerant unregister, prebuild test, in-place upgrade)
+- Task 5 (Step 0: `app.json` keys removed under the semantic prebuild diff)
+- Task 6 (Step 0: CI shape: Linux Swift rules on PRs, macOS nightly only, `pr-job-p95.mjs`,
+  release hold in `deploy-mobile`, the nightly `ios-live-font` job, the canary at 06:37 UTC)
+- Task 7 (every step's merge gate: Expo Go pin, React parity, all-ABI check, native evidence on
+  the head SHA, upgrade smoke, network-timeout check, Test Store journey), guards landed, device
+  checks open
+- Task 8 (Step 1, SDK 55), not started
+- Task 9 (Step 2, SDK 56, with the memory measurement and the release hold file), not started
+- Task 10 (Step 3, SDK 57), not started
+- Task 11 (Step 4, SDK 58, the complete-fix assertion and the D5 verdicts), not started
+- Task 12 (D7 production-shaped run), not started
+- Task 13 (Step 0: RevenueCat Test Store, key hygiene and the server partition), partly landed
+- Task 14 (D11 store and device gates), blocked on Apple and Google enrollment
+- Task 15 (this learning path step, the deployment guide, sprint status)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`, with
+  decisions D1 to D15, the Plan Change Log (TEA-01 to TEA-20, CX-01 to CX-14, R2 to R4, TD-01 to
+  TD-09) and the Step 0 Implementation Notes
+- `_bmad-output/test-artifacts/test-design/cc615-expo-sdk58-live-font-scale-test-design.md`, with
+  22 risks and the test IDs this step cites
+- `_bmad-output/test-artifacts/test-design/cc615-ios-native-flake-log.md`
+- `_bmad-output/implementation-artifacts/story-6-15/HANDOFF.md`, the state at the 2026-11-13
+  builder handover
+- `_bmad-output/implementation-artifacts/story-6-15/preflight-expo-sdk-58.md`
+- `_bmad-output/implementation-artifacts/story-6-15/reviews/`, the Antigravity review reports
+- PR #226 on `feat/story-6-15-expo-sdk-58`, a draft and not merged when this step was written
+
+Cross-links:
+
+- Step 23 provides the Story 3.3 ritual background task this step moves to
+  `expo-background-task`.
+- Step 24 provides the watchOS prebuild suite, which now runs nightly with
+  `WATCHOS_REQUIRE_BUILD=1`.
+- Step 34 provides the RevenueCat ledger, webhook and reconciliation that the Test Store partition
+  protects.
+- Step 46 provides `apps/mobile/modules/accessibility-focus`, whose focus rules now build on Linux.
+- Step 48 provides the Story 6.8 failing baseline, the composer workarounds that D5 judges at Step
+  4, and the `story68` cold font-scale matrix.
+- Step 49 provides the share-card native share and photo-save Swift modules whose rules now build
+  on Linux.
+- Step 54 provides the complimentary flow that Step 4 re-proves on RevenueCat 11 and the grant the
+  D7 test member holds.
+
+Sequence to follow:
+
+1. The spec's Intent, then D5, for the bug, the version switch and the oracle.
+2. `scripts/lib/live-font-scale-proof.mjs` for the classes, the growth tables and the residual
+   check.
+3. `scripts/lib/live-font-journey.mjs` for the order of cold references and live legs per screen.
+4. `scripts/lib/live-font-capture.mjs` for turning Maestro hierarchies and `adb` output into
+   captures.
+5. `scripts/run-live-font-proof.mjs` with the flows in `maestro/live-font/` for the device IO.
+6. `apps/mobile/components/live-font-mount-marker.tsx`, then `withModalMarker` in
+   `apps/mobile/components/edge-to-edge-modal.tsx`, for the identity the proof reads.
+7. `apps/mobile/plugins/with-font-scale-config-changes.js` for the Android Activity.
+8. `apps/mobile/src/lib/background-task.ts` and `apps/mobile/plugins/with-background-modes.js` for
+   the task move.
+9. `scripts/lib/prebuild-semantic-diff.mjs` for the structural prebuild comparison.
+10. `scripts/ci/mobile-release-hold.mjs`, called from `.github/workflows/deploy-mobile.yml`.
+11. `apps/mobile/src/lib/revenuecat-key.ts` and `scripts/ci/revenuecat-bundle-scan.mjs`, then
+    `planRevenueCatTransition` in `apps/api/src/modules/commerce/billing-webhook.service.ts` and
+    the REST pull in `apps/api/src/modules/commerce/revenuecat-client.ts`.
+12. `scripts/ci/pr-job-p95.mjs`, `.github/workflows/pr-apple-native.yml` and the new lanes in
+    `scripts/ci/lanes.mjs` for the CI shape.
+
+Task owner map:
+
+- Story 6.15 Task 1 step 1 owner: judge in `scripts/lib/live-font-scale-proof.mjs`, order legs in `scripts/lib/live-font-journey.mjs`, read captures in `scripts/lib/live-font-capture.mjs`, drive devices from `scripts/run-live-font-proof.mjs` with flows in `maestro/live-font/`, approve residuals in `scripts/lib/fixtures/live-font-residual-baselines.json`, and pin the Story 6.8 signature in `scripts/lib/fixtures/live-font-6-8-baseline.json`.
+- Story 6.15 Task 1 step 2 owner: render markers from `apps/mobile/components/live-font-mount-marker.tsx` in `apps/mobile/app/_layout.tsx`, `apps/mobile/app/(tabs)/index.tsx`, `apps/mobile/app/(tabs)/settings.tsx`, `apps/mobile/src/features/community/community-screen.tsx` and `apps/mobile/components/edge-to-edge-modal.tsx`, enabled for test builds in `apps/mobile/app.config.ts`.
+- Story 6.15 Task 1 step 3 owner: make the sheet the accessibility modal view in `apps/mobile/components/wardrobe/capsule-builder-modal.tsx`.
+- Story 6.15 Task 2 owner: append `fontScale` in `apps/mobile/plugins/with-font-scale-config-changes.js`, listed first in `apps/mobile/app.json`.
+- Story 6.15 Task 3 owner: allow font-scale reads at the composer sites only in `scripts/ci/font-scale-reads.test.mjs`.
+- Story 6.15 Task 4 owner: define and register the ritual task in `apps/mobile/src/lib/background-task.ts`, called from `apps/mobile/app/_layout.tsx`, with the iOS mode removed in `apps/mobile/plugins/with-background-modes.js`.
+- Story 6.15 Task 5 owner: compare prebuilt trees in `scripts/lib/prebuild-semantic-diff.mjs`, with the keys removed from `apps/mobile/app.json`.
+- Story 6.15 Task 6 step 1 owner: time PR jobs in `scripts/ci/pr-job-p95.mjs`, run the Linux Swift rules in `.github/workflows/pr-apple-native.yml` with lanes in `scripts/ci/lanes.mjs`, run the plugin suites in `.github/workflows/pr-checks.yml`, and hold releases in `scripts/ci/mobile-release-hold.mjs` from `.github/workflows/deploy-mobile.yml`.
+- Story 6.15 Task 6 step 2 owner: keep the Foundation-only rules in `apps/mobile/modules/accessibility-focus/ios/AccessibilityFocusRules.swift`, `apps/mobile/modules/share-card-native-share/ios/ShareCardShareFile.swift` and `apps/mobile/modules/share-card-photo-save/ios/ShareCardPngFile.swift`, built by each module's `Package.swift`.
+- Story 6.15 Task 7 owner: pin Expo Go in `scripts/lib/expo-go-version.mjs` and check React parity in `scripts/lib/react-parity.mjs`.
+- Story 6.15 Task 13 owner: select the RevenueCat key in `apps/mobile/src/lib/revenuecat-key.ts` from `apps/mobile/src/lib/premium.ts`, scan release exports in `scripts/ci/revenuecat-bundle-scan.mjs`, keep unsupported stores record-only in `apps/api/src/modules/commerce/billing-webhook.service.ts`, and refuse them in the REST pull in `apps/api/src/modules/commerce/revenuecat-client.ts`.
+- Story 6.15 Task 15 owner: document in `_bmad-output/project-knowledge/learning-path-step-by-step.md` and `_bmad-output/project-knowledge/deployment-guide.md`.
+
+Tests that cover this step:
+
+Live font-scale proof, `node --test`:
+
+- [`scripts/lib/live-font-scale-proof.test.mjs`](../../scripts/lib/live-font-scale-proof.test.mjs):
+  proves the fix is expected from 0.87.0 by semver, the AOSP nonlinear curve and iOS multipliers,
+  the Story 6.8 baseline as a known residual, the residual predicate in and out, restart,
+  recreation and remount as `restored`, clipping, and cold captures refused as live ones.
+- [`scripts/lib/live-font-capture.test.mjs`](../../scripts/lib/live-font-capture.test.mjs):
+  proves text keeps its parent bounds, volatile regions drop with their subtrees, iOS static text
+  counts once, the resumed `MainActivity` token and `onCreate` count read right, and an
+  unavailable log reads as unknown.
+- [`scripts/lib/live-font-journey.test.mjs`](../../scripts/lib/live-font-journey.test.mjs): proves
+  iOS walks every category and back on one live launch, Android goes 1.0 to 1.5 and back, and a
+  stale leg, a missing screen marker, a remount between legs or a failed capture fails the run.
+
+Mobile component and unit tests:
+
+- [`apps/mobile/components/live-font-mount-marker.test.tsx`](../../apps/mobile/components/live-font-mount-marker.test.tsx):
+  proves one id per mount, a new id on remount, the font scale, version and configuration
+  readings, the accessibility props per platform, and no marker outside development and test
+  builds.
+- [`apps/mobile/components/edge-to-edge-modal.test.tsx`](../../apps/mobile/components/edge-to-edge-modal.test.tsx):
+  proves the modal's marker lands inside the accessibility modal view through wrappers, fragments
+  and arrays, and beside content that has none.
+- [`apps/mobile/components/share-card-composer.marker.test.tsx`](../../apps/mobile/components/share-card-composer.marker.test.tsx):
+  proves the composer's marker sits inside the sheet that is the accessibility modal.
+- [`apps/mobile/components/wardrobe/capsule-builder-modal.test.tsx`](../../apps/mobile/components/wardrobe/capsule-builder-modal.test.tsx):
+  proves the capsule builder sheet is the accessibility modal view and holds the marker.
+- [`apps/mobile/src/lib/background-task.test.ts`](../../apps/mobile/src/lib/background-task.test.ts):
+  proves the ritual task's freshness rules, refresh and publication on `expo-background-task`, the
+  15-minute interval, and that launch unregisters the retired fetch task and survives a failure
+  there.
+- [`apps/mobile/src/lib/revenuecat-key.test.ts`](../../apps/mobile/src/lib/revenuecat-key.test.ts):
+  proves the Test Store key in a development bundle only, the platform key in a release bundle,
+  and any `test_` key refused outside `__DEV__`.
+
+Config plugin prebuild suites, `node --test`:
+
+- [`apps/mobile/plugins/font-scale-config-changes.test.js`](../../apps/mobile/plugins/font-scale-config-changes.test.js):
+  proves the whole-manifest delta is the one `fontScale` token on `MainActivity`, refuses each
+  mutant, and that the plugin is idempotent and keeps token order.
+- [`apps/mobile/plugins/background-task-prebuild.test.js`](../../apps/mobile/plugins/background-task-prebuild.test.js):
+  proves the iOS `processing` mode, the permitted identifier
+  `com.expo.modules.backgroundtask.processing`, no `fetch` mode, and no fetch component on
+  Android.
+
+Guards and CI scripts, `node --test`:
+
+- [`scripts/lib/prebuild-semantic-diff.test.mjs`](../../scripts/lib/prebuild-semantic-diff.test.mjs):
+  proves regenerated object IDs and the exact `newArchEnabled` deletion pass, and an unrelated
+  `gradle.properties` change, the New Architecture off, a reordered phase, a retargeted
+  configuration and changed format versions fail.
+- [`scripts/ci/font-scale-reads.test.mjs`](../../scripts/ci/font-scale-reads.test.mjs): proves only
+  the composer layout rules read the font scale, and a seeded `AppText` or a stray composer read
+  fails.
+- [`scripts/lib/react-parity.test.mjs`](../../scripts/lib/react-parity.test.mjs): proves one React
+  across every workspace and the lockfile, and catches each kind of drift.
+- [`scripts/lib/expo-go-version.test.mjs`](../../scripts/lib/expo-go-version.test.mjs): proves the
+  Expo Go pin runs the app's `expo` major and every reader takes the shared pin.
+- [`scripts/ci/mobile-release-hold.test.mjs`](../../scripts/ci/mobile-release-hold.test.mjs):
+  proves no hold before SDK 56, a refusal for a missing hold file or a missing lift, a release
+  within 10% on both platforms, and a refusal for every malformed, mismatched or earlier-SDK lift.
+- [`scripts/ci/revenuecat-bundle-scan.test.mjs`](../../scripts/ci/revenuecat-bundle-scan.test.mjs):
+  proves the scan finds the configured key and any `test_` key while naming files only, and that
+  the PR job runs it with a synthetic key.
+- [`scripts/ci/pr-job-p95.test.mjs`](../../scripts/ci/pr-job-p95.test.mjs): proves nearest-rank
+  p95, failed, timed-out and cancelled durations kept, queue-only lower bounds, the 20-observation
+  rule, and that fast jobs cannot dilute one slow job.
+- [`scripts/ci/apple-native-workflow.test.mjs`](../../scripts/ci/apple-native-workflow.test.mjs):
+  proves `pr-apple-native.yml` runs Linux jobs only, each Swift step fails on zero tests, the Linux
+  targets import no Apple-only framework outside its guard, and the watchOS suite runs on macOS
+  nightly with `WATCHOS_REQUIRE_BUILD=1`.
+- [`scripts/ci/ios-native-workflow.test.mjs`](../../scripts/ci/ios-native-workflow.test.mjs):
+  landed on `main` with PR #224; proves the nightly iOS workflow's one build, four shards and Expo
+  Go, and that every mandatory check fails its step.
+- [`scripts/ci/coverage-shards.test.mjs`](../../scripts/ci/coverage-shards.test.mjs) and
+  [`scripts/ci/lanes.test.mjs`](../../scripts/ci/lanes.test.mjs): prove a red plugin prebuild suite
+  fails the mobile shard, a JavaScript-only change wakes no Swift job, and any mobile source wakes
+  the bundle scan.
+
+Swift rules on Linux, `swift test` in `pr-apple-native.yml`:
+
+- [`apps/mobile/modules/accessibility-focus/ios/Tests/AccessibilityFocusRulesTests/AccessibilityFocusRulesTests.swift`](../../apps/mobile/modules/accessibility-focus/ios/Tests/AccessibilityFocusRulesTests/AccessibilityFocusRulesTests.swift):
+  proves the focus decisions: a view outside a window or a hidden ancestor refuses focus, and the
+  semantic target is the one element with the view's frame.
+- [`apps/mobile/modules/share-card-native-share/ios/Tests/ShareCardShareFileTests.swift`](../../apps/mobile/modules/share-card-native-share/ios/Tests/ShareCardShareFileTests.swift),
+  [`ShareCardAnchorConfigurationTests.swift`](../../apps/mobile/modules/share-card-native-share/ios/Tests/ShareCardAnchorConfigurationTests.swift)
+  and
+  [`apps/mobile/modules/share-card-photo-save/ios/Tests/ShareCardPhotoSaveTests.swift`](../../apps/mobile/modules/share-card-photo-save/ios/Tests/ShareCardPhotoSaveTests.swift):
+  prove the share-file and PNG rules on Linux, including a chunk with a bad CRC, a non-UUID share
+  directory and bounded anchor coordinates.
+
+API unit and integration tests:
+
+- [`apps/api/src/modules/commerce/revenuecat-client.spec.ts`](../../apps/api/src/modules/commerce/revenuecat-client.spec.ts):
+  proves the REST pull throws for an unsupported or missing store and for a missing product,
+  lifetime or invalid expiry.
+- [`apps/api/src/modules/commerce/billing-webhook.service.spec.ts`](../../apps/api/src/modules/commerce/billing-webhook.service.spec.ts):
+  proves every event from a store we do not sell, `TRANSFER` included, is record-only under each
+  `TEST_ENV`.
+- [`apps/api/src/modules/commerce/subscription.service.spec.ts`](../../apps/api/src/modules/commerce/subscription.service.spec.ts):
+  proves an unsupported-store ledger entitlement answers 503 and applies nothing.
+- [`apps/api/integration/premium-revenuecat-webhook.integration.spec.ts`](../../apps/api/integration/premium-revenuecat-webhook.integration.spec.ts),
+  [`premium-reconciliation.integration.spec.ts`](../../apps/api/integration/premium-reconciliation.integration.spec.ts)
+  and
+  [`premium-subscription.integration.spec.ts`](../../apps/api/integration/premium-subscription.integration.spec.ts):
+  prove on real PostgreSQL that a Test Store purchase or transfer grants nothing, and refresh and
+  reconciliation keep a paid row, with `TEST_ENV` unset, `staging` and `production`.
+
+Device runs, outside CI:
+
+- `node scripts/run-live-font-proof.mjs --platform android|ios ...` runs Home, Community, Settings
+  and the composer on an emulator or simulator and writes private evidence under `--out`.
+  No workflow runs it yet; see `Evidence boundaries`.
+
+Evidence boundaries:
+
+- **Written before review and merge, while the story is in flight.**
+  This step was written at branch head `fb055c16` on `feat/story-6-15-expo-sdk-58`.
+  PR #226 was a draft at `dee515eb`, with 4 checks passed, 12 pending and 16 skipped.
+  `sprint-status.yaml` lists the story as `drafted`.
+  The branch is still on SDK 54, Steps 1 to 4 have not started, and like Steps 38, 39 and 49 this
+  step departs from instruction 2 on purpose.
+- **What TEA planned.**
+  22 risks, 13 of them high, 7 medium and 2 low, with every Codex item (CX, R2 to R4, TD) mapped
+  to test IDs in the test design.
+- **Android Step 0 live font runs ran, and their evidence files are lost.**
+  The runs on 2026-11-12 and 13 used an API 36 `google_apis` arm64 emulator and the
+  non-debuggable Release build.
+  SDK 54 without the plugin was `restored` on all four screens, with stale nodes on Home 32 of 39,
+  composer 5 of 5, Settings 19 of 23 and Community 11 of 15.
+  SDK 54 with the plugin was `known-residual` with the same stale counts and the Activity and root
+  kept.
+  The growth controls passed on every screen: Home Cloudy 1.529 against 1.571 expected, Community
+  New post 1.511 against 1.538, Settings Language 1.439 against 1.438, composer title 1.109
+  against 1.103.
+  The private evidence under `_bmad-output/test-artifacts/story-6-15/runs/` is gone, so the
+  numbers here come from the spec's Implementation Notes and the handoff, and the runs get
+  re-recorded on the merge head.
+  P0-07, the Android in-place upgrade from an `a01e0307` Release with a reboot, kept the session
+  and left exactly one WorkManager job; its record sat in the same lost directory.
+- **Every baseline run still fails as `live_font_residual_unapproved`.**
+  `scripts/lib/fixtures/live-font-residual-baselines.json` has no reviewed entries, and TEA
+  approves an entry only for an exact, structurally clean residual.
+- **iOS Step 0 legs are still in progress.**
+  The one four-screen Release run on the iOS 26.1 simulator, built from `e23216b4`, ended
+  `pass: false`.
+  Home and Community failed as `live_font_residual_unapproved`.
+  Settings failed on control text and baseline checks that `a4505d81` and `b3bfd15e` address.
+  The composer leg was void, because the modal marker fix landed after that build.
+  The rerun on the merged head, P0-08 retained state on one simulator and the capsule builder
+  hierarchy check have not run.
+- **Still in progress for Step 0.**
+  The D15 RevenueCat Test Store journey on `debug` and `minifiedDebuggable` has not run on a
+  device. The `minifiedDebuggable` build type, the `test_store` ledger value for `TEST_ENV`
+  `local` and `preview`, and the server rules that make a `test_store` row no paid access
+  elsewhere have landed with tests.
+  The CX-06 reflection mutant on `ModalSystemBarsModule` drops the class's constructor in a local
+  `minifiedDebuggable` build; the launch failure it should cause is inferred from Expo's eager
+  module registration and counts only once seen on a device with the control build green.
+  RevenueCat ships `-keep class com.revenuecat.** { *; }`, so the story records no targeted R8
+  evidence for RevenueCat; the evidence script checks its classes survive shrinking.
+  The Maestro network-timeout flow passes its syntax check and has not run on a device.
+  The nightly `ios-native.yml` now runs `scripts/run-live-font-proof.mjs` in `ios-live-font`; it
+  has not run on a real runner yet, and it stays red until TEA approves residual baselines from
+  the proposals the driver writes.
+- **Development client reinstall.**
+  A committed test-only keystore now signs Android `debug` and `minifiedDebuggable`, so a
+  development client installed before Step 0 needs one uninstall. The Release key is unchanged.
+- **No macOS job runs on a pull request (owner rule, 2026-11-13).**
+  The iOS evidence for this PR is a recorded local run of the iOS native suites on the exact head
+  SHA, with the build identity.
+  The nightly `ios-native.yml` run on `main` gates opening Step 1.
+- **Local suites and seeded defects.**
+  After the merge of `main` as `3d6bd7a8`, the `node --test` run over `scripts/ci/*.test.mjs` and
+  `scripts/lib/*.test.mjs` passed 2489 of 2502; the 13 failures are two known environment cases.
+  The later commits, from merge `8586f43c` through `fb055c16`, came after that count, and CI on
+  the PR covers them.
+  The seeded defects in the Implementation Notes turned their tests red: dropping the unregister
+  call, dropping the plugin from `app.json`, `hermesEnabled=false` in the prebuild diff, and
+  dropping cancelled jobs from the timing.
+  Their red-proof logs are gone, so a reviewer reruns the mutant to reproduce one.
+- **Reviews.**
+  Antigravity cleared `13873a7d..2561c69c` after three rounds.
+  It has not reviewed `66de9e80`, `a4505d81`, `b3bfd15e`, the `5c4ddbcc` spec amendment, the
+  merges, or the commits after them.
+  The local high-effort code review and the zero-thread check have not run.
+- **Config changes on SDK 54 Release.**
+  Theme changed in place, and density recreated the Activity with the process and route kept.
+  Locale `ar-EG` changed in place, while the layout stays left to right until the next launch,
+  because React Native fixes `I18nManager.isRTL` at startup; R3-07 stays open for TEA.
+- **Blocked on enrollment (D11).**
+  Neither an Apple Developer nor a Google Play account exists.
+  BackgroundTask registration and a worker run on a physical iPhone, the device font proof, store
+  sandbox purchases and restores, and TestFlight are reported as blocked, and they hold every iOS
+  release.
+  iOS simulators cannot run BackgroundTask, so the simulator proves retained state only.
+- **Cross-link comments.**
+  Eight listed test files carry no `Learning path Step 55` comment: `edge-to-edge-modal.test.tsx`,
+  `capsule-builder-modal.test.tsx`, `coverage-shards.test.mjs`, `lanes.test.mjs` and the four
+  Swift test files.
+- **Known work for later steps.**
+  Step 4 must close `live_font_relayout_on_scroll` and ship the WorkManager keep rule.
+  Step 2 measures the SDK 56 memory regression and commits `apps/mobile/release-hold.json`.
+
+Architecture diagram:
+
+```mermaid
+flowchart TD
+  Build["test build: Release or dev client\nliveFontMountMarkers on"] --> Marker["LiveFontMountMarker\nmount id, JS font scale, RN version"]
+  Driver["scripts/run-live-font-proof.mjs\nadb, simctl, Maestro"] -->|"cold launch per scale"| Cold["cold references\ngrowth control first"]
+  Driver -->|"one live launch walks the scales"| Live["live legs: immediate, settled,\nupdated, reverted"]
+  Marker --> Capture["live-font-capture.mjs\ntext, bounds, identity"]
+  Cold --> Capture
+  Live --> Capture
+  Capture --> Oracle{"live-font-scale-proof.mjs\nRN version at least 0.87.0?"}
+  Oracle -->|"yes"| Fixed["only fixed passes"]
+  Oracle -->|"no"| Classes["fixed, known-residual, restored or failure"]
+  Classes -->|"known-residual"| Baseline["reviewed entry in\nlive-font-residual-baselines.json"]
+  Oracle --> Verdict["aggregate verdict\nnonzero exit on any failed leg"]
+```

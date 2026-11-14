@@ -556,6 +556,8 @@ export async function seedPremiumEntitlements(
         will_renew: seed.willRenew,
         current_period_end: seed.currentPeriodEnd,
         synced_at: PREMIUM_SEED_SYNCED_AT,
+        // A reseed is a confirmed sync too: no drift settle may survive it (story 6.15 r40).
+        drift_settled_at: null,
         last_event_occurred_at: PREMIUM_SEED_SYNCED_AT,
         last_event_id: `seed-premium-${seed.status}`,
       },

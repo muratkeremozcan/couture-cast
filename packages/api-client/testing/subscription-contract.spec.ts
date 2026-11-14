@@ -1,14 +1,18 @@
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   billingWebhookResponseSchema,
   checkoutSessionRequestSchema,
   checkoutSessionResponseSchema,
   conflictHttpErrorSchema,
+  entitlementStoreSchema,
   notFoundHttpErrorSchema,
   portalSessionResponseSchema,
   serviceUnavailableHttpErrorSchema,
   subscriptionPlanSchema,
   subscriptionResponseSchema,
+  subscriptionManageEntry,
   subscriptionSchema,
   unauthorizedHttpErrorSchema,
   BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE,
@@ -101,7 +105,13 @@ describe('subscription status response', () => {
   })
 
   it('5.2-CONTRACT-07 accepts every store the ledger can report', () => {
-    for (const store of ['app_store', 'play_store', 'stripe', 'promotional'] as const) {
+    for (const store of [
+      'app_store',
+      'play_store',
+      'stripe',
+      'promotional',
+      'test_store',
+    ] as const) {
       expect(
         subscriptionSchema.safeParse({ ...entitledSubscription, store }).success
       ).toBe(true)
@@ -241,5 +251,38 @@ describe('error envelopes and messages', () => {
     for (const source of registeredPathSources) {
       expect(source).not.toMatch(/\{userId\}|\{id\}/)
     }
+  })
+})
+
+describe('subscriptionManageEntry', () => {
+  // Story 6.15: web and mobile both read this, so every store is decided once.
+  it('sends Stripe to the web, the stores to the store, and grants and Test Store nowhere', () => {
+    const entries = Object.fromEntries(
+      entitlementStoreSchema.options.map((store) => [
+        store,
+        subscriptionManageEntry(store),
+      ])
+    )
+    expect(entries).toEqual({
+      app_store: 'store',
+      play_store: 'store',
+      stripe: 'web',
+      promotional: 'none',
+      test_store: 'none',
+    })
+  })
+})
+
+describe('the Test Store webhook probe', () => {
+  // Story 6.15 D15: scripts/lib keeps the handler's 401 message as a literal, since the node
+  // test gate runs before this package builds; this case keeps it equal to the contract.
+  it('classifies the handler 401 by the contract message', async () => {
+    const probePath = pathToFileURL(
+      path.resolve(__dirname, '../../../scripts/lib/test-store-webhook.mjs')
+    ).href
+    const probe = (await import(/* @vite-ignore */ probePath)) as {
+      UNAUTHORIZED_MESSAGE: string
+    }
+    expect(probe.UNAUTHORIZED_MESSAGE).toBe(BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE)
   })
 })

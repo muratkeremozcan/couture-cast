@@ -1,0 +1,10 @@
+# Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: tab-settings
+- scrollUntilVisible:
+    element:
+      id: settings-language-title
+    direction: UP
+    timeout: 30000

@@ -267,6 +267,36 @@ export const LANES = {
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },
+  'revenuecat-bundle': {
+    title: 'RevenueCat Test Store key bundle scan',
+    workflow: 'pr-checks.yml',
+    jobs: ['revenuecat-bundle-scan'],
+    // The scan exports and searches the whole app, so any file the export bundles is an input:
+    // a new source can read the key outside __DEV__ or carry a test_ literal.
+    workspaces: ['mobile'],
+  },
+  // The Apple module rules that run on Linux (story 6.15 D6). Every macOS job runs nightly and
+  // on demand only, never on a pull request.
+  'ios-unit': {
+    title: 'iOS module rules (Linux)',
+    workflow: 'pr-apple-native.yml',
+    jobs: ['swift-linux'],
+    // The Foundation-only Swift rules build from these directories alone.
+    inputs: [
+      'apps/mobile/modules/share-card-native-share/ios/**',
+      'apps/mobile/modules/share-card-photo-save/ios/**',
+      'apps/mobile/modules/accessibility-focus/ios/**',
+      // The header semantics controls (scripts/ci/share-card-header-semantics.sh).
+      'apps/mobile/native-tests/ShareCardHeaderSemantics.swift',
+    ],
+  },
+  'ios-flow-syntax': {
+    title: 'iOS Maestro flow syntax (Linux)',
+    workflow: 'pr-apple-native.yml',
+    jobs: ['ios-flow-syntax'],
+    // The flows scripts/ci/maestro-check-flows.mjs checks.
+    inputs: ['maestro/story65/**', 'maestro/story67/**', 'maestro/story68/**'],
+  },
 }
 
 /** A glob as a RegExp: `**` spans directories, `*` and `?` stay within one, dotfiles match. */

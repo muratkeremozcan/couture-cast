@@ -327,6 +327,46 @@ describe('5.2 Stripe rail against real PostgreSQL and real HTTP', () => {
       )
     })
 
+    // Learning path Step 55: story 6.15 D15. A stray test_store row blocks a real Stripe purchase
+    // only where the Test Store is honored.
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`answers ${open ? '409' : '201'} over an active test_store row (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: buyerId,
+                status: 'active',
+                store: 'test_store',
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+
+          const response = await request(httpServer())
+            .post('/api/v1/commerce/subscription/checkout-session')
+            .set('authorization', tokenFor(buyerId))
+            .send({ plan: 'premium_monthly' })
+
+          expect(response.status).toBe(open ? 409 : 201)
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+
     it('creates the session, upserts BillingCustomer, and emits premium_checkout_started', async (context) => {
       if (!requireSchema(context)) return
 

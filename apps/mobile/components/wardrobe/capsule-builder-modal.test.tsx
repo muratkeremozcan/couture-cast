@@ -1,5 +1,7 @@
 // Learning path Step 31: Outfit capsule builder.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -53,6 +55,7 @@ import {
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
   paddingBottomOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 
 function garment(
@@ -628,6 +631,17 @@ describe('MobileCapsuleBuilderModal', () => {
 })
 
 describe('R52 MobileCapsuleBuilderModal over the system bars', () => {
+  // Story 6.15 review P3-1: the sheet is the accessibility modal view (react-native's Modal
+  // drops the prop, so on the Modal it left the Wardrobe screen reachable underneath), and the
+  // modal's live-font marker sits inside it, where iOS keeps it in the XCUITest hierarchy.
+  it('makes the sheet the accessibility modal and puts the live-font marker inside it', () => {
+    renderModal()
+    expect(liveFontMarkerPlacement()).toEqual({
+      markerInside: true,
+      host: 'mobile-capsule-builder-container',
+    })
+  })
+
   beforeAll(async () => {
     await initI18n()
     await i18n.changeLanguage('en-US')

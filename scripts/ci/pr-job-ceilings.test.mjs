@@ -110,17 +110,12 @@ test(`every job a pull request runs stops within ${CEILING} minutes`, () => {
 test('the jobs skipped on pull requests are exactly the device and release lanes', () => {
   assert.deepEqual(pullRequestJobs().skipped.sort(), [
     'pr-accessibility-focus.yml:ios',
-    'pr-accessibility-focus.yml:ios-app-build',
     'pr-share-card-native.yml:android36-controls',
     'pr-share-card-native.yml:android36-interaction',
     'pr-share-card-native.yml:android36-matrix-evidence',
     'pr-share-card-native.yml:android36-native-matrix',
     'pr-share-card-native.yml:android36-original',
     'pr-share-card-native.yml:android36-release-font',
-    'pr-share-card-native.yml:ios-build',
-    'pr-share-card-native.yml:ios-evidence',
-    'pr-share-card-native.yml:ios-expo-go',
-    'pr-share-card-native.yml:ios-shard',
     'pr-share-card-native.yml:original-resource',
     'pr-share-card-native.yml:original-resource-evidence',
     'pr-share-native-unit.yml:swift',

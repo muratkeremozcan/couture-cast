@@ -6,12 +6,25 @@ import { UnauthorizedException, type INestApplication } from '@nestjs/common'
 import { HttpAdapterHost } from '@nestjs/core'
 import { Test, type TestingModule } from '@nestjs/testing'
 import request from 'supertest'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import {
   buildPremiumEntitlementCreateInput,
   createPremiumEntitlement,
 } from '@couture/testing'
-import { BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE } from '../src/contracts/http.js'
+import {
+  BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE,
+  premiumAccessResponseSchema,
+  subscriptionResponseSchema,
+} from '../src/contracts/http.js'
 import { ApiExceptionFilter } from '../src/filters/api-exception.filter.js'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
@@ -649,6 +662,317 @@ describe('5.2 RevenueCat webhook rail against real PostgreSQL and real HTTP', ()
       // The loser still lost — RC has already moved the subscription.
       expect((await entitlementOf(subscriberId))?.status).toBe('revoked')
     })
+  })
+
+  // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  describe('story 6.15 R3-01: a RevenueCat Test Store event never changes production access', () => {
+    // `qa` stands for any TEST_ENV other than the D15 local and preview.
+    for (const testEnv of [undefined, 'staging', 'production', 'qa'] as const) {
+      describe(`with TEST_ENV ${testEnv ?? 'unset'}`, () => {
+        const saved = process.env.TEST_ENV
+        beforeEach(() => {
+          if (testEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = testEnv
+        })
+        afterEach(() => {
+          if (saved === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = saved
+        })
+
+        it('a TEST_STORE purchase is recorded and grants nothing', async (context) => {
+          if (!requireSchema(context)) return
+
+          const event = purchaseEvent({ store: 'TEST_STORE' })
+          const response = await postEvent(event)
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toBeNull()
+          expect(
+            await prisma.billingEvent.count({ where: { external_event_id: event.id } })
+          ).toBe(1)
+        })
+
+        it('a TEST_STORE TRANSFER leaves the paid member and the gainer unchanged', async (context) => {
+          if (!requireSchema(context)) return
+
+          await seedEntitlement(subscriberId, 'active')
+          const before = await entitlementOf(subscriberId)
+          const auditsBefore = await auditCount(subscriberId)
+
+          const response = await postEvent({
+            id: nextEventId(),
+            type: 'TRANSFER',
+            event_timestamp_ms: T0 + eventSequence * 1000,
+            store: 'TEST_STORE',
+            product_id: 'premium_monthly',
+            expiration_at_ms: PERIOD_END.getTime(),
+            transferred_from: [subscriberId],
+            transferred_to: [gainerId],
+          })
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toEqual(before)
+          expect(await entitlementOf(gainerId)).toBeNull()
+          expect(await auditCount(subscriberId)).toBe(auditsBefore)
+        })
+      })
+    }
+  })
+
+  // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  describe('story 6.15 D15: the Test Store converges under an explicit local or preview TEST_ENV', () => {
+    for (const testEnv of ['local', 'preview'] as const) {
+      describe(`with TEST_ENV ${testEnv}`, () => {
+        const saved = process.env.TEST_ENV
+        beforeEach(() => {
+          process.env.TEST_ENV = testEnv
+        })
+        afterEach(() => {
+          if (saved === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = saved
+        })
+
+        function readAs(path: string, userId: string) {
+          return request(httpServer())
+            .get(path)
+            .set('authorization', `Bearer premium-test:${userId}`)
+        }
+
+        it('a TEST_STORE purchase grants test_store premium on the status and access reads', async (context) => {
+          if (!requireSchema(context)) return
+
+          const event = purchaseEvent({ store: 'TEST_STORE', environment: 'SANDBOX' })
+          const response = await postEvent(event)
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toMatchObject({
+            status: 'active',
+            store: 'test_store',
+            product_id: 'premium_monthly',
+            current_period_end: PERIOD_END,
+          })
+          expect(
+            await prisma.billingEvent.findFirst({
+              where: { external_event_id: event.id },
+            })
+          ).toMatchObject({ store: 'test_store' })
+
+          const status = await readAs('/api/v1/commerce/subscription', subscriberId)
+          expect(status.status).toBe(200)
+          // The published contract accepts what the server now serializes.
+          expect(subscriptionResponseSchema.parse(status.body).data).toMatchObject({
+            status: 'active',
+            store: 'test_store',
+            productId: 'premium_monthly',
+          })
+          const access = await readAs('/api/v1/commerce/premium/access', subscriberId)
+          expect(access.status).toBe(200)
+          expect(premiumAccessResponseSchema.parse(access.body)).toEqual({
+            data: { premium: true, source: 'subscription' },
+          })
+        })
+
+        it('a TEST_STORE renewal extends the test_store period', async (context) => {
+          if (!requireSchema(context)) return
+
+          expect((await postEvent(purchaseEvent({ store: 'TEST_STORE' }))).status).toBe(
+            200
+          )
+          const renewedEnd = new Date('2030-02-01T00:00:00.000Z')
+          const renewal = await postEvent(
+            purchaseEvent({
+              type: 'RENEWAL',
+              store: 'TEST_STORE',
+              expiration_at_ms: renewedEnd.getTime(),
+            })
+          )
+
+          expect(renewal.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toMatchObject({
+            status: 'active',
+            store: 'test_store',
+            current_period_end: renewedEnd,
+          })
+        })
+
+        it('a TEST_STORE TRANSFER revokes the paid test_store member and grants the gainer', async (context) => {
+          if (!requireSchema(context)) return
+
+          expect((await postEvent(purchaseEvent({ store: 'TEST_STORE' }))).status).toBe(
+            200
+          )
+
+          const response = await postEvent({
+            id: nextEventId(),
+            type: 'TRANSFER',
+            event_timestamp_ms: T0 + eventSequence * 1000,
+            store: 'TEST_STORE',
+            product_id: 'premium_monthly',
+            expiration_at_ms: PERIOD_END.getTime(),
+            transferred_from: [subscriberId],
+            transferred_to: [gainerId],
+          })
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toMatchObject({
+            status: 'revoked',
+            store: 'test_store',
+          })
+          expect(await entitlementOf(gainerId)).toMatchObject({
+            status: 'active',
+            store: 'test_store',
+            product_id: 'premium_monthly',
+          })
+        })
+
+        it('an AMAZON purchase still grants nothing', async (context) => {
+          if (!requireSchema(context)) return
+
+          const response = await postEvent(purchaseEvent({ store: 'AMAZON' }))
+
+          expect(response.status).toBe(200)
+          expect(await entitlementOf(subscriberId)).toBeNull()
+        })
+      })
+    }
+  })
+
+  // Learning path Step 55: story 6.15 D15. A TRANSFER with no store falls back to the losing
+  // row's store, so it moves a test_store row only under local and preview.
+  describe('story 6.15 D15: a store-less TRANSFER of a test_store row', () => {
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'moves' : 'leaves'} the row under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: subscriberId,
+                status: 'active',
+                store: 'test_store',
+                currentPeriodEnd: PERIOD_END,
+                syncedAt: SEED_OCCURRED_AT,
+                lastEventOccurredAt: SEED_OCCURRED_AT,
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+          const before = await entitlementOf(subscriberId)
+          const event = {
+            id: nextEventId(),
+            type: 'TRANSFER',
+            event_timestamp_ms: T0 + eventSequence * 1000,
+            store: null,
+            transferred_from: [subscriberId],
+            transferred_to: [gainerId],
+          }
+
+          const response = await postEvent(event)
+
+          expect(response.status).toBe(200)
+          expect(
+            await prisma.billingEvent.count({ where: { external_event_id: event.id } })
+          ).toBe(1)
+          if (open) {
+            expect(await entitlementOf(subscriberId)).toMatchObject({ status: 'revoked' })
+            expect(await entitlementOf(gainerId)).toMatchObject({
+              status: 'active',
+              store: 'test_store',
+            })
+          } else {
+            expect(await entitlementOf(subscriberId)).toEqual(before)
+            expect(await entitlementOf(gainerId)).toBeNull()
+          }
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+  })
+
+  // Learning path Step 55: story 6.15 D15 r6. Outside local and preview a real purchase over a
+  // stray test_store row applies from `none`: its newer cursor cannot drop the purchase, and the
+  // audit row and activation telemetry are written.
+  describe('story 6.15 D15 r6: a real purchase over a test_store row', () => {
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'is ordered against' : 'replaces'} the row under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          const strayCursor = new Date(T0 + 365 * 86_400_000)
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: subscriberId,
+                status: 'active',
+                store: 'test_store',
+                currentPeriodEnd: PERIOD_END,
+                syncedAt: strayCursor,
+                lastEventOccurredAt: strayCursor,
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+          const before = await entitlementOf(subscriberId)
+          const auditsBefore = await auditCount(subscriberId)
+
+          const response = await postEvent(purchaseEvent({ store: 'APP_STORE' }))
+
+          expect(response.status).toBe(200)
+          if (open) {
+            expect(await entitlementOf(subscriberId)).toEqual(before)
+            expect(await auditCount(subscriberId)).toBe(auditsBefore)
+            expect(telemetry.captureEvent).not.toHaveBeenCalledWith(
+              subscriberId,
+              'premium_entitlement_activated',
+              expect.anything()
+            )
+          } else {
+            expect(await entitlementOf(subscriberId)).toMatchObject({
+              status: 'active',
+              store: 'app_store',
+            })
+            const audits = await prisma.auditLog.findMany({
+              where: { user_id: subscriberId, event_type: 'premium_entitlement_changed' },
+              orderBy: { timestamp: 'desc' },
+              take: 1,
+            })
+            expect(await auditCount(subscriberId)).toBe(auditsBefore + 1)
+            expect(audits[0]?.event_data).toMatchObject({ from: 'none', to: 'active' })
+            expect(telemetry.captureEvent).toHaveBeenCalledWith(
+              subscriberId,
+              'premium_entitlement_activated',
+              { store: 'app_store', productId: 'premium_monthly' }
+            )
+          }
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
   })
 
   describe('unknown subjects and degraded sinks', () => {

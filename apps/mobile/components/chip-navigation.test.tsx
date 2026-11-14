@@ -49,6 +49,26 @@ function MobileChipHarness() {
 }
 
 describe('MobileChipNavigation Component (Story 3.6 - 3.6-UNIT-009)', () => {
+  // Story 6.15: maestro/live-font/open-composer.yaml taps the share button only once its top
+  // is below this marker, because Maestro's `below` compares top edges.
+  it('marks the sticky row bottom edge with a full-width view that takes no touches', () => {
+    render(<MobileChipHarness />)
+
+    const row = screen.getByTestId('mobile-chip-navigation')
+    const edge = screen.getByTestId('chip-navigation-bottom-edge')
+    expect(row.lastElementChild).toBe(edge)
+    const style = getComputedStyle(edge)
+    expect(style.position).toBe('absolute')
+    expect([style.left, style.right, style.bottom, style.height]).toEqual([
+      '0px',
+      '0px',
+      '0px',
+      '1px',
+    ])
+    expect(style.pointerEvents).toBe('none')
+    expect(edge.getBoundingClientRect().width).toBe(row.getBoundingClientRect().width)
+  })
+
   it('renders chips and updates selection state on press', () => {
     render(<MobileChipHarness />)
 

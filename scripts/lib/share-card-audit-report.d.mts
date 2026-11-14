@@ -11,6 +11,11 @@ export function xcodebuildFailureReport(log: string): {
   tests: { test: string; lines: string[] }[]
   tail: string[]
 }
+export function readAuditResult(options: {
+  result: string
+  exists: (path: string) => boolean
+  read: (kind: 'summary' | 'tests') => string
+}): { summary: object; tree: object; resultError: 'missing' | 'unreadable' | null }
 export function closedShareCardAuditReport(
   summary: {
     result?: string

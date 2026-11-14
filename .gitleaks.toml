@@ -14,6 +14,9 @@ paths = [
   '''packages/k6-utils/src/jwt\.ts''',
 ]
 regexes = [
+  # SHA-256 of the committed test-only Android keystore (story 6.15 TEA-19), a file digest the
+  # minifiedDebuggable prebuild spec pins; it is no credential.
+  '''^bb0e9edef61334bbc98c133a85200ad218f1eebfd9828cceaf7d71dddcf87df3$''',
   # Fixed local-only analytics keys for the comment secret-rotation regression.
   '''^synthetic-rotation-before-at-least-32-characters$''',
   '''^synthetic-rotation-after-at-least-32-characters$''',

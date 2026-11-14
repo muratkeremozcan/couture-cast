@@ -408,14 +408,7 @@ describe('deployment workflows', () => {
     for (const block of jobs) {
       const name = block.slice(2, block.indexOf(':'))
       const condition = ifOf(block)
-      // The iOS jobs need macOS, which runs nightly and on demand only (owner rule, 2026-11-13).
-      if (
-        condition?.includes("github.event_name != 'pull_request'") ||
-        condition?.includes(
-          "github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'"
-        )
-      )
-        skipped.add(name)
+      if (condition?.includes("github.event_name != 'pull_request'")) skipped.add(name)
       else
         expect(['lanes', 'browser-acceptance', 'share-card-lanes-gate'], name).toContain(
           name
@@ -431,7 +424,8 @@ describe('deployment workflows', () => {
     expect(conditionOf('lanes')).toBeUndefined()
     expect(conditionOf('share-card-lanes-gate')).toBe('always()')
     // The device lanes take over an hour each, and the evidence jobs only read their artifacts;
-    // a pull request would wait on all of them.
+    // a pull request would wait on all of them. The iOS lanes run in ios-native-jobs.yml, nightly
+    // and on demand only (story 6.15 D6), so none is left here.
     expect([...skipped].sort()).toEqual([
       'android36-controls',
       'android36-interaction',
@@ -439,10 +433,6 @@ describe('deployment workflows', () => {
       'android36-native-matrix',
       'android36-original',
       'android36-release-font',
-      'ios-build',
-      'ios-evidence',
-      'ios-expo-go',
-      'ios-shard',
       'original-resource',
       'original-resource-evidence',
     ])

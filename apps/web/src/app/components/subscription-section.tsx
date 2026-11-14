@@ -19,10 +19,12 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
-import type {
-  PremiumAccess,
-  Subscription,
-  SubscriptionPlan,
+import {
+  subscriptionManageEntry,
+  type EntitlementStore,
+  type PremiumAccess,
+  type Subscription,
+  type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
 import { trackPremiumSubscribeTapped } from '@couture/api-client'
 import { browserAnalytics } from '../../analytics/browser-analytics'
@@ -163,22 +165,19 @@ function SubscribeControls({
   )
 }
 
-/**
- * The manage entry for an entitled subscription: the Customer Portal when the
- * subscription is web-managed, otherwise the store hint — the server would
- * answer that call with a 409, so the client does not make it.
- */
 function ManageControls({
   store,
   isRedirecting,
   onManage,
 }: {
-  store: string
+  store: EntitlementStore
   isRedirecting: boolean
   onManage: () => void
 }) {
   const { t } = useTranslation()
-  if (store !== 'stripe') {
+  const entry = subscriptionManageEntry(store)
+  if (entry === 'none') return null
+  if (entry === 'store') {
     return (
       <p className="mt-6 text-sm text-neutral-300" data-testid="premium-manage-in-store">
         {t('commerce.premium.manageInStore')}

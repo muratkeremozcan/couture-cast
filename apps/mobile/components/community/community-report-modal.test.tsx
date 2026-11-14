@@ -96,6 +96,7 @@ import {
   lastModalProps,
   paddingBottomOf,
   paddingTopOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
@@ -382,6 +383,13 @@ describe('CommunityReportModal (Story 6.1)', () => {
 })
 
 describe('R52 CommunityReportModal over the system bars', () => {
+  // Story 6.15 review P3-1: iOS hides every view outside the accessibility modal view from the
+  // XCUITest hierarchy, so the modal's live-font marker must sit inside it.
+  it('puts the live-font marker inside the dialog that is the accessibility modal', () => {
+    renderModal()
+    expect(liveFontMarkerPlacement().markerInside).toBe(true)
+  })
+
   it('covers the status and navigation bars and keeps the dialog clear of both', () => {
     renderModal()
     expect(lastModalProps()).toMatchObject({

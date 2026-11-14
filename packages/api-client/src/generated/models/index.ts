@@ -6691,6 +6691,7 @@ export const EntitlementStore = {
   play_store: 'play_store',
   stripe: 'stripe',
   promotional: 'promotional',
+  test_store: 'test_store',
 } as const
 export type EntitlementStore = (typeof EntitlementStore)[keyof typeof EntitlementStore]
 
@@ -18628,6 +18629,7 @@ export const SubscriptionOneOf1StoreEnum = {
   play_store: 'play_store',
   stripe: 'stripe',
   promotional: 'promotional',
+  test_store: 'test_store',
 } as const
 export type SubscriptionOneOf1StoreEnum =
   (typeof SubscriptionOneOf1StoreEnum)[keyof typeof SubscriptionOneOf1StoreEnum]

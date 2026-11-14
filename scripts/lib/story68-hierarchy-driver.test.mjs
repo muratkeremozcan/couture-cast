@@ -30,12 +30,29 @@ test('the approved-preview reads share that reader', () => {
   assert.match(source, /JSON\.parse\(hierarchyOutput\(\)\)/)
 })
 
-test('only the Settings breadcrumb read and the audit diagnostic keep a bare hierarchy call', () => {
+test('only the Settings breadcrumb read keeps a bare hierarchy call', () => {
   const bare = [
     ...source.matchAll(/run\(maestroBinary, \['--device', device, 'hierarchy'\]\)/g),
   ]
-  assert.equal(bare.length, 2)
-  const context = bare.map((match) => source.slice(match.index - 120, match.index))
-  assert.ok(context.some((text) => text.includes('breadcrumbIn')))
-  assert.ok(context.some((text) => text.includes('const hierarchy =')))
+  assert.equal(bare.length, 1)
+  assert.ok(source.slice(bare[0].index - 120, bare[0].index).includes('breadcrumbIn'))
+})
+
+// Antigravity audit-diag P2: the audit failure screen is read through the owned driver after the
+// stale one is stopped, and never replaces the audit failure.
+test('the audit failure screen stops the owned driver, then reads through it, inside a guard', () => {
+  const failure = source.slice(
+    source.indexOf('iosAuditFailure: {'),
+    source.indexOf("throw new Error('ios_accessibility_audit_failed')")
+  )
+  const stop = failure.indexOf(
+    'recordIosDriverFlow({ platform, directory, device, ok: false })'
+  )
+  const read = failure.indexOf('hierarchyOutput()')
+  const guard = failure.indexOf('try {')
+  assert.ok(guard >= 0 && stop > guard && read > stop, failure)
+  assert.match(
+    failure,
+    /\} catch \{\n\s+console\.log\(JSON\.stringify\(\{ iosAuditFailureScreen: 'unavailable' \}\)\)/
+  )
 })

@@ -118,20 +118,70 @@ async function createPendingPost(storage: InMemoryCommunityStorage) {
   return { postId, uploadSessionId }
 }
 
-/** Resolves with the first stdout line from `child` that starts with `prefix`. */
-function lineFrom(child: ChildProcess, prefix: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    let buffered = ''
-    child.stdout?.on('data', (chunk: Buffer) => {
-      buffered += chunk.toString('utf8')
-      const line = buffered.split('\n').find((candidate) => candidate.startsWith(prefix))
-      if (line) resolve(line)
-    })
-    child.once('exit', (code) =>
-      reject(new Error(`crash worker exited (${String(code)}) before "${prefix}"`))
-    )
+/**
+ * Every stdout line `child` writes, kept from spawn on. A waiter attached after a line
+ * arrived still finds it: the worker can print `screening <id>` before `queue.add`
+ * resolves in this process, and a listener attached only after that await missed the
+ * line and hung the test to its 60 s timeout. Each wait names its stage and the lines
+ * seen so far when it gives up.
+ */
+function stdoutLines(child: ChildProcess) {
+  const lines: string[] = []
+  let partial = ''
+  let exit: string | undefined
+  const waiters = new Set<() => void>()
+  const notify = () => {
+    for (const waiter of [...waiters]) waiter()
+  }
+  child.stdout?.on('data', (chunk: Buffer) => {
+    partial += chunk.toString('utf8')
+    const parts = partial.split('\n')
+    partial = parts.pop() ?? ''
+    lines.push(...parts)
+    notify()
   })
+  child.once('exit', (code, signal) => {
+    exit = String(code ?? signal)
+    notify()
+  })
+  return {
+    waitFor(prefix: string, timeoutMs: number): Promise<string> {
+      return new Promise((resolve, reject) => {
+        const settle = () => {
+          clearTimeout(timer)
+          waiters.delete(check)
+        }
+        const check = () => {
+          const line = lines.find((candidate) => candidate.startsWith(prefix))
+          if (line !== undefined) {
+            settle()
+            resolve(line)
+          } else if (exit !== undefined) {
+            settle()
+            reject(
+              new Error(
+                `crash worker exited (${exit}) before "${prefix}"; stdout: ${JSON.stringify(lines)}`
+              )
+            )
+          }
+        }
+        const timer = setTimeout(() => {
+          settle()
+          reject(
+            new Error(
+              `crash worker wrote no "${prefix}" line in ${String(timeoutMs)} ms; stdout: ${JSON.stringify(lines)}`
+            )
+          )
+        }, timeoutMs)
+        waiters.add(check)
+        check()
+      })
+    },
+  }
 }
+
+/** Ceiling for each crash-worker stage, so a hang fails at the stage that hung. */
+const STAGE_TIMEOUT_MS = 15_000
 
 beforeAll(probeSchema)
 
@@ -186,14 +236,15 @@ describe('6.2b community moderation crash recovery', () => {
       ],
       { stdio: ['ignore', 'pipe', 'inherit'] }
     )
-    await lineFrom(crashed, 'ready')
+    const crashedStdout = stdoutLines(crashed)
+    await crashedStdout.waitFor('ready', STAGE_TIMEOUT_MS)
     const jobId = buildCommunityModerationJobId(postId, uploadSessionId)
     await queue.add(
       'community-moderation-screening',
       { postId, uploadSessionId },
       { jobId, attempts: 3, backoff: { type: 'exponential', delay: 1000 } }
     )
-    await lineFrom(crashed, `screening ${jobId}`)
+    await crashedStdout.waitFor(`screening ${jobId}`, STAGE_TIMEOUT_MS)
 
     // The worker dies holding the job: no completion, no failure, no unlock.
     const exited = new Promise((resolve) => crashed?.once('exit', resolve))

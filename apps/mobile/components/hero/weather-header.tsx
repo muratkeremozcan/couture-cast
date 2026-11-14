@@ -100,6 +100,7 @@ export function WeatherHeader({ current, isLoading }: WeatherHeaderProps) {
       </View>
       <Text
         style={[styles.conditionText, { color: palette.mutedText }]}
+        testID="current-condition"
         accessible={false}
       >
         {text}

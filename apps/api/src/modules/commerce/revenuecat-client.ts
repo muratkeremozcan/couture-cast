@@ -1,5 +1,10 @@
 import { Injectable } from '@nestjs/common'
-import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
+import { z } from 'zod'
+import {
+  allowsTestOnlySecrets,
+  appliesRevenueCatTestStore,
+} from '../../config/runtime-environment.js'
+import { createBaseLogger } from '../../logger/pino.config.js'
 import type { LedgerEntitlementState } from './premium-entitlement.service.js'
 
 /**
@@ -136,27 +141,60 @@ export class FakeRevenueCatClient extends RevenueCatClient {
 const REVENUECAT_API_BASE_URL = 'https://api.revenuecat.com/v1'
 const REVENUECAT_ENTITLEMENT_ID = 'premium'
 
-/** The narrow slice of RC's subscriber response this client reads. */
-type RevenueCatSubscriberResponse = {
-  subscriber?: {
-    entitlements?: Record<
-      string,
-      {
-        expires_date?: string | null
-        purchase_date?: string | null
-        product_identifier?: string | null
-      }
-    >
-    subscriptions?: Record<
-      string,
-      {
-        store?: string | null
-        unsubscribe_detected_at?: string | null
-        billing_issues_detected_at?: string | null
-        expires_date?: string | null
-      }
-    >
-  }
+const nullableString = z.string().nullable()
+
+/**
+ * RC's v1 subscriber response, checked in two layers (story 6.15). A key the projection reads
+ * must be present, null where RC documents null: a renamed or missing key is RevenueCat changing
+ * its response, not a fact about the member, so it fails as a transient
+ * {@link RevenueCatResponseShapeError} and never as one of the permanent projection errors below.
+ *
+ * The envelope requires the `entitlements` and `subscriptions` maps but reads their entries
+ * loosely, so a sibling entitlement or subscription this API never reads (a `beta_perk` with no
+ * `expires_date`) cannot pin the member at a 503 (r40 P3). Only the `premium` entitlement and its
+ * own purchase record are held to the strict schemas. Unknown sibling keys pass everywhere.
+ */
+const revenueCatSubscriberEnvelopeSchema = z
+  .object({
+    subscriber: z
+      .object({
+        entitlements: z.record(z.string(), z.unknown()),
+        subscriptions: z.record(z.string(), z.unknown()),
+        non_subscriptions: z.record(z.string(), z.unknown()).optional(),
+      })
+      .passthrough(),
+  })
+  .passthrough()
+
+const premiumEntitlementSchema = z
+  .object({ expires_date: nullableString, product_identifier: nullableString })
+  .passthrough()
+
+const premiumSubscriptionSchema = z
+  .object({
+    store: nullableString,
+    unsubscribe_detected_at: nullableString.optional(),
+    billing_issues_detected_at: nullableString.optional(),
+  })
+  .passthrough()
+
+/** The premium product's one-time purchase records: at least one, each with its date and store. */
+const premiumNonSubscriptionSchema = z
+  .array(z.object({ purchase_date: z.string(), store: z.string() }).passthrough())
+  .nonempty()
+
+type RevenueCatSubscriberResponse = z.infer<typeof revenueCatSubscriberEnvelopeSchema>
+
+/** Zod issues as `path: code` under `prefix`, never a value: the body can hold attributes. */
+function shapeIssues(error: z.ZodError, prefix: readonly (string | number)[]): string[] {
+  return error.issues.map(
+    (issue) => `${[...prefix, ...issue.path].join('.') || 'response'}: ${issue.code}`
+  )
+}
+
+/** An own-key lookup: an inherited name such as `constructor` is not an entry. */
+function ownEntry(record: Record<string, unknown>, key: string): unknown {
+  return Object.hasOwn(record, key) ? record[key] : undefined
 }
 
 const restStoreMap: Readonly<Record<string, LedgerEntitlementState['store']>> = {
@@ -165,6 +203,82 @@ const restStoreMap: Readonly<Record<string, LedgerEntitlementState['store']>> = 
   play_store: 'play_store',
   stripe: 'stripe',
   promotional: 'promotional',
+}
+
+/**
+ * A REST subscription store projected onto ours, or undefined for a store we do not sell.
+ * `test_store` is ours only where {@link appliesRevenueCatTestStore} opens it (story 6.15 D15);
+ * elsewhere the pull refuses it like any other unsupported store.
+ */
+function mapRevenueCatRestStore(
+  store: string | null | undefined
+): LedgerEntitlementState['store'] | undefined {
+  const normalized = store?.toLowerCase() ?? ''
+  if (normalized === 'test_store') {
+    return appliesRevenueCatTestStore() ? 'test_store' : undefined
+  }
+  // Own keys only: an inherited name such as `constructor` is not a store.
+  return Object.hasOwn(restStoreMap, normalized) ? restStoreMap[normalized] : undefined
+}
+
+export class RevenueCatUnsupportedStoreError extends Error {
+  constructor(readonly store: string | null) {
+    super(
+      `RevenueCat entitlement comes from an unsupported store: ${store ?? 'none recorded'}`
+    )
+    this.name = 'RevenueCatUnsupportedStoreError'
+  }
+}
+
+export class RevenueCatUnrepresentableEntitlementError extends Error {
+  constructor(
+    readonly reason:
+      | 'missing_product'
+      | 'no_expiry'
+      | 'invalid_expiry'
+      | 'non_subscription'
+  ) {
+    super(`RevenueCat entitlement cannot be represented: ${reason}`)
+    this.name = 'RevenueCatUnrepresentableEntitlementError'
+  }
+}
+
+/** Why a ledger answer is permanently outside our model; retrying the same pull cannot change it. */
+export type PermanentLedgerProjectionFailure = {
+  reason: 'unsupported_store' | RevenueCatUnrepresentableEntitlementError['reason']
+  /** The RevenueCat store string, for an unsupported store only. */
+  store?: string | null
+}
+
+/**
+ * A 200 subscriber response that does not match {@link revenueCatSubscriberResponseSchema}.
+ * Transient: it says RevenueCat's response changed, nothing about the member. It carries the
+ * failing paths only, never a value, because the body can hold subscriber attributes.
+ */
+export class RevenueCatResponseShapeError extends Error {
+  constructor(readonly issues: readonly string[]) {
+    super(`RevenueCat subscriber response failed the shape check at ${issues.join('; ')}`)
+    this.name = 'RevenueCatResponseShapeError'
+  }
+}
+
+/**
+ * Story 6.15: classifies a ledger pull failure. The projection errors above describe what the
+ * ledger holds (a store we do not sell, a lifetime grant, a missing product) and are raised only
+ * from a response that passed the shape check, so they come back the same on every retry. Any
+ * other error (a non-2xx response, a shape failure, a timeout, a network failure) is transient
+ * and returns null.
+ */
+export function permanentLedgerProjectionFailure(
+  error: unknown
+): PermanentLedgerProjectionFailure | null {
+  if (error instanceof RevenueCatUnsupportedStoreError) {
+    return { reason: 'unsupported_store', store: error.store }
+  }
+  if (error instanceof RevenueCatUnrepresentableEntitlementError) {
+    return { reason: error.reason }
+  }
+  return null
 }
 
 export class RevenueCatRequestError extends Error {
@@ -180,6 +294,8 @@ export class RevenueCatRequestError extends Error {
 }
 
 export class RealRevenueCatClient extends RevenueCatClient {
+  private readonly logger = createBaseLogger().child({ feature: 'revenuecat-client' })
+
   constructor(private readonly secretApiKey: string) {
     super()
   }
@@ -194,8 +310,17 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (!response.ok) {
       throw new RevenueCatRequestError(response.status, 'subscriber GET')
     }
-    const body = (await response.json()) as RevenueCatSubscriberResponse
-    return this.projectSubscriber(body)
+    const parsed = revenueCatSubscriberEnvelopeSchema.safeParse(await response.json())
+    if (!parsed.success) {
+      throw this.shapeError(shapeIssues(parsed.error, []))
+    }
+    return this.projectSubscriber(parsed.data)
+  }
+
+  /** Logs a failed shape check once, by path and code only, and returns its transient error. */
+  private shapeError(issues: string[]): RevenueCatResponseShapeError {
+    this.logger.error({ issues }, 'RevenueCat subscriber response failed the shape check')
+    return new RevenueCatResponseShapeError(issues)
   }
 
   async forwardStripeSubscription(
@@ -245,24 +370,75 @@ export class RealRevenueCatClient extends RevenueCatClient {
   private projectSubscriber(
     body: RevenueCatSubscriberResponse
   ): RevenueCatSubscriberEntitlement {
-    const entitlement = body.subscriber?.entitlements?.[REVENUECAT_ENTITLEMENT_ID]
-    if (!entitlement) {
+    const { entitlements, subscriptions, non_subscriptions = {} } = body.subscriber
+    const rawEntitlement = ownEntry(entitlements, REVENUECAT_ENTITLEMENT_ID)
+    if (rawEntitlement === undefined) {
       return null
     }
-    const productId = entitlement.product_identifier ?? null
-    const expiresAt = entitlement.expires_date ? new Date(entitlement.expires_date) : null
-    if (productId === null || expiresAt === null || Number.isNaN(expiresAt.getTime())) {
-      // A lifetime (null-expiry) or malformed entitlement has no representable
-      // period end in our model; treat it as absent rather than inventing one.
-      return null
+    const parsedEntitlement = premiumEntitlementSchema.safeParse(rawEntitlement)
+    if (!parsedEntitlement.success) {
+      throw this.shapeError(
+        shapeIssues(parsedEntitlement.error, [
+          'subscriber',
+          'entitlements',
+          REVENUECAT_ENTITLEMENT_ID,
+        ])
+      )
     }
-
-    const subscription = body.subscriber?.subscriptions?.[productId]
-    const store = restStoreMap[subscription?.store?.toLowerCase() ?? ''] ?? 'stripe'
-    const willRenew = !subscription?.unsubscribe_detected_at
+    const entitlement = parsedEntitlement.data
+    // An entitlement that is present but that our model cannot represent fails the pull with a
+    // permanent error, so refresh serves the member's local state and reconciliation leaves the
+    // row's state as it is. Answering null here would read as "no entitlement" and expire a
+    // paying member (story 6.15 R4-01).
+    const productId = entitlement.product_identifier
+    if (productId === null) {
+      throw new RevenueCatUnrepresentableEntitlementError('missing_product')
+    }
+    const rawSubscription = ownEntry(subscriptions, productId)
+    if (rawSubscription === undefined) {
+      const rawPurchases = ownEntry(non_subscriptions, productId)
+      if (rawPurchases !== undefined) {
+        // Only a real purchase record proves a one-time purchase (r42 probe B): an empty or
+        // malformed entry is RevenueCat's response changing, so it stays transient.
+        const purchases = premiumNonSubscriptionSchema.safeParse(rawPurchases)
+        if (!purchases.success) {
+          throw this.shapeError(
+            shapeIssues(purchases.error, ['subscriber', 'non_subscriptions', productId])
+          )
+        }
+        // A one-time purchase (a lifetime unlock) is a fact about the member: our model holds
+        // subscriptions only, and retrying cannot change that.
+        throw new RevenueCatUnrepresentableEntitlementError('non_subscription')
+      }
+      // RC records every purchase that grants an entitlement under one of the two maps, keyed by
+      // product id. Finding it in neither means the response changed (r40 P3), not the member.
+      throw this.shapeError([`subscriber.subscriptions.${productId}: missing`])
+    }
+    const parsedSubscription = premiumSubscriptionSchema.safeParse(rawSubscription)
+    if (!parsedSubscription.success) {
+      throw this.shapeError(
+        shapeIssues(parsedSubscription.error, ['subscriber', 'subscriptions', productId])
+      )
+    }
+    const subscription = parsedSubscription.data
+    const store = mapRevenueCatRestStore(subscription.store)
+    if (store === undefined) {
+      // A store we do not sell (AMAZON, a RevenueCat Test Store purchase outside an explicit local
+      // or preview TEST_ENV) never takes a real store's identity (story 6.15 R3-01, D15). Checked
+      // before the expiry, so a lifetime or malformed unsupported entitlement fails the same way.
+      throw new RevenueCatUnsupportedStoreError(subscription.store)
+    }
+    if (!entitlement.expires_date) {
+      // A lifetime entitlement has no period end in our subscription-only model.
+      throw new RevenueCatUnrepresentableEntitlementError('no_expiry')
+    }
+    const expiresAt = new Date(entitlement.expires_date)
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new RevenueCatUnrepresentableEntitlementError('invalid_expiry')
+    }
+    const willRenew = !subscription.unsubscribe_detected_at
     const inGrace =
-      Boolean(subscription?.billing_issues_detected_at) &&
-      expiresAt.getTime() > Date.now()
+      Boolean(subscription.billing_issues_detected_at) && expiresAt.getTime() > Date.now()
 
     const status: LedgerEntitlementState['status'] =
       expiresAt.getTime() <= Date.now() ? 'expired' : inGrace ? 'grace_period' : 'active'

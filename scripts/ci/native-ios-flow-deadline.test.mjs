@@ -6,6 +6,20 @@ import { spawn, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { recordIosFlowTiming, spawnIosFlow } from './native-ios-flow-deadline.mjs'
+import { killOwned } from '../lib/owned-process.mjs'
+
+/**
+ * However a test ends, the owned command it started (its pid in `pidFile`, a node -e that sets an
+ * interval) must not outlive it: an assertion that fails before the liveness check used to leave
+ * it running for good. Register it before the hook that removes the test's directory: after
+ * hooks run in the order they were added.
+ */
+function reapOwnedCommand(t, pidFile) {
+  t.after(() => {
+    if (fs.existsSync(pidFile))
+      killOwned(Number(fs.readFileSync(pidFile, 'utf8')), 'setInterval')
+  })
+}
 
 const delayedTermination =
   "process.on('SIGTERM',()=>setTimeout(()=>process.exit(143),300));setInterval(()=>{},1000)"
@@ -97,8 +111,9 @@ test('the timing log line names the flow while the timing file keeps its shape',
 // and left the owned Maestro group running.
 test('a worker stopped by its parent still kills the owned group and writes its record', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-sigterm-'))
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
   const pidFile = path.join(dir, 'child.pid')
+  reapOwnedCommand(t, pidFile)
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
   const result = spawnIosFlow(
     process.execPath,
     [
@@ -165,8 +180,9 @@ test('a missing record prints only the worker diagnostic lines, never the flow s
 
 async function signalledWorker(t, signal) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cc68-flow-${signal}-`))
-  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
   const pidFile = path.join(dir, 'child.pid')
+  reapOwnedCommand(t, pidFile)
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
   const timingFile = path.join(dir, 'timing.json')
   const worker = spawn(process.execPath, [WORKER, 'worker', timingFile], {
     stdio: ['pipe', 'ignore', 'ignore'],
@@ -198,7 +214,6 @@ async function signalledWorker(t, signal) {
       alive = false
     }
   }
-  if (alive) process.kill(pid, 'SIGKILL')
   return { code, alive, record: fs.existsSync(timingFile) }
 }
 
@@ -216,6 +231,8 @@ for (const [signal, exitCode] of [
 // A logger that throws (EPIPE on a closed stderr) must not stop the kill or the record.
 test('an uncaught error kills the owned group and writes the record even when logging throws', (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-epipe-'))
+  const pidFile = path.join(dir, 'child.pid')
+  reapOwnedCommand(t, pidFile)
   t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
   const preload = path.join(dir, 'throwing-stderr.mjs')
   fs.writeFileSync(
@@ -226,7 +243,6 @@ test('an uncaught error kills the owned group and writes the record even when lo
       '',
     ].join('\n')
   )
-  const pidFile = path.join(dir, 'child.pid')
   const timingFile = path.join(dir, 'timing.json')
   const result = spawnSync(
     process.execPath,
@@ -259,6 +275,5 @@ test('an uncaught error kills the owned group and writes the record even when lo
       alive = false
     }
   }
-  if (alive) process.kill(pid, 'SIGKILL')
   assert.equal(alive, false, 'the owned command must not outlive its worker')
 })

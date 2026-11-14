@@ -1,3 +1,5 @@
+import { publicLogLine } from '../ci/native-ios-public-diagnostics.mjs'
+
 export const shareCardAuditLocales = [
   'en-US',
   'en-CA',
@@ -105,19 +107,13 @@ export function failedAuditTestDigest(log) {
       test: failed[1],
       lines: window
         .filter((line) => line.trim())
-        .map((line) =>
-          line
-            .replace(/\S*\/(?=[^/\s]+\.swift)/g, '')
-            .trim()
-            .slice(0, failureLineChars)
-        )
+        .map((line) => publicLogLine(line, failureLineChars))
         .slice(0, failureDigestLimit),
     })
   }
   return digests
 }
-const auditLine = (match) =>
-  match[1].replace(/\S*\/(?=[^/\s]+\.swift)/g, '').slice(0, 400)
+const auditLine = (match) => publicLogLine(match[1], 400)
 // Each issue the Swift audit handler refused, in log order. The "-context" scope lines that
 // describe what the screen showed are listed separately and never use up the issue limit.
 export function failedAuditIssues(log) {
@@ -147,12 +143,25 @@ export function xcodebuildFailureReport(log) {
           .split(/\r?\n/)
           .filter((line) => line.trim())
           .slice(-failureTailLines)
-          .map((line) =>
-            line
-              .replace(/\S*\/(?=[^/\s]+\.swift)/g, '')
-              .trim()
-              .slice(0, failureLineChars)
-          ),
+          .map((line) => publicLogLine(line, failureLineChars)),
+  }
+}
+/**
+ * The audit's xcresult summary and test tree, or empty ones with the reason (Antigravity
+ * audit-diag P1): a build failure, a destination lookup, an early runner launch or a killed
+ * xcodebuild leaves no bundle or a testless one, and the failure line must still print.
+ * `read(kind)` returns xcresulttool's JSON text for `summary` or `tests`, or throws.
+ */
+export function readAuditResult({ result, exists, read }) {
+  if (!exists(result)) return { summary: {}, tree: {}, resultError: 'missing' }
+  try {
+    return {
+      summary: JSON.parse(read('summary')),
+      tree: JSON.parse(read('tests')),
+      resultError: null,
+    }
+  } catch {
+    return { summary: {}, tree: {}, resultError: 'unreadable' }
   }
 }
 export function closedShareCardAuditReport(summary, tree, log) {

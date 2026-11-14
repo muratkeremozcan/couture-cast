@@ -1,0 +1,19 @@
+# Story 6.15 D15 (S4-12), local leg: a successful Test Store purchase. The app's refresh reaches
+# the local API, which pulls the RevenueCat ledger (the reconciliation path), and the section
+# turns entitled from the server's answer.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- runFlow: open-sheet.yaml
+- tapOn:
+    text: '(?i)Test valid purchase'
+    label: 'Simulate a successful purchase'
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+      text: ${PREMIUM_STATUS_ACTIVE}
+    direction: UP
+    centerElement: true
+    timeout: 60000
+    label: 'The app shows the server entitlement'
+- runFlow: assert-entitled.yaml

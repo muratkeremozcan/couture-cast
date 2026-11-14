@@ -321,3 +321,26 @@ describe('OutfitRecommendationCard affiliate CTA', () => {
     )
   })
 })
+
+describe('6.15 comfort notes face', () => {
+  // Story 6.15: the notes used fontStyle italic on the regular Playfair face, which iOS drew
+  // upright and Android drew as italic sans. The italic face is loaded as its own family.
+  it('6.15-MOB-FONT-01 sets the comfort notes in the Playfair Display Italic family', () => {
+    renderCard({})
+    const notes = getComputedStyle(screen.getByTestId('outfit-comfort-notes'))
+    expect(notes.fontFamily).toContain('Playfair Display Italic')
+    expect(notes.fontStyle).toBe('normal')
+  })
+})
+
+describe('6.15 outfit card spacing', () => {
+  // Story 6.15: the share card launcher sat flush on the comfort notes box, borders touching.
+  it('6.15-MOB-SPACE-01 leaves the section gap between the launcher and the comfort notes box', () => {
+    renderCard({ onExport: vi.fn() })
+    const launcher = screen.getByTestId('outfit-share-card-open').getBoundingClientRect()
+    const notesBox = screen
+      .getByTestId('outfit-comfort-notes')
+      .parentElement!.getBoundingClientRect()
+    expect(notesBox.top - launcher.bottom).toBeCloseTo(16, 0)
+  })
+})

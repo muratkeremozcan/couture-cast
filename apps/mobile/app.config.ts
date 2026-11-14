@@ -9,8 +9,12 @@ const rootEnvFiles = [
   '.env',
 ]
 
-for (const file of rootEnvFiles) {
-  loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
+// scripts/lib/resolved-app-config.mjs sets COUTURE_CONFIG_NO_ENV_FILES so the release config its
+// checks judge cannot pick up a developer's .env.local.
+if (process.env.COUTURE_CONFIG_NO_ENV_FILES !== '1') {
+  for (const file of rootEnvFiles) {
+    loadEnv({ path: path.join(rootDir, file), override: false, quiet: true })
+  }
 }
 
 const story68Native = process.env.STORY68_NATIVE_TEST_BUILD === '1'
@@ -65,6 +69,8 @@ export default ({ config }: ConfigContext) => ({
     ...config.extra,
     story65NativeFixtures: isolatedNative && !story68Native,
     story68NativeFixtures: story68Native,
+    // Story 6.15: the live font-scale proof reads mount markers from isolated native builds.
+    liveFontMountMarkers: isolatedNative,
     supabaseUrl:
       process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
     supabaseAnonKey:

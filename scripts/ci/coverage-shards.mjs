@@ -73,15 +73,40 @@ export function plannedShards(value) {
   return [...COVERAGE_SHARDS]
 }
 
+/**
+ * A shard's recorded result. The mobile shard's plugin prebuild suites run after its tests, so
+ * any plugin outcome other than success or skipped (failure, cancelled) fails the shard and is
+ * named in its failures; an absent plugin outcome is a shard that has no plugin step.
+ */
+export function shardResult({ outcome, plugins, dirs = [], failures = [] }) {
+  const pluginsRan = plugins !== undefined && plugins !== '' && plugins !== 'skipped'
+  if (!pluginsRan || plugins === 'success') return { outcome, dirs, failures }
+  return {
+    outcome: 'failure',
+    dirs,
+    failures: [
+      ...failures,
+      {
+        workspace: 'mobile plugin prebuild suites',
+        reason: plugins === 'failure' ? 'tests' : 'error',
+        line: `The mobile plugin prebuild suites step ended ${plugins}.`,
+      },
+    ],
+  }
+}
+
 function record() {
-  const { SHARD, OUTCOME, DIRS, FAILURES } = process.env
+  const { SHARD, OUTCOME, PLUGINS_OUTCOME, DIRS, FAILURES } = process.env
   writeFileSync(
     resultFile(SHARD),
-    JSON.stringify({
-      outcome: OUTCOME,
-      dirs: JSON.parse(DIRS || '[]'),
-      failures: JSON.parse(FAILURES || '[]'),
-    })
+    JSON.stringify(
+      shardResult({
+        outcome: OUTCOME,
+        plugins: PLUGINS_OUTCOME,
+        dirs: JSON.parse(DIRS || '[]'),
+        failures: JSON.parse(FAILURES || '[]'),
+      })
+    )
   )
 }
 

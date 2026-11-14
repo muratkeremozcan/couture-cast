@@ -62,7 +62,7 @@ final class ShareCardShareSheetUITests: XCTestCase {
     continueAfterFailure = false
     app.activate()
     dismissShareSheetIfPresent()
-    if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+    closeShareCardIfOpen(app)
     let settingsTab = element("tab-settings")
     XCTAssertTrue(settingsTab.waitForExistence(timeout: 15))
     settingsTab.tap()
@@ -77,7 +77,7 @@ final class ShareCardShareSheetUITests: XCTestCase {
   override func tearDownWithError() throws {
     dismissShareSheetIfPresent()
     fixture("real")
-    if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+    closeShareCardIfOpen(app)
   }
 
   func element(_ id: String) -> XCUIElement {
@@ -196,7 +196,7 @@ final class ShareCardShareSheetUITests: XCTestCase {
   /// Opens the composer and returns the loaded preview's digest, which its identifier carries.
   @discardableResult
   func openCard() throws -> String {
-    if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+    closeShareCardIfOpen(app)
     element("tab-home").tap()
     let opener = app.buttons.matching(identifier: "outfit-share-card-open").firstMatch
     for _ in 0..<8 where !opener.isHittable { app.swipeUp() }

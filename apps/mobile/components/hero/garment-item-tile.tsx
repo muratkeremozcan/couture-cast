@@ -2,6 +2,7 @@ import React, { type ComponentRef } from 'react'
 import { StyleSheet, Pressable, Platform } from 'react-native'
 import { Text, View } from '@/components/themed'
 import { useHeroPalette } from './hero-theme'
+import { useGlyphBox } from '@/components/glyph-box'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import type { GarmentCategory } from '@couture/api-client/contracts/http'
@@ -150,6 +151,7 @@ export function GarmentItemTile({
 }: GarmentItemTileProps) {
   const parts = parseGarmentId(garmentId, knownCategory)
   const palette = useHeroPalette()
+  const swapBox = useGlyphBox(30, true)
   const { i18n, t } = useTranslation()
   const locale = i18n.resolvedLanguage ?? i18n.language
   const title = garmentTitle(parts, t, locale)
@@ -198,6 +200,7 @@ export function GarmentItemTile({
         <View
           style={[
             styles.swapButton,
+            swapBox,
             { backgroundColor: palette.subtleSurface, borderColor: palette.divider },
           ]}
         >

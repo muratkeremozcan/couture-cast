@@ -8,7 +8,6 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "owner": "muratkerem",
-    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -26,7 +25,6 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "package": "com.couturecast.app",
       "versionCode": 6,
@@ -43,11 +41,16 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
+      "./plugins/with-font-scale-config-changes",
+      "./plugins/with-minified-debuggable",
       "expo-router",
       "expo-localization",
+      "expo-background-task",
+      "./plugins/with-background-modes",
       "./plugins/with-widgets",
       "./plugins/with-watchos",
       "./plugins/with-supported-ios-target",
+      "./plugins/with-text-layout-probe",
       [
         "expo-notifications",
         {

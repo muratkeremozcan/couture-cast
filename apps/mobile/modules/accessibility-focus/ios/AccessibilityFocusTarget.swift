@@ -7,13 +7,14 @@ public enum AccessibilityFocusTarget {
   /// and neither it nor an ancestor is hidden. A view React Native has not yet
   /// reattached after a navigation fails this, and the caller asks again.
   public static func canTakeFocus(_ view: UIView?) -> Bool {
-    guard let view, view.window != nil else { return false }
+    guard let view else { return false }
+    var chain: [AccessibilityFocusRules.Node] = []
     var current: UIView? = view
     while let node = current {
-      if node.isHidden || node.alpha <= 0.01 { return false }
+      chain.append(AccessibilityFocusRules.Node(isHidden: node.isHidden, alpha: node.alpha))
       current = node.superview
     }
-    return true
+    return AccessibilityFocusRules.canTakeFocus(inWindow: view.window != nil, chain: chain)
   }
 
   /// Reports a posted request only after the UIKit post call has been invoked.
@@ -40,8 +41,8 @@ public enum AccessibilityFocusTarget {
     } else {
       identifier = (element as? UIAccessibilityIdentification)?.accessibilityIdentifier
     }
-    if let identifier, !identifier.isEmpty { return identifier }
-    return requestedView?.accessibilityIdentifier ?? ""
+    return AccessibilityFocusRules.observationIdentifier(
+      element: identifier, requested: requestedView?.accessibilityIdentifier)
   }
 
   /// UIKit containers may expose semantic elements outside the UIView subtree.
@@ -62,14 +63,16 @@ public enum AccessibilityFocusTarget {
       guard seen.insert(ObjectIdentifier(node)).inserted,
         let container = containerView(of: node),
         let window = (container as? UIWindow) ?? container.window,
-        !window.isHidden, window.alpha > 0.01, !window.bounds.isEmpty,
+        !window.isHidden, window.alpha > AccessibilityFocusRules.transparentAlpha,
+        !window.bounds.isEmpty,
         container is UIWindow || canTakeFocus(container)
       else { return [] }
       // UIWindow is the root container. Its own UIView.window can be nil and
       // UIKit may expose window semantics separately from its app descendants.
       if node.isAccessibilityElement && !(node is UIWindow) {
         let frame = node.accessibilityFrame
-        return !frame.isEmpty && window.convert(window.bounds, to: nil).intersects(frame) ? [node] : []
+        return AccessibilityFocusRules.isOnScreen(frame, window: window.convert(window.bounds, to: nil))
+          ? [node] : []
       }
       let provided = (node.accessibilityElements ?? []).compactMap { $0 as? NSObject }
       let children: [NSObject] = (node as? UIView)?.subviews ?? []
@@ -82,8 +85,9 @@ public enum AccessibilityFocusTarget {
     guard let view, canTakeFocus(view) else { return nil }
     if view.isAccessibilityElement { return view }
     let frame = view.convert(view.bounds, to: nil)
-    let elements = visibleSemanticElements(in: view).filter { $0.accessibilityFrame == frame }
-    return elements.count == 1 ? elements[0] : nil
+    return AccessibilityFocusRules.soleMatch(visibleSemanticElements(in: view), frame: frame) {
+      $0.accessibilityFrame
+    }
   }
 
   /// The native view tags from a focused element outwards. React Native views
@@ -93,11 +97,11 @@ public enum AccessibilityFocusTarget {
     if view == nil, let accessibilityElement = element as? UIAccessibilityElement {
       view = accessibilityElement.accessibilityContainer as? UIView
     }
-    var tags: [Int] = []
+    var chain: [Int] = []
     while let current = view {
-      if current.tag > 0 { tags.append(current.tag) }
+      chain.append(current.tag)
       view = current.superview
     }
-    return tags
+    return AccessibilityFocusRules.tags(chain)
   }
 }

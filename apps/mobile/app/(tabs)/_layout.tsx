@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 
 import Colors from '@/constants/colors'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
+import { TabBarLabel, useTabBarSizing } from '@/components/tab-bar-label'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -17,15 +18,22 @@ function TabBarIcon(props: {
   color: string
   focused: boolean
   tabId: string
+  /** How far the underline drops below the icon as the bar grows (useTabBarSizing). */
+  growth: number
 }) {
-  const { focused, tabId, ...iconProps } = props
+  const { focused, tabId, growth, ...iconProps } = props
 
   return (
     <View style={styles.iconContainer}>
       <FontAwesome size={28} style={styles.icon} {...iconProps} />
       {focused && (
         <View
-          style={[styles.activeIndicator, { backgroundColor: props.color }]}
+          // The bar grows upward with its labels and the icon with it, so the underline drops
+          // by the same amount to stay on the bar's bottom edge, below the label.
+          style={[
+            styles.activeIndicator,
+            { backgroundColor: props.color, bottom: INDICATOR_BOTTOM - growth },
+          ]}
           testID={`tab-${tabId}-active-indicator`}
         />
       )}
@@ -40,6 +48,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets()
   const analytics = useMobileAnalytics()
   const { t } = useTranslation()
+  // Story 6.15 F-00i: each label reports its height and the bar grows by what the text grew.
+  const { growth, indicatorDrop, onLabelHeight, tallestLabel } = useTabBarSizing()
   const tabLabels = {
     home: t('tabs.home', { defaultValue: 'Home' }),
     wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
@@ -68,9 +78,27 @@ export default function TabLayout() {
         tabBarStyle: {
           borderTopColor: palette.border,
           backgroundColor: palette.background,
-          height: 56 + insets.bottom,
+          height: 56 + growth + insets.bottom,
           paddingBottom: insets.bottom,
         },
+        tabBarLabel: ({
+          color,
+          children,
+          position,
+        }: {
+          color: string
+          children: string
+          position: 'below-icon' | 'beside-icon'
+        }) => (
+          <TabBarLabel
+            color={color}
+            onHeight={onLabelHeight}
+            position={position}
+            lineBoxHeight={tallestLabel}
+          >
+            {children}
+          </TabBarLabel>
+        ),
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
@@ -84,7 +112,13 @@ export default function TabLayout() {
           tabBarButtonTestID: 'tab-home',
           tabBarAccessibilityLabel: tabLabels.home,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon name="home" color={color} focused={focused} tabId="home" />
+            <TabBarIcon
+              growth={indicatorDrop}
+              name="home"
+              color={color}
+              focused={focused}
+              tabId="home"
+            />
           ),
           headerRight: () => (
             <Link href="/modal" asChild>
@@ -118,6 +152,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: tabLabels.wardrobe,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
+              growth={indicatorDrop}
               name="shopping-bag"
               color={color}
               focused={focused}
@@ -137,7 +172,13 @@ export default function TabLayout() {
           tabBarButtonTestID: 'tab-community',
           tabBarAccessibilityLabel: tabLabels.community,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon name="users" color={color} focused={focused} tabId="community" />
+            <TabBarIcon
+              growth={indicatorDrop}
+              name="users"
+              color={color}
+              focused={focused}
+              tabId="community"
+            />
           ),
         }}
         listeners={{
@@ -151,7 +192,13 @@ export default function TabLayout() {
           tabBarButtonTestID: 'tab-settings',
           tabBarAccessibilityLabel: tabLabels.settings,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon name="cog" color={color} focused={focused} tabId="settings" />
+            <TabBarIcon
+              growth={indicatorDrop}
+              name="cog"
+              color={color}
+              focused={focused}
+              tabId="settings"
+            />
           ),
         }}
         listeners={{
@@ -167,6 +214,9 @@ export default function TabLayout() {
     </Tabs>
   )
 }
+
+/** The underline's offset below the icon at the default text size. */
+const INDICATOR_BOTTOM = -23
 
 const styles = StyleSheet.create({
   headerButton: {
@@ -184,7 +234,7 @@ const styles = StyleSheet.create({
   },
   activeIndicator: {
     position: 'absolute',
-    bottom: -23,
+    bottom: INDICATOR_BOTTOM,
     width: 64,
     height: 4,
     borderTopLeftRadius: 4,

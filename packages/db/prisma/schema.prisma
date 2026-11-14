@@ -178,12 +178,14 @@ enum BillingProvider {
 }
 
 /// Mirrors RevenueCat store values; `promotional` covers RC promotional grants
-/// (the operator break-glass path in the premium runbook).
+/// (the operator break-glass path in the premium runbook). `test_store` is the RevenueCat
+/// Test Store, written only when `TEST_ENV` is explicitly `local` or `preview` (story 6.15 D15).
 enum EntitlementStore {
   app_store
   play_store
   stripe
   promotional
+  test_store
 }
 
 enum PremiumEntitlementStatus {
@@ -1547,6 +1549,11 @@ model PremiumEntitlement {
   current_period_end     DateTime
   /// Last successful sync from the ledger (webhook apply or REST pull).
   synced_at              DateTime
+  /// Story 6.15: when the drift sweep last met a ledger entitlement this API cannot represent
+  /// and left the row as it was. The sweep orders and filters by it beside synced_at, so such a
+  /// row cannot lead every batch; synced_at keeps meaning a confirmed sync. Every confirmed sync
+  /// clears it in the same write, so non-null always means currently unrepresentable.
+  drift_settled_at       DateTime?
   /// Ordering guard: apply an event iff occurred_at is newer, or equal with a
   /// distinct event id. Strictly-older events are dropped.
   last_event_occurred_at DateTime

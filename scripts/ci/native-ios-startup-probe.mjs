@@ -18,7 +18,8 @@ import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
 export const INSTALL_CLIENT_TIMEOUT_MS = 300000
 
 /**
- * The first native flow opens the app on a 120 s deadline, so it must not start while the host is
+ * The first native flow opens the app on a fixed deadline (IOS_FIRST_FLOW_TIMEOUT_MS in
+ * native-ios-flow-budget.mjs, 120 s until story 6.15), so it must not start while the host is
  * saturated. The CPU gate above settles three named simulator daemons, yet the hosted VM can still
  * carry a 1-minute load of 130 or more from boot, install and Metro work: every failed first flow
  * on record started at load1 136 to 156 (runs 41297785476 and 41352898854, burn-in 41426869137),
@@ -61,6 +62,26 @@ export async function settleHostLoad({
   }
   console.log(JSON.stringify({ hostLoadGate: record }))
   return record
+}
+
+/** The development client ios-build builds and the shards install. */
+export const DEV_CLIENT_APP =
+  '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app'
+/** The Story 6.8 Release simulator app ios-live-font builds with the same derived data path. */
+export const RELEASE_APP =
+  '/tmp/cc68-ios-build/Build/Products/Release-iphonesimulator/CoutureCastStory68.app'
+
+/**
+ * The app a native-flow probe installs: the development client, or with `--app` the Release app,
+ * the only other build the iOS jobs make. Any other value fails before a simulator exists.
+ */
+export function probeAppPath(argv) {
+  const at = argv.indexOf('--app')
+  if (at < 0) return DEV_CLIENT_APP
+  const app = argv[at + 1]
+  if (![DEV_CLIENT_APP, RELEASE_APP].includes(app))
+    throw new Error('owned_story68_app_path_required')
+  return app
 }
 
 export async function finishOwnedStartup({
@@ -123,6 +144,7 @@ async function main() {
   const directory = path.resolve(
     process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
   )
+  const appPath = probeAppPath(process.argv.slice(2))
   const command = simulatorCommandRecorder(directory)
   const sample = (label) =>
     command(
@@ -212,8 +234,7 @@ async function main() {
     prepareForFlow,
     afterBoot,
     cleanup: () => cleanupOwnedDevice(device, directory, command),
-    appPath:
-      '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app',
+    appPath,
   })
   console.log(
     JSON.stringify({

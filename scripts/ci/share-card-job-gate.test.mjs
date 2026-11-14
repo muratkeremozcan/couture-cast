@@ -6,7 +6,6 @@ import { describe, test } from 'node:test'
 import {
   assertShareCardJobs,
   laneJobName,
-  iosShareCardJobs,
   pullRequestShareCardJobs,
   requiredShareCardJobs,
   shareCardLane,
@@ -25,14 +24,6 @@ const pullRequestResults = (override = {}) =>
   results(
     Object.fromEntries([
       ...deviceLanes.map((name) => [name, 'skipped']),
-      ...Object.entries(override),
-    ])
-  )
-// On a merge to main the iOS lanes are skipped: macOS runs nightly and on demand only.
-const pushResults = (override = {}) =>
-  results(
-    Object.fromEntries([
-      ...iosShareCardJobs.map((name) => [name, 'skipped']),
       ...Object.entries(override),
     ])
   )
@@ -68,7 +59,7 @@ const cli = (value, event, plan) =>
   })
 
 describe('share-card aggregate job gate', () => {
-  test('requires both API32 shards and their evidence, the browser lane, the five Android36 partitions, the Android36 matrix shard evidence, the three iOS shard jobs and the Expo Go proof', () => {
+  test('requires both API32 shards and their evidence, the browser lane, the five Android36 partitions, and the Android36 matrix shard evidence', () => {
     assert.deepEqual([...requiredShareCardJobs].sort(), [
       'android36-controls',
       'android36-interaction',
@@ -77,10 +68,6 @@ describe('share-card aggregate job gate', () => {
       'android36-original',
       'android36-release-font',
       'browser-acceptance',
-      'ios-build',
-      'ios-evidence',
-      'ios-expo-go',
-      'ios-shard',
       'original-resource',
       'original-resource-evidence',
     ])
@@ -163,10 +150,6 @@ describe('share-card aggregate job gate', () => {
         'android36-native-matrix',
         'android36-original',
         'android36-release-font',
-        'ios-build',
-        'ios-evidence',
-        'ios-expo-go',
-        'ios-shard',
         'original-resource',
         'original-resource-evidence',
       ])
@@ -284,26 +267,18 @@ describe('share-card aggregate job gate', () => {
     })
   })
 
-  describe('a push requires the iOS lanes skipped and every other lane', () => {
-    test('iOS skipped and every other lane successful passes on push', () => {
-      assert.deepEqual(assertShareCardJobs(pushResults(), 'push'), requiredShareCardJobs)
-      assert.equal(cli(JSON.stringify(pushResults()), 'push').status, 0)
+  // Every lane here runs on Linux (the iOS lanes run in ios-native-jobs.yml), so a merge to main
+  // runs and requires all of them.
+  describe('a push requires every lane', () => {
+    test('every lane successful passes on push', () => {
+      assert.deepEqual(assertShareCardJobs(results(), 'push'), requiredShareCardJobs)
+      assert.equal(cli(JSON.stringify(results()), 'push').status, 0)
     })
 
-    for (const name of iosShareCardJobs)
-      test(`a ${name} that ran fails on push`, () => {
-        const value = pushResults({ [name]: 'success' })
-        assert.throws(
-          () => assertShareCardJobs(value, 'push'),
-          new RegExp(`failed: ${name}$`)
-        )
-        assert.equal(cli(JSON.stringify(value), 'push').status, 1)
-      })
-
-    for (const name of deviceLanes.filter((lane) => !iosShareCardJobs.includes(lane)))
+    for (const name of deviceLanes)
       for (const outcome of ['skipped', 'failure'])
         test(`a ${outcome} ${name} fails on push`, () => {
-          const value = pushResults({ [name]: outcome })
+          const value = results({ [name]: outcome })
           assert.throws(
             () => assertShareCardJobs(value, 'push'),
             new RegExp(`failed: ${name}$`)
@@ -312,7 +287,7 @@ describe('share-card aggregate job gate', () => {
         })
 
     test('a plan skipping the browser lane does not excuse it on push', () => {
-      const value = pushResults({ 'browser-acceptance': 'skipped' })
+      const value = results({ 'browser-acceptance': 'skipped' })
       assert.throws(
         () => assertShareCardJobs(value, 'push', browserSkipped),
         /failed: browser-acceptance$/

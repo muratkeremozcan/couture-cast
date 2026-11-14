@@ -21,9 +21,8 @@ import {
 import { startWeatherProviderDouble } from './weather-provider-double.mjs'
 import {
   closedShareCardAuditReport,
-  failedAuditContext,
-  failedAuditIssues,
-  failedAuditTestDigest,
+  readAuditResult,
+  xcodebuildFailureReport,
 } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
@@ -35,6 +34,7 @@ import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
   recordIosFlowProgress,
+  captureIosTimeoutHierarchy,
   recordIosHostSample,
   scheduleIosInFlowSample,
   logSize,
@@ -73,6 +73,7 @@ import {
   prebuildArgs,
   prebuildEnv,
 } from './lib/story68-native-build.mjs'
+import { assertNativeProbeMode } from './lib/text-layout-probe-mode.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
@@ -198,6 +199,29 @@ function run(binary, args, env = {}, cwd = root, input) {
       `owned_command_failed:${path.basename(binary)}:${result.status}:${result.stderr.slice(-1500)}`
     )
   return result.stdout
+}
+/** The screen after an iOS deadline kill, which leaves no failed-step hierarchy; else null. */
+// Codex RUNS-R4-01: the killed flow's runner may be wedged, so it is stopped and its reuse mark
+// cleared first; the read then starts one fresh runner on the owned port, as hierarchyOutput()
+// would, and the failure path's recordIosDriverFlow stops that one after.
+/** Whether the iOS flow deadline killed this flow, whatever the reads after it return. */
+function iosDeadlineKill(platform, result) {
+  return platform === 'ios' && result.deadline?.timedOut === true
+}
+function afterTimeoutHierarchy(platform, result, output) {
+  if (!iosDeadlineKill(platform, result)) return null
+  recordIosDriverFlow({ platform, directory, device, ok: false })
+  return captureIosTimeoutHierarchy({
+    maestroBinary,
+    output,
+    args: [
+      '--device',
+      device,
+      ...iosDriverGlobalArgs(platform),
+      'hierarchy',
+      ...iosDriverTestArgs({ platform, directory, device }),
+    ],
+  })
 }
 function requireDevice() {
   if (!device || !['android', 'ios'].includes(platform))
@@ -490,7 +514,13 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
   if (result.status !== 0 && !recoverSnapshot) {
+    // A deadline kill leaves no failed-step screen; read it once more while the device lives.
+    // The deadline, not the read's success, decides which screen is current (Codex RUNS-R5-01).
+    const deadlineKilled = iosDeadlineKill(platform, result)
+    const timeoutHierarchy = afterTimeoutHierarchy(platform, result, output)
     recordIosFlowProgress({
+      timeoutHierarchy,
+      deadlineKilled,
       platform,
       flow,
       maestroLog: snapshotLog,
@@ -525,6 +555,7 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
         adb,
         durationMs: failureDurationMs,
         exitCode: result.status,
+        deadlineKilled,
         signal: result.signal ?? null,
         sensitive: secret !== '',
         startedAt: started,
@@ -727,13 +758,23 @@ if (command === 'prebuild') {
   )
   fs.closeSync(fd)
   if (result.status !== 0) throw new Error('native_prebuild_failed')
-  if (platform === 'ios')
+  // Story 6.15 F-00i: the project links the text layout probe exactly when it was asked for.
+  // The Pods are checked once pod install has brought them in line with the Podfile.
+  const probeModeCheck = {
+    platform,
+    mobileDirectory: path.join(root, MOBILE_DIRECTORY),
+    env: prebuildEnv(process.env, env),
+  }
+  assertNativeProbeMode({ ...probeModeCheck, pods: false })
+  if (platform === 'ios') {
     run(
       IOS_POD_INSTALL.binary,
       [...IOS_POD_INSTALL.args],
       {},
       path.join(root, nativeProjectDirectory('ios'))
     )
+    assertNativeProbeMode(probeModeCheck)
+  }
 } else if (command === 'build') {
   ownedEnv()
   const { configuration, arch } = buildSelection({
@@ -747,6 +788,20 @@ if (command === 'prebuild') {
     'w',
     0o600
   )
+  const buildEnv = nativeBuildEnv(
+    process.env,
+    read('public-build-env.json'),
+    path.dirname(path.dirname(adb))
+  )
+  // Story 6.15 F-00i: a build reuses the last prebuild's project, which must link the text
+  // layout probe exactly when this build asks for it (a probe build once reused a production
+  // project). It runs before anything is staged into that project; on iOS it covers what the
+  // last pod install left as well as the Podfile.
+  assertNativeProbeMode({
+    platform,
+    mobileDirectory: path.join(root, MOBILE_DIRECTORY),
+    env: buildEnv,
+  })
   const workletsStaging =
     platform === 'android'
       ? prepareWorkletsStaging({
@@ -765,11 +820,7 @@ if (command === 'prebuild') {
   })
   const result = spawnSync(binary, args, {
     cwd: path.join(root, nativeProjectDirectory(platform)),
-    env: nativeBuildEnv(
-      process.env,
-      read('public-build-env.json'),
-      path.dirname(path.dirname(adb))
-    ),
+    env: buildEnv,
     stdio: ['ignore', fd, fd],
   })
   fs.closeSync(fd)
@@ -949,6 +1000,7 @@ if (command === 'prebuild') {
     'ShareCardAccessibilityUITests.swift',
     'ShareCardHeaderSemantics.swift',
     'ShareCardHeaderQuery.swift',
+    'ShareCardComposerDismissal.swift',
   ])
     fs.copyFileSync(
       path.join(root, 'apps/mobile/native-tests', name),
@@ -1042,34 +1094,47 @@ if (command === 'prebuild') {
   )
   try {
     const code = await new Promise((resolve) => audit.once('exit', resolve))
-    const summary = JSON.parse(
-      run('xcrun', ['xcresulttool', 'get', 'test-results', 'summary', '--path', result])
-    )
-    const tree = JSON.parse(
-      run('xcrun', ['xcresulttool', 'get', 'test-results', 'tests', '--path', result])
-    )
+    // The log first, then the result bundle, which a failed run may not have written.
     const auditText = fs.readFileSync(auditLog).subarray(offset).toString()
+    const { summary, tree, resultError } = readAuditResult({
+      result,
+      exists: fs.existsSync,
+      read: (kind) =>
+        run('xcrun', ['xcresulttool', 'get', 'test-results', kind, '--path', result]),
+    })
     const closed = closedShareCardAuditReport(summary, tree, auditText)
     privateJson('accessibility-ios.json', closed)
     if (code !== 0 || !closed.passed) {
       console.log(
         JSON.stringify({
+          // Story 6.15 (dispatch 43393273500 shard 3): a run with no failed test case printed
+          // three empty arrays, so the exit code, the xcresult counts and the log tail say why.
           iosAuditFailure: {
-            issues: failedAuditIssues(auditText),
-            context: failedAuditContext(auditText),
-            tests: failedAuditTestDigest(auditText),
+            exitCode: code,
+            resultError,
+            counts: closed.counts,
+            failedTestIDs: closed.failedTestIDs,
+            ...xcodebuildFailureReport(auditText),
           },
         })
       )
-      const hierarchy = run(maestroBinary, ['--device', device, 'hierarchy'])
-      if (hierarchy.includes('share-card-title'))
-        run('xcrun', [
-          'simctl',
-          'io',
-          device,
-          'screenshot',
-          path.join(directory, 'native-ios-audit-failure.png'),
-        ])
+      // Antigravity audit-diag P2: earlier flows left the owned driver on its port and the
+      // XCUITest bundle may have displaced it, so it is stopped and cleared first and the screen
+      // is read through the owned port (one fresh runner, as after a deadline kill). Nothing here
+      // may replace the audit failure.
+      try {
+        recordIosDriverFlow({ platform, directory, device, ok: false })
+        if (hierarchyOutput().includes('share-card-title'))
+          run('xcrun', [
+            'simctl',
+            'io',
+            device,
+            'screenshot',
+            path.join(directory, 'native-ios-audit-failure.png'),
+          ])
+      } catch {
+        console.log(JSON.stringify({ iosAuditFailureScreen: 'unavailable' }))
+      }
       throw new Error('ios_accessibility_audit_failed')
     }
   } finally {

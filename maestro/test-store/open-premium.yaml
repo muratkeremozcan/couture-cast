@@ -1,0 +1,16 @@
+# Story 6.15 D15 Test Store journey (scripts/run-test-store-journey.mjs). Learning path Step 55.
+# The driver has launched the debuggable build on its own Metro; this absorbs the dev-client
+# sheets, opens Settings and brings the Premium status line into view. Ids only, plus the status
+# patterns the driver derives from the app's locale file (PREMIUM_STATUS_NONE/ACTIVE).
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../story65/open-app.yaml
+- tapOn:
+    id: tab-settings
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+    label: 'The Premium section loaded the subscription from our API'

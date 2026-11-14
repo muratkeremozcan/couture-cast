@@ -52,7 +52,11 @@ test('every workflow and job the lane map names exists', () => {
   }
 })
 
-test('each gated job needs the plan job and runs only when its own lane does', () => {
+// A job several lanes gate runs when any of them does and reads exactly those lanes.
+const lanesOf = (file, id) =>
+  gated.filter(([, f, job]) => f === file && job === id).map(([lane]) => lane)
+
+test('each gated job needs the plan job and runs only when its own lanes do', () => {
   for (const [lane, file, id] of gated) {
     const job = workflows[file].jobs[id]
     assert.ok(needsOf(job).includes('lanes'), `${file} ${id} needs lanes`)
@@ -70,9 +74,13 @@ test('each gated job needs the plan job and runs only when its own lane does', (
       conditionOf(job).includes(planCondition(lane)),
       `${file} ${id} runs when ${planCondition(lane)}: ${conditionOf(job)}`
     )
-    // A job reads only its own lane, so one lane's plan never runs or skips another's job.
+    // A job reads only its own lanes, so one lane's plan never runs or skips another's job.
     const read = [...conditionOf(job).matchAll(/plan\)\['([^']+)'\]/g)].map((m) => m[1])
-    assert.deepEqual([...new Set(read)], [lane], `${file} ${id} reads only ${lane}`)
+    assert.deepEqual(
+      [...new Set(read)].sort(),
+      lanesOf(file, id).sort(),
+      `${file} ${id} reads only ${lanesOf(file, id).join(', ')}`
+    )
   }
 })
 

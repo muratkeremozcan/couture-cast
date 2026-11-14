@@ -1,0 +1,4015 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+//
+// F-00: the oracle judged on recorded and derived hierarchies before it judges any device run.
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import { createHash } from 'node:crypto'
+import path from 'node:path'
+import { describe, test } from 'node:test'
+import {
+  mountTracker,
+  readWithMounts,
+  rootIdentity,
+  widenMounts,
+} from './live-font-capture.mjs'
+
+import {
+  healthyAnswer,
+  probeRecord,
+  withTextProbe,
+  withTextProbes,
+} from './fixtures/live-font-text-probe-records.mjs'
+import {
+  androidScaledSize,
+  assertColdControl as assertColdControlRaw,
+  assertComposerControls,
+  assertComposerFeedbackStable,
+  assertLiveFontProof as assertLiveFontProofRaw,
+  captureVolatileKeys,
+  clipKeys,
+  evaluateLiveFontChange as evaluateLiveFontChangeRaw,
+  expectedTextRatio,
+  fixExpectedFor,
+  HOUR_LABEL,
+  parseBounds,
+  proposedResidualEntry,
+  requiredMounts,
+  stageKeys,
+  textLayout,
+  textProbeSummary,
+  WEATHER_BANNER_MARKER,
+  WEATHER_STALE_TEXT,
+  weatherBannerState,
+} from './live-font-scale-proof.mjs'
+import { createVolatileProofCheck } from './live-font-volatile-proof.mjs'
+
+// F-00i: every capture these specs build gets the healthy probe answer for its nodes, as the
+// nodes stand when the oracle judges them; the text probe specs give their own answers.
+const evaluateLiveFontChange = (change) =>
+  evaluateLiveFontChangeRaw(withTextProbes(change))
+const assertLiveFontProof = (change) => assertLiveFontProofRaw(withTextProbes(change))
+const assertColdControl = ({ base, target, ...rest }) =>
+  assertColdControlRaw({
+    ...rest,
+    base: withTextProbe(base, rest.platform),
+    target: withTextProbe(target, rest.platform),
+  })
+
+const baseline = JSON.parse(
+  fs.readFileSync(
+    new URL('./fixtures/live-font-6-8-baseline.json', import.meta.url),
+    'utf8'
+  )
+)
+const IDENTITY = { activity: 'activity-1', root: 'root-a1', onCreate: 1 }
+const stage = (name) => ({
+  ...structuredClone(baseline.captures.find((c) => c.stage === name)),
+  identity: { ...IDENTITY },
+})
+const ANCHORS = ['current-temperature', 'outfit-comfort-notes']
+// 48 sp temperature: Android 14+ keeps it at 48 dp at 1.5, so it correctly does not grow.
+// 14 sp condition line: 22 dp at 1.5, a 1.571 ratio.
+const PROBES = [
+  { id: 'current-temperature', sizeSp: 48 },
+  { id: 'current-condition', sizeSp: 14 },
+]
+const LARGE = new Set(['current-temperature'])
+
+/**
+ * A correct layout at the target scale: every app text box grows by the 14 sp ratio about its
+ * top edge, except the large temperature, which Android leaves at its size. System UI is left
+ * alone. Positions are not reflowed; the oracle compares heights and parents.
+ */
+function correct(capture, overrides = {}, factor = 22 / 14) {
+  return {
+    ...capture,
+    ...overrides,
+    nodes: capture.nodes.map((node) => {
+      if (
+        /^com\.android\.systemui:/.test(node.id) ||
+        node.text === '' ||
+        LARGE.has(node.id)
+      )
+        return node
+      const [left, top, right, bottom] = parseBounds(node.bounds)
+      const scaled = top + Math.round((bottom - top) * factor)
+      return { ...node, bounds: `[${left},${top}][${right},${scaled}]` }
+    }),
+  }
+}
+
+// The Story 6.8 run has no cold launch at 1.5; its correct layout is derived as above.
+const cold = () => correct(stage('settled'), { stage: 'cold' })
+const bugChange = () => ({
+  platform: 'android',
+  before: stage('before'),
+  immediate: stage('immediate'),
+  settled: stage('settled'),
+  cold: cold(),
+  anchors: ANCHORS,
+  probes: PROBES,
+})
+const fixedChange = () => ({
+  ...bugChange(),
+  immediate: correct(stage('immediate')),
+  settled: correct(stage('settled')),
+})
+
+describe('fixExpectedFor', () => {
+  test('expects the fix from React Native 0.87.0', () => {
+    assert.equal(fixExpectedFor('0.81.5'), false)
+    assert.equal(fixExpectedFor('0.83.10'), false)
+    assert.equal(fixExpectedFor('0.86.3'), false)
+    assert.equal(fixExpectedFor('0.87.0-rc.0'), false)
+    assert.equal(fixExpectedFor('0.87.0'), true)
+    assert.equal(fixExpectedFor('0.88.1'), true)
+    assert.equal(fixExpectedFor('1.0.0'), true)
+  })
+
+  test('refuses a missing or malformed version', () => {
+    for (const version of [undefined, '', '0.88', 'latest'])
+      assert.throws(() => fixExpectedFor(version), {
+        code: 'live_font_rn_version_required',
+      })
+  })
+})
+
+describe('expected text scaling', () => {
+  test('Android 14+ follows the AOSP 1.5 curve', () => {
+    assert.equal(androidScaledSize(20, 1.5), 26)
+    assert.equal(androidScaledSize(24, 1.5), 28)
+    assert.equal(androidScaledSize(30, 1.5), 30)
+    assert.equal(androidScaledSize(48, 1.5), 48)
+    assert.equal(androidScaledSize(14, 1.5), 22)
+    assert.equal(androidScaledSize(6, 1.5), 9)
+  })
+
+  test('Android stays linear outside the tables and blends between them', () => {
+    assert.equal(androidScaledSize(20, 1), 20)
+    assert.equal(androidScaledSize(20, 1.04), 20 * 1.04)
+    assert.equal(androidScaledSize(20, 2.5), 50)
+    assert.ok(Math.abs(androidScaledSize(20, 1.4) - 24.8) < 1e-9)
+  })
+
+  test('Android before 14 (API 34) scales linearly', () => {
+    assert.equal(
+      expectedTextRatio({
+        platform: 'android',
+        androidApi: 32,
+        sizeSp: 48,
+        from: 1,
+        to: 1.5,
+      }),
+      1.5
+    )
+    assert.equal(
+      expectedTextRatio({
+        platform: 'android',
+        androidApi: 36,
+        sizeSp: 48,
+        from: 1,
+        to: 1.5,
+      }),
+      1
+    )
+  })
+
+  test('iOS scales by the content-size multiplier ratio', () => {
+    assert.equal(expectedTextRatio({ platform: 'ios', from: 1, to: 1.353 }), 1.353)
+    assert.ok(
+      Math.abs(
+        expectedTextRatio({ platform: 'android', sizeSp: 14, from: 1, to: 1.5 }) - 22 / 14
+      ) < 1e-9
+    )
+  })
+})
+
+describe('evaluateLiveFontChange', () => {
+  test('the Story 6.8 baseline is a known residual: small text stale, large text correct', () => {
+    const { verdict, checks } = evaluateLiveFontChange(bugChange())
+    assert.equal(verdict, 'known-residual')
+    assert.equal(checks.fullText.before, 42) // 43 nodes less the status-bar clock
+    assert.equal(checks.identity.pass, true)
+    assert.equal(checks.coldParity.pass, false)
+    assert.ok(checks.coldParity.misses.every((miss) => miss.stale))
+    const [temperature, condition] = checks.growth.probes
+    assert.equal(
+      temperature.pass,
+      true,
+      'unchanged 48 sp text matches its cold reference'
+    )
+    assert.equal(temperature.expected, 1)
+    assert.equal(condition.pass, false, 'the 14 sp line stayed at its 1.0 height')
+    assert.equal(condition.ratio, 1)
+  })
+
+  test('a leg that starts from a stale screen measures growth from the cold reference', () => {
+    // The 1.5 -> 1.0 leg after a residual: `before` reads 1.5 but kept its 1.0 heights, and the
+    // return to 1.0 lands exactly on the 1.0 cold layout.
+    const staleBefore = stage('settled')
+    const backAtBase = (name) => ({ ...stage('before'), stage: name })
+    const reverse = {
+      platform: 'android',
+      before: staleBefore,
+      immediate: backAtBase('immediate'),
+      settled: backAtBase('settled'),
+      cold: backAtBase('cold'),
+      coldBefore: cold(),
+      anchors: ANCHORS,
+      probes: PROBES,
+    }
+    const { checks, verdict } = evaluateLiveFontChange(reverse)
+    assert.equal(checks.coldParity.pass, true)
+    assert.equal(checks.growth.pass, true, JSON.stringify(checks.growth.probes))
+    assert.equal(verdict, 'fixed')
+    // Without the cold reference the stale start reads as text that failed to shrink.
+    const withoutColdBefore = { ...reverse }
+    delete withoutColdBefore.coldBefore
+    assert.equal(evaluateLiveFontChange(withoutColdBefore).checks.growth.pass, false)
+    // Text stuck at the 1.5 size after the return still fails, with or without it.
+    const stuck = { ...reverse, settled: { ...cold(), stage: 'settled', fontScale: 1 } }
+    const judged = evaluateLiveFontChange(stuck)
+    assert.equal(judged.checks.growth.pass, false)
+    assert.equal(judged.checks.coldParity.pass, false)
+    assert.throws(
+      () =>
+        evaluateLiveFontChange({ ...reverse, coldBefore: { ...cold(), fontScale: 2 } }),
+      { code: 'live_font_cold_before_scale_mismatch' }
+    )
+  })
+
+  test('a live change that matches the cold layout is fixed, with large text unchanged', () => {
+    const { verdict, checks } = evaluateLiveFontChange(fixedChange())
+    assert.equal(verdict, 'fixed')
+    assert.equal(checks.coldParity.compared, 42)
+    assert.equal(checks.growth.probes[0].ratio, 1)
+    assert.ok(checks.growth.probes[1].ratio > 1.5)
+  })
+
+  // F-00e: Android recreates MainActivity on a font change unless it declares fontScale.
+  test('a same-PID Activity recreation is restored, never fixed, and says how', () => {
+    const change = fixedChange()
+    change.before.identity = { ...IDENTITY, onCreate: 1 }
+    change.immediate.identity = { ...IDENTITY, activity: 'activity-2', onCreate: 2 }
+    change.settled.identity = { ...IDENTITY, activity: 'activity-2', onCreate: 2 }
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(verdict, 'restored')
+    assert.equal(checks.identity.processKept, true)
+    assert.equal(checks.identity.activityChanged, true)
+    assert.equal(checks.identity.onCreateDelta, 1)
+    assert.deepEqual(checks.identity.activities, [
+      'activity-1',
+      'activity-2',
+      'activity-2',
+    ])
+  })
+
+  test('an onCreate rise is restored even when the token reads raced it', () => {
+    const change = fixedChange()
+    change.before.identity = { ...IDENTITY, onCreate: 3 }
+    change.settled.identity = { ...IDENTITY, onCreate: 4 }
+    assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  test('a same-PID React remount is restored, never fixed', () => {
+    const change = fixedChange()
+    change.immediate.identity = { ...IDENTITY, root: 'root-a2' }
+    change.settled.identity = { ...IDENTITY, root: 'root-a2' }
+    assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  // F-15 / Codex R4-05: Android must supply its native identity; unavailable is not zero.
+  test('Android without an Activity token or onCreate count cannot pass identity', () => {
+    for (const missing of ['activity', 'onCreate']) {
+      const change = fixedChange()
+      delete change.settled.identity[missing]
+      const { verdict, checks } = evaluateLiveFontChange(change)
+      assert.equal(checks.identity.nativeKnown, false, missing)
+      assert.notEqual(verdict, 'fixed', missing)
+    }
+    const ios = { ...fixedChange(), platform: 'ios' }
+    for (const name of ['before', 'immediate', 'settled'])
+      ios[name].identity = { root: 'root-a1' }
+    assert.equal(evaluateLiveFontChange(ios).checks.identity.pass, true)
+  })
+
+  // F-14 / Codex R4-04: the post-update stage keeps the screen whole and the same mount.
+  test('a remounted screen after the update is never fixed', () => {
+    const change = fixedChange()
+    change.updated = {
+      ...correct(stage('settled')),
+      pid: '20001',
+      identity: { activity: 'activity-9', root: 'root-z9', onCreate: 2 },
+    }
+    change.coldUpdated = cold()
+    assert.notEqual(evaluateLiveFontChange(change).verdict, 'fixed')
+    change.updated.pid = change.settled.pid
+    assert.equal(evaluateLiveFontChange(change).verdict, 'restored')
+  })
+
+  test('a mostly missing screen after the update is never fixed', () => {
+    const change = fixedChange()
+    change.updated = correct(stage('settled'))
+    change.updated.nodes = change.updated.nodes.filter(
+      (node) => node.id === 'current-condition'
+    )
+    change.coldUpdated = cold()
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(
+      checks.postUpdateParity.pass,
+      false,
+      'one surviving node does not pass parity'
+    )
+    assert.equal(checks.postUpdateFullText.pass, false)
+    assert.equal(checks.postUpdateAnchors.pass, false)
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('text measured at an earlier scale on the same launch is stale too', () => {
+    // The return leg's update brings back a label the 1.5 leg measured; it keeps that height.
+    const label = { text: 'Collapse', id: '', bounds: '[831,807][1017,872]' }
+    const reverse = {
+      platform: 'android',
+      before: stage('settled'),
+      immediate: { ...stage('before'), stage: 'immediate' },
+      settled: { ...stage('before'), stage: 'settled' },
+      cold: { ...stage('before'), stage: 'cold' },
+      coldBefore: cold(),
+      anchors: ANCHORS,
+      probes: PROBES,
+    }
+    reverse.updated = {
+      ...reverse.settled,
+      stage: 'updated',
+      nodes: [...reverse.settled.nodes, label],
+    }
+    reverse.coldUpdated = {
+      ...reverse.cold,
+      nodes: [...reverse.cold.nodes, { ...label, bounds: '[894,818][1017,861]' }],
+    }
+    const unexplained = evaluateLiveFontChange(reverse)
+    assert.equal(unexplained.verdict, 'unexpected')
+    assert.equal(unexplained.checks.postUpdateParity.misses[0].stale, false)
+    const earlier = [{ ...stage('settled'), nodes: [label] }]
+    const explained = evaluateLiveFontChange({ ...reverse, earlier })
+    assert.equal(explained.verdict, 'known-residual')
+    assert.equal(explained.checks.postUpdateParity.misses[0].staleFrom, 'earlier')
+    // A height no earlier capture showed stays unexplained.
+    const other = [
+      { ...stage('settled'), nodes: [{ ...label, bounds: '[831,807][1017,900]' }] },
+    ]
+    assert.equal(
+      evaluateLiveFontChange({ ...reverse, earlier: other }).verdict,
+      'unexpected'
+    )
+  })
+
+  test('a whole, same-mount update that matches its cold reference stays fixed', () => {
+    const change = fixedChange()
+    change.updated = correct(stage('settled'))
+    change.coldUpdated = cold()
+    assert.equal(evaluateLiveFontChange(change).verdict, 'fixed')
+  })
+
+  test('one screen mount across the stages is kept; a changed one is not', () => {
+    const both = 'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
+    const change = fixedChange()
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = both
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
+    change.settled.identity.root =
+      'live-font-mount-root-h16mcs1,live-font-mount-settings-k77abc3'
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, false)
+    change.settled.identity.root = 'live-font-mount-settings-h16mcs3'
+    const noRoot = evaluateLiveFontChange(change).checks.identity
+    assert.equal(noRoot.rootKnown, false)
+    assert.equal(noRoot.rootKept, false)
+  })
+
+  // Antigravity handover R1 (P2-1): a marker left out of any capture could hide a remount whose
+  // fresh render passes every height check, so it leaves identity unknown.
+  test('a screen marker missing from any stage leaves identity unknown', () => {
+    const both = 'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
+    const rootOnly = 'live-font-mount-root-h16mcs1'
+    for (const dropped of ['before', 'immediate', 'settled', 'updated']) {
+      const change = fixedChange()
+      change.updated = correct(stage('settled'))
+      change.coldUpdated = cold()
+      for (const name of ['before', 'immediate', 'settled', 'updated'])
+        change[name].identity.root = name === dropped ? rootOnly : both
+      const { verdict, checks } = evaluateLiveFontChange(change)
+      assert.equal(checks.identity.rootKnown, false, dropped)
+      assert.equal(checks.identity.rootKept, false, dropped)
+      assert.equal(verdict, 'unexpected', dropped)
+    }
+  })
+
+  test("the screen's own marker is required even when no stage shows it", () => {
+    const change = fixedChange()
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = 'live-font-mount-root-h16mcs1'
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
+    const { verdict, checks } = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(checks.identity.rootKnown, false)
+    assert.equal(verdict, 'unexpected')
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root =
+        'live-font-mount-root-h16mcs1,live-font-mount-settings-h16mcs3'
+    assert.equal(
+      evaluateLiveFontChange({ ...change, mount: 'settings' }).checks.identity.rootKept,
+      true
+    )
+  })
+
+  // Antigravity handover r2 (P2): Home stays mounted under Settings, so the before capture
+  // carries its marker and every stage must. The runner widens its reread to each scope the
+  // before capture showed: one dropped Home dump is reread and passes, three fail the leg.
+  test('a scope the before capture showed is reread, and fails only after three drops', () => {
+    const before = [
+      'live-font-mount-home-h1',
+      'live-font-mount-root-r1',
+      'live-font-mount-settings-s1',
+    ]
+    const dropped = ['live-font-mount-root-r1', 'live-font-mount-settings-s1']
+    const scopes = widenMounts(['root', 'settings'], before)
+    assert.deepEqual(scopes, ['root', 'settings', 'home'])
+    const settledWith = (dumps) => {
+      let index = 0
+      const read = () => ({ markers: dumps[Math.min(index++, dumps.length - 1)] })
+      return rootIdentity(readWithMounts(read, scopes).markers)
+    }
+    const change = fixedChange()
+    change.before.identity.root = rootIdentity(before)
+    change.immediate.identity.root = rootIdentity(before)
+    change.settled.identity.root = settledWith([dropped, before])
+    const once = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(once.checks.identity.rootKept, true)
+    assert.equal(once.verdict, 'fixed')
+    change.settled.identity.root = settledWith([dropped, dropped, dropped, before])
+    const thrice = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(thrice.checks.identity.rootKnown, false)
+    assert.equal(thrice.verdict, 'unexpected')
+  })
+
+  test('two mounts of one scope in one capture are no kept identity', () => {
+    const change = fixedChange()
+    const one = 'live-font-mount-modal-m2,live-font-mount-root-r1'
+    change.before.identity.root = one
+    change.immediate.identity.root = one
+    change.settled.identity.root =
+      'live-font-mount-modal-m1,live-font-mount-modal-m2,live-font-mount-root-r1'
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.identity.rootKept, false)
+    assert.notEqual(verdict, 'fixed')
+  })
+
+  test('a modal capture with only the modal marker judges identity by the modal mount', () => {
+    // Android dumps only the modal window while it is up (device run 2026-11-13, composer).
+    const change = fixedChange()
+    const modal = 'live-font-mount-modal-m1'
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = modal
+    const kept = evaluateLiveFontChange({ ...change, mount: 'modal' })
+    assert.equal(kept.checks.identity.rootKnown, true)
+    assert.equal(kept.checks.identity.rootKept, true)
+    assert.equal(kept.verdict, 'fixed')
+    // A root remount remounts the modal inside it: a new modal id is no kept identity.
+    change.settled.identity.root = 'live-font-mount-modal-m2'
+    const remounted = evaluateLiveFontChange({ ...change, mount: 'modal' })
+    assert.equal(remounted.checks.identity.rootKept, false)
+    assert.notEqual(remounted.verdict, 'fixed')
+    // Root shown in one modal stage must show in every stage (iOS shows both).
+    change.settled.identity.root = 'live-font-mount-modal-m1,live-font-mount-root-r1'
+    const partial = evaluateLiveFontChange({ ...change, mount: 'modal' })
+    assert.equal(partial.checks.identity.rootKnown, false)
+    // Other screens still need the root marker.
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = 'live-font-mount-settings-s1'
+    const noRoot = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(noRoot.checks.identity.rootKnown, false)
+  })
+
+  // Antigravity r28 (P3): the runner rereads for the scopes the identity check requires, so a
+  // composer capture on Android (modal window only) is read once.
+  test('the runner rereads for exactly the scopes the identity check requires', () => {
+    assert.deepEqual(requiredMounts('modal'), ['modal'])
+    assert.deepEqual(requiredMounts('settings'), ['root', 'settings'])
+    assert.deepEqual(requiredMounts(undefined), ['root'])
+    const readsFor = (mount, markers) => {
+      const tracker = mountTracker(requiredMounts(mount))
+      let reads = 0
+      readWithMounts(() => {
+        reads += 1
+        return { markers }
+      }, tracker.scopes())
+      return reads
+    }
+    assert.equal(readsFor('modal', ['live-font-mount-modal-m1']), 1)
+    assert.equal(readsFor('settings', ['live-font-mount-settings-s1']), 3)
+    assert.equal(
+      readsFor('settings', ['live-font-mount-root-r1', 'live-font-mount-settings-s1']),
+      1
+    )
+  })
+
+  test('a remount between legs of one launch is caught by the later leg', () => {
+    const change = fixedChange()
+    const later = 'live-font-mount-root-r1,live-font-mount-settings-s2'
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = later
+    assert.equal(evaluateLiveFontChange(change).checks.identity.rootKept, true)
+    const earlierLeg = correct(stage('settled'))
+    earlierLeg.identity.root = 'live-font-mount-root-r1,live-font-mount-settings-s1'
+    const { verdict, checks } = evaluateLiveFontChange({
+      ...change,
+      earlier: [earlierLeg],
+    })
+    assert.equal(checks.identity.rootKept, false)
+    assert.notEqual(verdict, 'fixed')
+  })
+
+  test('a capture without the mount marker cannot pass identity', () => {
+    const change = fixedChange()
+    delete change.settled.identity.root
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.identity.rootKnown, false)
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('the 44-to-5 blank-text regression is unexpected', () => {
+    const change = fixedChange()
+    const kept = new Set(change.settled.nodes.slice(0, 5).map((node) => node.text))
+    for (const name of ['immediate', 'settled'])
+      change[name].nodes = change[name].nodes.filter((node) => kept.has(node.text))
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(verdict, 'unexpected')
+    assert.equal(checks.anchors.pass, false)
+    assert.equal(checks.fullText.pass, false)
+  })
+
+  test('a process restart is unexpected even when layout is right', () => {
+    const change = fixedChange()
+    change.settled.pid = '20001'
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(verdict, 'unexpected')
+    assert.equal(checks.identity.processKept, false)
+  })
+
+  test('text that leaves its parent is clipped and never fixed', () => {
+    const change = fixedChange()
+    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
+    const [left, top, right] = parseBounds(node.bounds)
+    node.parent = `[${left},${top}][${right},${top + 40}]`
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.clipping.pass, false)
+    assert.equal(verdict, 'unexpected')
+  })
+
+  /** Gives the probe's node in `capture` a parent with `above` and `below` px of overhang. */
+  function overhang(capture, id, above, below) {
+    const node = capture.nodes.find((n) => n.id === id)
+    const [left, top, right, bottom] = parseBounds(node.bounds)
+    node.parent = `[${left},${top + above}][${right},${bottom - below}]`
+    return node
+  }
+  /** A node box of `size` px at `top`, centred over a `row` px parent. */
+  function centredBox(capture, id, size, row, top = 100) {
+    const node = capture.nodes.find((n) => n.id === id)
+    const [left, , right] = parseBounds(node.bounds)
+    const gap = (size - row) / 2
+    node.bounds = `[${left},${top}][${right},${top + size}]`
+    node.parent = `[${left},${top + gap}][${right},${top + size - gap}]`
+  }
+
+  test('a touch target centred over a shorter row is not clipped text', () => {
+    // iOS: a 44 pt icon button (About CoutureCast) centred on a 38 pt header row overflows it by
+    // 3 pt above and below with the same box at every text size, the cold base launch included.
+    const change = { ...fixedChange(), coldBase: structuredClone(stage('before')) }
+    overhang(change.coldBase, 'current-temperature', 3, 3)
+    overhang(change.settled, 'current-temperature', 3, 3)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, true)
+    // Without the cold base launch there is nothing to compare with: no exemption.
+    const withoutBase = { ...change }
+    delete withoutBase.coldBase
+    assert.equal(evaluateLiveFontChange(withoutBase).checks.clipping.pass, false)
+    // Overhang only below is grown text, never a centred target.
+    overhang(change.settled, 'current-temperature', 0, 6)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+  })
+
+  test('text that grew past a row that centres it is clipped (P2-1)', () => {
+    // Yoga centres the overflow of grown text equally above and below a fixed-height row.
+    const change = { ...fixedChange(), coldBase: structuredClone(stage('before')) }
+    overhang(change.settled, 'current-condition', 6, 6)
+    const { checks, verdict } = evaluateLiveFontChange(change)
+    assert.equal(checks.clipping.pass, false)
+    assert.notEqual(verdict, 'fixed')
+  })
+
+  test('growth within the height tolerance still ends the exemption (P2-1 re-check)', () => {
+    // Android tolerance is 2 px: 28 px text in a 24 px centred row at the base scale, 30 px live.
+    const change = { ...fixedChange(), coldBase: structuredClone(stage('before')) }
+    centredBox(change.coldBase, 'current-temperature', 28, 24)
+    centredBox(change.settled, 'current-temperature', 30, 24)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+    // A parent that shrinks under a box of the same height ends it too.
+    centredBox(change.settled, 'current-temperature', 28, 22)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+    centredBox(change.settled, 'current-temperature', 28, 24)
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, true)
+  })
+
+  test('stale text on a return leg is judged against the cold base launch (P2-1 re-check)', () => {
+    // 1.5 to 1.0: `before` is the stale 1.5 capture, so it shows the same 50 px box; the cold
+    // base launch shows the text at 20 px inside the 38 px row.
+    const before = structuredClone(stage('settled'))
+    centredBox(before, 'current-condition', 50, 38)
+    const settled = { ...structuredClone(stage('before')), stage: 'settled' }
+    centredBox(settled, 'current-condition', 50, 38)
+    const coldBase = structuredClone(stage('before'))
+    centredBox(coldBase, 'current-condition', 20, 20)
+    const change = {
+      platform: 'android',
+      before,
+      immediate: { ...settled, stage: 'immediate' },
+      settled,
+      cold: { ...stage('before'), stage: 'cold' },
+      coldBase,
+      anchors: ANCHORS,
+      probes: PROBES,
+    }
+    assert.equal(evaluateLiveFontChange(change).checks.clipping.pass, false)
+  })
+
+  test('a height that matches neither the base nor the cold layout is unexpected', () => {
+    const change = { ...fixedChange(), settled: correct(stage('settled'), {}, 1.3) }
+    assert.equal(evaluateLiveFontChange(change).verdict, 'unexpected')
+  })
+
+  test('stale text after a post-scale React update is a residual, caught after a clean settle', () => {
+    const change = fixedChange()
+    change.updated = stage('settled') // the update re-used the 1.0 measurements
+    change.coldUpdated = cold()
+    const { verdict, checks } = evaluateLiveFontChange(change)
+    assert.equal(checks.coldParity.pass, true)
+    assert.equal(checks.postUpdateParity.pass, false)
+    assert.equal(verdict, 'known-residual')
+  })
+
+  test('refuses a run with no scale change, no anchors, a cold launch at another scale, or half an update', () => {
+    assert.throws(
+      () => evaluateLiveFontChange({ ...bugChange(), settled: stage('before') }),
+      { code: 'live_font_scale_change_required' }
+    )
+    assert.throws(() => evaluateLiveFontChange({ ...bugChange(), anchors: [] }), {
+      code: 'live_font_anchors_required',
+    })
+    assert.throws(
+      () => evaluateLiveFontChange({ ...bugChange(), cold: { ...cold(), fontScale: 1 } }),
+      { code: 'live_font_cold_scale_mismatch' }
+    )
+    assert.throws(
+      () => evaluateLiveFontChange({ ...bugChange(), updated: stage('settled') }),
+      {
+        code: 'live_font_update_pair_required',
+      }
+    )
+  })
+})
+
+describe('assertLiveFontProof', () => {
+  // The stale miss keys of the Story 6.8 Home residual, as the oracle reports them, each with
+  // its stage: every miss of this leg is a cold parity miss.
+  const STALE_KEYS = evaluateLiveFontChange(bugChange())
+    .checks.coldParity.misses.map((miss) => `cold:${miss.key}`)
+    .sort()
+  const TZ = 'America/Chicago'
+  const BANNER = 'out-of-date'
+  // R2-05: the Story 6.8 Home residual as a reviewed baseline would describe it.
+  const BASELINE = {
+    timezone: TZ,
+    weatherBanner: BANNER,
+    staleKeys: STALE_KEYS,
+    clippedKeys: [],
+    review: {
+      verdict: 'known-residual',
+      structuralPass: true,
+      everyMissStale: true,
+      growthFailing: ['current-condition'],
+      controlPass: true,
+      clipsStale: true,
+    },
+  }
+  const attempt =
+    (residualBaseline, timezone = TZ, weatherBanner = BANNER, change = bugChange()) =>
+    () =>
+      assertLiveFontProof({
+        reactNativeVersion: '0.81.5',
+        residualBaseline,
+        timezone,
+        weatherBanner,
+        ...change,
+      })
+  const refused = (pattern) => (error) =>
+    error.code === 'live_font_residual_unapproved' && pattern.test(error.message)
+  const differs = (pattern) => (error) =>
+    error.code === 'live_font_residual_environment_differs' && pattern.test(error.message)
+  const unlabeled = STALE_KEYS.filter((key) => key.startsWith('cold:["",'))
+
+  test('the residual has 41 stale keys, two of them labeled, and no key twice', () => {
+    assert.equal(STALE_KEYS.length, 41)
+    assert.deepEqual(
+      STALE_KEYS.filter((key) => !key.startsWith('cold:["",')),
+      [
+        'cold:["current-condition","t-c63401aba20f"]#0',
+        'cold:["outfit-comfort-notes","t-cf83675a2f00"]#0',
+      ]
+    )
+    const { checks } = evaluateLiveFontChange(bugChange())
+    assert.deepEqual(proposedResidualEntry(checks, bugChange()).staleKeys, STALE_KEYS)
+    assert.equal(new Set(STALE_KEYS).size, 41)
+  })
+
+  test('below 0.87 a residual passes only inside its reviewed baseline', () => {
+    const result = attempt(BASELINE)()
+    assert.equal(result.verdict, 'known-residual')
+    assert.equal(result.baselineReview, false)
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          timezone: TZ,
+          weatherBanner: BANNER,
+          ...bugChange(),
+        }),
+      refused(/no reviewed baseline/)
+    )
+    // The keys may come in any order; the compare sorts them.
+    assert.doesNotThrow(attempt({ ...BASELINE, staleKeys: [...STALE_KEYS].reverse() }))
+  })
+
+  // TEA, 2026-11-13: an entry approves only in the timezone it was approved in, checked before
+  // its keys.
+  test('an entry approves only in the run timezone, and one with none approves nothing', () => {
+    assert.doesNotThrow(attempt(BASELINE, TZ))
+    assert.throws(
+      attempt(BASELINE, 'Europe/Istanbul'),
+      differs(/baseline timezone America\/Chicago, run timezone Europe\/Istanbul/)
+    )
+    const noZone = { ...BASELINE }
+    delete noZone.timezone
+    assert.throws(attempt(noZone), differs(/baseline timezone missing/))
+    assert.throws(attempt({ ...BASELINE, timezone: '' }), differs(/baseline timezone/))
+    assert.throws(attempt(BASELINE, null), differs(/run timezone missing/))
+    // The timezone is checked first: a wrong one fails there even with broken keys.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: 'all' }, 'UTC'),
+      differs(/run timezone UTC/)
+    )
+  })
+
+  // TEA, 2026-11-13: a proposal committed verbatim approves nothing when one of its review facts
+  // breaks the six approval rules, and growth may fail only on a probe the entry names.
+  test('an entry whose review facts break an approval rule approves nothing', () => {
+    const broken = {
+      verdict: 'restored',
+      structuralPass: false,
+      everyMissStale: false,
+      controlPass: false,
+      growthFailing: ['current-temperature'],
+    }
+    for (const [fact, value] of Object.entries(broken))
+      assert.throws(
+        attempt({ ...BASELINE, review: { ...BASELINE.review, [fact]: value } }),
+        refused(new RegExp(`approval rules: ${fact}`)),
+        fact
+      )
+    const withoutReview = { ...BASELINE }
+    delete withoutReview.review
+    assert.throws(attempt(withoutReview), refused(/approval rules/))
+    // current-condition fails growth, and no key names it.
+    assert.throws(
+      attempt({
+        ...BASELINE,
+        staleKeys: STALE_KEYS.filter(
+          (key) => !key.startsWith('cold:["current-condition"')
+        ),
+        review: { ...BASELINE.review, growthFailing: [] },
+      }),
+      refused(/growth fails outside baseline: current-condition/)
+    )
+  })
+
+  // Antigravity r30 item 2: the run's failing growth probes equal the entry's growthFailing as a
+  // sorted multiset, beside each failing probe being an id the keys name.
+  test('an entry whose growthFailing differs from the run, extra or missing, approves nothing', () => {
+    const growing = (growthFailing) => ({
+      ...BASELINE,
+      review: { ...BASELINE.review, growthFailing },
+    })
+    assert.doesNotThrow(attempt(growing(['current-condition'])))
+    // The run fails current-condition and the entry lists no growth failure.
+    assert.throws(
+      attempt(growing([])),
+      refused(
+        /growth failing differs from baseline; failing in run only: current-condition$/
+      )
+    )
+    // outfit-comfort-notes is a key id, so the review facts hold, and the run never fails it.
+    assert.throws(
+      attempt(growing(['current-condition', 'outfit-comfort-notes'])),
+      refused(
+        /growth failing differs from baseline; failing in baseline only: outfit-comfort-notes$/
+      )
+    )
+    // A multiset: the same probe twice is one too many.
+    assert.throws(
+      attempt(growing(['current-condition', 'current-condition'])),
+      refused(/failing in baseline only: current-condition$/)
+    )
+    assert.throws(
+      attempt(growing(['outfit-comfort-notes'])),
+      refused(
+        /failing in run only: current-condition; failing in baseline only: outfit-comfort-notes$/
+      )
+    )
+  })
+
+  // Antigravity r30 item 2: a key keeps its stage, so the same text moving between the cold and
+  // the updated parity is a new residual.
+  test('a key moved from the cold to the updated stage with the same text approves nothing', () => {
+    // The update re-used the 1.0 measurements too: every miss shows in both stages.
+    const twoStage = () => ({
+      ...bugChange(),
+      updated: stage('settled'),
+      coldUpdated: cold(),
+    })
+    const { checks } = evaluateLiveFontChange(twoStage())
+    const proposal = proposedResidualEntry(checks, twoStage())
+    const entry = { ...BASELINE, staleKeys: proposal.staleKeys }
+    assert.equal(entry.staleKeys.length, 82)
+    assert.equal(entry.staleKeys.filter((key) => key.startsWith('updated:')).length, 41)
+    assert.doesNotThrow(attempt(entry, TZ, BANNER, twoStage()))
+    const moved = entry.staleKeys.indexOf(STALE_KEYS[0])
+    const staleKeys = entry.staleKeys.map((key, index) =>
+      index === moved ? key.replace(/^cold:/, 'updated:') : key
+    )
+    // With the stages stripped the two lists are one multiset; with them they differ.
+    const bare = (keys) => keys.map((key) => key.replace(/^(cold|updated):/, '')).sort()
+    assert.deepEqual(bare(staleKeys), bare(entry.staleKeys))
+    const escaped = STALE_KEYS[0].replace(/[[\]]/g, '\\$&')
+    assert.throws(
+      attempt({ ...entry, staleKeys }, TZ, BANNER, twoStage()),
+      refused(
+        new RegExp(
+          `stale key outside baseline: ${escaped}; baseline key no miss hit: updated:.*; 1 extra, 1 missing`
+        )
+      )
+    )
+  })
+
+  // TEA ruling on Antigravity r30 item 1: the out-of-date forecast notice is part of the
+  // environment an entry is approved in, checked before its keys.
+  test('an entry approves only with the run weather banner, as the captures show it', () => {
+    assert.throws(
+      attempt(BASELINE, TZ, 'none'),
+      differs(/baseline weather banner out-of-date, run weather banner none/)
+    )
+    assert.throws(attempt(BASELINE, TZ, null), differs(/run weather banner missing/))
+    const noBanner = { ...BASELINE }
+    delete noBanner.weatherBanner
+    assert.throws(attempt(noBanner), differs(/baseline weather banner missing/))
+    // Checked before the keys: broken keys still fail on the banner.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: 'all' }, TZ, 'none'),
+      differs(/run weather banner none/)
+    )
+    // A screen that renders the banner must show the entry's state in its before and settled
+    // captures, whatever state the run says it set up.
+    const showing = (change) => {
+      for (const capture of [
+        change.before,
+        change.immediate,
+        change.settled,
+        change.cold,
+      ]) {
+        capture.controls = [{ id: WEATHER_BANNER_MARKER, bounds: '[42,677][1038,851]' }]
+        capture.nodes.push({
+          id: '',
+          text: WEATHER_STALE_TEXT,
+          bounds: '[81,716][999,812]',
+        })
+      }
+      return change
+    }
+    const banner = () => showing({ ...bugChange(), bannerMarker: WEATHER_BANNER_MARKER })
+    assert.doesNotThrow(attempt(BASELINE, TZ, BANNER, banner()))
+    const plain = { ...bugChange(), bannerMarker: WEATHER_BANNER_MARKER }
+    assert.throws(
+      attempt(BASELINE, TZ, BANNER, plain),
+      differs(/baseline weather banner out-of-date, before capture shows none/)
+    )
+    // The settled screen lost the banner view: its text alone is another state.
+    const lost = banner()
+    lost.settled.controls = []
+    assert.throws(
+      attempt(BASELINE, TZ, BANNER, lost),
+      differs(/baseline weather banner out-of-date, settled capture shows other/)
+    )
+    // The cold capture lost the banner (Antigravity r31): the cold launch is a stage too.
+    const coldLost = banner()
+    coldLost.cold.controls = []
+    coldLost.cold.nodes = coldLost.cold.nodes.filter(
+      (node) => node.text !== WEATHER_STALE_TEXT
+    )
+    assert.throws(
+      attempt(BASELINE, TZ, BANNER, coldLost),
+      differs(/baseline weather banner out-of-date, cold capture shows none/)
+    )
+    // The updated capture is not read: the Community update shows every band, which hides it.
+    const updatedHides = {
+      ...banner(),
+      updated: stage('settled'),
+      coldUpdated: cold(),
+    }
+    const twoStage = proposedResidualEntry(
+      evaluateLiveFontChange(updatedHides).checks,
+      updatedHides
+    )
+    assert.doesNotThrow(
+      attempt({ ...BASELINE, staleKeys: twoStage.staleKeys }, TZ, BANNER, updatedHides)
+    )
+    const quiet = { ...BASELINE, weatherBanner: 'none' }
+    assert.throws(
+      attempt(quiet, TZ, 'none', banner()),
+      differs(/baseline weather banner none, before capture shows out-of-date/)
+    )
+    // A screen without the banner (Home, Settings) is judged on the run's state alone.
+    assert.doesNotThrow(attempt(quiet, TZ, 'none', bugChange()))
+  })
+
+  // TEA ruling on Antigravity r28: rule 6, keys exact. Every stale miss key, duplicates kept,
+  // must be listed, and nothing else.
+  test('an entry with an extra, missing, swapped or miscounted key approves nothing', () => {
+    assert.doesNotThrow(attempt(BASELINE))
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, 'cold:["","Language"]#0'] }),
+      refused(/baseline key no miss hit: cold:\["","Language"\]#0; 0 extra, 1 missing/)
+    )
+    const dropped = unlabeled[3]
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: STALE_KEYS.filter((key) => key !== dropped) }),
+      refused(
+        new RegExp(
+          `stale key outside baseline: ${dropped.replace(/[[\]]/g, '\\$&')}; 1 extra, 0 missing`
+        )
+      )
+    )
+    // A duplicate of a listed key is one key too many.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, STALE_KEYS[0]] }),
+      refused(/baseline key no miss hit: .*; 0 extra, 1 missing/)
+    )
+    // Only the key for the failing growth probe: every other miss is outside the entry.
+    assert.throws(
+      attempt({
+        ...BASELINE,
+        staleKeys: ['cold:["current-condition","t-c63401aba20f"]#0'],
+      }),
+      refused(/40 extra, 0 missing/)
+    )
+  })
+
+  // The case the old ids-plus-count entry let through: one unlabeled text traded for another
+  // keeps the ids ('' and the two labeled ones) and the count (41), and must now fail.
+  test('an equal-count swap between unlabeled texts approves nothing', () => {
+    const swapped = STALE_KEYS.map((key) =>
+      key === unlabeled[0] ? 'cold:["","Elsewhere"]#0' : key
+    )
+    assert.equal(swapped.length, STALE_KEYS.length)
+    const ids = (keys) => [
+      ...new Set(keys.map((key) => JSON.parse(key.slice(5, key.lastIndexOf('#')))[0])),
+    ]
+    assert.deepEqual(ids(swapped), ids(STALE_KEYS))
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: swapped }),
+      refused(
+        /stale key outside baseline: .*baseline key no miss hit: cold:\["","Elsewhere"\]#0/
+      )
+    )
+  })
+
+  test('an entry whose staleKeys is no list of miss keys approves nothing', () => {
+    const shape = /baseline staleKeys must be a list of keys/
+    for (const staleKeys of [undefined, 'all', 41, { 0: STALE_KEYS[0] }])
+      assert.throws(
+        attempt({ ...BASELINE, staleKeys }),
+        refused(shape),
+        String(staleKeys)
+      )
+    for (const member of [
+      7,
+      null,
+      ['', 'Home'],
+      'Home',
+      '["","Home"]',
+      'Home#0',
+      '"x"#0',
+      // A key needs its stage, and only cold: or updated: name one.
+      '["","Home"]#0',
+      'settled:["","Home"]#0',
+      'Cold:["","Home"]#0',
+      'cold:["","Home"]',
+      'cold:Home#0',
+      'cold:"x"#0',
+      'updated:',
+    ])
+      assert.throws(
+        attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, member] }),
+        refused(shape),
+        JSON.stringify(member)
+      )
+    const noKeys = { ...BASELINE }
+    delete noKeys.staleKeys
+    assert.throws(attempt(noKeys), refused(shape))
+  })
+
+  test('the version switch: the residual fails from 0.87, the healthy run passes on both sides', () => {
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.87.0',
+          residualBaseline: BASELINE,
+          ...bugChange(),
+        }),
+      { code: 'live_font_fix_missing' }
+    )
+    for (const version of ['0.81.5', '0.88.1'])
+      assert.equal(
+        assertLiveFontProof({ reactNativeVersion: version, ...fixedChange() }).verdict,
+        'fixed'
+      )
+  })
+
+  test('a required control off screen fails inside an approved residual', () => {
+    const change = bugChange()
+    change.settled.window = '[0,0][1080,2400]'
+    change.settled.controls = [{ id: 'tab-settings', bounds: '[810,2410][1080,2520]' }]
+    assert.throws(
+      () =>
+        assertLiveFontProof({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: BASELINE,
+          requiredControls: ['tab-settings'],
+          ...change,
+        }),
+      (error) =>
+        error.code === 'live_font_baseline_unexpected' && /controls/.test(error.message)
+    )
+  })
+
+  test('below 0.87 an early correct relayout passes and flags the baseline for review', () => {
+    const result = assertLiveFontProof({
+      reactNativeVersion: '0.83.10',
+      ...fixedChange(),
+    })
+    assert.equal(result.verdict, 'fixed')
+    assert.equal(result.baselineReview, true)
+  })
+
+  test('a restored screen is red at every version', () => {
+    const change = fixedChange()
+    change.settled.identity = { ...IDENTITY, activity: 'activity-2' }
+    assert.throws(
+      () => assertLiveFontProof({ reactNativeVersion: '0.81.5', ...change }),
+      {
+        code: 'live_font_baseline_unexpected',
+      }
+    )
+    assert.throws(
+      () => assertLiveFontProof({ reactNativeVersion: '0.88.1', ...change }),
+      {
+        code: 'live_font_fix_missing',
+      }
+    )
+  })
+
+  // Red proof for F-00 (test design): the 6.8 baseline judged as fix-expected must fail on
+  // cold parity and growth.
+  test('from 0.87 the Story 6.8 baseline is red on cold parity and growth', () => {
+    assert.throws(
+      () => assertLiveFontProof({ reactNativeVersion: '0.88.1', ...bugChange() }),
+      (error) =>
+        error.code === 'live_font_fix_missing' &&
+        /verdict known-residual; failing coldParity,growth/.test(error.message)
+    )
+    assert.equal(
+      assertLiveFontProof({ reactNativeVersion: '0.88.1', ...fixedChange() }).verdict,
+      'fixed'
+    )
+  })
+})
+
+describe('assertColdControl', () => {
+  const base = () => ({ ...stage('before'), stage: 'cold' })
+
+  test('cold 1.0 against cold 1.5 keeps the text and scales each probe as the platform does', () => {
+    const target = correct(base(), { fontScale: 1.5 })
+    const { ratios } = assertColdControl({
+      platform: 'android',
+      base: base(),
+      target,
+      probes: PROBES,
+    })
+    assert.deepEqual(
+      ratios.map(({ probe, pass }) => [probe, pass]),
+      [
+        ['current-temperature', true],
+        ['current-condition', true],
+      ]
+    )
+  })
+
+  test('a control that does not grow is red, so the oracle cannot pass blind', () => {
+    const target = { ...base(), fontScale: 1.5 }
+    assert.throws(
+      () =>
+        assertColdControl({ platform: 'android', base: base(), target, probes: PROBES }),
+      { code: 'live_font_control_ratio_mismatch' }
+    )
+  })
+
+  test('a probe declared at the wrong size is red', () => {
+    const target = correct(base(), { fontScale: 1.5 })
+    const probes = [{ id: 'current-condition', sizeSp: 30 }]
+    assert.throws(
+      () => assertColdControl({ platform: 'android', base: base(), target, probes }),
+      { code: 'live_font_control_growth_probe_required' }
+    )
+    assert.throws(
+      () =>
+        assertColdControl({
+          platform: 'android',
+          base: base(),
+          target,
+          probes: [...probes, { id: 'current-temperature', sizeSp: 14 }],
+        }),
+      { code: 'live_font_control_ratio_mismatch' }
+    )
+  })
+})
+
+describe('composer controls (F-05)', () => {
+  const capture = (save, share) => ({
+    controls: [
+      { id: 'share-card-save', bounds: save },
+      { id: 'share-card-share', bounds: share },
+    ],
+  })
+  const window = '[0,0][1080,2400]'
+
+  test('across scales the controls may move but stay on screen, apart and touchable', () => {
+    assert.equal(
+      assertComposerControls({
+        capture: capture('[42,2000][530,2126]', '[550,2000][1038,2126]'),
+        window,
+        minTarget: 126,
+      }).tier,
+      'row'
+    )
+    assert.equal(
+      assertComposerControls({
+        capture: capture('[42,1900][1038,2026]', '[42,2050][1038,2176]'),
+        window,
+        minTarget: 126,
+      }).tier,
+      'stacked'
+    )
+  })
+
+  test('overlapping, off-screen or undersized controls are red', () => {
+    assert.throws(
+      () =>
+        assertComposerControls({
+          capture: capture('[42,2000][600,2126]', '[550,2000][1038,2126]'),
+          window,
+          minTarget: 126,
+        }),
+      { code: 'live_font_composer_controls_overlap' }
+    )
+    assert.throws(
+      () =>
+        assertComposerControls({
+          capture: capture('[42,2350][530,2476]', '[550,2000][1038,2126]'),
+          window,
+          minTarget: 126,
+        }),
+      { code: 'live_font_composer_control_off_screen' }
+    )
+    assert.throws(
+      () =>
+        assertComposerControls({
+          capture: capture('[42,2000][530,2100]', '[550,2000][1038,2126]'),
+          window,
+          minTarget: 126,
+        }),
+      { code: 'live_font_composer_control_too_small' }
+    )
+  })
+
+  test('at one scale, feedback copy must not move Save or Share', () => {
+    const still = capture('[42,2000][530,2126]', '[550,2000][1038,2126]')
+    assert.deepEqual(
+      assertComposerFeedbackStable({ withoutFeedback: still, withFeedback: still }),
+      { stable: true }
+    )
+    assert.throws(
+      () =>
+        assertComposerFeedbackStable({
+          withoutFeedback: still,
+          withFeedback: capture('[42,2040][530,2166]', '[550,2040][1038,2166]'),
+        }),
+      { code: 'live_font_composer_feedback_moved_control' }
+    )
+  })
+})
+
+// TEA ruling on Antigravity r30 item 1: the hourly ribbon labels follow the clock the run starts
+// at, so a residual entry keys them as one token, indexed by place.
+describe('hour labels in residual entry keys', () => {
+  const NNBSP = '\u202f'
+  test('HOUR_LABEL takes only the ribbon format: 1 to 12, a narrow no-break space, AM or PM', () => {
+    for (const label of ['1', '9', '10', '12'].flatMap((hour) => [
+      `${hour}${NNBSP}AM`,
+      `${hour}${NNBSP}PM`,
+    ]))
+      assert.ok(HOUR_LABEL.test(label), label)
+    for (const text of [
+      '1 AM',
+      `1${NNBSP}am`,
+      'Expand (48h)',
+      `10${NNBSP}AM meeting`,
+      'AM',
+      `${NNBSP}AM`,
+      `13${NNBSP}PM`,
+      `0${NNBSP}AM`,
+      `01${NNBSP}AM`,
+      `1:00${NNBSP}AM`,
+      `10:30${NNBSP}PM`,
+      `1${NNBSP}AM `,
+      `1${NNBSP}${NNBSP}AM`,
+      '68°F',
+    ])
+      assert.equal(HOUR_LABEL.test(text), false, JSON.stringify(text))
+  })
+
+  /** A ribbon of hour labels from `first`, one per 100 px, with a temperature under each. */
+  const ribbon = (first, count = 3, { id = '', top = 900 } = {}) => ({
+    nodes: Array.from({ length: count }, (_, index) => [
+      {
+        id,
+        text: `${((first + index - 1) % 12) + 1}${NNBSP}AM`,
+        bounds: `[${index * 100},${top}][${index * 100 + 80},${top + 40}]`,
+      },
+      {
+        id: '',
+        text: '68°F',
+        bounds: `[${index * 100},${top + 50}][${index * 100 + 80},${top + 90}]`,
+      },
+    ]).flat(),
+  })
+  const keyOf = (id, text, n = 0) => `${JSON.stringify([id, text])}#${n}`
+  const checksMissing = (keys) => ({
+    coldParity: { misses: keys.map((key) => ({ key })) },
+  })
+
+  test('an hour label becomes <hour> with its place among the hour labels, other text stays', () => {
+    const settled = ribbon(1)
+    const keys = stageKeys(
+      checksMissing([
+        keyOf('', `1${NNBSP}AM`),
+        keyOf('', `3${NNBSP}AM`),
+        keyOf('', '68°F', 2),
+      ]),
+      { settled }
+    )
+    assert.deepEqual(keys, [
+      'cold:["","68°F"]#2',
+      'cold:["","<hour>"]#0',
+      'cold:["","<hour>"]#2',
+    ])
+    // A stale hour label is still a stale key: the masked key keeps one entry per miss.
+    assert.equal(keys.filter((key) => key.includes('<hour>')).length, 2)
+  })
+
+  test('the same misses an hour later give the same keys; a moved or extra miss does not', () => {
+    const at1 = stageKeys(
+      checksMissing([keyOf('', `1${NNBSP}AM`), keyOf('', `3${NNBSP}AM`)]),
+      { settled: ribbon(1) }
+    )
+    const at2 = stageKeys(
+      checksMissing([keyOf('', `2${NNBSP}AM`), keyOf('', `4${NNBSP}AM`)]),
+      { settled: ribbon(2) }
+    )
+    assert.deepEqual(at2, at1)
+    // The second label stale in place of the third is another position.
+    const moved = stageKeys(
+      checksMissing([keyOf('', `2${NNBSP}AM`), keyOf('', `3${NNBSP}AM`)]),
+      { settled: ribbon(2) }
+    )
+    assert.deepEqual(moved, ['cold:["","<hour>"]#0', 'cold:["","<hour>"]#1'])
+    assert.notDeepEqual(moved, at1)
+    const more = stageKeys(
+      checksMissing([
+        keyOf('', `2${NNBSP}AM`),
+        keyOf('', `3${NNBSP}AM`),
+        keyOf('', `4${NNBSP}AM`),
+      ]),
+      { settled: ribbon(2) }
+    )
+    assert.equal(more.length, 3)
+  })
+
+  test('repeated hour texts get distinct indexes in screen order, whatever the node order', () => {
+    // An expanded 48 h ribbon shows 1 AM twice: two rows, same text, #0 and #1 as parity keys.
+    const twoRows = {
+      nodes: [...ribbon(1, 2, { top: 1200 }).nodes, ...ribbon(1, 2, { top: 900 }).nodes],
+    }
+    const misses = checksMissing([
+      keyOf('', `1${NNBSP}AM`, 1),
+      keyOf('', `2${NNBSP}AM`, 0),
+    ])
+    const keys = stageKeys(misses, { settled: twoRows })
+    // Row one (top 900) holds <hour>#0 and #1, row two #2 and #3; the second 1 AM is #2.
+    assert.deepEqual(keys, ['cold:["","<hour>"]#1', 'cold:["","<hour>"]#2'])
+    const shuffled = { nodes: [...twoRows.nodes].reverse() }
+    assert.deepEqual(stageKeys(misses, { settled: shuffled }), keys)
+    // Indexes count per testID.
+    const labeled = {
+      nodes: [...ribbon(1, 2).nodes, ...ribbon(5, 1, { id: 'x', top: 1500 }).nodes],
+    }
+    assert.deepEqual(
+      stageKeys(checksMissing([keyOf('x', `5${NNBSP}AM`), keyOf('', `2${NNBSP}AM`)]), {
+        settled: labeled,
+      }),
+      ['cold:["","<hour>"]#1', 'cold:["x","<hour>"]#0']
+    )
+  })
+
+  test('each stage masks against its own capture and keeps its prefix', () => {
+    const checks = {
+      coldParity: { misses: [{ key: keyOf('', `1${NNBSP}AM`) }] },
+      postUpdateParity: { misses: [{ key: keyOf('', `3${NNBSP}AM`) }] },
+    }
+    assert.deepEqual(stageKeys(checks, { settled: ribbon(1), updated: ribbon(2) }), [
+      'cold:["","<hour>"]#0',
+      'updated:["","<hour>"]#1',
+    ])
+  })
+
+  test('a miss the capture does not hold fails loudly', () => {
+    assert.throws(
+      () => stageKeys(checksMissing([keyOf('', `9${NNBSP}AM`)]), { settled: ribbon(1) }),
+      { code: 'live_font_miss_capture_required' }
+    )
+    assert.throws(() => stageKeys(checksMissing([keyOf('', 'Home')]), {}), {
+      code: 'live_font_miss_capture_required',
+    })
+  })
+})
+
+describe('weatherBannerState', () => {
+  const marker = { id: WEATHER_BANNER_MARKER, bounds: '[42,677][1038,851]' }
+  const text = { id: '', text: WEATHER_STALE_TEXT, bounds: '[81,716][999,812]' }
+  test('reads out-of-date, none or other from the banner view and its text', () => {
+    assert.equal(weatherBannerState({ controls: [marker], nodes: [text] }), 'out-of-date')
+    assert.equal(
+      weatherBannerState({
+        controls: [marker],
+        nodes: [],
+        fullText: [JSON.stringify(['', WEATHER_STALE_TEXT])],
+      }),
+      'out-of-date'
+    )
+    assert.equal(weatherBannerState({ controls: [], nodes: [] }), 'none')
+    assert.equal(weatherBannerState(undefined), 'none')
+    // The banner with another reason, or the text without the banner view.
+    assert.equal(
+      weatherBannerState({
+        controls: [marker],
+        nodes: [{ ...text, text: 'Add your location to see looks near you.' }],
+      }),
+      'other'
+    )
+    assert.equal(weatherBannerState({ controls: [], nodes: [text] }), 'other')
+  })
+})
+
+// F-00i (TD-01, TEA review of 2026-11-14): clipping judged by the laid-out text. Each capture
+// gets the healthy probe answer for its nodes; a case then changes the records it is about.
+describe('text layout clipping (F-00i)', () => {
+  const CONDITION = 't-c63401aba20f'
+  const TEMPERATURE = 't-f56b70feed61'
+  const CONDITION_KEY = `cold:["current-condition","${CONDITION}"]#0`
+  // A clip key names the face of the bug it shows first: here the first, a stale box.
+  const CONDITION_CLIP = `staleBox:${CONDITION_KEY}`
+  const probed = (capture, platform = 'android') => ({
+    ...capture,
+    textProbe: healthyAnswer(capture, platform),
+  })
+  const recordFor = (capture, text) =>
+    capture.textProbe.records.find((record) => record.text === text)
+  /** Content `by` px taller than its own (unchanged) box, which cuts it. */
+  const overflow = (capture, text, by = 29) => {
+    const record = recordFor(capture, text)
+    record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + by]
+    return capture
+  }
+  const withAll = (change) => {
+    const result = { ...change }
+    for (const name of [
+      'before',
+      'immediate',
+      'settled',
+      'cold',
+      'coldBefore',
+      'coldBase',
+      'updated',
+      'coldUpdated',
+    ])
+      if (result[name]) result[name] = probed(result[name])
+    return result
+  }
+  // The Story 6.8 Home residual with the cold launch at its starting scale, 1.0, which is also
+  // the base: it keeps the before heights, so a stale box there is that launch's box.
+  const coldOne = () => ({ ...stage('before'), stage: 'cold' })
+  const residualChange = () =>
+    withAll({ ...bugChange(), coldBefore: coldOne(), coldBase: coldOne() })
+  /** The residual with the stale condition line drawn at 1.5 inside its 1.0 box. */
+  const staleClipChange = () => {
+    const change = residualChange()
+    overflow(change.settled, CONDITION)
+    return change
+  }
+  const ENTRY = {
+    timezone: 'America/Chicago',
+    weatherBanner: 'out-of-date',
+    staleKeys: evaluateLiveFontChangeRaw(residualChange())
+      .checks.coldParity.misses.map((miss) => `cold:${miss.key}`)
+      .sort(),
+    clippedKeys: [CONDITION_CLIP],
+    review: {
+      verdict: 'known-residual',
+      structuralPass: true,
+      everyMissStale: true,
+      growthFailing: ['current-condition'],
+      controlPass: true,
+      clipsStale: true,
+    },
+  }
+  const prove =
+    (change, residualBaseline = ENTRY, reactNativeVersion = '0.81.5') =>
+    () =>
+      assertLiveFontProofRaw({
+        reactNativeVersion,
+        residualBaseline,
+        timezone: 'America/Chicago',
+        weatherBanner: 'out-of-date',
+        ...change,
+      })
+  const refused = (pattern) => (error) =>
+    error.code === 'live_font_residual_unapproved' && pattern.test(error.message)
+  const layoutClips = (check) =>
+    check.clipped.filter((entry) => entry.reason === 'clipped_by_layout')
+
+  test('content past its clip bounds is clipped_by_layout, kept apart from a box that leaves its parent', () => {
+    const change = withAll(fixedChange())
+    overflow(change.settled, TEMPERATURE)
+    const node = change.settled.nodes.find((n) => n.id === 'current-condition')
+    const [left, top, right] = parseBounds(node.bounds)
+    node.parent = `[${left},${top}][${right},${top + 40}]`
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(
+      checks.clipping.clipped.map((entry) => [entry.reason, entry.text]),
+      [
+        ['outside_parent', CONDITION],
+        ['clipped_by_layout', TEMPERATURE],
+      ]
+    )
+    // Within the tolerance it is no clip.
+    const within = withAll(fixedChange())
+    overflow(within.settled, TEMPERATURE, 2)
+    assert.equal(evaluateLiveFontChangeRaw(within).verdict, 'fixed')
+    // Both versions fail on it.
+    const clipped = withAll(fixedChange())
+    overflow(clipped.settled, TEMPERATURE)
+    assert.throws(prove(clipped, undefined, '0.88.1'), { code: 'live_font_fix_missing' })
+    assert.throws(prove(clipped, undefined, '0.81.5'), {
+      code: 'live_font_baseline_unexpected',
+    })
+  })
+
+  test('a text a scroll viewport cuts is no clip; an overflow-hidden container in the scroll content is', () => {
+    const change = withAll(fixedChange())
+    const record = recordFor(change.settled, TEMPERATURE)
+    const [left, top, right] = record.viewRect
+    // The scroll view shows only the top 20 px; the text fits its own box.
+    record.visibleRect = [left, top, right, top + 20]
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'fixed')
+    // A one-line container with hidden overflow cuts the same view the same way.
+    record.clipRect = [left, top, right, top + 20]
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.text, entry.content]),
+      [[TEMPERATURE, true]]
+    )
+  })
+
+  // TEA ruling 2026-11-14: content is judged on both axes.
+  test('content past its clip bounds on the left or the right is clipped too', () => {
+    for (const [edge, by] of [
+      [0, -20],
+      [2, 20],
+    ]) {
+      const change = withAll(fixedChange())
+      const record = recordFor(change.settled, TEMPERATURE)
+      record.contentRect = record.contentRect.map((value, at) =>
+        at === edge ? value + by : value
+      )
+      const { checks } = evaluateLiveFontChangeRaw(change)
+      assert.deepEqual(
+        layoutClips(checks.clipping).map((entry) => [entry.text, entry.content]),
+        [[TEMPERATURE, true]],
+        `edge ${edge}`
+      )
+      // Within the tolerance it is no clip.
+      record.contentRect[edge] -= by - Math.sign(by) * 2
+      assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'fixed', `edge ${edge}`)
+    }
+  })
+
+  // TEA ruling 2026-11-14: opacity 0 draws nothing; anything above 0 is judged.
+  test('an opacity 0 copy is left out of matching and judging and listed with its key', () => {
+    const change = withAll(fixedChange())
+    for (const capture of [change.settled, change.cold]) {
+      const copy = { ...recordFor(capture, TEMPERATURE), opacity: 0 }
+      // Clipped, but drawn at opacity 0: nothing of it shows.
+      copy.contentRect = [...copy.contentRect.slice(0, 3), copy.contentRect[3] + 40]
+      capture.textProbe.records.push(copy)
+    }
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'fixed')
+    assert.deepEqual(checks.textProbe.stages.settled.invisible, [
+      {
+        key: `["current-temperature","${TEMPERATURE}"]#0`,
+        text: TEMPERATURE,
+        comparable: true,
+      },
+    ])
+  })
+
+  test('a clipped record at opacity 0.5 still fails', () => {
+    const change = withAll(fixedChange())
+    recordFor(change.settled, TEMPERATURE).opacity = 0.5
+    overflow(change.settled, TEMPERATURE)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => entry.text),
+      [TEMPERATURE]
+    )
+  })
+
+  test('text the cold launch shows that the live screen draws only at opacity 0 fails as live_font_text_hidden', () => {
+    /** The capture draws the temperature (both its texts) at opacity 0; the hierarchy drops them. */
+    const hide = (capture, text = TEMPERATURE) => {
+      for (const record of capture.textProbe.records)
+        if (record.text === text) record.opacity = 0
+      capture.nodes = capture.nodes.filter((node) => node.text !== text)
+    }
+    const settled = withAll(fixedChange())
+    hide(settled.settled)
+    const { checks } = evaluateLiveFontChangeRaw(settled)
+    assert.deepEqual(checks.textHidden.hidden, [
+      {
+        stage: 'settled',
+        text: TEMPERATURE,
+        coldKeys: [
+          `["current-temperature","${TEMPERATURE}"]#0`,
+          `["","${TEMPERATURE}"]#0`,
+        ],
+        invisible: 2,
+      },
+    ])
+    for (const version of ['0.81.5', '0.88.1'])
+      assert.throws(prove(settled, undefined, version), { code: 'live_font_text_hidden' })
+    // After the update, against the cold launch's update.
+    const update = withAll({
+      ...fixedChange(),
+      updated: { ...fixedChange().settled, stage: 'updated' },
+      coldUpdated: { ...fixedChange().cold },
+    })
+    hide(update.updated)
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(update).checks.textHidden.hidden.map(
+        (entry) => entry.stage
+      ),
+      ['updated']
+    )
+    // Lost text, so structural: a residual whose full text still reads whole is no residual. The
+    // hidden text is a stale unlabeled line, no anchor and no probe, so nothing else fails.
+    const residual = residualChange()
+    const line = residual.settled.nodes.find((node) => node.id === '').text
+    residual.settled.fullText = residual.before.nodes
+      .filter((node) => !/^com\.android\.systemui:/.test(node.id))
+      .map((node) => JSON.stringify([node.id, node.text]))
+    hide(residual.settled, line)
+    assert.equal(evaluateLiveFontChangeRaw(residual).verdict, 'unexpected')
+    // Hidden at the cold launch too, it is the app's own state.
+    const both = withAll(fixedChange())
+    hide(both.settled)
+    hide(both.cold)
+    assert.equal(evaluateLiveFontChangeRaw(both).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling 2026-11-14, bound 1: only records that compare across launches count.
+  test('an invisible copy covered, volatile or scrolled away does not count as hidden text', () => {
+    const windows = [
+      { id: 1, rect: [0, 0, 100000, 100000], z: 0, focused: false },
+      { id: 2, rect: [0, 0, 10, 10], z: 1, focused: true },
+    ]
+    const cases = {
+      'behind a focused dialog': (capture, record) => {
+        capture.textProbe.windows = windows
+        capture.textProbe.records.push(
+          probeRecord('android', 'OK', [0, 0, 10, 10], { window: 2 })
+        )
+        capture.nodes = [...capture.nodes, { id: '', text: 'OK', bounds: '[0,0][10,10]' }]
+        return record
+      },
+      'in a volatile region': (capture, record) => {
+        capture.volatileRegions = [
+          `[${record.viewRect[0]},${record.viewRect[1]}][${record.viewRect[2]},${record.viewRect[3]}]`,
+        ]
+        return record
+      },
+      'scrolled away': (capture, record) =>
+        Object.assign(record, { visibleRect: null, clipRect: null, scrolledAway: true }),
+    }
+    for (const [name, place] of Object.entries(cases)) {
+      const change = withAll(fixedChange())
+      // The live screen lost the temperature: its texts are gone from the hierarchy, and one
+      // opacity 0 copy is left where the hidden-text count must not see it.
+      const live = change.settled
+      const records = live.textProbe.records.filter((r) => r.text === TEMPERATURE)
+      live.textProbe.records = live.textProbe.records.filter(
+        (r) => r.text !== TEMPERATURE
+      )
+      live.nodes = live.nodes.filter((node) => node.text !== TEMPERATURE)
+      live.textProbe.records.push(place(live, { ...records[0], opacity: 0 }))
+      const { checks } = evaluateLiveFontChangeRaw(change)
+      assert.equal(checks.textHidden.pass, true, name)
+      assert.equal(checks.textProbe.stages.settled.invisible[0].comparable, false, name)
+      // The text is still lost: the lost-text check fails it.
+      assert.equal(checks.fullText.pass, false, name)
+    }
+  })
+
+  // TEA ruling 2026-11-14, bound 2: hour labels count as residual keys mask them.
+  test('an hour label hidden after the clock moved on is counted by its masked text', () => {
+    const hourly = (capture, hour, opacity) => {
+      const label = `${hour}\u202fAM`
+      capture.nodes = [
+        ...capture.nodes,
+        ...(opacity > 0 ? [{ id: '', text: label, bounds: '[0,3000][80,3040]' }] : []),
+      ]
+      capture.textProbe.records.push(
+        probeRecord('android', label, [0, 3000, 80, 3040], { opacity })
+      )
+    }
+    const change = withAll(fixedChange())
+    hourly(change.cold, 1, 1)
+    hourly(change.settled, 2, 0)
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(change).checks.textHidden.hidden.map((entry) => [
+        entry.text,
+        entry.coldKeys,
+      ]),
+      [['<hour>', ['["","<hour>"]#0']]]
+    )
+    // Shown at the next hour, it is the same label.
+    const shown = withAll(fixedChange())
+    hourly(shown.cold, 1, 1)
+    hourly(shown.settled, 2, 1)
+    hourly(shown.settled, 2, 0)
+    assert.equal(evaluateLiveFontChangeRaw(shown).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling 2026-11-14, bound 3: a text gone with no record at all stays lost text.
+  test('text gone from the live probe and hierarchy, with no opacity 0 record, fails as lost text', () => {
+    const lost = () => {
+      const change = withAll(fixedChange())
+      const live = change.settled
+      live.textProbe.records = live.textProbe.records.filter(
+        (r) => r.text !== TEMPERATURE
+      )
+      live.nodes = live.nodes.filter((node) => node.text !== TEMPERATURE)
+      return change
+    }
+    const { checks } = evaluateLiveFontChangeRaw(lost())
+    assert.equal(checks.textHidden.pass, true, 'not the hidden-text rule')
+    assert.equal(checks.fullText.pass, false)
+    // TEA ruling on Antigravity r47 P2: the cold launch's record with none live is lost text,
+    // at every version.
+    assert.deepEqual(checks.textLost.lost, [{ stage: 'settled', text: TEMPERATURE }])
+    for (const version of ['0.88.1', '0.81.5'])
+      assert.throws(prove(lost(), undefined, version), { code: 'live_font_text_lost' })
+  })
+
+  // Antigravity r41 P3-1: `ellipsizeMode="clip"` drops lines with no ellipsis.
+  test('the r41 M11 record: lines dropped past the cold launch at the same scale are a clip', () => {
+    const change = withAll(fixedChange())
+    const lines = (capture, unlimitedLineCount) =>
+      Object.assign(recordFor(capture, TEMPERATURE), {
+        lineCount: 2,
+        maxLines: 2,
+        ellipsized: 0,
+        unlimitedLineCount,
+      })
+    lines(change.settled, 4)
+    lines(change.cold, 2)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [
+        entry.text,
+        entry.content,
+        entry.truncatedLines,
+        entry.coldTruncatedLines,
+      ]),
+      [[TEMPERATURE, false, 2, 0]]
+    )
+    // The same lines dropped at the cold launch are the app's own.
+    lines(change.cold, 4)
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'fixed')
+    // A cold record that reports no unlimited count drops nothing.
+    lines(change.cold, null)
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+  })
+
+  // Antigravity r41 P2-3, TEA ruling: records behind a focused dialog are judged, unkeyed.
+  test('a clipped record behind a focused dialog fails; an unclipped one passes', () => {
+    const dialogCapture = (change) => {
+      const settled = change.settled
+      const records = settled.textProbe.records.map((r) => ({ ...r, window: 0 }))
+      return {
+        ...settled,
+        nodes: [{ id: '', text: 'OK', bounds: '[150,420][250,470]' }],
+        textProbe: {
+          ...settled.textProbe,
+          windows: [
+            { id: 0, rect: [0, 0, 1080, 2400], z: 0, focused: false },
+            { id: 1, rect: [100, 300, 300, 500], z: 1, focused: true },
+          ],
+          records: [
+            ...records,
+            probeRecord('android', 'OK', [150, 420, 250, 470], { window: 1 }),
+          ],
+        },
+      }
+    }
+    const clean = withAll(fixedChange())
+    clean.settled = dialogCapture(clean)
+    const passed = evaluateLiveFontChangeRaw(clean).checks
+    assert.equal(passed.textProbe.stages.settled.pass, true)
+    assert.equal(passed.clipping.pass, true)
+    const clipped = withAll(fixedChange())
+    clipped.settled = dialogCapture(clipped)
+    overflow(clipped.settled, TEMPERATURE)
+    const { checks } = evaluateLiveFontChangeRaw(clipped)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.key, entry.text]),
+      [['behind', null, TEMPERATURE]]
+    )
+    assert.deepEqual(clipKeys(checks), [], 'no key, so no entry can list it')
+    // Scrolled away behind the dialog, it is not judged.
+    Object.assign(recordFor(clipped.settled, TEMPERATURE), {
+      visibleRect: null,
+      clipRect: null,
+      scrolledAway: true,
+    })
+    assert.equal(evaluateLiveFontChangeRaw(clipped).checks.clipping.pass, true)
+  })
+
+  // F-00i, every page probed (TEA ruling 2026-11-14, Android Release 791123d1 record run).
+  const SHIFT = 500
+  /**
+   * `capture` with its scroll pages: page 0 its own screen and answer, page 1 the screen
+   * SHIFT px further down (system UI stays put) plus `below`, text only page 1 shows, each with
+   * a healthy answer.
+   */
+  const withPages = (capture, below = []) => {
+    const move = (node) => {
+      if (/^com\.android\.systemui:/.test(node.id)) return node
+      const [left, top, right, bottom] = parseBounds(node.bounds)
+      return { ...node, bounds: `[${left},${top - SHIFT}][${right},${bottom - SHIFT}]` }
+    }
+    const nodes = [
+      ...capture.nodes.map(move).filter((node) => parseBounds(node.bounds)[1] >= 0),
+      ...below,
+    ]
+    const page = { nodes, volatileRegions: [], window: capture.window }
+    return {
+      ...capture,
+      pages: [
+        {
+          nodes: capture.nodes,
+          volatileRegions: [],
+          window: capture.window,
+          textProbe: capture.textProbe,
+        },
+        { ...page, textProbe: healthyAnswer(page, 'android') },
+      ],
+      pageShift: SHIFT,
+    }
+  }
+  const BELOW = { id: '', text: 'Below the fold', bounds: '[42,2300][600,2350]' }
+  const pageRecord = (capture, text) =>
+    capture.pages[1].textProbe.records.find((record) => record.text === text)
+  const overflowRecord = (record, by = 30) => {
+    record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + by]
+  }
+
+  test('F-01: a clip below the fold fails the cold capture', () => {
+    const base = probed({ ...stage('before'), stage: 'cold' })
+    const target = withPages(
+      probed(correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 })),
+      [BELOW]
+    )
+    const control = () =>
+      assertColdControlRaw({ platform: 'android', base, target, probes: PROBES })
+    assert.doesNotThrow(control)
+    overflowRecord(pageRecord(target, BELOW.text))
+    assert.throws(
+      control,
+      (error) =>
+        error.code === 'live_font_control_clipped_by_layout' &&
+        error.message.includes(BELOW.text)
+    )
+  })
+
+  test('a text on two pages, clipped on both, is one clip judged on each page', () => {
+    const change = withAll(fixedChange())
+    change.settled = withPages(change.settled)
+    // A text that page 0 and page 1 both show.
+    const shared = change.settled.pages[1].nodes.find(
+      (node) =>
+        node.id === '' &&
+        change.settled.nodes.filter((other) => other.text === node.text).length === 1
+    ).text
+    overflow(change.settled, shared)
+    overflowRecord(pageRecord(change.settled, shared))
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    const clips = layoutClips(checks.clipping).filter((entry) => entry.text === shared)
+    assert.deepEqual(
+      clips.map((entry) => [entry.key, entry.pages]),
+      [[`["","${shared}"]#0`, [0, 1]]]
+    )
+    assert.equal(
+      clipKeys(checks).filter((key) => key.endsWith(`["","${shared}"]#0`)).length,
+      1
+    )
+  })
+
+  test('text only a later page shows is keyed after page 0 and judged there', () => {
+    const change = withAll(fixedChange())
+    // The same text as one page 0 shows once, further down.
+    const twin = change.settled.nodes.find(
+      (node) =>
+        node.id === '' &&
+        change.settled.nodes.filter((other) => other.text === node.text).length === 1
+    ).text
+    change.settled = withPages(change.settled, [{ ...BELOW, text: twin }])
+    const records = change.settled.pages[1].textProbe.records.filter(
+      (r) => r.text === twin
+    )
+    overflowRecord(records.at(-1))
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [
+        entry.key,
+        entry.parityKey,
+        entry.pages,
+      ]),
+      [[`["","${twin}"]#1`, null, [1]]]
+    )
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('a text is offscreen only when no page shows it', () => {
+    const scrolled = (capture) => {
+      capture.textProbe.records.push(
+        probeRecord('android', BELOW.text, [42, 2800, 600, 2850], {
+          visibleRect: null,
+          clipRect: null,
+          scrolledAway: true,
+        })
+      )
+      return capture
+    }
+    const shown = withAll(fixedChange())
+    shown.settled = withPages(scrolled(shown.settled), [BELOW])
+    const seen = evaluateLiveFontChangeRaw(shown).checks.textProbe.stages.settled
+    assert.deepEqual(seen.offscreen, [])
+    const never = withAll(fixedChange())
+    never.settled = withPages(scrolled(never.settled))
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(never).checks.textProbe.stages.settled.offscreen,
+      [BELOW.text]
+    )
+  })
+
+  // TEA ruling 2026-11-14: hidden text and invisible text are judged on every page.
+  test('a text collapsed to zero height below the fold is a full clip', () => {
+    const change = withAll(fixedChange())
+    change.settled = withPages(change.settled, [BELOW])
+    // Page 1 draws nothing of it: no visible part, not scrolled away, and no hierarchy node.
+    const page = change.settled.pages[1]
+    Object.assign(pageRecord(change.settled, BELOW.text), {
+      viewRect: [42, 2300, 600, 2300],
+      visibleRect: null,
+      clipRect: null,
+    })
+    page.nodes = page.nodes.filter((node) => node.text !== BELOW.text)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.text, entry.pages]),
+      [['hidden', BELOW.text, [1]]]
+    )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(change, undefined, '0.88.1'), { code: 'live_font_fix_missing' })
+  })
+
+  test('a text the cold launch shows on page 1 that the live screen draws only at opacity 0 there fails', () => {
+    const change = withAll(fixedChange())
+    change.cold = withPages(change.cold, [BELOW])
+    change.settled = withPages(change.settled, [BELOW])
+    pageRecord(change.settled, BELOW.text).opacity = 0
+    change.settled.pages[1].nodes = change.settled.pages[1].nodes.filter(
+      (node) => node.text !== BELOW.text
+    )
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(checks.textHidden.hidden, [
+      {
+        stage: 'settled',
+        text: BELOW.text,
+        coldKeys: [`["","${BELOW.text}"]#0`],
+        invisible: 1,
+      },
+    ])
+    assert.throws(prove(change, undefined, '0.81.5'), { code: 'live_font_text_hidden' })
+    // Drawn at opacity 0 on page 1 at the cold launch too, it is the app's own state.
+    pageRecord(change.cold, BELOW.text).opacity = 0
+    change.cold.pages[1].nodes = change.cold.pages[1].nodes.filter(
+      (node) => node.text !== BELOW.text
+    )
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling 2026-11-14: offWindow, a text wholly off its window with no scroll view to
+  // bring it in, is no clip but is listed, and never hides lost text.
+  const parkedSheet = (overrides = {}) =>
+    probeRecord('android', 'Share your look', [42, 2500, 600, 2560], {
+      offWindow: true,
+      visibleRect: null,
+      clipRect: null,
+      ...overrides,
+    })
+
+  test('a parked sheet below the screen passes and is listed offWindow', () => {
+    const change = withAll(fixedChange())
+    change.settled.textProbe.records.push(parkedSheet())
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'fixed')
+    assert.deepEqual(checks.textProbe.stages.settled.offWindow, [
+      { key: null, text: 'Share your look' },
+    ])
+    // Where the hierarchy lists it (iOS lists offscreen elements), it pairs and is still no clip.
+    const listed = withAll(fixedChange())
+    listed.settled.textProbe.records.push(parkedSheet())
+    listed.settled.nodes = [
+      ...listed.settled.nodes,
+      { id: '', text: 'Share your look', bounds: '[42,2500][600,2560]' },
+    ]
+    assert.equal(evaluateLiveFontChangeRaw(listed).checks.clipping.pass, true)
+    // The same record without the field is a hidden text: a full clip.
+    const older = withAll(fixedChange())
+    const record = parkedSheet()
+    delete record.offWindow
+    older.settled.textProbe.records.push(record)
+    assert.deepEqual(
+      layoutClips(evaluateLiveFontChangeRaw(older).checks.clipping).map((entry) => [
+        entry.via,
+        entry.text,
+      ]),
+      [['hidden', 'Share your look']]
+    )
+  })
+
+  test('a fixed text half past the window bottom fails clipped_by_layout', () => {
+    const change = withAll(fixedChange())
+    const record = recordFor(change.settled, TEMPERATURE)
+    const [left, top, right, bottom] = record.viewRect
+    // The window ends halfway down the text; the clipRect is cut there, the content is not.
+    const cut = [left, top, right, Math.round((top + bottom) / 2)]
+    Object.assign(record, { visibleRect: cut, clipRect: cut, offWindow: false })
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.text, entry.content]),
+      [[TEMPERATURE, true]]
+    )
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('a text the cold launch shows that is wholly off the window live fails as hidden text', () => {
+    const change = withAll(fixedChange())
+    for (const record of change.settled.textProbe.records)
+      if (record.text === TEMPERATURE)
+        Object.assign(record, { offWindow: true, visibleRect: null, clipRect: null })
+    change.settled.nodes = change.settled.nodes.filter(
+      (node) => node.text !== TEMPERATURE
+    )
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      checks.textHidden.hidden.map((entry) => [entry.text, entry.offWindow]),
+      [[TEMPERATURE, 2]]
+    )
+    assert.equal(checks.fullText.pass, false, 'and lost text fails too')
+    assert.throws(prove(change, undefined, '0.88.1'), { code: 'live_font_text_hidden' })
+  })
+
+  test('a page whose answer does not pair fails the leg', () => {
+    const change = withAll(fixedChange())
+    change.settled = withPages(change.settled, [BELOW])
+    change.settled.pages[1].textProbe.records =
+      change.settled.pages[1].textProbe.records.filter(
+        (record) => record.text !== BELOW.text
+      )
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.equal(
+      checks.textProbe.stages['settled.page1'].code,
+      'live_font_text_probe_unmatched'
+    )
+    assert.throws(prove(change, undefined, '0.88.1'), {
+      code: 'live_font_text_probe_unmatched',
+    })
+  })
+
+  test('a single-line text input is judged like text; a multi-line one is paired and reported only', () => {
+    const input = (maxLines) => {
+      const change = withAll(fixedChange())
+      Object.assign(recordFor(change.settled, TEMPERATURE), {
+        kind: 'ReactEditText',
+        maxLines,
+      })
+      overflow(change.settled, TEMPERATURE)
+      return change
+    }
+    const single = evaluateLiveFontChangeRaw(input(1))
+    assert.deepEqual(
+      layoutClips(single.checks.clipping).map((entry) => entry.text),
+      [TEMPERATURE]
+    )
+    assert.equal(single.verdict, 'unexpected')
+    for (const maxLines of [null, 4]) {
+      const multi = evaluateLiveFontChangeRaw(input(maxLines))
+      assert.equal(multi.verdict, 'fixed', String(maxLines))
+      assert.deepEqual(multi.checks.textProbe.stages.settled.multilineInputs, [
+        TEMPERATURE,
+      ])
+    }
+  })
+
+  test('a text collapsed to nothing in an overflow-hidden container is a full clip; one scrolled away is not', () => {
+    const hidden = withAll(fixedChange())
+    hidden.settled.textProbe.records.push(
+      probeRecord('android', 'Collapsed', [42, 900, 400, 900], {
+        visibleRect: null,
+        clipRect: null,
+      })
+    )
+    const { checks, verdict } = evaluateLiveFontChangeRaw(hidden)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.text]),
+      [['hidden', 'Collapsed']]
+    )
+    assert.deepEqual(clipKeys(checks), [], 'a hidden record has no key to list')
+    const scrolled = withAll(fixedChange())
+    scrolled.settled.textProbe.records.push(
+      probeRecord('android', 'Far below', [42, 3000, 400, 3050], {
+        visibleRect: null,
+        scrolledAway: true,
+      })
+    )
+    assert.equal(evaluateLiveFontChangeRaw(scrolled).verdict, 'fixed')
+  })
+
+  test('an ellipsis the cold launch at the same scale does not show is a clip; one it shows is not', () => {
+    const change = withAll(fixedChange())
+    recordFor(change.settled, TEMPERATURE).ellipsized = 2
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [
+        entry.text,
+        entry.content,
+        entry.ellipsized,
+        entry.coldEllipsized,
+      ]),
+      [[TEMPERATURE, false, 2, 0]]
+    )
+    // The same truncation at the cold launch is the app's own (a numberOfLines label).
+    recordFor(change.cold, TEMPERATURE).ellipsized = 2
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'fixed')
+    // More than at the cold launch is still a clip.
+    recordFor(change.settled, TEMPERATURE).ellipsized = 3
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+  })
+
+  test('a volatile record clipped fails at every version and never goes in clippedKeys', () => {
+    const change = staleClipChange()
+    change.settled.volatileRegions = ['[0,3000][1080,3200]']
+    change.settled.textProbe.records.push(
+      probeRecord('android', 'Everyday Layering Tee', [81, 3050, 999, 3100], {
+        contentRect: [81, 3050, 999, 3140],
+      })
+    )
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(clipKeys(checks), [CONDITION_CLIP])
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+    assert.throws(prove(change, ENTRY, '0.88.1'), { code: 'live_font_fix_missing' })
+    // Unclipped, the volatile record is out of matching and the residual approves.
+    change.settled.textProbe.records.at(-1).contentRect = [81, 3050, 999, 3100]
+    assert.equal(prove(change)().verdict, 'known-residual')
+  })
+
+  test('below 0.87 a stale box clip passes as an exact clippedKeys key', () => {
+    const { checks } = evaluateLiveFontChangeRaw(staleClipChange())
+    const [clip] = layoutClips(checks.clipping)
+    assert.deepEqual(
+      [clip.key, clip.stale, clip.staleBox, clip.height, clip.baseHeight],
+      [`["current-condition","${CONDITION}"]#0`, true, true, 51, 51]
+    )
+    assert.equal(prove(staleClipChange())().verdict, 'known-residual')
+    // The run's proposal carries the clip and the seventh fact.
+    const proposal = proposedResidualEntry(checks, staleClipChange())
+    assert.deepEqual(proposal.clippedKeys, [CONDITION_CLIP])
+    assert.equal(proposal.review.clipsStale, true)
+    assert.deepEqual(proposal.staleKeys, ENTRY.staleKeys)
+  })
+
+  test('each clippedKeys fail mode approves nothing', () => {
+    assert.throws(
+      prove(staleClipChange(), { ...ENTRY, clippedKeys: [] }),
+      refused(/clip outside clippedKeys: staleBox:cold:\["current-condition"/)
+    )
+    assert.throws(
+      prove(staleClipChange(), {
+        ...ENTRY,
+        clippedKeys: [CONDITION_CLIP, CONDITION_CLIP],
+      }),
+      refused(/clipped key does not clip: staleBox:cold:\["current-condition"/)
+    )
+    assert.throws(prove(residualChange(), ENTRY), refused(/clipped key does not clip/))
+    // A listed key that is not stale, even beside the right one.
+    const notStale = `staleBox:cold:["current-temperature","${TEMPERATURE}"]#0`
+    assert.throws(
+      prove(staleClipChange(), { ...ENTRY, clippedKeys: [CONDITION_CLIP, notStale] }),
+      refused(/clipped key not in staleKeys: staleBox:cold:\["current-temperature"/)
+    )
+    // An updated-stage key for a cold-stage clip.
+    assert.throws(
+      prove(staleClipChange(), {
+        ...ENTRY,
+        clippedKeys: [CONDITION_CLIP.replace('cold:', 'updated:')],
+      }),
+      refused(/clipped key not in staleKeys: staleBox:updated:/)
+    )
+    for (const bad of [
+      '["current-condition"]#0',
+      'cold:nonsense',
+      42,
+      'staleBox:cold:["",""]#0>["x","y"]#0',
+      // A key without its face, or with a face that is none of the two.
+      CONDITION_KEY,
+      `noFace:${CONDITION_KEY}`,
+    ])
+      assert.throws(
+        prove(staleClipChange(), { ...ENTRY, clippedKeys: [bad] }),
+        refused(/baseline clippedKeys must be a list of clip keys/),
+        String(bad)
+      )
+    assert.throws(
+      prove(staleClipChange(), { ...ENTRY, clippedKeys: 'all' }),
+      refused(/clippedKeys must be a list/)
+    )
+  })
+
+  test('a clip of a key that is not stale is unexpected, listed or not', () => {
+    const change = residualChange()
+    overflow(change.settled, TEMPERATURE)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.equal(layoutClips(checks.clipping)[0].stale, false)
+    const listed = {
+      ...ENTRY,
+      clippedKeys: [`staleBox:cold:["current-temperature","${TEMPERATURE}"]#0`],
+    }
+    assert.throws(prove(change, listed), { code: 'live_font_baseline_unexpected' })
+    assert.equal(proposedResidualEntry(checks, change).review.clipsStale, false)
+  })
+
+  test('the stale box is computed: a clipped box at another height than the starting-scale cold launch is unexpected', () => {
+    const change = staleClipChange()
+    // The view itself grew 12 px past the 1.0 box: not the stale box's clip.
+    const record = recordFor(change.settled, CONDITION)
+    record.viewRect = [...record.viewRect.slice(0, 3), record.viewRect[3] + 12]
+    record.clipRect = record.viewRect
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [
+        entry.stale,
+        entry.staleBox,
+        entry.height,
+        entry.baseHeight,
+      ]),
+      [[true, false, 63, 51]]
+    )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+    // Without the cold launch at the starting scale nothing proves the box stale.
+    const noBase = staleClipChange()
+    delete noBase.coldBefore
+    assert.equal(evaluateLiveFontChangeRaw(noBase).verdict, 'unexpected')
+  })
+
+  // TEA ruling 2026-11-14: on a leg that starts above the base scale the stale box is the
+  // starting scale's, so the cold base launch never decides it.
+  test('the stale box is the cold launch at the leg starting scale, not the cold base launch', () => {
+    const shorten = (capture) => {
+      const record = recordFor(capture, CONDITION)
+      record.viewRect = [...record.viewRect.slice(0, 3), record.viewRect[3] - 11]
+      record.clipRect = record.viewRect
+      record.contentRect = record.viewRect
+    }
+    const baseDiffers = staleClipChange()
+    shorten(baseDiffers.coldBase)
+    const [kept] = layoutClips(evaluateLiveFontChangeRaw(baseDiffers).checks.clipping)
+    assert.deepEqual([kept.staleBox, kept.baseHeight], [true, 51])
+    assert.equal(prove(baseDiffers)().verdict, 'known-residual')
+    const startDiffers = staleClipChange()
+    shorten(startDiffers.coldBefore)
+    const [lost] = layoutClips(evaluateLiveFontChangeRaw(startDiffers).checks.clipping)
+    assert.deepEqual([lost.staleBox, lost.baseHeight], [false, 40])
+    assert.throws(prove(startDiffers), { code: 'live_font_baseline_unexpected' })
+  })
+
+  test('from 0.87 any clip fails, an approved stale one included', () => {
+    assert.throws(
+      prove(staleClipChange(), ENTRY, '0.87.0'),
+      (error) => error.code === 'live_font_fix_missing' && /clipping/.test(error.message)
+    )
+  })
+
+  // TEA ruling 2026-11-14: every entry is proposed again on the F-00i harness.
+  test('an entry from before the amendment approves nothing, whether or not the run clips', () => {
+    const old = { ...ENTRY, review: { ...ENTRY.review } }
+    delete old.clippedKeys
+    delete old.review.clipsStale
+    for (const change of [staleClipChange(), residualChange()])
+      assert.throws(
+        prove(change, old),
+        refused(/entry predates the TD-05 clip amendment .*approves nothing/)
+      )
+    // The amended entry with no clips approves the clean run.
+    const none = { ...ENTRY, clippedKeys: [] }
+    assert.equal(prove(residualChange(), none)().verdict, 'known-residual')
+    // Half an amendment approves nothing.
+    const noFact = { ...ENTRY, review: { ...ENTRY.review } }
+    delete noFact.review.clipsStale
+    assert.throws(prove(staleClipChange(), noFact), refused(/approval rules: clipsStale/))
+    const noList = { ...ENTRY }
+    delete noList.clippedKeys
+    assert.throws(prove(staleClipChange(), noList), refused(/clippedKeys must be a list/))
+    assert.throws(
+      prove(staleClipChange(), {
+        ...ENTRY,
+        review: { ...ENTRY.review, clipsStale: false },
+      }),
+      refused(/approval rules: clipsStale/)
+    )
+  })
+
+  test('a capture whose probe answer is missing or does not pair fails the leg at every version', () => {
+    for (const version of ['0.81.5', '0.88.1']) {
+      const missing = withAll(fixedChange())
+      delete missing.settled.textProbe
+      assert.throws(
+        prove(missing, undefined, version),
+        (error) =>
+          error.code === 'live_font_text_probe_missing' && /settled/.test(error.message)
+      )
+      // The mutant: the probe reports nothing for one node.
+      const silent = withAll(fixedChange())
+      silent.settled.textProbe.records = silent.settled.textProbe.records.filter(
+        (record) => record.text !== CONDITION
+      )
+      assert.throws(
+        prove(silent, undefined, version),
+        (error) =>
+          error.code === 'live_font_text_probe_unmatched' &&
+          error.message.includes(CONDITION)
+      )
+    }
+  })
+
+  test('F-01: a cold launch with a layout clip fails the control; its own ellipsis does not', () => {
+    const control =
+      (target, extra = {}) =>
+      () =>
+        assertColdControlRaw({
+          platform: 'android',
+          base: probed({ ...stage('before'), stage: 'cold' }),
+          target,
+          probes: PROBES,
+          ...extra,
+        })
+    const target = () =>
+      probed(correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 }))
+    assert.doesNotThrow(control(target()))
+    assert.throws(
+      control(overflow(target(), CONDITION)),
+      (error) =>
+        error.code === 'live_font_control_clipped_by_layout' &&
+        error.message.includes(CONDITION)
+    )
+    // The cold update of either scale is judged too.
+    assert.throws(control(target(), { updated: [overflow(target(), TEMPERATURE)] }), {
+      code: 'live_font_control_clipped_by_layout',
+    })
+    const ellipsized = target()
+    recordFor(ellipsized, CONDITION).ellipsized = 1
+    assert.doesNotThrow(control(ellipsized))
+    const unanswered = target()
+    delete unanswered.textProbe
+    assert.throws(control(unanswered), { code: 'live_font_text_probe_missing' })
+  })
+
+  // The leg back from 1.5 to 1.0: the cold 1.5 launch is the starting scale's, the cold 1.0
+  // launch the target's and the base's.
+  const big = (name) => correct(stage('settled'), { stage: name })
+  const small = (name) => ({ ...stage('before'), stage: name })
+  const returnLeg = () =>
+    withAll({
+      platform: 'android',
+      before: big('before'),
+      immediate: small('immediate'),
+      settled: small('settled'),
+      cold: small('cold'),
+      coldBefore: big('cold'),
+      coldBase: small('cold'),
+      anchors: ANCHORS,
+      probes: PROBES,
+    })
+  /** The second face on the condition line: the fresh 1.0 box around its 1.5 content. */
+  const secondFace = () => {
+    const change = returnLeg()
+    const start = recordFor(change.coldBefore, CONDITION).contentRect
+    const record = recordFor(change.settled, CONDITION)
+    record.contentRect = [
+      ...record.contentRect.slice(0, 3),
+      record.contentRect[1] + start[3] - start[1],
+    ]
+    return change
+  }
+  const SECOND_FACE = `staleContent:${CONDITION_KEY}`
+  const faceOf = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).map((entry) => [
+      entry.text,
+      entry.staleBox,
+      entry.staleContent,
+      entry.face,
+    ])
+
+  test('the second face: a fresh box around content of the starting scale height is staleContent and approves', () => {
+    assert.equal(evaluateLiveFontChangeRaw(returnLeg()).verdict, 'fixed')
+    const change = secondFace()
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(faceOf(change), [[CONDITION, false, true, 'staleContent']])
+    assert.equal(
+      layoutClips(checks.clipping)[0].staleContentFrom,
+      'startCold',
+      'the face records which launch the content kept'
+    )
+    assert.equal(verdict, 'known-residual')
+    // Its parity passes, so it lists no stale key.
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual([proposal.staleKeys, proposal.clippedKeys], [[], [SECOND_FACE]])
+    assert.equal(proposal.review.clipsStale, true)
+    const entry = {
+      ...ENTRY,
+      staleKeys: [],
+      clippedKeys: [SECOND_FACE],
+      review: { ...ENTRY.review, growthFailing: [] },
+    }
+    assert.equal(prove(change, entry)().verdict, 'known-residual')
+    assert.throws(prove(change, { ...entry, clippedKeys: [] }), refused(/clip outside/))
+  })
+
+  // TEA r44 P1-2 (PROBE_2A): the second face needs a vertical clip and a content height the
+  // scale changes.
+  test('a horizontal cut or a text whose height the scale keeps is no second face', () => {
+    // PROBE_2A: the temperature keeps one height at both scales; its content runs 40 px past
+    // the right edge of its box.
+    const sideways = returnLeg()
+    const temperature = recordFor(sideways.settled, TEMPERATURE)
+    temperature.contentRect = [
+      ...temperature.contentRect.slice(0, 2),
+      temperature.viewRect[2] + 40,
+      temperature.contentRect[3],
+    ]
+    assert.deepEqual(faceOf(sideways), [[TEMPERATURE, false, false, null]])
+    assert.equal(evaluateLiveFontChangeRaw(sideways).verdict, 'unexpected')
+    assert.throws(prove(sideways), { code: 'live_font_baseline_unexpected' })
+    // Cut at the bottom, with a content height both cold launches share: no face either.
+    const kept = returnLeg()
+    for (const capture of [kept.coldBefore, kept.cold, kept.settled]) {
+      const record = recordFor(capture, TEMPERATURE)
+      record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + 20]
+    }
+    assert.deepEqual(faceOf(kept), [[TEMPERATURE, false, false, null]])
+    assert.equal(evaluateLiveFontChangeRaw(kept).verdict, 'unexpected')
+  })
+
+  test('a single-line text with fresh box and starting-scale content cut only at the right is no face', () => {
+    // 1.0 to 1.5: the box is the cold 1.5 launch's, the content keeps its 1.0 height (it fits
+    // vertically) and runs past the right edge.
+    const change = withAll({
+      ...fixedChange(),
+      coldBefore: coldOne(),
+      coldBase: coldOne(),
+    })
+    const start = recordFor(change.coldBefore, CONDITION).contentRect
+    const record = recordFor(change.settled, CONDITION)
+    record.contentRect = [
+      record.viewRect[0],
+      record.viewRect[1],
+      record.viewRect[2] + 40,
+      record.viewRect[1] + start[3] - start[1],
+    ]
+    assert.deepEqual(faceOf(change), [[CONDITION, false, false, null]])
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+  })
+
+  // TEA r44 P1-2, the mirror for the first face.
+  test('a stale box whose height the cold launches share at both scales is no first face', () => {
+    const change = staleClipChange()
+    const start = recordFor(change.coldBefore, CONDITION).viewRect
+    const target = recordFor(change.cold, CONDITION)
+    target.viewRect = [
+      ...target.viewRect.slice(0, 3),
+      target.viewRect[1] + start[3] - start[1],
+    ]
+    target.clipRect = target.viewRect
+    target.contentRect = target.viewRect
+    const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual([clip.stale, clip.staleBox, clip.face], [true, false, null])
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+  })
+
+  // Android Release 0027bf63, Settings 1.0 to 1.5: Interface palettes, shown only on pages 1 to
+  // 3, kept its 1.0 box. Parity reads page 0 only, so its record proves it stale.
+  const belowAt = (height) => ({
+    ...BELOW,
+    bounds: `[42,2300][600,${2300 + height}]`,
+  })
+  const pageOnlyChange = (targetHeight = 78, liveHeight = 50) => {
+    const change = residualChange()
+    change.settled = withPages(change.settled, [belowAt(liveHeight)])
+    change.coldBefore = withPages(change.coldBefore, [belowAt(50)])
+    change.cold = withPages(change.cold, [belowAt(targetHeight)])
+    overflowRecord(pageRecord(change.settled, BELOW.text))
+    return change
+  }
+  const PAGE_ONLY = `staleBox:cold:["","${BELOW.text}"]#0`
+
+  test('a stale box clip of a text only later pages show is the first face and approves without a stale key', () => {
+    const change = pageOnlyChange()
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    const [clip] = layoutClips(checks.clipping)
+    assert.deepEqual(
+      [clip.key, clip.parityKey, clip.pages, clip.stale, clip.face],
+      [`["","${BELOW.text}"]#0`, null, [1], true, 'staleBox']
+    )
+    assert.equal(verdict, 'known-residual')
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual(proposal.clippedKeys, [PAGE_ONLY])
+    assert.equal(proposal.review.clipsStale, true)
+    assert.equal(proposal.staleKeys.includes(`cold:["","${BELOW.text}"]#0`), false)
+    const entry = { ...ENTRY, clippedKeys: [PAGE_ONLY] }
+    assert.equal(prove(change, entry)().verdict, 'known-residual')
+    // The same key on a page 0 text still needs its stale key.
+    assert.throws(
+      prove(staleClipChange(), {
+        ...ENTRY,
+        staleKeys: ENTRY.staleKeys.filter((key) => key !== CONDITION_KEY),
+      }),
+      { code: 'live_font_residual_unapproved' }
+    )
+  })
+
+  // TEA ruling r47 (r45 P2-2, PROBE_1C): a later-page stale box needs its content at the target
+  // launch's content height; content past that (a box fixed at both scales) is no stale box.
+  test('PROBE_1C: a later-page box at the start height whose content is not the target content is no first face', () => {
+    const change = pageOnlyChange()
+    overflowRecord(pageRecord(change.settled, BELOW.text), 40)
+    const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual(
+      [clip.staleBox, clip.boxMiss, clip.contentAtTarget, clip.stale, clip.face],
+      [true, true, false, false, null]
+    )
+    assert.throws(prove(change, { ...ENTRY, clippedKeys: [PAGE_ONLY] }), {
+      code: 'live_font_baseline_unexpected',
+    })
+  })
+
+  test('a later-page clip whose box is the target launch box is no stale miss', () => {
+    const change = pageOnlyChange(50)
+    const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual([clip.stale, clip.staleBox, clip.face], [false, false, null])
+    assert.throws(prove(change, { ...ENTRY, clippedKeys: [PAGE_ONLY] }), {
+      code: 'live_font_baseline_unexpected',
+    })
+    // Within the tolerance of both the starting box (50) and the target box (53): a box that
+    // already has the target height is no miss, however near the starting one.
+    const near = pageOnlyChange(53, 52)
+    const [between] = layoutClips(evaluateLiveFontChangeRaw(near).checks.clipping)
+    assert.deepEqual(
+      [between.staleBox, between.boxMiss, between.stale, between.face],
+      [true, false, false, null]
+    )
+  })
+
+  // TEA r44 P1-1 (PROBE_4B): a text layout alone pushes wholly off the window arrives as
+  // nothing shown, no clipRect, not scrolled away and not offWindow, while its node stays.
+  const pushedOff = (capture, text = CONDITION) => {
+    const record = recordFor(capture, text)
+    Object.assign(record, { visibleRect: null, clipRect: null, offWindow: false })
+    return capture
+  }
+
+  test('PROBE_4B: a text pushed off the window at the cold launch and live is a full clip in every judged stage', () => {
+    const change = residualChange()
+    pushedOff(change.cold)
+    pushedOff(change.settled)
+    change.updated = pushedOff(probed({ ...stage('settled'), stage: 'updated' }))
+    change.coldUpdated = pushedOff(probed({ ...change.cold, stage: 'cold' }))
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    for (const name of ['clipping', 'postUpdateClipping'])
+      assert.deepEqual(
+        layoutClips(checks[name]).map((entry) => [entry.text, entry.face]),
+        [[CONDITION, null]],
+        name
+      )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+    assert.throws(prove(change, ENTRY, '0.88.1'), { code: 'live_font_fix_missing' })
+    // The cold control inspects it at either scale.
+    const target = pushedOff(
+      probed(correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 }))
+    )
+    assert.throws(
+      () =>
+        assertColdControlRaw({
+          platform: 'android',
+          base: probed({ ...stage('before'), stage: 'cold' }),
+          target,
+          probes: PROBES,
+        }),
+      (error) =>
+        error.code === 'live_font_control_clipped_by_layout' &&
+        error.message.includes(CONDITION)
+    )
+  })
+
+  test('PROBE_4B: a translated sheet off the window passes at the cold launch and live, listed offWindow', () => {
+    const change = withAll(fixedChange())
+    for (const capture of [change.cold, change.settled])
+      capture.textProbe.records.push(parkedSheet())
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'fixed')
+    assert.deepEqual(checks.textProbe.stages.settled.offWindow, [
+      { key: null, text: 'Share your look' },
+    ])
+    const target = probed(
+      correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 })
+    )
+    target.textProbe.records.push(parkedSheet())
+    assert.doesNotThrow(() =>
+      assertColdControlRaw({
+        platform: 'android',
+        base: probed({ ...stage('before'), stage: 'cold' }),
+        target,
+        probes: PROBES,
+      })
+    )
+  })
+
+  // TEA ruling r45, Android Release 0027bf63 Home and Settings 1.5 to 1.0: the content keeps
+  // the layout the live before capture had (1.5 text wrapped into a stale 1.0 box), a height
+  // neither cold launch shows.
+  const carried = 100
+  const rectHeight = (rect) => rect[3] - rect[1]
+  /** The return leg with the condition line's before content `height` tall, and settled's too. */
+  const carriedOver = ({ before = carried, settled = carried } = {}) => {
+    const change = returnLeg()
+    for (const [capture, height] of [
+      [change.before, before],
+      [change.settled, settled],
+    ]) {
+      const record = recordFor(capture, CONDITION)
+      record.contentRect = [
+        ...record.contentRect.slice(0, 3),
+        record.contentRect[1] + height,
+      ]
+    }
+    return change
+  }
+  const sourceOf = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).map((entry) => [
+      entry.text,
+      entry.face,
+      entry.staleContentFrom,
+    ])
+
+  test('the second face also holds content the live before capture laid out, and says so', () => {
+    const change = carriedOver()
+    const start = recordFor(change.coldBefore, CONDITION)
+    assert.notEqual(
+      rectHeight(start.contentRect),
+      carried,
+      'the start launch shows no such height'
+    )
+    assert.deepEqual(sourceOf(change), [[CONDITION, 'staleContent', 'before']])
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'known-residual')
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual(proposal.clippedKeys, [SECOND_FACE])
+    const entry = {
+      ...ENTRY,
+      staleKeys: [],
+      clippedKeys: [SECOND_FACE],
+      review: { ...ENTRY.review, growthFailing: [] },
+    }
+    assert.equal(prove(change, entry)().verdict, 'known-residual')
+  })
+
+  test('content that matches the before capture is no face when before matches the target launch', () => {
+    // A fresh layout: before, target and settled content all at the target launch's height, cut
+    // at the bottom by an overflow-hidden parent.
+    const change = returnLeg()
+    const target = rectHeight(recordFor(change.cold, CONDITION).contentRect)
+    const before = recordFor(change.before, CONDITION)
+    before.contentRect = [
+      ...before.contentRect.slice(0, 3),
+      before.contentRect[1] + target,
+    ]
+    const record = recordFor(change.settled, CONDITION)
+    record.clipRect = [...record.clipRect.slice(0, 3), record.clipRect[1] + target - 10]
+    assert.deepEqual(sourceOf(change), [[CONDITION, null, null]])
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+  })
+
+  test('a before match cut only at the side, in a box not the target one, or at another height is no face', () => {
+    // Shorter than the box: the content fits vertically and runs past the right edge.
+    const sideways = carriedOver({ before: 30, settled: 30 })
+    const record = recordFor(sideways.settled, CONDITION)
+    record.contentRect = [
+      record.contentRect[0],
+      record.contentRect[1],
+      record.viewRect[2] + 40,
+      record.contentRect[3],
+    ]
+    assert.deepEqual(sourceOf(sideways), [[CONDITION, null, null]])
+    // The box grew 10 px past the target launch's.
+    const grown = carriedOver()
+    const box = recordFor(grown.settled, CONDITION)
+    box.viewRect = [...box.viewRect.slice(0, 3), box.viewRect[3] + 10]
+    box.clipRect = box.viewRect
+    box.visibleRect = box.viewRect
+    assert.deepEqual(sourceOf(grown), [[CONDITION, null, null]])
+    // Content at neither the before nor the starting launch's height.
+    assert.deepEqual(sourceOf(carriedOver({ settled: carried + 9 })), [
+      [CONDITION, null, null],
+    ])
+  })
+
+  // TEA ruling r47 (r45 P2-2, PROBE_1B): beside the earlier guards, the second face needs its
+  // source's line count and no cut at the side.
+  test('PROBE_1B: a carried-over height with a side cut or another line count is no second face', () => {
+    const sideways = carriedOver()
+    const cut = recordFor(sideways.settled, CONDITION)
+    cut.contentRect = [
+      cut.contentRect[0],
+      cut.contentRect[1],
+      cut.viewRect[2] + 40,
+      cut.contentRect[3],
+    ]
+    assert.deepEqual(sourceOf(sideways), [[CONDITION, null, null]])
+    assert.throws(prove(sideways), { code: 'live_font_baseline_unexpected' })
+    const relaid = carriedOver()
+    recordFor(relaid.settled, CONDITION).lineCount = 2
+    assert.deepEqual(sourceOf(relaid), [[CONDITION, null, null]])
+    // The same from the starting launch's layout.
+    const fromStart = secondFace()
+    recordFor(fromStart.settled, CONDITION).lineCount = 3
+    assert.deepEqual(faceOf(fromStart), [[CONDITION, false, false, null]])
+  })
+
+  // TEA ruling r48, Android Release 0027bf63 Home 1.5 to 1.0: the cloud glyph and the swap
+  // glyph keep their whole 1.5 layout, width and height, inside the fresh 1.0 box, so they are
+  // cut at the side and at the bottom. A side cut is the second face only when the content keeps
+  // its source's width, height and line count.
+  const GLYPHS = {
+    // [settled view, settled content, cold 1.5 view and content, before view, before content]
+    '\u2601\ufe0f': [
+      [100, 999, 166, 1070],
+      [100, 999, 186, 1091],
+      [90, 1054, 176, 1146],
+      [100, 999, 166, 1070],
+      [100, 999, 186, 1091],
+    ],
+    '\u21c4': [
+      [940, 1987, 977, 2038],
+      [940, 1987, 998, 2066],
+      [910, 2344, 968, 2423],
+      [910, 1992, 968, 2071],
+      [910, 1992, 968, 2071],
+    ],
+  }
+  const asBounds = ([l, t, r, b]) => `[${l},${t}][${r},${b}]`
+  /** The return leg with both glyphs as each capture of the 0027bf63 run shows them. */
+  const glyphLeg = (settledContent = (text) => GLYPHS[text][1]) => {
+    const change = returnLeg()
+    for (const [text, [view, , start, beforeView, beforeContent]] of Object.entries(
+      GLYPHS
+    )) {
+      const place = (capture, box, content) => {
+        capture.nodes.push({ id: '', text, bounds: asBounds(box) })
+        capture.textProbe.records.push(
+          probeRecord('android', text, box, { contentRect: content })
+        )
+      }
+      place(change.before, beforeView, beforeContent)
+      place(change.settled, view, settledContent(text))
+      for (const capture of [change.cold, change.coldBase]) place(capture, view, view)
+      place(change.coldBefore, start, start)
+    }
+    return change
+  }
+  const glyphFaces = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).map((entry) => [
+      entry.text,
+      entry.face,
+      entry.staleContentFrom,
+    ])
+
+  test('the cloud and swap glyphs that keep their whole 1.5 layout are the second face, side cut and all', () => {
+    const change = glyphLeg()
+    assert.deepEqual(glyphFaces(change), [
+      ['\u2601\ufe0f', 'staleContent', 'startCold'],
+      ['\u21c4', 'staleContent', 'startCold'],
+    ])
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'known-residual')
+  })
+
+  test('a side cut with a fresh width, or another line count, is no second face', () => {
+    // The cloud's content keeps the 1.5 height but takes a width neither launch laid out.
+    const fresh = glyphLeg((text) =>
+      text === '\u2601\ufe0f' ? [100, 999, 200, 1091] : GLYPHS[text][1]
+    )
+    assert.deepEqual(glyphFaces(fresh)[0], ['\u2601\ufe0f', null, null])
+    assert.throws(prove(fresh), { code: 'live_font_baseline_unexpected' })
+    const relaid = glyphLeg()
+    recordFor(relaid.settled, '\u21c4').lineCount = 2
+    assert.deepEqual(glyphFaces(relaid)[1], ['\u21c4', null, null])
+  })
+
+  // TEA ruling r48 (r46 PROBE_F2C): a flex-squeezed layout on a downward leg keeps the start
+  // launch's height and line count but not its width: no kept layout, no second face.
+  test('PROBE_F2C: a squeezed layout with the source height and line count but another width is no second face', () => {
+    const squeezed = secondFace()
+    recordFor(squeezed.coldBefore, CONDITION).lineCount = 2
+    const record = recordFor(squeezed.settled, CONDITION)
+    record.lineCount = 2
+    record.contentRect = [
+      record.contentRect[0],
+      record.contentRect[1],
+      record.contentRect[2] - 30,
+      record.contentRect[3],
+    ]
+    assert.deepEqual(faceOf(squeezed), [[CONDITION, false, false, null]])
+    assert.throws(prove(squeezed), { code: 'live_font_baseline_unexpected' })
+    // The whole layout kept, width included, is the second face.
+    const kept = secondFace()
+    recordFor(kept.coldBefore, CONDITION).lineCount = 2
+    recordFor(kept.settled, CONDITION).lineCount = 2
+    assert.deepEqual(faceOf(kept), [[CONDITION, false, true, 'staleContent']])
+  })
+
+  // TEA ruling r45: volatile records keyed by region testID, masked text and screen order,
+  // judged for a face only when both cold launches and the before capture hold the key.
+  const REGION = 'community-spotlight'
+  const REGION_RECT = '[0,3000][1080,3200]'
+  const VOLATILE_KEY = `volatile:["${REGION}","Partnered"]#0`
+  const VOLATILE_CLIP = `staleBox:cold:${VOLATILE_KEY}`
+  /** `capture` with the spotlight region and a "Partnered" record `height` tall at `top`. */
+  const withSpotlight = (capture, height, { top = 3050, by = 0 } = {}) => {
+    capture.volatileRegions = [REGION_RECT]
+    capture.volatileRegionIds = [REGION]
+    capture.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, top, 400, top + height], {
+        contentRect: [81, top, 400, top + height + by],
+      })
+    )
+    return capture
+  }
+  /** The residual with a stale spotlight label: 40 at 1.0 and live, 60 at the cold 1.5. */
+  const volatileChange = ({ skip = [] } = {}) => {
+    const change = residualChange()
+    for (const [name, height, by] of [
+      ['before', 40, 0],
+      ['coldBefore', 40, 0],
+      ['cold', 60, 0],
+      ['settled', 40, 20],
+    ])
+      if (!skip.includes(name)) withSpotlight(change[name], height, { by })
+    return change
+  }
+
+  test('a volatile record is keyed by region, text and order, and a stale box clip on it has a face', () => {
+    const change = volatileChange()
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    const [clip] = layoutClips(checks.clipping)
+    assert.deepEqual(
+      [clip.key, clip.via, clip.volatile, clip.comparable, clip.stale, clip.face],
+      [VOLATILE_KEY, 'volatile', true, true, true, 'staleBox']
+    )
+    assert.equal(verdict, 'known-residual')
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual(proposal.clippedKeys, [VOLATILE_CLIP])
+    for (const stage of ['before', 'settled', 'coldBefore', 'cold'])
+      assert.deepEqual(proposal.volatileKeys[stage], [VOLATILE_KEY], stage)
+    // Written with each capture for a later two-run diff.
+    assert.deepEqual(textProbeSummary(change.settled, 'android').volatileKeys, [
+      VOLATILE_KEY,
+    ])
+  })
+
+  test('a volatile key missing from either cold launch or the before capture shows no face and fails', () => {
+    for (const skip of ['before', 'coldBefore', 'cold']) {
+      const change = volatileChange({ skip: [skip] })
+      const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+      assert.deepEqual(
+        [clip.key, clip.comparable, clip.face],
+        [VOLATILE_KEY, false, null],
+        skip
+      )
+      assert.throws(prove(change), { code: 'live_font_baseline_unexpected' }, skip)
+    }
+  })
+
+  // TEA ruling r47 (r45 P2-1): the proof names committed runs; the harness reads them at HEAD
+  // and recomputes their keys, so nothing the entry states is trusted.
+  const SHA_A = 'a'.repeat(40)
+  /**
+   * A fake repository at HEAD: path to bytes, the commits HEAD descends from, and the shas whose
+   * recomputed live-font inputs differ from HEAD's.
+   */
+  const repository = () => {
+    const files = new Map()
+    const changedShas = new Set()
+    const commits = new Set([SHA_A])
+    return {
+      files,
+      changedShas,
+      commits,
+      read: (file) => (files.has(file) ? Buffer.from(files.get(file)) : null),
+      ancestor: (sha) => commits.has(sha),
+      changed: (sha) => (changedShas.has(sha) ? [{ path: 'apps/mobile' }] : []),
+    }
+  }
+  /** Writes the run's capture hash list from the captures it holds now, under `sha`. */
+  const rehash = (repo, dir, sha = SHA_A) => {
+    const captures = {}
+    for (const [file, bytes] of repo.files)
+      if (file.startsWith(`${dir}/community-`))
+        captures[file.slice(dir.length + 1, -'.json'.length)] = createHash('sha256')
+          .update(Buffer.from(bytes))
+          .digest('hex')
+    repo.files.set(
+      `${dir}/capture-hashes.json`,
+      JSON.stringify({ version: 1, leg: 'live-font', sha, captures })
+    )
+  }
+  /** Commits `change`'s captures as one run under `dir`, as launch `launch`, at `sha`. */
+  const commitRun = (
+    repo,
+    change,
+    dir,
+    { launch, sha = SHA_A, manifestAt = 'root' } = {}
+  ) => {
+    const evidence = {}
+    for (const [index, stage] of ['before', 'settled', 'coldBefore', 'cold'].entries()) {
+      const name = `community-${String(index + 1).padStart(3, '0')}-${stage.toLowerCase()}-1`
+      evidence[stage] = name
+      const capture = {
+        ...change[stage],
+        // A process id per launch and stage, digits as the runners write them.
+        pid: `${launch.charCodeAt(0)}${index + 1}`,
+        identity: { root: `root-${launch}-${stage}` },
+      }
+      repo.files.set(`${dir}/${name}.json`, JSON.stringify(capture))
+    }
+    rehash(repo, dir, sha)
+    const manifest = JSON.stringify({ leg: 'live-font', sha, inputs: {} })
+    repo.files.set(
+      manifestAt === 'root'
+        ? `${path.posix.dirname(dir)}/manifest.json`
+        : `${dir}/manifest.json`,
+      manifest
+    )
+    return { dir, evidence }
+  }
+  const RUN_A = '_bmad-output/test-artifacts/story-6-15/runs/run-a/driver-community'
+  const RUN_B = '_bmad-output/test-artifacts/story-6-15/runs/run-b/driver-community'
+  const proofCase = () => {
+    const change = volatileChange()
+    const repo = repository()
+    const runs = [
+      commitRun(repo, change, RUN_A, { launch: 'a' }),
+      commitRun(repo, change, RUN_B, { launch: 'b', manifestAt: 'dir' }),
+    ]
+    const check = createVolatileProofCheck({
+      platform: 'android',
+      read: repo.read,
+      ancestor: repo.ancestor,
+      changed: repo.changed,
+    })
+    const entry = { ...ENTRY, clippedKeys: [VOLATILE_CLIP], volatileProof: { runs } }
+    const proveWith =
+      (baseline, verify = check) =>
+      () =>
+        assertLiveFontProofRaw({
+          reactNativeVersion: '0.81.5',
+          residualBaseline: baseline,
+          timezone: 'America/Chicago',
+          weatherBanner: 'out-of-date',
+          volatileProofCheck: verify,
+          ...change,
+        })
+    return { change, repo, runs, check, entry, proveWith }
+  }
+
+  test('a listed volatile key approves with two committed runs that recompute its keys', () => {
+    const { entry, proveWith } = proofCase()
+    assert.equal(proveWith(entry)().verdict, 'known-residual')
+    // A run with no verifier approves no volatile key, whatever the entry says.
+    assert.throws(proveWith(entry, null), refused(/no volatile proof check in this run/))
+    // Unlisted, the clip is outside clippedKeys.
+    assert.throws(
+      proveWith(ENTRY),
+      refused(/clip outside clippedKeys: staleBox:cold:volatile:/)
+    )
+  })
+
+  test('PROBE_1A: one run copied under two dirs, or two runs of one launch, prove nothing', () => {
+    const { change, repo, entry, proveWith } = proofCase()
+    // The same files under a second dir: every capture hashes alike.
+    for (const [file, bytes] of [...repo.files])
+      if (file.includes('/run-a/'))
+        repo.files.set(file.replace('/run-a/', '/run-copy/'), bytes)
+    const copied = {
+      ...entry,
+      volatileProof: {
+        runs: [
+          entry.volatileProof.runs[0],
+          { ...entry.volatileProof.runs[0], dir: RUN_A.replace('run-a', 'run-copy') },
+        ],
+      },
+    }
+    assert.throws(proveWith(copied), refused(/share a capture \(copied run\)/))
+    // Other bytes, one launch.
+    const sameLaunch = repository()
+    const runs = [
+      commitRun(sameLaunch, change, RUN_A, { launch: 'x' }),
+      commitRun(
+        sameLaunch,
+        // Every capture rewritten (other bytes), the launch the same.
+        Object.fromEntries(
+          Object.entries(change).map(([stage, value]) => [
+            stage,
+            value && typeof value === 'object' && !Array.isArray(value)
+              ? { ...value, rewritten: true }
+              : value,
+          ])
+        ),
+        RUN_B,
+        { launch: 'x' }
+      ),
+    ]
+    const check = createVolatileProofCheck({
+      platform: 'android',
+      read: sameLaunch.read,
+      ancestor: sameLaunch.ancestor,
+      changed: sameLaunch.changed,
+    })
+    assert.throws(
+      proveWith({ ...entry, volatileProof: { runs } }, check),
+      refused(/share a launch/)
+    )
+  })
+
+  // TEA ruling on Antigravity r47 P2 (R47_F4): a launch is an integer pid and an identity root;
+  // a cold stage is the cold launch at that stage's scale in this leg.
+  test('R47_F4: a proof capture with no launch identity or a cold launch at another scale fails', () => {
+    const cases = {
+      'pid undefined and null (R47_F4)': (capture, run) => {
+        if (run === 0) delete capture.pid
+        else capture.pid = null
+      },
+      'pid not an integer': (capture) => (capture.pid = 'a-cold'),
+      'pid zero': (capture) => (capture.pid = 0),
+      'no identity root': (capture) => delete capture.identity.root,
+      'empty identity root': (capture) => (capture.identity.root = ''),
+      'cold at another scale': (capture, run, stage) => {
+        if (stage === 'cold') capture.fontScale = 1.3
+      },
+    }
+    const patterns = {
+      'cold at another scale': /is no cold launch at cold's scale 1\.5/,
+    }
+    for (const [name, edit] of Object.entries(cases)) {
+      const { entry, repo, proveWith } = proofCase()
+      for (const [run, dir] of [RUN_A, RUN_B].entries()) {
+        const { evidence } = entry.volatileProof.runs[run]
+        for (const [stage, file] of Object.entries(evidence)) {
+          const at = `${dir}/${file}.json`
+          const capture = JSON.parse(repo.files.get(at))
+          edit(capture, run, stage)
+          repo.files.set(at, JSON.stringify(capture))
+        }
+        rehash(repo, dir, SHA_A)
+      }
+      assert.throws(
+        proveWith(entry),
+        refused(
+          patterns[name] ?? /has no launch identity: an integer pid and an identity root/
+        ),
+        name
+      )
+    }
+    // A numeric pid is a launch too.
+    const { entry, repo, proveWith } = proofCase()
+    for (const [run, dir] of [RUN_A, RUN_B].entries()) {
+      for (const file of Object.values(entry.volatileProof.runs[run].evidence)) {
+        const at = `${dir}/${file}.json`
+        const capture = JSON.parse(repo.files.get(at))
+        capture.pid = Number(capture.pid)
+        repo.files.set(at, JSON.stringify(capture))
+      }
+      rehash(repo, dir, SHA_A)
+    }
+    assert.equal(proveWith(entry)().verdict, 'known-residual')
+  })
+
+  test('a proof run that is not committed, not at one head, changed since, or of other keys fails', () => {
+    const cases = {
+      'one run': ({ entry }) => ({
+        ...entry,
+        volatileProof: { runs: [entry.volatileProof.runs[0]] },
+      }),
+      'old self-attested shape': ({ entry }) => ({
+        ...entry,
+        volatileProof: {
+          runs: [
+            { run: 'copied-run-1', volatileKeys: {} },
+            { run: 'copied-run-2', volatileKeys: {} },
+          ],
+        },
+      }),
+      'a dir leaving the repository': ({ entry }) => ({
+        ...entry,
+        volatileProof: {
+          runs: [
+            entry.volatileProof.runs[0],
+            { ...entry.volatileProof.runs[1], dir: '../elsewhere' },
+          ],
+        },
+      }),
+      'a stage left out': ({ entry }) => {
+        const { cold, ...rest } = entry.volatileProof.runs[1].evidence
+        void cold
+        return {
+          ...entry,
+          volatileProof: {
+            runs: [
+              entry.volatileProof.runs[0],
+              { ...entry.volatileProof.runs[1], evidence: rest },
+            ],
+          },
+        }
+      },
+      'an uncommitted capture': ({ entry, repo }) => {
+        repo.files.delete(`${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`)
+        return entry
+      },
+      'no manifest': ({ entry, repo }) => {
+        repo.files.delete(`${RUN_B}/manifest.json`)
+        return entry
+      },
+      'another head': ({ entry, repo }) => {
+        repo.commits.add('b'.repeat(40))
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'live-font', sha: 'b'.repeat(40), inputs: {} })
+        )
+        rehash(repo, RUN_B, 'b'.repeat(40))
+        return entry
+      },
+      // TEA ruling r48 (r46 PROBE_F5): a sha no commit HEAD descends from, a manifest of no
+      // inputs, captures of another platform or stage, and an unbound capture.
+      'a forged sha': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'live-font', sha: '0'.repeat(40), inputs: {} })
+        )
+        rehash(repo, RUN_B, '0'.repeat(40))
+        return entry
+      },
+      'null inputs': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'live-font', sha: SHA_A, inputs: null })
+        )
+        return entry
+      },
+      'a manifest that is no JSON': ({ entry, repo }) => {
+        repo.files.set(`${RUN_B}/manifest.json`, '{ "leg": ')
+        return entry
+      },
+      'a capture of another platform': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        const capture = JSON.parse(repo.files.get(file))
+        capture.textProbe.platform = 'ios'
+        repo.files.set(file, JSON.stringify(capture))
+        rehash(repo, RUN_B)
+        return entry
+      },
+      'a capture of another stage': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        repo.files.set(
+          file,
+          JSON.stringify({ ...JSON.parse(repo.files.get(file)), stage: 'cold' })
+        )
+        rehash(repo, RUN_B)
+        return entry
+      },
+      'a capture that does not hash as listed': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        repo.files.set(file, `${repo.files.get(file)} `)
+        return entry
+      },
+      'no capture hash list': ({ entry, repo }) => {
+        repo.files.delete(`${RUN_B}/capture-hashes.json`)
+        return entry
+      },
+      'a hash list of another sha': ({ entry, repo }) => {
+        rehash(repo, RUN_B, 'c'.repeat(40))
+        return entry
+      },
+      'a manifest of another leg': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'ios-build', sha: SHA_A, inputs: {} })
+        )
+        return entry
+      },
+      'inputs changed since the build': ({ entry, repo }) => {
+        repo.changedShas.add(SHA_A)
+        return entry
+      },
+      'other volatile keys': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        const capture = JSON.parse(repo.files.get(file))
+        capture.textProbe.records = capture.textProbe.records.filter(
+          (record) => record.text !== 'Partnered'
+        )
+        repo.files.set(file, JSON.stringify(capture))
+        rehash(repo, RUN_B)
+        return entry
+      },
+    }
+    const REASONS = {
+      'one run': /two runs or more/,
+      'old self-attested shape': /must be \{ dir, evidence \}/,
+      'a dir leaving the repository': /must be \{ dir, evidence \}/,
+      'a stage left out': /evidence must name a capture/,
+      'an uncommitted capture': /is not committed/,
+      'no manifest': /no committed manifest/,
+      'another head': /different heads/,
+      'a manifest of another leg': /malformed or of another leg/,
+      'a forged sha': /is no commit HEAD descends from/,
+      'null inputs': /malformed or of another leg/,
+      'a manifest that is no JSON': /is unreadable/,
+      'a capture of another platform': /is no android settled capture/,
+      'a capture of another stage': /is no android settled capture/,
+      'a capture that does not hash as listed':
+        /does not hash as capture-hashes.json lists/,
+      'no capture hash list': /no committed capture-hashes.json/,
+      'a hash list of another sha': /capture-hashes.json names c{40}, the manifest a{40}/,
+      'inputs changed since the build': /inputs changed since/,
+      'other volatile keys': /volatile keys of run 1 .* differ/,
+    }
+    for (const [name, mutate] of Object.entries(cases)) {
+      const context = proofCase()
+      assert.throws(
+        context.proveWith(mutate(context)),
+        (error) =>
+          error.code === 'live_font_residual_unapproved' &&
+          REASONS[name].test(error.message),
+        name
+      )
+    }
+  })
+
+  // TEA ruling r49: the first face with a stale width. Real Android 6c85bbb4 Community 1 to 1.5
+  // shapes, each moved down into the spotlight region with its size and x kept: the settled
+  // record, the 1.0 cold launch's and the 1.5 cold launch's (view, content, lines).
+  const WRAPPED = {
+    '#1': {
+      settled: [[79, 1051, 120, 1098], [79, 1051, 110, 1184], 2],
+      start: [[79, 1051, 120, 1098], [79, 1051, 120, 1098], 1],
+      target: [[69, 1257, 130, 1328], [69, 1257, 130, 1328], 1],
+    },
+    Comments: {
+      settled: [[581, 1519, 753, 1566], [581, 1519, 738, 1652], 2],
+      start: [[581, 1395, 753, 1442], [581, 1395, 753, 1442], 1],
+      target: [[437, 1421, 698, 1492], [437, 1421, 698, 1492], 1],
+    },
+    Partnered: {
+      settled: [[103, 1343, 235, 1382], [103, 1343, 212, 1454], 2],
+      start: [[103, 1301, 235, 1340], [103, 1301, 235, 1340], 1],
+      target: [[103, 1581, 301, 1640], [103, 1581, 301, 1640], 1],
+    },
+    'Temperate and dry': {
+      settled: [[300, 1343, 544, 1382], [300, 1343, 515, 1454], 2],
+      start: [[300, 1301, 544, 1340], [300, 1301, 545, 1340], 1],
+      target: [[366, 1581, 740, 1640], [366, 1581, 740, 1640], 1],
+    },
+  }
+  /** `rect` moved down so its view top sits at 3050, inside the spotlight region. */
+  const intoRegion = (rect, top) => [
+    rect[0],
+    rect[1] - top + 3050,
+    rect[2],
+    rect[3] - top + 3050,
+  ]
+  /** The residual with one wrapped spotlight record of `text`, its shapes changed by `edit`. */
+  const wrappedChange = (text, edit = (shapes) => shapes) => {
+    const shapes = edit(structuredClone(WRAPPED[text]))
+    const change = residualChange()
+    for (const [name, [view, content, lineCount]] of [
+      ['before', shapes.start],
+      ['coldBefore', shapes.start],
+      ['cold', shapes.target],
+      ['settled', shapes.settled],
+    ]) {
+      const capture = change[name]
+      capture.volatileRegions = [REGION_RECT]
+      capture.volatileRegionIds = [REGION]
+      capture.textProbe.records.push(
+        probeRecord('android', text, intoRegion(view, view[1]), {
+          contentRect: intoRegion(content, view[1]),
+          lineCount,
+        })
+      )
+    }
+    return change
+  }
+  const wrappedClip = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).find(
+      (clip) => clip.volatile
+    )
+
+  test('a text wrapped inside its stale starting box shows the stale box face', () => {
+    for (const text of Object.keys(WRAPPED)) {
+      const clip = wrappedClip(wrappedChange(text))
+      assert.deepEqual(
+        [
+          clip.key,
+          clip.comparable,
+          clip.contentAtTarget,
+          clip.staleWidth,
+          clip.stale,
+          clip.face,
+        ],
+        [
+          `volatile:["${REGION}",${JSON.stringify(text)}]#0`,
+          true,
+          false,
+          true,
+          true,
+          'staleBox',
+        ],
+        text
+      )
+    }
+  })
+
+  test('a wrapped text shows no face in a box fixed at both cold launches or past its box', () => {
+    for (const text of Object.keys(WRAPPED)) {
+      const fixed = wrappedChange(text, (shapes) => ({ ...shapes, target: shapes.start }))
+      const wide = wrappedChange(text, (shapes) => {
+        const [view, content] = shapes.settled
+        content[2] = view[2] + 3
+        return shapes
+      })
+      for (const [name, change] of [
+        ['fixed', fixed],
+        ['wider than its box', wide],
+      ]) {
+        const clip = wrappedClip(change)
+        assert.deepEqual(
+          [clip.comparable, clip.staleWidth, clip.face],
+          [true, false, null],
+          `${text}: ${name}`
+        )
+        assert.throws(prove(change), { code: 'live_font_baseline_unexpected' }, text)
+      }
+    }
+  })
+
+  // TEA rulings r49 (i) and (ii): the iOS 6c85bbb4 Home hourly ribbon. Each hourly item is an
+  // accessibility group whose label no text view carries; its hour and temperature are members.
+  // Real shapes (box, content, lines) per capture, in points.
+  const HOURLY = 'Cloudy, 68 degrees Fahrenheit, and 3\u202fPM, Precipitation: 0%'
+  const HOURLY_SHAPES = {
+    cold1: { hour: [14.333, 14.036, 1], temp: [16.667, 16.588, 1] },
+    cold1353: { hour: [19, 18.991, 1], temp: [22.666, 22.443, 1] },
+    cold1786: { hour: [25.333, 25.068, 1], temp: [29.667, 29.626, 1] },
+    // Leg 1 to 1.353, settled: still the 1.0 layout, nothing cut.
+    fresh1: { hour: [14.333, 14.036, 1], temp: [16.667, 16.588, 1] },
+    // Leg 1 to 1.353 updated, and leg 1.353 to 1.786 settled: the 1.0 boxes, wrapped 1.353 text.
+    wrapped: { hour: [14.333, 37.981, 2], temp: [16.667, 44.887, 2] },
+  }
+  /** `capture` as iOS sees it with the hourly item in `shape`. */
+  const withHourly = (capture, shape, launch = 'live') => {
+    const shown = {
+      ...capture,
+      launch,
+      nodes: [
+        ...capture.nodes,
+        { id: 'hourly-item', text: HOURLY, bounds: '[42,1690][160,1830]' },
+      ],
+    }
+    const answer = healthyAnswer(shown, 'ios')
+    answer.records = answer.records.filter((record) => record.text !== HOURLY)
+    for (const [text, [box, content, lineCount], top] of [
+      ['3\u202fPM', shape.hour, 1700],
+      ['68°F', shape.temp, 1760],
+    ])
+      answer.records.push(
+        probeRecord('ios', text, [50, top, 150, top + box], {
+          contentRect: [50, top, 140, top + content],
+          lineCount,
+        })
+      )
+    return { ...shown, textProbe: answer }
+  }
+  const hourlyClips = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).filter((clip) =>
+      clip.key?.startsWith('["hourly-item"')
+    )
+  /** A leg on the hourly item: its shapes by stage, the scales passed and the previous leg. */
+  const hourlyLeg = ({ settled, coldBefore, cold, passed = [], previous, launch }) => ({
+    ...fixedChange(),
+    platform: 'ios',
+    before: withHourly(stage('before'), HOURLY_SHAPES[coldBefore]),
+    immediate: withHourly(stage('immediate'), HOURLY_SHAPES[coldBefore]),
+    settled: withHourly(fixedChange().settled, HOURLY_SHAPES[settled], launch),
+    coldBefore: withHourly(
+      { ...stage('before'), stage: 'cold' },
+      HOURLY_SHAPES[coldBefore],
+      'cold-a'
+    ),
+    coldBase: withHourly(
+      { ...stage('before'), stage: 'cold' },
+      HOURLY_SHAPES.cold1,
+      'cold-b'
+    ),
+    cold: withHourly(fixedChange().cold, HOURLY_SHAPES[cold], 'cold-c'),
+    coldEarlier: passed.map((name) => ({
+      reference: withHourly(
+        { ...stage('before'), stage: 'cold' },
+        HOURLY_SHAPES[name],
+        'cold-d'
+      ),
+    })),
+    earlier: previous
+      ? [
+          withHourly(
+            fixedChange().settled,
+            HOURLY_SHAPES[previous.shape],
+            previous.launch
+          ),
+        ]
+      : [],
+  })
+
+  test('a group member whose own box kept the starting launch box is stale on its record', () => {
+    const change = hourlyLeg({
+      settled: 'wrapped',
+      coldBefore: 'cold1',
+      cold: 'cold1353',
+    })
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    // The group node itself is no parity miss: only its members' boxes stayed.
+    assert.equal(
+      checks.coldParity.misses.some((miss) => miss.key.startsWith('["hourly-item"')),
+      false
+    )
+    const clips = hourlyClips(change)
+    assert.deepEqual(
+      clips.map((clip) => [
+        clip.key.slice(clip.key.indexOf('#0>') + 3),
+        clip.via,
+        clip.stale,
+        clip.face,
+      ]),
+      [
+        ['["","<hour>"]#0', 'group', true, 'staleBox'],
+        ['["","68°F"]#0', 'group', true, 'staleBox'],
+      ]
+    )
+    // A member whose box changed with the scale is no stale box: to the target launch's box, or
+    // to another that misses it.
+    for (const [hour, temp] of [
+      [19, 22.666],
+      [16.5, 19.5],
+    ]) {
+      const grown = hourlyLeg({
+        settled: 'wrapped',
+        coldBefore: 'cold1',
+        cold: 'cold1353',
+      })
+      grown.settled = withHourly(fixedChange().settled, {
+        hour: [hour, 37.981, 2],
+        temp: [temp, 44.887, 2],
+      })
+      assert.deepEqual(
+        hourlyClips(grown).map((clip) => [clip.staleBox, clip.stale, clip.face]),
+        [
+          [false, false, null],
+          [false, false, null],
+        ],
+        String(hour)
+      )
+    }
+  })
+
+  test('a box stale since an earlier leg of the launch shows the stale box face', () => {
+    // 1.353 to 1.786: the box is the 1.0 launch's, which the screen showed before, and the
+    // previous leg's settled screen already had it.
+    const chained = (overrides = {}) =>
+      hourlyLeg({
+        settled: 'wrapped',
+        coldBefore: 'cold1353',
+        cold: 'cold1786',
+        passed: ['cold1', 'cold1353'],
+        previous: { shape: 'wrapped', launch: 'live' },
+        ...overrides,
+      })
+    assert.deepEqual(
+      hourlyClips(chained()).map((clip) => [clip.staleChain, clip.staleBox, clip.face]),
+      [
+        [true, true, 'staleBox'],
+        [true, true, 'staleBox'],
+      ]
+    )
+    for (const [name, change] of [
+      // The previous leg showed the box fresh, at its own target's height.
+      ['previous fresh', chained({ previous: { shape: 'cold1353', launch: 'live' } })],
+      // A relaunch between the legs.
+      ['relaunched', chained({ previous: { shape: 'wrapped', launch: 'live-2' } })],
+      // No scale passed whose cold launch had the box.
+      ['never passed', chained({ passed: ['cold1353'] })],
+      ['no previous leg', chained({ previous: undefined })],
+    ])
+      assert.deepEqual(
+        hourlyClips(change).map((clip) => [clip.staleChain, clip.face]),
+        [
+          [false, null],
+          [false, null],
+        ],
+        name
+      )
+  })
+
+  // PROBE_1D: an extra row of one text in a volatile region shifts every later ordinal.
+  test('PROBE_1D: a region whose count of a text differs between the captures shows no face', () => {
+    const change = volatileChange()
+    // The inserted row above takes ordinal #0 and is cut like the stale row: without the count
+    // check it would borrow the cold launches' #0 and show the first face.
+    withSpotlight(change.settled, 40, { top: 3020, by: 20 })
+    const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.ok(clips.length > 0)
+    for (const clip of clips)
+      assert.deepEqual(
+        [clip.volatile, clip.comparable, clip.face],
+        [true, false, null],
+        clip.key
+      )
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+  })
+
+  test('volatile keys count in screen order and one record on two pages keeps one key', () => {
+    const capture = probed(stage('settled'))
+    withSpotlight(capture, 40, { top: 3120 })
+    withSpotlight(capture, 40, { top: 3050 })
+    assert.deepEqual(captureVolatileKeys(capture, 'android'), [
+      `volatile:["${REGION}","Partnered"]#0`,
+      `volatile:["${REGION}","Partnered"]#1`,
+    ])
+    const facts = textLayout(capture, 'android').facts.filter((fact) => fact.volatile)
+    assert.equal(facts.length, 2)
+    // Page 1 shows the upper one again, SHIFT px higher.
+    const paged = withPages(capture)
+    const page = paged.pages[1]
+    page.volatileRegions = [`[0,${3000 - SHIFT}][1080,${3200 - SHIFT}]`]
+    page.volatileRegionIds = [REGION]
+    page.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 3050 - SHIFT, 400, 3090 - SHIFT])
+    )
+    assert.deepEqual(captureVolatileKeys(paged, 'android'), [
+      `volatile:["${REGION}","Partnered"]#0`,
+      `volatile:["${REGION}","Partnered"]#1`,
+    ])
+    // A region without its testID (a capture from before the ids) leaves its records unkeyed.
+    delete capture.volatileRegionIds
+    assert.deepEqual(captureVolatileKeys(capture, 'android'), [])
+  })
+
+  // Android 6c85bbb4 Community: spotlight text scrolled under the sticky filter chips reads as a
+  // record in the chips region, with no visible part.
+  test('a scrolled away record in a volatile region is keyed for lookups and never judged', () => {
+    const change = volatileChange()
+    const chips = '[0,475][1080,645]'
+    change.settled.volatileRegions.push(chips)
+    change.settled.volatileRegionIds.push('community-sticky-filter-chips')
+    change.settled.textProbe.records.push(
+      probeRecord('android', 'Seeded spotlight look 1', [44, 568, 875, 643], {
+        contentRect: [44, 568, 875, 700],
+        visibleRect: null,
+        clipRect: null,
+        scrolledAway: true,
+      })
+    )
+    // TEA ruling r49: keyed and counted, so presence matches across captures.
+    assert.deepEqual(captureVolatileKeys(change.settled, 'android'), [
+      VOLATILE_KEY,
+      'volatile:["community-sticky-filter-chips","Seeded spotlight look 1"]#0',
+    ])
+    const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual(
+      clips.map((clip) => [clip.key, clip.face]),
+      [[VOLATILE_KEY, 'staleBox']]
+    )
+  })
+
+  // TEA ruling r49, Android 6c85bbb4 Community: the cold 1.5 launch's chip row is wider, so
+  // "Cold and dry" sits scrolled off to the right at x 1315, its full box kept by the probe;
+  // the 1.0 launches and the live 1.5 screen show it at x 1000.
+  test('a chip scrolled off sideways at one launch stays comparable across the launches', () => {
+    const CHIPS = 'community-sticky-filter-chips'
+    const KEY = `volatile:["${CHIPS}","Cold and dry"]#0`
+    const change = residualChange()
+    const shown = (contentBottom = 582) =>
+      probeRecord('android', 'Cold and dry', [1000, 535, 1198, 582], {
+        visibleRect: [1000, 535, 1080, 582],
+        contentRect: [1000, 535, 1198, contentBottom],
+      })
+    const away = (text, rect, contentBottom = rect[3]) =>
+      probeRecord('android', text, rect, {
+        visibleRect: null,
+        contentRect: [rect[0], rect[1], rect[2], contentBottom],
+        scrolledAway: true,
+      })
+    for (const [name, record] of [
+      ['before', shown()],
+      ['coldBefore', shown()],
+      ['cold', away('Cold and dry', [1315, 545, 1615, 616])],
+      // Stale at 1.5: the 1.0 box with the 1.5 content.
+      ['settled', shown(606)],
+    ]) {
+      const capture = change[name]
+      capture.volatileRegions = ['[0,475][1080,645]']
+      capture.volatileRegionIds = [CHIPS]
+      capture.textProbe.records.push(record)
+    }
+    // A scrolled-away chip on the live screen, cut too, is keyed and never judged.
+    change.settled.textProbe.records.push(
+      away('Temperate and wet', [1300, 535, 1500, 582], 640)
+    )
+    assert.deepEqual(captureVolatileKeys(change.cold, 'android'), [KEY])
+    const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).filter(
+      (clip) => clip.volatile
+    )
+    // The cold 1.5 counterpart keeps its full box (71 tall), never cut to the window.
+    assert.deepEqual(
+      clips.map((clip) => [
+        clip.key,
+        clip.comparable,
+        clip.baseHeight,
+        clip.targetHeight,
+        clip.face,
+      ]),
+      [[KEY, true, 47, 71, 'staleBox']]
+    )
+  })
+
+  // Android 6c85bbb4 Community: the sticky "Cold and wet" chip sits at one screen place on every
+  // scroll page, so it keeps one key on all of them.
+  test('a sticky volatile record at one screen place on every page keeps one key', () => {
+    const CHIPS = 'community-sticky-filter-chips'
+    const chip = (capture) => {
+      capture.volatileRegions = ['[0,475][1080,645]']
+      capture.volatileRegionIds = [CHIPS]
+      capture.textProbe.records.push(
+        probeRecord('android', 'Cold and wet', [695, 535, 900, 582])
+      )
+      return capture
+    }
+    const paged = withPages(chip(probed(stage('settled'))))
+    chip(paged.pages[1])
+    assert.deepEqual(captureVolatileKeys(paged, 'android'), [
+      `volatile:["${CHIPS}","Cold and wet"]#0`,
+    ])
+    // A record that scrolls with the page still moves down by the page offset: one key too.
+    const scrolling = withPages(withSpotlight(probed(stage('settled')), 40))
+    const page = scrolling.pages[1]
+    page.volatileRegions = [`[0,${3000 - SHIFT}][1080,${3200 - SHIFT}]`]
+    page.volatileRegionIds = [REGION]
+    page.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 3050 - SHIFT, 400, 3090 - SHIFT])
+    )
+    assert.deepEqual(captureVolatileKeys(scrolling, 'android'), [VOLATILE_KEY])
+  })
+
+  // Android 6c85bbb4 Community before 1.0, pages 4 to 5: no node measured the step and the
+  // drag fell 10 px short of the others, so one spotlight record got a key on each page.
+  test('a page no node measures is stepped by its probe records, so a volatile record keeps one key', () => {
+    const paged = withPages(probed(stage('settled')))
+    const region = (page, top) => {
+      page.volatileRegions = [`[0,${top}][1080,${top + 200}]`]
+      page.volatileRegionIds = [REGION]
+    }
+    region(paged.pages[1], 2900)
+    paged.pages[1].textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 2950, 400, 2990])
+    )
+    // Page 2 shows no hierarchy text; the drag moved the content 490 px.
+    const last = { nodes: [], volatileRegions: [], window: paged.window }
+    last.textProbe = healthyAnswer(last, 'android')
+    region(last, 2410)
+    last.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 2460, 400, 2500])
+    )
+    paged.pages.push(last)
+    assert.deepEqual(captureVolatileKeys(paged, 'android'), [
+      `volatile:["${REGION}","Partnered"]#0`,
+    ])
+  })
+
+  test('volatile keys never count as shown text in the hidden-text check', () => {
+    // The cold launch shows two spotlight "Partnered" labels, the live screen one, plus an
+    // opacity 0 copy outside the region: the region's own count says nothing about lost text.
+    const change = volatileChange()
+    withSpotlight(change.cold, 60, { top: 3130 })
+    change.settled.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 1500, 400, 1540], { opacity: 0 })
+    )
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling r45, iOS: a record attached to a node exact text took is keyed under it.
+  test('an attached record is keyed under its node and listed as attached', () => {
+    const capture = {
+      stage: 'cold',
+      window: '[0,0][402,874]',
+      nodes: [
+        { id: 'tab-home', text: 'Home', bounds: '[0,784][100,840]' },
+        { id: 'tab-settings', text: 'Settings', bounds: '[301,784][402,840]' },
+      ],
+    }
+    capture.textProbe = healthyAnswer(capture, 'ios')
+    capture.textProbe.records.push(
+      probeRecord('ios', '', [37, 791, 63, 819], {
+        accessibilityAncestor: { identifier: 'tab-home', rect: [0, 784, 100, 840] },
+      }),
+      probeRecord('ios', '', [340, 791, 364, 819], { accessibilityAncestor: null })
+    )
+    const { pass, facts } = textLayout(capture, 'ios')
+    assert.equal(pass, true)
+    assert.deepEqual(
+      facts.filter((fact) => fact.via === 'attached').map((fact) => fact.key),
+      ['["tab-home","Home"]#0>["",""]#0', '["tab-settings","Settings"]#0>["",""]#0']
+    )
+    assert.deepEqual(textProbeSummary(capture, 'ios').attached, [
+      { node: '["tab-home","Home"]', records: [''] },
+      { node: '["tab-settings","Settings"]', records: [''] },
+    ])
+  })
+
+  // TEA ruling r49: the iOS 6c85bbb4 Home teaser pill, hidden from accessibility, joins the link
+  // element's node, keyed under it, and is judged for clipping like any attached record.
+  test('a flagged accessibility-hidden record is keyed under its element node and clip-judged', () => {
+    const LINK = 'home-spotlight-teaser-link'
+    const LABEL =
+      'Standout look in US by Style Explorer 9BC8AA75, 6 reactions. Opens the City Spotlight. ' +
+      'Partnered with Sample Partner'
+    const capture = {
+      stage: 'settled',
+      window: '[0,0][402,874]',
+      nodes: [{ id: LINK, text: LABEL, bounds: '[17,536][385,635]' }],
+    }
+    capture.textProbe = healthyAnswer(capture, 'ios')
+    capture.textProbe.elements = [
+      {
+        hasText: true,
+        identifier: LINK,
+        label: LABEL,
+        rect: [17, 536.667, 385, 635.667],
+        window: 1,
+      },
+    ]
+    const pill = probeRecord('ios', 'Partnered', [37, 639.667, 92.667, 653], {
+      accessibilityHidden: true,
+    })
+    capture.textProbe.records.push(pill)
+    const KEY = `${JSON.stringify([LINK, LABEL])}#0>["","Partnered"]#0`
+    const { pass, facts } = textLayout(capture, 'ios')
+    assert.equal(pass, true)
+    assert.deepEqual(
+      facts.filter((fact) => fact.via === 'accessibilityHidden').map((fact) => fact.key),
+      [KEY]
+    )
+    assert.deepEqual(textProbeSummary(capture, 'ios').accessibilityHidden, [
+      { record: 'Partnered', node: JSON.stringify([LINK, LABEL]), identifier: LINK },
+    ])
+    // Cut at the bottom, it is a clip under that key.
+    pill.contentRect = [37, 639.667, 92.667, 670]
+    const cut = textLayout(capture, 'ios').facts.find((fact) => fact.key === KEY)
+    assert.ok(cut, 'still judged')
+    // Unflagged, the same record is unmatched.
+    pill.accessibilityHidden = false
+    assert.equal(textLayout(capture, 'ios').code, 'live_font_text_probe_unmatched')
+  })
+
+  // TEA ruling r46: accessibility elements pair nodes no text record takes, but never count as
+  // text, so text that vanishes behind a container label still fails.
+  const containerLabel = (overrides = {}) => ({
+    identifier: 'current-condition',
+    label: CONDITION,
+    rect: [42, 488, 304, 718],
+    hasText: true,
+    window: 1,
+    ...overrides,
+  })
+
+  test('a text gone behind a container label of the same text fails as lost text', () => {
+    const change = withAll(fixedChange())
+    change.settled.textProbe.records = change.settled.textProbe.records.filter(
+      (record) => record.text !== CONDITION
+    )
+    change.settled.textProbe.elements = [containerLabel()]
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.equal(checks.textProbe.pass, true, 'the element takes the node')
+    assert.deepEqual(checks.textProbe.stages.settled.elements, [
+      { node: `["current-condition","${CONDITION}"]`, identifier: 'current-condition' },
+    ])
+    assert.deepEqual(
+      checks.textHidden.hidden.map((entry) => [entry.stage, entry.text, entry.elements]),
+      [['settled', CONDITION, 1]]
+    )
+    // No live record of it at all: lost text first (TEA ruling on Antigravity r47 P2).
+    assert.deepEqual(checks.textLost.lost, [{ stage: 'settled', text: CONDITION }])
+    assert.throws(prove(change, undefined, '0.81.5'), { code: 'live_font_text_lost' })
+    // At the cold launch too, the label is the app's own: nothing lost.
+    change.cold.textProbe.records = change.cold.textProbe.records.filter(
+      (record) => record.text !== CONDITION
+    )
+    change.cold.textProbe.elements = [containerLabel()]
+    const both = evaluateLiveFontChangeRaw(change).checks
+    assert.equal(both.textHidden.pass, true)
+    assert.equal(both.textLost.pass, true)
+  })
+
+  test('the probe-reports-nothing mutant still fails beside its own element', () => {
+    const change = withAll(fixedChange())
+    change.settled.textProbe.records = change.settled.textProbe.records.filter(
+      (record) => record.text !== CONDITION
+    )
+    // Its own element, a text view inside, the record gone: nothing lies inside it.
+    change.settled.textProbe.elements = [containerLabel({ rect: [42, 667, 155, 718] })]
+    for (const version of ['0.81.5', '0.88.1'])
+      assert.throws(
+        prove(change, undefined, version),
+        (error) =>
+          error.code === 'live_font_text_probe_unmatched' &&
+          error.message.includes(CONDITION)
+      )
+  })
+
+  // TEA ruling r46: behind an accessibility-modal view a record leaves matching like a partial
+  // cover and stays judged with no key, unless the modal view's frame holds it.
+  test('a clip behind a modal view fails with no key; one the modal frame holds is left out', () => {
+    const behindSheet = (sheet, opaque = true) => {
+      const change = withAll(fixedChange())
+      // Both temperature labels sit behind the sheet; the first is cut.
+      for (const each of change.settled.textProbe.records)
+        if (each.text === TEMPERATURE) each.behindModal = { rect: sheet, opaque }
+      const record = recordFor(change.settled, TEMPERATURE)
+      record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + 30]
+      // The hierarchy lists nothing behind an accessibility-modal view.
+      change.settled.nodes = change.settled.nodes.filter(
+        (each) => each.text !== TEMPERATURE
+      )
+      return change
+    }
+    const partial = behindSheet([0, 1200, 1080, 2400])
+    const { checks, verdict } = evaluateLiveFontChangeRaw(partial)
+    assert.equal(checks.textProbe.pass, true, 'out of matching, owed no node')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.key, entry.text]),
+      [['behind', null, TEMPERATURE]]
+    )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(partial, undefined, '0.88.1'), { code: 'live_font_fix_missing' })
+    const whole = behindSheet([0, 0, 1080, 2400])
+    const held = evaluateLiveFontChangeRaw(whole)
+    assert.equal(held.checks.textProbe.pass, true)
+    assert.deepEqual(layoutClips(held.checks.clipping), [])
+    assert.deepEqual(held.checks.textProbe.stages.settled.modalCovered, [
+      TEMPERATURE,
+      TEMPERATURE,
+    ])
+    // PROBE_F3D: a transparent full-window backdrop hides nothing; the clip still fails.
+    const backdrop = behindSheet([0, 0, 1080, 2400], false)
+    const seen = evaluateLiveFontChangeRaw(backdrop)
+    assert.deepEqual(
+      layoutClips(seen.checks.clipping).map((entry) => [
+        entry.via,
+        entry.key,
+        entry.text,
+      ]),
+      [['behind', null, TEMPERATURE]]
+    )
+    assert.deepEqual(seen.checks.textProbe.stages.settled.modalCovered, [])
+  })
+
+  // TEA ruling r48 (r46 PROBE_F3B): an iOS button whose label text shows on a record at the cold
+  // launch but is gone live, while a glyph inside it remains, keeps its node as a group of the
+  // glyph; that must still fail as lost text.
+  test('PROBE_F3B: a label gone live while a glyph keeps its button a group fails as lost text', () => {
+    const SUBMIT = { id: 'btn-submit', text: 'Submit', bounds: '[20,1500][300,1560]' }
+    const withButton = (capture, records) => {
+      const shown = { ...capture, nodes: [...capture.nodes, SUBMIT] }
+      const answer = healthyAnswer(shown, 'ios')
+      answer.records = [
+        ...answer.records.filter((record) => record.text !== 'Submit'),
+        ...records.map(([text, rect]) => probeRecord('ios', text, rect)),
+      ]
+      return { ...shown, textProbe: answer }
+    }
+    const both = [
+      ['Submit', [40, 1510, 200, 1550]],
+      ['*', [210, 1510, 230, 1530]],
+    ]
+    const change = { ...fixedChange(), platform: 'ios' }
+    change.before = withButton(change.before, both)
+    change.cold = withButton(change.cold, both)
+    change.settled = withButton(change.settled, [both[1]])
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.equal(checks.textProbe.pass, true, 'the glyph keeps the button a group')
+    assert.deepEqual(checks.textProbe.stages.settled.groups, [
+      { node: '["btn-submit","Submit"]', records: ['*'] },
+    ])
+    assert.deepEqual(
+      checks.textHidden.hidden.map((entry) => [entry.stage, entry.text, entry.groups]),
+      [['settled', 'Submit', 1]]
+    )
+    // Both launches show it so: the app's own state, nothing lost.
+    change.cold = withButton(change.cold, [both[1]])
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling on Antigravity r47 P2 (R47_F3B): the button's composite label ("Submit, required")
+  // names no record, so the label check finds nothing; the cold launch's "Submit" record with
+  // none live is lost text, whatever the hierarchy or the group's label says.
+  test('R47_F3B: a text gone live inside a composite label group fails as lost text', () => {
+    const SUBMIT = {
+      id: 'btn-submit',
+      text: 'Submit, required',
+      bounds: '[20,1500][300,1560]',
+    }
+    const withButton = (capture, records) => {
+      const shown = { ...capture, nodes: [...capture.nodes, SUBMIT] }
+      const answer = healthyAnswer(shown, 'ios')
+      answer.records = [
+        ...answer.records.filter((record) => record.text !== SUBMIT.text),
+        ...records.map(([text, rect, overrides]) =>
+          probeRecord('ios', text, rect, overrides)
+        ),
+      ]
+      return { ...shown, textProbe: answer }
+    }
+    const submit = ['Submit', [40, 1510, 200, 1550]]
+    const star = ['*', [210, 1510, 230, 1530]]
+    const leg = (cold, settled) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.before = withButton(change.before, cold)
+      change.cold = withButton(change.cold, cold)
+      change.settled = withButton(change.settled, settled)
+      return change
+    }
+    const gone = leg([submit, star], [star])
+    const { checks, verdict } = evaluateLiveFontChangeRaw(gone)
+    // No residual explains lost text: on a stale screen whose every miss is stale, the leg would
+    // otherwise be the known residual.
+    assert.equal(verdict, 'unexpected')
+    const stale = { ...bugChange(), platform: 'ios' }
+    stale.before = withButton(stale.before, [submit, star])
+    stale.cold = withButton(stale.cold, [submit, star])
+    stale.settled = withButton(stale.settled, [submit, star])
+    assert.equal(evaluateLiveFontChangeRaw(stale).verdict, 'known-residual')
+    stale.settled = withButton(bugChange().settled, [star])
+    assert.equal(evaluateLiveFontChangeRaw(stale).verdict, 'unexpected')
+    assert.equal(checks.textProbe.pass, true, 'the glyph keeps the button a group')
+    assert.equal(checks.textHidden.pass, true, 'the composite label names no record')
+    assert.deepEqual(checks.textLost.lost, [{ stage: 'settled', text: 'Submit' }])
+    assert.throws(prove(gone, undefined, '0.81.5'), { code: 'live_font_text_lost' })
+    // Legitimately absent at both launches: nothing lost.
+    assert.equal(
+      evaluateLiveFontChangeRaw(leg([star], [star])).checks.textLost.pass,
+      true
+    )
+    // Live, a record of it drawn nowhere or scrolled away is still a record: not lost (the
+    // hidden-text and clip checks judge it).
+    for (const overrides of [
+      { opacity: 0 },
+      { visibleRect: null, clipRect: null, scrolledAway: true },
+    ])
+      assert.equal(
+        evaluateLiveFontChangeRaw(leg([submit, star], [[...submit, overrides], star]))
+          .checks.textLost.pass,
+        true,
+        JSON.stringify(overrides)
+      )
+    // At the cold launch, only compared records count: one drawn nowhere there, or in a
+    // volatile region, owes the live screen nothing.
+    assert.equal(
+      evaluateLiveFontChangeRaw(leg([[...submit, { opacity: 0 }], star], [star])).checks
+        .textLost.pass,
+      true
+    )
+    const regional = leg([submit, star], [star])
+    regional.cold.volatileRegions = ['[0,1490][1080,1570]']
+    assert.equal(evaluateLiveFontChangeRaw(regional).checks.textLost.pass, true)
+    // Scrolled away at the cold launch on every page, it may be a volatile card's text below the
+    // region's visible cut (the hierarchy cuts a region to what shows): not compared.
+    assert.equal(
+      evaluateLiveFontChangeRaw(
+        leg(
+          [[...submit, { visibleRect: null, clipRect: null, scrolledAway: true }], star],
+          [star]
+        )
+      ).checks.textLost.pass,
+      true
+    )
+  })
+})

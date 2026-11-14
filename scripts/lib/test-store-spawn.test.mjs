@@ -1,0 +1,413 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
+import { test } from 'node:test'
+import ts from 'typescript'
+import {
+  moduleRelativeLiterals,
+  relativeImports,
+  repoPathLiterals,
+} from './evidence-manifest.mjs'
+import { boundedSpawn, boundOf } from './test-store-spawn.mjs'
+
+// Antigravity r21 (1): a side call killed at its bound fails the run with its code.
+test('a hung call past its bound throws its code; a tolerated nonzero exit does not', () => {
+  const started = Date.now()
+  assert.throws(
+    () =>
+      boundedSpawn('sh', ['-c', 'sleep 5'], {
+        code: 'test_store_uninstall_failed',
+        timeout: 200,
+      }),
+    (error) =>
+      error.code === 'test_store_uninstall_failed' && /ETIMEDOUT/.test(error.message)
+  )
+  assert.ok(Date.now() - started < 3_000)
+  // An app that is not installed: nonzero, no error, tolerated.
+  assert.equal(
+    boundedSpawn('sh', ['-c', 'exit 1'], { code: 'x_y', tolerateStatus: true }).status,
+    1
+  )
+  assert.throws(
+    () => boundedSpawn('sh', ['-c', 'exit 1'], { code: 'test_store_rev_failed' }),
+    (error) => error.code === 'test_store_rev_failed'
+  )
+  assert.throws(
+    () =>
+      boundedSpawn('/nonexistent/tool', [], {
+        code: 'test_store_stop_failed',
+        tolerateStatus: true,
+      }),
+    (error) => error.code === 'test_store_stop_failed' && /ENOENT/.test(error.message)
+  )
+})
+
+// Out of scope (TEA, r23): spawn functions reached through createRequire, a dynamic import or a
+// shadowing local binding; the check stops at the static import forms below.
+const SPAWN_FUNCTIONS = new Set(['spawnSync', 'execFileSync', 'execSync'])
+// Where boundOf, the validated-bound function, is defined (spawn-bound.mjs) or re-exported.
+const BOUND_MODULES = ['spawn-bound.mjs', 'test-store-spawn.mjs']
+const CHILD_PROCESS = new Set(['node:child_process', 'child_process'])
+const propName = (property) =>
+  property.name && (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name))
+    ? property.name.text
+    : null
+const isConst = (statement) =>
+  ts.isVariableStatement(statement) &&
+  (statement.declarationList.flags & ts.NodeFlags.Const) !== 0
+const positiveLiteral = (node) =>
+  node && ts.isNumericLiteral(node) && Number(node.text.replaceAll('_', '')) > 0
+
+const importedName = (element) => (element.propertyName ?? element.name).text
+
+/** One import of child_process: its default, namespace and spawn-function local names. */
+function childProcessNames(clause, found) {
+  const bindings = clause.namedBindings
+  if (clause.name) found.moduleNames.add(clause.name.text)
+  if (bindings && ts.isNamespaceImport(bindings))
+    found.moduleNames.add(bindings.name.text)
+  if (bindings && ts.isNamedImports(bindings))
+    for (const element of bindings.elements)
+      if (SPAWN_FUNCTIONS.has(importedName(element)))
+        found.spawnNames.add(element.name.text)
+}
+
+/** The child_process bindings a file imports, and its local name for boundOf. */
+function readImports(tree, file) {
+  const found = {
+    spawnNames: new Set(),
+    moduleNames: new Set(),
+    boundOfName: BOUND_MODULES.some((name) => path.basename(file) === name)
+      ? 'boundOf'
+      : null,
+  }
+  for (const statement of tree.statements) {
+    const clause = ts.isImportDeclaration(statement) ? statement.importClause : undefined
+    if (!clause || !ts.isStringLiteral(statement.moduleSpecifier)) continue
+    const from = statement.moduleSpecifier.text
+    if (CHILD_PROCESS.has(from)) childProcessNames(clause, found)
+    const bindings = clause.namedBindings
+    if (
+      BOUND_MODULES.some((name) => from.endsWith(name)) &&
+      bindings &&
+      ts.isNamedImports(bindings)
+    ) {
+      const element = bindings.elements.find((each) => importedName(each) === 'boundOf')
+      if (element) found.boundOfName = element.name.text
+    }
+  }
+  return found
+}
+
+/** The bound rules for one file: timeout values, option objects, and its top-level consts. */
+function boundRules(tree, boundOfName) {
+  const boundConsts = new Set()
+  const boundingConsts = new Set()
+  const goodTimeout = (node) =>
+    positiveLiteral(node) ||
+    (node && ts.isIdentifier(node) && boundConsts.has(node.text)) ||
+    (node &&
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === boundOfName)
+  const boundsObject = (object) => {
+    let timeout = false
+    let killed = false
+    for (const property of object.properties) {
+      if (ts.isSpreadAssignment(property)) {
+        // A bounding constant sets both; anything else spread here could override both.
+        timeout = killed =
+          ts.isIdentifier(property.expression) &&
+          boundingConsts.has(property.expression.text)
+        continue
+      }
+      const name = propName(property)
+      const value = ts.isPropertyAssignment(property) ? property.initializer : null
+      if (name === 'timeout') timeout = Boolean(value) && goodTimeout(value)
+      if (name === 'killSignal')
+        killed = Boolean(value) && ts.isStringLiteral(value) && value.text === 'SIGKILL'
+    }
+    return timeout && killed
+  }
+  // Top-level consts only: a let, or a const in a function, can be anything by the time of use.
+  for (const statement of tree.statements.filter(isConst))
+    for (const { name, initializer } of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(name) || !initializer) continue
+      if (goodTimeout(initializer)) boundConsts.add(name.text)
+      if (ts.isObjectLiteralExpression(initializer) && boundsObject(initializer))
+        boundingConsts.add(name.text)
+    }
+  const boundedOptions = (options) =>
+    Boolean(options) &&
+    ((ts.isIdentifier(options) && boundingConsts.has(options.text)) ||
+      (ts.isObjectLiteralExpression(options) && boundsObject(options)))
+  return { boundedOptions }
+}
+
+const isCallee = (node) =>
+  ts.isCallExpression(node.parent) && node.parent.expression === node
+const isBindingName = (node) =>
+  (ts.isImportSpecifier(node.parent) ||
+    ts.isNamespaceImport(node.parent) ||
+    ts.isImportClause(node.parent)) &&
+  node.parent.name === node
+const isMemberName = (node) =>
+  ts.isPropertyAccessExpression(node.parent) && node.parent.name === node
+
+/**
+ * Every spawnSync, execFileSync or execSync use in `source` that is not a bounded direct call
+ * (Antigravity r22). It resolves the child_process imports (named, aliased, namespace and
+ * default), fails any reference to a spawn function that is not a direct callee and any bracket
+ * or value use of the module, accepts bounding constants only from top-level const declarations,
+ * and requires timeout to be a positive number literal, a top-level const bound, or boundOf(...)
+ * from test-store-spawn.mjs, with killSignal 'SIGKILL' after any spread that could override it.
+ */
+export function unboundedCalls(file, source = fs.readFileSync(file, 'utf8')) {
+  const tree = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.JS
+  )
+  const { spawnNames, moduleNames, boundOfName } = readImports(tree, file)
+  const { boundedOptions } = boundRules(tree, boundOfName)
+  const misses = []
+  const miss = (node, why) => {
+    const { line } = tree.getLineAndCharacterOfPosition(node.getStart())
+    misses.push(`${file}:${line + 1} ${why}`)
+  }
+  const use = (node, name) => {
+    if (!isCallee(node)) miss(node, `${name} used other than as a direct callee`)
+    else if (!boundedOptions(node.parent.arguments.at(-1))) miss(node, 'unbounded call')
+  }
+  const visit = (node) => {
+    if (ts.isIdentifier(node) && !isBindingName(node) && !isMemberName(node)) {
+      if (spawnNames.has(node.text)) use(node, node.text)
+      if (moduleNames.has(node.text)) {
+        const access = node.parent
+        const viaProperty =
+          ts.isPropertyAccessExpression(access) && access.expression === node
+        if (!viaProperty)
+          miss(node, `${node.text} (child_process) used other than by property`)
+        else if (SPAWN_FUNCTIONS.has(access.name.text)) use(access, access.name.text)
+      }
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(tree)
+  return { misses }
+}
+
+// The manifest writer's repository path literals are its leg input table, data it hashes; it
+// spawns only git (checked below), so the closure does not follow them.
+const LEG_TABLE = 'scripts/lib/evidence-manifest.mjs'
+const SCRIPT = /\.(?:mjs|cjs|js|sh)$/
+
+// Antigravity r21 (3) and r24 (P3): the driver and every script it loads or spawns.
+/**
+ * The scripts `entries` reach, read from disk under `root`: relative imports, module-relative
+ * URLs (`new URL('./x.mjs', import.meta.url)`, how the driver loads the manifest writer), and
+ * scripts named by repository path, which a harness spawns (`node scripts/x.mjs`), followed as
+ * importClosure in evidence-manifest.mjs follows them.
+ */
+export function driverClosure(entries, root = '.') {
+  const seen = new Set()
+  const queue = [...entries]
+  while (queue.length) {
+    const file = queue.shift()
+    if (seen.has(file)) continue
+    seen.add(file)
+    const source = fs.readFileSync(path.join(root, file), 'utf8')
+    for (const specifier of relativeImports(source))
+      queue.push(
+        path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier))
+      )
+    for (const named of moduleRelativeLiterals(source, file))
+      if (/\.(?:mjs|cjs|js)$/.test(named)) queue.push(named)
+    if (file === LEG_TABLE) continue
+    for (const named of repoPathLiterals(source, { shell: file.endsWith('.sh') }))
+      if (
+        named.startsWith('scripts/') &&
+        SCRIPT.test(named) &&
+        fs.existsSync(path.join(root, named))
+      )
+        queue.push(named)
+  }
+  return [...seen].sort()
+}
+
+const DRIVER_ENTRIES = [
+  'scripts/run-test-store-journey.mjs',
+  'scripts/test-store-preview-webhook.mjs',
+]
+
+// Antigravity r23: everything the driver loads, shared helpers included, is bounded.
+test('every spawnSync, execFileSync and execSync the Test Store driver loads is bounded', () => {
+  const files = driverClosure(DRIVER_ENTRIES)
+  // Shared with other legs, and loaded by the driver: they are scanned too.
+  for (const shared of [
+    'scripts/lib/evidence-manifest.mjs',
+    'scripts/lib/minified-debuggable-evidence.mjs',
+    'scripts/lib/resolved-app-config.mjs',
+  ])
+    assert.ok(files.includes(shared), shared)
+  let calls = 0
+  for (const file of files) {
+    const { misses } = unboundedCalls(file)
+    assert.deepEqual(misses, [], file)
+    calls += (
+      fs.readFileSync(file, 'utf8').match(/\b(?:spawnSync|execFileSync|execSync)\(/g) ??
+      []
+    ).length
+  }
+  assert.ok(calls >= 8, String(calls))
+})
+
+test('the closure follows scripts named by repository path, from scripts and shell', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'driver-closure-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const write = (file, text) => {
+    fs.mkdirSync(path.join(root, path.dirname(file)), { recursive: true })
+    fs.writeFileSync(path.join(root, file), text)
+  }
+  write(
+    'scripts/entry.mjs',
+    "spawnSync('node', [path.join(root, 'scripts/spawned.mjs')])\n" +
+      "const gone = 'scripts/absent.mjs'\n"
+  )
+  write('scripts/spawned.mjs', "spawnSync('bash', ['scripts/ci/step.sh'])\n")
+  write('scripts/ci/step.sh', 'node scripts/ci/leaf.mjs\n')
+  write('scripts/ci/leaf.mjs', '')
+  write(LEG_TABLE, "export const LEGS = { x: ['scripts/data-only.mjs'] }\n")
+  write('scripts/data-only.mjs', '')
+  write('scripts/uses-table.mjs', "import './lib/evidence-manifest.mjs'\n")
+  assert.deepEqual(driverClosure(['scripts/entry.mjs'], root), [
+    'scripts/ci/leaf.mjs',
+    'scripts/ci/step.sh',
+    'scripts/entry.mjs',
+    'scripts/spawned.mjs',
+  ])
+  // The leg table's literals are data, and it spawns nothing but git.
+  assert.deepEqual(driverClosure(['scripts/uses-table.mjs'], root), [
+    LEG_TABLE,
+    'scripts/uses-table.mjs',
+  ])
+  const table = fs.readFileSync(LEG_TABLE, 'utf8')
+  assert.deepEqual(
+    [...table.matchAll(/\bspawnSync\(\s*([^,]*),/g)].map((match) => match[1]),
+    ["'git'"]
+  )
+  assert.doesNotMatch(table, /\b(?:execFileSync|execSync|spawn|exec|execFile|fork)\(/)
+})
+
+test('the bound check rejects every bypass', () => {
+  const misses = (
+    body,
+    header = "import { spawnSync, execSync } from 'node:child_process'"
+  ) => unboundedCalls('x.mjs', `${header}\n${body}`).misses
+  const bound = "{ timeout: 1000, killSignal: 'SIGKILL' }"
+  // Bypasses, one each (Antigravity r21 and r22): every one is reported.
+  for (const [name, body, header] of [
+    ['no options', "spawnSync('a', [])"],
+    ['timeout only', "spawnSync('a', [], { timeout: 1 })"],
+    ['SIGTERM', "spawnSync('a', [], { timeout: 1, killSignal: 'SIGTERM' })"],
+    ['spread after the bound', `spawnSync('a', [], { ...${bound}, ...rest })`],
+    ['timeout 0', "spawnSync('a', [], { timeout: 0, killSignal: 'SIGKILL' })"],
+    [
+      'timeout undefined',
+      "spawnSync('a', [], { timeout: undefined, killSignal: 'SIGKILL' })",
+    ],
+    [
+      'timeout from a variable',
+      "spawnSync('a', [], { timeout: ms, killSignal: 'SIGKILL' })",
+    ],
+    ['shorthand timeout', "spawnSync('a', [], { timeout, killSignal: 'SIGKILL' })"],
+    [
+      'aliased import',
+      "r('a', [])",
+      "import { spawnSync as r } from 'node:child_process'",
+    ],
+    ['reassigned', "const s = spawnSync\ns('a', [], B)"],
+    ['passed as a value', 'run(spawnSync)'],
+    [
+      'namespace call unbounded',
+      "cp.spawnSync('a', [])",
+      "import * as cp from 'node:child_process'",
+    ],
+    [
+      'bracket access',
+      `cp['spawnSync']('a', [], ${bound})`,
+      "import * as cp from 'node:child_process'",
+    ],
+    ['namespace passed on', 'use(cp)', "import * as cp from 'node:child_process'"],
+    ['default import unbounded', "cp.execSync('a')", "import cp from 'child_process'"],
+    ['let bounding constant', `let B = ${bound}\nB = {}\nspawnSync('a', [], B)`],
+    [
+      'bounding constant inside a function',
+      `function f() {\n  const B = ${bound}\n  return spawnSync('a', [], B)\n}`,
+    ],
+  ])
+    assert.notDeepEqual(misses(body, header), [], name)
+  // What the driver and helpers really write passes.
+  for (const [name, body, header] of [
+    ['literal', `spawnSync('a', [], ${bound})`],
+    [
+      'top-level const',
+      `const B = ${bound}\nspawnSync('a', [], B)\nexecSync('b', { ...B, cwd })`,
+    ],
+    [
+      'top-level const bound',
+      "const MS = 5_000\nspawnSync('a', [], { timeout: MS, killSignal: 'SIGKILL' })",
+    ],
+    [
+      'boundOf',
+      "spawnSync('a', [], { ...rest, timeout: boundOf(t), killSignal: 'SIGKILL' })",
+      "import { spawnSync } from 'node:child_process'\nimport { boundOf } from './test-store-spawn.mjs'",
+    ],
+    [
+      'namespace call',
+      `cp.execFileSync('a', [], ${bound})`,
+      "import * as cp from 'node:child_process'",
+    ],
+    ['text only', "// spawnSync('a')\nconst s = 'spawnSync(x)'"],
+  ])
+    assert.deepEqual(misses(body, header), [], name)
+})
+
+// Antigravity r22 (1): a bound is a positive safe integer, or the run fails coded.
+test('boundOf takes positive safe integers and refuses 0, text, negatives, fractions and unsafe', () => {
+  assert.equal(boundOf(300), 300)
+  assert.equal(boundOf('300'), 300)
+  for (const value of [
+    0,
+    '0',
+    'abc',
+    '',
+    -5,
+    '-5',
+    1.5,
+    '1.5',
+    2 ** 53,
+    '9007199254740993',
+    NaN,
+    undefined,
+  ])
+    assert.throws(
+      () => boundOf(value),
+      (error) => error.code === 'test_store_spawn_timeout_invalid',
+      String(value)
+    )
+  // boundedSpawn checks its own bound too, before anything runs.
+  assert.throws(
+    () =>
+      boundedSpawn('sh', ['-c', 'exit 0'], {
+        code: 'test_store_stop_failed',
+        timeout: 0,
+      }),
+    (error) => error.code === 'test_store_spawn_timeout_invalid'
+  )
+})

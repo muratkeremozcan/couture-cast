@@ -1,9 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type { PremiumEntitlementService } from './premium-entitlement.service.js'
 import { BillingReconciliationService } from './billing-reconciliation.service.js'
-import { FakeRevenueCatClient } from './revenuecat-client.js'
+import {
+  FakeRevenueCatClient,
+  RevenueCatRequestError,
+  RevenueCatResponseShapeError,
+  RevenueCatUnrepresentableEntitlementError,
+  RevenueCatUnsupportedStoreError,
+} from './revenuecat-client.js'
 
 /**
  * Story 5.2 Decision 4a: the sweep's failure isolation and abandonment rules
@@ -13,7 +19,7 @@ import { FakeRevenueCatClient } from './revenuecat-client.js'
  */
 describe('BillingReconciliationService', () => {
   const billingEvent = { findMany: vi.fn(), update: vi.fn() }
-  const premiumEntitlement = { findMany: vi.fn() }
+  const premiumEntitlement = { findMany: vi.fn(), updateMany: vi.fn() }
   const prisma = { billingEvent, premiumEntitlement } as unknown as PrismaClient
   const entitlements = { applyLedgerSnapshot: vi.fn() }
   const telemetry = { captureEvent: vi.fn() }
@@ -24,6 +30,7 @@ describe('BillingReconciliationService', () => {
     billingEvent.findMany.mockReset().mockResolvedValue([])
     billingEvent.update.mockReset().mockResolvedValue({})
     premiumEntitlement.findMany.mockReset().mockResolvedValue([])
+    premiumEntitlement.updateMany.mockReset().mockResolvedValue({ count: 1 })
     entitlements.applyLedgerSnapshot.mockReset().mockResolvedValue(null)
     telemetry.captureEvent.mockReset().mockResolvedValue(undefined)
     ledger = new FakeRevenueCatClient()
@@ -152,6 +159,141 @@ describe('BillingReconciliationService', () => {
     )
   })
 
+  // Story 6.15: a ledger entitlement our model cannot represent fails the pull the same way on
+  // every retry. Left stale, such rows would lead every drift batch (oldest synced_at first) and
+  // starve drift correction for everyone behind them.
+  describe('a permanently unrepresentable ledger entitlement', () => {
+    function warnSpy() {
+      return vi.spyOn(
+        (service as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn'
+      )
+    }
+
+    it.each([
+      [
+        'an unsupported store',
+        new RevenueCatUnsupportedStoreError('amazon'),
+        { reason: 'unsupported_store', store: 'amazon' },
+      ],
+      [
+        'a missing product',
+        new RevenueCatUnrepresentableEntitlementError('missing_product'),
+        { reason: 'missing_product' },
+      ],
+      [
+        'a lifetime grant',
+        new RevenueCatUnrepresentableEntitlementError('no_expiry'),
+        { reason: 'no_expiry' },
+      ],
+      [
+        'an invalid expiry',
+        new RevenueCatUnrepresentableEntitlementError('invalid_expiry'),
+        { reason: 'invalid_expiry' },
+      ],
+    ] as const)(
+      'with %s stamps only drift_settled_at, applies nothing, warns once, and moves on',
+      async (_label, error, logged) => {
+        premiumEntitlement.findMany.mockResolvedValue([
+          { user_id: 'user-1' },
+          { user_id: 'user-2' },
+        ])
+        vi.spyOn(ledger, 'getSubscriberEntitlement').mockRejectedValueOnce(error)
+        const warn = warnSpy()
+
+        const result = await service.sweep()
+
+        expect(result.entitlementsChecked).toBe(2)
+        expect(premiumEntitlement.updateMany).toHaveBeenCalledTimes(1)
+        const [stamp] = premiumEntitlement.updateMany.mock.calls[0] as [
+          {
+            where: { user_id: string; synced_at: { lt: Date }; OR: unknown }
+            data: Record<string, unknown>
+          },
+        ]
+        const [scan] = premiumEntitlement.findMany.mock.calls[0] as [
+          { where: { synced_at: { lt: Date }; OR: unknown } },
+        ]
+        const staleBefore = scan.where.synced_at.lt
+        // The stamp is guarded on the scan's own filter: still stale and not settled since.
+        expect(stamp.where).toEqual({
+          user_id: 'user-1',
+          synced_at: { lt: staleBefore },
+          OR: [{ drift_settled_at: null }, { drift_settled_at: { lt: staleBefore } }],
+        })
+        // r38 P3-1: synced_at keeps meaning a confirmed sync, so the settle writes only its own
+        // column; status, store, product, period end and synced_at stay as they were.
+        expect(Object.keys(stamp.data)).toEqual(['drift_settled_at'])
+        expect(stamp.data.drift_settled_at).toBeInstanceOf(Date)
+        expect((stamp.data.drift_settled_at as Date).getTime()).toBeGreaterThan(
+          staleBefore.getTime()
+        )
+        expect(entitlements.applyLedgerSnapshot).toHaveBeenCalledTimes(1)
+        expect(entitlements.applyLedgerSnapshot).toHaveBeenCalledWith(
+          'user-2',
+          null,
+          expect.any(String)
+        )
+        const unrepresentable = warn.mock.calls.filter(
+          ([, message]) =>
+            message === 'billing_reconciliation_drift_entitlement_unrepresentable'
+        )
+        expect(unrepresentable).toEqual([
+          [
+            { userId: 'user-1', ...logged },
+            'billing_reconciliation_drift_entitlement_unrepresentable',
+          ],
+        ])
+      }
+    )
+
+    it('logs no settle when the stamp counted no row (a concurrent write got there first)', async () => {
+      premiumEntitlement.findMany.mockResolvedValue([{ user_id: 'user-1' }])
+      premiumEntitlement.updateMany.mockResolvedValue({ count: 0 })
+      vi.spyOn(ledger, 'getSubscriberEntitlement').mockRejectedValueOnce(
+        new RevenueCatUnrepresentableEntitlementError('no_expiry')
+      )
+      const warn = warnSpy()
+
+      await service.sweep()
+
+      expect(premiumEntitlement.updateMany).toHaveBeenCalledTimes(1)
+      expect(
+        warn.mock.calls.filter(
+          ([, message]) =>
+            message === 'billing_reconciliation_drift_entitlement_unrepresentable'
+        )
+      ).toEqual([])
+    })
+
+    it.each([
+      ['a non-2xx ledger response', new RevenueCatRequestError(503, 'subscriber GET')],
+      ['a ledger outage', new Error('network down')],
+      [
+        'a RevenueCat response-shape change',
+        new RevenueCatResponseShapeError([
+          'subscriber.entitlements.premium.product_identifier: invalid_type',
+        ]),
+      ],
+    ])(
+      'a transient %s leaves the row stale for the next sweep',
+      async (_label, error) => {
+        premiumEntitlement.findMany.mockResolvedValue([{ user_id: 'user-1' }])
+        vi.spyOn(ledger, 'getSubscriberEntitlement').mockRejectedValueOnce(error)
+        const warn = warnSpy()
+
+        await service.sweep()
+
+        expect(premiumEntitlement.updateMany).not.toHaveBeenCalled()
+        expect(entitlements.applyLedgerSnapshot).not.toHaveBeenCalled()
+        expect(warn).toHaveBeenCalledWith(
+          { userId: 'user-1', error },
+          'billing_reconciliation_drift_pull_failed'
+        )
+      }
+    )
+  })
+
   it('emits deactivation telemetry fail-open when drift correction downgrades', async () => {
     premiumEntitlement.findMany.mockResolvedValue([{ user_id: 'user-1' }])
     entitlements.applyLedgerSnapshot.mockResolvedValue({
@@ -171,5 +313,54 @@ describe('BillingReconciliationService', () => {
       'premium_entitlement_deactivated',
       { store: 'stripe', productId: 'premium_monthly', reason: 'expired' }
     )
+  })
+
+  // Story 6.15 r38 P3-1: the scan filters out a row settled within the staleness window and puts
+  // never-settled rows first, oldest confirmed sync first, so a settled row cannot lead a batch.
+  it('scans stale rows not settled within the window, never-settled first', async () => {
+    await service.sweep()
+
+    const [scan] = premiumEntitlement.findMany.mock.calls[0] as [
+      { where: { synced_at: { lt: Date }; OR: unknown }; orderBy: unknown },
+    ]
+    const staleBefore = scan.where.synced_at.lt
+    expect(scan.where.OR).toEqual([
+      { drift_settled_at: null },
+      { drift_settled_at: { lt: staleBefore } },
+    ])
+    expect(scan.orderBy).toEqual([
+      { drift_settled_at: { sort: 'asc', nulls: 'first' } },
+      { synced_at: 'asc' },
+    ])
+  })
+
+  // Learning path Step 55: story 6.15 D15 r6. A test_store row this API does not honor never enters
+  // the drift batch; under local and preview it does.
+  describe('the drift query and test_store rows', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    function driftWhere(): Record<string, unknown> {
+      const [args] = premiumEntitlement.findMany.mock.calls[0] as [
+        { where: Record<string, unknown> },
+      ]
+      return args.where
+    }
+
+    it.each([undefined, 'staging', 'production'])(
+      'with TEST_ENV %s excludes them',
+      async (testEnv) => {
+        vi.stubEnv('TEST_ENV', testEnv as string)
+        await service.sweep()
+        expect(driftWhere()).toMatchObject({ store: { not: 'test_store' } })
+      }
+    )
+
+    it.each(['local', 'preview'])('with TEST_ENV %s keeps them', async (testEnv) => {
+      vi.stubEnv('TEST_ENV', testEnv)
+      await service.sweep()
+      expect(driftWhere()).not.toHaveProperty('store')
+    })
   })
 })
