@@ -93,6 +93,10 @@ export const LOCAL_NEEDS = {
     probe: 'apps/mobile/android/gradlew',
     how: 'node scripts/run-story68-native.mjs prebuild --platform android (needs Temurin 21)',
   },
+  packages: {
+    probe: 'packages/testing/dist/index.js',
+    how: 'npm run db:generate && npm run build:packages',
+  },
   runtime: {
     probe: 'apps/api/dist/src/load-env.js',
     how: 'npm run db:generate && npm run build:packages && npm run build --workspace api',

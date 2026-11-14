@@ -11,7 +11,8 @@
       "apps/mobile/plugins/with-share-card-permissions.test.js",
       "apps/mobile/plugins/with-story68-release-network.test.js"
     ],
-    "native-harness": "discover"
+    "native-harness": "discover",
+    "playwright-spec-loading": ["scripts/ci/playwright-spec-loading.test.mjs"]
   },
   "conditionNeeds": {
     "startup-deadline": ["install"],
@@ -19,11 +20,16 @@
     "share-card-plugins": ["install"],
     "native-harness": ["install"],
     "worklets-staging": ["prebuild"],
-    "vitest": ["runtime"]
+    "vitest": ["runtime"],
+    "playwright-spec-loading": ["packages"]
   },
   "rowRestrictions": {
-    "browser-deps": { "platform": ["android"] },
-    "worklets-staging": { "platform": ["android"] }
+    "browser-deps": {
+      "platform": ["android"]
+    },
+    "worklets-staging": {
+      "platform": ["android"]
+    }
   },
   "runElsewhere": {
     "apps/mobile/plugins/background-task-prebuild.test.js": "apps/mobile npm test (test:background-task-prebuild) and pr-checks.yml tests-shard (mobile)",

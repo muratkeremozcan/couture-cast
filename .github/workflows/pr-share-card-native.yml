@@ -782,12 +782,23 @@ jobs:
         if: ${{ always() && steps.supabase.outcome == 'failure' }}
         timeout-minutes: 2
         run: timeout --kill-after=10 90 npx supabase stop --no-backup
-      - name: Prepare isolated UUID runtime and built renderer
-        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
-        id: runtime
+      # The Prisma client and the shared packages' dist, which the runtime and the spec-loading
+      # suite read. It needs only the install, so a Supabase failure cannot hide that suite.
+      - name: Build the Prisma client and the shared packages
+        id: packages
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: |
           npm run db:generate
           npm run build:packages
+      # Every Playwright spec must load; the suite only lists, so it runs beside the runtime.
+      - name: Start the Playwright spec-loading suite in the background
+        id: spec_loading_start
+        if: ${{ !cancelled() && steps.packages.outcome == 'success' }}
+        run: node scripts/ci/node-test-gate.mjs --start playwright-spec-loading
+      - name: Prepare isolated UUID runtime and built renderer
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' && steps.packages.outcome == 'success' }}
+        id: runtime
+        run: |
           npm run build --workspace api
           node scripts/e2e-share-card/prepare.mjs
           node scripts/lib/story68-built-render.mjs
@@ -813,6 +824,11 @@ jobs:
         if: ${{ !cancelled() && steps.harness_start.outcome == 'success' }}
         timeout-minutes: 12
         run: node scripts/ci/node-test-gate.mjs --collect share-card-plugins native-harness
+      - name: Verify every Playwright spec loads
+        id: spec_loading_collect
+        if: ${{ !cancelled() && steps.spec_loading_start.outcome == 'success' }}
+        timeout-minutes: 4
+        run: node scripts/ci/node-test-gate.mjs --collect playwright-spec-loading
       # The device lanes run this too, but they skip pull requests. Running it here makes
       # a test title change (a Vitest upgrade reformatting test.each names) fail the PR.
       - name: Verify localized native accessibility announcements and focus bridge
