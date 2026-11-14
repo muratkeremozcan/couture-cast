@@ -43,13 +43,56 @@ export function tabBarGrowth(labelHeights: readonly number[], fontScale: number)
   return grown.length === 0 ? 0 : PixelRatio.roundToNearestPixel(Math.max(...grown))
 }
 
+/** The labels' reported heights at one text scale. */
+export type TabLabelHeights = {
+  fontScale: number
+  heights: Readonly<Record<string, number>>
+}
+
+/**
+ * Records one label's height. Heights reported at another text scale are dropped: a label box
+ * is held at the tallest label's height (see TabBarLabel), so after a scale change only fresh
+ * reports say how tall the labels now are.
+ */
+export function recordTabLabelHeight(
+  current: TabLabelHeights,
+  fontScale: number,
+  label: string,
+  height: number
+): TabLabelHeights {
+  const heights = current.fontScale === fontScale ? current.heights : {}
+  if (current.fontScale === fontScale && heights[label] === height) return current
+  return { fontScale, heights: { ...heights, [label]: height } }
+}
+
+/** The tallest label's height at this text scale, or undefined before any label reported one. */
+export function tallestTabLabel(
+  current: TabLabelHeights,
+  fontScale: number
+): number | undefined {
+  if (current.fontScale !== fontScale) return undefined
+  const heights = Object.values(current.heights).filter((height) => height > 0)
+  return heights.length === 0 ? undefined : Math.max(...heights)
+}
+
 type TabBarLabelProps = {
   color: string
   children: string
   onHeight: (label: string, height: number) => void
+  /**
+   * The tallest label's height. A label shrunk to fit its tab is shorter than the others, and
+   * the tab places it at the top, so its baseline sat 5 px above theirs at Android 2.0; held at
+   * the tallest height and drawn at the box bottom, it lines up with them.
+   */
+  lineBoxHeight?: number
 }
 
-export function TabBarLabel({ color, children, onHeight }: TabBarLabelProps) {
+export function TabBarLabel({
+  color,
+  children,
+  onHeight,
+  lineBoxHeight,
+}: TabBarLabelProps) {
   const onLayout = (event: LayoutChangeEvent) =>
     onHeight(children, event.nativeEvent.layout.height)
   return (
@@ -59,7 +102,12 @@ export function TabBarLabel({ color, children, onHeight }: TabBarLabelProps) {
       minimumFontScale={TAB_LABEL_MIN_SCALE}
       allowFontScaling={Platform.OS === 'ios' ? false : undefined}
       onLayout={onLayout}
-      style={[styles.label, MEDIUM, { color }]}
+      style={[
+        styles.label,
+        MEDIUM,
+        { color },
+        lineBoxHeight === undefined ? null : { minHeight: lineBoxHeight },
+      ]}
     >
       {children}
     </Text>
@@ -71,5 +119,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     backgroundColor: 'transparent',
     fontSize: 10,
+    textAlignVertical: 'bottom',
   },
 })

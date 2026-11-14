@@ -20,7 +20,14 @@ vi.mock('react-native', async (original) => {
   }
 })
 
-import { TAB_LABEL_MIN_SCALE, TabBarLabel, tabBarGrowth } from './tab-bar-label'
+import { StyleSheet } from 'react-native'
+import {
+  recordTabLabelHeight,
+  TAB_LABEL_MIN_SCALE,
+  TabBarLabel,
+  tabBarGrowth,
+  tallestTabLabel,
+} from './tab-bar-label'
 
 describe('6.15 tab bar label', () => {
   it('6.15-MOB-TAB-01 keeps the bar at its default height at or below the default text size', () => {
@@ -56,5 +63,36 @@ describe('6.15 tab bar label', () => {
       expect(onHeight).toHaveBeenCalledWith('Community', expect.any(Number))
     )
     expect(onHeight.mock.calls.at(-1)?.[1]).toBeGreaterThan(0)
+  })
+})
+
+describe('6.15 tab bar label line box', () => {
+  it('6.15-MOB-TAB-04 keeps heights per text scale and drops them when the scale changes', () => {
+    let state = recordTabLabelHeight({ fontScale: 2, heights: {} }, 2, 'Home', 27)
+    state = recordTabLabelHeight(state, 2, 'Community', 24)
+    expect(tallestTabLabel(state, 2)).toBe(27)
+    // The same report again keeps the same state, so a layout pass cannot loop.
+    expect(recordTabLabelHeight(state, 2, 'Home', 27)).toBe(state)
+    // After a change to 1.0 the 2.0 heights are stale: nothing until a label reports again.
+    expect(tallestTabLabel(state, 1)).toBeUndefined()
+    state = recordTabLabelHeight(state, 1, 'Home', 14)
+    expect(state.heights).toEqual({ Home: 14 })
+    expect(tallestTabLabel(state, 1)).toBe(14)
+  })
+
+  it('6.15-MOB-TAB-05 holds a label at the tallest height and draws it at the box bottom', () => {
+    captured.props.length = 0
+    render(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()} lineBoxHeight={27}>
+        Community
+      </TabBarLabel>
+    )
+    const label = screen.getByText('Community')
+    expect(getComputedStyle(label).minHeight).toBe('27px')
+    const props = captured.props.find((entry) => entry.children === 'Community')!
+    expect(StyleSheet.flatten(props.style)).toMatchObject({
+      minHeight: 27,
+      textAlignVertical: 'bottom',
+    })
   })
 })

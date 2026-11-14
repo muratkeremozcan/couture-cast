@@ -16,7 +16,13 @@ import { useTranslation } from 'react-i18next'
 
 import Colors from '@/constants/colors'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
-import { TabBarLabel, tabBarGrowth } from '@/components/tab-bar-label'
+import {
+  recordTabLabelHeight,
+  TabBarLabel,
+  tabBarGrowth,
+  type TabLabelHeights,
+  tallestTabLabel,
+} from '@/components/tab-bar-label'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -58,14 +64,20 @@ export default function TabLayout() {
   const { fontScale } = useWindowDimensions()
   // Story 6.15 F-00i: each label reports its height and the bar grows by what the text grew.
   // iOS labels do not scale (Large Content Viewer), so the bar keeps its height there.
-  const [labelHeights, setLabelHeights] = useState<Record<string, number>>({})
-  const onLabelHeight = useCallback((label: string, height: number) => {
-    setLabelHeights((current) =>
-      current[label] === height ? current : { ...current, [label]: height }
-    )
-  }, [])
+  const [labelHeights, setLabelHeights] = useState<TabLabelHeights>({
+    fontScale,
+    heights: {},
+  })
+  const onLabelHeight = useCallback(
+    (label: string, height: number) =>
+      setLabelHeights((current) =>
+        recordTabLabelHeight(current, fontScale, label, height)
+      ),
+    [fontScale]
+  )
+  const tallestLabel = tallestTabLabel(labelHeights, fontScale)
   const growth = tabBarGrowth(
-    Object.values(labelHeights),
+    tallestLabel === undefined ? [] : [tallestLabel],
     Platform.OS === 'ios' ? 1 : fontScale
   )
   const tabLabels = {
@@ -100,7 +112,11 @@ export default function TabLayout() {
           paddingBottom: insets.bottom,
         },
         tabBarLabel: ({ color, children }: { color: string; children: string }) => (
-          <TabBarLabel color={color} onHeight={onLabelHeight}>
+          <TabBarLabel
+            color={color}
+            onHeight={onLabelHeight}
+            lineBoxHeight={tallestLabel}
+          >
             {children}
           </TabBarLabel>
         ),
