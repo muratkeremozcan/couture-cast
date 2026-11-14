@@ -123,36 +123,86 @@ export function scanForLeaks(dir, needles) {
   return hits
 }
 
-/**
- * Moves `from` to `to`. Across mounts (EXDEV: the evidence dir on its own volume) it copies,
- * keeping mode 600 for a file and recreating a symlink as a symlink, then removes the source.
- */
-export function moveAcrossMounts(from, to, rename = fs.renameSync) {
+/** The fs calls a quarantine move makes; tests inject failures through them. */
+export const FS_OPS = Object.freeze({
+  rename: (from, to) => fs.renameSync(from, to),
+  copyFile: (from, to) => fs.copyFileSync(from, to, fs.constants.COPYFILE_EXCL),
+  chmod: (file, mode) => fs.chmodSync(file, mode),
+  unlink: (file) => fs.unlinkSync(file),
+  symlink: (target, file) => fs.symlinkSync(target, file),
+})
+
+/** Removes the evidence copy; when even that fails, the error says the file is still there. */
+function removeFromEvidence(from, ops) {
   try {
-    rename(from, to)
+    ops.unlink(from)
   } catch (error) {
-    if (error?.code !== 'EXDEV') throw error
-    if (fs.lstatSync(from).isSymbolicLink()) fs.symlinkSync(fs.readlinkSync(from), to)
-    else {
-      fs.copyFileSync(from, to)
-      fs.chmodSync(to, 0o600)
-    }
-    fs.unlinkSync(from)
+    throw new JourneyError(
+      'test_store_quarantine_failed',
+      `${from} is still in the evidence dir (${error.code ?? error.message})`
+    )
   }
 }
 
 /**
- * Moves every leaking or non-regular entry under the evidence dir into
- * `<private>/quarantine/`, so an always-run upload of the evidence dir never carries it
+ * Moves `from` to `to`. Across mounts (EXDEV: the evidence dir on its own volume) it copies,
+ * keeping mode 600 for a file and recreating a symlink as a symlink, then removes the source.
+ * A leak must never stay behind (Antigravity r15): when the rename fails for another reason, or
+ * the copy or chmod fails, the source is removed anyway (the private copy is a nicety) and the
+ * original error is thrown; a source that cannot be removed throws test_store_quarantine_failed.
+ */
+export function moveAcrossMounts(from, to, ops = FS_OPS) {
+  try {
+    ops.rename(from, to)
+    return
+  } catch (error) {
+    if (error?.code !== 'EXDEV') {
+      removeFromEvidence(from, ops)
+      throw error
+    }
+  }
+  try {
+    if (fs.lstatSync(from).isSymbolicLink()) ops.symlink(fs.readlinkSync(from), to)
+    else {
+      ops.copyFile(from, to)
+      ops.chmod(to, 0o600)
+    }
+  } catch (error) {
+    removeFromEvidence(from, ops)
+    throw error
+  }
+  removeFromEvidence(from, ops)
+}
+
+// One run id per process plus a counter: a reused out dir never meets an earlier entry's name.
+const RUN_ID = `${Date.now().toString(36)}-${process.pid}-${Math.random().toString(36).slice(2, 8)}`
+let quarantined = 0
+
+/** A fresh quarantine path for `file` (relative to the evidence dir). */
+export function quarantineTarget(dirs, file) {
+  quarantined += 1
+  return privatePath(dirs, path.join('quarantine', `${RUN_ID}-${quarantined}`, file))
+}
+
+/**
+ * Moves every leaking or non-regular entry under the evidence dir into its own fresh directory
+ * under `<private>/quarantine/`, so an always-run upload of the evidence dir never carries it
  * (Antigravity r13 P2). Returns the moved paths, relative to the evidence dir.
  */
-export function quarantineLeaks(dirs, needles, { rename = fs.renameSync } = {}) {
+export function quarantineLeaks(dirs, needles, { ops = FS_OPS } = {}) {
   const files = [...new Set(scanForLeaks(dirs.evidence, needles).map((hit) => hit.file))]
+  const failures = []
   for (const file of files) {
-    const target = privatePath(dirs, path.join('quarantine', file))
+    const target = quarantineTarget(dirs, file)
     fs.mkdirSync(path.dirname(target), { recursive: true, mode: 0o700 })
-    moveAcrossMounts(path.join(dirs.evidence, file), target, rename)
+    try {
+      moveAcrossMounts(path.join(dirs.evidence, file), target, ops)
+    } catch (error) {
+      failures.push(error)
+    }
   }
+  // Every entry was attempted before the first failure is reported.
+  if (failures.length) throw failures[0]
   return files
 }
 
@@ -167,12 +217,12 @@ export function assertEvidenceClean(dirs, needles, options) {
  * under the evidence dir is quarantined first; the report is serialized and scanned in memory and
  * reaches the evidence dir only when it and the dir are clean. Returns the written paths.
  */
-export function writeRunOutputs({ dirs, label, report, member, extraIds = [], rename }) {
+export function writeRunOutputs({ dirs, label, report, member, extraIds = [], ops }) {
   const needles = [member?.userId, ...extraIds]
   const written = {}
   if (member)
     written.member = writePrivate(dirs, `${label}.member.json`, { userId: member.userId })
-  const moved = quarantineLeaks(dirs, needles, { rename })
+  const moved = quarantineLeaks(dirs, needles, { ops })
   const text = `${JSON.stringify(report, null, 2)}\n`
   const reportLeaks = leaksInText(text, needles).length > 0
   if (moved.length || reportLeaks)
@@ -181,6 +231,6 @@ export function writeRunOutputs({ dirs, label, report, member, extraIds = [], re
       [...moved, ...(reportLeaks ? [`${label}.json (not written)`] : [])].join(', ')
     )
   written.report = writeEvidence(dirs, `${label}.json`, text)
-  assertEvidenceClean(dirs, needles, { rename })
+  assertEvidenceClean(dirs, needles, { ops })
   return written
 }
