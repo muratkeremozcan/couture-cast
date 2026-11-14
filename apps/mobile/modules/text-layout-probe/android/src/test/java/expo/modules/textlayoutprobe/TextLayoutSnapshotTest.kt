@@ -3,6 +3,7 @@ package expo.modules.textlayoutprobe
 import android.app.Activity
 import android.app.Dialog
 import android.content.Context
+import android.content.res.Resources
 import android.os.Looper
 import android.text.StaticLayout
 import android.text.TextUtils
@@ -13,6 +14,7 @@ import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.inspector.WindowInspector
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -1335,6 +1337,230 @@ class TextLayoutSnapshotTest {
     assertEquals(2, record.maxLines)
     assertEquals(4, record.unlimitedLineCount)
     assertEquals(record.viewRect.top + 3 + 7, record.contentRect.top)
+  }
+
+  // TEA ruling 2026-11-14: accessibility elements are listed apart from the text records,
+  // {identifier, label, rect, hasText, window}, never judged and never counted as text.
+
+  /** testID as React Native's BaseViewManager.setTestId sets it: the keyed tag and the plain one. */
+  private fun <T : View> T.testId(id: String): T = apply {
+    setTag(com.facebook.react.R.id.react_test_id, id)
+    tag = id
+  }
+
+  @Test
+  fun anImageWithALabelAndNoTextHasNoText() {
+    lateinit var image: View
+    host { context ->
+      image = ImageView(context).apply {
+        contentDescription = "Outfit photo"
+        layoutParams = LinearLayout.LayoutParams(80, 80)
+      }.testId("outfit-photo")
+      column(context, image)
+    }
+    val snapshot = snapshot()
+    assertEquals(
+      listOf(ProbeElement("outfit-photo", "Outfit photo", TextLayoutSnapshot.screenRect(image), false, 0)),
+      snapshot.elements
+    )
+    assertTrue("an element is no record", snapshot.records.isEmpty())
+  }
+
+  @Test
+  fun aButtonWhoseLabelEchoesItsChildTextHasText() {
+    host { context ->
+      column(
+        context,
+        OverflowViewGroup(context, "hidden").apply {
+          contentDescription = "Save"
+          isFocusable = true
+          addView(label(context, "Save"))
+        }.testId("save-button")
+      )
+    }
+    val snapshot = snapshot()
+    assertEquals(listOf("save-button" to true), snapshot.elements.map { it.identifier to it.hasText })
+    assertEquals(listOf("Save"), snapshot.elements.map { it.label })
+    // The text keeps its own record.
+    assertEquals(listOf("Save"), snapshot.records.map { it.text })
+  }
+
+  @Test
+  fun aContainerLabelHasTextAndTheElementsInsideItAreListedAfterIt() {
+    host { context ->
+      column(
+        context,
+        FrameLayout(context).apply {
+          contentDescription = "Outfit card"
+          addView(
+            column(
+              context,
+              label(context, "Jacket"),
+              ImageView(context).apply { contentDescription = "Heart" }
+            )
+          )
+        }.testId("outfit-card")
+      )
+    }
+    val elements = snapshot().elements
+    assertEquals(listOf("Outfit card", "Heart"), elements.map { it.label })
+    assertEquals(listOf(true, false), elements.map { it.hasText })
+    assertEquals(listOf("outfit-card", null), elements.map { it.identifier })
+  }
+
+  /**
+   * React Native joins accessibilityLabel, the busy or mixed state and accessibilityValue.text
+   * into contentDescription (BaseViewManager.updateViewContentDescription); the placeholder stays
+   * the hint, so the input's label is its contentDescription alone.
+   */
+  @Test
+  fun anInputsLabelIsItsContentDescriptionWithoutTheHintAndItHasText() {
+    host { context ->
+      column(
+        context,
+        ReactEditText(context).apply {
+          hint = "name@example.com"
+          contentDescription = "Email, required"
+          setTextSize(TypedValue.COMPLEX_UNIT_PX, 20f)
+          layoutParams = LinearLayout.LayoutParams(300, WRAP_CONTENT)
+        }.testId("email-input")
+      )
+    }
+    val snapshot = snapshot()
+    assertEquals(listOf("Email, required"), snapshot.elements.map { it.label })
+    assertEquals(listOf(true), snapshot.elements.map { it.hasText })
+    assertEquals(listOf("email-input"), snapshot.elements.map { it.identifier })
+    assertEquals(snapshot.records.single().viewRect, snapshot.elements.single().rect)
+  }
+
+  @Test
+  fun anEmptyOrMissingTestIdIsNullAndAnEmptyLabelIsNotAnElement() {
+    host { context ->
+      column(
+        context,
+        ImageView(context).apply { contentDescription = "Close" }.testId(""),
+        ImageView(context).apply { contentDescription = "Back" },
+        ImageView(context).apply { contentDescription = "" }.testId("blank"),
+        ImageView(context).testId("unlabelled"),
+        // A plain tag that is no testID is not read.
+        ImageView(context).apply {
+          contentDescription = "Plain tag"
+          tag = "not-a-test-id"
+        }
+      )
+    }
+    val elements = snapshot().elements
+    assertEquals(listOf("Close", "Back", "Plain tag"), elements.map { it.label })
+    assertEquals(listOf(null, null, null), elements.map { it.identifier })
+  }
+
+  @Test
+  fun hiddenAndAccessibilityHiddenElementsAreSkippedYetCountForText() {
+    host { context ->
+      column(
+        context,
+        ImageView(context).apply {
+          contentDescription = "Invisible"
+          visibility = View.INVISIBLE
+        },
+        ImageView(context).apply {
+          contentDescription = "Gone"
+          visibility = View.GONE
+        },
+        ImageView(context).apply {
+          contentDescription = "Clear"
+          alpha = 0f
+        },
+        FrameLayout(context).apply {
+          alpha = 0f
+          addView(ImageView(context).apply { contentDescription = "Under clear" })
+        },
+        FrameLayout(context).apply {
+          visibility = View.INVISIBLE
+          addView(ImageView(context).apply { contentDescription = "Under invisible" })
+        },
+        ImageView(context).apply {
+          contentDescription = "Not important"
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        },
+        FrameLayout(context).apply {
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+          addView(ImageView(context).apply { contentDescription = "Under hide descendants" })
+        },
+        // A shown element whose only text is faded to 0 (itself, or a group around it) still
+        // holds that text's record.
+        FrameLayout(context).apply {
+          contentDescription = "Holder"
+          addView(label(context, "Faded").apply { alpha = 0f })
+        },
+        FrameLayout(context).apply {
+          contentDescription = "Outer holder"
+          addView(FrameLayout(context).apply {
+            alpha = 0f
+            addView(label(context, "Under a faded group"))
+          })
+        }
+      )
+    }
+    val snapshot = snapshot()
+    assertEquals(listOf("Holder", "Outer holder"), snapshot.elements.map { it.label })
+    assertEquals(listOf(true, true), snapshot.elements.map { it.hasText })
+    assertEquals(0.0, snapshot.records.single { it.text == "Faded" }.opacity, 0.0)
+    assertEquals(0.0, snapshot.records.single { it.text == "Under a faded group" }.opacity, 0.0)
+  }
+
+  @Test
+  fun elementsRunInWindowOrderThenTreeOrder() {
+    val activity = host { context ->
+      column(
+        context,
+        FrameLayout(context).apply {
+          contentDescription = "A"
+          addView(label(context, "A text"))
+        },
+        column(context, ImageView(context).apply { contentDescription = "B" }, label(context, "Loose")),
+        ImageView(context).apply { contentDescription = "C" }
+      )
+    }
+    val dialog = Dialog(activity)
+    dialog.setContentView(
+      column(activity, ImageView(activity).apply { contentDescription = "D" }.testId("dialog-d"))
+    )
+    dialog.show()
+    shadowOf(Looper.getMainLooper()).idle()
+    val snapshot = snapshot()
+    val behind = snapshot.records.single { it.text == "A text" }.window
+    assertEquals(listOf("A", "B", "C", "D"), snapshot.elements.map { it.label })
+    assertEquals(listOf(true, false, false, false), snapshot.elements.map { it.hasText })
+    assertEquals(listOf(behind, behind, behind, 1 - behind), snapshot.elements.map { it.window })
+    assertEquals(snapshot.elements, snapshot().elements)
+  }
+
+  @Test
+  fun theTestIdKeyIsReadFromReactNativesRClassOrElseByName() {
+    val ownLoader = javaClass.classLoader
+    assertEquals(
+      com.facebook.react.R.id.react_test_id,
+      ReactNativeTextClasses.testIdKey(ownLoader, null, null)
+    )
+    // A minified build without React Native's R class: the resource of that name.
+    val withoutR = object : ClassLoader(ownLoader) {
+      override fun loadClass(name: String, resolve: Boolean): Class<*> =
+        if (name == ReactNativeTextClasses.REACT_ID_CLASS) throw ClassNotFoundException(name)
+        else super.loadClass(name, resolve)
+    }
+    val base = androidx.test.core.app.ApplicationProvider.getApplicationContext<Context>().resources
+    @Suppress("DEPRECATION")
+    val named = object : Resources(base.assets, base.displayMetrics, base.configuration) {
+      override fun getIdentifier(name: String, defType: String, defPackage: String): Int =
+        if (name == "react_test_id" && defType == "id" && defPackage == "com.example.app") 0x7f0f0b02 else 0
+    }
+    assertEquals(0x7f0f0b02, ReactNativeTextClasses.testIdKey(withoutR, named, "com.example.app"))
+    assertNull(ReactNativeTextClasses.testIdKey(withoutR, named, "com.other"))
+    assertNull(ReactNativeTextClasses.testIdKey(withoutR, null, null))
+    // Without the key there is no answer, so identifiers cannot silently read null.
+    assertNull(ReactNativeTextClasses.load(withoutR))
+    assertNotNull(ReactNativeTextClasses.load(withoutR, named, "com.example.app"))
   }
 
   private companion object {

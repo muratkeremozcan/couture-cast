@@ -1,5 +1,6 @@
 package expo.modules.textlayoutprobe
 
+import android.content.res.Resources
 import android.graphics.Matrix
 import android.os.Build
 import android.text.Layout
@@ -10,6 +11,8 @@ import android.view.WindowManager
 import android.widget.HorizontalScrollView
 import android.widget.ScrollView
 import android.widget.TextView
+import java.util.Collections
+import java.util.IdentityHashMap
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -88,7 +91,27 @@ data class ProbeRecord(
   val opacity: Double = 1.0
 )
 
-data class ProbeSnapshot(val windows: List<ProbeWindow>, val records: List<ProbeRecord>)
+/**
+ * One accessibility element, listed apart from the text records (TEA ruling 2026-11-14): never
+ * judged and never counted as text. A view important for accessibility with a non-empty
+ * contentDescription; [identifier] is its React Native testID (the view tag keyed
+ * `R.id.react_test_id`, which React Native's accessibility delegate exposes as the node's
+ * resource-id), null when it has none; [rect] is its box like a record's viewRect; [hasText] says
+ * whether a text view the probe reports as a record sits at or under it.
+ */
+data class ProbeElement(
+  val identifier: String?,
+  val label: String,
+  val rect: ProbeRect,
+  val hasText: Boolean,
+  val window: Int
+)
+
+data class ProbeSnapshot(
+  val windows: List<ProbeWindow>,
+  val records: List<ProbeRecord>,
+  val elements: List<ProbeElement> = emptyList()
+)
 
 /**
  * The React Native classes the probe recognises, looked up by name so this file compiles without
@@ -102,7 +125,9 @@ class ReactNativeTextClasses(
   val overflowView: Class<*>,
   val preparedLayoutTextView: Class<*>?,
   val compoundView: Class<*>?,
-  val reactSwitch: Class<*>? = null
+  val reactSwitch: Class<*>? = null,
+  /** The view tag key React Native's BaseViewManager.setTestId stores testID under. */
+  val testIdKey: Int
 ) {
   companion object {
     const val REACT_TEXT_VIEW = "com.facebook.react.views.text.ReactTextView"
@@ -111,9 +136,40 @@ class ReactNativeTextClasses(
     const val OVERFLOW_VIEW = "com.facebook.react.uimanager.ReactOverflowView"
     const val COMPOUND_VIEW = "com.facebook.react.uimanager.ReactCompoundView"
     const val REACT_SWITCH = "com.facebook.react.views.switchview.ReactSwitch"
+    const val REACT_ID_CLASS = "com.facebook.react.R\$id"
+    const val TEST_ID_NAME = "react_test_id"
 
-    /** Null when a class every React Native app links is missing (a minified or renamed build). */
-    fun load(loader: ClassLoader?): ReactNativeTextClasses? {
+    /**
+     * The key of React Native's testID view tag: `com.facebook.react.R.id.react_test_id`, read
+     * from React Native's R class, or by name from the app's resources when a minified build has
+     * dropped that class; null when neither has it.
+     */
+    fun testIdKey(loader: ClassLoader?, resources: Resources?, packageName: String?): Int? {
+      val fromClass =
+        try {
+          Class.forName(REACT_ID_CLASS, false, loader).getField(TEST_ID_NAME).getInt(null)
+        } catch (_: ReflectiveOperationException) {
+          0
+        }
+      if (fromClass != 0) return fromClass
+      val fromResources =
+        if (resources != null && packageName != null) {
+          resources.getIdentifier(TEST_ID_NAME, "id", packageName)
+        } else {
+          0
+        }
+      return if (fromResources != 0) fromResources else null
+    }
+
+    /**
+     * Null when a class every React Native app links is missing (a minified or renamed build), or
+     * when the testID tag key cannot be found, which would leave every element's identifier null.
+     */
+    fun load(
+      loader: ClassLoader?,
+      resources: Resources? = null,
+      packageName: String? = null
+    ): ReactNativeTextClasses? {
       fun find(name: String): Class<*>? =
         try {
           Class.forName(name, false, loader)
@@ -122,13 +178,15 @@ class ReactNativeTextClasses(
         }
       val text = find(REACT_TEXT_VIEW) ?: return null
       val overflow = find(OVERFLOW_VIEW) ?: return null
+      val testIdKey = testIdKey(loader, resources, packageName) ?: return null
       return ReactNativeTextClasses(
         text,
         find(REACT_EDIT_TEXT),
         overflow,
         find(PREPARED_LAYOUT_TEXT_VIEW),
         find(COMPOUND_VIEW),
-        find(REACT_SWITCH)
+        find(REACT_SWITCH),
+        testIdKey
       )
     }
   }
@@ -152,17 +210,72 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       )
     }
     val records = mutableListOf<ProbeRecord>()
-    for ((id, root) in shown) collect(root, id, screenRect(root), records)
-    return ProbeSnapshot(windows, records)
+    val elements = mutableListOf<ProbeElement>()
+    for ((id, root) in shown) {
+      val recorded = Collections.newSetFromMap(IdentityHashMap<View, Boolean>())
+      collect(root, id, screenRect(root), records, recorded)
+      collectElements(root, id, recorded, listing = true, elements)
+    }
+    return ProbeSnapshot(windows, records, elements)
   }
 
-  private fun collect(view: View, window: Int, windowRect: ProbeRect, out: MutableList<ProbeRecord>) {
+  private fun collect(
+    view: View,
+    window: Int,
+    windowRect: ProbeRect,
+    out: MutableList<ProbeRecord>,
+    recorded: MutableSet<View>
+  ) {
     if (!view.isShown) return
-    record(view, window, windowRect)?.let(out::add)
+    record(view, window, windowRect)?.let {
+      out.add(it)
+      recorded.add(view)
+    }
     if (view is ViewGroup) {
-      for (index in 0 until view.childCount) collect(view.getChildAt(index), window, windowRect, out)
+      for (index in 0 until view.childCount) {
+        collect(view.getChildAt(index), window, windowRect, out, recorded)
+      }
     }
   }
+
+  /**
+   * Every accessibility element under [view], in tree order, the way the accessibility tree shows
+   * them: a view not VISIBLE or at alpha 0 is left out with everything under it; an element's own
+   * descendants are listed too (Android's tree keeps them). The whole subtree is still walked for
+   * hasText, alpha-0 parts included, as records include them. True when a recorded text view sits
+   * at or under [view].
+   */
+  private fun collectElements(
+    view: View,
+    window: Int,
+    recorded: Set<View>,
+    listing: Boolean,
+    out: MutableList<ProbeElement>
+  ): Boolean {
+    val skipped = view.visibility != View.VISIBLE || view.alpha <= 0f
+    val label = view.contentDescription?.toString().orEmpty()
+    val index =
+      if (listing && !skipped && label.isNotEmpty() && view.isImportantForAccessibility) {
+        out.add(ProbeElement(testId(view), label, screenRect(view), hasText = false, window))
+        out.size - 1
+      } else {
+        -1
+      }
+    var found = view in recorded
+    if (view is ViewGroup) {
+      for (child in 0 until view.childCount) {
+        if (collectElements(view.getChildAt(child), window, recorded, listing && !skipped, out)) {
+          found = true
+        }
+      }
+    }
+    if (index >= 0) out[index] = out[index].copy(hasText = found)
+    return found
+  }
+
+  /** React Native's testID: the view tag BaseViewManager.setTestId keys `R.id.react_test_id`. */
+  private fun testId(view: View): String? =
+    (view.getTag(classes.testIdKey) as? String)?.takeIf { it.isNotEmpty() }
 
   private fun record(view: View, window: Int, windowRect: ProbeRect): ProbeRecord? {
     val reading = read(view) ?: return null

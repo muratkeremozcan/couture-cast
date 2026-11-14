@@ -11,22 +11,41 @@ enum TextLayoutProbeSnapshot {
     let z = TextLayoutProbeWire.zOrder(levels: shown.map { $0.element.windowLevel.rawValue })
     var windows: [TextLayoutProbeWire.Window] = []
     var records: [TextLayoutProbeWire.Record] = []
+    var elements: [TextLayoutProbeWire.Element] = []
     for (rank, entry) in shown.enumerated() {
       let window = entry.element
       windows.append(
         .init(id: entry.offset, rect: window.frame, z: z[rank], focused: window.isKeyWindow))
-      collect(window, in: window, id: entry.offset, into: &records)
+      var recorded = Set<ObjectIdentifier>()
+      collect(window, in: window, id: entry.offset, into: &records, recorded: &recorded)
+      accessibilityElements(window, id: entry.offset, recorded: recorded, into: &elements)
     }
-    return try TextLayoutProbeWire.json(token: token, windows: windows, records: records)
+    return try TextLayoutProbeWire.json(
+      token: token, windows: windows, records: records, elements: elements)
   }
 
-  /// Every text view, hidden and faded ones included, with the opacity it draws with.
+  /// A view the accessibility tree does not show, with everything under it.
+  private static func invisible(_ view: UIView) -> Bool {
+    view.isHidden || view.alpha <= 0 || view.layer.opacity <= 0
+  }
+
+  /// A UIKit text control draws its own internals (placeholder labels, field editors), so the
+  /// record walk does not go below it.
+  private static func descends(_ view: UIView) -> Bool {
+    TLPParagraphReader.isParagraphLikeView(view)
+  }
+
+  /// Every text view, hidden and faded ones included, with the opacity it draws with and, when
+  /// the window has an accessibility-modal view it lies outside, that view's frame.
   private static func collect(
     _ view: UIView,
     in window: UIWindow,
     id: Int,
-    into records: inout [TextLayoutProbeWire.Record]
+    into records: inout [TextLayoutProbeWire.Record],
+    recorded: inout Set<ObjectIdentifier>
   ) {
+    let modal = TextLayoutProbeWire.topmostModal(
+      view, children: { $0.subviews }, hidden: invisible, isModal: { $0.accessibilityViewIsModal })
     TextLayoutProbeWire.collect(
       view,
       layer: { .init(alpha: $0.alpha, opacity: $0.layer.opacity, hidden: $0.isHidden) },
@@ -34,11 +53,40 @@ enum TextLayoutProbeSnapshot {
       read: { view in
         guard var found = record(view, in: window, id: id) else { return nil }
         found.accessibilityAncestor = accessibilityAncestor(view, in: window)
+        found.behindModal = TextLayoutProbeWire.behindModal(
+          view, modal: modal, contains: { holder, inner in inner.isDescendant(of: holder) },
+          rect: { $0.convert($0.bounds, to: window) })
+        recorded.insert(ObjectIdentifier(view))
         return found
       },
-      // A UIKit text control draws its own internals (placeholder labels, field editors).
-      descends: { TLPParagraphReader.isParagraphLikeView($0) },
+      descends: descends,
       into: &records)
+  }
+
+  /// Every accessibility element with a non-empty label, as the accessibility tree shows them:
+  /// hidden, alpha 0 and accessibilityElementsHidden subtrees left out, an element a leaf.
+  private static func accessibilityElements(
+    _ window: UIWindow,
+    id: Int,
+    recorded: Set<ObjectIdentifier>,
+    into elements: inout [TextLayoutProbeWire.Element]
+  ) {
+    TextLayoutProbeWire.elements(
+      window as UIView,
+      window: id,
+      children: { $0.subviews },
+      hidden: { invisible($0) || $0.accessibilityElementsHidden },
+      element: { view in
+        view.isAccessibilityElement
+          ? .init(
+            label: view.accessibilityLabel, identifier: view.accessibilityIdentifier,
+            rect: view.convert(view.bounds, to: window))
+          : nil
+      },
+      isText: { recorded.contains(ObjectIdentifier($0)) },
+      drawsSubtree: { !descends($0) },
+      descendsIntoElements: false,
+      into: &elements)
   }
 
   /// The nearest accessibility element with an identifier at or above `view`, below the window.

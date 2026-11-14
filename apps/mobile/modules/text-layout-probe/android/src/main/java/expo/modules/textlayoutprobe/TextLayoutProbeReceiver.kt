@@ -28,9 +28,10 @@ class TextLayoutProbeReceiver(
       Log.w(TextLayoutProbeWire.TAG, "rejected a request without a valid token")
       return
     }
-    // No answer when a recognised class is missing: the harness then fails the leg on a missing
-    // answer, where a partial one would hide text from it.
-    val classes = ReactNativeTextClasses.load(context.classLoader)
+    // No answer when a recognised class or the testID tag key is missing: the harness then fails
+    // the leg on a missing answer, where a partial one would hide text or identifiers from it.
+    val classes =
+      ReactNativeTextClasses.load(context.classLoader, context.resources, context.packageName)
     if (classes == null) {
       Log.e(TextLayoutProbeWire.TAG, "error $token react_native_text_classes_missing")
       return

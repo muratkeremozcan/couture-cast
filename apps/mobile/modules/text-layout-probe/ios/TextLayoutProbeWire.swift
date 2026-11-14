@@ -32,6 +32,131 @@ enum TextLayoutProbeWire {
     var opacity: Double = 1
     /// The nearest accessibility element with an identifier at or above the view; nil for none.
     var accessibilityAncestor: AccessibilityAncestor? = nil
+    /// The frame of the topmost accessibility-modal view of the window when the view lies outside
+    /// it (behind it); nil when there is none or the view is inside it.
+    var behindModal: BehindModal? = nil
+  }
+
+  /// A view behind the window's topmost `accessibilityViewIsModal` view: that view's frame in
+  /// window coordinates, written like viewRect.
+  struct BehindModal: Equatable {
+    let rect: CGRect
+  }
+
+  /// One accessibility element, listed apart from the text records (TEA ruling 2026-11-14): never
+  /// judged and never counted as text. `hasText` says whether a text view the probe reports as a
+  /// record sits at or under it, or the element sits inside a text control's record (a
+  /// TextInput's backing view, which the record walk does not enter).
+  struct Element: Equatable {
+    let identifier: String?
+    let label: String
+    let rect: CGRect
+    var hasText: Bool
+    let window: Int
+  }
+
+  /// What the element walk reads of an accessibility element: its label and identifier as UIKit
+  /// gives them (empty or nil included) and its frame in window coordinates.
+  struct ElementRead {
+    let label: String?
+    let identifier: String?
+    let rect: CGRect
+  }
+
+  /// Every accessibility element with a non-empty label under `root`, in tree order, the way the
+  /// accessibility tree shows them: a node `hidden` says the tree skips (hidden, alpha 0,
+  /// accessibilityElementsHidden) is left out with everything under it, and with
+  /// `descendsIntoElements` false (UIKit) an element's own subviews are not listed, since the tree
+  /// shows an element as a leaf. `element` reads a node that is an accessibility element (nil for
+  /// one that is not); an empty identifier is written as nil. `isText` says the probe reported a
+  /// record for a node and `drawsSubtree` that this record's view draws what lies under it. The
+  /// whole subtree is still walked for `hasText`, hidden parts included, as records include them.
+  static func elements<Node>(
+    _ root: Node,
+    window: Int,
+    children: (Node) -> [Node],
+    hidden: (Node) -> Bool,
+    element: (Node) -> ElementRead?,
+    isText: (Node) -> Bool,
+    drawsSubtree: (Node) -> Bool,
+    descendsIntoElements: Bool,
+    into out: inout [Element]
+  ) {
+    visitElements(
+      root, window: window, children: children, hidden: hidden, element: element, isText: isText,
+      drawsSubtree: drawsSubtree, descendsIntoElements: descendsIntoElements, listing: true,
+      covered: false, into: &out)
+  }
+
+  /// One node of the element walk; true when a record's view sits at or under it, or it lies
+  /// inside a text control's record.
+  @discardableResult
+  private static func visitElements<Node>(
+    _ node: Node,
+    window: Int,
+    children: (Node) -> [Node],
+    hidden: (Node) -> Bool,
+    element: (Node) -> ElementRead?,
+    isText: (Node) -> Bool,
+    drawsSubtree: (Node) -> Bool,
+    descendsIntoElements: Bool,
+    listing: Bool,
+    covered: Bool,
+    into out: inout [Element]
+  ) -> Bool {
+    let skipped = hidden(node)
+    var index: Int? = nil
+    if listing, !skipped, let read = element(node), let label = read.label, !label.isEmpty {
+      index = out.count
+      let identifier = read.identifier.flatMap { $0.isEmpty ? nil : $0 }
+      out.append(
+        Element(
+          identifier: identifier, label: label, rect: read.rect, hasText: false, window: window))
+    }
+    let text = isText(node)
+    let coversBelow = covered || (text && drawsSubtree(node))
+    let listsBelow = listing && !skipped && (index == nil || descendsIntoElements)
+    var found = text || covered
+    for child in children(node) {
+      let below = visitElements(
+        child, window: window, children: children, hidden: hidden, element: element,
+        isText: isText, drawsSubtree: drawsSubtree, descendsIntoElements: descendsIntoElements,
+        listing: listsBelow, covered: coversBelow, into: &out)
+      if below { found = true }
+    }
+    if let index { out[index].hasText = found }
+    return found
+  }
+
+  /// The topmost shown view with `isModal` (accessibilityViewIsModal) under `root`: the last one
+  /// in tree order, since a later sibling and a deeper view draw above. A node `hidden` says is not
+  /// shown (hidden, alpha 0) is passed over with everything under it; nil when there is none.
+  static func topmostModal<Node>(
+    _ root: Node,
+    children: (Node) -> [Node],
+    hidden: (Node) -> Bool,
+    isModal: (Node) -> Bool
+  ) -> Node? {
+    if hidden(root) { return nil }
+    var found: Node? = isModal(root) ? root : nil
+    for child in children(root) {
+      if let deeper = topmostModal(child, children: children, hidden: hidden, isModal: isModal) {
+        found = deeper
+      }
+    }
+    return found
+  }
+
+  /// `behindModal` of a record's view: the modal view's frame when the window has a topmost modal
+  /// view and the view is not it or inside it (`contains(modal, view)`); nil otherwise.
+  static func behindModal<Node>(
+    _ node: Node,
+    modal: Node?,
+    contains: (Node, Node) -> Bool,
+    rect: (Node) -> CGRect
+  ) -> BehindModal? {
+    guard let modal, !contains(modal, node) else { return nil }
+    return BehindModal(rect: rect(modal))
   }
 
   /// An accessibility element with a non-empty accessibilityIdentifier (React Native's testID)
@@ -310,7 +435,9 @@ enum TextLayoutProbeWire {
 
   /// The answer; a record whose opacity is not in 0...1 (NaN included) refuses the whole capture
   /// with `opacityInvalid` (JSONSerialization cannot write a NaN, and a coerced one would lie).
-  static func json(token: String, windows: [Window], records: [Record]) throws -> Data {
+  static func json(
+    token: String, windows: [Window], records: [Record], elements: [Element] = []
+  ) throws -> Data {
     if let index = records.firstIndex(where: { !($0.opacity >= 0 && $0.opacity <= 1) }) {
       return try refusal(
         token: token, code: opacityInvalid, record: index, kind: records[index].kind)
@@ -342,6 +469,17 @@ enum TextLayoutProbeWire {
           "accessibilityAncestor": record.accessibilityAncestor.map { ancestor -> Any in
             ["identifier": ancestor.identifier, "rect": wire(ancestor.rect)]
           } ?? NSNull(),
+          "behindModal": record.behindModal.map { modal -> Any in ["rect": wire(modal.rect)] }
+            ?? NSNull(),
+        ]
+      },
+      "elements": elements.map { element -> [String: Any] in
+        [
+          "identifier": element.identifier.map { $0 as Any } ?? NSNull(),
+          "label": element.label,
+          "rect": wire(element.rect),
+          "hasText": element.hasText,
+          "window": element.window,
         ]
       },
     ]

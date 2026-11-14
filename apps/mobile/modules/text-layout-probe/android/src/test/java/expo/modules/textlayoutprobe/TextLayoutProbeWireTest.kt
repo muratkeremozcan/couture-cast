@@ -87,6 +87,36 @@ class TextLayoutProbeWireTest {
     assertFalse(first.getBoolean("offWindow"))
     assertEquals(0.25, first.getDouble("opacity"), 0.0)
     assertTrue(json.contains("\"opacity\":0.25}"))
+    assertEquals(
+      setOf("version", "token", "platform", "windows", "records", "elements"),
+      parsed.keys().asSequence().toSet()
+    )
+    assertEquals(0, parsed.getJSONArray("elements").length())
+  }
+
+  // TEA ruling 2026-11-14: accessibility elements travel in their own list beside the records.
+  @Test
+  fun eachElementIsWrittenWithItsIdentifierLabelRectHasTextAndWindow() {
+    val elements = listOf(
+      ProbeElement("save-button", "Save \"now\"", ProbeRect(10, 20, 110, 64), true, 0),
+      ProbeElement(null, "Outfit photo", ProbeRect(0, 0, 80, 80), false, 1)
+    )
+    val json = TextLayoutProbeWire.json("e1", ProbeSnapshot(windows, emptyList(), elements))
+    assertTrue(
+      json,
+      json.endsWith(
+        "\"records\":[],\"elements\":[" +
+          "{\"identifier\":\"save-button\",\"label\":\"Save \\\"now\\\"\",\"rect\":[10,20,110,64]," +
+          "\"hasText\":true,\"window\":0}," +
+          "{\"identifier\":null,\"label\":\"Outfit photo\",\"rect\":[0,0,80,80]," +
+          "\"hasText\":false,\"window\":1}]}"
+      )
+    )
+    val parsed = JSONObject(reassemble("e1", TextLayoutProbeWire.lines("e1", json)))
+    val first = parsed.getJSONArray("elements").getJSONObject(0)
+    assertEquals(setOf("identifier", "label", "rect", "hasText", "window"), first.keys().asSequence().toSet())
+    assertEquals("Save \"now\"", first.getString("label"))
+    assertTrue(parsed.getJSONArray("elements").getJSONObject(1).isNull("identifier"))
   }
 
   // TEA ruling 2026-11-14 (r43 P2): the raw opacity, so only an exact 0 reads as invisible.

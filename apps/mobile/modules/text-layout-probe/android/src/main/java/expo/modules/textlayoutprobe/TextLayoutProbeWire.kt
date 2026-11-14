@@ -71,6 +71,16 @@ object TextLayoutProbeWire {
       out.append(",\"opacity\":").append(number(record.opacity))
       out.append('}')
     }
+    out.append("],\"elements\":[")
+    snapshot.elements.forEachIndexed { index, element ->
+      if (index > 0) out.append(',')
+      out.append("{\"identifier\":").append(element.identifier?.let(::quote) ?: "null")
+      out.append(",\"label\":").append(quote(element.label))
+      out.append(",\"rect\":").append(rect(element.rect))
+      out.append(",\"hasText\":").append(element.hasText)
+      out.append(",\"window\":").append(element.window)
+      out.append('}')
+    }
     out.append("]}")
     return out.toString()
   }

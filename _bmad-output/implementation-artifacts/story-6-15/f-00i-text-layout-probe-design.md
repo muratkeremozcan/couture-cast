@@ -2,7 +2,8 @@
 
 Updated: 2026-11-14. Story 6.15, TD-01 and F-00i. Learning path Step 55. The r44 TEA rulings
 (offWindow by translation, non-clipping and inverted scroll views, opacity refusal, ReactSwitch,
-accessibilityAncestor) are in the wire contract below.
+accessibilityAncestor) are in the wire contract below, with the answer-level `elements` list and
+the iOS `behindModal` field from the label-element and accessibility-modal rulings.
 
 ## Problem
 
@@ -184,7 +185,12 @@ refusal in place of the windows and records, written and delivered as any answer
 hashed in logcat on Android, `<token>.json` on iOS):
 
 ```json
-{"version":1,"token":"<token>","platform":"android","error":{"code":"text_probe_opacity_invalid","record":3,"kind":"ReactTextView"}}
+{
+  "version": 1,
+  "token": "<token>",
+  "platform": "android",
+  "error": { "code": "text_probe_opacity_invalid", "record": 3, "kind": "ReactTextView" }
+}
 ```
 
 `record` is the index the first such record has among the records, `kind` its kind. iOS writes
@@ -209,3 +215,68 @@ Harness invariants: `scrolledAway` implies `visibleRect` null; `offWindow` impli
 that is not `scrolledAway` has `clipRect` null. A text wholly below the fold that a scroll view
 reaches is `scrolledAway`; one no band reaches (no scroll view above, or too little travel) is
 cut to nothing unless a translation put it off the window, which makes it `offWindow`.
+
+## Accessibility elements and accessibility-modal, 2026-11-14
+
+TEA ruling: label elements do not look like text records. Native reports accessibility elements
+in their own answer-level list, `elements`, on both platforms; they are never judged and never
+counted as text. Each answer is now
+`{version, token, platform, windows, records, elements}` (iOS keys sorted, Android in that
+order); the opacity refusal keeps its shape and carries no `elements`.
+
+```json
+{
+  "identifier": "save-button",
+  "label": "Save",
+  "rect": [10, 20, 110, 64],
+  "hasText": true,
+  "window": 0
+}
+```
+
+| Field        | Meaning                                                                                |
+| ------------ | -------------------------------------------------------------------------------------- |
+| `identifier` | React Native's `testID`, a non-empty string, or null when the element has none         |
+| `label`      | the accessibility label, a non-empty string, as UIKit or Android hands it over         |
+| `rect`       | `[left, top, right, bottom]` in the units and rounding of `viewRect` (px, pt to 0.001) |
+| `hasText`    | a text view the probe reports as a record sits at or under the element                 |
+| `window`     | the window id, as records name it                                                      |
+
+Which views are elements, in deterministic order (window order, then tree order, the element
+before what lies inside it):
+
+- iOS: `isAccessibilityElement` true with a non-empty `accessibilityLabel`; `identifier` from
+  `accessibilityIdentifier`, null when empty. The walk leaves out a view that is hidden, at alpha
+  or layer opacity 0, or has `accessibilityElementsHidden`, with everything under it, and lists
+  nothing inside an element, since the accessibility tree shows an element as a leaf. React
+  Native composes some labels: an accessible view without its own label reads its subviews'
+  labels, and a multiline input's backing `RCTUITextView` joins its label and placeholder.
+- Android: a view `isImportantForAccessibility` (an explicit NO, or an ancestor's
+  NO_HIDE_DESCENDANTS, makes it false; a non-empty content description makes AUTO true) with a
+  non-empty `contentDescription`. The walk leaves out a view not VISIBLE or at alpha 0 with
+  everything under it, and lists elements inside elements, as Android's tree keeps them. React
+  Native joins `accessibilityLabel`, the busy or mixed state and `accessibilityValue.text` into
+  the content description; an input's placeholder stays its hint and is not in the label.
+- `hasText` walks the element's whole subtree, hidden and faded parts included, because records
+  include them at opacity 0. On iOS an element inside a TextInput's record (its backing text view,
+  which the record walk does not enter) has `hasText` true as well: the record reports what it
+  draws.
+
+Android `identifier`: React Native's `BaseViewManager.setTestId` stores `testID` as the view tag
+keyed `com.facebook.react.R.id.react_test_id` (and, for now, as the plain tag), and
+`ReactAccessibilityDelegate` exposes that keyed tag as the node's `viewIdResourceName`, which the
+Maestro hierarchy reads as `resource-id`. The probe reads the keyed tag, a string, null when empty.
+The key comes from React Native's R class (`com.facebook.react.R$id.react_test_id`), or by name
+from the app's resources (`getIdentifier("react_test_id", "id", <package>)`) when a minified build
+dropped that class; when neither has it the app gives no answer, so identifiers cannot silently
+read null. The plain tag is not read, since other code can set it.
+
+iOS `behindModal` (accessibility-modal ruling: same rule as partial cover; records behind the
+modal leave matching but stay clip-judged with key null, unless the modal view's frame contains
+them, then they are left out like a whole cover). Each iOS record carries `behindModal`: null, or
+`{"rect": [left, top, right, bottom]}`, the frame in window points to a thousandth of the topmost
+shown view with `accessibilityViewIsModal` true in the record's window, when the record's view is
+neither that view nor inside it. Topmost is the last such view in tree order (a later sibling or a
+deeper view draws above); a hidden or alpha-0 view and everything under it are passed over. No
+modal view in the window gives null. Android records omit the field: modal content there is its
+own window, judged by the covered-window rule.

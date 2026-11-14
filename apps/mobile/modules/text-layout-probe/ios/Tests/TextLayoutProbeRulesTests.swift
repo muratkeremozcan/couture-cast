@@ -312,9 +312,12 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       [
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
         "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
-        "opacity", "accessibilityAncestor",
+        "opacity", "accessibilityAncestor", "behindModal",
       ])
+    XCTAssertEqual(Set(json.keys), ["version", "token", "platform", "windows", "records", "elements"])
+    XCTAssertEqual((json["elements"] as? [[String: Any]])?.count, 0)
     XCTAssertTrue(record["accessibilityAncestor"] is NSNull)
+    XCTAssertTrue(record["behindModal"] is NSNull)
     XCTAssertTrue(record["visibleRect"] is NSNull)
     XCTAssertTrue(record["clipRect"] is NSNull)
     XCTAssertTrue(record["maxLines"] is NSNull)
@@ -854,6 +857,239 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertEqual(Set(found.keys), ["identifier", "rect"])
     XCTAssertEqual(found["identifier"] as? String, "outfit-card")
     XCTAssertEqual(found["rect"] as? [Double], [0.333, 100, 390.333, 300])
+  }
+
+  // TEA ruling 2026-11-14: accessibility elements are listed apart from the text records,
+  // `{identifier, label, rect, hasText, window}`, never judged and never counted as text.
+
+  private final class AXNode {
+    var isElement = false
+    var label: String? = nil
+    var identifier: String? = nil
+    var rect = CGRect.zero
+    var hidden = false
+    var elementsHidden = false
+    /// The probe reported a record for it; `drawsSubtree` for a text control's record.
+    var text = false
+    var drawsSubtree = false
+    var modal = false
+    var children: [AXNode] = []
+    weak var parent: AXNode?
+
+    init(
+      element label: String? = nil, identifier: String? = nil, rect: CGRect = .zero,
+      text: Bool = false, _ children: [AXNode] = []
+    ) {
+      self.isElement = label != nil
+      self.label = label
+      self.identifier = identifier
+      self.rect = rect
+      self.text = text
+      self.children = children
+      for child in children { child.parent = self }
+    }
+
+    func contains(_ other: AXNode) -> Bool {
+      var current: AXNode? = other
+      while let node = current {
+        if node === self { return true }
+        current = node.parent
+      }
+      return false
+    }
+  }
+
+  private func elements(_ root: AXNode, window: Int = 0, descends: Bool = false) -> [Wire.Element] {
+    var out: [Wire.Element] = []
+    Wire.elements(
+      root, window: window, children: { $0.children },
+      hidden: { $0.hidden || $0.elementsHidden },
+      element: { $0.isElement ? .init(label: $0.label, identifier: $0.identifier, rect: $0.rect) : nil },
+      isText: { $0.text }, drawsSubtree: { $0.drawsSubtree }, descendsIntoElements: descends,
+      into: &out)
+    return out
+  }
+
+  func testAnImageWithALabelAndNoTextHasNoText() {
+    let image = AXNode(element: "Outfit photo", identifier: "outfit-photo", rect: CGRect(x: 0, y: 0, width: 80, height: 80))
+    XCTAssertEqual(
+      elements(AXNode([image])),
+      [.init(identifier: "outfit-photo", label: "Outfit photo", rect: image.rect, hasText: false, window: 0)])
+  }
+
+  func testAButtonWhoseLabelEchoesItsChildTextHasText() {
+    let button = AXNode(element: "Save", identifier: "save-button", [AXNode(text: true)])
+    let found = elements(AXNode([button]))
+    XCTAssertEqual(found.map(\.label), ["Save"])
+    XCTAssertEqual(found.map(\.hasText), [true])
+  }
+
+  func testATextRecordThatIsItsOwnElementHasText() {
+    XCTAssertEqual(elements(AXNode([AXNode(element: "Title", text: true)])).map(\.hasText), [true])
+  }
+
+  func testAContainerLabelHasTextFromBelowAndHidesItsElementsAsALeaf() {
+    let card = AXNode(
+      element: "Outfit card", identifier: "outfit-card",
+      [AXNode(element: "Jacket", text: true), AXNode([AXNode(element: "Heart")])])
+    let found = elements(AXNode([card]))
+    XCTAssertEqual(found.map(\.label), ["Outfit card"])
+    XCTAssertEqual(found.map(\.hasText), [true])
+    // With descending (Android's tree), the inner elements are listed after the container.
+    XCTAssertEqual(elements(AXNode([card]), descends: true).map(\.label), ["Outfit card", "Jacket", "Heart"])
+    XCTAssertEqual(elements(AXNode([card]), descends: true).map(\.hasText), [true, true, false])
+  }
+
+  /// RCTUITextView's accessibilityLabel joins the input's label and placeholder; the backing view
+  /// sits inside the TextInput's record, which the record walk does not enter.
+  func testAnInputsBackingElementInsideItsRecordHasTextWithTheJoinedLabel() {
+    let backing = AXNode(element: "Email name@example.com", identifier: "email-input")
+    let input = AXNode(text: true, [AXNode([backing])])
+    input.drawsSubtree = true
+    let found = elements(AXNode([input]))
+    XCTAssertEqual(found.map(\.label), ["Email name@example.com"])
+    XCTAssertEqual(found.map(\.hasText), [true])
+    // A paragraph's record covers nothing below it.
+    let paragraph = AXNode(text: true, [AXNode(element: "Link")])
+    XCTAssertEqual(elements(AXNode([paragraph])).map(\.hasText), [false])
+  }
+
+  func testAnEmptyIdentifierIsNullAndAnEmptyLabelOrANonElementIsNotListed() {
+    let blankId = AXNode(element: "Close", identifier: "")
+    let noId = AXNode(element: "Back")
+    let emptyLabel = AXNode(element: "", identifier: "empty")
+    let nilLabel = AXNode(element: nil, identifier: "unlabelled")
+    nilLabel.isElement = true
+    let notElement = AXNode(identifier: "plain")
+    notElement.label = "Not an element"
+    let found = elements(AXNode([blankId, noId, emptyLabel, nilLabel, notElement]))
+    XCTAssertEqual(found.map(\.label), ["Close", "Back"])
+    XCTAssertEqual(found.map(\.identifier), [nil, nil])
+  }
+
+  func testHiddenAndAccessibilityHiddenSubtreesAreSkippedYetCountForText() {
+    let hidden = AXNode(element: "Hidden")
+    hidden.hidden = true
+    let underHidden = AXNode([AXNode(element: "Under hidden")])
+    underHidden.hidden = true
+    let axHidden = AXNode([AXNode(element: "Under elements hidden")])
+    axHidden.elementsHidden = true
+    // A shown element whose only text is hidden (itself, or a group around it) still holds that
+    // text's record.
+    let faded = AXNode(text: true)
+    faded.hidden = true
+    let holder = AXNode(element: "Holder", [faded])
+    let fadedGroup = AXNode([AXNode(text: true)])
+    fadedGroup.hidden = true
+    let outer = AXNode(element: "Outer holder", [fadedGroup])
+    let found = elements(AXNode([hidden, underHidden, axHidden, holder, outer]))
+    XCTAssertEqual(found.map(\.label), ["Holder", "Outer holder"])
+    XCTAssertEqual(found.map(\.hasText), [true, true])
+  }
+
+  func testElementsRunInTreeOrderWithTheirWindow() {
+    let tree = AXNode([
+      AXNode(element: "A", [AXNode(text: true)]),
+      AXNode([AXNode(element: "B"), AXNode(element: "C", text: true)]),
+      AXNode(element: "D"),
+    ])
+    let found = elements(tree, window: 2)
+    XCTAssertEqual(found.map(\.label), ["A", "B", "C", "D"])
+    XCTAssertEqual(found.map(\.hasText), [true, false, true, false])
+    XCTAssertEqual(Set(found.map(\.window)), [2])
+  }
+
+  func testTheJsonWritesEachElementLikeARecordsRect() throws {
+    let data = try Wire.json(
+      token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)], records: [],
+      elements: [
+        .init(
+          identifier: "save-button", label: "Save", rect: CGRect(x: 1.0 / 3, y: 10, width: 100, height: 44),
+          hasText: true, window: 0),
+        .init(identifier: nil, label: "Outfit photo", rect: .zero, hasText: false, window: 0),
+      ])
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let list = try XCTUnwrap(json["elements"] as? [[String: Any]])
+    XCTAssertEqual(list.count, 2)
+    XCTAssertEqual(Set(list[0].keys), ["identifier", "label", "rect", "hasText", "window"])
+    XCTAssertEqual(list[0]["identifier"] as? String, "save-button")
+    XCTAssertEqual(list[0]["label"] as? String, "Save")
+    XCTAssertEqual(list[0]["rect"] as? [Double], [0.333, 10, 100.333, 54])
+    XCTAssertEqual(list[0]["hasText"] as? Bool, true)
+    XCTAssertEqual(list[0]["window"] as? Int, 0)
+    XCTAssertTrue(list[1]["identifier"] is NSNull)
+    XCTAssertEqual(list[1]["hasText"] as? Bool, false)
+    let text = String(decoding: data, as: UTF8.self)
+    XCTAssertTrue(text.contains("\"hasText\":true"), text)
+    XCTAssertTrue(text.contains("\"window\":0"), text)
+  }
+
+  // TEA ruling 2026-11-14: a record behind the window's topmost accessibilityViewIsModal view
+  // carries `behindModal: {rect}`, that view's frame; inside it, or with no modal view, null.
+
+  private func modal(_ root: AXNode) -> AXNode? {
+    Wire.topmostModal(root, children: { $0.children }, hidden: { $0.hidden }, isModal: { $0.modal })
+  }
+
+  private func behind(_ node: AXNode, _ root: AXNode) -> Wire.BehindModal? {
+    Wire.behindModal(node, modal: modal(root), contains: { $0.contains($1) }, rect: { $0.rect })
+  }
+
+  func testARecordBehindAModalSheetGetsTheSheetsRectAndOneInsideItNull() {
+    let behindText = AXNode(text: true)
+    let sheetText = AXNode(text: true)
+    let sheetRect = CGRect(x: 0, y: 400, width: 390, height: 444)
+    let sheet = AXNode(rect: sheetRect, [AXNode([sheetText])])
+    sheet.modal = true
+    let root = AXNode([AXNode([behindText]), sheet])
+    XCTAssertEqual(behind(behindText, root), Wire.BehindModal(rect: sheetRect))
+    XCTAssertNil(behind(sheetText, root))
+    // The modal view itself is inside it.
+    XCTAssertNil(behind(sheet, root))
+  }
+
+  func testNoModalViewGivesNull() {
+    let text = AXNode(text: true)
+    XCTAssertNil(behind(text, AXNode([AXNode([text]), AXNode()])))
+  }
+
+  func testTheTopmostModalIsTheLastShownOneInTreeOrder() {
+    let first = AXNode(rect: CGRect(x: 0, y: 0, width: 10, height: 10))
+    first.modal = true
+    let nested = AXNode(rect: CGRect(x: 0, y: 0, width: 5, height: 5))
+    nested.modal = true
+    let outer = AXNode(rect: CGRect(x: 0, y: 0, width: 20, height: 20), [nested])
+    outer.modal = true
+    let hiddenLast = AXNode(rect: CGRect(x: 0, y: 0, width: 30, height: 30))
+    hiddenLast.modal = true
+    hiddenLast.hidden = true
+    let underHidden = AXNode()
+    underHidden.modal = true
+    let hiddenHolder = AXNode([underHidden])
+    hiddenHolder.hidden = true
+    let root = AXNode([first, outer, hiddenLast, hiddenHolder])
+    XCTAssertTrue(modal(root) === nested)
+    // A text inside the outer modal but outside the nested one is behind the nested one.
+    let between = AXNode(text: true)
+    outer.children.append(between)
+    between.parent = outer
+    XCTAssertEqual(behind(between, root), Wire.BehindModal(rect: nested.rect))
+    XCTAssertNil(modal(AXNode([hiddenLast, hiddenHolder])))
+  }
+
+  func testTheJsonWritesBehindModalLikeViewRect() throws {
+    var record = Wire.Record(
+      kind: "RCTParagraphComponentView", text: "Behind", viewRect: .zero, visibleRect: nil,
+      clipRect: nil, contentRect: .zero, lineCount: 1, maxLines: nil, ellipsized: 0,
+      unlimitedLineCount: 1, window: 0, scrolledAway: false, offWindow: false)
+    record.behindModal = .init(rect: CGRect(x: 0, y: 400.0004, width: 390, height: 444))
+    let data = try Wire.json(
+      token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)], records: [record])
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let first = try XCTUnwrap((json["records"] as? [[String: Any]])?.first)
+    let found = try XCTUnwrap(first["behindModal"] as? [String: Any])
+    XCTAssertEqual(Set(found.keys), ["rect"])
+    XCTAssertEqual(found["rect"] as? [Double], [0, 400, 390, 844])
   }
 
   // Antigravity r43 P3: a field wider than its text rect starts at its leading edge whatever
