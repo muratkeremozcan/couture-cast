@@ -460,9 +460,17 @@ type AppliedTransferWrite = {
  * Runs one authenticated TRANSFER from `paid-member`, who holds a `test_store` row, to
  * `other-member` through the webhook rail and returns every ledger write it asked for.
  */
+const TRANSFER_UNHONORED_LOG =
+  'TRANSFER recorded without transition: its store is not honored in this environment'
+const TRANSFER_GAIN_SKIPPED_LOG =
+  'TRANSFER gain skipped: no store/product/period derivable from the event or the losing row'
+
+/** One TRANSFER log line the rail wrote, as `[level, message]`. */
+type TransferLog = ['info' | 'warn', string]
+
 async function transferOverTestStoreRow(
   eventOverrides: Partial<RevenueCatEvent>
-): Promise<{ applied: AppliedTransferWrite[]; recorded: number }> {
+): Promise<{ applied: AppliedTransferWrite[]; recorded: number; logged: TransferLog[] }> {
   const savedRc = process.env.REVENUECAT_WEBHOOK_AUTH
   delete process.env.REVENUECAT_WEBHOOK_AUTH
   try {
@@ -495,6 +503,16 @@ async function transferOverTestStoreRow(
       { emitTransition: vi.fn() } as unknown as SubscriptionService,
       {} as RevenueCatClient
     )
+    const logger = (
+      service as unknown as {
+        logger: Record<'info' | 'warn', (fields: unknown, message: string) => void>
+      }
+    ).logger
+    const logged: TransferLog[] = []
+    for (const level of ['info', 'warn'] as const)
+      vi.spyOn(logger, level).mockImplementation((_fields, message) => {
+        if (message.startsWith('TRANSFER ')) logged.push([level, message])
+      })
     const body = {
       event: rcEvent({
         type: 'TRANSFER',
@@ -513,7 +531,7 @@ async function transferOverTestStoreRow(
       const { userId, state } = input as AppliedTransferWrite
       return { userId, state }
     })
-    return { applied, recorded: create.mock.calls.length }
+    return { applied, recorded: create.mock.calls.length, logged }
   } finally {
     if (savedRc === undefined) delete process.env.REVENUECAT_WEBHOOK_AUTH
     else process.env.REVENUECAT_WEBHOOK_AUTH = savedRc
@@ -530,8 +548,9 @@ describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
   async function transferTestStoreRow(): Promise<{
     applied: { userId: string; status: string; store: string }[]
     recorded: number
+    logged: TransferLog[]
   }> {
-    const { applied, recorded } = await transferOverTestStoreRow({
+    const { applied, recorded, logged } = await transferOverTestStoreRow({
       store: null,
       product_id: null,
       expiration_at_ms: null,
@@ -543,6 +562,7 @@ describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
         store: state.store,
       })),
       recorded,
+      logged,
     }
   }
 
@@ -554,14 +574,21 @@ describe('a store-less TRANSFER of a test_store row (story 6.15 D15)', () => {
         { userId: 'other-member', status: 'active', store: 'test_store' },
       ],
       recorded: 1,
+      logged: [],
     })
   })
 
+  // r38 P3-3: the store gate, not the later gain fallback, must stop this TRANSFER, which shows
+  // only in the log: one info line naming the unhonored store and no gain-skipped warning.
   it.each([undefined, 'staging', 'production', 'qa'])(
-    'with TEST_ENV %s records the event and revokes and grants no one',
+    'with TEST_ENV %s records the event, revokes and grants no one, and says why',
     async (testEnv) => {
       vi.stubEnv('TEST_ENV', testEnv as string)
-      await expect(transferTestStoreRow()).resolves.toEqual({ applied: [], recorded: 1 })
+      await expect(transferTestStoreRow()).resolves.toEqual({
+        applied: [],
+        recorded: 1,
+        logged: [['info', TRANSFER_UNHONORED_LOG]],
+      })
     }
   )
 })
@@ -600,6 +627,7 @@ describe('an APP_STORE TRANSFER over a test_store losing row (story 6.15 D15)', 
           },
         ],
         recorded: 1,
+        logged: [],
       })
     }
   )
@@ -618,7 +646,11 @@ describe('an APP_STORE TRANSFER over a test_store losing row (story 6.15 D15)', 
           expiration_at_ms: eventPeriodEndMs,
           ...missing,
         })
-      ).resolves.toEqual({ applied: [], recorded: 1 })
+      ).resolves.toEqual({
+        applied: [],
+        recorded: 1,
+        logged: [['warn', TRANSFER_GAIN_SKIPPED_LOG]],
+      })
     }
   )
 
@@ -657,6 +689,7 @@ describe('an APP_STORE TRANSFER over a test_store losing row (story 6.15 D15)', 
           },
         ],
         recorded: 1,
+        logged: [],
       })
     }
   )
