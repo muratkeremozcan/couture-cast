@@ -66,9 +66,9 @@ export function checkJunitReport(file, suiteName, minimum) {
 /** True when this module is the process entry point; false for stdin, eval or an import. */
 function runAsScript() {
   try {
-    return (
-      Boolean(process.argv[1]) &&
-      fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
+    return Boolean(
+      process.argv[1] &&
+        fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)
     )
   } catch {
     return false
