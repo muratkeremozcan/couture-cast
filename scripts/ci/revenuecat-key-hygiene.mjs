@@ -22,6 +22,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import dotenv from 'dotenv'
+import { expand } from 'dotenv-expand'
 
 export const TEST_STORE_KEY_VARIABLE = 'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY'
 export const DEVELOPMENT_PROFILE = 'development'
@@ -52,13 +53,24 @@ export function mobileEnvFileScope(name) {
   return undefined
 }
 
+function parseEnvFile(file) {
+  return dotenv.parse(fs.readFileSync(file, 'utf8'))
+}
+
 /**
- * Every assignment of a dotenv file as `[name, value]`, read by dotenv itself, the parser Expo and
- * app.config.ts load the files with, so `NAME: value`, `export NAME=value` and quoted or
- * multi-line values count exactly as they would at build time.
+ * Every assignment of a dotenv file as `[name, value]`, read the way Expo's `@expo/env` reads it:
+ * dotenv parses the file, so `NAME: value`, `export NAME=value` and quoted or multi-line values
+ * count exactly as they would at build time, and dotenv-expand then resolves `${NAME}` and `$NAME`
+ * references (story 6.15 r38 P3-2), so a key assembled from shorter variables is seen whole.
+ * `context` holds the variables of the other env files a build loads beside this one; Expo
+ * expands across its loaded files, so a reference may resolve to one of them. The file's own
+ * assignments win over `context`, and the caller's process environment is never read.
  */
-export function readEnvEntries(file) {
-  return Object.entries(dotenv.parse(fs.readFileSync(file, 'utf8')))
+export function readEnvEntries(file, context = {}) {
+  const parsed = parseEnvFile(file)
+  const processEnv = { ...context }
+  for (const name of Object.keys(parsed)) delete processEnv[name]
+  return Object.entries(expand({ parsed: { ...parsed }, processEnv }).parsed)
 }
 
 function mergeProfile(parent, child) {
@@ -140,11 +152,33 @@ export function appConfigEnvFiles(source) {
   ]
 }
 
-function envFileProblems(file, label, scope) {
+/**
+ * Each assignment is checked as written and as expanded: the written text catches a reference to
+ * the Test Store variable itself, the expanded value a key assembled from other variables.
+ */
+function envFileProblems(file, label, scope, context) {
   if (!scope || scope === 'debug' || !fs.existsSync(file)) return []
-  return envProblems(label, readEnvEntries(file), {
-    allowTestStoreVariable: scope === 'shared',
-  })
+  const writtenValues = parseEnvFile(file)
+  const written = Object.entries(writtenValues)
+  const expanded = readEnvEntries(file, context).filter(
+    ([name, value]) => value !== writtenValues[name]
+  )
+  return [
+    ...new Set(
+      envProblems(label, [...written, ...expanded], {
+        allowTestStoreVariable: scope === 'shared',
+      })
+    ),
+  ]
+}
+
+/** The written variables of every env file a release or preview build may load. */
+function buildEnvContext(files) {
+  const context = {}
+  for (const [file, scope] of files)
+    if ((scope === 'shared' || scope === 'release') && fs.existsSync(file))
+      Object.assign(context, parseEnvFile(file))
+  return context
 }
 
 /** Every way a release, preview or non-development EAS build would resolve a Test Store key. */
@@ -161,20 +195,27 @@ export function keyHygieneProblems(root) {
   for (const name of loaded)
     if (!ROOT_ENV_FILES[name])
       problems.push(`app.config.ts loads ${name}, which this spec does not scope`)
-  for (const [name, scope] of Object.entries(ROOT_ENV_FILES))
-    if (loaded.includes(name))
-      problems.push(...envFileProblems(path.join(root, name), name, scope))
-  problems.push(
-    ...envFileProblems(path.join(root, '.env.example'), '.env.example', 'shared')
+  const rootFiles = Object.entries(ROOT_ENV_FILES)
+    .filter(([name]) => loaded.includes(name))
+    .map(([name, scope]) => [path.join(root, name), name, scope])
+  const mobileFiles = fs
+    .readdirSync(mobile)
+    .filter((entry) => entry.startsWith('.env'))
+    .map((name) => [
+      path.join(mobile, name),
+      `apps/mobile/${name}`,
+      mobileEnvFileScope(name),
+    ])
+  const context = buildEnvContext(
+    [...rootFiles, ...mobileFiles].map(([file, , scope]) => [file, scope])
   )
 
-  for (const name of fs.readdirSync(mobile).filter((entry) => entry.startsWith('.env')))
-    problems.push(
-      ...envFileProblems(
-        path.join(mobile, name),
-        `apps/mobile/${name}`,
-        mobileEnvFileScope(name)
-      )
-    )
+  for (const [file, label, scope] of rootFiles)
+    problems.push(...envFileProblems(file, label, scope, context))
+  problems.push(
+    ...envFileProblems(path.join(root, '.env.example'), '.env.example', 'shared', {})
+  )
+  for (const [file, label, scope] of mobileFiles)
+    problems.push(...envFileProblems(file, label, scope, context))
   return problems
 }
