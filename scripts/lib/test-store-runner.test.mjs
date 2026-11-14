@@ -88,7 +88,14 @@ function fakeIo({ server, faults = {} }) {
     'purchase-failure': () => {
       if (faults.failureEntitles) paid = true
     },
-    'purchase-cancel': () => launches.push('cancelled'),
+    'purchase-cancel': () => {
+      launches.push('cancelled')
+      if (faults.refreshOnCancel) appRefresh()
+      if (faults.leakyError)
+        throw new Error(
+          `maestro failed: GET /api/v1/users/member-1?token=${faults.leakyError}`
+        )
+    },
     'purchase-success': () => {
       buy()
       handlers['assert-entitled']()
@@ -414,4 +421,22 @@ test('every flow the runner calls exists and only targets testIDs the app define
     ['purchase-success.yaml', TEST_STORE_SHEET.success],
   ])
     assert.ok(fs.readFileSync(path.join(FLOW_DIR, flow), 'utf8').includes(label), flow)
+})
+
+test('a refresh during the unpaid cancel fails that step', async () => {
+  const { records } = await run('local', 'purchase', { refreshOnCancel: true })
+  assert.deepEqual(
+    [records.at(-1).step, records.at(-1).error],
+    ['unpaid-cancel', 'test_store_unpaid_refresh_forwarded']
+  )
+})
+
+test('a failing step records a redacted message: no bearer or member id reaches the evidence', async () => {
+  const bearer = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiJtZW1iZXItMSJ9.couturecast-mobile-e2e'
+  const { records } = await run('local', 'purchase', { leakyError: bearer })
+  const failed = records.at(-1)
+  assert.equal(failed.step, 'unpaid-cancel')
+  assert.ok(!JSON.stringify(records).includes(bearer))
+  assert.ok(!JSON.stringify(records).includes('eyJ'))
+  assert.ok(!JSON.stringify(records).includes('member-1'))
 })

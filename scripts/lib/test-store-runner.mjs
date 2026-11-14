@@ -28,12 +28,14 @@ import {
   assertNonComplimentary,
   assertServerPaid,
   assertServerUnpaid,
+  assertNoForwardedRefresh,
   attributeRestore,
   attributeServerPath,
   JourneyError,
   evidenceRecord,
   jsDevEvidence,
   journeyVerdict,
+  redactMessage,
   refreshPolicyFor,
   restoreBoundaryObserved,
 } from './test-store-journey.mjs'
@@ -104,20 +106,24 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
     'native-debuggable-r8': async () => io.minifiedEvidence(),
     // S4-12 order: cancel, then failure, while the member is unentitled and the control is offered.
     'unpaid-cancel': async () => {
+      const since = io.now()
       await io.flow('purchase-cancel')
       return {
         offerings: 'Test Store sheet opened',
         purchaseControlsOffered: true,
         outcome: 'cancelled: quiet return to the offer, no error',
+        ...assertNoForwardedRefresh(io.proxyLog(), since),
         serverState: await unpaid(),
       }
     },
     'unpaid-failure': async () => {
+      const since = io.now()
       await io.flow('purchase-failure')
       return {
         offerings: 'Test Store sheet opened',
         purchaseControlsOffered: true,
         outcome: 'failed: purchase error shown',
+        ...assertNoForwardedRefresh(io.proxyLog(), since),
         serverState: await unpaid(),
       }
     },
@@ -214,8 +220,8 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
           step,
           server,
           pass: false,
-          error: error.code ?? String(error.message).split(':')[0],
-          message: String(error.message).slice(0, 600),
+          error: error.code ?? redactMessage(String(error.message).split(':')[0]),
+          message: redactMessage(error.message),
         })
       )
       break

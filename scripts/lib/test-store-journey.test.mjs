@@ -18,6 +18,9 @@ import {
   journeyVerdict,
   premiumStatusPatterns,
   readData,
+  redactMessage,
+  MESSAGE_CAP,
+  assertNoForwardedRefresh,
   refreshPolicyFor,
   REFRESH_PATH,
   restoreBoundaryObserved,
@@ -418,4 +421,28 @@ test('readData: a non-2xx or a body without data is a coded failure', async () =
     code(/^test_store_api_failed$/)
   )
   await assert.rejects(readData(response(200, {}), 'x'), code(/^test_store_api_shape$/))
+})
+
+test('failure messages lose ids, bearers, keys and queries, and are capped', () => {
+  const member = '7b2c4e8a-1f3d-4c5b-9a6e-0d1f2a3b4c5d'
+  const bearer = 'eyJhbGciOiJub25lIn0.eyJzdWIiOiI3YjJjIn0.couturecast-mobile-e2e'
+  const key = 'test_AbCdEfGhIjKlMnOp1234'
+  const message = `test_store_command_failed: maestro test failed at premium-status-line: GET /api/v1/users/${member}?token=${bearer} key=${key} $RCAnonymousID:abc123def`
+  const redacted = redactMessage(message)
+  for (const secret of [member, bearer, key, 'RCAnonymousID', 'eyJ', 'abc123def'])
+    assert.ok(!redacted.includes(secret), secret)
+  // Readable names survive, so the message still says what failed.
+  assert.match(redacted, /premium-status-line/)
+  assert.ok(redactMessage('x '.repeat(400)).length <= MESSAGE_CAP + 3)
+})
+
+test('an unpaid cancel or failure fails when a refresh reached the API', () => {
+  const log = [
+    { at: at + 5, method: 'POST', path: REFRESH_PATH, action: 'forward', status: 200 },
+  ]
+  assert.deepEqual(assertNoForwardedRefresh(log, at + 10), { refreshesForwarded: 0 })
+  assert.throws(
+    () => assertNoForwardedRefresh(log, at),
+    code(/^test_store_unpaid_refresh_forwarded$/)
+  )
 })

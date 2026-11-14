@@ -14,6 +14,7 @@ import {
   writePrivate,
   writeRunOutputs,
 } from './test-store-output.mjs'
+import { buildMobileE2EAccessToken } from './mobile-e2e-token.mjs'
 import { startApiProxy } from './test-store-proxy.mjs'
 import { memberRef, writeArtifactManifests } from './test-store-runner.mjs'
 
@@ -99,4 +100,31 @@ test('a member id anywhere under the evidence dir fails the run without printing
       error.message.includes(path.join('nested', 'notes.txt')) &&
       !error.message.includes(MEMBER)
   )
+})
+
+// Antigravity r12 P2: every encoding an id can take in a file is found by scanning for the id.
+test('the leak scan finds an id in base64url, base64, double URL, case-changed and \\u-escaped form', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const forms = {
+    'bearer.txt': `Authorization: Bearer ${buildMobileE2EAccessToken(MEMBER)}`,
+    'base64.txt': Buffer.from(`{"appUserID":"${APP_USER}","x":1}`).toString('base64'),
+    'double-url.txt': `GET /x?u=${encodeURIComponent(encodeURIComponent(APP_USER))}`,
+    'upper.txt': `member ${MEMBER.toUpperCase()}`,
+    'escaped.json': JSON.stringify({ u: 'placeholder' }).replace(
+      'placeholder',
+      [...SUBSCRIBER]
+        .map((char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, '0')}`)
+        .join('')
+    ),
+  }
+  for (const [name, text] of Object.entries(forms)) writeEvidence(dirs, name, text)
+  const hits = scanForLeaks(dirs.evidence, IDS)
+  assert.deepEqual(
+    [...new Set(hits.map((hit) => hit.file))].sort(),
+    Object.keys(forms).sort()
+  )
+  // A clean file stays clean: no false positive from the variants.
+  writeEvidence(dirs, 'clean.json', { memberRef: memberRef(MEMBER), step: 'preflight' })
+  assert.ok(!hits.some((hit) => hit.file === 'clean.json'))
+  assert.ok(!scanForLeaks(dirs.evidence, IDS).some((hit) => hit.file === 'clean.json'))
 })

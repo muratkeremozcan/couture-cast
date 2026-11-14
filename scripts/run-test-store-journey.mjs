@@ -465,7 +465,16 @@ if (platform === 'android') {
   if (logcat.status === 0) writePrivate(dirs, 'device.log', logcat.stdout)
 }
 // Fails the run (test_store_evidence_leak) if the member id is anywhere under the evidence dir.
-writeRunOutputs({ dirs, label, report, member })
+writeRunOutputs({
+  dirs,
+  label,
+  report,
+  member,
+  // The bearer (its base64url payload carries the user id), the Test Store key and the preview
+  // bypass value. The RevenueCat app user id and subscriber id are the member's user id
+  // (premium.ts configures appUserID with it), which writeRunOutputs scans for already.
+  extraIds: [member?.token, testStoreKey, ...Object.values(bypassHeaders)],
+})
 console.log(
   JSON.stringify({ label, verdict: result.verdict, wallSeconds: report.wallSeconds })
 )

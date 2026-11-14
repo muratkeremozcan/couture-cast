@@ -167,6 +167,49 @@ const refreshEntries = (log, since) =>
   )
 
 /**
+ * An unpaid cancel or failure never asks the API to pull the ledger: the app refreshes only
+ * after a purchase or restore success (Antigravity r12). Any refresh reaching the API since
+ * `since` fails the step.
+ */
+export function assertNoForwardedRefresh(log, since) {
+  const forwarded = refreshEntries(log, since).filter(
+    (entry) => entry.action === 'forward'
+  )
+  if (forwarded.length)
+    fail('test_store_unpaid_refresh_forwarded', String(forwarded.length))
+  return { refreshesForwarded: 0 }
+}
+
+// Free-form text that could carry an id, a token or a key: URL queries, UUIDs, JWT-shaped and
+// RevenueCat ids, and token-looking runs (TOKEN_RUN below).
+const MESSAGE_REDACTIONS = [
+  /\?[^\s'"]*/g,
+  /\$RCAnonymousID:[^\s'"]*/gi,
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi,
+  /[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,
+]
+// A run of 16 or more token characters that carries a digit or mixes case: a key, a base64
+// payload or an opaque id. Lowercase kebab names (premium-status-line) stay readable.
+// `/` splits a run, so a path stays readable and each of its segments is judged alone.
+const TOKEN_RUN = /[A-Za-z0-9+_=-]{16,}/g
+const looksLikeToken = (run) => /\d/.test(run) || (/[a-z]/.test(run) && /[A-Z]/.test(run))
+export const MESSAGE_CAP = 300
+
+/**
+ * A failure message as the evidence keeps it (Antigravity r12 P2): id-like and query text
+ * replaced with `<redacted>`, capped at MESSAGE_CAP characters. Upstream output (a command's
+ * stderr, an HTTP body) may name a member or carry a bearer; the code alone says what failed.
+ */
+export function redactMessage(message) {
+  let text = String(message ?? '')
+  // The segment after an id-bearing path segment, as the proxy log writes it.
+  text = text.replace(/(\/(?:users|members|receipts|subscribers)\/)[^/\s'"?]+/g, '$1:id')
+  for (const pattern of MESSAGE_REDACTIONS) text = text.replace(pattern, '<redacted>')
+  text = text.replace(TOKEN_RUN, (run) => (looksLikeToken(run) ? '<redacted>' : run))
+  return text.length > MESSAGE_CAP ? `${text.slice(0, MESSAGE_CAP)}...` : text
+}
+
+/**
  * TEA-18: which path delivered the entitlement now on the server.
  *
  * local: the API pulled the ledger because the app's refresh reached it after the purchase
