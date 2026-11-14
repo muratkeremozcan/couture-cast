@@ -9,6 +9,7 @@
 ## Findings (P0–P3)
 
 ### [P2] Cross-file precedence inversion in `revenuecat-key-hygiene.mjs` misses `test_` keys resolved by `app.config.ts` and `@expo/env`
+
 - **Location**: `scripts/ci/revenuecat-key-hygiene.mjs:69-74`, `scripts/ci/revenuecat-key-hygiene.mjs:176-182`, `scripts/ci/revenuecat-key-hygiene.mjs:209-211`
 - **Failure scenario**:
   - At build time with `NODE_ENV=production`, `apps/mobile/app.config.ts:14-17` loads `.env.local`, `.env.prod`, and `.env` with `override: false`, so `.env.local` wins over `.env.prod` which wins over `.env`, and both populate `process.env`. Next, `@expo/env/build/index.js:105-110, 138, 196-200, 222-227` parses `apps/mobile/.env*` and never lets mobile `.env*` files overwrite `systemEnv` (`process.env`).
@@ -19,12 +20,14 @@
   - Mitigated downstream by `revenuecat-bundle-scan.mjs` on exported Hermes bundles, leaving this a static pre-export CI gate bypass (P2).
 
 ### [P3] `revenueCatSubscriberResponseSchema` validates unrelated sibling records globally while a `subscriptions` key mismatch still hits `RevenueCatUnsupportedStoreError`
+
 - **Location**: `apps/api/src/modules/commerce/revenuecat-client.ts:153-176`, `apps/api/src/modules/commerce/revenuecat-client.ts:371-377`, `apps/api/src/modules/commerce/revenuecat-client.ts:248-252`
 - **Failure scenario**:
   - `revenueCatSubscriberResponseSchema` uses `z.record(z.string(), ...)` across all entries of `subscriber.entitlements` and `subscriber.subscriptions`. In probe `unrelated_sibling_entitlement_missing_expires_date`, a valid `premium` entitlement whose sibling `entitlements.beta_perk` omits `expires_date` triggers `RevenueCatResponseShapeError` (`subscriber.entitlements.beta_perk.expires_date: invalid_type`) and keeps that member pinned at 503 on refresh.
   - Conversely, if RevenueCat keys `subscriber.subscriptions` by anything other than `product_identifier` (probe `renamed_subscription_key_format`), or for a `non_subscriptions` purchase (`lifetime_in_non_subscriptions_only`), schema validation passes and `Object.hasOwn(subscriptions, productId)` (`L372`) yields `undefined`, throwing `RevenueCatUnsupportedStoreError(null)` (`permanentLedgerProjectionFailure` -> `{ reason: 'unsupported_store', store: null }`), classifying a response-key change as permanent rather than transient. (Renaming optional `unsubscribe_detected_at` / `billing_issues_detected_at` silently defaults `willRenew` / `status` without triggering any error.)
 
 ### [P3] `junit-report-check.mjs` regex check matches inside CDATA/XML comments and misses `<testcase>` child `<failure>`/`<error>`/`<skipped>` elements
+
 - **Location**: `scripts/ci/junit-report-check.mjs:18-48`
 - **Failure scenario**:
   - All r39 probes pass in `3dccf698` / `b4d334f1` (multi-suite failing second suite, truncated open tag, self-closing `<testsuite/>`, renamed suite class, `<testsuites>` wrapper), and every caller passes the right class/count (`pr-modal-system-bars.yml:97-98`, `pr-share-card-native.yml:255,494`, `pr-task-manager-migration.yml:91-92`).
@@ -67,17 +70,17 @@
 
 ## Mutants Tested (in detached `/tmp/wt-615-mutant-r40`, reverted & removed after)
 
-| Mutant | Change | Result | Killing test(s) |
-|---|---|---|---|
-| `M1_clear_drift_settled_at_event` | Drop `drift_settled_at: null` in `applyLedgerEvent` | **KILLED** | `premium-entitlement.service.spec.ts` (2), `premium-reconciliation.integration.spec.ts` (1) |
-| `M2a_settle_log_count0` | Log settle when `settled.count === 0` | **KILLED** | `billing-reconciliation.service.spec.ts` (1) |
-| `M2b_orderBy_no_nulls_first` | Drop `nulls: 'first'` on `drift_settled_at` orderBy | **KILLED** | `billing-reconciliation.service.spec.ts` (1) |
-| `M3_bypass_rc_zod_gate` | Bypass `revenueCatSubscriberResponseSchema.safeParse` | **KILLED** | `revenuecat-client.spec.ts` (6) |
-| `M4_transfersUnhonoredStore_false` | Short-circuit `transfersUnhonoredStore` to `false` | **KILLED** | `billing-webhook.service.spec.ts` (4) |
-| `M5_skip_dotenv_expand` | Return unexpanded `parsed` in `readEnvEntries` | **KILLED** | `scripts/ci/revenuecat-key-hygiene.test.mjs` (2) |
-| `M6_junit_skip_case_count` | Disable `cases !== tests` check | **KILLED** | `scripts/ci/junit-report-check.test.mjs` (3) |
-| `M7_clear_drift_settled_at_expired_pull` | Drop `drift_settled_at: null` in already-expired pull update | **KILLED** | `premium-entitlement.service.spec.ts` (1) |
-| `M8_clear_drift_settled_at_active_pull` | Drop `drift_settled_at: null` in active/grace pull upsert | **KILLED** | `premium-entitlement.service.spec.ts` (1) |
+| Mutant                                   | Change                                                       | Result     | Killing test(s)                                                                             |
+| ---------------------------------------- | ------------------------------------------------------------ | ---------- | ------------------------------------------------------------------------------------------- |
+| `M1_clear_drift_settled_at_event`        | Drop `drift_settled_at: null` in `applyLedgerEvent`          | **KILLED** | `premium-entitlement.service.spec.ts` (2), `premium-reconciliation.integration.spec.ts` (1) |
+| `M2a_settle_log_count0`                  | Log settle when `settled.count === 0`                        | **KILLED** | `billing-reconciliation.service.spec.ts` (1)                                                |
+| `M2b_orderBy_no_nulls_first`             | Drop `nulls: 'first'` on `drift_settled_at` orderBy          | **KILLED** | `billing-reconciliation.service.spec.ts` (1)                                                |
+| `M3_bypass_rc_zod_gate`                  | Bypass `revenueCatSubscriberResponseSchema.safeParse`        | **KILLED** | `revenuecat-client.spec.ts` (6)                                                             |
+| `M4_transfersUnhonoredStore_false`       | Short-circuit `transfersUnhonoredStore` to `false`           | **KILLED** | `billing-webhook.service.spec.ts` (4)                                                       |
+| `M5_skip_dotenv_expand`                  | Return unexpanded `parsed` in `readEnvEntries`               | **KILLED** | `scripts/ci/revenuecat-key-hygiene.test.mjs` (2)                                            |
+| `M6_junit_skip_case_count`               | Disable `cases !== tests` check                              | **KILLED** | `scripts/ci/junit-report-check.test.mjs` (3)                                                |
+| `M7_clear_drift_settled_at_expired_pull` | Drop `drift_settled_at: null` in already-expired pull update | **KILLED** | `premium-entitlement.service.spec.ts` (1)                                                   |
+| `M8_clear_drift_settled_at_active_pull`  | Drop `drift_settled_at: null` in active/grace pull upsert    | **KILLED** | `premium-entitlement.service.spec.ts` (1)                                                   |
 
 ---
 

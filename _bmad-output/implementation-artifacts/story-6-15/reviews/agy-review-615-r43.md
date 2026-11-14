@@ -9,6 +9,7 @@
 ## Findings
 
 ### P1 — Axis-opening scroll rule passes visibly cut, unreachable text across smaller outer clippers, tall scroll views, and unscrollable Android `ScrollView`s
+
 - **Locations**:
   - `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeWire.swift:105-123` (`TextLayoutProbeWire.cuts`)
   - `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeSnapshot.swift:183-189` (`scrolls(_:horizontally:)`)
@@ -20,6 +21,7 @@
   3. **Unscrollable `ScrollView` on Android / `isScrollEnabled = false` on iOS**: `TextLayoutSnapshot.kt:246-247` sets `scrollsX = ancestor is HorizontalScrollView` and `scrollsY = ancestor is ScrollView` without checking whether content actually overflows the viewport. Under Robolectric, a `300x200` `ScrollView` containing a non-overflowing `300x180` child inside a `300x60` `OverflowViewGroup` with text at `y = 35..85` yielded `visible = ProbeRect(0, 35, 200, 60)` alongside `clip = ProbeRect(0, 35, 200, 85)` (`scrolledAway = false`), opening the `60px` outer clip even though `0px` can scroll. On iOS, `scrolls(_:horizontally:)` checks `contentSize + adjustedContentInset > bounds + 0.5` without checking `scroll.isScrollEnabled`.
 
 ### P2 — iOS `collect` drops views with `alpha <= 0.01`, contradicting TEA's opacity ruling (`0` vs `> 0`) and omitting `opacity: 0` records
+
 - **Locations**:
   - `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeSnapshot.swift:29` (`collect`)
   - Secondary wire precision note: `apps/mobile/modules/text-layout-probe/android/src/main/java/expo/modules/textlayoutprobe/TextLayoutProbeWire.kt:73-77` (`number`)
@@ -29,15 +31,17 @@
   2. When an iOS view becomes hidden (`alpha = 0` or `isHidden = true`), iOS omits its record instead of emitting `opacity: 0`, so `hiddenText()` (`live_font_text_hidden`) receives `invisible = []` on iOS; whereas on Android `alpha = 0f` (`visibility = VISIBLE`) emits `opacity: 0` and triggers `live_font_text_hidden`. (Note also that Android `TextLayoutProbeWire.number` rounds to 4 decimals, so `4e-5f` serializes to `0`.)
 
 ### P2 — Build probe guard (`assertNativeProbeMode`) checks `ios/Podfile` before `pod install` and ignores `ios/Podfile.lock` / `Pods` on `build`
+
 - **Locations**:
   - `scripts/lib/text-layout-probe-mode.mjs:23-26, 52-63`
   - `scripts/run-story68-native.mjs:761-773, 811-815`
-- **What happens**: `PROBE_MODE_FILES.ios` inspects only `ios/Podfile`. During `prebuild`, `assertNativeProbeMode` runs *before* `pod install` (`L762-773`), and during `build` (`L811`) it never verifies `ios/Podfile.lock` (or generated `Pods` target support files).
+- **What happens**: `PROBE_MODE_FILES.ios` inspects only `ios/Podfile`. During `prebuild`, `assertNativeProbeMode` runs _before_ `pod install` (`L762-773`), and during `build` (`L811`) it never verifies `ios/Podfile.lock` (or generated `Pods` target support files).
 - **Concrete failure scenarios**:
   1. If `ios/Podfile` matches a production build (`use_expo_modules!(exclude: ['text-layout-probe'])`), e.g. after switching modes without `--clean` and skipping or failing `pod install`, `assertNativeProbeMode({ platform: 'ios', ... })` passes cleanly while `xcodebuild` still compiles and links `TextLayoutProbe` from stale `ios/Pods` / `Podfile.lock` (reproduced with a synthetic `Podfile` + stale `Podfile.lock` listing `TextLayoutProbe`).
   2. **Minor P3 regex fragility**: `EXCLUDED.ios` (`text-layout-probe-mode.mjs:23-26`) rejects trailing comments (`# ...`) and double quotes (`"text-layout-probe"`), classifying such a production `Podfile` as `'probe'`. On Android `build`, `prepareWorkletsStaging` (`run-story68-native.mjs:789`) runs before `assertNativeProbeMode` (`L811`).
 
 ### P3 — Two test-coverage gaps shown by surviving mutants in `preparedUnlimitedLines` and `TextLayoutProbeMeasure.field`
+
 - **Locations**:
   - `apps/mobile/modules/text-layout-probe/android/src/main/java/expo/modules/textlayoutprobe/TextLayoutSnapshot.kt:387-395` (`preparedUnlimitedLines`), `485-490` (`verticalOffsetOf`), `492-497` (`maxLinesOf`)
   - `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeMeasure.swift:88-90` (`field`)

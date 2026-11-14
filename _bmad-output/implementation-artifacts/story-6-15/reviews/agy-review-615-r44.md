@@ -9,40 +9,46 @@
 ## Findings
 
 ### P1-1 — Real text pushed wholly off-window on both `cold` and `settled` (or in `assertColdControl`) passes as `offWindow`
+
 - **Locations**:
   - `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeWire.swift:142-144`
   - `apps/mobile/modules/text-layout-probe/android/src/main/java/expo/modules/textlayoutprobe/TextLayoutSnapshot.kt:382-384`
   - `scripts/lib/live-font-text-probe.mjs:562-563,722`
   - `scripts/lib/live-font-scale-proof.mjs:976-993,1563-1600`
-- **Failure scenario**: `offWindow` (`clip == nil && disjoint(viewRect, window)`) treats any view wholly outside its window with no scroll reach the same way as a parked bottom sheet, including a non-scrolling horizontal row item pushed past `window.right` or a non-scrolling footer pushed past `window.bottom`. `matchTextProbe` puts `offWindow` records outside `facts` (never judged for clipping), and `hiddenText` only fails when `cold` has strictly more paired on-screen keys (`shown.keys.length < keys.length`). When `cold` at target scale *also* pushes that non-anchor text off-window (or in `assertColdControl`, which never inspects `offWindow`) and accessibility keeps the node in `nodes`, `clipping` and `textHidden` both pass (`verdict: 'fixed'` with healthy identity).
+- **Failure scenario**: `offWindow` (`clip == nil && disjoint(viewRect, window)`) treats any view wholly outside its window with no scroll reach the same way as a parked bottom sheet, including a non-scrolling horizontal row item pushed past `window.right` or a non-scrolling footer pushed past `window.bottom`. `matchTextProbe` puts `offWindow` records outside `facts` (never judged for clipping), and `hiddenText` only fails when `cold` has strictly more paired on-screen keys (`shown.keys.length < keys.length`). When `cold` at target scale _also_ pushes that non-anchor text off-window (or in `assertColdControl`, which never inspects `offWindow`) and accessibility keeps the node in `nodes`, `clipping` and `textHidden` both pass (`verdict: 'fixed'` with healthy identity).
 - **Probe evidence** (`/tmp/wt-615-mutant-r44`):
   - Swift `testR44ProbeNonClippingScrollInsideClipperAndRightOverflowOffWindow` (`cutsB`) & Android `r44ProbeInvertedScrollAndRightOverflowOffWindow`: a label pushed right of `window.right` received `offWindow = true, clipRect = null, scrolledAway = false`.
   - Node `PROBE_4_OFFWINDOW_HIDES_LOST_TEXT` (one-sided on `settled`): `textHidden` caught it (`textHiddenPass: false`), `clippingPass: true`.
   - Node `PROBE_4B_COLD_AND_SETTLED_OFFWINDOW` (both `cold` and `settled` pushed off-window while nodes stay in hierarchy): `textHiddenPass: true`, `clippingPass: true`, only synthetic `identity` failed (`failing: ['identity']`).
 
 ### P1-2 — `staleContent` second-face check can classify non-6.8 target clips as `face: 'staleContent'`
+
 - **Location**: `scripts/lib/live-font-scale-proof.mjs:581-597,1037-1042`
 - **Failure scenario**: `faces()` computes `staleContent` solely from `near(height, rectHeight(targetRecord.viewRect), tolerance) && near(rectHeight(record.contentRect), rectHeight(startRecord.contentRect), tolerance)`. It never checks that `startRecord.contentRect` height actually differed from `targetRecord.contentRect` height (for example, single-line text or Android 14+ large capped text `>= 36sp` whose height is equal at `1.5` and `1.0`), nor that the clip is vertical content height exceeding `clipRect` rather than a fresh horizontal clip (`contentRect.right > clipRect.right`) or truncation (`ellipsize`). A brand-new horizontal overflow at the target scale then receives `face: 'staleContent'` and is accepted into `clippedKeys` / `clipsStale: true`.
 - **Probe evidence** (`/tmp/wt-615-mutant-r44`):
   - Node `PROBE_2A_DETAIL`: on `1.5 -> 1.0`, `outfit-comfort-notes` kept identical height (`40px` at start and target), `coldParityMisses: []`, and adding horizontal overflow (`contentRect.right = viewRect.right + 40`) produced `clipped: [{ key: '["outfit-comfort-notes","t-cf83675a2f00"]#0', reason: 'clipped_by_layout', face: 'staleContent', staleBox: true, staleContent: true }]` and `clipKeys: ['staleContent:cold:["outfit-comfort-notes","t-cf83675a2f00"]#0']`.
 
 ### P2-1 — iOS non-clipping `UIScrollView` (`clipsToBounds == false`) inside an outer clipping ancestor cuts reachable scroll content to `nil`
+
 - **Location**: `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeWire.swift:179` (`TextLayoutProbeSnapshot.swift:176-179`)
 - **Failure scenario**: `Wire.cuts` iterates `for ancestor in ancestors.reversed() where ancestor.clips`. If an outer view clips (`clips: true`) around a `UIScrollView` with `clipsToBounds == false` (RN `overflow: 'visible'` on `ScrollView`) that has positive scroll travel, skipping the non-clipping scroll view skips `widen(...)` too. Reachable content outside the outer clipper is falsely cut to `clip == nil` (`clipped_by_layout`). (Android `TextLayoutSnapshot.kt:255` avoids this by always adding `bounds` for `ScrollView`/`HorizontalScrollView` regardless of `clipChildren`.)
 - **Probe evidence** (`/tmp/wt-615-mutant-r44`):
   - Swift `testR44ProbeNonClippingScrollInsideClipperAndRightOverflowOffWindow` (`cutsA`): `viewRect (y=210..240)` with `scrollY(0, of: 200)` (`clips: false`) inside `rect (y=100..200)` (`clips: true`) yielded `clip = nil`.
 
 ### P2-2 — Inverted `ScrollView` / `FlatList` (`scaleY: -1`) widens the scroll band on the wrong side of the viewport
+
 - **Locations**:
   - `apps/mobile/modules/text-layout-probe/ios/TextLayoutProbeWire.swift:159-162`
   - `apps/mobile/modules/text-layout-probe/android/src/main/java/expo/modules/textlayoutprobe/TextLayoutSnapshot.kt:350-353`
 - **Failure scenario**: `widen` always opens `[span.lo - offset, span.hi + maximum - offset]`, assuming increasing `offset` shifts content upward (`y - d`) in window coordinates. In an inverted RN `FlatList`/`ScrollView` (`scaleY: -1`), `offset = 0` rests at the visual bottom and increasing `offset` moves older content downward (`y + d`) from above `span.lo` into the viewport, causing reachable rows above to get `clip == nil` and unreachable space below to open.
 
 ### P3-1 — Android `TextLayoutProbeWire.number(Double)` throws on `Double.NaN`
+
 - **Location**: `apps/mobile/modules/text-layout-probe/android/src/main/java/expo/modules/textlayoutprobe/TextLayoutProbeWire.kt:77-80`
 - **Detail**: `Double.NaN.coerceIn(0.0, 1.0)` returns `Double.NaN`, so `BigDecimal("NaN")` throws `NumberFormatException` if a view's effective alpha ever evaluates to `NaN` (probe-only build).
 
 ### P3-2 — `useGlyphBox` has no `maxFontSizeMultiplier` cap and rounds at `1.0` on fractional PixelRatio densities
+
 - **Location**: `apps/mobile/components/glyph-box.ts:14-17,23-29`
 - **Detail**: All 5 current callers (`apps/mobile/app/(tabs)/index.tsx:266,837`, `apps/mobile/components/community/community-card.tsx:289,450`, `apps/mobile/components/community/community-post-sheet.tsx:138,161`, `apps/mobile/components/hero/garment-item-tile.tsx:154,207`, `apps/mobile/components/info-banner.tsx:27,58`) omit `maxFontSizeMultiplier` and `allowFontScaling`, so boxes and glyphs scale in 1:1 lockstep from `1.0` past `3.0x` (and clamp at `base` when `fontScale < 1`). If a future caller adds `maxFontSizeMultiplier` to the child `<Text>`, `useGlyphBox` would overgrow past the glyph; at `1.0`, fractional device densities (`2.625`) nudge integer dimensions by `<0.4px`.
 
@@ -68,6 +74,7 @@
 ## Verification & Mutation Summary
 
 ### Baseline Runs (in detached `/tmp/wt-615-mutant-r44` unless noted)
+
 - `npx tsc -p apps/mobile/tsconfig.json --noEmit` (shared tree, read-only): **PASS** (`exit 0`, 0 errors).
 - `node --test scripts/lib/live-font-{capture,pages,text-probe,scale-proof,journey}.test.mjs scripts/lib/text-layout-probe-mode.test.mjs scripts/lib/story68-{native-build-env,release-live-font-command}.test.mjs`: **268 / 268 PASS**.
 - `swift test --package-path apps/mobile/modules/text-layout-probe/ios`: **42 / 42 PASS**.
@@ -75,6 +82,7 @@
 - `apps/mobile/components/glyph-box.test.tsx`: **Not executed** (requires `@vitest/browser-playwright`, excluded by no-Playwright constraint).
 
 ### Targeted Mutants (`/tmp/wt-615-mutant-r44`, all reverted)
+
 - `M1` `live-font-pages.mjs:58` skip post-probe sandwich read -> **KILLED** (`live-font-pages.test.mjs`).
 - `M2` `live-font-pages.mjs:83` disable `scrollPages` end-of-scroll break -> **KILLED** (`live-font-pages.test.mjs`).
 - `M3` `live-font-scale-proof.mjs:587` force `staleContent: false` -> **SURVIVED** `live-font-scale-proof.test.mjs` alone; **KILLED** when run across `live-font-journey.test.mjs`.
