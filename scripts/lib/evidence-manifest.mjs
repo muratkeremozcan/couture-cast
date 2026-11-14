@@ -145,7 +145,11 @@ function git(args, cwd) {
 
 const OBJECT_ID = /^[0-9a-f]{40}(?:[0-9a-f]{24})?$/
 
-/** The commit `rev` names. A success that prints anything but an object id throws. */
+/**
+ * The commit `rev` names, an annotated tag peeled to it. Anything that is not a commit, a tree
+ * or a commit missing from a shallow clone included, throws, as does a success that prints
+ * anything but an object id.
+ */
 function revParse(rev, cwd) {
   const args = ['rev-parse', '--verify', '--end-of-options', `${rev}^{commit}`]
   const sha = git(args, cwd)
@@ -153,11 +157,25 @@ function revParse(rev, cwd) {
   return sha
 }
 
+// Commits verified present, per repository. Only full object ids are kept: a commit that exists
+// stays put, while a name such as HEAD can move, so it is checked on every call.
+const verifiedCommits = new Set()
+
+/** Throws unless `rev` names a commit present in the repository at `cwd`. */
+function verifyCommit(rev, cwd) {
+  const key = `${path.resolve(cwd ?? '.')}\0${rev}`
+  if (verifiedCommits.has(key)) return
+  if (revParse(rev, cwd) === rev) verifiedCommits.add(key)
+}
+
 /**
- * The object id of `path` at `rev`, or null when the path does not exist there: `--quiet` makes
- * that exit 1 with nothing on stderr. Any other ending throws.
+ * The object id of `path` at `rev`, or null when the path does not exist there. `rev` is
+ * verified first (Antigravity r25), since `--quiet` exits 1 alike for a missing path and a
+ * missing commit; then only that exit, with nothing on stderr, reads as absent. Any other ending
+ * throws.
  */
 export function objectId(rev, file, cwd) {
+  verifyCommit(rev, cwd)
   const args = ['rev-parse', '--verify', '--quiet', `${rev}:${file}`]
   const result = spawnGit(args, cwd)
   if (result.status === 1 && result.stdout === '' && result.stderr === '') return null

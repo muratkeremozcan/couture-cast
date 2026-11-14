@@ -323,6 +323,7 @@ case " $* " in
   *"$STUB_MATCH"*)
     if [ "$STUB_MODE" = fail ]; then echo "fatal: stub" >&2; exit 2; fi
     if [ "$STUB_MODE" = garbage ]; then echo "not-an-object-id"; exit 0; fi
+    if [ "$STUB_MODE" = stderr ]; then echo "fatal: stub-detail-1f2e" >&2; exit 1; fi
     exec sleep 30 ;;
 esac
 exec "$REAL_GIT" "$@"
@@ -408,6 +409,76 @@ test('a hung or failing git call throws evidence_git_failed on every path', asyn
       })
     ),
   ])
+})
+
+// Antigravity r25 (1): exit 1 is the not-found status only with nothing on stderr; with a
+// message it is a failure, and the message stays out of the error.
+test('objectId throws on exit 1 with stderr, leaving the stderr text out', async (t) => {
+  const repo = fixtureRepo(t)
+  repo.commit('build')
+  const result = await underStubGit(t, repo, {
+    match: '--quiet',
+    mode: 'stderr',
+    call: "m.objectId(sha, 'package.json')",
+  })
+  assert.deepEqual(result, {
+    error: 'evidence_git_failed:rev-parse:exit_1',
+    code: 'evidence_git_failed',
+  })
+  assert.doesNotMatch(JSON.stringify(result), /stub-detail/)
+})
+
+// Antigravity r25 (2): a shallow clone lacks the older commit, and `--quiet` exits 1 for a
+// missing commit as for a missing path. objectId verifies the commit first, so that throws, and
+// only a path missing under a present commit reads as absent.
+test('objectId on a commit a shallow clone lacks throws; a missing path under it is null', (t) => {
+  const repo = fixtureRepo(t)
+  const first = repo.commit('first')
+  repo.write('docs/notes.md', 'notes')
+  const second = repo.commit('second')
+  const clone = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-shallow-'))
+  t.after(() => fs.rmSync(clone, { recursive: true, force: true }))
+  const cloned = spawnSync(
+    'git',
+    ['clone', '-q', '--depth', '1', `file://${repo.dir}`, clone],
+    { encoding: 'utf8', timeout: 30_000, killSignal: 'SIGKILL' }
+  )
+  assert.equal(cloned.status, 0, cloned.stderr)
+  // Verified in the full repository first: the memo is per repository, so this must not carry
+  // over to the clone.
+  assert.match(objectId(first, 'package.json', repo.dir), /^[0-9a-f]{40}$/)
+  // Twice: a failed verification is not remembered as a pass.
+  for (let round = 0; round < 2; round += 1)
+    assert.throws(() => objectId(first, 'package.json', clone), {
+      message: 'evidence_git_failed:rev-parse:exit_128',
+    })
+  assert.match(objectId(second, 'package.json', clone), /^[0-9a-f]{40}$/)
+  assert.equal(objectId(second, 'scripts/absent.mjs', clone), null)
+})
+
+// Antigravity r25 (3): the build revision peels to a commit; an annotated tag gives its commit,
+// and a tree is refused.
+test('a manifest revision peels an annotated tag to its commit and refuses a tree', (t) => {
+  const repo = fixtureRepo(t)
+  const sha = repo.commit('build')
+  repo.git('tag', '-a', 'v-build', '-m', 'build')
+  assert.notEqual(repo.git('rev-parse', 'v-build'), sha)
+  for (const requireClean of [true, false])
+    assert.equal(
+      writeManifest({ leg: 'live-font', rev: 'v-build', cwd: repo.dir, requireClean })
+        .sha,
+      sha
+    )
+  assert.throws(
+    () =>
+      writeManifest({
+        leg: 'live-font',
+        rev: 'HEAD^{tree}',
+        cwd: repo.dir,
+        requireClean: false,
+      }),
+    { message: 'evidence_git_failed:rev-parse:exit_128', code: 'evidence_git_failed' }
+  )
 })
 
 test('a git that cannot spawn throws evidence_git_failed', async (t) => {
