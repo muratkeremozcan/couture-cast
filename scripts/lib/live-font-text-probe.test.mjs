@@ -367,6 +367,24 @@ describe('validateTextProbeAnswer', () => {
   const ok = () => structuredClone(SAMPLE)
   const asked = { platform: 'android', token: 't1' }
 
+  test('text inputs are known kinds, each on its own platform', () => {
+    const android = ok()
+    android.records[0].kind = 'ReactEditText'
+    assert.doesNotThrow(() => validateTextProbeAnswer(android, asked))
+    android.records[0].kind = 'RCTTextInputComponentView'
+    assert.throws(() => validateTextProbeAnswer(android, asked), {
+      code: 'live_font_text_probe_invalid',
+    })
+    const ios = answerFor(
+      't1',
+      [iosRecord('Caption', [16, 400, 386, 440], { kind: 'RCTTextInputComponentView' })],
+      { platform: 'ios' }
+    )
+    assert.doesNotThrow(() =>
+      validateTextProbeAnswer(ios, { platform: 'ios', token: 't1' })
+    )
+  })
+
   test('a well-formed answer passes as it is', () => {
     assert.deepEqual(validateTextProbeAnswer(ok(), asked), SAMPLE)
     const ios = answerFor('t1', [iosRecord('57°F', [16, 173, 115, 235])], {

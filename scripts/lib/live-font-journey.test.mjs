@@ -50,6 +50,7 @@ function fakeDevice(
     banner,
     hourStart,
     probe,
+    staleScale,
   } = {}
 ) {
   const calls = []
@@ -78,7 +79,7 @@ function fakeDevice(
       : `live-font-mount-community-${screenMount}${tag},${root}`
   }
   const screen = (stage, at, stale) => {
-    const h = stale ? height(SCALES[platform].base) : height(at)
+    const h = stale ? height(staleScale ?? SCALES[platform].base) : height(at)
     const nodes = [
       {
         id: 'community-new-post-label',
@@ -156,7 +157,10 @@ function fakeDevice(
       navigate: async () => step('navigate'),
       capture: async (stage, at) => step(`capture:${stage}:${at}`, screen(stage, at)),
       settle: async (stage, at) =>
-        step(`settle:${stage}:${at}`, screen(stage, at, breakAt === `${stage}:${at}`)),
+        step(
+          `settle:${stage}:${at}`,
+          screen(stage, at, [breakAt].flat().includes(`${stage}:${at}`))
+        ),
       fullText: async (capture) => capture,
       update: async () => {
         updated = true
@@ -752,7 +756,7 @@ describe('runScreenJourney with the text layout probe', () => {
     )
   })
 
-  test('a leg approved by an entry from before the amendment passes and proposes it again', async () => {
+  test('an entry from before the amendment approves nothing and the leg proposes it again', async () => {
     const breaking = () => fakeDevice('android', { breakAt: 'settled:1.5' })
     const fresh = (await run('android', breaking(), options)).legs[0].residualProposal
     const old = { ...fresh, review: { ...fresh.review } }
@@ -763,7 +767,9 @@ describe('runScreenJourney with the text layout probe', () => {
       residualBaselines: [old],
     })
     const [leg] = result.legs
-    assert.equal(leg.pass, true, leg.message)
+    assert.equal(leg.pass, false)
+    assert.equal(leg.error, 'live_font_residual_unapproved')
+    assert.match(leg.message, /predates the TD-05 clip amendment/)
     assert.deepEqual(leg.residualProposal, fresh)
     const proposed = proposedBaselines({ entries: [old] }, [result])
     assert.deepEqual(proposed.entries, [{ ...fresh, evidence: leg.evidence }])
@@ -777,12 +783,12 @@ describe('runScreenJourney with the text layout probe', () => {
   })
 
   // iOS: the New post label is an accessibility group over two text views, "New" and "post".
-  // On the stale settled screen "post" draws at the new scale inside its base-scale box.
+  // On a stale settled or updated screen "post" draws at the new scale inside its stale box.
   const splitNewPost = ({ stage, stale, capture }) => {
     const label = capture.nodes.find((node) => node.id === 'community-new-post-label')
     const [left, top, right, bottom] = rectOf(label.bounds)
     const post = probeRecord('ios', 'post', [left + 150, top, right, bottom])
-    if (stage === 'settled' && stale)
+    if (['settled', 'updated'].includes(stage) && stale)
       post.contentRect = [left + 150, top, right, bottom + 20]
     return {
       ...capture,
@@ -798,6 +804,34 @@ describe('runScreenJourney with the text layout probe', () => {
   }
   const groupBreaking = () =>
     fakeDevice('ios', { breakAt: 'settled:extra-extra-extra-large', probe: splitNewPost })
+
+  // TEA ruling 2026-11-14: the iOS leg from extra-extra-extra-large keeps that scale's box, and
+  // its clip is the stale box's own, judged against the cold launch it starts from.
+  test('a stale clip on a leg that starts above the base keeps the starting-scale box', async () => {
+    const xxxl = 'extra-extra-extra-large'
+    const fake = () =>
+      fakeDevice('ios', {
+        breakAt: ['settled:accessibility-medium', 'updated:accessibility-medium'],
+        staleScale: xxxl,
+        probe: splitNewPost,
+      })
+    const result = await run('ios', fake(), options)
+    const leg = result.legs[1]
+    assert.deepEqual([leg.from, leg.to], [xxxl, 'accessibility-medium'])
+    assert.equal(leg.error, 'live_font_residual_unapproved', leg.message)
+    // Both stages: the settled box against the cold xxxl launch, the updated box against that
+    // launch's update.
+    assert.deepEqual(leg.residualProposal.clippedKeys, [
+      `cold:${NEW_POST}#0>["","post"]#0`,
+      `updated:${NEW_POST}#0>["","post"]#0`,
+    ])
+    assert.equal(leg.residualProposal.review.clipsStale, true)
+    const approved = await run('ios', fake(), {
+      ...options,
+      residualBaselines: [leg.residualProposal],
+    })
+    assert.equal(approved.legs[1].pass, true, approved.legs[1].message)
+  })
 
   test('a clipped record inside an iOS group is keyed under the group and proposed exactly', async () => {
     const result = await run('ios', groupBreaking(), options)

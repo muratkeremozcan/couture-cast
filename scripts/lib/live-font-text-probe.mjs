@@ -44,11 +44,16 @@ export const TEXT_PROBE_ANSWER_MS = 8_000
 export const TEXT_PROBE_CALL_MS = 30_000
 const POLL_MS = 250
 
-/** The text view classes each platform's probe reports; any other is `unknown:<class>`. */
+/**
+ * The text view classes each platform's probe reports; any other is `unknown:<class>`. Text
+ * inputs (TEA ruling 2026-11-14) are paired like text; a single-line one (maxLines 1) is judged
+ * like text, a multi-line one scrolls its own content and is reported only.
+ */
 export const TEXT_PROBE_KINDS = {
-  android: ['ReactTextView', 'PreparedLayoutTextView'],
-  ios: ['RCTParagraphComponentView'],
+  android: ['ReactTextView', 'PreparedLayoutTextView', 'ReactEditText'],
+  ios: ['RCTParagraphComponentView', 'RCTTextInputComponentView'],
 }
+export const INPUT_KINDS = new Set(['ReactEditText', 'RCTTextInputComponentView'])
 
 /**
  * TEA ruling, 2026-11-14 (F-00i matching, change 5 as amended): on iOS a hierarchy text node is

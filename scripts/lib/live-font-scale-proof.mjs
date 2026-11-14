@@ -29,7 +29,7 @@
 // launch at the same scale, is `clipped_by_layout`. Below 0.87 a residual entry may list such a
 // clip exactly (`clippedKeys`, TD-05 as amended 2026-11-14) when it is the stale box's own.
 
-import { matchTextProbe } from './live-font-text-probe.mjs'
+import { INPUT_KINDS, matchTextProbe } from './live-font-text-probe.mjs'
 
 const FIX_VERSION = [0, 87, 0]
 
@@ -258,6 +258,8 @@ function clipping(capture, tolerance, reference) {
 }
 
 const rectHeight = (rect) => rect[3] - rect[1]
+/** A text input of more than one line (maxLines other than 1): it scrolls its own content. */
+const multilineInput = (record) => INPUT_KINDS.has(record.kind) && record.maxLines !== 1
 const maskText = (text) => (HOUR_LABEL.test(text) ? HOUR_TOKEN : text)
 
 /**
@@ -330,7 +332,8 @@ export function ellipsizedRecords(capture, platform) {
 /**
  * What the report shows of one capture's probe answer for review: the iOS accessibility groups
  * with the record texts each took, the volatile records per region, the covered windows with
- * their record counts, and the records left out as scrolled away, hidden or empty.
+ * their record counts, the paired multi-line inputs (reported, never judged), and the records
+ * left out as scrolled away, hidden or empty.
  */
 export function textProbeSummary(capture, platform) {
   const { pass, code, match } = textLayout(capture, platform)
@@ -358,6 +361,9 @@ export function textProbeSummary(capture, platform) {
     covered: match.covered,
     offscreen: match.offscreen.map((index) => records[index].text),
     hidden: match.hiddenRecords.map((index) => records[index].text),
+    multilineInputs: match.pairs
+      .filter((pair) => multilineInput(records[pair.record]))
+      .map((pair) => records[pair.record].text),
     empty: match.empty.length,
     windowNodes: match.windowNodes.map((index) => identityOf(nodes[index])),
     unmatchedRecords: match.unmatchedRecords.map((index) => records[index].text),
@@ -371,38 +377,54 @@ export function textProbeSummary(capture, platform) {
 
 /**
  * Layout clips of one capture (F-00i). A judged record is `clipped_by_layout` when its content
- * runs past its clipRect by more than the platform tolerance at the top or the bottom (clipRect
- * is the view cut by every clipping ancestor but scroll views and the window, so a text a
- * scroll viewport cuts is no clip, and a hidden record with no clipRect is a full clip), or,
- * given `cold` (the cold launch at the same scale), when it is ellipsized more than its keyed
- * counterpart there (none counts as zero). Given `base` (the cold base launch), each clip
- * records whether its box kept that launch's height (`staleBox`, TEA change 6).
+ * runs past its clipRect by more than the platform tolerance at the top, bottom, left or right
+ * (clipRect is the view cut by every clipping ancestor but scroll views and the window, so a
+ * text a scroll viewport cuts is no clip, and a hidden record with no clipRect is a full clip),
+ * or, given `cold` (the cold launch at the same scale), when it is ellipsized more than its keyed
+ * counterpart there (none counts as zero). A multi-line text input scrolls its own content, so
+ * it is paired and reported but never judged; a single-line one is judged like text. Given
+ * `base` (the cold launch at the leg's starting scale, TEA ruling 2026-11-14), each clip records
+ * whether its box kept that launch's height (`staleBox`, TEA change 6).
  */
+/** Content past its clipRect by more than `tolerance` on any side, or no clipRect at all. */
+function contentClipped(record, tolerance) {
+  const clip = record.clipRect
+  if (clip === null) return true
+  const [left, top, right, bottom] = record.contentRect
+  return (
+    left < clip[0] - tolerance ||
+    top < clip[1] - tolerance ||
+    right > clip[2] + tolerance ||
+    bottom > clip[3] + tolerance
+  )
+}
+
+/** The keyed records of a capture by key, or none when there is no capture. */
+function recordsByKey(capture, platform) {
+  if (!capture) return new Map()
+  return new Map(
+    textLayout(capture, platform)
+      .facts.filter((fact) => fact.key !== null)
+      .map((fact) => [fact.key, fact.record])
+  )
+}
+
 function layoutClips(capture, platform, { cold, base } = {}) {
   const tolerance = HEIGHT_TOLERANCE[platform]
-  const index = (other) =>
-    other
-      ? new Map(
-          textLayout(other, platform)
-            .facts.filter((fact) => fact.key !== null)
-            .map((fact) => [fact.key, fact.record])
-        )
-      : new Map()
-  const [coldRecords, baseRecords] = [index(cold), index(base)]
+  const [coldRecords, baseRecords] = [
+    recordsByKey(cold, platform),
+    recordsByKey(base, platform),
+  ]
   const clips = []
   for (const fact of textLayout(capture, platform).facts) {
     const { record } = fact
-    const clip = record.clipRect
-    const content =
-      clip === null ||
-      record.contentRect[1] < clip[1] - tolerance ||
-      record.contentRect[3] > clip[3] + tolerance
-    const coldEllipsized =
-      fact.key !== null ? (coldRecords.get(fact.key)?.ellipsized ?? 0) : 0
-    const ellipsis =
-      cold !== undefined && fact.key !== null && record.ellipsized > coldEllipsized
+    if (multilineInput(record)) continue
+    const content = contentClipped(record, tolerance)
+    const keyed = fact.key !== null
+    const coldEllipsized = keyed ? (coldRecords.get(fact.key)?.ellipsized ?? 0) : 0
+    const ellipsis = cold !== undefined && keyed && record.ellipsized > coldEllipsized
     if (!content && !ellipsis) continue
-    const baseRecord = fact.key !== null ? baseRecords.get(fact.key) : undefined
+    const baseRecord = keyed ? baseRecords.get(fact.key) : undefined
     clips.push({
       reason: 'clipped_by_layout',
       key: fact.key,
@@ -590,7 +612,7 @@ export function evaluateLiveFontChange({
   cold,
   coldBefore,
   coldBase,
-  coldBaseUpdated,
+  coldBeforeUpdated,
   earlier = [],
   mount,
   updated,
@@ -666,7 +688,9 @@ export function evaluateLiveFontChange({
     ),
     coldParity: parity(settled, cold, before, tolerance, earlier),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
-    clipping: clippingWithLayout(settled, platform, coldBase, { cold, base: coldBase }),
+    // TEA ruling 2026-11-14: a stale box keeps the height of the cold launch at the leg's
+    // starting scale (the cold base launch only on a leg that starts at the base scale).
+    clipping: clippingWithLayout(settled, platform, coldBase, { cold, base: coldBefore }),
     controls: controlsOnScreen(settled, requiredControls),
     // The settled captures only: `immediate` is read while the screen relays out, so its probe
     // answer, a moment after its hierarchy, may show another layout; it is judged for nothing.
@@ -697,7 +721,7 @@ export function evaluateLiveFontChange({
     checks.postUpdateControls = controlsOnScreen(updated, requiredControls)
     checks.postUpdateClipping = clippingWithLayout(updated, platform, coldBase, {
       cold: coldUpdated,
-      base: coldBaseUpdated,
+      base: coldBeforeUpdated,
     })
   }
   markStaleClips(checks)
@@ -740,9 +764,9 @@ function markStaleClips(checks) {
 
 /**
  * A layout clip a residual entry may list (TD-05 as amended 2026-11-14): on a node that is a
- * stale miss of its stage, whose box kept its cold base launch's height. Any other clip is
- * structural: a box that leaves its parent, and a volatile record's or an unpaired hidden
- * record's, which pair with no node, so none is ever stale (markStaleClips).
+ * stale miss of its stage, whose box kept the height of the cold launch at the leg's starting
+ * scale. Any other clip is structural: a box that leaves its parent, and a volatile record's or
+ * an unpaired hidden record's, which pair with no node, so none is ever stale (markStaleClips).
  */
 const residualClip = (entry) =>
   entry.reason === 'clipped_by_layout' && entry.stale && entry.staleBox
@@ -905,14 +929,14 @@ function brokenReviewFacts(baseline) {
     review.controlPass !== true && 'controlPass',
     growthOutside === null && 'growthFailing',
     growthOutside?.length > 0 && `growthFailing(${growthOutside.join(',')})`,
-    // TD-05 as amended 2026-11-14: an amended entry carries the seventh fact.
-    amended(baseline) && review.clipsStale !== true && 'clipsStale',
+    // TD-05 as amended 2026-11-14: the seventh fact.
+    review.clipsStale !== true && 'clipsStale',
   ].filter(Boolean)
 }
 
-/** An entry written since the TD-05 amendment: it names its clips, even none, and clipsStale. */
-const amended = (baseline) =>
-  baseline.clippedKeys !== undefined || baseline.review?.clipsStale !== undefined
+/** An entry from before the TD-05 amendment: it names no clips, not even none, nor clipsStale. */
+const predatesClipAmendment = (baseline) =>
+  baseline.clippedKeys === undefined && baseline.review?.clipsStale === undefined
 
 /**
  * A layout clip key split into its stage, node key and, for a record an iOS group took, the
@@ -952,25 +976,16 @@ function splitClipKey(key) {
 }
 
 /**
- * TD-05 as amended 2026-11-14: why the run's layout clips are not the entry's, or null. An entry
- * written before the amendment (no `clippedKeys`, no `review.clipsStale`) approves only a run
- * with no layout clip; TEA ruled that every such entry is proposed again from a run on the F-00i
- * harness, so it is not refused outright, but it can never approve a clip. An amended entry must
- * carry both fields; each listed key, by its node, must be in `staleKeys`; and the run's clip
- * keys must equal `clippedKeys` exactly, as a multiset. The run's clips reach this point only
- * when each is keyed, stale and kept its cold base launch's height (classify makes any other
- * clip structural).
+ * TD-05 as amended 2026-11-14: why the run's layout clips are not the entry's, or null. The entry
+ * must carry `clippedKeys` (even empty); each listed key, by its node, must be in `staleKeys`;
+ * and the run's clip keys must equal `clippedKeys` exactly, as a multiset. The run's clips reach
+ * this point only when each is stale and kept the height of the cold launch at the leg's starting
+ * scale (classify makes any other clip structural).
  */
 function clipProblem(checks, baseline) {
   const run = clipKeys(checks)
-  if (!amended(baseline))
-    return run.length
-      ? `entry predates the TD-05 clip amendment (no clippedKeys, no clipsStale) and the run has ${run.length} layout clip(s): ${run[0]}; propose it again from this run`
-      : null
   if (!Array.isArray(baseline.clippedKeys))
     return 'baseline clippedKeys must be a list of clip keys'
-  if (baseline.review?.clipsStale === undefined)
-    return 'baseline clippedKeys without review.clipsStale'
   const bad = baseline.clippedKeys.find((key) => splitClipKey(key) === null)
   if (bad !== undefined)
     return `baseline clippedKeys must be a list of clip keys: ${JSON.stringify(bad)}`
@@ -1118,6 +1133,12 @@ function residualApproved(checks, baseline, environment) {
       code: 'live_font_residual_environment_differs',
       reason: differs,
     }
+  // TEA ruling 2026-11-14: an entry from before the clip amendment approves nothing, whether or
+  // not the run clips; every such entry is proposed again from a run on the F-00i harness.
+  if (predatesClipAmendment(baseline))
+    return unapproved(
+      'entry predates the TD-05 clip amendment (no clippedKeys, no clipsStale) and approves nothing; propose it again from this run'
+    )
   const shape = staleKeysProblem(baseline.staleKeys)
   if (shape) return unapproved(shape)
   // An entry approves only with review facts that meet the six approval rules, so a proposal
@@ -1130,7 +1151,7 @@ function residualApproved(checks, baseline, environment) {
   const problem =
     exactnessProblem(checks, baseline, environment.captures) ??
     clipProblem(checks, baseline)
-  return problem ? unapproved(problem) : { pass: true, amended: amended(baseline) }
+  return problem ? unapproved(problem) : { pass: true }
 }
 
 /**
@@ -1149,7 +1170,7 @@ export function proposedResidualEntry(checks, captures) {
   return {
     staleKeys: stageKeys(checks, captures),
     // TD-05 as amended 2026-11-14: the run's exact layout clips, none included, and whether
-    // every one is a stale key's own clip with its box at the cold base launch's height.
+    // every one is a stale key's own clip with its box at the starting-scale cold height.
     clippedKeys: clipKeys(checks),
     review: {
       verdict: classify(checks),
@@ -1208,10 +1229,6 @@ export function assertLiveFontProof({
       captures: change,
     })
     if (!approved.pass) fail(approved.code, approved.reason)
-    // An entry from before the TD-05 clip amendment approved a clip-free run; TEA ruled every
-    // such entry proposed again from the F-00i harness, so the leg says so.
-    if (!approved.amended)
-      return { ...result, fixExpected, baselineReview: false, reproposeEntry: true }
   }
   return {
     ...result,

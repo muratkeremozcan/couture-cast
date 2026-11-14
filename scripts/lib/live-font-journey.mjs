@@ -140,11 +140,6 @@ function judgeLeg({
       verdict: result.verdict,
       baselineReview: result.baselineReview,
       checks: result.checks,
-      // An entry from before the TD-05 clip amendment approved this leg; TEA ruled every such
-      // entry proposed again from the F-00i harness, so the leg proposes its replacement.
-      ...(result.reproposeEntry
-        ? { residualProposal: proposedResidualEntry(result.checks, change) }
-        : {}),
     }
   } catch (error) {
     let evaluated
@@ -300,7 +295,7 @@ export async function runScreenJourney({
         cold: cold[to].reference,
         coldBefore: cold[from].reference,
         coldBase: cold[base].reference,
-        coldBaseUpdated: cold[base].updated,
+        coldBeforeUpdated: cold[from].updated,
         earlier: [...earlier],
         updated,
         coldUpdated: cold[to].updated,

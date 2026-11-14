@@ -685,12 +685,14 @@ describe('assertLiveFontProof', () => {
     timezone: TZ,
     weatherBanner: BANNER,
     staleKeys: STALE_KEYS,
+    clippedKeys: [],
     review: {
       verdict: 'known-residual',
       structuralPass: true,
       everyMissStale: true,
       growthFailing: ['current-condition'],
       controlPass: true,
+      clipsStale: true,
     },
   }
   const attempt =
@@ -1423,6 +1425,7 @@ describe('text layout clipping (F-00i)', () => {
       'immediate',
       'settled',
       'cold',
+      'coldBefore',
       'coldBase',
       'updated',
       'coldUpdated',
@@ -1430,10 +1433,11 @@ describe('text layout clipping (F-00i)', () => {
       if (result[name]) result[name] = probed(result[name])
     return result
   }
-  // The Story 6.8 Home residual with its cold base launch: the 1.0 cold launch keeps the before
-  // heights, so a stale box there is the base launch's box.
+  // The Story 6.8 Home residual with the cold launch at its starting scale, 1.0, which is also
+  // the base: it keeps the before heights, so a stale box there is that launch's box.
+  const coldOne = () => ({ ...stage('before'), stage: 'cold' })
   const residualChange = () =>
-    withAll({ ...bugChange(), coldBase: { ...stage('before'), stage: 'cold' } })
+    withAll({ ...bugChange(), coldBefore: coldOne(), coldBase: coldOne() })
   /** The residual with the stale condition line drawn at 1.5 inside its 1.0 box. */
   const staleClipChange = () => {
     const change = residualChange()
@@ -1513,6 +1517,54 @@ describe('text layout clipping (F-00i)', () => {
       layoutClips(checks.clipping).map((entry) => [entry.text, entry.content]),
       [[TEMPERATURE, true]]
     )
+  })
+
+  // TEA ruling 2026-11-14: content is judged on both axes.
+  test('content past its clip bounds on the left or the right is clipped too', () => {
+    for (const [edge, by] of [
+      [0, -20],
+      [2, 20],
+    ]) {
+      const change = withAll(fixedChange())
+      const record = recordFor(change.settled, TEMPERATURE)
+      record.contentRect = record.contentRect.map((value, at) =>
+        at === edge ? value + by : value
+      )
+      const { checks } = evaluateLiveFontChangeRaw(change)
+      assert.deepEqual(
+        layoutClips(checks.clipping).map((entry) => [entry.text, entry.content]),
+        [[TEMPERATURE, true]],
+        `edge ${edge}`
+      )
+      // Within the tolerance it is no clip.
+      record.contentRect[edge] -= by - Math.sign(by) * 2
+      assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'fixed', `edge ${edge}`)
+    }
+  })
+
+  test('a single-line text input is judged like text; a multi-line one is paired and reported only', () => {
+    const input = (maxLines) => {
+      const change = withAll(fixedChange())
+      Object.assign(recordFor(change.settled, TEMPERATURE), {
+        kind: 'ReactEditText',
+        maxLines,
+      })
+      overflow(change.settled, TEMPERATURE)
+      return change
+    }
+    const single = evaluateLiveFontChangeRaw(input(1))
+    assert.deepEqual(
+      layoutClips(single.checks.clipping).map((entry) => entry.text),
+      [TEMPERATURE]
+    )
+    assert.equal(single.verdict, 'unexpected')
+    for (const maxLines of [null, 4]) {
+      const multi = evaluateLiveFontChangeRaw(input(maxLines))
+      assert.equal(multi.verdict, 'fixed', String(maxLines))
+      assert.deepEqual(multi.checks.textProbe.stages.settled.multilineInputs, [
+        TEMPERATURE,
+      ])
+    }
   })
 
   test('a text collapsed to nothing in an overflow-hidden container is a full clip; one scrolled away is not', () => {
@@ -1649,7 +1701,7 @@ describe('text layout clipping (F-00i)', () => {
     assert.equal(proposedResidualEntry(checks, change).review.clipsStale, false)
   })
 
-  test('the stale box is computed: a clipped box at another height than the cold base launch is unexpected', () => {
+  test('the stale box is computed: a clipped box at another height than the starting-scale cold launch is unexpected', () => {
     const change = staleClipChange()
     // The view itself grew 12 px past the 1.0 box: not the stale box's clip.
     const record = recordFor(change.settled, CONDITION)
@@ -1667,10 +1719,31 @@ describe('text layout clipping (F-00i)', () => {
     )
     assert.equal(verdict, 'unexpected')
     assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
-    // Without the cold base launch nothing proves the box stale.
+    // Without the cold launch at the starting scale nothing proves the box stale.
     const noBase = staleClipChange()
-    delete noBase.coldBase
+    delete noBase.coldBefore
     assert.equal(evaluateLiveFontChangeRaw(noBase).verdict, 'unexpected')
+  })
+
+  // TEA ruling 2026-11-14: on a leg that starts above the base scale the stale box is the
+  // starting scale's, so the cold base launch never decides it.
+  test('the stale box is the cold launch at the leg starting scale, not the cold base launch', () => {
+    const shorten = (capture) => {
+      const record = recordFor(capture, CONDITION)
+      record.viewRect = [...record.viewRect.slice(0, 3), record.viewRect[3] - 11]
+      record.clipRect = record.viewRect
+      record.contentRect = record.viewRect
+    }
+    const baseDiffers = staleClipChange()
+    shorten(baseDiffers.coldBase)
+    const [kept] = layoutClips(evaluateLiveFontChangeRaw(baseDiffers).checks.clipping)
+    assert.deepEqual([kept.staleBox, kept.baseHeight], [true, 51])
+    assert.equal(prove(baseDiffers)().verdict, 'known-residual')
+    const startDiffers = staleClipChange()
+    shorten(startDiffers.coldBefore)
+    const [lost] = layoutClips(evaluateLiveFontChangeRaw(startDiffers).checks.clipping)
+    assert.deepEqual([lost.staleBox, lost.baseHeight], [false, 40])
+    assert.throws(prove(startDiffers), { code: 'live_font_baseline_unexpected' })
   })
 
   test('from 0.87 any clip fails, an approved stale one included', () => {
@@ -1680,26 +1753,19 @@ describe('text layout clipping (F-00i)', () => {
     )
   })
 
-  test('an entry from before the amendment approves only a run with no layout clip', () => {
+  // TEA ruling 2026-11-14: every entry is proposed again on the F-00i harness.
+  test('an entry from before the amendment approves nothing, whether or not the run clips', () => {
     const old = { ...ENTRY, review: { ...ENTRY.review } }
     delete old.clippedKeys
     delete old.review.clipsStale
-    assert.throws(
-      prove(staleClipChange(), old),
-      refused(
-        /entry predates the TD-05 clip amendment .*1 layout clip\(s\): cold:\["current-condition"/
+    for (const change of [staleClipChange(), residualChange()])
+      assert.throws(
+        prove(change, old),
+        refused(/entry predates the TD-05 clip amendment .*approves nothing/)
       )
-    )
-    const clean = prove(residualChange(), old)()
-    assert.equal(clean.verdict, 'known-residual')
-    assert.equal(
-      clean.reproposeEntry,
-      true,
-      'the leg asks for the entry to be proposed again'
-    )
-    // An amended entry with no clips approves the clean run and asks for nothing.
+    // The amended entry with no clips approves the clean run.
     const none = { ...ENTRY, clippedKeys: [] }
-    assert.equal(prove(residualChange(), none)().reproposeEntry, undefined)
+    assert.equal(prove(residualChange(), none)().verdict, 'known-residual')
     // Half an amendment approves nothing.
     const noFact = { ...ENTRY, review: { ...ENTRY.review } }
     delete noFact.review.clipsStale
