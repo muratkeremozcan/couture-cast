@@ -129,7 +129,6 @@ describe('RealRevenueCatClient', () => {
       { premium_monthly: { store: 'test_store' } },
     ],
     ['an Amazon subscription', { premium_monthly: { store: 'amazon' } }],
-    ['no subscription record for the product', {}],
     // An inherited object key is not a store, so it can never pass as one.
     [
       'a store named after an inherited key',
@@ -203,8 +202,8 @@ describe('RealRevenueCatClient', () => {
       }
     )
 
-    it('still refuses every other store we do not sell and a missing record', async () => {
-      for (const subscriptions of [{ premium_monthly: { store: 'amazon' } }, {}]) {
+    it('still refuses every other store we do not sell', async () => {
+      for (const subscriptions of [{ premium_monthly: { store: 'amazon' } }]) {
         fetchMock.mockResolvedValueOnce(
           subscriberResponse({
             entitlements: {
@@ -371,6 +370,117 @@ describe('RealRevenueCatClient', () => {
     expect(caught).toBeInstanceOf(RevenueCatResponseShapeError)
     expect((caught as RevenueCatResponseShapeError).issues).toEqual(issues)
     expect(permanentLedgerProjectionFailure(caught)).toBeNull()
+  })
+
+  // Story 6.15 r40 P3: only the premium entitlement and its own purchase record are held to the
+  // strict schemas; a sibling this API never reads cannot fail the pull.
+  it('projects premium while an unrelated sibling entitlement and subscription are malformed (unrelated_sibling)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      subscriberResponse({
+        entitlements: {
+          premium: {
+            expires_date: '2026-09-12T12:00:00.000Z',
+            product_identifier: 'premium_monthly',
+          },
+          beta_perk: { product_identifier: 'beta_perk_sku' },
+        },
+        subscriptions: {
+          premium_monthly: { store: 'play_store', unsubscribe_detected_at: null },
+          beta_perk_sku: { store_name: 'app_store' },
+        },
+      })
+    )
+
+    await expect(client.getSubscriberEntitlement('user-1')).resolves.toEqual({
+      status: 'active',
+      store: 'play_store',
+      productId: 'premium_monthly',
+      willRenew: true,
+      currentPeriodEnd: new Date('2026-09-12T12:00:00.000Z'),
+    })
+  })
+
+  // A product RC records in neither map means its keys changed: transient, and the member's row
+  // is left for the next pull. Under every TEST_ENV, so no Test Store path can change that.
+  it.each([undefined, 'staging', 'production', 'qa', 'local', 'preview'])(
+    'fails the shape check on a premium product recorded in neither map, TEST_ENV %s (renamed_subscription_key_format)',
+    async (testEnv) => {
+      if (testEnv === undefined) vi.stubEnv('TEST_ENV', undefined as unknown as string)
+      else vi.stubEnv('TEST_ENV', testEnv)
+      fetchMock.mockResolvedValueOnce(
+        subscriberResponse({
+          entitlements: {
+            premium: {
+              expires_date: '2026-09-12T12:00:00.000Z',
+              product_identifier: 'premium_monthly',
+            },
+          },
+          // Keyed by a store transaction id instead of the product id.
+          subscriptions: { 'GPA.3312-0000-1111': { store: 'play_store' } },
+          non_subscriptions: {},
+        })
+      )
+
+      const caught = await client
+        .getSubscriberEntitlement('user-1')
+        .catch((error: unknown) => error)
+
+      expect(caught).toBeInstanceOf(RevenueCatResponseShapeError)
+      expect((caught as RevenueCatResponseShapeError).issues).toEqual([
+        'subscriber.subscriptions.premium_monthly: missing',
+      ])
+      expect(permanentLedgerProjectionFailure(caught)).toBeNull()
+      vi.unstubAllEnvs()
+    }
+  )
+
+  it('refuses a premium product found only in non_subscriptions as permanently unrepresentable (lifetime_in_non_subscriptions_only)', async () => {
+    fetchMock.mockResolvedValueOnce(
+      subscriberResponse({
+        entitlements: {
+          premium: { expires_date: null, product_identifier: 'premium_lifetime' },
+        },
+        subscriptions: {},
+        non_subscriptions: {
+          premium_lifetime: [
+            { id: 'np-1', purchase_date: '2026-08-01T00:00:00Z', store: 'app_store' },
+          ],
+        },
+      })
+    )
+
+    const caught = await client
+      .getSubscriberEntitlement('user-1')
+      .catch((error: unknown) => error)
+
+    expect(caught).toBeInstanceOf(RevenueCatUnrepresentableEntitlementError)
+    expect(permanentLedgerProjectionFailure(caught)).toEqual({
+      reason: 'non_subscription',
+    })
+  })
+
+  it('holds the premium subscription record to its schema', async () => {
+    fetchMock.mockResolvedValueOnce(
+      subscriberResponse({
+        entitlements: {
+          premium: {
+            expires_date: '2026-09-12T12:00:00.000Z',
+            product_identifier: 'premium_monthly',
+          },
+        },
+        subscriptions: {
+          premium_monthly: { store: 'play_store', unsubscribe_detected_at: 7 },
+        },
+      })
+    )
+
+    const caught = await client
+      .getSubscriberEntitlement('user-1')
+      .catch((error: unknown) => error)
+
+    expect((caught as RevenueCatResponseShapeError).issues).toEqual([
+      'subscriber.subscriptions.premium_monthly.unsubscribe_detected_at: invalid_type',
+    ])
   })
 
   it('names the failing paths only, never a response value', async () => {

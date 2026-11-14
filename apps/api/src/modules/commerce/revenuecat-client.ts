@@ -144,38 +144,53 @@ const REVENUECAT_ENTITLEMENT_ID = 'premium'
 const nullableString = z.string().nullable()
 
 /**
- * The slice of RC's v1 subscriber response this client reads, as a schema (story 6.15). Every key
- * whose value decides the projection must be present, null where RC documents null: a renamed or
- * missing key is RevenueCat changing its response, not a fact about the member, so it fails as a
- * transient {@link RevenueCatResponseShapeError} and never as one of the permanent projection
- * errors below. Unknown sibling keys pass, so an additive RC change is never a failure.
+ * RC's v1 subscriber response, checked in two layers (story 6.15). A key the projection reads
+ * must be present, null where RC documents null: a renamed or missing key is RevenueCat changing
+ * its response, not a fact about the member, so it fails as a transient
+ * {@link RevenueCatResponseShapeError} and never as one of the permanent projection errors below.
+ *
+ * The envelope requires the `entitlements` and `subscriptions` maps but reads their entries
+ * loosely, so a sibling entitlement or subscription this API never reads (a `beta_perk` with no
+ * `expires_date`) cannot pin the member at a 503 (r40 P3). Only the `premium` entitlement and its
+ * own purchase record are held to the strict schemas. Unknown sibling keys pass everywhere.
  */
-const revenueCatSubscriberResponseSchema = z
+const revenueCatSubscriberEnvelopeSchema = z
   .object({
     subscriber: z
       .object({
-        entitlements: z.record(
-          z.string(),
-          z
-            .object({ expires_date: nullableString, product_identifier: nullableString })
-            .passthrough()
-        ),
-        subscriptions: z.record(
-          z.string(),
-          z
-            .object({
-              store: nullableString,
-              unsubscribe_detected_at: nullableString.optional(),
-              billing_issues_detected_at: nullableString.optional(),
-            })
-            .passthrough()
-        ),
+        entitlements: z.record(z.string(), z.unknown()),
+        subscriptions: z.record(z.string(), z.unknown()),
+        non_subscriptions: z.record(z.string(), z.unknown()).optional(),
       })
       .passthrough(),
   })
   .passthrough()
 
-type RevenueCatSubscriberResponse = z.infer<typeof revenueCatSubscriberResponseSchema>
+const premiumEntitlementSchema = z
+  .object({ expires_date: nullableString, product_identifier: nullableString })
+  .passthrough()
+
+const premiumSubscriptionSchema = z
+  .object({
+    store: nullableString,
+    unsubscribe_detected_at: nullableString.optional(),
+    billing_issues_detected_at: nullableString.optional(),
+  })
+  .passthrough()
+
+type RevenueCatSubscriberResponse = z.infer<typeof revenueCatSubscriberEnvelopeSchema>
+
+/** Zod issues as `path: code` under `prefix`, never a value: the body can hold attributes. */
+function shapeIssues(error: z.ZodError, prefix: readonly (string | number)[]): string[] {
+  return error.issues.map(
+    (issue) => `${[...prefix, ...issue.path].join('.') || 'response'}: ${issue.code}`
+  )
+}
+
+/** An own-key lookup: an inherited name such as `constructor` is not an entry. */
+function ownEntry(record: Record<string, unknown>, key: string): unknown {
+  return Object.hasOwn(record, key) ? record[key] : undefined
+}
 
 const restStoreMap: Readonly<Record<string, LedgerEntitlementState['store']>> = {
   app_store: 'app_store',
@@ -211,7 +226,13 @@ export class RevenueCatUnsupportedStoreError extends Error {
 }
 
 export class RevenueCatUnrepresentableEntitlementError extends Error {
-  constructor(readonly reason: 'missing_product' | 'no_expiry' | 'invalid_expiry') {
+  constructor(
+    readonly reason:
+      | 'missing_product'
+      | 'no_expiry'
+      | 'invalid_expiry'
+      | 'non_subscription'
+  ) {
     super(`RevenueCat entitlement cannot be represented: ${reason}`)
     this.name = 'RevenueCatUnrepresentableEntitlementError'
   }
@@ -284,18 +305,17 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (!response.ok) {
       throw new RevenueCatRequestError(response.status, 'subscriber GET')
     }
-    const parsed = revenueCatSubscriberResponseSchema.safeParse(await response.json())
+    const parsed = revenueCatSubscriberEnvelopeSchema.safeParse(await response.json())
     if (!parsed.success) {
-      const issues = parsed.error.issues.map(
-        (issue) => `${issue.path.join('.') || 'response'}: ${issue.code}`
-      )
-      this.logger.error(
-        { issues },
-        'RevenueCat subscriber response failed the shape check'
-      )
-      throw new RevenueCatResponseShapeError(issues)
+      throw this.shapeError(shapeIssues(parsed.error, []))
     }
     return this.projectSubscriber(parsed.data)
+  }
+
+  /** Logs a failed shape check once, by path and code only, and returns its transient error. */
+  private shapeError(issues: string[]): RevenueCatResponseShapeError {
+    this.logger.error({ issues }, 'RevenueCat subscriber response failed the shape check')
+    return new RevenueCatResponseShapeError(issues)
   }
 
   async forwardStripeSubscription(
@@ -345,14 +365,22 @@ export class RealRevenueCatClient extends RevenueCatClient {
   private projectSubscriber(
     body: RevenueCatSubscriberResponse
   ): RevenueCatSubscriberEntitlement {
-    const { entitlements, subscriptions } = body.subscriber
-    // Own keys only, as for stores: an inherited name is not an entitlement or a subscription.
-    const entitlement = Object.hasOwn(entitlements, REVENUECAT_ENTITLEMENT_ID)
-      ? entitlements[REVENUECAT_ENTITLEMENT_ID]
-      : undefined
-    if (!entitlement) {
+    const { entitlements, subscriptions, non_subscriptions = {} } = body.subscriber
+    const rawEntitlement = ownEntry(entitlements, REVENUECAT_ENTITLEMENT_ID)
+    if (rawEntitlement === undefined) {
       return null
     }
+    const parsedEntitlement = premiumEntitlementSchema.safeParse(rawEntitlement)
+    if (!parsedEntitlement.success) {
+      throw this.shapeError(
+        shapeIssues(parsedEntitlement.error, [
+          'subscriber',
+          'entitlements',
+          REVENUECAT_ENTITLEMENT_ID,
+        ])
+      )
+    }
+    const entitlement = parsedEntitlement.data
     // An entitlement that is present but that our model cannot represent fails the pull with a
     // permanent error, so refresh serves the member's local state and reconciliation leaves the
     // row's state as it is. Answering null here would read as "no entitlement" and expire a
@@ -361,16 +389,30 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (productId === null) {
       throw new RevenueCatUnrepresentableEntitlementError('missing_product')
     }
-    const subscription = Object.hasOwn(subscriptions, productId)
-      ? subscriptions[productId]
-      : undefined
-    const store = mapRevenueCatRestStore(subscription?.store)
+    const rawSubscription = ownEntry(subscriptions, productId)
+    if (rawSubscription === undefined) {
+      if (ownEntry(non_subscriptions, productId) !== undefined) {
+        // A one-time purchase (a lifetime unlock) is a fact about the member: our model holds
+        // subscriptions only, and retrying cannot change that.
+        throw new RevenueCatUnrepresentableEntitlementError('non_subscription')
+      }
+      // RC records every purchase that grants an entitlement under one of the two maps, keyed by
+      // product id. Finding it in neither means the response changed (r40 P3), not the member.
+      throw this.shapeError([`subscriber.subscriptions.${productId}: missing`])
+    }
+    const parsedSubscription = premiumSubscriptionSchema.safeParse(rawSubscription)
+    if (!parsedSubscription.success) {
+      throw this.shapeError(
+        shapeIssues(parsedSubscription.error, ['subscriber', 'subscriptions', productId])
+      )
+    }
+    const subscription = parsedSubscription.data
+    const store = mapRevenueCatRestStore(subscription.store)
     if (store === undefined) {
       // A store we do not sell (AMAZON, a RevenueCat Test Store purchase outside an explicit local
-      // or preview TEST_ENV) or a missing subscription record never takes a real store's identity
-      // (story 6.15 R3-01, D15). Checked
+      // or preview TEST_ENV) never takes a real store's identity (story 6.15 R3-01, D15). Checked
       // before the expiry, so a lifetime or malformed unsupported entitlement fails the same way.
-      throw new RevenueCatUnsupportedStoreError(subscription?.store ?? null)
+      throw new RevenueCatUnsupportedStoreError(subscription.store)
     }
     if (!entitlement.expires_date) {
       // A lifetime entitlement has no period end in our subscription-only model.
@@ -380,10 +422,9 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (Number.isNaN(expiresAt.getTime())) {
       throw new RevenueCatUnrepresentableEntitlementError('invalid_expiry')
     }
-    const willRenew = !subscription?.unsubscribe_detected_at
+    const willRenew = !subscription.unsubscribe_detected_at
     const inGrace =
-      Boolean(subscription?.billing_issues_detected_at) &&
-      expiresAt.getTime() > Date.now()
+      Boolean(subscription.billing_issues_detected_at) && expiresAt.getTime() > Date.now()
 
     const status: LedgerEntitlementState['status'] =
       expiresAt.getTime() <= Date.now() ? 'expired' : inGrace ? 'grace_period' : 'active'
