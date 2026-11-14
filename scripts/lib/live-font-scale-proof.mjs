@@ -792,6 +792,24 @@ function staleWidthOf(record, { start, target }, tolerance) {
 }
 
 /**
+ * TEA ruling r49 (ii): stale since an earlier leg of the same launch. The box has the height
+ * the same key has at the cold launch of a scale the screen passed through since its launch
+ * (`chain.passed`), and the previous leg's judged capture of this launch (`chain.previous`)
+ * showed the key with that same box, so it was stale there already (iOS 6c85bbb4 Home 1.353 to
+ * 1.786: the hourly labels keep their 1.0 boxes). A relaunch between the legs leaves no chain.
+ */
+function chainedBox(height, chain, tolerance) {
+  if (!chain?.previous) return false
+  return (
+    near(height, rectHeight(chain.previous.viewRect), tolerance) &&
+    chain.passed.some(
+      (record) =>
+        record !== undefined && near(height, rectHeight(record.viewRect), tolerance)
+    )
+  )
+}
+
+/**
  * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14, r44
  * P1-2 and r45), given the cold launches at the leg's starting scale (`start`) and target scale
  * (`target`) and the leg's live `before` capture, keyed. `staleBox` when its box kept the
@@ -808,7 +826,7 @@ function staleWidthOf(record, { start, target }, tolerance) {
  * whether its box misses the target launch's height, the stale miss of a text no parity key
  * names.
  */
-function faces(record, { start, target, before }, tolerance) {
+function faces(record, { start, target, before, chain }, tolerance) {
   const height = rectHeight(record.viewRect)
   const boxMiss =
     target !== undefined && !near(height, rectHeight(target.viewRect), tolerance)
@@ -817,6 +835,7 @@ function faces(record, { start, target, before }, tolerance) {
     staleContent: false,
     staleContentFrom: null,
     staleWidth: false,
+    staleChain: false,
     boxMiss,
     contentAtTarget: false,
   }
@@ -837,6 +856,7 @@ function faces(record, { start, target, before }, tolerance) {
     record.lineCount === source.lineCount
   const second = verticalClip(record, tolerance) && freshBox
   const staleWidth = staleWidthOf(record, { start, target }, tolerance)
+  const staleChain = boxMiss && chainedBox(height, chain, tolerance)
   const staleContentFrom = !second
     ? null
     : keptFrom(start)
@@ -847,12 +867,14 @@ function faces(record, { start, target, before }, tolerance) {
   return {
     staleBox:
       staleWidth ||
+      staleChain ||
       (start !== undefined &&
         near(height, rectHeight(start.viewRect), tolerance) &&
         !near(rectHeight(start.viewRect), targetBox, tolerance)),
     staleContent: staleContentFrom !== null,
     staleContentFrom,
     staleWidth,
+    staleChain,
     boxMiss,
     // The content has the target launch's height: grown text in a stale box (the first face).
     contentAtTarget: near(content, targetContent, tolerance),
@@ -865,7 +887,11 @@ function faces(record, { start, target, before }, tolerance) {
  * when both cold launches and the before capture hold it too; missing in any, it is a clip with
  * no face, so it fails.
  */
-function clipOf(fact, { content, cut, start, target, before, sameCount }, tolerance) {
+function clipOf(
+  fact,
+  { content, cut, start, target, before, chain, sameCount },
+  tolerance
+) {
   const { record } = fact
   const comparable =
     !fact.volatile ||
@@ -873,7 +899,7 @@ function clipOf(fact, { content, cut, start, target, before, sameCount }, tolera
       target !== undefined &&
       before !== undefined &&
       sameCount === true)
-  const shown = faces(record, { start, target, before }, tolerance)
+  const shown = faces(record, { start, target, before, chain }, tolerance)
   return {
     reason: 'clipped_by_layout',
     key: fact.key,
@@ -895,19 +921,30 @@ function clipOf(fact, { content, cut, start, target, before, sameCount }, tolera
           staleContent: false,
           staleContentFrom: null,
           staleWidth: false,
+          staleChain: false,
           boxMiss: shown.boxMiss,
           contentAtTarget: false,
         }),
   }
 }
 
-function layoutClips(capture, platform, { cold, base, before } = {}) {
+function layoutClips(
+  capture,
+  platform,
+  { cold, base, before, passed = [], previous } = {}
+) {
   const tolerance = HEIGHT_TOLERANCE[platform]
   const [coldRecords, baseRecords, beforeRecords] = [
     recordsByKey(cold, platform),
     recordsByKey(base, platform),
     recordsByKey(before, platform),
   ]
+  // TEA ruling r49 (ii): the cold launches of the scales passed since the launch, and the
+  // previous leg's judged capture, read only when it is of this capture's launch.
+  const passedRecords = passed.map((each) => recordsByKey(each, platform))
+  const previousRecords = sameLaunch(previous, capture)
+    ? recordsByKey(previous, platform)
+    : new Map()
   // TEA ruling r47 (r45 P2-1): a volatile key's ordinal means one record only when its region
   // shows that text as often in both cold launches, the before capture and the judged one.
   const counts = [capture, cold, base, before].map((each) =>
@@ -942,6 +979,10 @@ function layoutClips(capture, platform, { cold, base, before } = {}) {
         start: counterpart(baseRecords),
         target: counterpart(coldRecords),
         before: counterpart(beforeRecords),
+        chain: {
+          passed: passedRecords.map(counterpart),
+          previous: counterpart(previousRecords),
+        },
         sameCount: fact.volatile && keyed ? sameCount(fact.key) : true,
       },
       tolerance
@@ -951,6 +992,16 @@ function layoutClips(capture, platform, { cold, base, before } = {}) {
   }
   return clips
 }
+
+/** Two captures of one launch: the same launch id and, when both carry one, the same process. */
+const sameLaunch = (a, b) =>
+  typeof a?.launch === 'string' &&
+  a.launch === b?.launch &&
+  (a.pid === undefined || b.pid === undefined || a.pid === b.pid)
+
+/** The last capture of `stage` among a launch's earlier captures. */
+const lastStage = (earlier, stage) =>
+  [...earlier].reverse().find((capture) => capture?.stage === stage)
 
 /**
  * The box-in-parent check (clipping) with the layout clips beside it, each reason kept apart:
@@ -1120,6 +1171,7 @@ export function evaluateLiveFontChange({
   coldBefore,
   coldBase,
   coldBeforeUpdated,
+  coldEarlier = [],
   earlier = [],
   mount,
   updated,
@@ -1201,6 +1253,8 @@ export function evaluateLiveFontChange({
       cold,
       base: coldBefore,
       before,
+      passed: coldEarlier.map((each) => each.reference),
+      previous: lastStage(earlier, 'settled'),
     }),
     controls: controlsOnScreen(settled, requiredControls),
     // The settled captures only: `immediate` is read while the screen relays out, so its probe
@@ -1238,6 +1292,8 @@ export function evaluateLiveFontChange({
       cold: coldUpdated,
       base: coldBeforeUpdated,
       before,
+      passed: coldEarlier.map((each) => each.updated),
+      previous: lastStage(earlier, 'updated'),
     })
   }
   markStaleClips(checks)
@@ -1363,6 +1419,32 @@ function textProbeCheck(platform, captures) {
  * against the cold parity misses, an updated clip against the post-update ones. A record a group
  * took counts by its group's node.
  */
+const GROUP_VIAS = new Set(['group', 'attached', 'accessibilityHidden'])
+
+/**
+ * Whether a layout clip is a stale miss. A text with a parity key is when that key is a stale
+ * parity miss (`staleKeys`, the set of them), and a group or attached member also on its own
+ * record, its box the starting launch's and not the target launch's, whatever its group node's
+ * parity (TEA ruling r49 (i)). Parity reads page 0 only, so a text only later pages show (keyed,
+ * no parity key) is a stale miss by its own record: its box kept the starting launch's height
+ * (staleBox) and misses the target launch's (boxMiss), and its content has the target launch's
+ * content height (TEA ruling r47, r45 P2-2: a box that is fixed at both scales is no stale box),
+ * or its box kept the starting launch's whole box and the text wraps inside it (staleWidth, TEA
+ * ruling r49).
+ */
+function staleClip(entry, staleKeys) {
+  if (entry.parityKey !== null)
+    return (
+      staleKeys.has(entry.parityKey) ||
+      (GROUP_VIAS.has(entry.via) && entry.staleBox && entry.boxMiss)
+    )
+  return (
+    entry.key !== null &&
+    entry.staleBox &&
+    ((entry.boxMiss && entry.contentAtTarget) || entry.staleWidth)
+  )
+}
+
 function markStaleClips(checks) {
   for (const [clippingCheck, parityCheck] of [
     ['clipping', 'coldParity'],
@@ -1375,18 +1457,7 @@ function markStaleClips(checks) {
     )
     for (const entry of checks[clippingCheck]?.clipped ?? []) {
       if (entry.reason !== 'clipped_by_layout') continue
-      // Parity reads page 0 only, so a text only later pages show (keyed, no parity key) is a
-      // stale miss by its own record: its box kept the starting launch's height (staleBox) and
-      // misses the target launch's (boxMiss), and its content has the target launch's content
-      // height (TEA ruling r47, r45 P2-2: a box that is fixed at both scales is no stale box), or
-      // its box kept the starting launch's whole box and the text wraps inside it (staleWidth,
-      // TEA ruling r49).
-      entry.stale =
-        entry.parityKey !== null
-          ? stale.has(entry.parityKey)
-          : entry.key !== null &&
-            entry.staleBox &&
-            ((entry.boxMiss && entry.contentAtTarget) || entry.staleWidth)
+      entry.stale = staleClip(entry, stale)
       // Which face of the bug the clip is, or null (residualClip).
       entry.face =
         entry.stale && entry.staleBox

@@ -285,6 +285,8 @@ export async function runScreenJourney({
     let from = base
     // Every capture of this launch's earlier legs: heights a measurement cache could hand back.
     const earlier = []
+    // Every scale this launch has shown (TEA ruling r49 (ii): a box may keep any one's height).
+    const passed = [base]
     for (const to of sequence) {
       await io.setScale(to)
       const immediate = await io.capture('immediate', to)
@@ -301,6 +303,7 @@ export async function runScreenJourney({
         coldBefore: cold[from].reference,
         coldBase: cold[base].reference,
         coldBeforeUpdated: cold[from].updated,
+        coldEarlier: passed.map((scale) => cold[scale]),
         earlier: [...earlier],
         updated,
         coldUpdated: cold[to].updated,
@@ -369,6 +372,7 @@ export async function runScreenJourney({
         }
       report.legs.push(leg)
       earlier.push(before, immediate, settled, updated)
+      passed.push(to)
       await io.revert()
       before = await io.fullText(await io.settle('before', to))
       from = to

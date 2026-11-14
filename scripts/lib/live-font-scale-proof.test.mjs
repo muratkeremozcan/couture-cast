@@ -3314,6 +3314,172 @@ describe('text layout clipping (F-00i)', () => {
     }
   })
 
+  // TEA rulings r49 (i) and (ii): the iOS 6c85bbb4 Home hourly ribbon. Each hourly item is an
+  // accessibility group whose label no text view carries; its hour and temperature are members.
+  // Real shapes (box, content, lines) per capture, in points.
+  const HOURLY = 'Cloudy, 68 degrees Fahrenheit, and 3\u202fPM, Precipitation: 0%'
+  const HOURLY_SHAPES = {
+    cold1: { hour: [14.333, 14.036, 1], temp: [16.667, 16.588, 1] },
+    cold1353: { hour: [19, 18.991, 1], temp: [22.666, 22.443, 1] },
+    cold1786: { hour: [25.333, 25.068, 1], temp: [29.667, 29.626, 1] },
+    // Leg 1 to 1.353, settled: still the 1.0 layout, nothing cut.
+    fresh1: { hour: [14.333, 14.036, 1], temp: [16.667, 16.588, 1] },
+    // Leg 1 to 1.353 updated, and leg 1.353 to 1.786 settled: the 1.0 boxes, wrapped 1.353 text.
+    wrapped: { hour: [14.333, 37.981, 2], temp: [16.667, 44.887, 2] },
+  }
+  /** `capture` as iOS sees it with the hourly item in `shape`. */
+  const withHourly = (capture, shape, launch = 'live') => {
+    const shown = {
+      ...capture,
+      launch,
+      nodes: [
+        ...capture.nodes,
+        { id: 'hourly-item', text: HOURLY, bounds: '[42,1690][160,1830]' },
+      ],
+    }
+    const answer = healthyAnswer(shown, 'ios')
+    answer.records = answer.records.filter((record) => record.text !== HOURLY)
+    for (const [text, [box, content, lineCount], top] of [
+      ['3\u202fPM', shape.hour, 1700],
+      ['68°F', shape.temp, 1760],
+    ])
+      answer.records.push(
+        probeRecord('ios', text, [50, top, 150, top + box], {
+          contentRect: [50, top, 140, top + content],
+          lineCount,
+        })
+      )
+    return { ...shown, textProbe: answer }
+  }
+  const hourlyClips = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).filter((clip) =>
+      clip.key?.startsWith('["hourly-item"')
+    )
+  /** A leg on the hourly item: its shapes by stage, the scales passed and the previous leg. */
+  const hourlyLeg = ({ settled, coldBefore, cold, passed = [], previous, launch }) => ({
+    ...fixedChange(),
+    platform: 'ios',
+    before: withHourly(stage('before'), HOURLY_SHAPES[coldBefore]),
+    immediate: withHourly(stage('immediate'), HOURLY_SHAPES[coldBefore]),
+    settled: withHourly(fixedChange().settled, HOURLY_SHAPES[settled], launch),
+    coldBefore: withHourly(
+      { ...stage('before'), stage: 'cold' },
+      HOURLY_SHAPES[coldBefore],
+      'cold-a'
+    ),
+    coldBase: withHourly(
+      { ...stage('before'), stage: 'cold' },
+      HOURLY_SHAPES.cold1,
+      'cold-b'
+    ),
+    cold: withHourly(fixedChange().cold, HOURLY_SHAPES[cold], 'cold-c'),
+    coldEarlier: passed.map((name) => ({
+      reference: withHourly(
+        { ...stage('before'), stage: 'cold' },
+        HOURLY_SHAPES[name],
+        'cold-d'
+      ),
+    })),
+    earlier: previous
+      ? [
+          withHourly(
+            fixedChange().settled,
+            HOURLY_SHAPES[previous.shape],
+            previous.launch
+          ),
+        ]
+      : [],
+  })
+
+  test('a group member whose own box kept the starting launch box is stale on its record', () => {
+    const change = hourlyLeg({
+      settled: 'wrapped',
+      coldBefore: 'cold1',
+      cold: 'cold1353',
+    })
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    // The group node itself is no parity miss: only its members' boxes stayed.
+    assert.equal(
+      checks.coldParity.misses.some((miss) => miss.key.startsWith('["hourly-item"')),
+      false
+    )
+    const clips = hourlyClips(change)
+    assert.deepEqual(
+      clips.map((clip) => [
+        clip.key.slice(clip.key.indexOf('#0>') + 3),
+        clip.via,
+        clip.stale,
+        clip.face,
+      ]),
+      [
+        ['["","<hour>"]#0', 'group', true, 'staleBox'],
+        ['["","68°F"]#0', 'group', true, 'staleBox'],
+      ]
+    )
+    // A member whose box changed with the scale is no stale box: to the target launch's box, or
+    // to another that misses it.
+    for (const [hour, temp] of [
+      [19, 22.666],
+      [16.5, 19.5],
+    ]) {
+      const grown = hourlyLeg({
+        settled: 'wrapped',
+        coldBefore: 'cold1',
+        cold: 'cold1353',
+      })
+      grown.settled = withHourly(fixedChange().settled, {
+        hour: [hour, 37.981, 2],
+        temp: [temp, 44.887, 2],
+      })
+      assert.deepEqual(
+        hourlyClips(grown).map((clip) => [clip.staleBox, clip.stale, clip.face]),
+        [
+          [false, false, null],
+          [false, false, null],
+        ],
+        String(hour)
+      )
+    }
+  })
+
+  test('a box stale since an earlier leg of the launch shows the stale box face', () => {
+    // 1.353 to 1.786: the box is the 1.0 launch's, which the screen showed before, and the
+    // previous leg's settled screen already had it.
+    const chained = (overrides = {}) =>
+      hourlyLeg({
+        settled: 'wrapped',
+        coldBefore: 'cold1353',
+        cold: 'cold1786',
+        passed: ['cold1', 'cold1353'],
+        previous: { shape: 'wrapped', launch: 'live' },
+        ...overrides,
+      })
+    assert.deepEqual(
+      hourlyClips(chained()).map((clip) => [clip.staleChain, clip.staleBox, clip.face]),
+      [
+        [true, true, 'staleBox'],
+        [true, true, 'staleBox'],
+      ]
+    )
+    for (const [name, change] of [
+      // The previous leg showed the box fresh, at its own target's height.
+      ['previous fresh', chained({ previous: { shape: 'cold1353', launch: 'live' } })],
+      // A relaunch between the legs.
+      ['relaunched', chained({ previous: { shape: 'wrapped', launch: 'live-2' } })],
+      // No scale passed whose cold launch had the box.
+      ['never passed', chained({ passed: ['cold1353'] })],
+      ['no previous leg', chained({ previous: undefined })],
+    ])
+      assert.deepEqual(
+        hourlyClips(change).map((clip) => [clip.staleChain, clip.face]),
+        [
+          [false, null],
+          [false, null],
+        ],
+        name
+      )
+  })
+
   // PROBE_1D: an extra row of one text in a volatile region shifts every later ordinal.
   test('PROBE_1D: a region whose count of a text differs between the captures shows no face', () => {
     const change = volatileChange()

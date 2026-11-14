@@ -847,6 +847,35 @@ describe('runScreenJourney with the text layout probe', () => {
     assert.equal(approved.legs[1].pass, true, approved.legs[1].message)
   })
 
+  // TEA ruling r49 (ii), iOS 6c85bbb4 Home: a box that kept the base launch's height through the
+  // first leg keeps it through the second, so the second leg's clip is stale since the first.
+  test('a box stale since an earlier leg of the launch keeps its face on the next leg', async () => {
+    const xxxl = 'extra-extra-extra-large'
+    const fake = () =>
+      fakeDevice('ios', {
+        breakAt: [
+          `settled:${xxxl}`,
+          `updated:${xxxl}`,
+          'settled:accessibility-medium',
+          'updated:accessibility-medium',
+        ],
+        probe: splitNewPost,
+      })
+    const result = await run('ios', fake(), options)
+    const leg = result.legs[1]
+    assert.deepEqual([leg.from, leg.to], [xxxl, 'accessibility-medium'])
+    const clips = ['clipping', 'postUpdateClipping'].flatMap((name) =>
+      leg.checks[name].clipped.filter((clip) => clip.text === 'post')
+    )
+    assert.deepEqual(
+      clips.map((clip) => [clip.staleChain, clip.face]),
+      [
+        [true, 'staleBox'],
+        [true, 'staleBox'],
+      ]
+    )
+  })
+
   // The 6.8 bug's second face (TEA ruling 2026-11-14, Android Release 791123d1, Home and
   // Settings 1.5 to 1.0): the box resizes to 1.0 while the text keeps its 1.5 layout. The fake
   // leg back to 1.0 shows it on New post: a fresh box (the cold 1.0 launch's) whose content is
