@@ -438,6 +438,17 @@ const trackedDirs = new Set(
  * it, which catches paths a test builds from a directory and a file name; shallower ones
  * (`apps/api`) are working directories and labels far more often than reads.
  */
+/**
+ * How the code just before a path literal uses it: an import loads the module it names, and an
+ * import, require.resolve or new URL resolves a directory to its index file.
+ */
+function referenceBefore(code, at) {
+  const before = code.slice(Math.max(0, at - 20), at)
+  const imported = /\b(?:from|import|require)\s*\(?\s*$/.test(before)
+  const resolved = /\b(?:require\.resolve|new\s+URL)\s*\(\s*$/.test(before)
+  return { imported, indexable: imported || resolved }
+}
+
 function filesNamed(source, file, modules = new Set()) {
   const named = new Set()
   const code = source
@@ -448,17 +459,20 @@ function filesNamed(source, file, modules = new Set()) {
     /(['"`])((?:\.{1,2}\/)*[\w@.-]+(?:\/[\w@.-]+)+)\/?\1/g
   )) {
     const literal = match[2]
-    const imported = /\b(?:from|import|require)\s*\(?\s*$/.test(
-      code.slice(Math.max(0, match.index - 20), match.index)
-    )
+    const { imported, indexable } = referenceBefore(code, match.index)
     for (const candidate of [
       path.posix.normalize(literal),
       path.posix.join(path.posix.dirname(file), literal),
     ]) {
-      // A directory resolves to its index only through an import; a directory literal elsewhere
-      // is a path spec ('apps/mobile' in vercel-preview-inputs.mjs), never a read of its index.
+      // A directory resolves to its index only through an import, require.resolve or new URL;
+      // a directory literal elsewhere is a path spec ('apps/mobile' in vercel-preview-inputs.mjs),
+      // never a read of its index. Known gap: an index reached by a variable import, or by
+      // path.join(dir, 'index.ts') on a two-segment directory literal, counts as no read (a
+      // directory of three or more segments still names every file inside it); no spec does
+      // either today.
       const suffixes = ['', '.ts', '.tsx', '.js', '.mjs']
-      if (imported || !trackedDirs.has(candidate)) suffixes.push('/index.ts', '/index.js')
+      if (indexable || !trackedDirs.has(candidate))
+        suffixes.push('/index.ts', '/index.js')
       const withExtension = suffixes
         .map((suffix) => `${candidate}${suffix}`)
         .find((name) => trackedSet.has(name))
@@ -507,13 +521,23 @@ function filesRead(file) {
   return [...read]
 }
 
-test('a directory literal reads its index only when imported', () => {
+test('a directory literal reads its index only when imported or resolved', () => {
   // vercel-preview-inputs.mjs lists 'apps/mobile' as a path spec; apps/mobile/index.ts exists.
   assert.ok(
     !filesNamed("const outside = ['apps/mobile']", 'scripts/x.mjs').includes(
       'apps/mobile/index.ts'
     )
   )
+  // A two-segment directory names no file inside it, so only the index rule can find these.
+  for (const reference of [
+    "import mobile from '../../apps/mobile'",
+    "require.resolve('../../apps/mobile')",
+    "new URL('../../apps/mobile', import.meta.url)",
+  ])
+    assert.ok(
+      filesNamed(reference, 'scripts/ci/x.mjs').includes('apps/mobile/index.ts'),
+      reference
+    )
   assert.ok(
     filesNamed(
       "import { withHeadlessJsTimers } from '../../modules/headless-js-timers'",
