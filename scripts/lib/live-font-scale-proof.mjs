@@ -293,9 +293,13 @@ function mountsOf(root) {
  * stage, and every other scope any stage shows in every stage too. A marker left out of one
  * capture could hide a remount whose fresh render passes every height check; the runner rereads
  * a dump that drops one (iOS drops a 1x1 view now and then) before it records the capture.
+ * The modal scope stands alone: Android dumps only the modal's window while it is up, so the
+ * root marker never shows there, and the modal is mounted inside the root tree, so a root
+ * remount gives the modal a new mount id too. Where a modal capture does show root (iOS), the
+ * every-scope-in-every-stage rule still holds it.
  */
 function mountsKnown(mounts, mount) {
-  const required = ['root', ...(mount ? [mount] : [])]
+  const required = mount === 'modal' ? ['modal'] : ['root', ...(mount ? [mount] : [])]
   if (!mounts.every((scopes) => scopes && required.every((scope) => scopes.has(scope))))
     return false
   const scopes = new Set(mounts.flatMap((stage) => [...stage.keys()]))

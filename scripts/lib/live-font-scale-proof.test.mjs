@@ -427,6 +427,32 @@ describe('evaluateLiveFontChange', () => {
     assert.notEqual(verdict, 'fixed')
   })
 
+  test('a modal capture with only the modal marker judges identity by the modal mount', () => {
+    // Android dumps only the modal window while it is up (device run 2026-11-13, composer).
+    const change = fixedChange()
+    const modal = 'live-font-mount-modal-m1'
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = modal
+    const kept = evaluateLiveFontChange({ ...change, mount: 'modal' })
+    assert.equal(kept.checks.identity.rootKnown, true)
+    assert.equal(kept.checks.identity.rootKept, true)
+    assert.equal(kept.verdict, 'fixed')
+    // A root remount remounts the modal inside it: a new modal id is no kept identity.
+    change.settled.identity.root = 'live-font-mount-modal-m2'
+    const remounted = evaluateLiveFontChange({ ...change, mount: 'modal' })
+    assert.equal(remounted.checks.identity.rootKept, false)
+    assert.notEqual(remounted.verdict, 'fixed')
+    // Root shown in one modal stage must show in every stage (iOS shows both).
+    change.settled.identity.root = 'live-font-mount-modal-m1,live-font-mount-root-r1'
+    const partial = evaluateLiveFontChange({ ...change, mount: 'modal' })
+    assert.equal(partial.checks.identity.rootKnown, false)
+    // Other screens still need the root marker.
+    for (const name of ['before', 'immediate', 'settled'])
+      change[name].identity.root = 'live-font-mount-settings-s1'
+    const noRoot = evaluateLiveFontChange({ ...change, mount: 'settings' })
+    assert.equal(noRoot.checks.identity.rootKnown, false)
+  })
+
   test('a remount between legs of one launch is caught by the later leg', () => {
     const change = fixedChange()
     const later = 'live-font-mount-root-r1,live-font-mount-settings-s2'

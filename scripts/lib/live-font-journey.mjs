@@ -320,8 +320,9 @@ export function screenRunSteps({ configChange, versionKnown }) {
  * Null when no leg proposes one.
  */
 export function proposedBaselines(current, results) {
+  // A screen that errored before any leg has no legs and proposes nothing.
   const proposals = results.flatMap((result) =>
-    result.legs
+    (result.legs ?? [])
       .filter((leg) => leg.residualProposal)
       .map((leg) => ({ ...leg.residualProposal, evidence: leg.evidence }))
   )

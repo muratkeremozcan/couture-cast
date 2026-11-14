@@ -273,6 +273,16 @@ describe('runScreenJourney', () => {
       proposedBaselines(current, [await run('android', fakeDevice('android'))]),
       null
     )
+    // Every screen errored before a leg (device run 2026-11-13): no proposal, no crash.
+    assert.equal(
+      proposedBaselines(current, [{ screen: 'home', error: 'maestro_failed' }]),
+      null
+    )
+    assert.deepEqual(
+      proposedBaselines(current, [{ screen: 'home', error: 'maestro_failed' }, result])
+        .entries,
+      [{ screen: 'home' }, { ...leg.residualProposal, evidence: leg.evidence }]
+    )
     // The proposal, committed as the baseline, approves exactly that leg.
     const approved = await run(
       'android',
