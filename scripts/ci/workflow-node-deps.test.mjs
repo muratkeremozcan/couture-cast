@@ -214,6 +214,34 @@ describe('the node commands a run block executes', () => {
     assert.deepEqual(nodeLoads(root, run), { scripts: [], inline: ['yaml'] })
   })
 
+  test('<< in a comment or quotes opens no heredoc; any delimiter word closes one (r14)', (t) => {
+    const root = fixture(t, { 'scripts/a.mjs': '' })
+    const scripts = (run) =>
+      nodeLoads(root, run).scripts.map((file) => path.relative(root, file))
+    assert.deepEqual(scripts('# note <<EOF\nnode scripts/a.mjs'), ['scripts/a.mjs'])
+    assert.deepEqual(scripts('echo "a <<EOF"\nnode scripts/a.mjs'), ['scripts/a.mjs'])
+    assert.deepEqual(scripts('cat <<END-OF-MSG\nhello\nEND-OF-MSG\nnode scripts/a.mjs'), [
+      'scripts/a.mjs',
+    ])
+    assert.deepEqual(scripts("cat <<-'X.1'\n\thello\n\tX.1\nnode scripts/a.mjs"), [
+      'scripts/a.mjs',
+    ])
+    assert.deepEqual(scripts('cat <<< "here string"\nnode scripts/a.mjs'), [
+      'scripts/a.mjs',
+    ])
+  })
+
+  test('a relative import in a heredoc fed to node is followed (r14)', (t) => {
+    const root = fixture(t, { 'scripts/a.mjs': yamlScript })
+    const run = "node --input-type=module <<'EOF'\nimport './scripts/a.mjs'\nEOF"
+    const loads = nodeLoads(root, run)
+    assert.deepEqual(
+      loads.scripts.map((file) => path.relative(root, file)),
+      ['scripts/a.mjs']
+    )
+    assert.deepEqual(loads.inline, [])
+  })
+
   test('npm run, npm test, npm --prefix and repository shell scripts are followed', (t) => {
     const root = fixture(t, {
       'package.json': JSON.stringify({

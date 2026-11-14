@@ -434,9 +434,44 @@ function programOf(command, options) {
   return argv
 }
 
+/** The delimiter after `<<` or `<<-` at `j`: quoted or bare, as the shell reads it. */
+function delimiterAt(command, j) {
+  const strip = command[j] === '-'
+  let k = strip ? j + 1 : j
+  while (command[k] === ' ' || command[k] === '\t') k += 1
+  const open = command[k]
+  if (open === "'" || open === '"') {
+    const close = command.indexOf(open, k + 1)
+    return { strip, word: command.slice(k + 1, close < 0 ? undefined : close) }
+  }
+  const word = /^[^\s<>|&;()'"]+/.exec(command.slice(k))?.[0]
+  return word ? { strip, word } : null
+}
+
+/**
+ * The heredoc a command opens, if any: `{ strip, word }` for an unquoted `<<` or `<<-` (not the
+ * `<<<` here-string), with its delimiter word, quoted or bare, read as the shell reads it.
+ */
+function heredocMarker(command) {
+  let quote = ''
+  for (let i = 0; i < command.length; i += 1) {
+    const c = command[i]
+    if (quote) quote = c === quote ? '' : quote
+    else if (c === "'" || c === '"') quote = c
+    else if (
+      command.startsWith('<<', i) &&
+      command[i + 2] !== '<' &&
+      command[i - 1] !== '<'
+    )
+      return delimiterAt(command, i + 2)
+  }
+  return null
+}
+
 /**
  * The run block with each heredoc body taken out, so its lines never read as commands, and the
- * bodies fed to a `node` command (its program on stdin) returned as code.
+ * bodies fed to a `node` command (its program on stdin) returned as code. A `<<` inside a comment
+ * or a quoted string opens nothing.
  */
 function heredocs(run) {
   const lines = run.split('\n')
@@ -445,20 +480,33 @@ function heredocs(run) {
   for (let i = 0; i < lines.length; i += 1) {
     const header = lines[i]
     kept.push(header)
-    const match = /<<(-?)\s*(['"]?)([A-Za-z_]\w*)\2/.exec(header)
-    if (!match) continue
+    const opened = commands(header)
+      .map((command) => ({ command, marker: heredocMarker(command) }))
+      .find(({ marker }) => marker)
+    if (!opened) continue
     const body = []
     while (i + 1 < lines.length) {
       i += 1
-      const line = match[1] ? lines[i].replace(/^\t+/, '') : lines[i]
-      if (line === match[3]) break
+      const line = opened.marker.strip ? lines[i].replace(/^\t+/, '') : lines[i]
+      if (line === opened.marker.word) break
       body.push(line)
     }
-    const command = commands(header).find((c) => /<</.test(c))
-    const [program] = command ? programOf(command) : []
+    const [program] = programOf(opened.command)
     if (program === 'node') nodeCode.push(body.join('\n'))
   }
   return { text: kept.join('\n'), nodeCode }
+}
+
+/** Code fed to node on stdin: its packages, and the relative files it loads from `cwd`. */
+function stdinLoads(root, cwd, nodeCode, loads) {
+  for (const code of nodeCode)
+    for (const specifier of specifiers(code)) {
+      if (!allowed(specifier)) loads.inline.push(specifier)
+      else if (specifier.startsWith('.')) {
+        const file = resolveRelative(path.join(root, cwd, 'stdin.mjs'), specifier)
+        if (file) loads.scripts.add(file)
+      }
+    }
 }
 
 /**
@@ -476,8 +524,7 @@ export function nodeLoads(root, run, cwd = '.', depth = 0) {
   }
   let dir = cwd
   const { text, nodeCode } = heredocs(run)
-  for (const code of nodeCode)
-    loads.inline.push(...specifiers(code).filter((s) => !allowed(s)))
+  stdinLoads(root, cwd, nodeCode, loads)
   for (const command of commands(text)) {
     const [program, ...args] = programOf(command)
     if (program === 'cd' && typeof args[0] === 'string')
