@@ -303,6 +303,58 @@ Step 0 (PR #226) stays on SDK 54 and readies the app and CI:
   Release test build) and on manual dispatch; the iOS 26.5 canary runs at 06:37 UTC. Pre-merge iOS
   evidence is a recorded local run on the pull request's exact head SHA.
 
+### Story 6.15 Test Store journey and preview webhook (D15)
+
+`scripts/run-test-store-journey.mjs` runs the RevenueCat Test Store journey on an emulator or
+simulator in a debuggable build (Android `debug` and `minifiedDebuggable`, iOS Debug). It signs up a
+fresh plain member, puts a loopback proxy in front of the API, starts Metro with that member's
+mobile E2E bearer, the proxy origin and the Test Store public key, and drives
+`maestro/test-store/`. Every evidence record names its server leg and the delivery path it proves
+(TEA-18): `local-reconciliation` or `preview-webhook`. Each installed artifact gets a `test-store`
+evidence manifest.
+
+```bash
+# Local leg: API on 127.0.0.1:4000 with TEST_ENV=local and the Test Store project's
+# REVENUECAT_SECRET_API_KEY (both from .env.local). Purchase, then the lost-mirror restore.
+node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
+  --build debug --server local --artifact apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
+  --over-install apps/mobile/android/app/build/outputs/apk/minifiedDebuggable/app-minifiedDebuggable.apk \
+  --over-install-build minifiedDebuggable --reinstall --out /tmp/test-store-android-debug
+node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
+  --build debug --server local --scenario restore --artifact <same apk> --out /tmp/test-store-restore
+# minifiedDebuggable adds the native debuggable and R8 record (minified-debuggable-evidence.mjs).
+node scripts/run-test-store-journey.mjs --platform android --device emulator-5554 \
+  --build minifiedDebuggable --server local --artifact <app-minifiedDebuggable.apk> --out <dir>
+node scripts/run-test-store-journey.mjs --platform ios --device <udid> --build debug \
+  --server local --artifact <CoutureCast.app> --out <dir>
+```
+
+The proxy logs each request's method, path and status, never a header, query or body. On the
+local leg the entitlement must come from the app's refresh (the API's ledger pull), since no
+RevenueCat webhook reaches a loopback API. On the preview leg the proxy refuses every refresh, so
+an entitlement that still arrives came by webhook.
+
+Preview webhook setup, done once by an operator (the scripts change nothing on Vercel or
+RevenueCat):
+
+1. Vercel, API project, Settings, Deployment Protection, Protection Bypass for Automation: add a
+   secret noted `revenuecat-test-store-webhook`. Store it as
+   `REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET` in `.env.preview`. It is separate from
+   `VERCEL_AUTOMATION_BYPASS_SECRET`, so it can be revoked without touching CI.
+2. Confirm the API preview environment names `TEST_ENV=preview`, `REVENUECAT_WEBHOOK_AUTH` and
+   `REVENUECAT_SECRET_API_KEY`.
+3. RevenueCat, the Test Store project only, Integrations, Webhooks: URL
+   `https://<api-project>-git-<branch-slug>-<team>.vercel.app/api/v1/commerce/subscription/webhooks/revenuecat?x-vercel-protection-bypass=<REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET>`;
+   Authorization header value: the preview `REVENUECAT_WEBHOOK_AUTH`. RevenueCat sends one
+   Authorization value, which the handler still checks, so the Vercel bypass rides in the query.
+4. `node scripts/test-store-preview-webhook.mjs probe --api-url <preview API origin>`: two
+   unauthenticated POSTs through the bypass must get the handler's own JSON 401.
+5. `node scripts/run-test-store-journey.mjs --server preview --api-url <origin> ...`, then
+   `node scripts/test-store-preview-webhook.mjs verify --report <run report> --api-url <origin>`
+   re-reads the member on the preview API's read endpoints and checks the run's proxy log.
+
+`scripts/test-store-preview-webhook.mjs steps --api-url <origin>` prints these steps for an origin.
+
 ### Root Expo configuration conflict
 
 The repository also contains a root [app.json](../../app.json) with a different EAS project ID from
