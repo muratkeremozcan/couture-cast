@@ -682,6 +682,7 @@ Nothing is retried green, quarantined, marked expected-failure or marked `contin
 
 ## Execution record
 
-(Filled in per step: test files, run URLs, p95 tables, baselines, seeded-defect results, differences from the plan.)
+(Filled in per step: test files, run URLs, p95 tables, baselines, seeded-defect results,
+differences from the plan.)
 
 - Step 0, `3d458bcd`: P0-05 and P0-06 seeded defects recorded by the builder (Implementation Notes).
