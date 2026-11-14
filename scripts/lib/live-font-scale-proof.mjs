@@ -323,7 +323,8 @@ export function textLayout(capture, platform, naming) {
 
 /**
  * The judged facts of the paired records, scrolled-away ones left out. A record an iOS group
- * took, or one attached to a node exact text took (TEA ruling r45), is keyed as that node's
+ * took, one attached to a node exact text took (TEA ruling r45), or a flagged accessibility
+ * hidden record joined to an element's node (via `accessibilityHidden`, TEA ruling r49), is keyed as that node's
  * key, `>`, then its own `["",text]#n` among the node's records; a node with no name
  * (a page node no stitch place names) leaves its records unkeyed.
  */
@@ -354,7 +355,7 @@ function pairedFacts(match, { answer, nodes, names }) {
       const own = named?.key ?? null
       return {
         key:
-          own !== null && (pair.via === 'group' || pair.via === 'attached')
+          own !== null && ['group', 'attached', 'accessibilityHidden'].includes(pair.via)
             ? `${own}${groupSuffix(pair)}`
             : own,
         parityKey: named?.parityKey ?? null,
@@ -665,6 +666,17 @@ export function textProbeSummary(capture, platform) {
       elements: entry.elements.length,
     })),
     modalCovered: (match.modalCovered ?? []).map((index) => records[index].text),
+    // TEA ruling r49: flagged accessibility-hidden records joined to an element's node, and
+    // the flagged records two elements or two nodes tie for.
+    accessibilityHidden: (match.hiddenAttached ?? []).map((entry) => ({
+      record: records[entry.record].text,
+      node: identityOf(nodes[entry.node]),
+      identifier: capture.textProbe.elements[entry.element].identifier,
+    })),
+    accessibilityHiddenAmbiguous: (match.hiddenAmbiguous ?? []).map((entry) => ({
+      record: records[entry.record].text,
+      ties: (entry.elements ?? entry.nodes).length,
+    })),
   }
 }
 
@@ -736,11 +748,34 @@ function verticalClip(record, tolerance) {
 }
 
 /**
+ * TEA ruling r49: the first face with a stale width. The box kept the starting launch's whole
+ * box, height and width, which is not the target launch's box, and the grown text wraps inside
+ * that old width to more lines than the target launch draws, so it fits the box's width and
+ * spills below it (Android 6c85bbb4 Community: "Partnered" on 2 lines in its 1.0 box).
+ */
+function staleWidthOf(record, { start, target }, tolerance) {
+  if (start === undefined) return false
+  const [box, from, to] = [record.viewRect, start.viewRect, target.viewRect]
+  const sameBox = (a, b) =>
+    near(rectHeight(a), rectHeight(b), tolerance) &&
+    near(rectWidth(a), rectWidth(b), tolerance)
+  return (
+    sameBox(box, from) &&
+    !sameBox(from, to) &&
+    record.lineCount > target.lineCount &&
+    rectWidth(record.contentRect) <= rectWidth(box) + tolerance &&
+    verticalClip(record, tolerance)
+  )
+}
+
+/**
  * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14, r44
  * P1-2 and r45), given the cold launches at the leg's starting scale (`start`) and target scale
  * (`target`) and the leg's live `before` capture, keyed. `staleBox` when its box kept the
- * starting launch's height and that height is not the target launch's (the first face, which
- * also needs its node to be a stale miss, markStaleClips). `staleContent` when the clip is
+ * starting launch's height and that height is not the target launch's, or its box kept the
+ * starting launch's whole box and the text wraps inside it (`staleWidth`, r49); either is the
+ * first face, which also needs its node to be a stale miss (markStaleClips). `staleContent` when
+ * the clip is
  * vertical (content past the clip at the top or the bottom; a left, right or ellipsis cut alone
  * never is), its box has the target launch's height, and its content keeps a content height
  * that is not the target launch's: the starting launch's (`staleContentFrom: 'startCold'`), or
@@ -758,6 +793,7 @@ function faces(record, { start, target, before }, tolerance) {
     staleBox: false,
     staleContent: false,
     staleContentFrom: null,
+    staleWidth: false,
     boxMiss,
     contentAtTarget: false,
   }
@@ -777,6 +813,7 @@ function faces(record, { start, target, before }, tolerance) {
     near(rectWidth(record.contentRect), rectWidth(source.contentRect), tolerance) &&
     record.lineCount === source.lineCount
   const second = verticalClip(record, tolerance) && freshBox
+  const staleWidth = staleWidthOf(record, { start, target }, tolerance)
   const staleContentFrom = !second
     ? null
     : keptFrom(start)
@@ -786,11 +823,13 @@ function faces(record, { start, target, before }, tolerance) {
         : null
   return {
     staleBox:
-      start !== undefined &&
-      near(height, rectHeight(start.viewRect), tolerance) &&
-      !near(rectHeight(start.viewRect), targetBox, tolerance),
+      staleWidth ||
+      (start !== undefined &&
+        near(height, rectHeight(start.viewRect), tolerance) &&
+        !near(rectHeight(start.viewRect), targetBox, tolerance)),
     staleContent: staleContentFrom !== null,
     staleContentFrom,
+    staleWidth,
     boxMiss,
     // The content has the target launch's height: grown text in a stale box (the first face).
     contentAtTarget: near(content, targetContent, tolerance),
@@ -832,6 +871,7 @@ function clipOf(fact, { content, cut, start, target, before, sameCount }, tolera
           staleBox: false,
           staleContent: false,
           staleContentFrom: null,
+          staleWidth: false,
           boxMiss: shown.boxMiss,
           contentAtTarget: false,
         }),
@@ -1315,11 +1355,15 @@ function markStaleClips(checks) {
       // Parity reads page 0 only, so a text only later pages show (keyed, no parity key) is a
       // stale miss by its own record: its box kept the starting launch's height (staleBox) and
       // misses the target launch's (boxMiss), and its content has the target launch's content
-      // height (TEA ruling r47, r45 P2-2: a box that is fixed at both scales is no stale box).
+      // height (TEA ruling r47, r45 P2-2: a box that is fixed at both scales is no stale box), or
+      // its box kept the starting launch's whole box and the text wraps inside it (staleWidth,
+      // TEA ruling r49).
       entry.stale =
         entry.parityKey !== null
           ? stale.has(entry.parityKey)
-          : entry.key !== null && entry.staleBox && entry.boxMiss && entry.contentAtTarget
+          : entry.key !== null &&
+            entry.staleBox &&
+            ((entry.boxMiss && entry.contentAtTarget) || entry.staleWidth)
       // Which face of the bug the clip is, or null (residualClip).
       entry.face =
         entry.stale && entry.staleBox

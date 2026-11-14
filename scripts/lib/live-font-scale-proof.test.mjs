@@ -3207,6 +3207,113 @@ describe('text layout clipping (F-00i)', () => {
     }
   })
 
+  // TEA ruling r49: the first face with a stale width. Real Android 6c85bbb4 Community 1 to 1.5
+  // shapes, each moved down into the spotlight region with its size and x kept: the settled
+  // record, the 1.0 cold launch's and the 1.5 cold launch's (view, content, lines).
+  const WRAPPED = {
+    '#1': {
+      settled: [[79, 1051, 120, 1098], [79, 1051, 110, 1184], 2],
+      start: [[79, 1051, 120, 1098], [79, 1051, 120, 1098], 1],
+      target: [[69, 1257, 130, 1328], [69, 1257, 130, 1328], 1],
+    },
+    Comments: {
+      settled: [[581, 1519, 753, 1566], [581, 1519, 738, 1652], 2],
+      start: [[581, 1395, 753, 1442], [581, 1395, 753, 1442], 1],
+      target: [[437, 1421, 698, 1492], [437, 1421, 698, 1492], 1],
+    },
+    Partnered: {
+      settled: [[103, 1343, 235, 1382], [103, 1343, 212, 1454], 2],
+      start: [[103, 1301, 235, 1340], [103, 1301, 235, 1340], 1],
+      target: [[103, 1581, 301, 1640], [103, 1581, 301, 1640], 1],
+    },
+    'Temperate and dry': {
+      settled: [[300, 1343, 544, 1382], [300, 1343, 515, 1454], 2],
+      start: [[300, 1301, 544, 1340], [300, 1301, 545, 1340], 1],
+      target: [[366, 1581, 740, 1640], [366, 1581, 740, 1640], 1],
+    },
+  }
+  /** `rect` moved down so its view top sits at 3050, inside the spotlight region. */
+  const intoRegion = (rect, top) => [
+    rect[0],
+    rect[1] - top + 3050,
+    rect[2],
+    rect[3] - top + 3050,
+  ]
+  /** The residual with one wrapped spotlight record of `text`, its shapes changed by `edit`. */
+  const wrappedChange = (text, edit = (shapes) => shapes) => {
+    const shapes = edit(structuredClone(WRAPPED[text]))
+    const change = residualChange()
+    for (const [name, [view, content, lineCount]] of [
+      ['before', shapes.start],
+      ['coldBefore', shapes.start],
+      ['cold', shapes.target],
+      ['settled', shapes.settled],
+    ]) {
+      const capture = change[name]
+      capture.volatileRegions = [REGION_RECT]
+      capture.volatileRegionIds = [REGION]
+      capture.textProbe.records.push(
+        probeRecord('android', text, intoRegion(view, view[1]), {
+          contentRect: intoRegion(content, view[1]),
+          lineCount,
+        })
+      )
+    }
+    return change
+  }
+  const wrappedClip = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).find(
+      (clip) => clip.volatile
+    )
+
+  test('a text wrapped inside its stale starting box shows the stale box face', () => {
+    for (const text of Object.keys(WRAPPED)) {
+      const clip = wrappedClip(wrappedChange(text))
+      assert.deepEqual(
+        [
+          clip.key,
+          clip.comparable,
+          clip.contentAtTarget,
+          clip.staleWidth,
+          clip.stale,
+          clip.face,
+        ],
+        [
+          `volatile:["${REGION}",${JSON.stringify(text)}]#0`,
+          true,
+          false,
+          true,
+          true,
+          'staleBox',
+        ],
+        text
+      )
+    }
+  })
+
+  test('a wrapped text shows no face in a box fixed at both cold launches or past its box', () => {
+    for (const text of Object.keys(WRAPPED)) {
+      const fixed = wrappedChange(text, (shapes) => ({ ...shapes, target: shapes.start }))
+      const wide = wrappedChange(text, (shapes) => {
+        const [view, content] = shapes.settled
+        content[2] = view[2] + 3
+        return shapes
+      })
+      for (const [name, change] of [
+        ['fixed', fixed],
+        ['wider than its box', wide],
+      ]) {
+        const clip = wrappedClip(change)
+        assert.deepEqual(
+          [clip.comparable, clip.staleWidth, clip.face],
+          [true, false, null],
+          `${text}: ${name}`
+        )
+        assert.throws(prove(change), { code: 'live_font_baseline_unexpected' }, text)
+      }
+    }
+  })
+
   // PROBE_1D: an extra row of one text in a volatile region shifts every later ordinal.
   test('PROBE_1D: a region whose count of a text differs between the captures shows no face', () => {
     const change = volatileChange()
@@ -3340,6 +3447,51 @@ describe('text layout clipping (F-00i)', () => {
       { node: '["tab-home","Home"]', records: [''] },
       { node: '["tab-settings","Settings"]', records: [''] },
     ])
+  })
+
+  // TEA ruling r49: the iOS 6c85bbb4 Home teaser pill, hidden from accessibility, joins the link
+  // element's node, keyed under it, and is judged for clipping like any attached record.
+  test('a flagged accessibility-hidden record is keyed under its element node and clip-judged', () => {
+    const LINK = 'home-spotlight-teaser-link'
+    const LABEL =
+      'Standout look in US by Style Explorer 9BC8AA75, 6 reactions. Opens the City Spotlight. ' +
+      'Partnered with Sample Partner'
+    const capture = {
+      stage: 'settled',
+      window: '[0,0][402,874]',
+      nodes: [{ id: LINK, text: LABEL, bounds: '[17,536][385,635]' }],
+    }
+    capture.textProbe = healthyAnswer(capture, 'ios')
+    capture.textProbe.elements = [
+      {
+        hasText: true,
+        identifier: LINK,
+        label: LABEL,
+        rect: [17, 536.667, 385, 635.667],
+        window: 1,
+      },
+    ]
+    const pill = probeRecord('ios', 'Partnered', [37, 639.667, 92.667, 653], {
+      accessibilityHidden: true,
+    })
+    capture.textProbe.records.push(pill)
+    const KEY = `${JSON.stringify([LINK, LABEL])}#0>["","Partnered"]#0`
+    const { pass, facts } = textLayout(capture, 'ios')
+    assert.equal(pass, true)
+    assert.deepEqual(
+      facts.filter((fact) => fact.via === 'accessibilityHidden').map((fact) => fact.key),
+      [KEY]
+    )
+    assert.deepEqual(textProbeSummary(capture, 'ios').accessibilityHidden, [
+      { record: 'Partnered', node: JSON.stringify([LINK, LABEL]), identifier: LINK },
+    ])
+    // Cut at the bottom, it is a clip under that key.
+    pill.contentRect = [37, 639.667, 92.667, 670]
+    const cut = textLayout(capture, 'ios').facts.find((fact) => fact.key === KEY)
+    assert.ok(cut, 'still judged')
+    // Unflagged, the same record is unmatched.
+    pill.accessibilityHidden = false
+    assert.equal(textLayout(capture, 'ios').code, 'live_font_text_probe_unmatched')
   })
 
   // TEA ruling r46: accessibility elements pair nodes no text record takes, but never count as

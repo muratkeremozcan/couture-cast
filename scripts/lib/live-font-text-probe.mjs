@@ -13,14 +13,18 @@
 //     windows: [{ id, rect, z, focused }],
 //     records: [{ kind, text, window, viewRect, visibleRect|null, clipRect|null, contentRect,
 //                 scrolledAway, lineCount, maxLines|null, ellipsized, unlimitedLineCount|null,
-//                 opacity, offWindow? }] }
+//                 opacity, accessibilityHidden, offWindow? }] }
 // Rects are [left, top, right, bottom]: screen pixels on Android (as uiautomator bounds), window
 // points on iOS (as Maestro iOS bounds). `visibleRect` is the view cut by every clipping ancestor
 // and the window; `clipRect` is the view cut by every clipping ancestor except scroll views and
 // the window, so a scroll viewport edge never reads as a clip; `scrolledAway` is true when the
 // view lies outside its nearest scroll view's clip or outside the window; `opacity` is the
 // view's effective opacity, 0 to 1; `offWindow` (optional, false when absent) is true when the
-// view lies wholly outside its window and no scroll view can bring it in.
+// view lies wholly outside its window and no scroll view can bring it in; `accessibilityHidden`
+// (TEA ruling r49, both platforms, required) is true when the text view is hidden from
+// accessibility (importantForAccessibility no-hide-descendants, accessibilityElementsHidden, or
+// not accessible inside an accessible parent), so no hierarchy node carries its text. Stored
+// answers from before the field read as false in the matcher only.
 //
 // Android: `am broadcast -a com.couturecast.textlayoutprobe.DUMP --es token <t> -p <package>`,
 // then `logcat -d -s TextLayoutProbe` lines `begin <t> <chunks> <sha256>`, `chunk <t> <i>
@@ -89,6 +93,7 @@ const RECORD_FIELDS = [
   'ellipsized',
   'unlimitedLineCount',
   'opacity',
+  'accessibilityHidden',
 ].sort()
 const ANSWER_FIELDS = ['elements', 'platform', 'records', 'token', 'version', 'windows']
 /**
@@ -128,6 +133,7 @@ const isMaxLines = (value) => Number.isSafeInteger(value) && value > 0
  */
 const RECORD_RULES = [
   ['text', (record) => typeof record.text === 'string'],
+  ['accessibilityHidden', (record) => typeof record.accessibilityHidden === 'boolean'],
   ['viewRect', (record) => isRect(record.viewRect)],
   ['contentRect', (record) => isRect(record.contentRect)],
   ['visibleRect', (record) => nullOr(isRect)(record.visibleRect)],
@@ -958,6 +964,113 @@ function attachToElements({
     entry.records.sort((a, b) => recordRank.get(a) - recordRank.get(b))
 }
 
+/** Text with every whitespace run one space, trimmed. */
+const normalized = (text) => text.replace(/\s+/g, ' ').trim()
+
+/** The gap between two rects, 0 when they touch or overlap. */
+const gap = (a, b) =>
+  Math.hypot(Math.max(0, a[0] - b[2], b[0] - a[2]), Math.max(0, a[1] - b[3], b[1] - a[3]))
+
+/**
+ * The one element and node a flagged accessibility-hidden record joins (attachHiddenRecords):
+ * `{ element, node }`, `{ ambiguous }` with the tied element or node indexes, or null.
+ */
+function hiddenOwner(record, { nodes, elements }) {
+  const text = normalized(record.text)
+  if (text === '') return null
+  const rect = recordRect(record)
+  const nearest = best(
+    elements
+      .map((element, index) => ({ element, index }))
+      .filter(
+        ({ element }) =>
+          element.identifier !== null && normalized(element.label).includes(text)
+      ),
+    ({ element }) => gap(element.rect, rect)
+  )
+  if (nearest.length > 1) return { ambiguous: { elements: nearest.map((e) => e.index) } }
+  if (!nearest.length) return null
+  const [{ element, index }] = nearest
+  const owners = best(
+    nodes.filter(
+      (node) =>
+        node.id === element.identifier &&
+        node.text === element.label &&
+        overlapRatio(node.box, element.rect) > 0
+    ),
+    (node) => -overlapRatio(node.box, element.rect)
+  )
+  if (owners.length > 1) return { ambiguous: { nodes: owners.map((node) => node.index) } }
+  return owners.length ? { element: index, node: owners[0].index } : null
+}
+
+/**
+ * TEA ruling r49: a record native flags `accessibilityHidden` (a decorative pill or caption whose
+ * words an accessible parent's label carries) that is still free after every other pairing joins
+ * the nearest identified accessibility element (an identifier, not null) whose label contains
+ * its text, whitespace normalized; nearest by the gap between the element's frame and the
+ * record's rect, and two elements at one gap are ambiguous. It joins the hierarchy node of that
+ * element (its testID and label, frames overlapping; of several, the best overlap, a tie
+ * ambiguous): the node's group when the node is one, else its attached records, so each node
+ * keeps one member list. It is keyed as that node's key, `>`, then its own `["",text]#n`, and
+ * judged for clipping like any attached record. A record without the flag never takes this
+ * path, and a flagged record no label contains, or whose element has no node, stays free. Takes
+ * the records it places, or finds ambiguous, out of `free`; returns the placements
+ * `{ record, element, node }` and the ambiguous ones.
+ */
+function attachHiddenRecords({
+  leftover,
+  nodes,
+  elements,
+  groups,
+  attached,
+  free,
+  recordRank,
+}) {
+  const placed = []
+  const ambiguous = []
+  for (const record of leftover.filter((each) => each.accessibilityHidden === true)) {
+    const owner = hiddenOwner(record, { nodes, elements })
+    if (owner === null) continue
+    free.delete(record.index)
+    if (owner.ambiguous) {
+      ambiguous.push({ record: record.index, ...owner.ambiguous })
+      continue
+    }
+    placed.push({ record: record.index, ...owner })
+    const entry =
+      groups.find((each) => each.node === owner.node) ??
+      attached.find((each) => each.node === owner.node)
+    if (entry) entry.records.push(record.index)
+    else attached.push({ node: owner.node, records: [record.index] })
+  }
+  for (const entry of [...groups, ...attached])
+    entry.records.sort((a, b) => recordRank.get(a) - recordRank.get(b))
+  return { placed, ambiguous }
+}
+
+/**
+ * The pairs of every group and attached member, via `group` or `attached`, or
+ * `accessibilityHidden` for a
+ * flagged record attachHiddenRecords placed.
+ */
+function memberPairs({ groups, attached, hidden }) {
+  const placed = new Set(hidden.map((each) => each.record))
+  const pairs = []
+  for (const [via, list] of [
+    ['group', groups],
+    ['attached', attached],
+  ])
+    for (const entry of list)
+      for (const record of entry.records)
+        pairs.push({
+          node: entry.node,
+          record,
+          via: placed.has(record) ? 'accessibilityHidden' : via,
+        })
+  return pairs
+}
+
 /**
  * Pairs the probe records of one capture with its hierarchy text nodes. `nodes` are the app's
  * text nodes ({ text, id, box }, box as [l, t, r, b]), `answer` the checked probe answer,
@@ -1076,12 +1189,17 @@ export function matchTextProbe({
     tolerance,
     recordRank,
   })
-  for (const [via, list] of [
-    ['group', groups],
-    ['attached', attached],
-  ])
-    for (const entry of list)
-      for (const record of entry.records) pairs.push({ node: entry.node, record, via })
+  // TEA ruling r49: last of all, flagged accessibility-hidden records join an element's node.
+  const hidden = attachHiddenRecords({
+    leftover: candidates.filter((record) => free.has(record.index)),
+    nodes: indexed,
+    elements,
+    groups,
+    attached,
+    free,
+    recordRank,
+  })
+  pairs.push(...memberPairs({ groups, attached, hidden: hidden.placed }))
   const unmatchedRecords = classes.visible
     .filter((record) => free.has(record.index))
     .map((record) => record.index)
@@ -1093,7 +1211,9 @@ export function matchTextProbe({
   )
   let code = null
   if (!coverAnswered) code = 'live_font_text_probe_missing'
-  else if (ambiguous.length || elementPairs.ambiguous.length)
+  else if (
+    [ambiguous, elementPairs.ambiguous, hidden.ambiguous].some((list) => list.length)
+  )
     code = 'live_font_text_probe_ambiguous'
   else if (unmatchedRecords.length || unmatchedNodes.length)
     code = 'live_font_text_probe_unmatched'
@@ -1105,6 +1225,8 @@ export function matchTextProbe({
     attached,
     elements: [...elementPairs],
     elementAmbiguous: elementPairs.ambiguous,
+    hiddenAttached: hidden.placed,
+    hiddenAmbiguous: hidden.ambiguous,
     modalCovered: classes.modalCovered.map((record) => record.index),
     ambiguous,
     unmatchedRecords,

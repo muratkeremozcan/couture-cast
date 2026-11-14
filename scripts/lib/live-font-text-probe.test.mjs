@@ -614,6 +614,10 @@ describe('validateTextProbeAnswer', () => {
       'another platform kind': (a) => (a.records[0].kind = 'RCTParagraphComponentView'),
       'extra record field': (a) => (a.records[0].extra = 1),
       'missing record field': (a) => delete a.records[0].clipRect,
+      // TEA ruling r49: required on new answers, a boolean.
+      'no accessibilityHidden': (a) => delete a.records[0].accessibilityHidden,
+      'accessibilityHidden as text': (a) => (a.records[0].accessibilityHidden = 'false'),
+      'accessibilityHidden null': (a) => (a.records[0].accessibilityHidden = null),
       'inverted rect': (a) => (a.records[0].viewRect = [10, 10, 5, 20]),
       'short rect': (a) => (a.records[0].contentRect = [1, 2, 3]),
       'NaN in a rect': (a) => (a.records[0].visibleRect = [0, 0, Number.NaN, 1]),
@@ -1117,6 +1121,183 @@ describe('matchTextProbe, accessibility elements (TEA ruling r46)', () => {
       ],
       [[0], [1], []]
     )
+  })
+})
+
+// TEA ruling r49: the iOS 6c85bbb4 Home spotlight teaser on scroll page 2. The "Partnered" pill and
+// the in-app browser caption are hidden from accessibility; their words live only in the link's
+// and the shop button's labels, so no node carries their text and no element frame holds them.
+describe('matchTextProbe, accessibility-hidden records (TEA ruling r49)', () => {
+  const LINK_LABEL =
+    'Standout look in US by Style Explorer 9BC8AA75, 6 reactions. Opens the City Spotlight. ' +
+    'Partnered with Sample Partner'
+  const SHOP_LABEL = 'Shop this look at Sample Partner. Opens in an in-app browser'
+  const LINK = { id: 'home-spotlight-teaser-link', rect: [17, 536.667, 385, 635.667] }
+  const SHOP = { id: 'home-spotlight-teaser-shop', rect: [29, 665, 373, 709] }
+  const nodes = () => [
+    node(LINK_LABEL, [17, 536, 385, 635], LINK.id),
+    node('Standout look in US', [113, 548, 373, 566], 'home-spotlight-teaser-heading'),
+    node('Style Explorer 9BC8AA75', [113, 568, 373, 584], 'home-spotlight-teaser-author'),
+    node('6 reactions', [113, 586, 373, 602], 'home-spotlight-teaser-reactions'),
+    node(SHOP_LABEL, [29, 665, 373, 709], SHOP.id),
+  ]
+  const PILL = 4
+  const CAPTION = 6
+  /** The page's records; `flag` lists the texts native flags accessibility hidden. */
+  const records = ({
+    flag = ['Partnered', 'Opens in an in-app browser'],
+    pill = 'Partnered',
+  } = {}) => {
+    const hidden = (text) => ({ accessibilityHidden: flag.includes(text) })
+    const under = (ancestor) => ({ identifier: ancestor.id, rect: ancestor.rect })
+    return [
+      iosRecord('Standout look in US', [113, 548.667, 373, 566.667], {
+        accessibilityAncestor: under(LINK),
+      }),
+      iosRecord('Style Explorer 9BC8AA75', [113, 568.667, 373, 584.333], {
+        accessibilityAncestor: under(LINK),
+      }),
+      iosRecord('6 reactions', [113, 586.333, 373, 602], {
+        accessibilityAncestor: under(LINK),
+        ...hidden('6 reactions'),
+      }),
+      iosRecord('See it in the City Spotlight', [113, 608, 373, 623.667], {
+        accessibilityAncestor: under(LINK),
+      }),
+      iosRecord(pill, [37, 639.667, 92.667, 653], hidden(pill)),
+      iosRecord('Shop this look at Sample Partner', [88.333, 678.333, 313.333, 695.333], {
+        accessibilityAncestor: under(SHOP),
+      }),
+      iosRecord('Opens in an in-app browser', [29, 715, 373, 731], {
+        contentRect: [29, 715, 185.152, 731],
+        ...hidden('Opens in an in-app browser'),
+      }),
+    ]
+  }
+  const elements = () => [
+    { hasText: true, identifier: LINK.id, label: LINK_LABEL, rect: LINK.rect, window: 1 },
+    { hasText: true, identifier: SHOP.id, label: SHOP_LABEL, rect: SHOP.rect, window: 1 },
+  ]
+  const teaser = (list = records(), elementList = elements()) =>
+    matchTextProbe({
+      platform: 'ios',
+      nodes: nodes(),
+      answer: answerFor('t', list, {
+        platform: 'ios',
+        windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+        elements: elementList,
+      }),
+      window: [0, 0, 402, 874],
+      tolerance: 1,
+    })
+  const viaOf = (result, index) => result.pairs.find((pair) => pair.record === index)
+
+  test('the teaser pill and caption join the nearest identified element whose label holds them', () => {
+    const result = teaser()
+    assert.equal(result.pass, true, result.code)
+    assert.deepEqual(result.hiddenAttached, [
+      { record: PILL, element: 0, node: 0 },
+      { record: CAPTION, element: 1, node: 4 },
+    ])
+    assert.deepEqual(
+      [viaOf(result, PILL), viaOf(result, CAPTION)],
+      [
+        { node: 0, record: PILL, via: 'accessibilityHidden' },
+        { node: 4, record: CAPTION, via: 'accessibilityHidden' },
+      ]
+    )
+    // Each node keeps one member list: the link's and the shop's groups take them.
+    assert.deepEqual(
+      result.groups.map((group) => [group.node, group.records]),
+      [
+        [0, [3, PILL]],
+        [4, [5, CAPTION]],
+      ]
+    )
+    assert.deepEqual(result.attached, [])
+    // The path runs last: a flagged record a node of its text takes pairs by text.
+    assert.equal(
+      viaOf(
+        teaser(
+          records({ flag: ['6 reactions', 'Partnered', 'Opens in an in-app browser'] })
+        ),
+        2
+      ).via,
+      'text'
+    )
+    // The record text and the label match with whitespace normalized: a caption wrapped in two.
+    const wrapped = records()
+    wrapped[CAPTION].text = 'Opens in an\nin-app  browser'
+    assert.deepEqual(teaser(wrapped).hiddenAttached[1], {
+      record: CAPTION,
+      element: 1,
+      node: 4,
+    })
+  })
+
+  test('an unflagged leftover of the same text, or a flagged one no label holds, stays unmatched', () => {
+    const unflagged = teaser(records({ flag: [] }))
+    assert.deepEqual(
+      [unflagged.code, unflagged.unmatchedRecords, unflagged.hiddenAttached],
+      ['live_font_text_probe_unmatched', [PILL, CAPTION], []]
+    )
+    // An answer from before the field reads as false in the matcher.
+    const old = records()
+    for (const each of old) delete each.accessibilityHidden
+    assert.deepEqual(teaser(old).unmatchedRecords, [PILL, CAPTION])
+    const sponsored = teaser(
+      records({ flag: ['Sponsored', 'Opens in an in-app browser'], pill: 'Sponsored' })
+    )
+    assert.deepEqual(
+      [sponsored.code, sponsored.unmatchedRecords],
+      ['live_font_text_probe_unmatched', [PILL]]
+    )
+    // An element with no identifier never takes one.
+    const anonymous = elements()
+    anonymous[0].identifier = null
+    assert.deepEqual(teaser(records(), anonymous).unmatchedRecords, [PILL])
+    // Nor does one nearer than the identified element: the pill still joins the link.
+    const nearer = [
+      ...elements(),
+      {
+        hasText: false,
+        identifier: null,
+        label: 'Partnered',
+        rect: [33, 637, 97, 655],
+        window: 1,
+      },
+    ]
+    assert.deepEqual(teaser(records(), nearer).hiddenAttached[0], {
+      record: PILL,
+      element: 0,
+      node: 0,
+    })
+    // An element no node stands for leaves it free.
+    const renamed = elements()
+    renamed[0].identifier = 'home-spotlight-teaser-card'
+    assert.deepEqual(teaser(records(), renamed).unmatchedRecords, [PILL])
+  })
+
+  test('two identified elements at one gap from a flagged record are ambiguous', () => {
+    const twins = [
+      ...elements(),
+      { ...elements()[0], identifier: 'home-spotlight-teaser-copy' },
+    ]
+    const result = teaser(records(), twins)
+    assert.deepEqual(
+      [result.code, result.hiddenAmbiguous],
+      ['live_font_text_probe_ambiguous', [{ record: PILL, elements: [0, 2] }]]
+    )
+    // A nearer one decides.
+    const nearer = [
+      ...elements(),
+      {
+        ...elements()[0],
+        identifier: 'home-spotlight-teaser-copy',
+        rect: [17, 400, 385, 500],
+      },
+    ]
+    assert.equal(teaser(records(), nearer).pass, true)
   })
 })
 
