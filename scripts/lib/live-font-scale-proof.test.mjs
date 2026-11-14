@@ -2365,4 +2365,245 @@ describe('text layout clipping (F-00i)', () => {
     delete unanswered.textProbe
     assert.throws(control(unanswered), { code: 'live_font_text_probe_missing' })
   })
+
+  // The leg back from 1.5 to 1.0: the cold 1.5 launch is the starting scale's, the cold 1.0
+  // launch the target's and the base's.
+  const big = (name) => correct(stage('settled'), { stage: name })
+  const small = (name) => ({ ...stage('before'), stage: name })
+  const returnLeg = () =>
+    withAll({
+      platform: 'android',
+      before: big('before'),
+      immediate: small('immediate'),
+      settled: small('settled'),
+      cold: small('cold'),
+      coldBefore: big('cold'),
+      coldBase: small('cold'),
+      anchors: ANCHORS,
+      probes: PROBES,
+    })
+  /** The second face on the condition line: the fresh 1.0 box around its 1.5 content. */
+  const secondFace = () => {
+    const change = returnLeg()
+    const start = recordFor(change.coldBefore, CONDITION).contentRect
+    const record = recordFor(change.settled, CONDITION)
+    record.contentRect = [
+      ...record.contentRect.slice(0, 3),
+      record.contentRect[1] + start[3] - start[1],
+    ]
+    return change
+  }
+  const SECOND_FACE = `staleContent:${CONDITION_KEY}`
+  const faceOf = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).map((entry) => [
+      entry.text,
+      entry.staleBox,
+      entry.staleContent,
+      entry.face,
+    ])
+
+  test('the second face: a fresh box around content of the starting scale height is staleContent and approves', () => {
+    assert.equal(evaluateLiveFontChangeRaw(returnLeg()).verdict, 'fixed')
+    const change = secondFace()
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(faceOf(change), [[CONDITION, false, true, 'staleContent']])
+    assert.equal(verdict, 'known-residual')
+    // Its parity passes, so it lists no stale key.
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual([proposal.staleKeys, proposal.clippedKeys], [[], [SECOND_FACE]])
+    assert.equal(proposal.review.clipsStale, true)
+    const entry = {
+      ...ENTRY,
+      staleKeys: [],
+      clippedKeys: [SECOND_FACE],
+      review: { ...ENTRY.review, growthFailing: [] },
+    }
+    assert.equal(prove(change, entry)().verdict, 'known-residual')
+    assert.throws(prove(change, { ...entry, clippedKeys: [] }), refused(/clip outside/))
+  })
+
+  // TEA r44 P1-2 (PROBE_2A): the second face needs a vertical clip and a content height the
+  // scale changes.
+  test('a horizontal cut or a text whose height the scale keeps is no second face', () => {
+    // PROBE_2A: the temperature keeps one height at both scales; its content runs 40 px past
+    // the right edge of its box.
+    const sideways = returnLeg()
+    const temperature = recordFor(sideways.settled, TEMPERATURE)
+    temperature.contentRect = [
+      ...temperature.contentRect.slice(0, 2),
+      temperature.viewRect[2] + 40,
+      temperature.contentRect[3],
+    ]
+    assert.deepEqual(faceOf(sideways), [[TEMPERATURE, false, false, null]])
+    assert.equal(evaluateLiveFontChangeRaw(sideways).verdict, 'unexpected')
+    assert.throws(prove(sideways), { code: 'live_font_baseline_unexpected' })
+    // Cut at the bottom, with a content height both cold launches share: no face either.
+    const kept = returnLeg()
+    for (const capture of [kept.coldBefore, kept.cold, kept.settled]) {
+      const record = recordFor(capture, TEMPERATURE)
+      record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + 20]
+    }
+    assert.deepEqual(faceOf(kept), [[TEMPERATURE, false, false, null]])
+    assert.equal(evaluateLiveFontChangeRaw(kept).verdict, 'unexpected')
+  })
+
+  test('a single-line text with fresh box and starting-scale content cut only at the right is no face', () => {
+    // 1.0 to 1.5: the box is the cold 1.5 launch's, the content keeps its 1.0 height (it fits
+    // vertically) and runs past the right edge.
+    const change = withAll({
+      ...fixedChange(),
+      coldBefore: coldOne(),
+      coldBase: coldOne(),
+    })
+    const start = recordFor(change.coldBefore, CONDITION).contentRect
+    const record = recordFor(change.settled, CONDITION)
+    record.contentRect = [
+      record.viewRect[0],
+      record.viewRect[1],
+      record.viewRect[2] + 40,
+      record.viewRect[1] + start[3] - start[1],
+    ]
+    assert.deepEqual(faceOf(change), [[CONDITION, false, false, null]])
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+  })
+
+  // TEA r44 P1-2, the mirror for the first face.
+  test('a stale box whose height the cold launches share at both scales is no first face', () => {
+    const change = staleClipChange()
+    const start = recordFor(change.coldBefore, CONDITION).viewRect
+    const target = recordFor(change.cold, CONDITION)
+    target.viewRect = [
+      ...target.viewRect.slice(0, 3),
+      target.viewRect[1] + start[3] - start[1],
+    ]
+    target.clipRect = target.viewRect
+    target.contentRect = target.viewRect
+    const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual([clip.stale, clip.staleBox, clip.face], [true, false, null])
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+  })
+
+  // Android Release 0027bf63, Settings 1.0 to 1.5: Interface palettes, shown only on pages 1 to
+  // 3, kept its 1.0 box. Parity reads page 0 only, so its record proves it stale.
+  const belowAt = (height) => ({
+    ...BELOW,
+    bounds: `[42,2300][600,${2300 + height}]`,
+  })
+  const pageOnlyChange = (targetHeight = 78, liveHeight = 50) => {
+    const change = residualChange()
+    change.settled = withPages(change.settled, [belowAt(liveHeight)])
+    change.coldBefore = withPages(change.coldBefore, [belowAt(50)])
+    change.cold = withPages(change.cold, [belowAt(targetHeight)])
+    overflowRecord(pageRecord(change.settled, BELOW.text))
+    return change
+  }
+  const PAGE_ONLY = `staleBox:cold:["","${BELOW.text}"]#0`
+
+  test('a stale box clip of a text only later pages show is the first face and approves without a stale key', () => {
+    const change = pageOnlyChange()
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    const [clip] = layoutClips(checks.clipping)
+    assert.deepEqual(
+      [clip.key, clip.parityKey, clip.pages, clip.stale, clip.face],
+      [`["","${BELOW.text}"]#0`, null, [1], true, 'staleBox']
+    )
+    assert.equal(verdict, 'known-residual')
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual(proposal.clippedKeys, [PAGE_ONLY])
+    assert.equal(proposal.review.clipsStale, true)
+    assert.equal(proposal.staleKeys.includes(`cold:["","${BELOW.text}"]#0`), false)
+    const entry = { ...ENTRY, clippedKeys: [PAGE_ONLY] }
+    assert.equal(prove(change, entry)().verdict, 'known-residual')
+    // The same key on a page 0 text still needs its stale key.
+    assert.throws(
+      prove(staleClipChange(), {
+        ...ENTRY,
+        staleKeys: ENTRY.staleKeys.filter((key) => key !== CONDITION_KEY),
+      }),
+      { code: 'live_font_residual_unapproved' }
+    )
+  })
+
+  test('a later-page clip whose box is the target launch box is no stale miss', () => {
+    const change = pageOnlyChange(50)
+    const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual([clip.stale, clip.staleBox, clip.face], [false, false, null])
+    assert.throws(prove(change, { ...ENTRY, clippedKeys: [PAGE_ONLY] }), {
+      code: 'live_font_baseline_unexpected',
+    })
+    // Within the tolerance of both the starting box (50) and the target box (53): a box that
+    // already has the target height is no miss, however near the starting one.
+    const near = pageOnlyChange(53, 52)
+    const [between] = layoutClips(evaluateLiveFontChangeRaw(near).checks.clipping)
+    assert.deepEqual(
+      [between.staleBox, between.boxMiss, between.stale, between.face],
+      [true, false, false, null]
+    )
+  })
+
+  // TEA r44 P1-1 (PROBE_4B): a text layout alone pushes wholly off the window arrives as
+  // nothing shown, no clipRect, not scrolled away and not offWindow, while its node stays.
+  const pushedOff = (capture, text = CONDITION) => {
+    const record = recordFor(capture, text)
+    Object.assign(record, { visibleRect: null, clipRect: null, offWindow: false })
+    return capture
+  }
+
+  test('PROBE_4B: a text pushed off the window at the cold launch and live is a full clip in every judged stage', () => {
+    const change = residualChange()
+    pushedOff(change.cold)
+    pushedOff(change.settled)
+    change.updated = pushedOff(probed({ ...stage('settled'), stage: 'updated' }))
+    change.coldUpdated = pushedOff(probed({ ...change.cold, stage: 'cold' }))
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    for (const name of ['clipping', 'postUpdateClipping'])
+      assert.deepEqual(
+        layoutClips(checks[name]).map((entry) => [entry.text, entry.face]),
+        [[CONDITION, null]],
+        name
+      )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
+    assert.throws(prove(change, ENTRY, '0.88.1'), { code: 'live_font_fix_missing' })
+    // The cold control inspects it at either scale.
+    const target = pushedOff(
+      probed(correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 }))
+    )
+    assert.throws(
+      () =>
+        assertColdControlRaw({
+          platform: 'android',
+          base: probed({ ...stage('before'), stage: 'cold' }),
+          target,
+          probes: PROBES,
+        }),
+      (error) =>
+        error.code === 'live_font_control_clipped_by_layout' &&
+        error.message.includes(CONDITION)
+    )
+  })
+
+  test('PROBE_4B: a translated sheet off the window passes at the cold launch and live, listed offWindow', () => {
+    const change = withAll(fixedChange())
+    for (const capture of [change.cold, change.settled])
+      capture.textProbe.records.push(parkedSheet())
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'fixed')
+    assert.deepEqual(checks.textProbe.stages.settled.offWindow, [
+      { key: null, text: 'Share your look' },
+    ])
+    const target = probed(
+      correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 })
+    )
+    target.textProbe.records.push(parkedSheet())
+    assert.doesNotThrow(() =>
+      assertColdControlRaw({
+        platform: 'android',
+        base: probed({ ...stage('before'), stage: 'cold' }),
+        target,
+        probes: PROBES,
+      })
+    )
+  })
 })

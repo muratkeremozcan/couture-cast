@@ -570,29 +570,51 @@ function newlyCut(record, coldRecord) {
  */
 const near = (a, b, tolerance) => Math.abs(a - b) <= tolerance
 
+/** Content past its clipRect at the top or the bottom by more than `tolerance`. */
+function verticalClip(record, tolerance) {
+  const clip = record.clipRect
+  if (clip === null) return false
+  const [, top, , bottom] = record.contentRect
+  return top < clip[1] - tolerance || bottom > clip[3] + tolerance
+}
+
 /**
- * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14), given
- * the cold launches at the leg's starting scale (`start`) and target scale (`target`), keyed:
- * `staleBox` when its box kept the starting launch's height (the first face, which also needs
- * its node to be a stale miss, markStaleClips), and `staleContent` when its box has the target
- * launch's height while its content keeps the starting launch's content height (the second face:
- * a fresh box around stale text, whose parity passes).
+ * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14 and
+ * r44 P1-2), given the cold launches at the leg's starting scale (`start`) and target scale
+ * (`target`), keyed. `staleBox` when its box kept the starting launch's height and that height
+ * is not the target launch's (the first face, which also needs its node to be a stale miss,
+ * markStaleClips). `staleContent` when the clip is vertical (content past the clip at the top or
+ * the bottom; a left, right or ellipsis cut alone never is) and its box has the target launch's
+ * height while its content keeps the starting launch's content height, and that content height
+ * is not the target launch's (the second face: a fresh box around stale text, whose parity
+ * passes). Text whose height the scale does not change shows neither face, nor does a full clip
+ * (no clipRect: nothing of the text can be brought into view, r44 P1-1). `boxMiss` is whether
+ * its box misses the target launch's height, the stale miss of a text no parity key names.
  */
 function faces(record, startRecord, targetRecord, tolerance) {
   const height = rectHeight(record.viewRect)
+  if (startRecord === undefined || targetRecord === undefined || record.clipRect === null)
+    return {
+      staleBox: false,
+      staleContent: false,
+      boxMiss:
+        targetRecord !== undefined &&
+        !near(height, rectHeight(targetRecord.viewRect), tolerance),
+    }
+  const [startBox, targetBox] = [startRecord, targetRecord].map((other) =>
+    rectHeight(other.viewRect)
+  )
+  const [startContent, targetContent] = [startRecord, targetRecord].map((other) =>
+    rectHeight(other.contentRect)
+  )
   return {
-    staleBox:
-      startRecord !== undefined &&
-      near(height, rectHeight(startRecord.viewRect), tolerance),
+    staleBox: near(height, startBox, tolerance) && !near(startBox, targetBox, tolerance),
     staleContent:
-      startRecord !== undefined &&
-      targetRecord !== undefined &&
-      near(height, rectHeight(targetRecord.viewRect), tolerance) &&
-      near(
-        rectHeight(record.contentRect),
-        rectHeight(startRecord.contentRect),
-        tolerance
-      ),
+      verticalClip(record, tolerance) &&
+      !near(startContent, targetContent, tolerance) &&
+      near(height, targetBox, tolerance) &&
+      near(rectHeight(record.contentRect), startContent, tolerance),
+    boxMiss: !near(height, targetBox, tolerance),
   }
 }
 
@@ -632,6 +654,7 @@ function layoutClips(capture, platform, { cold, base } = {}) {
       ...cut,
       height: rectHeight(record.viewRect),
       baseHeight: baseRecord ? rectHeight(baseRecord.viewRect) : null,
+      targetHeight: targetRecord ? rectHeight(targetRecord.viewRect) : null,
       ...faces(record, baseRecord, targetRecord, tolerance),
     }
     if (keyed) byKey.set(fact.key, clip)
@@ -1032,7 +1055,13 @@ function markStaleClips(checks) {
     )
     for (const entry of checks[clippingCheck]?.clipped ?? []) {
       if (entry.reason !== 'clipped_by_layout') continue
-      entry.stale = entry.parityKey !== null && stale.has(entry.parityKey)
+      // Parity reads page 0 only, so a text only later pages show (keyed, no parity key) is a
+      // stale miss by its own record: its box kept the starting launch's height (staleBox) and
+      // misses the target launch's (boxMiss).
+      entry.stale =
+        entry.parityKey !== null
+          ? stale.has(entry.parityKey)
+          : entry.key !== null && entry.staleBox && entry.boxMiss
       // Which face of the bug the clip is, or null (residualClip).
       entry.face =
         entry.stale && entry.staleBox
@@ -1058,13 +1087,19 @@ const residualClip = (entry) =>
  * sorted.
  */
 export function clipKeys(checks) {
+  return keyedLayoutClips(checks)
+    .map(([, key]) => key)
+    .sort()
+}
+
+/** Every keyed layout clip of a leg with its entry key (clipKeys), in check order. */
+function keyedLayoutClips(checks) {
   return [
     ...(checks.clipping?.clipped ?? []).map((entry) => [entry, 'cold']),
     ...(checks.postUpdateClipping?.clipped ?? []).map((entry) => [entry, 'updated']),
   ]
     .filter(([entry]) => entry.reason === 'clipped_by_layout' && entry.key !== null)
-    .map(([entry, stage]) => `${entry.face ?? 'noFace'}:${stage}:${entry.key}`)
-    .sort()
+    .map(([entry, stage]) => [entry, `${entry.face ?? 'noFace'}:${stage}:${entry.key}`])
 }
 
 function recreated(identity) {
@@ -1292,10 +1327,17 @@ function clipProblem(checks, baseline) {
   if (bad !== undefined)
     return `baseline clippedKeys must be a list of clip keys: ${JSON.stringify(bad)}`
   const stale = new Set(baseline.staleKeys)
+  // A first-face clip of a text only later pages show has no parity key, so no stale key can
+  // name it; its record proved it stale (markStaleClips), and the run must clip it so.
+  const pageOnly = new Set(
+    keyedLayoutClips(checks)
+      .filter(([entry]) => entry.parityKey === null && entry.face === 'staleBox')
+      .map(([, key]) => key)
+  )
   // The first face's key is a stale key; the second face's parity passes, so it is not.
   const notStale = baseline.clippedKeys.find((key) => {
     const { face, stage, node } = splitClipKey(key)
-    return face === 'staleBox' && !stale.has(`${stage}:${node}`)
+    return face === 'staleBox' && !stale.has(`${stage}:${node}`) && !pageOnly.has(key)
   })
   if (notStale !== undefined) return `clipped key not in staleKeys: ${notStale}`
   const { extra, missing } = multisetDifference(run, baseline.clippedKeys)
