@@ -202,6 +202,31 @@ export class RevenueCatUnrepresentableEntitlementError extends Error {
   }
 }
 
+/** Why a ledger answer is permanently outside our model; retrying the same pull cannot change it. */
+export type PermanentLedgerProjectionFailure = {
+  reason: 'unsupported_store' | RevenueCatUnrepresentableEntitlementError['reason']
+  /** The RevenueCat store string, for an unsupported store only. */
+  store?: string | null
+}
+
+/**
+ * Story 6.15: classifies a ledger pull failure. The projection errors above describe what the
+ * ledger holds (a store we do not sell, a lifetime grant, a missing product), so they come back
+ * the same on every retry; any other error (a non-2xx response, a timeout, a network failure)
+ * is transient and returns null.
+ */
+export function permanentLedgerProjectionFailure(
+  error: unknown
+): PermanentLedgerProjectionFailure | null {
+  if (error instanceof RevenueCatUnsupportedStoreError) {
+    return { reason: 'unsupported_store', store: error.store }
+  }
+  if (error instanceof RevenueCatUnrepresentableEntitlementError) {
+    return { reason: error.reason }
+  }
+  return null
+}
+
 export class RevenueCatRequestError extends Error {
   constructor(
     readonly status: number,
@@ -284,9 +309,10 @@ export class RealRevenueCatClient extends RevenueCatClient {
     if (!entitlement) {
       return null
     }
-    // An entitlement that is present but that our model cannot represent fails the pull, so
-    // refresh answers 503 and reconciliation leaves the member's row as it is. Answering null
-    // here would read as "no entitlement" and expire a paying member (story 6.15 R4-01).
+    // An entitlement that is present but that our model cannot represent fails the pull with a
+    // permanent error, so refresh serves the member's local state and reconciliation leaves the
+    // row's state as it is. Answering null here would read as "no entitlement" and expire a
+    // paying member (story 6.15 R4-01).
     const productId = entitlement.product_identifier ?? null
     if (productId === null) {
       throw new RevenueCatUnrepresentableEntitlementError('missing_product')

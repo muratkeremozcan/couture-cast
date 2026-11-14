@@ -9,6 +9,8 @@ import type {
 } from './premium-entitlement.service.js'
 import {
   type RevenueCatClient,
+  RevenueCatRequestError,
+  RevenueCatUnrepresentableEntitlementError,
   RevenueCatUnsupportedStoreError,
 } from './revenuecat-client.js'
 import { SubscriptionService } from './subscription.service.js'
@@ -127,13 +129,80 @@ describe('refreshSubscription', () => {
     })
   })
 
-  // Learning path Step 55, story 6.15 R3-01: a Test Store entitlement on the ledger refuses the
-  // pull, so the refresh changes nothing.
-  it('a ledger entitlement from an unsupported store answers 503 and applies nothing', async () => {
+  // Learning path Step 55, story 6.15 R3-01 and R4-01: a ledger entitlement our model cannot
+  // represent refuses the pull, so the refresh changes nothing. Retrying cannot change what the
+  // ledger holds, so the refresh answers the member's local state, the same shape as a successful
+  // refresh, where a 503 would fail it forever.
+  it.each([
+    [
+      'an unsupported store',
+      new RevenueCatUnsupportedStoreError('amazon'),
+      { reason: 'unsupported_store', store: 'amazon' },
+    ],
+    [
+      'a missing product',
+      new RevenueCatUnrepresentableEntitlementError('missing_product'),
+      { reason: 'missing_product' },
+    ],
+    [
+      'a lifetime grant',
+      new RevenueCatUnrepresentableEntitlementError('no_expiry'),
+      { reason: 'no_expiry' },
+    ],
+    [
+      'an invalid expiry',
+      new RevenueCatUnrepresentableEntitlementError('invalid_expiry'),
+      { reason: 'invalid_expiry' },
+    ],
+  ] as const)(
+    'a ledger entitlement with %s serves local state, applies nothing, and warns why',
+    async (_label, error, logged) => {
+      const { service, entitlements } = build({
+        entitlement: entitledView,
+        ledger: vi.fn().mockRejectedValue(error),
+      })
+      const warn = vi.spyOn(
+        (service as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn'
+      )
+
+      await expect(service.refreshSubscription('user-1')).resolves.toEqual({
+        status: 'active',
+        store: 'stripe',
+        productId: 'premium_monthly',
+        willRenew: true,
+        currentPeriodEnd: '2030-01-01T00:00:00.000Z',
+        syncedAt: '2026-08-01T00:00:00.000Z',
+        purchasesEnabled: false,
+      })
+      expect(entitlements.applyLedgerSnapshot).not.toHaveBeenCalled()
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn).toHaveBeenCalledWith(
+        { userId: 'user-1', ...logged },
+        'RevenueCat ledger entitlement is not representable; serving local state'
+      )
+    }
+  )
+
+  it('an unrepresentable ledger entitlement starts the rate-limit window like any answered pull', async () => {
+    const ledger = vi
+      .fn()
+      .mockRejectedValue(new RevenueCatUnrepresentableEntitlementError('no_expiry'))
+    const { service } = build({ entitlement: entitledView, ledger })
+
+    await service.refreshSubscription('user-1')
+    vi.advanceTimersByTime(9_000)
+    await service.refreshSubscription('user-1')
+    expect(ledger).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['a non-2xx ledger response', new RevenueCatRequestError(503, 'subscriber GET')],
+    ['a ledger timeout', new Error('RevenueCat ledger pull timed out')],
+  ])('%s still answers 503 and applies nothing', async (_label, error) => {
     const { service, entitlements } = build({
-      ledger: vi
-        .fn()
-        .mockRejectedValue(new RevenueCatUnsupportedStoreError('test_store')),
+      entitlement: entitledView,
+      ledger: vi.fn().mockRejectedValue(error),
     })
 
     await expect(service.refreshSubscription('user-1')).rejects.toBeInstanceOf(

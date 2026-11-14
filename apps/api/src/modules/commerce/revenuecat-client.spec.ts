@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   FakeRevenueCatClient,
+  permanentLedgerProjectionFailure,
   RealRevenueCatClient,
   RevenueCatRequestError,
   RevenueCatUnrepresentableEntitlementError,
@@ -379,5 +380,41 @@ describe('FakeRevenueCatClient forward idempotency (5.2-INT-026 contract)', () =
 
     expect(fake.getForwardedSubscription('user-1')).toBe('sub_abc')
     expect(second).toEqual(first)
+  })
+})
+
+// Story 6.15: refresh and the drift sweep retry a transient ledger failure and settle a permanent
+// one, so the classification is pinned for every error the pull can raise.
+describe('permanentLedgerProjectionFailure', () => {
+  it.each([
+    [
+      new RevenueCatUnsupportedStoreError('amazon'),
+      { reason: 'unsupported_store', store: 'amazon' },
+    ],
+    [
+      new RevenueCatUnsupportedStoreError(null),
+      { reason: 'unsupported_store', store: null },
+    ],
+    [
+      new RevenueCatUnrepresentableEntitlementError('missing_product'),
+      { reason: 'missing_product' },
+    ],
+    [new RevenueCatUnrepresentableEntitlementError('no_expiry'), { reason: 'no_expiry' }],
+    [
+      new RevenueCatUnrepresentableEntitlementError('invalid_expiry'),
+      { reason: 'invalid_expiry' },
+    ],
+  ])('classifies %s as permanent', (error, failure) => {
+    expect(permanentLedgerProjectionFailure(error)).toEqual(failure)
+  })
+
+  it.each([
+    new RevenueCatRequestError(503, 'subscriber GET'),
+    new RevenueCatRequestError(429, 'subscriber GET'),
+    new Error('RevenueCat ledger pull timed out'),
+    new TypeError('fetch failed'),
+    'not an error',
+  ])('classifies %s as transient', (error) => {
+    expect(permanentLedgerProjectionFailure(error)).toBeNull()
   })
 })

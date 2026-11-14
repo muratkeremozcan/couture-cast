@@ -393,7 +393,8 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
     // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
     // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
     // Story 6.15 R3-01 and R4-01: a ledger entitlement from a store we do not sell, or one our model
-    // cannot represent, answers 503 through the real projection and keeps the paying member's row.
+    // cannot represent, keeps the paying member's row through the real projection. Retrying cannot
+    // change what the ledger holds, so the refresh answers 200 with that unchanged local state.
     // Each shape runs under every TEST_ENV; `qa` stands for any value other than local and preview.
     // D15 opens only the representable Test Store shape, and only under local and preview.
     const refreshEnvironments = [
@@ -478,13 +479,21 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
           try {
             const response = await postRefresh(subscriberId)
 
-            expect(response.status).toBe(503)
+            expect(response.status).toBe(200)
             expect(pull).toHaveBeenCalledTimes(1)
             expect(
               await prisma.premiumEntitlement.findUnique({
                 where: { user_id: subscriberId },
               })
             ).toEqual(before)
+            expect(subscriptionResponseSchema.parse(response.body).data).toMatchObject({
+              status: 'active',
+              store: before?.store,
+              productId: before?.product_id,
+              willRenew: before?.will_renew,
+              currentPeriodEnd: before?.current_period_end.toISOString(),
+              syncedAt: before?.synced_at.toISOString(),
+            })
           } finally {
             pull.mockRestore()
             vi.unstubAllGlobals()
