@@ -253,11 +253,20 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran, and none was skipped.
           grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      - name: Verify the persisted task cleanup against the task manager restore
+        id: task_manager_migration
+        # P0-07: an install upgraded from SDK 54 must restore no retired task consumer.
+        # Its inputs are part of the fingerprint, so a restored client already passed it.
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.native_build.outcome == 'success' }}
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :task-manager-migration:testDebugUnitTest --tests expo.modules.taskmanagermigration.PersistedTaskConsumersTest
+          grep -q 'tests="3" skipped="0" failures="0" errors="0"' ../modules/task-manager-migration/android/build/test-results/testDebugUnitTest/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml
       # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
       # only the publishable anon key of this job's loopback stack may ride along.
       - name: Refuse to cache a development client that embeds a secret
         id: apk_scan
-        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' && steps.task_manager_migration.outcome == 'success' }}
         run: |
           rm -rf "$RUNNER_TEMP/cc68-apk"
           unzip -q "${{ steps.native_key.outputs.path }}" -d "$RUNNER_TEMP/cc68-apk"
@@ -492,11 +501,20 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 :modal-system-bars:testDebugUnitTest --tests expo.modules.modalsystembars.ModalSystemBarsTest
           # Both SDK branches ran, and none was skipped.
           grep -q 'tests="2" skipped="0" failures="0" errors="0"' ../modules/modal-system-bars/android/build/test-results/testDebugUnitTest/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml
+      - name: Verify the persisted task cleanup against the task manager restore
+        id: task_manager_migration
+        # P0-07: an install upgraded from SDK 54 must restore no retired task consumer.
+        # Its inputs are part of the fingerprint, so a restored client already passed it.
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' }}
+        working-directory: apps/mobile/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :task-manager-migration:testDebugUnitTest --tests expo.modules.taskmanagermigration.PersistedTaskConsumersTest
+          grep -q 'tests="3" skipped="0" failures="0" errors="0"' ../modules/task-manager-migration/android/build/test-results/testDebugUnitTest/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml
       # A fork's pull request can restore this cache, so the APK is scanned like the iOS client:
       # only the publishable anon key of this job's loopback stack may ride along.
       - name: Refuse to cache a development client that embeds a secret
         id: apk_scan
-        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.native_build.outcome == 'success' && steps.modal_system_bars.outcome == 'success' && steps.task_manager_migration.outcome == 'success' }}
         run: |
           rm -rf "$RUNNER_TEMP/cc68-apk"
           unzip -q "${{ steps.native_key.outputs.path }}" -d "$RUNNER_TEMP/cc68-apk"

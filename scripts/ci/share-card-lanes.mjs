@@ -386,6 +386,7 @@ function androidClientCacheProblems(name, steps, check) {
       steps[scan].run?.includes('native-ios-app-secret-scan.mjs') &&
       steps[scan].if?.includes("steps.native_build.outcome == 'success'") &&
       steps[scan].if?.includes("steps.modal_system_bars.outcome == 'success'") &&
+      steps[scan].if?.includes("steps.task_manager_migration.outcome == 'success'") &&
       save > scan &&
       steps[save].if?.includes("steps.apk_scan.outcome == 'success'"),
     `${name}: cache only a built, tested and scanned client`
