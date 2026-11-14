@@ -204,10 +204,15 @@ export function findAapt2(env = process.env) {
   return path.join(tools, versions.at(-1), 'aapt2')
 }
 
+// aapt2 and adb are bounded; one killed at the bound fails like any nonzero exit.
+const TOOL_TIMEOUT_MS = 120_000
+
 function run(command, args) {
   const result = spawnSync(command, args, {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
+    timeout: TOOL_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
   })
   if (result.status !== 0)
     throw new Error(

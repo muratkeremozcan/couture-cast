@@ -27,6 +27,9 @@ export function resolveEnv(env = process.env) {
 }
 
 /** `{ config }` or `{ error }` for the app under `<root>/apps/mobile`. Offline, about a second. */
+// expo config is bounded; a run killed at the bound takes the same nonzero-status path below.
+const CONFIG_TIMEOUT_MS = 120_000
+
 export function resolvedAppConfig(root) {
   // A relative root (the evidence CLI's default '.') resolves against the working directory.
   const mobile = path.resolve(root, 'apps/mobile')
@@ -39,6 +42,8 @@ export function resolvedAppConfig(root) {
       env: resolveEnv(),
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
+      timeout: CONFIG_TIMEOUT_MS,
+      killSignal: 'SIGKILL',
     }
   )
   if (result.status !== 0)

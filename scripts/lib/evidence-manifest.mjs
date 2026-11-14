@@ -96,8 +96,16 @@ export const LEGS = {
   },
 }
 
+// A git call killed at its bound reads as a failed one (status null), the same as before.
+const GIT_TIMEOUT_MS = 30_000
+
 function git(args, cwd) {
-  const result = spawnSync('git', args, { cwd, encoding: 'utf8' })
+  const result = spawnSync('git', args, {
+    cwd,
+    encoding: 'utf8',
+    timeout: GIT_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+  })
   return { ok: result.status === 0, out: result.stdout.trim() }
 }
 
@@ -109,7 +117,12 @@ export function objectId(rev, file, cwd) {
 
 /** The file at `rev`, or null. */
 function show(rev, file, cwd) {
-  const result = spawnSync('git', ['show', `${rev}:${file}`], { cwd, encoding: 'utf8' })
+  const result = spawnSync('git', ['show', `${rev}:${file}`], {
+    cwd,
+    encoding: 'utf8',
+    timeout: GIT_TIMEOUT_MS,
+    killSignal: 'SIGKILL',
+  })
   return result.status === 0 ? result.stdout : null
 }
 

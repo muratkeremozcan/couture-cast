@@ -5,6 +5,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
 import ts from 'typescript'
+import { moduleRelativeLiterals, relativeImports } from './evidence-manifest.mjs'
 import { boundedSpawn, boundOf } from './test-store-spawn.mjs'
 
 // Antigravity r21 (1): a side call killed at its bound fails the run with its code.
@@ -39,6 +40,8 @@ test('a hung call past its bound throws its code; a tolerated nonzero exit does 
   )
 })
 
+// Out of scope (TEA, r23): spawn functions reached through createRequire, a dynamic import or a
+// shadowing local binding; the check stops at the static import forms below.
 const SPAWN_FUNCTIONS = new Set(['spawnSync', 'execFileSync', 'execSync'])
 const CHILD_PROCESS = new Set(['node:child_process', 'child_process'])
 const propName = (property) =>
@@ -191,16 +194,43 @@ export function unboundedCalls(file, source = fs.readFileSync(file, 'utf8')) {
 }
 
 // Antigravity r21 (3): the driver and every Test Store helper it loads, read as syntax.
-test('every spawnSync, execFileSync and execSync in the Test Store driver and helpers is bounded', () => {
-  const files = [
-    'scripts/run-test-store-journey.mjs',
-    ...fs
-      .readdirSync('scripts/lib')
-      .filter(
-        (name) => /^test-store-[a-z-]+\.mjs$/.test(name) && !name.includes('.test.')
+/**
+ * The scripts `entries` load, followed through relative imports and module-relative URLs
+ * (`new URL('./x.mjs', import.meta.url)`, how the driver loads the manifest writer), from disk.
+ */
+export function driverClosure(entries) {
+  const seen = new Set()
+  const queue = [...entries]
+  while (queue.length) {
+    const file = queue.shift()
+    if (seen.has(file)) continue
+    seen.add(file)
+    const source = fs.readFileSync(file, 'utf8')
+    for (const specifier of relativeImports(source))
+      queue.push(
+        path.posix.normalize(path.posix.join(path.posix.dirname(file), specifier))
       )
-      .map((name) => path.join('scripts/lib', name)),
-  ]
+    for (const named of moduleRelativeLiterals(source, file))
+      if (/\.(?:mjs|cjs|js)$/.test(named)) queue.push(named)
+  }
+  return [...seen].sort()
+}
+
+const DRIVER_ENTRIES = [
+  'scripts/run-test-store-journey.mjs',
+  'scripts/test-store-preview-webhook.mjs',
+]
+
+// Antigravity r23: everything the driver loads, shared helpers included, is bounded.
+test('every spawnSync, execFileSync and execSync the Test Store driver loads is bounded', () => {
+  const files = driverClosure(DRIVER_ENTRIES)
+  // Shared with other legs, and loaded by the driver: they are scanned too.
+  for (const shared of [
+    'scripts/lib/evidence-manifest.mjs',
+    'scripts/lib/minified-debuggable-evidence.mjs',
+    'scripts/lib/resolved-app-config.mjs',
+  ])
+    assert.ok(files.includes(shared), shared)
   let calls = 0
   for (const file of files) {
     const { misses } = unboundedCalls(file)
@@ -210,7 +240,7 @@ test('every spawnSync, execFileSync and execSync in the Test Store driver and he
       []
     ).length
   }
-  assert.ok(calls >= 5, String(calls))
+  assert.ok(calls >= 9, String(calls))
 })
 
 test('the bound check rejects every bypass', () => {
