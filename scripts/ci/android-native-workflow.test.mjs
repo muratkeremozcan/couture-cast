@@ -17,11 +17,14 @@ import {
   NETWORK_JOB,
   NETWORK_SCRIPT,
   RELEASE_ABIS,
+  RELEASE_ABI_LIST,
   RELEASE_BUILD,
   RELEASE_JOB,
   androidNativeProblems,
   readAndroidNative,
 } from './android-native-workflow.mjs'
+import { SHIPPED_ABIS } from './android-release-abis.mjs'
+import { STAGED_ABIS } from '../lib/story68-worklets-staging.mjs'
 
 const source = readAndroidNative()
 const fresh = () => JSON.parse(JSON.stringify(source.workflow))
@@ -78,7 +81,25 @@ describe('android-native.yml', () => {
       step(job, (row) => row.id === 'minified_debuggable').run.includes(MINIFIED_EVIDENCE)
     )
     assert.ok(step(job, (row) => row.id === 'release_abis').run.includes(RELEASE_ABIS))
-    assert.ok(!RELEASE_BUILD.includes('reactNativeArchitectures'))
+  })
+
+  // TEA, 2026-11-13: the release run goes through the Worklets staging for the four ABIs the AAB
+  // ships, the ABI check expects and the Release staging accepts.
+  test('stages and builds exactly the shipped ABIs through the Worklets staging', () => {
+    const abis = RELEASE_ABI_LIST.split(',')
+    assert.deepEqual([...abis].sort(), [...SHIPPED_ABIS].sort())
+    assert.deepEqual(abis, STAGED_ABIS.Release)
+    assert.ok(RELEASE_BUILD.startsWith('node scripts/ci/worklets-staged-gradle.mjs '))
+    assert.ok(
+      RELEASE_BUILD.includes(`--configuration Release --abis ${RELEASE_ABI_LIST} `)
+    )
+    assert.ok(RELEASE_BUILD.includes(` -PreactNativeArchitectures=${RELEASE_ABI_LIST} `))
+    assert.ok(
+      RELEASE_BUILD.includes('--evidence "$RUNNER_TEMP/android-release-builds/worklets"')
+    )
+    const build = step(release(source.workflow), (row) => row.id === 'android_build')
+    assert.equal(build['working-directory'], undefined)
+    assert.deepEqual(build.env, { NODE_ENV: 'production' })
   })
 
   test('runs the network-timeout flow from the debug client on an emulator', () => {
@@ -199,9 +220,35 @@ describe('android-native.yml', () => {
   rejected('a release build without the AAB', /the build .*does not execute/, (w) => {
     build(w).run = './gradlew :app:assembleMinifiedDebuggable --console=plain\n'
   })
-  rejected('a release build of one ABI', /with every shipped ABI/, (w) => {
+  rejected('a release build of one ABI', /every shipped ABI/, (w) => {
     build(w).run = `${RELEASE_BUILD} -PreactNativeArchitectures=x86_64\n`
   })
+  rejected(
+    'a plain release build without the Worklets staging',
+    /the build .*does not execute/,
+    (w) => {
+      build(w).run =
+        './gradlew :app:bundleRelease :app:assembleMinifiedDebuggable --console=plain\n'
+      build(w)['working-directory'] = 'apps/mobile/android'
+    }
+  )
+  rejected(
+    'a staged release of three ABIs',
+    /staging and building every shipped ABI/,
+    (w) => {
+      build(w).run = RELEASE_BUILD.replaceAll(
+        RELEASE_ABI_LIST,
+        'armeabi-v7a,arm64-v8a,x86_64'
+      )
+    }
+  )
+  rejected(
+    'a release build inside apps/mobile/android',
+    /from the repository root/,
+    (w) => {
+      build(w)['working-directory'] = 'apps/mobile/android'
+    }
+  )
   rejected('a release build whose failure is ignored', /the build must exist/, (w) => {
     build(w).run = `${RELEASE_BUILD} || true\n`
   })

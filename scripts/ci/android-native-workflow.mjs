@@ -6,9 +6,11 @@
 // pull request or a merge:
 //
 //   android-release-builds    one Gradle run builds the release AAB with every shipped ABI and
-//                             the minifiedDebuggable APK; android-release-abis.mjs reads the AAB
-//                             and minified-debuggable-evidence.mjs the APK, and either failing
-//                             fails the job.
+//                             the minifiedDebuggable APK through the Worklets staging (Release,
+//                             all four ABIs, staged and passed to Gradle explicitly);
+//                             android-release-abis.mjs reads the AAB and
+//                             minified-debuggable-evidence.mjs the APK, and either failing fails
+//                             the job.
 //   android-network-timeout   the debug development client on an emulator runs
 //                             maestro/network-timeout/dev-client-timeout.yaml against
 //                             scripts/lib/network-tarpit.mjs through
@@ -33,13 +35,15 @@ export const NETWORK_JOB = 'android-network-timeout'
 export const LIMITS = { [RELEASE_JOB]: 120, [NETWORK_JOB]: 60 }
 const NIGHTLY = /^([0-5]?\d) ([01]?\d|2[0-3]) \* \* \*$/
 const HOSTED_JOB_LIMIT = 360
-const ANDROID = 'apps/mobile/android'
 const BUILT = "${{ !cancelled() && steps.android_build.outcome == 'success' }}"
 
-export const RELEASE_BUILD =
-  './gradlew :app:bundleRelease :app:assembleMinifiedDebuggable --console=plain'
-// TEA, 2026-11-13: the Debug x86_64 client goes through the Worklets staging, which the device run
-// needed against Reanimated's legacy libworklets.so race; the release builds stay plain.
+// TEA, 2026-11-13: every build goes through the Worklets staging. The device run hit Reanimated's
+// legacy libworklets.so race on the Debug x86_64 client and on `:app:bundleRelease`
+// (buildCMakeRelWithDebInfo[arm64-v8a][reanimated]). The release run stages the four ABIs the AAB
+// ships, in the template's order, and passes the same list to Gradle; minifiedDebuggable links each
+// library's release variant, so the one Release staging covers it.
+export const RELEASE_ABI_LIST = 'armeabi-v7a,arm64-v8a,x86,x86_64'
+export const RELEASE_BUILD = `node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Release --abis ${RELEASE_ABI_LIST} --evidence "$RUNNER_TEMP/android-release-builds/worklets" -- :app:bundleRelease :app:assembleMinifiedDebuggable -PreactNativeArchitectures=${RELEASE_ABI_LIST} --console=plain`
 export const CLIENT_BUILD =
   'node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-network-timeout/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain'
 export const MINIFIED_EVIDENCE =
@@ -187,11 +191,17 @@ function releaseProblems(job, check) {
   const rows = steps(job)
   const build = rows.find((step) => step.id === 'android_build')
   stepProblems(`${RELEASE_JOB}: the build`, build, undefined, [RELEASE_BUILD], check)
+  const run = String(build?.run ?? '')
+  const staged = [...run.matchAll(/--abis (\S+)/g)].map((match) => match[1])
+  const built = [...run.matchAll(/-PreactNativeArchitectures=(\S+)/g)].map(
+    (match) => match[1]
+  )
   check(
-    build?.['working-directory'] === ANDROID &&
-      !String(build?.run ?? '').includes('reactNativeArchitectures') &&
+    build?.['working-directory'] === undefined &&
+      same(staged, [RELEASE_ABI_LIST]) &&
+      same(built, [RELEASE_ABI_LIST]) &&
       Number.isInteger(build?.['timeout-minutes']),
-    `${RELEASE_JOB}: build in ${ANDROID} with every shipped ABI and its own limit`
+    `${RELEASE_JOB}: build from the repository root through the Worklets staging, staging and building every shipped ABI (${RELEASE_ABI_LIST}), with its own limit`
   )
   const minified = rows.find((step) => step.id === 'minified_debuggable')
   stepProblems(

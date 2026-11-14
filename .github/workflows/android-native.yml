@@ -6,7 +6,8 @@
 # parallel; scripts/ci/android-native-workflow.mjs holds the rules this file keeps.
 #
 #   android-release-builds    the app's release AAB with every shipped ABI and its
-#                             minifiedDebuggable APK, from one Gradle run, then
+#                             minifiedDebuggable APK, from one Gradle run through the Worklets
+#                             staging, then
 #                             android-release-abis.mjs on the AAB (four ABIs, their native
 #                             libraries and the bundled ReactNativeVersion, TEA-11) and
 #                             minified-debuggable-evidence.mjs on the APK (a debuggable manifest
@@ -22,11 +23,12 @@
 # Story 6.8 isolated client against its own runtime or a release app, so the flow gets its own
 # schedule-only job here. Neither job uses a secret; each uploads its evidence for 7 days.
 #
-# The release builds run plain: Reanimated's externalNativeBuild tasks depend on Worklets' own, so
-# a fresh checkout links the binary that run compiled, as pr-accessibility-focus.yml's release
-# build does. The Debug x86_64 client goes through the Worklets staging
-# (scripts/lib/story68-worklets-staging.mjs, via scripts/ci/worklets-staged-gradle.mjs), since a
-# plain Debug build raced Reanimated's legacy libworklets.so import on the 2026-11-13 device run.
+# Both builds go through the Worklets staging (scripts/lib/story68-worklets-staging.mjs, via
+# scripts/ci/worklets-staged-gradle.mjs): the 2026-11-13 device run hit Reanimated's legacy
+# libworklets.so race on the Debug x86_64 client and on :app:bundleRelease
+# (buildCMakeRelWithDebInfo[arm64-v8a][reanimated]). The release run stages the four shipped ABIs
+# and passes the same list to Gradle; its staging proofs upload with the release evidence. The
+# minifiedDebuggable APK links each library's release variant, so the same staging covers it.
 name: Android native
 
 on:
@@ -87,15 +89,14 @@ jobs:
         run: npx expo prebuild --platform android --no-install
       - name: Fetch the Gradle wrapper
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
-      # No -PreactNativeArchitectures: the AAB carries every ABI the generated gradle.properties
-      # ships, which is what the ABI check expects.
+      # Every shipped ABI, staged and built: the wrapper refuses a -PreactNativeArchitectures that
+      # differs from the staged list, and the ABI check below expects all four in the AAB.
       - name: Build the release AAB and the minifiedDebuggable APK
         id: android_build
         timeout-minutes: 100
-        working-directory: apps/mobile/android
         env:
           NODE_ENV: production
-        run: ./gradlew :app:bundleRelease :app:assembleMinifiedDebuggable --console=plain
+        run: node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Release --abis armeabi-v7a,arm64-v8a,x86,x86_64 --evidence "$RUNNER_TEMP/android-release-builds/worklets" -- :app:bundleRelease :app:assembleMinifiedDebuggable -PreactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64 --console=plain
       - name: Check the minifiedDebuggable build is debuggable and went through R8
         id: minified_debuggable
         if: ${{ !cancelled() && steps.android_build.outcome == 'success' }}
