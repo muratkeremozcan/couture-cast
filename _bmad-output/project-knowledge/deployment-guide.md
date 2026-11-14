@@ -331,8 +331,12 @@ node scripts/run-test-store-journey.mjs --platform ios --device <udid> --build d
 
 The proxy logs each request's method, path and status. It drops headers, query strings and
 bodies, and writes id-shaped path segments as `:id` (`:subscriber` after `subscribers`). The
-report names the member only by a hash; the user id sits in a private `.member.private.json`
-beside it. On the local leg the entitlement must come from the app's refresh (the API's ledger
+report names the member only by a hash. The `--out` dir holds redacted records only (the report
+and the manifests); the member side file `<label>.member.json`, Metro's log, the device log
+(logcat or the simulator's log stream, which can carry the RevenueCat app user id), Maestro's
+debug output and any pulled APK go to the sibling `<out>.private/` (mode 700, files 600). The run
+fails with `test_store_evidence_leak` if the member id appears anywhere under `--out`. On the
+local leg the entitlement must come from the app's refresh (the API's ledger
 pull), since no RevenueCat webhook reaches a loopback API. On the preview leg the proxy refuses
 every refresh, so an entitlement that still arrives came by webhook.
 
@@ -360,7 +364,8 @@ RevenueCat):
    unauthenticated POSTs through the bypass must get the handler's own JSON 401.
 5. `node scripts/run-test-store-journey.mjs --server preview --api-url <origin> ...`, then
    `node scripts/test-store-preview-webhook.mjs verify --report <run report> --member-file
-   <run .member.private.json> --api-url <origin>` re-reads the member on the preview API's read endpoints and checks the run's proxy log.
+   <out>.private/<label>.member.json --api-url <origin>` re-reads the member on the preview
+   API's read endpoints and checks the run's proxy log.
 
 `scripts/test-store-preview-webhook.mjs steps --api-url <origin>` prints these steps for an origin.
 

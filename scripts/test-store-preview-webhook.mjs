@@ -9,7 +9,7 @@
 //   node scripts/test-store-preview-webhook.mjs steps --api-url <preview API origin>
 //   node scripts/test-store-preview-webhook.mjs probe --api-url <origin> [--secrets-env .env.preview]
 //   node scripts/test-store-preview-webhook.mjs verify --report <run-test-store-journey report> \
-//     --member-file <the run's .member.private.json> \
+//     --member-file <out>.private/<label>.member.json \
 //     --api-url <origin> [--secrets-env .env.preview]
 //
 // `probe` reads REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET from the env file by name and sends

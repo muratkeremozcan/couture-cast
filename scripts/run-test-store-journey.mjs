@@ -50,6 +50,12 @@ import {
   premiumStatusPatterns,
   signerSha256,
 } from './lib/test-store-journey.mjs'
+import {
+  outputDirs,
+  privatePath,
+  writePrivate,
+  writeRunOutputs,
+} from './lib/test-store-output.mjs'
 import { startApiProxy } from './lib/test-store-proxy.mjs'
 import {
   memberRef,
@@ -75,8 +81,10 @@ const options = journeyOptions({
 const { platform, build, server, scenario, appId } = options
 const device = option('device')
 if (!device || !option('out')) throw new Error('usage: --device <id> --out <dir>')
-const out = path.resolve(option('out'))
-fs.mkdirSync(out, { recursive: true, mode: 0o700 })
+// The evidence dir holds redacted records only; raw logs and the member side file go to
+// `<out>.private/` (scripts/lib/test-store-output.mjs).
+const dirs = outputDirs(option('out'))
+const out = dirs.evidence
 const artifact = option('artifact') && path.resolve(option('artifact'))
 const overInstallArtifact = option('over-install') && path.resolve(option('over-install'))
 // The over-install may be the other Android debuggable type (debug over minifiedDebuggable or the
@@ -176,7 +184,7 @@ const metroEnv = () => {
 }
 
 async function startMetro() {
-  const log = fs.openSync(path.join(out, 'metro.log'), 'w', 0o600)
+  const log = fs.openSync(privatePath(dirs, 'metro.log'), 'w', 0o600)
   metro = spawn(
     'npx',
     ['expo', 'start', '--dev-client', '--clear', '--port', String(metroPort)],
@@ -225,7 +233,7 @@ function flow(name) {
       device,
       'test',
       '--debug-output',
-      path.join(out, 'maestro', `${Date.now()}-${name}`),
+      privatePath(dirs, path.join('maestro', `${Date.now()}-${name}`)),
       '-e',
       `MAESTRO_APP_ID=${appId}`,
       '-e',
@@ -257,7 +265,7 @@ function installedSigner() {
     .map((line) => line.replace(/^package:/, '').trim())
     .find((line) => line.endsWith('base.apk'))
   if (!remote) throw new JourneyError('test_store_installed_apk_missing', appId)
-  const local = path.join(out, `installed-${Date.now()}.apk`)
+  const local = privatePath(dirs, `installed-${Date.now()}.apk`)
   adb('pull', remote, local)
   return apkSigner(local)
 }
@@ -277,7 +285,7 @@ function startDeviceLog() {
     adb('logcat', '-c')
     return
   }
-  const file = fs.openSync(path.join(out, 'device.log'), 'w', 0o600)
+  const file = fs.openSync(privatePath(dirs, 'device.log'), 'w', 0o600)
   logStream = spawn(
     'xcrun',
     [
@@ -299,7 +307,7 @@ function startDeviceLog() {
 
 function deviceLog() {
   if (platform === 'android') return adb('logcat', '-d', '-v', 'time')
-  return fs.readFileSync(path.join(out, 'device.log'), 'utf8')
+  return fs.readFileSync(privatePath(dirs, 'device.log'), 'utf8')
 }
 
 const io = {
@@ -438,8 +446,8 @@ const report = {
   appId,
   apiHost: new URL(apiOrigin).host,
   buildSha,
-  // No user id in the evidence: a hash reference here, the id itself in a private side file
-  // that only `test-store-preview-webhook.mjs verify --member-file` reads.
+  // No user id in the evidence: a hash reference here, the id itself in the private dir's side
+  // file, which only `test-store-preview-webhook.mjs verify --member-file` reads.
   memberRef: member ? memberRef(member.userId) : null,
   wallSeconds: Math.round((Date.now() - startedAt) / 1000),
   steps,
@@ -448,15 +456,16 @@ const report = {
   proxyLog: proxy?.log ?? [],
   manifests: manifests.map((file) => path.basename(file)),
 }
-if (member)
-  fs.writeFileSync(
-    path.join(out, `${label}.member.private.json`),
-    JSON.stringify({ userId: member.userId }),
-    { mode: 0o600 }
-  )
-fs.writeFileSync(path.join(out, `${label}.json`), JSON.stringify(report, null, 2), {
-  mode: 0o600,
-})
+// Android logcat is a raw log too: kept in the private dir for diagnosis.
+if (platform === 'android') {
+  const logcat = spawnSync(adbBinary, ['-s', device, 'logcat', '-d', '-v', 'time'], {
+    encoding: 'utf8',
+    maxBuffer: 64 * 1024 * 1024,
+  })
+  if (logcat.status === 0) writePrivate(dirs, 'device.log', logcat.stdout)
+}
+// Fails the run (test_store_evidence_leak) if the member id is anywhere under the evidence dir.
+writeRunOutputs({ dirs, label, report, member })
 console.log(
   JSON.stringify({ label, verdict: result.verdict, wallSeconds: report.wallSeconds })
 )
