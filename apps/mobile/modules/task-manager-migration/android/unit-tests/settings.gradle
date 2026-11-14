@@ -1,6 +1,6 @@
 // Standalone build of the persisted task cleanup and its Robolectric regression (Story 6.15
 // P0-07). The module's own build.gradle needs the generated app; this one needs neither a
-// prebuild nor React Native, so the PR job (pr-share-native-unit.yml) runs it directly:
+// prebuild nor React Native, so the PR job (pr-task-manager-migration.yml) runs it directly:
 //   gradle -p apps/mobile/modules/task-manager-migration/android/unit-tests testDebugUnitTest
 // The regression drives the installed expo-task-manager's own TaskService restore, which Expo
 // ships precompiled in a local Maven repository inside the package, with the app loader beside it.

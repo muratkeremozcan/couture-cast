@@ -1,5 +1,6 @@
 // Versions follow the app's React Native 0.81 toolchain (AGP 8.11, Kotlin 2.1.20, SDK 36).
-//   gradle testDebugUnitTest          the PersistedTaskConsumersTest regression (pr-share-native-unit)
+//   gradle testDebugUnitTest   the PersistedTaskConsumersTest regression
+//                              (pr-task-manager-migration.yml)
 import groovy.json.JsonSlurper
 
 plugins {
@@ -8,10 +9,10 @@ plugins {
 }
 
 // The cleanup's own sources plus the expo-modules-core classes it and TaskService link against
-// (the task manager interfaces and the headless app loader), taken from the installed package. Package and the task service provider pull in the
-// rest of expo-modules-core and React Native, so they stay out: TaskManagerMigrationPackage is
-// linked in the app build, and the autolinking spec (scripts/ci/mobile-android-autolinking.test.mjs)
-// proves it is.
+// (the task manager interfaces and the headless app loader), taken from the installed package.
+// Package and the task service provider pull in the rest of expo-modules-core and React Native,
+// so they stay out: TaskManagerMigrationPackage is linked in the app build, and the autolinking
+// spec (scripts/ci/mobile-android-autolinking.test.mjs) proves it is.
 def core = new File(gradle.ext.expoModulesCore, 'android/src/main/java')
 def stageSources = tasks.register('stageSources', Sync) {
   into layout.buildDirectory.dir('staged-src')
@@ -78,7 +79,11 @@ dependencies {
   implementation 'androidx.core:core:1.13.1'
   // expo-modules-core's interfaces annotate with javax.annotation.Nullable.
   compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
-  implementation "${taskManagerPublication.groupId}:${taskManagerPublication.artifactId}:${taskManagerPublication.version}"
+  implementation [
+    taskManagerPublication.groupId,
+    taskManagerPublication.artifactId,
+    taskManagerPublication.version,
+  ].join(':')
   testImplementation 'junit:junit:4.13.2'
   testImplementation 'org.robolectric:robolectric:4.16.1'
   testImplementation 'androidx.test:core:1.6.1'

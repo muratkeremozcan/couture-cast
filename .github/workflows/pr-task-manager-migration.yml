@@ -66,7 +66,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/robolectric
-          key: robolectric-${{ hashFiles('apps/mobile/modules/task-manager-migration/android/unit-tests/build.gradle') }}
+          # The build files pin the Robolectric version, which picks the runtimes.
+          key: >-
+            robolectric-${{
+            hashFiles('apps/mobile/modules/task-manager-migration/**/build.gradle') }}
 
       - name: Robolectric regression for the persisted task cleanup
         run: |
@@ -74,7 +77,9 @@ jobs:
           project=apps/mobile/modules/task-manager-migration/android/unit-tests
           gradle -p "$project" testDebugUnitTest --console=plain
           # All three cases ran, none skipped.
-          grep -q 'tests="3" skipped="0" failures="0" errors="0"' "$project/build/test-results/testDebugUnitTest/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml"
+          report="$project/build/test-results/testDebugUnitTest"
+          report="$report/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml"
+          grep -q 'tests="3" skipped="0" failures="0" errors="0"' "$report"
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}
