@@ -362,9 +362,14 @@ describe('android-native.yml', () => {
 // tarpit, Metro and the flow pass, and fails when any one of them does not.
 describe('android-network-timeout.sh', () => {
   const script = path.resolve(NETWORK_SCRIPT)
-  const run = (env = {}) => {
+  // `expectLeak`: the caller expects Metro's grandchild to survive, so it is read at once rather
+  // than given time to exit. Every stub process left behind is killed before the run returns.
+  const run = (env = {}, { scriptText, expectLeak = false } = {}) => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'android-network-timeout-'))
+    const leftovers = []
     try {
+      const target = scriptText ? path.join(dir, 'variant.sh') : script
+      if (scriptText) fs.writeFileSync(target, scriptText)
       const bin = path.join(dir, 'bin')
       const maestroBin = path.join(dir, 'home/.maestro/bin')
       fs.mkdirSync(bin)
@@ -378,15 +383,23 @@ describe('android-network-timeout.sh', () => {
             mode: 0o755,
           }
         )
-      stub(path.join(bin, 'node'), '[ -n "$TARPIT_DIES" ] && exit 1\nexec /bin/sleep 5')
-      // Metro's stub records the env it got and leaves a grandchild, as npx and expo start do.
+      // The tarpit stub lives as long as Metro's, so a slow Metro start cannot outlast it.
+      stub(
+        path.join(bin, 'node'),
+        `[ -n "$TARPIT_DIES" ] && exit 1\necho $$ >> "${dir}/stub-pids"\nexec /bin/sleep 30`
+      )
+      // Metro's stub records the env it got and leaves a grandchild, as npx and expo start do. It
+      // publishes the grandchild's pid in one rename, so a reader never sees half a pid.
       stub(
         path.join(bin, 'npx'),
-        `echo "metro-env $EXPO_PUBLIC_API_BASE_URL $EXPO_PUBLIC_SUPABASE_URL $EXPO_PUBLIC_SUPABASE_ANON_KEY" >> "${dir}/calls"\n/bin/sleep 30 &\necho $! > "${dir}/metro-child"\nexec /bin/sleep 30`
+        `echo "metro-env $EXPO_PUBLIC_API_BASE_URL $EXPO_PUBLIC_SUPABASE_URL $EXPO_PUBLIC_SUPABASE_ANON_KEY" >> "${dir}/calls"\necho $$ >> "${dir}/stub-pids"\n/bin/sleep 30 &\necho $! > "${dir}/metro-child.tmp"\n/bin/mv "${dir}/metro-child.tmp" "${dir}/metro-child"\nexec /bin/sleep 30`
       )
+      // Real Metro answers its status route only once it runs, so the stub does too: it answers
+      // after Metro's grandchild exists. Without this the script could finish, and stop Metro,
+      // before the grandchild was forked, and the leak check below would pass with no cleanup.
       stub(
         path.join(bin, 'curl'),
-        '[ -n "$METRO_DOWN" ] && exit 7\necho packager-status:running'
+        `[ -n "$METRO_DOWN" ] && exit 7\ni=0\nwhile [ ! -f "${dir}/metro-child" ] && [ $i -lt 100 ]; do /bin/sleep 0.1; i=$((i + 1)); done\n[ -f "${dir}/metro-child" ] || exit 7\necho packager-status:running`
       )
       stub(path.join(bin, 'adb'), 'exit 0')
       stub(path.join(bin, 'sleep'), 'exit 0')
@@ -396,9 +409,13 @@ describe('android-network-timeout.sh', () => {
           spawnSync('/usr/bin/which', [tool], { encoding: 'utf8' }).stdout.trim(),
           path.join(bin, tool)
         )
-      const result = spawnSync('/bin/bash', ['--noprofile', '--norc', script], {
+      // Output to a file, not a pipe: spawnSync waits for every holder of a pipe to close it, so a
+      // service the script failed to stop would hold the run open until it ended by itself, and the
+      // leak check would always find it gone.
+      const output = fs.openSync(path.join(dir, 'script.log'), 'w')
+      const result = spawnSync('/bin/bash', ['--noprofile', '--norc', target], {
         cwd: path.join(dir, 'work'),
-        encoding: 'utf8',
+        stdio: ['ignore', output, output],
         env: {
           PATH: bin,
           HOME: path.join(dir, 'home'),
@@ -406,6 +423,7 @@ describe('android-network-timeout.sh', () => {
           ...env,
         },
       })
+      fs.closeSync(output)
       const calls = fs.existsSync(path.join(dir, 'calls'))
         ? fs.readFileSync(path.join(dir, 'calls'), 'utf8')
         : ''
@@ -425,21 +443,47 @@ describe('android-network-timeout.sh', () => {
       }
       let childAlive = false
       if (child) {
-        const deadline = Date.now() + 5000
+        leftovers.push(child)
+        const deadline = expectLeak ? 0 : Date.now() + 5000
         while (alive(child) && Date.now() < deadline)
           Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50)
         childAlive = alive(child)
-        if (childAlive) process.kill(child, 'SIGKILL')
       }
-      return { status: result.status, calls, childAlive }
+      return { status: result.status, calls, child, childAlive }
     } finally {
+      const stubs = path.join(dir, 'stub-pids')
+      if (fs.existsSync(stubs))
+        leftovers.push(
+          ...fs.readFileSync(stubs, 'utf8').split(/\s+/).filter(Boolean).map(Number)
+        )
+      for (const pid of leftovers)
+        try {
+          process.kill(pid, 'SIGKILL')
+        } catch {
+          // Already gone.
+        }
       fs.rmSync(dir, { recursive: true, force: true })
     }
   }
 
-  test('passes when the tarpit, Metro and the flow pass, with the documented arguments', () => {
-    const { status, calls, childAlive } = run()
+  // The leak check above can only pass for the right reason if it fails without the cleanup.
+  test("Metro's grandchild outlives the script when the cleanup is removed", () => {
+    const text = fs.readFileSync(script, 'utf8')
+    assert.ok(text.includes('trap stop_services EXIT\n'))
+    const { status, child, childAlive } = run(
+      {},
+      { scriptText: text.replace('trap stop_services EXIT\n', ''), expectLeak: true }
+    )
     assert.equal(status, 0)
+    assert.ok(child > 0, 'the Metro stub forked its grandchild')
+    assert.equal(childAlive, true)
+  })
+
+  test('passes when the tarpit, Metro and the flow pass, with the documented arguments', () => {
+    const { status, calls, child, childAlive } = run()
+    assert.equal(status, 0)
+    // Metro's grandchild existed before the script stopped Metro, so the leak check means something.
+    assert.ok(child > 0, 'the Metro stub forked its grandchild')
     // Device runner, leg 3: without a Supabase URL and key the app never sends Home's request.
     assert.match(
       calls,
