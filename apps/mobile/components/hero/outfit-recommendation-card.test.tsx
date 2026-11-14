@@ -332,3 +332,15 @@ describe('6.15 comfort notes face', () => {
     expect(notes.fontStyle).toBe('normal')
   })
 })
+
+describe('6.15 outfit card spacing', () => {
+  // Story 6.15: the share card launcher sat flush on the comfort notes box, borders touching.
+  it('6.15-MOB-SPACE-01 leaves the section gap between the launcher and the comfort notes box', () => {
+    renderCard({ onExport: vi.fn() })
+    const launcher = screen.getByTestId('outfit-share-card-open').getBoundingClientRect()
+    const notesBox = screen
+      .getByTestId('outfit-comfort-notes')
+      .parentElement!.getBoundingClientRect()
+    expect(notesBox.top - launcher.bottom).toBeCloseTo(16, 0)
+  })
+})

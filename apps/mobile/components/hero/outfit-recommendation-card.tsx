@@ -131,13 +131,7 @@ export function OutfitRecommendationCard({
           accessibilityLabel={t('shareCard.launcher')}
           testID="outfit-share-card-open"
           ref={shareOpener}
-          style={{
-            minHeight: 48,
-            padding: 12,
-            borderColor: '#B28D46',
-            borderWidth: 1,
-            borderRadius: 8,
-          }}
+          style={styles.shareLauncher}
           onPressIn={() => traceShareCardOpener('opener-press-in')}
           onTouchCancel={() => traceShareCardOpener('opener-touch-cancel')}
           onPress={() => {
@@ -317,6 +311,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: 'transparent',
+  },
+  // Story 6.15: the launcher sat flush on the comfort notes box, borders touching; the card's
+  // sections are 16 apart.
+  shareLauncher: {
+    minHeight: 48,
+    padding: 12,
+    borderColor: '#B28D46',
+    borderWidth: 1,
+    borderRadius: 8,
+    marginBottom: 16,
   },
   notesContainer: {
     backgroundColor: 'rgba(0,0,0,0.02)',
