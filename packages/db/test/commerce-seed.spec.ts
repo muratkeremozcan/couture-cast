@@ -434,4 +434,26 @@ describe('premium entitlement seed', () => {
       })
     ).toBe(2)
   })
+
+  // Story 6.15 r40: the reseed restamps synced_at, so it is a confirmed sync and clears any drift
+  // settle a sweep left on a fixture row; non-null drift_settled_at means currently unrepresentable.
+  it('6.15-DB-001 a reseed clears a drift settle left on a fixture row', async () => {
+    await seedPremiumEntitlements(prisma, { NODE_ENV: 'test' })
+    await prisma.premiumEntitlement.update({
+      where: { user_id: PREMIUM_SEED_USERS.active.id },
+      data: { drift_settled_at: new Date() },
+    })
+
+    await seedPremiumEntitlements(prisma, { NODE_ENV: 'test' })
+
+    const rows = await prisma.premiumEntitlement.findMany({
+      where: { user_id: { in: seededUserIds } },
+      select: { drift_settled_at: true },
+    })
+    expect(rows).toEqual([
+      { drift_settled_at: null },
+      { drift_settled_at: null },
+      { drift_settled_at: null },
+    ])
+  })
 })
