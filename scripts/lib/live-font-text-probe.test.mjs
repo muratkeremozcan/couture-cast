@@ -429,6 +429,10 @@ describe('validateTextProbeAnswer', () => {
       'scrolled away yet visible': (a) => (a.records[0].scrolledAway = true),
       'visible without a clipRect': (a) => (a.records[0].clipRect = null),
       'hidden with a clipRect': (a) => (a.records[0].visibleRect = null),
+      'missing opacity': (a) => delete a.records[0].opacity,
+      'opacity above 1': (a) => (a.records[0].opacity = 1.5),
+      'negative opacity': (a) => (a.records[0].opacity = -0.1),
+      'opacity as text': (a) => (a.records[0].opacity = '1'),
     }
     for (const [name, mutate] of Object.entries(cases)) {
       const answer = ok()
@@ -536,6 +540,44 @@ describe('matchTextProbe, exact text one to one', () => {
     const result = match(ribbonNodes.slice(1), ribbonRecords)
     assert.equal(result.code, 'live_font_text_probe_unmatched')
     assert.deepEqual(result.unmatchedRecords, [0])
+  })
+
+  // TEA ruling 2026-11-14, from the b0bd7215 Android Release Home cold probe (records 53 and
+  // 54): the bottom tab bar stacks an active and an inactive icon, byte-identical but for
+  // opacity, and the hierarchy shows one.
+  const tabIcon = (opacity) =>
+    record('\uf015', [100, 2207, 169, 2282], {
+      unlimitedLineCount: 1,
+      window: 1,
+      opacity,
+    })
+  test('a stacked icon pair passes, its opacity 0 copy listed invisible', () => {
+    const result = match(
+      [node('\uf015', [100, 2207, 169, 2282])],
+      [tabIcon(1), tabIcon(0)]
+    )
+    assert.equal(result.pass, true, result.code)
+    assert.deepEqual(
+      result.pairs.map((pair) => [pair.node, pair.record]),
+      [[0, 0]]
+    )
+    assert.deepEqual(result.invisible, [{ record: 1, node: 0 }])
+    // Listed in either order, the visible copy pairs.
+    assert.equal(
+      match([node('\uf015', [100, 2207, 169, 2282])], [tabIcon(0), tabIcon(1)]).pass,
+      true
+    )
+  })
+
+  test('a visible duplicate, however faint, still fails as unmatched', () => {
+    for (const faint of [1, 0.4, 0.01]) {
+      const result = match(
+        [node('\uf015', [100, 2207, 169, 2282])],
+        [tabIcon(1), tabIcon(faint)]
+      )
+      assert.equal(result.code, 'live_font_text_probe_unmatched', String(faint))
+      assert.deepEqual(result.invisible, [])
+    }
   })
 
   test('the same text far from the node is no pair, so a missing record cannot hide', () => {

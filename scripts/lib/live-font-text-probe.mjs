@@ -12,12 +12,14 @@
 //   { version: 1, token, platform: 'android'|'ios',
 //     windows: [{ id, rect, z, focused }],
 //     records: [{ kind, text, window, viewRect, visibleRect|null, clipRect|null, contentRect,
-//                 scrolledAway, lineCount, maxLines|null, ellipsized, unlimitedLineCount|null }] }
+//                 scrolledAway, lineCount, maxLines|null, ellipsized, unlimitedLineCount|null,
+//                 opacity }] }
 // Rects are [left, top, right, bottom]: screen pixels on Android (as uiautomator bounds), window
 // points on iOS (as Maestro iOS bounds). `visibleRect` is the view cut by every clipping ancestor
 // and the window; `clipRect` is the view cut by every clipping ancestor except scroll views and
 // the window, so a scroll viewport edge never reads as a clip; `scrolledAway` is true when the
-// view lies outside its nearest scroll view's clip or outside the window.
+// view lies outside its nearest scroll view's clip or outside the window; `opacity` is the
+// view's effective opacity, 0 to 1.
 //
 // Android: `am broadcast -a com.couturecast.textlayoutprobe.DUMP --es token <t> -p <package>`,
 // then `logcat -d -s TextLayoutProbe` lines `begin <t> <chunks> <sha256>`, `chunk <t> <i>
@@ -82,6 +84,7 @@ const RECORD_FIELDS = [
   'maxLines',
   'ellipsized',
   'unlimitedLineCount',
+  'opacity',
 ].sort()
 const ANSWER_FIELDS = ['platform', 'records', 'token', 'version', 'windows']
 const WINDOW_FIELDS = ['focused', 'id', 'rect', 'z']
@@ -119,6 +122,11 @@ const RECORD_RULES = [
   ['ellipsized', (record) => isCount(record.ellipsized)],
   ['maxLines', (record) => nullOr(isMaxLines)(record.maxLines)],
   ['unlimitedLineCount', (record) => nullOr(isCount)(record.unlimitedLineCount)],
+  [
+    'opacity',
+    (record) =>
+      typeof record.opacity === 'number' && record.opacity >= 0 && record.opacity <= 1,
+  ],
   [
     'scrolledAway with a visibleRect',
     (record) => !record.scrolledAway || record.visibleRect === null,
@@ -512,6 +520,7 @@ function classifyRecords(records, coveredIds, volatileRegions) {
   const classes = {
     empty: [],
     covered: [],
+    invisible: [],
     behind: [],
     volatile: [],
     scrolled: [],
@@ -526,8 +535,11 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     )
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
-    else if (coveredIds.has(record.window))
-      kind = coveredIds.get(record.window).whole ? 'covered' : 'behind'
+    else if (coveredIds.get(record.window)?.whole) kind = 'covered'
+    // TEA ruling 2026-11-14: opacity exactly 0 draws nothing (the inactive copy of a stacked
+    // tab icon); anything above 0, a fade caught mid-way, is matched and judged.
+    else if (record.opacity === 0) kind = 'invisible'
+    else if (coveredIds.has(record.window)) kind = 'behind'
     else if (region >= 0) kind = 'volatile'
     else if (record.scrolledAway) kind = 'scrolled'
     else if (record.visibleRect === null) kind = 'hidden'
@@ -535,6 +547,20 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     if (kind === 'volatile') regionOf.set(record.index, region)
   }
   return { classes, regionOf }
+}
+
+/**
+ * For the report only: the node each invisible record would pair with (same text, touching
+ * rect, best overlap), or null. It takes no node from the matching.
+ */
+function invisibleNodes(nodes, invisible, tolerance) {
+  return invisible.map((record) => {
+    const rect = recordRect(record)
+    const touching = nodes
+      .filter((node) => node.text === record.text && touches(node.box, rect, tolerance))
+      .sort((a, b) => overlapRatio(b.box, rect) - overlapRatio(a.box, rect))
+    return { record: record.index, node: touching[0]?.index ?? null }
+  })
 }
 
 /** Rank of each item in screen order: top to bottom, left to right, then list order. */
@@ -615,6 +641,7 @@ function groupLeftovers({ nodes, leftover, open, free, tolerance }) {
  * leaves out. Every record falls in one class:
  *   empty      text '' (no text to cut), left out
  *   covered    in a window a focused higher window covers whole, left out
+ *   invisible  opacity exactly 0: left out of matching and judging, listed for review
  *   behind     in a window under a focused higher window that does not cover it whole (a
  *              centred dialog): out of matching, still judged for clipping
  *   volatile   centre inside a volatile region: out of matching, still judged for clipping
@@ -712,6 +739,7 @@ export function matchTextProbe({
         .length,
     })),
     behind: classes.behind.map((record) => record.index),
+    invisible: invisibleNodes(indexed, classes.invisible, tolerance),
     empty: classes.empty.map((record) => record.index),
     windowNodes: windowNodes.map((node) => node.index),
   }

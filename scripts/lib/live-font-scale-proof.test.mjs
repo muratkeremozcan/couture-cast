@@ -1542,6 +1542,86 @@ describe('text layout clipping (F-00i)', () => {
     }
   })
 
+  // TEA ruling 2026-11-14: opacity 0 draws nothing; anything above 0 is judged.
+  test('an opacity 0 copy is left out of matching and judging and listed with its key', () => {
+    const change = withAll(fixedChange())
+    for (const capture of [change.settled, change.cold]) {
+      const copy = { ...recordFor(capture, TEMPERATURE), opacity: 0 }
+      // Clipped, but drawn at opacity 0: nothing of it shows.
+      copy.contentRect = [...copy.contentRect.slice(0, 3), copy.contentRect[3] + 40]
+      capture.textProbe.records.push(copy)
+    }
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'fixed')
+    assert.deepEqual(checks.textProbe.stages.settled.invisible, [
+      { key: `["current-temperature","${TEMPERATURE}"]#0`, text: TEMPERATURE },
+    ])
+  })
+
+  test('a clipped record at opacity 0.5 still fails', () => {
+    const change = withAll(fixedChange())
+    recordFor(change.settled, TEMPERATURE).opacity = 0.5
+    overflow(change.settled, TEMPERATURE)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => entry.text),
+      [TEMPERATURE]
+    )
+  })
+
+  test('text the cold launch shows that the live screen draws only at opacity 0 fails as live_font_text_hidden', () => {
+    /** The capture draws the temperature (both its texts) at opacity 0; the hierarchy drops them. */
+    const hide = (capture, text = TEMPERATURE) => {
+      for (const record of capture.textProbe.records)
+        if (record.text === text) record.opacity = 0
+      capture.nodes = capture.nodes.filter((node) => node.text !== text)
+    }
+    const settled = withAll(fixedChange())
+    hide(settled.settled)
+    const { checks } = evaluateLiveFontChangeRaw(settled)
+    assert.deepEqual(checks.textHidden.hidden, [
+      {
+        stage: 'settled',
+        text: TEMPERATURE,
+        coldKeys: [
+          `["current-temperature","${TEMPERATURE}"]#0`,
+          `["","${TEMPERATURE}"]#0`,
+        ],
+        invisible: 2,
+      },
+    ])
+    for (const version of ['0.81.5', '0.88.1'])
+      assert.throws(prove(settled, undefined, version), { code: 'live_font_text_hidden' })
+    // After the update, against the cold launch's update.
+    const update = withAll({
+      ...fixedChange(),
+      updated: { ...fixedChange().settled, stage: 'updated' },
+      coldUpdated: { ...fixedChange().cold },
+    })
+    hide(update.updated)
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(update).checks.textHidden.hidden.map(
+        (entry) => entry.stage
+      ),
+      ['updated']
+    )
+    // Lost text, so structural: a residual whose full text still reads whole is no residual. The
+    // hidden text is a stale unlabeled line, no anchor and no probe, so nothing else fails.
+    const residual = residualChange()
+    const line = residual.settled.nodes.find((node) => node.id === '').text
+    residual.settled.fullText = residual.before.nodes
+      .filter((node) => !/^com\.android\.systemui:/.test(node.id))
+      .map((node) => JSON.stringify([node.id, node.text]))
+    hide(residual.settled, line)
+    assert.equal(evaluateLiveFontChangeRaw(residual).verdict, 'unexpected')
+    // Hidden at the cold launch too, it is the app's own state.
+    const both = withAll(fixedChange())
+    hide(both.settled)
+    hide(both.cold)
+    assert.equal(evaluateLiveFontChangeRaw(both).checks.textHidden.pass, true)
+  })
+
   // Antigravity r41 P3-1: `ellipsizeMode="clip"` drops lines with no ellipsis.
   test('the r41 M11 record: lines dropped past the cold launch at the same scale are a clip', () => {
     const change = withAll(fixedChange())

@@ -32,6 +32,7 @@ export function probeRecord(platform, text, rect, overrides = {}) {
     maxLines: null,
     ellipsized: 0,
     unlimitedLineCount: null,
+    opacity: 1,
     ...overrides,
   }
 }

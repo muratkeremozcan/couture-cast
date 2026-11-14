@@ -344,6 +344,8 @@ export function textProbeSummary(capture, platform) {
   if (!match) return { pass, code }
   const records = capture.textProbe.records
   const nodes = [...keyed(capture).values()]
+  const keys = [...keyed(capture).keys()]
+  const masked = entryKeys(capture)
   const regions = capture.volatileRegions ?? []
   return {
     pass,
@@ -368,6 +370,12 @@ export function textProbeSummary(capture, platform) {
     multilineInputs: match.pairs
       .filter((pair) => multilineInput(records[pair.record]))
       .map((pair) => records[pair.record].text),
+    // TEA ruling 2026-11-14: records at opacity 0, with the key of the node each would pair
+    // with (null when the hierarchy shows none), for review with each entry.
+    invisible: match.invisible.map(({ record, node }) => ({
+      key: node === null ? null : masked.get(keys[node]),
+      text: records[record].text,
+    })),
     empty: match.empty.length,
     windowNodes: match.windowNodes.map((index) => identityOf(nodes[index])),
     unmatchedRecords: match.unmatchedRecords.map((index) => records[index].text),
@@ -723,6 +731,10 @@ export function evaluateLiveFontChange({
     // The settled captures only: `immediate` is read while the screen relays out, so its probe
     // answer, a moment after its hierarchy, may show another layout; it is judged for nothing.
     textProbe: textProbeCheck(platform, { before, settled, updated }),
+    textHidden: hiddenText(platform, [
+      ['settled', settled, cold],
+      ['updated', updated, coldUpdated],
+    ]),
   }
   if (updated) {
     // Codex R4-04: the update must keep the screen whole, so it gets the structural checks and a
@@ -754,6 +766,41 @@ export function evaluateLiveFontChange({
   }
   markStaleClips(checks)
   return { checks, verdict: classify(checks) }
+}
+
+/** Per text (hour labels masked): the keys its paired records have, and its invisible count. */
+function textPresence(capture, platform) {
+  const presence = new Map()
+  const entry = (text) => {
+    if (!presence.has(text)) presence.set(text, { keys: [], invisible: 0 })
+    return presence.get(text)
+  }
+  const layout = textLayout(capture, platform)
+  for (const fact of layout.facts)
+    if (fact.key !== null) entry(maskText(fact.record.text)).keys.push(fact.key)
+  for (const { record } of layout.match?.invisible ?? [])
+    entry(maskText(capture.textProbe.records[record].text)).invisible += 1
+  return presence
+}
+
+/**
+ * TEA ruling 2026-11-14: an invisible record must not hide lost text. A text the cold launch at
+ * the same scale shows on more paired records than the live capture does, while the live
+ * capture draws it at opacity 0, failed to show: live_font_text_hidden. `stages` holds
+ * [stage, live capture, cold capture] triples; a missing capture is skipped.
+ */
+function hiddenText(platform, stages) {
+  const hidden = []
+  for (const [stage, live, cold] of stages) {
+    if (!live || !cold) continue
+    const [now, then] = [textPresence(live, platform), textPresence(cold, platform)]
+    for (const [text, { keys }] of then) {
+      const shown = now.get(text)
+      if (shown?.invisible && shown.keys.length < keys.length)
+        hidden.push({ stage, text, coldKeys: keys, invisible: shown.invisible })
+    }
+  }
+  return { pass: hidden.length === 0, hidden }
 }
 
 /** Every live capture of the leg carries a probe answer that pairs with its text nodes. */
@@ -831,6 +878,7 @@ function structural(checks) {
       'identity',
       'controls',
       'textProbe',
+      'textHidden',
       'postUpdateFullText',
       'postUpdateAnchors',
       'postUpdateControls',
@@ -1238,6 +1286,9 @@ export function assertLiveFontProof({
         )
       )
     )
+  // Text the cold launch shows that the live screen only draws at opacity 0 is lost text.
+  if (!result.checks.textHidden.pass)
+    fail('live_font_text_hidden', JSON.stringify(result.checks.textHidden.hidden))
   const failing = () =>
     Object.entries(result.checks)
       .filter(([, check]) => !check.pass)
