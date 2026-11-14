@@ -45,7 +45,9 @@ function readMarker(id, { markers, jsScales, environments }) {
  * A node whose id starts with a `volatile` prefix is dropped with its subtree and counted in
  * `volatileDropped`: a region whose presence the app decides on grounds unrelated to text size.
  * With `markVolatile` the region's text stays, flagged `volatile: true`, so scroll pages can
- * still be aligned on it (stitchPages leaves it out of the result).
+ * still be aligned on it (stitchPages leaves it out of the result). `volatileRegions` holds the
+ * bounds of each dropped region, so the text layout probe's records inside one are left out of
+ * matching too (F-00i; they are still judged for clipping).
  */
 export function flattenHierarchy(
   tree,
@@ -53,6 +55,7 @@ export function flattenHierarchy(
 ) {
   const nodes = []
   let volatileDropped = 0
+  const volatileRegions = []
   const controls = []
   const markers = []
   const jsScales = []
@@ -72,6 +75,7 @@ export function flattenHierarchy(
     const isVolatile = inVolatile || matchesPrefix(id, volatile)
     if (isVolatile && !markVolatile) {
       volatileDropped += countText(node, platform)
+      if (bounds) volatileRegions.push(bounds)
       return
     }
     const entry = textEntry({
@@ -112,6 +116,7 @@ export function flattenHierarchy(
     jsFontScale,
     environment: environment.size === 1 ? parseEnvironment(environments[0]) : undefined,
     volatileDropped,
+    volatileRegions,
   }
 }
 

@@ -102,10 +102,13 @@ describe('flattenHierarchy', () => {
       ['Create my outfit card', 'Kept']
     )
     assert.equal(kept.volatileDropped, 2)
+    // F-00i: each dropped region's bounds, so the probe's records inside it skip matching.
+    assert.deepEqual(kept.volatileRegions, ['[81,1862][999,1915]', '[81,1936][999,2052]'])
     assert.ok(!kept.controls.some((control) => control.id.startsWith('shop-this-look-')))
     const all = flattenHierarchy(page, { platform: 'android' })
     assert.equal(all.nodes.length, 4)
     assert.equal(all.volatileDropped, 0)
+    assert.deepEqual(all.volatileRegions, [])
   })
 })
 
