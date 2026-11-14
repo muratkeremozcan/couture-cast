@@ -48,6 +48,7 @@ import {
   SCREENS,
   screenRunSteps,
 } from './lib/live-font-journey.mjs'
+import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
@@ -95,11 +96,17 @@ function run(binary, args, { timeout = 120_000 } = {}) {
   return result.stdout
 }
 const adb = (...args) => run(adbBinary, ['-s', device, ...args])
+// Every Maestro invocation goes through the driver lifecycle (scripts/lib/maestro-driver-sync.mjs).
+const maestroRun = createSyncMaestro({
+  platform,
+  device,
+  adb: (args) => run(adbBinary, ['-s', device, ...args]),
+  maestro: (args, options) => run('maestro', args, options),
+})
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function maestro(flow) {
-  run(
-    'maestro',
+  maestroRun(
     [
       '--device',
       device,
@@ -122,7 +129,7 @@ function hierarchy() {
   // An Activity relaunch or a window change can leave one read between mounts with no marker;
   // a marker still missing after three reads, a wrong build or a wrong device fails at once.
   for (let attempt = 1; ; attempt += 1) {
-    const raw = run('maestro', ['--device', device, 'hierarchy'])
+    const raw = maestroRun(['--device', device, 'hierarchy'])
     const start = raw.indexOf('{')
     if (start < 0) throw new Error('live_font_hierarchy_invalid')
     const tree = JSON.parse(raw.slice(start))
@@ -293,7 +300,7 @@ function drag(size, up) {
       '1500'
     )
   else
-    run('maestro', [
+    maestroRun([
       '--device',
       device,
       'test',
@@ -407,8 +414,7 @@ function launch() {
     spawnSync('xcrun', ['simctl', 'terminate', device, appId])
     run('xcrun', ['simctl', 'launch', device, appId])
   }
-  run(
-    'maestro',
+  maestroRun(
     [
       '--device',
       device,

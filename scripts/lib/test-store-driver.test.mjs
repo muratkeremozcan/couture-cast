@@ -125,6 +125,10 @@ async function runDriver(
     'adb',
     [
       'case "$*" in *" reverse "*) echo "$*" >> "$STUB_DIR/adb-reverse.log";; esac',
+      // The Maestro driver packages exist while $STUB_DIR/driver does (the maestro stub installs it).
+      'case "$*" in *" pm uninstall "*) rm -f "$STUB_DIR/driver"; exit 0;; esac',
+      'case "$*" in *" pm list packages "*) [ -f "$STUB_DIR/driver" ] && printf "package:dev.mobile.maestro\\npackage:dev.mobile.maestro.test\\n"; exit 0;; esac',
+      'case "$*" in *" pm list instrumentation"*) [ -f "$STUB_DIR/driver" ] && echo "instrumentation:dev.mobile.maestro.test/androidx.test.runner.AndroidJUnitRunner (target=dev.mobile.maestro)"; exit 0;; esac',
       'case "$*" in *" $STUB_HANG "*) exec sleep 300;; esac',
       'case "$*" in *" $STUB_FAIL "*) exit 1;; esac',
       'exit 0',
@@ -134,6 +138,8 @@ async function runDriver(
     bin,
     'maestro',
     [
+      'touch "$STUB_DIR/driver"',
+      'echo "$*" >> "$STUB_DIR/maestro-args.log"',
       'case "$*" in *hierarchy*) echo \'{"id":"live-font-env-root~0.81.5~light~ltr~3~en-US"}\'; exit 0;; esac',
       'printf \'{"u":"%s"}\' "$(cat "$STUB_DIR/member")" > "$STUB_EVIDENCE/leak.json"',
       'touch "$STUB_DIR/planted"',
@@ -222,6 +228,9 @@ async function runDriver(
     member,
     pids: stubPids(),
     reverse: fs.existsSync(reverseLog) ? fs.readFileSync(reverseLog, 'utf8') : '',
+    maestroArgs: fs.existsSync(path.join(stubDir, 'maestro-args.log'))
+      ? fs.readFileSync(path.join(stubDir, 'maestro-args.log'), 'utf8').trim().split('\n')
+      : [],
   }
 }
 
@@ -316,6 +325,14 @@ test('Android: the crash path removes the reverse of the actual proxy and Metro 
   assert.equal(added.length, 2, result.reverse)
   assert.ok(!added.includes('tcp:0'))
   assert.deepEqual([...removed].sort(), [...new Set(added)].sort())
+  // TEA: Maestro keeps the driver it installed; the flow pins the driver port.
+  assert.ok(result.maestroArgs.length > 0)
+  for (const args of result.maestroArgs) assert.match(args, /--no-reinstall-driver/)
+  assert.ok(
+    result.maestroArgs
+      .filter((args) => / test /.test(args))
+      .every((args) => args.includes('--driver-host-port 17001'))
+  )
   await assertCleaned(result)
 })
 

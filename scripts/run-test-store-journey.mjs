@@ -58,6 +58,7 @@ import {
   writeRunOutputs,
 } from './lib/test-store-output.mjs'
 import { startApiProxy } from './lib/test-store-proxy.mjs'
+import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 import { boundedSpawn, boundOf, SPAWN_TIMEOUT_MS } from './lib/test-store-spawn.mjs'
 import {
   memberRef,
@@ -155,6 +156,13 @@ function run(binary, args, { timeout = 180_000 } = {}) {
   return result.stdout
 }
 const adb = (...args) => run(adbBinary, ['-s', device, ...args])
+// Every Maestro invocation goes through the driver lifecycle (scripts/lib/maestro-driver-sync.mjs).
+const maestroRun = createSyncMaestro({
+  platform,
+  device,
+  adb: (args) => run(adbBinary, ['-s', device, ...args]),
+  maestro: (args, options) => run('maestro', args, options),
+})
 const simctl = (...args) => run('xcrun', ['simctl', ...args])
 
 // --- secrets, read by name only ----------------------------------------------------------
@@ -271,8 +279,7 @@ async function launch() {
 }
 
 function flow(name) {
-  run(
-    'maestro',
+  maestroRun(
     [
       '--device',
       device,
@@ -391,7 +398,7 @@ const io = {
   },
   launch,
   flow: async (name) => flow(name),
-  hierarchy: async () => run('maestro', ['--device', device, 'hierarchy']),
+  hierarchy: async () => maestroRun(['--device', device, 'hierarchy']),
   serverState: () => serverState(api, member.token),
   waitForPaid: () =>
     waitForServerState({
