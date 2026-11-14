@@ -11,8 +11,12 @@ import { sameLayout, stitchPages } from './live-font-capture.mjs'
 /** Reads a page settles within; at 500 ms apart, about ten seconds. */
 export const PAGE_ATTEMPTS = 20
 export const PAGE_INTERVAL_MS = 500
-/** Drags a scroll-through takes at most before it stops. */
-export const MAX_DRAGS = 12
+/**
+ * Drags a scroll-through takes at most. A screen still scrolling after them fails: at 12 the
+ * Android 6c85bbb4 Community feed stopped 13 pages down on every capture, so its last cards were
+ * read at some launches and not others.
+ */
+export const MAX_DRAGS = 30
 
 /**
  * The screenshot file of page `page` of the capture named `file`: page 0 keeps the capture's own
@@ -100,20 +104,25 @@ export async function stablePage({
 
 /**
  * The scroll-through: the page at the top, then one page per drag until a drag shows the same
- * page again (the bottom) or `maxDrags` drags are done. `page(index)` reads settled page
- * `index` (stablePage; 0 the top) and `dragUp()` scrolls one step down the content. Returns the distinct pages in
- * order and the number of drags made, which the caller undoes.
+ * page again (the bottom). `page(index)` reads settled page `index` (stablePage; 0 the top) and
+ * `dragUp()` scrolls one step down the content. Returns the distinct pages in order and the
+ * number of drags made, which the caller undoes. A screen that still shows a new page after
+ * `maxDrags` drags never reached its bottom, so its last pages would go unread: it fails as
+ * live_font_scroll_bottom_unreached.
  */
 export async function scrollPages({ page, dragUp, maxDrags = MAX_DRAGS }) {
   const pages = [await page(0)]
-  let drags = 0
-  for (; drags < maxDrags; drags += 1) {
+  for (let drags = 0; drags < maxDrags; drags += 1) {
     dragUp()
     const next = await page(pages.length)
-    if (sameLayout(next.nodes, pages.at(-1).nodes)) break
+    if (sameLayout(next.nodes, pages.at(-1).nodes)) return { pages, drags }
     pages.push(next)
   }
-  return { pages, drags }
+  const error = new Error(
+    `live_font_scroll_bottom_unreached: still scrolling after ${maxDrags} drags`
+  )
+  error.code = 'live_font_scroll_bottom_unreached'
+  throw error
 }
 
 /**

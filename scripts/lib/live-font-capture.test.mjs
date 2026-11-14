@@ -303,14 +303,142 @@ describe('stitchPages', () => {
       ),
       ['Header', 'Caption 1', 'Caption 2']
     )
-    // Once a step is measured, a later textless page reuses it.
-    const second = [at('Caption 1', -540), at('Footer', 1000)]
-    const afterGap = [at('Footer', 1000 - 1680)]
+    // Once a step is measured (830 px for a drag of 840), a textless page takes it: the footer
+    // two such steps on lands on itself, where the drag's own length would put it 20 px off.
+    const second = [at('Caption 1', 300 - 830), at('Footer', 1000)]
+    const afterGap = [at('Footer', 1000 - 1660)]
     assert.deepEqual(
-      stitchPages([first, second, [], afterGap], { expectedShift: 5 }).map(
+      stitchPages([first, second, [], afterGap], { expectedShift: 840 }).map(
         (key) => JSON.parse(key)[1]
       ),
       ['Header', 'Caption 1', 'Footer']
+    )
+    // A textless page before the first measured step takes it too.
+    assert.deepEqual(
+      stitchPlaces([first, [], [at('X', 500)], [at('X', 500 - 830)]], {
+        expectedShift: 840,
+      }).offsets,
+      [0, 830, 1660, 2490]
+    )
+  })
+
+  // Android 6c85bbb4 Community, cold 1.0 launch 002, pages 2 to 3 (drag 840, true step 846):
+  // the status-bar clock, which changed minute on a later page so it is no chrome, measured 0;
+  // the id-less "Comments" and "Temperate and dry" paired with another card's copy (-930,
+  // -993); the cc68 caption, cut by the bottom edge on page 2, measured 844 off a 3 px box. The
+  // median was 0, so the caption landed in two places.
+  test('measures a step only from shifts that measure the drag', () => {
+    const box = (id, text, bounds, extra = {}) => ({ id, text, bounds, ...extra })
+    const CAPTION =
+      'community-card-caption-cc68-native-7756b8d9-4e43-4afa-bcce-a79bbe01e969'
+    const tabs = [
+      box('', 'Home', '[99,2277][171,2314]'),
+      box('', 'Settings', '[895,2277][994,2314]'),
+    ]
+    const page2 = [
+      box('com.android.systemui:id/clock', '1:40', '[50,43][154,86]'),
+      box('community-new-post-label', 'New post', '[847,372][996,419]'),
+      box('', 'Comments', '[419,861][591,908]', { volatile: true }),
+      box('', 'Temperate and dry', '[725,1104][969,1143]', { volatile: true }),
+      box(
+        CAPTION,
+        'A synthetic CC68 outfit for native export proof.',
+        '[44,2187][1036,2190]',
+        {
+          volatile: true,
+        }
+      ),
+      ...tabs,
+    ]
+    const page3 = [
+      box('com.android.systemui:id/clock', '1:40', '[50,43][154,86]'),
+      box('community-new-post-label', 'New post', '[847,372][996,419]'),
+      box('', 'Comments', '[543,1791][715,1838]', { volatile: true }),
+      box('', 'Temperate and dry', '[300,2097][544,2136]', { volatile: true }),
+      box(
+        CAPTION,
+        'A synthetic CC68 outfit for native export proof.',
+        '[44,1343][1036,1419]',
+        {
+          volatile: true,
+        }
+      ),
+      box('', 'Report', '[800,1500][950,1547]'),
+      ...tabs,
+    ]
+    const page4 = [
+      box('com.android.systemui:id/clock', '1:41', '[50,43][154,86]'),
+      box('community-new-post-label', 'New post', '[847,372][996,419]'),
+      box('', 'Report', '[800,654][950,701]'),
+      ...tabs,
+    ]
+    const { offsets } = stitchPlaces([page2, page3, page4], { expectedShift: 840 })
+    assert.deepEqual(offsets, [0, 846, 1692])
+    // The caption's page 3 box, moved by the step, lands on its page 2 top.
+    assert.ok(Math.abs(1343 + offsets[1] - 2187) <= 4)
+    // Status-bar nodes never measure a step, even with no drag length to check against.
+    const status = (time, signal) => [
+      box('com.android.systemui:id/clock', time, '[50,43][154,86]'),
+      box('com.android.systemui:id/mobile_signal', signal, '[900,43][960,86]'),
+    ]
+    const clocked = [
+      [...status('1:40', 'Two bars'), box('card-a', 'A', '[44,1382][1036,1458]')],
+      [...status('1:40', 'Two bars'), box('card-a', 'A', '[44,536][1036,612]')],
+      [...status('1:41', 'Three bars')],
+    ]
+    assert.deepEqual(stitchPlaces(clocked).offsets.slice(0, 2), [0, 846])
+    // A box the viewport clamps on one page (3 px tall there) never measures a step.
+    const clamped = [
+      [box('card-a', 'A', '[44,2187][1036,2190]')],
+      [
+        box('card-a', 'A', '[44,1382][1036,1458]'),
+        box('card-b', 'B', '[44,1500][1036,1550]'),
+      ],
+      [box('card-b', 'B', '[44,654][1036,704]')],
+    ]
+    assert.deepEqual(
+      stitchPlaces(clamped, { expectedShift: 840 }).offsets,
+      [0, 846, 1692]
+    )
+  })
+
+  // Android 6c85bbb4 Community, before 1.0 launch 005, pages 4 to 5: the viewport clamps every
+  // shared box of the spotlight card (39 px tall on page 4, 26 on page 5), so no node measures
+  // the step, and the drags before it were 847 px. Its probe records, never cut, moved 837.
+  test('measures a step from the probe records when no node does', () => {
+    const box = (id, text, bounds) => ({ id, text, bounds })
+    const record = (text, rect) => ({ text, viewRect: rect })
+    const pages = [
+      [box('header', 'Header', '[44,1500][1036,1550]')],
+      [
+        box('header', 'Header', '[44,653][1036,703]'),
+        box('', 'Partnered', '[103,1469][235,1508]'),
+      ],
+      [box('', 'Partnered', '[103,632][235,658]')],
+    ]
+    const records = [
+      [record('Header', [44, 1500, 1036, 1550])],
+      [
+        record('Header', [44, 653, 1036, 703]),
+        record('Partnered', [103, 1469, 235, 1508]),
+      ],
+      [
+        record('Partnered', [103, 632, 235, 671]),
+        record('Style Explorer 9BC8AA75', [103, 500, 600, 551]),
+      ],
+    ]
+    // Fixed on every page, a sticky chip shifts by 0 and measures nothing.
+    for (const list of records) list.push(record('Cold and wet', [695, 535, 900, 582]))
+    records[1].push(record('Style Explorer 9BC8AA75', [103, 1337, 600, 1388]))
+    assert.deepEqual(stitchPlaces(pages, { expectedShift: 840 }).offsets, [0, 847, 1694])
+    assert.deepEqual(
+      stitchPlaces(pages, { expectedShift: 840, records }).offsets,
+      [0, 847, 1684]
+    )
+    // Without the drag's length the records measure nothing: they carry no chrome of their own.
+    assert.deepEqual(
+      stitchPlaces(pages, { records }).offsets,
+      stitchPlaces(pages).offsets
     )
   })
 

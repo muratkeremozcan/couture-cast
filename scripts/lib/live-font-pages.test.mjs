@@ -10,6 +10,7 @@ import { describe, test } from 'node:test'
 import {
   attachClipImages,
   attachPages,
+  MAX_DRAGS,
   PAGE_ATTEMPTS,
   pageImage,
   scrollPages,
@@ -177,17 +178,43 @@ describe('scrollPages', () => {
     assert.equal(result.drags, 2)
   })
 
-  test('stops after maxDrags drags on a screen that keeps scrolling', async () => {
+  // Android 6c85bbb4 Community: a feed longer than the cap stopped 13 pages down every time.
+  test('a screen still scrolling after maxDrags drags fails as live_font_scroll_bottom_unreached', async () => {
     let drags = 0
+    await assert.rejects(
+      scrollPages({
+        page: async () => pageOf(`page ${drags}`),
+        dragUp: () => {
+          drags += 1
+        },
+        maxDrags: 3,
+      }),
+      { code: 'live_font_scroll_bottom_unreached' }
+    )
+    assert.equal(drags, 3)
+    // A bottom reached on the last drag the cap allows passes.
+    const shown = ['top', 'a', 'b', 'b']
+    let made = 0
     const result = await scrollPages({
-      page: async () => pageOf(`page ${drags}`),
+      page: async () => pageOf(shown[made]),
       dragUp: () => {
-        drags += 1
+        made += 1
       },
       maxDrags: 3,
     })
-    assert.equal(result.pages.length, 4)
-    assert.equal(result.drags, 3)
+    assert.deepEqual([result.pages.length, result.drags], [3, 2])
+  })
+
+  test('the default cap reads a feed of 25 pages to its bottom', async () => {
+    assert.ok(MAX_DRAGS >= 25)
+    let drags = 0
+    const result = await scrollPages({
+      page: async () => pageOf(`page ${Math.min(drags, 24)}`),
+      dragUp: () => {
+        drags += 1
+      },
+    })
+    assert.deepEqual([result.pages.length, result.drags], [25, 24])
   })
 })
 

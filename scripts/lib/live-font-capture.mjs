@@ -295,13 +295,43 @@ const median = (values) =>
 
 /**
  * The step for two pages that share no moving text (a page of only a tall image): the median
- * step measured so far in this stitch, since every drag is the same length, or the drag's own
- * length before any was measured.
+ * of every step measured in this stitch, since every drag is the same length, or the drag's own
+ * length when none was measured.
  */
 function fallbackStep(steps, expectedShift) {
   if (steps.length) return median(steps)
   if (expectedShift > 0) return expectedShift
   throw new Error('live_font_scroll_pages_disjoint')
+}
+
+const SYSTEM_UI = /^com\.android\.systemui:/
+/** A probe record as a stitch node: its text and its viewRect as bounds. */
+const asNode = (record) => {
+  const [left, top, right, bottom] = record.viewRect
+  return { id: '', text: record.text, bounds: `[${left},${top}][${right},${bottom}]` }
+}
+/** How far a measured shift may sit from the drag's own length and still count: 10 percent. */
+const SHIFT_SPREAD = 0.1
+
+/**
+ * The shifts from page `a` to page `b` that the moving identities shown once on both measure
+ * truly (Android 6c85bbb4 Community): never a system UI node (the status-bar clock changes on
+ * its own), only a node of the same height on both pages (the hierarchy clamps a box the
+ * viewport cuts, so its top moves less), and, given the drag's length, only a shift within
+ * SHIFT_SPREAD of it (an id-less text each card repeats, such as "Comments", pairs with another
+ * card's copy).
+ */
+function measuredShifts(a, b, { tolerance, expectedShift }) {
+  const height = (node) => edges(node)[1] - edges(node)[0]
+  return [...a.keys()]
+    .filter((key) => b.has(key) && !SYSTEM_UI.test(a.get(key).id ?? ''))
+    .filter((key) => Math.abs(height(a.get(key)) - height(b.get(key))) <= tolerance)
+    .map((key) => top(a.get(key)) - top(b.get(key)))
+    .filter(
+      (shift) =>
+        !(expectedShift > 0) ||
+        Math.abs(shift - expectedShift) <= SHIFT_SPREAD * expectedShift
+    )
 }
 
 /**
@@ -310,8 +340,8 @@ function fallbackStep(steps, expectedShift) {
  * the previous one by the median shift of the moving identities that appear exactly once on
  * both pages; a node whose identity and shifted top or bottom match one already taken is the
  * same node seen again. Either edge counts because the hierarchy clips a node cut by the
- * viewport, so a node half off screen keeps only its visible edge. Pages that share no moving
- * text take the step from fallbackStep.
+ * viewport, so a node half off screen keeps only its visible edge. Only shifts that measure the
+ * drag truly count (measuredShifts); pages that share none take the step from fallbackStep.
  */
 export function stitchPages(pages, options = {}) {
   return stitchPlaces(pages, options).taken.map(({ key }) => key)
@@ -322,9 +352,13 @@ export function stitchPages(pages, options = {}) {
  * `taken` is the stitched text in order (page 0's own text first, then each later page's new
  * text), `offsets` each page's shift from page 0, and `places[p][i]` the index in `taken` of
  * node i of page p. A chrome node on a later page takes the place of its page 0 copy; a volatile
- * node, or a chrome node page 0 does not show, has none (-1).
+ * node, or a chrome node page 0 does not show, has none (-1). Given the drag's length, each
+ * page's probe `records` (their viewRect, which the probe never cuts to the window) measure
+ * the step beside the nodes: a card whose every hierarchy box the viewport clamps still moves
+ * its records by the true step (Android 6c85bbb4 Community before 1.0, pages 4 to 5: 837 px
+ * where the drags before were 847).
  */
-export function stitchPlaces(pages, { tolerance = 4, expectedShift } = {}) {
+export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = {}) {
   if (!pages.length) return { taken: [], offsets: [], places: [] }
   const at = (page, node) =>
     page.some(
@@ -342,27 +376,43 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift } = {}) {
       return taken.length - 1
     }),
   ]
+  const once = (page, fixed) => {
+    const counts = new Map()
+    for (const node of page)
+      counts.set(identityOf(node), (counts.get(identityOf(node)) ?? 0) + 1)
+    return new Map(
+      page
+        .filter((node) => counts.get(identityOf(node)) === 1 && !fixed(node))
+        .map((node) => [identityOf(node), node])
+    )
+  }
+  const shifts = (list, fixed) =>
+    list.slice(1).map((page, at) =>
+      measuredShifts(once(list[at], fixed), once(page, fixed), {
+        tolerance,
+        expectedShift,
+      })
+    )
+  const recordPages =
+    expectedShift > 0 && Array.isArray(records) && records.length === pages.length
+      ? records.map((list) =>
+          (list ?? []).filter((record) => record.text !== '').map(asNode)
+        )
+      : null
+  // A record fixed on screen (a sticky chip) shifts by 0, never within SHIFT_SPREAD of a drag.
+  const byRecords = recordPages ? shifts(recordPages, () => false) : []
+  // Every page's measured shifts first, so a page that shares no moving text takes the median
+  // of all measured steps, the later ones too.
+  const measured = shifts(pages, chrome).map((own, at) => [
+    ...own,
+    ...(byRecords[at] ?? []),
+  ])
+  const steps = measured.filter((shifts) => shifts.length).map(median)
   const offsets = [0]
   let offset = 0
-  const steps = []
   for (let index = 1; index < pages.length; index += 1) {
-    const once = (page) => {
-      const counts = new Map()
-      for (const node of page)
-        counts.set(identityOf(node), (counts.get(identityOf(node)) ?? 0) + 1)
-      return new Map(
-        page
-          .filter((node) => counts.get(identityOf(node)) === 1 && !chrome(node))
-          .map((node) => [identityOf(node), node])
-      )
-    }
-    const [a, b] = [once(pages[index - 1]), once(pages[index])]
-    const shifts = [...a.keys()]
-      .filter((key) => b.has(key))
-      .map((key) => top(a.get(key)) - top(b.get(key)))
-    const step = shifts.length ? median(shifts) : fallbackStep(steps, expectedShift)
-    steps.push(step)
-    offset += step
+    const shifts = measured[index - 1]
+    offset += shifts.length ? median(shifts) : fallbackStep(steps, expectedShift)
     offsets.push(offset)
     const place = []
     places.push(place)

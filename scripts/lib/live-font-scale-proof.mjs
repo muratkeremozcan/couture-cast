@@ -293,24 +293,7 @@ export function textLayout(capture, platform, naming) {
   })
   const facts = pairedFacts(match, { answer, nodes, names })
   const paired = new Set(match.pairs.map((pair) => pair.record))
-  // Keyed across the capture's pages by allFacts (volatileKeys) when the regions carry ids.
-  const regionIds = Array.isArray(capture.volatileRegionIds)
-    ? capture.volatileRegionIds
-    : []
-  // Scrolled away, a volatile record is never judged or keyed, like any other scrolled record
-  // (Android 6c85bbb4 Community: spotlight text scrolled under the sticky filter chips).
-  for (const { record, region } of match.volatile.filter(
-    (entry) => !answer.records[entry.record].scrolledAway
-  ))
-    facts.push({
-      key: null,
-      via: 'volatile',
-      id: '',
-      record: answer.records[record],
-      volatile: true,
-      region: typeof regionIds[region] === 'string' ? regionIds[region] : null,
-      contentTop: answer.records[record].viewRect[1] + (capture.contentOffset ?? 0),
-    })
+  facts.push(...volatileFacts(match, capture))
   for (const index of match.hiddenRecords)
     if (!paired.has(index))
       facts.push({ key: null, via: 'hidden', id: '', record: answer.records[index] })
@@ -319,6 +302,31 @@ export function textLayout(capture, platform, naming) {
     if (!answer.records[index].scrolledAway)
       facts.push({ key: null, via: 'behind', id: '', record: answer.records[index] })
   return { pass: match.pass, code: match.code, facts, match }
+}
+
+/**
+ * The volatile records of one capture as facts, keyed across the capture's pages by allFacts
+ * (volatileKeys) when the regions carry ids. Scrolled away, a volatile record is never judged,
+ * like any other scrolled record (Android 6c85bbb4 Community: spotlight text scrolled under the
+ * sticky filter chips), but it is keyed and counted (`lookupOnly`), so a chip scrolled off
+ * sideways at one launch is still there for the counterpart and count lookups of another (TEA
+ * ruling r49).
+ */
+function volatileFacts(match, capture) {
+  const records = capture.textProbe.records
+  const regionIds = Array.isArray(capture.volatileRegionIds)
+    ? capture.volatileRegionIds
+    : []
+  return match.volatile.map(({ record, region }) => ({
+    key: null,
+    via: 'volatile',
+    id: '',
+    record: records[record],
+    volatile: true,
+    ...(records[record].scrolledAway ? { lookupOnly: true } : {}),
+    region: typeof regionIds[region] === 'string' ? regionIds[region] : null,
+    contentTop: records[record].viewRect[1] + (capture.contentOffset ?? 0),
+  }))
 }
 
 /**
@@ -384,7 +392,10 @@ export function pageCaptures(capture) {
   if (pages.length < 2) return []
   const { taken, places, offsets } = stitchPlaces(
     pages.map((page) => page.nodes),
-    { expectedShift: capture.pageShift }
+    {
+      expectedShift: capture.pageShift,
+      records: pages.map((page) => page.textProbe?.records ?? []),
+    }
   )
   const own = [...keyed(capture)]
   const masked = entryKeys(capture)
@@ -448,7 +459,11 @@ export function pageCaptures(capture) {
   })
 }
 
-/** Every judged fact of a capture and its later pages, each with its page. */
+/**
+ * Every fact of a capture and its later pages, each with its page: the judged ones and the
+ * `lookupOnly` volatile records scrolled away, which only key and count (judgedFacts leaves
+ * them out).
+ */
 function allFacts(capture, platform) {
   return volatileKeys([
     ...textLayout(capture, platform).facts.map((fact) => ({ ...fact, page: 0 })),
@@ -457,6 +472,10 @@ function allFacts(capture, platform) {
     ),
   ])
 }
+
+/** The facts the judges read: allFacts without the lookup-only scrolled-away records. */
+const judgedFacts = (capture, platform) =>
+  allFacts(capture, platform).filter((fact) => !fact.lookupOnly)
 
 /** How far apart, in capture units, two page reads of one volatile record may sit. */
 const VOLATILE_PLACE_TOLERANCE = 4
@@ -571,7 +590,7 @@ export function legVolatileKeys(change, platform = change?.platform) {
  */
 export function ellipsizedRecords(capture, platform) {
   return textLayout(capture, platform)
-    .facts.filter((fact) => fact.record.ellipsized > 0)
+    .facts.filter((fact) => !fact.lookupOnly && fact.record.ellipsized > 0)
     .map((fact) => ({
       key: fact.key,
       via: fact.via,
@@ -592,7 +611,9 @@ export function textProbeSummary(capture, platform) {
   const records = capture.textProbe.records
   const shownLater = new Set(
     pageCaptures(capture).flatMap(({ capture: pageCapture, naming }) =>
-      textLayout(pageCapture, platform, naming).facts.map((fact) => fact.record.text)
+      textLayout(pageCapture, platform, naming)
+        .facts.filter((fact) => !fact.lookupOnly)
+        .map((fact) => fact.record.text)
     )
   )
   const nodes = [...keyed(capture).values()]
@@ -697,6 +718,8 @@ function contentClipped(record, tolerance) {
 function recordsByKey(capture, platform) {
   if (!capture) return new Map()
   const records = new Map()
+  // A scrolled-away (lookup-only) record keeps its full box (the probe never cuts viewRect or
+  // contentRect to the window), so whichever page's read of a key comes first stands for it.
   for (const fact of allFacts(capture, platform))
     if (fact.key !== null && !records.has(fact.key)) records.set(fact.key, fact.record)
   return records
@@ -896,7 +919,7 @@ function layoutClips(capture, platform, { cold, base, before } = {}) {
   }
   const clips = []
   const byKey = new Map()
-  for (const fact of allFacts(capture, platform)) {
+  for (const fact of judgedFacts(capture, platform)) {
     const { record } = fact
     if (multilineInput(record)) continue
     const content = contentClipped(record, tolerance)
@@ -1235,7 +1258,7 @@ function textPresence(capture, platform) {
   }
   // Every page counts (TEA ruling 2026-11-14): a key once however many pages show it, and a
   // text's invisible records as the most any one page draws, so an overlap is not counted twice.
-  for (const fact of allFacts(capture, platform)) {
+  for (const fact of judgedFacts(capture, platform)) {
     // A volatile record's presence differs between launches on grounds other than text size.
     if (fact.key === null || fact.volatile) continue
     const { keys } = entry(maskText(fact.record.text))

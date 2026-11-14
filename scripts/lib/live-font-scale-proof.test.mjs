@@ -3360,7 +3360,7 @@ describe('text layout clipping (F-00i)', () => {
 
   // Android 6c85bbb4 Community: spotlight text scrolled under the sticky filter chips reads as a
   // record in the chips region, with no visible part.
-  test('a scrolled away record in a volatile region is never keyed or judged', () => {
+  test('a scrolled away record in a volatile region is keyed for lookups and never judged', () => {
     const change = volatileChange()
     const chips = '[0,475][1080,645]'
     change.settled.volatileRegions.push(chips)
@@ -3373,11 +3373,66 @@ describe('text layout clipping (F-00i)', () => {
         scrolledAway: true,
       })
     )
-    assert.deepEqual(captureVolatileKeys(change.settled, 'android'), [VOLATILE_KEY])
+    // TEA ruling r49: keyed and counted, so presence matches across captures.
+    assert.deepEqual(captureVolatileKeys(change.settled, 'android'), [
+      VOLATILE_KEY,
+      'volatile:["community-sticky-filter-chips","Seeded spotlight look 1"]#0',
+    ])
     const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
     assert.deepEqual(
       clips.map((clip) => [clip.key, clip.face]),
       [[VOLATILE_KEY, 'staleBox']]
+    )
+  })
+
+  // TEA ruling r49, Android 6c85bbb4 Community: the cold 1.5 launch's chip row is wider, so
+  // "Cold and dry" sits scrolled off to the right at x 1315, its full box kept by the probe;
+  // the 1.0 launches and the live 1.5 screen show it at x 1000.
+  test('a chip scrolled off sideways at one launch stays comparable across the launches', () => {
+    const CHIPS = 'community-sticky-filter-chips'
+    const KEY = `volatile:["${CHIPS}","Cold and dry"]#0`
+    const change = residualChange()
+    const shown = (contentBottom = 582) =>
+      probeRecord('android', 'Cold and dry', [1000, 535, 1198, 582], {
+        visibleRect: [1000, 535, 1080, 582],
+        contentRect: [1000, 535, 1198, contentBottom],
+      })
+    const away = (text, rect, contentBottom = rect[3]) =>
+      probeRecord('android', text, rect, {
+        visibleRect: null,
+        contentRect: [rect[0], rect[1], rect[2], contentBottom],
+        scrolledAway: true,
+      })
+    for (const [name, record] of [
+      ['before', shown()],
+      ['coldBefore', shown()],
+      ['cold', away('Cold and dry', [1315, 545, 1615, 616])],
+      // Stale at 1.5: the 1.0 box with the 1.5 content.
+      ['settled', shown(606)],
+    ]) {
+      const capture = change[name]
+      capture.volatileRegions = ['[0,475][1080,645]']
+      capture.volatileRegionIds = [CHIPS]
+      capture.textProbe.records.push(record)
+    }
+    // A scrolled-away chip on the live screen, cut too, is keyed and never judged.
+    change.settled.textProbe.records.push(
+      away('Temperate and wet', [1300, 535, 1500, 582], 640)
+    )
+    assert.deepEqual(captureVolatileKeys(change.cold, 'android'), [KEY])
+    const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).filter(
+      (clip) => clip.volatile
+    )
+    // The cold 1.5 counterpart keeps its full box (71 tall), never cut to the window.
+    assert.deepEqual(
+      clips.map((clip) => [
+        clip.key,
+        clip.comparable,
+        clip.baseHeight,
+        clip.targetHeight,
+        clip.face,
+      ]),
+      [[KEY, true, 47, 71, 'staleBox']]
     )
   })
 
@@ -3407,6 +3462,31 @@ describe('text layout clipping (F-00i)', () => {
       probeRecord('android', 'Partnered', [81, 3050 - SHIFT, 400, 3090 - SHIFT])
     )
     assert.deepEqual(captureVolatileKeys(scrolling, 'android'), [VOLATILE_KEY])
+  })
+
+  // Android 6c85bbb4 Community before 1.0, pages 4 to 5: no node measured the step and the
+  // drag fell 10 px short of the others, so one spotlight record got a key on each page.
+  test('a page no node measures is stepped by its probe records, so a volatile record keeps one key', () => {
+    const paged = withPages(probed(stage('settled')))
+    const region = (page, top) => {
+      page.volatileRegions = [`[0,${top}][1080,${top + 200}]`]
+      page.volatileRegionIds = [REGION]
+    }
+    region(paged.pages[1], 2900)
+    paged.pages[1].textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 2950, 400, 2990])
+    )
+    // Page 2 shows no hierarchy text; the drag moved the content 490 px.
+    const last = { nodes: [], volatileRegions: [], window: paged.window }
+    last.textProbe = healthyAnswer(last, 'android')
+    region(last, 2410)
+    last.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 2460, 400, 2500])
+    )
+    paged.pages.push(last)
+    assert.deepEqual(captureVolatileKeys(paged, 'android'), [
+      `volatile:["${REGION}","Partnered"]#0`,
+    ])
   })
 
   test('volatile keys never count as shown text in the hidden-text check', () => {

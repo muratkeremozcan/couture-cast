@@ -676,7 +676,7 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
   }
   const regionOf = new Map()
   for (const record of records) {
-    const region = volatileRegionOf(record, volatileRegions)
+    const region = regionOfRecord(record, volatileRegions)
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
@@ -729,6 +729,29 @@ const volatileRegionOf = (record, volatileRegions) => {
   return volatileRegions.findIndex(
     (rect) => x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3]
   )
+}
+
+/**
+ * A record scrolled out sideways past a volatile region's edge, its centre within the region's
+ * height (a filter chip the row scrolled off screen, Android 6c85bbb4 Community cold 1.5 "Cold
+ * and dry" at x 1315): the region's index, or -1. The hierarchy cuts a region to what shows, so
+ * the chip's own centre lies outside it.
+ */
+const overflowRegionOf = (record, volatileRegions) => {
+  const rect = recordRect(record)
+  const [, y] = centre(rect)
+  return volatileRegions.findIndex(
+    (region) =>
+      y >= region[1] && y <= region[3] && (rect[0] >= region[2] || rect[2] <= region[0])
+  )
+}
+
+/** The volatile region a record belongs to: by its centre, or, scrolled away, by overflow. */
+const regionOfRecord = (record, volatileRegions) => {
+  const region = volatileRegionOf(record, volatileRegions)
+  return region < 0 && record.scrolledAway
+    ? overflowRegionOf(record, volatileRegions)
+    : region
 }
 
 /** Rank of each item in screen order: top to bottom, left to right, then list order. */

@@ -12,6 +12,7 @@ import { planRedis, resolveSupabase } from './runtime-sources.mjs'
 import { localDatabaseUrl } from '../lib/local-supabase-ports.mjs'
 import { pinNativeJourneyWeather } from '../lib/native-journey-weather.mjs'
 import { story68PublicBuildEnv } from '../lib/story68-public-build-env.mjs'
+import { CC68_SEEDED_POST_ID } from '../lib/story68-fallback-post.mjs'
 
 const root = process.cwd()
 const directory = path.resolve(
@@ -224,7 +225,7 @@ for (const label of ['primary', 'secondary']) {
   await prisma.comfortPreferences.create({ data: { user_id: appUserId } })
 }
 const primary = identities[0]
-const postId = `cc68-native-${randomUUID()}`
+const postId = CC68_SEEDED_POST_ID
 const objectPath = `community/${postId}/${randomUUID()}.png`
 const svg =
   '<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1000"><rect width="800" height="1000" fill="#E9E2D0"/><rect x="80" y="60" width="640" height="880" rx="40" fill="#F8F5EE"/><path d="M280 160 L340 120 L460 120 L520 160 L590 310 L520 350 L485 280 L485 470 L315 470 L315 280 L280 350 L210 310 Z" fill="#7A1F2D"/><path d="M320 485 H480 L520 810 H440 L400 610 L360 810 H280 Z" fill="#292724"/><path d="M280 830 H360 V875 H250 Q230 860 250 845 Z M440 830 H520 L550 845 Q570 860 550 875 H440 Z" fill="#B28D46"/></svg>'

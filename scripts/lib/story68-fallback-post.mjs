@@ -1,6 +1,12 @@
 import { assertRapidWatermarkRuntime } from './story68-rapid-watermark.mjs'
 
 const uuid = /^cc68-native-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/
+/**
+ * The id of the synthetic post prepare.mjs seeds, fixed so text keys that name it (the post
+ * card's testIDs, the live font-scale proof's volatile keys) carry from one prepared harness to
+ * the next. Each prepare seeds it into its own database. It is the id the 6c85bbb4 run drew.
+ */
+export const CC68_SEEDED_POST_ID = 'cc68-native-7756b8d9-4e43-4afa-bcce-a79bbe01e969'
 const snapshotColumns = `id, user_id, status::text AS status,
   published_at, erasure_requested_at, anonymized_at,
   community_revision::text AS community_revision, reaction_generation,
