@@ -9,11 +9,17 @@ import {
   createBillingEvent,
   createPremiumEntitlement,
 } from '@couture/testing'
-import { BillingReconciliationService } from '../src/modules/commerce/billing-reconciliation.service.js'
+import {
+  BillingReconciliationService,
+  DRIFT_STALENESS_HOURS,
+} from '../src/modules/commerce/billing-reconciliation.service.js'
 import { PremiumEntitlementService } from '../src/modules/commerce/premium-entitlement.service.js'
 import {
   FakeRevenueCatClient,
   RealRevenueCatClient,
+  RevenueCatRequestError,
+  RevenueCatUnrepresentableEntitlementError,
+  RevenueCatUnsupportedStoreError,
 } from '../src/modules/commerce/revenuecat-client.js'
 import { FakeStripeBillingClient } from '../src/modules/commerce/stripe-client.js'
 import type { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
@@ -382,9 +388,19 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
             expect.stringContaining(encodeURIComponent(userId)),
             expect.anything()
           )
-          expect(
-            await prisma.premiumEntitlement.findUnique({ where: { user_id: userId } })
-          ).toEqual(before)
+          // The ledger answer is permanent, so only synced_at moves (story 6.15): the row leaves
+          // the head of the drift batch and its state stays exactly as it was.
+          const after = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: userId },
+          })
+          expect(after).toEqual({
+            ...before,
+            synced_at: expect.any(Date) as Date,
+            updated_at: expect.any(Date) as Date,
+          })
+          expect(after!.synced_at.getTime()).toBeGreaterThan(
+            Date.now() - DRIFT_STALENESS_HOURS * 60 * 60 * 1000
+          )
         } finally {
           vi.unstubAllGlobals()
           if (savedEnv === undefined) delete process.env.TEST_ENV
@@ -538,6 +554,83 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
         vi.unstubAllGlobals()
         if (savedEnv === undefined) delete process.env.TEST_ENV
         else process.env.TEST_ENV = savedEnv
+      }
+    })
+  }
+
+  // Story 6.15: the drift batch takes the oldest synced_at first. A row whose ledger entitlement
+  // our model cannot represent fails its pull the same way on every retry, so left stale it would
+  // lead every batch and starve drift correction. A transient failure must still be retried.
+  for (const [label, failure, pullsAcrossTwoSweeps] of [
+    [
+      'a permanently unrepresentable member does not lead the next sweep',
+      () => new RevenueCatUnrepresentableEntitlementError('no_expiry'),
+      1,
+    ],
+    [
+      'an unsupported-store member does not lead the next sweep',
+      () => new RevenueCatUnsupportedStoreError('amazon'),
+      1,
+    ],
+    [
+      'a transiently failing member still leads the next sweep',
+      () => new RevenueCatRequestError(503, 'subscriber GET'),
+      2,
+    ],
+  ] as const) {
+    it(label, async (context) => {
+      if (!requireSchema(context)) return
+
+      const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+      await prisma.premiumEntitlement.create({
+        data: buildPremiumEntitlementCreateInput(
+          createPremiumEntitlement({
+            userId,
+            status: 'active',
+            store: 'play_store',
+            syncedAt: staleSyncedAt,
+            lastEventOccurredAt: staleSyncedAt,
+            lastEventId: `${namespace}-unrepresentable-seed`,
+          })
+        ),
+      })
+      const before = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      const pull = vi
+        .spyOn(ledger, 'getSubscriberEntitlement')
+        .mockImplementation((appUserId) =>
+          Promise.reject(
+            appUserId === userId
+              ? failure()
+              : new Error('out-of-scope subscriber pull; row belongs to another suite')
+          )
+        )
+      const ownPulls = () =>
+        pull.mock.calls.filter(([appUserId]) => appUserId === userId).length
+
+      try {
+        await service.sweep()
+        expect(ownPulls()).toBe(1)
+        await service.sweep()
+        expect(ownPulls()).toBe(pullsAcrossTwoSweeps)
+      } finally {
+        pull.mockRestore()
+      }
+
+      const after = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      // Either way the ledger state is untouched; only a permanent answer moves synced_at.
+      expect({ ...after, synced_at: null, updated_at: null }).toEqual({
+        ...before,
+        synced_at: null,
+        updated_at: null,
+      })
+      if (pullsAcrossTwoSweeps === 1) {
+        expect(after!.synced_at.getTime()).toBeGreaterThan(staleSyncedAt.getTime())
+      } else {
+        expect(after!.synced_at).toEqual(staleSyncedAt)
       }
     })
   }

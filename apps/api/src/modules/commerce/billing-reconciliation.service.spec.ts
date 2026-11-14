@@ -3,7 +3,12 @@ import type { PrismaClient } from '@prisma/client'
 import type { TelemetryService } from '../telemetry/telemetry.service.js'
 import type { PremiumEntitlementService } from './premium-entitlement.service.js'
 import { BillingReconciliationService } from './billing-reconciliation.service.js'
-import { FakeRevenueCatClient } from './revenuecat-client.js'
+import {
+  FakeRevenueCatClient,
+  RevenueCatRequestError,
+  RevenueCatUnrepresentableEntitlementError,
+  RevenueCatUnsupportedStoreError,
+} from './revenuecat-client.js'
 
 /**
  * Story 5.2 Decision 4a: the sweep's failure isolation and abandonment rules
@@ -13,7 +18,7 @@ import { FakeRevenueCatClient } from './revenuecat-client.js'
  */
 describe('BillingReconciliationService', () => {
   const billingEvent = { findMany: vi.fn(), update: vi.fn() }
-  const premiumEntitlement = { findMany: vi.fn() }
+  const premiumEntitlement = { findMany: vi.fn(), updateMany: vi.fn() }
   const prisma = { billingEvent, premiumEntitlement } as unknown as PrismaClient
   const entitlements = { applyLedgerSnapshot: vi.fn() }
   const telemetry = { captureEvent: vi.fn() }
@@ -24,6 +29,7 @@ describe('BillingReconciliationService', () => {
     billingEvent.findMany.mockReset().mockResolvedValue([])
     billingEvent.update.mockReset().mockResolvedValue({})
     premiumEntitlement.findMany.mockReset().mockResolvedValue([])
+    premiumEntitlement.updateMany.mockReset().mockResolvedValue({ count: 1 })
     entitlements.applyLedgerSnapshot.mockReset().mockResolvedValue(null)
     telemetry.captureEvent.mockReset().mockResolvedValue(undefined)
     ledger = new FakeRevenueCatClient()
@@ -149,6 +155,111 @@ describe('BillingReconciliationService', () => {
       'user-2',
       null,
       expect.any(String)
+    )
+  })
+
+  // Story 6.15: a ledger entitlement our model cannot represent fails the pull the same way on
+  // every retry. Left stale, such rows would lead every drift batch (oldest synced_at first) and
+  // starve drift correction for everyone behind them.
+  describe('a permanently unrepresentable ledger entitlement', () => {
+    function warnSpy() {
+      return vi.spyOn(
+        (service as unknown as { logger: { warn: (...args: unknown[]) => void } }).logger,
+        'warn'
+      )
+    }
+
+    it.each([
+      [
+        'an unsupported store',
+        new RevenueCatUnsupportedStoreError('amazon'),
+        { reason: 'unsupported_store', store: 'amazon' },
+      ],
+      [
+        'a missing product',
+        new RevenueCatUnrepresentableEntitlementError('missing_product'),
+        { reason: 'missing_product' },
+      ],
+      [
+        'a lifetime grant',
+        new RevenueCatUnrepresentableEntitlementError('no_expiry'),
+        { reason: 'no_expiry' },
+      ],
+      [
+        'an invalid expiry',
+        new RevenueCatUnrepresentableEntitlementError('invalid_expiry'),
+        { reason: 'invalid_expiry' },
+      ],
+    ] as const)(
+      'with %s stamps only synced_at, applies nothing, warns once, and moves on',
+      async (_label, error, logged) => {
+        premiumEntitlement.findMany.mockResolvedValue([
+          { user_id: 'user-1' },
+          { user_id: 'user-2' },
+        ])
+        vi.spyOn(ledger, 'getSubscriberEntitlement').mockRejectedValueOnce(error)
+        const warn = warnSpy()
+
+        const result = await service.sweep()
+
+        expect(result.entitlementsChecked).toBe(2)
+        expect(premiumEntitlement.updateMany).toHaveBeenCalledTimes(1)
+        const [stamp] = premiumEntitlement.updateMany.mock.calls[0] as [
+          {
+            where: { user_id: string; synced_at: { lt: Date } }
+            data: Record<string, unknown>
+          },
+        ]
+        expect(stamp.where.user_id).toBe('user-1')
+        // The stamp is guarded on the same staleness bound the scan used.
+        const [scan] = premiumEntitlement.findMany.mock.calls[0] as [
+          { where: { synced_at: { lt: Date } } },
+        ]
+        expect(stamp.where.synced_at.lt).toEqual(scan.where.synced_at.lt)
+        // Only synced_at moves: status, store, product and period end stay as they were.
+        expect(Object.keys(stamp.data)).toEqual(['synced_at'])
+        expect(stamp.data.synced_at).toBeInstanceOf(Date)
+        expect((stamp.data.synced_at as Date).getTime()).toBeGreaterThan(
+          stamp.where.synced_at.lt.getTime()
+        )
+        expect(entitlements.applyLedgerSnapshot).toHaveBeenCalledTimes(1)
+        expect(entitlements.applyLedgerSnapshot).toHaveBeenCalledWith(
+          'user-2',
+          null,
+          expect.any(String)
+        )
+        const unrepresentable = warn.mock.calls.filter(
+          ([, message]) =>
+            message === 'billing_reconciliation_drift_entitlement_unrepresentable'
+        )
+        expect(unrepresentable).toEqual([
+          [
+            { userId: 'user-1', ...logged },
+            'billing_reconciliation_drift_entitlement_unrepresentable',
+          ],
+        ])
+      }
+    )
+
+    it.each([
+      ['a non-2xx ledger response', new RevenueCatRequestError(503, 'subscriber GET')],
+      ['a ledger outage', new Error('network down')],
+    ])(
+      'a transient %s leaves the row stale for the next sweep',
+      async (_label, error) => {
+        premiumEntitlement.findMany.mockResolvedValue([{ user_id: 'user-1' }])
+        vi.spyOn(ledger, 'getSubscriberEntitlement').mockRejectedValueOnce(error)
+        const warn = warnSpy()
+
+        await service.sweep()
+
+        expect(premiumEntitlement.updateMany).not.toHaveBeenCalled()
+        expect(entitlements.applyLedgerSnapshot).not.toHaveBeenCalled()
+        expect(warn).toHaveBeenCalledWith(
+          { userId: 'user-1', error },
+          'billing_reconciliation_drift_pull_failed'
+        )
+      }
     )
   })
 

@@ -10,7 +10,11 @@ import {
   type PremiumEntitlementService,
 } from './premium-entitlement.service.js'
 import type { BillingEventPayloadProjection } from './billing-webhook.service.js'
-import type { RevenueCatClient } from './revenuecat-client.js'
+import {
+  permanentLedgerProjectionFailure,
+  type PermanentLedgerProjectionFailure,
+  type RevenueCatClient,
+} from './revenuecat-client.js'
 
 /**
  * Story 5.2 Decision 4a: the 15-minute billing reconciliation sweep, run as a
@@ -198,6 +202,11 @@ export class BillingReconciliationService {
           result.entitlementsCorrected += 1
         }
       } catch (error) {
+        const permanent = permanentLedgerProjectionFailure(error)
+        if (permanent !== null) {
+          await this.settleUnrepresentableRow(row.user_id, staleBefore, permanent)
+          continue
+        }
         // One user's ledger failure must not stall the rest of the batch; the
         // row stays stale and the next sweep retries it.
         this.logger.warn(
@@ -206,6 +215,30 @@ export class BillingReconciliationService {
         )
       }
     }
+  }
+
+  /**
+   * The ledger answered with an entitlement our model cannot represent, and every retry would
+   * answer the same. The row's state stays exactly as it is; only `synced_at` moves, so the row
+   * leaves the head of the drift batch until it is stale again instead of leading every sweep
+   * and starving drift correction for everyone behind it. Logged once per sweep that meets it,
+   * which the stamp bounds to once per {@link DRIFT_STALENESS_HOURS}.
+   */
+  private async settleUnrepresentableRow(
+    userId: string,
+    staleBefore: Date,
+    failure: PermanentLedgerProjectionFailure
+  ): Promise<void> {
+    // Guarded on the staleness bound: a webhook or refresh that wrote the row since the scan
+    // already moved `synced_at`, and this stamp must not touch that write.
+    await this.prisma.premiumEntitlement.updateMany({
+      where: { user_id: userId, synced_at: { lt: staleBefore } },
+      data: { synced_at: new Date() },
+    })
+    this.logger.warn(
+      { userId, ...failure },
+      'billing_reconciliation_drift_entitlement_unrepresentable'
+    )
   }
 
   /**
