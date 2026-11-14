@@ -740,7 +740,7 @@ export function weatherBannerState(capture, marker = WEATHER_BANNER_MARKER) {
  * Why the run's environment differs from the one the entry was approved in, or null. The
  * timezone and the weather banner are part of it: an entry without either, or a run without
  * either, approves nothing. `weatherBanner` is the banner state the run set up; on a screen that
- * renders the banner (`captures.bannerMarker`), the leg's before and settled captures must show
+ * renders the banner (`captures.bannerMarker`), the leg's before, settled and cold captures must show
  * the entry's state too. The updated capture is left out: the Community update shows every band,
  * and the notice belongs to the viewer's own band only, so it hides the banner by design.
  */
@@ -752,7 +752,7 @@ function environmentProblem(baseline, { timezone, weatherBanner, captures }) {
   if (!same(baseline.weatherBanner, weatherBanner))
     return `baseline weather banner ${baseline.weatherBanner ?? 'missing'}, run weather banner ${weatherBanner ?? 'missing'}`
   if (captures?.bannerMarker)
-    for (const stage of ['before', 'settled']) {
+    for (const stage of ['before', 'settled', 'cold']) {
       if (!captures[stage]) continue
       const shown = weatherBannerState(captures[stage], captures.bannerMarker)
       if (shown !== baseline.weatherBanner)

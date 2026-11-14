@@ -890,6 +890,16 @@ describe('assertLiveFontProof', () => {
       attempt(BASELINE, TZ, BANNER, lost),
       differs(/baseline weather banner out-of-date, settled capture shows other/)
     )
+    // The cold capture lost the banner (Antigravity r31): the cold launch is a stage too.
+    const coldLost = banner()
+    coldLost.cold.controls = []
+    coldLost.cold.nodes = coldLost.cold.nodes.filter(
+      (node) => node.text !== WEATHER_STALE_TEXT
+    )
+    assert.throws(
+      attempt(BASELINE, TZ, BANNER, coldLost),
+      differs(/baseline weather banner out-of-date, cold capture shows none/)
+    )
     // The updated capture is not read: the Community update shows every band, which hides it.
     const updatedHides = {
       ...banner(),

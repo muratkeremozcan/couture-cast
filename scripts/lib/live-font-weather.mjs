@@ -33,6 +33,18 @@ export function harnessDatabaseUrl(ownedEnv) {
   } catch {
     throw coded('live_font_harness_database_required', 'DATABASE_URL unreadable')
   }
+  // pg connects to a host or socket named in the query string, so a URL with any search part,
+  // or any scheme but postgres, could reach another server than the loopback host it names.
+  if (!['postgres:', 'postgresql:'].includes(url.protocol))
+    throw coded(
+      'live_font_harness_database_required',
+      `scheme ${url.protocol} is not postgres`
+    )
+  if (url.search !== '' || url.hash !== '')
+    throw coded(
+      'live_font_harness_database_required',
+      'connection options in the URL are not allowed'
+    )
   if (!['127.0.0.1', 'localhost'].includes(url.hostname))
     throw coded(
       'live_font_harness_database_required',

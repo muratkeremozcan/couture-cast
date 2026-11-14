@@ -31,10 +31,11 @@ function fakeQuery({ rows = 1, error } = {}) {
 describe('harnessDatabaseUrl', () => {
   test("takes the harness's own database on a loopback host", () => {
     for (const host of ['127.0.0.1:54322', 'localhost:5432'])
-      assert.equal(
-        harnessDatabaseUrl(owned(`postgresql://postgres:pw@${host}/${DATABASE}`)),
-        `postgresql://postgres:pw@${host}/${DATABASE}`
-      )
+      for (const scheme of ['postgresql', 'postgres'])
+        assert.equal(
+          harnessDatabaseUrl(owned(`${scheme}://postgres:pw@${host}/${DATABASE}`)),
+          `${scheme}://postgres:pw@${host}/${DATABASE}`
+        )
   })
 
   test('refuses another host, the default database, or no URL, and never echoes the URL', () => {
@@ -60,6 +61,15 @@ describe('harnessDatabaseUrl', () => {
         `postgresql://postgres:pw@127.0.0.1:54322/${DATABASE}x`,
         /is not a harness database/,
       ],
+      [
+        `postgresql://postgres:pw@127.0.0.1:54322/${DATABASE}?host=db.example.com`,
+        /connection options in the URL are not allowed/,
+      ],
+      [
+        `postgresql://postgres:pw@127.0.0.1:54322/${DATABASE}?host=/var/run/postgresql`,
+        /connection options in the URL are not allowed/,
+      ],
+      [`http://postgres:pw@127.0.0.1:54322/${DATABASE}`, /scheme http: is not postgres/],
       ['not a url', /DATABASE_URL unreadable/],
       [undefined, /DATABASE_URL unreadable/],
     ])
