@@ -83,7 +83,7 @@ describe('6.15 tab bar label line box', () => {
     expect(tallestTabLabel(state, 1)).toBe(14)
   })
 
-  it('6.15-MOB-TAB-05 holds a label at the tallest height and draws it at the box bottom', () => {
+  it('6.15-MOB-TAB-05 holds the line box at the tallest height with the label at its bottom', () => {
     captured.props.length = 0
     render(
       <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()} lineBoxHeight={27}>
@@ -91,12 +91,19 @@ describe('6.15 tab bar label line box', () => {
       </TabBarLabel>
     )
     const label = screen.getByText('Community')
-    expect(getComputedStyle(label).minHeight).toBe('27px')
+    const lineBox = label.parentElement!
+    expect(getComputedStyle(lineBox).minHeight).toBe('27px')
+    expect(getComputedStyle(lineBox).justifyContent).toBe('flex-end')
+    // The text keeps its own height: textAlignVertical on a held text view drew a shrunk label
+    // above its own box on Android 2.0.
     const props = captured.props.find((entry) => entry.children === 'Community')!
-    expect(StyleSheet.flatten(props.style)).toMatchObject({
-      minHeight: 27,
-      textAlignVertical: 'bottom',
-    })
+    const style = StyleSheet.flatten(props.style)
+    expect(style.minHeight).toBeUndefined()
+    expect(style.textAlignVertical).toBeUndefined()
+    expect(label.getBoundingClientRect().bottom).toBeCloseTo(
+      lineBox.getBoundingClientRect().bottom,
+      0
+    )
   })
 })
 

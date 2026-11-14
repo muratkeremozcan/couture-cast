@@ -18,6 +18,7 @@ import {
   Text,
   type TextLayoutEventData,
   useWindowDimensions,
+  View,
 } from 'react-native'
 
 const WEB_FONT_STACK =
@@ -53,9 +54,8 @@ export type TabLabelHeights = {
 }
 
 /**
- * Records one label's height. Heights reported at another text scale are dropped: a label box
- * is held at the tallest label's height (see TabBarLabel), so after a scale change only fresh
- * reports say how tall the labels now are.
+ * Records one label's height. Heights reported at another text scale are dropped, since after a
+ * scale change only fresh reports say how tall the labels now are.
  */
 export function recordTabLabelHeight(
   current: TabLabelHeights,
@@ -142,22 +142,31 @@ export function TabBarLabel({
     else setFitState({ key, fit: next })
   }
   const base = position === 'beside-icon' ? styles.beside : styles.below
+  // The line box is a view holding the text at its bottom. Holding the text view itself at the
+  // tallest height with textAlignVertical bottom drew a shrunk label 64 px above its own box on
+  // Android 2.0 (6c85bbb4 record run), so the text keeps its own height and reports it.
   return (
-    <Text
-      allowFontScaling={Platform.OS === 'ios' ? false : undefined}
-      onLayout={onLayout}
-      onTextLayout={onTextLayout}
+    <View
       style={[
-        styles.label,
-        base,
-        MEDIUM,
-        { color },
-        fit < 1 ? { fontSize: base.fontSize * fit } : null,
+        styles.lineBox,
         lineBoxHeight === undefined ? null : { minHeight: lineBoxHeight },
       ]}
     >
-      {children}
-    </Text>
+      <Text
+        allowFontScaling={Platform.OS === 'ios' ? false : undefined}
+        onLayout={onLayout}
+        onTextLayout={onTextLayout}
+        style={[
+          styles.label,
+          base,
+          MEDIUM,
+          { color },
+          fit < 1 ? { fontSize: base.fontSize * fit } : null,
+        ]}
+      >
+        {children}
+      </Text>
+    </View>
   )
 }
 
@@ -167,8 +176,8 @@ const styles = StyleSheet.create({
   label: {
     textAlign: 'center',
     backgroundColor: 'transparent',
-    textAlignVertical: 'bottom',
   },
+  lineBox: { justifyContent: 'flex-end' },
   below: { fontSize: 10 },
   beside: { fontSize: 13, marginStart: 5, marginEnd: 12, lineHeight: 24 },
 })
