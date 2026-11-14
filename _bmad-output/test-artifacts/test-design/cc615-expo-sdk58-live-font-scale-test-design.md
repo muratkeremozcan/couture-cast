@@ -550,11 +550,18 @@ The amendment keeps the clip a failure everywhere except as the bug's own face, 
   stale box: the node's view height equals, within tolerance, the height the same key has at the
   cold launch at the leg's starting scale (the scale the leg changes from; the cold base launch
   only on a leg that starts at the base scale).
+- Second face (TEA ruling 2026-11-14, Android Release 791123d1, Home and Settings 1.5 to 1.0): the
+  box resizes to the new scale while the text keeps the layout of the old one, so the old, larger
+  text overflows a fresh box. Its parity passes, so it is not in `staleKeys`. A key may still be in
+  `clippedKeys` when both are computed true: its view height equals, within tolerance, the same
+  key's height at the cold launch at the leg's target scale (a fresh box), and its content height
+  equals the same key's content height at the cold launch at the leg's starting scale (stale
+  content). Each listed clip records which face it is (`staleBox` or `staleContent`).
 - Clipping is judged on both axes: content past the clip rect at the top, bottom, left or right.
   A single-line text input is judged like text; a multi-line input scrolls its content and is
   paired and reported but not judged.
-- A clip outside `clippedKeys`, a listed key that does not clip, a clip of a key that is not stale,
-  and any clip from 0.87 on fail the proof. The six approval facts gain `clipsStale: true`.
+- A clip outside `clippedKeys`, a listed key that does not clip, a clip that is neither face, and
+  any clip from 0.87 on fail the proof. The six approval facts gain `clipsStale: true`.
 - Every entry approved before this amendment is proposed again from a run on the F-00i harness and
   approved against its updated-stage screenshots. An entry without `clipsStale` and `clippedKeys`
   approves nothing, whether or not the run clips.
