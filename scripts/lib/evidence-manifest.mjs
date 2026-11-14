@@ -115,7 +115,8 @@ export function relativeImports(source) {
     /\bimport\s*['"](\.{1,2}\/[^'"]+)['"]/g,
     /\bimport\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
     /\bexport\s[^'"]*?from\s*['"](\.{1,2}\/[^'"]+)['"]/g,
-    // require('./x'), including a createRequire(import.meta.url) require.
+    // A relative require call, including a createRequire(import.meta.url) require. (Spelled out
+    // here without a literal, so this file can sit in a leg's closure without naming a file.)
     /\brequire\(\s*['"](\.{1,2}\/[^'"]+)['"]\s*\)/g,
   ]
   for (const pattern of patterns)
