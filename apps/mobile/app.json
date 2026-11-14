@@ -50,6 +50,7 @@
       "./plugins/with-widgets",
       "./plugins/with-watchos",
       "./plugins/with-supported-ios-target",
+      "./plugins/with-text-layout-probe",
       [
         "expo-notifications",
         {
