@@ -1,7 +1,7 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -369,9 +369,21 @@ function fakeProcess() {
   proc.exitCode = undefined
   proc.err = ''
   proc.stderr = { write: (text) => (proc.err += text) }
+  proc.exits = 0
   proc.exit = (code) => {
+    proc.exits += 1
     proc.exitCode = code
     proc.emit('exit', code)
+  }
+  // Node's rule: a signal with no listener takes the default action and kills the process on
+  // the spot, cleanup or not. The stand-in records the kill and aborts the current stack.
+  const emit = proc.emit.bind(proc)
+  proc.emit = (event, ...args) => {
+    if ((event === 'SIGINT' || event === 'SIGTERM') && proc.listenerCount(event) === 0) {
+      proc.killed = event
+      throw new Error(`killed by ${event}`)
+    }
+    return emit(event, ...args)
   }
   return proc
 }
@@ -446,4 +458,109 @@ test('the driver installs the exit guard right after its dirs and feeds it every
     'scanIds.push(member.userId, member.token)',
   ])
     assert.ok(driver.includes(push), push)
+})
+
+// Antigravity r17 (1): a second Ctrl-C during the exit scan must not kill the run mid-scan.
+test('a second SIGINT (or a SIGTERM) during the exit scan is ignored: evidence clean, exit 130', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const proc = fakeProcess()
+  let repeated = false
+  const ops = {
+    ...FS_OPS,
+    rename: (from, to) => {
+      if (!repeated) {
+        repeated = true
+        proc.emit('SIGINT')
+        proc.emit('SIGTERM')
+      }
+      FS_OPS.rename(from, to)
+    },
+  }
+  installEvidenceGuard({ dirs, ids: [MEMBER], ops, proc })
+  writeEvidence(dirs, 'a.json', MEMBER)
+  writeEvidence(dirs, 'b.json', MEMBER)
+  proc.emit('SIGINT')
+  assert.equal(repeated, true)
+  assert.equal(proc.killed, undefined)
+  // The first signal decides the code; the repeats start no second exit.
+  assert.equal(proc.exitCode, 130)
+  assert.equal(proc.exits, 1)
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+})
+
+test('teardowns run once each, after the scan, and a failing one does not stop the rest', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const proc = fakeProcess()
+  const order = []
+  const guard = installEvidenceGuard({ dirs, ids: [MEMBER], proc })
+  writeEvidence(dirs, 'leak.json', MEMBER)
+  guard.teardown('metro', () => {
+    order.push(['metro', fs.readdirSync(dirs.evidence).length])
+  })
+  guard.teardown('broken', () => {
+    throw new Error('already gone')
+  })
+  guard.teardown('log-stream', () => order.push(['log-stream']))
+  guard.runTeardowns()
+  proc.emit('SIGTERM')
+  assert.equal(proc.exitCode, 143)
+  // The normal path ran them first (evidence still dirty then); the exit path did not repeat them.
+  assert.deepEqual(order, [['metro', 1], ['log-stream']])
+  assert.match(proc.err, /test_store_teardown_failed: broken: already gone/)
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+})
+
+/** Runs `script` as an ES module child; resolves { code, stdout, stderr }. */
+function runChild(script, { env = {}, onReady } = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ['--input-type=module', '-e', script], {
+      env: { ...process.env, ...env },
+    })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk
+      if (onReady && stdout.includes('ready')) {
+        const ready = onReady
+        onReady = undefined
+        ready(child)
+      }
+    })
+    child.stderr.on('data', (chunk) => (stderr += chunk))
+    child.on('close', (code) => resolve({ code, stdout, stderr }))
+  })
+}
+
+// Antigravity r17 (2): the teardowns run on every way out of the process.
+test('each registered teardown runs on throw, process.exit, SIGINT and SIGTERM', async (t) => {
+  const lib = pathToFileURL(
+    fileURLToPath(new URL('./test-store-output.mjs', import.meta.url))
+  )
+  for (const [mode, expected] of [
+    ['throw', 1],
+    ['exit', 3],
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ]) {
+    const out = tempOut(t)
+    const script = [
+      'import fs from "node:fs"',
+      `import { installEvidenceGuard, outputDirs } from ${JSON.stringify(lib.href)}`,
+      `const dirs = outputDirs(${JSON.stringify(out)})`,
+      'const guard = installEvidenceGuard({ dirs, ids: [] })',
+      'for (const name of ["metro", "log-stream", "adb-reverse"])',
+      '  guard.teardown(name, () => fs.writeFileSync(`${dirs.private}/${name}.done`, ""))',
+      `const mode = ${JSON.stringify(mode)}`,
+      'if (mode === "throw") throw new Error("crash")',
+      'if (mode === "exit") process.exit(3)',
+      'console.log("ready")',
+      'setInterval(() => {}, 1000)',
+    ].join('\n')
+    const result = await runChild(script, {
+      onReady: (child) => child.kill(mode),
+    })
+    assert.equal(result.code, expected, `${mode}: ${result.stderr}`)
+    for (const name of ['metro', 'log-stream', 'adb-reverse'])
+      assert.ok(fs.existsSync(`${out}.private/${name}.done`), `${mode}: ${name}`)
+  }
 })

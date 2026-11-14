@@ -88,7 +88,7 @@ const dirs = outputDirs(option('out'))
 // Whatever ends the run (a throw, process.exit, a signal), the evidence dir is scanned and any
 // leak quarantined before an always() upload can read it. Ids join the list as they are known.
 const scanIds = []
-installEvidenceGuard({ dirs, ids: scanIds })
+const guard = installEvidenceGuard({ dirs, ids: scanIds })
 const out = dirs.evidence
 const artifact = option('artifact') && path.resolve(option('artifact'))
 const overInstallArtifact = option('over-install') && path.resolve(option('over-install'))
@@ -202,15 +202,33 @@ async function startMetro() {
       detached: true,
     }
   )
+  // Metro runs in its own process group; the whole group goes on any exit, signals included.
+  const metroPid = metro.pid
+  guard.teardown('metro', () => {
+    try {
+      process.kill(-metroPid, 'SIGTERM')
+    } catch {
+      // Metro already exited.
+    }
+  })
   await waitForExpoStatus(`http://127.0.0.1:${metroPort}`, 180_000)
 }
 
 const devClientUrl = `mobile://expo-development-client/?url=${encodeURIComponent(`http://127.0.0.1:${metroPort}`)}`
 
+let reverseRegistered = false
 async function launch() {
   if (platform === 'android') {
     adb('reverse', `tcp:${metroPort}`, `tcp:${metroPort}`)
     adb('reverse', `tcp:${proxy.port}`, `tcp:${proxy.port}`)
+    if (!reverseRegistered) {
+      reverseRegistered = true
+      const ports = [metroPort, proxy.port]
+      guard.teardown('adb-reverse', () => {
+        for (const port of ports)
+          spawnSync(adbBinary, ['-s', device, 'reverse', '--remove', `tcp:${port}`])
+      })
+    }
     spawnSync(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId])
     // minifiedDebuggable has no dev launcher: React Native loads from Metro at localhost:8081.
     if (installedBuild === 'minifiedDebuggable')
@@ -310,6 +328,8 @@ function startDeviceLog() {
     ],
     { stdio: ['ignore', file, file] }
   )
+  const stream = logStream
+  guard.teardown('log-stream', () => stream.kill('SIGTERM'))
 }
 
 function deviceLog() {
@@ -407,20 +427,17 @@ try {
   }
   result = await runJourney({ steps, io, server, platform, appId, metroEnv })
 } finally {
-  logStream?.kill('SIGTERM')
+  // The same teardowns the exit guard runs on a signal or crash; each runs once.
+  guard.runTeardowns()
   await proxy?.close()
-  if (metro?.pid) {
-    try {
-      process.kill(-metro.pid, 'SIGTERM')
-    } catch {
-      // Metro already exited.
-    }
-  }
-  if (platform === 'android') {
-    spawnSync(adbBinary, ['-s', device, 'reverse', '--remove', `tcp:${metroPort}`])
-    spawnSync(adbBinary, ['-s', device, 'reverse', '--remove', `tcp:${proxyPort}`])
-  }
 }
+// The run's outcome, before any evidence write can fail: step names and codes only, no ids.
+console.log(
+  JSON.stringify({
+    verdict: result.verdict,
+    errors: result.records.filter((record) => !record.pass).map((record) => record.error),
+  })
+)
 
 const label = `test-store-${platform}-${build}-${server}-${scenario}`
 // Loaded by URL: the manifest writer is a recorded input of the leg (evidence-manifest.mjs

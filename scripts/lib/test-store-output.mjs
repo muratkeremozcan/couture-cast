@@ -229,11 +229,32 @@ const exists = (file) => {
  * normal end, an uncaught exception, process.exit, and SIGINT or SIGTERM (which exit 130 or 143
  * through the same path). The quarantine is synchronous, so it runs inside Node's 'exit' event.
  * The original failure stays the exit cause; a leak found on an otherwise passing exit sets exit
- * code 1. `ids` is read at exit, so the caller can push ids as they become known. Returns an
- * uninstall function.
+ * code 1. `ids` is read at exit, so the caller can push ids as they become known.
+ *
+ * Signal handlers stay installed (`on`, with an exiting flag): with `once`, Node restores the
+ * default action after the first signal, and a second Ctrl-C during the scan would kill the
+ * process with leaks left behind (Antigravity r17). Teardowns (Metro's process group, a log
+ * stream, adb reverse) registered with `teardown` run synchronously on exit after the scan, and
+ * at most once, so the normal path can call `runTeardowns` too.
+ *
+ * Returns { teardown(name, fn), runTeardowns(), uninstall() }.
  */
 export function installEvidenceGuard({ dirs, ids, ops, proc = process }) {
+  const teardowns = []
+  let exiting = false
+  const runTeardowns = () => {
+    for (const entry of teardowns) {
+      if (entry.done) continue
+      entry.done = true
+      try {
+        entry.fn()
+      } catch (error) {
+        proc.stderr.write(`test_store_teardown_failed: ${entry.name}: ${error.message}\n`)
+      }
+    }
+  }
   const onExit = (code) => {
+    exiting = true
     try {
       const moved = quarantineLeaks(dirs, [...ids], { ops })
       if (moved.length) {
@@ -244,16 +265,29 @@ export function installEvidenceGuard({ dirs, ids, ops, proc = process }) {
       proc.stderr.write(`${error.message}\n`)
       if (!code) proc.exitCode = 1
     }
+    runTeardowns()
   }
-  const onSigint = () => proc.exit(130)
-  const onSigterm = () => proc.exit(143)
+  const onSignal = (code) => () => {
+    // A repeat signal while the exit path runs is ignored; the first one decided the code.
+    if (exiting) return
+    exiting = true
+    proc.exit(code)
+  }
+  const onSigint = onSignal(130)
+  const onSigterm = onSignal(143)
   proc.once('exit', onExit)
-  proc.once('SIGINT', onSigint)
-  proc.once('SIGTERM', onSigterm)
-  return () => {
-    proc.removeListener('exit', onExit)
-    proc.removeListener('SIGINT', onSigint)
-    proc.removeListener('SIGTERM', onSigterm)
+  proc.on('SIGINT', onSigint)
+  proc.on('SIGTERM', onSigterm)
+  return {
+    teardown: (name, fn) => {
+      teardowns.push({ name, fn, done: false })
+    },
+    runTeardowns,
+    uninstall: () => {
+      proc.removeListener('exit', onExit)
+      proc.removeListener('SIGINT', onSigint)
+      proc.removeListener('SIGTERM', onSigterm)
+    },
   }
 }
 
