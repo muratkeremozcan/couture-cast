@@ -132,8 +132,8 @@ Each record carries these rect and visibility fields (rects `[left, top, right, 
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `visibleRect`  | `viewRect` cut by every clipping ancestor and the window; null when nothing shows                                                          |
 | `clipRect`     | `viewRect` cut by its reach (below); null when no part of it can be brought into view                                                      |
-| `scrolledAway` | `visibleRect` null, `clipRect` not null and `offWindow` false: only a scroll position hides it                                             |
-| `offWindow`    | `viewRect` lies wholly outside the window (a zero-size view by its origin), scroll views or not; `scrolledAway` is then false              |
+| `scrolledAway` | `visibleRect` null and `clipRect` not null: only a scroll position hides it, on the window or wholly off it                                |
+| `offWindow`    | `viewRect` lies wholly outside the window (a zero-size view by its origin) and no scroll view can bring it in, so `clipRect` is null       |
 | `opacity`      | the effective opacity, unrounded on both platforms; only exactly 0 is invisible. iOS records hidden views too, at 0, as Android does alpha |
 
 Reach, per axis, from the window inward: every clipping ancestor cuts the band so far, and a
@@ -147,6 +147,8 @@ the content up, so at offset 0 only content below V can scroll in and at `max` o
 above. Nested scroll views compose inner to outer, each with its own travel. A text only partly
 off the window with no scroll view above is cut by the window on every edge.
 
-Harness invariants: `scrolledAway` and `offWindow` each imply `visibleRect` null; they never
-both hold; a record with `visibleRect` null that is neither has `clipRect` null; an `offWindow`
-record may keep a `clipRect` when a scroll view can bring it in.
+Harness invariants: `scrolledAway` implies `visibleRect` null; `offWindow` implies
+`visibleRect` null, `clipRect` null and `scrolledAway` false; a record with `visibleRect` null
+that is not `scrolledAway` has `clipRect` null. A text wholly below the fold that a scroll view
+reaches is `scrolledAway`; one no band reaches (no scroll view above, or too little travel) is
+`offWindow`.

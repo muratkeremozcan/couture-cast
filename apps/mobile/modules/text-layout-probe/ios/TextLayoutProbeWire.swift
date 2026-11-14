@@ -136,10 +136,11 @@ enum TextLayoutProbeWire {
     let offWindow: Bool
   }
 
-  /// Off the window: the view lies wholly outside it (a zero-size one by its origin), whatever
-  /// the scroll views above could do. Reported apart from scrolledAway, which it excludes.
-  static func offWindow(_ viewRect: CGRect, _ window: CGRect) -> Bool {
-    disjoint(viewRect, window)
+  /// Off the window: the view lies wholly outside it (a zero-size one by its origin) and no
+  /// scroll view can bring it in (no reach, so no clipRect). One a scroll view's band reaches is
+  /// scrolledAway instead.
+  static func offWindow(_ viewRect: CGRect, _ window: CGRect, clip: CGRect?) -> Bool {
+    clip == nil && disjoint(viewRect, window)
   }
 
   /// One axis of a rect, or nil when it is empty.
@@ -165,7 +166,8 @@ enum TextLayoutProbeWire {
   /// scroll view that can move on that axis then widens it by its own travel (`widen`). So a
   /// scroll view's band is its viewport cut by everything above it (outer scroll views' bands
   /// included) widened by its travel, nested scroll views compose, and an axis with no travel
-  /// cuts as any clipper does. scrolledAway: not off the window, not visible, yet within reach.
+  /// cuts as any clipper does. scrolledAway: not visible, yet within reach, on the window or off
+  /// it; offWindow: wholly off the window and out of reach.
   static func cuts(viewRect: CGRect, ancestors: [Ancestor], window: CGRect) -> Cuts {
     var visible: CGRect? = viewRect
     for ancestor in ancestors where ancestor.clips { visible = cut(visible, ancestor.rect) }
@@ -182,10 +184,9 @@ enum TextLayoutProbeWire {
     if let x, let y {
       clip = cut(viewRect, CGRect(x: x.lo, y: y.lo, width: x.hi - x.lo, height: y.hi - y.lo))
     }
-    let off = offWindow(viewRect, window)
     return Cuts(
-      visible: visible, clip: clip, scrolledAway: !off && visible == nil && clip != nil,
-      offWindow: off)
+      visible: visible, clip: clip, scrolledAway: visible == nil && clip != nil,
+      offWindow: offWindow(viewRect, window, clip: clip))
   }
 
   /// Window stacking: by windowLevel, then by scene order; z counts up from 0 at the bottom.

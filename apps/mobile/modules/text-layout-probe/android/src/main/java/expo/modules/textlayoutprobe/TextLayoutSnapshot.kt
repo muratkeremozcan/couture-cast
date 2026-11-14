@@ -314,8 +314,8 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
      * scroll view's band is its padded viewport cut by everything above it (outer scroll views'
      * bands included) widened by its travel, nested scroll views compose, and a scroll view with
      * no travel (no overflow, scrolling disabled) cuts as any clipper does. Levels run nearest
-     * first. offWindow: the view lies wholly outside the window; scrolledAway: not off the
-     * window, not visible, yet within reach.
+     * first. scrolledAway: not visible, yet within reach, on the window or off it; offWindow:
+     * wholly off the window and out of reach.
      */
     fun cuts(viewRect: ProbeRect, levels: List<Level>, windowRect: ProbeRect): ProbeCuts {
       var visible: ProbeRect? = viewRect
@@ -333,12 +333,11 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       }
       val clip =
         if (x != null && y != null) viewRect.intersect(ProbeRect(x.lo, y.lo, x.hi, y.hi)) else null
-      val off = offWindow(viewRect, windowRect)
       return ProbeCuts(
         visible,
         clip,
-        scrolledAway = !off && visible == null && clip != null,
-        offWindow = off
+        scrolledAway = visible == null && clip != null,
+        offWindow = offWindow(viewRect, windowRect, clip)
       )
     }
 
@@ -376,8 +375,12 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       return ScrollTravel(offset.coerceIn(0, maximum), maximum)
     }
 
-    /** Off the window: wholly outside it (a zero-size view by its corner), reported apart. */
-    fun offWindow(viewRect: ProbeRect, windowRect: ProbeRect): Boolean = disjoint(viewRect, windowRect)
+    /**
+     * Off the window: wholly outside it (a zero-size view by its corner) and out of every scroll
+     * view's reach (no clipRect). One a scroll view's band reaches is scrolledAway instead.
+     */
+    fun offWindow(viewRect: ProbeRect, windowRect: ProbeRect, clip: ProbeRect?): Boolean =
+      clip == null && disjoint(viewRect, windowRect)
 
     fun screenRect(view: View): ProbeRect {
       val at = IntArray(2)

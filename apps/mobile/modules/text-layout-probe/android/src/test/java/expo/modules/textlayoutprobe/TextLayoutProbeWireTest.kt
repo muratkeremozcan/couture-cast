@@ -108,13 +108,14 @@ class TextLayoutProbeWireTest {
 
   @Test
   fun aFaintAndAnOffWindowRecordKeepTheirFieldsOnTheWire() {
-    val faint = record("Faint").copy(opacity = 4e-5f.toDouble(), offWindow = true)
+    val faint = record("Faint").copy(opacity = 4e-5f.toDouble(), clipRect = null, offWindow = true)
     val first = JSONObject(TextLayoutProbeWire.json("f", ProbeSnapshot(windows, listOf(faint))))
       .getJSONArray("records").getJSONObject(0)
     assertTrue(first.getDouble("opacity") > 0)
     assertEquals(4e-5f.toDouble(), first.getDouble("opacity"), 0.0)
     assertTrue(first.getBoolean("offWindow"))
     assertFalse(first.getBoolean("scrolledAway"))
+    assertTrue(first.isNull("clipRect"))
   }
 
   @Test

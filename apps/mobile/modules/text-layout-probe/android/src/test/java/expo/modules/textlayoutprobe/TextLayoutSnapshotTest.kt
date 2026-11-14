@@ -73,10 +73,10 @@ class TextLayoutSnapshotTest {
       if (record.visibleRect != null) assertNotNull("$record has a clipRect", record.clipRect)
       if (record.offWindow) {
         assertNull("$record off the window", record.visibleRect)
+        assertNull("$record off the window is out of reach", record.clipRect)
         assertFalse("$record off the window is not scrolled away", record.scrolledAway)
       }
-      // Off the window, a text may still lie within a scroll view's reach.
-      if (record.visibleRect == null && !record.scrolledAway && !record.offWindow) {
+      if (record.visibleRect == null && !record.scrolledAway) {
         assertNull("$record is cut to nothing", record.clipRect)
       }
     }
@@ -859,12 +859,12 @@ class TextLayoutSnapshotTest {
     val edge = records.single { it.text == "Edge" }
     assertEquals(window.bottom + 10, edge.clipRect!!.bottom)
     assertFalse(edge.offWindow)
-    // Wholly below the window but within the 10 px of travel: off the window, not scrolled away.
+    // Wholly below the window but within the 10 px of travel: scrolled away, not off the window.
     val reachable = records.single { it.text == "Reachable" }
-    assertTrue(reachable.offWindow)
+    assertFalse(reachable.offWindow)
     assertEquals(reachable.viewRect, reachable.clipRect)
     assertNull(reachable.visibleRect)
-    assertFalse(reachable.scrolledAway)
+    assertTrue(reachable.scrolledAway)
   }
 
   /**
@@ -941,6 +941,42 @@ class TextLayoutSnapshotTest {
     assertTrue(record.scrolledAway)
   }
 
+  /**
+   * Coordinator alignment (TEA wording): a text wholly below the window that its scroll view can
+   * bring in is scrolledAway with its clipRect, not offWindow.
+   */
+  @Test
+  fun belowFoldTextAScrollCanReachIsScrolledAwayNotOffWindow() {
+    lateinit var spacer: View
+    lateinit var text: View
+    host { context ->
+      spacer = View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      text = label(context, "Below the fold").apply {
+        layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+      }
+      ScrollView(context).apply {
+        addView(
+          column(
+            context,
+            spacer,
+            text,
+            View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 400) }
+          )
+        )
+      }
+    }
+    val window = TextLayoutSnapshot.screenRect((spacer.context as Activity).window.decorView)
+    spacer.layoutParams.height = window.bottom - TextLayoutSnapshot.screenRect(spacer).top + 50
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Below the fold")
+    assertTrue(record.viewRect.top > window.bottom)
+    assertTrue(record.scrolledAway)
+    assertFalse(record.offWindow)
+    assertEquals(record.viewRect, record.clipRect)
+    assertNull(record.visibleRect)
+  }
+
   @Test
   fun aParkedSheetBelowTheScreenIsOffWindowAndNotScrolledAway() {
     lateinit var sheet: View
@@ -957,6 +993,7 @@ class TextLayoutSnapshotTest {
     assertTrue(record.offWindow)
     assertFalse(record.scrolledAway)
     assertNull(record.visibleRect)
+    assertNull(record.clipRect)
   }
 
   // Antigravity r43 P3: a prepared layout's uncapped count and its field fallbacks.

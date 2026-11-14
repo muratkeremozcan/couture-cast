@@ -113,6 +113,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
           if cuts.scrolledAway { XCTAssertNil(cuts.visible) }
           if cuts.visible != nil { XCTAssertNotNil(cuts.clip) }
           if cuts.visible == nil && !cuts.scrolledAway { XCTAssertNil(cuts.clip) }
+          if cuts.offWindow { XCTAssertNil(cuts.clip) }
           XCTAssertFalse(cuts.offWindow)
         }
       }
@@ -218,7 +219,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
         .init(
           kind: "RCTParagraphComponentView", text: "Show \"watermark\"\n",
           viewRect: CGRect(x: 1.0 / 3, y: 2, width: 3, height: 4), visibleRect: nil,
-          clipRect: CGRect(x: 0, y: 0, width: 1, height: 1),
+          clipRect: nil,
           contentRect: CGRect(x: 0, y: 0, width: 1, height: 8), lineCount: 2, maxLines: nil,
           ellipsized: 0, unlimitedLineCount: 2, window: 0, scrolledAway: false, offWindow: true)
       ])
@@ -238,6 +239,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
         "opacity",
       ])
     XCTAssertTrue(record["visibleRect"] is NSNull)
+    XCTAssertTrue(record["clipRect"] is NSNull)
     XCTAssertTrue(record["maxLines"] is NSNull)
     XCTAssertEqual(record["text"] as? String, "Show \"watermark\"\n")
     XCTAssertEqual(record["viewRect"] as? [Double], [0.333, 2, 3.333, 6])
@@ -440,13 +442,13 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       viewRect: CGRect(x: 0, y: 490, width: 100, height: 40), ancestors: [scroller], window: small)
     XCTAssertEqual(edge.clip, CGRect(x: 0, y: 490, width: 100, height: 20))
     XCTAssertFalse(edge.offWindow)
-    // Wholly below the window but within the 10 pt of travel: off the window, not scrolled away.
+    // Wholly below the window but within the 10 pt of travel: scrolled away, not off the window.
     let reachable = Wire.cuts(
       viewRect: CGRect(x: 0, y: 502, width: 100, height: 6), ancestors: [scroller], window: small)
-    XCTAssertTrue(reachable.offWindow)
+    XCTAssertFalse(reachable.offWindow)
     XCTAssertEqual(reachable.clip, CGRect(x: 0, y: 502, width: 100, height: 6))
     XCTAssertNil(reachable.visible)
-    XCTAssertFalse(reachable.scrolledAway)
+    XCTAssertTrue(reachable.scrolledAway)
   }
 
   /// Antigravity r43 probe 3: content that does not overflow, or scrolling switched off, gives no
@@ -507,6 +509,20 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertTrue(cuts.scrolledAway)
   }
 
+  /// Coordinator alignment (TEA wording): a text wholly below the window that the scroll view
+  /// can bring in is scrolledAway with its clipRect, not offWindow.
+  func testBelowFoldTextAScrollCanReachIsScrolledAwayNotOffWindow() {
+    let text = CGRect(x: 10, y: 900, width: 200, height: 40)
+    let cuts = Wire.cuts(
+      viewRect: text,
+      ancestors: [.init(rect: window, clips: true, scrollY: scroll(0, of: 400))],
+      window: window)
+    XCTAssertTrue(cuts.scrolledAway)
+    XCTAssertFalse(cuts.offWindow)
+    XCTAssertEqual(cuts.clip, text)
+    XCTAssertNil(cuts.visible)
+  }
+
   func testAParkedSheetBelowTheScreenIsOffWindowAndNotScrolledAway() {
     let sheet = CGRect(x: 0, y: 880, width: 390, height: 300)
     let cuts = Wire.cuts(
@@ -515,6 +531,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertTrue(cuts.offWindow)
     XCTAssertFalse(cuts.scrolledAway)
     XCTAssertNil(cuts.visible)
+    XCTAssertNil(cuts.clip)
   }
 
   // TEA ruling 2026-11-14 (r43 P2): every text view is recorded with the opacity it draws with.
