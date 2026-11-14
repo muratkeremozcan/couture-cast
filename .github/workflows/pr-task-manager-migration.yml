@@ -13,6 +13,7 @@ on:
     paths:
       - 'apps/mobile/modules/task-manager-migration/**'
       - 'package-lock.json'
+      - 'scripts/ci/junit-report-check.mjs'
       - '.nvmrc'
       - '.github/actions/install/**'
       - '.github/workflows/pr-task-manager-migration.yml'
@@ -21,6 +22,7 @@ on:
     paths:
       - 'apps/mobile/modules/task-manager-migration/**'
       - 'package-lock.json'
+      - 'scripts/ci/junit-report-check.mjs'
       - '.nvmrc'
       - '.github/actions/install/**'
       - '.github/workflows/pr-task-manager-migration.yml'
@@ -83,10 +85,10 @@ jobs:
           set -euo pipefail
           project=apps/mobile/modules/task-manager-migration/android/unit-tests
           gradle -p "$project" testDebugUnitTest --console=plain
-          # All three cases ran, none skipped.
+          # At least the three cases ran, and none was skipped, failed or errored.
           report="$project/build/test-results/testDebugUnitTest"
           report="$report/TEST-expo.modules.taskmanagermigration.PersistedTaskConsumersTest.xml"
-          grep -q 'tests="3" skipped="0" failures="0" errors="0"' "$report"
+          node scripts/ci/junit-report-check.mjs "$report" 3
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}
