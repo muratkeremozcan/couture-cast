@@ -39,8 +39,10 @@ export function parseArgs(argv) {
     if (!parsed[key]) throw new Error(`worklets_gradle_option_required:${key}`)
   if (gradle.length === 0) throw new Error('worklets_gradle_tasks_required')
   // The architectures Gradle builds must be exactly the ones staged.
-  const flag = gradle.find((arg) => arg.startsWith('-PreactNativeArchitectures='))
-  if (flag?.split('=')[1] !== parsed.abis)
+  const flags = gradle.filter((arg) => arg.startsWith('-PreactNativeArchitectures='))
+  // One flag only (Antigravity r12): Gradle takes the last, so a second could undo the staged set.
+  if (flags.length !== 1) throw new Error('worklets_gradle_architectures_mismatch')
+  if (flags[0].split('=')[1] !== parsed.abis)
     throw new Error('worklets_gradle_architectures_mismatch')
   return parsed
 }

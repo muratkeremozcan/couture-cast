@@ -42,6 +42,15 @@ test('parseArgs needs every option, tasks, and the same architectures Gradle bui
       ]),
     { message: 'worklets_gradle_architectures_mismatch' }
   )
+  // Antigravity r12 (P3): a second flag, or none, is refused.
+  assert.throws(
+    () => parseArgs([...options('/tmp/e'), '-PreactNativeArchitectures=arm64-v8a']),
+    { message: 'worklets_gradle_architectures_mismatch' }
+  )
+  assert.throws(
+    () => parseArgs([...options('/tmp/e').slice(0, 9), ':app:assembleDebug']),
+    { message: 'worklets_gradle_architectures_mismatch' }
+  )
 })
 
 test('Gradle runs with the staging init script, and the proofs are verified only after a pass', (t) => {
