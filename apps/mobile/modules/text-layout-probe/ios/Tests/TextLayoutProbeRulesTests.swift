@@ -82,15 +82,72 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertEqual(cuts.visible, cuts.clip)
   }
 
-  // TEA ruling 2026-11-14 (r43): a text wholly outside the window is offWindow, reported apart
-  // from scrolledAway, which it leaves false.
-  func testATextOutsideTheWindowIsOffWindowNotScrolledAwayWithNothingLeft() {
+  // TEA ruling 2026-11-14 (r44 P1-1): a text wholly outside the window by layout alone, with no
+  // scroll reach, is cut to nothing (the harness fails it); only a translation that put it there
+  // makes it offWindow. Neither is scrolledAway.
+  func testATextOutsideTheWindowByLayoutIsCutToNothingNotOffWindow() {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 900, width: 200, height: 40), ancestors: [], window: window)
+    XCTAssertFalse(cuts.offWindow)
+    XCTAssertFalse(cuts.scrolledAway)
+    XCTAssertNil(cuts.visible)
+    XCTAssertNil(cuts.clip)
+  }
+
+  func testATextItsOwnTranslationMovesOffTheWindowIsOffWindow() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 900, width: 200, height: 40), ancestors: [], window: window,
+      transform: CGAffineTransform(translationX: 0, y: 500))
     XCTAssertTrue(cuts.offWindow)
     XCTAssertFalse(cuts.scrolledAway)
     XCTAssertNil(cuts.visible)
     XCTAssertNil(cuts.clip)
+  }
+
+  /// Antigravity r44 PROBE_4B: a non-scrolling footer pushed past the window bottom, and a row
+  /// item pushed past the window right, by layout. Both are cut to nothing, not offWindow.
+  func testR44AFooterPastTheWindowBottomAndARowItemPastItsRightAreNotOffWindow() {
+    let column = Wire.Ancestor(rect: CGRect(x: 0, y: 0, width: 390, height: 900), clips: false)
+    let footer = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 860, width: 200, height: 30), ancestors: [column], window: window)
+    let rowHolder = Wire.Ancestor(rect: CGRect(x: 0, y: 100, width: 600, height: 40), clips: false)
+    let item = Wire.cuts(
+      viewRect: CGRect(x: 400, y: 100, width: 80, height: 40), ancestors: [rowHolder, column],
+      window: window)
+    for cuts in [footer, item] {
+      XCTAssertFalse(cuts.offWindow)
+      XCTAssertNil(cuts.clip)
+      XCTAssertNil(cuts.visible)
+      XCTAssertFalse(cuts.scrolledAway)
+    }
+  }
+
+  /// A sheet whose own text lies past the window even with the sheet's translation undone is cut
+  /// to nothing: the translation is not what hides it.
+  func testATranslatedSheetsTextOffTheWindowEvenUntranslatedIsNotOffWindow() {
+    let sheet = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 1100, width: 390, height: 300), clips: false,
+      transform: CGAffineTransform(translationX: 0, y: 200))
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 1260, width: 200, height: 40), ancestors: [sheet], window: window)
+    XCTAssertFalse(cuts.offWindow)
+    XCTAssertNil(cuts.clip)
+  }
+
+  /// A translation under a parent scaled by 2 moves the text twice as far on screen, so undoing it
+  /// moves the text back by twice the translation: 1200 - 600 is on the window, 1200 - 300 not.
+  func testATranslationIsUndoneAsTheScaleOfTheViewsOutsideItMapsIt() {
+    let scaled = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 0, width: 390, height: 2000), clips: false,
+      transform: CGAffineTransform(scaleX: 2, y: 2))
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 1200, width: 100, height: 40), ancestors: [scaled],
+      window: window, transform: CGAffineTransform(translationX: 0, y: 300))
+    XCTAssertTrue(cuts.offWindow)
+    let half = Wire.untranslated(
+      viewRect: CGRect(x: 10, y: 1200, width: 100, height: 40), ancestors: [scaled],
+      transform: CGAffineTransform(translationX: 0, y: 300))
+    XCTAssertEqual(half.viewRect, CGRect(x: 10, y: 600, width: 100, height: 40))
   }
 
   /// The harness validator's invariants hold whatever the cuts: scrolled away means no visible
@@ -185,12 +242,31 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertEqual(cuts.visible, CGRect(x: 360, y: 100, width: 30, height: 30))
   }
 
-  func testANonClippingScrollViewOpensNoAxis() {
+  // TEA ruling 2026-11-14 (r44 P2-1): a scroll view that does not clip still moves its content,
+  // so it widens the band on its axis; it cuts nothing.
+  func testANonClippingScrollViewWidensItsAxisWithoutCutting() {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 824, width: 200, height: 40),
       ancestors: [.init(rect: CGRect(x: 0, y: 0, width: 390, height: 900), clips: false, scrollY: scroll(0, of: 100))],
       window: window)
-    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 824, width: 200, height: 20))
+    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 824, width: 200, height: 40))
+    XCTAssertEqual(cuts.visible, CGRect(x: 10, y: 824, width: 200, height: 20))
+  }
+
+  /// Antigravity r44 cutsA: a non-clipping scroll view with 200 of travel inside a clipper at
+  /// 100...200 reaches the text at 210...240.
+  func testR44ANonClippingScrollViewInsideAClipperReachesItsTravel() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 0, y: 210, width: 100, height: 30),
+      ancestors: [
+        .init(rect: CGRect(x: 0, y: 100, width: 100, height: 100), clips: false, scrollY: scroll(0, of: 200)),
+        .init(rect: CGRect(x: 0, y: 100, width: 100, height: 100), clips: true),
+      ],
+      window: window)
+    XCTAssertEqual(cuts.clip, CGRect(x: 0, y: 210, width: 100, height: 30))
+    XCTAssertNil(cuts.visible)
+    XCTAssertTrue(cuts.scrolledAway)
+    XCTAssertFalse(cuts.offWindow)
   }
 
   func testOpacityMultipliesUpTheChainAndHiddenMakesItZero() {
@@ -236,8 +312,9 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       [
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
         "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
-        "opacity",
+        "opacity", "accessibilityAncestor",
       ])
+    XCTAssertTrue(record["accessibilityAncestor"] is NSNull)
     XCTAssertTrue(record["visibleRect"] is NSNull)
     XCTAssertTrue(record["clipRect"] is NSNull)
     XCTAssertTrue(record["maxLines"] is NSNull)
@@ -437,7 +514,8 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertNil(far.visible)
     XCTAssertNil(far.clip)
     XCTAssertFalse(far.scrolledAway)
-    XCTAssertTrue(far.offWindow)
+    // Past the travel by layout: cut to nothing, not offWindow (r44 P1-1).
+    XCTAssertFalse(far.offWindow)
     let edge = Wire.cuts(
       viewRect: CGRect(x: 0, y: 490, width: 100, height: 40), ancestors: [scroller], window: small)
     XCTAssertEqual(edge.clip, CGRect(x: 0, y: 490, width: 100, height: 20))
@@ -523,15 +601,83 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertNil(cuts.visible)
   }
 
+  /// Parked by a translation of 500 below its laid-out place at 380 (r44 P1-1).
   func testAParkedSheetBelowTheScreenIsOffWindowAndNotScrolledAway() {
     let sheet = CGRect(x: 0, y: 880, width: 390, height: 300)
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 900, width: 200, height: 40),
-      ancestors: [.init(rect: sheet, clips: true)], window: window)
+      ancestors: [
+        .init(rect: sheet, clips: true, transform: CGAffineTransform(translationX: 0, y: 500))
+      ],
+      window: window)
     XCTAssertTrue(cuts.offWindow)
     XCTAssertFalse(cuts.scrolledAway)
     XCTAssertNil(cuts.visible)
     XCTAssertNil(cuts.clip)
+  }
+
+  // TEA ruling 2026-11-14 (r44 P2-2): an inverted scroll view (its content flipped on screen on
+  // that axis) moves its content down as its offset grows, so its band mirrors.
+
+  private let lowViewport = CGRect(x: 0, y: 300, width: 390, height: 300)
+
+  private func inverted(
+    _ text: CGRect, _ travel: Wire.Scroll, scroller: CGAffineTransform = CGAffineTransform(scaleX: 1, y: -1),
+    holders: [CGAffineTransform] = []
+  ) -> Wire.Cuts {
+    Wire.cuts(
+      viewRect: text,
+      ancestors: [.init(rect: lowViewport, clips: true, scrollY: travel, transform: scroller)]
+        + holders.map { .init(rect: window, clips: false, transform: $0) },
+      window: window)
+  }
+
+  func testAnInvertedScrollViewAtRestReachesAboveItsViewportAndNotBelow() {
+    // Offset 0 of 100: the band is 200...600.
+    let above = inverted(row(220), scroll(0, of: 100))
+    XCTAssertEqual(above.clip, row(220))
+    XCTAssertTrue(above.scrolledAway)
+    XCTAssertEqual(inverted(row(180), scroll(0, of: 100)).clip, CGRect(x: 10, y: 200, width: 200, height: 20))
+    let below = inverted(row(620), scroll(0, of: 100))
+    XCTAssertNil(below.clip)
+    XCTAssertFalse(below.scrolledAway)
+    XCTAssertFalse(below.offWindow)
+  }
+
+  func testAnInvertedScrollViewOpensEachSideByTheMirroredTravel() {
+    // Offset 30 of 100: 70 above, 30 below; the band is 230...630.
+    XCTAssertEqual(
+      inverted(row(200), scroll(30, of: 100)).clip, CGRect(x: 10, y: 230, width: 200, height: 10))
+    XCTAssertEqual(
+      inverted(row(600), scroll(30, of: 100)).clip, CGRect(x: 10, y: 600, width: 200, height: 30))
+  }
+
+  /// React Native iOS flips the component view that holds the UIScrollView; a flip inside a flip
+  /// scrolls the usual way.
+  func testAFlipOnAHolderInvertsAndAFlipInsideAFlipDoesNot() {
+    let flip = CGAffineTransform(scaleX: 1, y: -1)
+    let held = inverted(row(220), scroll(0, of: 100), scroller: .identity, holders: [flip])
+    XCTAssertEqual(held.clip, row(220))
+    let twice = inverted(row(220), scroll(0, of: 100), scroller: flip, holders: [flip])
+    XCTAssertNil(twice.clip)
+    XCTAssertEqual(inverted(row(620), scroll(0, of: 100), scroller: flip, holders: [flip]).clip, row(620))
+  }
+
+  func testAHorizontallyInvertedScrollViewReachesLeftOfItsViewport() {
+    let viewport = CGRect(x: 200, y: 100, width: 100, height: 40)
+    func cuts(_ x: CGFloat) -> Wire.Cuts {
+      Wire.cuts(
+        viewRect: CGRect(x: x, y: 100, width: 40, height: 40),
+        ancestors: [
+          .init(
+            rect: viewport, clips: true, scrollX: scroll(0, of: 100),
+            transform: CGAffineTransform(scaleX: -1, y: 1))
+        ],
+        window: window)
+    }
+    XCTAssertEqual(cuts(120).clip, CGRect(x: 120, y: 100, width: 40, height: 40))
+    XCTAssertTrue(cuts(120).scrolledAway)
+    XCTAssertNil(cuts(310).clip)
   }
 
   // TEA ruling 2026-11-14 (r43 P2): every text view is recorded with the opacity it draws with.
@@ -610,6 +756,104 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
     let first = try XCTUnwrap((json["records"] as? [[String: Any]])?.first)
     XCTAssertEqual(first["opacity"] as? Double, 0.00004)
+  }
+
+  // TEA ruling 2026-11-14 (r44 P3-1): a NaN opacity refuses the answer with its own code; it is
+  // never coerced or dropped.
+  func testANaNOpacityRefusesTheAnswerWithItsOwnCode() throws {
+    let opacity = Wire.effectiveOpacity([
+      Wire.Layer(alpha: 1, opacity: 1, hidden: false), Wire.Layer(alpha: .nan, opacity: 1, hidden: false),
+    ])
+    XCTAssertTrue(opacity.isNaN)
+    func record(_ text: String, _ opacity: Double) -> Wire.Record {
+      var record = Wire.Record(
+        kind: "RCTParagraphComponentView", text: text, viewRect: .zero, visibleRect: nil,
+        clipRect: nil, contentRect: .zero, lineCount: 1, maxLines: nil, ellipsized: 0,
+        unlimitedLineCount: 1, window: 0, scrolledAway: false, offWindow: false)
+      record.opacity = opacity
+      return record
+    }
+    let data = try Wire.json(
+      token: "t-nan", windows: [.init(id: 0, rect: window, z: 0, focused: true)],
+      records: [record("Fine", 1), record("Broken", opacity)])
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    XCTAssertEqual(Set(json.keys), ["version", "token", "platform", "error"])
+    XCTAssertEqual(json["token"] as? String, "t-nan")
+    XCTAssertEqual(json["platform"] as? String, "ios")
+    let error = try XCTUnwrap(json["error"] as? [String: Any])
+    XCTAssertEqual(Set(error.keys), ["code", "record", "kind"])
+    XCTAssertEqual(error["code"] as? String, "text_probe_opacity_invalid")
+    XCTAssertEqual(error["record"] as? Int, 1)
+    XCTAssertEqual(error["kind"] as? String, "RCTParagraphComponentView")
+    XCTAssertEqual(
+      String(decoding: data, as: UTF8.self),
+      #"{"error":{"code":"text_probe_opacity_invalid","kind":"RCTParagraphComponentView","record":1},"platform":"ios","token":"t-nan","version":1}"#)
+    // Any value outside 0...1 is refused the same way.
+    for bad in [-0.5, 1.5, Double.infinity] {
+      let refused = try Wire.json(
+        token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)],
+        records: [record("Odd", bad)])
+      let parsed = try XCTUnwrap(JSONSerialization.jsonObject(with: refused) as? [String: Any])
+      XCTAssertNotNil(parsed["error"], "\(bad)")
+      XCTAssertNil(parsed["records"], "\(bad)")
+    }
+  }
+
+  // TEA ruling 2026-11-14 (r44 4): each iOS record names the nearest accessibility element with
+  // an identifier at or above it, `{identifier, rect}` with rect written like viewRect, or null.
+
+  private final class Element {
+    let isElement: Bool
+    let identifier: String?
+    let rect: CGRect
+    let parent: Element?
+    init(_ isElement: Bool, _ identifier: String?, _ rect: CGRect, _ parent: Element? = nil) {
+      self.isElement = isElement
+      self.identifier = identifier
+      self.rect = rect
+      self.parent = parent
+    }
+  }
+
+  private func ancestor(_ node: Element) -> Wire.AccessibilityAncestor? {
+    Wire.accessibilityAncestor(
+      node, parent: { $0.parent }, isElement: { $0.isElement }, identifier: { $0.identifier },
+      rect: { $0.rect })
+  }
+
+  func testTheAccessibilityAncestorIsTheNearestElementWithAnIdentifier() {
+    let card = CGRect(x: 0, y: 100, width: 390, height: 200)
+    let root = Element(true, "screen", window)
+    let outer = Element(true, "outfit-card", card, root)
+    // Not an element, or an element without an identifier: passed over.
+    let plain = Element(false, "not-an-element", CGRect(x: 0, y: 120, width: 390, height: 80), outer)
+    let blank = Element(true, "", CGRect(x: 0, y: 130, width: 390, height: 60), plain)
+    let text = Element(false, nil, CGRect(x: 10, y: 140, width: 200, height: 20), blank)
+    XCTAssertEqual(ancestor(text), Wire.AccessibilityAncestor(identifier: "outfit-card", rect: card))
+    // The view itself when it is one.
+    let own = CGRect(x: 10, y: 140, width: 200, height: 20)
+    XCTAssertEqual(
+      ancestor(Element(true, "title", own, outer)),
+      Wire.AccessibilityAncestor(identifier: "title", rect: own))
+    XCTAssertNil(ancestor(Element(false, nil, own, Element(false, "x", window))))
+    XCTAssertNil(ancestor(Element(true, nil, own)))
+  }
+
+  func testTheJsonWritesTheAccessibilityAncestorLikeViewRect() throws {
+    var record = Wire.Record(
+      kind: "RCTParagraphComponentView", text: "Title", viewRect: .zero, visibleRect: nil,
+      clipRect: nil, contentRect: .zero, lineCount: 1, maxLines: nil, ellipsized: 0,
+      unlimitedLineCount: 1, window: 0, scrolledAway: false, offWindow: false)
+    record.accessibilityAncestor = .init(
+      identifier: "outfit-card", rect: CGRect(x: 1.0 / 3, y: 100, width: 390, height: 200))
+    let data = try Wire.json(
+      token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)], records: [record])
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let first = try XCTUnwrap((json["records"] as? [[String: Any]])?.first)
+    let found = try XCTUnwrap(first["accessibilityAncestor"] as? [String: Any])
+    XCTAssertEqual(Set(found.keys), ["identifier", "rect"])
+    XCTAssertEqual(found["identifier"] as? String, "outfit-card")
+    XCTAssertEqual(found["rect"] as? [Double], [0.333, 100, 390.333, 300])
   }
 
   // Antigravity r43 P3: a field wider than its text rect starts at its leading edge whatever

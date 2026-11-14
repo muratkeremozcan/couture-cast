@@ -31,10 +31,26 @@ enum TextLayoutProbeSnapshot {
       view,
       layer: { .init(alpha: $0.alpha, opacity: $0.layer.opacity, hidden: $0.isHidden) },
       children: { $0.subviews },
-      read: { record($0, in: window, id: id) },
+      read: { view in
+        guard var found = record(view, in: window, id: id) else { return nil }
+        found.accessibilityAncestor = accessibilityAncestor(view, in: window)
+        return found
+      },
       // A UIKit text control draws its own internals (placeholder labels, field editors).
       descends: { TLPParagraphReader.isParagraphLikeView($0) },
       into: &records)
+  }
+
+  /// The nearest accessibility element with an identifier at or above `view`, below the window.
+  private static func accessibilityAncestor(_ view: UIView, in window: UIWindow)
+    -> TextLayoutProbeWire.AccessibilityAncestor?
+  {
+    TextLayoutProbeWire.accessibilityAncestor(
+      view,
+      parent: { $0.superview === window ? nil : $0.superview },
+      isElement: { $0.isAccessibilityElement },
+      identifier: { $0.accessibilityIdentifier },
+      rect: { $0.convert($0.bounds, to: window) })
   }
 
   private static func record(_ view: UIView, in window: UIWindow, id: Int)
@@ -176,10 +192,18 @@ enum TextLayoutProbeSnapshot {
           clips: ancestor.clipsToBounds || ancestor.layer.masksToBounds
             || ancestor.layer.mask != nil,
           scrollX: travel(ancestor, horizontally: true),
-          scrollY: travel(ancestor, horizontally: false)))
+          scrollY: travel(ancestor, horizontally: false),
+          transform: transform(ancestor)))
       parent = ancestor.superview
     }
-    return TextLayoutProbeWire.cuts(viewRect: viewRect, ancestors: ancestors, window: window.bounds)
+    return TextLayoutProbeWire.cuts(
+      viewRect: viewRect, ancestors: ancestors, window: window.bounds, transform: transform(view))
+  }
+
+  /// A view's own transform: React Native sets it on the layer (translate, scale, an inverted
+  /// list's scaleY -1), which UIView.transform mirrors; its affine part is what moves and flips.
+  private static func transform(_ view: UIView) -> CGAffineTransform {
+    CATransform3DGetAffineTransform(view.layer.transform)
   }
 
   /// A scroll view's travel on one axis: nil unless it is a scroll view with scrolling enabled
