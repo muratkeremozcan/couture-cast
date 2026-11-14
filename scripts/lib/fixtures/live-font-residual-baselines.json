@@ -1,4 +1,235 @@
 {
   "about": "Story 6.15 R2-05: residuals below React Native 0.87 that a reviewer approved. An entry names the platform, build, screen, scale change, the testIDs ('' for text without one) allowed to keep their base-scale height and how many nodes may. A residual outside its entry fails the proof until it is reviewed and added here with its evidence path.",
-  "entries": []
+  "entries": [
+    {
+      "platform": "android",
+      "build": "sdk54-release",
+      "screen": "home",
+      "from": "1",
+      "to": "1.5",
+      "staleIds": ["", "current-condition", "outfit-comfort-notes"],
+      "maxStaleMisses": 63,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": ["current-condition"],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-release-sdk54-plugin-20261113-1814/proof",
+        "before": "home-005-before-1",
+        "immediate": "home-006-immediate-1.5",
+        "settled": "home-007-settled-1.5",
+        "updated": "home-008-updated-1.5"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-release",
+      "screen": "home",
+      "from": "1.5",
+      "to": "1",
+      "staleIds": [""],
+      "maxStaleMisses": 1,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": [],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-release-sdk54-plugin-20261113-1814/proof",
+        "before": "home-009-before-1.5",
+        "immediate": "home-010-immediate-1",
+        "settled": "home-011-settled-1",
+        "updated": "home-012-updated-1"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-release",
+      "screen": "community",
+      "from": "1",
+      "to": "1.5",
+      "staleIds": ["", "community-new-post-label"],
+      "maxStaleMisses": 15,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": ["community-new-post-label"],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-release-sdk54-plugin-20261113-1814/proof",
+        "before": "community-018-before-1",
+        "immediate": "community-019-immediate-1.5",
+        "settled": "community-020-settled-1.5",
+        "updated": "community-021-updated-1.5"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-release",
+      "screen": "settings",
+      "from": "1",
+      "to": "1.5",
+      "staleIds": ["", "commerce-settings-disclosure", "settings-language-title"],
+      "maxStaleMisses": 36,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": ["settings-language-title"],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-release-sdk54-plugin-20261113-1814/proof-settings-composer",
+        "before": "settings-005-before-1",
+        "immediate": "settings-006-immediate-1.5",
+        "settled": "settings-007-settled-1.5",
+        "updated": "settings-008-updated-1.5"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-release",
+      "screen": "settings",
+      "from": "1.5",
+      "to": "1",
+      "staleIds": ["", "premium-settings-disclosure"],
+      "maxStaleMisses": 3,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": [],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-release-sdk54-plugin-20261113-1814/proof-settings-composer",
+        "before": "settings-009-before-1.5",
+        "immediate": "settings-010-immediate-1",
+        "settled": "settings-011-settled-1",
+        "updated": "settings-012-updated-1"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-debug",
+      "screen": "home",
+      "from": "1",
+      "to": "1.5",
+      "staleIds": ["", "current-condition", "outfit-comfort-notes"],
+      "maxStaleMisses": 63,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": ["current-condition"],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-debug-sdk54-plugin-20261113-2109/proof-home-community",
+        "before": "home-005-before-1",
+        "immediate": "home-006-immediate-1.5",
+        "settled": "home-007-settled-1.5",
+        "updated": "home-008-updated-1.5"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-debug",
+      "screen": "home",
+      "from": "1.5",
+      "to": "1",
+      "staleIds": [""],
+      "maxStaleMisses": 1,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": [],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-debug-sdk54-plugin-20261113-2109/proof-home-community",
+        "before": "home-009-before-1.5",
+        "immediate": "home-010-immediate-1",
+        "settled": "home-011-settled-1",
+        "updated": "home-012-updated-1"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-debug",
+      "screen": "community",
+      "from": "1",
+      "to": "1.5",
+      "staleIds": ["", "community-new-post-label"],
+      "maxStaleMisses": 15,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": ["community-new-post-label"],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-debug-sdk54-plugin-20261113-2109/proof-home-community",
+        "before": "community-018-before-1",
+        "immediate": "community-019-immediate-1.5",
+        "settled": "community-020-settled-1.5",
+        "updated": "community-021-updated-1.5"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-debug",
+      "screen": "settings",
+      "from": "1",
+      "to": "1.5",
+      "staleIds": ["", "commerce-settings-disclosure", "settings-language-title"],
+      "maxStaleMisses": 36,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": ["settings-language-title"],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-debug-sdk54-plugin-20261113-2109/proof-settings-composer",
+        "before": "settings-005-before-1",
+        "immediate": "settings-006-immediate-1.5",
+        "settled": "settings-007-settled-1.5",
+        "updated": "settings-008-updated-1.5"
+      }
+    },
+    {
+      "platform": "android",
+      "build": "sdk54-debug",
+      "screen": "settings",
+      "from": "1.5",
+      "to": "1",
+      "staleIds": ["", "premium-settings-disclosure"],
+      "maxStaleMisses": 3,
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": [],
+        "controlPass": true
+      },
+      "evidence": {
+        "dir": "_bmad-output/test-artifacts/story-6-15/runs/live-font-android-debug-sdk54-plugin-20261113-2109/proof-settings-composer",
+        "before": "settings-009-before-1.5",
+        "immediate": "settings-010-immediate-1",
+        "settled": "settings-011-settled-1",
+        "updated": "settings-012-updated-1"
+      }
+    }
+  ]
 }
