@@ -50,7 +50,10 @@ class TextLayoutProbeReceiver(
     /**
      * Registers the receiver on the main looper, so every read runs on the UI thread. API 29 and
      * later only: WindowInspector, which lists every window root (the composer's modal dialog
-     * beside the Activity), arrived in Android 10.
+     * beside the Activity), and View.transformMatrixToGlobal, which maps every box, line and clip
+     * through scaled and flipped ancestors, arrived in Android 10. Below API 29 nothing is
+     * registered and null is returned, so a request gets no answer at all (never one with unmapped
+     * boxes) and the harness fails the leg on the missing answer (live_font_text_probe_missing).
      */
     fun register(context: Context): TextLayoutProbeReceiver? {
       if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return null

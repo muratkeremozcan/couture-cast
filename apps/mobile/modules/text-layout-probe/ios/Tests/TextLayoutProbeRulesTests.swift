@@ -150,6 +150,63 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertEqual(half.viewRect, CGRect(x: 10, y: 600, width: 100, height: 40))
   }
 
+  // TEA ruling 2026-11-14 (r45 P2-3): the untranslated rect must lie wholly inside the window,
+  // not merely overlap it.
+
+  /// Antigravity r45 testR45ProbeFocus2And3: laid out at 370...480 over a 0...390 window (90 pt
+  /// of layout overflow), then translated 30 pt right to 400...510. The translation does not
+  /// hide the overflow, so it is cut to nothing, not offWindow.
+  func testR45ALayoutOverflowPastTheWindowRightIsNotOffWindowUnderATranslation() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 400, y: 100, width: 110, height: 30), ancestors: [], window: window,
+      transform: CGAffineTransform(translationX: 30, y: 0))
+    XCTAssertFalse(cuts.offWindow)
+    XCTAssertNil(cuts.clip)
+    XCTAssertNil(cuts.visible)
+    XCTAssertFalse(cuts.scrolledAway)
+    // Laid out at 270...380, wholly inside the window, the same text translated by 130 is.
+    let parked = Wire.cuts(
+      viewRect: CGRect(x: 400, y: 100, width: 110, height: 30), ancestors: [], window: window,
+      transform: CGAffineTransform(translationX: 130, y: 0))
+    XCTAssertTrue(parked.offWindow)
+  }
+
+  /// The same across the bottom, on a sheet: the text runs 10 pt past the window bottom when the
+  /// sheet is in place, so the sheet's translation does not make it offWindow.
+  func testR45ASheetTextOverflowingTheWindowBottomUntranslatedIsNotOffWindow() {
+    let sheet = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 1300, width: 390, height: 400), clips: false,
+      transform: CGAffineTransform(translationX: 0, y: 500))
+    let overflowing = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 1314, width: 200, height: 40), ancestors: [sheet], window: window)
+    XCTAssertFalse(overflowing.offWindow)
+    XCTAssertNil(overflowing.clip)
+    let whole = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 1300, width: 200, height: 40), ancestors: [sheet], window: window)
+    XCTAssertTrue(whole.offWindow)
+  }
+
+  /// Whole within reach untranslated is what counts: a parked sheet's text below the fold of the
+  /// sheet's own scroll view is offWindow, since in place it is scrolledAway; one its own sheet
+  /// cuts in part untranslated is not.
+  func testR45AParkedSheetsScrollContentIsOffWindowAndItsCutTextIsNot() {
+    let translation = CGAffineTransform(translationX: 0, y: 1000)
+    let sheet = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 1400, width: 390, height: 400), clips: true, transform: translation)
+    let scroller = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 1400, width: 390, height: 400), clips: true,
+      scrollY: scroll(0, of: 600))
+    let belowFold = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 1900, width: 200, height: 40), ancestors: [scroller, sheet],
+      window: window)
+    XCTAssertTrue(belowFold.offWindow)
+    let cut = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 1780, width: 200, height: 40), ancestors: [sheet],
+      window: window)
+    XCTAssertFalse(cut.offWindow)
+    XCTAssertNil(cut.clip)
+  }
+
   /// The harness validator's invariants hold whatever the cuts: scrolled away means no visible
   /// rect, a visible rect means a clip rect, and nothing visible without scrolling means no clip.
   func testEveryCutCombinationKeepsTheValidatorInvariants() {
@@ -681,6 +738,60 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertEqual(cuts(120).clip, CGRect(x: 120, y: 100, width: 40, height: 40))
     XCTAssertTrue(cuts(120).scrolledAway)
     XCTAssertNil(cuts(310).clip)
+  }
+
+  /// r45 P3-1 (mutant M2): the horizontal flip sits on an outer holder, not on the scroll view,
+  /// so only the composed transform shows the scroll view inverted; a flip inside it undoes it.
+  func testAFlipOnAnOuterHolderInvertsAHorizontalScrollViewAndAFlipInsideItDoesNot() {
+    let viewport = CGRect(x: 200, y: 100, width: 100, height: 40)
+    let flip = CGAffineTransform(scaleX: -1, y: 1)
+    func cuts(_ x: CGFloat, scroller: CGAffineTransform) -> Wire.Cuts {
+      Wire.cuts(
+        viewRect: CGRect(x: x, y: 100, width: 40, height: 40),
+        ancestors: [
+          .init(rect: viewport, clips: true, scrollX: scroll(0, of: 100), transform: scroller),
+          .init(rect: window, clips: false, transform: flip),
+        ],
+        window: window)
+    }
+    XCTAssertEqual(cuts(120, scroller: .identity).clip, CGRect(x: 120, y: 100, width: 40, height: 40))
+    XCTAssertTrue(cuts(120, scroller: .identity).scrolledAway)
+    XCTAssertNil(cuts(310, scroller: .identity).clip)
+    XCTAssertNil(cuts(120, scroller: flip).clip)
+    XCTAssertEqual(cuts(310, scroller: flip).clip, CGRect(x: 310, y: 100, width: 40, height: 40))
+  }
+
+  // TEA ruling 2026-11-14 (r45 P2-5): a scroll view's travel is in its own points, so a scaled
+  // ancestor scales it on the window.
+
+  /// A 300...600 viewport with 200 pt of travel at offset 0 under a holder scaled by 0.5 opens
+  /// 100 pt below on the window, and by 2, 400 pt.
+  func testAScaledAncestorScalesTheScrollTravelOnTheWindow() {
+    func cuts(_ top: CGFloat, scale: CGFloat) -> Wire.Cuts {
+      Wire.cuts(
+        viewRect: CGRect(x: 10, y: top, width: 200, height: 20),
+        ancestors: [
+          .init(rect: lowViewport, clips: true, scrollY: scroll(0, of: 200)),
+          .init(
+            rect: CGRect(x: 0, y: 0, width: 390, height: 2000), clips: false,
+            transform: CGAffineTransform(scaleX: scale, y: scale)),
+        ],
+        window: CGRect(x: 0, y: 0, width: 390, height: 2000))
+    }
+    XCTAssertEqual(cuts(680, scale: 0.5).clip, CGRect(x: 10, y: 680, width: 200, height: 20))
+    XCTAssertEqual(cuts(690, scale: 0.5).clip, CGRect(x: 10, y: 690, width: 200, height: 10))
+    XCTAssertNil(cuts(720, scale: 0.5).clip)
+    XCTAssertEqual(cuts(980, scale: 2).clip, CGRect(x: 10, y: 980, width: 200, height: 20))
+    XCTAssertNil(cuts(1000, scale: 2).clip)
+    // Flipped and scaled by 0.5: the band mirrors and keeps the scale, 200...600.
+    let flipped = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 190, width: 200, height: 20),
+      ancestors: [
+        .init(rect: lowViewport, clips: true, scrollY: scroll(0, of: 200)),
+        .init(rect: window, clips: false, transform: CGAffineTransform(scaleX: 1, y: -0.5)),
+      ],
+      window: window)
+    XCTAssertEqual(flipped.clip, CGRect(x: 10, y: 200, width: 200, height: 10))
   }
 
   // TEA ruling 2026-11-14 (r43 P2): every text view is recorded with the opacity it draws with.

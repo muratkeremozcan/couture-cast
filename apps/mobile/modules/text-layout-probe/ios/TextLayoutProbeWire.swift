@@ -293,15 +293,21 @@ enum TextLayoutProbeWire {
   }
 
   /// Off the window: a translation put it there. The view has no reach (clip nil), lies wholly
-  /// outside the window (a zero-size one by its origin), and the same reach computed with every
-  /// translation removed (`untranslated`) is not nil, so without the translations of the view
-  /// and its ancestors (a parked sheet or drawer) part of it could be brought into view. A text
-  /// wholly off the window by layout alone has no reach either way and is not offWindow: the
-  /// harness fails it as cut to nothing. One a scroll view's band reaches is scrolledAway.
+  /// outside the window (a zero-size one by its origin), and with every translation removed
+  /// (`untranslated`) its whole rect lies within reach: `untranslatedClip`, the reach computed
+  /// again, is the untranslated rect itself. With no clipper or scroll view above, that is the
+  /// untranslated rect lying wholly inside the window (r45 P2-3); merely overlapping it is not
+  /// enough, since the part outside is a layout overflow the translation did not cause. So a
+  /// parked sheet or drawer whose text sits whole in it (or in its scroll view's band) is
+  /// offWindow; a text wholly off the window by layout alone, or overflowing the window or a
+  /// clipper even untranslated, is not, and the harness fails it as cut to nothing. One a scroll
+  /// view's band reaches is scrolledAway.
   static func offWindow(
-    _ viewRect: CGRect, _ window: CGRect, clip: CGRect?, untranslatedClip: CGRect?
+    _ viewRect: CGRect, _ window: CGRect, clip: CGRect?, untranslatedRect: CGRect,
+    untranslatedClip: CGRect?
   ) -> Bool {
     clip == nil && disjoint(viewRect, window) && untranslatedClip != nil
+      && untranslatedClip == untranslatedRect
   }
 
   /// One axis of a rect, or nil when it is empty.
@@ -316,14 +322,19 @@ enum TextLayoutProbeWire {
   /// The band of positions a scroll view can bring into `span`. A larger offset moves the content
   /// up (or left), so text now at p shows after a further scroll by d when p - d lies in span, for
   /// d from -offset (back to the start) to maximum - offset (to the end): the band runs from
-  /// span start minus offset to span end plus (maximum minus offset). In an inverted scroll view
-  /// (its content flipped on that axis on screen) a larger offset moves the content down (or
-  /// right), so the band mirrors: span start minus (maximum minus offset) to span end plus offset.
-  private static func widen(_ span: Span?, _ scroll: Scroll?, inverted: Bool) -> Span? {
+  /// span start minus offset to span end plus (maximum minus offset). Offsets are in the scroll
+  /// view's own points, so on screen they move the content by `scale`, the composed linear part of
+  /// the scroll view and every ancestor on that axis (r45 P2-5): a scroll view under a parent
+  /// scaled by 0.5 travels half as far on the window. A negative scale is an inverted scroll view
+  /// (its content flipped on that axis on screen), where a larger offset moves the content down
+  /// (or right), so the band mirrors: span start minus (maximum minus offset) to span end plus
+  /// offset, both times the scale's size.
+  private static func widen(_ span: Span?, _ scroll: Scroll?, scale: CGFloat) -> Span? {
     guard let span, let scroll else { return span }
-    let back = scroll.offset
-    let ahead = scroll.maximum - scroll.offset
-    return inverted ? (span.lo - ahead, span.hi + back) : (span.lo - back, span.hi + ahead)
+    let size = abs(scale)
+    let back = scroll.offset * size
+    let ahead = (scroll.maximum - scroll.offset) * size
+    return scale < 0 ? (span.lo - ahead, span.hi + back) : (span.lo - back, span.hi + ahead)
   }
 
   /// The scale, flip and rotation of a transform, without its translation.
@@ -339,7 +350,7 @@ enum TextLayoutProbeWire {
   /// an axis with no travel cuts as any clipper does. A scroll view is inverted on an axis when
   /// the linear parts of its own transform and every ancestor's above it, composed, flip that
   /// axis (a negative a for x, d for y): React Native's inverted lists flip the scroll view or the
-  /// component view that holds it.
+  /// component view that holds it. The same composition scales its travel onto the window.
   private static func reach(_ viewRect: CGRect, _ ancestors: [Ancestor], _ window: CGRect)
     -> CGRect?
   {
@@ -353,8 +364,8 @@ enum TextLayoutProbeWire {
         x = narrow(x, ancestor.rect.minX, ancestor.rect.maxX)
         y = narrow(y, ancestor.rect.minY, ancestor.rect.maxY)
       }
-      x = widen(x, ancestor.scrollX, inverted: onScreen.a < 0)
-      y = widen(y, ancestor.scrollY, inverted: onScreen.d < 0)
+      x = widen(x, ancestor.scrollX, scale: onScreen.a)
+      y = widen(y, ancestor.scrollY, scale: onScreen.d)
     }
     guard let x, let y else { return nil }
     return cut(viewRect, CGRect(x: x.lo, y: y.lo, width: x.hi - x.lo, height: y.hi - y.lo))
@@ -402,7 +413,7 @@ enum TextLayoutProbeWire {
     if clip == nil && disjoint(viewRect, window) {
       let back = untranslated(viewRect: viewRect, ancestors: ancestors, transform: transform)
       off = offWindow(
-        viewRect, window, clip: clip,
+        viewRect, window, clip: clip, untranslatedRect: back.viewRect,
         untranslatedClip: reach(back.viewRect, back.ancestors, window))
     }
     return Cuts(

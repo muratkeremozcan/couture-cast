@@ -13,6 +13,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import java.util.Collections
 import java.util.IdentityHashMap
+import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.roundToInt
@@ -287,7 +288,7 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       viewRect = viewRect,
       visibleRect = cuts.visible,
       clipRect = cuts.clip,
-      contentRect = reading.content(viewRect),
+      contentRect = reading.content(view),
       lineCount = reading.lineCount,
       maxLines = reading.maxLines,
       ellipsized = reading.ellipsized,
@@ -311,18 +312,24 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
     val lineCount = layout?.lineCount ?: 0
     val ellipsized = layout?.let { (0 until it.lineCount).sumOf(it::getEllipsisCount) } ?: 0
 
-    /** The laid-out text's own extents: its lines' left and right, its first top, last bottom. */
-    fun content(viewRect: ProbeRect): ProbeRect {
-      val layout = layout ?: return viewRect
-      val left = viewRect.left + paddingLeft
-      val top = viewRect.top + paddingTop
-      if (lineCount == 0) return ProbeRect(left, top, left, top)
+    /**
+     * The laid-out text's own extents on screen: its lines' left and right, its first top and last
+     * bottom, in the view's own pixels, mapped like its box through its own and every ancestor's
+     * matrix (r45 P2-5), so a scaled or flipped ancestor scales or flips the lines with the view.
+     */
+    fun content(view: View): ProbeRect {
+      val layout = layout ?: return screenRect(view)
+      val left = paddingLeft.toFloat()
+      val top = paddingTop.toFloat()
+      if (lineCount == 0) return mapToScreen(view, left, top, left, top, outward = true)
       val lines = 0 until lineCount
-      return ProbeRect(
-        left + floor(lines.minOf(layout::getLineLeft)).toInt(),
+      return mapToScreen(
+        view,
+        left + lines.minOf(layout::getLineLeft),
         top + layout.getLineTop(0),
-        left + ceil(lines.maxOf(layout::getLineRight)).toInt(),
-        top + layout.getLineBottom(lineCount - 1)
+        left + lines.maxOf(layout::getLineRight),
+        top + layout.getLineBottom(lineCount - 1),
+        outward = true
       )
     }
   }
@@ -429,7 +436,11 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
     return cuts(viewRect, levels, windowRect, ProbeTransform.of(view))
   }
 
-  /** The rects in screen space that [ancestor] cuts its descendants' drawing to. */
+  /**
+   * The rects in screen space that [ancestor] cuts its descendants' drawing to. Its padding and
+   * clip bounds are in its own pixels, so they are mapped through its matrix like its box (r45
+   * P2-5): under a vertical flip its top padding cuts at its bottom on screen.
+   */
   private fun ancestorClips(ancestor: View, bounds: ProbeRect): List<ProbeRect> {
     val cuts = mutableListOf<ProbeRect>()
     // A parent with clipChildren clips each child's drawing, and so its subtree, to its bounds.
@@ -439,16 +450,17 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       (ancestor.paddingLeft or ancestor.paddingTop or ancestor.paddingRight or ancestor.paddingBottom) != 0
     ) {
       cuts.add(
-        ProbeRect(
-          bounds.left + ancestor.paddingLeft,
-          bounds.top + ancestor.paddingTop,
-          bounds.right - ancestor.paddingRight,
-          bounds.bottom - ancestor.paddingBottom
+        mapToScreen(
+          ancestor,
+          ancestor.paddingLeft.toFloat(),
+          ancestor.paddingTop.toFloat(),
+          (ancestor.width - ancestor.paddingRight).toFloat(),
+          (ancestor.height - ancestor.paddingBottom).toFloat()
         )
       )
     }
     ancestor.clipBounds?.let {
-      cuts.add(ProbeRect(it.left, it.top, it.right, it.bottom).offset(bounds.left, bounds.top))
+      cuts.add(mapToScreen(ancestor, it.left.toFloat(), it.top.toFloat(), it.right.toFloat(), it.bottom.toFloat()))
     }
     return cuts
   }
@@ -484,7 +496,7 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       val off =
         clip == null && disjoint(viewRect, windowRect) &&
           untranslated(viewRect, levels, own).let { (rect, moved) ->
-            offWindow(viewRect, windowRect, clip, reach(rect, moved, windowRect))
+            offWindow(viewRect, windowRect, clip, rect, reach(rect, moved, windowRect))
           }
       return ProbeCuts(visible, clip, scrolledAway = visible == null && clip != null, offWindow = off)
     }
@@ -497,22 +509,23 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
      * scroll view with no travel (no overflow, scrolling disabled) cuts as any clipper does. A
      * scroll view is inverted on an axis when the product of its own scale and every ancestor's
      * above it is negative there: its content then moves the other way on screen (React Native's
-     * inverted lists set scaleY -1, or scale -1 on Android).
+     * inverted lists set scaleY -1, or scale -1 on Android). The same product scales its travel,
+     * which is in its own pixels, onto the screen.
      */
     private fun reach(viewRect: ProbeRect, levels: List<Level>, windowRect: ProbeRect): ProbeRect? {
       var x: Span? = Span(windowRect.left, windowRect.right)
       var y: Span? = Span(windowRect.top, windowRect.bottom)
-      var signX = 1f
-      var signY = 1f
+      var scaleX = 1f
+      var scaleY = 1f
       for (level in levels.asReversed()) {
-        signX *= level.transform.scaleX
-        signY *= level.transform.scaleY
+        scaleX *= level.transform.scaleX
+        scaleY *= level.transform.scaleY
         for (cut in level.cuts) {
           x = x?.narrow(cut.left, cut.right)
           y = y?.narrow(cut.top, cut.bottom)
         }
-        x = widen(x, level.scrollX, inverted = signX < 0)
-        y = widen(y, level.scrollY, inverted = signY < 0)
+        x = widen(x, level.scrollX, scaleX)
+        y = widen(y, level.scrollY, scaleY)
       }
       return if (x != null && y != null) viewRect.intersect(ProbeRect(x.lo, y.lo, x.hi, y.hi)) else null
     }
@@ -550,15 +563,20 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
      * The band of positions a scroll view can bring into [span]. A larger scroll offset moves the
      * content up (or left), so a text now at p shows after a further scroll by d when p - d lies
      * in span, for d from -offset (back to the start) to maximum - offset (to the end): the band
-     * runs from span start minus offset to span end plus (maximum minus offset). In an inverted
-     * scroll view a larger offset moves the content down (or right) on screen, so the band
-     * mirrors: span start minus (maximum minus offset) to span end plus offset.
+     * runs from span start minus offset to span end plus (maximum minus offset). Offsets are in
+     * the scroll view's own pixels, so on screen they move the content by [scale], the product of
+     * the scroll view's and every ancestor's scale on that axis (r45 P2-5): under a parent scaled
+     * by 0.5 the content travels half as far on screen. A negative scale is an inverted scroll
+     * view, where a larger offset moves the content down (or right) on screen, so the band
+     * mirrors: span start minus (maximum minus offset) to span end plus offset, both times the
+     * scale's size.
      */
-    private fun widen(span: Span?, travel: ScrollTravel?, inverted: Boolean): Span? {
+    private fun widen(span: Span?, travel: ScrollTravel?, scale: Float): Span? {
       if (span == null || travel == null) return span
-      val back = travel.offset
-      val ahead = travel.maximum - travel.offset
-      return if (inverted) Span(span.lo - ahead, span.hi + back) else Span(span.lo - back, span.hi + ahead)
+      val size = abs(scale)
+      val back = (travel.offset * size).roundToInt()
+      val ahead = ((travel.maximum - travel.offset) * size).roundToInt()
+      return if (scale < 0) Span(span.lo - ahead, span.hi + back) else Span(span.lo - back, span.hi + ahead)
     }
 
     /**
@@ -586,48 +604,70 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
 
     /**
      * Off the window: a translation put it there. The view has no reach (no clipRect), lies wholly
-     * outside the window (a zero-size view by its corner), and the same reach computed with every
-     * translation removed ([untranslated]) is not null, so without the translations of the view
-     * and its ancestors (a parked sheet or drawer) part of it could be brought into view. A text
-     * wholly off the window by layout alone has no reach either way and is not offWindow: the
-     * harness fails it as cut to nothing. One a scroll view's band reaches is scrolledAway.
+     * outside the window (a zero-size view by its corner), and with every translation removed
+     * ([untranslated]) its whole rect lies within reach: [untranslatedClip], the reach computed
+     * again, is [untranslatedRect] itself. With no clipper or scroll view above, that is the
+     * untranslated rect lying wholly inside the window (r45 P2-3); merely overlapping it is not
+     * enough, since the part outside is a layout overflow the translation did not cause. So a
+     * parked sheet or drawer whose text sits whole in it (or in its scroll view's band) is
+     * offWindow; a text wholly off the window by layout alone, or overflowing the window or a
+     * clipper even untranslated, is not, and the harness fails it as cut to nothing. One a scroll
+     * view's band reaches is scrolledAway.
      */
     fun offWindow(
       viewRect: ProbeRect,
       windowRect: ProbeRect,
       clip: ProbeRect?,
+      untranslatedRect: ProbeRect,
       untranslatedClip: ProbeRect?
-    ): Boolean = clip == null && disjoint(viewRect, windowRect) && untranslatedClip != null
+    ): Boolean =
+      clip == null && disjoint(viewRect, windowRect) && untranslatedClip != null &&
+        untranslatedClip == untranslatedRect
 
     /**
      * The view's box on screen: the bounding box of its four corners mapped through its own and
-     * every ancestor's matrix, anchored where getLocationOnScreen puts its origin. With no scale
-     * that is the origin plus the size; a flipped view (an inverted list's scroll view, scale -1)
-     * has its origin at its visual bottom or right, which the corners correct.
+     * every ancestor's matrix ([mapToScreen]). With no scale that is the origin plus the size; a
+     * flipped view (an inverted list's scroll view, scale -1) has its origin at its visual bottom
+     * or right, which the corners correct.
      */
-    fun screenRect(view: View): ProbeRect {
+    fun screenRect(view: View): ProbeRect =
+      mapToScreen(view, 0f, 0f, view.width.toFloat(), view.height.toFloat())
+
+    /**
+     * A rect in [view]'s own pixels on screen: the bounding box of its four corners mapped through
+     * the view's own and every ancestor's matrix (transformMatrixToGlobal), anchored where
+     * getLocationOnScreen puts the view's origin, which adds the window's place on the screen.
+     * Rounded to the nearest pixel, or with [outward] to the pixels the rect touches (a text's
+     * fractional line extents). transformMatrixToGlobal is API 29: below it the receiver is never
+     * registered (TextLayoutProbeReceiver.register), so nothing here runs and no answer is sent.
+     */
+    fun mapToScreen(
+      view: View,
+      left: Float,
+      top: Float,
+      right: Float,
+      bottom: Float,
+      outward: Boolean = false
+    ): ProbeRect {
       val at = IntArray(2)
       view.getLocationOnScreen(at)
-      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-        return ProbeRect(at[0], at[1], at[0] + view.width, at[1] + view.height)
-      }
       val matrix = Matrix()
       view.transformMatrixToGlobal(matrix)
-      val width = view.width.toFloat()
-      val height = view.height.toFloat()
-      val corners = floatArrayOf(0f, 0f, width, 0f, 0f, height, width, height)
+      val origin = floatArrayOf(0f, 0f)
+      matrix.mapPoints(origin)
+      val corners = floatArrayOf(left, top, right, top, left, bottom, right, bottom)
       matrix.mapPoints(corners)
-      val dx = at[0] - corners[0]
-      val dy = at[1] - corners[1]
+      val dx = at[0] - origin[0]
+      val dy = at[1] - origin[1]
       val xs = listOf(corners[0], corners[2], corners[4], corners[6])
       val ys = listOf(corners[1], corners[3], corners[5], corners[7])
-      return ProbeRect(
-        (xs.min() + dx).roundToInt(),
-        (ys.min() + dy).roundToInt(),
-        (xs.max() + dx).roundToInt(),
-        (ys.max() + dy).roundToInt()
-      )
+      // A thousandth of slack, so float error on a whole pixel does not spill into the next one.
+      fun low(value: Float) = if (outward) floor(value + SLACK).toInt() else value.roundToInt()
+      fun high(value: Float) = if (outward) ceil(value - SLACK).toInt() else value.roundToInt()
+      return ProbeRect(low(xs.min() + dx), low(ys.min() + dy), high(xs.max() + dx), high(ys.max() + dy))
     }
+
+    private const val SLACK = 0.001f
 
     /**
      * Whether [rect] lies entirely outside [area]: no shared area, or for a zero-size rect, its

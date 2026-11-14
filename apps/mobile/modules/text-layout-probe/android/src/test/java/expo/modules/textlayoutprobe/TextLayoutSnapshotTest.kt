@@ -1147,6 +1147,221 @@ class TextLayoutSnapshotTest {
     assertTrue(reachable.offWindow)
   }
 
+  /**
+   * r45 P3-1 (mutant M11): the translation sits on an intermediate level, a sheet inside a holder
+   * scaled by 2, so undoing it moves everything inside the sheet back by twice the translation.
+   */
+  @Test
+  fun aTranslationOnAnIntermediateLevelIsUndoneAsTheScaledLevelOutsideItMapsIt() {
+    val sheet = TextLayoutSnapshot.Level(
+      listOf(ProbeRect(200, 2650, 1000, 2800)),
+      transform = ProbeTransform(translationX = 100f, translationY = 300f)
+    )
+    val scaled = TextLayoutSnapshot.Level(emptyList(), transform = ProbeTransform(scaleX = 2f, scaleY = 2f))
+    val text = ProbeRect(210, 2700, 310, 2740)
+    val (back, moved) = TextLayoutSnapshot.untranslated(text, listOf(sheet, scaled))
+    assertEquals(ProbeRect(10, 2100, 110, 2140), back)
+    assertEquals(listOf(ProbeRect(0, 2050, 800, 2200)), moved[0].cuts)
+    assertEquals(emptyList<ProbeRect>(), moved[1].cuts)
+    val cuts = TextLayoutSnapshot.cuts(text, listOf(sheet, scaled), screen)
+    assertNull(cuts.clip)
+    assertTrue(cuts.offWindow)
+  }
+
+  // TEA ruling 2026-11-14 (r45 P2-3): the untranslated rect must lie wholly inside the window,
+  // not merely overlap it.
+
+  /** A 390 x 844 window, the size of the Antigravity r45 probes. */
+  private val phone = ProbeRect(0, 0, 390, 844)
+
+  /**
+   * Antigravity r45 r45ProbeFocus2And3: laid out at 830..870 over an 844 px window (26 px of
+   * layout overflow), then translated 30 px down to 860..900. The translation does not hide the
+   * overflow, so it is cut to nothing, not offWindow.
+   */
+  @Test
+  fun r45ALayoutOverflowPastTheWindowBottomIsNotOffWindowUnderATranslation() {
+    val text = ProbeRect(10, 860, 210, 900)
+    val cuts = TextLayoutSnapshot.cuts(text, emptyList(), phone, ProbeTransform(translationY = 30f))
+    assertFalse(cuts.offWindow)
+    assertNull(cuts.clip)
+    assertNull(cuts.visible)
+    assertFalse(cuts.scrolledAway)
+    // Laid out at 760..800, wholly inside the window, the same text translated by 100 is.
+    assertTrue(TextLayoutSnapshot.cuts(text, emptyList(), phone, ProbeTransform(translationY = 100f)).offWindow)
+  }
+
+  /** The same with real views: a 40 px label laid out across the window bottom, translated off it. */
+  @Test
+  fun r45ARealLabelAcrossTheWindowBottomTranslatedOffItIsNotOffWindow() {
+    lateinit var text: View
+    host { context ->
+      text = label(context, "Across")
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(text, FrameLayout.LayoutParams(200, 40))
+      }
+    }
+    val window = TextLayoutSnapshot.screenRect((text.context as Activity).window.decorView)
+    val top = window.bottom - 10 - TextLayoutSnapshot.screenRect(text).top
+    (text.layoutParams as FrameLayout.LayoutParams).topMargin = top
+    text.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(window.bottom - 10, TextLayoutSnapshot.screenRect(text).top)
+    text.translationY = 100f
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Across")
+    assertTrue(record.viewRect.top > window.bottom)
+    assertFalse(record.offWindow)
+    assertNull(record.clipRect)
+    assertNull(record.visibleRect)
+    assertFalse(record.scrolledAway)
+  }
+
+  /**
+   * Whole within reach untranslated is what counts: a parked sheet's text below the fold of the
+   * sheet's own scroll view is offWindow, since in place it is scrolledAway; one its own sheet cuts
+   * in part untranslated is not.
+   */
+  @Test
+  fun r45AParkedSheetsScrollContentIsOffWindowAndItsCutTextIsNot() {
+    val rect = ProbeRect(0, 1400, 390, 1800)
+    val sheet = TextLayoutSnapshot.Level(listOf(rect), transform = ProbeTransform(translationY = 1000f))
+    val scroller = TextLayoutSnapshot.Level(listOf(rect), scrollY = ScrollTravel(0, 600))
+    assertTrue(TextLayoutSnapshot.cuts(ProbeRect(10, 1900, 210, 1940), listOf(scroller, sheet), phone).offWindow)
+    val cut = TextLayoutSnapshot.cuts(ProbeRect(10, 1780, 210, 1820), listOf(sheet), phone)
+    assertFalse(cut.offWindow)
+    assertNull(cut.clip)
+  }
+
+  // TEA ruling 2026-11-14 (r45 P2-5): content lines, padding clips and scroll travel are mapped
+  // through the view's global transform, so scaled and flipped ancestors move them with the box.
+
+  /** Antigravity r45 ANDROID_F3A_SCALED_TEXT: a label at its natural height under scaleY 0.5. */
+  @Test
+  fun r45AScaledParentScalesTheTextsLinesWithItsBox() {
+    lateinit var text: ReactTextView
+    host { context ->
+      text = label(context, "Scaled")
+      val holder = FrameLayout(context).apply {
+        clipChildren = false
+        pivotX = 0f
+        pivotY = 0f
+        scaleY = 0.5f
+        addView(text, FrameLayout.LayoutParams(300, natural(text)))
+      }
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(holder, FrameLayout.LayoutParams(300, 400).apply { topMargin = 200 })
+      }
+    }
+    val record = only(snapshot(), "Scaled")
+    val lines = text.layout.getLineBottom(0)
+    assertTrue("$record", kotlin.math.abs(record.viewRect.bottom - record.viewRect.top - lines / 2f) <= 1f)
+    assertEquals(record.viewRect.top, record.contentRect.top)
+    assertTrue("$record", kotlin.math.abs(record.contentRect.bottom - (record.viewRect.top + lines / 2f)) <= 1f)
+    assertTrue("$record", record.contentRect.bottom <= record.visibleRect!!.bottom)
+  }
+
+  /** A flip puts the text view's own top padding at its bottom on screen, and its line above it. */
+  @Test
+  fun r45AFlippedParentPutsTheTextsTopPaddingBelowItsLine() {
+    lateinit var text: ReactTextView
+    host { context ->
+      text = label(context, "Flipped").apply { setPadding(0, 30, 0, 0) }
+      val height = natural(text)
+      val holder = FrameLayout(context).apply {
+        clipChildren = false
+        scaleY = -1f
+        addView(text, FrameLayout.LayoutParams(300, height))
+      }
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(holder, FrameLayout.LayoutParams(300, height).apply { topMargin = 200 })
+      }
+    }
+    val record = only(snapshot(), "Flipped")
+    val line = text.layout.getLineBottom(0)
+    assertEquals(record.viewRect.top + line + 30, record.viewRect.bottom)
+    assertEquals(record.viewRect.top, record.contentRect.top)
+    assertEquals(record.viewRect.top + line, record.contentRect.bottom)
+  }
+
+  /**
+   * Antigravity r45 ANDROID_F3C_PADDING_FLIP: a clipToPadding parent with 30 px of top padding,
+   * flipped by scaleY -1, holds a 100 px label laid out at its local 30..130. On screen the padding
+   * lies at the parent's bottom, so it cuts the label's bottom 30 px, not its top.
+   */
+  @Test
+  fun r45AFlippedClipToPaddingParentCutsAtItsVisualPadding() {
+    lateinit var clipper: FrameLayout
+    host { context ->
+      clipper = FrameLayout(context).apply {
+        clipChildren = false
+        clipToPadding = true
+        setPadding(0, 30, 0, 0)
+        scaleY = -1f
+        addView(label(context, "Padded"), FrameLayout.LayoutParams(200, 100))
+      }
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(clipper, FrameLayout.LayoutParams(200, 100).apply { topMargin = 200 })
+      }
+    }
+    val box = TextLayoutSnapshot.screenRect(clipper)
+    val record = only(snapshot(), "Padded")
+    assertEquals(ProbeRect(box.left, box.top - 30, box.left + 200, box.bottom - 30), record.viewRect)
+    assertEquals(ProbeRect(box.left, box.top, box.left + 200, box.bottom - 30), record.visibleRect)
+  }
+
+  /** A parent's clip bounds are in its own pixels: under scaleY 0.5 a 40 px clip cuts 20 px. */
+  @Test
+  fun r45AScaledParentsClipBoundsScaleOnScreen() {
+    lateinit var clipper: FrameLayout
+    host { context ->
+      clipper = FrameLayout(context).apply {
+        clipChildren = false
+        pivotX = 0f
+        pivotY = 0f
+        scaleY = 0.5f
+        clipBounds = android.graphics.Rect(0, 0, 200, 40)
+        addView(label(context, "Bounded"), FrameLayout.LayoutParams(200, 100))
+      }
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(clipper, FrameLayout.LayoutParams(200, 100).apply { topMargin = 200 })
+      }
+    }
+    val box = TextLayoutSnapshot.screenRect(clipper)
+    val record = only(snapshot(), "Bounded")
+    assertEquals(ProbeRect(box.left, box.top, box.left + 200, box.top + 50), record.viewRect)
+    assertEquals(ProbeRect(box.left, box.top, box.left + 200, box.top + 20), record.visibleRect)
+  }
+
+  /**
+   * A 300..600 viewport with 200 px of travel at offset 0 under a holder scaled by 0.5 opens
+   * 100 px below on screen, and by 2, 400 px; flipped and scaled by 0.5 the band mirrors and keeps
+   * the scale.
+   */
+  @Test
+  fun r45AScaledAncestorScalesTheScrollTravelOnScreen() {
+    fun cuts(top: Int, scaleY: Float) = TextLayoutSnapshot.cuts(
+      ProbeRect(10, top, 210, top + 20),
+      listOf(
+        TextLayoutSnapshot.Level(listOf(ProbeRect(0, 300, 1080, 600)), scrollY = ScrollTravel(0, 200)),
+        TextLayoutSnapshot.Level(emptyList(), transform = ProbeTransform(scaleY = scaleY))
+      ),
+      screen
+    )
+    assertEquals(ProbeRect(10, 680, 210, 700), cuts(680, 0.5f).clip)
+    assertEquals(ProbeRect(10, 690, 210, 700), cuts(690, 0.5f).clip)
+    assertNull(cuts(720, 0.5f).clip)
+    assertEquals(ProbeRect(10, 980, 210, 1000), cuts(980, 2f).clip)
+    assertNull(cuts(1000, 2f).clip)
+    assertEquals(ProbeRect(10, 200, 210, 210), cuts(190, -0.5f).clip)
+    assertNull(cuts(600, -0.5f).clip)
+  }
+
   // TEA ruling 2026-11-14 (r44 P2-2): an inverted scroll view (its content flipped on screen on
   // that axis) moves its content down as its offset grows, so its band mirrors.
 

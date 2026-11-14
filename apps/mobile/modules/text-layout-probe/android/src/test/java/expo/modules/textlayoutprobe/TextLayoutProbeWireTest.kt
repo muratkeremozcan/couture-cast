@@ -10,6 +10,7 @@ import androidx.test.core.app.ApplicationProvider
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -250,5 +251,23 @@ class TextLayoutProbeWireTest {
     assertTrue(registered.intentFilter.hasAction(TextLayoutProbeWire.ACTION))
     assertEquals(Manifest.permission.DUMP, registered.broadcastPermission)
     assertEquals(Looper.getMainLooper(), registered.scheduler.looper)
+  }
+
+  /**
+   * r45 P2-5: below API 29 there is no transformMatrixToGlobal to map boxes, lines and clips
+   * through scaled or flipped ancestors (nor WindowInspector), so nothing is registered and a
+   * dump request gets no answer at all; the harness fails the leg on the missing answer.
+   */
+  @Test
+  @Config(sdk = [28])
+  fun belowApi29NothingIsRegisteredAndARequestGetsNoAnswer() {
+    val application = ApplicationProvider.getApplicationContext<Application>()
+    ShadowLog.clear()
+    assertNull(TextLayoutProbeReceiver.register(application))
+    assertTrue(shadowOf(application).registeredReceivers.none { it.broadcastReceiver is TextLayoutProbeReceiver })
+    shadowOf(application).grantPermissions(Manifest.permission.DUMP)
+    application.sendBroadcast(Intent(TextLayoutProbeWire.ACTION).putExtra("token", "28"))
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(emptyList<ShadowLog.LogItem>(), ShadowLog.getLogsForTag(TextLayoutProbeWire.TAG))
   }
 }

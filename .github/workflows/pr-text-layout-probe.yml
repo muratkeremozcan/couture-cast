@@ -71,9 +71,10 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.m2/repository/org/robolectric
-          # The build files pin the Robolectric version, which picks the runtimes.
+          # The build files pin the Robolectric version, which picks the runtimes; the SDK levels
+          # the tests' @Config lists name the runtimes it holds.
           key: >-
-            robolectric-${{
+            robolectric-sdk28-32-36-${{
             hashFiles('apps/mobile/modules/text-layout-probe/**/build.gradle') }}
 
       - name: Robolectric tests for the text layout probe
@@ -81,12 +82,13 @@ jobs:
           set -euo pipefail
           project=apps/mobile/modules/text-layout-probe/android/unit-tests
           gradle -p "$project" testDebugUnitTest --console=plain
-          # Every case ran, at API 32 and 36 for the wire, and none was skipped, failed or errored.
+          # Every case ran, at API 32 and 36 for the wire (the below-API-29 receiver case at 28), and
+          # none was skipped, failed or errored.
           reports="$project/build/test-results/testDebugUnitTest"
           suite=expo.modules.textlayoutprobe.TextLayoutSnapshotTest
-          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 60
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 69
           suite=expo.modules.textlayoutprobe.TextLayoutProbeWireTest
-          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 22
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 23
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}
