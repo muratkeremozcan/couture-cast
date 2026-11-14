@@ -35,6 +35,26 @@ function setup(begin?: Begin) {
   return { begin: nativeBegin, providers, withTimers, headlessTask, tasks }
 }
 
+/** The JS task the native side started for call `index`, once `count` calls have started. */
+function startedTask(tasks: Promise<void>[], count: number, index = 0): Promise<void> {
+  expect(tasks).toHaveLength(count)
+  const task = tasks[index]
+  if (task === undefined) throw new Error(`no JS task started for call ${index}`)
+  return task
+}
+
+/** A unit of work that ends when the spec says so. */
+function pendingWork() {
+  let finish: ((value: string) => void) | undefined
+  const work = vi.fn(
+    () =>
+      new Promise<string>((resolve) => {
+        finish = resolve
+      })
+  )
+  return { work, finish: (value: string) => finish?.(value) }
+}
+
 const settled = async (promise: Promise<unknown>) => {
   let done = false
   void promise.then(() => (done = true))
@@ -47,23 +67,38 @@ describe('the headless JS timers scope', () => {
   it('starts the native scope before the work and holds its JS task until the work ends', async () => {
     const { begin, providers, withTimers, tasks } = setup()
     expect([...providers.keys()]).toEqual([HEADLESS_TIMERS_TASK_KEY])
-    let finishWork: ((value: string) => void) | undefined
-    const work = vi.fn(
-      () =>
-        new Promise<string>((resolve) => {
-          finishWork = resolve
-        })
-    )
+    const { work, finish } = pendingWork()
 
     const result = withTimers(work)
     await vi.waitFor(() => expect(work).toHaveBeenCalled())
 
     expect(begin).toHaveBeenCalledWith(1, HEADLESS_TIMERS_TIMEOUT_MS)
-    expect(tasks).toHaveLength(1)
-    expect(await settled(tasks[0])).toBe(false)
-    finishWork?.('done')
+    const task = startedTask(tasks, 1)
+    expect(await settled(task)).toBe(false)
+    finish('done')
     await expect(result).resolves.toBe('done')
-    expect(await settled(tasks[0])).toBe(true)
+    expect(await settled(task)).toBe(true)
+  })
+
+  it('gives overlapping work its own scope, so ending one leaves the other task pending', async () => {
+    const { begin, withTimers, tasks } = setup()
+    const first = pendingWork()
+    const second = pendingWork()
+
+    const firstResult = withTimers(first.work)
+    const secondResult = withTimers(second.work)
+    await vi.waitFor(() => expect(second.work).toHaveBeenCalled())
+
+    expect(begin.mock.calls.map(([scope]) => scope)).toEqual([1, 2])
+    const firstTask = startedTask(tasks, 2, 0)
+    const secondTask = startedTask(tasks, 2, 1)
+    first.finish('one')
+    await expect(firstResult).resolves.toBe('one')
+    expect(await settled(firstTask)).toBe(true)
+    expect(await settled(secondTask)).toBe(false)
+    second.finish('two')
+    await expect(secondResult).resolves.toBe('two')
+    expect(await settled(secondTask)).toBe(true)
   })
 
   it('releases the JS task when the work fails', async () => {
@@ -71,8 +106,8 @@ describe('the headless JS timers scope', () => {
     const failing = withTimers(() => Promise.reject(new Error('offline')))
 
     await expect(failing).rejects.toThrow('offline')
-    expect(tasks).toHaveLength(1)
-    expect(await settled(tasks[0])).toBe(true)
+    const task = startedTask(tasks, 1)
+    expect(await settled(task)).toBe(true)
   })
 
   it('ends at once a JS task that reaches JS after its work ended', async () => {
