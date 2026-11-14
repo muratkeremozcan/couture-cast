@@ -13,6 +13,18 @@ import { JourneyError } from './test-store-journey.mjs'
 
 export const SPAWN_TIMEOUT_MS = 30_000
 
+/**
+ * A spawn bound in milliseconds: a positive safe integer, given as a number or the text of one.
+ * 0 would turn the bound off and text such as `abc` would reach spawnSync as NaN (Antigravity
+ * r22), so anything else throws test_store_spawn_timeout_invalid.
+ */
+export function boundOf(value) {
+  const ms = typeof value === 'string' && value.trim() !== '' ? Number(value) : value
+  if (typeof ms !== 'number' || !Number.isSafeInteger(ms) || ms <= 0)
+    throw new JourneyError('test_store_spawn_timeout_invalid', String(value))
+  return ms
+}
+
 export function boundedSpawn(
   binary,
   args,
@@ -21,7 +33,7 @@ export function boundedSpawn(
   const result = spawnSync(binary, args, {
     encoding: 'utf8',
     ...options,
-    timeout,
+    timeout: boundOf(timeout),
     killSignal: 'SIGKILL',
   })
   const call = `${path.basename(binary)} ${args.slice(0, 2).join(' ')}`

@@ -58,7 +58,7 @@ import {
   writeRunOutputs,
 } from './lib/test-store-output.mjs'
 import { startApiProxy } from './lib/test-store-proxy.mjs'
-import { boundedSpawn, SPAWN_TIMEOUT_MS } from './lib/test-store-spawn.mjs'
+import { boundedSpawn, boundOf, SPAWN_TIMEOUT_MS } from './lib/test-store-spawn.mjs'
 import {
   memberRef,
   runJourney,
@@ -121,7 +121,7 @@ const proxyPort = Number(option('proxy-port', '4011'))
 // the run (or its exit path) past a CI kill (Antigravity r20).
 const BOUNDED = { timeout: 30_000, killSignal: 'SIGKILL' }
 // A test may shorten the bound of the side calls to prove a hung one fails the run.
-const spawnTimeout = Number(option('spawn-timeout-ms', String(SPAWN_TIMEOUT_MS)))
+const spawnTimeout = boundOf(option('spawn-timeout-ms', String(SPAWN_TIMEOUT_MS)))
 const rev = (value) => {
   const sha = boundedSpawn('git', ['rev-parse', value], {
     code: 'test_store_rev_failed',
@@ -142,7 +142,7 @@ function run(binary, args, { timeout = 180_000 } = {}) {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
-    timeout,
+    timeout: boundOf(timeout),
     killSignal: 'SIGKILL',
   })
   if (result.status !== 0 || result.error) {
@@ -239,9 +239,10 @@ async function launch() {
           })
       })
     }
+    // force-stop exits 0 whether or not the app runs; a nonzero exit is the device, offline or
+    // gone, and fails the step.
     boundedSpawn(adbBinary, ['-s', device, 'shell', 'am', 'force-stop', appId], {
       code: 'test_store_stop_failed',
-      tolerateStatus: true,
       timeout: spawnTimeout,
     })
     // minifiedDebuggable has no dev launcher: React Native loads from Metro at localhost:8081.

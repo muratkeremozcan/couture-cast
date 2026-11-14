@@ -86,7 +86,12 @@ const killQuietly = (pid, signal = 'SIGKILL') => {
   }
 }
 
-async function runDriver(t, mode, platform = 'ios', { hang = '' } = {}) {
+async function runDriver(
+  t,
+  mode,
+  platform = 'ios',
+  { hang = '', fail = '', git = '', extraArgs = [] } = {}
+) {
   const base = fs.mkdtempSync(path.join(os.tmpdir(), 'test-store-driver-'))
   t.after(() => fs.rmSync(base, { recursive: true, force: true }))
   const bin = path.join(base, 'bin')
@@ -107,10 +112,13 @@ async function runDriver(t, mode, platform = 'ios', { hang = '' } = {}) {
     [
       'case "$*" in *" stream "*) echo $$ > "$STUB_DIR/stream.pid"; exec sleep 300;; esac',
       'case "$*" in *"simctl $STUB_HANG "*) exec sleep 300;; esac',
+      'case "$*" in *"simctl $STUB_FAIL "*) exit 1;; esac',
       'exit 0',
     ].join('\n')
   )
   if (hang === 'git') writeStub(bin, 'git', 'exec sleep 300')
+  // git that answers rev-parse with something that is not a sha, and exits 0.
+  if (git === 'not-a-sha') writeStub(bin, 'git', 'echo not-a-sha; exit 0')
   // adb records every reverse and reverse --remove it is asked for, one line each.
   writeStub(
     path.join(androidHome, 'platform-tools'),
@@ -118,6 +126,7 @@ async function runDriver(t, mode, platform = 'ios', { hang = '' } = {}) {
     [
       'case "$*" in *" reverse "*) echo "$*" >> "$STUB_DIR/adb-reverse.log";; esac',
       'case "$*" in *" $STUB_HANG "*) exec sleep 300;; esac',
+      'case "$*" in *" $STUB_FAIL "*) exit 1;; esac',
       'exit 0',
     ].join('\n')
   )
@@ -151,6 +160,7 @@ async function runDriver(t, mode, platform = 'ios', { hang = '' } = {}) {
       ...['--metro-port', String(port), '--proxy-port', '0'],
       ...['--artifact', artifact, '--secrets-env', secrets, '--out', out],
       ...(hang ? ['--spawn-timeout-ms', '300'] : []),
+      ...extraArgs,
     ],
     {
       cwd: repo,
@@ -162,6 +172,7 @@ async function runDriver(t, mode, platform = 'ios', { hang = '' } = {}) {
         STUB_EVIDENCE: out,
         STUB_MODE: mode,
         STUB_HANG: hang || 'none-hangs',
+        STUB_FAIL: fail || 'none-fails',
       },
     }
   )
@@ -322,4 +333,42 @@ for (const [platform, hang, code, where] of [
     assert.match(result[where], new RegExp(code), `${result.stdout}\n${result.stderr}`)
     for (const pid of result.pids)
       assert.equal(await goneWithin(pid), true, `stub process ${pid} is gone`)
+  })
+
+// Antigravity r22 (4): rev-parse that exits 0 with no sha still fails the run.
+test('git rev-parse printing a non-sha fails the run as test_store_rev_failed', async (t) => {
+  const result = await runDriver(t, 'crash', 'ios', { git: 'not-a-sha' })
+  assert.equal(result.code, 1)
+  assert.match(result.stderr, /test_store_rev_failed/)
+})
+
+// Antigravity r22 (2): force-stop exits 0 either way, so a nonzero is a device failure; simctl
+// terminate exits nonzero for an app that is not running, which is fine.
+test('android: a nonzero force-stop fails the step as test_store_stop_failed', async (t) => {
+  const result = await runDriver(t, 'crash', 'android', { fail: 'force-stop' })
+  assert.notEqual(result.code, 0)
+  assert.match(result.stdout, /test_store_stop_failed/)
+})
+
+test('ios: a nonzero simctl terminate is tolerated and the run goes on to its flow', async (t) => {
+  const result = await runDriver(t, 'crash', 'ios', { fail: 'terminate' })
+  assert.equal(result.code, 1)
+  assert.doesNotMatch(result.stdout, /test_store_stop_failed/)
+  // The open step reached maestro, which the crash stub fails.
+  assert.match(result.stdout, /test_store_command_failed/)
+})
+
+// Antigravity r22 (1): the option is checked before anything runs.
+for (const value of ['0', 'abc', '-5', '1.5', '9007199254740993'])
+  test(`--spawn-timeout-ms ${value} fails as test_store_spawn_timeout_invalid`, async (t) => {
+    const result = await runDriver(t, 'crash', 'ios', {
+      extraArgs: ['--spawn-timeout-ms', value],
+    })
+    assert.equal(result.code, 1)
+    // The option itself is refused, as given: not a NaN or a rounded number further on.
+    assert.ok(
+      result.stderr.includes(`test_store_spawn_timeout_invalid: ${value}`),
+      result.stderr
+    )
+    assert.deepEqual(result.pids, [])
   })
