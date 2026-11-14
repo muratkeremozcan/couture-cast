@@ -28,6 +28,8 @@ const native = vi.hoisted(() => {
     isTaskRegisteredAsync: vi.fn(),
     unregisterTaskAsync: vi.fn(),
     registerTaskAsync: vi.fn(),
+    timersScopes: 0,
+    insideTimersScope: false,
   }
 })
 
@@ -40,6 +42,19 @@ vi.mock('expo-task-manager', () => ({
 vi.mock('expo-background-task', () => ({
   BackgroundTaskResult: native.result,
   registerTaskAsync: native.registerTaskAsync,
+}))
+
+// The Android timers scope is native; this stand-in records whether work ran inside it.
+vi.mock('../../modules/headless-js-timers', () => ({
+  withHeadlessJsTimers: async (work: () => Promise<unknown>) => {
+    native.timersScopes++
+    native.insideTimersScope = true
+    try {
+      return await work()
+    } finally {
+      native.insideTimersScope = false
+    }
+  },
 }))
 
 import { registerRitualBackgroundTaskAsync } from './background-task'
@@ -123,6 +138,27 @@ describe('ritual background task', () => {
 
   it('registers the ritual task with TaskManager at module load', () => {
     expect(native.tasks.has(TASK_NAME)).toBe(true)
+  })
+
+  /**
+   * P0-07: a headless Android wake has no resumed Activity, where React Native holds JS timers,
+   * and fetch resolves its response through a timer. The ritual request must run inside the
+   * scope that keeps them live, or the run waits until the member opens the app.
+   */
+  it('fetches the ritual inside the headless JS timers scope', async () => {
+    const insideAtRequest: boolean[] = []
+    server.use(
+      http.get('*/api/v1/ritual', () => {
+        insideAtRequest.push(native.insideTimersScope)
+        return HttpResponse.json(mockRitualResponse)
+      })
+    )
+    const scopesBefore = native.timersScopes
+
+    await expect(runRitualTask()).resolves.toBe(native.result.Success)
+
+    expect(native.timersScopes - scopesBefore).toBe(1)
+    expect(insideAtRequest).toEqual([true])
   })
 
   /**
