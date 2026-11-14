@@ -297,7 +297,11 @@ export function textLayout(capture, platform, naming) {
   const regionIds = Array.isArray(capture.volatileRegionIds)
     ? capture.volatileRegionIds
     : []
-  for (const { record, region } of match.volatile)
+  // Scrolled away, a volatile record is never judged or keyed, like any other scrolled record
+  // (Android 6c85bbb4 Community: spotlight text scrolled under the sticky filter chips).
+  for (const { record, region } of match.volatile.filter(
+    (entry) => !answer.records[entry.record].scrolledAway
+  ))
     facts.push({
       key: null,
       via: 'volatile',
@@ -467,18 +471,35 @@ export const VOLATILE_KEY_PREFIX = 'volatile:'
  */
 function volatileKeys(facts) {
   const places = new Map()
+  const groupOf = (fact) => JSON.stringify([fact.region, maskText(fact.record.text)])
+  const close = (a, b) => near(a, b, VOLATILE_PLACE_TOLERANCE)
+  // A sticky record (a filter chip pinned over the scroll) sits at one screen place on every
+  // page, so its place is that screen place and it keeps one key across the pages.
+  const pages = new Set(facts.map((fact) => fact.page))
+  const screenPlaces = new Map()
+  for (const fact of facts.filter((each) => each.volatile && each.region !== null)) {
+    const at = `${groupOf(fact)}@${fact.page}`
+    if (!screenPlaces.has(at)) screenPlaces.set(at, [])
+    screenPlaces.get(at).push(fact.record.viewRect)
+  }
+  const sticky = (fact) =>
+    pages.size > 1 &&
+    [...pages].every((page) =>
+      (screenPlaces.get(`${groupOf(fact)}@${page}`) ?? []).some(
+        (rect) =>
+          close(rect[1], fact.record.viewRect[1]) &&
+          close(rect[0], fact.record.viewRect[0])
+      )
+    )
   const placeOf = (fact) => {
-    const group = JSON.stringify([fact.region, maskText(fact.record.text)])
+    const group = groupOf(fact)
     const left = fact.record.viewRect[0]
+    const top = sticky(fact) ? fact.record.viewRect[1] : fact.contentTop
     if (!places.has(group)) places.set(group, [])
     const list = places.get(group)
-    let place = list.find(
-      (entry) =>
-        Math.abs(entry.top - fact.contentTop) <= VOLATILE_PLACE_TOLERANCE &&
-        Math.abs(entry.left - left) <= VOLATILE_PLACE_TOLERANCE
-    )
+    let place = list.find((entry) => close(entry.top, top) && close(entry.left, left))
     if (!place) {
-      place = { top: fact.contentTop, left }
+      place = { top, left }
       list.push(place)
     }
     return { group, place }

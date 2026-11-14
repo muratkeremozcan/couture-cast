@@ -3251,6 +3251,57 @@ describe('text layout clipping (F-00i)', () => {
     assert.deepEqual(captureVolatileKeys(capture, 'android'), [])
   })
 
+  // Android 6c85bbb4 Community: spotlight text scrolled under the sticky filter chips reads as a
+  // record in the chips region, with no visible part.
+  test('a scrolled away record in a volatile region is never keyed or judged', () => {
+    const change = volatileChange()
+    const chips = '[0,475][1080,645]'
+    change.settled.volatileRegions.push(chips)
+    change.settled.volatileRegionIds.push('community-sticky-filter-chips')
+    change.settled.textProbe.records.push(
+      probeRecord('android', 'Seeded spotlight look 1', [44, 568, 875, 643], {
+        contentRect: [44, 568, 875, 700],
+        visibleRect: null,
+        clipRect: null,
+        scrolledAway: true,
+      })
+    )
+    assert.deepEqual(captureVolatileKeys(change.settled, 'android'), [VOLATILE_KEY])
+    const clips = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+    assert.deepEqual(
+      clips.map((clip) => [clip.key, clip.face]),
+      [[VOLATILE_KEY, 'staleBox']]
+    )
+  })
+
+  // Android 6c85bbb4 Community: the sticky "Cold and wet" chip sits at one screen place on every
+  // scroll page, so it keeps one key on all of them.
+  test('a sticky volatile record at one screen place on every page keeps one key', () => {
+    const CHIPS = 'community-sticky-filter-chips'
+    const chip = (capture) => {
+      capture.volatileRegions = ['[0,475][1080,645]']
+      capture.volatileRegionIds = [CHIPS]
+      capture.textProbe.records.push(
+        probeRecord('android', 'Cold and wet', [695, 535, 900, 582])
+      )
+      return capture
+    }
+    const paged = withPages(chip(probed(stage('settled'))))
+    chip(paged.pages[1])
+    assert.deepEqual(captureVolatileKeys(paged, 'android'), [
+      `volatile:["${CHIPS}","Cold and wet"]#0`,
+    ])
+    // A record that scrolls with the page still moves down by the page offset: one key too.
+    const scrolling = withPages(withSpotlight(probed(stage('settled')), 40))
+    const page = scrolling.pages[1]
+    page.volatileRegions = [`[0,${3000 - SHIFT}][1080,${3200 - SHIFT}]`]
+    page.volatileRegionIds = [REGION]
+    page.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 3050 - SHIFT, 400, 3090 - SHIFT])
+    )
+    assert.deepEqual(captureVolatileKeys(scrolling, 'android'), [VOLATILE_KEY])
+  })
+
   test('volatile keys never count as shown text in the hidden-text check', () => {
     // The cold launch shows two spotlight "Partnered" labels, the live screen one, plus an
     // opacity 0 copy outside the region: the region's own count says nothing about lost text.
