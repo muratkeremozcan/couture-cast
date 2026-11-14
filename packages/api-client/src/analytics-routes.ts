@@ -42,6 +42,8 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/signin',
   '/signup',
   '/teen-dashboard',
+  // Story 6.15 F-00i: the text layout probe's fixture; it renders nothing outside probe builds.
+  '/text-clip-fixture',
   '/two',
   '/wardrobe',
   '/wardrobe-capsules',
