@@ -739,6 +739,18 @@ describe('node-test-gate attribution across Node 24 releases', () => {
       )
     })
 
+  // TEA, 2026-11-13: a gate run once ended with no summary; a runner killed by a signal is named.
+  test('a runner killed by a signal is reported with its signal', () => {
+    assert.throws(
+      () =>
+        assertNodeTestGate(
+          { passed: 1, failed: 0, skipped: 0, todo: 0, perFile: { 'a.test.mjs': 1 } },
+          { status: null, signal: 'SIGKILL' }
+        ),
+      /^Error: node_test_gate_failed: node --test exited by SIGKILL$/
+    )
+  })
+
   test('a test named like another path still counts; only a file named after itself is a wrapper', async () => {
     const [event] = await replay([
       {

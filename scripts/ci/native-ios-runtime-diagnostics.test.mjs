@@ -10,6 +10,7 @@ import {
 } from './native-ios-siri-preferences.mjs'
 import { collectSimulatorLogCounts, logCounter } from './native-ios-log-counts.mjs'
 import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
+import { killOwned } from '../lib/owned-process.mjs'
 
 const device = 'A63391DE-17A2-4B16-9C93-16B986580C99'
 const directoryFor = (t) => {
@@ -88,13 +89,10 @@ test('a stuck or oversized log query is bounded and returns partial evidence wit
 test('a grandchild that keeps the pipes open cannot hold the query past its deadline', async (t) => {
   const directory = directoryFor(t)
   const pidFile = path.join(directory, 'grandchild.pid')
-  t.after(() => {
-    try {
-      process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 'SIGKILL')
-    } catch {
-      // already gone
-    }
-  })
+  // A grandchild this test never spawned: only a live one still running its writer is ours. Its
+  // pid is read when the query returns, before the directory hook removes the file.
+  let grandchild
+  t.after(() => killOwned(grandchild, 'setInterval'))
   const r = await collectSimulatorLogCounts(device, directory, {
     binary: process.execPath,
     args: [
@@ -107,6 +105,7 @@ test('a grandchild that keeps the pipes open cannot hold the query past its dead
     timeoutMs: 400,
     killGraceMs: 300,
   })
+  if (fs.existsSync(pidFile)) grandchild = Number(fs.readFileSync(pidFile, 'utf8'))
   assert.equal(r.timedOut, true)
   assert.equal(r.settledBy, 'exit_after_stop')
   assert.equal(r.boundHeld, true)
@@ -127,11 +126,7 @@ test('refused kills (EPERM) still end the query at the grace bound with every at
   const directory = directoryFor(t)
   let pid = null
   t.after(() => {
-    try {
-      process.kill(pid, 'SIGKILL')
-    } catch {
-      // already gone
-    }
+    killOwned(pid, 'setInterval')
   })
   const r = await collectSimulatorLogCounts(device, directory, {
     binary: process.execPath,

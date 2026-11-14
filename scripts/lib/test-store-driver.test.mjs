@@ -16,6 +16,7 @@ import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { killOwned } from './owned-process.mjs'
 import { fileURLToPath } from 'node:url'
 import { scanForLeaks } from './test-store-output.mjs'
 
@@ -75,14 +76,6 @@ const alive = (pid) => {
     return true
   } catch {
     return false
-  }
-}
-
-const killQuietly = (pid, signal = 'SIGKILL') => {
-  try {
-    process.kill(pid, signal)
-  } catch {
-    // Already gone.
   }
 }
 
@@ -191,8 +184,10 @@ async function runDriver(
       .map((file) => Number(fs.readFileSync(file, 'utf8')))
   // A failing test leaves nothing running: the driver and every stub it started.
   t.after(() => {
-    killQuietly(child.pid)
-    for (const pid of stubPids()) killQuietly(pid)
+    // The driver is a direct child: child.kill does nothing once Node has reaped it. The stubs'
+    // pids come from files, so only a live process still running the stub's sleep is killed.
+    child.kill('SIGKILL')
+    for (const pid of stubPids()) killOwned(pid, 'sleep 300')
   })
   let stdout = ''
   let stderr = ''
@@ -286,13 +281,7 @@ function lingering(t, delay) {
   const child = spawn('sh', ['-c', `${trap}; while :; do sleep 0.05; done`], {
     stdio: 'ignore',
   })
-  t.after(() => {
-    try {
-      process.kill(child.pid, 'SIGKILL')
-    } catch {
-      // Already gone.
-    }
-  })
+  t.after(() => child.kill('SIGKILL'))
   return child
 }
 

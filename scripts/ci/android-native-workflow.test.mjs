@@ -10,6 +10,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import { killOwned } from '../lib/owned-process.mjs'
 import {
   CLIENT_BUILD,
   LIMITS,
@@ -456,12 +457,9 @@ describe('android-network-timeout.sh', () => {
         leftovers.push(
           ...fs.readFileSync(stubs, 'utf8').split(/\s+/).filter(Boolean).map(Number)
         )
-      for (const pid of leftovers)
-        try {
-          process.kill(pid, 'SIGKILL')
-        } catch {
-          // Already gone.
-        }
+      // Every stub left behind runs /bin/sleep 30; a pid that exited and was reused runs
+      // something else and is left alone.
+      for (const pid of leftovers) killOwned(pid, '/bin/sleep 30')
       fs.rmSync(dir, { recursive: true, force: true })
     }
   }

@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { killOwnedGroup } from './owned-process.mjs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   assertEvidenceClean,
@@ -633,11 +634,10 @@ function stubborn(t, options = {}) {
     ...options,
   })
   t.after(() => {
-    try {
-      process.kill(options.detached ? -child.pid : child.pid, 'SIGKILL')
-    } catch {
-      // Already gone.
-    }
+    // Until Node reaps the child its pid and group are still this test's; after, they may not be.
+    if (child.exitCode !== null || child.signalCode !== null) return
+    if (options.detached) killOwnedGroup(child.pid, 'sleep 0.05')
+    child.kill('SIGKILL')
   })
   return child
 }
@@ -804,11 +804,8 @@ test('a Metro group is still signalled when ps fails at teardown', async (t) => 
     detached: true,
   })
   t.after(() => {
-    try {
-      process.kill(-leader.pid, 'SIGKILL')
-    } catch {
-      // Already gone.
-    }
+    // The leader exited at once; only members still running its sleep are this test's.
+    killOwnedGroup(leader.pid, 'sleep 30')
   })
   await new Promise((resolve) => leader.once('exit', resolve))
   // The leader is gone and its sleep lives on in the group.
