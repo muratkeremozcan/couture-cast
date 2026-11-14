@@ -16,10 +16,8 @@ internal fun setDarkModalStatusBar(view: View?): Boolean {
   val root = view.rootView
   if (Build.VERSION.SDK_INT >= 30) {
     val controller = root.windowInsetsController ?: return false
-    controller.setSystemBarsAppearance(
-      WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
-      WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS,
-    )
+    // RED PROOF: clears the light status bar flag instead of setting it.
+    controller.setSystemBarsAppearance(0, WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS)
   } else {
     @Suppress("DEPRECATION")
     root.systemUiVisibility = root.systemUiVisibility or View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR
