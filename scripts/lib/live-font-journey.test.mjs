@@ -273,6 +273,12 @@ describe('runScreenJourney', () => {
       proposedBaselines(current, [await run('android', fakeDevice('android'))]),
       null
     )
+    // Given the proof dir, each entry names where its captures live.
+    const dir = '_bmad-output/test-artifacts/story-6-15/runs/r/proof'
+    assert.deepEqual(proposedBaselines(current, [result], { dir }).entries[1].evidence, {
+      dir,
+      ...leg.evidence,
+    })
     // Every screen errored before a leg (device run 2026-11-13): no proposal, no crash.
     assert.equal(
       proposedBaselines(current, [{ screen: 'home', error: 'maestro_failed' }]),

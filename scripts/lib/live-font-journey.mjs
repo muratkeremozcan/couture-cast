@@ -316,15 +316,19 @@ export function screenRunSteps({ configChange, versionKnown }) {
 
 /**
  * The baselines file a reviewer would commit to approve every unapproved known-residual leg of
- * `results`: the current entries plus one proposal per leg, each with its evidence capture names.
+ * `results`: the current entries plus one proposal per leg, each with its evidence capture names
+ * and, given `dir` (the proof dir relative to the repository), where those captures live.
  * Null when no leg proposes one.
  */
-export function proposedBaselines(current, results) {
+export function proposedBaselines(current, results, { dir } = {}) {
   // A screen that errored before any leg has no legs and proposes nothing.
   const proposals = results.flatMap((result) =>
     (result.legs ?? [])
       .filter((leg) => leg.residualProposal)
-      .map((leg) => ({ ...leg.residualProposal, evidence: leg.evidence }))
+      .map((leg) => ({
+        ...leg.residualProposal,
+        evidence: dir ? { dir, ...leg.evidence } : leg.evidence,
+      }))
   )
   if (proposals.length === 0) return null
   return { ...current, entries: [...current.entries, ...proposals] }

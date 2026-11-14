@@ -689,7 +689,12 @@ fs.writeFileSync(
 // Approval of a known residual is a reviewed diff: diff this file against
 // scripts/lib/fixtures/live-font-residual-baselines.json and commit only entries that meet the
 // six approval rules.
-const proposed = proposedBaselines(residualBaselineFile, results)
+// Each entry names its proof dir relative to the repository, so the captures can be found.
+const repoRoot = fileURLToPath(new URL('..', import.meta.url))
+const proofDir = path.relative(repoRoot, out)
+const proposed = proposedBaselines(residualBaselineFile, results, {
+  dir: proofDir.startsWith('..') || path.isAbsolute(proofDir) ? undefined : proofDir,
+})
 if (proposed)
   fs.writeFileSync(
     path.join(out, 'live-font-residual-baselines.proposed.json'),
