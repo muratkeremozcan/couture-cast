@@ -19,11 +19,10 @@ import { REFRESH_PATH } from './test-store-journey.mjs'
 const ID_SEGMENT =
   /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?=.*\d)[^/]{16,}|\$RCAnonymousID:.*)$/i
 
-/**
- * The path as the evidence records it (TEA ruling, 2026-11-13): no query string, the segment
- * after `subscribers` as `:subscriber`, and every id-shaped segment as `:id`, so a log line
- * carries no user id or receipt data.
- */
+// Segments whose next segment names a person or a purchase, whatever that id looks like
+// (Antigravity r12 P3: a short or letter-only id passes the shape test).
+const ID_BEARING = new Set(['users', 'members', 'receipts', 'subscribers'])
+
 const safeDecode = (segment) => {
   try {
     return decodeURIComponent(segment)
@@ -32,13 +31,20 @@ const safeDecode = (segment) => {
   }
 }
 
+/**
+ * The path as the evidence records it (TEA ruling, 2026-11-13): no query string, the segment
+ * after `subscribers` as `:subscriber`, the segment after `users`, `members` or `receipts` as
+ * `:id` whatever its shape, and every other id-shaped segment as `:id`, so a log line carries no
+ * user id or receipt data.
+ */
 export function redactPath(url) {
   const pathname = new URL(url, 'http://proxy.invalid').pathname
   const segments = pathname.split('/')
   return segments
     .map((segment, index) => {
-      if (index > 0 && segments[index - 1] === 'subscribers' && segment)
-        return ':subscriber'
+      const previous = segments[index - 1]
+      if (segment && ID_BEARING.has(previous))
+        return previous === 'subscribers' ? ':subscriber' : ':id'
       return ID_SEGMENT.test(safeDecode(segment)) ? ':id' : segment
     })
     .join('/')

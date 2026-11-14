@@ -150,3 +150,23 @@ test('logged paths drop the query and replace subscriber, member and receipt ids
     '/api/v1/commerce/premium/access'
   )
 })
+
+// Antigravity r12 P3: the segment after users, members, receipts or subscribers is an id
+// whatever its shape, short or letter-only included.
+test('short and letter-only ids after id-bearing segments are tokenized', () => {
+  assert.equal(redactPath('/api/v1/users/bob/profile'), '/api/v1/users/:id/profile')
+  assert.equal(redactPath('/api/v1/members/42'), '/api/v1/members/:id')
+  assert.equal(
+    redactPath('/api/v1/receipts/abcdefghijklmnopqrstu'),
+    '/api/v1/receipts/:id'
+  )
+  assert.equal(
+    redactPath('/v1/subscribers/ann/offerings'),
+    '/v1/subscribers/:subscriber/offerings'
+  )
+  assert.equal(redactPath('/api/v1/users'), '/api/v1/users')
+  assert.equal(
+    redactPath('/api/v1/commerce/premium/access'),
+    '/api/v1/commerce/premium/access'
+  )
+})
