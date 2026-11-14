@@ -242,6 +242,59 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertLessThan(measure.usedRect.maxX, 200)
   }
 
+  private let fieldArea = CGRect(x: 8, y: 0, width: 100, height: 36)
+
+  func testAFieldWiderThanItsTextRectRunsPastItAtItsNaturalWidth() {
+    let long = text("A very long single-line input string that overflows 100pt horizontally")
+    let input = TextLayoutProbeMeasure.field(
+      long, area: fieldArea, alignment: .natural, rightToLeft: false)
+    XCTAssertEqual(input.content.minX, fieldArea.minX)
+    XCTAssertGreaterThan(input.content.maxX, fieldArea.maxX + 100)
+    XCTAssertEqual(input.lineCount, 1)
+    XCTAssertEqual(input.maxLines, 1)
+    XCTAssertEqual(input.unlimitedLineCount, 1)
+    XCTAssertEqual(input.ellipsized, 0)
+    // Centred vertically in the text rect, one line tall.
+    XCTAssertEqual(input.content.midY, fieldArea.midY, accuracy: 0.5)
+    XCTAssertLessThan(input.content.height, 30)
+  }
+
+  func testAShortFieldSitsWhereItsAlignmentPutsIt() {
+    let short = text("Hi")
+    let natural = TextLayoutProbeMeasure.field(
+      short, area: fieldArea, alignment: .natural, rightToLeft: false)
+    let centred = TextLayoutProbeMeasure.field(
+      short, area: fieldArea, alignment: .center, rightToLeft: false)
+    let right = TextLayoutProbeMeasure.field(
+      short, area: fieldArea, alignment: .right, rightToLeft: false)
+    let rtl = TextLayoutProbeMeasure.field(
+      short, area: fieldArea, alignment: .natural, rightToLeft: true)
+    XCTAssertEqual(natural.content.minX, fieldArea.minX)
+    XCTAssertEqual(centred.content.midX, fieldArea.midX, accuracy: 0.01)
+    XCTAssertEqual(right.content.maxX, fieldArea.maxX, accuracy: 0.01)
+    XCTAssertEqual(rtl.content.maxX, fieldArea.maxX, accuracy: 0.01)
+    XCTAssertLessThan(natural.content.width, 30)
+  }
+
+  func testATextViewLaysOutInItsContainerOffsetByInsetAndPadding() {
+    let input = TextLayoutProbeMeasure.textView(
+      text("Show watermark\nCard preview"), containerWidth: 210, lineFragmentPadding: 5,
+      insetLeft: 4, insetTop: 8, maximumNumberOfLines: 0, lineBreakMode: .byWordWrapping)
+    XCTAssertEqual(input.lineCount, 2)
+    XCTAssertNil(input.maxLines)
+    XCTAssertEqual(input.content.minY, 8)
+    XCTAssertGreaterThanOrEqual(input.content.minX, 9)
+    XCTAssertLessThanOrEqual(input.content.maxX, 4 + 5 + 200 + 0.5)
+    let limited = TextLayoutProbeMeasure.textView(
+      text("Show watermark\nCard preview"), containerWidth: 210, lineFragmentPadding: 5,
+      insetLeft: 4, insetTop: 8, maximumNumberOfLines: 1, lineBreakMode: .byTruncatingTail)
+    XCTAssertEqual(limited.lineCount, 1)
+    XCTAssertEqual(limited.maxLines, 1)
+    XCTAssertEqual(limited.unlimitedLineCount, 2)
+    XCTAssertEqual(limited.ellipsized, 1)
+    XCTAssertLessThan(limited.content.height, input.content.height * 0.7)
+  }
+
   func testALimitTheTextFitsInIsNotATruncation() {
     let measure = TextLayoutProbeMeasure.measure(
       text("Short"), width: 300, maximumNumberOfLines: 2, lineBreakMode: .byTruncatingTail)

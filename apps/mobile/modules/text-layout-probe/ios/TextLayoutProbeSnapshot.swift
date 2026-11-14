@@ -94,29 +94,18 @@ enum TextLayoutProbeSnapshot {
       return unknown(view, "RCTTextInputComponentView", "", viewRect, window, id)
     }
     let shown: NSAttributedString
+    let input: TextLayoutProbeMeasure.Input
     let content: CGRect
-    let lineCount: Int
-    let maxLines: Int?
-    let unlimited: Int
     if let field = backing as? UITextField {
       let value = field.attributedText ?? NSAttributedString()
       shown =
         value.length > 0
         ? value
         : field.attributedPlaceholder ?? NSAttributedString(string: field.placeholder ?? "")
-      // A field keeps one line and scrolls it sideways; it centres the line vertically.
-      let area = field.textRect(forBounds: field.bounds)
-      let measure = TextLayoutProbeMeasure.measure(
-        shown, width: area.width, maximumNumberOfLines: 1, lineBreakMode: .byClipping)
-      let height = measure.usedRect.height
-      content = field.convert(
-        CGRect(
-          x: area.minX + measure.usedRect.minX, y: area.midY - height / 2,
-          width: measure.usedRect.width, height: height),
-        to: window)
-      lineCount = 1
-      maxLines = 1
-      unlimited = 1
+      input = TextLayoutProbeMeasure.field(
+        shown, area: field.textRect(forBounds: field.bounds), alignment: field.textAlignment,
+        rightToLeft: field.effectiveUserInterfaceLayoutDirection == .rightToLeft)
+      content = field.convert(input.content, to: window)
     } else if let textView = backing as? UITextView {
       let value = textView.attributedText ?? NSAttributedString()
       let placeholder =
@@ -129,19 +118,14 @@ enum TextLayoutProbeSnapshot {
           string: placeholder ?? "",
           attributes: [.font: textView.font ?? UIFont.preferredFont(forTextStyle: .body)])
       let container = textView.textContainer
-      let width = container.size.width - 2 * container.lineFragmentPadding
-      let measure = TextLayoutProbeMeasure.measure(
-        shown, width: width, maximumNumberOfLines: container.maximumNumberOfLines,
+      input = TextLayoutProbeMeasure.textView(
+        shown, containerWidth: container.size.width,
+        lineFragmentPadding: container.lineFragmentPadding,
+        insetLeft: textView.textContainerInset.left, insetTop: textView.textContainerInset.top,
+        maximumNumberOfLines: container.maximumNumberOfLines,
         lineBreakMode: container.lineBreakMode)
       // Content coordinates are the text view's bounds space, so its scroll offset carries over.
-      content = textView.convert(
-        measure.usedRect.offsetBy(
-          dx: textView.textContainerInset.left + container.lineFragmentPadding,
-          dy: textView.textContainerInset.top),
-        to: window)
-      lineCount = measure.lineCount
-      maxLines = container.maximumNumberOfLines > 0 ? container.maximumNumberOfLines : nil
-      unlimited = measure.unlimitedLineCount
+      content = textView.convert(input.content, to: window)
     } else {
       return nil
     }
@@ -149,9 +133,9 @@ enum TextLayoutProbeSnapshot {
     let cuts = clip(view, viewRect, window)
     return .init(
       kind: "RCTTextInputComponentView", text: shown.string, viewRect: viewRect,
-      visibleRect: cuts.visible, clipRect: cuts.clip, contentRect: content, lineCount: lineCount,
-      maxLines: maxLines, ellipsized: unlimited > lineCount ? 1 : 0,
-      unlimitedLineCount: unlimited, window: id, scrolledAway: cuts.scrolledAway)
+      visibleRect: cuts.visible, clipRect: cuts.clip, contentRect: content,
+      lineCount: input.lineCount, maxLines: input.maxLines, ellipsized: input.ellipsized,
+      unlimitedLineCount: input.unlimitedLineCount, window: id, scrolledAway: cuts.scrolledAway)
   }
 
   /// The UITextField or UITextView inside a text input component view, nearest first.
