@@ -364,7 +364,7 @@ RevenueCat):
    unauthenticated POSTs through the bypass must get the handler's own JSON 401.
 5. `node scripts/run-test-store-journey.mjs --server preview --api-url <origin> ...`, then
    `node scripts/test-store-preview-webhook.mjs verify --report <run report> --member-file
-   <out>.private/<label>.member.json --api-url <origin>` re-reads the member on the preview
+<out>.private/<label>.member.json --api-url <origin>` re-reads the member on the preview
    API's read endpoints and checks the run's proxy log.
 
 `scripts/test-store-preview-webhook.mjs steps --api-url <origin>` prints these steps for an origin.
