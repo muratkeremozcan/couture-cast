@@ -106,6 +106,41 @@ class TextLayoutProbeWireTest {
     }
   }
 
+  // TEA ruling 2026-11-14 (r44 P3-1): a NaN opacity refuses the answer with its own code; it is
+  // never coerced or dropped, and the refusal travels chunked and hashed like any answer.
+  @Test
+  fun aNaNOpacityRefusesTheAnswerWithItsOwnCode() {
+    val records = listOf(record("Fine"), record("Broken").copy(opacity = Double.NaN))
+    val json = TextLayoutProbeWire.json("t-nan", ProbeSnapshot(windows, records))
+    assertEquals(
+      "{\"version\":1,\"token\":\"t-nan\",\"platform\":\"android\"," +
+        "\"error\":{\"code\":\"text_probe_opacity_invalid\",\"record\":1,\"kind\":\"ReactTextView\"}}",
+      json
+    )
+    val parsed = JSONObject(reassemble("t-nan", TextLayoutProbeWire.lines("t-nan", json)))
+    assertEquals(setOf("version", "token", "platform", "error"), parsed.keys().asSequence().toSet())
+    assertEquals("text_probe_opacity_invalid", parsed.getJSONObject("error").getString("code"))
+    for (bad in listOf(-0.5, 1.5, Double.POSITIVE_INFINITY)) {
+      val refused = JSONObject(TextLayoutProbeWire.json("t", ProbeSnapshot(windows, listOf(record("Odd").copy(opacity = bad)))))
+      assertTrue("$bad", refused.has("error"))
+      assertFalse("$bad", refused.has("records"))
+    }
+    for (bad in listOf(Double.NaN, -0.5, 1.5)) {
+      val thrown = runCatching { TextLayoutProbeWire.number(bad) }.exceptionOrNull()
+      assertTrue("$bad: $thrown", thrown is IllegalArgumentException)
+    }
+  }
+
+  @Test
+  fun aNaNAlphaUpTheTreeGivesANaNOpacity() {
+    val application = ApplicationProvider.getApplicationContext<Application>()
+    val parent = android.widget.FrameLayout(application)
+    val child = View(application)
+    parent.addView(child)
+    parent.alpha = Float.NaN
+    assertTrue(TextLayoutSnapshot.effectiveOpacity(child).isNaN())
+  }
+
   @Test
   fun aFaintAndAnOffWindowRecordKeepTheirFieldsOnTheWire() {
     val faint = record("Faint").copy(opacity = 4e-5f.toDouble(), clipRect = null, offWindow = true)

@@ -591,6 +591,39 @@ class TextLayoutSnapshotTest {
     assertEquals("unknown:android.widget.TextView", only(snapshot(), "Plain").kind)
   }
 
+  // TEA ruling 2026-11-14 (r44 3): React Native's Switch is known, with empty text, while it shows
+  // no text; with showText on its thumb text has a layout of its own, so it stays unknown.
+  private fun switchRecord(showText: Boolean): ProbeRecord {
+    host { context ->
+      column(context, com.facebook.react.views.switchview.ReactSwitch(context).apply {
+        text = "Label"
+        this.showText = showText
+        textOn = "On"
+        textOff = "Off"
+      })
+    }
+    return snapshot().records.single { it.kind.contains("Switch") }
+  }
+
+  @Test
+  fun aReactSwitchShowingNoTextIsAKnownKindWithEmptyText() {
+    val record = switchRecord(showText = false)
+    assertEquals("ReactSwitch", record.kind)
+    assertEquals("", record.text)
+    assertEquals(record.viewRect, record.contentRect)
+    assertEquals(0, record.lineCount)
+    assertNull(record.maxLines)
+    assertNull(record.unlimitedLineCount)
+  }
+
+  @Test
+  fun aReactSwitchShowingTextIsUnknown() {
+    assertEquals(
+      "unknown:com.facebook.react.views.switchview.ReactSwitch",
+      switchRecord(showText = true).kind
+    )
+  }
+
   @Test
   fun aPreparedLayoutTextViewIsReadFromItsPreparedLayoutAndUnknownWithoutOne() {
     host { context ->
@@ -855,7 +888,8 @@ class TextLayoutSnapshotTest {
     assertNull(far.visibleRect)
     assertNull(far.clipRect)
     assertFalse(far.scrolledAway)
-    assertTrue(far.offWindow)
+    // Past the travel by layout: cut to nothing, not offWindow (r44 P1-1).
+    assertFalse(far.offWindow)
     val edge = records.single { it.text == "Edge" }
     assertEquals(window.bottom + 10, edge.clipRect!!.bottom)
     assertFalse(edge.offWindow)
@@ -977,23 +1011,247 @@ class TextLayoutSnapshotTest {
     assertNull(record.visibleRect)
   }
 
-  @Test
-  fun aParkedSheetBelowTheScreenIsOffWindowAndNotScrolledAway() {
+  // TEA ruling 2026-11-14 (r44 P1-1): offWindow only when a translation of the view or an
+  // ancestor put the text off the window; off the window by layout alone it is cut to nothing.
+
+  /** A 200 px hidden-overflow sheet holding "Parked sheet", [place] moving it below the window. */
+  private fun parked(place: (sheet: View, below: Int) -> Unit): ProbeRecord {
     lateinit var sheet: View
     host { context ->
       sheet = inside(OverflowViewGroup(context, "hidden"), label(context, "Parked sheet"))
       FrameLayout(context).apply { addView(sheet, FrameLayout.LayoutParams(300, 200)) }
     }
     val window = TextLayoutSnapshot.screenRect((sheet.context as Activity).window.decorView)
-    (sheet.layoutParams as FrameLayout.LayoutParams).topMargin = window.bottom + 50
-    sheet.requestLayout()
+    place(sheet, window.bottom + 50)
     shadowOf(Looper.getMainLooper()).idle()
     val record = only(snapshot(), "Parked sheet")
     assertTrue(record.viewRect.top > window.bottom)
-    assertTrue(record.offWindow)
-    assertFalse(record.scrolledAway)
     assertNull(record.visibleRect)
     assertNull(record.clipRect)
+    assertFalse(record.scrolledAway)
+    return record
+  }
+
+  @Test
+  fun aParkedSheetBelowTheScreenIsOffWindowAndNotScrolledAway() {
+    val record = parked { sheet, below -> sheet.translationY = below.toFloat() }
+    assertTrue(record.offWindow)
+  }
+
+  @Test
+  fun aSheetLaidOutBelowTheScreenIsCutToNothingNotOffWindow() {
+    val record = parked { sheet, below ->
+      (sheet.layoutParams as FrameLayout.LayoutParams).topMargin = below
+      sheet.requestLayout()
+    }
+    assertFalse(record.offWindow)
+  }
+
+  /** Antigravity r44 PROBE_4B: a non-scrolling footer pushed past the window bottom by layout. */
+  @Test
+  fun r44AFooterPushedPastTheWindowBottomIsCutToNothingNotOffWindow() {
+    lateinit var spacer: View
+    host { context ->
+      spacer = View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      column(context, spacer, label(context, "Footer").apply {
+        layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT)
+      })
+    }
+    val window = TextLayoutSnapshot.screenRect((spacer.context as Activity).window.decorView)
+    spacer.layoutParams.height = window.bottom + 40
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Footer")
+    assertTrue(record.viewRect.top > window.bottom)
+    assertFalse(record.offWindow)
+    assertNull(record.clipRect)
+    assertNull(record.visibleRect)
+    assertFalse(record.scrolledAway)
+  }
+
+  /** Antigravity r44: a row item pushed past the window right by layout, with no scroll view. */
+  @Test
+  fun r44ARightOverflowRowItemPastTheWindowIsCutToNothingNotOffWindow() {
+    lateinit var spacer: View
+    host { context ->
+      spacer = View(context)
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(
+          LinearLayout(context).apply {
+            clipChildren = false
+            addView(spacer, LinearLayout.LayoutParams(0, 30))
+            addView(label(context, "Row item"), LinearLayout.LayoutParams(80, 30))
+          },
+          FrameLayout.LayoutParams(WRAP_CONTENT, 30).apply { topMargin = 100 }
+        )
+      }
+    }
+    val window = TextLayoutSnapshot.screenRect((spacer.context as Activity).window.decorView)
+    spacer.layoutParams.width = window.right + 20
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Row item")
+    assertTrue(record.viewRect.left > window.right)
+    assertFalse(record.offWindow)
+    assertNull(record.clipRect)
+    assertNull(record.visibleRect)
+    assertFalse(record.scrolledAway)
+  }
+
+  /** The text's own translation counts as its ancestors' do. */
+  @Test
+  fun aTextItsOwnTranslationMovesPastTheWindowRightIsOffWindow() {
+    lateinit var text: View
+    host { context ->
+      text = label(context, "Slid away")
+      FrameLayout(context).apply { addView(text, FrameLayout.LayoutParams(200, WRAP_CONTENT)) }
+    }
+    val window = TextLayoutSnapshot.screenRect((text.context as Activity).window.decorView)
+    text.translationX = (window.right + 10).toFloat()
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Slid away")
+    assertTrue(record.viewRect.left > window.right)
+    assertTrue(record.offWindow)
+    assertNull(record.clipRect)
+  }
+
+  /** A phone-sized window for the rules that take rects directly. */
+  private val screen = ProbeRect(0, 0, 1080, 2400)
+
+  @Test
+  fun aTranslationIsUndoneAsTheScaleOfTheViewsOutsideItMapsIt() {
+    // A text 300 px translated under a parent scaled by 2 lies 600 px further on screen.
+    val scaled = TextLayoutSnapshot.Level(emptyList(), transform = ProbeTransform(scaleX = 2f, scaleY = 2f))
+    val own = ProbeTransform(translationY = 300f)
+    val text = ProbeRect(10, 2700, 110, 2740)
+    val (back, _) = TextLayoutSnapshot.untranslated(text, listOf(scaled), own)
+    assertEquals(ProbeRect(10, 2100, 110, 2140), back)
+    assertTrue(TextLayoutSnapshot.cuts(text, listOf(scaled), screen, own).offWindow)
+    // Without the scale the same translation leaves it off the window: not offWindow.
+    assertFalse(TextLayoutSnapshot.cuts(text, emptyList(), screen, own).offWindow)
+  }
+
+  @Test
+  fun aTranslatedSheetsTextOffTheWindowEvenUntranslatedIsNotOffWindow() {
+    // A sheet at 2450..2850 translated by 100 lies at 2350..2750 untranslated.
+    val sheet = ProbeRect(0, 2450, 1080, 2850)
+    val levels = listOf(TextLayoutSnapshot.Level(listOf(sheet), transform = ProbeTransform(translationY = 100f)))
+    val cuts = TextLayoutSnapshot.cuts(ProbeRect(10, 2560, 200, 2600), levels, screen)
+    assertNull(cuts.clip)
+    assertFalse(cuts.offWindow)
+    val reachable = TextLayoutSnapshot.cuts(ProbeRect(10, 2460, 200, 2500), levels, screen)
+    assertNull(reachable.clip)
+    assertTrue(reachable.offWindow)
+  }
+
+  // TEA ruling 2026-11-14 (r44 P2-2): an inverted scroll view (its content flipped on screen on
+  // that axis) moves its content down as its offset grows, so its band mirrors.
+
+  private fun invertedCuts(top: Int, offset: Int, vararg outer: ProbeTransform, own: ProbeTransform) =
+    TextLayoutSnapshot.cuts(
+      ProbeRect(10, top, 210, top + 40),
+      listOf(TextLayoutSnapshot.Level(listOf(ProbeRect(0, 300, 1080, 600)), scrollY = ScrollTravel(offset, 100), transform = own)) +
+        outer.map { TextLayoutSnapshot.Level(emptyList(), transform = it) },
+      screen
+    )
+
+  @Test
+  fun anInvertedBandOpensTheSideItsOffsetCanScrollInAndKeepsTheOtherClosed() {
+    val flip = ProbeTransform(scaleY = -1f)
+    // Offset 0 of 100: the band is 200..600.
+    val above = invertedCuts(220, 0, own = flip)
+    assertEquals(ProbeRect(10, 220, 210, 260), above.clip)
+    assertTrue(above.scrolledAway)
+    assertEquals(ProbeRect(10, 200, 210, 220), invertedCuts(180, 0, own = flip).clip)
+    val below = invertedCuts(620, 0, own = flip)
+    assertNull(below.clip)
+    assertFalse(below.scrolledAway)
+    assertFalse(below.offWindow)
+    // Offset 30 of 100: 70 above, 30 below; the band is 230..630.
+    assertEquals(ProbeRect(10, 230, 210, 240), invertedCuts(200, 30, own = flip).clip)
+    assertEquals(ProbeRect(10, 600, 210, 630), invertedCuts(600, 30, own = flip).clip)
+    // React Native Android's inverted list flips both axes (scale -1): the same band.
+    assertEquals(above.clip, invertedCuts(220, 0, own = ProbeTransform(scaleX = -1f, scaleY = -1f)).clip)
+  }
+
+  @Test
+  fun aFlipAboveTheScrollViewInvertsItAndAFlipInsideAFlipDoesNot() {
+    val flip = ProbeTransform(scaleY = -1f)
+    assertEquals(ProbeRect(10, 220, 210, 260), invertedCuts(220, 0, flip, own = ProbeTransform.NONE).clip)
+    assertNull(invertedCuts(220, 0, flip, own = flip).clip)
+    assertEquals(ProbeRect(10, 620, 210, 660), invertedCuts(620, 0, flip, own = flip).clip)
+  }
+
+  @Test
+  fun aHorizontallyInvertedScrollViewReachesLeftOfItsViewport() {
+    val levels = listOf(
+      TextLayoutSnapshot.Level(
+        listOf(ProbeRect(200, 100, 300, 140)),
+        scrollX = ScrollTravel(0, 100),
+        transform = ProbeTransform(scaleX = -1f)
+      )
+    )
+    val left = TextLayoutSnapshot.cuts(ProbeRect(120, 100, 160, 140), levels, screen)
+    assertEquals(ProbeRect(120, 100, 160, 140), left.clip)
+    assertTrue(left.scrolledAway)
+    assertNull(TextLayoutSnapshot.cuts(ProbeRect(310, 100, 350, 140), levels, screen).clip)
+  }
+
+  /**
+   * A 100 px scroll view at [CONTAINER_TOP] with 300 px of content (travel 200) at [offset], the
+   * scroll view and each 20 px row flipped as an inverted list's are, rows named by content top.
+   */
+  private fun invertedList(offset: Int, flipX: Boolean, vararg tops: Int): Pair<ScrollView, Map<Int, ProbeRecord>> {
+    lateinit var scroll: ScrollView
+    fun flipped(view: View) = view.apply {
+      scaleY = -1f
+      if (flipX) scaleX = -1f
+    }
+    host { context ->
+      scroll = flipped(ScrollView(context)) as ScrollView
+      scroll.addView(
+        content(context, 300, *tops.map { flipped(label(context, "Row $it")) to at(it, 300, 20) }.toTypedArray())
+      )
+      FrameLayout(context).apply {
+        addView(scroll, FrameLayout.LayoutParams(300, 100).apply { topMargin = CONTAINER_TOP })
+      }
+    }
+    scroll.scrollTo(0, offset)
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(offset, scroll.scrollY)
+    val records = snapshot().records
+    return scroll to tops.associateWith { top -> records.single { it.text == "Row $top" } }
+  }
+
+  @Test
+  fun aRealInvertedListReachesTheRowsAboveItsViewport() = assertInvertedList(flipX = false)
+
+  /** React Native Android's inverted list: scale -1, both axes. */
+  @Test
+  fun aRealInvertedListFlippedOnBothAxesReachesTheRowsAboveItsViewport() = assertInvertedList(flipX = true)
+
+  private fun assertInvertedList(flipX: Boolean) {
+    val (scroll, rows) = invertedList(50, flipX, 0, 40, 230)
+    val viewport = TextLayoutSnapshot.screenRect(scroll)
+    val parent = TextLayoutSnapshot.screenRect(scroll.parent as View)
+    // The flipped scroll view's box is where it is laid out, not shifted by its own height.
+    assertEquals("flipX $flipX", parent.top + CONTAINER_TOP, viewport.top)
+    assertEquals("flipX $flipX", viewport.top + 100, viewport.bottom)
+    // Content top c shows at viewport top + 80 - c + offset on screen.
+    val first = rows.getValue(0)
+    assertEquals("flipX $flipX", viewport.top + 130, first.viewRect.top)
+    assertEquals("flipX $flipX", first.viewRect, first.clipRect)
+    // Visually 80..100 above the viewport: 150 of travel lies that way, so it is reachable.
+    val above = rows.getValue(230)
+    assertEquals("flipX $flipX", viewport.top - 100, above.viewRect.top)
+    assertEquals("flipX $flipX", above.viewRect, above.clipRect)
+    assertTrue("flipX $flipX", above.scrolledAway)
+    assertNull("flipX $flipX", above.visibleRect)
+    // Straddling the viewport bottom: visible in part, reachable whole.
+    val straddle = rows.getValue(40)
+    assertEquals("flipX $flipX", straddle.viewRect, straddle.clipRect)
+    assertEquals("flipX $flipX", viewport.bottom, straddle.visibleRect!!.bottom)
   }
 
   // Antigravity r43 P3: a prepared layout's uncapped count and its field fallbacks.

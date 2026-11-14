@@ -20,7 +20,27 @@ object TextLayoutProbeWire {
 
   fun acceptsToken(token: String?): Boolean = token != null && TOKEN.matches(token)
 
+  /**
+   * The error code of an answer refused because a record's opacity is not a number from 0 to 1
+   * (NaN from a NaN alpha anywhere up the chain). Such a record is never coerced or dropped.
+   */
+  const val OPACITY_INVALID = "text_probe_opacity_invalid"
+
+  private fun validOpacity(value: Double) = value >= 0.0 && value <= 1.0
+
+  /**
+   * The refusal the harness reads in place of the records, chunked and hashed like any answer:
+   * `{version, token, platform, error: {code, record, kind}}`, `record` the index the first
+   * refused record has in the records.
+   */
+  fun refusal(token: String, code: String, record: Int, kind: String): String =
+    "{\"version\":1,\"token\":${quote(token)},\"platform\":\"android\"," +
+      "\"error\":{\"code\":${quote(code)},\"record\":$record,\"kind\":${quote(kind)}}}"
+
+  /** The answer; a record whose opacity is not in 0..1 (NaN included) refuses the whole capture. */
   fun json(token: String, snapshot: ProbeSnapshot): String {
+    val refused = snapshot.records.indexOfFirst { !validOpacity(it.opacity) }
+    if (refused >= 0) return refusal(token, OPACITY_INVALID, refused, snapshot.records[refused].kind)
     val out = StringBuilder()
     out.append("{\"version\":1,\"token\":").append(quote(token))
     out.append(",\"platform\":\"android\",\"windows\":[")
@@ -72,12 +92,13 @@ object TextLayoutProbeWire {
 
   /**
    * 0..1 unrounded (the shortest decimal that reads back as the same double), in plain notation
-   * (no exponent), trailing zeros dropped, so only an exact 0 reads as invisible.
+   * (no exponent), trailing zeros dropped, so only an exact 0 reads as invisible. Anything else,
+   * NaN included, is refused, never coerced: [json] answers such a record with [OPACITY_INVALID].
    */
-  fun number(value: Double): String =
-    java.math.BigDecimal(value.coerceIn(0.0, 1.0).toString())
-      .stripTrailingZeros()
-      .toPlainString()
+  fun number(value: Double): String {
+    require(validOpacity(value)) { "opacity $value is not in 0..1" }
+    return java.math.BigDecimal(value.toString()).stripTrailingZeros().toPlainString()
+  }
 
   private fun rect(rect: ProbeRect?): String =
     if (rect == null) "null" else "[${rect.left},${rect.top},${rect.right},${rect.bottom}]"

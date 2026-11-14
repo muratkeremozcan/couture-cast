@@ -1,5 +1,6 @@
 package expo.modules.textlayoutprobe
 
+import android.graphics.Matrix
 import android.os.Build
 import android.text.Layout
 import android.text.StaticLayout
@@ -33,6 +34,24 @@ data class ProbeRect(val left: Int, val top: Int, val right: Int, val bottom: In
 
 /** A scroll view's travel on one axis: its current offset and the largest one, in pixels. */
 data class ScrollTravel(val offset: Int, val maximum: Int)
+
+/**
+ * A view's own translation and scale (View.getTranslationX/Y, getScaleX/Y). Its translation moves
+ * it and everything in it after its scale, so its scale applies only to what it holds; a negative
+ * scale flips its content on that axis (an inverted list). Rotation is not read.
+ */
+data class ProbeTransform(
+  val translationX: Float = 0f,
+  val translationY: Float = 0f,
+  val scaleX: Float = 1f,
+  val scaleY: Float = 1f
+) {
+  companion object {
+    val NONE = ProbeTransform()
+
+    fun of(view: View) = ProbeTransform(view.translationX, view.translationY, view.scaleX, view.scaleY)
+  }
+}
 
 data class ProbeCuts(
   val visible: ProbeRect?,
@@ -82,7 +101,8 @@ class ReactNativeTextClasses(
   val reactEditText: Class<*>?,
   val overflowView: Class<*>,
   val preparedLayoutTextView: Class<*>?,
-  val compoundView: Class<*>?
+  val compoundView: Class<*>?,
+  val reactSwitch: Class<*>? = null
 ) {
   companion object {
     const val REACT_TEXT_VIEW = "com.facebook.react.views.text.ReactTextView"
@@ -90,6 +110,7 @@ class ReactNativeTextClasses(
     const val PREPARED_LAYOUT_TEXT_VIEW = "com.facebook.react.views.text.PreparedLayoutTextView"
     const val OVERFLOW_VIEW = "com.facebook.react.uimanager.ReactOverflowView"
     const val COMPOUND_VIEW = "com.facebook.react.uimanager.ReactCompoundView"
+    const val REACT_SWITCH = "com.facebook.react.views.switchview.ReactSwitch"
 
     /** Null when a class every React Native app links is missing (a minified or renamed build). */
     fun load(loader: ClassLoader?): ReactNativeTextClasses? {
@@ -106,7 +127,8 @@ class ReactNativeTextClasses(
         find(REACT_EDIT_TEXT),
         overflow,
         find(PREPARED_LAYOUT_TEXT_VIEW),
-        find(COMPOUND_VIEW)
+        find(COMPOUND_VIEW),
+        find(REACT_SWITCH)
       )
     }
   }
@@ -195,6 +217,7 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
   /** The text read of a text renderer, or null for a view that renders no text of its own. */
   private fun read(view: View): Reading? {
     val type = view.javaClass
+    if (type == classes.reactSwitch) return switchReading(view)
     if (view is TextView) {
       val kind = when (type) {
         classes.reactTextView -> "ReactTextView"
@@ -243,11 +266,32 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
     return null
   }
 
-  /** One ancestor on the way up: the rects it cuts its descendants to and its scroll travel. */
+  /**
+   * React Native's Switch (a SwitchCompat) draws no text unless showText is on, so it is the
+   * known kind ReactSwitch with empty text and no layout. With showText on, or when showText
+   * cannot be read, it is unknown: the thumb text has a layout of its own that the TextView
+   * Layout does not describe, so the leg fails.
+   */
+  private fun switchReading(view: View): Reading {
+    val showText =
+      try {
+        view.javaClass.getMethod("getShowText").invoke(view) as? Boolean
+      } catch (_: ReflectiveOperationException) {
+        null
+      }
+    if (showText == false) return Reading("ReactSwitch", "", null, 0, 0, null, null)
+    return Reading("unknown:${view.javaClass.name}", reflectedText(view), null, 0, 0, null, null)
+  }
+
+  /**
+   * One ancestor on the way up: the rects it cuts its descendants to, its scroll travel and its
+   * own translation and scale.
+   */
   class Level(
     val cuts: List<ProbeRect>,
     val scrollX: ScrollTravel? = null,
-    val scrollY: ScrollTravel? = null
+    val scrollY: ScrollTravel? = null,
+    val transform: ProbeTransform = ProbeTransform.NONE
   )
 
   private fun clips(view: View, viewRect: ProbeRect, windowRect: ProbeRect): ProbeCuts {
@@ -263,12 +307,13 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
         Level(
           cuts,
           scrollX = (ancestor as? HorizontalScrollView)?.let { travel(it) },
-          scrollY = (ancestor as? ScrollView)?.let { travel(it) }
+          scrollY = (ancestor as? ScrollView)?.let { travel(it) },
+          transform = ProbeTransform.of(ancestor)
         )
       )
       parent = ancestor.parent
     }
-    return cuts(viewRect, levels, windowRect)
+    return cuts(viewRect, levels, windowRect, ProbeTransform.of(view))
   }
 
   /** The rects in screen space that [ancestor] cuts its descendants' drawing to. */
@@ -309,47 +354,98 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
   companion object {
     /**
      * visibleRect: [viewRect] cut by every level's cuts and the window. clipRect: the text's
-     * reach. On each axis, from the window inward, every level's cuts narrow the band so far and
-     * a scroll view that can move on that axis then widens it by its own travel ([widen]). So a
-     * scroll view's band is its padded viewport cut by everything above it (outer scroll views'
-     * bands included) widened by its travel, nested scroll views compose, and a scroll view with
-     * no travel (no overflow, scrolling disabled) cuts as any clipper does. Levels run nearest
-     * first. scrolledAway: not visible, yet within reach, on the window or off it; offWindow:
-     * wholly off the window and out of reach.
+     * reach ([reach]). scrolledAway: not visible, yet within reach, on the window or off it;
+     * offWindow: wholly off the window and out of reach because of a translation ([offWindow]).
+     * Levels run nearest first; [own] is the text view's own transform.
      */
-    fun cuts(viewRect: ProbeRect, levels: List<Level>, windowRect: ProbeRect): ProbeCuts {
+    fun cuts(
+      viewRect: ProbeRect,
+      levels: List<Level>,
+      windowRect: ProbeRect,
+      own: ProbeTransform = ProbeTransform.NONE
+    ): ProbeCuts {
       var visible: ProbeRect? = viewRect
       for (level in levels) for (cut in level.cuts) visible = visible?.intersect(cut)
       visible = visible?.intersect(windowRect)
+      val clip = reach(viewRect, levels, windowRect)
+      val off =
+        clip == null && disjoint(viewRect, windowRect) &&
+          untranslated(viewRect, levels, own).let { (rect, moved) ->
+            offWindow(viewRect, windowRect, clip, reach(rect, moved, windowRect))
+          }
+      return ProbeCuts(visible, clip, scrolledAway = visible == null && clip != null, offWindow = off)
+    }
+
+    /**
+     * The reach (clipRect). On each axis, from the window inward, every level's cuts narrow the
+     * band so far and a scroll view that can move on that axis then widens it by its own travel
+     * ([widen]). So a scroll view's band is its padded viewport cut by everything above it (outer
+     * scroll views' bands included) widened by its travel, nested scroll views compose, and a
+     * scroll view with no travel (no overflow, scrolling disabled) cuts as any clipper does. A
+     * scroll view is inverted on an axis when the product of its own scale and every ancestor's
+     * above it is negative there: its content then moves the other way on screen (React Native's
+     * inverted lists set scaleY -1, or scale -1 on Android).
+     */
+    private fun reach(viewRect: ProbeRect, levels: List<Level>, windowRect: ProbeRect): ProbeRect? {
       var x: Span? = Span(windowRect.left, windowRect.right)
       var y: Span? = Span(windowRect.top, windowRect.bottom)
+      var signX = 1f
+      var signY = 1f
       for (level in levels.asReversed()) {
+        signX *= level.transform.scaleX
+        signY *= level.transform.scaleY
         for (cut in level.cuts) {
           x = x?.narrow(cut.left, cut.right)
           y = y?.narrow(cut.top, cut.bottom)
         }
-        x = widen(x, level.scrollX)
-        y = widen(y, level.scrollY)
+        x = widen(x, level.scrollX, inverted = signX < 0)
+        y = widen(y, level.scrollY, inverted = signY < 0)
       }
-      val clip =
-        if (x != null && y != null) viewRect.intersect(ProbeRect(x.lo, y.lo, x.hi, y.hi)) else null
-      return ProbeCuts(
-        visible,
-        clip,
-        scrolledAway = visible == null && clip != null,
-        offWindow = offWindow(viewRect, windowRect, clip)
-      )
+      return if (x != null && y != null) viewRect.intersect(ProbeRect(x.lo, y.lo, x.hi, y.hi)) else null
+    }
+
+    /**
+     * The view and its levels as they would lie with every translation removed. Removing a view's
+     * translation moves it and everything inside it rigidly by that translation times the scales
+     * of the views outside it, so each rect moves back by the sum of those scaled translations
+     * from itself outward. Scroll offsets, travel, scales and the window stay.
+     */
+    fun untranslated(
+      viewRect: ProbeRect,
+      levels: List<Level>,
+      own: ProbeTransform = ProbeTransform.NONE
+    ): Pair<ProbeRect, List<Level>> {
+      var shiftX = 0f
+      var shiftY = 0f
+      var scaleX = 1f
+      var scaleY = 1f
+      fun back(rect: ProbeRect) = rect.offset(-shiftX.roundToInt(), -shiftY.roundToInt())
+      val moved = ArrayList<Level>(levels.size)
+      for (level in levels.asReversed()) {
+        shiftX += level.transform.translationX * scaleX
+        shiftY += level.transform.translationY * scaleY
+        moved.add(Level(level.cuts.map(::back), level.scrollX, level.scrollY, level.transform))
+        scaleX *= level.transform.scaleX
+        scaleY *= level.transform.scaleY
+      }
+      shiftX += own.translationX * scaleX
+      shiftY += own.translationY * scaleY
+      return back(viewRect) to moved.asReversed()
     }
 
     /**
      * The band of positions a scroll view can bring into [span]. A larger scroll offset moves the
      * content up (or left), so a text now at p shows after a further scroll by d when p - d lies
      * in span, for d from -offset (back to the start) to maximum - offset (to the end): the band
-     * runs from span start minus offset to span end plus (maximum minus offset).
+     * runs from span start minus offset to span end plus (maximum minus offset). In an inverted
+     * scroll view a larger offset moves the content down (or right) on screen, so the band
+     * mirrors: span start minus (maximum minus offset) to span end plus offset.
      */
-    private fun widen(span: Span?, travel: ScrollTravel?): Span? {
+    private fun widen(span: Span?, travel: ScrollTravel?, inverted: Boolean): Span? {
       if (span == null || travel == null) return span
-      return Span(span.lo - travel.offset, span.hi + travel.maximum - travel.offset)
+      val back = travel.offset
+      val ahead = travel.maximum - travel.offset
+      return if (inverted) Span(span.lo - ahead, span.hi + back) else Span(span.lo - back, span.hi + ahead)
     }
 
     /**
@@ -376,16 +472,48 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
     }
 
     /**
-     * Off the window: wholly outside it (a zero-size view by its corner) and out of every scroll
-     * view's reach (no clipRect). One a scroll view's band reaches is scrolledAway instead.
+     * Off the window: a translation put it there. The view has no reach (no clipRect), lies wholly
+     * outside the window (a zero-size view by its corner), and the same reach computed with every
+     * translation removed ([untranslated]) is not null, so without the translations of the view
+     * and its ancestors (a parked sheet or drawer) part of it could be brought into view. A text
+     * wholly off the window by layout alone has no reach either way and is not offWindow: the
+     * harness fails it as cut to nothing. One a scroll view's band reaches is scrolledAway.
      */
-    fun offWindow(viewRect: ProbeRect, windowRect: ProbeRect, clip: ProbeRect?): Boolean =
-      clip == null && disjoint(viewRect, windowRect)
+    fun offWindow(
+      viewRect: ProbeRect,
+      windowRect: ProbeRect,
+      clip: ProbeRect?,
+      untranslatedClip: ProbeRect?
+    ): Boolean = clip == null && disjoint(viewRect, windowRect) && untranslatedClip != null
 
+    /**
+     * The view's box on screen: the bounding box of its four corners mapped through its own and
+     * every ancestor's matrix, anchored where getLocationOnScreen puts its origin. With no scale
+     * that is the origin plus the size; a flipped view (an inverted list's scroll view, scale -1)
+     * has its origin at its visual bottom or right, which the corners correct.
+     */
     fun screenRect(view: View): ProbeRect {
       val at = IntArray(2)
       view.getLocationOnScreen(at)
-      return ProbeRect(at[0], at[1], at[0] + view.width, at[1] + view.height)
+      if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+        return ProbeRect(at[0], at[1], at[0] + view.width, at[1] + view.height)
+      }
+      val matrix = Matrix()
+      view.transformMatrixToGlobal(matrix)
+      val width = view.width.toFloat()
+      val height = view.height.toFloat()
+      val corners = floatArrayOf(0f, 0f, width, 0f, 0f, height, width, height)
+      matrix.mapPoints(corners)
+      val dx = at[0] - corners[0]
+      val dy = at[1] - corners[1]
+      val xs = listOf(corners[0], corners[2], corners[4], corners[6])
+      val ys = listOf(corners[1], corners[3], corners[5], corners[7])
+      return ProbeRect(
+        (xs.min() + dx).roundToInt(),
+        (ys.min() + dy).roundToInt(),
+        (xs.max() + dx).roundToInt(),
+        (ys.max() + dy).roundToInt()
+      )
     }
 
     /**
