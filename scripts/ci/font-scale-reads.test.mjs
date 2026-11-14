@@ -15,17 +15,19 @@
 // wraps or rescales app text:
 // - `glyphScale`, `glyphBoxSide` and `useGlyphBox` (glyph-box.ts): a fixed box around one glyph
 //   grows by the scale the glyph is drawn at, capped by the glyph's own maxFontSizeMultiplier;
-// - `tabBarGrowth`, `recordTabLabelHeight`, `tallestTabLabel` and `TabBarLabel`
-//   (tab-bar-label.tsx), with `TabLayout` (app/(tabs)/_layout.tsx): the tab bar grows by what its
-//   labels grew, and a label fits its tab; on iOS the label keeps React Navigation's
-//   allowFontScaling false, since the tab's Large Content Viewer shows it at the user's size.
-// Banned names (allowFontScaling, maxFontSizeMultiplier, getFontScale) pass only in the functions
-// BANNED_ALLOWED lists.
+// - `tabBarGrowth`, `recordTabLabelHeight`, `tallestTabLabel`, `useTabBarSizing` and
+//   `TabBarLabel` (tab-bar-label.tsx): the tab bar grows by what its labels grew, and a label fits
+//   its tab; on iOS the label keeps React Navigation's allowFontScaling false, since the tab's
+//   Large Content Viewer shows it at the user's size.
+// A banned name (allowFontScaling, maxFontSizeMultiplier, getFontScale) passes only in the one
+// function BANNED_ALLOWED gives it, and only on a line matching its pattern there. Names are scoped
+// by real function bodies (brace depth), so code after a function never inherits its allowance.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import ts from 'typescript'
 
 const mobileRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -47,13 +49,21 @@ const ALLOWED = {
     'tabBarGrowth',
     'recordTabLabelHeight',
     'tallestTabLabel',
+    'useTabBarSizing',
     'TabBarLabel',
+    // A type with a fontScale field: the scale the stored label heights were measured at.
+    'TabLabelHeights',
   ],
-  'app/(tabs)/_layout.tsx': ['TabLayout'],
 }
+/** file -> function -> banned name -> the pattern a line must match to use it there. */
 const BANNED_ALLOWED = {
-  'components/glyph-box.ts': ['glyphScale', 'glyphBoxSide', 'useGlyphBox'],
-  'components/tab-bar-label.tsx': ['TabBarLabel'],
+  'components/glyph-box.ts': { glyphScale: { maxFontSizeMultiplier: /./ } },
+  'components/tab-bar-label.tsx': {
+    TabBarLabel: {
+      allowFontScaling:
+        /allowFontScaling=\{Platform\.OS === 'ios' \? false : undefined\}/,
+    },
+  },
 }
 
 function sourceFiles(root) {
@@ -72,27 +82,51 @@ function sourceFiles(root) {
   })
 }
 
-/** The name of the nearest enclosing top-level function or component for each line. */
-function enclosingNames(lines) {
-  let current = null
-  return lines.map((line) => {
-    const match =
-      /^(?:export\s+)?(?:default\s+)?(?:function|const)\s+([A-Za-z0-9_]+)/.exec(line)
-    if (match) current = match[1]
-    return current
-  })
+/**
+ * The top-level function or component each line belongs to, from the TypeScript parser: a
+ * top-level function, or a const, owns exactly the lines of its own statement, so code after it
+ * (a trailing class, another statement) belongs to no function.
+ */
+function enclosingNames(text, file) {
+  const source = ts.createSourceFile(
+    file,
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+  )
+  const names = text.split('\n').map(() => null)
+  for (const statement of source.statements) {
+    let name = null
+    if (
+      ts.isFunctionDeclaration(statement) ||
+      ts.isTypeAliasDeclaration(statement) ||
+      ts.isInterfaceDeclaration(statement)
+    )
+      name = statement.name?.text ?? null
+    else if (ts.isVariableStatement(statement)) {
+      const [declaration] = statement.declarationList.declarations
+      if (declaration && ts.isIdentifier(declaration.name)) name = declaration.name.text
+    }
+    if (!name) continue
+    const first = source.getLineAndCharacterOfPosition(statement.getStart(source)).line
+    const last = source.getLineAndCharacterOfPosition(statement.getEnd()).line
+    for (let line = first; line <= last; line += 1) names[line] = name
+  }
+  return names
 }
 
 export function fontScaleReads(files) {
   const problems = []
   for (const [file, text] of Object.entries(files)) {
     const lines = text.split('\n')
-    const names = enclosingNames(lines)
+    const names = enclosingNames(text, file)
     lines.forEach((line, index) => {
       if (/^\s*(\/\/|\*)/.test(line)) return
-      if (BANNED.test(line)) {
-        if (!(BANNED_ALLOWED[file] ?? []).includes(names[index]))
-          problems.push(`${file}:${index + 1} ${line.trim()}`)
+      const banned = BANNED.exec(line)?.[1]
+      if (banned) {
+        const pattern = BANNED_ALLOWED[file]?.[names[index]]?.[banned]
+        if (!pattern?.test(line)) problems.push(`${file}:${index + 1} ${line.trim()}`)
       } else if (FONT_SCALE.test(line) && !(ALLOWED[file] ?? []).includes(names[index]))
         problems.push(`${file}:${index + 1} ${line.trim()}`)
     })
@@ -139,6 +173,46 @@ describe('font-scale reads in app code', () => {
     assert.deepEqual(fontScaleReads({ 'components/tab-bar-label.tsx': label }), [
       'components/tab-bar-label.tsx:2 return <Text allowFontScaling={false} />',
     ])
+  })
+
+  test('r46 PROBE_F1A: a font-scale read in the tab layout is caught', () => {
+    const layout = [
+      'export default function TabLayout() {',
+      '  const { fontScale } = useWindowDimensions()',
+      '  return <Text style={{ fontSize: 16 * fontScale }} />',
+      '}',
+    ].join('\n')
+    assert.equal(fontScaleReads({ 'app/(tabs)/_layout.tsx': layout }).length, 2)
+  })
+
+  test('r46 PROBE_F1B: code after an allowed function does not inherit its allowance', () => {
+    const glyph = [
+      'export function useGlyphBox(base, round) {',
+      '  const { fontScale } = useWindowDimensions()',
+      '  return { width: base * fontScale }',
+      '}',
+      'class GlobalTextScaler {',
+      '  scale(fontScale) { return 16 * fontScale }',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': glyph }), [
+      'components/glyph-box.ts:6 scale(fontScale) { return 16 * fontScale }',
+    ])
+  })
+
+  test('a banned name passes only in its one function and only in its allowed form', () => {
+    const label = [
+      'export function TabBarLabel() {',
+      '  return <Text allowFontScaling={false} maxFontSizeMultiplier={1} />',
+      '}',
+    ].join('\n')
+    assert.equal(fontScaleReads({ 'components/tab-bar-label.tsx': label }).length, 1)
+    const glyph = [
+      'export function useGlyphBox(base, round, maxFontSizeMultiplier) {',
+      '  return base',
+      '}',
+    ].join('\n')
+    assert.equal(fontScaleReads({ 'components/glyph-box.ts': glyph }).length, 1)
   })
 
   test('a composer read outside its layout rules is caught', () => {
