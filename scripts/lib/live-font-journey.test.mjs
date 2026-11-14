@@ -315,6 +315,8 @@ describe('runScreenJourney', () => {
           'coldUpdated',
         ].map((stage) => [stage, []])
       ),
+      // No clip, so no page screenshot to name.
+      clipImages: {},
       review: {
         verdict: 'known-residual',
         structuralPass: true,
@@ -898,6 +900,32 @@ describe('runScreenJourney with the text layout probe', () => {
       reactNativeVersion: '0.88.1',
     })
     assert.equal(fixed.legs[1].error, 'live_font_fix_missing')
+  })
+
+  // TEA approves entries against screenshots: each listed clip, in the report and in the
+  // proposal, names the page image it shows on.
+  test('a listed clip names its page screenshot in the report and the proposal', async () => {
+    const named = (probe) => (context) =>
+      Object.defineProperty(probe(context), 'file', {
+        value: `community-${context.stage}-${context.at}`,
+      })
+    const result = await run(
+      'android',
+      fakeDevice('android', { probe: named(secondFace(staleContent)) }),
+      options
+    )
+    const back = result.legs[1]
+    assert.deepEqual(back.checks.clipping.clipped[0].images, ['community-settled-1.png'])
+    assert.deepEqual(back.residualProposal.clipImages, {
+      [`staleContent:${NEW_POST_KEY}`]: ['community-settled-1.png'],
+    })
+    // Committed with the images, the proposal still approves the leg.
+    const approved = await run(
+      'android',
+      fakeDevice('android', { probe: named(secondFace(staleContent)) }),
+      { ...options, residualBaselines: [back.residualProposal] }
+    )
+    assert.equal(approved.legs[1].pass, true, approved.legs[1].message)
   })
 
   test('a fresh box with fresh content that clips is neither face and fails', async () => {

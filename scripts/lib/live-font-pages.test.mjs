@@ -8,8 +8,10 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 
 import {
+  attachClipImages,
   attachPages,
   PAGE_ATTEMPTS,
+  pageImage,
   scrollPages,
   stablePage,
 } from './live-font-pages.mjs'
@@ -211,5 +213,90 @@ describe('attachPages', () => {
     assert.equal(capture.fullText, undefined)
     assert.equal(capture.pages, undefined)
     assert.equal(capture.pageShift, undefined)
+  })
+})
+
+// TEA approves entries against screenshots, so every scroll page is shot, inside its settled
+// read, and every listed clip names the image of each page it shows on.
+describe('page screenshots', () => {
+  test('page 0 keeps the capture name; a later page adds its index', () => {
+    assert.equal(pageImage('home-007-settled-1.5', 0), 'home-007-settled-1.5.png')
+    assert.equal(pageImage('home-007-settled-1.5', 2), 'home-007-settled-1.5-page2.png')
+    for (const [file, page] of [
+      ['', 0],
+      [undefined, 1],
+      ['home-007-settled-1.5', -1],
+      ['home-007-settled-1.5', 1.5],
+    ])
+      assert.throws(() => pageImage(file, page), /live_font_page_image/)
+  })
+
+  test('the shot is taken once, after the read that follows the answer holds, and kept as the image', async () => {
+    const fake = device(['A', 'A', 'B', 'B'])
+    let shots = 0
+    const page = await stablePage({
+      ...fake,
+      shoot: () => {
+        shots += 1
+        fake.log.push('shoot')
+        return 'cap-page1.png'
+      },
+    })
+    assert.equal(shots, 1)
+    assert.equal(page.image, 'cap-page1.png')
+    // Never on the page that moved at answer 1; after answer 2 and the read that confirms it.
+    assert.deepEqual(fake.log.slice(-4), ['read:B', 'probe:2', 'read:B', 'shoot'])
+    const unshot = await stablePage(device(['A', 'A']))
+    assert.equal('image' in unshot, false)
+  })
+
+  test('scrollPages hands each page read its index', async () => {
+    const indexes = []
+    let drags = 0
+    await scrollPages({
+      page: async (index) => {
+        indexes.push(index)
+        return { ...layout(['top', 'middle', 'middle'][drags]), textProbe: {} }
+      },
+      dragUp: () => {
+        drags += 1
+      },
+    })
+    assert.deepEqual(indexes, [0, 1, 2])
+  })
+
+  test('every listed clip names the screenshot of each page it shows on, by its stage', () => {
+    const settled = Object.defineProperty({}, 'file', {
+      value: 'settings-020-settled-1.5',
+    })
+    const updated = Object.defineProperty({}, 'file', {
+      value: 'settings-021-updated-1.5',
+    })
+    const checks = {
+      clipping: {
+        clipped: [
+          { reason: 'clipped_by_layout', key: 'a', pages: [0, 2] },
+          { reason: 'outside_parent', text: 'b' },
+        ],
+      },
+      postUpdateClipping: {
+        clipped: [{ reason: 'clipped_by_layout', key: 'c', pages: [1] }],
+      },
+    }
+    attachClipImages(checks, { settled, updated })
+    assert.deepEqual(
+      [...checks.clipping.clipped, ...checks.postUpdateClipping.clipped].map(
+        (entry) => entry.images
+      ),
+      [
+        ['settings-020-settled-1.5.png', 'settings-020-settled-1.5-page2.png'],
+        ['settings-020-settled-1.5.png'],
+        ['settings-021-updated-1.5-page1.png'],
+      ]
+    )
+    // A capture with no file name (a unit fixture) leaves its clips alone.
+    const bare = { clipping: { clipped: [{ pages: [0] }] } }
+    attachClipImages(bare, { settled: {} })
+    assert.equal('images' in bare.clipping.clipped[0], false)
   })
 })

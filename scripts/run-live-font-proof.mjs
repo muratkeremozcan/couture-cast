@@ -60,7 +60,12 @@ import {
   SCREENS,
   screenRunSteps,
 } from './lib/live-font-journey.mjs'
-import { attachPages, scrollPages, stablePage } from './lib/live-font-pages.mjs'
+import {
+  attachPages,
+  pageImage,
+  scrollPages,
+  stablePage,
+} from './lib/live-font-pages.mjs'
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
 import { createTextProbe } from './lib/live-font-text-probe.mjs'
@@ -238,8 +243,9 @@ let mounts = mountTracker(['root'])
 let launchCount = 0
 let launchId
 let sequence = 0
+/** Saves the screen as `name` (a file name such as pageImage gives) in the proof dir. */
 function screenshot(name) {
-  const file = path.join(out, `${name}.png`)
+  const file = path.join(out, name)
   if (platform === 'android') {
     const shot = spawnSync(adbBinary, ['-s', device, 'exec-out', 'screencap', '-p'], {
       maxBuffer: 64 * 1024 * 1024,
@@ -311,7 +317,7 @@ async function makeCapture(screenName, stage, scale) {
     enumerable: false,
   })
   persist(capture)
-  screenshot(capture.file)
+  screenshot(pageImage(capture.file, 0))
   return capture
 }
 
@@ -388,14 +394,31 @@ function readPage() {
     window: windowBounds(tree),
   }
 }
-const settledPage = () =>
-  stablePage({ read: readPage, probe: () => textProbe.read(), pause })
+/**
+ * Page `index` of `capture`'s scroll-through, settled around one probe answer. A later page is
+ * shot inside the settled read; page 0 keeps the screenshot makeCapture took with its answer.
+ */
+const settledPage = (capture, index) =>
+  stablePage({
+    read: readPage,
+    probe: () => textProbe.read(),
+    pause,
+    ...(index > 0
+      ? {
+          shoot: () => {
+            const name = pageImage(capture.file, index)
+            screenshot(name)
+            return name
+          },
+        }
+      : {}),
+  })
 
 async function fullText(capture) {
   const size = windowSize(capture)
   if (!size) throw new Error('live_font_window_bounds_required')
   const { pages, drags } = await scrollPages({
-    page: settledPage,
+    page: (index) => settledPage(capture, index),
     dragUp: () => drag(size, true),
   })
   for (let back = 0; back <= drags + 1; back += 1) drag(size, false)
@@ -423,6 +446,7 @@ async function fullText(capture) {
   )
   // A page of only a tall image shares no text with its neighbors; the stitch then steps by
   // the drag's length. F-00i: every page keeps its probe answer, judged page by page.
+  pages[0].image = pageImage(capture.file, 0)
   attachPages(capture, pages, Math.round(size.height * (DRAG_FROM - DRAG_TO)))
   persist(capture)
   return capture

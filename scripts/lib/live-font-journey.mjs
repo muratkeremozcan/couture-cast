@@ -14,10 +14,12 @@ import fs from 'node:fs'
 import path from 'node:path'
 
 import { assertLiveProvenance, IOS_CONTENT_SIZES } from './live-font-capture.mjs'
+import { attachClipImages } from './live-font-pages.mjs'
 import {
   assertColdControl,
   assertComposerControls,
   assertLiveFontProof,
+  clipKeyEntries,
   ellipsizedRecords,
   evaluateLiveFontChange,
   proposedResidualEntry,
@@ -332,6 +334,9 @@ export async function runScreenJourney({
         if (!leg.composer.pass) leg.pass = false
       }
       leg.evidence = { before, immediate, settled, updated }
+      // Every listed clip names the screenshot of each page it shows on, for review.
+      attachClipImages(leg.checks, { settled, updated })
+      if (leg.residualProposal) leg.residualProposal.clipImages = clipImagesOf(leg.checks)
       if (leg.residualProposal)
         leg.residualProposal = {
           platform,
@@ -408,6 +413,17 @@ export function screenRunSteps({ configChange, versionKnown }) {
  * keeps one entry per leg and environment; entries for another timezone or banner stay.
  * Null when no leg proposes one.
  */
+/**
+ * A proposal's clip keys (clipKeys) with the page screenshots each one's clip shows on, so the
+ * reviewer opens the image of every clip an entry lists.
+ */
+export function clipImagesOf(checks) {
+  const images = {}
+  for (const [entry, key] of clipKeyEntries(checks ?? {}))
+    images[key] = [...new Set([...(images[key] ?? []), ...(entry.images ?? [])])]
+  return images
+}
+
 export function proposedBaselines(current, results, { dir, weatherAging } = {}) {
   // A screen that errored before any leg has no legs and proposes nothing.
   const proposals = results.flatMap((result) =>

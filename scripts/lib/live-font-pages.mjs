@@ -14,6 +14,36 @@ export const PAGE_INTERVAL_MS = 500
 /** Drags a scroll-through takes at most before it stops. */
 export const MAX_DRAGS = 12
 
+/**
+ * The screenshot file of page `page` of the capture named `file`: page 0 keeps the capture's own
+ * name (`<file>.png`, what every reader and earlier run use), a later page `<file>-page<n>.png`.
+ */
+export function pageImage(file, page) {
+  if (typeof file !== 'string' || file === '')
+    throw new Error('live_font_page_image_file')
+  if (!Number.isSafeInteger(page) || page < 0)
+    throw new Error('live_font_page_image_index')
+  return page === 0 ? `${file}.png` : `${file}-page${page}.png`
+}
+
+/**
+ * Points every listed clip of a judged leg at the screenshot of each page it shows on: a settled
+ * clip (`clipping`) at the settled capture's pages, an updated one (`postUpdateClipping`) at the
+ * updated capture's; a box-in-parent clip, read on page 0, at page 0. A capture without a file
+ * name (a unit fixture) leaves its clips as they are.
+ */
+export function attachClipImages(checks, { settled, updated } = {}) {
+  for (const [name, capture] of [
+    ['clipping', settled],
+    ['postUpdateClipping', updated],
+  ]) {
+    if (typeof capture?.file !== 'string') continue
+    for (const entry of checks?.[name]?.clipped ?? [])
+      entry.images = (entry.pages ?? [0]).map((page) => pageImage(capture.file, page))
+  }
+  return checks
+}
+
 function unstable(detail) {
   const error = new Error(`live_font_scroll_page_unstable: ${detail}`)
   error.code = 'live_font_scroll_page_unstable'
@@ -29,13 +59,16 @@ function unstable(detail) {
  * that moved between the read and the answer (a scroll still settling) is never paired, the read
  * after becomes the next comparison and the page is tried again. Within `attempts` pauses the
  * page must hold still on both sides of one answer, or the run fails as
- * live_font_scroll_page_unstable.
+ * live_font_scroll_page_unstable. `shoot()`, given, takes the page's screenshot once it held
+ * still on both sides (so the image is the page the answer describes) and returns its file
+ * name, kept as the page's `image`.
  */
 export async function stablePage({
   read,
   probe,
   pause,
   first,
+  shoot,
   attempts = PAGE_ATTEMPTS,
   intervalMs = PAGE_INTERVAL_MS,
 }) {
@@ -55,7 +88,10 @@ export async function stablePage({
     }
     const textProbe = probe()
     const after = read()
-    if (sameLayout(after.nodes, previous.nodes)) return { ...previous, textProbe }
+    if (sameLayout(after.nodes, previous.nodes))
+      return shoot
+        ? { ...previous, textProbe, image: shoot() }
+        : { ...previous, textProbe }
     moved += 1
     previous = after
     settled = false
@@ -64,16 +100,16 @@ export async function stablePage({
 
 /**
  * The scroll-through: the page at the top, then one page per drag until a drag shows the same
- * page again (the bottom) or `maxDrags` drags are done. `page()` reads one settled page
- * (stablePage) and `dragUp()` scrolls one step down the content. Returns the distinct pages in
+ * page again (the bottom) or `maxDrags` drags are done. `page(index)` reads settled page
+ * `index` (stablePage; 0 the top) and `dragUp()` scrolls one step down the content. Returns the distinct pages in
  * order and the number of drags made, which the caller undoes.
  */
 export async function scrollPages({ page, dragUp, maxDrags = MAX_DRAGS }) {
-  const pages = [await page()]
+  const pages = [await page(0)]
   let drags = 0
   for (; drags < maxDrags; drags += 1) {
     dragUp()
-    const next = await page()
+    const next = await page(pages.length)
     if (sameLayout(next.nodes, pages.at(-1).nodes)) break
     pages.push(next)
   }
