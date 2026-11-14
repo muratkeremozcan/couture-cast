@@ -23,7 +23,6 @@ import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 
-import { changedInputs } from './evidence-manifest.mjs'
 import { canonicalVolatileKeys, captureVolatileKeys } from './live-font-scale-proof.mjs'
 
 const CAPTURE_NAME = /^[a-z]+-\d{3}-[a-z]+-[0-9a-z.-]+$/
@@ -121,13 +120,14 @@ function readRun(run, index, { stages, platform, read, changed, current }) {
  * The verifier the oracle calls with an entry's `volatileProof` and this leg's volatile keys by
  * stage (legVolatileKeys); it returns why the proof fails, or null. `read(file)` returns the
  * file's bytes at HEAD or null (committedReader), `changed(manifest)` the manifest's inputs that
- * differ at HEAD (evidence-manifest changedInputs); both are injectable for the units.
+ * differ at HEAD (evidence-manifest changedInputs, which the runner passes in: importing the
+ * manifest module here would pull every leg's harness paths into the live-font leg).
  */
 export function createVolatileProofCheck({
   platform,
   repoRoot,
   read = committedReader(repoRoot),
-  changed = (manifest) => changedInputs(manifest, { cwd: repoRoot, requireClean: false }),
+  changed,
 }) {
   return (proof, currentKeys) => {
     const stages = Object.keys(currentKeys).sort()

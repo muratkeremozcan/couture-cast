@@ -73,6 +73,12 @@ import { createVolatileProofCheck } from './lib/live-font-volatile-proof.mjs'
 import { ageWeatherSnapshot } from './lib/live-font-weather.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
+// Loaded by URL: the manifest module is a recorded input of the leg (evidence-manifest.mjs lists
+// it as a path), and its own literals name every other leg's harness, which this leg does not read.
+const { changedInputs } = await import(
+  new URL('./lib/evidence-manifest.mjs', import.meta.url).href
+)
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const argv = process.argv.slice(2)
 const option = (name, fallback) => {
@@ -811,7 +817,12 @@ try {
       timezone: pinned.timezone,
       weatherBanner: weather.weatherBanner,
       androidDensity,
-      volatileProofCheck: createVolatileProofCheck({ platform, repoRoot: root }),
+      volatileProofCheck: createVolatileProofCheck({
+        platform,
+        repoRoot: root,
+        changed: (manifest) =>
+          changedInputs(manifest, { cwd: root, requireClean: false }),
+      }),
     })
     for (const leg of report.legs) {
       for (const [stage, capture] of Object.entries(leg.evidence))

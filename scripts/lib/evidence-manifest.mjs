@@ -51,7 +51,13 @@ const HARNESS_DATA = [
  */
 export const LEGS = {
   'live-font': {
-    paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
+    // The runner loads the manifest module by URL for the volatile-key proof.
+    paths: [
+      ...SHARED_INPUTS,
+      ...SERVER_INPUTS,
+      ...HARNESS_DATA,
+      'scripts/lib/evidence-manifest.mjs',
+    ],
     globs: ['scripts/lib/live-font-*'],
     entries: ['scripts/run-live-font-proof.mjs', 'scripts/run-story68-native.mjs'],
   },
