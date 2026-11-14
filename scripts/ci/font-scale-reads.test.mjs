@@ -33,14 +33,35 @@ const mobileRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../apps/mobile'
 )
-const SOURCE_DIRECTORIES = ['app', 'src', 'components']
-const BANNED = /\b(getFontScale|maxFontSizeMultiplier|allowFontScaling)\b/
-const FONT_SCALE = /\bfontScale\b/
+/** Directories under apps/mobile that hold no app TypeScript: dependencies and native projects. */
+const SKIPPED_DIRECTORIES = new Set([
+  'node_modules',
+  'ios',
+  'android',
+  '.expo',
+  'dist',
+  'build',
+  'coverage',
+])
+const BANNED_NAMES = new Set([
+  'getFontScale',
+  'maxFontSizeMultiplier',
+  'allowFontScaling',
+])
+const FONT_SCALE = 'fontScale'
+/**
+ * file -> the functions allowed to read the font scale, by scope path: a nested named function
+ * is its own scope, written outer.inner, and never inherits its outer function's allowance.
+ * Anonymous callbacks (a map callback, a useCallback body) belong to the function around them.
+ */
 const ALLOWED = {
   'components/share-card-composer.tsx': [
     'feedbackSlotHeight',
     'actionRowTier',
+    'actionRowTier.oneLine',
     'useActionColumns',
+    // The label measure callback that feeds actionRowTier the scale it measured at.
+    'useActionColumns.measure',
     'ComposerFeedback',
   ],
   'components/live-font-mount-marker.tsx': ['LiveFontMountMarker'],
@@ -55,81 +76,102 @@ const ALLOWED = {
     'TabLabelHeights',
   ],
 }
-/** file -> function -> banned name -> the pattern a line must match to use it there. */
+/**
+ * file -> scope path -> banned name -> a test of the use: the name passes only in that one scope
+ * and only in that form, each occurrence checked on its own.
+ */
 const BANNED_ALLOWED = {
-  'components/glyph-box.ts': { glyphScale: { maxFontSizeMultiplier: /./ } },
+  'components/glyph-box.ts': { glyphScale: { maxFontSizeMultiplier: () => true } },
   'components/tab-bar-label.tsx': {
     TabBarLabel: {
-      allowFontScaling:
-        /allowFontScaling=\{Platform\.OS === 'ios' \? false : undefined\}/,
+      // React Navigation's iOS label, which the tab's Large Content Viewer shows at full size.
+      allowFontScaling: (node, source) =>
+        ts.isJsxAttribute(node.parent) &&
+        node.parent.initializer?.getText(source) ===
+          "{Platform.OS === 'ios' ? false : undefined}",
     },
   },
 }
 
 function sourceFiles(root) {
-  return SOURCE_DIRECTORIES.flatMap((directory) => {
-    const walk = (relative) =>
-      fs
-        .readdirSync(path.join(root, relative), { withFileTypes: true })
-        .flatMap((entry) => {
-          const next = path.posix.join(relative, entry.name)
-          if (entry.isDirectory()) return walk(next)
-          if (!/\.(ts|tsx)$/.test(entry.name) || /\.(test|spec)\.tsx?$/.test(entry.name))
-            return []
-          return [next]
-        })
-    return fs.existsSync(path.join(root, directory)) ? walk(directory) : []
-  })
+  const walk = (relative) =>
+    fs
+      .readdirSync(path.join(root, relative), { withFileTypes: true })
+      .flatMap((entry) => {
+        const next = relative ? path.posix.join(relative, entry.name) : entry.name
+        if (entry.isDirectory())
+          return SKIPPED_DIRECTORIES.has(entry.name) || entry.name.startsWith('.')
+            ? []
+            : walk(next)
+        if (!/\.(ts|tsx)$/.test(entry.name) || /\.(test|spec)\.tsx?$/.test(entry.name))
+          return []
+        return [next]
+      })
+  return walk('')
+}
+
+/** The name a function-like node is known by, or null for an anonymous callback. */
+function functionName(node) {
+  if (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node))
+    return node.name?.getText() ?? null
+  if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+    if (node.name) return node.name.getText()
+    const parent = node.parent
+    if (ts.isVariableDeclaration(parent) && ts.isIdentifier(parent.name))
+      return parent.name.text
+    if (ts.isPropertyAssignment(parent)) return parent.name.getText()
+  }
+  return null
 }
 
 /**
- * The top-level function or component each line belongs to, from the TypeScript parser: a
- * top-level function, or a const, owns exactly the lines of its own statement, so code after it
- * (a trailing class, another statement) belongs to no function.
+ * The scope path a node belongs to: its named functions from outermost to innermost (outer.inner),
+ * or, outside any function, the top-level type or interface it sits in; null elsewhere.
  */
-function enclosingNames(text, file) {
-  const source = ts.createSourceFile(
-    file,
-    text,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-  )
-  const names = text.split('\n').map(() => null)
-  for (const statement of source.statements) {
-    let name = null
+function scopeOf(node) {
+  const names = []
+  let typeName = null
+  for (let current = node.parent; current; current = current.parent) {
+    const name = ts.isFunctionLike(current) ? functionName(current) : null
+    if (name) names.unshift(name)
     if (
-      ts.isFunctionDeclaration(statement) ||
-      ts.isTypeAliasDeclaration(statement) ||
-      ts.isInterfaceDeclaration(statement)
+      (ts.isTypeAliasDeclaration(current) || ts.isInterfaceDeclaration(current)) &&
+      ts.isSourceFile(current.parent)
     )
-      name = statement.name?.text ?? null
-    else if (ts.isVariableStatement(statement)) {
-      const [declaration] = statement.declarationList.declarations
-      if (declaration && ts.isIdentifier(declaration.name)) name = declaration.name.text
-    }
-    if (!name) continue
-    const first = source.getLineAndCharacterOfPosition(statement.getStart(source)).line
-    const last = source.getLineAndCharacterOfPosition(statement.getEnd()).line
-    for (let line = first; line <= last; line += 1) names[line] = name
+      typeName = current.name.text
   }
-  return names
+  return names.length > 0 ? names.join('.') : typeName
 }
 
 export function fontScaleReads(files) {
   const problems = []
   for (const [file, text] of Object.entries(files)) {
+    const source = ts.createSourceFile(
+      file,
+      text,
+      ts.ScriptTarget.Latest,
+      true,
+      file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+    )
     const lines = text.split('\n')
-    const names = enclosingNames(text, file)
-    lines.forEach((line, index) => {
-      if (/^\s*(\/\/|\*)/.test(line)) return
-      const banned = BANNED.exec(line)?.[1]
-      if (banned) {
-        const pattern = BANNED_ALLOWED[file]?.[names[index]]?.[banned]
-        if (!pattern?.test(line)) problems.push(`${file}:${index + 1} ${line.trim()}`)
-      } else if (FONT_SCALE.test(line) && !(ALLOWED[file] ?? []).includes(names[index]))
-        problems.push(`${file}:${index + 1} ${line.trim()}`)
-    })
+    const flagged = new Set()
+    const visit = (node) => {
+      if (ts.isIdentifier(node)) {
+        const scope = scopeOf(node)
+        const name = node.text
+        const allowed = BANNED_NAMES.has(name)
+          ? (BANNED_ALLOWED[file]?.[scope]?.[name]?.(node, source) ?? false)
+          : name === FONT_SCALE
+            ? (ALLOWED[file] ?? []).includes(scope)
+            : true
+        if (!allowed)
+          flagged.add(source.getLineAndCharacterOfPosition(node.getStart(source)).line)
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(source)
+    for (const line of [...flagged].sort((a, b) => a - b))
+      problems.push(`${file}:${line + 1} ${lines[line].trim()}`)
   }
   return problems
 }
@@ -213,6 +255,67 @@ describe('font-scale reads in app code', () => {
       '}',
     ].join('\n')
     assert.equal(fontScaleReads({ 'components/glyph-box.ts': glyph }).length, 1)
+  })
+
+  test('r47 R47_F1: every banned name on a line is checked on its own', () => {
+    const label = [
+      'export function TabBarLabel() {',
+      "  return <Text allowFontScaling={Platform.OS === 'ios' ? false : undefined} maxFontSizeMultiplier={1} />",
+      '}',
+    ].join('\n')
+    assert.equal(fontScaleReads({ 'components/tab-bar-label.tsx': label }).length, 1)
+    const glyph = [
+      'function glyphScale(fontScale, maxFontSizeMultiplier) {',
+      '  return maxFontSizeMultiplier && <Text allowFontScaling={false} />',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': glyph }), [
+      'components/glyph-box.ts:2 return maxFontSizeMultiplier && <Text allowFontScaling={false} />',
+    ])
+  })
+
+  test('allowFontScaling passes in TabBarLabel only as the iOS-only expression', () => {
+    const label = [
+      'export function TabBarLabel() {',
+      "  const ios = <Text allowFontScaling={Platform.OS === 'ios' ? false : undefined} />",
+      '  return <Text allowFontScaling={false} />',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/tab-bar-label.tsx': label }), [
+      'components/tab-bar-label.tsx:3 return <Text allowFontScaling={false} />',
+    ])
+  })
+
+  test('r47 R47_F1: each declarator and each nested function is its own scope', () => {
+    const multi = [
+      'export const glyphBoxSide = (base, fontScale) => base * fontScale,',
+      '  EvilScaler = (fontScale) => 16 * fontScale',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': multi }), [
+      'components/glyph-box.ts:2 EvilScaler = (fontScale) => 16 * fontScale',
+    ])
+    const nested = [
+      'export function TabBarLabel() {',
+      '  const { fontScale } = useWindowDimensions()',
+      '  function AppText() {',
+      '    return <Text style={{ fontSize: 16 * fontScale }} />',
+      '  }',
+      '  return null',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/tab-bar-label.tsx': nested }), [
+      'components/tab-bar-label.tsx:4 return <Text style={{ fontSize: 16 * fontScale }} />',
+    ])
+  })
+
+  test('the scan covers every app source under apps/mobile, not three folders', () => {
+    const files = sourceFiles(mobileRoot)
+    assert.ok(files.includes('index.ts'), 'the entry file is scanned')
+    assert.ok(
+      files.some((file) => file.startsWith('constants/')),
+      'constants are scanned'
+    )
+    assert.ok(!files.some((file) => /(^|\/)(node_modules|ios|android)\//.test(file)))
   })
 
   test('a composer read outside its layout rules is caught', () => {
