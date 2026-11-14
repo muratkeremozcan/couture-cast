@@ -1260,6 +1260,10 @@ export function evaluateLiveFontChange({
     // The settled captures only: `immediate` is read while the screen relays out, so its probe
     // answer, a moment after its hierarchy, may show another layout; it is judged for nothing.
     textProbe: textProbeCheck(platform, { before, settled, updated }),
+    textLost: lostText(platform, [
+      ['settled', settled, cold],
+      ['updated', updated, coldUpdated],
+    ]),
     textHidden: hiddenText(platform, [
       ['settled', settled, cold],
       ['updated', updated, coldUpdated],
@@ -1392,6 +1396,55 @@ function hiddenText(platform, stages) {
   return { pass: hidden.length === 0, hidden }
 }
 
+/**
+ * The record classes the lost-text check compares at the cold launch (matchTextProbe): text the
+ * screen draws on screen, whole or cut, including a regional record a hierarchy node of its text
+ * took. Pages cover the whole scroll range, so text the screen keeps is on screen on one of them.
+ * Volatile records are not compared, nor scrolled-away ones: the hierarchy cuts a volatile region
+ * to what shows, so a card's text below it reads as scrolled away (Android 6c85bbb4 Community
+ * cold 1.5, a card's "Image unavailable"). Records in a covered window, behind a modal or a
+ * dialog, and records drawn nowhere (opacity 0, off the window) are not compared either.
+ */
+const COMPARED_KINDS = new Set(['visible', 'hidden', 'regional'])
+
+/**
+ * The masked texts of a capture's probe records over all its pages: those of COMPARED_KINDS
+ * when `compared`, else of any record but an empty one.
+ */
+function recordTexts(capture, platform, compared) {
+  const texts = new Set()
+  const pages = [capture, ...pageCaptures(capture).map((page) => page.capture)]
+  for (const page of pages) {
+    const { match } = textLayout(page, platform)
+    if (!match) continue
+    page.textProbe.records.forEach((record, index) => {
+      if (record.text === '') return
+      if (compared && !COMPARED_KINDS.has(match.kinds[index])) return
+      texts.add(maskText(record.text))
+    })
+  }
+  return texts
+}
+
+/**
+ * TEA ruling on Antigravity r47 P2 (R47_F3B): a text the cold launch at the same scale shows as a
+ * compared record (COMPARED_KINDS) that the live capture has no record of at all, on any page,
+ * is lost: live_font_text_lost, whatever the hierarchy or a group's composite label says. A text
+ * the live capture still has a record of, drawn nowhere or only behind a label, is the hidden
+ * text check's (hiddenText). `stages` holds [stage, live capture, cold capture] triples; a
+ * missing capture is skipped.
+ */
+function lostText(platform, stages) {
+  const lost = []
+  for (const [stage, live, cold] of stages) {
+    if (!live?.textProbe || !cold?.textProbe) continue
+    const now = recordTexts(live, platform, false)
+    for (const text of recordTexts(cold, platform, true))
+      if (!now.has(text)) lost.push({ stage, text })
+  }
+  return { pass: lost.length === 0, lost }
+}
+
 /** Every live capture of the leg carries a probe answer that pairs with its text nodes. */
 function textProbeCheck(platform, captures) {
   const stages = {}
@@ -1414,11 +1467,7 @@ function textProbeCheck(platform, captures) {
   return { pass: code === null, ...(code ? { code } : {}), stages }
 }
 
-/**
- * Marks each layout clip `stale` when its node is a stale miss of the same stage: a settled clip
- * against the cold parity misses, an updated clip against the post-update ones. A record a group
- * took counts by its group's node.
- */
+/** The ways a record joins a node other than its own text: a group, attached, or hidden. */
 const GROUP_VIAS = new Set(['group', 'attached', 'accessibilityHidden'])
 
 /**
@@ -1445,6 +1494,11 @@ function staleClip(entry, staleKeys) {
   )
 }
 
+/**
+ * Marks each layout clip `stale` when its node is a stale miss of the same stage: a settled clip
+ * against the cold parity misses, an updated clip against the post-update ones. A record a group
+ * took counts by its group's node.
+ */
 function markStaleClips(checks) {
   for (const [clippingCheck, parityCheck] of [
     ['clipping', 'coldParity'],
@@ -1519,6 +1573,7 @@ function structural(checks) {
       'identity',
       'controls',
       'textProbe',
+      'textLost',
       'textHidden',
       'postUpdateFullText',
       'postUpdateAnchors',
@@ -1729,7 +1784,14 @@ function splitClipKey(key) {
  */
 function volatileProofProblem(baseline, captures, verify) {
   if (typeof verify !== 'function') return 'no volatile proof check in this run'
-  return verify(baseline.volatileProof, legVolatileKeys(captures))
+  // Each stage's scale in this leg, so a proof run's cold capture must be the same scale's.
+  const scales = Object.fromEntries(
+    VOLATILE_STAGES.filter((stage) => captures?.[stage]).map((stage) => [
+      stage,
+      captures[stage].fontScale,
+    ])
+  )
+  return verify(baseline.volatileProof, legVolatileKeys(captures), scales)
 }
 
 function clipProblem(checks, baseline, captures, verify) {
@@ -1983,6 +2045,9 @@ export function assertLiveFontProof({
         )
       )
     )
+  // Text the cold launch shows as a record that the live screen has no record of is lost.
+  if (!result.checks.textLost.pass)
+    fail('live_font_text_lost', JSON.stringify(result.checks.textLost.lost))
   // Text the cold launch shows that the live screen only draws at opacity 0 is lost text.
   if (!result.checks.textHidden.pass)
     fail('live_font_text_hidden', JSON.stringify(result.checks.textHidden.hidden))

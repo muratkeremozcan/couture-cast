@@ -675,6 +675,7 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
     visible: [],
   }
   const regionOf = new Map()
+  const kinds = []
   for (const record of records) {
     const region = regionOfRecord(record, volatileRegions)
     let kind = 'visible'
@@ -699,9 +700,10 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
     else if (record.scrolledAway) kind = 'scrolled'
     else if (record.visibleRect === null) kind = 'hidden'
     classes[kind].push(record)
+    kinds[record.index] = kind
     if (kind === 'regional') regionOf.set(record.index, region)
   }
-  return { classes, regionOf }
+  return { classes, regionOf, kinds }
 }
 
 /**
@@ -1143,7 +1145,7 @@ export function matchTextProbe({
 }) {
   const records = answer.records.map((record, index) => ({ ...record, index }))
   const covers = coveredWindows(answer.windows, tolerance)
-  const { classes, regionOf } = classifyRecords(
+  const { classes, regionOf, kinds } = classifyRecords(
     records,
     covers,
     volatileRegions,
@@ -1281,6 +1283,13 @@ export function matchTextProbe({
       tolerance,
     }),
     empty: classes.empty.map((record) => record.index),
+    // Each record's class, by index (volatile records are 'regional' with no node of their text).
+    kinds: records.map((record) =>
+      kinds[record.index] === 'regional' &&
+      volatile.some((each) => each.index === record.index)
+        ? 'volatile'
+        : kinds[record.index]
+    ),
     windowNodes: windowNodes.map((node) => node.index),
   }
 }

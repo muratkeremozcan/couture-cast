@@ -1721,15 +1721,11 @@ describe('text layout clipping (F-00i)', () => {
     const { checks } = evaluateLiveFontChangeRaw(lost())
     assert.equal(checks.textHidden.pass, true, 'not the hidden-text rule')
     assert.equal(checks.fullText.pass, false)
-    assert.throws(
-      prove(lost(), undefined, '0.88.1'),
-      (error) => error.code === 'live_font_fix_missing' && /fullText/.test(error.message)
-    )
-    assert.throws(
-      prove(lost(), undefined, '0.81.5'),
-      (error) =>
-        error.code === 'live_font_baseline_unexpected' && /fullText/.test(error.message)
-    )
+    // TEA ruling on Antigravity r47 P2: the cold launch's record with none live is lost text,
+    // at every version.
+    assert.deepEqual(checks.textLost.lost, [{ stage: 'settled', text: TEMPERATURE }])
+    for (const version of ['0.88.1', '0.81.5'])
+      assert.throws(prove(lost(), undefined, version), { code: 'live_font_text_lost' })
   })
 
   // Antigravity r41 P3-1: `ellipsizeMode="clip"` drops lines with no ellipsis.
@@ -2943,7 +2939,8 @@ describe('text layout clipping (F-00i)', () => {
       evidence[stage] = name
       const capture = {
         ...change[stage],
-        pid: `${launch}-${stage}`,
+        // A process id per launch and stage, digits as the runners write them.
+        pid: `${launch.charCodeAt(0)}${index + 1}`,
         identity: { root: `root-${launch}-${stage}` },
       }
       repo.files.set(`${dir}/${name}.json`, JSON.stringify(capture))
@@ -3045,6 +3042,59 @@ describe('text layout clipping (F-00i)', () => {
       proveWith({ ...entry, volatileProof: { runs } }, check),
       refused(/share a launch/)
     )
+  })
+
+  // TEA ruling on Antigravity r47 P2 (R47_F4): a launch is an integer pid and an identity root;
+  // a cold stage is the cold launch at that stage's scale in this leg.
+  test('R47_F4: a proof capture with no launch identity or a cold launch at another scale fails', () => {
+    const cases = {
+      'pid undefined and null (R47_F4)': (capture, run) => {
+        if (run === 0) delete capture.pid
+        else capture.pid = null
+      },
+      'pid not an integer': (capture) => (capture.pid = 'a-cold'),
+      'pid zero': (capture) => (capture.pid = 0),
+      'no identity root': (capture) => delete capture.identity.root,
+      'empty identity root': (capture) => (capture.identity.root = ''),
+      'cold at another scale': (capture, run, stage) => {
+        if (stage === 'cold') capture.fontScale = 1.3
+      },
+    }
+    const patterns = {
+      'cold at another scale': /is no cold launch at cold's scale 1\.5/,
+    }
+    for (const [name, edit] of Object.entries(cases)) {
+      const { entry, repo, proveWith } = proofCase()
+      for (const [run, dir] of [RUN_A, RUN_B].entries()) {
+        const { evidence } = entry.volatileProof.runs[run]
+        for (const [stage, file] of Object.entries(evidence)) {
+          const at = `${dir}/${file}.json`
+          const capture = JSON.parse(repo.files.get(at))
+          edit(capture, run, stage)
+          repo.files.set(at, JSON.stringify(capture))
+        }
+        rehash(repo, dir, SHA_A)
+      }
+      assert.throws(
+        proveWith(entry),
+        refused(
+          patterns[name] ?? /has no launch identity: an integer pid and an identity root/
+        ),
+        name
+      )
+    }
+    // A numeric pid is a launch too.
+    const { entry, repo, proveWith } = proofCase()
+    for (const [run, dir] of [RUN_A, RUN_B].entries()) {
+      for (const file of Object.values(entry.volatileProof.runs[run].evidence)) {
+        const at = `${dir}/${file}.json`
+        const capture = JSON.parse(repo.files.get(at))
+        capture.pid = Number(capture.pid)
+        repo.files.set(at, JSON.stringify(capture))
+      }
+      rehash(repo, dir, SHA_A)
+    }
+    assert.equal(proveWith(entry)().verdict, 'known-residual')
   })
 
   test('a proof run that is not committed, not at one head, changed since, or of other keys fails', () => {
@@ -3766,13 +3816,17 @@ describe('text layout clipping (F-00i)', () => {
       checks.textHidden.hidden.map((entry) => [entry.stage, entry.text, entry.elements]),
       [['settled', CONDITION, 1]]
     )
-    assert.throws(prove(change, undefined, '0.81.5'), { code: 'live_font_text_hidden' })
+    // No live record of it at all: lost text first (TEA ruling on Antigravity r47 P2).
+    assert.deepEqual(checks.textLost.lost, [{ stage: 'settled', text: CONDITION }])
+    assert.throws(prove(change, undefined, '0.81.5'), { code: 'live_font_text_lost' })
     // At the cold launch too, the label is the app's own: nothing lost.
     change.cold.textProbe.records = change.cold.textProbe.records.filter(
       (record) => record.text !== CONDITION
     )
     change.cold.textProbe.elements = [containerLabel()]
-    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+    const both = evaluateLiveFontChangeRaw(change).checks
+    assert.equal(both.textHidden.pass, true)
+    assert.equal(both.textLost.pass, true)
   })
 
   test('the probe-reports-nothing mutant still fails beside its own element', () => {
@@ -3872,5 +3926,90 @@ describe('text layout clipping (F-00i)', () => {
     // Both launches show it so: the app's own state, nothing lost.
     change.cold = withButton(change.cold, [both[1]])
     assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling on Antigravity r47 P2 (R47_F3B): the button's composite label ("Submit, required")
+  // names no record, so the label check finds nothing; the cold launch's "Submit" record with
+  // none live is lost text, whatever the hierarchy or the group's label says.
+  test('R47_F3B: a text gone live inside a composite label group fails as lost text', () => {
+    const SUBMIT = {
+      id: 'btn-submit',
+      text: 'Submit, required',
+      bounds: '[20,1500][300,1560]',
+    }
+    const withButton = (capture, records) => {
+      const shown = { ...capture, nodes: [...capture.nodes, SUBMIT] }
+      const answer = healthyAnswer(shown, 'ios')
+      answer.records = [
+        ...answer.records.filter((record) => record.text !== SUBMIT.text),
+        ...records.map(([text, rect, overrides]) =>
+          probeRecord('ios', text, rect, overrides)
+        ),
+      ]
+      return { ...shown, textProbe: answer }
+    }
+    const submit = ['Submit', [40, 1510, 200, 1550]]
+    const star = ['*', [210, 1510, 230, 1530]]
+    const leg = (cold, settled) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.before = withButton(change.before, cold)
+      change.cold = withButton(change.cold, cold)
+      change.settled = withButton(change.settled, settled)
+      return change
+    }
+    const gone = leg([submit, star], [star])
+    const { checks, verdict } = evaluateLiveFontChangeRaw(gone)
+    // No residual explains lost text: on a stale screen whose every miss is stale, the leg would
+    // otherwise be the known residual.
+    assert.equal(verdict, 'unexpected')
+    const stale = { ...bugChange(), platform: 'ios' }
+    stale.before = withButton(stale.before, [submit, star])
+    stale.cold = withButton(stale.cold, [submit, star])
+    stale.settled = withButton(stale.settled, [submit, star])
+    assert.equal(evaluateLiveFontChangeRaw(stale).verdict, 'known-residual')
+    stale.settled = withButton(bugChange().settled, [star])
+    assert.equal(evaluateLiveFontChangeRaw(stale).verdict, 'unexpected')
+    assert.equal(checks.textProbe.pass, true, 'the glyph keeps the button a group')
+    assert.equal(checks.textHidden.pass, true, 'the composite label names no record')
+    assert.deepEqual(checks.textLost.lost, [{ stage: 'settled', text: 'Submit' }])
+    assert.throws(prove(gone, undefined, '0.81.5'), { code: 'live_font_text_lost' })
+    // Legitimately absent at both launches: nothing lost.
+    assert.equal(
+      evaluateLiveFontChangeRaw(leg([star], [star])).checks.textLost.pass,
+      true
+    )
+    // Live, a record of it drawn nowhere or scrolled away is still a record: not lost (the
+    // hidden-text and clip checks judge it).
+    for (const overrides of [
+      { opacity: 0 },
+      { visibleRect: null, clipRect: null, scrolledAway: true },
+    ])
+      assert.equal(
+        evaluateLiveFontChangeRaw(leg([submit, star], [[...submit, overrides], star]))
+          .checks.textLost.pass,
+        true,
+        JSON.stringify(overrides)
+      )
+    // At the cold launch, only compared records count: one drawn nowhere there, or in a
+    // volatile region, owes the live screen nothing.
+    assert.equal(
+      evaluateLiveFontChangeRaw(leg([[...submit, { opacity: 0 }], star], [star])).checks
+        .textLost.pass,
+      true
+    )
+    const regional = leg([submit, star], [star])
+    regional.cold.volatileRegions = ['[0,1490][1080,1570]']
+    assert.equal(evaluateLiveFontChangeRaw(regional).checks.textLost.pass, true)
+    // Scrolled away at the cold launch on every page, it may be a volatile card's text below the
+    // region's visible cut (the hierarchy cuts a region to what shows): not compared.
+    assert.equal(
+      evaluateLiveFontChangeRaw(
+        leg(
+          [[...submit, { visibleRect: null, clipRect: null, scrolledAway: true }], star],
+          [star]
+        )
+      ).checks.textLost.pass,
+      true
+    )
   })
 })

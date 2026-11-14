@@ -191,10 +191,41 @@ function readRun(run, index, context) {
   }
 }
 
+/**
+ * A capture's launch: its process id, a positive integer (as the runners write it, a decimal
+ * string or a number), and its React root mounts. Null when either is missing (TEA ruling on
+ * Antigravity r47 P2: `undefined` and `null` pids once read as two launches).
+ */
+function launchOf(capture) {
+  const pid =
+    Number.isSafeInteger(capture?.pid) && capture.pid > 0
+      ? capture.pid
+      : typeof capture?.pid === 'string' && /^[1-9]\d*$/.test(capture.pid)
+        ? Number(capture.pid)
+        : null
+  const root = capture?.identity?.root
+  return pid === null || typeof root !== 'string' || root === '' ? null : `${pid}|${root}`
+}
+
+/** Why one committed capture cannot stand for `stage` of this leg, or null. */
+function captureProblem(capture, stage, { platform, scales }) {
+  if (capture?.textProbe?.platform !== platform || capture.stage !== CAPTURE_STAGE[stage])
+    return `is no ${platform} ${CAPTURE_STAGE[stage]} capture`
+  if (launchOf(capture) === null)
+    return 'has no launch identity: an integer pid and an identity root'
+  // TEA ruling on Antigravity r47 P2: a cold stage is the cold launch at that stage's scale.
+  if (
+    CAPTURE_STAGE[stage] === 'cold' &&
+    (scales?.[stage] === undefined || Number(capture.fontScale) !== Number(scales[stage]))
+  )
+    return `is no cold launch at ${stage}'s scale ${scales?.[stage]}`
+  return null
+}
+
 function readRunUnsafe(
   run,
   index,
-  { stages, platform, read, ancestor, changed, current }
+  { stages, platform, read, ancestor, changed, current, scales }
 ) {
   const at = `volatileProof run ${index}`
   const manifest = manifestOf(run.dir, read)
@@ -219,14 +250,9 @@ function readRunUnsafe(
       return { problem: `${at} ${name} does not hash as ${CAPTURE_HASHES} lists` }
     hashes.push(hash)
     const capture = JSON.parse(String(bytes))
-    if (
-      capture?.textProbe?.platform !== platform ||
-      capture.stage !== CAPTURE_STAGE[stage]
-    )
-      return {
-        problem: `${at} ${name} is no ${platform} ${CAPTURE_STAGE[stage]} capture`,
-      }
-    launches.add(`${capture.pid}|${capture.identity?.root ?? ''}`)
+    const issue = captureProblem(capture, stage, { platform, scales })
+    if (issue) return { problem: `${at} ${name} ${issue}` }
+    launches.add(launchOf(capture))
     keys[stage] = captureVolatileKeys(capture, platform)
   }
   if (canonicalVolatileKeys(keys) !== current)
@@ -237,8 +263,8 @@ function readRunUnsafe(
 }
 
 /**
- * The verifier the oracle calls with an entry's `volatileProof` and this leg's volatile keys by
- * stage (legVolatileKeys); it returns why the proof fails, or null. `read(file)` returns the
+ * The verifier the oracle calls with an entry's `volatileProof`, this leg's volatile keys by
+ * stage (legVolatileKeys) and each stage's scale; it returns why the proof fails, or null. `read(file)` returns the
  * file's bytes at HEAD or null (committedReader), `ancestor(sha)` whether sha is a commit HEAD
  * descends from (commitAncestor), and `changed(sha)` the live-font inputs that differ between
  * sha and HEAD, both recomputed from git (evidence-manifest writeManifest and changedInputs,
@@ -252,7 +278,7 @@ export function createVolatileProofCheck({
   ancestor = commitAncestor(repoRoot),
   changed,
 }) {
-  return (proof, currentKeys) => {
+  return (proof, currentKeys, scales) => {
     const stages = Object.keys(currentKeys).sort()
     const shape = shapeProblem(proof, stages)
     if (shape) return shape
@@ -266,6 +292,7 @@ export function createVolatileProofCheck({
         ancestor,
         changed: changed ?? (() => [{ path: 'no input comparison' }]),
         current,
+        scales,
       })
       if (read_.problem) return read_.problem
       runs.push(read_)
