@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import http from 'node:http'
 import { test } from 'node:test'
 import { REFRESH_PATH } from './test-store-journey.mjs'
-import { refreshPolicy, startApiProxy } from './test-store-proxy.mjs'
+import { redactPath, refreshPolicy, startApiProxy } from './test-store-proxy.mjs'
 
 /** A stand-in API that echoes what reached it. */
 async function upstream(t) {
@@ -97,4 +97,56 @@ test('an unreachable API answers 502 and the log records it', async (t) => {
   const response = await fetch(`${proxy.url}/api/health`)
   assert.equal(response.status, 502)
   assert.equal(proxy.log[0].status, 502)
+})
+
+// TEA ruling, 2026-11-13: the evidence carries no user id, subscriber id or receipt data.
+test('logged paths drop the query and replace subscriber, member and receipt ids', async (t) => {
+  const member = '7b2c4e8a-1f3d-4c5b-9a6e-0d1f2a3b4c5d'
+  const cuid = 'clx9a8b7c6d5e4f3g2h1i0j'
+  const subscriber = '$RCAnonymousID:4f1c2b9e8d7a6c5b'
+  const receipt = 'GPA.3312-4410-2231-55128'
+  const api = await upstream(t)
+  const proxy = await startApiProxy({ target: api.origin })
+  t.after(() => proxy.close())
+  const paths = [
+    `/api/v1/commerce/subscription?receipt=${receipt}&user=${member}`,
+    `/v1/subscribers/${encodeURIComponent(subscriber)}/offerings`,
+    '/v1/subscribers/plain-name/attributes',
+    `/api/v1/users/${member}/profile`,
+    `/api/v1/members/${cuid}`,
+    `/api/v1/receipts/${receipt}`,
+  ]
+  for (const item of paths) await fetch(`${proxy.url}${item}`)
+  assert.deepEqual(
+    proxy.log.map((entry) => entry.path),
+    [
+      '/api/v1/commerce/subscription',
+      '/v1/subscribers/:subscriber/offerings',
+      '/v1/subscribers/:subscriber/attributes',
+      '/api/v1/users/:id/profile',
+      '/api/v1/members/:id',
+      '/api/v1/receipts/:id',
+    ]
+  )
+  const logged = JSON.stringify(proxy.log)
+  for (const secret of [
+    member,
+    cuid,
+    '4f1c2b9e8d7a6c5b',
+    'RCAnonymousID',
+    receipt,
+    'plain-name',
+  ])
+    assert.ok(!logged.includes(secret), secret)
+  // The API still received the real path; only the evidence is redacted.
+  assert.ok(api.seen.some((entry) => entry.url.includes(member)))
+  // Fixed paths stay readable.
+  assert.equal(
+    redactPath('/api/v1/commerce/subscription/refresh'),
+    '/api/v1/commerce/subscription/refresh'
+  )
+  assert.equal(
+    redactPath('/api/v1/commerce/premium/access?x=1'),
+    '/api/v1/commerce/premium/access'
+  )
 })

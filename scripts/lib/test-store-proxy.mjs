@@ -2,8 +2,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 //
 // Story 6.15 D15 (TEA-18): the app under the Test Store journey reaches our API only through
-// this loopback proxy. It logs every request (method, path, action, status; never a header,
-// query or body) and can refuse the subscription refresh, the one call that makes the API pull
+// this loopback proxy. It logs every request (method, redacted path, action, status; never a
+// header, query or body) and can refuse the subscription refresh, the one call that makes the API pull
 // the RevenueCat ledger. That log is how a journey record names the path that delivered an
 // entitlement, and refusing the refresh is how the preview leg isolates the webhook.
 //
@@ -13,6 +13,36 @@
 import http from 'node:http'
 import https from 'node:https'
 import { REFRESH_PATH } from './test-store-journey.mjs'
+
+// A path segment that names a user, member, subscriber or receipt: a UUID, or any segment of 16
+// or more characters that carries a digit (cuid, hex and RevenueCat `$RCAnonymousID:` ids).
+const ID_SEGMENT =
+  /^(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|(?=.*\d)[^/]{16,}|\$RCAnonymousID:.*)$/i
+
+/**
+ * The path as the evidence records it (TEA ruling, 2026-11-13): no query string, the segment
+ * after `subscribers` as `:subscriber`, and every id-shaped segment as `:id`, so a log line
+ * carries no user id or receipt data.
+ */
+const safeDecode = (segment) => {
+  try {
+    return decodeURIComponent(segment)
+  } catch {
+    return segment
+  }
+}
+
+export function redactPath(url) {
+  const pathname = new URL(url, 'http://proxy.invalid').pathname
+  const segments = pathname.split('/')
+  return segments
+    .map((segment, index) => {
+      if (index > 0 && segments[index - 1] === 'subscribers' && segment)
+        return ':subscriber'
+      return ID_SEGMENT.test(safeDecode(segment)) ? ':id' : segment
+    })
+    .join('/')
+}
 
 const isRefresh = (entry) => entry.method === 'POST' && entry.path === REFRESH_PATH
 
@@ -48,7 +78,7 @@ export function startApiProxy({ target, port = 0, headers = {}, now = Date.now }
     const entry = {
       at: now(),
       method: request.method,
-      path: new URL(request.url, 'http://proxy.invalid').pathname,
+      path: redactPath(request.url),
     }
     entry.action = policy(entry)
     log.push(entry)
