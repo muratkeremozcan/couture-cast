@@ -388,6 +388,10 @@ TECH: technical or architecture. DATA: data integrity or loss. OPS: CI, build, d
 - Native evidence on that SHA is linked in the PR (CX-10):
   - Before the D6 workflows: `workflow_dispatch` runs of `pr-share-card-native`, `pr-accessibility-focus` and `watchos-native`.
   - After D6: the consolidated iOS job by dispatch, or a recorded local run of its suites when the job is off the PR path, plus the Android lanes.
+  - Local device evidence carries a manifest from `scripts/lib/evidence-manifest.mjs` that hashes the
+    leg's inputs at its revision; any failed or hung git call fails the manifest. Limit (Antigravity
+    r25): a subtree object missing from the object store reads as an absent input, because git
+    itself reports it as "exists on disk, but not in" the revision.
 - The first nightly on `main` after merge is green before the next step opens. It never stands in for pre-merge evidence.
 - Every flake met is fixed and burned in by TEA (see Flake policy).
 - The step's C-02 table is appended to the spec.
