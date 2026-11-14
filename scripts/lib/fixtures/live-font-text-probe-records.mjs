@@ -34,7 +34,7 @@ export function probeRecord(platform, text, rect, overrides = {}) {
     unlimitedLineCount: null,
     opacity: 1,
     // iOS records always carry their accessibility ancestor (wire contract r44 4), Android none.
-    ...(platform === 'ios' ? { accessibilityAncestor: null } : {}),
+    ...(platform === 'ios' ? { accessibilityAncestor: null, behindModal: null } : {}),
     ...overrides,
   }
 }
@@ -50,6 +50,9 @@ export function healthyAnswer(capture, platform, { token = 'fixture' } = {}) {
     records: (capture.nodes ?? [])
       .filter((node) => node.text && !SYSTEM_UI.test(node.id ?? '') && !node.volatile)
       .map((node) => probeRecord(platform, node.text, node.bounds)),
+    // TEA ruling r46: the accessibility elements beside the records; a healthy screen whose
+    // every node is text needs none.
+    elements: [],
   }
 }
 

@@ -28,13 +28,14 @@ const WINDOW = { id: 1, rect: [0, 0, 1080, 2400], z: 0, focused: true }
 const answerFor = (
   token,
   records,
-  { platform = 'android', windows = [WINDOW] } = {}
+  { platform = 'android', windows = [WINDOW], elements = [] } = {}
 ) => ({
   version: 1,
   token,
   platform,
   windows,
   records,
+  elements,
 })
 const record = (text, rect, overrides) => probeRecord('android', text, rect, overrides)
 const iosRecord = (text, rect, overrides) => probeRecord('ios', text, rect, overrides)
@@ -422,6 +423,92 @@ describe('validateTextProbeAnswer', () => {
 
   // Wire contract r44 4: every iOS record carries accessibilityAncestor, null or an identifier
   // with a rect; Android records omit it.
+  // TEA ruling r46: the accessibility elements beside the records, required on both platforms.
+  test('every element carries an identifier or null, a label, a rect, hasText and a window', () => {
+    const element = (overrides = {}) => ({
+      identifier: 'community-card-image-seed-spotlight-1',
+      label: 'Spotlight look 1 styled for the season',
+      rect: [17, 721, 325, 1029],
+      hasText: false,
+      window: 1,
+      ...overrides,
+    })
+    for (const each of [element(), element({ identifier: null, hasText: true })]) {
+      const answer = ok()
+      answer.elements = [each]
+      assert.doesNotThrow(
+        () => validateTextProbeAnswer(answer, asked),
+        JSON.stringify(each)
+      )
+    }
+    for (const [name, each] of Object.entries({
+      'empty identifier': element({ identifier: '' }),
+      'identifier not text': element({ identifier: 3 }),
+      'missing identifier': (() => {
+        const each = element()
+        delete each.identifier
+        return each
+      })(),
+      'empty label': element({ label: '' }),
+      'label not text': element({ label: null }),
+      'inverted rect': element({ rect: [325, 721, 17, 1029] }),
+      'hasText not a boolean': element({ hasText: 'false' }),
+      'unknown window': element({ window: 9 }),
+      'extra field': element({ kind: 'image' }),
+      'not an object': 'Spotlight look 1',
+    })) {
+      const answer = ok()
+      answer.elements = [element(), each]
+      assert.throws(
+        () => validateTextProbeAnswer(answer, asked),
+        (error) =>
+          error.code === 'live_font_text_probe_invalid' &&
+          /^\S+: element 1 /.test(error.message),
+        name
+      )
+    }
+  })
+
+  // TEA ruling r46: behindModal, required on iOS (null or the modal view's frame), absent on Android.
+  test('behindModal is required on iOS, null or a frame, and absent on Android', () => {
+    const iosAsked = { platform: 'ios', token: 't1' }
+    const iosAnswer = (modal) => {
+      const answer = answerFor('t1', [iosRecord('Community', [121, 63, 281, 99])], {
+        platform: 'ios',
+      })
+      if (modal === undefined) delete answer.records[0].behindModal
+      else answer.records[0].behindModal = modal
+      return answer
+    }
+    for (const modal of [null, { rect: [0, 300, 402, 874] }])
+      assert.doesNotThrow(() => validateTextProbeAnswer(iosAnswer(modal), iosAsked))
+    for (const [name, modal] of Object.entries({
+      missing: undefined,
+      'inverted rect': { rect: [402, 300, 0, 874] },
+      'no rect': {},
+      'extra field': { rect: [0, 300, 402, 874], id: 'sheet' },
+      'a boolean': true,
+    }))
+      assert.throws(
+        () => validateTextProbeAnswer(iosAnswer(modal), iosAsked),
+        (error) =>
+          error.code === 'live_font_text_probe_invalid' &&
+          /record 0 (behindModal|fields)/.test(error.message),
+        name
+      )
+    for (const modal of [null, { rect: [0, 300, 402, 874] }]) {
+      const answer = ok()
+      answer.records[0].behindModal = modal
+      assert.throws(
+        () => validateTextProbeAnswer(answer, asked),
+        (error) =>
+          error.code === 'live_font_text_probe_invalid' &&
+          /record 0 fields/.test(error.message),
+        `android ${JSON.stringify(modal)}`
+      )
+    }
+  })
+
   test('accessibilityAncestor is required on iOS, null or an identifier with a rect, and absent on Android', () => {
     const iosAsked = { platform: 'ios', token: 't1' }
     const iosAnswer = (ancestor) => {
@@ -516,6 +603,8 @@ describe('validateTextProbeAnswer', () => {
       platform: (a) => (a.platform = 'ios'),
       'extra top-level field': (a) => (a.debug = true),
       'records not a list': (a) => (a.records = {}),
+      'no elements': (a) => delete a.elements,
+      'elements not a list': (a) => (a.elements = {}),
       'another platform kind': (a) => (a.records[0].kind = 'RCTParagraphComponentView'),
       'extra record field': (a) => (a.records[0].extra = 1),
       'missing record field': (a) => delete a.records[0].clipRect,
@@ -818,6 +907,164 @@ describe('matchTextProbe, exact text one to one', () => {
     )
     assert.equal(result.code, 'live_font_text_probe_unmatched')
     assert.deepEqual(result.groups, [])
+  })
+})
+
+// TEA ruling r46: label elements pair the nodes no text record takes; never judged, never text.
+describe('matchTextProbe, accessibility elements (TEA ruling r46)', () => {
+  const iosMatch = (nodes, records, elements) =>
+    matchTextProbe({
+      platform: 'ios',
+      nodes,
+      answer: answerFor('t', records, {
+        platform: 'ios',
+        windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+        elements,
+      }),
+      window: [0, 0, 402, 874],
+      tolerance: 1,
+    })
+  const element = (label, rect, overrides = {}) => ({
+    identifier: null,
+    label,
+    rect,
+    hasText: false,
+    window: 1,
+    ...overrides,
+  })
+  const IMAGE = 'Spotlight look 1 styled for the season'
+  const imageNode = node(
+    IMAGE,
+    [17, 721, 325, 1029],
+    'community-card-image-seed-spotlight-1'
+  )
+
+  test('an element-only node pairs by identity, else by frame; neither fails unmatched', () => {
+    const byId = iosMatch(
+      [imageNode],
+      [],
+      // A frame off by more than the tolerance: only the identity can pair it.
+      [element(IMAGE, [17, 715, 325, 1040], { identifier: imageNode.id })]
+    )
+    assert.deepEqual(
+      [byId.pass, byId.elements],
+      [true, [{ node: 0, element: 0, label: IMAGE }]]
+    )
+    assert.deepEqual(byId.pairs, [], 'an element pairs no record and is never judged')
+    const byFrame = iosMatch([imageNode], [], [element(IMAGE, [17, 721.5, 325, 1029])])
+    assert.equal(byFrame.pass, true)
+    // Same label, other frame, no identity: no pair.
+    const elsewhere = iosMatch([imageNode], [], [element(IMAGE, [17, 400, 325, 700])])
+    assert.deepEqual(
+      [elsewhere.code, elsewhere.unmatchedNodes],
+      ['live_font_text_probe_unmatched', [0]]
+    )
+    // Another label: no pair.
+    const other = iosMatch(
+      [imageNode],
+      [],
+      [element('A photo', imageNode.box, { identifier: imageNode.id })]
+    )
+    assert.equal(other.code, 'live_font_text_probe_unmatched')
+    // No text record and no element: unmatched, as before.
+    assert.equal(iosMatch([imageNode], [], []).code, 'live_font_text_probe_unmatched')
+    // Two elements of one label and frame for one node: ambiguous.
+    const twice = iosMatch(
+      [imageNode],
+      [],
+      [element(IMAGE, imageNode.box), element(IMAGE, imageNode.box)]
+    )
+    assert.equal(twice.code, 'live_font_text_probe_ambiguous')
+    // One element pairs one node.
+    const twin = node(IMAGE, [17, 721, 325, 1029], '')
+    assert.equal(
+      iosMatch([imageNode, twin], [], [element(IMAGE, imageNode.box)]).code,
+      'live_font_text_probe_unmatched'
+    )
+  })
+
+  test('a button echoing its child label pairs with its element; the child text pairs with its node', () => {
+    const button = node('New post', [251, 116, 386, 168], 'community-new-post-button')
+    const label = node('New post', [267, 128, 370, 156], 'community-new-post-label')
+    const records = [iosRecord('New post', [267.667, 128.667, 370, 156.667])]
+    const elements = [
+      element('New post', [251, 116, 386, 168], { identifier: button.id, hasText: true }),
+    ]
+    const result = iosMatch([button, label], records, elements)
+    assert.equal(result.pass, true, JSON.stringify(result.unmatchedNodes))
+    assert.deepEqual(
+      result.pairs.map((pair) => [pair.node, pair.via]),
+      [[1, 'text']]
+    )
+    assert.deepEqual(result.elements, [{ node: 0, element: 0, label: 'New post' }])
+  })
+
+  // The probe-reports-nothing mutant: the text record is gone, its own element (a text view
+  // inside) is still listed. Nothing lies inside the element, so it cannot stand in.
+  test('an element with a text view inside stands in only when a text record lies inside it', () => {
+    const heading = node(
+      'Spotlight in US',
+      [17, 300, 385, 330],
+      'community-spotlight-heading'
+    )
+    const own = element('Spotlight in US', [17, 300, 385, 330], {
+      identifier: heading.id,
+      hasText: true,
+    })
+    const result = iosMatch([heading], [], [own])
+    assert.deepEqual(
+      [result.code, result.unmatchedNodes],
+      ['live_font_text_probe_unmatched', [0]]
+    )
+    // With its record it pairs by text and the element is not needed.
+    const healthy = iosMatch(
+      [heading],
+      [iosRecord('Spotlight in US', [17, 300, 385, 330])],
+      [own]
+    )
+    assert.deepEqual([healthy.pass, healthy.elements], [true, []])
+  })
+
+  test('an input node with the joined label pairs its element and its placeholder attaches there', () => {
+    const input = node(
+      'Image description Describe the garments, layers and colours',
+      [22, 431, 380, 507],
+      'community-alt-text-input'
+    )
+    const placeholder = iosRecord(
+      'Describe the garments, layers and colours',
+      [21, 430.667, 381, 508.333],
+      {
+        kind: 'RCTTextInputComponentView',
+      }
+    )
+    const elements = [
+      element(input.text, [21, 430.667, 381, 508.333], {
+        identifier: input.id,
+        hasText: true,
+      }),
+    ]
+    const result = iosMatch([input], [placeholder], elements)
+    assert.equal(
+      result.pass,
+      true,
+      JSON.stringify([result.unmatchedRecords, result.unmatchedNodes])
+    )
+    assert.deepEqual(result.attached, [{ node: 0, records: [0] }])
+    assert.deepEqual(
+      result.pairs.map((pair) => [pair.node, pair.record, pair.via]),
+      [[0, 0, 'attached']]
+    )
+  })
+
+  // TEA ruling r46: behind an accessibility-modal view, like a partial or a whole cover.
+  test('records behind a modal view leave matching; one its frame holds is left out', () => {
+    const sheet = { rect: [0, 300, 402, 874] }
+    const outside = iosRecord('Community', [121, 63, 281, 99], { behindModal: sheet })
+    const inside = iosRecord('Shoes', [16, 600, 386, 640], { behindModal: sheet })
+    const result = iosMatch([], [outside, inside], [])
+    assert.equal(result.pass, true)
+    assert.deepEqual([result.behind, result.modalCovered], [[0], [1]])
   })
 })
 

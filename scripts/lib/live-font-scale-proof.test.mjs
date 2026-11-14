@@ -2872,4 +2872,90 @@ describe('text layout clipping (F-00i)', () => {
       { node: '["tab-settings","Settings"]', records: [''] },
     ])
   })
+
+  // TEA ruling r46: accessibility elements pair nodes no text record takes, but never count as
+  // text, so text that vanishes behind a container label still fails.
+  const containerLabel = (overrides = {}) => ({
+    identifier: 'current-condition',
+    label: CONDITION,
+    rect: [42, 488, 304, 718],
+    hasText: true,
+    window: 1,
+    ...overrides,
+  })
+
+  test('a text gone behind a container label of the same text fails as lost text', () => {
+    const change = withAll(fixedChange())
+    change.settled.textProbe.records = change.settled.textProbe.records.filter(
+      (record) => record.text !== CONDITION
+    )
+    change.settled.textProbe.elements = [containerLabel()]
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.equal(checks.textProbe.pass, true, 'the element takes the node')
+    assert.deepEqual(checks.textProbe.stages.settled.elements, [
+      { node: `["current-condition","${CONDITION}"]`, identifier: 'current-condition' },
+    ])
+    assert.deepEqual(
+      checks.textHidden.hidden.map((entry) => [entry.stage, entry.text, entry.elements]),
+      [['settled', CONDITION, 1]]
+    )
+    assert.throws(prove(change, undefined, '0.81.5'), { code: 'live_font_text_hidden' })
+    // At the cold launch too, the label is the app's own: nothing lost.
+    change.cold.textProbe.records = change.cold.textProbe.records.filter(
+      (record) => record.text !== CONDITION
+    )
+    change.cold.textProbe.elements = [containerLabel()]
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
+  test('the probe-reports-nothing mutant still fails beside its own element', () => {
+    const change = withAll(fixedChange())
+    change.settled.textProbe.records = change.settled.textProbe.records.filter(
+      (record) => record.text !== CONDITION
+    )
+    // Its own element, a text view inside, the record gone: nothing lies inside it.
+    change.settled.textProbe.elements = [containerLabel({ rect: [42, 667, 155, 718] })]
+    for (const version of ['0.81.5', '0.88.1'])
+      assert.throws(
+        prove(change, undefined, version),
+        (error) =>
+          error.code === 'live_font_text_probe_unmatched' &&
+          error.message.includes(CONDITION)
+      )
+  })
+
+  // TEA ruling r46: behind an accessibility-modal view a record leaves matching like a partial
+  // cover and stays judged with no key, unless the modal view's frame holds it.
+  test('a clip behind a modal view fails with no key; one the modal frame holds is left out', () => {
+    const behindSheet = (sheet) => {
+      const change = withAll(fixedChange())
+      // Both temperature labels sit behind the sheet; the first is cut.
+      for (const each of change.settled.textProbe.records)
+        if (each.text === TEMPERATURE) each.behindModal = { rect: sheet }
+      const record = recordFor(change.settled, TEMPERATURE)
+      record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + 30]
+      // The hierarchy lists nothing behind an accessibility-modal view.
+      change.settled.nodes = change.settled.nodes.filter(
+        (each) => each.text !== TEMPERATURE
+      )
+      return change
+    }
+    const partial = behindSheet([0, 1200, 1080, 2400])
+    const { checks, verdict } = evaluateLiveFontChangeRaw(partial)
+    assert.equal(checks.textProbe.pass, true, 'out of matching, owed no node')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.key, entry.text]),
+      [['behind', null, TEMPERATURE]]
+    )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(partial, undefined, '0.88.1'), { code: 'live_font_fix_missing' })
+    const whole = behindSheet([0, 0, 1080, 2400])
+    const held = evaluateLiveFontChangeRaw(whole)
+    assert.equal(held.checks.textProbe.pass, true)
+    assert.deepEqual(layoutClips(held.checks.clipping), [])
+    assert.deepEqual(held.checks.textProbe.stages.settled.modalCovered, [
+      TEMPERATURE,
+      TEMPERATURE,
+    ])
+  })
 })

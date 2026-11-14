@@ -622,6 +622,17 @@ export function textProbeSummary(capture, platform) {
       record: records[entry.record].text,
       nodes: entry.nodes.map((index) => identityOf(nodes[index])),
     })),
+    // TEA ruling r46: nodes an accessibility element took (never judged, never text), elements
+    // two of which fit one node, and records left out behind a modal view that holds them.
+    elements: (match.elements ?? []).map((pair) => ({
+      node: identityOf(nodes[pair.node]),
+      identifier: capture.textProbe.elements[pair.element].identifier,
+    })),
+    elementAmbiguous: (match.elementAmbiguous ?? []).map((entry) => ({
+      node: identityOf(nodes[entry.node]),
+      elements: entry.elements.length,
+    })),
+    modalCovered: (match.modalCovered ?? []).map((index) => records[index].text),
   }
 }
 
@@ -1118,7 +1129,8 @@ export function evaluateLiveFontChange({
 function textPresence(capture, platform) {
   const presence = new Map()
   const entry = (text) => {
-    if (!presence.has(text)) presence.set(text, { keys: [], invisible: 0, offWindow: 0 })
+    if (!presence.has(text))
+      presence.set(text, { keys: [], invisible: 0, offWindow: 0, elements: 0 })
     return presence.get(text)
   }
   // Every page counts (TEA ruling 2026-11-14): a key once however many pages show it, and a
@@ -1133,27 +1145,36 @@ function textPresence(capture, platform) {
     capture,
     ...pageCaptures(capture).map(({ capture: pageCapture }) => pageCapture),
   ]
-  // Drawn nowhere on a page: at opacity 0, or wholly off the window (TEA ruling 2026-11-14).
-  for (const page of pages) {
-    const match = textLayout(page, platform).match
-    for (const kind of ['invisible', 'offWindow']) {
-      const counts = new Map()
-      for (const { record, comparable } of match?.[kind] ?? []) {
-        if (!comparable) continue
-        const text = maskText(page.textProbe.records[record].text)
-        counts.set(text, (counts.get(text) ?? 0) + 1)
-      }
+  // The most any one page shows of each, so an overlap is not counted twice.
+  for (const page of pages)
+    for (const [kind, counts] of Object.entries(pageCounts(page, platform)))
       for (const [text, count] of counts)
         entry(text)[kind] = Math.max(entry(text)[kind], count)
-    }
-  }
   return presence
+}
+
+/**
+ * Per masked text, how many records one page draws nowhere (at opacity 0, or wholly off the
+ * window; TEA ruling 2026-11-14), counting only those launches compare, and how many of its
+ * nodes only an accessibility element took (TEA ruling r46: a label, not text).
+ */
+function pageCounts(page, platform) {
+  const match = textLayout(page, platform).match
+  const counts = { invisible: new Map(), offWindow: new Map(), elements: new Map() }
+  const add = (kind, text) =>
+    counts[kind].set(maskText(text), (counts[kind].get(maskText(text)) ?? 0) + 1)
+  for (const kind of ['invisible', 'offWindow'])
+    for (const { record, comparable } of match?.[kind] ?? [])
+      if (comparable) add(kind, page.textProbe.records[record].text)
+  for (const { label } of match?.elements ?? []) add('elements', label)
+  return counts
 }
 
 /**
  * TEA ruling 2026-11-14: an invisible or off-window record must not hide lost text. A text the
  * cold launch at the same scale shows on more paired records than the live capture does, while
- * the live capture draws it at opacity 0 or wholly off the window, failed to show:
+ * the live capture draws it at opacity 0 or wholly off the window, or shows it only as an
+ * accessibility element's label (TEA ruling r46: elements never count as text), failed to show:
  * live_font_text_hidden. `stages` holds
  * [stage, live capture, cold capture] triples; a missing capture is skipped.
  */
@@ -1164,13 +1185,17 @@ function hiddenText(platform, stages) {
     const [now, then] = [textPresence(live, platform), textPresence(cold, platform)]
     for (const [text, { keys }] of then) {
       const shown = now.get(text)
-      if ((shown?.invisible || shown?.offWindow) && shown.keys.length < keys.length)
+      if (
+        (shown?.invisible || shown?.offWindow || shown?.elements) &&
+        shown.keys.length < keys.length
+      )
         hidden.push({
           stage,
           text,
           coldKeys: keys,
           invisible: shown.invisible,
           ...(shown.offWindow ? { offWindow: shown.offWindow } : {}),
+          ...(shown.elements ? { elements: shown.elements } : {}),
         })
     }
   }

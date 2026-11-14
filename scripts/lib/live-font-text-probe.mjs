@@ -90,7 +90,7 @@ const RECORD_FIELDS = [
   'unlimitedLineCount',
   'opacity',
 ].sort()
-const ANSWER_FIELDS = ['platform', 'records', 'token', 'version', 'windows']
+const ANSWER_FIELDS = ['elements', 'platform', 'records', 'token', 'version', 'windows']
 /**
  * The refusal the native probe answers with instead of windows and records (wire contract r44
  * P3-1): `{ version, token, platform, error: { code, record, kind } }`, `record` the index of the
@@ -196,13 +196,18 @@ const validAncestor = (ancestor) =>
     typeof ancestor.identifier === 'string' &&
     ancestor.identifier !== '' &&
     isRect(ancestor.rect))
+/**
+ * `behindModal` (TEA ruling r46, iOS only, required): null, or `{ rect }`, the frame of the
+ * accessibilityViewIsModal view the text sits behind, in the form of viewRect. Android records
+ * omit it.
+ */
+const validModal = (modal) =>
+  modal === null || (sameFields(modal, ['rect']) && isRect(modal.rect))
+const IOS_FIELDS = [...RECORD_FIELDS, 'accessibilityAncestor', 'behindModal'].sort()
 /** The record field sets each platform's contract takes, offWindow optional on both. */
 const FIELD_SETS = {
   android: [RECORD_FIELDS, WITH_OFF_WINDOW],
-  ios: [
-    [...RECORD_FIELDS, 'accessibilityAncestor'].sort(),
-    [...WITH_OFF_WINDOW, 'accessibilityAncestor'].sort(),
-  ],
+  ios: [IOS_FIELDS, [...IOS_FIELDS, 'offWindow'].sort()],
 }
 
 /** Why `record` breaks the contract, or null. `unknown:*` kinds are judged by the caller. */
@@ -212,6 +217,7 @@ function recordProblem(record, platform, windowIds) {
   if (!TEXT_PROBE_KINDS[platform].includes(record.kind)) return `kind ${record.kind}`
   if (!windowIds.has(record.window)) return `window ${record.window}`
   if (!validAncestor(record.accessibilityAncestor)) return 'accessibilityAncestor'
+  if (platform === 'ios' && !validModal(record.behindModal)) return 'behindModal'
   return (
     [...RECORD_RULES, ...OFF_WINDOW_RULES].find(([, holds]) => !holds(record))?.[0] ??
     null
@@ -248,8 +254,35 @@ function answerProblem(answer, { platform, token }) {
   if (answer.version !== TEXT_PROBE_VERSION) return `version ${answer.version}`
   if (answer.token !== token) return `token ${answer.token}, asked ${token}`
   if (answer.platform !== platform) return `platform ${answer.platform}, run ${platform}`
-  if (!Array.isArray(answer.windows) || !Array.isArray(answer.records))
-    return 'windows and records must be lists'
+  if (
+    !Array.isArray(answer.windows) ||
+    !Array.isArray(answer.records) ||
+    !Array.isArray(answer.elements)
+  )
+    return 'windows, records and elements must be lists'
+  return null
+}
+
+/**
+ * TEA ruling r46: the accessibility elements the native probe lists beside the text records,
+ * `{ identifier, label, rect, hasText, window }`: the testID (a non-empty string, or null), the
+ * accessibility label (a non-empty string), the frame in the form of viewRect, whether a text
+ * view sits inside, and the window. Never judged, never counted as text: they only let a
+ * hierarchy node no text record takes pair (matchTextProbe).
+ */
+const ELEMENT_FIELDS = ['hasText', 'identifier', 'label', 'rect', 'window']
+const elementProblem = (element, windowIds) => {
+  if (!sameFields(element, ELEMENT_FIELDS))
+    return `fields ${JSON.stringify(Object.keys(element ?? {}).sort())}`
+  if (
+    element.identifier !== null &&
+    (typeof element.identifier !== 'string' || element.identifier === '')
+  )
+    return 'identifier'
+  if (typeof element.label !== 'string' || element.label === '') return 'label'
+  if (!isRect(element.rect)) return 'rect'
+  if (typeof element.hasText !== 'boolean') return 'hasText'
+  if (!windowIds.has(element.window)) return `window ${element.window}`
   return null
 }
 
@@ -299,6 +332,10 @@ export function validateTextProbeAnswer(answer, { platform, token }) {
       )
     const breach = recordProblem(record, platform, windowIds)
     if (breach) fail('live_font_text_probe_invalid', `record ${index} ${breach}`)
+  }
+  for (const [index, element] of answer.elements.entries()) {
+    const breach = elementProblem(element, windowIds)
+    if (breach) fail('live_font_text_probe_invalid', `element ${index} ${breach}`)
   }
   return answer
 }
@@ -614,10 +651,11 @@ export function coveredWindows(windows, tolerance) {
 }
 
 /** Each record's class (see matchTextProbe) and, for one in a volatile region, the region's index. */
-function classifyRecords(records, coveredIds, volatileRegions) {
+function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
   const classes = {
     empty: [],
     covered: [],
+    modalCovered: [],
     invisible: [],
     offWindow: [],
     behind: [],
@@ -632,12 +670,19 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
+    // TEA ruling r46: behind an accessibilityViewIsModal view whose frame holds it, it is left
+    // out like a whole cover; behind one that does not, like a partial cover (behind).
+    else if (
+      record.behindModal &&
+      contains(record.behindModal.rect, recordRect(record), tolerance)
+    )
+      kind = 'modalCovered'
     // TEA ruling 2026-11-14: opacity exactly 0 draws nothing (the inactive copy of a stacked
     // tab icon); anything above 0, a fade caught mid-way, is matched and judged.
     else if (record.opacity === 0) kind = 'invisible'
     // Wholly off its window with no scroll view to bring it in: drawn nowhere, so no clip.
     else if (record.offWindow === true) kind = 'offWindow'
-    else if (coveredIds.has(record.window)) kind = 'behind'
+    else if (coveredIds.has(record.window) || record.behindModal) kind = 'behind'
     // In a volatile region: volatile only if no hierarchy node of its text takes it (matchTextProbe).
     else if (region >= 0) kind = 'regional'
     else if (record.scrolledAway) kind = 'scrolled'
@@ -803,17 +848,106 @@ function resolveLeftovers({
 }
 
 /**
+ * TEA ruling r46: each hierarchy node no text record took (after text pairing, groups and
+ * attachment), in screen order, pairs with one accessibility element of the same label: by
+ * identity first (the element's identifier is the node's testID and its frame touches the
+ * node's box; the best overlap, a tie ambiguous), else by frame (every edge within the
+ * tolerance; two such elements ambiguous). An element with a text view inside stands in only
+ * when a text record lies inside it, so a probe that drops a text record cannot hide it behind
+ * its own element. Each element pairs once; it is never judged and never counts as text.
+ * Returns the pairs `{ node, element, label }`, with `ambiguous` beside them.
+ */
+function pairElements({ nodes, open, elements, records, tolerance, nodeRank }) {
+  const used = new Set()
+  const pairs = []
+  pairs.ambiguous = []
+  const holdsText = (element) =>
+    records.some(
+      (record) =>
+        record.text !== '' && contains(element.rect, recordRect(record), tolerance)
+    )
+  const sameFrame = (a, b) => a.every((edge, at) => Math.abs(edge - b[at]) <= tolerance)
+  const waiting = nodes
+    .filter((node) => open.has(node.index))
+    .sort((a, b) => nodeRank.get(a.index) - nodeRank.get(b.index))
+  for (const node of waiting) {
+    const eligible = elements
+      .map((element, index) => ({ element, index }))
+      .filter(
+        ({ element, index }) =>
+          !used.has(index) &&
+          element.label === node.text &&
+          (!element.hasText || holdsText(element))
+      )
+    const named = eligible.filter(
+      ({ element }) =>
+        node.id !== '' &&
+        element.identifier === node.id &&
+        overlapRatio(element.rect, node.box) > 0
+    )
+    const chosen = named.length
+      ? best(named, ({ element }) => -overlapRatio(element.rect, node.box))
+      : eligible.filter(({ element }) => sameFrame(element.rect, node.box))
+    if (!chosen.length) continue
+    open.delete(node.index)
+    if (chosen.length > 1) {
+      pairs.ambiguous.push({
+        node: node.index,
+        elements: chosen.map(({ index }) => index),
+      })
+      continue
+    }
+    used.add(chosen[0].index)
+    pairs.push({ node: node.index, element: chosen[0].index, label: node.text })
+  }
+  return pairs
+}
+
+/**
+ * A free record inside a paired element (an input's placeholder under the element carrying the
+ * joined label) is attached to that element's node, the smallest such element first. Members
+ * stay in screen order.
+ */
+function attachToElements({
+  leftover,
+  elementPairs,
+  elements,
+  attached,
+  free,
+  tolerance,
+  recordRank,
+}) {
+  for (const record of leftover) {
+    const holders = elementPairs
+      .filter((pair) =>
+        contains(elements[pair.element].rect, recordRect(record), tolerance)
+      )
+      .sort((a, b) => area(elements[a.element].rect) - area(elements[b.element].rect))
+    if (!holders.length) continue
+    free.delete(record.index)
+    const entry = attached.find((each) => each.node === holders[0].node)
+    if (entry) entry.records.push(record.index)
+    else attached.push({ node: holders[0].node, records: [record.index] })
+  }
+  for (const entry of attached)
+    entry.records.sort((a, b) => recordRank.get(a) - recordRank.get(b))
+}
+
+/**
  * Pairs the probe records of one capture with its hierarchy text nodes. `nodes` are the app's
  * text nodes ({ text, id, box }, box as [l, t, r, b]), `answer` the checked probe answer,
  * `window` the capture's window rect, `volatileRegions` the rects of the regions the capture
  * leaves out. Every record falls in one class:
  *   empty      text '' (no text to cut), left out
  *   covered    in a window a focused higher window covers whole, left out
+ *   modalCovered  behind an accessibilityViewIsModal view whose frame holds it (iOS
+ *              `behindModal`, TEA ruling r46), left out like a whole cover
  *   invisible  opacity exactly 0: left out of matching and judging, listed for review
  *   offWindow  wholly off its window, no scroll view to bring it in: may match, never
  *              required, never judged, listed for review
  *   behind     in a window under a focused higher window that does not cover it whole (a
- *              centred dialog): out of matching, still judged for clipping
+ *              centred dialog), or behind a modal view whose frame does not hold it: out of
+ *              matching, still judged for clipping, with no key
  *   volatile   centre inside a volatile region and taken by no hierarchy node of its text: out
  *              of matching, still judged for clipping. The hierarchy drops a region's subtree by
  *              testID, so a text it keeps inside the region's rect (a sibling the region's
@@ -831,7 +965,9 @@ function resolveLeftovers({
  * when it reports one, else into the smallest open node (a group) whose rect holds it, else
  * attached to the smallest node of any kind that holds it; ties are ambiguous. A group that
  * holds no record, a visible record no node takes, and on Android any leftover node, are
- * unmatched. A covering window none of whose records pairs is a missing answer. Indexes refer to
+ * unmatched, unless an accessibility element of the node's label takes the node (pairElements,
+ * TEA ruling r46, both platforms); a free record inside such an element is attached to its
+ * node. A covering window none of whose records pairs is a missing answer. Indexes refer to
  * `nodes` and `answer.records`.
  */
 export function matchTextProbe({
@@ -845,7 +981,12 @@ export function matchTextProbe({
 }) {
   const records = answer.records.map((record, index) => ({ ...record, index }))
   const covers = coveredWindows(answer.windows, tolerance)
-  const { classes, regionOf } = classifyRecords(records, covers, volatileRegions)
+  const { classes, regionOf } = classifyRecords(
+    records,
+    covers,
+    volatileRegions,
+    tolerance
+  )
   const indexed = nodes.map((node, index) => ({ ...node, index }))
   const windowNodes =
     groupRule && window
@@ -891,6 +1032,24 @@ export function matchTextProbe({
         recordRank,
       })
     : { groups: [], attached: [], ambiguous: [] }
+  const elements = answer.elements ?? []
+  const elementPairs = pairElements({
+    nodes: indexed,
+    open,
+    elements,
+    records,
+    tolerance,
+    nodeRank,
+  })
+  attachToElements({
+    leftover: candidates.filter((record) => free.has(record.index)),
+    elementPairs,
+    elements,
+    attached,
+    free,
+    tolerance,
+    recordRank,
+  })
   for (const [via, list] of [
     ['group', groups],
     ['attached', attached],
@@ -908,7 +1067,8 @@ export function matchTextProbe({
   )
   let code = null
   if (!coverAnswered) code = 'live_font_text_probe_missing'
-  else if (ambiguous.length) code = 'live_font_text_probe_ambiguous'
+  else if (ambiguous.length || elementPairs.ambiguous.length)
+    code = 'live_font_text_probe_ambiguous'
   else if (unmatchedRecords.length || unmatchedNodes.length)
     code = 'live_font_text_probe_unmatched'
   return {
@@ -917,6 +1077,9 @@ export function matchTextProbe({
     pairs,
     groups,
     attached,
+    elements: [...elementPairs],
+    elementAmbiguous: elementPairs.ambiguous,
+    modalCovered: classes.modalCovered.map((record) => record.index),
     ambiguous,
     unmatchedRecords,
     unmatchedNodes,
