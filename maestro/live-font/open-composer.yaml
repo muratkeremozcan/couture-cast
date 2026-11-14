@@ -17,20 +17,21 @@ appId: ${MAESTRO_APP_ID}
     centerElement: true
 # At the largest text sizes the sticky header and chip row grow, and a centered button can still
 # sit under them. Maestro's hierarchy ignores occlusion, so it rates that button visible and the
-# tap lands on a chip (iOS accessibility-medium, 2026-11-14: the Community chip). Scrolling the
-# content down brings the button below the chip row before the tap.
+# tap lands on a chip (iOS accessibility-medium, 2026-11-14: the Community chip). Maestro's
+# `below` compares top edges only, so the anchor is chip-navigation-bottom-edge, a full-width
+# view on the row's bottom edge: the button's top must clear the row before the tap.
 - scrollUntilVisible:
     element:
       id: outfit-share-card-open
       below:
-        id: chip-sponsored
+        id: chip-navigation-bottom-edge
     direction: UP
     timeout: 30000
     label: 'Bring the share button below the sticky chip row'
 - tapOn:
     id: outfit-share-card-open
     below:
-      id: chip-sponsored
+      id: chip-navigation-bottom-edge
 # A tap that missed the button and selected a chip fails here, with its own message, instead of
 # timing out on the composer below. With the composer open, the chip row is hidden behind it.
 - assertNotVisible:
