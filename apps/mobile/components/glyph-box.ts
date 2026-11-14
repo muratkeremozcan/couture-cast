@@ -11,22 +11,44 @@
 import { PixelRatio, useWindowDimensions } from 'react-native'
 
 /**
+ * The text scale a glyph is drawn at: the system scale, capped by the glyph's own
+ * `maxFontSizeMultiplier` when it sets one (React Native ignores values below 1, as here).
+ */
+function glyphScale(fontScale: number, maxFontSizeMultiplier?: number): number {
+  return maxFontSizeMultiplier !== undefined &&
+    Number.isFinite(maxFontSizeMultiplier) &&
+    maxFontSizeMultiplier >= 1
+    ? Math.min(fontScale, maxFontSizeMultiplier)
+    : fontScale
+}
+
+/**
  * The side of a glyph box drawn at `base` at the default text size, never smaller than `base`.
  * At or below the default size it is `base` exactly: rounding it to the pixel grid made a 22 box
  * 58 px where Yoga drew 57 or 58 by position (2.625 density), so the default look moved 1 px.
+ * Pass the glyph's `maxFontSizeMultiplier` when it sets one, so the box stops where the glyph does.
  */
-export function glyphBoxSide(base: number, fontScale: number): number {
-  if (!(Number.isFinite(fontScale) && fontScale > 1)) return base
-  return PixelRatio.roundToNearestPixel(base * fontScale)
+export function glyphBoxSide(
+  base: number,
+  fontScale: number,
+  maxFontSizeMultiplier?: number
+): number {
+  const scale = glyphScale(fontScale, maxFontSizeMultiplier)
+  if (!(Number.isFinite(scale) && scale > 1)) return base
+  return PixelRatio.roundToNearestPixel(base * scale)
 }
 
 /**
  * The size style of a square glyph box at the current text size. `round` makes it a circle;
  * otherwise the caller keeps its own corner radius.
  */
-export function useGlyphBox(base: number, round: boolean) {
+export function useGlyphBox(
+  base: number,
+  round: boolean,
+  maxFontSizeMultiplier?: number
+) {
   const { fontScale } = useWindowDimensions()
-  const side = glyphBoxSide(base, fontScale)
+  const side = glyphBoxSide(base, fontScale, maxFontSizeMultiplier)
   return round
     ? { width: side, height: side, borderRadius: side / 2 }
     : { width: side, height: side }

@@ -52,6 +52,14 @@ describe('6.15 glyph box', () => {
     expect(glyphBoxSide(52, 3.1)).toBeCloseTo(161.2, 0)
   })
 
+  it('6.15-MOB-GLYPH-04 stops growing where a glyph with maxFontSizeMultiplier stops', () => {
+    expect(glyphBoxSide(30, 2, 1.5)).toBe(45)
+    expect(glyphBoxSide(30, 1.2, 1.5)).toBe(36)
+    // React Native ignores a multiplier below 1, and so does the box.
+    expect(glyphBoxSide(30, 2, 0)).toBe(60)
+    expect(glyphBoxSide(30, 2, Number.NaN)).toBe(60)
+  })
+
   it('6.15-MOB-GLYPH-03 draws the info dot at 22 by default and at 44, still round, at 2.0', async () => {
     const view = await render(<InfoBanner message="Look unavailable." />)
     let box = iconBox().getBoundingClientRect()
