@@ -216,6 +216,89 @@ test('a test_ part that wins by build precedence is caught (r40 probes 3A and 3D
   ])
 })
 
+// r42: each loader order catches a leak the other misses, so the check needs both (mutant M2a).
+test('each loader order catches a key only it resolves', (t) => {
+  // Expo CLI first: apps/mobile expands its own test_ part before .env.local can set the live one.
+  const expoFirst = repo(t, {
+    files: {
+      '.env.local': 'RC_PART=live_AbCd\n',
+      'apps/mobile/.env.production':
+        'RC_PART=test_AbCd\nEXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_PART}EfGhIjKlMnOp\n',
+    },
+  })
+  const expoFirstProblem =
+    'the resolved production build env EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key'
+  assert.deepEqual(keyHygieneProblems(expoFirst), [expoFirstProblem])
+  assert.deepEqual(keyHygieneProblems(expoFirst, { orders: ['expo-cli-first'] }), [
+    expoFirstProblem,
+  ])
+  assert.deepEqual(keyHygieneProblems(expoFirst, { orders: ['app-config-first'] }), [])
+
+  // app.config.ts first: the root test_ part is set before apps/mobile expands (r40 probe 3A).
+  const appConfigFirst = repo(t, {
+    files: {
+      '.env.local': 'RC_PART=test_12345678\n',
+      'apps/mobile/.env.production':
+        'EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_PART}90abcdef\n',
+    },
+  })
+  assert.deepEqual(keyHygieneProblems(appConfigFirst, { orders: ['expo-cli-first'] }), [])
+  assert.equal(
+    keyHygieneProblems(appConfigFirst, { orders: ['app-config-first'] }).length,
+    1
+  )
+})
+
+// r42 A2: on EAS Build the profile's env is in the environment before either loader runs, so a
+// short test_ part a profile sets can complete a key an env file assembles.
+test('a key assembled from an EAS profile env and an env file is caught (r42 A2)', (t) => {
+  const probe = repo(t, {
+    build: {
+      production: { ...PRODUCTION, env: { RC_PART: 'test_AbCd' } },
+      'production-ios': { extends: 'production', ios: { env: { RC_IOS: 'test_IjKl' } } },
+    },
+    files: {
+      'apps/mobile/.env.production':
+        'EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_PART}EfGhIjKlMnOp\nEXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY=${RC_IOS}MnOpQrStUvWx\n',
+    },
+  })
+  const problems = keyHygieneProblems(probe)
+  for (const expected of [
+    // The shared env block, on both platforms and through extends.
+    'the resolved production build env of eas.json build profile production on android EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+    'the resolved production build env of eas.json build profile production-ios on android EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+    // The ios block, on ios only.
+    'the resolved production build env of eas.json build profile production-ios on ios EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY holds a RevenueCat Test Store key',
+  ])
+    assert.ok(problems.includes(expected), expected)
+  assert.ok(
+    !problems.some((problem) =>
+      problem.includes('production-ios on android EXPO_PUBLIC_REVENUECAT_GOOGLE')
+    ),
+    'the ios env block does not reach the android build'
+  )
+  assert.ok(
+    problems.every((problem) => !problem.includes('test_')),
+    'never prints the key'
+  )
+})
+
+// r42: a profile's NODE_ENV decides both app.config.ts's root file and @expo/env's mode, so a
+// mobile file only that mode loads is judged under it.
+test("a profile's NODE_ENV picks the env files its build resolves", (t) => {
+  const probe = repo(t, {
+    build: { staging: { env: { NODE_ENV: 'staging' } } },
+    files: {
+      'apps/mobile/.env.staging':
+        'RC_PART=test_AbCd\nEXPO_PUBLIC_REVENUECAT_APPLE_API_KEY=${RC_PART}EfGhIjKlMnOp\n',
+    },
+  })
+  assert.deepEqual(keyHygieneProblems(probe), [
+    'the resolved staging build env of eas.json build profile staging on android EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+    'the resolved staging build env of eas.json build profile staging on ios EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY holds a RevenueCat Test Store key',
+  ])
+})
+
 test('resolveBuildEnv follows each loader order and never touches the process env', (t) => {
   const root = repo(t, {
     files: {

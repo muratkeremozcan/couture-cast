@@ -82,10 +82,11 @@ export const RELEASE_MODES = { production: '.env.prod', preview: '.env.preview' 
  *   environment already present, and never overwrites a variable that is already set.
  * Which loader runs first depends on the entry point (Expo CLI loads its env before it reads the
  * config; a config evaluated first fills the environment before `@expo/env` expands), so
- * `order` picks one and the check runs both.
+ * `order` picks one and the check runs both. `seed` is the environment the build starts with,
+ * an EAS profile's env on EAS Build (story 6.15 r42): both loaders keep it and expand against it.
  */
-export function resolveBuildEnv(root, { mode, order, rootFiles }) {
-  const env = {}
+export function resolveBuildEnv(root, { mode, order, rootFiles, seed = {} }) {
+  const env = { ...seed }
   const mobile = path.join(root, 'apps/mobile')
   const loadRoot = () => {
     for (const name of rootFiles)
@@ -203,31 +204,105 @@ function envFileProblems(file, label, scope) {
   })
 }
 
+/** The loader orders {@link resolveBuildEnv} runs; the check judges every one. */
+export const LOADER_ORDERS = ['app-config-first', 'expo-cli-first']
+
+/** The root env files app.config.ts loads under a NODE_ENV, in its source order. */
+function rootFilesFor(loaded, nodeEnv) {
+  // app.config.ts picks `.env.prod` only for NODE_ENV production, `.env.preview` otherwise.
+  const modeFile =
+    nodeEnv === 'production' ? RELEASE_MODES.production : RELEASE_MODES.preview
+  const otherModeFiles = Object.values(RELEASE_MODES).filter((file) => file !== modeFile)
+  return loaded.filter((name) => !otherModeFiles.includes(name))
+}
+
 /**
- * Every variable a release export resolves to a Test Store key, by mode and loader order. The
- * Test Store variable itself may resolve from a shared file: revenueCatKeyEnv reads it only under
- * `__DEV__`, and revenuecat-bundle-scan.mjs proves release exports drop it.
+ * The starting environments a release export can resolve from: a clean one for each release
+ * mode (a laptop export), and on EAS Build each non-development profile's env for each platform,
+ * `extends` applied and the platform block over the shared one. A profile that sets NODE_ENV
+ * builds in that mode only; one that does not is judged in every release mode.
  */
-function resolvedEnvProblems(root, loaded) {
+function buildContexts(eas) {
+  const contexts = Object.keys(RELEASE_MODES).map((mode) => ({
+    label: `the resolved ${mode} build env`,
+    mode,
+    seed: {},
+  }))
+  for (const name of Object.keys(eas.build ?? {})) {
+    if (name === DEVELOPMENT_PROFILE) continue
+    const profile = resolveBuildProfile(eas, name)
+    for (const platform of ['android', 'ios']) {
+      const seed = Object.fromEntries(
+        Object.entries({ ...profile.env, ...profile[platform]?.env }).map(
+          ([key, value]) => [key, String(value)]
+        )
+      )
+      // A profile with no env resolves exactly as the clean build does.
+      if (Object.keys(seed).length === 0) continue
+      const modes = seed.NODE_ENV ? [seed.NODE_ENV] : Object.keys(RELEASE_MODES)
+      for (const mode of modes)
+        contexts.push({
+          label: `the resolved ${mode} build env of eas.json build profile ${name} on ${platform}`,
+          mode,
+          seed,
+        })
+    }
+  }
+  return contexts
+}
+
+/**
+ * Every variable a release export resolves to a Test Store key, by starting environment and
+ * loader order. A value the profile itself sets is judged by {@link profileProblems}; only what
+ * the env files resolve is judged here. The Test Store variable itself may resolve from a shared
+ * file: revenueCatKeyEnv reads it only under `__DEV__`, and revenuecat-bundle-scan.mjs proves
+ * release exports drop it.
+ */
+function resolvedEnvProblems(root, loaded, eas, orders = LOADER_ORDERS) {
   const problems = new Set()
-  for (const [mode, modeFile] of Object.entries(RELEASE_MODES)) {
-    const otherModeFiles = Object.values(RELEASE_MODES).filter(
-      (file) => file !== modeFile
-    )
-    const rootFiles = loaded.filter((name) => !otherModeFiles.includes(name))
-    for (const order of ['app-config-first', 'expo-cli-first'])
-      for (const problem of envProblems(
-        `the resolved ${mode} build env`,
-        Object.entries(resolveBuildEnv(root, { mode, order, rootFiles })),
-        { allowTestStoreVariable: true }
-      ))
+  const clean = new Map()
+  const cleanEnv = (mode, order) => {
+    const key = `${mode}\n${order}`
+    if (!clean.has(key))
+      clean.set(
+        key,
+        resolveBuildEnv(root, { mode, order, rootFiles: rootFilesFor(loaded, mode) })
+      )
+    return clean.get(key)
+  }
+  for (const { label, mode, seed } of buildContexts(eas)) {
+    const seeded = Object.keys(seed).length > 0
+    for (const order of orders) {
+      const resolved = seeded
+        ? resolveBuildEnv(root, {
+            mode,
+            order,
+            rootFiles: rootFilesFor(loaded, mode),
+            seed,
+          })
+        : cleanEnv(mode, order)
+      // Under a profile, only what its env changes is new: a value the profile sets itself is
+      // judged by profileProblems, and one the clean build of a release mode resolves the same way
+      // is judged there. A profile mode with no clean context (NODE_ENV staging) judges it all.
+      const cleanJudged = Object.hasOwn(RELEASE_MODES, mode)
+      const judged = Object.entries(resolved).filter(
+        ([name, value]) =>
+          !seeded ||
+          (seed[name] !== value &&
+            !(cleanJudged && cleanEnv(mode, order)[name] === value))
+      )
+      for (const problem of envProblems(label, judged, { allowTestStoreVariable: true }))
         problems.add(problem)
+    }
   }
   return [...problems]
 }
 
-/** Every way a release, preview or non-development EAS build would resolve a Test Store key. */
-export function keyHygieneProblems(root) {
+/**
+ * Every way a release, preview or non-development EAS build would resolve a Test Store key.
+ * `orders` narrows the loader orders only so a test can show each order is needed.
+ */
+export function keyHygieneProblems(root, { orders = LOADER_ORDERS } = {}) {
   const problems = []
   const mobile = path.join(root, 'apps/mobile')
   const eas = JSON.parse(fs.readFileSync(path.join(mobile, 'eas.json'), 'utf8'))
@@ -254,6 +329,6 @@ export function keyHygieneProblems(root) {
         mobileEnvFileScope(name)
       )
     )
-  problems.push(...resolvedEnvProblems(root, loaded))
+  problems.push(...resolvedEnvProblems(root, loaded, eas, orders))
   return problems
 }
