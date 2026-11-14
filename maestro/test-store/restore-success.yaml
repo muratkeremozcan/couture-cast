@@ -1,5 +1,6 @@
-# Story 6.15 D15 (TD-04): the restore runs `Purchases.restorePurchases()` (the driver reads the
-# SDK's own log line for it), then the refresh pulls the ledger and the entitlement returns.
+# Story 6.15 D15 (TD-04): restore from the paywall in the lost-mirror state. The member is not
+# entitled before the tap and entitled after it. Every refresh before the tap was refused at the
+# journey proxy, so the restore's own refresh is the one that pulled the ledger.
 appId: ${MAESTRO_APP_ID}
 ---
 - runFlow: assert-unpaid.yaml

@@ -9,9 +9,9 @@
 //
 //   node scripts/run-test-store-journey.mjs --platform android|ios --device <serial|udid> \
 //     --build debug|minifiedDebuggable --server local|preview --out <dir> \
-//     [--scenario purchase|restore] [--api-url <origin>] [--artifact <apk|app>] \
+//     [--scenario purchase|restore] [--api-url <origin>] --artifact <apk|app> \
 //     [--over-install <apk|app>] [--over-install-build debug|minifiedDebuggable] \
-//     [--over-install-sha <sha>] [--build-sha <sha>] [--reinstall] \
+//     [--over-install-sha <sha>] [--build-sha <sha>] \
 //     [--secrets-env <file>] [--app-id com.couturecast.app] [--metro-port 8081] [--proxy-port 4011]
 //
 // Before it runs: the debuggable build (--artifact, or already installed) on a booted emulator or
@@ -51,7 +51,11 @@ import {
   signerSha256,
 } from './lib/test-store-journey.mjs'
 import { startApiProxy } from './lib/test-store-proxy.mjs'
-import { runJourney, writeArtifactManifests } from './lib/test-store-runner.mjs'
+import {
+  memberRef,
+  runJourney,
+  writeArtifactManifests,
+} from './lib/test-store-runner.mjs'
 import { READ_BYPASS_ENV } from './lib/test-store-webhook.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -60,7 +64,6 @@ const option = (name, fallback) => {
   const at = argv.indexOf(`--${name}`)
   return at < 0 ? fallback : argv[at + 1]
 }
-const flag = (name) => argv.includes(`--${name}`)
 
 const options = journeyOptions({
   platform: option('platform'),
@@ -82,7 +85,8 @@ const overInstallBuild = option('over-install-build', build)
 if (!['debug', 'minifiedDebuggable'].includes(overInstallBuild))
   throw new JourneyError('test_store_build_invalid', overInstallBuild)
 let installedBuild = build
-if ((scenario === 'restore' || flag('reinstall')) && !artifact)
+// Both scenarios reinstall (the sign-in recovery and the lost-mirror restore).
+if (!artifact)
   throw new JourneyError('test_store_artifact_required', 'reinstall needs --artifact')
 const apiOrigin = new URL(
   option('api-url', server === 'local' ? 'http://127.0.0.1:4000' : '')
@@ -376,7 +380,6 @@ const steps = journeySteps({
   server,
   build,
   overInstall: Boolean(overInstallArtifact),
-  reinstall: flag('reinstall'),
 })
 let result
 try {
@@ -428,7 +431,9 @@ const report = {
   appId,
   apiHost: new URL(apiOrigin).host,
   buildSha,
-  member: member?.userId ?? null,
+  // No user id in the evidence: a hash reference here, the id itself in a private side file
+  // that only `test-store-preview-webhook.mjs verify --member-file` reads.
+  memberRef: member ? memberRef(member.userId) : null,
   wallSeconds: Math.round((Date.now() - startedAt) / 1000),
   steps,
   verdict: result.verdict,
@@ -436,6 +441,12 @@ const report = {
   proxyLog: proxy?.log ?? [],
   manifests: manifests.map((file) => path.basename(file)),
 }
+if (member)
+  fs.writeFileSync(
+    path.join(out, `${label}.member.private.json`),
+    JSON.stringify({ userId: member.userId }),
+    { mode: 0o600 }
+  )
 fs.writeFileSync(path.join(out, `${label}.json`), JSON.stringify(report, null, 2), {
   mode: 0o600,
 })

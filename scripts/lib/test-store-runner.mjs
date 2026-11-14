@@ -18,7 +18,7 @@
 //   minifiedEvidence()  the S4-15 build record (minified-debuggable-evidence.mjs)
 //   overInstall()       installs the second debuggable build over the paid one -> details
 //   reinstall()         uninstalls and installs the run's artifact again -> details
-//   deviceLog()         the device log since the run began
+//   deviceLog()         the device log since the run began (extra evidence, never a pass rule)
 //   now()               ms clock shared with the proxy log
 import { createHash } from 'node:crypto'
 import fs from 'node:fs'
@@ -29,17 +29,25 @@ import {
   assertNonComplimentary,
   assertServerPaid,
   assertServerUnpaid,
+  attributeRestore,
   attributeServerPath,
   JourneyError,
   evidenceRecord,
   jsDevEvidence,
   journeyVerdict,
   refreshPolicyFor,
-  restoreBoundaryEvidence,
+  restoreBoundaryObserved,
 } from './test-store-journey.mjs'
 
-/** How many `restorePurchases()` calls the restore scenario makes: the rejected one and the good one. */
-export const RESTORE_CALLS = 2
+/** The two TD-04 assertions, recorded apart (TEA ruling, 2026-11-13). */
+export const TD04 = Object.freeze({
+  restore: 'TD-04 restore from the paywall in the lost-mirror state',
+  signIn: 'TD-04 sign-in recovers access after a reinstall',
+})
+
+/** A stable, non-reversible reference to the member for evidence (no user id in records). */
+export const memberRef = (userId) =>
+  createHash('sha256').update(String(userId)).digest('hex').slice(0, 16)
 
 export async function runJourney({ steps, io, server, platform, appId, metroEnv }) {
   const records = []
@@ -80,7 +88,7 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
       const state = await io.serverState()
       assertNonComplimentary(state.access)
       assertServerUnpaid(state)
-      return { member: member.userId, ledger: member.ledger }
+      return { memberRef: memberRef(member.userId), ledger: member.ledger }
     },
     open: async () => {
       await io.launch()
@@ -95,13 +103,24 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
         appId,
       }),
     'native-debuggable-r8': async () => io.minifiedEvidence(),
-    'unpaid-failure': async () => {
-      await io.flow('purchase-failure')
-      return { offerings: 'Test Store sheet opened', serverState: await unpaid() }
-    },
+    // S4-12 order: cancel, then failure, while the member is unentitled and the control is offered.
     'unpaid-cancel': async () => {
       await io.flow('purchase-cancel')
-      return { offerings: 'Test Store sheet opened', serverState: await unpaid() }
+      return {
+        offerings: 'Test Store sheet opened',
+        purchaseControlsOffered: true,
+        outcome: 'cancelled: quiet return to the offer, no error',
+        serverState: await unpaid(),
+      }
+    },
+    'unpaid-failure': async () => {
+      await io.flow('purchase-failure')
+      return {
+        offerings: 'Test Store sheet opened',
+        purchaseControlsOffered: true,
+        outcome: 'failed: purchase error shown',
+        serverState: await unpaid(),
+      }
     },
     'purchase-success': async () => {
       const since = io.now()
@@ -135,9 +154,18 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
       await io.launch()
       await io.flow('open-premium')
       await io.flow('assert-entitled')
-      return { install, restoreOffered: false, ...(await stillPaid()) }
+      // Sign-in, not restore, recovers access here: the server kept the entitlement and the
+      // paywall offers no restore while entitled. Restore is proved on its own in the
+      // lost-mirror scenario.
+      return {
+        assertion: TD04.signIn,
+        install,
+        restoreOffered: false,
+        ...(await stillPaid()),
+      }
     },
     'purchase-unsynced': async () => {
+      context.purchaseStartedAt = io.now()
       await io.flow('purchase-unsynced')
       return { sdkSuccess: true, serverState: await unpaid() }
     },
@@ -152,16 +180,26 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
       return { restoreError: 'shown', serverState: await unpaid() }
     },
     'restore-success': async () => {
-      const since = io.now()
+      const tapAt = io.now()
+      // The flow asserts not entitled before the tap and entitled after it.
       await io.flow('restore-success')
-      return paidWithPath(since)
+      const state = await io.waitForPaid()
+      assertServerPaid(state)
+      return {
+        assertion: TD04.restore,
+        entitlementDelivered: true,
+        uiTransition: 'not entitled before the restore tap, entitled after it',
+        ...attributeRestore({
+          log: io.proxyLog(),
+          purchaseStartedAt: context.purchaseStartedAt,
+          tapAt,
+          subscription: state.subscription,
+        }),
+        subscription: pick(state.subscription),
+        access: state.access,
+        sdkBoundary: restoreBoundaryObserved({ platform, log: await io.deviceLog() }),
+      }
     },
-    'restore-boundary': async () =>
-      restoreBoundaryEvidence({
-        platform,
-        log: await io.deviceLog(),
-        expected: RESTORE_CALLS,
-      }),
   }
 
   for (const step of steps) {
@@ -192,7 +230,7 @@ export async function runJourney({ steps, io, server, platform, appId, metroEnv 
  * API's read endpoints, and the run's proxy log shows no refresh reached the API after the
  * purchase began, so the webhook delivered the entitlement.
  */
-export function verifyWebhookDelivery({ report, state }) {
+export function verifyWebhookDelivery({ report, state, userId }) {
   if (report?.server !== 'preview')
     throw new JourneyError('test_store_verify_not_preview')
   const purchase = report.records?.find(
@@ -200,9 +238,11 @@ export function verifyWebhookDelivery({ report, state }) {
   )
   if (!purchase?.pass || !Number.isFinite(purchase.startedAt))
     throw new JourneyError('test_store_verify_no_webhook_purchase')
+  if (memberRef(userId) !== report.memberRef)
+    throw new JourneyError('test_store_verify_member_mismatch')
   assertServerPaid(state)
   return {
-    member: report.member,
+    memberRef: report.memberRef,
     ...attributeServerPath({
       server: 'preview',
       log: report.proxyLog ?? [],

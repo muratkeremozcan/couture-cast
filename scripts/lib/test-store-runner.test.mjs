@@ -14,6 +14,8 @@ import {
 } from './test-store-journey.mjs'
 import {
   artifactSha256,
+  memberRef,
+  TD04,
   runJourney,
   verifyWebhookDelivery,
   writeArtifactManifests,
@@ -100,9 +102,20 @@ function fakeIo({ server, faults = {} }) {
       restores += 1
       if (appRefresh() !== 'block')
         throw new Error('maestro: premium-purchase-error not visible')
+      // A proxy that let one refresh through before the tap (it found nothing to pull yet).
+      if (faults.forwardBeforeTap)
+        log.push({
+          at: clock,
+          method: 'POST',
+          path: REFRESH_PATH,
+          action: 'forward',
+          status: 200,
+        })
     },
     'restore-success': () => {
-      if (!faults.restoreCallRemoved) restores += 1
+      if (paid)
+        throw new Error('maestro: premium-status-line none not visible before the tap')
+      restores += 1
       appRefresh()
       handlers['assert-entitled']()
     },
@@ -139,7 +152,8 @@ function fakeIo({ server, faults = {} }) {
     },
     deviceLog: async () =>
       Array.from({ length: restores }, () => RESTORE_LINE).join('\n'),
-    now: () => clock,
+    // Each reading moves the clock on, as wall time does between a reading and the next request.
+    now: () => (clock += 1),
   }
   return io
 }
@@ -179,10 +193,22 @@ test('local purchase: every step passes, the success names local reconciliation'
   )
   assert.deepEqual(io.flows.slice(0, 4), [
     'open-premium',
-    'purchase-failure',
     'purchase-cancel',
+    'purchase-failure',
     'purchase-success',
   ])
+  const [cancel, failure] = ['unpaid-cancel', 'unpaid-failure'].map((step) =>
+    records.find((record) => record.step === step)
+  )
+  assert.match(cancel.outcome, /^cancelled/)
+  assert.match(failure.outcome, /^failed/)
+  assert.equal(cancel.purchaseControlsOffered, true)
+  const signIn = records.find((record) => record.step === 'reinstall-entitled')
+  assert.equal(signIn.assertion, TD04.signIn)
+  assert.equal(signIn.subscription.status, 'active')
+  // No user id anywhere in the evidence; the preflight carries a hash reference.
+  assert.equal(records[0].memberRef, memberRef('member-1'))
+  assert.doesNotMatch(JSON.stringify(records), /member-1/)
 })
 
 test('preview purchase: refreshes are refused and the webhook path is named', async () => {
@@ -236,41 +262,54 @@ test('local purchase fails when the pull never delivers (the UI never turns enti
 test('restore: unsynced purchase, reinstall, a rejected restore, then a restore that pulls it back', async () => {
   const { verdict, records, io } = await run('local', 'restore', {})
   assert.equal(verdict.pass, true, JSON.stringify(records.at(-1)))
-  assert.deepEqual(io.policies.slice(3), [
-    'block',
-    'forward',
-    'block-once',
-    'forward',
-    'forward',
-  ])
+  assert.deepEqual(io.policies.slice(3), ['block', 'block', 'block-once', 'forward'])
   const restored = records.find((record) => record.step === 'restore-success')
+  assert.equal(restored.assertion, TD04.restore)
   assert.equal(restored.serverPath, 'local-reconciliation')
-  assert.equal(
-    records.find((record) => record.step === 'restore-boundary').restoreCalls,
-    2
+  assert.equal(restored.refreshesRefusedBeforeTap, 2)
+  assert.equal(restored.refreshesForwarded, 1)
+  // The SDK log line rides along as extra evidence only.
+  assert.deepEqual(
+    [restored.sdkBoundary.sdkRestoreLines, restored.sdkBoundary.passCondition],
+    [2, false]
   )
 })
 
-test('restore mutant: removing the restorePurchases() call fails although access comes back', async () => {
-  const { verdict, records } = await run('local', 'restore', { restoreCallRemoved: true })
+test('restore fails when a refresh reached the API before the restore tap', async () => {
+  const { verdict, records } = await run('local', 'restore', { forwardBeforeTap: true })
   assert.equal(verdict.pass, false)
-  assert.equal(records.find((record) => record.step === 'restore-success').pass, true)
-  assert.equal(records.at(-1).error, 'test_store_restore_boundary_unseen')
+  assert.deepEqual(
+    [records.at(-1).step, records.at(-1).error],
+    ['restore-success', 'test_store_restore_refresh_before_tap']
+  )
 })
 
 test('verify: a preview run report and a paid read prove the webhook; a local report does not', async () => {
   const { records, io } = await run('preview', 'purchase', {})
   const report = {
     server: 'preview',
-    member: 'member-1',
+    memberRef: memberRef('member-1'),
     records,
     proxyLog: io.proxyLog(),
   }
   const state = await io.serverState()
-  assert.equal(verifyWebhookDelivery({ report, state }).serverPath, 'preview-webhook')
+  assert.equal(
+    verifyWebhookDelivery({ report, state, userId: 'member-1' }).serverPath,
+    'preview-webhook'
+  )
   assert.throws(
-    () => verifyWebhookDelivery({ report: { ...report, server: 'local' }, state }),
+    () =>
+      verifyWebhookDelivery({
+        report: { ...report, server: 'local' },
+        state,
+        userId: 'member-1',
+      }),
     (error) => error.code === 'test_store_verify_not_preview'
+  )
+  // The member file must belong to the run: its id hashes to the report's memberRef.
+  assert.throws(
+    () => verifyWebhookDelivery({ report, state, userId: 'someone-else' }),
+    (error) => error.code === 'test_store_verify_member_mismatch'
   )
   const leaked = {
     ...report,
@@ -286,7 +325,7 @@ test('verify: a preview run report and a paid read prove the webhook; a local re
     ],
   }
   assert.throws(
-    () => verifyWebhookDelivery({ report: leaked, state }),
+    () => verifyWebhookDelivery({ report: leaked, state, userId: 'member-1' }),
     (error) => error.code === 'test_store_path_refresh_leaked'
   )
 })

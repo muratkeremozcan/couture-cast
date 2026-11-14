@@ -86,13 +86,7 @@ export function journeyOptions({ platform, build, server, scenario, appId }) {
  * cancel, then success. `restore` buys with the refresh refused so the server never learns of
  * the purchase, reinstalls, and restores: once refused (the rejected-restore UI) and once through.
  */
-export function journeySteps({
-  scenario,
-  server,
-  build,
-  overInstall = false,
-  reinstall = false,
-}) {
+export function journeySteps({ scenario, server, build, overInstall = false }) {
   // S4-15: the minifiedDebuggable build proves it is debuggable and went through R8, apart from
   // the JS `__DEV__` check.
   const opening = [
@@ -108,22 +102,24 @@ export function journeySteps({
       'reinstall',
       'restore-rejected',
       'restore-success',
-      'restore-boundary',
     ]
   return [
     ...opening,
-    'unpaid-failure',
     'unpaid-cancel',
+    'unpaid-failure',
     server === 'preview' ? 'purchase-success-webhook' : 'purchase-success',
     'paid-controls',
     ...(overInstall ? ['over-install'] : []),
-    ...(reinstall ? ['reinstall-entitled'] : []),
+    'reinstall-entitled',
   ]
 }
 
 /** The proxy policy each step needs: which refreshes reach the API. */
 export function refreshPolicyFor(step) {
-  if (step === 'purchase-success-webhook' || step === 'purchase-unsynced') return 'block'
+  // From the unsynced purchase until the restore tap every refresh is refused, so the restore's
+  // own refresh is the only one that can reach the API.
+  if (['purchase-success-webhook', 'purchase-unsynced', 'reinstall'].includes(step))
+    return 'block'
   if (step === 'restore-rejected') return 'block-once'
   return 'forward'
 }
@@ -221,23 +217,46 @@ export function jsDevEvidence({ hierarchy, metroEnv = {}, appId }) {
 }
 
 /**
- * TD-04: SDK-boundary evidence that `Purchases.restorePurchases()` ran, from the device log.
- * Under a Test Store key each call logs, at debug level, "Restoring purchases not available in
- * Test Store. Returning current CustomerInfo." (RevenueCat iOS 5.83 `PurchaseStrings`;
- * purchases-android 10.16 `PurchasesOrchestrator.restorePurchases` spells it "test store").
- * Nothing else in the SDK writes that line. iOS Debug logs debug lines by default; Android writes
- * them only when the SDK's log level is DEBUG.
+ * TD-04, restore from the paywall in the lost-mirror state. The app calls the refresh only after
+ * a purchase success or a restore success, and every refresh from the unsynced purchase up to
+ * the restore tap was refused at the proxy. So a refresh that reached the API after the tap is
+ * the restore's own, and the entitlement it pulled is the restore's result (local
+ * reconciliation). The UI half, not entitled before the tap and entitled after it, is
+ * restore-success.yaml.
+ */
+export function attributeRestore({ log, purchaseStartedAt, tapAt, subscription }) {
+  const before = refreshEntries(log, purchaseStartedAt).filter(
+    (entry) => entry.at < tapAt
+  )
+  const leaked = before.filter((entry) => entry.action === 'forward')
+  if (leaked.length) fail('test_store_restore_refresh_before_tap', String(leaked.length))
+  return {
+    ...attributeServerPath({ server: 'local', log, since: tapAt, subscription }),
+    refreshesRefusedBeforeTap: before.length,
+  }
+}
+
+/**
+ * Extra evidence only, never a pass condition: under a Test Store key each
+ * `Purchases.restorePurchases()` call logs, at debug level, "Restoring purchases not available in
+ * Test Store. Returning current CustomerInfo." (RevenueCat iOS 5.83 `PurchaseStrings`). iOS Debug
+ * logs debug lines by default; Android logs them only at log level DEBUG, which the app does not
+ * set, so Android records none.
  */
 export const RESTORE_BOUNDARY = /Restoring purchases not available in test store/i
 
-export function restoreBoundaryEvidence({ platform, log, expected }) {
-  if (!BUILDS[platform]) fail('test_store_platform_invalid', platform)
-  const count = (log ?? '')
+export function restoreBoundaryObserved({ platform, log }) {
+  const lines = (log ?? '')
     .split('\n')
     .filter((line) => RESTORE_BOUNDARY.test(line)).length
-  if (count < expected)
-    fail('test_store_restore_boundary_unseen', `${count} of ${expected} ${platform}`)
-  return { restoreCalls: count, pattern: RESTORE_BOUNDARY.source }
+  return {
+    sdkRestoreLines: lines,
+    passCondition: false,
+    note:
+      platform === 'ios'
+        ? 'RevenueCat debug line, extra evidence'
+        : 'Android RevenueCat logs at INFO; no line expected',
+  }
 }
 
 const REGEX_SPECIAL = /[.*+?^${}()|[\]\\]/g

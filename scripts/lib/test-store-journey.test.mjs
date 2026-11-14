@@ -9,6 +9,7 @@ import {
   assertSameSigner,
   assertServerPaid,
   assertServerUnpaid,
+  attributeRestore,
   attributeServerPath,
   evidenceRecord,
   jsDevEvidence,
@@ -19,7 +20,7 @@ import {
   readData,
   refreshPolicyFor,
   REFRESH_PATH,
-  restoreBoundaryEvidence,
+  restoreBoundaryObserved,
   SERVER_PATHS,
   signerSha256,
 } from './test-store-journey.mjs'
@@ -81,23 +82,23 @@ test('options: the builds D15 names per platform, both legs, restore only on the
   )
 })
 
-test('steps: unpaid failure and cancel before success, minifiedDebuggable adds its build proof', () => {
+test('steps: unpaid cancel, then failure, then success; sign-in recovery last; minifiedDebuggable adds its build proof', () => {
   const steps = journeySteps({ scenario: 'purchase', server: 'local', build: 'debug' })
   assert.deepEqual(steps, [
     'preflight',
     'open',
     'js-dev',
-    'unpaid-failure',
     'unpaid-cancel',
+    'unpaid-failure',
     'purchase-success',
     'paid-controls',
+    'reinstall-entitled',
   ])
   const minified = journeySteps({
     scenario: 'purchase',
     server: 'preview',
     build: 'minifiedDebuggable',
     overInstall: true,
-    reinstall: true,
   })
   assert.equal(minified[3], 'native-debuggable-r8')
   assert.ok(minified.includes('purchase-success-webhook'))
@@ -108,13 +109,13 @@ test('steps: unpaid failure and cancel before success, minifiedDebuggable adds i
     'reinstall',
     'restore-rejected',
     'restore-success',
-    'restore-boundary',
   ])
 })
 
 test('refresh policy: refused for the webhook purchase and the unsynced purchase, once for the rejected restore', () => {
   assert.equal(refreshPolicyFor('purchase-success-webhook'), 'block')
   assert.equal(refreshPolicyFor('purchase-unsynced'), 'block')
+  assert.equal(refreshPolicyFor('reinstall'), 'block')
   assert.equal(refreshPolicyFor('restore-rejected'), 'block-once')
   assert.equal(refreshPolicyFor('purchase-success'), 'forward')
   assert.equal(refreshPolicyFor('restore-success'), 'forward')
@@ -278,34 +279,70 @@ test('JS __DEV__: the live-font env marker, only for the app id and Metro env th
   )
 })
 
-test('restore boundary: the SDK line per restorePurchases() call, on both platforms', () => {
-  const ios =
-    'DEBUG: Restoring purchases not available in Test Store. Returning current CustomerInfo.'
-  const android =
-    'D/[Purchases] - DEBUG: Restoring purchases not available in test store. Returning current CustomerInfo.'
-  assert.equal(
-    restoreBoundaryEvidence({ platform: 'ios', log: `${ios}\n${ios}`, expected: 2 })
-      .restoreCalls,
-    2
+test('restore: only the refresh after the tap reached the API, and it delivered the entitlement', () => {
+  const tapAt = at + 60_000
+  const log = [
+    refresh(1_000, 'block', 503),
+    refresh(30_000, 'block', 503),
+    refresh(61_000),
+  ]
+  const result = attributeRestore({
+    log,
+    purchaseStartedAt: at,
+    tapAt,
+    subscription: { ...paid.subscription, syncedAt: new Date(at + 62_000).toISOString() },
+  })
+  assert.deepEqual(
+    {
+      path: result.serverPath,
+      before: result.refreshesRefusedBeforeTap,
+      after: result.refreshesForwarded,
+    },
+    { path: 'local-reconciliation', before: 2, after: 1 }
   )
-  assert.equal(
-    restoreBoundaryEvidence({
-      platform: 'android',
-      log: `x\n${android}\n${android}`,
-      expected: 2,
-    }).restoreCalls,
-    2
-  )
-  // "Restoring purchases" alone is the non-Test-Store path's first line; it is not the boundary.
+  // A refresh that reached the API before the tap could have delivered it; restore proves nothing.
   assert.throws(
     () =>
-      restoreBoundaryEvidence({
-        platform: 'android',
-        log: `D/[Purchases] - DEBUG: Restoring purchases\n${android}`,
-        expected: 2,
+      attributeRestore({
+        log: [refresh(30_000), refresh(61_000)],
+        purchaseStartedAt: at,
+        tapAt,
+        subscription: {
+          ...paid.subscription,
+          syncedAt: new Date(at + 62_000).toISOString(),
+        },
       }),
-    code(/^test_store_restore_boundary_unseen$/)
+    code(/^test_store_restore_refresh_before_tap$/)
   )
+  // No refresh after the tap: nothing reconciled the restore.
+  assert.throws(
+    () =>
+      attributeRestore({
+        log: [refresh(30_000, 'block', 503)],
+        purchaseStartedAt: at,
+        tapAt,
+        subscription: paid.subscription,
+      }),
+    code(/^test_store_path_no_refresh$/)
+  )
+})
+
+test('the SDK restore line is extra evidence and never a pass condition', () => {
+  const ios =
+    'DEBUG: Restoring purchases not available in Test Store. Returning current CustomerInfo.'
+  assert.deepEqual(
+    pickObserved(restoreBoundaryObserved({ platform: 'ios', log: `${ios}\n${ios}` })),
+    { sdkRestoreLines: 2, passCondition: false }
+  )
+  assert.deepEqual(
+    pickObserved(restoreBoundaryObserved({ platform: 'android', log: 'nothing' })),
+    { sdkRestoreLines: 0, passCondition: false }
+  )
+})
+
+const pickObserved = ({ sdkRestoreLines, passCondition }) => ({
+  sdkRestoreLines,
+  passCondition,
 })
 
 test('status patterns from the app locale full-match the rendered English lines', () => {

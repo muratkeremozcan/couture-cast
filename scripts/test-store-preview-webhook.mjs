@@ -9,6 +9,7 @@
 //   node scripts/test-store-preview-webhook.mjs steps --api-url <preview API origin>
 //   node scripts/test-store-preview-webhook.mjs probe --api-url <origin> [--secrets-env .env.preview]
 //   node scripts/test-store-preview-webhook.mjs verify --report <run-test-store-journey report> \
+//     --member-file <the run's .member.private.json> \
 //     --api-url <origin> [--secrets-env .env.preview]
 //
 // `probe` reads REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET from the env file by name and sends
@@ -56,8 +57,9 @@ try {
         'x-vercel-protection-bypass': requireEnvValue(envFile, READ_BYPASS_ENV),
       },
     })
-    const state = await serverState(api, buildMobileE2EAccessToken(report.member))
-    console.log(JSON.stringify(verifyWebhookDelivery({ report, state }), null, 2))
+    const { userId } = JSON.parse(fs.readFileSync(option('member-file'), 'utf8'))
+    const state = await serverState(api, buildMobileE2EAccessToken(userId))
+    console.log(JSON.stringify(verifyWebhookDelivery({ report, state, userId }), null, 2))
   } else throw new Error(`unknown command: ${command}`)
 } catch (error) {
   console.error(error.message)
