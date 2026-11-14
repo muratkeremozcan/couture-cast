@@ -354,7 +354,8 @@ describe('Android build environment', () => {
           },
         })
         assert.equal(observed.ANDROID_HOME, explicit ?? '/owned/android-sdk')
-        assert.deepEqual(events, ['prepare', 'probe-mode', 'build', 'verify'])
+        // Story 6.15 F-00i (r43): the probe mode check comes before anything is staged.
+        assert.deepEqual(events, ['probe-mode', 'prepare', 'build', 'verify'])
         assert.equal(probeModeCheck.platform, 'android')
         assert.equal(
           probeModeCheck.mobileDirectory,

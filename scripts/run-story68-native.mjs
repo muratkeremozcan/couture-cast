@@ -759,18 +759,22 @@ if (command === 'prebuild') {
   fs.closeSync(fd)
   if (result.status !== 0) throw new Error('native_prebuild_failed')
   // Story 6.15 F-00i: the project links the text layout probe exactly when it was asked for.
-  assertNativeProbeMode({
+  // The Pods are checked once pod install has brought them in line with the Podfile.
+  const probeModeCheck = {
     platform,
     mobileDirectory: path.join(root, MOBILE_DIRECTORY),
     env: prebuildEnv(process.env, env),
-  })
-  if (platform === 'ios')
+  }
+  assertNativeProbeMode({ ...probeModeCheck, pods: false })
+  if (platform === 'ios') {
     run(
       IOS_POD_INSTALL.binary,
       [...IOS_POD_INSTALL.args],
       {},
       path.join(root, nativeProjectDirectory('ios'))
     )
+    assertNativeProbeMode(probeModeCheck)
+  }
 } else if (command === 'build') {
   ownedEnv()
   const { configuration, arch } = buildSelection({
@@ -784,6 +788,20 @@ if (command === 'prebuild') {
     'w',
     0o600
   )
+  const buildEnv = nativeBuildEnv(
+    process.env,
+    read('public-build-env.json'),
+    path.dirname(path.dirname(adb))
+  )
+  // Story 6.15 F-00i: a build reuses the last prebuild's project, which must link the text
+  // layout probe exactly when this build asks for it (a probe build once reused a production
+  // project). It runs before anything is staged into that project; on iOS it covers what the
+  // last pod install left as well as the Podfile.
+  assertNativeProbeMode({
+    platform,
+    mobileDirectory: path.join(root, MOBILE_DIRECTORY),
+    env: buildEnv,
+  })
   const workletsStaging =
     platform === 'android'
       ? prepareWorkletsStaging({
@@ -799,19 +817,6 @@ if (command === 'prebuild') {
     arch,
     derivedData: option('derived-data') ?? IOS_DERIVED_DATA,
     workletsArgs: workletsStaging?.args ?? [],
-  })
-  const buildEnv = nativeBuildEnv(
-    process.env,
-    read('public-build-env.json'),
-    path.dirname(path.dirname(adb))
-  )
-  // Story 6.15 F-00i: a build reuses the last prebuild's project, which must link the text
-  // layout probe exactly when this build asks for it (a probe build once reused a production
-  // project).
-  assertNativeProbeMode({
-    platform,
-    mobileDirectory: path.join(root, MOBILE_DIRECTORY),
-    env: buildEnv,
   })
   const result = spawnSync(binary, args, {
     cwd: path.join(root, nativeProjectDirectory(platform)),
