@@ -434,17 +434,25 @@ function programOf(command, options) {
   return argv
 }
 
-/** The delimiter after `<<` or `<<-` at `j`: quoted or bare, as the shell reads it. */
+/**
+ * The delimiter after `<<` or `<<-` at `j`, unquoted as the shell unquotes it: a backslash keeps
+ * the next character, and quoted parts join the word (`\\EOF`, `'E'OF` and `"EOF"` are all EOF).
+ */
 function delimiterAt(command, j) {
   const strip = command[j] === '-'
   let k = strip ? j + 1 : j
   while (command[k] === ' ' || command[k] === '\t') k += 1
-  const open = command[k]
-  if (open === "'" || open === '"') {
-    const close = command.indexOf(open, k + 1)
-    return { strip, word: command.slice(k + 1, close < 0 ? undefined : close) }
+  let word = ''
+  for (; k < command.length && !/[\s<>|&;()]/.test(command[k]); k += 1) {
+    const c = command[k]
+    if (c === '\\') word += command[++k] ?? ''
+    else if (c === "'" || c === '"') {
+      const close = command.indexOf(c, k + 1)
+      const end = close < 0 ? command.length : close
+      word += command.slice(k + 1, end)
+      k = end
+    } else word += c
   }
-  const word = /^[^\s<>|&;()'"]+/.exec(command.slice(k))?.[0]
   return word ? { strip, word } : null
 }
 
@@ -492,21 +500,27 @@ function heredocs(run) {
       body.push(line)
     }
     const [program] = programOf(opened.command)
-    if (program === 'node') nodeCode.push(body.join('\n'))
+    if (program === 'node') {
+      // The node command gets a marker word, so its code is read where the command runs (after
+      // any cd before it).
+      kept[kept.length - 1] = `${header} ${STDIN_MARK}${nodeCode.length}`
+      nodeCode.push(body.join('\n'))
+    }
   }
   return { text: kept.join('\n'), nodeCode }
 }
 
+const STDIN_MARK = '@@node-stdin:'
+
 /** Code fed to node on stdin: its packages, and the relative files it loads from `cwd`. */
-function stdinLoads(root, cwd, nodeCode, loads) {
-  for (const code of nodeCode)
-    for (const specifier of specifiers(code)) {
-      if (!allowed(specifier)) loads.inline.push(specifier)
-      else if (specifier.startsWith('.')) {
-        const file = resolveRelative(path.join(root, cwd, 'stdin.mjs'), specifier)
-        if (file) loads.scripts.add(file)
-      }
+function stdinLoads(root, cwd, code, loads) {
+  for (const specifier of specifiers(code)) {
+    if (!allowed(specifier)) loads.inline.push(specifier)
+    else if (specifier.startsWith('.')) {
+      const file = resolveRelative(path.join(root, cwd, 'stdin.mjs'), specifier)
+      if (file) loads.scripts.add(file)
     }
+  }
 }
 
 /**
@@ -524,14 +538,18 @@ export function nodeLoads(root, run, cwd = '.', depth = 0) {
   }
   let dir = cwd
   const { text, nodeCode } = heredocs(run)
-  stdinLoads(root, cwd, nodeCode, loads)
   for (const command of commands(text)) {
     const [program, ...args] = programOf(command)
     if (program === 'cd' && typeof args[0] === 'string')
       dir = path.relative(root, path.resolve(root, dir, args[0])) || '.'
-    else if (program === 'node')
-      nodeCommand(root, dir, args, loads, programOf(command, { raw: true }).slice(1))
-    else if (depth >= 5) continue
+    else if (program === 'node') {
+      const stdin = args.find(
+        (arg) => typeof arg === 'string' && arg.startsWith(STDIN_MARK)
+      )
+      if (stdin)
+        stdinLoads(root, dir, nodeCode[Number(stdin.slice(STDIN_MARK.length))], loads)
+      else nodeCommand(root, dir, args, loads, programOf(command, { raw: true }).slice(1))
+    } else if (depth >= 5) continue
     else if (program === 'bash' || program === 'sh') {
       const file = shellScript(root, dir, args)
       if (file) follow(fs.readFileSync(file, 'utf8'), dir)

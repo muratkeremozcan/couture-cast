@@ -231,6 +231,22 @@ describe('the node commands a run block executes', () => {
     ])
   })
 
+  test('backslash and mixed-quote delimiters close; a cd before stdin code applies (r15)', (t) => {
+    const root = fixture(t, { 'scripts/a.mjs': '', 'apps/x/b.mjs': yamlScript })
+    const scripts = (run) =>
+      nodeLoads(root, run).scripts.map((file) => path.relative(root, file))
+    assert.deepEqual(scripts('cat <<\\EOF\nhello\nEOF\nnode scripts/a.mjs'), [
+      'scripts/a.mjs',
+    ])
+    assert.deepEqual(scripts("cat <<'E'OF\nhello\nEOF\nnode scripts/a.mjs"), [
+      'scripts/a.mjs',
+    ])
+    assert.deepEqual(
+      scripts("cd apps/x\nnode --input-type=module <<'EOF'\nimport './b.mjs'\nEOF"),
+      ['apps/x/b.mjs']
+    )
+  })
+
   test('a relative import in a heredoc fed to node is followed (r14)', (t) => {
     const root = fixture(t, { 'scripts/a.mjs': yamlScript })
     const run = "node --input-type=module <<'EOF'\nimport './scripts/a.mjs'\nEOF"
