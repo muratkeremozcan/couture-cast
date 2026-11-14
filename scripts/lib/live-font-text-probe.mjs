@@ -487,21 +487,22 @@ const byPosition = (rectOf) => (a, b) =>
 export const recordRect = (record) => record.visibleRect ?? record.viewRect
 
 /**
- * Windows another window hides: below a focused window (higher `z`) whose rect covers theirs.
- * Android's hierarchy holds only the focused modal's window while the composer is up, so the
- * records of the Activity under it have no node to match.
+ * Windows under a focused window (higher `z`), by id: `{ by, whole }`. Android's hierarchy holds
+ * only the focused window while a modal or a dialog is up, so the records of the Activity under
+ * it have no node to match. `whole` when the focused window's rect covers theirs (the composer's
+ * full-screen modal): nothing of them shows, so they are left out. Otherwise (a centred dialog,
+ * TEA ruling on Antigravity r41 P2-3) they still show around it: out of matching, still judged
+ * for clipping.
  */
 export function coveredWindows(windows, tolerance) {
   const covered = new Map()
   for (const window of windows) {
-    const cover = windows.find(
-      (other) =>
-        other.focused &&
-        other.z > window.z &&
-        other.id !== window.id &&
-        contains(other.rect, window.rect, tolerance)
+    const above = windows.filter(
+      (other) => other.focused && other.z > window.z && other.id !== window.id
     )
-    if (cover) covered.set(window.id, cover.id)
+    const whole = above.find((other) => contains(other.rect, window.rect, tolerance))
+    if (whole) covered.set(window.id, { by: whole.id, whole: true })
+    else if (above.length) covered.set(window.id, { by: above[0].id, whole: false })
   }
   return covered
 }
@@ -511,6 +512,7 @@ function classifyRecords(records, coveredIds, volatileRegions) {
   const classes = {
     empty: [],
     covered: [],
+    behind: [],
     volatile: [],
     scrolled: [],
     hidden: [],
@@ -524,7 +526,8 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     )
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
-    else if (coveredIds.has(record.window)) kind = 'covered'
+    else if (coveredIds.has(record.window))
+      kind = coveredIds.get(record.window).whole ? 'covered' : 'behind'
     else if (region >= 0) kind = 'volatile'
     else if (record.scrolledAway) kind = 'scrolled'
     else if (record.visibleRect === null) kind = 'hidden'
@@ -611,7 +614,9 @@ function groupLeftovers({ nodes, leftover, open, free, tolerance }) {
  * `window` the capture's window rect, `volatileRegions` the rects of the regions the capture
  * leaves out. Every record falls in one class:
  *   empty      text '' (no text to cut), left out
- *   covered    in a window under a focused covering window, left out
+ *   covered    in a window a focused higher window covers whole, left out
+ *   behind     in a window under a focused higher window that does not cover it whole (a
+ *              centred dialog): out of matching, still judged for clipping
  *   volatile   centre inside a volatile region: out of matching, still judged for clipping
  *   scrolled   scrolledAway: may match, never required, never judged
  *   hidden     visibleRect null but not scrolled away: a full clip, judged
@@ -675,8 +680,8 @@ export function matchTextProbe({
   const unmatchedNodes = [...open].sort((a, b) => nodeRank.get(a) - nodeRank.get(b))
   // A covering window must answer for itself: the hierarchy shows only it, so a capture that
   // pairs none of its records read the wrong windows.
-  const coverAnswered = [...new Set(covers.values())].every((id) =>
-    pairs.some((pair) => answer.records[pair.record].window === id)
+  const coverAnswered = [...new Set([...covers.values()].map((cover) => cover.by))].every(
+    (id) => pairs.some((pair) => answer.records[pair.record].window === id)
   )
   let code = null
   if (!coverAnswered) code = 'live_font_text_probe_missing'
@@ -699,11 +704,14 @@ export function matchTextProbe({
       record: record.index,
       region: regionOf.get(record.index),
     })),
-    covered: [...covers].map(([id, by]) => ({
+    covered: [...covers].map(([id, { by, whole }]) => ({
       window: id,
       by,
-      records: classes.covered.filter((record) => record.window === id).length,
+      whole,
+      records: records.filter((record) => record.window === id && record.text !== '')
+        .length,
     })),
+    behind: classes.behind.map((record) => record.index),
     empty: classes.empty.map((record) => record.index),
     windowNodes: windowNodes.map((node) => node.index),
   }

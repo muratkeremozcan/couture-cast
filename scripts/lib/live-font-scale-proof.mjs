@@ -310,6 +310,10 @@ export function textLayout(capture, platform) {
   for (const index of match.hiddenRecords)
     if (!paired.has(index))
       facts.push({ key: null, via: 'hidden', id: '', record: answer.records[index] })
+  // Behind a focused dialog: shown around it, so judged, unless scrolled away.
+  for (const index of match.behind)
+    if (!answer.records[index].scrolledAway)
+      facts.push({ key: null, via: 'behind', id: '', record: answer.records[index] })
   return { pass: match.pass, code: match.code, facts, match }
 }
 
@@ -375,17 +379,6 @@ export function textProbeSummary(capture, platform) {
   }
 }
 
-/**
- * Layout clips of one capture (F-00i). A judged record is `clipped_by_layout` when its content
- * runs past its clipRect by more than the platform tolerance at the top, bottom, left or right
- * (clipRect is the view cut by every clipping ancestor but scroll views and the window, so a
- * text a scroll viewport cuts is no clip, and a hidden record with no clipRect is a full clip),
- * or, given `cold` (the cold launch at the same scale), when it is ellipsized more than its keyed
- * counterpart there (none counts as zero). A multi-line text input scrolls its own content, so
- * it is paired and reported but never judged; a single-line one is judged like text. Given
- * `base` (the cold launch at the leg's starting scale, TEA ruling 2026-11-14), each clip records
- * whether its box kept that launch's height (`staleBox`, TEA change 6).
- */
 /** Content past its clipRect by more than `tolerance` on any side, or no clipRect at all. */
 function contentClipped(record, tolerance) {
   const clip = record.clipRect
@@ -409,6 +402,41 @@ function recordsByKey(capture, platform) {
   )
 }
 
+/** Lines the layout dropped: the unlimited line count past the drawn one (0 when unknown). */
+const truncatedLines = (record) =>
+  record?.unlimitedLineCount == null
+    ? 0
+    : Math.max(0, record.unlimitedLineCount - record.lineCount)
+
+/**
+ * What a keyed record cuts that its counterpart at the cold launch at the same scale does not
+ * (a missing counterpart cuts nothing): more ellipsized characters, or more dropped lines (an
+ * `ellipsizeMode="clip"` text drops lines with no ellipsis; Antigravity r41 P3-1).
+ */
+function newlyCut(record, coldRecord) {
+  const coldEllipsized = coldRecord?.ellipsized ?? 0
+  const coldTruncated = truncatedLines(coldRecord)
+  return {
+    ...(record.ellipsized > coldEllipsized
+      ? { ellipsized: record.ellipsized, coldEllipsized }
+      : {}),
+    ...(truncatedLines(record) > coldTruncated
+      ? { truncatedLines: truncatedLines(record), coldTruncatedLines: coldTruncated }
+      : {}),
+  }
+}
+
+/**
+ * Layout clips of one capture (F-00i). A judged record is `clipped_by_layout` when its content
+ * runs past its clipRect by more than the platform tolerance at the top, bottom, left or right
+ * (clipRect is the view cut by every clipping ancestor but scroll views and the window, so a
+ * text a scroll viewport cuts is no clip, and a hidden record with no clipRect is a full clip),
+ * or, given `cold` (the cold launch at the same scale), when a keyed record cuts more there
+ * (newlyCut: ellipsis or dropped lines). A multi-line text input scrolls its own content, so it
+ * is paired and reported but never judged; a single-line one is judged like text. Given `base`
+ * (the cold launch at the leg's starting scale, TEA ruling 2026-11-14), each clip records
+ * whether its box kept that launch's height (`staleBox`, TEA change 6).
+ */
 function layoutClips(capture, platform, { cold, base } = {}) {
   const tolerance = HEIGHT_TOLERANCE[platform]
   const [coldRecords, baseRecords] = [
@@ -421,9 +449,9 @@ function layoutClips(capture, platform, { cold, base } = {}) {
     if (multilineInput(record)) continue
     const content = contentClipped(record, tolerance)
     const keyed = fact.key !== null
-    const coldEllipsized = keyed ? (coldRecords.get(fact.key)?.ellipsized ?? 0) : 0
-    const ellipsis = cold !== undefined && keyed && record.ellipsized > coldEllipsized
-    if (!content && !ellipsis) continue
+    const cut =
+      cold !== undefined && keyed ? newlyCut(record, coldRecords.get(fact.key)) : {}
+    if (!content && !Object.keys(cut).length) continue
     const baseRecord = keyed ? baseRecords.get(fact.key) : undefined
     clips.push({
       reason: 'clipped_by_layout',
@@ -433,7 +461,7 @@ function layoutClips(capture, platform, { cold, base } = {}) {
       id: fact.id,
       text: record.text,
       content,
-      ...(ellipsis ? { ellipsized: record.ellipsized, coldEllipsized } : {}),
+      ...cut,
       height: rectHeight(record.viewRect),
       baseHeight: baseRecord ? rectHeight(baseRecord.viewRect) : null,
       staleBox:

@@ -606,15 +606,15 @@ describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () 
     ]
     const result = match([node('Share card', [42, 300, 400, 360])], records, { windows })
     assert.equal(result.pass, true)
-    assert.deepEqual(result.covered, [{ window: 1, by: 2, records: 1 }])
+    assert.deepEqual(result.covered, [{ window: 1, by: 2, whole: true, records: 1 }])
+    assert.deepEqual(result.behind, [])
   })
 
-  test('a cover that is not focused, not above, or not whole leaves the records in', () => {
+  test('a window that is not focused, or not above, covers nothing', () => {
     const under = { id: 1, rect: [0, 0, 1080, 2400], z: 0, focused: false }
     for (const cover of [
       { id: 2, rect: [0, 0, 1080, 2400], z: 1, focused: false },
       { id: 2, rect: [0, 0, 1080, 2400], z: -1, focused: true },
-      { id: 2, rect: [0, 400, 1080, 2400], z: 1, focused: true },
     ]) {
       const records = [
         record('Home', [42, 176, 184, 247], { window: 1 }),
@@ -626,6 +626,30 @@ describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () 
       assert.equal(result.code, 'live_font_text_probe_unmatched', JSON.stringify(cover))
       assert.deepEqual(coveredWindows([under, cover], 2).size, 0)
     }
+  })
+
+  // Antigravity r41 P2-3, TEA ruling: a centred dialog does not cover the Activity whole. The
+  // hierarchy shows only the dialog, so the Activity's records leave matching, but they still
+  // show around it and are judged for clipping (live-font-scale-proof.test.mjs).
+  test('the r41 dialog probe: records behind a focused dialog leave matching', () => {
+    const windows = [
+      { id: 0, rect: [0, 0, 1080, 2400], z: 0, focused: false },
+      { id: 1, rect: [100, 300, 300, 500], z: 1, focused: true },
+    ]
+    const records = [
+      record('Home', [42, 176, 184, 247], { window: 0 }),
+      record('OK', [150, 420, 250, 470], { window: 1 }),
+    ]
+    const result = match([node('OK', [150, 420, 250, 470])], records, { windows })
+    assert.equal(result.pass, true, result.code)
+    assert.deepEqual(result.covered, [{ window: 0, by: 1, whole: false, records: 1 }])
+    assert.deepEqual(result.behind, [0])
+    assert.deepEqual(result.unmatchedRecords, [])
+    // The dialog must still answer for itself.
+    const silent = match([node('OK', [150, 420, 250, 470])], records.slice(0, 1), {
+      windows,
+    })
+    assert.equal(silent.code, 'live_font_text_probe_missing')
   })
 
   test('a covering window none of whose records matches is a missing answer', () => {

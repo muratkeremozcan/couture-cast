@@ -1542,6 +1542,81 @@ describe('text layout clipping (F-00i)', () => {
     }
   })
 
+  // Antigravity r41 P3-1: `ellipsizeMode="clip"` drops lines with no ellipsis.
+  test('the r41 M11 record: lines dropped past the cold launch at the same scale are a clip', () => {
+    const change = withAll(fixedChange())
+    const lines = (capture, unlimitedLineCount) =>
+      Object.assign(recordFor(capture, TEMPERATURE), {
+        lineCount: 2,
+        maxLines: 2,
+        ellipsized: 0,
+        unlimitedLineCount,
+      })
+    lines(change.settled, 4)
+    lines(change.cold, 2)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'unexpected')
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [
+        entry.text,
+        entry.content,
+        entry.truncatedLines,
+        entry.coldTruncatedLines,
+      ]),
+      [[TEMPERATURE, false, 2, 0]]
+    )
+    // The same lines dropped at the cold launch are the app's own.
+    lines(change.cold, 4)
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'fixed')
+    // A cold record that reports no unlimited count drops nothing.
+    lines(change.cold, null)
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+  })
+
+  // Antigravity r41 P2-3, TEA ruling: records behind a focused dialog are judged, unkeyed.
+  test('a clipped record behind a focused dialog fails; an unclipped one passes', () => {
+    const dialogCapture = (change) => {
+      const settled = change.settled
+      const records = settled.textProbe.records.map((r) => ({ ...r, window: 0 }))
+      return {
+        ...settled,
+        nodes: [{ id: '', text: 'OK', bounds: '[150,420][250,470]' }],
+        textProbe: {
+          ...settled.textProbe,
+          windows: [
+            { id: 0, rect: [0, 0, 1080, 2400], z: 0, focused: false },
+            { id: 1, rect: [100, 300, 300, 500], z: 1, focused: true },
+          ],
+          records: [
+            ...records,
+            probeRecord('android', 'OK', [150, 420, 250, 470], { window: 1 }),
+          ],
+        },
+      }
+    }
+    const clean = withAll(fixedChange())
+    clean.settled = dialogCapture(clean)
+    const passed = evaluateLiveFontChangeRaw(clean).checks
+    assert.equal(passed.textProbe.stages.settled.pass, true)
+    assert.equal(passed.clipping.pass, true)
+    const clipped = withAll(fixedChange())
+    clipped.settled = dialogCapture(clipped)
+    overflow(clipped.settled, TEMPERATURE)
+    const { checks } = evaluateLiveFontChangeRaw(clipped)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.key, entry.text]),
+      [['behind', null, TEMPERATURE]]
+    )
+    assert.deepEqual(clipKeys(checks), [], 'no key, so no entry can list it')
+    // Scrolled away behind the dialog, it is not judged.
+    Object.assign(recordFor(clipped.settled, TEMPERATURE), {
+      visibleRect: null,
+      clipRect: null,
+      scrolledAway: true,
+    })
+    assert.equal(evaluateLiveFontChangeRaw(clipped).checks.clipping.pass, true)
+  })
+
   test('a single-line text input is judged like text; a multi-line one is paired and reported only', () => {
     const input = (maxLines) => {
       const change = withAll(fixedChange())
