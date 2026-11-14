@@ -8,7 +8,7 @@
 // wider than its tab shrinks to fit (nextTabLabelFit) instead of being cut, and each label reports
 // its height so the bar can grow by what the text grew (tabBarGrowth). On iOS the label keeps React Navigation's behaviour: it does
 // not scale, and the tab's Large Content Viewer shows the label at the user's size instead.
-import React, { useRef, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import {
   type LayoutChangeEvent,
   type NativeSyntheticEvent,
@@ -95,12 +95,47 @@ export function nextTabLabelFit(fit: number, lineWidths: readonly number[]): num
   return Math.max(TAB_LABEL_MIN_SCALE, fit * Math.min(available / natural, 1) * 0.98)
 }
 
+/** A tab label's position, as React Navigation passes it to tabBarLabel. */
+export type TabLabelPosition = 'below-icon' | 'beside-icon'
+
+/**
+ * The tab bar's text-scale sizing, for the tabs layout: how much the bar grows, how far the
+ * below-icon underline drops with it, the tallest label for the line boxes, and the callback each
+ * label reports its height and position through. iOS labels do not scale (Large Content Viewer),
+ * so the bar keeps its height there.
+ */
+export function useTabBarSizing() {
+  const { fontScale } = useWindowDimensions()
+  const [labelHeights, setLabelHeights] = useState<TabLabelHeights>({
+    fontScale,
+    heights: {},
+  })
+  const [position, setPosition] = useState<TabLabelPosition>('below-icon')
+  const onLabelHeight = useCallback(
+    (label: string, height: number, labelPosition: TabLabelPosition) => {
+      setPosition(labelPosition)
+      setLabelHeights((current) =>
+        recordTabLabelHeight(current, fontScale, label, height)
+      )
+    },
+    [fontScale]
+  )
+  const tallestLabel = tallestTabLabel(labelHeights, fontScale)
+  const growth = tabBarGrowth(
+    tallestLabel === undefined ? [] : [tallestLabel],
+    Platform.OS === 'ios' ? 1 : fontScale
+  )
+  // The underline sits on the bar's bottom edge below a label; beside the icon it does not move.
+  const indicatorDrop = position === 'below-icon' ? growth : 0
+  return { growth, indicatorDrop, onLabelHeight, tallestLabel }
+}
+
 type TabBarLabelProps = {
   color: string
   children: string
-  onHeight: (label: string, height: number) => void
+  onHeight: (label: string, height: number, position: TabLabelPosition) => void
   /** React Navigation's label position: below the icon on phones, beside it on tablets. */
-  position?: 'below-icon' | 'beside-icon'
+  position?: TabLabelPosition
   /**
    * The tallest label's height. A label shrunk to fit its tab is shorter than the others, and
    * the tab places it at the top, so its baseline sat 5 px above theirs at Android 2.0; held at
@@ -122,11 +157,17 @@ export function TabBarLabel({
   const fit = fitState.key === key ? fitState.fit : 1
   // A label reports its height only once it has settled on its size; a wrapped first layout
   // would otherwise grow the bar for a moment. Web has no text layout events and no text scale.
+  // A new text, scale or position starts unsettled again (r46): its first layout is unfitted.
   const settled = useRef(Platform.OS === 'web')
+  const settledKey = useRef(key)
+  if (settledKey.current !== key) {
+    settledKey.current = key
+    settled.current = Platform.OS === 'web'
+  }
   const layoutHeight = useRef<number | null>(null)
   const report = () => {
     if (settled.current && layoutHeight.current !== null)
-      onHeight(children, layoutHeight.current)
+      onHeight(children, layoutHeight.current, position)
   }
   const onLayout = (event: LayoutChangeEvent) => {
     layoutHeight.current = event.nativeEvent.layout.height
@@ -161,13 +202,23 @@ export function TabBarLabel({
           base,
           MEDIUM,
           { color },
-          fit < 1 ? { fontSize: base.fontSize * fit } : null,
+          fit < 1 ? fitted(position, fit) : null,
         ]}
       >
         {children}
       </Text>
     </View>
   )
+}
+
+/** The size of a label shrunk by `fit`; beside the icon its fixed line height shrinks with it. */
+function fitted(position: TabLabelPosition, fit: number) {
+  return position === 'beside-icon'
+    ? {
+        fontSize: styles.beside.fontSize * fit,
+        lineHeight: styles.beside.lineHeight * fit,
+      }
+    : { fontSize: styles.below.fontSize * fit }
 }
 
 // React Navigation's label styles: labelBeneath, and labelBeside with labelBesideUikit (the bar
@@ -179,5 +230,6 @@ const styles = StyleSheet.create({
   },
   lineBox: { justifyContent: 'flex-end' },
   below: { fontSize: 10 },
-  beside: { fontSize: 13, marginStart: 5, marginEnd: 12, lineHeight: 24 },
+  // flexShrink lets a beside-icon label wrap inside its row instead of widening it.
+  beside: { fontSize: 13, marginStart: 5, marginEnd: 12, lineHeight: 24, flexShrink: 1 },
 })

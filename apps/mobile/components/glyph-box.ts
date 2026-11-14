@@ -26,14 +26,15 @@ function glyphScale(fontScale: number, maxFontSizeMultiplier?: number): number {
  * The side of a glyph box drawn at `base` at the default text size, never smaller than `base`.
  * At or below the default size it is `base` exactly: rounding it to the pixel grid made a 22 box
  * 58 px where Yoga drew 57 or 58 by position (2.625 density), so the default look moved 1 px.
- * Pass the glyph's `maxFontSizeMultiplier` when it sets one, so the box stops where the glyph does.
+ * Pass the glyph's maxFontSizeMultiplier as `glyphMultiplier` when it sets one, so the box stops
+ * where the glyph does.
  */
 export function glyphBoxSide(
   base: number,
   fontScale: number,
-  maxFontSizeMultiplier?: number
+  glyphMultiplier?: number
 ): number {
-  const scale = glyphScale(fontScale, maxFontSizeMultiplier)
+  const scale = glyphScale(fontScale, glyphMultiplier)
   if (!(Number.isFinite(scale) && scale > 1)) return base
   return PixelRatio.roundToNearestPixel(base * scale)
 }
@@ -42,13 +43,9 @@ export function glyphBoxSide(
  * The size style of a square glyph box at the current text size. `round` makes it a circle;
  * otherwise the caller keeps its own corner radius.
  */
-export function useGlyphBox(
-  base: number,
-  round: boolean,
-  maxFontSizeMultiplier?: number
-) {
+export function useGlyphBox(base: number, round: boolean, glyphMultiplier?: number) {
   const { fontScale } = useWindowDimensions()
-  const side = glyphBoxSide(base, fontScale, maxFontSizeMultiplier)
+  const side = glyphBoxSide(base, fontScale, glyphMultiplier)
   return round
     ? { width: side, height: side, borderRadius: side / 2 }
     : { width: side, height: side }

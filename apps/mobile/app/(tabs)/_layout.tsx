@@ -1,28 +1,15 @@
-import React, { useCallback, useState } from 'react'
+import React from 'react'
 import { useAndroidNavigationIntent } from '@/components/android-share-card-presentation'
 import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
-import {
-  Platform,
-  Pressable,
-  StyleSheet,
-  useColorScheme,
-  useWindowDimensions,
-  View,
-} from 'react-native'
+import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 
 import Colors from '@/constants/colors'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
-import {
-  recordTabLabelHeight,
-  TabBarLabel,
-  tabBarGrowth,
-  type TabLabelHeights,
-  tallestTabLabel,
-} from '@/components/tab-bar-label'
+import { TabBarLabel, useTabBarSizing } from '@/components/tab-bar-label'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -31,7 +18,7 @@ function TabBarIcon(props: {
   color: string
   focused: boolean
   tabId: string
-  /** How much taller the bar is than at the default text size (see tabBarGrowth). */
+  /** How far the underline drops below the icon as the bar grows (useTabBarSizing). */
   growth: number
 }) {
   const { focused, tabId, growth, ...iconProps } = props
@@ -61,25 +48,8 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets()
   const analytics = useMobileAnalytics()
   const { t } = useTranslation()
-  const { fontScale } = useWindowDimensions()
   // Story 6.15 F-00i: each label reports its height and the bar grows by what the text grew.
-  // iOS labels do not scale (Large Content Viewer), so the bar keeps its height there.
-  const [labelHeights, setLabelHeights] = useState<TabLabelHeights>({
-    fontScale,
-    heights: {},
-  })
-  const onLabelHeight = useCallback(
-    (label: string, height: number) =>
-      setLabelHeights((current) =>
-        recordTabLabelHeight(current, fontScale, label, height)
-      ),
-    [fontScale]
-  )
-  const tallestLabel = tallestTabLabel(labelHeights, fontScale)
-  const growth = tabBarGrowth(
-    tallestLabel === undefined ? [] : [tallestLabel],
-    Platform.OS === 'ios' ? 1 : fontScale
-  )
+  const { growth, indicatorDrop, onLabelHeight, tallestLabel } = useTabBarSizing()
   const tabLabels = {
     home: t('tabs.home', { defaultValue: 'Home' }),
     wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
@@ -143,7 +113,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: tabLabels.home,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
-              growth={growth}
+              growth={indicatorDrop}
               name="home"
               color={color}
               focused={focused}
@@ -182,7 +152,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: tabLabels.wardrobe,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
-              growth={growth}
+              growth={indicatorDrop}
               name="shopping-bag"
               color={color}
               focused={focused}
@@ -203,7 +173,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: tabLabels.community,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
-              growth={growth}
+              growth={indicatorDrop}
               name="users"
               color={color}
               focused={focused}
@@ -223,7 +193,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: tabLabels.settings,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
-              growth={growth}
+              growth={indicatorDrop}
               name="cog"
               color={color}
               focused={focused}

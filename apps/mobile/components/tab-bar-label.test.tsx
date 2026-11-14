@@ -63,7 +63,7 @@ describe('6.15 tab bar label', () => {
     expect(props.adjustsFontSizeToFit).toBeUndefined()
     expect(props.onTextLayout).toEqual(expect.any(Function))
     await waitFor(() =>
-      expect(onHeight).toHaveBeenCalledWith('Community', expect.any(Number))
+      expect(onHeight).toHaveBeenCalledWith('Community', expect.any(Number), 'below-icon')
     )
     expect(onHeight.mock.calls.at(-1)?.[1]).toBeGreaterThan(0)
   })
@@ -149,5 +149,28 @@ describe('6.15 tab bar label fit and position', () => {
     expect(label.lineHeight).toBe('24px')
     expect(label.marginInlineStart).toBe('5px')
     expect(label.marginInlineEnd).toBe('12px')
+  })
+})
+
+describe('6.15 tab bar sizing (r46)', () => {
+  it('6.15-MOB-TAB-10 shrinks a beside-icon label with its line height and lets it shrink in its row', () => {
+    captured.props.length = 0
+    render(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()} position="beside-icon">
+        Community
+      </TabBarLabel>
+    )
+    const first = captured.props.findLast((entry) => entry.children === 'Community')!
+    act(() =>
+      first.onTextLayout!({
+        nativeEvent: { lines: [{ width: 100 }, { width: 20 }] },
+      } as never)
+    )
+    const label = getComputedStyle(screen.getByText('Community'))
+    const fit = (100 / 120) * 0.98
+    expect(Number.parseFloat(label.fontSize)).toBeCloseTo(13 * fit, 1)
+    expect(Number.parseFloat(label.lineHeight)).toBeCloseTo(24 * fit, 1)
+    const props = captured.props.findLast((entry) => entry.children === 'Community')!
+    expect(StyleSheet.flatten(props.style).flexShrink).toBe(1)
   })
 })
