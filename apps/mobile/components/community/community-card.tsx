@@ -605,8 +605,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  // Story 6.15 F-00i: at the largest text sizes the climate pill alone is wider than a spotlight
+  // card, so the pills wrap and a pill wraps its own text instead of running past the card edge.
   headerTags: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 1,
     alignItems: 'center',
     gap: 6,
   },
@@ -620,6 +624,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   climatePill: {
+    flexShrink: 1,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,

@@ -930,10 +930,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
   },
+  // Story 6.15 F-00i: at the largest text sizes the label and the counter no longer fit on one
+  // line, so the counter wraps below the label instead of running past the sheet edge.
   captionHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    columnGap: 8,
   },
   countText: {
     fontSize: 11,
