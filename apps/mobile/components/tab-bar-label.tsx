@@ -159,12 +159,14 @@ export function TabBarLabel({
   // would otherwise grow the bar for a moment. Web has no text layout events and no text scale.
   // A new text, scale or position starts unsettled again (r46): its first layout is unfitted.
   const settled = useRef(Platform.OS === 'web')
+  const layoutHeight = useRef<number | null>(null)
   const settledKey = useRef(key)
   if (settledKey.current !== key) {
     settledKey.current = key
     settled.current = Platform.OS === 'web'
+    // The previous label's height is not this one's (r47): report only a layout of this key.
+    layoutHeight.current = null
   }
-  const layoutHeight = useRef<number | null>(null)
   const report = () => {
     if (settled.current && layoutHeight.current !== null)
       onHeight(children, layoutHeight.current, position)
@@ -189,7 +191,7 @@ export function TabBarLabel({
   return (
     <View
       style={[
-        styles.lineBox,
+        position === 'beside-icon' ? styles.lineBoxBeside : styles.lineBox,
         lineBoxHeight === undefined ? null : { minHeight: lineBoxHeight },
       ]}
     >
@@ -229,6 +231,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   lineBox: { justifyContent: 'flex-end' },
+  // Beside the icon the line box shrinks in the tab's row and centres its label on the icon.
+  lineBoxBeside: { justifyContent: 'center', flexShrink: 1 },
   below: { fontSize: 10 },
   // flexShrink lets a beside-icon label wrap inside its row instead of widening it.
   beside: { fontSize: 13, marginStart: 5, marginEnd: 12, lineHeight: 24, flexShrink: 1 },

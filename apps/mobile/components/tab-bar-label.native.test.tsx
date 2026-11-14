@@ -75,4 +75,27 @@ describe('6.15 tab bar label on a native platform', () => {
     expect(sizing!.growth).toBe(14)
     expect(sizing!.indicatorDrop).toBe(0)
   })
+
+  it('6.15-MOB-TAB-13 never reports the previous label height after a change', () => {
+    captured.props.length = 0
+    const onHeight = vi.fn()
+    const view = render(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={onHeight}>
+        Home
+      </TabBarLabel>
+    )
+    layout(latest('Home'), 40)
+    oneLine(latest('Home'))
+    view.rerender(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={onHeight}>
+        Community
+      </TabBarLabel>
+    )
+    onHeight.mockClear()
+    // The text layout settles before this label's own layout: Home's 40 must not be reported.
+    oneLine(latest('Community'))
+    expect(onHeight).not.toHaveBeenCalled()
+    layout(latest('Community'), 80)
+    expect(onHeight).toHaveBeenLastCalledWith('Community', 80, 'below-icon')
+  })
 })

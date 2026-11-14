@@ -173,4 +173,20 @@ describe('6.15 tab bar sizing (r46)', () => {
     const props = captured.props.findLast((entry) => entry.children === 'Community')!
     expect(StyleSheet.flatten(props.style).flexShrink).toBe(1)
   })
+
+  it('6.15-MOB-TAB-12 centres a beside-icon label on its icon and lets its line box shrink', () => {
+    render(
+      <TabBarLabel
+        color="rgb(1, 2, 3)"
+        onHeight={vi.fn()}
+        position="beside-icon"
+        lineBoxHeight={30}
+      >
+        Settings
+      </TabBarLabel>
+    )
+    const lineBox = getComputedStyle(screen.getByText('Settings').parentElement!)
+    expect(lineBox.justifyContent).toBe('center')
+    expect(lineBox.flexShrink).toBe('1')
+  })
 })
