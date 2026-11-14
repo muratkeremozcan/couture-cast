@@ -11,6 +11,10 @@
 //   node scripts/run-live-font-proof.mjs --platform android|ios --device <serial|udid> \
 //     --build release|debug --screens home,community,settings,composer --out <dir> \
 //     [--label sdk54-release] [--app-id com.couturecast.story68] [--scale-path settings|in-place]
+//     [--timezone America/Chicago]
+//   --timezone pins the Android device's timezone before the first capture (default: the one the
+//   approved residual entries were captured in) and puts the previous one back at the end. An iOS
+//   simulator follows the host, so the run records the host's and fails on any other.
 //   --scale-path settings (default) changes the live scale the way a user does: the app goes to
 //   the background behind the system Settings screen, the scale changes, and the app returns.
 //   React Native reads the new font scale on resume, so a foreground write (in-place) is a
@@ -33,6 +37,7 @@ import {
   settleCapture,
   readEnvironment,
   restoreFailure,
+  runTimezone,
   rootIdentity,
   sameLayout,
   sameLayoutShifted,
@@ -42,12 +47,14 @@ import {
 import {
   aggregateVerdict,
   numericScale,
+  proofDirInRepo,
   proposedBaselines,
   runScreenJourney,
   SCALES,
   SCREENS,
   screenRunSteps,
 } from './lib/live-font-journey.mjs'
+import { requiredMounts } from './lib/live-font-scale-proof.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -63,6 +70,7 @@ const appId = option('app-id', 'com.couturecast.story68')
 const screens = option('screens', 'home,community,settings,composer').split(',')
 const configChange = option('config-change')
 const runLabel = option('label', build)
+const requestedTimezone = option('timezone')
 const scalePath = option('scale-path', 'settings')
 if (!['settings', 'in-place'].includes(scalePath))
   throw new Error('scale_path_settings_or_in_place_required')
@@ -205,8 +213,9 @@ function nativeIdentity() {
 // The screen whose journey is running sets the regions every capture leaves out; screens run
 // one after another, so one module-level value is enough.
 let activeVolatile = []
-// The marker scopes every capture of the active screen must carry: the root and the screen's own,
-// widened after each before capture by every scope it showed, until the next launch.
+// The marker scopes every capture of the active screen must carry (requiredMounts: the root and
+// the screen's own, the modal alone for the composer), widened after each before capture by every
+// scope it showed, until the next launch.
 let mounts = mountTracker(['root'])
 let launchCount = 0
 let launchId
@@ -416,7 +425,11 @@ function launch() {
         `couturecast-story68://expo-development-client/?url=${encodeURIComponent('http://127.0.0.1:8089')}`
       )
   } else {
-    spawnSync('xcrun', ['simctl', 'terminate', device, appId])
+    // A terminate with no running app exits nonzero, so its status is not checked.
+    spawnSync('xcrun', ['simctl', 'terminate', device, appId], {
+      timeout: 60_000,
+      killSignal: 'SIGKILL',
+    })
     run('xcrun', ['simctl', 'launch', device, appId])
   }
   maestroRun(
@@ -582,6 +595,8 @@ const androidApi =
 // A 4 MiB event buffer holds a whole journey's wm_on_create_called entries.
 if (platform === 'android') adb('logcat', '-b', 'events', '-G', '4M')
 const previousScale = readScale()
+// The device timezone every capture is taken in, set before the first one (runTimezone).
+let pinned
 const started = Date.now()
 const results = []
 if (fingerprint)
@@ -605,12 +620,15 @@ try {
     if (/pkgFlags=\[[^\]]*DEBUGGABLE/.test(flags))
       throw new Error('non_debuggable_release_required')
   }
+  pinned = runTimezone({
+    platform,
+    requested: requestedTimezone,
+    hostTimezone: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    adb,
+  })
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
-    mounts = mountTracker([
-      'root',
-      ...(SCREENS[name]?.mount ? [SCREENS[name].mount] : []),
-    ])
+    mounts = mountTracker(requiredMounts(SCREENS[name]?.mount))
     const steps = screenRunSteps({
       configChange,
       versionKnown: Boolean(reactNativeVersion),
@@ -656,6 +674,7 @@ try {
       reactNativeVersion,
       residualBaselines,
       label: runLabel,
+      timezone: pinned.timezone,
       androidDensity,
     })
     for (const leg of report.legs) {
@@ -665,7 +684,13 @@ try {
     results.push(report)
   }
 } finally {
-  if (fingerprint) spawnSync('xcrun', ['simctl', 'status_bar', device, 'clear'])
+  if (fingerprint)
+    spawnSync('xcrun', ['simctl', 'status_bar', device, 'clear'], {
+      timeout: 60_000,
+      killSignal: 'SIGKILL',
+    })
+  if (pinned?.previous && pinned.previous !== pinned.timezone)
+    adb('shell', 'cmd', 'alarm', 'set-timezone', pinned.previous)
   if (platform === 'android' && previousScale === 'null')
     adb('shell', 'settings', 'delete', 'system', 'font_scale')
   else setScale(previousScale)
@@ -680,6 +705,7 @@ const report = {
   platform,
   device,
   build,
+  timezone: pinned?.timezone ?? null,
   label: runLabel,
   appId,
   reactNativeVersion: reactNativeVersion ?? null,
@@ -699,12 +725,11 @@ fs.writeFileSync(
 )
 // Approval of a known residual is a reviewed diff: diff this file against
 // scripts/lib/fixtures/live-font-residual-baselines.json and commit only entries that meet the
-// six approval rules.
-// Each entry names its proof dir relative to the repository, so the captures can be found.
-const repoRoot = fileURLToPath(new URL('..', import.meta.url))
-const proofDir = path.relative(repoRoot, out)
+// six approval rules. Each proposed entry carries the run's timezone and its exact stale keys.
+// Each entry names its proof dir relative to the repository, so the captures can be found; a
+// proof dir outside the repository (symlinks resolved) names none.
 const proposed = proposedBaselines(residualBaselineFile, results, {
-  dir: proofDir.startsWith('..') || path.isAbsolute(proofDir) ? undefined : proofDir,
+  dir: proofDirInRepo(root, out),
 })
 if (proposed)
   fs.writeFileSync(

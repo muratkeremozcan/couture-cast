@@ -18,9 +18,9 @@
 // stable release with commit 45904c8 (text keeping a stale font scale across later commits).
 // From 0.87 the screen must be `fixed`. Below it the oracle records what it sees: `fixed` passes
 // and flags the baseline for review; `known-residual` (heights stale against the cold reference,
-// nothing else wrong) passes only when a reviewed baseline entry for that platform, build and
-// screen allows exactly those stale nodes (scripts/lib/fixtures/live-font-residual-baselines.json);
-// anything else fails. Required controls must stay on screen in every class.
+// nothing else wrong) passes only when a reviewed baseline entry for that platform, build,
+// screen and timezone lists exactly those stale miss keys
+// (scripts/lib/fixtures/live-font-residual-baselines.json); anything else fails. Required controls must stay on screen in every class.
 
 const FIX_VERSION = [0, 87, 0]
 
@@ -288,6 +288,15 @@ function mountsOf(root) {
 }
 
 /**
+ * The marker scopes every capture of a screen with marker scope `mount` must carry, as the
+ * identity check below requires them and the runner rereads for them: the modal alone for the
+ * composer, the root and the screen's own scope for every other screen.
+ */
+export function requiredMounts(mount) {
+  return mount === 'modal' ? ['modal'] : ['root', ...(mount ? [mount] : [])]
+}
+
+/**
  * Whether the stages carry enough mount evidence to judge identity: the root marker and the
  * screen's own scope (`mount`: home, community, settings, or modal for the composer) in every
  * stage, and every other scope any stage shows in every stage too. A marker left out of one
@@ -299,7 +308,7 @@ function mountsOf(root) {
  * every-scope-in-every-stage rule still holds it.
  */
 function mountsKnown(mounts, mount) {
-  const required = mount === 'modal' ? ['modal'] : ['root', ...(mount ? [mount] : [])]
+  const required = requiredMounts(mount)
   if (!mounts.every((scopes) => scopes && required.every((scope) => scopes.has(scope))))
     return false
   const scopes = new Set(mounts.flatMap((stage) => [...stage.keys()]))
@@ -534,14 +543,21 @@ function classify(checks) {
     : 'unexpected'
 }
 
-const missId = (miss) => JSON.parse(miss.key.slice(0, miss.key.lastIndexOf('#')))[0]
+/** The testID a miss key names (`''` for text without one): `["id","text"]#n` gives `id`. */
+const keyId = (key) => JSON.parse(key.slice(0, key.lastIndexOf('#')))[0]
+
+/** Every stale miss of a leg, cold parity first, duplicates kept. */
+const staleMisses = (checks) => [
+  ...checks.coldParity.misses,
+  ...(checks.postUpdateParity?.misses ?? []),
+]
 
 /** The review facts of an entry that break the six approval rules (TEA, 2026-11-13). */
 function brokenReviewFacts(baseline) {
   const review = baseline.review ?? {}
-  const staleIds = Array.isArray(baseline.staleIds) ? baseline.staleIds : []
+  const staleIds = new Set(baseline.staleKeys.map(keyId))
   const growthOutside = Array.isArray(review.growthFailing)
-    ? review.growthFailing.filter((id) => !staleIds.includes(id))
+    ? review.growthFailing.filter((id) => !staleIds.has(id))
     : null
   return [
     review.verdict !== 'known-residual' && 'verdict',
@@ -554,63 +570,109 @@ function brokenReviewFacts(baseline) {
 }
 
 /**
- * Rule 6, ids and counts exact: the run's stale misses number exactly `maxStaleMisses`, every
- * miss and failing growth probe is in `staleIds`, and every listed id is hit by one of them, so a
- * hand edit carries no headroom.
+ * Rule 6, keys exact: every failing growth probe is an id `staleKeys` names, and the run's stale
+ * miss keys, sorted with duplicates kept, equal `staleKeys` exactly, so a hand edit carries no
+ * headroom and a swap between two unlabeled texts is a new residual.
  */
 function exactnessProblem(checks, baseline) {
-  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
+  const staleIds = new Set(baseline.staleKeys.map(keyId))
   const failingProbes = checks.growth.probes
     .filter((probe) => !probe.pass)
     .map((probe) => probe.probe)
-  const growthOutside = failingProbes.filter((id) => !baseline.staleIds.includes(id))
+  const growthOutside = failingProbes.filter((id) => !staleIds.has(id))
   if (growthOutside.length)
     return `growth fails outside baseline: ${growthOutside.join(',')}`
-  const outside = misses.filter((miss) => !baseline.staleIds.includes(missId(miss)))
-  if (outside.length) return `stale outside baseline: ${outside.map(missId).join(',')}`
-  const hit = new Set([...misses.map(missId), ...failingProbes])
-  const unused = baseline.staleIds.filter((id) => !hit.has(id))
-  if (unused.length) return `baseline lists ids no miss hit: ${unused.join(',')}`
-  if (
-    !Number.isInteger(baseline.maxStaleMisses) ||
-    misses.length !== baseline.maxStaleMisses
-  )
-    return `${misses.length} stale nodes, baseline names ${baseline.maxStaleMisses}`
+  // Multiset difference both ways: each run key uses up one listed copy.
+  const runKeys = staleMisses(checks).map((miss) => miss.key)
+  const left = [...baseline.staleKeys].sort()
+  const extra = []
+  for (const key of runKeys.sort()) {
+    const at = left.indexOf(key)
+    if (at < 0) extra.push(key)
+    else left.splice(at, 1)
+  }
+  if (extra.length || left.length)
+    return [
+      extra.length && `stale key outside baseline: ${extra[0]}`,
+      left.length && `baseline key no miss hit: ${left[0]}`,
+      `${extra.length} extra, ${left.length} missing`,
+    ]
+      .filter(Boolean)
+      .join('; ')
   return null
 }
 
+/** Why `keys` is no list of miss keys (`["id","text"]#n`), or null when it is one. */
+function staleKeysProblem(keys) {
+  if (!Array.isArray(keys)) return 'baseline staleKeys must be a list of keys'
+  const bad = keys.find((key) => {
+    if (typeof key !== 'string' || !/#\d+$/.test(key)) return true
+    try {
+      const named = JSON.parse(key.slice(0, key.lastIndexOf('#')))
+      return !Array.isArray(named) || typeof named[0] !== 'string'
+    } catch {
+      return true
+    }
+  })
+  return bad === undefined
+    ? null
+    : `baseline staleKeys must be a list of keys: ${JSON.stringify(bad)}`
+}
+
 /**
- * A residual passes only as a reviewed baseline entry describes it: `staleIds` lists exactly the
- * ids (`''` for text without one) that keep their base-scale height, and `maxStaleMisses` names
- * exactly how many nodes do. Anything else is a new regression until it is reviewed.
+ * Why the run's environment differs from the one the entry was approved in, or null. The
+ * timezone is part of it: an entry with none, or a run with none, approves nothing.
  */
-function residualApproved(checks, baseline) {
-  if (!baseline) return { pass: false, reason: 'no reviewed baseline' }
-  if (!Array.isArray(baseline.staleIds))
-    return { pass: false, reason: 'baseline staleIds must be a list' }
+function environmentProblem(baseline, timezone) {
+  const known = (value) => typeof value === 'string' && value !== ''
+  if (known(baseline.timezone) && known(timezone) && baseline.timezone === timezone)
+    return null
+  return `baseline timezone ${baseline.timezone ?? 'missing'}, run timezone ${timezone ?? 'missing'}`
+}
+
+/**
+ * A residual passes only as a reviewed baseline entry describes it: approved in the run's
+ * timezone, and `staleKeys` lists exactly the stale miss keys (`["id","text"]#n`, `''` for text
+ * without an id) that keep their base-scale height. Anything else is a new regression until it
+ * is reviewed.
+ */
+function residualApproved(checks, baseline, timezone) {
+  const unapproved = (reason) => ({
+    pass: false,
+    code: 'live_font_residual_unapproved',
+    reason,
+  })
+  if (!baseline) return unapproved('no reviewed baseline')
+  const environment = environmentProblem(baseline, timezone)
+  if (environment)
+    return {
+      pass: false,
+      code: 'live_font_residual_environment_differs',
+      reason: environment,
+    }
+  const shape = staleKeysProblem(baseline.staleKeys)
+  if (shape) return unapproved(shape)
   // An entry approves only with review facts that meet the six approval rules, so a proposal
   // committed verbatim with a failing fact approves nothing.
   const broken = brokenReviewFacts(baseline)
   if (broken.length)
-    return {
-      pass: false,
-      reason: `baseline review facts break the approval rules: ${broken.join(',')}`,
-    }
+    return unapproved(
+      `baseline review facts break the approval rules: ${broken.join(',')}`
+    )
   const problem = exactnessProblem(checks, baseline)
-  return problem ? { pass: false, reason: problem } : { pass: true }
+  return problem ? unapproved(problem) : { pass: true }
 }
 
 /**
  * TEA, 2026-11-13: what a reviewer needs to approve a known-residual leg, in the baseline entry's
- * own shape. `staleIds` and `maxStaleMisses` are exact (no headroom), and the facts the six
- * approval rules read ride beside them under `review`; the runner adds the leg's identity and
- * evidence. Approval is then a reviewed diff of the baselines file.
+ * own shape. `staleKeys` is exact (every stale miss key, sorted, duplicates kept, no headroom),
+ * and the facts the six approval rules read ride beside it under `review`; the runner adds the
+ * leg's identity, timezone and evidence. Approval is then a reviewed diff of the baselines file.
  */
 export function proposedResidualEntry(checks) {
-  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
+  const misses = staleMisses(checks)
   return {
-    staleIds: [...new Set(misses.map(missId))].sort(),
-    maxStaleMisses: misses.length,
+    staleKeys: misses.map((miss) => miss.key).sort(),
     review: {
       verdict: classify(checks),
       structuralPass: !structural(checks),
@@ -625,9 +687,15 @@ export function proposedResidualEntry(checks) {
 /**
  * The proof's pass rule. With the fix bundled the screen must relayout in place. Without it an
  * early correct relayout passes with `baselineReview` set, and a residual passes only within its
- * reviewed baseline; a restored screen or any other failure is red.
+ * reviewed baseline, approved in the run's `timezone`; a restored screen or any other failure is
+ * red.
  */
-export function assertLiveFontProof({ reactNativeVersion, residualBaseline, ...change }) {
+export function assertLiveFontProof({
+  reactNativeVersion,
+  residualBaseline,
+  timezone,
+  ...change
+}) {
   const fixExpected = fixExpectedFor(reactNativeVersion)
   const result = evaluateLiveFontChange(change)
   const failing = () =>
@@ -643,8 +711,8 @@ export function assertLiveFontProof({ reactNativeVersion, residualBaseline, ...c
       `verdict ${result.verdict}; failing ${failing()}`
     )
   if (!fixExpected && result.verdict === 'known-residual') {
-    const approved = residualApproved(result.checks, residualBaseline)
-    if (!approved.pass) fail('live_font_residual_unapproved', approved.reason)
+    const approved = residualApproved(result.checks, residualBaseline, timezone)
+    if (!approved.pass) fail(approved.code, approved.reason)
   }
   return {
     ...result,

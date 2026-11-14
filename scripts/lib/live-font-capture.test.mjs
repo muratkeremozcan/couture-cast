@@ -22,6 +22,8 @@ import {
   widenMounts,
   readWithMounts,
   rootIdentity,
+  runTimezone,
+  LIVE_FONT_TIMEZONE,
   sameLayout,
   stitchPages,
 } from './live-font-capture.mjs'
@@ -865,5 +867,103 @@ describe('settleCapture', () => {
       }),
       { message: 'live_font_stable_state_deadline:home:before' }
     )
+  })
+})
+
+// TEA, 2026-11-13: residual keys hold time labels, so every run captures in one timezone.
+describe('runTimezone', () => {
+  /** A fake adb whose `persist.sys.timezone` is `zone` and moves with set-timezone unless `stuck`. */
+  const fakeAdb = (zone, { stuck, failOn } = {}) => {
+    const calls = []
+    const adb = (...args) => {
+      calls.push(args.join(' '))
+      if (failOn && args.includes(failOn))
+        throw new Error('live_font_command_failed:adb shell cmd alarm:1:')
+      if (args[1] === 'cmd') {
+        if (!stuck) zone = args.at(-1)
+        return ''
+      }
+      if (args[1] === 'getprop') return `${zone}\n`
+      throw new Error(`unexpected ${args.join(' ')}`)
+    }
+    return { adb, calls }
+  }
+
+  test('Android pins the timezone of the approved runs by default and reads it back', () => {
+    assert.equal(LIVE_FONT_TIMEZONE, 'America/Chicago')
+    const { adb, calls } = fakeAdb('GMT')
+    assert.deepEqual(runTimezone({ platform: 'android', adb }), {
+      timezone: 'America/Chicago',
+      previous: 'GMT',
+    })
+    assert.deepEqual(calls, [
+      'shell getprop persist.sys.timezone',
+      'shell cmd alarm set-timezone America/Chicago',
+      'shell getprop persist.sys.timezone',
+    ])
+    const requested = fakeAdb('America/Chicago')
+    assert.deepEqual(
+      runTimezone({
+        platform: 'android',
+        requested: 'Europe/Istanbul',
+        adb: requested.adb,
+      }),
+      { timezone: 'Europe/Istanbul', previous: 'America/Chicago' }
+    )
+  })
+
+  test('Android fails when the readback differs or adb fails', () => {
+    assert.throws(
+      () =>
+        runTimezone({ platform: 'android', adb: fakeAdb('GMT', { stuck: true }).adb }),
+      (error) =>
+        error.code === 'live_font_timezone_pin_failed' &&
+        error.message === 'live_font_timezone_pin_failed:America/Chicago set, GMT read'
+    )
+    assert.throws(
+      () => runTimezone({ platform: 'android', adb: fakeAdb('', { stuck: true }).adb }),
+      { message: 'live_font_timezone_pin_failed:America/Chicago set, nothing read' }
+    )
+    assert.throws(
+      () =>
+        runTimezone({ platform: 'android', adb: fakeAdb('GMT', { failOn: 'cmd' }).adb }),
+      (error) =>
+        error.code === 'live_font_timezone_pin_failed' &&
+        /^live_font_timezone_pin_failed:America\/Chicago: live_font_command_failed/.test(
+          error.message
+        )
+    )
+  })
+
+  test('iOS records the host timezone and refuses any other, touching no device', () => {
+    const adb = () => assert.fail('iOS runs no adb')
+    assert.deepEqual(
+      runTimezone({ platform: 'ios', hostTimezone: 'America/Chicago', adb }),
+      {
+        timezone: 'America/Chicago',
+      }
+    )
+    assert.deepEqual(
+      runTimezone({
+        platform: 'ios',
+        requested: 'America/Chicago',
+        hostTimezone: 'America/Chicago',
+        adb,
+      }),
+      { timezone: 'America/Chicago' }
+    )
+    assert.throws(
+      () =>
+        runTimezone({
+          platform: 'ios',
+          requested: 'Europe/Istanbul',
+          hostTimezone: 'America/Chicago',
+          adb,
+        }),
+      { code: 'live_font_timezone_pin_failed' }
+    )
+    assert.throws(() => runTimezone({ platform: 'ios', adb }), {
+      message: 'live_font_timezone_pin_failed:host timezone unknown',
+    })
   })
 })

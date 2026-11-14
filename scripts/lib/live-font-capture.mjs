@@ -516,6 +516,52 @@ export function restoreFailure(captured, after, tolerance = 2) {
 }
 
 /**
+ * The device timezone of the approved residual runs (Android release and debug, 2026-11-13).
+ * Their reports record none; the status bar clock in their captures matches the host's Central
+ * time stamps (7:41 at 19:41 CST, 9:23 at 21:24 CST), so the emulator ran on America/Chicago.
+ */
+export const LIVE_FONT_TIMEZONE = 'America/Chicago'
+
+function timezoneFailure(detail) {
+  const error = new Error(`live_font_timezone_pin_failed:${detail}`)
+  error.code = 'live_font_timezone_pin_failed'
+  return error
+}
+
+/**
+ * The device timezone a run captures in, set before its first capture (TEA, 2026-11-13: an
+ * approved residual's stale keys hold time labels, so they are exact only in one timezone).
+ * Android pins `requested` (default LIVE_FONT_TIMEZONE) with `cmd alarm set-timezone` and reads
+ * `persist.sys.timezone` back; `adb(...args)` runs one adb command on the device and returns its
+ * stdout. `previous` is the timezone to put back when the run ends. An iOS simulator follows the
+ * host, so the run records `hostTimezone`, and a `requested` timezone other than the host's
+ * fails since nothing can pin it.
+ */
+export function runTimezone({ platform, requested, hostTimezone, adb }) {
+  if (platform === 'ios') {
+    if (!hostTimezone) throw timezoneFailure('host timezone unknown')
+    if (requested && requested !== hostTimezone)
+      throw timezoneFailure(
+        `${requested} requested, the simulator follows the host's ${hostTimezone}`
+      )
+    return { timezone: hostTimezone }
+  }
+  const timezone = requested || LIVE_FONT_TIMEZONE
+  let previous
+  let read
+  try {
+    previous = adb('shell', 'getprop', 'persist.sys.timezone').trim()
+    adb('shell', 'cmd', 'alarm', 'set-timezone', timezone)
+    read = adb('shell', 'getprop', 'persist.sys.timezone').trim()
+  } catch (error) {
+    throw timezoneFailure(`${timezone}: ${error.message}`)
+  }
+  if (read !== timezone)
+    throw timezoneFailure(`${timezone} set, ${read || 'nothing'} read`)
+  return { timezone, previous }
+}
+
+/**
  * A status bar the proof sets on the simulator under test (`xcrun simctl status_bar override`),
  * derived from its UDID: battery 1 to 99%, 0 to 4 cellular bars, 0 to 2 Wi-Fi bars, so an
  * unmarked simulator (100%, three Wi-Fi bars) never matches. Maestro 2.8 serves `hierarchy` for

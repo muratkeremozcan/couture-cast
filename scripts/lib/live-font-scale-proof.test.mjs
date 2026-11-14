@@ -5,7 +5,12 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
-import { readWithMounts, rootIdentity, widenMounts } from './live-font-capture.mjs'
+import {
+  mountTracker,
+  readWithMounts,
+  rootIdentity,
+  widenMounts,
+} from './live-font-capture.mjs'
 
 import {
   androidScaledSize,
@@ -17,6 +22,7 @@ import {
   expectedTextRatio,
   fixExpectedFor,
   parseBounds,
+  requiredMounts,
 } from './live-font-scale-proof.mjs'
 
 const baseline = JSON.parse(
@@ -453,6 +459,29 @@ describe('evaluateLiveFontChange', () => {
     assert.equal(noRoot.checks.identity.rootKnown, false)
   })
 
+  // Antigravity r28 (P3): the runner rereads for the scopes the identity check requires, so a
+  // composer capture on Android (modal window only) is read once.
+  test('the runner rereads for exactly the scopes the identity check requires', () => {
+    assert.deepEqual(requiredMounts('modal'), ['modal'])
+    assert.deepEqual(requiredMounts('settings'), ['root', 'settings'])
+    assert.deepEqual(requiredMounts(undefined), ['root'])
+    const readsFor = (mount, markers) => {
+      const tracker = mountTracker(requiredMounts(mount))
+      let reads = 0
+      readWithMounts(() => {
+        reads += 1
+        return { markers }
+      }, tracker.scopes())
+      return reads
+    }
+    assert.equal(readsFor('modal', ['live-font-mount-modal-m1']), 1)
+    assert.equal(readsFor('settings', ['live-font-mount-settings-s1']), 3)
+    assert.equal(
+      readsFor('settings', ['live-font-mount-root-r1', 'live-font-mount-settings-s1']),
+      1
+    )
+  })
+
   test('a remount between legs of one launch is caught by the later leg', () => {
     const change = fixedChange()
     const later = 'live-font-mount-root-r1,live-font-mount-settings-s2'
@@ -619,10 +648,15 @@ describe('evaluateLiveFontChange', () => {
 })
 
 describe('assertLiveFontProof', () => {
+  // The stale miss keys of the Story 6.8 Home residual, as the oracle reports them.
+  const STALE_KEYS = evaluateLiveFontChange(bugChange())
+    .checks.coldParity.misses.map((miss) => miss.key)
+    .sort()
+  const TZ = 'America/Chicago'
   // R2-05: the Story 6.8 Home residual as a reviewed baseline would describe it.
   const BASELINE = {
-    staleIds: ['', 'current-condition', 'outfit-comfort-notes'],
-    maxStaleMisses: 41,
+    timezone: TZ,
+    staleKeys: STALE_KEYS,
     review: {
       verdict: 'known-residual',
       structuralPass: true,
@@ -631,40 +665,68 @@ describe('assertLiveFontProof', () => {
       controlPass: true,
     },
   }
+  const attempt =
+    (residualBaseline, timezone = TZ) =>
+    () =>
+      assertLiveFontProof({
+        reactNativeVersion: '0.81.5',
+        residualBaseline,
+        timezone,
+        ...bugChange(),
+      })
+  const refused = (pattern) => (error) =>
+    error.code === 'live_font_residual_unapproved' && pattern.test(error.message)
+  const unlabeled = STALE_KEYS.filter((key) => key.startsWith('["",'))
+
+  test('the residual has 41 stale keys, two of them labeled, and no key twice', () => {
+    assert.equal(STALE_KEYS.length, 41)
+    assert.deepEqual(
+      STALE_KEYS.filter((key) => !key.startsWith('["",')),
+      [
+        '["current-condition","t-c63401aba20f"]#0',
+        '["outfit-comfort-notes","t-cf83675a2f00"]#0',
+      ]
+    )
+    assert.equal(new Set(STALE_KEYS).size, 41)
+  })
 
   test('below 0.87 a residual passes only inside its reviewed baseline', () => {
-    const result = assertLiveFontProof({
-      reactNativeVersion: '0.81.5',
-      residualBaseline: BASELINE,
-      ...bugChange(),
-    })
+    const result = attempt(BASELINE)()
     assert.equal(result.verdict, 'known-residual')
     assert.equal(result.baselineReview, false)
     assert.throws(
-      () => assertLiveFontProof({ reactNativeVersion: '0.81.5', ...bugChange() }),
-      {
-        code: 'live_font_residual_unapproved',
-      }
-    )
-    assert.throws(
       () =>
         assertLiveFontProof({
           reactNativeVersion: '0.81.5',
-          residualBaseline: { ...BASELINE, staleIds: ['', 'current-condition'] },
+          timezone: TZ,
           ...bugChange(),
         }),
-      (error) =>
-        error.code === 'live_font_residual_unapproved' &&
-        /stale outside baseline: .*outfit-comfort-notes/.test(error.message)
+      refused(/no reviewed baseline/)
     )
+    // The keys may come in any order; the compare sorts them.
+    assert.doesNotThrow(attempt({ ...BASELINE, staleKeys: [...STALE_KEYS].reverse() }))
+  })
+
+  // TEA, 2026-11-13: an entry approves only in the timezone it was approved in, checked before
+  // its keys.
+  test('an entry approves only in the run timezone, and one with none approves nothing', () => {
+    const differs = (pattern) => (error) =>
+      error.code === 'live_font_residual_environment_differs' &&
+      pattern.test(error.message)
+    assert.doesNotThrow(attempt(BASELINE, TZ))
     assert.throws(
-      () =>
-        assertLiveFontProof({
-          reactNativeVersion: '0.81.5',
-          residualBaseline: { ...BASELINE, maxStaleMisses: 3 },
-          ...bugChange(),
-        }),
-      { code: 'live_font_residual_unapproved' }
+      attempt(BASELINE, 'Europe/Istanbul'),
+      differs(/baseline timezone America\/Chicago, run timezone Europe\/Istanbul/)
+    )
+    const noZone = { ...BASELINE }
+    delete noZone.timezone
+    assert.throws(attempt(noZone), differs(/baseline timezone missing/))
+    assert.throws(attempt({ ...BASELINE, timezone: '' }), differs(/baseline timezone/))
+    assert.throws(attempt(BASELINE, null), differs(/run timezone missing/))
+    // The timezone is checked first: a wrong one fails there even with broken keys.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: 'all' }, 'UTC'),
+      differs(/run timezone UTC/)
     )
   })
 
@@ -680,86 +742,105 @@ describe('assertLiveFontProof', () => {
     }
     for (const [fact, value] of Object.entries(broken))
       assert.throws(
-        () =>
-          assertLiveFontProof({
-            reactNativeVersion: '0.81.5',
-            residualBaseline: {
-              ...BASELINE,
-              review: { ...BASELINE.review, [fact]: value },
-            },
-            ...bugChange(),
-          }),
-        (error) =>
-          error.code === 'live_font_residual_unapproved' &&
-          error.message.includes(`approval rules: ${fact}`),
+        attempt({ ...BASELINE, review: { ...BASELINE.review, [fact]: value } }),
+        refused(new RegExp(`approval rules: ${fact}`)),
         fact
       )
     const withoutReview = { ...BASELINE }
     delete withoutReview.review
-    assert.throws(
-      () =>
-        assertLiveFontProof({
-          reactNativeVersion: '0.81.5',
-          residualBaseline: withoutReview,
-          ...bugChange(),
-        }),
-      { code: 'live_font_residual_unapproved' }
-    )
-    assert.throws(
-      () =>
-        assertLiveFontProof({
-          reactNativeVersion: '0.81.5',
-          residualBaseline: {
-            ...BASELINE,
-            staleIds: ['', 'outfit-comfort-notes', 'current-condition-x'],
-            review: { ...BASELINE.review, growthFailing: [] },
-          },
-          ...bugChange(),
-        }),
-      (error) =>
-        error.code === 'live_font_residual_unapproved' &&
-        /growth fails outside/.test(error.message)
-    )
-  })
-
-  // Antigravity r7 (P2): rule 6, ids and counts exact. Headroom, an unused id and a missing or
-  // non-integer count approve nothing.
-  test('an entry with headroom, an unused id or no exact count approves nothing', () => {
-    const attempt = (residualBaseline) => () =>
-      assertLiveFontProof({
-        reactNativeVersion: '0.81.5',
-        residualBaseline,
-        ...bugChange(),
-      })
-    const refused = (pattern) => (error) =>
-      error.code === 'live_font_residual_unapproved' && pattern.test(error.message)
-    assert.doesNotThrow(attempt(BASELINE))
-    assert.throws(
-      attempt({ ...BASELINE, maxStaleMisses: 999 }),
-      refused(/baseline names 999/)
-    )
-    assert.throws(
-      attempt({ ...BASELINE, maxStaleMisses: 42 }),
-      refused(/baseline names 42/)
-    )
+    assert.throws(attempt(withoutReview), refused(/approval rules/))
+    // current-condition fails growth, and no key names it.
     assert.throws(
       attempt({
         ...BASELINE,
-        staleIds: [...BASELINE.staleIds, 'settings-language-title'],
+        staleKeys: STALE_KEYS.filter((key) => !key.startsWith('["current-condition"')),
+        review: { ...BASELINE.review, growthFailing: [] },
       }),
-      refused(/no miss hit: settings-language-title/)
+      refused(/growth fails outside baseline: current-condition/)
     )
-    const noCount = { ...BASELINE }
-    delete noCount.maxStaleMisses
-    assert.throws(attempt(noCount), refused(/baseline names undefined/))
+  })
+
+  // TEA ruling on Antigravity r28: rule 6, keys exact. Every stale miss key, duplicates kept,
+  // must be listed, and nothing else.
+  test('an entry with an extra, missing, swapped or miscounted key approves nothing', () => {
+    assert.doesNotThrow(attempt(BASELINE))
     assert.throws(
-      attempt({ ...BASELINE, maxStaleMisses: Number.NaN }),
-      refused(/baseline names NaN/)
+      attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, '["","Language"]#0'] }),
+      refused(/baseline key no miss hit: \["","Language"\]#0; 0 extra, 1 missing/)
+    )
+    const dropped = unlabeled[3]
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: STALE_KEYS.filter((key) => key !== dropped) }),
+      refused(
+        new RegExp(
+          `stale key outside baseline: ${dropped.replace(/[[\]]/g, '\\$&')}; 1 extra, 0 missing`
+        )
+      )
+    )
+    // A duplicate of a listed key is one key too many.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, STALE_KEYS[0]] }),
+      refused(/baseline key no miss hit: .*; 0 extra, 1 missing/)
+    )
+    // Only the key for the failing growth probe: every other miss is outside the entry.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: ['["current-condition","t-c63401aba20f"]#0'] }),
+      refused(/40 extra, 0 missing/)
+    )
+  })
+
+  // The case the old ids-plus-count entry let through: one unlabeled text traded for another
+  // keeps the ids ('' and the two labeled ones) and the count (41), and must now fail.
+  test('an equal-count swap between unlabeled texts approves nothing', () => {
+    const swapped = STALE_KEYS.map((key) =>
+      key === unlabeled[0] ? '["","Elsewhere"]#0' : key
+    )
+    assert.equal(swapped.length, STALE_KEYS.length)
+    assert.deepEqual(
+      [
+        ...new Set(
+          swapped.map((key) => JSON.parse(key.slice(0, key.lastIndexOf('#')))[0])
+        ),
+      ],
+      [
+        ...new Set(
+          STALE_KEYS.map((key) => JSON.parse(key.slice(0, key.lastIndexOf('#')))[0])
+        ),
+      ]
     )
     assert.throws(
-      attempt({ ...BASELINE, maxStaleMisses: '41' }),
-      refused(/baseline names 41/)
+      attempt({ ...BASELINE, staleKeys: swapped }),
+      refused(
+        /stale key outside baseline: .*baseline key no miss hit: \["","Elsewhere"\]#0/
+      )
     )
+  })
+
+  test('an entry whose staleKeys is no list of miss keys approves nothing', () => {
+    const shape = /baseline staleKeys must be a list of keys/
+    for (const staleKeys of [undefined, 'all', 41, { 0: STALE_KEYS[0] }])
+      assert.throws(
+        attempt({ ...BASELINE, staleKeys }),
+        refused(shape),
+        String(staleKeys)
+      )
+    for (const member of [
+      7,
+      null,
+      ['', 'Home'],
+      'Home',
+      '["","Home"]',
+      'Home#0',
+      '"x"#0',
+    ])
+      assert.throws(
+        attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, member] }),
+        refused(shape),
+        JSON.stringify(member)
+      )
+    const noKeys = { ...BASELINE }
+    delete noKeys.staleKeys
+    assert.throws(attempt(noKeys), refused(shape))
   })
 
   test('the version switch: the residual fails from 0.87, the healthy run passes on both sides', () => {

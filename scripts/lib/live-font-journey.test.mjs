@@ -4,10 +4,14 @@
 // F-13, F-16, F-17 (Codex R4-03, R4-06, R4-07): the journey's order, coverage, unit choice and
 // verdict, with device IO replaced by a scripted fake that renders a healthy screen.
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { describe, test } from 'node:test'
 
 import {
   aggregateVerdict,
+  proofDirInRepo,
   proposedBaselines,
   numericScale,
   runScreenJourney,
@@ -140,6 +144,7 @@ const run = (platform, fake, extra = {}) =>
     name: 'community',
     reactNativeVersion: '0.88.1',
     androidDensity: () => 420,
+    timezone: 'America/Chicago',
     ...extra,
   })
 
@@ -250,8 +255,8 @@ describe('runScreenJourney', () => {
       screen: 'community',
       from: '1',
       to: '1.5',
-      staleIds: ['community-new-post-label'],
-      maxStaleMisses: 1,
+      timezone: 'America/Chicago',
+      staleKeys: ['["community-new-post-label","New post"]#0'],
       review: {
         verdict: 'known-residual',
         structuralPass: true,
@@ -300,6 +305,28 @@ describe('runScreenJourney', () => {
       }
     )
     assert.equal(approved.legs[0].pass, true)
+  })
+
+  // TEA, 2026-11-13: an entry approved in one timezone approves nothing in another, and the leg
+  // proposes the entry for the run's own timezone.
+  test('an entry from another timezone fails the leg and proposes one for this run', async () => {
+    const breaking = () => fakeDevice('android', { breakAt: 'settled:1.5' })
+    const options = { reactNativeVersion: '0.81.5', label: 'sdk54-release' }
+    const entry = (await run('android', breaking(), options)).legs[0].residualProposal
+    const result = await run('android', breaking(), {
+      ...options,
+      residualBaselines: [entry],
+      timezone: 'Europe/Istanbul',
+    })
+    const [leg] = result.legs
+    assert.equal(leg.pass, false)
+    assert.equal(leg.error, 'live_font_residual_environment_differs')
+    assert.match(
+      leg.message,
+      /baseline timezone America\/Chicago, run timezone Europe\/Istanbul/
+    )
+    assert.deepEqual(leg.residualProposal, { ...entry, timezone: 'Europe/Istanbul' })
+    assert.equal(aggregateVerdict([result], 'android').pass, false)
   })
 
   // TEA, 2026-11-13: a control that fails on this run fails it, whatever an approved entry's
@@ -378,5 +405,52 @@ describe('screenRunSteps', () => {
   test('a journey run reads it once, before the first journey', () => {
     assert.deepEqual(screenRunSteps({ versionKnown: false }), ['read-version', 'journey'])
     assert.deepEqual(screenRunSteps({ versionKnown: true }), ['journey'])
+  })
+})
+
+// Antigravity r28 (P3, mutant M6): a proposed entry names its proof dir only when the dir sits
+// inside the repository, judged on real paths.
+describe('proofDirInRepo', () => {
+  const tree = (t) => {
+    const base = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'proof-dir-')))
+    t.after(() => fs.rmSync(base, { recursive: true, force: true }))
+    const repo = path.join(base, 'repo')
+    const outside = path.join(base, 'outside')
+    fs.mkdirSync(path.join(repo, '_bmad-output', 'runs', 'proof'), { recursive: true })
+    fs.mkdirSync(path.join(repo, '..cache', 'proof'), { recursive: true })
+    fs.mkdirSync(outside)
+    fs.symlinkSync(outside, path.join(repo, 'linked-out'))
+    return { repo, outside }
+  }
+
+  test('a dir inside the repository, a ..cache dir among them, names its relative path', (t) => {
+    const { repo } = tree(t)
+    assert.equal(
+      proofDirInRepo(repo, path.join(repo, '_bmad-output', 'runs', 'proof')),
+      path.join('_bmad-output', 'runs', 'proof')
+    )
+    assert.equal(
+      proofDirInRepo(repo, path.join(repo, '..cache', 'proof')),
+      path.join('..cache', 'proof')
+    )
+    assert.equal(proofDirInRepo(repo, path.join(repo, '..cache')), '..cache')
+  })
+
+  test('a dir outside, a link out of the repository and the repository itself name none', (t) => {
+    const { repo, outside } = tree(t)
+    assert.equal(proofDirInRepo(repo, outside), undefined)
+    assert.equal(proofDirInRepo(repo, path.join(repo, 'linked-out')), undefined)
+    assert.equal(proofDirInRepo(repo, repo), undefined)
+    assert.equal(proofDirInRepo(repo, path.dirname(repo)), undefined)
+  })
+
+  test('a repository reached through a link still sees its own dirs', (t) => {
+    const { repo } = tree(t)
+    const alias = path.join(path.dirname(repo), 'alias')
+    fs.symlinkSync(repo, alias)
+    assert.equal(
+      proofDirInRepo(alias, path.join(repo, '_bmad-output', 'runs', 'proof')),
+      path.join('_bmad-output', 'runs', 'proof')
+    )
   })
 })

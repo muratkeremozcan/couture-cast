@@ -10,6 +10,9 @@
 //      captures at once and when settled, makes the update, captures, reverts it, and the
 //      reverted state is the next leg's `before`.
 // The driver turns the report into an exit code with `aggregateVerdict`.
+import fs from 'node:fs'
+import path from 'node:path'
+
 import { assertLiveProvenance, IOS_CONTENT_SIZES } from './live-font-capture.mjs'
 import {
   assertColdControl,
@@ -103,12 +106,19 @@ function failure(error) {
   }
 }
 
-function judgeLeg({ platform, reactNativeVersion, residualBaseline, change }) {
+// A known residual with no entry approved for this run, in this environment, proposes one.
+const UNAPPROVED = new Set([
+  'live_font_residual_unapproved',
+  'live_font_residual_environment_differs',
+])
+
+function judgeLeg({ platform, reactNativeVersion, residualBaseline, timezone, change }) {
   try {
     assertLiveProvenance({ ...change, platform })
     const result = assertLiveFontProof({
       reactNativeVersion,
       residualBaseline,
+      timezone,
       ...change,
     })
     return {
@@ -130,7 +140,7 @@ function judgeLeg({ platform, reactNativeVersion, residualBaseline, change }) {
       verdict: evaluated.verdict ?? null,
       checks: evaluated.checks,
     }
-    if (leg.error === 'live_font_residual_unapproved' && leg.verdict === 'known-residual')
+    if (UNAPPROVED.has(leg.error) && leg.verdict === 'known-residual')
       leg.residualProposal = proposedResidualEntry(evaluated.checks)
     return leg
   }
@@ -155,6 +165,7 @@ function composerGeometry(platform, androidDensity, captures) {
  * Runs one screen's journey. `io` supplies: `cold(scale)` (fresh launch at the scale, settled,
  * with full text), `launch()`, `setScale(scale)`, `navigate()`, `capture(stage, scale)`,
  * `settle(stage, scale)` and `fullText(capture)` for the live launch, and `update()`/`revert()`.
+ * `timezone` is the device timezone of the run; a residual entry approves only in its own.
  */
 export async function runScreenJourney({
   io,
@@ -164,6 +175,7 @@ export async function runScreenJourney({
   reactNativeVersion,
   residualBaselines = [],
   label,
+  timezone,
   androidDensity = () => undefined,
 }) {
   const screen = SCREENS[name]
@@ -241,6 +253,7 @@ export async function runScreenJourney({
           androidApi,
           reactNativeVersion,
           residualBaseline,
+          timezone,
           change,
         }),
       }
@@ -256,6 +269,7 @@ export async function runScreenJourney({
           screen: name,
           from: String(from),
           to: String(to),
+          timezone,
           ...leg.residualProposal,
           review: {
             ...leg.residualProposal.review,
@@ -332,4 +346,23 @@ export function proposedBaselines(current, results, { dir } = {}) {
   )
   if (proposals.length === 0) return null
   return { ...current, entries: [...current.entries, ...proposals] }
+}
+
+/**
+ * The proof dir `out` relative to the repository at `repoRoot`, for a baseline entry's evidence,
+ * or undefined when `out` is the repository itself or lies outside it. Both sides are resolved
+ * through symlinks, so a link inside the repository that points out of it counts as outside, and
+ * only a whole `..` path segment leaves the repository (a dir named `..cache` stays in). `out`
+ * must exist.
+ */
+export function proofDirInRepo(repoRoot, out) {
+  const rel = path.relative(fs.realpathSync(repoRoot), fs.realpathSync(out))
+  if (
+    rel === '' ||
+    rel === '..' ||
+    rel.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(rel)
+  )
+    return undefined
+  return rel
 }
