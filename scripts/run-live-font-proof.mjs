@@ -301,15 +301,15 @@ function makeCapture(screenName, stage, scale) {
 }
 
 /**
- * Two identical pages half a second apart. A scroll page (`page: true`) keeps volatile text,
- * flagged, so stitchPages can line pages up through a feed of volatile cards.
+ * Two identical reads half a second apart, volatile text left out. A scroll page (stablePage)
+ * keeps volatile text, flagged, so stitchPages can line pages up through a feed of volatile
+ * cards.
  */
-async function stableNodes({ page = false } = {}) {
+async function stableNodes() {
   const read = () =>
     flattenHierarchy(hierarchy(), {
       platform,
       volatile: activeVolatile,
-      markVolatile: page,
     }).nodes
   let previous = read()
   for (let attempt = 0; attempt < 20; attempt += 1) {
@@ -353,15 +353,45 @@ function drag(size, up) {
 }
 
 /** Adds the scrolled-through text to a capture, then scrolls back and checks the top. */
+/**
+ * A settled scroll page as F-00i judges it: its nodes (volatile text kept, flagged), the bounds
+ * of its volatile regions, its window, and the text layout probe's answer for it, asked once the
+ * page holds still, so a clip below the fold is judged like one above it.
+ */
+async function stablePage() {
+  const read = () => {
+    const tree = hierarchy()
+    const flat = flattenHierarchy(tree, {
+      platform,
+      volatile: activeVolatile,
+      markVolatile: true,
+    })
+    return {
+      nodes: flat.nodes,
+      volatileRegions: flat.volatileRegions,
+      window: windowBounds(tree),
+    }
+  }
+  let previous = read()
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    await pause(500)
+    const current = read()
+    if (sameLayout(current.nodes, previous.nodes))
+      return { ...current, textProbe: textProbe.read() }
+    previous = current
+  }
+  throw new Error('live_font_scroll_page_unstable')
+}
+
 async function fullText(capture) {
   const size = windowSize(capture)
   if (!size) throw new Error('live_font_window_bounds_required')
-  const pages = [await stableNodes({ page: true })]
+  const pages = [await stablePage()]
   let drags = 0
   for (; drags < 12; drags += 1) {
     drag(size, true)
-    const page = await stableNodes({ page: true })
-    if (sameLayout(page, pages.at(-1))) break
+    const page = await stablePage()
+    if (sameLayout(page.nodes, pages.at(-1).nodes)) break
     pages.push(page)
   }
   for (let back = 0; back <= drags + 1; back += 1) drag(size, false)
@@ -382,17 +412,22 @@ async function fullText(capture) {
     // itself; a lost scroll position is a failure of the run.
     throw new Error(restoreFailure(capture.nodes, top))
   }
-  fs.writeFileSync(path.join(out, `${capture.file}-pages.json`), JSON.stringify(pages), {
-    mode: 0o600,
-  })
+  const nodePages = pages.map((page) => page.nodes)
+  fs.writeFileSync(
+    path.join(out, `${capture.file}-pages.json`),
+    JSON.stringify(nodePages),
+    { mode: 0o600 }
+  )
   // A page of only a tall image shares no text with its neighbors; the stitch then steps by
   // the drag's length.
+  const expectedShift = Math.round(size.height * (DRAG_FROM - DRAG_TO))
   capture.fullText =
-    pages.length > 1
-      ? stitchPages(pages, {
-          expectedShift: Math.round(size.height * (DRAG_FROM - DRAG_TO)),
-        })
-      : undefined
+    pages.length > 1 ? stitchPages(nodePages, { expectedShift }) : undefined
+  // F-00i: every page with its probe answer, judged page by page (pageCaptures).
+  if (pages.length > 1) {
+    capture.pages = pages
+    capture.pageShift = expectedShift
+  }
   persist(capture)
   return capture
 }

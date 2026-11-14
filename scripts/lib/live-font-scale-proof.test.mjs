@@ -1406,6 +1406,8 @@ describe('text layout clipping (F-00i)', () => {
   const CONDITION = 't-c63401aba20f'
   const TEMPERATURE = 't-f56b70feed61'
   const CONDITION_KEY = `cold:["current-condition","${CONDITION}"]#0`
+  // A clip key names the face of the bug it shows first: here the first, a stale box.
+  const CONDITION_CLIP = `staleBox:${CONDITION_KEY}`
   const probed = (capture, platform = 'android') => ({
     ...capture,
     textProbe: healthyAnswer(capture, platform),
@@ -1450,7 +1452,7 @@ describe('text layout clipping (F-00i)', () => {
     staleKeys: evaluateLiveFontChangeRaw(residualChange())
       .checks.coldParity.misses.map((miss) => `cold:${miss.key}`)
       .sort(),
-    clippedKeys: [CONDITION_KEY],
+    clippedKeys: [CONDITION_CLIP],
     review: {
       verdict: 'known-residual',
       structuralPass: true,
@@ -1799,6 +1801,151 @@ describe('text layout clipping (F-00i)', () => {
     assert.equal(evaluateLiveFontChangeRaw(clipped).checks.clipping.pass, true)
   })
 
+  // F-00i, every page probed (TEA ruling 2026-11-14, Android Release 791123d1 record run).
+  const SHIFT = 500
+  /**
+   * `capture` with its scroll pages: page 0 its own screen and answer, page 1 the screen
+   * SHIFT px further down (system UI stays put) plus `below`, text only page 1 shows, each with
+   * a healthy answer.
+   */
+  const withPages = (capture, below = []) => {
+    const move = (node) => {
+      if (/^com\.android\.systemui:/.test(node.id)) return node
+      const [left, top, right, bottom] = parseBounds(node.bounds)
+      return { ...node, bounds: `[${left},${top - SHIFT}][${right},${bottom - SHIFT}]` }
+    }
+    const nodes = [
+      ...capture.nodes.map(move).filter((node) => parseBounds(node.bounds)[1] >= 0),
+      ...below,
+    ]
+    const page = { nodes, volatileRegions: [], window: capture.window }
+    return {
+      ...capture,
+      pages: [
+        {
+          nodes: capture.nodes,
+          volatileRegions: [],
+          window: capture.window,
+          textProbe: capture.textProbe,
+        },
+        { ...page, textProbe: healthyAnswer(page, 'android') },
+      ],
+      pageShift: SHIFT,
+    }
+  }
+  const BELOW = { id: '', text: 'Below the fold', bounds: '[42,2300][600,2350]' }
+  const pageRecord = (capture, text) =>
+    capture.pages[1].textProbe.records.find((record) => record.text === text)
+  const overflowRecord = (record, by = 30) => {
+    record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + by]
+  }
+
+  test('F-01: a clip below the fold fails the cold capture', () => {
+    const base = probed({ ...stage('before'), stage: 'cold' })
+    const target = withPages(
+      probed(correct({ ...stage('before'), stage: 'cold' }, { fontScale: 1.5 })),
+      [BELOW]
+    )
+    const control = () =>
+      assertColdControlRaw({ platform: 'android', base, target, probes: PROBES })
+    assert.doesNotThrow(control)
+    overflowRecord(pageRecord(target, BELOW.text))
+    assert.throws(
+      control,
+      (error) =>
+        error.code === 'live_font_control_clipped_by_layout' &&
+        error.message.includes(BELOW.text)
+    )
+  })
+
+  test('a text on two pages, clipped on both, is one clip judged on each page', () => {
+    const change = withAll(fixedChange())
+    change.settled = withPages(change.settled)
+    // A text that page 0 and page 1 both show.
+    const shared = change.settled.pages[1].nodes.find(
+      (node) =>
+        node.id === '' &&
+        change.settled.nodes.filter((other) => other.text === node.text).length === 1
+    ).text
+    overflow(change.settled, shared)
+    overflowRecord(pageRecord(change.settled, shared))
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    const clips = layoutClips(checks.clipping).filter((entry) => entry.text === shared)
+    assert.deepEqual(
+      clips.map((entry) => [entry.key, entry.pages]),
+      [[`["","${shared}"]#0`, [0, 1]]]
+    )
+    assert.equal(
+      clipKeys(checks).filter((key) => key.endsWith(`["","${shared}"]#0`)).length,
+      1
+    )
+  })
+
+  test('text only a later page shows is keyed after page 0 and judged there', () => {
+    const change = withAll(fixedChange())
+    // The same text as one page 0 shows once, further down.
+    const twin = change.settled.nodes.find(
+      (node) =>
+        node.id === '' &&
+        change.settled.nodes.filter((other) => other.text === node.text).length === 1
+    ).text
+    change.settled = withPages(change.settled, [{ ...BELOW, text: twin }])
+    const records = change.settled.pages[1].textProbe.records.filter(
+      (r) => r.text === twin
+    )
+    overflowRecord(records.at(-1))
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [
+        entry.key,
+        entry.parityKey,
+        entry.pages,
+      ]),
+      [[`["","${twin}"]#1`, null, [1]]]
+    )
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('a text is offscreen only when no page shows it', () => {
+    const scrolled = (capture) => {
+      capture.textProbe.records.push(
+        probeRecord('android', BELOW.text, [42, 2800, 600, 2850], {
+          visibleRect: null,
+          clipRect: null,
+          scrolledAway: true,
+        })
+      )
+      return capture
+    }
+    const shown = withAll(fixedChange())
+    shown.settled = withPages(scrolled(shown.settled), [BELOW])
+    const seen = evaluateLiveFontChangeRaw(shown).checks.textProbe.stages.settled
+    assert.deepEqual(seen.offscreen, [])
+    const never = withAll(fixedChange())
+    never.settled = withPages(scrolled(never.settled))
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(never).checks.textProbe.stages.settled.offscreen,
+      [BELOW.text]
+    )
+  })
+
+  test('a page whose answer does not pair fails the leg', () => {
+    const change = withAll(fixedChange())
+    change.settled = withPages(change.settled, [BELOW])
+    change.settled.pages[1].textProbe.records =
+      change.settled.pages[1].textProbe.records.filter(
+        (record) => record.text !== BELOW.text
+      )
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.equal(
+      checks.textProbe.stages['settled.page1'].code,
+      'live_font_text_probe_unmatched'
+    )
+    assert.throws(prove(change, undefined, '0.88.1'), {
+      code: 'live_font_text_probe_unmatched',
+    })
+  })
+
   test('a single-line text input is judged like text; a multi-line one is paired and reported only', () => {
     const input = (maxLines) => {
       const change = withAll(fixedChange())
@@ -1880,7 +2027,7 @@ describe('text layout clipping (F-00i)', () => {
     )
     const { checks, verdict } = evaluateLiveFontChangeRaw(change)
     assert.equal(verdict, 'unexpected')
-    assert.deepEqual(clipKeys(checks), [CONDITION_KEY])
+    assert.deepEqual(clipKeys(checks), [CONDITION_CLIP])
     assert.throws(prove(change), { code: 'live_font_baseline_unexpected' })
     assert.throws(prove(change, ENTRY, '0.88.1'), { code: 'live_font_fix_missing' })
     // Unclipped, the volatile record is out of matching and the residual approves.
@@ -1898,7 +2045,7 @@ describe('text layout clipping (F-00i)', () => {
     assert.equal(prove(staleClipChange())().verdict, 'known-residual')
     // The run's proposal carries the clip and the seventh fact.
     const proposal = proposedResidualEntry(checks, staleClipChange())
-    assert.deepEqual(proposal.clippedKeys, [CONDITION_KEY])
+    assert.deepEqual(proposal.clippedKeys, [CONDITION_CLIP])
     assert.equal(proposal.review.clipsStale, true)
     assert.deepEqual(proposal.staleKeys, ENTRY.staleKeys)
   })
@@ -1906,32 +2053,38 @@ describe('text layout clipping (F-00i)', () => {
   test('each clippedKeys fail mode approves nothing', () => {
     assert.throws(
       prove(staleClipChange(), { ...ENTRY, clippedKeys: [] }),
-      refused(/clip outside clippedKeys: cold:\["current-condition"/)
+      refused(/clip outside clippedKeys: staleBox:cold:\["current-condition"/)
     )
     assert.throws(
-      prove(staleClipChange(), { ...ENTRY, clippedKeys: [CONDITION_KEY, CONDITION_KEY] }),
-      refused(/clipped key does not clip: cold:\["current-condition"/)
+      prove(staleClipChange(), {
+        ...ENTRY,
+        clippedKeys: [CONDITION_CLIP, CONDITION_CLIP],
+      }),
+      refused(/clipped key does not clip: staleBox:cold:\["current-condition"/)
     )
     assert.throws(prove(residualChange(), ENTRY), refused(/clipped key does not clip/))
     // A listed key that is not stale, even beside the right one.
-    const notStale = `cold:["current-temperature","${TEMPERATURE}"]#0`
+    const notStale = `staleBox:cold:["current-temperature","${TEMPERATURE}"]#0`
     assert.throws(
-      prove(staleClipChange(), { ...ENTRY, clippedKeys: [CONDITION_KEY, notStale] }),
-      refused(/clipped key not in staleKeys: cold:\["current-temperature"/)
+      prove(staleClipChange(), { ...ENTRY, clippedKeys: [CONDITION_CLIP, notStale] }),
+      refused(/clipped key not in staleKeys: staleBox:cold:\["current-temperature"/)
     )
     // An updated-stage key for a cold-stage clip.
     assert.throws(
       prove(staleClipChange(), {
         ...ENTRY,
-        clippedKeys: [CONDITION_KEY.replace('cold:', 'updated:')],
+        clippedKeys: [CONDITION_CLIP.replace('cold:', 'updated:')],
       }),
-      refused(/clipped key not in staleKeys: updated:/)
+      refused(/clipped key not in staleKeys: staleBox:updated:/)
     )
     for (const bad of [
       '["current-condition"]#0',
       'cold:nonsense',
       42,
-      'cold:["",""]#0>["x","y"]#0',
+      'staleBox:cold:["",""]#0>["x","y"]#0',
+      // A key without its face, or with a face that is none of the two.
+      CONDITION_KEY,
+      `noFace:${CONDITION_KEY}`,
     ])
       assert.throws(
         prove(staleClipChange(), { ...ENTRY, clippedKeys: [bad] }),
@@ -1952,7 +2105,7 @@ describe('text layout clipping (F-00i)', () => {
     assert.equal(layoutClips(checks.clipping)[0].stale, false)
     const listed = {
       ...ENTRY,
-      clippedKeys: [`cold:["current-temperature","${TEMPERATURE}"]#0`],
+      clippedKeys: [`staleBox:cold:["current-temperature","${TEMPERATURE}"]#0`],
     }
     assert.throws(prove(change, listed), { code: 'live_font_baseline_unexpected' })
     assert.equal(proposedResidualEntry(checks, change).review.clipsStale, false)

@@ -29,6 +29,7 @@
 // launch at the same scale, is `clipped_by_layout`. Below 0.87 a residual entry may list such a
 // clip exactly (`clippedKeys`, TD-05 as amended 2026-11-14) when it is the stale box's own.
 
+import { stitchPlaces } from './live-font-capture.mjs'
 import { INPUT_KINDS, matchTextProbe } from './live-font-text-probe.mjs'
 
 const FIX_VERSION = [0, 87, 0]
@@ -272,14 +273,15 @@ const maskText = (text) => (HOUR_LABEL.test(text) ? HOUR_TOKEN : text)
  * judged with no key. Scrolled-away, covered and empty records are never judged. A capture with
  * no probe answer fails as live_font_text_probe_missing.
  */
-export function textLayout(capture, platform) {
+export function textLayout(capture, platform, naming) {
   const tolerance = HEIGHT_TOLERANCE[platform]
   if (tolerance === undefined) fail('live_font_platform_required', String(platform))
   const answer = capture?.textProbe
   if (!Array.isArray(answer?.records) || !Array.isArray(answer?.windows))
     return { pass: false, code: 'live_font_text_probe_missing', facts: [], match: null }
   const nodes = [...keyed(capture)].map(([key, node]) => ({ ...node, key }))
-  const masked = entryKeys(capture)
+  // A page's text is named by the capture's keys (pageCaptures); a capture's by its own.
+  const names = naming ?? ownNames(capture)
   const match = matchTextProbe({
     platform,
     nodes,
@@ -288,23 +290,7 @@ export function textLayout(capture, platform) {
     volatileRegions: (capture.volatileRegions ?? []).map(parseBounds),
     tolerance,
   })
-  const facts = []
-  const groupOf = new Map(match.groups.map((group) => [group.node, group.records]))
-  for (const pair of match.pairs) {
-    const record = answer.records[pair.record]
-    if (record.scrolledAway) continue
-    const node = nodes[pair.node]
-    let key = masked.get(node.key)
-    if (pair.via === 'group') {
-      const text = maskText(record.text)
-      const members = groupOf.get(pair.node)
-      const before = members
-        .slice(0, members.indexOf(pair.record))
-        .filter((index) => maskText(answer.records[index].text) === text).length
-      key = `${key}>${JSON.stringify(['', text])}#${before}`
-    }
-    facts.push({ key, parityKey: node.key, via: pair.via, id: node.id ?? '', record })
-  }
+  const facts = pairedFacts(match, { answer, nodes, names })
   const paired = new Set(match.pairs.map((pair) => pair.record))
   for (const { record } of match.volatile)
     facts.push({ key: null, via: 'volatile', id: '', record: answer.records[record] })
@@ -316,6 +302,125 @@ export function textLayout(capture, platform) {
     if (!answer.records[index].scrolledAway)
       facts.push({ key: null, via: 'behind', id: '', record: answer.records[index] })
   return { pass: match.pass, code: match.code, facts, match }
+}
+
+/**
+ * The judged facts of the paired records, scrolled-away ones left out. A record an iOS group
+ * took is keyed as the group's key, `>`, then its own `["",text]#n`; a node with no name
+ * (a page node no stitch place names) leaves its records unkeyed.
+ */
+function pairedFacts(match, { answer, nodes, names }) {
+  const groupOf = new Map(match.groups.map((group) => [group.node, group.records]))
+  const groupSuffix = (pair) => {
+    const text = maskText(answer.records[pair.record].text)
+    const members = groupOf.get(pair.node)
+    const before = members
+      .slice(0, members.indexOf(pair.record))
+      .filter((index) => maskText(answer.records[index].text) === text).length
+    return `>${JSON.stringify(['', text])}#${before}`
+  }
+  return match.pairs
+    .filter((pair) => !answer.records[pair.record].scrolledAway)
+    .map((pair) => {
+      const node = nodes[pair.node]
+      const named = names.get(node.key)
+      const own = named?.key ?? null
+      return {
+        key: own !== null && pair.via === 'group' ? `${own}${groupSuffix(pair)}` : own,
+        parityKey: named?.parityKey ?? null,
+        via: pair.via,
+        id: node.id ?? '',
+        record: answer.records[pair.record],
+      }
+    })
+}
+
+/** A capture's own names: each parity key with its entry key (hour labels masked). */
+function ownNames(capture) {
+  const masked = entryKeys(capture)
+  return new Map([...masked].map(([parityKey, key]) => [parityKey, { key, parityKey }]))
+}
+
+/**
+ * F-00i, every page probed: the capture's later scroll pages (`capture.pages`, page 0 being the
+ * capture's own screen), each as a capture of its own with names in the capture's key space. A
+ * text a page shares with page 0 (stitchPlaces) takes its page 0 key and parity key; a text only
+ * later pages show is keyed `["id","text"]#n`, hour labels masked, where n counts on from that
+ * text's keys on page 0 in stitched order, and has no parity key (parity reads page 0 only).
+ */
+export function pageCaptures(capture) {
+  const pages = capture?.pages ?? []
+  if (pages.length < 2) return []
+  const { taken, places } = stitchPlaces(
+    pages.map((page) => page.nodes),
+    { expectedShift: capture.pageShift }
+  )
+  const own = [...keyed(capture)]
+  const masked = entryKeys(capture)
+  const maskedIdentity = (node) => JSON.stringify([node.id ?? '', maskText(node.text)])
+  // Each page 0 stitched place, by the capture key of its node: same identity, nearest top.
+  const firstKeys = new Map()
+  const used = new Set()
+  pages[0].nodes.forEach((node, index) => {
+    const place = places[0][index]
+    if (place < 0) return
+    const [, top] = parseBounds(node.bounds)
+    const match = own
+      .filter(([key, other]) => !used.has(key) && identityOf(other) === identityOf(node))
+      .sort(([, a], [, b]) => Math.abs(a.box[1] - top) - Math.abs(b.box[1] - top))[0]
+    if (!match) return
+    used.add(match[0])
+    firstKeys.set(place, { key: masked.get(match[0]), parityKey: match[0] })
+  })
+  // Text only later pages show, numbered after page 0's keys of the same masked text.
+  const onFirst = new Map()
+  for (const [, node] of own)
+    onFirst.set(maskedIdentity(node), (onFirst.get(maskedIdentity(node)) ?? 0) + 1)
+  const laterKeys = new Map()
+  const laterCount = new Map()
+  const laterNode = new Map()
+  pages.forEach((page, p) =>
+    page.nodes.forEach((node, index) => {
+      const place = places[p][index]
+      if (p > 0 && place >= 0 && !firstKeys.has(place)) laterNode.set(place, node)
+    })
+  )
+  for (const place of [...laterNode.keys()].sort((a, b) => taken[a].y - taken[b].y)) {
+    const identity = maskedIdentity(laterNode.get(place))
+    const n = (onFirst.get(identity) ?? 0) + (laterCount.get(identity) ?? 0)
+    laterCount.set(identity, (laterCount.get(identity) ?? 0) + 1)
+    laterKeys.set(place, { key: `${identity}#${n}`, parityKey: null })
+  }
+  return pages.slice(1).map((page, at) => {
+    const p = at + 1
+    const nodes = page.nodes
+      .map((node, index) => ({ ...node, place: places[p][index] }))
+      .filter((node) => !node.volatile)
+    const pageCapture = {
+      nodes,
+      window: page.window,
+      volatileRegions: page.volatileRegions ?? [],
+      textProbe: page.textProbe,
+    }
+    const naming = new Map(
+      [...keyed(pageCapture)].map(([key, node]) => [
+        key,
+        firstKeys.get(node.place) ??
+          laterKeys.get(node.place) ?? { key: null, parityKey: null },
+      ])
+    )
+    return { page: p, capture: pageCapture, naming }
+  })
+}
+
+/** Every judged fact of a capture and its later pages, each with its page. */
+function allFacts(capture, platform) {
+  return [
+    ...textLayout(capture, platform).facts.map((fact) => ({ ...fact, page: 0 })),
+    ...pageCaptures(capture).flatMap(({ page, capture: pageCapture, naming }) =>
+      textLayout(pageCapture, platform, naming).facts.map((fact) => ({ ...fact, page }))
+    ),
+  ]
 }
 
 /**
@@ -344,6 +449,11 @@ export function textProbeSummary(capture, platform) {
   const { pass, code, match } = textLayout(capture, platform)
   if (!match) return { pass, code }
   const records = capture.textProbe.records
+  const shownLater = new Set(
+    pageCaptures(capture).flatMap(({ capture: pageCapture, naming }) =>
+      textLayout(pageCapture, platform, naming).facts.map((fact) => fact.record.text)
+    )
+  )
   const nodes = [...keyed(capture).values()]
   const keys = [...keyed(capture).keys()]
   const masked = entryKeys(capture)
@@ -366,7 +476,10 @@ export function textProbeSummary(capture, platform) {
       }))
       .filter((entry) => entry.records.length),
     covered: match.covered,
-    offscreen: match.offscreen.map((index) => records[index].text),
+    // A text scrolled away here counts as offscreen only when no later page shows it.
+    offscreen: match.offscreen
+      .map((index) => records[index].text)
+      .filter((text) => !shownLater.has(text)),
     hidden: match.hiddenRecords.map((index) => records[index].text),
     multilineInputs: match.pairs
       .filter((pair) => multilineInput(records[pair.record]))
@@ -405,11 +518,10 @@ function contentClipped(record, tolerance) {
 /** The keyed records of a capture by key, or none when there is no capture. */
 function recordsByKey(capture, platform) {
   if (!capture) return new Map()
-  return new Map(
-    textLayout(capture, platform)
-      .facts.filter((fact) => fact.key !== null)
-      .map((fact) => [fact.key, fact.record])
-  )
+  const records = new Map()
+  for (const fact of allFacts(capture, platform))
+    if (fact.key !== null && !records.has(fact.key)) records.set(fact.key, fact.record)
+  return records
 }
 
 /** Lines the layout dropped: the unlimited line count past the drawn one (0 when unknown). */
@@ -447,6 +559,34 @@ function newlyCut(record, coldRecord) {
  * (the cold launch at the leg's starting scale, TEA ruling 2026-11-14), each clip records
  * whether its box kept that launch's height (`staleBox`, TEA change 6).
  */
+const near = (a, b, tolerance) => Math.abs(a - b) <= tolerance
+
+/**
+ * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14), given
+ * the cold launches at the leg's starting scale (`start`) and target scale (`target`), keyed:
+ * `staleBox` when its box kept the starting launch's height (the first face, which also needs
+ * its node to be a stale miss, markStaleClips), and `staleContent` when its box has the target
+ * launch's height while its content keeps the starting launch's content height (the second face:
+ * a fresh box around stale text, whose parity passes).
+ */
+function faces(record, startRecord, targetRecord, tolerance) {
+  const height = rectHeight(record.viewRect)
+  return {
+    staleBox:
+      startRecord !== undefined &&
+      near(height, rectHeight(startRecord.viewRect), tolerance),
+    staleContent:
+      startRecord !== undefined &&
+      targetRecord !== undefined &&
+      near(height, rectHeight(targetRecord.viewRect), tolerance) &&
+      near(
+        rectHeight(record.contentRect),
+        rectHeight(startRecord.contentRect),
+        tolerance
+      ),
+  }
+}
+
 function layoutClips(capture, platform, { cold, base } = {}) {
   const tolerance = HEIGHT_TOLERANCE[platform]
   const [coldRecords, baseRecords] = [
@@ -454,7 +594,8 @@ function layoutClips(capture, platform, { cold, base } = {}) {
     recordsByKey(base, platform),
   ]
   const clips = []
-  for (const fact of textLayout(capture, platform).facts) {
+  const byKey = new Map()
+  for (const fact of allFacts(capture, platform)) {
     const { record } = fact
     if (multilineInput(record)) continue
     const content = contentClipped(record, tolerance)
@@ -462,23 +603,30 @@ function layoutClips(capture, platform, { cold, base } = {}) {
     const cut =
       cold !== undefined && keyed ? newlyCut(record, coldRecords.get(fact.key)) : {}
     if (!content && !Object.keys(cut).length) continue
+    // One text on two pages is one clip, judged on each page it shows on.
+    const seen = keyed ? byKey.get(fact.key) : undefined
+    if (seen) {
+      seen.pages.push(fact.page)
+      continue
+    }
     const baseRecord = keyed ? baseRecords.get(fact.key) : undefined
-    clips.push({
+    const targetRecord = keyed ? coldRecords.get(fact.key) : undefined
+    const clip = {
       reason: 'clipped_by_layout',
       key: fact.key,
       parityKey: fact.parityKey ?? null,
       via: fact.via,
       id: fact.id,
       text: record.text,
+      pages: [fact.page],
       content,
       ...cut,
       height: rectHeight(record.viewRect),
       baseHeight: baseRecord ? rectHeight(baseRecord.viewRect) : null,
-      staleBox:
-        baseRecord !== undefined &&
-        Math.abs(rectHeight(record.viewRect) - rectHeight(baseRecord.viewRect)) <=
-          tolerance,
-    })
+      ...faces(record, baseRecord, targetRecord, tolerance),
+    }
+    if (keyed) byKey.set(fact.key, clip)
+    clips.push(clip)
   }
   return clips
 }
@@ -815,9 +963,18 @@ function textProbeCheck(platform, captures) {
   let code = null
   for (const [stage, capture] of Object.entries(captures)) {
     if (!capture) continue
-    const summary = textProbeSummary(capture, platform)
-    stages[stage] = summary
-    code ??= summary.pass ? null : summary.code
+    const pages = [
+      [stage, capture],
+      ...pageCaptures(capture).map(({ page, capture: pageCapture }) => [
+        `${stage}.page${page}`,
+        pageCapture,
+      ]),
+    ]
+    for (const [name, each] of pages) {
+      const summary = textProbeSummary(each, platform)
+      stages[name] = summary
+      code ??= summary.pass ? null : summary.code
+    }
   }
   return { pass: code === null, ...(code ? { code } : {}), stages }
 }
@@ -837,29 +994,40 @@ function markStaleClips(checks) {
         .filter((miss) => miss.stale)
         .map((miss) => miss.key)
     )
-    for (const entry of checks[clippingCheck]?.clipped ?? [])
-      if (entry.reason === 'clipped_by_layout')
-        entry.stale = entry.parityKey !== null && stale.has(entry.parityKey)
+    for (const entry of checks[clippingCheck]?.clipped ?? []) {
+      if (entry.reason !== 'clipped_by_layout') continue
+      entry.stale = entry.parityKey !== null && stale.has(entry.parityKey)
+      // Which face of the bug the clip is, or null (residualClip).
+      entry.face =
+        entry.stale && entry.staleBox
+          ? 'staleBox'
+          : entry.staleContent
+            ? 'staleContent'
+            : null
+    }
   }
 }
 
 /**
- * A layout clip a residual entry may list (TD-05 as amended 2026-11-14): on a node that is a
- * stale miss of its stage, whose box kept the height of the cold launch at the leg's starting
- * scale. Any other clip is structural: a box that leaves its parent, and a volatile record's or
- * an unpaired hidden record's, which pair with no node, so none is ever stale (markStaleClips).
+ * A layout clip a residual entry may list (TD-05 as amended 2026-11-14): keyed, and one of the
+ * 6.8 bug's two faces (faces, markStaleClips). Any other clip is structural: a box that leaves
+ * its parent, and a volatile, hidden or behind record's, which has no key to compare.
  */
 const residualClip = (entry) =>
-  entry.reason === 'clipped_by_layout' && entry.stale && entry.staleBox
+  entry.reason === 'clipped_by_layout' && entry.key !== null && Boolean(entry.face)
 
-/** Every keyed layout clip of a leg as an entry key, `cold:` (settled) or `updated:`, sorted. */
+/**
+ * Every keyed layout clip of a leg as an entry key: its face (`staleBox:` or `staleContent:`,
+ * `noFace:` for a clip that is neither), then `cold:` (settled) or `updated:`, then the key;
+ * sorted.
+ */
 export function clipKeys(checks) {
   return [
     ...(checks.clipping?.clipped ?? []).map((entry) => [entry, 'cold']),
     ...(checks.postUpdateClipping?.clipped ?? []).map((entry) => [entry, 'updated']),
   ]
     .filter(([entry]) => entry.reason === 'clipped_by_layout' && entry.key !== null)
-    .map(([entry, stage]) => `${stage}:${entry.key}`)
+    .map(([entry, stage]) => `${entry.face ?? 'noFace'}:${stage}:${entry.key}`)
     .sort()
 }
 
@@ -896,12 +1064,22 @@ function classify(checks) {
   if (Object.values(checks).every((check) => check.pass)) return 'fixed'
   if (recreated(checks.identity)) return 'restored'
   if (structural(checks)) return 'unexpected'
-  // What remains must be stale text: heights the live screen kept from the base scale while the
-  // cold launch measured different ones.
-  const misses = [...checks.coldParity.misses, ...(checks.postUpdateParity?.misses ?? [])]
-  return misses.length > 0 && misses.every((miss) => miss.stale)
-    ? 'known-residual'
-    : 'unexpected'
+  // What remains must be the bug's own: heights the live screen kept from the base scale while
+  // the cold launch measured different ones, or clips of either face (a second-face clip comes
+  // with no miss: its box is fresh).
+  return everyMissStale(checks) ? 'known-residual' : 'unexpected'
+}
+
+/**
+ * Every parity miss is stale, and the leg shows the bug at all: at least one miss, or at least
+ * one layout clip (classify has made every clip a residual one by then).
+ */
+function everyMissStale(checks) {
+  const misses = staleMisses(checks)
+  const clips = ['clipping', 'postUpdateClipping'].some((name) =>
+    (checks[name]?.clipped ?? []).some((entry) => entry.reason === 'clipped_by_layout')
+  )
+  return (misses.length > 0 || clips) && misses.every((miss) => miss.stale)
 }
 
 /**
@@ -1021,14 +1199,19 @@ function brokenReviewFacts(baseline) {
 const predatesClipAmendment = (baseline) =>
   baseline.clippedKeys === undefined && baseline.review?.clipsStale === undefined
 
+/** A clip key starts with the face of the bug it shows (faces). */
+const CLIP_FACE = /^(staleBox|staleContent):(.*)$/s
+
 /**
- * A layout clip key split into its stage, node key and, for a record an iOS group took, the
+ * A layout clip key split into its face, its stage, node key and, for a record an iOS group took, the
  * record's own `["",text]#n`; null when it is no clip key. Text may hold `>`, so each `]#n>`
  * is tried until both halves read as keys.
  */
 function splitClipKey(key) {
-  const staged = typeof key === 'string' ? STAGED_KEY.exec(key) : null
+  const faced = typeof key === 'string' ? CLIP_FACE.exec(key) : null
+  const staged = faced ? STAGED_KEY.exec(faced[2]) : null
   if (!staged) return null
+  const face = faced[1]
   const nodeKey = (text) => {
     const at = text.lastIndexOf('#')
     if (at < 0 || !/^\d+$/.test(text.slice(at + 1))) return false
@@ -1044,7 +1227,7 @@ function splitClipKey(key) {
     }
   }
   const rest = staged[2]
-  if (nodeKey(rest)) return { stage: staged[1], node: rest, record: null }
+  if (nodeKey(rest)) return { face, stage: staged[1], node: rest, record: null }
   for (const cut of rest.matchAll(/\]#\d+>/g)) {
     const end = cut.index + cut[0].length - 1
     const [node, record] = [rest.slice(0, end), rest.slice(end + 1)]
@@ -1053,17 +1236,17 @@ function splitClipKey(key) {
       nodeKey(record) &&
       JSON.parse(record.slice(0, record.lastIndexOf('#')))[0] === ''
     )
-      return { stage: staged[1], node, record }
+      return { face, stage: staged[1], node, record }
   }
   return null
 }
 
 /**
  * TD-05 as amended 2026-11-14: why the run's layout clips are not the entry's, or null. The entry
- * must carry `clippedKeys` (even empty); each listed key, by its node, must be in `staleKeys`;
- * and the run's clip keys must equal `clippedKeys` exactly, as a multiset. The run's clips reach
- * this point only when each is stale and kept the height of the cold launch at the leg's starting
- * scale (classify makes any other clip structural).
+ * must carry `clippedKeys` (even empty), each key naming its face; a `staleBox:` key, by its
+ * node, must be in `staleKeys` (a `staleContent:` key's parity passes, so it is in none); and
+ * the run's clip keys must equal `clippedKeys` exactly, as a multiset, faces included. The run's
+ * clips reach this point only when each shows a face (classify makes any other clip structural).
  */
 function clipProblem(checks, baseline) {
   const run = clipKeys(checks)
@@ -1073,9 +1256,10 @@ function clipProblem(checks, baseline) {
   if (bad !== undefined)
     return `baseline clippedKeys must be a list of clip keys: ${JSON.stringify(bad)}`
   const stale = new Set(baseline.staleKeys)
+  // The first face's key is a stale key; the second face's parity passes, so it is not.
   const notStale = baseline.clippedKeys.find((key) => {
-    const { stage, node } = splitClipKey(key)
-    return !stale.has(`${stage}:${node}`)
+    const { face, stage, node } = splitClipKey(key)
+    return face === 'staleBox' && !stale.has(`${stage}:${node}`)
   })
   if (notStale !== undefined) return `clipped key not in staleKeys: ${notStale}`
   const { extra, missing } = multisetDifference(run, baseline.clippedKeys)
@@ -1246,7 +1430,6 @@ function residualApproved(checks, baseline, environment) {
  * `settled` and `updated` captures.
  */
 export function proposedResidualEntry(checks, captures) {
-  const misses = staleMisses(checks)
   const clips = ['clipping', 'postUpdateClipping'].flatMap((name) =>
     (checks[name]?.clipped ?? []).filter((entry) => entry.reason === 'clipped_by_layout')
   )
@@ -1258,7 +1441,7 @@ export function proposedResidualEntry(checks, captures) {
     review: {
       verdict: classify(checks),
       structuralPass: !structural(checks),
-      everyMissStale: misses.length > 0 && misses.every((miss) => miss.stale),
+      everyMissStale: everyMissStale(checks),
       growthFailing: failingGrowth(checks),
       clipsStale: clips.every(residualClip),
     },

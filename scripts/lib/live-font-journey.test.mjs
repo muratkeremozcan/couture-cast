@@ -822,8 +822,8 @@ describe('runScreenJourney with the text layout probe', () => {
     // Both stages: the settled box against the cold xxxl launch, the updated box against that
     // launch's update.
     assert.deepEqual(leg.residualProposal.clippedKeys, [
-      `cold:${NEW_POST}#0>["","post"]#0`,
-      `updated:${NEW_POST}#0>["","post"]#0`,
+      `staleBox:cold:${NEW_POST}#0>["","post"]#0`,
+      `staleBox:updated:${NEW_POST}#0>["","post"]#0`,
     ])
     assert.equal(leg.residualProposal.review.clipsStale, true)
     const approved = await run('ios', fake(), {
@@ -833,6 +833,91 @@ describe('runScreenJourney with the text layout probe', () => {
     assert.equal(approved.legs[1].pass, true, approved.legs[1].message)
   })
 
+  // The 6.8 bug's second face (TEA ruling 2026-11-14, Android Release 791123d1, Home and
+  // Settings 1.5 to 1.0): the box resizes to 1.0 while the text keeps its 1.5 layout. The fake
+  // leg back to 1.0 shows it on New post: a fresh box (the cold 1.0 launch's) whose content is
+  // the cold 1.5 launch's height.
+  const tall = Math.round(
+    40 *
+      expectedTextRatio({
+        platform: 'android',
+        androidApi: 36,
+        sizeSp: 13,
+        from: 1,
+        to: 1.5,
+      })
+  )
+  const secondFace = (change) =>
+    editRecords((record, { stage, at }) =>
+      record.text === 'New post' && stage === 'settled' && at === '1'
+        ? change(record)
+        : record
+    )
+  const staleContent = (record) => ({
+    ...record,
+    contentRect: [...record.contentRect.slice(0, 3), record.contentRect[1] + tall],
+  })
+  const NEW_POST_KEY = `cold:${NEW_POST}#0`
+
+  test('the second face: a fresh box with stale content is proposed as staleContent and approves', async () => {
+    const fake = () => fakeDevice('android', { probe: secondFace(staleContent) })
+    const result = await run('android', fake(), options)
+    const back = result.legs[1]
+    assert.deepEqual([back.from, back.to], ['1.5', '1'])
+    assert.equal(back.error, 'live_font_residual_unapproved', back.message)
+    const clip = back.checks.clipping.clipped[0]
+    assert.deepEqual(
+      [clip.face, clip.stale, clip.staleContent, clip.height],
+      ['staleContent', false, true, 40]
+    )
+    // Its parity passes, so it lists no stale key.
+    assert.deepEqual(back.residualProposal.staleKeys, [])
+    assert.deepEqual(back.residualProposal.clippedKeys, [`staleContent:${NEW_POST_KEY}`])
+    assert.equal(back.residualProposal.review.clipsStale, true)
+    assert.equal(back.residualProposal.review.everyMissStale, true)
+    const approved = await run('android', fake(), {
+      ...options,
+      residualBaselines: [back.residualProposal],
+    })
+    assert.equal(approved.legs[1].pass, true, approved.legs[1].message)
+    // From 0.87 every clip fails.
+    const fixed = await run('android', fake(), {
+      label: 'sdk54-release',
+      reactNativeVersion: '0.88.1',
+    })
+    assert.equal(fixed.legs[1].error, 'live_font_fix_missing')
+  })
+
+  test('a fresh box with fresh content that clips is neither face and fails', async () => {
+    const cut = (record) => ({
+      ...record,
+      clipRect: [...record.clipRect.slice(0, 3), record.clipRect[1] + 20],
+    })
+    const result = await run(
+      'android',
+      fakeDevice('android', { probe: secondFace(cut) }),
+      options
+    )
+    assert.equal(result.legs[1].error, 'live_font_baseline_unexpected')
+    assert.equal(result.legs[1].checks.clipping.clipped[0].face, null)
+  })
+
+  test('stale content in a box that is not the target cold box fails', async () => {
+    const grown = (record) => {
+      const stale = staleContent(record)
+      const viewRect = [...record.viewRect.slice(0, 3), record.viewRect[3] + 10]
+      return { ...stale, viewRect, clipRect: viewRect, visibleRect: viewRect }
+    }
+    const result = await run(
+      'android',
+      fakeDevice('android', { probe: secondFace(grown) }),
+      options
+    )
+    assert.equal(result.legs[1].error, 'live_font_baseline_unexpected')
+    const [clip] = result.legs[1].checks.clipping.clipped
+    assert.deepEqual([clip.staleContent, clip.staleBox, clip.face], [false, false, null])
+  })
+
   test('a clipped record inside an iOS group is keyed under the group and proposed exactly', async () => {
     const result = await run('ios', groupBreaking(), options)
     const [leg] = result.legs
@@ -840,7 +925,7 @@ describe('runScreenJourney with the text layout probe', () => {
     assert.deepEqual(leg.checks.textProbe.stages.settled.groups, [
       { node: NEW_POST, records: ['New', 'post'] },
     ])
-    const groupKey = `cold:${NEW_POST}#0>["","post"]#0`
+    const groupKey = `staleBox:cold:${NEW_POST}#0>["","post"]#0`
     assert.deepEqual(leg.residualProposal.staleKeys, [`cold:${NEW_POST}#0`])
     assert.deepEqual(leg.residualProposal.clippedKeys, [groupKey])
     assert.equal(leg.residualProposal.review.clipsStale, true)
@@ -857,13 +942,13 @@ describe('runScreenJourney with the text layout probe', () => {
     assert.equal(unlisted.legs[0].error, 'live_font_residual_unapproved')
     assert.match(
       unlisted.legs[0].message,
-      /clip outside clippedKeys: cold:.*>\["","post"\]#0/
+      /clip outside clippedKeys: staleBox:cold:.*>\["","post"\]#0/
     )
     // The node's own key is not the record's: listing it fails both ways.
     const nodeKeyed = await run('ios', groupBreaking(), {
       ...options,
       residualBaselines: [
-        { ...leg.residualProposal, clippedKeys: [`cold:${NEW_POST}#0`] },
+        { ...leg.residualProposal, clippedKeys: [`staleBox:cold:${NEW_POST}#0`] },
       ],
     })
     assert.match(nodeKeyed.legs[0].message, /1 extra, 1 missing/)

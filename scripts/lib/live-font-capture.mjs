@@ -73,9 +73,10 @@ export function flattenHierarchy(
     const bounds = attrs.bounds
     readMarker(id, { markers, jsScales, environments })
     const isVolatile = inVolatile || matchesPrefix(id, volatile)
+    // A region's own bounds, whether its text is dropped or kept flagged on a scroll page.
+    if (isVolatile && !inVolatile && bounds) volatileRegions.push(bounds)
     if (isVolatile && !markVolatile) {
       volatileDropped += countText(node, platform)
-      if (bounds) volatileRegions.push(bounds)
       return
     }
     const entry = textEntry({
@@ -299,8 +300,19 @@ function fallbackStep(steps, expectedShift) {
  * viewport, so a node half off screen keeps only its visible edge. Pages that share no moving
  * text take the step from fallbackStep.
  */
-export function stitchPages(pages, { tolerance = 4, expectedShift } = {}) {
-  if (!pages.length) return []
+export function stitchPages(pages, options = {}) {
+  return stitchPlaces(pages, options).taken.map(({ key }) => key)
+}
+
+/**
+ * The stitch behind stitchPages, with where each page node went (F-00i, every page probed):
+ * `taken` is the stitched text in order (page 0's own text first, then each later page's new
+ * text), `offsets` each page's shift from page 0, and `places[p][i]` the index in `taken` of
+ * node i of page p. A chrome node on a later page takes the place of its page 0 copy; a volatile
+ * node, or a chrome node page 0 does not show, has none (-1).
+ */
+export function stitchPlaces(pages, { tolerance = 4, expectedShift } = {}) {
+  if (!pages.length) return { taken: [], offsets: [], places: [] }
   const at = (page, node) =>
     page.some(
       (other) =>
@@ -308,12 +320,16 @@ export function stitchPages(pages, { tolerance = 4, expectedShift } = {}) {
         Math.abs(top(other) - top(node)) <= tolerance
     )
   const chrome = (node) => pages.length > 1 && pages.every((page) => at(page, node))
-  const taken = pages[0]
-    .filter((node) => !node.volatile)
-    .map((node) => {
+  const taken = []
+  const places = [
+    pages[0].map((node) => {
+      if (node.volatile) return -1
       const [y, bottom] = edges(node)
-      return { key: identityOf(node), y, bottom }
-    })
+      taken.push({ key: identityOf(node), y, bottom })
+      return taken.length - 1
+    }),
+  ]
+  const offsets = [0]
   let offset = 0
   const steps = []
   for (let index = 1; index < pages.length; index += 1) {
@@ -334,8 +350,21 @@ export function stitchPages(pages, { tolerance = 4, expectedShift } = {}) {
     const step = shifts.length ? median(shifts) : fallbackStep(steps, expectedShift)
     steps.push(step)
     offset += step
+    offsets.push(offset)
+    const place = []
+    places.push(place)
     for (const node of pages[index]) {
-      if (chrome(node) || node.volatile) continue
+      place.push(-1)
+      if (node.volatile) continue
+      if (chrome(node)) {
+        place[place.length - 1] = pages[0].findIndex(
+          (first) =>
+            identityOf(first) === identityOf(node) &&
+            Math.abs(top(first) - top(node)) <= tolerance
+        )
+        if (place.at(-1) >= 0) place[place.length - 1] = places[0][place.at(-1)]
+        continue
+      }
       const key = identityOf(node)
       const [y, bottom] = edges(node).map((edge) => edge + offset)
       // The same text whose box shares an edge with, or overlaps, one already taken is that node
@@ -351,10 +380,14 @@ export function stitchPages(pages, { tolerance = 4, expectedShift } = {}) {
       if (seen) {
         seen.y = Math.min(seen.y, y)
         seen.bottom = Math.max(seen.bottom, bottom)
-      } else taken.push({ key, y, bottom })
+        place[place.length - 1] = taken.indexOf(seen)
+      } else {
+        taken.push({ key, y, bottom })
+        place[place.length - 1] = taken.length - 1
+      }
     }
   }
-  return taken.map(({ key }) => key)
+  return { taken, offsets, places }
 }
 
 /**

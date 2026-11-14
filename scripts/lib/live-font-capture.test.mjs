@@ -26,6 +26,7 @@ import {
   LIVE_FONT_TIMEZONE,
   sameLayout,
   stitchPages,
+  stitchPlaces,
 } from './live-font-capture.mjs'
 
 const node = (attributes, children = []) => ({ attributes, children })
@@ -221,6 +222,29 @@ describe('stitchPages', () => {
     assert.equal(
       stitchPages([third]).filter((key) => JSON.parse(key)[1] === 'Disclosure').length,
       2
+    )
+  })
+
+  // F-00i, every page probed: where each page node went, so its probe records are named once.
+  test('places each page node on its stitched text, chrome on its page 0 copy', () => {
+    const tab = { text: 'Home', id: 'tab-home', bounds: '[0,2200][100,2240]' }
+    const card = { ...at('Card', 300), volatile: true }
+    const first = [at('A', 100), card, at('B', 200), at('C', 400), tab]
+    const second = [at('B', 0), at('C', 200), at('D', 400), tab]
+    const { taken, offsets, places } = stitchPlaces([first, second])
+    assert.deepEqual(
+      taken.map(({ key }) => JSON.parse(key)[1]),
+      ['A', 'B', 'C', 'Home', 'D']
+    )
+    assert.deepEqual(offsets, [0, 200])
+    // The volatile card has no place; the tab bar on page 1 is page 0's.
+    assert.deepEqual(places, [
+      [0, -1, 1, 2, 3],
+      [1, 2, 4, 3],
+    ])
+    assert.deepEqual(
+      stitchPages([first, second]),
+      taken.map(({ key }) => key)
     )
   })
 
