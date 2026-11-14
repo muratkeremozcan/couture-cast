@@ -3,7 +3,9 @@
 Updated: 2026-11-14. Story 6.15, TD-01 and F-00i. Learning path Step 55. The r44 TEA rulings
 (offWindow by translation, non-clipping and inverted scroll views, opacity refusal, ReactSwitch,
 accessibilityAncestor) are in the wire contract below, with the answer-level `elements` list and
-the iOS `behindModal` field from the label-element and accessibility-modal rulings.
+the iOS `behindModal` field from the label-element and accessibility-modal rulings, and the r45
+rulings (offWindow needs the whole untranslated rect within reach; Android lines, padding clips
+and scroll travel mapped through the view's global transform; no answer below API 29).
 
 ## Problem
 
@@ -36,6 +38,12 @@ and fails the leg, so a renderer change cannot hide text from the probe.
 Windows: Android enumerates `WindowInspector.getGlobalWindowViews()` (API 29+; the proof
 emulators are API 32 and 36), so the composer's modal dialog window is read with the Activity;
 iOS walks every window of every connected scene.
+
+API floor (r45 P2-5). Below API 29 the Android module registers no receiver
+(`TextLayoutProbeReceiver.register` returns null), so a dump request gets no answer at all and the
+harness fails the leg as `live_font_text_probe_missing`. Nothing answers with unmapped boxes:
+`View.transformMatrixToGlobal`, which maps every box, line and clip, is API 29 as well, and the
+record builder has no fallback below it. A Robolectric case at API 28 holds this.
 
 ## How the harness asks and reads
 
@@ -149,7 +157,11 @@ disabled: `getScrollEnabled()` false on React Native's Android scroll views, `is
 false on iOS), the band is `[V.start - cur, V.end + (max - cur)]`, where V is the scroll view's
 viewport cut by everything above it, outer scroll views' bands included. A larger offset moves
 the content up, so at offset 0 only content below V can scroll in and at `max` only content
-above. Nested scroll views compose inner to outer, each with its own travel. A text only partly
+above. Nested scroll views compose inner to outer, each with its own travel. `cur` and `max` are
+in the scroll view's own units, so on screen each is multiplied by the size of the scale the
+scroll view and every ancestor above it compose on that axis (r45 P2-5): under a parent scaled by
+0.5 the content travels half as far (Android the product of `getScaleX`/`getScaleY`, iOS the
+composed `a` or `d`, the composition that also says whether it is inverted). A text only partly
 off the window with no scroll view above is cut by the window on every edge.
 
 Inverted scroll views (r44 P2-2). A scroll view is inverted on an axis when its content is
@@ -162,11 +174,22 @@ ReactScrollView, and a flip inside a flip scrolls the usual way. An inverted scr
 offset moves its content down (or right) on screen, so its band mirrors:
 `[V.start - (max - cur), V.end + cur]`. Android boxes come from the four corners of the view
 mapped through every matrix on the way (`transformMatrixToGlobal`), anchored at
-`getLocationOnScreen`, so a flipped scroll view's own box is where it is laid out.
+`getLocationOnScreen`, so a flipped scroll view's own box is where it is laid out. The same
+mapping carries everything else read in a view's own pixels (r45 P2-5): `contentRect` (the lines'
+left, right, first top and last bottom past the padding), an ancestor's `clipToPadding` rect and
+its `clipBounds`. So under a parent scaled by 0.5 the lines take half the height with the box, and
+under a vertical flip a top padding cuts at the bottom on screen and a text's line sits above its
+own top padding. Line extents round outward to the pixels they touch.
 
-offWindow (r44 P1-1). A record is `offWindow` when all three hold: its `clipRect` is null; its
-`viewRect` lies wholly outside the window (a zero-size view by its origin); and the reach
-computed again with every translation removed is not null. Removing translations: each view
+offWindow (r44 P1-1, r45 P2-3). A record is `offWindow` when all three hold: its `clipRect` is
+null; its `viewRect` lies wholly outside the window (a zero-size view by its origin); and with
+every translation removed its whole rect is within reach: the reach computed again is the
+untranslated rect itself. With no clipper or scroll view above, that is the r45 ruling's words:
+the untranslated rect lies wholly inside the window, not merely overlapping it, since the part
+outside is a layout overflow the translation did not cause. The reach form keeps a parked
+sheet's text below the fold of the sheet's own scroll view `offWindow` (in place it would be
+`scrolledAway`), and makes one that the sheet itself cuts in part, untranslated, not
+`offWindow`. Removing translations: each view
 on the way, the text view included, has a translation (Android `translationX`/`translationY`;
 iOS the layer transform's `tx`/`ty`) applied after its own scale, so it moves the view and
 everything inside it rigidly by that translation mapped through the linear parts (scale, flip;
@@ -177,7 +200,8 @@ linear parts and the window stay. So a sheet or drawer parked off the window by 
 past the bottom, a row item pushed past the right) has no reach either way and is not: it has
 `visibleRect` null, `clipRect` null, `scrolledAway` false and `offWindow` false, a full clip the
 harness fails in every stage and in the cold control. A text that the translation does not hide
-(off the window even untranslated, or cut to nothing by a clipper) is not `offWindow` either.
+(off the window even untranslated, overflowing the window or a clipper untranslated, or cut to
+nothing by a clipper) is not `offWindow` either.
 
 Opacity refusal (r44 P3-1). A record whose effective opacity is not a number from 0 to 1 (NaN,
 from a NaN alpha anywhere up the chain) is never coerced or dropped: the whole answer is a
