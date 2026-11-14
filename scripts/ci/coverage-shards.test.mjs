@@ -4,7 +4,6 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { test } from 'node:test'
-import { parse } from 'yaml'
 
 import {
   COVERAGE_SHARDS,
@@ -72,14 +71,23 @@ test('the workflow matrix runs exactly the shards this file knows', () => {
 // TEA review of 8586f43c: the mobile shard's plugin prebuild suites run after its tests, so the
 // recorded outcome must read them too, or a red plugin suite shows the shard as passed.
 test("a shard's recorded outcome includes the mobile plugin prebuild suites", () => {
-  const workflow = parse(readFileSync('.github/workflows/pr-checks.yml', 'utf8'))
-  const steps = workflow.jobs['tests-shard'].steps
-  const plugins = steps.find((step) => step.name === 'Mobile plugin prebuild suites')
-  const record = steps.find((step) => step.name === "Record this shard's result")
-  assert.equal(plugins.id, 'plugins')
-  assert.ok(steps.indexOf(plugins) < steps.indexOf(record))
-  assert.equal(record.env.OUTCOME, '${{ steps.tests.outcome }}')
-  assert.equal(record.env.PLUGINS_OUTCOME, '${{ steps.plugins.outcome }}')
+  // Text, not a YAML parser: the merge job runs this file with no dependency install.
+  const workflow = readFileSync('.github/workflows/pr-checks.yml', 'utf8')
+  const plugins = workflow.indexOf(
+    '      - name: Mobile plugin prebuild suites\n        id: plugins\n'
+  )
+  const record = workflow.indexOf("      - name: Record this shard's result\n")
+  assert.ok(plugins > 0, 'the plugin step carries id plugins')
+  assert.ok(record > plugins, 'the record step follows the plugin step')
+  const recordStep = workflow.slice(
+    record,
+    workflow.indexOf('\n      - name:', record + 1)
+  )
+  assert.match(recordStep, /\n {10}OUTCOME: \$\{\{ steps\.tests\.outcome \}\}\n/)
+  assert.match(
+    recordStep,
+    /\n {10}PLUGINS_OUTCOME: \$\{\{ steps\.plugins\.outcome \}\}\n/
+  )
 })
 
 // Antigravity handover r2 (P3): a cancelled plugin step must not record a passed shard.
