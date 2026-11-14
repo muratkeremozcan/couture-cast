@@ -730,10 +730,10 @@ function best(nodes, score) {
  *   1. with an `accessibilityAncestor`, joins the node with that identifier whose box overlaps
  *      the ancestor's rect best (ties are ambiguous); a record whose identifier no such node
  *      carries stays free, so a visible one is unmatched. Geometry never decides it.
- *   2. without one, joins the smallest open node (by area) whose rect holds its rect within
- *      the tolerance (two smallest of one area are ambiguous);
- *   3. else the smallest node of any kind (one exact text took, or a group) that holds it,
- *      ties ambiguous.
+ *   2. without one, joins the smallest node of any kind (by area; open, or one exact text
+ *      took) whose rect holds its rect within the tolerance; two smallest of one area are
+ *      ambiguous. The smallest holder is the most specific element: an icon in a tab button
+ *      that a card scrolled under the tab bar also holds goes to the tab (iOS 9adc0d1a).
  * Window nodes take nothing. An open node that takes a record is a group; a node exact text
  * took that takes one has it attached. Members are in screen order. Takes the ids it places
  * out of `open` and `free`.
@@ -780,20 +780,7 @@ function resolveLeftovers({
       )
   }
   const opened = new Set(open)
-  const rest = []
   for (const record of geometric) {
-    const holding = holdingOf(
-      record,
-      placeable.filter((node) => opened.has(node.index))
-    )
-    if (holding.length)
-      place(
-        record,
-        best(holding, (node) => area(node.box))
-      )
-    else rest.push(record)
-  }
-  for (const record of rest) {
     const holding = holdingOf(record, placeable)
     if (holding.length)
       place(

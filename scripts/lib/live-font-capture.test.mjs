@@ -766,6 +766,62 @@ test('iOS skips a deeper copy with the labelled id below a skipped copy without 
   )
 })
 
+// iOS 9adc0d1a, Community: the card image carries its testID on an element inside an id-less
+// element with the same alt text and bounds. Kept as two nodes, a record either could take tied
+// between them (live_font_text_probe_ambiguous); it is one element, kept once with the testID.
+test('iOS keeps an element repeated inside an id-less copy once, with the inner testID', () => {
+  const card = (inner) =>
+    node({ bounds: '[0,0][0,0]' }, [
+      node({ accessibilityText: 'CoutureCast Story68', bounds: '[0,0][402,874]' }, [
+        node(
+          {
+            'resource-id': 'community-card-open-seed-spotlight-1',
+            bounds: '[17,721][325,1029]',
+          },
+          [
+            node(
+              {
+                accessibilityText: 'Spotlight look 1 styled for the season',
+                bounds: '[17,721][325,1029]',
+              },
+              [
+                node({
+                  accessibilityText: 'Spotlight look 1 styled for the season',
+                  bounds: '[17,721][325,1029]',
+                  'resource-id': inner,
+                }),
+              ]
+            ),
+          ]
+        ),
+      ]),
+    ])
+  const flat = flattenHierarchy(card('community-card-image-seed-spotlight-1'), {
+    platform: 'ios',
+  })
+  assert.deepEqual(
+    flat.nodes.map((entry) => [entry.id, entry.text]),
+    [
+      ['', 'CoutureCast Story68'],
+      ['community-card-image-seed-spotlight-1', 'Spotlight look 1 styled for the season'],
+    ]
+  )
+  assert.deepEqual(
+    flat.controls.map((control) => control.id),
+    ['community-card-open-seed-spotlight-1', 'community-card-image-seed-spotlight-1']
+  )
+  // Two different testIDs are two elements, whatever their label.
+  const twoIds = node({ bounds: '[0,0][0,0]' }, [
+    node({ accessibilityText: 'X', bounds: '[0,0][10,10]', 'resource-id': 'outer' }, [
+      node({ accessibilityText: 'X', bounds: '[0,0][10,10]', 'resource-id': 'inner' }),
+    ]),
+  ])
+  assert.deepEqual(
+    flattenHierarchy(twoIds, { platform: 'ios' }).nodes.map((entry) => entry.id),
+    ['outer', 'inner']
+  )
+})
+
 test('missingMounts names the required scopes no marker carries', () => {
   const markers = ['live-font-mount-root-r1', 'live-font-mount-settings-s1']
   assert.deepEqual(missingMounts(markers, ['root', 'settings']), [])

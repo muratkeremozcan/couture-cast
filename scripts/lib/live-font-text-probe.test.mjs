@@ -1111,6 +1111,32 @@ describe('matchTextProbe, iOS accessibility groups (TEA rulings 2026-11-14)', ()
     )
   })
 
+  // iOS 9adc0d1a, Community: the spotlight card image runs under the tab bar, so its two
+  // identical label nodes (open: no text view carries alt text) held each tab icon too, and the
+  // open-first pass tied between them. The smallest holder of any kind is the tab.
+  test('a leftover record goes to the smallest holder of any kind, before a larger open node', () => {
+    const image = node('Spotlight look 1 styled for the season', [17, 721, 325, 1029], '')
+    const copy = node(
+      'Spotlight look 1 styled for the season',
+      [17, 721, 325, 1029],
+      'community-card-image-seed-spotlight-1'
+    )
+    const records = [
+      iosRecord('Home', [20, 822, 80, 838]),
+      iosRecord(ICON, [37, 791, 63, 819]),
+    ]
+    const result = ios([TAB, image, copy], records)
+    assert.deepEqual(result.ambiguous, [])
+    assert.deepEqual(attachedOf(result), [[0, [1]]])
+    assert.deepEqual(result.unmatchedNodes, [1, 2], 'alt text no text view carries')
+    // Smallest of all is still a group when it is open.
+    const open = ios(
+      [image, node('Hourly', [30, 790, 70, 830], 'hourly-item')],
+      [records[1]]
+    )
+    assert.deepEqual([open.groups, open.attached], [[{ node: 1, records: [0] }], []])
+  })
+
   test('an ancestor identifier decides before geometry, and one no node carries fails', () => {
     // The ancestor names the tile, though the tab is the smaller holder.
     const named = ios([TAB, TILE], tabRecords({ identifier: TILE.id, rect: TILE.box }))

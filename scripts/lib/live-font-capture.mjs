@@ -15,14 +15,19 @@ function attributes(node) {
 const matchesPrefix = (id, prefixes) =>
   id !== '' && prefixes.some((prefix) => id.startsWith(prefix))
 
-/** iOS repeats a static text as an identical element inside the one that labels it. */
+/**
+ * iOS repeats one accessibility element as an identical element (same label, same bounds)
+ * inside the one that labels it: a static text inside its label, or an image carrying the
+ * testID inside an id-less element with the same label (iOS 9adc0d1a, the Community card
+ * image). One of the two is kept; when only the inner one has a testID, the kept node takes it.
+ */
 function repeatsParent(entry, parentEntry) {
   return (
     entry !== undefined &&
     parentEntry !== undefined &&
     entry.text === parentEntry.text &&
     entry.bounds === parentEntry.bounds &&
-    (entry.id === '' || entry.id === parentEntry.id)
+    (entry.id === '' || entry.id === parentEntry.id || parentEntry.id === '')
   )
 }
 
@@ -65,6 +70,7 @@ export function flattenHierarchy(
   const environments = []
   const record = ({ entry, parentEntry, id, bounds, isVolatile }) => {
     const repeat = platform === 'ios' && repeatsParent(entry, parentEntry)
+    if (repeat && parentEntry.id === '' && entry.id !== '') parentEntry.id = entry.id
     if (entry && !repeat) nodes.push(entry)
     if (id && bounds && !isVolatile) controls.push({ id, bounds })
     return repeat
