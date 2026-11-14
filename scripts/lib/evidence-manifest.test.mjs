@@ -456,6 +456,57 @@ test('objectId on a commit a shallow clone lacks throws; a missing path under it
   assert.equal(objectId(second, 'scripts/absent.mjs', clone), null)
 })
 
+// Antigravity r26 (1): no verified commit outlives one manifest call. A shallow re-clone at the
+// same path drops a commit verified earlier in the same process; every later call throws.
+test('a commit verified before a same-path shallow re-clone is checked again', (t) => {
+  const repo = fixtureRepo(t)
+  const first = repo.commit('first')
+  repo.write('docs/notes.md', 'notes')
+  repo.commit('second')
+  const base = fs.mkdtempSync(path.join(os.tmpdir(), 'evidence-reclone-'))
+  t.after(() => fs.rmSync(base, { recursive: true, force: true }))
+  const clone = path.join(base, 'clone')
+  const cloneInto = (...flags) => {
+    fs.rmSync(clone, { recursive: true, force: true })
+    const result = spawnSync(
+      'git',
+      ['clone', '-q', ...flags, `file://${repo.dir}`, clone],
+      {
+        encoding: 'utf8',
+        timeout: 30_000,
+        killSignal: 'SIGKILL',
+      }
+    )
+    assert.equal(result.status, 0, result.stderr)
+  }
+  const at = { leg: 'live-font', rev: first, cwd: clone, requireClean: false }
+  cloneInto()
+  const manifest = writeManifest(at)
+  assert.match(manifest.inputs['package.json'], /^[0-9a-f]{40}$/)
+  assert.match(objectId(first, 'package.json', clone), /^[0-9a-f]{40}$/)
+  cloneInto('--depth', '1')
+  const missing = { message: 'evidence_git_failed:rev-parse:exit_128' }
+  assert.throws(() => writeManifest(at), missing)
+  assert.throws(() => changedInputs(manifest, at), missing)
+  assert.throws(() => objectId(first, 'package.json', clone), missing)
+})
+
+// Antigravity r26 (2): HEAD can move, so a manifest call's set never takes it as verified.
+test('objectId checks HEAD on every call, within one verified set', (t) => {
+  const repo = fixtureRepo(t)
+  repo.commit('build')
+  const verified = new Set()
+  assert.equal(objectId('HEAD', 'docs/new.md', repo.dir, verified), null)
+  repo.write('docs/new.md', 'new')
+  repo.commit('new')
+  assert.match(objectId('HEAD', 'docs/new.md', repo.dir, verified), /^[0-9a-f]{40}$/)
+  // HEAD on an unborn branch names no commit: the next call throws.
+  repo.git('symbolic-ref', 'HEAD', 'refs/heads/unborn')
+  assert.throws(() => objectId('HEAD', 'package.json', repo.dir, verified), {
+    message: 'evidence_git_failed:rev-parse:exit_128',
+  })
+})
+
 // Antigravity r25 (3): the build revision peels to a commit; an annotated tag gives its commit,
 // and a tree is refused.
 test('a manifest revision peels an annotated tag to its commit and refuses a tree', (t) => {

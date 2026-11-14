@@ -157,25 +157,26 @@ function revParse(rev, cwd) {
   return sha
 }
 
-// Commits verified present, per repository. Only full object ids are kept: a commit that exists
-// stays put, while a name such as HEAD can move, so it is checked on every call.
-const verifiedCommits = new Set()
-
-/** Throws unless `rev` names a commit present in the repository at `cwd`. */
-function verifyCommit(rev, cwd) {
-  const key = `${path.resolve(cwd ?? '.')}\0${rev}`
-  if (verifiedCommits.has(key)) return
-  if (revParse(rev, cwd) === rev) verifiedCommits.add(key)
+/**
+ * Throws unless `rev` names a commit present in the repository at `cwd`. `verified` holds the
+ * commits one manifest call has already checked (Antigravity r26): it lives no longer than that
+ * call, since a gc or a shallow re-clone at the same path can drop a commit later in the same
+ * process. Only full object ids go in; a name such as HEAD can move, so it is checked each time.
+ */
+function verifyCommit(rev, cwd, verified) {
+  if (verified?.has(rev)) return
+  if (revParse(rev, cwd) === rev) verified?.add(rev)
 }
 
 /**
  * The object id of `path` at `rev`, or null when the path does not exist there. `rev` is
  * verified first (Antigravity r25), since `--quiet` exits 1 alike for a missing path and a
  * missing commit; then only that exit, with nothing on stderr, reads as absent. Any other ending
- * throws.
+ * throws. `verified` is the calling manifest's set of checked commits; without one, every call
+ * checks.
  */
-export function objectId(rev, file, cwd) {
-  verifyCommit(rev, cwd)
+export function objectId(rev, file, cwd, verified) {
+  verifyCommit(rev, cwd, verified)
   const args = ['rev-parse', '--verify', '--quiet', `${rev}:${file}`]
   const result = spawnGit(args, cwd)
   if (result.status === 1 && result.stdout === '' && result.stderr === '') return null
@@ -308,6 +309,7 @@ export const covered = (file, inputs) =>
  */
 export function uncoveredReads(leg, rev = 'HEAD', cwd) {
   const sha = revParse(rev, cwd)
+  const verified = new Set([sha])
   const inputs = legInputs(leg, sha, cwd)
   const misses = []
   for (const file of importClosure(LEGS[leg].entries, sha, cwd)) {
@@ -316,7 +318,7 @@ export function uncoveredReads(leg, rev = 'HEAD', cwd) {
       ...repoPathLiterals(source, { shell: file.endsWith('.sh') }),
       ...moduleRelativeLiterals(source, file),
     ])
-      if (objectId(sha, named, cwd) !== null && !covered(named, inputs))
+      if (objectId(sha, named, cwd, verified) !== null && !covered(named, inputs))
         misses.push(`${file} -> ${named}`)
   }
   return misses
@@ -353,6 +355,7 @@ export function dirtyInputs(paths, cwd) {
  */
 export function writeManifest({ leg, rev = 'HEAD', cwd, requireClean = true }) {
   const sha = revParse(rev, cwd)
+  const verified = new Set([sha])
   if (requireClean) {
     const head = revParse('HEAD', cwd)
     if (sha !== head) throw new Error(`evidence_manifest_rev_not_head:${sha}`)
@@ -364,7 +367,7 @@ export function writeManifest({ leg, rev = 'HEAD', cwd, requireClean = true }) {
     leg,
     sha,
     inputs: Object.fromEntries(
-      legInputs(leg, sha, cwd).map((file) => [file, objectId(sha, file, cwd)])
+      legInputs(leg, sha, cwd).map((file) => [file, objectId(sha, file, cwd, verified)])
     ),
   }
 }
