@@ -11,6 +11,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import kotlin.math.ceil
 import kotlin.math.floor
+import kotlin.math.roundToInt
 
 /** A rect as the wire carries it: left, top, right, bottom in screen pixels. */
 data class ProbeRect(val left: Int, val top: Int, val right: Int, val bottom: Int) {
@@ -207,9 +208,10 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
         text,
         prepared.layout,
         view.paddingLeft,
-        view.paddingTop,
+        // onDraw translates by paddingTop plus the prepared layout's vertical offset.
+        view.paddingTop + prepared.verticalOffset.roundToInt(),
         maxLines,
-        if (maxLines == null) prepared.layout.lineCount else null
+        preparedUnlimitedLines(prepared.layout, maxLines)
       )
     }
     if (classes.compoundView?.isInstance(view) == true) {
@@ -359,14 +361,38 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       if (layout == null) return null
       if (maxLines == null) return layout.lineCount
       val text = textView.text ?: return null
+      return relaidLines(text, layout, textView.includeFontPadding, textView)
+    }
+
+    /**
+     * A prepared layout keeps only its Layout. With ellipsizeMode clip its text is the source text
+     * and is laid out again without the cap; an ellipsizing Layout holds its text with the
+     * ellipsis in place (Layout.Ellipsizer), which cannot be laid out again, so that is null.
+     */
+    fun preparedUnlimitedLines(layout: Layout, maxLines: Int?): Int? {
+      if (maxLines == null) return layout.lineCount
+      val text = layout.text ?: return null
+      if (text.javaClass.name.contains("Ellipsizer")) return null
+      return relaidLines(text, layout, layout.topPadding != 0 || layout.bottomPadding != 0, null)
+    }
+
+    /** The line count of [text] laid out at [layout]'s width, paint and spacing, with no cap. */
+    private fun relaidLines(
+      text: CharSequence,
+      layout: Layout,
+      includePad: Boolean,
+      textView: TextView?
+    ): Int {
       val builder = StaticLayout.Builder.obtain(text, 0, text.length, layout.paint, layout.width)
         .setAlignment(layout.alignment)
         .setLineSpacing(layout.spacingAdd, layout.spacingMultiplier)
-        .setIncludePad(textView.includeFontPadding)
-        .setBreakStrategy(textView.breakStrategy)
-        .setHyphenationFrequency(textView.hyphenationFrequency)
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        builder.setJustificationMode(textView.justificationMode)
+        .setIncludePad(includePad)
+      if (textView != null) {
+        builder.setBreakStrategy(textView.breakStrategy)
+        builder.setHyphenationFrequency(textView.hyphenationFrequency)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+          builder.setJustificationMode(textView.justificationMode)
+        }
       }
       return builder.build().lineCount
     }
@@ -394,12 +420,16 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
  * and draws a PreparedLayout's Layout. The getter is tried first, then any field holding an object
  * that holds a Layout, so a renamed accessor still reads; null when neither is found.
  */
-class PreparedLayoutRead(val layout: Layout, val maximumNumberOfLines: Int) {
+class PreparedLayoutRead(
+  val layout: Layout,
+  val maximumNumberOfLines: Int,
+  val verticalOffset: Float
+) {
   companion object {
     fun of(view: View): PreparedLayoutRead? {
       val prepared = preparedObject(view) ?: return null
       val layout = layoutOf(prepared) ?: return null
-      return PreparedLayoutRead(layout, maxLinesOf(prepared))
+      return PreparedLayoutRead(layout, maxLinesOf(prepared), verticalOffsetOf(prepared))
     }
 
     private fun preparedObject(view: View): Any? {
@@ -433,6 +463,13 @@ class PreparedLayoutRead(val layout: Layout, val maximumNumberOfLines: Int) {
       }
       return null
     }
+
+    private fun verticalOffsetOf(prepared: Any): Float =
+      try {
+        prepared.javaClass.getMethod("getVerticalOffset").invoke(prepared) as Float
+      } catch (_: ReflectiveOperationException) {
+        0f
+      }
 
     private fun maxLinesOf(prepared: Any): Int =
       try {

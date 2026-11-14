@@ -481,6 +481,92 @@ class TextLayoutSnapshotTest {
   }
 
   @Test
+  fun ellipsizeModeClipKeepsTheUncappedLineCountBesideTheCappedOne() {
+    host { context ->
+      column(
+        context,
+        label(context, "One\nTwo\nThree\nFour").apply {
+          maxLines = 2
+          ellipsize = null
+          layoutParams = LinearLayout.LayoutParams(300, WRAP_CONTENT)
+        }
+      )
+    }
+    val record = snapshot().records.single()
+    // Without an ellipsis StaticLayout keeps every line (setMaxLines acts only with one); the
+    // view is two lines tall, so the dropped lines show as content past the clipRect.
+    assertEquals(2, record.maxLines)
+    assertEquals(0, record.ellipsized)
+    assertEquals(4, record.unlimitedLineCount)
+    assertEquals(4, record.lineCount)
+    assertTrue(
+      "content ${record.contentRect} past clip ${record.clipRect}",
+      record.contentRect.bottom > record.clipRect!!.bottom + 2
+    )
+  }
+
+  private fun preparedLayout(
+    context: Context,
+    text: String,
+    maxLines: Int,
+    ellipsize: TextUtils.TruncateAt?
+  ): StaticLayout =
+    StaticLayout.Builder.obtain(text, 0, text.length, label(context).paint, 300)
+      .setMaxLines(maxLines)
+      .setEllipsize(ellipsize)
+      .build()
+
+  @Test
+  fun aPreparedLayoutReportsItsUncappedLineCountInClipModeAndNullWhenEllipsized() {
+    host { context ->
+      column(
+        context,
+        PreparedLayoutTextView(context).apply {
+          preparedLayout = PreparedLayout(preparedLayout(context, "One\nTwo\nThree\nFour", 2, null), 2, 0f)
+          layoutParams = LinearLayout.LayoutParams(300, 60)
+        },
+        PreparedLayoutTextView(context).apply {
+          preparedLayout = PreparedLayout(
+            preparedLayout(context, "Five\nSix\nSeven", 1, TextUtils.TruncateAt.END),
+            1,
+            0f
+          )
+          layoutParams = LinearLayout.LayoutParams(300, 30)
+        }
+      )
+    }
+    val records = snapshot().records
+    val clipped = records.single { it.text.startsWith("One") }
+    assertEquals(2, clipped.maxLines)
+    assertEquals(0, clipped.ellipsized)
+    assertEquals(4, clipped.unlimitedLineCount)
+    assertTrue(clipped.contentRect.bottom > clipped.clipRect!!.bottom + 2)
+    val ellipsized = records.single { it !== clipped }
+    assertEquals(1, ellipsized.maxLines)
+    assertTrue(ellipsized.ellipsized > 0)
+    assertNull(ellipsized.unlimitedLineCount)
+  }
+
+  @Test
+  fun aPreparedLayoutsVerticalOffsetMovesItsContentDown() {
+    lateinit var layout: StaticLayout
+    host { context ->
+      layout = preparedLayout(context, twoLines, Int.MAX_VALUE, null)
+      column(
+        context,
+        PreparedLayoutTextView(context).apply {
+          preparedLayout = PreparedLayout(layout, -1, 7.4f)
+          setPadding(0, 3, 0, 0)
+          layoutParams = LinearLayout.LayoutParams(300, 120)
+        }
+      )
+    }
+    val record = snapshot().records.single()
+    assertEquals(record.viewRect.top + 3 + 7, record.contentRect.top)
+    assertEquals(record.viewRect.top + 3 + 7 + layout.getLineBottom(1), record.contentRect.bottom)
+  }
+
+  @Test
   fun aHiddenTextAndABlankReactTextAreNotRecorded() {
     host { context ->
       column(
