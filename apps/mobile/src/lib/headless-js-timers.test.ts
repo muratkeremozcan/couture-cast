@@ -1,3 +1,4 @@
+/// <reference types="vite/client" />
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Story 6.15 P0-07: the JS half of modules/headless-js-timers.
@@ -8,21 +9,30 @@ import {
   HEADLESS_TIMERS_TASK_KEY,
   HEADLESS_TIMERS_TIMEOUT_MS,
 } from '../../modules/headless-js-timers/scope'
+import kotlinModuleSource from '../../modules/headless-js-timers/android/src/main/java/expo/modules/headlessjstimers/HeadlessJsTimersModule.kt?raw'
 
 type Provider = () => (data: { scope?: number }) => Promise<void>
 
 type Begin = (scope: number, timeoutMs: number) => Promise<number | null>
 
-function setup(begin = vi.fn<Begin>(() => Promise.resolve(7))) {
+function setup(begin?: Begin) {
   const providers = new Map<string, Provider>()
-  const withTimers = createHeadlessTimers({ begin }, (key, provider) => {
-    providers.set(key, provider)
-  })
+  const tasks: Promise<void>[] = []
   const headlessTask = (scope: number) =>
     providers.get(HEADLESS_TIMERS_TASK_KEY)!()({ scope })
-  /** The scope the native side was asked to start, which it hands to the JS task. */
-  const startedScope = () => begin.mock.lastCall?.[0] ?? -1
-  return { begin, providers, withTimers, headlessTask, startedScope }
+  // As HeadlessJsTaskContext.startTask does, the native side queues the JS task before begin
+  // resolves, so the task can reach JS before the await in the scope returns.
+  const nativeBegin = vi.fn<Begin>(
+    begin ??
+      ((scope) => {
+        tasks.push(headlessTask(scope))
+        return Promise.resolve(7)
+      })
+  )
+  const withTimers = createHeadlessTimers({ begin: nativeBegin }, (key, provider) => {
+    providers.set(key, provider)
+  })
+  return { begin: nativeBegin, providers, withTimers, headlessTask, tasks }
 }
 
 const settled = async (promise: Promise<unknown>) => {
@@ -35,51 +45,46 @@ const settled = async (promise: Promise<unknown>) => {
 
 describe('the headless JS timers scope', () => {
   it('starts the native scope before the work and holds its JS task until the work ends', async () => {
-    const { begin, providers, withTimers, headlessTask, startedScope } = setup()
+    const { begin, providers, withTimers, tasks } = setup()
     expect([...providers.keys()]).toEqual([HEADLESS_TIMERS_TASK_KEY])
     let finishWork: ((value: string) => void) | undefined
-    let task: Promise<void> | undefined
-    const work = vi.fn(() => {
-      // React Native runs the registered task once the native side has started it.
-      task = headlessTask(startedScope())
-      return new Promise<string>((resolve) => {
-        finishWork = resolve
-      })
-    })
+    const work = vi.fn(
+      () =>
+        new Promise<string>((resolve) => {
+          finishWork = resolve
+        })
+    )
 
     const result = withTimers(work)
     await vi.waitFor(() => expect(work).toHaveBeenCalled())
 
     expect(begin).toHaveBeenCalledWith(1, HEADLESS_TIMERS_TIMEOUT_MS)
-    expect(await settled(task!)).toBe(false)
+    expect(tasks).toHaveLength(1)
+    expect(await settled(tasks[0])).toBe(false)
     finishWork?.('done')
     await expect(result).resolves.toBe('done')
-    expect(await settled(task!)).toBe(true)
+    expect(await settled(tasks[0])).toBe(true)
   })
 
   it('releases the JS task when the work fails', async () => {
-    const { withTimers, headlessTask, startedScope } = setup()
-    let task: Promise<void> | undefined
-    const failing = withTimers(() => {
-      task = headlessTask(startedScope())
-      return Promise.reject(new Error('offline'))
-    })
+    const { withTimers, tasks } = setup()
+    const failing = withTimers(() => Promise.reject(new Error('offline')))
 
     await expect(failing).rejects.toThrow('offline')
-    expect(await settled(task!)).toBe(true)
+    expect(tasks).toHaveLength(1)
+    expect(await settled(tasks[0])).toBe(true)
   })
 
   it('ends at once a JS task that reaches JS after its work ended', async () => {
-    const { withTimers, headlessTask } = setup()
+    const { withTimers, headlessTask } = setup(() => Promise.resolve(7))
     await withTimers(() => Promise.resolve('fast'))
 
     expect(await settled(headlessTask(1))).toBe(true)
   })
 
   it('still runs the work when the native scope cannot start', async () => {
-    const begin = vi.fn<Begin>(() => Promise.reject(new Error('no react context')))
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
-    const { withTimers } = setup(begin)
+    const { withTimers } = setup(() => Promise.reject(new Error('no react context')))
 
     await expect(withTimers(() => Promise.resolve('ran'))).resolves.toBe('ran')
     expect(warn).toHaveBeenCalled()
@@ -92,5 +97,13 @@ describe('the headless JS timers scope', () => {
 
     await expect(withTimers(() => Promise.resolve('ios'))).resolves.toBe('ios')
     expect(register).not.toHaveBeenCalled()
+  })
+
+  it('registers the task key the native module starts', () => {
+    // The key lives in Kotlin and in scope.ts; a mismatch starts a task no JS answers.
+    const declared = [
+      ...kotlinModuleSource.matchAll(/const val HEADLESS_TIMERS_TASK_KEY = "([^"]*)"/g),
+    ]
+    expect(declared.map((match) => match[1])).toEqual([HEADLESS_TIMERS_TASK_KEY])
   })
 })
