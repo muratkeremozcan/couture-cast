@@ -10,6 +10,11 @@ import path from 'node:path'
 import { describe, test } from 'node:test'
 
 import {
+  probeRecord,
+  rectOf,
+  withTextProbe,
+} from './fixtures/live-font-text-probe-records.mjs'
+import {
   aggregateVerdict,
   proofDirInRepo,
   proposedBaselines,
@@ -44,6 +49,7 @@ function fakeDevice(
     staleColdAt,
     banner,
     hourStart,
+    probe,
   } = {}
 ) {
   const calls = []
@@ -100,7 +106,7 @@ function fakeDevice(
           }))
         : []),
     ]
-    return {
+    const capture = {
       stage,
       launch,
       fontScale: numericScale(platform, at),
@@ -121,6 +127,9 @@ function fakeDevice(
       ],
       window: '[0,0][1080,2400]',
     }
+    // F-00i: the probe answer a healthy screen gives, then any record `probe` changes.
+    const probed = withTextProbe(capture, platform)
+    return probe ? probe({ stage, at, stale, capture: probed, updated }) : probed
   }
   const step = (name, value) => {
     calls.push(name)
@@ -288,11 +297,14 @@ describe('runScreenJourney', () => {
       timezone: 'America/Chicago',
       weatherBanner: 'none',
       staleKeys: ['cold:["community-new-post-label","New post"]#0'],
+      // TD-05 as amended 2026-11-14: a run with no layout clip proposes none, and says so.
+      clippedKeys: [],
       review: {
         verdict: 'known-residual',
         structuralPass: true,
         everyMissStale: true,
         growthFailing: ['community-new-post-label'],
+        clipsStale: true,
         controlPass: true,
       },
     })
@@ -665,5 +677,161 @@ describe('proofDirInRepo', () => {
       proofDirInRepo(alias, path.join(repo, '_bmad-output', 'runs', 'proof')),
       path.join('_bmad-output', 'runs', 'proof')
     )
+  })
+})
+
+// F-00i (TD-01, TEA review of 2026-11-14) through the journey: the cold control, the report's
+// review lists, and TD-05 clipped keys proposed and approved from a run.
+describe('runScreenJourney with the text layout probe', () => {
+  const NEW_POST = JSON.stringify(['community-new-post-label', 'New post'])
+  const options = { reactNativeVersion: '0.81.5', label: 'sdk54-release' }
+  /** Every capture's records with `change(record, context)` applied to each. */
+  const editRecords =
+    (change) =>
+    ({ capture, ...context }) => ({
+      ...capture,
+      textProbe: {
+        ...capture.textProbe,
+        records: capture.textProbe.records.map((record) =>
+          change({ ...record }, context)
+        ),
+      },
+    })
+
+  test('an ellipsis every cold launch shows passes and is listed per scale for review', async () => {
+    const probe = editRecords((record) =>
+      record.text === 'About' ? { ...record, ellipsized: 1 } : record
+    )
+    const result = await run('android', fakeDevice('android', { probe }))
+    assert.ok(
+      result.legs.every((leg) => leg.pass),
+      JSON.stringify(result.legs.map((l) => l.message))
+    )
+    for (const scale of ['1', '1.5'])
+      for (const stage of ['reference', 'updated'])
+        assert.deepEqual(result.coldTextProbe[scale][stage].ellipsized, [
+          {
+            key: '["header-info-modal","About"]#0',
+            via: 'text',
+            text: 'About',
+            ellipsized: 1,
+          },
+        ])
+    assert.equal(aggregateVerdict([result], 'android').pass, true)
+  })
+
+  test('an ellipsis only the live screen shows fails its leg', async () => {
+    const probe = editRecords((record, { stage, at }) =>
+      record.text === 'About' && stage === 'settled' && at === '1.5'
+        ? { ...record, ellipsized: 1 }
+        : record
+    )
+    const result = await run('android', fakeDevice('android', { probe }))
+    assert.equal(result.legs[0].error, 'live_font_fix_missing')
+    assert.match(result.legs[0].message, /failing clipping/)
+    assert.equal(result.legs[1].pass, true)
+  })
+
+  test('a layout clip at a cold launch fails the F-01 control and the run', async () => {
+    const probe = editRecords((record, { stage, at }) =>
+      record.text === 'New post' && stage === 'cold' && at === '1.5'
+        ? {
+            ...record,
+            contentRect: [...record.contentRect.slice(0, 3), record.contentRect[3] + 30],
+          }
+        : record
+    )
+    const result = await run('android', fakeDevice('android', { probe }))
+    assert.equal(result.controls[0].pass, false)
+    assert.equal(result.controls[0].error, 'live_font_control_clipped_by_layout')
+    const verdict = aggregateVerdict([result], 'android')
+    assert.equal(verdict.pass, false)
+    assert.match(
+      verdict.reasons.join(' '),
+      /control 1\.5 live_font_control_clipped_by_layout/
+    )
+  })
+
+  test('a leg approved by an entry from before the amendment passes and proposes it again', async () => {
+    const breaking = () => fakeDevice('android', { breakAt: 'settled:1.5' })
+    const fresh = (await run('android', breaking(), options)).legs[0].residualProposal
+    const old = { ...fresh, review: { ...fresh.review } }
+    delete old.clippedKeys
+    delete old.review.clipsStale
+    const result = await run('android', breaking(), {
+      ...options,
+      residualBaselines: [old],
+    })
+    const [leg] = result.legs
+    assert.equal(leg.pass, true, leg.message)
+    assert.deepEqual(leg.residualProposal, fresh)
+    const proposed = proposedBaselines({ entries: [old] }, [result])
+    assert.deepEqual(proposed.entries, [{ ...fresh, evidence: leg.evidence }])
+    // The amended entry, once committed, approves the leg and proposes nothing more.
+    const again = await run('android', breaking(), {
+      ...options,
+      residualBaselines: [fresh],
+    })
+    assert.equal(again.legs[0].pass, true)
+    assert.equal(again.legs[0].residualProposal, undefined)
+  })
+
+  // iOS: the New post label is an accessibility group over two text views, "New" and "post".
+  // On the stale settled screen "post" draws at the new scale inside its base-scale box.
+  const splitNewPost = ({ stage, stale, capture }) => {
+    const label = capture.nodes.find((node) => node.id === 'community-new-post-label')
+    const [left, top, right, bottom] = rectOf(label.bounds)
+    const post = probeRecord('ios', 'post', [left + 150, top, right, bottom])
+    if (stage === 'settled' && stale)
+      post.contentRect = [left + 150, top, right, bottom + 20]
+    return {
+      ...capture,
+      textProbe: {
+        ...capture.textProbe,
+        records: [
+          ...capture.textProbe.records.filter((record) => record.text !== 'New post'),
+          probeRecord('ios', 'New', [left, top, left + 140, bottom]),
+          post,
+        ],
+      },
+    }
+  }
+  const groupBreaking = () =>
+    fakeDevice('ios', { breakAt: 'settled:extra-extra-extra-large', probe: splitNewPost })
+
+  test('a clipped record inside an iOS group is keyed under the group and proposed exactly', async () => {
+    const result = await run('ios', groupBreaking(), options)
+    const [leg] = result.legs
+    assert.equal(leg.error, 'live_font_residual_unapproved')
+    assert.deepEqual(leg.checks.textProbe.stages.settled.groups, [
+      { node: NEW_POST, records: ['New', 'post'] },
+    ])
+    const groupKey = `cold:${NEW_POST}#0>["","post"]#0`
+    assert.deepEqual(leg.residualProposal.staleKeys, [`cold:${NEW_POST}#0`])
+    assert.deepEqual(leg.residualProposal.clippedKeys, [groupKey])
+    assert.equal(leg.residualProposal.review.clipsStale, true)
+    // Committed, the proposal approves the leg; without the group key it approves nothing.
+    const approved = await run('ios', groupBreaking(), {
+      ...options,
+      residualBaselines: [leg.residualProposal],
+    })
+    assert.equal(approved.legs[0].pass, true, approved.legs[0].message)
+    const unlisted = await run('ios', groupBreaking(), {
+      ...options,
+      residualBaselines: [{ ...leg.residualProposal, clippedKeys: [] }],
+    })
+    assert.equal(unlisted.legs[0].error, 'live_font_residual_unapproved')
+    assert.match(
+      unlisted.legs[0].message,
+      /clip outside clippedKeys: cold:.*>\["","post"\]#0/
+    )
+    // The node's own key is not the record's: listing it fails both ways.
+    const nodeKeyed = await run('ios', groupBreaking(), {
+      ...options,
+      residualBaselines: [
+        { ...leg.residualProposal, clippedKeys: [`cold:${NEW_POST}#0`] },
+      ],
+    })
+    assert.match(nodeKeyed.legs[0].message, /1 extra, 1 missing/)
   })
 })

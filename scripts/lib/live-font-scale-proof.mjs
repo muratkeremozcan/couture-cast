@@ -22,6 +22,14 @@
 // screen, timezone and weather banner lists exactly those stale miss keys, each with its stage
 // (scripts/lib/fixtures/live-font-residual-baselines.json); anything else fails. Required
 // controls must stay on screen in every class.
+//
+// F-00i (TD-01): each capture also carries the text layout probe's answer (`textProbe`, see
+// live-font-text-probe.mjs), so clipping is judged by the laid-out text as well as by the box:
+// a text whose content runs past its clip bounds, or that is ellipsized more than at the cold
+// launch at the same scale, is `clipped_by_layout`. Below 0.87 a residual entry may list such a
+// clip exactly (`clippedKeys`, TD-05 as amended 2026-11-14) when it is the stale box's own.
+
+import { matchTextProbe } from './live-font-text-probe.mjs'
 
 const FIX_VERSION = [0, 87, 0]
 
@@ -249,6 +257,185 @@ function clipping(capture, tolerance, reference) {
   return { pass: clipped.length === 0, clipped }
 }
 
+const rectHeight = (rect) => rect[3] - rect[1]
+const maskText = (text) => (HOUR_LABEL.test(text) ? HOUR_TOKEN : text)
+
+/**
+ * The probe's records of one capture paired with the capture's text keys (matchTextProbe).
+ * Each judged record is a fact: `key` is its entry key (entryKeys: hour labels masked), or for
+ * a record an iOS accessibility group took, the group's entry key, `>`, then the record's own
+ * `["",text]#n` (n counting that text among the group's records in screen order); `parityKey`
+ * is the hierarchy node's parity key. Volatile records and hidden records no node took are
+ * judged with no key. Scrolled-away, covered and empty records are never judged. A capture with
+ * no probe answer fails as live_font_text_probe_missing.
+ */
+export function textLayout(capture, platform) {
+  const tolerance = HEIGHT_TOLERANCE[platform]
+  if (tolerance === undefined) fail('live_font_platform_required', String(platform))
+  const answer = capture?.textProbe
+  if (!Array.isArray(answer?.records) || !Array.isArray(answer?.windows))
+    return { pass: false, code: 'live_font_text_probe_missing', facts: [], match: null }
+  const nodes = [...keyed(capture)].map(([key, node]) => ({ ...node, key }))
+  const masked = entryKeys(capture)
+  const match = matchTextProbe({
+    platform,
+    nodes,
+    answer,
+    window: capture.window ? parseBounds(capture.window) : undefined,
+    volatileRegions: (capture.volatileRegions ?? []).map(parseBounds),
+    tolerance,
+  })
+  const facts = []
+  const groupOf = new Map(match.groups.map((group) => [group.node, group.records]))
+  for (const pair of match.pairs) {
+    const record = answer.records[pair.record]
+    if (record.scrolledAway) continue
+    const node = nodes[pair.node]
+    let key = masked.get(node.key)
+    if (pair.via === 'group') {
+      const text = maskText(record.text)
+      const members = groupOf.get(pair.node)
+      const before = members
+        .slice(0, members.indexOf(pair.record))
+        .filter((index) => maskText(answer.records[index].text) === text).length
+      key = `${key}>${JSON.stringify(['', text])}#${before}`
+    }
+    facts.push({ key, parityKey: node.key, via: pair.via, id: node.id ?? '', record })
+  }
+  const paired = new Set(match.pairs.map((pair) => pair.record))
+  for (const { record } of match.volatile)
+    facts.push({ key: null, via: 'volatile', id: '', record: answer.records[record] })
+  for (const index of match.hiddenRecords)
+    if (!paired.has(index))
+      facts.push({ key: null, via: 'hidden', id: '', record: answer.records[index] })
+  return { pass: match.pass, code: match.code, facts, match }
+}
+
+/**
+ * The records the probe saw ellipsized, keyed: at a cold launch the list TEA reviews with each
+ * entry (an intentional truncation, a `numberOfLines` chip, is ellipsized at the cold launch
+ * too, so it is no clip).
+ */
+export function ellipsizedRecords(capture, platform) {
+  return textLayout(capture, platform)
+    .facts.filter((fact) => fact.record.ellipsized > 0)
+    .map((fact) => ({
+      key: fact.key,
+      via: fact.via,
+      text: fact.record.text,
+      ellipsized: fact.record.ellipsized,
+    }))
+}
+
+/**
+ * What the report shows of one capture's probe answer for review: the iOS accessibility groups
+ * with the record texts each took, the volatile records per region, the covered windows with
+ * their record counts, and the records left out as scrolled away, hidden or empty.
+ */
+export function textProbeSummary(capture, platform) {
+  const { pass, code, match } = textLayout(capture, platform)
+  if (!match) return { pass, code }
+  const records = capture.textProbe.records
+  const nodes = [...keyed(capture).values()]
+  const regions = capture.volatileRegions ?? []
+  return {
+    pass,
+    ...(code ? { code } : {}),
+    records: records.length,
+    pairs: match.pairs.length,
+    groups: match.groups.map((group) => ({
+      node: identityOf(nodes[group.node]),
+      records: group.records.map((index) => records[index].text),
+    })),
+    volatile: regions
+      .map((region, at) => ({
+        region,
+        records: match.volatile
+          .filter((entry) => entry.region === at)
+          .map((entry) => records[entry.record].text),
+      }))
+      .filter((entry) => entry.records.length),
+    covered: match.covered,
+    offscreen: match.offscreen.map((index) => records[index].text),
+    hidden: match.hiddenRecords.map((index) => records[index].text),
+    empty: match.empty.length,
+    windowNodes: match.windowNodes.map((index) => identityOf(nodes[index])),
+    unmatchedRecords: match.unmatchedRecords.map((index) => records[index].text),
+    unmatchedNodes: match.unmatchedNodes.map((index) => identityOf(nodes[index])),
+    ambiguous: match.ambiguous.map((entry) => ({
+      record: records[entry.record].text,
+      nodes: entry.nodes.map((index) => identityOf(nodes[index])),
+    })),
+  }
+}
+
+/**
+ * Layout clips of one capture (F-00i). A judged record is `clipped_by_layout` when its content
+ * runs past its clipRect by more than the platform tolerance at the top or the bottom (clipRect
+ * is the view cut by every clipping ancestor but scroll views and the window, so a text a
+ * scroll viewport cuts is no clip, and a hidden record with no clipRect is a full clip), or,
+ * given `cold` (the cold launch at the same scale), when it is ellipsized more than its keyed
+ * counterpart there (none counts as zero). Given `base` (the cold base launch), each clip
+ * records whether its box kept that launch's height (`staleBox`, TEA change 6).
+ */
+function layoutClips(capture, platform, { cold, base } = {}) {
+  const tolerance = HEIGHT_TOLERANCE[platform]
+  const index = (other) =>
+    other
+      ? new Map(
+          textLayout(other, platform)
+            .facts.filter((fact) => fact.key !== null)
+            .map((fact) => [fact.key, fact.record])
+        )
+      : new Map()
+  const [coldRecords, baseRecords] = [index(cold), index(base)]
+  const clips = []
+  for (const fact of textLayout(capture, platform).facts) {
+    const { record } = fact
+    const clip = record.clipRect
+    const content =
+      clip === null ||
+      record.contentRect[1] < clip[1] - tolerance ||
+      record.contentRect[3] > clip[3] + tolerance
+    const coldEllipsized =
+      fact.key !== null ? (coldRecords.get(fact.key)?.ellipsized ?? 0) : 0
+    const ellipsis =
+      cold !== undefined && fact.key !== null && record.ellipsized > coldEllipsized
+    if (!content && !ellipsis) continue
+    const baseRecord = fact.key !== null ? baseRecords.get(fact.key) : undefined
+    clips.push({
+      reason: 'clipped_by_layout',
+      key: fact.key,
+      parityKey: fact.parityKey ?? null,
+      via: fact.via,
+      id: fact.id,
+      text: record.text,
+      content,
+      ...(ellipsis ? { ellipsized: record.ellipsized, coldEllipsized } : {}),
+      height: rectHeight(record.viewRect),
+      baseHeight: baseRecord ? rectHeight(baseRecord.viewRect) : null,
+      staleBox:
+        baseRecord !== undefined &&
+        Math.abs(rectHeight(record.viewRect) - rectHeight(baseRecord.viewRect)) <=
+          tolerance,
+    })
+  }
+  return clips
+}
+
+/**
+ * The box-in-parent check (clipping) with the layout clips beside it, each reason kept apart:
+ * `outside_parent` for a box that leaves its parent, `clipped_by_layout` for the probe's.
+ */
+function clippingWithLayout(capture, platform, reference, layout) {
+  const boxes = clipping(capture, HEIGHT_TOLERANCE[platform], reference)
+  const clipped = [
+    ...boxes.clipped.map((entry) => ({ ...entry, reason: 'outside_parent' })),
+    ...layoutClips(capture, platform, layout),
+  ]
+  return { pass: clipped.length === 0, clipped }
+}
+
 /** Every required control is present and inside the window. */
 function controlsOnScreen(capture, ids) {
   if (!ids.length) return { pass: true, missing: [] }
@@ -403,6 +590,7 @@ export function evaluateLiveFontChange({
   cold,
   coldBefore,
   coldBase,
+  coldBaseUpdated,
   earlier = [],
   mount,
   updated,
@@ -478,8 +666,11 @@ export function evaluateLiveFontChange({
     ),
     coldParity: parity(settled, cold, before, tolerance, earlier),
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
-    clipping: clipping(settled, tolerance, coldBase),
+    clipping: clippingWithLayout(settled, platform, coldBase, { cold, base: coldBase }),
     controls: controlsOnScreen(settled, requiredControls),
+    // The settled captures only: `immediate` is read while the screen relays out, so its probe
+    // answer, a moment after its hierarchy, may show another layout; it is judged for nothing.
+    textProbe: textProbeCheck(platform, { before, settled, updated }),
   }
   if (updated) {
     // Codex R4-04: the update must keep the screen whole, so it gets the structural checks and a
@@ -504,9 +695,67 @@ export function evaluateLiveFontChange({
       ),
     }
     checks.postUpdateControls = controlsOnScreen(updated, requiredControls)
-    checks.postUpdateClipping = clipping(updated, tolerance, coldBase)
+    checks.postUpdateClipping = clippingWithLayout(updated, platform, coldBase, {
+      cold: coldUpdated,
+      base: coldBaseUpdated,
+    })
   }
+  markStaleClips(checks)
   return { checks, verdict: classify(checks) }
+}
+
+/** Every live capture of the leg carries a probe answer that pairs with its text nodes. */
+function textProbeCheck(platform, captures) {
+  const stages = {}
+  let code = null
+  for (const [stage, capture] of Object.entries(captures)) {
+    if (!capture) continue
+    const summary = textProbeSummary(capture, platform)
+    stages[stage] = summary
+    code ??= summary.pass ? null : summary.code
+  }
+  return { pass: code === null, ...(code ? { code } : {}), stages }
+}
+
+/**
+ * Marks each layout clip `stale` when its node is a stale miss of the same stage: a settled clip
+ * against the cold parity misses, an updated clip against the post-update ones. A record a group
+ * took counts by its group's node.
+ */
+function markStaleClips(checks) {
+  for (const [clippingCheck, parityCheck] of [
+    ['clipping', 'coldParity'],
+    ['postUpdateClipping', 'postUpdateParity'],
+  ]) {
+    const stale = new Set(
+      (checks[parityCheck]?.misses ?? [])
+        .filter((miss) => miss.stale)
+        .map((miss) => miss.key)
+    )
+    for (const entry of checks[clippingCheck]?.clipped ?? [])
+      if (entry.reason === 'clipped_by_layout')
+        entry.stale = entry.parityKey !== null && stale.has(entry.parityKey)
+  }
+}
+
+/**
+ * A layout clip a residual entry may list (TD-05 as amended 2026-11-14): on a node that is a
+ * stale miss of its stage, whose box kept its cold base launch's height. Any other clip is
+ * structural: a box that leaves its parent, and a volatile record's or an unpaired hidden
+ * record's, which pair with no node, so none is ever stale (markStaleClips).
+ */
+const residualClip = (entry) =>
+  entry.reason === 'clipped_by_layout' && entry.stale && entry.staleBox
+
+/** Every keyed layout clip of a leg as an entry key, `cold:` (settled) or `updated:`, sorted. */
+export function clipKeys(checks) {
+  return [
+    ...(checks.clipping?.clipped ?? []).map((entry) => [entry, 'cold']),
+    ...(checks.postUpdateClipping?.clipped ?? []).map((entry) => [entry, 'updated']),
+  ]
+    .filter(([entry]) => entry.reason === 'clipped_by_layout' && entry.key !== null)
+    .map(([entry, stage]) => `${stage}:${entry.key}`)
+    .sort()
 }
 
 function recreated(identity) {
@@ -519,17 +768,22 @@ function recreated(identity) {
 
 /** Failures that no residual explains: lost text or identity, off-screen controls, clipping. */
 function structural(checks) {
-  return [
-    'anchors',
-    'fullText',
-    'identity',
-    'controls',
-    'clipping',
-    'postUpdateClipping',
-    'postUpdateFullText',
-    'postUpdateAnchors',
-    'postUpdateControls',
-  ].some((name) => checks[name] && !checks[name].pass)
+  const clipsStructural = ['clipping', 'postUpdateClipping'].some((name) =>
+    (checks[name]?.clipped ?? []).some((entry) => !residualClip(entry))
+  )
+  return (
+    clipsStructural ||
+    [
+      'anchors',
+      'fullText',
+      'identity',
+      'controls',
+      'textProbe',
+      'postUpdateFullText',
+      'postUpdateAnchors',
+      'postUpdateControls',
+    ].some((name) => checks[name] && !checks[name].pass)
+  )
 }
 
 function classify(checks) {
@@ -651,7 +905,91 @@ function brokenReviewFacts(baseline) {
     review.controlPass !== true && 'controlPass',
     growthOutside === null && 'growthFailing',
     growthOutside?.length > 0 && `growthFailing(${growthOutside.join(',')})`,
+    // TD-05 as amended 2026-11-14: an amended entry carries the seventh fact.
+    amended(baseline) && review.clipsStale !== true && 'clipsStale',
   ].filter(Boolean)
+}
+
+/** An entry written since the TD-05 amendment: it names its clips, even none, and clipsStale. */
+const amended = (baseline) =>
+  baseline.clippedKeys !== undefined || baseline.review?.clipsStale !== undefined
+
+/**
+ * A layout clip key split into its stage, node key and, for a record an iOS group took, the
+ * record's own `["",text]#n`; null when it is no clip key. Text may hold `>`, so each `]#n>`
+ * is tried until both halves read as keys.
+ */
+function splitClipKey(key) {
+  const staged = typeof key === 'string' ? STAGED_KEY.exec(key) : null
+  if (!staged) return null
+  const nodeKey = (text) => {
+    const at = text.lastIndexOf('#')
+    if (at < 0 || !/^\d+$/.test(text.slice(at + 1))) return false
+    try {
+      const named = JSON.parse(text.slice(0, at))
+      return (
+        Array.isArray(named) &&
+        named.length === 2 &&
+        named.every((part) => typeof part === 'string')
+      )
+    } catch {
+      return false
+    }
+  }
+  const rest = staged[2]
+  if (nodeKey(rest)) return { stage: staged[1], node: rest, record: null }
+  for (const cut of rest.matchAll(/\]#\d+>/g)) {
+    const end = cut.index + cut[0].length - 1
+    const [node, record] = [rest.slice(0, end), rest.slice(end + 1)]
+    if (
+      nodeKey(node) &&
+      nodeKey(record) &&
+      JSON.parse(record.slice(0, record.lastIndexOf('#')))[0] === ''
+    )
+      return { stage: staged[1], node, record }
+  }
+  return null
+}
+
+/**
+ * TD-05 as amended 2026-11-14: why the run's layout clips are not the entry's, or null. An entry
+ * written before the amendment (no `clippedKeys`, no `review.clipsStale`) approves only a run
+ * with no layout clip; TEA ruled that every such entry is proposed again from a run on the F-00i
+ * harness, so it is not refused outright, but it can never approve a clip. An amended entry must
+ * carry both fields; each listed key, by its node, must be in `staleKeys`; and the run's clip
+ * keys must equal `clippedKeys` exactly, as a multiset. The run's clips reach this point only
+ * when each is keyed, stale and kept its cold base launch's height (classify makes any other
+ * clip structural).
+ */
+function clipProblem(checks, baseline) {
+  const run = clipKeys(checks)
+  if (!amended(baseline))
+    return run.length
+      ? `entry predates the TD-05 clip amendment (no clippedKeys, no clipsStale) and the run has ${run.length} layout clip(s): ${run[0]}; propose it again from this run`
+      : null
+  if (!Array.isArray(baseline.clippedKeys))
+    return 'baseline clippedKeys must be a list of clip keys'
+  if (baseline.review?.clipsStale === undefined)
+    return 'baseline clippedKeys without review.clipsStale'
+  const bad = baseline.clippedKeys.find((key) => splitClipKey(key) === null)
+  if (bad !== undefined)
+    return `baseline clippedKeys must be a list of clip keys: ${JSON.stringify(bad)}`
+  const stale = new Set(baseline.staleKeys)
+  const notStale = baseline.clippedKeys.find((key) => {
+    const { stage, node } = splitClipKey(key)
+    return !stale.has(`${stage}:${node}`)
+  })
+  if (notStale !== undefined) return `clipped key not in staleKeys: ${notStale}`
+  const { extra, missing } = multisetDifference(run, baseline.clippedKeys)
+  if (extra.length || missing.length)
+    return [
+      extra.length && `clip outside clippedKeys: ${extra[0]}`,
+      missing.length && `clipped key does not clip: ${missing[0]}`,
+      `${extra.length} extra, ${missing.length} missing`,
+    ]
+      .filter(Boolean)
+      .join('; ')
+  return null
 }
 
 /**
@@ -789,8 +1127,10 @@ function residualApproved(checks, baseline, environment) {
     return unapproved(
       `baseline review facts break the approval rules: ${broken.join(',')}`
     )
-  const problem = exactnessProblem(checks, baseline, environment.captures)
-  return problem ? unapproved(problem) : { pass: true }
+  const problem =
+    exactnessProblem(checks, baseline, environment.captures) ??
+    clipProblem(checks, baseline)
+  return problem ? unapproved(problem) : { pass: true, amended: amended(baseline) }
 }
 
 /**
@@ -803,13 +1143,20 @@ function residualApproved(checks, baseline, environment) {
  */
 export function proposedResidualEntry(checks, captures) {
   const misses = staleMisses(checks)
+  const clips = ['clipping', 'postUpdateClipping'].flatMap((name) =>
+    (checks[name]?.clipped ?? []).filter((entry) => entry.reason === 'clipped_by_layout')
+  )
   return {
     staleKeys: stageKeys(checks, captures),
+    // TD-05 as amended 2026-11-14: the run's exact layout clips, none included, and whether
+    // every one is a stale key's own clip with its box at the cold base launch's height.
+    clippedKeys: clipKeys(checks),
     review: {
       verdict: classify(checks),
       structuralPass: !structural(checks),
       everyMissStale: misses.length > 0 && misses.every((miss) => miss.stale),
       growthFailing: failingGrowth(checks),
+      clipsStale: clips.every(residualClip),
     },
   }
 }
@@ -830,6 +1177,18 @@ export function assertLiveFontProof({
 }) {
   const fixExpected = fixExpectedFor(reactNativeVersion)
   const result = evaluateLiveFontChange(change)
+  // A probe answer that does not pair with the hierarchy judges nothing, at every version.
+  if (!result.checks.textProbe.pass)
+    fail(
+      result.checks.textProbe.code,
+      JSON.stringify(
+        Object.fromEntries(
+          Object.entries(result.checks.textProbe.stages).filter(
+            ([, stage]) => !stage.pass
+          )
+        )
+      )
+    )
   const failing = () =>
     Object.entries(result.checks)
       .filter(([, check]) => !check.pass)
@@ -849,6 +1208,10 @@ export function assertLiveFontProof({
       captures: change,
     })
     if (!approved.pass) fail(approved.code, approved.reason)
+    // An entry from before the TD-05 clip amendment approved a clip-free run; TEA ruled every
+    // such entry proposed again from the F-00i harness, so the leg says so.
+    if (!approved.amended)
+      return { ...result, fixExpected, baselineReview: false, reproposeEntry: true }
   }
   return {
     ...result,
@@ -863,9 +1226,29 @@ export function assertLiveFontProof({
  * grow. A pass shows the oracle can see scaling, and that each probe's declared size is right,
  * before it judges a live change.
  */
-export function assertColdControl({ platform, androidApi, base, target, probes }) {
+export function assertColdControl({
+  platform,
+  androidApi,
+  base,
+  target,
+  probes,
+  updated = [],
+}) {
   if (HEIGHT_TOLERANCE[platform] === undefined)
     fail('live_font_platform_required', String(platform))
+  // F-00i: every cold capture of the control, its updates included, pairs with its probe answer
+  // and shows no layout clip; ellipsis there is the reference, so only content is judged.
+  for (const capture of [base, target, ...updated]) {
+    const layout = textLayout(capture, platform)
+    if (!layout.pass)
+      fail(layout.code, JSON.stringify(textProbeSummary(capture, platform)))
+    const clips = layoutClips(capture, platform)
+    if (clips.length)
+      fail(
+        'live_font_control_clipped_by_layout',
+        JSON.stringify(clips.map(({ key, via, text }) => ({ key, via, text })))
+      )
+  }
   if (!(Number(target.fontScale) > Number(base.fontScale)))
     fail('live_font_scale_change_required')
   if (!sameMultiset(multiset(base), multiset(target)))

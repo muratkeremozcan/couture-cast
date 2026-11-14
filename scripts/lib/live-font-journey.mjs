@@ -18,8 +18,10 @@ import {
   assertColdControl,
   assertComposerControls,
   assertLiveFontProof,
+  ellipsizedRecords,
   evaluateLiveFontChange,
   proposedResidualEntry,
+  textProbeSummary,
   WEATHER_BANNER_MARKER,
 } from './live-font-scale-proof.mjs'
 
@@ -138,6 +140,11 @@ function judgeLeg({
       verdict: result.verdict,
       baselineReview: result.baselineReview,
       checks: result.checks,
+      // An entry from before the TD-05 clip amendment approved this leg; TEA ruled every such
+      // entry proposed again from the F-00i harness, so the leg proposes its replacement.
+      ...(result.reproposeEntry
+        ? { residualProposal: proposedResidualEntry(result.checks, change) }
+        : {}),
     }
   } catch (error) {
     let evaluated
@@ -227,7 +234,15 @@ export async function runScreenJourney({
   const screen = SCREENS[name]
   if (!screen) throw new Error(`live_font_unknown_screen:${name}`)
   const { base, sequence } = SCALES[platform]
-  const report = { screen: name, scales: [base, ...sequence], legs: [], controls: [] }
+  const report = {
+    screen: name,
+    scales: [base, ...sequence],
+    legs: [],
+    controls: [],
+    // F-00i, TEA change 4: every record ellipsized at each cold launch, per scale, and what each
+    // cold capture's probe answer held (groups, volatile records, covered windows), for review.
+    coldTextProbe: {},
+  }
   try {
     const cold = {}
     for (const scale of [...new Set([base, ...sequence])]) {
@@ -237,6 +252,15 @@ export async function runScreenJourney({
       // An update can persist (the Settings locale does), so undo it before the next launch.
       await io.revert()
       cold[scale] = { reference, updated }
+      report.coldTextProbe[scale] = Object.fromEntries(
+        Object.entries(cold[scale]).map(([stage, capture]) => [
+          stage,
+          {
+            ellipsized: ellipsizedRecords(capture, platform),
+            ...textProbeSummary(capture, platform),
+          },
+        ])
+      )
     }
     for (const scale of new Set(sequence.filter((scale) => scale !== base))) {
       try {
@@ -246,6 +270,7 @@ export async function runScreenJourney({
           base: cold[base].reference,
           target: cold[scale].reference,
           probes: screen.probes,
+          updated: [cold[base].updated, cold[scale].updated],
         })
         report.controls.push({ scale, pass: true })
       } catch (error) {
@@ -275,6 +300,7 @@ export async function runScreenJourney({
         cold: cold[to].reference,
         coldBefore: cold[from].reference,
         coldBase: cold[base].reference,
+        coldBaseUpdated: cold[base].updated,
         earlier: [...earlier],
         updated,
         coldUpdated: cold[to].updated,
