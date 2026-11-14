@@ -88,10 +88,15 @@ function run(binary, args, { timeout = 120_000 } = {}) {
   if (result.status !== 0 || result.error) {
     // Maestro reports a failed step on stdout, so keep the tail of both streams and the last
     // argument (the flow file) to make the failure readable from the report alone.
-    const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim().slice(-900)
-    throw new Error(
+    const full = `${result.stdout ?? ''}\n${result.stderr ?? ''}`.trim()
+    const output = full.slice(-900)
+    const error = new Error(
       `live_font_command_failed:${path.basename(binary)} ${args.slice(0, 4).join(' ')} ${path.basename(String(args.at(-1)))}:${result.status ?? result.error?.code}:${output}`
     )
+    // The whole output, for a caller that matches a cause a long traceback pushed out of the
+    // tail (maestro-driver-sync). Not enumerable, so no report serializes it.
+    Object.defineProperty(error, 'output', { value: full })
+    throw error
   }
   return result.stdout
 }

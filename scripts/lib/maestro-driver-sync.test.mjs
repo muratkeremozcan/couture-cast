@@ -2,14 +2,18 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { createSyncMaestro, waitOutStaleSessions } from './maestro-driver-sync.mjs'
+import {
+  createSyncMaestro,
+  waitForPortFree,
+  waitOutStaleSessions,
+} from './maestro-driver-sync.mjs'
 
 const PACKAGES = 'package:dev.mobile.maestro\npackage:dev.mobile.maestro.test\n'
 const INSTRUMENTATION =
   'instrumentation:dev.mobile.maestro.test/androidx.test.runner.AndroidJUnitRunner (target=dev.mobile.maestro)\n'
 
 /** A device whose driver packages come and go as adb and Maestro act on them. */
-function fakeDevice({ failures = [] } = {}) {
+function fakeDevice({ failures = [], installsOnFailure = true, outputs = [] } = {}) {
   const state = { installed: true, adb: [], maestro: [], log: [] }
   const adb = (args) => {
     state.adb.push(args.join(' '))
@@ -22,10 +26,16 @@ function fakeDevice({ failures = [] } = {}) {
   }
   const maestro = (args, options) => {
     state.maestro.push({ args, options })
-    // Maestro installs the driver when it is missing, and with --no-reinstall-driver keeps it.
-    state.installed = true
     const failure = failures.shift()
-    if (failure) throw new Error(failure)
+    const output = outputs.shift()
+    // Maestro installs the driver when it is missing, and with --no-reinstall-driver keeps it;
+    // a driver that dies at start can leave it half installed.
+    if (!failure || installsOnFailure) state.installed = true
+    if (failure) {
+      const error = new Error(failure)
+      if (output) Object.defineProperty(error, 'output', { value: output })
+      throw error
+    }
     return 'ok'
   }
   const run = createSyncMaestro({
@@ -179,4 +189,87 @@ test('before an invocation, a session record a failed start left is waited out',
   run(flow)
   assert.equal(calls.length, 1)
   assert.ok(calls[0].at - 95_000 >= 21_000, `ran at ${calls[0].at}`)
+})
+
+// Antigravity r29 P2: a first run that died before installing the driver must not leave the next
+// one checking a driver that was never there.
+test('a run that died before installing the driver makes the next one start fresh', () => {
+  const died = "DeviceServerDiedException: Device server died during 'deviceInfo'"
+  const reader = fakeDevice({ failures: [died], installsOnFailure: false })
+  assert.equal(reader.run(read), 'ok')
+  assert.equal(reader.state.maestro.length, 2)
+  // Both attempts started from a removed driver.
+  assert.equal(reader.state.adb.filter((call) => call.includes('uninstall')).length, 4)
+  const flows = fakeDevice({ failures: [died], installsOnFailure: false })
+  assert.throws(() => flows.run(flow), /DeviceServerDiedException/)
+  assert.equal(flows.run(flow), 'ok')
+  assert.equal(flows.state.adb.filter((call) => call.includes('uninstall')).length, 4)
+})
+
+test('only the hierarchy subcommand is retried, read from its position', () => {
+  const died = "DeviceServerDiedException: Device server died during 'deviceInfo'"
+  const named = fakeDevice({ failures: [died] })
+  const args = ['--device', 'emulator-5554', 'test', '-e', 'hierarchy', 'flow.yaml']
+  assert.throws(() => named.run(args), /DeviceServerDiedException/)
+  assert.equal(named.state.maestro.length, 1)
+})
+
+test('a driver start cause past the kept tail of the message is read from the whole output', () => {
+  const long = fakeDevice({
+    failures: [
+      'live_font_command_failed:maestro hierarchy:1:...tail of a long traceback',
+    ],
+    outputs: ["DeviceServerDiedException: Device server died during 'deviceInfo'\n..."],
+  })
+  assert.equal(long.run(read), 'ok')
+  assert.equal(long.state.maestro.length, 2)
+})
+
+test('maestro test waits for its pinned port to be free; hierarchy does not', () => {
+  const held = '  1: 0100007F:4269 00000000:0000 0A 00000000:00000000\n'
+  let reads = 0
+  let installed = false
+  const run = createSyncMaestro({
+    platform: 'android',
+    device: 'emulator-5554',
+    adb: (args) => {
+      if (args.includes('/proc/net/tcp')) return reads++ < 2 ? held : ''
+      if (args.includes('uninstall')) installed = false
+      if (args.includes('packages')) return installed ? PACKAGES : ''
+      if (args.includes('instrumentation')) return installed ? INSTRUMENTATION : ''
+      return ''
+    },
+    maestro: () => {
+      installed = true
+      return 'ok'
+    },
+    read: () => '',
+    sleep: () => undefined,
+    log: () => undefined,
+  })
+  run(read)
+  assert.equal(reads, 0)
+  run(flow)
+  assert.equal(reads, 3)
+  let clock = 0
+  assert.throws(
+    () =>
+      waitForPortFree({
+        adb: () => held,
+        port: 17001,
+        now: () => clock,
+        sleep: (ms) => {
+          clock += ms
+        },
+      }),
+    /maestro_driver_port_busy:17001/
+  )
+  // A device that hides its socket table is not checked.
+  waitForPortFree({
+    adb: () => {
+      throw new Error('permission denied')
+    },
+    port: 17001,
+    log: () => undefined,
+  })
 })

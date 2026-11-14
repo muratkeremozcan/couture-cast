@@ -174,6 +174,8 @@ async function runDriver(
         ...process.env,
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
         ANDROID_HOME: androidHome,
+        // A real ~/.maestro/sessions must not hold a stub device (Antigravity r29).
+        HOME: base,
         STUB_DIR: stubDir,
         STUB_EVIDENCE: out,
         STUB_MODE: mode,

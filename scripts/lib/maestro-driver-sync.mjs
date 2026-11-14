@@ -34,6 +34,7 @@ import {
   MAESTRO_SESSION_ACTIVE_MS,
   MAESTRO_SESSIONS_FILE,
   activeMaestroSessions,
+  devicePortHolders,
   readSessionsFile,
 } from './maestro-android-driver-session.mjs'
 
@@ -42,6 +43,45 @@ export const DRIVER_START_FAILURE =
   /DeviceServerDiedException|did not start up in time|BindException|Address already in use/
 
 const sleepSync = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+
+/** Where the subcommand (`test` or `hierarchy`) sits in a Maestro command line. */
+function subcommandAt(args) {
+  const at = args.findIndex((arg) => arg === 'test' || arg === 'hierarchy')
+  if (at < 0) throw new Error('maestro_subcommand_required')
+  return at
+}
+
+/**
+ * Waits until no device socket other than TIME_WAIT holds `port` (run-maestro.mjs R18:
+ * sockets a stopped driver leaves closing clear within seconds). A device that hides its socket
+ * table cannot be checked, and the call goes on; anything still holding the port at `timeoutMs`
+ * would make the driver's bind fail, so it throws naming the sockets.
+ */
+export function waitForPortFree({
+  adb,
+  port,
+  timeoutMs = 10_000,
+  intervalMs = 1_000,
+  now = Date.now,
+  sleep = sleepSync,
+  log = (message) => process.stderr.write(`${message}\n`),
+}) {
+  const startedAt = now()
+  for (;;) {
+    let table
+    try {
+      table = adb(['shell', 'cat', '/proc/net/tcp', '/proc/net/tcp6'])
+    } catch (error) {
+      log(`maestro_driver_port_unchecked: ${String(error.message).split('\n')[0]}`)
+      return
+    }
+    const holders = devicePortHolders(table, port)
+    if (holders.length === 0) return
+    if (now() - startedAt >= timeoutMs)
+      throw new Error(`maestro_driver_port_busy:${port}:${holders.join('; ')}`)
+    sleep(intervalMs)
+  }
+}
 
 /**
  * Waits until no Maestro session counts as active on `device`. A record whose heartbeat stays
@@ -76,8 +116,8 @@ export function waitOutStaleSessions({
 
 /**
  * A runner's Maestro driver lifecycle. `adb(args)` runs adb on the device and returns stdout,
- * throwing on failure; `maestro(args)` runs Maestro and throws an Error whose message carries
- * its output on failure. Returns `run(args, options)`, which runs one Maestro command line (its
+ * throwing on failure; `maestro(args)` runs Maestro and throws an Error on failure, with its whole
+ * output as `error.output` (or in the message). Returns `run(args, options)`, which runs one Maestro command line (its
  * subcommand `test` or `hierarchy`) with the driver handled, passes `options` through to
  * `maestro`, and returns stdout.
  */
@@ -93,7 +133,21 @@ export function createSyncMaestro({
 }) {
   let installed = false
 
-  const prepare = () => {
+  /** Whether both driver packages are on the device and the instrumentation is registered. */
+  const driverComplete = () => {
+    try {
+      return (
+        missingMaestroDriverParts(
+          adb(['shell', 'pm', 'list', 'packages', 'dev.mobile.maestro']),
+          adb(['shell', 'pm', 'list', 'instrumentation'])
+        ).length === 0
+      )
+    } catch {
+      return false
+    }
+  }
+
+  const prepare = (subcommand) => {
     if (!installed) {
       // The first invocation installs a driver of this Maestro version from nothing.
       for (const name of [...MAESTRO_DRIVER_PACKAGES].reverse()) {
@@ -121,11 +175,13 @@ export function createSyncMaestro({
     // A driver an earlier invocation left running holds its port until it is stopped.
     adb(['shell', 'am', 'force-stop', 'dev.mobile.maestro'])
     waitOutStaleSessions({ device, read, now, sleep, log })
+    // maestro test binds the pinned port on the device; hierarchy has no port option.
+    if (subcommand === 'test')
+      waitForPortFree({ adb, port: MAESTRO_ANDROID_DRIVER_PORT, now, sleep, log })
   }
 
   const withDriverArgs = (args) => {
-    const at = args.findIndex((arg) => arg === 'test' || arg === 'hierarchy')
-    if (at < 0) throw new Error('maestro_subcommand_required')
+    const at = subcommandAt(args)
     const extra =
       args[at] === 'test'
         ? [
@@ -138,14 +194,18 @@ export function createSyncMaestro({
   }
 
   const once = (args, options) => {
-    prepare()
+    prepare(args[subcommandAt(args)])
+    let result
     try {
-      return maestro(withDriverArgs(args), options)
-    } finally {
-      // Whatever the outcome, this invocation installed the driver if it was missing; the next
-      // one checks it is complete before reusing it.
-      installed = true
+      result = maestro(withDriverArgs(args), options)
+    } catch (error) {
+      // A run that failed may have died before it installed the driver (Antigravity r29): reuse
+      // it next time only if it is complete, else the next invocation starts fresh.
+      installed = driverComplete()
+      throw error
     }
+    installed = true
+    return result
   }
 
   return function run(args, options) {
@@ -153,8 +213,11 @@ export function createSyncMaestro({
     try {
       return once(args, options)
     } catch (error) {
-      const hierarchyRead = args.includes('hierarchy')
-      if (!hierarchyRead || !DRIVER_START_FAILURE.test(String(error.message))) throw error
+      // The whole output when the caller kept it: a long traceback can push the cause out of a
+      // message that keeps only the tail.
+      const output = String(error.output ?? error.message)
+      if (args[subcommandAt(args)] !== 'hierarchy' || !DRIVER_START_FAILURE.test(output))
+        throw error
       log(`maestro_hierarchy_retry: ${String(error.message).split('\n')[0]}`)
       return once(args, options)
     }
