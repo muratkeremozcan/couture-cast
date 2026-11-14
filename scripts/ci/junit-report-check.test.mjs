@@ -158,3 +158,28 @@ test('fails a case with a failure, error or skipped child whatever the counts sa
     'case c: error',
   ])
 })
+
+// The r42 probes: markup inside CDATA, a comment or a processing instruction.
+test('reads comments, CDATA and processing instructions in one pass', () => {
+  const C1b = report(
+    `<testsuite name="${SUITE}" tests="2" skipped="0" failures="0" errors="0">` +
+      `<testcase name="t1" classname="${SUITE}"><system-out><![CDATA[log <!-- start]]></system-out></testcase>` +
+      `<testcase name="t2" classname="${SUITE}"><failure message="REAL"/>` +
+      '<system-out><![CDATA[end -->]]></system-out></testcase>' +
+      '</testsuite>'
+  )
+  assert.deepEqual(junitReportProblems(C1b, SUITE, 2), ['case t2: failure'])
+  const C4 = report(
+    `<testsuite name="${SUITE}" tests="1" skipped="0" failures="0" errors="0">` +
+      `<testcase name="t1" classname="${SUITE}"><?pi <failure/> ?></testcase>` +
+      '</testsuite>'
+  )
+  assert.deepEqual(junitReportProblems(C4, SUITE, 1), [])
+  const C7 = report(
+    suite(2).replace(
+      '</testsuite>',
+      '<!-- <![CDATA[ <testcase name="x"/> ]]> --></testsuite>'
+    )
+  )
+  assert.deepEqual(junitReportProblems(C7, SUITE, 2), [])
+})

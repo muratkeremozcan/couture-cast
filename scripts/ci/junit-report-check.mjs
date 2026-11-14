@@ -48,10 +48,13 @@ function caseProblems(xml) {
 
 /** The problems with a report's text for one suite class and a minimum test count. */
 export function junitReportProblems(report, suiteName, minimum) {
-  // Comments and CDATA (test output in <system-out>) are text, never elements.
-  const xml = report
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')
+  // Comments, CDATA (test output in <system-out>) and processing instructions are text, never
+  // elements. One left-to-right pass, so a comment marker inside CDATA, or CDATA inside a
+  // comment, ends where the XML parser would end it.
+  const xml = report.replace(
+    /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<\?[\s\S]*?\?>/g,
+    ''
+  )
   const opens = [...xml.matchAll(/<testsuite\b[^>]*>/g)].map((match) => match[0])
   if (opens.length === 0) return ['no <testsuite> element']
   const problems = []
