@@ -59,6 +59,97 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertNotNil(cuts.clip)
   }
 
+  // TEA ruling 2026-11-14: a scrolled-away counterpart is usable because native viewRect is the
+  // real layout box, never clamped to the window. The record builder (TextLayoutProbeSnapshot)
+  // needs UIKit, so these run the Wire layer it hands the view's frame to: the cuts, the walk
+  // that collects the record and the JSON, with the record assembled as the builder does.
+
+  /// The one record a text at `viewRect` under `ancestors` gives, through `collect`, and the JSON
+  /// object the harness reads for it.
+  private func scrolledRecord(_ viewRect: CGRect, _ ancestors: [Wire.Ancestor]) throws
+    -> (Wire.Record, [String: Any])
+  {
+    var out: [Wire.Record] = []
+    Wire.collect(
+      "text",
+      layer: { _ in Wire.Layer(alpha: 1, opacity: 1, hidden: false) },
+      children: { _ in [] },
+      read: { _ in
+        let cuts = Wire.cuts(viewRect: viewRect, ancestors: ancestors, window: self.window)
+        return Wire.Record(
+          kind: "RCTParagraphComponentView", text: "Away", viewRect: viewRect,
+          visibleRect: cuts.visible, clipRect: cuts.clip, contentRect: viewRect, lineCount: 1,
+          maxLines: nil, ellipsized: 0, unlimitedLineCount: 1, window: 0,
+          scrolledAway: cuts.scrolledAway, offWindow: cuts.offWindow)
+      },
+      descends: { _ in false },
+      into: &out)
+    let record = try XCTUnwrap(out.first)
+    XCTAssertEqual(out.count, 1)
+    let data = try Wire.json(
+      token: "t-away", windows: [.init(id: 0, rect: window, z: 0, focused: true)],
+      records: out)
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    return (record, try XCTUnwrap((json["records"] as? [[String: Any]])?.first))
+  }
+
+  func testATextScrolledBelowTheWindowKeepsItsFullViewRectOnTheRecordAndTheWire() throws {
+    // A 200 pt wide vertical scroll view from y 100 to the window bottom, 1000 pt of content
+    // (256 pt of travel), holding a 400 x 40 text 100 pt below the window bottom.
+    let viewport = CGRect(x: 0, y: 100, width: 200, height: 744)
+    let travel = try XCTUnwrap(
+      Wire.travel(
+        content: 1000, insetStart: 0, insetEnd: 0, bounds: viewport.height, offset: 0,
+        enabled: true))
+    let text = CGRect(x: 0, y: 944, width: 400, height: 40)
+    let (record, json) = try scrolledRecord(
+      text,
+      [
+        .init(rect: CGRect(x: 0, y: 100, width: 400, height: 1000), clips: false),
+        .init(rect: viewport, clips: true, scrollY: travel),
+      ])
+    XCTAssertGreaterThan(text.minY, window.maxY)
+    XCTAssertGreaterThan(text.maxX, window.maxX)
+    XCTAssertEqual(record.viewRect, text)
+    XCTAssertTrue(record.scrolledAway)
+    XCTAssertFalse(record.offWindow)
+    XCTAssertNil(record.visibleRect)
+    // The band reaches the whole text down the scroll axis; across it the viewport cuts at 200.
+    XCTAssertEqual(record.clipRect, CGRect(x: 0, y: 944, width: 200, height: 40))
+    XCTAssertEqual(json["viewRect"] as? [Double], [0, 944, 400, 984])
+    XCTAssertTrue(json["visibleRect"] is NSNull)
+    XCTAssertEqual(json["clipRect"] as? [Double], [0, 944, 200, 984])
+    XCTAssertEqual(json["scrolledAway"] as? Bool, true)
+  }
+
+  func testAChipScrolledPastTheWindowRightKeepsItsFullViewRectOnTheRecordAndTheWire() throws {
+    // A 40 pt tall horizontal scroll view across the window at y 200, 1800 pt of content
+    // (1410 pt of travel), holding a 120 x 80 chip at x 615, 225 pt past the window's right edge.
+    let viewport = CGRect(x: 0, y: 200, width: 390, height: 40)
+    let travel = try XCTUnwrap(
+      Wire.travel(
+        content: 1800, insetStart: 0, insetEnd: 0, bounds: viewport.width, offset: 0,
+        enabled: true))
+    let chip = CGRect(x: 615, y: 200, width: 120, height: 80)
+    let (record, json) = try scrolledRecord(
+      chip,
+      [
+        .init(rect: CGRect(x: 0, y: 200, width: 1800, height: 80), clips: false),
+        .init(rect: viewport, clips: true, scrollX: travel),
+      ])
+    XCTAssertGreaterThan(chip.minX, window.maxX)
+    XCTAssertEqual(record.viewRect, chip)
+    XCTAssertTrue(record.scrolledAway)
+    XCTAssertFalse(record.offWindow)
+    XCTAssertNil(record.visibleRect)
+    // The travel reaches the whole chip along x; across the axis the 40 pt viewport cuts it.
+    XCTAssertEqual(record.clipRect, CGRect(x: 615, y: 200, width: 120, height: 40))
+    XCTAssertEqual(json["viewRect"] as? [Double], [615, 200, 735, 280])
+    XCTAssertTrue(json["visibleRect"] is NSNull)
+    XCTAssertEqual(json["clipRect"] as? [Double], [615, 200, 735, 240])
+    XCTAssertEqual(json["scrolledAway"] as? Bool, true)
+  }
+
   func testAZeroHeightClipperCutsToNothingWithoutScrollingAway() {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 100, width: 200, height: 40),

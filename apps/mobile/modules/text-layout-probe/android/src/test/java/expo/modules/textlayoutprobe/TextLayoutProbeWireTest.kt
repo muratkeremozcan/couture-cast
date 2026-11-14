@@ -186,6 +186,27 @@ class TextLayoutProbeWireTest {
     assertTrue(first.isNull("clipRect"))
   }
 
+  // TEA ruling 2026-11-14: a scrolled-away record keeps its full viewRect, never clamped.
+  @Test
+  fun aScrolledAwayChipPastTheWindowRightKeepsItsFullViewRectOnTheWire() {
+    // A chip at x 1315 on a 1080 px window, 80 px tall in a 40 px horizontal scroll viewport.
+    val chip = record("Chip").copy(
+      viewRect = ProbeRect(1315, 600, 1435, 680),
+      visibleRect = null,
+      clipRect = ProbeRect(1315, 600, 1435, 640),
+      contentRect = ProbeRect(1315, 600, 1435, 680),
+      scrolledAway = true
+    )
+    val json = TextLayoutProbeWire.json("w", ProbeSnapshot(windows, listOf(chip)))
+    val first = JSONObject(reassemble("w", TextLayoutProbeWire.lines("w", json)))
+      .getJSONArray("records").getJSONObject(0)
+    assertEquals("[1315,600,1435,680]", first.getJSONArray("viewRect").toString())
+    assertEquals("[1315,600,1435,640]", first.getJSONArray("clipRect").toString())
+    assertTrue(first.isNull("visibleRect"))
+    assertTrue(first.getBoolean("scrolledAway"))
+    assertFalse(first.getBoolean("offWindow"))
+  }
+
   // TEA ruling: native flags a record hidden from accessibility, a JSON boolean on every record.
   @Test
   fun accessibilityHiddenIsWrittenAsABooleanOnEveryRecord() {

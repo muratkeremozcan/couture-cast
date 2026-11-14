@@ -23,6 +23,7 @@ import com.facebook.react.views.textinput.ReactEditText
 import com.facebook.react.views.text.PreparedLayout
 import com.facebook.react.views.text.PreparedLayoutTextView
 import com.facebook.react.views.text.ReactTextView
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -487,6 +488,112 @@ class TextLayoutSnapshotTest {
     assertTrue(record.viewRect.left < window.right && record.viewRect.right > window.right)
     assertEquals(record.viewRect, record.clipRect)
     assertEquals(window.right, record.visibleRect!!.right)
+  }
+
+  // TEA ruling 2026-11-14: a scrolled-away counterpart is usable because native viewRect is the
+  // real layout box, never clamped to the window. These build the record from real views.
+
+  /** The record [text] has in the answer's JSON, as the harness reads it. */
+  private fun wired(snapshot: ProbeSnapshot, text: String): JSONObject {
+    val records = JSONObject(TextLayoutProbeWire.json("t-away", snapshot)).getJSONArray("records")
+    return (0 until records.length()).map(records::getJSONObject).single { it.getString("text") == text }
+  }
+
+  private fun JSONObject.rectOf(name: String): ProbeRect =
+    getJSONArray(name).let { ProbeRect(it.getInt(0), it.getInt(1), it.getInt(2), it.getInt(3)) }
+
+  @Test
+  fun aTextScrolledBelowTheWindowKeepsItsFullViewRectOnTheRecordAndTheWire() {
+    lateinit var scroll: ScrollView
+    lateinit var spacer: View
+    host { context ->
+      spacer = View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 0) }
+      scroll = ScrollView(context).apply {
+        // 400 px of content in a 200 px wide viewport: the viewport cuts across the scroll axis.
+        addView(
+          column(
+            context,
+            spacer,
+            label(context, "Below the fold").apply { layoutParams = LinearLayout.LayoutParams(400, 40) },
+            View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 160) }
+          ),
+          FrameLayout.LayoutParams(400, WRAP_CONTENT)
+        )
+      }
+      FrameLayout(context).apply { addView(scroll, FrameLayout.LayoutParams(200, MATCH_PARENT)) }
+    }
+    val window = TextLayoutSnapshot.screenRect((scroll.context as Activity).window.decorView)
+    val viewport = TextLayoutSnapshot.screenRect(scroll)
+    // The label's top 100 px below the window bottom; 200 px of travel reach it.
+    val below = window.bottom - viewport.top + 100
+    spacer.layoutParams.height = below
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(0, scroll.scrollY)
+    assertEquals(window.bottom, viewport.bottom)
+    val snapshot = snapshot()
+    val record = only(snapshot, "Below the fold")
+    // The whole laid-out box: wholly below the window and past its right edge, never clamped.
+    val box = ProbeRect(viewport.left, viewport.top + below, viewport.left + 400, viewport.top + below + 40)
+    assertTrue("$window is narrower than the 400 px label", window.right < box.right)
+    assertEquals(box, record.viewRect)
+    assertTrue(record.scrolledAway)
+    assertFalse(record.offWindow)
+    assertNull(record.visibleRect)
+    // The band reaches the whole label down the scroll axis; across it the viewport cuts at 200.
+    assertEquals(ProbeRect(box.left, box.top, box.left + 200, box.bottom), record.clipRect)
+    val json = wired(snapshot, "Below the fold")
+    assertEquals(box, json.rectOf("viewRect"))
+    assertTrue(json.isNull("visibleRect"))
+    assertEquals(record.clipRect, json.rectOf("clipRect"))
+    assertTrue(json.getBoolean("scrolledAway"))
+  }
+
+  @Test
+  fun aChipScrolledPastTheWindowRightKeepsItsFullViewRectOnTheRecordAndTheWire() {
+    lateinit var scroll: HorizontalScrollView
+    lateinit var spacer: View
+    host { context ->
+      spacer = View(context)
+      scroll = HorizontalScrollView(context).apply {
+        addView(
+          LinearLayout(context).apply {
+            addView(spacer, LinearLayout.LayoutParams(0, 80))
+            // An 80 px chip in a 40 px tall viewport: the viewport cuts across the scroll axis.
+            addView(label(context, "Chip"), LinearLayout.LayoutParams(120, 80))
+            addView(View(context), LinearLayout.LayoutParams(300, 80))
+          },
+          FrameLayout.LayoutParams(WRAP_CONTENT, 80)
+        )
+      }
+      FrameLayout(context).apply {
+        addView(scroll, FrameLayout.LayoutParams(MATCH_PARENT, 40).apply { topMargin = 100 })
+      }
+    }
+    val window = TextLayoutSnapshot.screenRect((scroll.context as Activity).window.decorView)
+    val viewport = TextLayoutSnapshot.screenRect(scroll)
+    // The chip's left 235 px past the window's right edge, as a chip at x 1315 on a 1080 px screen.
+    val past = window.right - viewport.left + 235
+    spacer.layoutParams.width = past
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    assertEquals(0, scroll.scrollX)
+    assertEquals(window.right, viewport.right)
+    val snapshot = snapshot()
+    val record = only(snapshot, "Chip")
+    val box = ProbeRect(viewport.left + past, viewport.top, viewport.left + past + 120, viewport.top + 80)
+    assertEquals(window.right + 235, box.left)
+    assertEquals(box, record.viewRect)
+    assertTrue(record.scrolledAway)
+    assertFalse(record.offWindow)
+    assertNull(record.visibleRect)
+    // The travel reaches the whole chip along x; across the axis the 40 px viewport cuts it.
+    assertEquals(ProbeRect(box.left, box.top, box.right, box.top + 40), record.clipRect)
+    val json = wired(snapshot, "Chip")
+    assertEquals(box, json.rectOf("viewRect"))
+    assertTrue(json.isNull("visibleRect"))
+    assertEquals(record.clipRect, json.rectOf("clipRect"))
+    assertTrue(json.getBoolean("scrolledAway"))
   }
 
   @Test
