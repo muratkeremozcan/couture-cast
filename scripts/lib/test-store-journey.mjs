@@ -56,8 +56,8 @@ const ISOLATED_BUILD_ENV = ['STORY65_NATIVE_TEST_BUILD', 'STORY68_NATIVE_TEST_BU
 const ISOLATED_APP_ID = /\.story6[58]$/
 
 export class JourneyError extends Error {
-  constructor(code, detail) {
-    super(detail === undefined ? code : `${code}: ${detail}`)
+  constructor(code, detail, options) {
+    super(detail === undefined ? code : `${code}: ${detail}`, options)
     this.code = code
   }
 }

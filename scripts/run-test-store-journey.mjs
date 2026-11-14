@@ -51,6 +51,7 @@ import {
   signerSha256,
 } from './lib/test-store-journey.mjs'
 import {
+  installEvidenceGuard,
   outputDirs,
   privatePath,
   writePrivate,
@@ -84,6 +85,10 @@ if (!device || !option('out')) throw new Error('usage: --device <id> --out <dir>
 // The evidence dir holds redacted records only; raw logs and the member side file go to
 // `<out>.private/` (scripts/lib/test-store-output.mjs).
 const dirs = outputDirs(option('out'))
+// Whatever ends the run (a throw, process.exit, a signal), the evidence dir is scanned and any
+// leak quarantined before an always() upload can read it. Ids join the list as they are known.
+const scanIds = []
+installEvidenceGuard({ dirs, ids: scanIds })
 const out = dirs.evidence
 const artifact = option('artifact') && path.resolve(option('artifact'))
 const overInstallArtifact = option('over-install') && path.resolve(option('over-install'))
@@ -140,12 +145,14 @@ const simctl = (...args) => run('xcrun', ['simctl', ...args])
 
 // --- secrets, read by name only ----------------------------------------------------------
 const testStoreKey = requireEnvValue(envFile, 'EXPO_PUBLIC_REVENUECAT_TEST_STORE_API_KEY')
+scanIds.push(testStoreKey)
 if (!testStoreKey.startsWith('test_'))
   throw new JourneyError('test_store_key_not_test_store', envFile)
 const bypassHeaders =
   server === 'preview'
     ? { 'x-vercel-protection-bypass': requireEnvValue(envFile, READ_BYPASS_ENV) }
     : {}
+scanIds.push(...Object.values(bypassHeaders))
 if (server === 'local') requireEnvValue(envFile, 'REVENUECAT_SECRET_API_KEY')
 
 const api = journeyApi({ origin: apiOrigin, headers: bypassHeaders })
@@ -314,6 +321,8 @@ const io = {
   async preflight() {
     await api.health()
     member = await api.signup()
+    // The RevenueCat app user and subscriber ids are this user id (premium.ts appUserID).
+    scanIds.push(member.userId, member.token)
     // Local: the ledger answers. A 503 means the API has no RevenueCat secret and a purchase
     // could never reach the server by reconciliation. Preview: no refresh before or during the
     // purchase, so the webhook stays the only path.

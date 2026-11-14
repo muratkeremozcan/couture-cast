@@ -201,9 +201,60 @@ export function quarantineLeaks(dirs, needles, { ops = FS_OPS } = {}) {
       failures.push(error)
     }
   }
-  // Every entry was attempted before the first failure is reported.
-  if (failures.length) throw failures[0]
-  return files
+  if (!failures.length) return files
+  // Every entry was attempted. Whatever is still in the evidence dir is named in one error, the
+  // originals attached; only when nothing remains does the first original error stand alone
+  // (Antigravity r16).
+  const remaining = files.filter((file) => exists(path.join(dirs.evidence, file)))
+  if (remaining.length)
+    throw new JourneyError(
+      'test_store_quarantine_failed',
+      `${remaining.join(', ')} still in the evidence dir`,
+      { cause: new AggregateError(failures, 'quarantine move failures') }
+    )
+  throw failures[0]
+}
+
+const exists = (file) => {
+  try {
+    fs.lstatSync(file)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Scans and quarantines the evidence dir on every exit of the process (Antigravity r16): a
+ * normal end, an uncaught exception, process.exit, and SIGINT or SIGTERM (which exit 130 or 143
+ * through the same path). The quarantine is synchronous, so it runs inside Node's 'exit' event.
+ * The original failure stays the exit cause; a leak found on an otherwise passing exit sets exit
+ * code 1. `ids` is read at exit, so the caller can push ids as they become known. Returns an
+ * uninstall function.
+ */
+export function installEvidenceGuard({ dirs, ids, ops, proc = process }) {
+  const onExit = (code) => {
+    try {
+      const moved = quarantineLeaks(dirs, [...ids], { ops })
+      if (moved.length) {
+        proc.stderr.write(`test_store_evidence_leak: quarantined ${moved.join(', ')}\n`)
+        if (!code) proc.exitCode = 1
+      }
+    } catch (error) {
+      proc.stderr.write(`${error.message}\n`)
+      if (!code) proc.exitCode = 1
+    }
+  }
+  const onSigint = () => proc.exit(130)
+  const onSigterm = () => proc.exit(143)
+  proc.once('exit', onExit)
+  proc.once('SIGINT', onSigint)
+  proc.once('SIGTERM', onSigterm)
+  return () => {
+    proc.removeListener('exit', onExit)
+    proc.removeListener('SIGINT', onSigint)
+    proc.removeListener('SIGTERM', onSigterm)
+  }
 }
 
 /** Throws, naming files but never the ids, after quarantining every leak under the evidence dir. */

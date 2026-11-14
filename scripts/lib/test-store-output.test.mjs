@@ -1,13 +1,17 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { EventEmitter } from 'node:events'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { test } from 'node:test'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   assertEvidenceClean,
   FS_OPS,
+  installEvidenceGuard,
   outputDirs,
   privatePath,
   scanForLeaks,
@@ -316,4 +320,130 @@ test('a source that cannot be removed is named as still in the evidence dir', (t
       error.message.includes('still in the evidence dir') &&
       !error.message.includes(MEMBER)
   )
+})
+
+// Antigravity r16: one entry's error must not hide another entry still in the evidence dir.
+test('a failed quarantine names every file still in evidence, with the originals as causes', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  writeEvidence(dirs, 'a.json', MEMBER)
+  writeEvidence(dirs, 'b.json', MEMBER)
+  const ops = exdevOps({
+    // a: the copy fails, then its source is removed. b: copied, but its source cannot be removed.
+    copyFile: (from, to) => {
+      if (from.endsWith('a.json')) failing('ENOSPC')()
+      FS_OPS.copyFile(from, to)
+    },
+    unlink: (file) => {
+      if (file.endsWith('b.json')) failing('EBUSY')()
+      FS_OPS.unlink(file)
+    },
+  })
+  assert.throws(
+    () => assertEvidenceClean(dirs, [MEMBER], { ops }),
+    (error) =>
+      error.code === 'test_store_quarantine_failed' &&
+      error.message.includes('b.json') &&
+      !error.message.includes('a.json') &&
+      error.cause instanceof AggregateError &&
+      error.cause.errors.length === 2
+  )
+  assert.deepEqual(fs.readdirSync(dirs.evidence), ['b.json'])
+})
+
+test('when every failed entry still left the evidence dir, the first original error stands', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  writeEvidence(dirs, 'a.json', MEMBER)
+  assert.throws(
+    () =>
+      assertEvidenceClean(dirs, [MEMBER], {
+        ops: exdevOps({ copyFile: failing('ENOSPC') }),
+      }),
+    (error) => error.code === 'ENOSPC'
+  )
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+})
+
+/** A process stand-in: events, exit, exitCode and a stderr buffer. */
+function fakeProcess() {
+  const proc = new EventEmitter()
+  proc.exitCode = undefined
+  proc.err = ''
+  proc.stderr = { write: (text) => (proc.err += text) }
+  proc.exit = (code) => {
+    proc.exitCode = code
+    proc.emit('exit', code)
+  }
+  return proc
+}
+
+// Antigravity r16: every exit scans the evidence dir.
+test('the exit guard quarantines leaks on a passing exit and fails it', (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const ids = []
+  const proc = fakeProcess()
+  installEvidenceGuard({ dirs, ids, proc })
+  ids.push(MEMBER)
+  writeEvidence(dirs, 'late.json', MEMBER)
+  proc.emit('exit', 0)
+  assert.equal(proc.exitCode, 1)
+  assert.deepEqual(fs.readdirSync(dirs.evidence), [])
+  assert.match(proc.err, /test_store_evidence_leak: quarantined late\.json/)
+  assert.ok(!proc.err.includes(MEMBER))
+})
+
+test('SIGINT and SIGTERM exit through the guard with 130 and 143', (t) => {
+  for (const [signal, code] of [
+    ['SIGINT', 130],
+    ['SIGTERM', 143],
+  ]) {
+    const dirs = outputDirs(tempOut(t))
+    const proc = fakeProcess()
+    installEvidenceGuard({ dirs, ids: [MEMBER], proc })
+    writeEvidence(dirs, 'partial.json', MEMBER)
+    proc.emit(signal)
+    assert.equal(proc.exitCode, code, signal)
+    assert.deepEqual(fs.readdirSync(dirs.evidence), [], signal)
+  }
+})
+
+test('a run that throws mid-run quarantines the leak and keeps the original error as the cause', (t) => {
+  const out = tempOut(t)
+  const lib = pathToFileURL(
+    fileURLToPath(new URL('./test-store-output.mjs', import.meta.url))
+  )
+  const script = [
+    `import { installEvidenceGuard, outputDirs, writeEvidence } from ${JSON.stringify(lib.href)}`,
+    `const dirs = outputDirs(${JSON.stringify(out)})`,
+    `installEvidenceGuard({ dirs, ids: [${JSON.stringify(MEMBER)}] })`,
+    `writeEvidence(dirs, 'metro-copy.log', ${JSON.stringify(`bundling for ${MEMBER}`)})`,
+    "throw new Error('mid-run failure')",
+  ].join('\n')
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+    encoding: 'utf8',
+  })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /mid-run failure/)
+  assert.match(result.stderr, /test_store_evidence_leak: quarantined metro-copy\.log/)
+  assert.deepEqual(fs.readdirSync(out), [])
+  assert.ok(quarantined({ private: `${out}.private` }, 'metro-copy.log'))
+})
+
+test('the driver installs the exit guard right after its dirs and feeds it every id it learns', () => {
+  const driver = fs.readFileSync('scripts/run-test-store-journey.mjs', 'utf8')
+  const dirsAt = driver.indexOf("const dirs = outputDirs(option('out'))")
+  const guardAt = driver.indexOf('installEvidenceGuard({ dirs, ids: scanIds })')
+  assert.ok(dirsAt > 0 && guardAt > dirsAt)
+  // Nothing that can throw sits between them.
+  const between = driver
+    .slice(dirsAt, guardAt)
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n')
+  assert.doesNotMatch(between, /require|await|throw/)
+  for (const push of [
+    'scanIds.push(testStoreKey)',
+    'scanIds.push(...Object.values(bypassHeaders))',
+    'scanIds.push(member.userId, member.token)',
+  ])
+    assert.ok(driver.includes(push), push)
 })
