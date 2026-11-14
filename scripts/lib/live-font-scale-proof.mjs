@@ -929,11 +929,28 @@ function textPresence(capture, platform) {
     if (!presence.has(text)) presence.set(text, { keys: [], invisible: 0 })
     return presence.get(text)
   }
-  const layout = textLayout(capture, platform)
-  for (const fact of layout.facts)
-    if (fact.key !== null) entry(maskText(fact.record.text)).keys.push(fact.key)
-  for (const { record, comparable } of layout.match?.invisible ?? [])
-    if (comparable) entry(maskText(capture.textProbe.records[record].text)).invisible += 1
+  // Every page counts (TEA ruling 2026-11-14): a key once however many pages show it, and a
+  // text's invisible records as the most any one page draws, so an overlap is not counted twice.
+  for (const fact of allFacts(capture, platform)) {
+    if (fact.key === null) continue
+    const { keys } = entry(maskText(fact.record.text))
+    if (!keys.includes(fact.key)) keys.push(fact.key)
+  }
+  const pages = [
+    capture,
+    ...pageCaptures(capture).map(({ capture: pageCapture }) => pageCapture),
+  ]
+  for (const page of pages) {
+    const counts = new Map()
+    for (const { record, comparable } of textLayout(page, platform).match?.invisible ??
+      []) {
+      if (!comparable) continue
+      const text = maskText(page.textProbe.records[record].text)
+      counts.set(text, (counts.get(text) ?? 0) + 1)
+    }
+    for (const [text, count] of counts)
+      entry(text).invisible = Math.max(entry(text).invisible, count)
+  }
   return presence
 }
 

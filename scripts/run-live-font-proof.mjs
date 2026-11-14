@@ -48,7 +48,6 @@ import {
   rootIdentity,
   sameLayout,
   sameLayoutShifted,
-  stitchPages,
   windowBounds,
 } from './lib/live-font-capture.mjs'
 import {
@@ -61,6 +60,7 @@ import {
   SCREENS,
   screenRunSteps,
 } from './lib/live-font-journey.mjs'
+import { attachPages, scrollPages, stablePage } from './lib/live-font-pages.mjs'
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
 import { createTextProbe } from './lib/live-font-text-probe.mjs'
@@ -354,46 +354,34 @@ function drag(size, up) {
 
 /** Adds the scrolled-through text to a capture, then scrolls back and checks the top. */
 /**
- * A settled scroll page as F-00i judges it: its nodes (volatile text kept, flagged), the bounds
- * of its volatile regions, its window, and the text layout probe's answer for it, asked once the
- * page holds still, so a clip below the fold is judged like one above it.
+ * One read of a scroll page as F-00i judges it: its nodes (volatile text kept, flagged), the
+ * bounds of its volatile regions and its window. stablePage (live-font-pages.mjs) reads it until
+ * it holds still on both sides of the probe's answer, so a clip below the fold is judged like
+ * one above it.
  */
-async function stablePage() {
-  const read = () => {
-    const tree = hierarchy()
-    const flat = flattenHierarchy(tree, {
-      platform,
-      volatile: activeVolatile,
-      markVolatile: true,
-    })
-    return {
-      nodes: flat.nodes,
-      volatileRegions: flat.volatileRegions,
-      window: windowBounds(tree),
-    }
+function readPage() {
+  const tree = hierarchy()
+  const flat = flattenHierarchy(tree, {
+    platform,
+    volatile: activeVolatile,
+    markVolatile: true,
+  })
+  return {
+    nodes: flat.nodes,
+    volatileRegions: flat.volatileRegions,
+    window: windowBounds(tree),
   }
-  let previous = read()
-  for (let attempt = 0; attempt < 20; attempt += 1) {
-    await pause(500)
-    const current = read()
-    if (sameLayout(current.nodes, previous.nodes))
-      return { ...current, textProbe: textProbe.read() }
-    previous = current
-  }
-  throw new Error('live_font_scroll_page_unstable')
 }
+const settledPage = () =>
+  stablePage({ read: readPage, probe: () => textProbe.read(), pause })
 
 async function fullText(capture) {
   const size = windowSize(capture)
   if (!size) throw new Error('live_font_window_bounds_required')
-  const pages = [await stablePage()]
-  let drags = 0
-  for (; drags < 12; drags += 1) {
-    drag(size, true)
-    const page = await stablePage()
-    if (sameLayout(page.nodes, pages.at(-1).nodes)) break
-    pages.push(page)
-  }
+  const { pages, drags } = await scrollPages({
+    page: settledPage,
+    dragUp: () => drag(size, true),
+  })
   for (let back = 0; back <= drags + 1; back += 1) drag(size, false)
   let top = await stableNodes()
   for (let extra = 0; extra < 3 && !sameLayout(top, capture.nodes); extra += 1) {
@@ -412,22 +400,14 @@ async function fullText(capture) {
     // itself; a lost scroll position is a failure of the run.
     throw new Error(restoreFailure(capture.nodes, top))
   }
-  const nodePages = pages.map((page) => page.nodes)
   fs.writeFileSync(
     path.join(out, `${capture.file}-pages.json`),
-    JSON.stringify(nodePages),
+    JSON.stringify(pages.map((each) => each.nodes)),
     { mode: 0o600 }
   )
   // A page of only a tall image shares no text with its neighbors; the stitch then steps by
-  // the drag's length.
-  const expectedShift = Math.round(size.height * (DRAG_FROM - DRAG_TO))
-  capture.fullText =
-    pages.length > 1 ? stitchPages(nodePages, { expectedShift }) : undefined
-  // F-00i: every page with its probe answer, judged page by page (pageCaptures).
-  if (pages.length > 1) {
-    capture.pages = pages
-    capture.pageShift = expectedShift
-  }
+  // the drag's length. F-00i: every page keeps its probe answer, judged page by page.
+  attachPages(capture, pages, Math.round(size.height * (DRAG_FROM - DRAG_TO)))
   persist(capture)
   return capture
 }

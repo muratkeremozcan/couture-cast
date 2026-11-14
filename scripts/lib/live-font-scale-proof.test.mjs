@@ -1929,6 +1929,53 @@ describe('text layout clipping (F-00i)', () => {
     )
   })
 
+  // TEA ruling 2026-11-14: hidden text and invisible text are judged on every page.
+  test('a text collapsed to zero height below the fold is a full clip', () => {
+    const change = withAll(fixedChange())
+    change.settled = withPages(change.settled, [BELOW])
+    // Page 1 draws nothing of it: no visible part, not scrolled away, and no hierarchy node.
+    const page = change.settled.pages[1]
+    Object.assign(pageRecord(change.settled, BELOW.text), {
+      viewRect: [42, 2300, 600, 2300],
+      visibleRect: null,
+      clipRect: null,
+    })
+    page.nodes = page.nodes.filter((node) => node.text !== BELOW.text)
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.via, entry.text, entry.pages]),
+      [['hidden', BELOW.text, [1]]]
+    )
+    assert.equal(verdict, 'unexpected')
+    assert.throws(prove(change, undefined, '0.88.1'), { code: 'live_font_fix_missing' })
+  })
+
+  test('a text the cold launch shows on page 1 that the live screen draws only at opacity 0 there fails', () => {
+    const change = withAll(fixedChange())
+    change.cold = withPages(change.cold, [BELOW])
+    change.settled = withPages(change.settled, [BELOW])
+    pageRecord(change.settled, BELOW.text).opacity = 0
+    change.settled.pages[1].nodes = change.settled.pages[1].nodes.filter(
+      (node) => node.text !== BELOW.text
+    )
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(checks.textHidden.hidden, [
+      {
+        stage: 'settled',
+        text: BELOW.text,
+        coldKeys: [`["","${BELOW.text}"]#0`],
+        invisible: 1,
+      },
+    ])
+    assert.throws(prove(change, undefined, '0.81.5'), { code: 'live_font_text_hidden' })
+    // Drawn at opacity 0 on page 1 at the cold launch too, it is the app's own state.
+    pageRecord(change.cold, BELOW.text).opacity = 0
+    change.cold.pages[1].nodes = change.cold.pages[1].nodes.filter(
+      (node) => node.text !== BELOW.text
+    )
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
   test('a page whose answer does not pair fails the leg', () => {
     const change = withAll(fixedChange())
     change.settled = withPages(change.settled, [BELOW])
