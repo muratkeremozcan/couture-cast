@@ -14,6 +14,10 @@ const worker = new Worker(
   },
   JSON.parse(optionsJson)
 )
-worker.on('error', () => undefined)
+// Shown on the test's stderr: a worker that cannot reach Redis or take the job
+// would otherwise leave the test waiting with nothing in the log.
+worker.on('error', (error) => {
+  process.stderr.write(`crash worker error: ${error?.stack ?? String(error)}\n`)
+})
 await worker.waitUntilReady()
 process.stdout.write('ready\n')
