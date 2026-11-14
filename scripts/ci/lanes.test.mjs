@@ -433,12 +433,6 @@ const trackedDirs = new Set(
 )
 
 /**
- * Repository files a source names in a string literal, root-relative or relative to it, comments
- * left out. A literal naming a directory three or more levels deep stands for every file under
- * it, which catches paths a test builds from a directory and a file name; shallower ones
- * (`apps/api`) are working directories and labels far more often than reads.
- */
-/**
  * How the code just before a path literal uses it: an import loads the module it names, and an
  * import, require.resolve or new URL resolves a directory to its index file.
  */
@@ -449,6 +443,12 @@ function referenceBefore(code, at) {
   return { imported, indexable: imported || resolved }
 }
 
+/**
+ * Repository files a source names in a string literal, root-relative or relative to it, comments
+ * left out. A literal naming a directory three or more levels deep stands for every file under
+ * it, which catches paths a test builds from a directory and a file name; shallower ones
+ * (`apps/api`) are working directories and labels far more often than reads.
+ */
 function filesNamed(source, file, modules = new Set()) {
   const named = new Set()
   const code = source
