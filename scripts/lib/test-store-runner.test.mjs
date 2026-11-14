@@ -87,6 +87,7 @@ function fakeIo({ server, faults = {} }) {
     },
     'purchase-failure': () => {
       if (faults.failureEntitles) paid = true
+      if (faults.refreshOnFailure) appRefresh()
     },
     'purchase-cancel': () => {
       launches.push('cancelled')
@@ -439,4 +440,12 @@ test('a failing step records a redacted message: no bearer or member id reaches 
   assert.ok(!JSON.stringify(records).includes(bearer))
   assert.ok(!JSON.stringify(records).includes('eyJ'))
   assert.ok(!JSON.stringify(records).includes('member-1'))
+})
+
+test('a refresh during the unpaid failure fails that step', async () => {
+  const { records } = await run('local', 'purchase', { refreshOnFailure: true })
+  assert.deepEqual(
+    [records.at(-1).step, records.at(-1).error],
+    ['unpaid-failure', 'test_store_unpaid_refresh_forwarded']
+  )
 })

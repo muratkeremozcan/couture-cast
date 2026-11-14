@@ -19,7 +19,6 @@ import {
   premiumStatusPatterns,
   readData,
   redactMessage,
-  MESSAGE_CAP,
   assertNoForwardedRefresh,
   refreshPolicyFor,
   REFRESH_PATH,
@@ -433,7 +432,11 @@ test('failure messages lose ids, bearers, keys and queries, and are capped', () 
     assert.ok(!redacted.includes(secret), secret)
   // Readable names survive, so the message still says what failed.
   assert.match(redacted, /premium-status-line/)
-  assert.ok(redactMessage('x '.repeat(400)).length <= MESSAGE_CAP + 3)
+  // Pinned: 300 characters, then the ellipsis.
+  const capped = redactMessage('x '.repeat(400))
+  assert.equal(capped.length, 303)
+  assert.equal(capped, `${'x '.repeat(150)}...`)
+  assert.equal(redactMessage('x '.repeat(150)), 'x '.repeat(150))
 })
 
 test('an unpaid cancel or failure fails when a refresh reached the API', () => {
