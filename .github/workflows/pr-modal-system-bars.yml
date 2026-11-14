@@ -1,0 +1,86 @@
+# Story 6.15: the modal system bars module (apps/mobile/modules/modal-system-bars). Its
+# Robolectric test drives the module through expo-modules-core's Kotlin runtime on both Android SDK
+# branches, so it is sensitive to an Expo or React Native bump. The native app lanes skip pull
+# requests, so this path-filtered workflow runs it on every PR that touches the module or the
+# lockfile, inside the generated Android project (the accessibility-focus pattern). PR Gate makes
+# every job that runs here required.
+name: Modal system bars module
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/modules/modal-system-bars/**'
+      - 'package-lock.json'
+      - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - '.github/workflows/pr-modal-system-bars.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/modules/modal-system-bars/**'
+      - 'package-lock.json'
+      - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - '.github/workflows/pr-modal-system-bars.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: modal-system-bars-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  robolectric:
+    name: Modal status-bar styling on both Android SDK branches
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
+
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Fetch the Gradle wrapper
+        run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
+
+      - name: Robolectric tests for the modal system bars module
+        working-directory: apps/mobile/android
+        run: |
+          set -euo pipefail
+          ./gradlew --max-workers=2 :modal-system-bars:testDebugUnitTest \
+            --tests expo.modules.modalsystembars.ModalSystemBarsTest --console=plain
+          # Both SDK branches ran, and none was skipped.
+          report=../modules/modal-system-bars/android/build/test-results/testDebugUnitTest
+          report="$report/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml"
+          grep -q 'tests="2" skipped="0" failures="0" errors="0"' "$report"
+
+      - name: Upload Robolectric reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: modal-system-bars-robolectric-reports
+          path: apps/mobile/modules/modal-system-bars/android/build/reports/tests
+          if-no-files-found: warn
