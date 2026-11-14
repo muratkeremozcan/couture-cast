@@ -26,6 +26,7 @@ import {
   startBackgroundSuites,
   summarizeNodeTestEvents,
 } from './node-test-gate.mjs'
+import { killOwnedGroup } from '../lib/owned-process.mjs'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 
@@ -209,15 +210,17 @@ function groupAlive(pid) {
   }
 }
 
-/** Kills the group led by `pid`; a group that ended, or holds only a zombie, is not an error. */
+/**
+ * Kills what is left of the group led by `pid`: only live members that are this suite's (the
+ * background gate, its node --test runner and reporter, or a fixture file under the temp dir), so
+ * a group id the OS gave to someone else after this one ended is never signalled (TEA, r32).
+ */
 function killGroup(pid) {
-  try {
-    process.kill(-checkedGroup(pid), 'SIGKILL')
-  } catch (error) {
-    if (error.code === 'ESRCH') return
-    if (error.code === 'EPERM' && liveMembers(pid).length === 0) return
-    throw error
-  }
+  killOwnedGroup(checkedGroup(pid), [
+    'node-test-gate',
+    os.tmpdir(),
+    fs.realpathSync(os.tmpdir()),
+  ])
 }
 
 /**

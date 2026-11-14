@@ -10,15 +10,9 @@
 // (child.kill), which does nothing once Node has reaped it.
 import { spawnSync } from 'node:child_process'
 
-/** Live processes as [{ pid, pgid, command }], zombies left out; [] when ps cannot run. */
-function processTable() {
-  const ps = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat=,command='], {
-    encoding: 'utf8',
-    timeout: 5_000,
-    killSignal: 'SIGKILL',
-  })
-  if (ps.status !== 0) return []
-  return ps.stdout
+/** `ps -o pid=,pgid=,stat=,command=` output as [{ pid, pgid, command }], zombies left out. */
+export function parseProcessTable(text) {
+  return text
     .split('\n')
     .map((line) => line.trim().match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/))
     .filter((match) => match && !match[3].startsWith('Z'))
@@ -28,6 +22,22 @@ function processTable() {
       command,
     }))
 }
+
+/** Live processes; [] when ps cannot run, so nothing is signalled. */
+function processTable() {
+  const ps = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat=,command='], {
+    encoding: 'utf8',
+    timeout: 5_000,
+    killSignal: 'SIGKILL',
+  })
+  return ps.status === 0 ? parseProcessTable(ps.stdout) : []
+}
+
+/** Whether a command line contains `expected`, or any of a list of expected substrings. */
+const runs = (command, expected) =>
+  (Array.isArray(expected) ? expected : [expected]).some(
+    (part) => part && command.includes(part)
+  )
 
 const signal = (pid, name) => {
   try {
@@ -40,13 +50,13 @@ const signal = (pid, name) => {
 }
 
 /**
- * Signals `pid` only while it is alive and its command line contains `expected`. Returns whether
- * a signal was sent.
+ * Signals `pid` only while it is alive and its command line contains `expected` (a string, or a
+ * list of which any one will do). Returns whether a signal was sent.
  */
 export function killOwned(pid, expected, name = 'SIGKILL', table = processTable) {
   if (!Number.isInteger(pid) || pid <= 0 || !expected) return false
   const entry = table().find((row) => row.pid === pid)
-  return entry?.command.includes(expected) ? signal(pid, name) : false
+  return entry && runs(entry.command, expected) ? signal(pid, name) : false
 }
 
 /**
@@ -56,6 +66,6 @@ export function killOwned(pid, expected, name = 'SIGKILL', table = processTable)
 export function killOwnedGroup(pgid, expected, name = 'SIGKILL', table = processTable) {
   if (!Number.isInteger(pgid) || pgid <= 0 || !expected) return 0
   return table()
-    .filter((row) => row.pgid === pgid && row.command.includes(expected))
+    .filter((row) => row.pgid === pgid && runs(row.command, expected))
     .filter((row) => signal(row.pid, name)).length
 }
