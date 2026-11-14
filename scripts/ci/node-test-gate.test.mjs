@@ -210,17 +210,18 @@ function groupAlive(pid) {
   }
 }
 
+// The fixture files a background run executes. node --test runs each in its own worker whose
+// command line names the file as given (relative to the run's cwd), so the file name is what
+// identifies that worker (Antigravity r33).
+const BACKGROUND_FIXTURES = [...Object.keys(sources), 'blocked.test.mjs']
+
 /**
  * Kills what is left of the group led by `pid`: only live members that are this suite's (the
- * background gate, its node --test runner and reporter, or a fixture file under the temp dir), so
- * a group id the OS gave to someone else after this one ended is never signalled (TEA, r32).
+ * background gate, its node --test runner and reporter, or a worker running one of the fixture
+ * files), so a group id the OS gave to someone else after this one ended is never signalled.
  */
 function killGroup(pid) {
-  killOwnedGroup(checkedGroup(pid), [
-    'node-test-gate',
-    os.tmpdir(),
-    fs.realpathSync(os.tmpdir()),
-  ])
+  killOwnedGroup(checkedGroup(pid), ['node-test-gate', ...BACKGROUND_FIXTURES])
 }
 
 /**
