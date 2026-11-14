@@ -455,3 +455,67 @@ describe('the ledger writers over a test_store row (story 6.15 D15 r6)', () => {
     })
   })
 })
+
+// Story 6.15 r38: drift_settled_at marks a row whose ledger entitlement is currently
+// unrepresentable. Every confirmed sync that moves synced_at clears it in the same write, or a
+// row settled once keeps a stale settle and sorts behind every never-settled row forever.
+describe('a confirmed sync clears the drift settle', () => {
+  const settledRow = existingRow({ drift_settled_at: new Date(T0.getTime() - 60_000) })
+
+  function writer(tx: StubTx): PremiumEntitlementService {
+    return new PremiumEntitlementService(
+      {
+        $transaction: (work: (client: unknown) => unknown) => work(tx),
+      } as unknown as PrismaClient,
+      new FakeRevenueCatClient(),
+      new FakeStripeBillingClient(),
+      {
+        isActive: () => Promise.resolve(false),
+        check: () => Promise.resolve('not_granted' as const),
+      }
+    )
+  }
+
+  function upsertUpdate(tx: StubTx): Record<string, unknown> {
+    const [args] = tx.premiumEntitlement.upsert.mock.calls[0] as [
+      { update: Record<string, unknown> },
+    ]
+    return args.update
+  }
+
+  it('a webhook apply', async () => {
+    const tx = stubTx(settledRow)
+    await apply(tx, new Date(T0.getTime() + 1_000), 'evt-newer')
+    expect(upsertUpdate(tx)).toMatchObject({
+      synced_at: expect.any(Date) as Date,
+      drift_settled_at: null,
+    })
+  })
+
+  it('a refresh or drift pull with an entitlement', async () => {
+    const tx = stubTx(settledRow)
+    await writer(tx).applyLedgerSnapshot('user-1', activeState, 'pull-1')
+    expect(upsertUpdate(tx)).toMatchObject({
+      synced_at: expect.any(Date) as Date,
+      drift_settled_at: null,
+    })
+  })
+
+  it('a pull with no entitlement that downgrades an active row', async () => {
+    const tx = stubTx(settledRow)
+    await writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+    expect(upsertUpdate(tx)).toMatchObject({ status: 'expired', drift_settled_at: null })
+  })
+
+  it('a pull with no entitlement over an already expired row', async () => {
+    const tx = stubTx({ ...settledRow, status: 'expired' })
+    await writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+    const [args] = tx.premiumEntitlement.update.mock.calls[0] as [
+      { data: Record<string, unknown> },
+    ]
+    expect(args.data).toMatchObject({
+      synced_at: expect.any(Date) as Date,
+      drift_settled_at: null,
+    })
+  })
+})

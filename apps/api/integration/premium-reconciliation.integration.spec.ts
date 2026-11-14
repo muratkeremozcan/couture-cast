@@ -24,6 +24,7 @@ import {
 } from '../src/modules/commerce/revenuecat-client.js'
 import { FakeStripeBillingClient } from '../src/modules/commerce/stripe-client.js'
 import type { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
+import { interactiveTransaction } from '../src/prisma/prisma-client.js'
 
 /**
  * Story 5.2 Decision 4a: the reconciliation sweep against real PostgreSQL —
@@ -753,6 +754,104 @@ describe('5.2 billing reconciliation sweep against real PostgreSQL', () => {
       } finally {
         vi.unstubAllGlobals()
       }
+    })
+  }
+
+  // Story 6.15 r38: a non-null drift_settled_at must always mean "currently unrepresentable".
+  // Each confirmed sync clears it in the same write; left set, a settled row that became
+  // representable would sit behind every never-settled stale row, or out of the batch entirely.
+  for (const path of ['webhook apply', 'refresh snapshot', 'drift pull'] as const) {
+    it(`a ${path} after a settle clears drift_settled_at and the row is drift-checked by synced_at`, async (context) => {
+      if (!requireSchema(context)) return
+
+      const staleSyncedAt = new Date(Date.now() - 48 * 60 * 60 * 1000)
+      await prisma.premiumEntitlement.create({
+        data: buildPremiumEntitlementCreateInput(
+          createPremiumEntitlement({
+            userId,
+            status: 'active',
+            store: 'play_store',
+            syncedAt: staleSyncedAt,
+            lastEventOccurredAt: staleSyncedAt,
+            lastEventId: `${namespace}-settle-seed`,
+          })
+        ),
+      })
+      const renewed = {
+        status: 'active' as const,
+        store: 'play_store' as const,
+        productId: 'premium_annual',
+        willRenew: true,
+        currentPeriodEnd: new Date(Date.now() + 300 * 86_400_000),
+      }
+      // 1. The sweep settles the row: the ledger holds a lifetime grant. Later it holds `renewed`.
+      let unrepresentable = true
+      const ownPull = vi
+        .spyOn(ledger, 'getSubscriberEntitlement')
+        .mockImplementation((appUserId) =>
+          appUserId !== userId
+            ? Promise.reject(
+                new Error('out-of-scope subscriber pull; row belongs to another suite')
+              )
+            : unrepresentable
+              ? Promise.reject(new RevenueCatUnrepresentableEntitlementError('no_expiry'))
+              : Promise.resolve(renewed)
+        )
+      const ownPulls = () =>
+        ownPull.mock.calls.filter(([appUserId]) => appUserId === userId).length
+      await service.sweep()
+      unrepresentable = false
+      const settled = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      expect(settled?.drift_settled_at).toBeInstanceOf(Date)
+
+      // 2. The member becomes representable and a confirmed sync lands.
+      const entitlements = new PremiumEntitlementService(
+        prisma,
+        ledger,
+        new FakeStripeBillingClient(),
+        noComplimentaryGrants
+      )
+      if (path === 'webhook apply') {
+        await interactiveTransaction(prisma, (tx) =>
+          entitlements.applyLedgerEvent(tx, {
+            userId,
+            state: renewed,
+            occurredAt: new Date(),
+            eventId: `${namespace}-renewal`,
+            provider: 'revenuecat',
+          })
+        )
+      } else if (path === 'refresh snapshot') {
+        await entitlements.applyLedgerSnapshot(userId, renewed, randomUUID())
+      } else {
+        // The settle has aged out of the window, so the next sweep pulls the row again.
+        await prisma.premiumEntitlement.update({
+          where: { user_id: userId },
+          data: { drift_settled_at: staleSyncedAt },
+        })
+        await service.sweep()
+      }
+
+      const synced = await prisma.premiumEntitlement.findUnique({
+        where: { user_id: userId },
+      })
+      expect(synced).toMatchObject({
+        product_id: 'premium_annual',
+        drift_settled_at: null,
+      })
+      expect(synced!.synced_at.getTime()).toBeGreaterThan(staleSyncedAt.getTime())
+
+      // 3. A day later the row is stale again and is drift-checked by its synced_at alone.
+      await prisma.premiumEntitlement.update({
+        where: { user_id: userId },
+        data: { synced_at: staleSyncedAt },
+      })
+      const pullsBefore = ownPulls()
+      await service.sweep()
+      expect(ownPulls()).toBe(pullsBefore + 1)
+      ownPull.mockRestore()
     })
   }
 

@@ -309,6 +309,9 @@ export class PremiumEntitlementService {
         will_renew: input.state.willRenew,
         current_period_end: input.state.currentPeriodEnd,
         synced_at: syncedAt,
+        // A confirmed sync ends any drift settle (story 6.15 r38): a non-null
+        // drift_settled_at always means the ledger is currently unrepresentable.
+        drift_settled_at: null,
         last_event_occurred_at: input.occurredAt,
         last_event_id: input.eventId,
       },
@@ -363,6 +366,7 @@ export class PremiumEntitlementService {
             where: { user_id: userId },
             data: {
               synced_at: occurredAt,
+              drift_settled_at: null,
               last_event_occurred_at: occurredAt,
               last_event_id: eventId,
             },
@@ -407,6 +411,7 @@ export class PremiumEntitlementService {
           will_renew: state.willRenew,
           current_period_end: state.currentPeriodEnd,
           synced_at: occurredAt,
+          drift_settled_at: null,
           last_event_occurred_at: occurredAt,
           last_event_id: eventId,
         },

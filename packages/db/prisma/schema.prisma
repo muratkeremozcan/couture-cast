@@ -1551,7 +1551,8 @@ model PremiumEntitlement {
   synced_at              DateTime
   /// Story 6.15: when the drift sweep last met a ledger entitlement this API cannot represent
   /// and left the row as it was. The sweep orders and filters by it beside synced_at, so such a
-  /// row cannot lead every batch; synced_at keeps meaning a confirmed sync.
+  /// row cannot lead every batch; synced_at keeps meaning a confirmed sync. Every confirmed sync
+  /// clears it in the same write, so non-null always means currently unrepresentable.
   drift_settled_at       DateTime?
   /// Ordering guard: apply an event iff occurred_at is newer, or equal with a
   /// distinct event id. Strictly-older events are dropped.
