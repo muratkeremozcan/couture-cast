@@ -533,11 +533,19 @@ function timezoneFailure(detail) {
  * approved residual's stale keys hold time labels, so they are exact only in one timezone).
  * Android pins `requested` (default LIVE_FONT_TIMEZONE) with `cmd alarm set-timezone` and reads
  * `persist.sys.timezone` back; `adb(...args)` runs one adb command on the device and returns its
- * stdout. `previous` is the timezone to put back when the run ends. An iOS simulator follows the
- * host, so the run records `hostTimezone`, and a `requested` timezone other than the host's
- * fails since nothing can pin it.
+ * stdout. `previous` is the timezone to put back when the run ends. `onPrevious(previous)` hears it
+ * as soon as it is read, before the device is changed, so a pin that fails after the change (a
+ * readback that differs, an adb failure) still leaves the caller what to restore. An iOS
+ * simulator follows the host, so the run records `hostTimezone`, and a `requested` timezone other
+ * than the host's fails since nothing can pin it.
  */
-export function runTimezone({ platform, requested, hostTimezone, adb }) {
+export function runTimezone({
+  platform,
+  requested,
+  hostTimezone,
+  adb,
+  onPrevious = () => undefined,
+}) {
   if (platform === 'ios') {
     if (!hostTimezone) throw timezoneFailure('host timezone unknown')
     if (requested && requested !== hostTimezone)
@@ -551,6 +559,7 @@ export function runTimezone({ platform, requested, hostTimezone, adb }) {
   let read
   try {
     previous = adb('shell', 'getprop', 'persist.sys.timezone').trim()
+    onPrevious(previous)
     adb('shell', 'cmd', 'alarm', 'set-timezone', timezone)
     read = adb('shell', 'getprop', 'persist.sys.timezone').trim()
   } catch (error) {

@@ -11,10 +11,16 @@
 //   node scripts/run-live-font-proof.mjs --platform android|ios --device <serial|udid> \
 //     --build release|debug --screens home,community,settings,composer --out <dir> \
 //     [--label sdk54-release] [--app-id com.couturecast.story68] [--scale-path settings|in-place]
-//     [--timezone America/Chicago]
+//     [--timezone America/Chicago] [--harness _bmad-output/test-artifacts/story-6-8/runtime]
 //   --timezone pins the Android device's timezone before the first capture (default: the one the
 //   approved residual entries were captured in) and puts the previous one back at the end. An iOS
 //   simulator follows the host, so the run records the host's and fails on any other.
+//   --harness is the Story 6.8 harness dir (default: CC68_HARNESS_DIR, else the runtime dir
+//   scripts/run-story68-native.mjs uses). Before the first capture the run ages the harness
+//   location's weather snapshot past the hour through that harness's own local database, so the
+//   Community screen shows the out-of-date forecast notice on every run (live-font-weather.mjs).
+//   Every device change is put back however the run ends, SIGINT and SIGTERM included
+//   (live-font-run-guard.mjs), and the report lists any restore that failed.
 //   --scale-path settings (default) changes the live scale the way a user does: the app goes to
 //   the background behind the system Settings screen, the scale changes, and the app returns.
 //   React Native reads the new font scale on resume, so a foreground write (in-place) is a
@@ -24,6 +30,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
+import pg from 'pg'
 
 import {
   activityConfiguration,
@@ -54,7 +61,9 @@ import {
   SCREENS,
   screenRunSteps,
 } from './lib/live-font-journey.mjs'
+import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts } from './lib/live-font-scale-proof.mjs'
+import { ageWeatherSnapshot } from './lib/live-font-weather.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
@@ -71,6 +80,12 @@ const screens = option('screens', 'home,community,settings,composer').split(',')
 const configChange = option('config-change')
 const runLabel = option('label', build)
 const requestedTimezone = option('timezone')
+const harness = path.resolve(
+  option(
+    'harness',
+    process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
+  )
+)
 const scalePath = option('scale-path', 'settings')
 if (!['settings', 'in-place'].includes(scalePath))
   throw new Error('scale_path_settings_or_in_place_required')
@@ -225,6 +240,8 @@ function screenshot(name) {
   if (platform === 'android') {
     const shot = spawnSync(adbBinary, ['-s', device, 'exec-out', 'screencap', '-p'], {
       maxBuffer: 64 * 1024 * 1024,
+      timeout: 60_000,
+      killSignal: 'SIGKILL',
     })
     fs.writeFileSync(file, shot.stdout, { mode: 0o600 })
   } else run('xcrun', ['simctl', 'io', device, 'screenshot', file])
@@ -588,6 +605,26 @@ const residualBaselineFile = JSON.parse(
   )
 )
 const residualBaselines = residualBaselineFile.entries
+
+/** One statement against the harness database, bounded, resolving to its row count. */
+async function harnessQuery(url, sql, params) {
+  const client = new pg.Client({
+    connectionString: url,
+    connectionTimeoutMillis: 15_000,
+    query_timeout: 15_000,
+    statement_timeout: 15_000,
+  })
+  await client.connect()
+  try {
+    return (await client.query(sql, params)).rowCount
+  } finally {
+    await client.end()
+  }
+}
+
+// Every device change below has a restore step, added before the change is made. The steps run
+// once, each on its own, at the end of the run or on SIGINT or SIGTERM.
+const guard = installRestoreGuard()
 const androidApi =
   platform === 'android'
     ? Number(adb('shell', 'getprop', 'ro.build.version.sdk').trim())
@@ -595,36 +632,64 @@ const androidApi =
 // A 4 MiB event buffer holds a whole journey's wm_on_create_called entries.
 if (platform === 'android') adb('logcat', '-b', 'events', '-G', '4M')
 const previousScale = readScale()
+guard.step('font-scale', () => {
+  if (platform === 'android' && previousScale === 'null')
+    adb('shell', 'settings', 'delete', 'system', 'font_scale')
+  else setScale(previousScale)
+})
 // The device timezone every capture is taken in, set before the first one (runTimezone).
 let pinned
+// The timezone to put back, known as soon as runTimezone reads it, even if the pin then fails.
+let previousTimezone
+guard.step('timezone', () => {
+  if (previousTimezone && previousTimezone !== pinned?.timezone)
+    adb('shell', 'cmd', 'alarm', 'set-timezone', previousTimezone)
+})
+// The weather banner state the run sets up, and how (ageWeatherSnapshot).
+let weather
+let runError
 const started = Date.now()
 const results = []
-if (fingerprint)
-  run('xcrun', [
-    'simctl',
-    'status_bar',
-    device,
-    'override',
-    '--batteryLevel',
-    String(fingerprint.battery),
-    '--cellularMode',
-    'active',
-    '--cellularBars',
-    String(fingerprint.cellular),
-    '--wifiBars',
-    String(fingerprint.wifi),
-  ])
 try {
+  if (fingerprint) {
+    guard.step('status-bar', () =>
+      run('xcrun', ['simctl', 'status_bar', device, 'clear'], { timeout: 60_000 })
+    )
+    run('xcrun', [
+      'simctl',
+      'status_bar',
+      device,
+      'override',
+      '--batteryLevel',
+      String(fingerprint.battery),
+      '--cellularMode',
+      'active',
+      '--cellularBars',
+      String(fingerprint.cellular),
+      '--wifiBars',
+      String(fingerprint.wifi),
+    ])
+  }
   if (platform === 'android' && build === 'release') {
     const flags = adb('shell', 'dumpsys', 'package', appId)
     if (/pkgFlags=\[[^\]]*DEBUGGABLE/.test(flags))
       throw new Error('non_debuggable_release_required')
   }
+  const ownedEnvFile = path.join(harness, 'owned-env.json')
+  if (!fs.existsSync(ownedEnvFile))
+    throw new Error(`live_font_harness_required:${ownedEnvFile} is missing`)
+  weather = await ageWeatherSnapshot({
+    ownedEnv: JSON.parse(fs.readFileSync(ownedEnvFile, 'utf8')),
+    query: harnessQuery,
+  })
   pinned = runTimezone({
     platform,
     requested: requestedTimezone,
     hostTimezone: process.env.TZ || Intl.DateTimeFormat().resolvedOptions().timeZone,
     adb,
+    onPrevious: (previous) => {
+      previousTimezone = previous
+    },
   })
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
@@ -675,6 +740,7 @@ try {
       residualBaselines,
       label: runLabel,
       timezone: pinned.timezone,
+      weatherBanner: weather.weatherBanner,
       androidDensity,
     })
     for (const leg of report.legs) {
@@ -683,59 +749,70 @@ try {
     }
     results.push(report)
   }
-} finally {
-  if (fingerprint)
-    spawnSync('xcrun', ['simctl', 'status_bar', device, 'clear'], {
-      timeout: 60_000,
-      killSignal: 'SIGKILL',
-    })
-  if (pinned?.previous && pinned.previous !== pinned.timezone)
-    adb('shell', 'cmd', 'alarm', 'set-timezone', pinned.previous)
-  if (platform === 'android' && previousScale === 'null')
-    adb('shell', 'settings', 'delete', 'system', 'font_scale')
-  else setScale(previousScale)
+} catch (error) {
+  // A run that stops early still restores the device and writes its report.
+  runError = { error: error.code ?? error.message.split(':')[0], message: error.message }
 }
-const verdict = configChange
-  ? {
-      pass: results.length > 0 && results.every((result) => result.pass),
-      reasons: results.filter((result) => !result.pass).map((result) => result.screen),
+let verdict
+guard.finish((restoreErrors) => {
+  verdict = configChange
+    ? {
+        pass: results.length > 0 && results.every((result) => result.pass),
+        reasons: results.filter((result) => !result.pass).map((result) => result.screen),
+      }
+    : aggregateVerdict(results, platform)
+  if (runError) verdict = { pass: false, reasons: [runError.error, ...verdict.reasons] }
+  // A device left changed fails the run, whatever the screens showed.
+  if (restoreErrors.length)
+    verdict = {
+      pass: false,
+      reasons: [
+        ...verdict.reasons,
+        ...restoreErrors.map(({ step, error }) => `restore ${step}: ${error}`),
+      ],
     }
-  : aggregateVerdict(results, platform)
-const report = {
-  platform,
-  device,
-  build,
-  timezone: pinned?.timezone ?? null,
-  label: runLabel,
-  appId,
-  reactNativeVersion: reactNativeVersion ?? null,
-  androidApi: androidApi ?? null,
-  configChange: configChange ?? null,
-  scalePath,
-  wallSeconds: Math.round((Date.now() - started) / 1000),
-  verdict,
-  results,
-}
-fs.writeFileSync(
-  path.join(out, 'live-font-report.json'),
-  JSON.stringify(report, null, 2),
-  {
-    mode: 0o600,
+  const report = {
+    platform,
+    device,
+    build,
+    timezone: pinned?.timezone ?? null,
+    weatherBanner: weather?.weatherBanner ?? null,
+    weatherAging: weather?.weatherAging ?? null,
+    label: runLabel,
+    appId,
+    reactNativeVersion: reactNativeVersion ?? null,
+    androidApi: androidApi ?? null,
+    configChange: configChange ?? null,
+    scalePath,
+    wallSeconds: Math.round((Date.now() - started) / 1000),
+    verdict,
+    ...(runError ? { error: runError } : {}),
+    restoreErrors,
+    results,
   }
-)
-// Approval of a known residual is a reviewed diff: diff this file against
-// scripts/lib/fixtures/live-font-residual-baselines.json and commit only entries that meet the
-// six approval rules. Each proposed entry carries the run's timezone and its exact stale keys.
-// Each entry names its proof dir relative to the repository, so the captures can be found; a
-// proof dir outside the repository (symlinks resolved) names none.
-const proposed = proposedBaselines(residualBaselineFile, results, {
-  dir: proofDirInRepo(root, out),
-})
-if (proposed)
   fs.writeFileSync(
-    path.join(out, 'live-font-residual-baselines.proposed.json'),
-    `${JSON.stringify(proposed, null, 2)}\n`,
-    { mode: 0o600 }
+    path.join(out, 'live-font-report.json'),
+    JSON.stringify(report, null, 2),
+    {
+      mode: 0o600,
+    }
   )
-console.log(JSON.stringify({ verdict, wallSeconds: report.wallSeconds }))
+  // Approval of a known residual is a reviewed diff: diff this file against
+  // scripts/lib/fixtures/live-font-residual-baselines.json and commit only entries that meet the
+  // six approval rules. Each proposed entry carries the run's timezone, its weather banner and its
+  // exact stale keys, and names its proof dir relative to the repository, so the captures can be
+  // found; a proof dir outside the repository (symlinks resolved) names none.
+  const proposed = proposedBaselines(residualBaselineFile, results, {
+    dir: proofDirInRepo(root, out),
+    weatherAging: weather?.weatherAging,
+  })
+  if (proposed)
+    fs.writeFileSync(
+      path.join(out, 'live-font-residual-baselines.proposed.json'),
+      `${JSON.stringify(proposed, null, 2)}\n`,
+      { mode: 0o600 }
+    )
+  console.log(JSON.stringify({ verdict, wallSeconds: report.wallSeconds }))
+})
+if (runError) console.error(runError.message)
 process.exitCode = verdict.pass ? 0 : 1

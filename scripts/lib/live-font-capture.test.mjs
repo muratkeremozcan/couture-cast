@@ -935,6 +935,26 @@ describe('runTimezone', () => {
     )
   })
 
+  // Antigravity r30 item 3: the timezone to put back is known before the device changes, so a
+  // pin that fails after the change still restores it.
+  test('Android hands over the previous timezone before it changes the device', () => {
+    for (const options of [{}, { stuck: true }, { failOn: 'cmd' }]) {
+      const { adb, calls } = fakeAdb('GMT', options)
+      const heard = []
+      const pin = () =>
+        runTimezone({
+          platform: 'android',
+          adb,
+          onPrevious: (previous) => heard.push([previous, calls.length]),
+        })
+      if (options.stuck || options.failOn)
+        assert.throws(pin, { code: 'live_font_timezone_pin_failed' })
+      else pin()
+      // Heard once, after the first getprop and before set-timezone.
+      assert.deepEqual(heard, [['GMT', 1]], JSON.stringify(options))
+    }
+  })
+
   test('iOS records the host timezone and refuses any other, touching no device', () => {
     const adb = () => assert.fail('iOS runs no adb')
     assert.deepEqual(

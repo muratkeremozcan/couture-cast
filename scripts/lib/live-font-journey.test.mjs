@@ -14,21 +14,37 @@ import {
   proofDirInRepo,
   proposedBaselines,
   numericScale,
+  residualBaselineFor,
   runScreenJourney,
   SCALES,
   screenRunSteps,
   touchTarget,
 } from './live-font-journey.mjs'
-import { expectedTextRatio } from './live-font-scale-proof.mjs'
+import {
+  expectedTextRatio,
+  WEATHER_BANNER_MARKER,
+  WEATHER_STALE_TEXT,
+} from './live-font-scale-proof.mjs'
 
 /**
  * A fake device whose screen relayouts correctly at every scale: the 13 sp label's box follows
  * the platform's text scaling, the update adds one line that persists across launches until
  * reverted (as the Settings locale does), and nothing remounts on the live launch. `breakAt` makes one live capture stale or makes a capture throw.
+ * `banner` shows the out-of-date forecast notice; `hourStart` adds a ribbon of three hour labels
+ * from that hour, which go stale with the rest of the text.
  */
 function fakeDevice(
   platform,
-  { breakAt, throwAt, dropMountAt, remountOnRevert, noScreenMount, staleColdAt } = {}
+  {
+    breakAt,
+    throwAt,
+    dropMountAt,
+    remountOnRevert,
+    noScreenMount,
+    staleColdAt,
+    banner,
+    hourStart,
+  } = {}
 ) {
   const calls = []
   let launches = 0
@@ -73,6 +89,16 @@ function fakeDevice(
       ...(updated
         ? [{ id: '', text: 'Every band', bounds: `[0,300][300,${300 + h}]` }]
         : []),
+      ...(banner
+        ? [{ id: '', text: WEATHER_STALE_TEXT, bounds: '[0,500][1000,560]' }]
+        : []),
+      ...(hourStart
+        ? [0, 1, 2].map((index) => ({
+            id: '',
+            text: `${hourStart + index}\u202fAM`,
+            bounds: `[${index * 100},700][${index * 100 + 80},${700 + h}]`,
+          }))
+        : []),
     ]
     return {
       stage,
@@ -86,10 +112,13 @@ function fakeDevice(
           ? { root: mounts(stage, at), activity: `act-${launch}`, onCreate: 1 }
           : { root: mounts(stage, at) },
       nodes,
-      controls: ['tab-home', 'tab-community', 'tab-settings'].map((id, index) => ({
-        id,
-        bounds: `[${index * 300},2200][${index * 300 + 300},2400]`,
-      })),
+      controls: [
+        ...['tab-home', 'tab-community', 'tab-settings'].map((id, index) => ({
+          id,
+          bounds: `[${index * 300},2200][${index * 300 + 300},2400]`,
+        })),
+        ...(banner ? [{ id: WEATHER_BANNER_MARKER, bounds: '[0,480][1080,580]' }] : []),
+      ],
       window: '[0,0][1080,2400]',
     }
   }
@@ -145,6 +174,7 @@ const run = (platform, fake, extra = {}) =>
     reactNativeVersion: '0.88.1',
     androidDensity: () => 420,
     timezone: 'America/Chicago',
+    weatherBanner: 'none',
     ...extra,
   })
 
@@ -256,7 +286,8 @@ describe('runScreenJourney', () => {
       from: '1',
       to: '1.5',
       timezone: 'America/Chicago',
-      staleKeys: ['["community-new-post-label","New post"]#0'],
+      weatherBanner: 'none',
+      staleKeys: ['cold:["community-new-post-label","New post"]#0'],
       review: {
         verdict: 'known-residual',
         structuralPass: true,
@@ -329,6 +360,121 @@ describe('runScreenJourney', () => {
     assert.equal(aggregateVerdict([result], 'android').pass, false)
   })
 
+  // Antigravity r30 item 2: the entry for a leg is chosen by its timezone too, so of two entries
+  // that differ only by timezone each run uses its own.
+  test('of two entries that differ only by timezone, each run uses its own', async () => {
+    const breaking = () => fakeDevice('android', { breakAt: 'settled:1.5' })
+    const options = { reactNativeVersion: '0.81.5', label: 'sdk54-release' }
+    const chicago = (await run('android', breaking(), options)).legs[0].residualProposal
+    // The Istanbul entry lists a key this run never misses, so only the Chicago entry approves.
+    const istanbul = {
+      ...chicago,
+      timezone: 'Europe/Istanbul',
+      staleKeys: [...chicago.staleKeys, 'cold:["","Elsewhere"]#0'],
+    }
+    for (const entries of [
+      [chicago, istanbul],
+      [istanbul, chicago],
+    ]) {
+      const here = await run('android', breaking(), {
+        ...options,
+        residualBaselines: entries,
+      })
+      assert.equal(here.legs[0].pass, true, here.legs[0].message)
+      const there = await run('android', breaking(), {
+        ...options,
+        residualBaselines: entries,
+        timezone: 'Europe/Istanbul',
+      })
+      assert.equal(there.legs[0].error, 'live_font_residual_unapproved')
+      assert.match(
+        there.legs[0].message,
+        /baseline key no miss hit: cold:\["","Elsewhere"\]#0/
+      )
+    }
+    // A timezone with no entry still reports the environment and proposes its own entry.
+    const utc = await run('android', breaking(), {
+      ...options,
+      residualBaselines: [chicago, istanbul],
+      timezone: 'UTC',
+    })
+    assert.equal(utc.legs[0].error, 'live_font_residual_environment_differs')
+    assert.match(
+      utc.legs[0].message,
+      /baseline timezone America\/Chicago, run timezone UTC/
+    )
+    assert.deepEqual(utc.legs[0].residualProposal, { ...chicago, timezone: 'UTC' })
+  })
+
+  // TEA ruling on Antigravity r30 item 1: the banner state is part of an entry's environment.
+  test('an entry approved with the out-of-date banner fails a run whose screen shows none', async () => {
+    const options = {
+      reactNativeVersion: '0.81.5',
+      label: 'sdk54-release',
+      weatherBanner: 'out-of-date',
+    }
+    const shown = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5', banner: true }),
+      options
+    )
+    const entry = shown.legs[0].residualProposal
+    assert.equal(entry.weatherBanner, 'out-of-date')
+    const approved = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5', banner: true }),
+      { ...options, residualBaselines: [entry] }
+    )
+    assert.equal(approved.legs[0].pass, true, approved.legs[0].message)
+    const hidden = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5' }),
+      {
+        ...options,
+        residualBaselines: [entry],
+      }
+    )
+    assert.equal(hidden.legs[0].error, 'live_font_residual_environment_differs')
+    assert.match(
+      hidden.legs[0].message,
+      /baseline weather banner out-of-date, before capture shows none/
+    )
+  })
+
+  // TEA ruling on Antigravity r30 item 1: stale hour labels are keyed by place, so an entry
+  // approved at one hour approves the same residual an hour later.
+  test('stale hour labels approve an hour later and still count as stale keys', async () => {
+    const options = { reactNativeVersion: '0.81.5', label: 'sdk54-release' }
+    const first = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5', hourStart: 1 }),
+      options
+    )
+    const entry = first.legs[0].residualProposal
+    assert.deepEqual(entry.staleKeys, [
+      'cold:["","<hour>"]#0',
+      'cold:["","<hour>"]#1',
+      'cold:["","<hour>"]#2',
+      'cold:["community-new-post-label","New post"]#0',
+    ])
+    const later = await run(
+      'android',
+      fakeDevice('android', { breakAt: 'settled:1.5', hourStart: 2 }),
+      { ...options, residualBaselines: [entry] }
+    )
+    assert.equal(later.legs[0].pass, true, later.legs[0].message)
+    // The full labels stay in the parity check itself.
+    assert.deepEqual(
+      later.legs[0].checks.coldParity.misses.map((miss) => miss.key).sort(),
+      [
+        '["","2\u202fAM"]#0',
+        '["","3\u202fAM"]#0',
+        '["","4\u202fAM"]#0',
+        '["community-new-post-label","New post"]#0',
+      ]
+    )
+  })
+
   // TEA, 2026-11-13: a control that fails on this run fails it, whatever an approved entry's
   // stored controlPass says.
   test('a live control failure fails the run even with an approved residual entry', async () => {
@@ -364,6 +510,73 @@ describe('runScreenJourney', () => {
 
   test('no screen is a failed run', () => {
     assert.equal(aggregateVerdict([], 'android').pass, false)
+  })
+})
+
+describe('residualBaselineFor', () => {
+  const leg = {
+    platform: 'android',
+    build: 'sdk54-release',
+    screen: 'home',
+    from: '1',
+    to: '1.5',
+    timezone: 'America/Chicago',
+    weatherBanner: 'out-of-date',
+  }
+  test('picks the entry for the leg, its timezone and its banner', () => {
+    const chicago = { ...leg, from: 1, to: 1.5, id: 'chicago' }
+    const istanbul = { ...leg, timezone: 'Europe/Istanbul', id: 'istanbul' }
+    assert.equal(residualBaselineFor([istanbul, chicago], leg).id, 'chicago')
+    assert.equal(
+      residualBaselineFor([chicago, istanbul], { ...leg, timezone: 'Europe/Istanbul' })
+        .id,
+      'istanbul'
+    )
+    // No entry for the run's timezone: one for the same leg, so the environment is reported.
+    assert.equal(
+      residualBaselineFor([chicago], { ...leg, timezone: 'UTC' }).id,
+      'chicago'
+    )
+    const quiet = { ...leg, weatherBanner: 'none', id: 'quiet' }
+    assert.equal(residualBaselineFor([quiet, chicago], leg).id, 'chicago')
+    assert.equal(
+      residualBaselineFor([chicago, quiet], { ...leg, weatherBanner: 'none' }).id,
+      'quiet'
+    )
+    // The timezone outranks the banner when neither entry matches both.
+    assert.equal(
+      residualBaselineFor([istanbul, quiet], { ...leg, weatherBanner: 'other' }).id,
+      'quiet'
+    )
+    for (const other of [
+      { platform: 'ios' },
+      { build: 'sdk54-debug' },
+      { screen: 'settings' },
+      { from: '1.5' },
+      { to: '1' },
+    ])
+      assert.equal(residualBaselineFor([chicago], { ...leg, ...other }), undefined)
+  })
+
+  test('proposedBaselines replaces the entry with the same identity and keeps the others', () => {
+    const proposal = { ...leg, staleKeys: ['cold:["","Home"]#0'] }
+    const old = { ...leg, staleKeys: ['cold:["","Away"]#0'] }
+    const istanbul = { ...old, timezone: 'Europe/Istanbul' }
+    const quiet = { ...old, weatherBanner: 'none' }
+    const results = [
+      { legs: [{ residualProposal: proposal, evidence: { before: 'b' } }] },
+    ]
+    const weatherAging = { locationKey: 'san-francisco-ca', ageMinutes: 120 }
+    const proposed = proposedBaselines(
+      { about: 'x', entries: [old, istanbul, quiet] },
+      results,
+      { dir: 'runs/proof', weatherAging }
+    )
+    assert.deepEqual(proposed.entries, [
+      istanbul,
+      quiet,
+      { ...proposal, evidence: { dir: 'runs/proof', before: 'b', weatherAging } },
+    ])
   })
 })
 

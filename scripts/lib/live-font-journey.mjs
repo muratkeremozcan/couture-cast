@@ -20,6 +20,7 @@ import {
   assertLiveFontProof,
   evaluateLiveFontChange,
   proposedResidualEntry,
+  WEATHER_BANNER_MARKER,
 } from './live-font-scale-proof.mjs'
 
 const TABS = ['tab-home', 'tab-community', 'tab-settings']
@@ -55,6 +56,9 @@ export const SCREENS = {
       'community-spotlight',
       'community-sticky-filter-chips',
     ],
+    // The band notice says the local forecast is out of date while the snapshot is over an hour
+    // old; a residual entry approves only with the banner state it was approved with.
+    bannerMarker: WEATHER_BANNER_MARKER,
     controls: TABS,
     probes: [{ id: 'community-new-post-label', sizeSp: 13 }],
   },
@@ -112,13 +116,21 @@ const UNAPPROVED = new Set([
   'live_font_residual_environment_differs',
 ])
 
-function judgeLeg({ platform, reactNativeVersion, residualBaseline, timezone, change }) {
+function judgeLeg({
+  platform,
+  reactNativeVersion,
+  residualBaseline,
+  timezone,
+  weatherBanner,
+  change,
+}) {
   try {
     assertLiveProvenance({ ...change, platform })
     const result = assertLiveFontProof({
       reactNativeVersion,
       residualBaseline,
       timezone,
+      weatherBanner,
       ...change,
     })
     return {
@@ -141,7 +153,7 @@ function judgeLeg({ platform, reactNativeVersion, residualBaseline, timezone, ch
       checks: evaluated.checks,
     }
     if (UNAPPROVED.has(leg.error) && leg.verdict === 'known-residual')
-      leg.residualProposal = proposedResidualEntry(evaluated.checks)
+      leg.residualProposal = proposedResidualEntry(evaluated.checks, change)
     return leg
   }
 }
@@ -161,11 +173,44 @@ function composerGeometry(platform, androidDensity, captures) {
   }
 }
 
+/** The fields that name a residual entry: one entry per leg, run timezone and weather banner. */
+const ENTRY_IDENTITY = [
+  'platform',
+  'build',
+  'screen',
+  'from',
+  'to',
+  'timezone',
+  'weatherBanner',
+]
+const sameIdentity = (a, b) =>
+  ENTRY_IDENTITY.every((field) => String(a[field]) === String(b[field]))
+
+/**
+ * The baseline entry that judges a leg: the one for its platform, build, screen, from, to,
+ * timezone and weather banner. Without one, an entry for the same leg in another timezone or
+ * banner state (in that order), so the leg reports live_font_residual_environment_differs and
+ * proposes the entry for its own environment; undefined when the leg has no entry at all.
+ */
+export function residualBaselineFor(entries, leg) {
+  const sameLeg = entries.filter((entry) =>
+    ENTRY_IDENTITY.slice(0, 5).every(
+      (field) => String(entry[field]) === String(leg[field])
+    )
+  )
+  return (
+    sameLeg.find((entry) => sameIdentity(entry, leg)) ??
+    sameLeg.find((entry) => entry.timezone === leg.timezone) ??
+    sameLeg[0]
+  )
+}
+
 /**
  * Runs one screen's journey. `io` supplies: `cold(scale)` (fresh launch at the scale, settled,
  * with full text), `launch()`, `setScale(scale)`, `navigate()`, `capture(stage, scale)`,
  * `settle(stage, scale)` and `fullText(capture)` for the live launch, and `update()`/`revert()`.
- * `timezone` is the device timezone of the run; a residual entry approves only in its own.
+ * `timezone` is the device timezone of the run and `weatherBanner` the banner state it set up; a
+ * residual entry approves only in its own.
  */
 export async function runScreenJourney({
   io,
@@ -176,6 +221,7 @@ export async function runScreenJourney({
   residualBaselines = [],
   label,
   timezone,
+  weatherBanner,
   androidDensity = () => undefined,
 }) {
   const screen = SCREENS[name]
@@ -236,15 +282,17 @@ export async function runScreenJourney({
         probes: screen.probes,
         requiredControls: screen.controls,
         mount: screen.mount,
+        bannerMarker: screen.bannerMarker,
       }
-      const residualBaseline = residualBaselines.find(
-        (entry) =>
-          entry.platform === platform &&
-          entry.build === label &&
-          entry.screen === name &&
-          String(entry.from) === String(from) &&
-          String(entry.to) === String(to)
-      )
+      const residualBaseline = residualBaselineFor(residualBaselines, {
+        platform,
+        build: label,
+        screen: name,
+        from,
+        to,
+        timezone,
+        weatherBanner,
+      })
       const leg = {
         from,
         to,
@@ -254,6 +302,7 @@ export async function runScreenJourney({
           reactNativeVersion,
           residualBaseline,
           timezone,
+          weatherBanner,
           change,
         }),
       }
@@ -270,6 +319,7 @@ export async function runScreenJourney({
           from: String(from),
           to: String(to),
           timezone,
+          weatherBanner,
           ...leg.residualProposal,
           review: {
             ...leg.residualProposal.review,
@@ -331,21 +381,31 @@ export function screenRunSteps({ configChange, versionKnown }) {
 /**
  * The baselines file a reviewer would commit to approve every unapproved known-residual leg of
  * `results`: the current entries plus one proposal per leg, each with its evidence capture names
- * and, given `dir` (the proof dir relative to the repository), where those captures live.
+ * and, given `dir` (the proof dir relative to the repository), where those captures live, and,
+ * given `weatherAging`, how the run aged the forecast. A proposal replaces the current entry with
+ * the same identity (platform, build, screen, from, to, timezone, weather banner), so the file
+ * keeps one entry per leg and environment; entries for another timezone or banner stay.
  * Null when no leg proposes one.
  */
-export function proposedBaselines(current, results, { dir } = {}) {
+export function proposedBaselines(current, results, { dir, weatherAging } = {}) {
   // A screen that errored before any leg has no legs and proposes nothing.
   const proposals = results.flatMap((result) =>
     (result.legs ?? [])
       .filter((leg) => leg.residualProposal)
       .map((leg) => ({
         ...leg.residualProposal,
-        evidence: dir ? { dir, ...leg.evidence } : leg.evidence,
+        evidence: {
+          ...(dir ? { dir } : {}),
+          ...leg.evidence,
+          ...(weatherAging ? { weatherAging } : {}),
+        },
       }))
   )
   if (proposals.length === 0) return null
-  return { ...current, entries: [...current.entries, ...proposals] }
+  const kept = current.entries.filter(
+    (entry) => !proposals.some((proposal) => sameIdentity(entry, proposal))
+  )
+  return { ...current, entries: [...kept, ...proposals] }
 }
 
 /**

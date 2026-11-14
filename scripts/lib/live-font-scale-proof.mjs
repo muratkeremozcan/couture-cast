@@ -19,8 +19,9 @@
 // From 0.87 the screen must be `fixed`. Below it the oracle records what it sees: `fixed` passes
 // and flags the baseline for review; `known-residual` (heights stale against the cold reference,
 // nothing else wrong) passes only when a reviewed baseline entry for that platform, build,
-// screen and timezone lists exactly those stale miss keys
-// (scripts/lib/fixtures/live-font-residual-baselines.json); anything else fails. Required controls must stay on screen in every class.
+// screen, timezone and weather banner lists exactly those stale miss keys, each with its stage
+// (scripts/lib/fixtures/live-font-residual-baselines.json); anything else fails. Required
+// controls must stay on screen in every class.
 
 const FIX_VERSION = [0, 87, 0]
 
@@ -543,14 +544,98 @@ function classify(checks) {
     : 'unexpected'
 }
 
-/** The testID a miss key names (`''` for text without one): `["id","text"]#n` gives `id`. */
-const keyId = (key) => JSON.parse(key.slice(0, key.lastIndexOf('#')))[0]
+/**
+ * An hour-of-day label as the hourly ribbon renders it in English (formatHour in
+ * apps/mobile/components/hero/hourly-forecast-ribbon.tsx): an hour from 1 to 12, a narrow no-break
+ * space (U+202F), then AM or PM. The labels follow the clock the run starts at, so a residual entry
+ * keys them as one token, HOUR_TOKEN, whatever hour they show.
+ */
+export const HOUR_LABEL = /^(?:[1-9]|1[0-2])\u202f(?:AM|PM)$/
+export const HOUR_TOKEN = '<hour>'
+
+/**
+ * The key each text of a capture has in a residual entry, by its parity key. Hour labels become
+ * HOUR_TOKEN, indexed by their place among that testID's hour labels in screen order (top to
+ * bottom, then left to right, the order the parity keys count in), so several labels stay
+ * distinct and a label that moves along the ribbon gets another index. Every other key is its
+ * parity key. The parity measurement itself keeps the full text.
+ */
+function entryKeys(capture) {
+  const masked = new Map()
+  const hours = new Map()
+  for (const [key, node] of keyed(capture)) {
+    if (!HOUR_LABEL.test(node.text)) {
+      masked.set(key, key)
+      continue
+    }
+    const id = node.id ?? ''
+    const index = hours.get(id) ?? 0
+    hours.set(id, index + 1)
+    masked.set(key, `${JSON.stringify([id, HOUR_TOKEN])}#${index}`)
+  }
+  return masked
+}
+
+/** Each entry key stage: the parity check whose misses it records and the capture they sit on. */
+const STAGES = {
+  cold: { check: 'coldParity', capture: 'settled' },
+  updated: { check: 'postUpdateParity', capture: 'updated' },
+}
+const STAGED_KEY = /^(cold|updated):(.*)$/s
+
+/**
+ * Every stale miss of a leg as a residual entry keys it: `cold:` for a cold parity miss (measured
+ * on the settled screen), `updated:` for a post-update parity miss (on the updated screen), then
+ * the miss key with hour labels masked (entryKeys); sorted, duplicates kept. `captures` holds the
+ * leg's `settled` and `updated` captures.
+ */
+export function stageKeys(checks, captures) {
+  const keys = []
+  for (const [stage, { check, capture }] of Object.entries(STAGES)) {
+    const misses = checks[check]?.misses ?? []
+    if (!misses.length) continue
+    const masked = entryKeys(captures?.[capture])
+    for (const miss of misses) {
+      const key = masked.get(miss.key)
+      if (key === undefined)
+        fail('live_font_miss_capture_required', `${stage} ${miss.key}`)
+      keys.push(`${stage}:${key}`)
+    }
+  }
+  return keys.sort()
+}
+
+/** The testID an entry key names (`''` for text without one): `cold:["id","text"]#n` gives `id`. */
+const keyId = (key) => {
+  const bare = STAGED_KEY.exec(key)?.[2] ?? key
+  return JSON.parse(bare.slice(0, bare.lastIndexOf('#')))[0]
+}
 
 /** Every stale miss of a leg, cold parity first, duplicates kept. */
 const staleMisses = (checks) => [
   ...checks.coldParity.misses,
   ...(checks.postUpdateParity?.misses ?? []),
 ]
+
+/** The failing growth probe ids of a leg, sorted, duplicates kept. */
+const failingGrowth = (checks) =>
+  checks.growth.probes
+    .filter((probe) => !probe.pass)
+    .map((probe) => probe.probe)
+    .sort()
+
+/** What `run` holds beyond `listed`, and `listed` beyond `run`, as multisets. */
+function multisetDifference(run, listed) {
+  const missing = [...listed].sort()
+  const extra = []
+  // Each run item uses up one listed copy.
+  for (const item of [...run].sort()) {
+    const at = missing.indexOf(item)
+    if (at < 0) extra.push(item)
+    else missing.splice(at, 1)
+  }
+  return { extra, missing }
+}
 
 /** The review facts of an entry that break the six approval rules (TEA, 2026-11-13). */
 function brokenReviewFacts(baseline) {
@@ -570,45 +655,53 @@ function brokenReviewFacts(baseline) {
 }
 
 /**
- * Rule 6, keys exact: every failing growth probe is an id `staleKeys` names, and the run's stale
- * miss keys, sorted with duplicates kept, equal `staleKeys` exactly, so a hand edit carries no
- * headroom and a swap between two unlabeled texts is a new residual.
+ * Rule 6, keys exact: every failing growth probe is an id `staleKeys` names, the run's failing
+ * growth probes equal the entry's `review.growthFailing` (sorted, duplicates kept), and the run's
+ * entry keys (stageKeys) equal `staleKeys` exactly. A hand edit carries no headroom, a swap
+ * between two unlabeled texts is a new residual, and a key that moves between the cold and the
+ * updated stage is one key extra and one missing.
  */
-function exactnessProblem(checks, baseline) {
+function exactnessProblem(checks, baseline, captures) {
   const staleIds = new Set(baseline.staleKeys.map(keyId))
-  const failingProbes = checks.growth.probes
-    .filter((probe) => !probe.pass)
-    .map((probe) => probe.probe)
+  const failingProbes = failingGrowth(checks)
   const growthOutside = failingProbes.filter((id) => !staleIds.has(id))
   if (growthOutside.length)
     return `growth fails outside baseline: ${growthOutside.join(',')}`
-  // Multiset difference both ways: each run key uses up one listed copy.
-  const runKeys = staleMisses(checks).map((miss) => miss.key)
-  const left = [...baseline.staleKeys].sort()
-  const extra = []
-  for (const key of runKeys.sort()) {
-    const at = left.indexOf(key)
-    if (at < 0) extra.push(key)
-    else left.splice(at, 1)
-  }
-  if (extra.length || left.length)
+  const growth = multisetDifference(failingProbes, baseline.review.growthFailing)
+  if (growth.extra.length || growth.missing.length)
+    return [
+      'growth failing differs from baseline',
+      growth.extra.length && `failing in run only: ${growth.extra.join(',')}`,
+      growth.missing.length && `failing in baseline only: ${growth.missing.join(',')}`,
+    ]
+      .filter(Boolean)
+      .join('; ')
+  const { extra, missing } = multisetDifference(
+    stageKeys(checks, captures),
+    baseline.staleKeys
+  )
+  if (extra.length || missing.length)
     return [
       extra.length && `stale key outside baseline: ${extra[0]}`,
-      left.length && `baseline key no miss hit: ${left[0]}`,
-      `${extra.length} extra, ${left.length} missing`,
+      missing.length && `baseline key no miss hit: ${missing[0]}`,
+      `${extra.length} extra, ${missing.length} missing`,
     ]
       .filter(Boolean)
       .join('; ')
   return null
 }
 
-/** Why `keys` is no list of miss keys (`["id","text"]#n`), or null when it is one. */
+/**
+ * Why `keys` is no list of entry keys (`cold:` or `updated:`, then `["id","text"]#n`), or null
+ * when it is one.
+ */
 function staleKeysProblem(keys) {
   if (!Array.isArray(keys)) return 'baseline staleKeys must be a list of keys'
   const bad = keys.find((key) => {
-    if (typeof key !== 'string' || !/#\d+$/.test(key)) return true
+    const staged = typeof key === 'string' ? STAGED_KEY.exec(key) : null
+    if (!staged || !/#\d+$/.test(staged[2])) return true
     try {
-      const named = JSON.parse(key.slice(0, key.lastIndexOf('#')))
+      const named = JSON.parse(staged[2].slice(0, staged[2].lastIndexOf('#')))
       return !Array.isArray(named) || typeof named[0] !== 'string'
     } catch {
       return true
@@ -620,35 +713,72 @@ function staleKeysProblem(keys) {
 }
 
 /**
- * Why the run's environment differs from the one the entry was approved in, or null. The
- * timezone is part of it: an entry with none, or a run with none, approves nothing.
+ * The Community screen's notice while the local forecast is out of date: the view with this
+ * testID, holding community.band.unresolved.weather_stale (the proof runs in en-US).
  */
-function environmentProblem(baseline, timezone) {
+export const WEATHER_BANNER_MARKER = 'community-band-unresolved'
+export const WEATHER_STALE_TEXT =
+  'Your local forecast is out of date, so you are seeing looks from every climate band.'
+
+/**
+ * The weather banner a capture shows: `out-of-date` when the banner view (`marker`) is on screen
+ * with the out-of-date text, `none` when neither is, and `other` for anything else (the banner
+ * with another reason, or the text without the view).
+ */
+export function weatherBannerState(capture, marker = WEATHER_BANNER_MARKER) {
+  const shown = (capture?.controls ?? []).some((control) => control.id === marker)
+  const texts = [
+    ...appNodes(capture).map((node) => node.text),
+    ...(capture?.fullText ?? []).map((key) => JSON.parse(key)[1]),
+  ]
+  const stale = texts.includes(WEATHER_STALE_TEXT)
+  if (!shown && !stale) return 'none'
+  return shown && stale ? 'out-of-date' : 'other'
+}
+
+/**
+ * Why the run's environment differs from the one the entry was approved in, or null. The
+ * timezone and the weather banner are part of it: an entry without either, or a run without
+ * either, approves nothing. `weatherBanner` is the banner state the run set up; on a screen that
+ * renders the banner (`captures.bannerMarker`), the leg's before and settled captures must show
+ * the entry's state too. The updated capture is left out: the Community update shows every band,
+ * and the notice belongs to the viewer's own band only, so it hides the banner by design.
+ */
+function environmentProblem(baseline, { timezone, weatherBanner, captures }) {
   const known = (value) => typeof value === 'string' && value !== ''
-  if (known(baseline.timezone) && known(timezone) && baseline.timezone === timezone)
-    return null
-  return `baseline timezone ${baseline.timezone ?? 'missing'}, run timezone ${timezone ?? 'missing'}`
+  const same = (a, b) => known(a) && known(b) && a === b
+  if (!same(baseline.timezone, timezone))
+    return `baseline timezone ${baseline.timezone ?? 'missing'}, run timezone ${timezone ?? 'missing'}`
+  if (!same(baseline.weatherBanner, weatherBanner))
+    return `baseline weather banner ${baseline.weatherBanner ?? 'missing'}, run weather banner ${weatherBanner ?? 'missing'}`
+  if (captures?.bannerMarker)
+    for (const stage of ['before', 'settled']) {
+      if (!captures[stage]) continue
+      const shown = weatherBannerState(captures[stage], captures.bannerMarker)
+      if (shown !== baseline.weatherBanner)
+        return `baseline weather banner ${baseline.weatherBanner}, ${stage} capture shows ${shown}`
+    }
+  return null
 }
 
 /**
  * A residual passes only as a reviewed baseline entry describes it: approved in the run's
- * timezone, and `staleKeys` lists exactly the stale miss keys (`["id","text"]#n`, `''` for text
- * without an id) that keep their base-scale height. Anything else is a new regression until it
- * is reviewed.
+ * timezone and weather banner, with `staleKeys` listing exactly the run's entry keys (stageKeys).
+ * Anything else is a new regression until it is reviewed.
  */
-function residualApproved(checks, baseline, timezone) {
+function residualApproved(checks, baseline, environment) {
   const unapproved = (reason) => ({
     pass: false,
     code: 'live_font_residual_unapproved',
     reason,
   })
   if (!baseline) return unapproved('no reviewed baseline')
-  const environment = environmentProblem(baseline, timezone)
-  if (environment)
+  const differs = environmentProblem(baseline, environment)
+  if (differs)
     return {
       pass: false,
       code: 'live_font_residual_environment_differs',
-      reason: environment,
+      reason: differs,
     }
   const shape = staleKeysProblem(baseline.staleKeys)
   if (shape) return unapproved(shape)
@@ -659,27 +789,27 @@ function residualApproved(checks, baseline, timezone) {
     return unapproved(
       `baseline review facts break the approval rules: ${broken.join(',')}`
     )
-  const problem = exactnessProblem(checks, baseline)
+  const problem = exactnessProblem(checks, baseline, environment.captures)
   return problem ? unapproved(problem) : { pass: true }
 }
 
 /**
  * TEA, 2026-11-13: what a reviewer needs to approve a known-residual leg, in the baseline entry's
- * own shape. `staleKeys` is exact (every stale miss key, sorted, duplicates kept, no headroom),
- * and the facts the six approval rules read ride beside it under `review`; the runner adds the
- * leg's identity, timezone and evidence. Approval is then a reviewed diff of the baselines file.
+ * own shape. `staleKeys` is exact (stageKeys: every stale miss key with its stage and hour labels
+ * masked, sorted, duplicates kept, no headroom), and the facts the six approval rules read ride
+ * beside it under `review`; the runner adds the leg's identity, timezone, weather banner and
+ * evidence. Approval is then a reviewed diff of the baselines file. `captures` holds the leg's
+ * `settled` and `updated` captures.
  */
-export function proposedResidualEntry(checks) {
+export function proposedResidualEntry(checks, captures) {
   const misses = staleMisses(checks)
   return {
-    staleKeys: misses.map((miss) => miss.key).sort(),
+    staleKeys: stageKeys(checks, captures),
     review: {
       verdict: classify(checks),
       structuralPass: !structural(checks),
       everyMissStale: misses.length > 0 && misses.every((miss) => miss.stale),
-      growthFailing: checks.growth.probes
-        .filter((probe) => !probe.pass)
-        .map((probe) => probe.probe),
+      growthFailing: failingGrowth(checks),
     },
   }
 }
@@ -687,13 +817,15 @@ export function proposedResidualEntry(checks) {
 /**
  * The proof's pass rule. With the fix bundled the screen must relayout in place. Without it an
  * early correct relayout passes with `baselineReview` set, and a residual passes only within its
- * reviewed baseline, approved in the run's `timezone`; a restored screen or any other failure is
- * red.
+ * reviewed baseline, approved in the run's `timezone` and `weatherBanner` (the banner state the
+ * run set up); a restored screen or any other failure is red. `change.bannerMarker` names the
+ * banner view on a screen that renders it.
  */
 export function assertLiveFontProof({
   reactNativeVersion,
   residualBaseline,
   timezone,
+  weatherBanner,
   ...change
 }) {
   const fixExpected = fixExpectedFor(reactNativeVersion)
@@ -711,7 +843,11 @@ export function assertLiveFontProof({
       `verdict ${result.verdict}; failing ${failing()}`
     )
   if (!fixExpected && result.verdict === 'known-residual') {
-    const approved = residualApproved(result.checks, residualBaseline, timezone)
+    const approved = residualApproved(result.checks, residualBaseline, {
+      timezone,
+      weatherBanner,
+      captures: change,
+    })
     if (!approved.pass) fail(approved.code, approved.reason)
   }
   return {

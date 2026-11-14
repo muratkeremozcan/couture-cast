@@ -21,8 +21,14 @@ import {
   evaluateLiveFontChange,
   expectedTextRatio,
   fixExpectedFor,
+  HOUR_LABEL,
   parseBounds,
+  proposedResidualEntry,
   requiredMounts,
+  stageKeys,
+  WEATHER_BANNER_MARKER,
+  WEATHER_STALE_TEXT,
+  weatherBannerState,
 } from './live-font-scale-proof.mjs'
 
 const baseline = JSON.parse(
@@ -648,14 +654,17 @@ describe('evaluateLiveFontChange', () => {
 })
 
 describe('assertLiveFontProof', () => {
-  // The stale miss keys of the Story 6.8 Home residual, as the oracle reports them.
+  // The stale miss keys of the Story 6.8 Home residual, as the oracle reports them, each with
+  // its stage: every miss of this leg is a cold parity miss.
   const STALE_KEYS = evaluateLiveFontChange(bugChange())
-    .checks.coldParity.misses.map((miss) => miss.key)
+    .checks.coldParity.misses.map((miss) => `cold:${miss.key}`)
     .sort()
   const TZ = 'America/Chicago'
+  const BANNER = 'out-of-date'
   // R2-05: the Story 6.8 Home residual as a reviewed baseline would describe it.
   const BASELINE = {
     timezone: TZ,
+    weatherBanner: BANNER,
     staleKeys: STALE_KEYS,
     review: {
       verdict: 'known-residual',
@@ -666,27 +675,32 @@ describe('assertLiveFontProof', () => {
     },
   }
   const attempt =
-    (residualBaseline, timezone = TZ) =>
+    (residualBaseline, timezone = TZ, weatherBanner = BANNER, change = bugChange()) =>
     () =>
       assertLiveFontProof({
         reactNativeVersion: '0.81.5',
         residualBaseline,
         timezone,
-        ...bugChange(),
+        weatherBanner,
+        ...change,
       })
   const refused = (pattern) => (error) =>
     error.code === 'live_font_residual_unapproved' && pattern.test(error.message)
-  const unlabeled = STALE_KEYS.filter((key) => key.startsWith('["",'))
+  const differs = (pattern) => (error) =>
+    error.code === 'live_font_residual_environment_differs' && pattern.test(error.message)
+  const unlabeled = STALE_KEYS.filter((key) => key.startsWith('cold:["",'))
 
   test('the residual has 41 stale keys, two of them labeled, and no key twice', () => {
     assert.equal(STALE_KEYS.length, 41)
     assert.deepEqual(
-      STALE_KEYS.filter((key) => !key.startsWith('["",')),
+      STALE_KEYS.filter((key) => !key.startsWith('cold:["",')),
       [
-        '["current-condition","t-c63401aba20f"]#0',
-        '["outfit-comfort-notes","t-cf83675a2f00"]#0',
+        'cold:["current-condition","t-c63401aba20f"]#0',
+        'cold:["outfit-comfort-notes","t-cf83675a2f00"]#0',
       ]
     )
+    const { checks } = evaluateLiveFontChange(bugChange())
+    assert.deepEqual(proposedResidualEntry(checks, bugChange()).staleKeys, STALE_KEYS)
     assert.equal(new Set(STALE_KEYS).size, 41)
   })
 
@@ -699,6 +713,7 @@ describe('assertLiveFontProof', () => {
         assertLiveFontProof({
           reactNativeVersion: '0.81.5',
           timezone: TZ,
+          weatherBanner: BANNER,
           ...bugChange(),
         }),
       refused(/no reviewed baseline/)
@@ -710,9 +725,6 @@ describe('assertLiveFontProof', () => {
   // TEA, 2026-11-13: an entry approves only in the timezone it was approved in, checked before
   // its keys.
   test('an entry approves only in the run timezone, and one with none approves nothing', () => {
-    const differs = (pattern) => (error) =>
-      error.code === 'live_font_residual_environment_differs' &&
-      pattern.test(error.message)
     assert.doesNotThrow(attempt(BASELINE, TZ))
     assert.throws(
       attempt(BASELINE, 'Europe/Istanbul'),
@@ -753,11 +765,151 @@ describe('assertLiveFontProof', () => {
     assert.throws(
       attempt({
         ...BASELINE,
-        staleKeys: STALE_KEYS.filter((key) => !key.startsWith('["current-condition"')),
+        staleKeys: STALE_KEYS.filter(
+          (key) => !key.startsWith('cold:["current-condition"')
+        ),
         review: { ...BASELINE.review, growthFailing: [] },
       }),
       refused(/growth fails outside baseline: current-condition/)
     )
+  })
+
+  // Antigravity r30 item 2: the run's failing growth probes equal the entry's growthFailing as a
+  // sorted multiset, beside each failing probe being an id the keys name.
+  test('an entry whose growthFailing differs from the run, extra or missing, approves nothing', () => {
+    const growing = (growthFailing) => ({
+      ...BASELINE,
+      review: { ...BASELINE.review, growthFailing },
+    })
+    assert.doesNotThrow(attempt(growing(['current-condition'])))
+    // The run fails current-condition and the entry lists no growth failure.
+    assert.throws(
+      attempt(growing([])),
+      refused(
+        /growth failing differs from baseline; failing in run only: current-condition$/
+      )
+    )
+    // outfit-comfort-notes is a key id, so the review facts hold, and the run never fails it.
+    assert.throws(
+      attempt(growing(['current-condition', 'outfit-comfort-notes'])),
+      refused(
+        /growth failing differs from baseline; failing in baseline only: outfit-comfort-notes$/
+      )
+    )
+    // A multiset: the same probe twice is one too many.
+    assert.throws(
+      attempt(growing(['current-condition', 'current-condition'])),
+      refused(/failing in baseline only: current-condition$/)
+    )
+    assert.throws(
+      attempt(growing(['outfit-comfort-notes'])),
+      refused(
+        /failing in run only: current-condition; failing in baseline only: outfit-comfort-notes$/
+      )
+    )
+  })
+
+  // Antigravity r30 item 2: a key keeps its stage, so the same text moving between the cold and
+  // the updated parity is a new residual.
+  test('a key moved from the cold to the updated stage with the same text approves nothing', () => {
+    // The update re-used the 1.0 measurements too: every miss shows in both stages.
+    const twoStage = () => ({
+      ...bugChange(),
+      updated: stage('settled'),
+      coldUpdated: cold(),
+    })
+    const { checks } = evaluateLiveFontChange(twoStage())
+    const proposal = proposedResidualEntry(checks, twoStage())
+    const entry = { ...BASELINE, staleKeys: proposal.staleKeys }
+    assert.equal(entry.staleKeys.length, 82)
+    assert.equal(entry.staleKeys.filter((key) => key.startsWith('updated:')).length, 41)
+    assert.doesNotThrow(attempt(entry, TZ, BANNER, twoStage()))
+    const moved = entry.staleKeys.indexOf(STALE_KEYS[0])
+    const staleKeys = entry.staleKeys.map((key, index) =>
+      index === moved ? key.replace(/^cold:/, 'updated:') : key
+    )
+    // With the stages stripped the two lists are one multiset; with them they differ.
+    const bare = (keys) => keys.map((key) => key.replace(/^(cold|updated):/, '')).sort()
+    assert.deepEqual(bare(staleKeys), bare(entry.staleKeys))
+    const escaped = STALE_KEYS[0].replace(/[[\]]/g, '\\$&')
+    assert.throws(
+      attempt({ ...entry, staleKeys }, TZ, BANNER, twoStage()),
+      refused(
+        new RegExp(
+          `stale key outside baseline: ${escaped}; baseline key no miss hit: updated:.*; 1 extra, 1 missing`
+        )
+      )
+    )
+  })
+
+  // TEA ruling on Antigravity r30 item 1: the out-of-date forecast notice is part of the
+  // environment an entry is approved in, checked before its keys.
+  test('an entry approves only with the run weather banner, as the captures show it', () => {
+    assert.throws(
+      attempt(BASELINE, TZ, 'none'),
+      differs(/baseline weather banner out-of-date, run weather banner none/)
+    )
+    assert.throws(attempt(BASELINE, TZ, null), differs(/run weather banner missing/))
+    const noBanner = { ...BASELINE }
+    delete noBanner.weatherBanner
+    assert.throws(attempt(noBanner), differs(/baseline weather banner missing/))
+    // Checked before the keys: broken keys still fail on the banner.
+    assert.throws(
+      attempt({ ...BASELINE, staleKeys: 'all' }, TZ, 'none'),
+      differs(/run weather banner none/)
+    )
+    // A screen that renders the banner must show the entry's state in its before and settled
+    // captures, whatever state the run says it set up.
+    const showing = (change) => {
+      for (const capture of [
+        change.before,
+        change.immediate,
+        change.settled,
+        change.cold,
+      ]) {
+        capture.controls = [{ id: WEATHER_BANNER_MARKER, bounds: '[42,677][1038,851]' }]
+        capture.nodes.push({
+          id: '',
+          text: WEATHER_STALE_TEXT,
+          bounds: '[81,716][999,812]',
+        })
+      }
+      return change
+    }
+    const banner = () => showing({ ...bugChange(), bannerMarker: WEATHER_BANNER_MARKER })
+    assert.doesNotThrow(attempt(BASELINE, TZ, BANNER, banner()))
+    const plain = { ...bugChange(), bannerMarker: WEATHER_BANNER_MARKER }
+    assert.throws(
+      attempt(BASELINE, TZ, BANNER, plain),
+      differs(/baseline weather banner out-of-date, before capture shows none/)
+    )
+    // The settled screen lost the banner view: its text alone is another state.
+    const lost = banner()
+    lost.settled.controls = []
+    assert.throws(
+      attempt(BASELINE, TZ, BANNER, lost),
+      differs(/baseline weather banner out-of-date, settled capture shows other/)
+    )
+    // The updated capture is not read: the Community update shows every band, which hides it.
+    const updatedHides = {
+      ...banner(),
+      updated: stage('settled'),
+      coldUpdated: cold(),
+    }
+    const twoStage = proposedResidualEntry(
+      evaluateLiveFontChange(updatedHides).checks,
+      updatedHides
+    )
+    assert.doesNotThrow(
+      attempt({ ...BASELINE, staleKeys: twoStage.staleKeys }, TZ, BANNER, updatedHides)
+    )
+    const quiet = { ...BASELINE, weatherBanner: 'none' }
+    assert.throws(
+      attempt(quiet, TZ, 'none', banner()),
+      differs(/baseline weather banner none, before capture shows out-of-date/)
+    )
+    // A screen without the banner (Home, Settings) is judged on the run's state alone.
+    assert.doesNotThrow(attempt(quiet, TZ, 'none', bugChange()))
   })
 
   // TEA ruling on Antigravity r28: rule 6, keys exact. Every stale miss key, duplicates kept,
@@ -765,8 +917,8 @@ describe('assertLiveFontProof', () => {
   test('an entry with an extra, missing, swapped or miscounted key approves nothing', () => {
     assert.doesNotThrow(attempt(BASELINE))
     assert.throws(
-      attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, '["","Language"]#0'] }),
-      refused(/baseline key no miss hit: \["","Language"\]#0; 0 extra, 1 missing/)
+      attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, 'cold:["","Language"]#0'] }),
+      refused(/baseline key no miss hit: cold:\["","Language"\]#0; 0 extra, 1 missing/)
     )
     const dropped = unlabeled[3]
     assert.throws(
@@ -784,7 +936,10 @@ describe('assertLiveFontProof', () => {
     )
     // Only the key for the failing growth probe: every other miss is outside the entry.
     assert.throws(
-      attempt({ ...BASELINE, staleKeys: ['["current-condition","t-c63401aba20f"]#0'] }),
+      attempt({
+        ...BASELINE,
+        staleKeys: ['cold:["current-condition","t-c63401aba20f"]#0'],
+      }),
       refused(/40 extra, 0 missing/)
     )
   })
@@ -793,25 +948,17 @@ describe('assertLiveFontProof', () => {
   // keeps the ids ('' and the two labeled ones) and the count (41), and must now fail.
   test('an equal-count swap between unlabeled texts approves nothing', () => {
     const swapped = STALE_KEYS.map((key) =>
-      key === unlabeled[0] ? '["","Elsewhere"]#0' : key
+      key === unlabeled[0] ? 'cold:["","Elsewhere"]#0' : key
     )
     assert.equal(swapped.length, STALE_KEYS.length)
-    assert.deepEqual(
-      [
-        ...new Set(
-          swapped.map((key) => JSON.parse(key.slice(0, key.lastIndexOf('#')))[0])
-        ),
-      ],
-      [
-        ...new Set(
-          STALE_KEYS.map((key) => JSON.parse(key.slice(0, key.lastIndexOf('#')))[0])
-        ),
-      ]
-    )
+    const ids = (keys) => [
+      ...new Set(keys.map((key) => JSON.parse(key.slice(5, key.lastIndexOf('#')))[0])),
+    ]
+    assert.deepEqual(ids(swapped), ids(STALE_KEYS))
     assert.throws(
       attempt({ ...BASELINE, staleKeys: swapped }),
       refused(
-        /stale key outside baseline: .*baseline key no miss hit: \["","Elsewhere"\]#0/
+        /stale key outside baseline: .*baseline key no miss hit: cold:\["","Elsewhere"\]#0/
       )
     )
   })
@@ -832,6 +979,14 @@ describe('assertLiveFontProof', () => {
       '["","Home"]',
       'Home#0',
       '"x"#0',
+      // A key needs its stage, and only cold: or updated: name one.
+      '["","Home"]#0',
+      'settled:["","Home"]#0',
+      'Cold:["","Home"]#0',
+      'cold:["","Home"]',
+      'cold:Home#0',
+      'cold:"x"#0',
+      'updated:',
     ])
       assert.throws(
         attempt({ ...BASELINE, staleKeys: [...STALE_KEYS, member] }),
@@ -1040,5 +1195,176 @@ describe('composer controls (F-05)', () => {
         }),
       { code: 'live_font_composer_feedback_moved_control' }
     )
+  })
+})
+
+// TEA ruling on Antigravity r30 item 1: the hourly ribbon labels follow the clock the run starts
+// at, so a residual entry keys them as one token, indexed by place.
+describe('hour labels in residual entry keys', () => {
+  const NNBSP = '\u202f'
+  test('HOUR_LABEL takes only the ribbon format: 1 to 12, a narrow no-break space, AM or PM', () => {
+    for (const label of ['1', '9', '10', '12'].flatMap((hour) => [
+      `${hour}${NNBSP}AM`,
+      `${hour}${NNBSP}PM`,
+    ]))
+      assert.ok(HOUR_LABEL.test(label), label)
+    for (const text of [
+      '1 AM',
+      `1${NNBSP}am`,
+      'Expand (48h)',
+      `10${NNBSP}AM meeting`,
+      'AM',
+      `${NNBSP}AM`,
+      `13${NNBSP}PM`,
+      `0${NNBSP}AM`,
+      `01${NNBSP}AM`,
+      `1:00${NNBSP}AM`,
+      `10:30${NNBSP}PM`,
+      `1${NNBSP}AM `,
+      `1${NNBSP}${NNBSP}AM`,
+      '68°F',
+    ])
+      assert.equal(HOUR_LABEL.test(text), false, JSON.stringify(text))
+  })
+
+  /** A ribbon of hour labels from `first`, one per 100 px, with a temperature under each. */
+  const ribbon = (first, count = 3, { id = '', top = 900 } = {}) => ({
+    nodes: Array.from({ length: count }, (_, index) => [
+      {
+        id,
+        text: `${((first + index - 1) % 12) + 1}${NNBSP}AM`,
+        bounds: `[${index * 100},${top}][${index * 100 + 80},${top + 40}]`,
+      },
+      {
+        id: '',
+        text: '68°F',
+        bounds: `[${index * 100},${top + 50}][${index * 100 + 80},${top + 90}]`,
+      },
+    ]).flat(),
+  })
+  const keyOf = (id, text, n = 0) => `${JSON.stringify([id, text])}#${n}`
+  const checksMissing = (keys) => ({
+    coldParity: { misses: keys.map((key) => ({ key })) },
+  })
+
+  test('an hour label becomes <hour> with its place among the hour labels, other text stays', () => {
+    const settled = ribbon(1)
+    const keys = stageKeys(
+      checksMissing([
+        keyOf('', `1${NNBSP}AM`),
+        keyOf('', `3${NNBSP}AM`),
+        keyOf('', '68°F', 2),
+      ]),
+      { settled }
+    )
+    assert.deepEqual(keys, [
+      'cold:["","68°F"]#2',
+      'cold:["","<hour>"]#0',
+      'cold:["","<hour>"]#2',
+    ])
+    // A stale hour label is still a stale key: the masked key keeps one entry per miss.
+    assert.equal(keys.filter((key) => key.includes('<hour>')).length, 2)
+  })
+
+  test('the same misses an hour later give the same keys; a moved or extra miss does not', () => {
+    const at1 = stageKeys(
+      checksMissing([keyOf('', `1${NNBSP}AM`), keyOf('', `3${NNBSP}AM`)]),
+      { settled: ribbon(1) }
+    )
+    const at2 = stageKeys(
+      checksMissing([keyOf('', `2${NNBSP}AM`), keyOf('', `4${NNBSP}AM`)]),
+      { settled: ribbon(2) }
+    )
+    assert.deepEqual(at2, at1)
+    // The second label stale in place of the third is another position.
+    const moved = stageKeys(
+      checksMissing([keyOf('', `2${NNBSP}AM`), keyOf('', `3${NNBSP}AM`)]),
+      { settled: ribbon(2) }
+    )
+    assert.deepEqual(moved, ['cold:["","<hour>"]#0', 'cold:["","<hour>"]#1'])
+    assert.notDeepEqual(moved, at1)
+    const more = stageKeys(
+      checksMissing([
+        keyOf('', `2${NNBSP}AM`),
+        keyOf('', `3${NNBSP}AM`),
+        keyOf('', `4${NNBSP}AM`),
+      ]),
+      { settled: ribbon(2) }
+    )
+    assert.equal(more.length, 3)
+  })
+
+  test('repeated hour texts get distinct indexes in screen order, whatever the node order', () => {
+    // An expanded 48 h ribbon shows 1 AM twice: two rows, same text, #0 and #1 as parity keys.
+    const twoRows = {
+      nodes: [...ribbon(1, 2, { top: 1200 }).nodes, ...ribbon(1, 2, { top: 900 }).nodes],
+    }
+    const misses = checksMissing([
+      keyOf('', `1${NNBSP}AM`, 1),
+      keyOf('', `2${NNBSP}AM`, 0),
+    ])
+    const keys = stageKeys(misses, { settled: twoRows })
+    // Row one (top 900) holds <hour>#0 and #1, row two #2 and #3; the second 1 AM is #2.
+    assert.deepEqual(keys, ['cold:["","<hour>"]#1', 'cold:["","<hour>"]#2'])
+    const shuffled = { nodes: [...twoRows.nodes].reverse() }
+    assert.deepEqual(stageKeys(misses, { settled: shuffled }), keys)
+    // Indexes count per testID.
+    const labeled = {
+      nodes: [...ribbon(1, 2).nodes, ...ribbon(5, 1, { id: 'x', top: 1500 }).nodes],
+    }
+    assert.deepEqual(
+      stageKeys(checksMissing([keyOf('x', `5${NNBSP}AM`), keyOf('', `2${NNBSP}AM`)]), {
+        settled: labeled,
+      }),
+      ['cold:["","<hour>"]#1', 'cold:["x","<hour>"]#0']
+    )
+  })
+
+  test('each stage masks against its own capture and keeps its prefix', () => {
+    const checks = {
+      coldParity: { misses: [{ key: keyOf('', `1${NNBSP}AM`) }] },
+      postUpdateParity: { misses: [{ key: keyOf('', `3${NNBSP}AM`) }] },
+    }
+    assert.deepEqual(stageKeys(checks, { settled: ribbon(1), updated: ribbon(2) }), [
+      'cold:["","<hour>"]#0',
+      'updated:["","<hour>"]#1',
+    ])
+  })
+
+  test('a miss the capture does not hold fails loudly', () => {
+    assert.throws(
+      () => stageKeys(checksMissing([keyOf('', `9${NNBSP}AM`)]), { settled: ribbon(1) }),
+      { code: 'live_font_miss_capture_required' }
+    )
+    assert.throws(() => stageKeys(checksMissing([keyOf('', 'Home')]), {}), {
+      code: 'live_font_miss_capture_required',
+    })
+  })
+})
+
+describe('weatherBannerState', () => {
+  const marker = { id: WEATHER_BANNER_MARKER, bounds: '[42,677][1038,851]' }
+  const text = { id: '', text: WEATHER_STALE_TEXT, bounds: '[81,716][999,812]' }
+  test('reads out-of-date, none or other from the banner view and its text', () => {
+    assert.equal(weatherBannerState({ controls: [marker], nodes: [text] }), 'out-of-date')
+    assert.equal(
+      weatherBannerState({
+        controls: [marker],
+        nodes: [],
+        fullText: [JSON.stringify(['', WEATHER_STALE_TEXT])],
+      }),
+      'out-of-date'
+    )
+    assert.equal(weatherBannerState({ controls: [], nodes: [] }), 'none')
+    assert.equal(weatherBannerState(undefined), 'none')
+    // The banner with another reason, or the text without the banner view.
+    assert.equal(
+      weatherBannerState({
+        controls: [marker],
+        nodes: [{ ...text, text: 'Add your location to see looks near you.' }],
+      }),
+      'other'
+    )
+    assert.equal(weatherBannerState({ controls: [], nodes: [text] }), 'other')
   })
 })
