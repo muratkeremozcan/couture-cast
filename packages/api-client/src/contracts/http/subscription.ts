@@ -153,6 +153,12 @@ export const billingWebhookResponseSchema = z.object({
 
 export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
 export type EntitlementStore = z.infer<typeof entitlementStoreSchema>
+export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>
+export type Subscription = z.infer<typeof subscriptionSchema>
+export type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>
+export type CheckoutSessionRequest = z.infer<typeof checkoutSessionRequestSchema>
+export type CheckoutSessionResponse = z.infer<typeof checkoutSessionResponseSchema>
+export type PortalSessionResponse = z.infer<typeof portalSessionResponseSchema>
 
 /** Where a member manages a subscription, by the store that bills it. */
 export type SubscriptionManageEntry = 'web' | 'store' | 'none'
@@ -177,12 +183,6 @@ export function subscriptionManageEntry(
       return 'store'
   }
 }
-export type SubscriptionStatus = z.infer<typeof subscriptionStatusSchema>
-export type Subscription = z.infer<typeof subscriptionSchema>
-export type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>
-export type CheckoutSessionRequest = z.infer<typeof checkoutSessionRequestSchema>
-export type CheckoutSessionResponse = z.infer<typeof checkoutSessionResponseSchema>
-export type PortalSessionResponse = z.infer<typeof portalSessionResponseSchema>
 export type BillingWebhookResponse = z.infer<typeof billingWebhookResponseSchema>
 
 // --- Error messages --------------------------------------------------------

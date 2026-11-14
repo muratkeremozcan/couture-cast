@@ -14,16 +14,19 @@
 // Authorization and one with a wrong value must reach our handler and get its JSON 401. A
 // Vercel login page or a 2xx fails it.
 
-import { BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE } from '@couture/api-client/contracts/http/subscription'
-
 export const WEBHOOK_ROUTE = '/api/v1/commerce/subscription/webhooks/revenuecat'
 export const BYPASS_PARAM = 'x-vercel-protection-bypass'
 /** The dedicated secret's variable name; its value lives in .env.preview only. */
 export const WEBHOOK_BYPASS_ENV = 'REVENUECAT_TEST_STORE_WEBHOOK_BYPASS_SECRET'
 /** The bypass the journey proxy and the read checks send as a header (Playwright's). */
 export const READ_BYPASS_ENV = 'VERCEL_AUTOMATION_BYPASS_SECRET'
-/** The handler's own 401 message, from the API contract, so a reworded message still matches. */
-export const UNAUTHORIZED_MESSAGE = BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE
+/**
+ * The handler's own 401 message. scripts/lib imports no workspace build output (the node test
+ * gate runs before packages build), so this is a literal that
+ * packages/api-client/testing/subscription-contract.spec.ts pins to
+ * BILLING_WEBHOOK_UNAUTHORIZED_MESSAGE.
+ */
+export const UNAUTHORIZED_MESSAGE = 'Invalid webhook credentials.'
 
 /** The URL to paste into RevenueCat, with the secret shown only as its variable name. */
 export function webhookUrlShape(apiOrigin) {
