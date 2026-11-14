@@ -260,6 +260,7 @@ function clipping(capture, tolerance, reference) {
 const rectHeight = (rect) => rect[3] - rect[1]
 /** A text input of more than one line (maxLines other than 1): it scrolls its own content. */
 const multilineInput = (record) => INPUT_KINDS.has(record.kind) && record.maxLines !== 1
+/** The one masking residual entry keys and the hidden-text count share: hour labels to HOUR_TOKEN. */
 const maskText = (text) => (HOUR_LABEL.test(text) ? HOUR_TOKEN : text)
 
 /**
@@ -372,9 +373,10 @@ export function textProbeSummary(capture, platform) {
       .map((pair) => records[pair.record].text),
     // TEA ruling 2026-11-14: records at opacity 0, with the key of the node each would pair
     // with (null when the hierarchy shows none), for review with each entry.
-    invisible: match.invisible.map(({ record, node }) => ({
+    invisible: match.invisible.map(({ record, node, comparable }) => ({
       key: node === null ? null : masked.get(keys[node]),
       text: records[record].text,
+      comparable,
     })),
     empty: match.empty.length,
     windowNodes: match.windowNodes.map((index) => identityOf(nodes[index])),
@@ -768,7 +770,11 @@ export function evaluateLiveFontChange({
   return { checks, verdict: classify(checks) }
 }
 
-/** Per text (hour labels masked): the keys its paired records have, and its invisible count. */
+/**
+ * Per text, masked by maskText as residual entry keys are: the keys its paired records have, and
+ * how many of its records are invisible and comparable across launches (not covered, volatile or
+ * scrolled away; the paired keys already leave those out).
+ */
 function textPresence(capture, platform) {
   const presence = new Map()
   const entry = (text) => {
@@ -778,8 +784,8 @@ function textPresence(capture, platform) {
   const layout = textLayout(capture, platform)
   for (const fact of layout.facts)
     if (fact.key !== null) entry(maskText(fact.record.text)).keys.push(fact.key)
-  for (const { record } of layout.match?.invisible ?? [])
-    entry(maskText(capture.textProbe.records[record].text)).invisible += 1
+  for (const { record, comparable } of layout.match?.invisible ?? [])
+    if (comparable) entry(maskText(capture.textProbe.records[record].text)).invisible += 1
   return presence
 }
 
@@ -918,14 +924,15 @@ function entryKeys(capture) {
   const masked = new Map()
   const hours = new Map()
   for (const [key, node] of keyed(capture)) {
-    if (!HOUR_LABEL.test(node.text)) {
+    const text = maskText(node.text)
+    if (text === node.text) {
       masked.set(key, key)
       continue
     }
     const id = node.id ?? ''
     const index = hours.get(id) ?? 0
     hours.set(id, index + 1)
-    masked.set(key, `${JSON.stringify([id, HOUR_TOKEN])}#${index}`)
+    masked.set(key, `${JSON.stringify([id, text])}#${index}`)
   }
   return masked
 }

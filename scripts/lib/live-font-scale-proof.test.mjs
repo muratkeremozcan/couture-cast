@@ -1554,7 +1554,11 @@ describe('text layout clipping (F-00i)', () => {
     const { checks, verdict } = evaluateLiveFontChangeRaw(change)
     assert.equal(verdict, 'fixed')
     assert.deepEqual(checks.textProbe.stages.settled.invisible, [
-      { key: `["current-temperature","${TEMPERATURE}"]#0`, text: TEMPERATURE },
+      {
+        key: `["current-temperature","${TEMPERATURE}"]#0`,
+        text: TEMPERATURE,
+        comparable: true,
+      },
     ])
   })
 
@@ -1620,6 +1624,104 @@ describe('text layout clipping (F-00i)', () => {
     hide(both.settled)
     hide(both.cold)
     assert.equal(evaluateLiveFontChangeRaw(both).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling 2026-11-14, bound 1: only records that compare across launches count.
+  test('an invisible copy covered, volatile or scrolled away does not count as hidden text', () => {
+    const windows = [
+      { id: 1, rect: [0, 0, 100000, 100000], z: 0, focused: false },
+      { id: 2, rect: [0, 0, 10, 10], z: 1, focused: true },
+    ]
+    const cases = {
+      'behind a focused dialog': (capture, record) => {
+        capture.textProbe.windows = windows
+        capture.textProbe.records.push(
+          probeRecord('android', 'OK', [0, 0, 10, 10], { window: 2 })
+        )
+        capture.nodes = [...capture.nodes, { id: '', text: 'OK', bounds: '[0,0][10,10]' }]
+        return record
+      },
+      'in a volatile region': (capture, record) => {
+        capture.volatileRegions = [
+          `[${record.viewRect[0]},${record.viewRect[1]}][${record.viewRect[2]},${record.viewRect[3]}]`,
+        ]
+        return record
+      },
+      'scrolled away': (capture, record) =>
+        Object.assign(record, { visibleRect: null, clipRect: null, scrolledAway: true }),
+    }
+    for (const [name, place] of Object.entries(cases)) {
+      const change = withAll(fixedChange())
+      // The live screen lost the temperature: its texts are gone from the hierarchy, and one
+      // opacity 0 copy is left where the hidden-text count must not see it.
+      const live = change.settled
+      const records = live.textProbe.records.filter((r) => r.text === TEMPERATURE)
+      live.textProbe.records = live.textProbe.records.filter(
+        (r) => r.text !== TEMPERATURE
+      )
+      live.nodes = live.nodes.filter((node) => node.text !== TEMPERATURE)
+      live.textProbe.records.push(place(live, { ...records[0], opacity: 0 }))
+      const { checks } = evaluateLiveFontChangeRaw(change)
+      assert.equal(checks.textHidden.pass, true, name)
+      assert.equal(checks.textProbe.stages.settled.invisible[0].comparable, false, name)
+      // The text is still lost: the lost-text check fails it.
+      assert.equal(checks.fullText.pass, false, name)
+    }
+  })
+
+  // TEA ruling 2026-11-14, bound 2: hour labels count as residual keys mask them.
+  test('an hour label hidden after the clock moved on is counted by its masked text', () => {
+    const hourly = (capture, hour, opacity) => {
+      const label = `${hour}\u202fAM`
+      capture.nodes = [
+        ...capture.nodes,
+        ...(opacity > 0 ? [{ id: '', text: label, bounds: '[0,3000][80,3040]' }] : []),
+      ]
+      capture.textProbe.records.push(
+        probeRecord('android', label, [0, 3000, 80, 3040], { opacity })
+      )
+    }
+    const change = withAll(fixedChange())
+    hourly(change.cold, 1, 1)
+    hourly(change.settled, 2, 0)
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(change).checks.textHidden.hidden.map((entry) => [
+        entry.text,
+        entry.coldKeys,
+      ]),
+      [['<hour>', ['["","<hour>"]#0']]]
+    )
+    // Shown at the next hour, it is the same label.
+    const shown = withAll(fixedChange())
+    hourly(shown.cold, 1, 1)
+    hourly(shown.settled, 2, 1)
+    hourly(shown.settled, 2, 0)
+    assert.equal(evaluateLiveFontChangeRaw(shown).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling 2026-11-14, bound 3: a text gone with no record at all stays lost text.
+  test('text gone from the live probe and hierarchy, with no opacity 0 record, fails as lost text', () => {
+    const lost = () => {
+      const change = withAll(fixedChange())
+      const live = change.settled
+      live.textProbe.records = live.textProbe.records.filter(
+        (r) => r.text !== TEMPERATURE
+      )
+      live.nodes = live.nodes.filter((node) => node.text !== TEMPERATURE)
+      return change
+    }
+    const { checks } = evaluateLiveFontChangeRaw(lost())
+    assert.equal(checks.textHidden.pass, true, 'not the hidden-text rule')
+    assert.equal(checks.fullText.pass, false)
+    assert.throws(
+      prove(lost(), undefined, '0.88.1'),
+      (error) => error.code === 'live_font_fix_missing' && /fullText/.test(error.message)
+    )
+    assert.throws(
+      prove(lost(), undefined, '0.81.5'),
+      (error) =>
+        error.code === 'live_font_baseline_unexpected' && /fullText/.test(error.message)
+    )
   })
 
   // Antigravity r41 P3-1: `ellipsizeMode="clip"` drops lines with no ellipsis.

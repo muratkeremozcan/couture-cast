@@ -529,10 +529,7 @@ function classifyRecords(records, coveredIds, volatileRegions) {
   }
   const regionOf = new Map()
   for (const record of records) {
-    const [x, y] = centre(recordRect(record))
-    const region = volatileRegions.findIndex(
-      (rect) => x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3]
-    )
+    const region = volatileRegionOf(record, volatileRegions)
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
@@ -550,17 +547,30 @@ function classifyRecords(records, coveredIds, volatileRegions) {
 }
 
 /**
- * For the report only: the node each invisible record would pair with (same text, touching
- * rect, best overlap), or null. It takes no node from the matching.
+ * Each invisible record with the node it would pair with (same text, touching rect, best
+ * overlap) or null, for the report only: it takes no node from the matching. `comparable` is
+ * false for a record the hidden-text count leaves out (TEA ruling 2026-11-14): one in a window
+ * a focused window covers, whole or in part, one in a volatile region, and one scrolled away,
+ * none of which can be compared across launches.
  */
-function invisibleNodes(nodes, invisible, tolerance) {
+function invisibleNodes(nodes, invisible, { covers, inVolatile, tolerance }) {
   return invisible.map((record) => {
     const rect = recordRect(record)
     const touching = nodes
       .filter((node) => node.text === record.text && touches(node.box, rect, tolerance))
       .sort((a, b) => overlapRatio(b.box, rect) - overlapRatio(a.box, rect))
-    return { record: record.index, node: touching[0]?.index ?? null }
+    const comparable =
+      !covers.has(record.window) && !inVolatile(record) && !record.scrolledAway
+    return { record: record.index, node: touching[0]?.index ?? null, comparable }
   })
+}
+
+/** Whether a record's centre lies inside one of the volatile regions. */
+const volatileRegionOf = (record, volatileRegions) => {
+  const [x, y] = centre(recordRect(record))
+  return volatileRegions.findIndex(
+    (rect) => x >= rect[0] && x <= rect[2] && y >= rect[1] && y <= rect[3]
+  )
 }
 
 /** Rank of each item in screen order: top to bottom, left to right, then list order. */
@@ -739,7 +749,11 @@ export function matchTextProbe({
         .length,
     })),
     behind: classes.behind.map((record) => record.index),
-    invisible: invisibleNodes(indexed, classes.invisible, tolerance),
+    invisible: invisibleNodes(indexed, classes.invisible, {
+      covers,
+      inVolatile: (record) => volatileRegionOf(record, volatileRegions) >= 0,
+      tolerance,
+    }),
     empty: classes.empty.map((record) => record.index),
     windowNodes: windowNodes.map((node) => node.index),
   }

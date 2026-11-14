@@ -561,7 +561,7 @@ describe('matchTextProbe, exact text one to one', () => {
       result.pairs.map((pair) => [pair.node, pair.record]),
       [[0, 0]]
     )
-    assert.deepEqual(result.invisible, [{ record: 1, node: 0 }])
+    assert.deepEqual(result.invisible, [{ record: 1, node: 0, comparable: true }])
     // Listed in either order, the visible copy pairs.
     assert.equal(
       match([node('\uf015', [100, 2207, 169, 2282])], [tabIcon(0), tabIcon(1)]).pass,
