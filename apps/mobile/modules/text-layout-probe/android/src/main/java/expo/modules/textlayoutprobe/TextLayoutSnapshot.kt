@@ -45,7 +45,8 @@ data class ProbeRecord(
   val ellipsized: Int,
   val unlimitedLineCount: Int?,
   val window: Int,
-  val scrolledAway: Boolean
+  val scrolledAway: Boolean,
+  val opacity: Double = 1.0
 )
 
 data class ProbeSnapshot(val windows: List<ProbeWindow>, val records: List<ProbeRecord>)
@@ -137,7 +138,8 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       ellipsized = reading.ellipsized,
       unlimitedLineCount = reading.unlimitedLineCount,
       window = window,
-      scrolledAway = cuts.scrolledAway
+      scrolledAway = cuts.scrolledAway,
+      opacity = effectiveOpacity(view)
     )
   }
 
@@ -224,34 +226,37 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
 
   /**
    * visibleRect: the view's own rect cut by every ancestor that clips its descendants and by the
-   * window. clipRect: the same without scroll views, whose viewport cuts are not layout clips.
-   * Above a scroll view, an ancestor or the window cuts clipRect only on the edges where it cuts
-   * into that scroll view's viewport: scroll content that runs past the screen (and so past the
-   * root views that clip at it) is only scrolled off, while a container smaller than the scroll
-   * view it holds is a real clip. A text outside every scroll view is cut by the window whole.
+   * window. clipRect: the same, except on a scroll axis. A ScrollView scrolls vertically and a
+   * HorizontalScrollView horizontally; on its scroll axis neither the scroll view nor anything
+   * above it (the root views that clip at the screen edge, the window) cuts clipRect, since
+   * content cut there is only scrolled off and can be scrolled into the viewport. On the other
+   * axis the scroll view (its bounds, padding and clip bounds) and everything above it cut as any
+   * clipping ancestor does.
    */
   private fun clips(view: View, viewRect: ProbeRect, windowRect: ProbeRect): Cuts {
     var visible: ProbeRect? = viewRect
     var clip: ProbeRect? = viewRect
-    // The viewport of the scroll view passed last on the way up, once there is one.
-    var viewport: ProbeRect? = null
+    // The scroll axes passed on the way up, open for clipRect from there to the window.
+    var openX = false
+    var openY = false
     var parent = view.parent
     while (parent is View) {
       val ancestor = parent as View
       val bounds = screenRect(ancestor)
-      if (isScrollView(ancestor)) {
-        viewport = bounds
-        visible = visible?.intersect(bounds)
-      } else {
-        for (cut in ancestorClips(ancestor, bounds)) {
-          visible = visible?.intersect(cut)
-          clip = clip?.intersect(viewport?.let { cutInto(cut, it) } ?: cut)
-        }
+      val scrollsX = ancestor is HorizontalScrollView
+      val scrollsY = ancestor is ScrollView
+      // A scroll view always cuts its content to its viewport, whatever its parent's flags.
+      val cuts = ancestorClips(ancestor, bounds) + if (scrollsX || scrollsY) listOf(bounds) else emptyList()
+      for (cut in cuts) {
+        visible = visible?.intersect(cut)
+        clip = clip?.intersect(openAxes(cut, openX || scrollsX, openY || scrollsY))
       }
+      openX = openX || scrollsX
+      openY = openY || scrollsY
       parent = ancestor.parent
     }
     visible = visible?.intersect(windowRect)
-    clip = clip?.intersect(viewport?.let { cutInto(windowRect, it) } ?: windowRect)
+    clip = clip?.intersect(openAxes(windowRect, openX, openY))
     return Cuts(visible, clip, scrolledAway(viewRect, visible, clip, windowRect))
   }
 
@@ -323,15 +328,28 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
 
     private const val OPEN = 1 shl 29
 
-    /** [cut] with every edge that does not cut into [viewport] opened. */
-    fun cutInto(cut: ProbeRect, viewport: ProbeRect) = ProbeRect(
-      if (cut.left > viewport.left) cut.left else -OPEN,
-      if (cut.top > viewport.top) cut.top else -OPEN,
-      if (cut.right < viewport.right) cut.right else OPEN,
-      if (cut.bottom < viewport.bottom) cut.bottom else OPEN
+    /** [cut] with both edges of each open axis opened. */
+    fun openAxes(cut: ProbeRect, openX: Boolean, openY: Boolean) = ProbeRect(
+      if (openX) -OPEN else cut.left,
+      if (openY) -OPEN else cut.top,
+      if (openX) OPEN else cut.right,
+      if (openY) OPEN else cut.bottom
     )
 
-    fun isScrollView(view: View) = view is ScrollView || view is HorizontalScrollView
+    /**
+     * The opacity the view draws with: the product of its own and every ancestor's alpha up to the
+     * window root, and exactly 0 when it or any ancestor is not VISIBLE (INVISIBLE or GONE).
+     */
+    fun effectiveOpacity(view: View): Double {
+      var opacity = 1.0
+      var current: View? = view
+      while (current != null) {
+        if (current.visibility != View.VISIBLE) return 0.0
+        opacity *= current.alpha.toDouble().coerceIn(0.0, 1.0)
+        current = current.parent as? View
+      }
+      return opacity
+    }
 
     /**
      * Stacking group of a window root, lowest first: the base application window, other

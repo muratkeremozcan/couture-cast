@@ -12,6 +12,7 @@ import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import android.view.ViewGroup.LayoutParams.WRAP_CONTENT
 import android.view.inspector.WindowInspector
 import android.widget.FrameLayout
+import android.widget.HorizontalScrollView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -366,25 +367,148 @@ class TextLayoutSnapshotTest {
   }
 
   @Test
-  fun aClippingContainerSmallerThanItsScrollViewCutsTheClipRect() {
+  fun aContainerSmallerThanItsScrollViewCutsOnlyTheAxisItDoesNotScroll() {
     host { context ->
       val scroll = ScrollView(context)
       scroll.addView(
         column(
           context,
-          View(context).apply { layoutParams = LinearLayout.LayoutParams(MATCH_PARENT, 40) },
-          label(context)
+          View(context).apply { layoutParams = LinearLayout.LayoutParams(300, 40) },
+          label(context).apply { layoutParams = LinearLayout.LayoutParams(300, WRAP_CONTENT) }
         )
       )
-      // A one-line-tall hidden-overflow container holding a 100 px scroll view.
+      // A 150 x 60 hidden-overflow container holding a 300 x 100 vertical scroll view.
       OverflowViewGroup(context, "hidden").apply {
-        addView(scroll, FrameLayout.LayoutParams(MATCH_PARENT, 100))
-        layoutParams = FrameLayout.LayoutParams(MATCH_PARENT, 60)
+        addView(scroll, FrameLayout.LayoutParams(300, 100))
+        layoutParams = FrameLayout.LayoutParams(150, 60)
       }.let { container -> FrameLayout(context).apply { addView(container) } }
     }
     val record = only(snapshot())
-    val container = record.viewRect.top - 40 + 60
-    assertEquals(container, record.clipRect!!.bottom)
+    // Across the scroll axis the container is a real clip; along it the text scrolls into view.
+    assertEquals(record.viewRect.left + 150, record.clipRect!!.right)
+    assertEquals(record.viewRect.top, record.clipRect!!.top)
+    assertEquals(record.viewRect.bottom, record.clipRect!!.bottom)
+    assertEquals(record.viewRect.top - 40 + 60, record.visibleRect!!.bottom)
+  }
+
+  // Antigravity r42 P2: the three probes that showed clipRect blind to the scroll axis.
+
+  @Test
+  fun aHorizontalScrollViewCutsTheClipRectVertically() {
+    host { context ->
+      FrameLayout(context).apply {
+        addView(
+          HorizontalScrollView(context).apply {
+            // Content as tall as the label, so only the scroll view itself can cut it.
+            addView(
+              LinearLayout(context).apply {
+                addView(label(context), LinearLayout.LayoutParams(200, 80))
+              },
+              FrameLayout.LayoutParams(WRAP_CONTENT, 80)
+            )
+          },
+          FrameLayout.LayoutParams(390, 40).apply { topMargin = 100 }
+        )
+      }
+    }
+    val record = only(snapshot())
+    assertEquals(80, record.viewRect.bottom - record.viewRect.top)
+    assertEquals(record.viewRect.top + 40, record.clipRect!!.bottom)
+    assertEquals(record.visibleRect, record.clipRect)
+  }
+
+  @Test
+  fun aVerticalScrollViewCutsTheClipRectHorizontally() {
+    host { context ->
+      FrameLayout(context).apply {
+        addView(
+          ScrollView(context).apply {
+            addView(
+              LinearLayout(context).apply {
+                clipChildren = false
+                addView(label(context, "Wide"), LinearLayout.LayoutParams(300, 30))
+              },
+              FrameLayout.LayoutParams(300, WRAP_CONTENT)
+            )
+          },
+          FrameLayout.LayoutParams(200, 100).apply { topMargin = 100 }
+        )
+      }
+    }
+    val record = only(snapshot(), "Wide")
+    assertEquals(300, record.viewRect.right - record.viewRect.left)
+    assertEquals(record.viewRect.left + 200, record.clipRect!!.right)
+  }
+
+  @Test
+  fun aScrollViewWiderThanTheWindowDoesNotCutItsScrollableContent() {
+    lateinit var spacer: View
+    host { context ->
+      spacer = View(context)
+      FrameLayout(context).apply {
+        clipChildren = false
+        addView(
+          HorizontalScrollView(context).apply {
+            addView(
+              LinearLayout(context).apply {
+                addView(spacer, LinearLayout.LayoutParams(0, 30))
+                addView(label(context, "Edge"), LinearLayout.LayoutParams(60, 30))
+              }
+            )
+          },
+          FrameLayout.LayoutParams(0, 100).apply { topMargin = 100 }
+        )
+      }
+    }
+    val window = TextLayoutSnapshot.screenRect((spacer.context as Activity).window.decorView)
+    // The scroll view is 60 px wider than the window; the label straddles the window's right edge.
+    (spacer.parent.parent as View).layoutParams.width = window.right + 60
+    spacer.layoutParams.width = window.right - 30
+    spacer.requestLayout()
+    shadowOf(Looper.getMainLooper()).idle()
+    val record = only(snapshot(), "Edge")
+    assertTrue(record.viewRect.left < window.right && record.viewRect.right > window.right)
+    assertEquals(record.viewRect, record.clipRect)
+    assertEquals(window.right, record.visibleRect!!.right)
+  }
+
+  @Test
+  fun aStackedActiveAndInactiveGlyphReportTheirOwnOpacity() {
+    host { context ->
+      FrameLayout(context).apply {
+        addView(label(context, "Home active"))
+        addView(label(context, "Home inactive").apply { alpha = 0f })
+      }
+    }
+    val records = snapshot().records
+    assertEquals(1.0, records.single { it.text == "Home active" }.opacity, 0.0)
+    assertEquals(0.0, records.single { it.text == "Home inactive" }.opacity, 0.0)
+  }
+
+  @Test
+  fun opacityMultipliesUpTheTreeAndAnInvisibleAncestorMakesItZero() {
+    lateinit var half: View
+    lateinit var hidden: View
+    host { context ->
+      half = label(context, "Half of half").apply { alpha = 0.5f }
+      hidden = label(context, "Behind an invisible group")
+      column(
+        context,
+        FrameLayout(context).apply {
+          alpha = 0.5f
+          addView(half)
+        },
+        FrameLayout(context).apply {
+          visibility = View.INVISIBLE
+          addView(hidden)
+        }
+      )
+    }
+    assertEquals(0.25, only(snapshot(), "Half of half").opacity, 1e-6)
+    assertEquals(0.0, TextLayoutSnapshot.effectiveOpacity(hidden), 0.0)
+    // INVISIBLE, not alpha: the label's own alpha is 1.
+    assertEquals(1f, hidden.alpha)
+    assertEquals(0.0, TextLayoutSnapshot.effectiveOpacity(hidden.parent as View), 0.0)
   }
 
   @Test

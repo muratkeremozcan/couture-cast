@@ -28,6 +28,25 @@ enum TextLayoutProbeWire {
     let unlimitedLineCount: Int?
     let window: Int
     let scrolledAway: Bool
+    var opacity: Double = 1
+  }
+
+  /// One view on the way from a text view up to its window, for its effective opacity.
+  struct Layer {
+    let alpha: CGFloat
+    let opacity: Float
+    let hidden: Bool
+  }
+
+  /// The opacity a view draws with: the product of alpha and layer opacity of the view and every
+  /// ancestor, and exactly 0 when any of them is hidden.
+  static func effectiveOpacity(_ chain: [Layer]) -> Double {
+    var opacity = 1.0
+    for layer in chain {
+      if layer.hidden { return 0 }
+      opacity *= min(max(Double(layer.alpha), 0), 1) * min(max(Double(layer.opacity), 0), 1)
+    }
+    return opacity
   }
 
   /// Tokens name the answer file, so they carry no path separator or whitespace.
@@ -57,7 +76,9 @@ enum TextLayoutProbeWire {
   struct Ancestor {
     let rect: CGRect
     let clips: Bool
-    let isScrollView: Bool
+    /// A scroll view that can scroll on that axis: its content is larger than its bounds there.
+    var scrollsX = false
+    var scrollsY = false
   }
 
   struct Cuts {
@@ -76,39 +97,38 @@ enum TextLayoutProbeWire {
     disjoint(viewRect, window) || (visible == nil && clip != nil)
   }
 
-  /// visibleRect: cut by every clipping ancestor and the window. clipRect: the same without
-  /// scroll views, whose viewport cuts are not layout clips. Above a scroll view, an ancestor or
-  /// the window cuts clipRect only on the edges where it cuts into that scroll view's viewport:
-  /// scroll content past the screen is only scrolled off, while a container smaller than the
-  /// scroll view it holds is a real clip. A text outside every scroll view is cut by the window
-  /// whole. Ancestors run nearest first.
+  /// visibleRect: cut by every clipping ancestor and the window. clipRect: the same, except on a
+  /// scroll axis: on the axis a clipping scroll view scrolls, neither it nor anything above it
+  /// (screen containers, the window) cuts clipRect, since content cut there is only scrolled off
+  /// and can be scrolled into the viewport. On the other axis the scroll view and everything
+  /// above it cut as any clipping ancestor does. Ancestors run nearest first.
   static func cuts(viewRect: CGRect, ancestors: [Ancestor], window: CGRect) -> Cuts {
     var visible: CGRect? = viewRect
     var clip: CGRect? = viewRect
-    // The viewport of the scroll view passed last on the way up, once there is one.
-    var viewport: CGRect?
+    // The scroll axes passed on the way up, open for clipRect from there to the window. Only a
+    // clipping scroll view opens one.
+    var openX = false
+    var openY = false
     for ancestor in ancestors {
-      if ancestor.isScrollView {
-        if ancestor.clips { visible = cut(visible, ancestor.rect) }
-        viewport = ancestor.rect
-        continue
-      }
       guard ancestor.clips else { continue }
       visible = cut(visible, ancestor.rect)
-      clip = cut(clip, viewport.map { cutInto(ancestor.rect, $0) } ?? ancestor.rect)
+      clip = cut(
+        clip, openAxes(ancestor.rect, x: openX || ancestor.scrollsX, y: openY || ancestor.scrollsY))
+      openX = openX || ancestor.scrollsX
+      openY = openY || ancestor.scrollsY
     }
     visible = cut(visible, window)
-    clip = cut(clip, viewport.map { cutInto(window, $0) } ?? window)
+    clip = cut(clip, openAxes(window, x: openX, y: openY))
     return Cuts(visible: visible, clip: clip, scrolledAway: scrolledAway(viewRect, visible, clip, window))
   }
 
-  /// `rect` with every edge that does not cut into `viewport` opened.
-  static func cutInto(_ rect: CGRect, _ viewport: CGRect) -> CGRect {
+  /// `rect` with both edges of each open axis opened.
+  static func openAxes(_ rect: CGRect, x: Bool, y: Bool) -> CGRect {
     let open = CGFloat(1 << 29)
-    let left = rect.minX > viewport.minX ? rect.minX : -open
-    let top = rect.minY > viewport.minY ? rect.minY : -open
-    let right = rect.maxX < viewport.maxX ? rect.maxX : open
-    let bottom = rect.maxY < viewport.maxY ? rect.maxY : open
+    let left = x ? -open : rect.minX
+    let top = y ? -open : rect.minY
+    let right = x ? open : rect.maxX
+    let bottom = y ? open : rect.maxY
     return CGRect(x: left, y: top, width: right - left, height: bottom - top)
   }
 
@@ -142,6 +162,7 @@ enum TextLayoutProbeWire {
           "unlimitedLineCount": record.unlimitedLineCount.map { $0 as Any } ?? NSNull(),
           "window": record.window,
           "scrolledAway": record.scrolledAway,
+          "opacity": (record.opacity * 10000).rounded() / 10000,
         ]
       },
     ]

@@ -27,7 +27,8 @@ enum TextLayoutProbeSnapshot {
     into records: inout [TextLayoutProbeWire.Record]
   ) {
     if view.isHidden || view.alpha <= 0.01 { return }
-    if let record = record(view, in: window, id: id) {
+    if var record = record(view, in: window, id: id) {
+      record.opacity = opacity(view)
       records.append(record)
       // A UIKit text control draws its own internals (placeholder labels, field editors).
       if !TLPParagraphReader.isParagraphLikeView(view) { return }
@@ -170,9 +171,31 @@ enum TextLayoutProbeSnapshot {
           rect: ancestor.convert(ancestor.bounds, to: window),
           clips: ancestor.clipsToBounds || ancestor.layer.masksToBounds
             || ancestor.layer.mask != nil,
-          isScrollView: ancestor is UIScrollView))
+          scrollsX: scrolls(ancestor, horizontally: true),
+          scrollsY: scrolls(ancestor, horizontally: false)))
       parent = ancestor.superview
     }
     return TextLayoutProbeWire.cuts(viewRect: viewRect, ancestors: ancestors, window: window.bounds)
+  }
+
+  /// Whether a view is a scroll view that can scroll on the axis: its content, with the insets,
+  /// is larger than its bounds there (a horizontal React Native ScrollView has wider content).
+  private static func scrolls(_ view: UIView, horizontally: Bool) -> Bool {
+    guard let scroll = view as? UIScrollView, !(view is UITextView) else { return false }
+    let inset = scroll.adjustedContentInset
+    return horizontally
+      ? scroll.contentSize.width + inset.left + inset.right > scroll.bounds.width + 0.5
+      : scroll.contentSize.height + inset.top + inset.bottom > scroll.bounds.height + 0.5
+  }
+
+  /// The view and every ancestor up to and including its window, for its effective opacity.
+  private static func opacity(_ view: UIView) -> Double {
+    var chain: [TextLayoutProbeWire.Layer] = []
+    var current: UIView? = view
+    while let layer = current {
+      chain.append(.init(alpha: layer.alpha, opacity: layer.layer.opacity, hidden: layer.isHidden))
+      current = layer.superview
+    }
+    return TextLayoutProbeWire.effectiveOpacity(chain)
   }
 }

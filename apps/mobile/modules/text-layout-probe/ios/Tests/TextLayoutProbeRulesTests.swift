@@ -20,8 +20,8 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let cuts = Wire.cuts(
       viewRect: text,
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 20), clips: true, isScrollView: false),
-        .init(rect: CGRect(x: 0, y: 90, width: 390, height: 40), clips: true, isScrollView: true),
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 20), clips: true),
+        .init(rect: CGRect(x: 0, y: 90, width: 390, height: 40), clips: true, scrollsY: true),
       ],
       window: window)
     XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 100, width: 200, height: 20))
@@ -34,7 +34,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let cuts = Wire.cuts(
       viewRect: text,
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 300), clips: true, isScrollView: true)
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 300), clips: true, scrollsY: true)
       ],
       window: window)
     XCTAssertEqual(cuts.clip, text)
@@ -46,7 +46,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 500, width: 200, height: 40),
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 300), clips: true, isScrollView: true)
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 300), clips: true, scrollsY: true)
       ],
       window: window)
     XCTAssertTrue(cuts.scrolledAway)
@@ -58,7 +58,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 100, width: 200, height: 40),
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 0), clips: true, isScrollView: false)
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 0), clips: true)
       ],
       window: window)
     XCTAssertNil(cuts.visible)
@@ -70,7 +70,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 830, width: 200, height: 40),
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 0, width: 390, height: 10), clips: false, isScrollView: false)
+        .init(rect: CGRect(x: 0, y: 0, width: 390, height: 10), clips: false)
       ],
       window: window)
     XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 830, width: 200, height: 14))
@@ -98,8 +98,8 @@ final class TextLayoutProbeRulesTests: XCTestCase {
           let cuts = Wire.cuts(
             viewRect: CGRect(x: 10, y: 100, width: 200, height: 60),
             ancestors: [
-              .init(rect: first, clips: true, isScrollView: scrollFirst),
-              .init(rect: second, clips: true, isScrollView: !scrollFirst),
+              .init(rect: first, clips: true, scrollsY: scrollFirst),
+              .init(rect: second, clips: true, scrollsY: !scrollFirst),
             ],
             window: window)
           if cuts.scrolledAway { XCTAssertNil(cuts.visible) }
@@ -115,9 +115,9 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let cuts = Wire.cuts(
       viewRect: text,
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 0, width: 390, height: 844), clips: true, isScrollView: true),
+        .init(rect: CGRect(x: 0, y: 0, width: 390, height: 844), clips: true, scrollsY: true),
         // A screen container that clips at the window edge, above the scroll view.
-        .init(rect: window, clips: true, isScrollView: false),
+        .init(rect: window, clips: true),
       ],
       window: window)
     XCTAssertEqual(cuts.clip, text)
@@ -131,15 +131,68 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 824, width: 200, height: 20))
   }
 
-  func testAClipperSmallerThanTheScrollViewItHoldsCutsTheClipRect() {
+  func testAClipperSmallerThanTheScrollViewItHoldsCutsOnlyAcrossTheScrollAxis() {
     let cuts = Wire.cuts(
       viewRect: CGRect(x: 10, y: 140, width: 200, height: 40),
       ancestors: [
-        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 100), clips: true, isScrollView: true),
-        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 60), clips: true, isScrollView: false),
+        .init(rect: CGRect(x: 0, y: 100, width: 390, height: 100), clips: true, scrollsY: true),
+        .init(rect: CGRect(x: 0, y: 100, width: 150, height: 60), clips: true),
       ],
       window: window)
-    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 140, width: 200, height: 20))
+    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 140, width: 140, height: 40))
+    XCTAssertEqual(cuts.visible, CGRect(x: 10, y: 140, width: 140, height: 20))
+  }
+
+  // Antigravity r42 P2: the three probes that showed clipRect blind to the scroll axis.
+
+  func testSwiftP1HorizClipY() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 100, width: 200, height: 80),
+      ancestors: [.init(rect: CGRect(x: 0, y: 100, width: 390, height: 40), clips: true, scrollsX: true)],
+      window: window)
+    XCTAssertEqual(cuts.visible, CGRect(x: 10, y: 100, width: 200, height: 40))
+    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 100, width: 200, height: 40))
+  }
+
+  func testSwiftVertScrollCutsHoriz() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 0, y: 100, width: 300, height: 30),
+      ancestors: [.init(rect: CGRect(x: 0, y: 0, width: 200, height: 400), clips: true, scrollsY: true)],
+      window: window)
+    XCTAssertEqual(cuts.visible, CGRect(x: 0, y: 100, width: 200, height: 30))
+    XCTAssertEqual(cuts.clip, CGRect(x: 0, y: 100, width: 200, height: 30))
+  }
+
+  func testSwiftP5ScrollWiderThanWindow() {
+    let text = CGRect(x: 360, y: 100, width: 60, height: 30)
+    let cuts = Wire.cuts(
+      viewRect: text,
+      ancestors: [.init(rect: CGRect(x: 0, y: 0, width: 450, height: 400), clips: true, scrollsX: true)],
+      window: window)
+    XCTAssertEqual(cuts.clip, text)
+    XCTAssertEqual(cuts.visible, CGRect(x: 360, y: 100, width: 30, height: 30))
+  }
+
+  func testANonClippingScrollViewOpensNoAxis() {
+    let cuts = Wire.cuts(
+      viewRect: CGRect(x: 10, y: 824, width: 200, height: 40),
+      ancestors: [.init(rect: CGRect(x: 0, y: 0, width: 390, height: 900), clips: false, scrollsY: true)],
+      window: window)
+    XCTAssertEqual(cuts.clip, CGRect(x: 10, y: 824, width: 200, height: 20))
+  }
+
+  func testOpacityMultipliesUpTheChainAndHiddenMakesItZero() {
+    typealias Layer = Wire.Layer
+    XCTAssertEqual(Wire.effectiveOpacity([Layer(alpha: 1, opacity: 1, hidden: false)]), 1)
+    XCTAssertEqual(Wire.effectiveOpacity([Layer(alpha: 0, opacity: 1, hidden: false)]), 0)
+    XCTAssertEqual(
+      Wire.effectiveOpacity([
+        Layer(alpha: 0.5, opacity: 1, hidden: false), Layer(alpha: 1, opacity: 0.5, hidden: false),
+      ]), 0.25, accuracy: 1e-9)
+    XCTAssertEqual(
+      Wire.effectiveOpacity([
+        Layer(alpha: 1, opacity: 1, hidden: false), Layer(alpha: 1, opacity: 1, hidden: true),
+      ]), 0)
   }
 
   func testWindowsStackByLevelThenOrder() {
@@ -170,13 +223,14 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       Set(record.keys),
       [
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
-        "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway",
+        "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "opacity",
       ])
     XCTAssertTrue(record["visibleRect"] is NSNull)
     XCTAssertTrue(record["maxLines"] is NSNull)
     XCTAssertEqual(record["text"] as? String, "Show \"watermark\"\n")
     XCTAssertEqual(record["viewRect"] as? [Double], [0.333, 2, 3.333, 6])
     XCTAssertEqual(record["scrolledAway"] as? Bool, false)
+    XCTAssertEqual(record["opacity"] as? Double, 1)
     // Integers stay integers on the wire.
     let text = String(decoding: data, as: UTF8.self)
     XCTAssertTrue(text.contains("\"lineCount\":2"), text)

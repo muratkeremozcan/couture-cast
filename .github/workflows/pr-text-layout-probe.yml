@@ -84,9 +84,9 @@ jobs:
           # Every case ran, at API 32 and 36 for the wire, and none was skipped, failed or errored.
           reports="$project/build/test-results/testDebugUnitTest"
           suite=expo.modules.textlayoutprobe.TextLayoutSnapshotTest
-          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 21
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 26
           suite=expo.modules.textlayoutprobe.TextLayoutProbeWireTest
-          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 12
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 14
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}

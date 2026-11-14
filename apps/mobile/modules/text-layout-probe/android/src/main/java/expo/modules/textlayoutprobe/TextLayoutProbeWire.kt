@@ -47,6 +47,7 @@ object TextLayoutProbeWire {
       out.append(",\"unlimitedLineCount\":").append(record.unlimitedLineCount?.toString() ?: "null")
       out.append(",\"window\":").append(record.window)
       out.append(",\"scrolledAway\":").append(record.scrolledAway)
+      out.append(",\"opacity\":").append(number(record.opacity))
       out.append('}')
     }
     out.append("]}")
@@ -67,6 +68,13 @@ object TextLayoutProbeWire {
 
   fun sha256(bytes: ByteArray): String =
     MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
+
+  /** 0..1 to four decimals, in plain notation (no exponent), trailing zeros dropped. */
+  fun number(value: Double): String =
+    java.math.BigDecimal(value.coerceIn(0.0, 1.0))
+      .setScale(4, java.math.RoundingMode.HALF_UP)
+      .stripTrailingZeros()
+      .toPlainString()
 
   private fun rect(rect: ProbeRect?): String =
     if (rect == null) "null" else "[${rect.left},${rect.top},${rect.right},${rect.bottom}]"

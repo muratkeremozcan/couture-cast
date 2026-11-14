@@ -36,7 +36,8 @@ class TextLayoutProbeWireTest {
     ellipsized = 0,
     unlimitedLineCount = 2,
     window = 0,
-    scrolledAway = false
+    scrolledAway = false,
+    opacity = 0.25
   )
 
   private val windows = listOf(ProbeWindow(0, ProbeRect(0, 0, 1080, 2400), 0, true))
@@ -73,7 +74,7 @@ class TextLayoutProbeWireTest {
     assertEquals(
       setOf(
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
-        "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway"
+        "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "opacity"
       ),
       first.keys().asSequence().toSet()
     )
@@ -82,6 +83,18 @@ class TextLayoutProbeWireTest {
     assertTrue(first.isNull("maxLines"))
     assertEquals(60, first.getJSONArray("contentRect").getInt(3))
     assertFalse(first.getBoolean("scrolledAway"))
+    assertEquals(0.25, first.getDouble("opacity"), 0.0)
+    assertTrue(json.contains("\"opacity\":0.25}"))
+  }
+
+  @Test
+  fun opacityIsWrittenInPlainNotationToFourDecimals() {
+    assertEquals("1", TextLayoutProbeWire.number(1.0))
+    assertEquals("0", TextLayoutProbeWire.number(0.0))
+    assertEquals("0.25", TextLayoutProbeWire.number(0.25))
+    assertEquals("0.0001", TextLayoutProbeWire.number(0.0001))
+    assertEquals("0", TextLayoutProbeWire.number(0.00001))
+    assertEquals("0.3333", TextLayoutProbeWire.number(1.0 / 3))
   }
 
   @Test
