@@ -11,6 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import {
   assertEvidenceClean,
   awaitExit,
+  stillRunning,
   FS_OPS,
   installEvidenceGuard,
   outputDirs,
@@ -622,4 +623,76 @@ test('the teardown wait treats an exited, unreaped child as gone', () => {
   const left = awaitExit([child.pid], 3_000)
   assert.deepEqual(left, [])
   assert.ok(Date.now() - started < 2_000, `waited ${Date.now() - started} ms`)
+})
+
+/** A shell that ignores SIGTERM; only SIGKILL stops it. */
+function stubborn(t, options = {}) {
+  const child = spawn('sh', ['-c', "trap '' TERM; while :; do sleep 0.05; done"], {
+    stdio: 'ignore',
+    ...options,
+  })
+  t.after(() => {
+    try {
+      process.kill(options.detached ? -child.pid : child.pid, 'SIGKILL')
+    } catch {
+      // Already gone.
+    }
+  })
+  return child
+}
+
+const exitOf = (child, ms = 3_000) =>
+  Promise.race([
+    new Promise((resolve) => child.once('exit', (code, signal) => resolve(signal))),
+    new Promise((resolve) => setTimeout(() => resolve('still running'), ms)),
+  ])
+
+// Antigravity r19 (2): what outlives the deadline is SIGKILLed.
+test('awaitExit SIGKILLs a child that ignores SIGTERM past the deadline', async (t) => {
+  const child = stubborn(t)
+  await new Promise((resolve) => setTimeout(resolve, 200))
+  child.kill('SIGTERM')
+  const exited = exitOf(child)
+  assert.deepEqual(awaitExit([child.pid], 300), [child.pid])
+  assert.equal(await exited, 'SIGKILL')
+})
+
+// Antigravity r19 (3): a pid the OS may have recycled is never signalled.
+test('a child that exited mid-run is dropped from the teardown and never signalled', async (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const signalled = []
+  const guard = installEvidenceGuard({
+    dirs,
+    ids: [],
+    proc: fakeProcess(),
+    kill: (pid, signal) => signalled.push([pid, signal]),
+  })
+  const done = spawn('sh', ['-c', 'exit 0'], { stdio: 'ignore' })
+  guard.child('done', done)
+  await new Promise((resolve) => done.once('exit', resolve))
+  const live = stubborn(t)
+  guard.child('live', live)
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [[live.pid, 'SIGTERM']])
+})
+
+test('a process group is signalled only while ps shows a member of it', async (t) => {
+  const dirs = outputDirs(tempOut(t))
+  const signalled = []
+  const guard = installEvidenceGuard({
+    dirs,
+    ids: [],
+    proc: fakeProcess(),
+    kill: (pid, signal) => signalled.push([pid, signal]),
+    waitMs: 100,
+  })
+  const gone = spawn('sh', ['-c', 'exit 0'], { stdio: 'ignore', detached: true })
+  await new Promise((resolve) => gone.once('exit', resolve))
+  assert.deepEqual(stillRunning([-gone.pid]), [])
+  guard.child('gone-group', gone, { group: true })
+  const alive = stubborn(t, { detached: true })
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  guard.child('live-group', alive, { group: true })
+  guard.runTeardowns()
+  assert.deepEqual(signalled, [[-alive.pid, 'SIGTERM']])
 })

@@ -232,7 +232,7 @@ export const TEARDOWN_WAIT_MS = 3_000
  * driver spawned stays a zombie until Node reaps it, which cannot happen while the exit path
  * holds the thread, so a zombie counts as exited; `ps` reports it with state Z.
  */
-function stillRunning(pids) {
+export function stillRunning(pids) {
   if (!pids.length) return []
   const table = spawnSync('ps', ['-A', '-o', 'pid=,pgid=,stat='], { encoding: 'utf8' })
   if (table.status !== 0)
@@ -300,6 +300,7 @@ export function installEvidenceGuard({
   ops,
   proc = process,
   waitMs = TEARDOWN_WAIT_MS,
+  kill = (pid, signal) => process.kill(pid, signal),
 }) {
   const teardowns = []
   let exiting = false
@@ -308,12 +309,13 @@ export function installEvidenceGuard({
     for (const entry of teardowns) {
       if (entry.done) continue
       entry.done = true
-      pids.push(...entry.pids)
       try {
         entry.fn()
       } catch (error) {
         proc.stderr.write(`test_store_teardown_failed: ${entry.name}: ${error.message}\n`)
       }
+      // After fn: a child teardown decides its targets when it runs.
+      pids.push(...(typeof entry.pids === 'function' ? entry.pids() : entry.pids))
     }
     awaitExit(pids, waitMs)
   }
@@ -346,6 +348,39 @@ export function installEvidenceGuard({
   return {
     teardown: (name, fn, { pids = [] } = {}) => {
       teardowns.push({ name, fn, pids, done: false })
+    },
+    /**
+     * Stops a spawned child on teardown (Antigravity r19). A child that already exited is
+     * dropped at its exit event, so its pid, which the OS may hand to another process, is never
+     * signalled. With `group`, the child leads its own process group (spawned detached): the
+     * group is signalled, and waited on, only while `ps` still shows a member of it.
+     */
+    child: (name, child, { group = false } = {}) => {
+      const pid = child.pid
+      let exited = false
+      child.once('exit', () => {
+        exited = true
+      })
+      const target = () => {
+        if (group) return stillRunning([-pid]).length ? [-pid] : []
+        return exited ? [] : [pid]
+      }
+      let targets = []
+      teardowns.push({
+        name,
+        done: false,
+        pids: () => targets,
+        fn: () => {
+          targets = target()
+          for (const each of targets) {
+            try {
+              kill(each, 'SIGTERM')
+            } catch {
+              // Gone between the check and the signal.
+            }
+          }
+        },
+      })
     },
     runTeardowns,
     uninstall: () => {

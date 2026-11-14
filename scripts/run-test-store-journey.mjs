@@ -203,19 +203,8 @@ async function startMetro() {
       detached: true,
     }
   )
-  // Metro runs in its own process group; the whole group goes on any exit, signals included.
-  const metroPid = metro.pid
-  guard.teardown(
-    'metro',
-    () => {
-      try {
-        process.kill(-metroPid, 'SIGTERM')
-      } catch {
-        // Metro already exited.
-      }
-    },
-    { pids: [-metroPid] }
-  )
+  // Metro leads its own process group; the group is stopped on any exit while a member lives.
+  guard.child('metro', metro, { group: true })
   await waitForExpoStatus(`http://127.0.0.1:${metroPort}`, 180_000)
 }
 
@@ -336,8 +325,7 @@ function startDeviceLog() {
     ],
     { stdio: ['ignore', file, file] }
   )
-  const stream = logStream
-  guard.teardown('log-stream', () => stream.kill('SIGTERM'), { pids: [stream.pid] })
+  guard.child('log-stream', logStream)
 }
 
 function deviceLog() {

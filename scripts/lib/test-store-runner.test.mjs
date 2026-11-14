@@ -463,3 +463,39 @@ test('stdout carries error codes only: an uncoded message prints uncoded_error',
   assert.deepEqual(summary.errors, ['test_store_command_failed', 'uncoded_error'])
   assert.ok(!JSON.stringify(summary).includes('stub-member'))
 })
+
+test('a bare lowercase token is no error code: it prints uncoded_error', () => {
+  const summary = stdoutSummary({
+    verdict: { pass: false, failed: ['open', 'js-dev', 'reinstall'], missing: [] },
+    records: [
+      { step: 'open', pass: false, error: 'a1b2c3d4' },
+      { step: 'js-dev', pass: false, error: 'test_store_js_dev_marker_missing' },
+      { step: 'reinstall', pass: false, error: 'ENOENT' },
+    ],
+  })
+  assert.deepEqual(summary.errors, [
+    'uncoded_error',
+    'test_store_js_dev_marker_missing',
+    'uncoded_error',
+  ])
+})
+
+test('every code the journey can raise prints as itself', () => {
+  const sources = fs
+    .readdirSync('scripts/lib')
+    .filter((name) => /^test-store-[a-z-]+\.mjs$/.test(name) && !name.includes('.test.'))
+    .map((name) => fs.readFileSync(path.join('scripts/lib', name), 'utf8'))
+    .concat(fs.readFileSync('scripts/run-test-store-journey.mjs', 'utf8'))
+    .join('\n')
+  const codes = [
+    ...new Set(
+      sources.match(/'test_store_[a-z0-9_]+'/g).map((code) => code.slice(1, -1))
+    ),
+  ]
+  assert.ok(codes.length > 30)
+  const printed = stdoutSummary({
+    verdict: { pass: false, failed: [], missing: [] },
+    records: codes.map((error) => ({ pass: false, error })),
+  }).errors
+  assert.deepEqual(printed, codes)
+})

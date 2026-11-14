@@ -312,8 +312,11 @@ export function writeArtifactManifests({
   })
 }
 
-/** A coded error: lowercase snake case, as every JourneyError code is. */
-export const ERROR_CODE = /^[a-z][a-z0-9_]*$/
+/**
+ * A coded error: lowercase snake case with at least one underscore, as every JourneyError code
+ * is (test_store_*). A bare lowercase token could be an id fragment (Antigravity r19).
+ */
+export const ERROR_CODE = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)+$/
 
 /**
  * The line the driver prints to stdout before any evidence write: the verdict and each failing
