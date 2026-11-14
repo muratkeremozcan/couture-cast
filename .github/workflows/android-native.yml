@@ -22,10 +22,11 @@
 # Story 6.8 isolated client against its own runtime or a release app, so the flow gets its own
 # schedule-only job here. Neither job uses a secret; each uploads its evidence for 7 days.
 #
-# The plain prebuild needs no Worklets staging (scripts/lib/story68-worklets-staging.mjs, which
-# the Story 6.8 harness applies to its own builds): Reanimated's externalNativeBuild tasks depend
-# on Worklets' own, so a fresh checkout links the binary that run compiled, as
-# pr-accessibility-focus.yml's release build does.
+# The release builds run plain: Reanimated's externalNativeBuild tasks depend on Worklets' own, so
+# a fresh checkout links the binary that run compiled, as pr-accessibility-focus.yml's release
+# build does. The Debug x86_64 client goes through the Worklets staging
+# (scripts/lib/story68-worklets-staging.mjs, via scripts/ci/worklets-staged-gradle.mjs), since a
+# plain Debug build raced Reanimated's legacy libworklets.so import on the 2026-11-13 device run.
 name: Android native
 
 on:
@@ -154,11 +155,13 @@ jobs:
         run: npx expo prebuild --platform android --no-install
       - name: Fetch the Gradle wrapper
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
+      # Through the Worklets staging (scripts/ci/worklets-staged-gradle.mjs): a plain Debug build
+      # raced Reanimated's legacy libworklets.so import on the 2026-11-13 device run. Its staging
+      # proof lands in the evidence directory.
       - name: Build the debug development client
         id: client_build
         timeout-minutes: 35
-        working-directory: apps/mobile/android
-        run: ./gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain
+        run: node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-network-timeout/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain
       - name: Install the pinned Maestro CLI
         run: node scripts/maestro-install.mjs
       - name: Enable and verify Android hardware acceleration

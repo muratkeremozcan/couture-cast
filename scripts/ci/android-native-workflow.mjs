@@ -38,8 +38,10 @@ const BUILT = "${{ !cancelled() && steps.android_build.outcome == 'success' }}"
 
 export const RELEASE_BUILD =
   './gradlew :app:bundleRelease :app:assembleMinifiedDebuggable --console=plain'
+// TEA, 2026-11-13: the Debug x86_64 client goes through the Worklets staging, which the device run
+// needed against Reanimated's legacy libworklets.so race; the release builds stay plain.
 export const CLIENT_BUILD =
-  './gradlew :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain'
+  'node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-network-timeout/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain'
 export const MINIFIED_EVIDENCE =
   'node scripts/lib/minified-debuggable-evidence.mjs --android apps/mobile/android | tee "$RUNNER_TEMP/android-release-builds/minified-debuggable.json"'
 export const RELEASE_ABIS =
@@ -231,9 +233,9 @@ function networkProblems(job, script, check) {
     check
   )
   check(
-    build?.['working-directory'] === ANDROID &&
+    build?.['working-directory'] === undefined &&
       Number.isInteger(build?.['timeout-minutes']),
-    `${NETWORK_JOB}: build the client in ${ANDROID} with its own limit`
+    `${NETWORK_JOB}: build the client from the repository root through the Worklets staging, with its own limit`
   )
   const flow = rows.find((step) => step.id === 'network_timeout')
   check(
