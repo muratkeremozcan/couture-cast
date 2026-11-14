@@ -259,18 +259,32 @@ function persist(capture) {
   )
 }
 
-function makeCapture(screenName, stage, scale) {
+async function makeCapture(screenName, stage, scale) {
   // iOS drops a 1x1 marker view from a dump now and then. A marker still missing after three
   // reads stays missing in the capture, and the identity check fails the leg on it.
-  const { tree, flat } = readWithMounts(() => {
-    const read = hierarchy()
-    const flattened = flattenHierarchy(read, { platform, volatile: activeVolatile })
-    return { tree: read, flat: flattened, markers: flattened.markers }
-  }, mounts.scopes())
+  const readScreen = () => {
+    const read = readWithMounts(() => {
+      const raw = hierarchy()
+      const flattened = flattenHierarchy(raw, { platform, volatile: activeVolatile })
+      return { tree: raw, flat: flattened, markers: flattened.markers }
+    }, mounts.scopes())
+    return { ...read, nodes: read.flat.nodes }
+  }
+  // F-00i: the laid-out text of the screen the hierarchy just showed, read again after the
+  // probe's answer (stablePage's sandwich read), so a screen that moved meanwhile is read and
+  // asked again. Three asks without a whole answer, or an answer that breaks the wire
+  // contract, fail the run with the probe's code.
+  const {
+    tree,
+    flat,
+    textProbe: answer,
+  } = await stablePage({
+    first: readScreen(),
+    read: readScreen,
+    probe: () => textProbe.read(),
+    pause,
+  })
   mounts.captured(stage, flat.markers)
-  // F-00i: the laid-out text of the screen the hierarchy just showed. Three asks without a whole
-  // answer, or an answer that breaks the wire contract, fail the run with the probe's code.
-  const answer = textProbe.read()
   sequence += 1
   const capture = {
     stage,

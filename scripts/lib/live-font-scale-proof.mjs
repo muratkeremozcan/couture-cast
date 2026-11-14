@@ -320,7 +320,11 @@ function pairedFacts(match, { answer, nodes, names }) {
     return `>${JSON.stringify(['', text])}#${before}`
   }
   return match.pairs
-    .filter((pair) => !answer.records[pair.record].scrolledAway)
+    .filter(
+      (pair) =>
+        !answer.records[pair.record].scrolledAway &&
+        answer.records[pair.record].offWindow !== true
+    )
     .map((pair) => {
       const node = nodes[pair.node]
       const named = names.get(node.key)
@@ -490,6 +494,11 @@ export function textProbeSummary(capture, platform) {
       key: node === null ? null : masked.get(keys[node]),
       text: records[record].text,
       comparable,
+    })),
+    // TEA ruling 2026-11-14: records wholly off their window, no clip, listed for review.
+    offWindow: match.offWindow.map(({ record, node }) => ({
+      key: node === null ? null : masked.get(keys[node]),
+      text: records[record].text,
     })),
     empty: match.empty.length,
     windowNodes: match.windowNodes.map((index) => identityOf(nodes[index])),
@@ -926,7 +935,7 @@ export function evaluateLiveFontChange({
 function textPresence(capture, platform) {
   const presence = new Map()
   const entry = (text) => {
-    if (!presence.has(text)) presence.set(text, { keys: [], invisible: 0 })
+    if (!presence.has(text)) presence.set(text, { keys: [], invisible: 0, offWindow: 0 })
     return presence.get(text)
   }
   // Every page counts (TEA ruling 2026-11-14): a key once however many pages show it, and a
@@ -940,24 +949,28 @@ function textPresence(capture, platform) {
     capture,
     ...pageCaptures(capture).map(({ capture: pageCapture }) => pageCapture),
   ]
+  // Drawn nowhere on a page: at opacity 0, or wholly off the window (TEA ruling 2026-11-14).
   for (const page of pages) {
-    const counts = new Map()
-    for (const { record, comparable } of textLayout(page, platform).match?.invisible ??
-      []) {
-      if (!comparable) continue
-      const text = maskText(page.textProbe.records[record].text)
-      counts.set(text, (counts.get(text) ?? 0) + 1)
+    const match = textLayout(page, platform).match
+    for (const kind of ['invisible', 'offWindow']) {
+      const counts = new Map()
+      for (const { record, comparable } of match?.[kind] ?? []) {
+        if (!comparable) continue
+        const text = maskText(page.textProbe.records[record].text)
+        counts.set(text, (counts.get(text) ?? 0) + 1)
+      }
+      for (const [text, count] of counts)
+        entry(text)[kind] = Math.max(entry(text)[kind], count)
     }
-    for (const [text, count] of counts)
-      entry(text).invisible = Math.max(entry(text).invisible, count)
   }
   return presence
 }
 
 /**
- * TEA ruling 2026-11-14: an invisible record must not hide lost text. A text the cold launch at
- * the same scale shows on more paired records than the live capture does, while the live
- * capture draws it at opacity 0, failed to show: live_font_text_hidden. `stages` holds
+ * TEA ruling 2026-11-14: an invisible or off-window record must not hide lost text. A text the
+ * cold launch at the same scale shows on more paired records than the live capture does, while
+ * the live capture draws it at opacity 0 or wholly off the window, failed to show:
+ * live_font_text_hidden. `stages` holds
  * [stage, live capture, cold capture] triples; a missing capture is skipped.
  */
 function hiddenText(platform, stages) {
@@ -967,8 +980,14 @@ function hiddenText(platform, stages) {
     const [now, then] = [textPresence(live, platform), textPresence(cold, platform)]
     for (const [text, { keys }] of then) {
       const shown = now.get(text)
-      if (shown?.invisible && shown.keys.length < keys.length)
-        hidden.push({ stage, text, coldKeys: keys, invisible: shown.invisible })
+      if ((shown?.invisible || shown?.offWindow) && shown.keys.length < keys.length)
+        hidden.push({
+          stage,
+          text,
+          coldKeys: keys,
+          invisible: shown.invisible,
+          ...(shown.offWindow ? { offWindow: shown.offWindow } : {}),
+        })
     }
   }
   return { pass: hidden.length === 0, hidden }

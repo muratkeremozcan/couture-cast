@@ -21,37 +21,45 @@ function unstable(detail) {
 }
 
 /**
- * One settled scroll page with its probe answer. `read()` returns the page's hierarchy as the
- * judge needs it ({ nodes, volatileRegions, window }); `probe()` returns the probe's answer.
- * A page is settled after two identical reads `intervalMs` apart; the probe is asked then, and
- * the hierarchy is read once more after its answer (a sandwich read): a page that moved between
- * the read and the answer (a scroll still settling) is never paired, the read after becomes
- * the next comparison and the page is tried again. Within `attempts` pauses the page must hold
- * still on both sides of one answer, or the run fails as live_font_scroll_page_unstable.
+ * One settled screen or scroll page with its probe answer. `read()` returns the hierarchy as the
+ * caller needs it, with the `nodes` the comparison reads; `probe()` returns the probe's answer.
+ * A page is settled after two identical reads `intervalMs` apart, or at once when the caller
+ * hands a read it already saw settle as `first` (makeCapture, after settleCapture). The probe is
+ * asked then, and the hierarchy is read once more after its answer (a sandwich read): a page
+ * that moved between the read and the answer (a scroll still settling) is never paired, the read
+ * after becomes the next comparison and the page is tried again. Within `attempts` pauses the
+ * page must hold still on both sides of one answer, or the run fails as
+ * live_font_scroll_page_unstable.
  */
 export async function stablePage({
   read,
   probe,
   pause,
+  first,
   attempts = PAGE_ATTEMPTS,
   intervalMs = PAGE_INTERVAL_MS,
 }) {
-  let previous = read()
+  let previous = first ?? read()
+  let settled = first !== undefined
   let moved = 0
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    await pause(intervalMs)
-    const current = read()
-    if (!sameLayout(current.nodes, previous.nodes)) {
+  for (let attempt = 0; ; ) {
+    if (!settled) {
+      if (attempt >= attempts)
+        throw unstable(`${attempts} reads, ${moved} probe answers on a moving page`)
+      attempt += 1
+      await pause(intervalMs)
+      const current = read()
+      settled = sameLayout(current.nodes, previous.nodes)
       previous = current
-      continue
+      if (!settled) continue
     }
     const textProbe = probe()
     const after = read()
-    if (sameLayout(after.nodes, current.nodes)) return { ...current, textProbe }
+    if (sameLayout(after.nodes, previous.nodes)) return { ...previous, textProbe }
     moved += 1
     previous = after
+    settled = false
   }
-  throw unstable(`${attempts} reads, ${moved} probe answers on a moving page`)
 }
 
 /**

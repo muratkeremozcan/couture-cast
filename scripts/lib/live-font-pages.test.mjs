@@ -119,6 +119,43 @@ describe('stablePage', () => {
   })
 })
 
+// makeCapture hands stablePage the read settleCapture already saw settle.
+describe('stablePage with a settled first read', () => {
+  test('asks the probe at once and pairs it when the screen held still', async () => {
+    const fake = device(['A'])
+    const page = await stablePage({ ...fake, first: layout('A') })
+    assert.equal(page.textProbe.token, 'answer-1')
+    assert.deepEqual(fake.log, ['probe:1', 'read:A'])
+  })
+
+  test('a screen that moved at the probe answer is read until it holds and asked again', async () => {
+    const fake = device(['B', 'B', 'B'])
+    const page = await stablePage({ ...fake, first: layout('A') })
+    assert.equal(page.textProbe.token, 'answer-2')
+    assert.deepEqual(
+      page.nodes.map((node) => node.text),
+      ['B top', 'B bottom']
+    )
+    assert.deepEqual(fake.log, [
+      'probe:1',
+      'read:B',
+      'pause',
+      'read:B',
+      'probe:2',
+      'read:B',
+    ])
+  })
+
+  test('a screen that never holds after the answer fails unstable', async () => {
+    const moving = Array.from({ length: 3 * PAGE_ATTEMPTS }, (_, index) => `M${index}`)
+    const fake = device(moving)
+    await assert.rejects(stablePage({ ...fake, first: layout('A') }), {
+      code: 'live_font_scroll_page_unstable',
+    })
+    assert.equal(fake.log.filter((entry) => entry.startsWith('probe')).length, 1)
+  })
+})
+
 describe('scrollPages', () => {
   const pageOf = (name) => ({ ...layout(name), textProbe: { token: name } })
 

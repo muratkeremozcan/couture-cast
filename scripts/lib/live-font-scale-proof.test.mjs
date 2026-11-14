@@ -1976,6 +1976,78 @@ describe('text layout clipping (F-00i)', () => {
     assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
   })
 
+  // TEA ruling 2026-11-14: offWindow, a text wholly off its window with no scroll view to
+  // bring it in, is no clip but is listed, and never hides lost text.
+  const parkedSheet = (overrides = {}) =>
+    probeRecord('android', 'Share your look', [42, 2500, 600, 2560], {
+      offWindow: true,
+      visibleRect: null,
+      clipRect: null,
+      ...overrides,
+    })
+
+  test('a parked sheet below the screen passes and is listed offWindow', () => {
+    const change = withAll(fixedChange())
+    change.settled.textProbe.records.push(parkedSheet())
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'fixed')
+    assert.deepEqual(checks.textProbe.stages.settled.offWindow, [
+      { key: null, text: 'Share your look' },
+    ])
+    // Where the hierarchy lists it (iOS lists offscreen elements), it pairs and is still no clip.
+    const listed = withAll(fixedChange())
+    listed.settled.textProbe.records.push(parkedSheet())
+    listed.settled.nodes = [
+      ...listed.settled.nodes,
+      { id: '', text: 'Share your look', bounds: '[42,2500][600,2560]' },
+    ]
+    assert.equal(evaluateLiveFontChangeRaw(listed).checks.clipping.pass, true)
+    // The same record without the field is a hidden text: a full clip.
+    const older = withAll(fixedChange())
+    const record = parkedSheet()
+    delete record.offWindow
+    older.settled.textProbe.records.push(record)
+    assert.deepEqual(
+      layoutClips(evaluateLiveFontChangeRaw(older).checks.clipping).map((entry) => [
+        entry.via,
+        entry.text,
+      ]),
+      [['hidden', 'Share your look']]
+    )
+  })
+
+  test('a fixed text half past the window bottom fails clipped_by_layout', () => {
+    const change = withAll(fixedChange())
+    const record = recordFor(change.settled, TEMPERATURE)
+    const [left, top, right, bottom] = record.viewRect
+    // The window ends halfway down the text; the clipRect is cut there, the content is not.
+    const cut = [left, top, right, Math.round((top + bottom) / 2)]
+    Object.assign(record, { visibleRect: cut, clipRect: cut, offWindow: false })
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      layoutClips(checks.clipping).map((entry) => [entry.text, entry.content]),
+      [[TEMPERATURE, true]]
+    )
+    assert.equal(verdict, 'unexpected')
+  })
+
+  test('a text the cold launch shows that is wholly off the window live fails as hidden text', () => {
+    const change = withAll(fixedChange())
+    for (const record of change.settled.textProbe.records)
+      if (record.text === TEMPERATURE)
+        Object.assign(record, { offWindow: true, visibleRect: null, clipRect: null })
+    change.settled.nodes = change.settled.nodes.filter(
+      (node) => node.text !== TEMPERATURE
+    )
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.deepEqual(
+      checks.textHidden.hidden.map((entry) => [entry.text, entry.offWindow]),
+      [[TEMPERATURE, 2]]
+    )
+    assert.equal(checks.fullText.pass, false, 'and lost text fails too')
+    assert.throws(prove(change, undefined, '0.88.1'), { code: 'live_font_text_hidden' })
+  })
+
   test('a page whose answer does not pair fails the leg', () => {
     const change = withAll(fixedChange())
     change.settled = withPages(change.settled, [BELOW])

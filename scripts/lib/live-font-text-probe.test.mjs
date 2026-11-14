@@ -433,6 +433,15 @@ describe('validateTextProbeAnswer', () => {
       'opacity above 1': (a) => (a.records[0].opacity = 1.5),
       'negative opacity': (a) => (a.records[0].opacity = -0.1),
       'opacity as text': (a) => (a.records[0].opacity = '1'),
+      'offWindow as text': (a) => (a.records[0].offWindow = 'true'),
+      'offWindow yet visible': (a) => (a.records[0].offWindow = true),
+      'offWindow and scrolled away': (a) =>
+        Object.assign(a.records[0], {
+          offWindow: true,
+          visibleRect: null,
+          clipRect: null,
+          scrolledAway: true,
+        }),
     }
     for (const [name, mutate] of Object.entries(cases)) {
       const answer = ok()
@@ -551,6 +560,36 @@ describe('matchTextProbe, exact text one to one', () => {
       window: 1,
       opacity,
     })
+  // TEA ruling 2026-11-14: offWindow, optional so older captures read as false.
+  test('a record with or without offWindow passes the contract', () => {
+    const without = structuredClone(SAMPLE)
+    assert.doesNotThrow(() =>
+      validateTextProbeAnswer(without, { platform: 'android', token: 't1' })
+    )
+    const parked = structuredClone(SAMPLE)
+    Object.assign(parked.records[0], {
+      offWindow: true,
+      visibleRect: null,
+      clipRect: null,
+    })
+    parked.records[1].offWindow = false
+    assert.doesNotThrow(() =>
+      validateTextProbeAnswer(parked, { platform: 'android', token: 't1' })
+    )
+  })
+
+  test('a parked sheet below the screen is listed offWindow and owes no node', () => {
+    const sheet = record('Share your look', [42, 2500, 600, 2560], {
+      offWindow: true,
+      visibleRect: null,
+      clipRect: null,
+    })
+    const result = match([], [sheet])
+    assert.equal(result.pass, true, result.code)
+    assert.deepEqual(result.offWindow, [{ record: 0, node: null, comparable: true }])
+    assert.deepEqual(result.hiddenRecords, [])
+  })
+
   test('a stacked icon pair passes, its opacity 0 copy listed invisible', () => {
     const result = match(
       [node('\uf015', [100, 2207, 169, 2282])],

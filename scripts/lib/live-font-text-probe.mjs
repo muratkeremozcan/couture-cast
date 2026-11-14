@@ -13,13 +13,14 @@
 //     windows: [{ id, rect, z, focused }],
 //     records: [{ kind, text, window, viewRect, visibleRect|null, clipRect|null, contentRect,
 //                 scrolledAway, lineCount, maxLines|null, ellipsized, unlimitedLineCount|null,
-//                 opacity }] }
+//                 opacity, offWindow? }] }
 // Rects are [left, top, right, bottom]: screen pixels on Android (as uiautomator bounds), window
 // points on iOS (as Maestro iOS bounds). `visibleRect` is the view cut by every clipping ancestor
 // and the window; `clipRect` is the view cut by every clipping ancestor except scroll views and
 // the window, so a scroll viewport edge never reads as a clip; `scrolledAway` is true when the
 // view lies outside its nearest scroll view's clip or outside the window; `opacity` is the
-// view's effective opacity, 0 to 1.
+// view's effective opacity, 0 to 1; `offWindow` (optional, false when absent) is true when the
+// view lies wholly outside its window and no scroll view can bring it in.
 //
 // Android: `am broadcast -a com.couturecast.textlayoutprobe.DUMP --es token <t> -p <package>`,
 // then `logcat -d -s TextLayoutProbe` lines `begin <t> <chunks> <sha256>`, `chunk <t> <i>
@@ -142,13 +143,34 @@ const RECORD_RULES = [
   ],
 ]
 
+/**
+ * `offWindow` (TEA ruling 2026-11-14): true when the text lies wholly outside its window and no
+ * scroll view can bring it in (a sheet parked below the screen). Optional: a record from before
+ * the field reads as false.
+ */
+const WITH_OFF_WINDOW = [...RECORD_FIELDS, 'offWindow'].sort()
+const OFF_WINDOW_RULES = [
+  [
+    'offWindow',
+    (record) => record.offWindow === undefined || typeof record.offWindow === 'boolean',
+  ],
+  [
+    'offWindow with a visibleRect or scrolled away',
+    (record) =>
+      record.offWindow !== true || (record.visibleRect === null && !record.scrolledAway),
+  ],
+]
+
 /** Why `record` breaks the contract, or null. `unknown:*` kinds are judged by the caller. */
 function recordProblem(record, platform, windowIds) {
-  if (!sameFields(record, RECORD_FIELDS))
+  if (!sameFields(record, RECORD_FIELDS) && !sameFields(record, WITH_OFF_WINDOW))
     return `fields ${JSON.stringify(Object.keys(record ?? {}).sort())}`
   if (!TEXT_PROBE_KINDS[platform].includes(record.kind)) return `kind ${record.kind}`
   if (!windowIds.has(record.window)) return `window ${record.window}`
-  return RECORD_RULES.find(([, holds]) => !holds(record))?.[0] ?? null
+  return (
+    [...RECORD_RULES, ...OFF_WINDOW_RULES].find(([, holds]) => !holds(record))?.[0] ??
+    null
+  )
 }
 
 /** Why the answer's top level breaks the contract, or null. */
@@ -521,6 +543,7 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     empty: [],
     covered: [],
     invisible: [],
+    offWindow: [],
     behind: [],
     volatile: [],
     scrolled: [],
@@ -536,6 +559,8 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     // TEA ruling 2026-11-14: opacity exactly 0 draws nothing (the inactive copy of a stacked
     // tab icon); anything above 0, a fade caught mid-way, is matched and judged.
     else if (record.opacity === 0) kind = 'invisible'
+    // Wholly off its window with no scroll view to bring it in: drawn nowhere, so no clip.
+    else if (record.offWindow === true) kind = 'offWindow'
     else if (coveredIds.has(record.window)) kind = 'behind'
     else if (region >= 0) kind = 'volatile'
     else if (record.scrolledAway) kind = 'scrolled'
@@ -652,6 +677,8 @@ function groupLeftovers({ nodes, leftover, open, free, tolerance }) {
  *   empty      text '' (no text to cut), left out
  *   covered    in a window a focused higher window covers whole, left out
  *   invisible  opacity exactly 0: left out of matching and judging, listed for review
+ *   offWindow  wholly off its window, no scroll view to bring it in: may match, never
+ *              required, never judged, listed for review
  *   behind     in a window under a focused higher window that does not cover it whole (a
  *              centred dialog): out of matching, still judged for clipping
  *   volatile   centre inside a volatile region: out of matching, still judged for clipping
@@ -689,7 +716,12 @@ export function matchTextProbe({
   const open = new Set(
     indexed.filter((node) => !windowNodes.includes(node)).map((node) => node.index)
   )
-  const candidates = [...classes.visible, ...classes.hidden, ...classes.scrolled]
+  const candidates = [
+    ...classes.visible,
+    ...classes.hidden,
+    ...classes.scrolled,
+    ...classes.offWindow,
+  ]
   const free = new Set(candidates.map((record) => record.index))
   const nodeRank = ranks(indexed, (node) => node.box)
   const recordRank = ranks(records, recordRect)
@@ -750,6 +782,11 @@ export function matchTextProbe({
     })),
     behind: classes.behind.map((record) => record.index),
     invisible: invisibleNodes(indexed, classes.invisible, {
+      covers,
+      inVolatile: (record) => volatileRegionOf(record, volatileRegions) >= 0,
+      tolerance,
+    }),
+    offWindow: invisibleNodes(indexed, classes.offWindow, {
       covers,
       inVolatile: (record) => volatileRegionOf(record, volatileRegions) >= 0,
       tolerance,
