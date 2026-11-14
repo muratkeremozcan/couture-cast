@@ -320,12 +320,7 @@ export function planRevenueCatTransition(event: RevenueCatEvent): TransitionPlan
   }
 }
 
-/**
- * The gaining side of a TRANSFER: the event's store/product/expiry when
- * carried; otherwise the losing row's — a TRANSFER moves an existing
- * subscription, so the loser's record is the authoritative fallback. Neither
- * known → null, and the caller writes no entitlement.
- */
+/** The store a TRANSFER moves: the event's own, else the losing row's. */
 function resolveTransferStore(
   event: RevenueCatEvent,
   losingRow: PremiumEntitlement | null
@@ -333,10 +328,7 @@ function resolveTransferStore(
   return mapRevenueCatStore(event.store) ?? losingRow?.store ?? null
 }
 
-/**
- * Story 6.15 D15: a TRANSFER whose resolved store this API does not honor (a `test_store` row
- * moved by a store-less event outside local and preview) revokes no one and grants no one.
- */
+/** Story 6.15 D15: true when this environment does not honor the resolved TRANSFER store. */
 function transfersUnhonoredStore(
   event: RevenueCatEvent,
   losingRow: PremiumEntitlement | null
@@ -345,6 +337,13 @@ function transfersUnhonoredStore(
   return store !== null && !honorsEntitlementStore(store)
 }
 
+/**
+ * The gaining side of a TRANSFER: the event's store/product/expiry when
+ * carried; otherwise the losing row's — a TRANSFER moves an existing
+ * subscription, so the loser's record is the authoritative fallback. The
+ * caller passes the losing row only when this environment honors its store.
+ * Neither known → null, and the caller writes no entitlement.
+ */
 function resolveTransferGainState(
   event: RevenueCatEvent,
   losingRow: PremiumEntitlement | null
