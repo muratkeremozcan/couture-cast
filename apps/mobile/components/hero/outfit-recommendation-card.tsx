@@ -330,12 +330,11 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
     color: '#111111',
-    fontStyle: 'italic',
+    // The italic face loaded as its own family (app/_layout.tsx). fontStyle italic on the regular
+    // face drew upright Playfair on iOS and a synthetic italic sans on Android.
     fontFamily: Platform.select({
-      ios: 'Playfair Display',
-      android: 'Playfair Display',
-      web: 'Playfair Display, serif',
-      default: 'System',
+      web: '"Playfair Display Italic", serif',
+      default: 'Playfair Display Italic',
     }),
   },
   badgesSection: {

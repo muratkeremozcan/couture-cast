@@ -54,6 +54,7 @@ vi.mock('@/components/android-share-card-presentation', () => ({
 vi.mock('@expo/vector-icons/FontAwesome', () => ({ default: { font: {} } }))
 vi.mock('@expo-google-fonts/playfair-display', () => ({
   PlayfairDisplay_400Regular: 1,
+  PlayfairDisplay_400Regular_Italic: 1,
   PlayfairDisplay_700Bold: 1,
 }))
 vi.mock('@expo-google-fonts/space-grotesk', () => ({

@@ -7,6 +7,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
 import {
   PlayfairDisplay_400Regular,
+  PlayfairDisplay_400Regular_Italic,
   PlayfairDisplay_700Bold,
 } from '@expo-google-fonts/playfair-display'
 import {
@@ -65,6 +66,9 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     'Playfair Display': PlayfairDisplay_400Regular,
     'Playfair Display Bold': PlayfairDisplay_700Bold,
+    // Story 6.15: the comfort notes' face. Each face is its own family, so italic is a family,
+    // never fontStyle on the regular face (iOS drew it upright, Android drew italic sans).
+    'Playfair Display Italic': PlayfairDisplay_400Regular_Italic,
     'Space Grotesk': SpaceGrotesk_400Regular,
     'Space Grotesk Bold': SpaceGrotesk_700Bold,
     ...FontAwesome.font,
