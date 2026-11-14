@@ -111,10 +111,19 @@ export default function TabLayout() {
           height: 56 + growth + insets.bottom,
           paddingBottom: insets.bottom,
         },
-        tabBarLabel: ({ color, children }: { color: string; children: string }) => (
+        tabBarLabel: ({
+          color,
+          children,
+          position,
+        }: {
+          color: string
+          children: string
+          position: 'below-icon' | 'beside-icon'
+        }) => (
           <TabBarLabel
             color={color}
             onHeight={onLabelHeight}
+            position={position}
             lineBoxHeight={tallestLabel}
           >
             {children}

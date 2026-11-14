@@ -4,7 +4,7 @@
 // Story 6.15 F-00i: the bottom tab bar grows with its labels, and a label wider than its tab
 // shrinks to fit instead of ellipsizing.
 import type * as ReactNative from 'react-native'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 const captured = vi.hoisted(() => ({ props: [] as ReactNative.TextProps[] }))
@@ -22,6 +22,7 @@ vi.mock('react-native', async (original) => {
 
 import { StyleSheet } from 'react-native'
 import {
+  nextTabLabelFit,
   recordTabLabelHeight,
   TAB_LABEL_MIN_SCALE,
   TabBarLabel,
@@ -43,7 +44,7 @@ describe('6.15 tab bar label', () => {
     expect(tabBarGrowth([21], 1.5)).toBe(7)
   })
 
-  it('6.15-MOB-TAB-03 draws one centred 10 pt line that shrinks to fit and reports its height', async () => {
+  it('6.15-MOB-TAB-03 draws a centred 10 pt label that is never cut and reports its height', async () => {
     captured.props.length = 0
     const onHeight = vi.fn()
     render(
@@ -56,9 +57,11 @@ describe('6.15 tab bar label', () => {
     expect(getComputedStyle(label).textAlign).toBe('center')
     expect(getComputedStyle(label).color).toBe('rgb(1, 2, 3)')
     const props = captured.props.find((entry) => entry.children === 'Community')!
-    expect(props.numberOfLines).toBe(1)
-    expect(props.adjustsFontSizeToFit).toBe(true)
-    expect(props.minimumFontScale).toBe(TAB_LABEL_MIN_SCALE)
+    // r45 P2-4: Fabric Android drops minimumFontScale, so adjustsFontSizeToFit could shrink a
+    // label toward 4 dp. The label fits itself from its own text layout, and never ellipsizes.
+    expect(props.numberOfLines).toBeUndefined()
+    expect(props.adjustsFontSizeToFit).toBeUndefined()
+    expect(props.onTextLayout).toEqual(expect.any(Function))
     await waitFor(() =>
       expect(onHeight).toHaveBeenCalledWith('Community', expect.any(Number))
     )
@@ -94,5 +97,50 @@ describe('6.15 tab bar label line box', () => {
       minHeight: 27,
       textAlignVertical: 'bottom',
     })
+  })
+})
+
+describe('6.15 tab bar label fit and position', () => {
+  it('6.15-MOB-TAB-06 shrinks a wrapped label by its overflow, never below half its size', () => {
+    // One line fits: the factor stays.
+    expect(nextTabLabelFit(1, [120])).toBe(1)
+    // Two lines of 100 and 20 in a 100 wide tab: 120 natural, shrink to 100/120 with slack.
+    expect(nextTabLabelFit(1, [100, 20])).toBeCloseTo((100 / 120) * 0.98, 5)
+    // A label that would need a third of its size is held at half and stays wrapped, never cut.
+    expect(nextTabLabelFit(1, [100, 100, 100])).toBe(TAB_LABEL_MIN_SCALE)
+    expect(nextTabLabelFit(TAB_LABEL_MIN_SCALE, [100, 100, 100])).toBe(
+      TAB_LABEL_MIN_SCALE
+    )
+  })
+
+  it('6.15-MOB-TAB-07 redraws a wrapped label at its fitted size', () => {
+    captured.props.length = 0
+    render(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()}>
+        Community
+      </TabBarLabel>
+    )
+    const first = captured.props.findLast((entry) => entry.children === 'Community')!
+    act(() =>
+      first.onTextLayout!({
+        nativeEvent: { lines: [{ width: 100 }, { width: 20 }] },
+      } as never)
+    )
+    expect(
+      Number.parseFloat(getComputedStyle(screen.getByText('Community')).fontSize)
+    ).toBeCloseTo(10 * (100 / 120) * 0.98, 1)
+  })
+
+  it('6.15-MOB-TAB-08 draws a label beside its icon the way React Navigation does', () => {
+    render(
+      <TabBarLabel color="rgb(1, 2, 3)" onHeight={vi.fn()} position="beside-icon">
+        Settings
+      </TabBarLabel>
+    )
+    const label = getComputedStyle(screen.getByText('Settings'))
+    expect(label.fontSize).toBe('13px')
+    expect(label.lineHeight).toBe('24px')
+    expect(label.marginInlineStart).toBe('5px')
+    expect(label.marginInlineEnd).toBe('12px')
   })
 })
