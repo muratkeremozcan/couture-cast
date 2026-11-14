@@ -300,6 +300,7 @@ async function makeCapture(screenName, stage, scale) {
     controls: flat.controls,
     window: windowBounds(tree),
     volatileRegions: flat.volatileRegions,
+    volatileRegionIds: flat.volatileRegionIds,
     textProbe: answer,
   }
   // How the answer paired with the hierarchy, kept with the capture for review; the oracle
@@ -383,6 +384,7 @@ function readPage() {
   return {
     nodes: flat.nodes,
     volatileRegions: flat.volatileRegions,
+    volatileRegionIds: flat.volatileRegionIds,
     window: windowBounds(tree),
   }
 }

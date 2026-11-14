@@ -33,6 +33,8 @@ export function probeRecord(platform, text, rect, overrides = {}) {
     ellipsized: 0,
     unlimitedLineCount: null,
     opacity: 1,
+    // iOS records always carry their accessibility ancestor (wire contract r44 4), Android none.
+    ...(platform === 'ios' ? { accessibilityAncestor: null } : {}),
     ...overrides,
   }
 }

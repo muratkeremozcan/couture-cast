@@ -303,6 +303,18 @@ describe('runScreenJourney', () => {
       staleKeys: ['cold:["community-new-post-label","New post"]#0'],
       // TD-05 as amended 2026-11-14: a run with no layout clip proposes none, and says so.
       clippedKeys: [],
+      // TEA ruling r45: every capture's volatile keys, none on this screen.
+      volatileKeys: Object.fromEntries(
+        [
+          'before',
+          'settled',
+          'updated',
+          'coldBefore',
+          'cold',
+          'coldBeforeUpdated',
+          'coldUpdated',
+        ].map((stage) => [stage, []])
+      ),
       review: {
         verdict: 'known-residual',
         structuralPass: true,

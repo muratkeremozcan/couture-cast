@@ -47,7 +47,9 @@ function readMarker(id, { markers, jsScales, environments }) {
  * With `markVolatile` the region's text stays, flagged `volatile: true`, so scroll pages can
  * still be aligned on it (stitchPages leaves it out of the result). `volatileRegions` holds the
  * bounds of each dropped region, so the text layout probe's records inside one that no kept node
- * takes are left out of matching too (F-00i; they are still judged for clipping).
+ * takes are left out of matching too (F-00i; they are still judged for clipping), and
+ * `volatileRegionIds` the testID of each, in the same order, which keys those records (TEA
+ * ruling r45).
  */
 export function flattenHierarchy(
   tree,
@@ -56,6 +58,7 @@ export function flattenHierarchy(
   const nodes = []
   let volatileDropped = 0
   const volatileRegions = []
+  const volatileRegionIds = []
   const controls = []
   const markers = []
   const jsScales = []
@@ -74,7 +77,10 @@ export function flattenHierarchy(
     readMarker(id, { markers, jsScales, environments })
     const isVolatile = inVolatile || matchesPrefix(id, volatile)
     // A region's own bounds, whether its text is dropped or kept flagged on a scroll page.
-    if (isVolatile && !inVolatile && bounds) volatileRegions.push(bounds)
+    if (isVolatile && !inVolatile && bounds) {
+      volatileRegions.push(bounds)
+      volatileRegionIds.push(id)
+    }
     if (isVolatile && !markVolatile) {
       volatileDropped += countText(node, platform)
       return
@@ -118,6 +124,7 @@ export function flattenHierarchy(
     environment: environment.size === 1 ? parseEnvironment(environments[0]) : undefined,
     volatileDropped,
     volatileRegions,
+    volatileRegionIds,
   }
 }
 

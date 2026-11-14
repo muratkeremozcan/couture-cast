@@ -395,6 +395,109 @@ describe('validateTextProbeAnswer', () => {
     )
   })
 
+  // TEA ruling r45: ReactSwitch is a known Android kind; an unknown kind fails whatever its text.
+  test('ReactSwitch is known on Android only; an unknown kind with empty text still fails', () => {
+    const answer = ok()
+    answer.records[0].kind = 'ReactSwitch'
+    assert.doesNotThrow(() => validateTextProbeAnswer(answer, asked))
+    const ios = answerFor(
+      't1',
+      [iosRecord('On', [16, 400, 80, 440], { kind: 'ReactSwitch' })],
+      {
+        platform: 'ios',
+      }
+    )
+    assert.throws(() => validateTextProbeAnswer(ios, { platform: 'ios', token: 't1' }), {
+      code: 'live_font_text_probe_invalid',
+    })
+    const unknownEmpty = ok()
+    Object.assign(unknownEmpty.records[0], {
+      kind: 'unknown:com.facebook.react.views.switchview.ReactSwitch',
+      text: '',
+    })
+    assert.throws(() => validateTextProbeAnswer(unknownEmpty, asked), {
+      code: 'live_font_text_probe_unknown_view',
+    })
+  })
+
+  // Wire contract r44 4: every iOS record carries accessibilityAncestor, null or an identifier
+  // with a rect; Android records omit it.
+  test('accessibilityAncestor is required on iOS, null or an identifier with a rect, and absent on Android', () => {
+    const iosAsked = { platform: 'ios', token: 't1' }
+    const iosAnswer = (ancestor) => {
+      const answer = answerFor('t1', [iosRecord('57°F', [16, 173, 115, 235])], {
+        platform: 'ios',
+      })
+      if (ancestor === undefined) delete answer.records[0].accessibilityAncestor
+      else answer.records[0].accessibilityAncestor = ancestor
+      return answer
+    }
+    for (const ancestor of [
+      null,
+      { identifier: 'current-temperature', rect: [16, 173, 115.667, 235.333] },
+    ])
+      assert.doesNotThrow(
+        () => validateTextProbeAnswer(iosAnswer(ancestor), iosAsked),
+        JSON.stringify(ancestor)
+      )
+    for (const [name, ancestor] of Object.entries({
+      missing: undefined,
+      'empty identifier': { identifier: '', rect: [0, 0, 1, 1] },
+      'identifier not text': { identifier: 7, rect: [0, 0, 1, 1] },
+      'inverted rect': { identifier: 'a', rect: [5, 0, 1, 1] },
+      'short rect': { identifier: 'a', rect: [0, 0, 1] },
+      'no rect': { identifier: 'a' },
+      'extra field': { identifier: 'a', rect: [0, 0, 1, 1], label: 'x' },
+      'a string': 'tab-home',
+      'a list': ['tab-home', [0, 0, 1, 1]],
+    }))
+      assert.throws(
+        () => validateTextProbeAnswer(iosAnswer(ancestor), iosAsked),
+        (error) =>
+          error.code === 'live_font_text_probe_invalid' &&
+          /record 0 (accessibilityAncestor|fields)/.test(error.message),
+        name
+      )
+    for (const ancestor of [null, { identifier: 'a', rect: [0, 0, 1, 1] }]) {
+      const answer = ok()
+      answer.records[0].accessibilityAncestor = ancestor
+      assert.throws(
+        () => validateTextProbeAnswer(answer, asked),
+        (error) =>
+          error.code === 'live_font_text_probe_invalid' &&
+          /record 0 fields/.test(error.message),
+        `android ${JSON.stringify(ancestor)}`
+      )
+    }
+  })
+
+  // Wire contract r44 3: a ReactSwitch with showText false, as Android writes it.
+  test('a ReactSwitch record as the native probe writes it passes', () => {
+    const answer = ok()
+    answer.records[0] = record('', [880, 700, 1000, 760], {
+      kind: 'ReactSwitch',
+      lineCount: 0,
+      maxLines: null,
+      unlimitedLineCount: null,
+    })
+    assert.equal(answer.records[0].contentRect, answer.records[0].viewRect)
+    assert.doesNotThrow(() => validateTextProbeAnswer(answer, asked))
+  })
+
+  // Wire contract r44 P1-1: text a layout alone pushes off the window is no offWindow record.
+  test('a record with nothing shown, no clipRect, not scrolled away and not offWindow passes', () => {
+    const answer = ok()
+    Object.assign(answer.records[0], {
+      viewRect: [97, 2500, 170, 2547],
+      contentRect: [97, 2500, 170, 2547],
+      visibleRect: null,
+      clipRect: null,
+      scrolledAway: false,
+      offWindow: false,
+    })
+    assert.doesNotThrow(() => validateTextProbeAnswer(answer, asked))
+  })
+
   test('a text view of an unknown class fails as live_font_text_probe_unknown_view', () => {
     const answer = ok()
     answer.records[1].kind = 'unknown:com.facebook.react.views.text.FancyTextView'
@@ -484,38 +587,51 @@ describe('validateTextProbeAnswer', () => {
     }
   })
 
-  test('the native error answer for an opacity fails with that code; any other is invalid', () => {
-    const native = (error, overrides = {}) => ({
+  // Wire contract r44 P3-1: the refusal answer, as both platforms write it.
+  test('the native refusal for an opacity fails with that code; any other is invalid', () => {
+    const refusal = (error, overrides = {}) => ({
       version: 1,
       token: 't1',
       platform: 'android',
       error,
       ...overrides,
     })
+    const opacity = {
+      code: 'text_probe_opacity_invalid',
+      record: 3,
+      kind: 'ReactTextView',
+    }
     assert.throws(
-      () =>
-        validateTextProbeAnswer(
-          native({ code: 'opacity_invalid', detail: 'record 3 alpha NaN' }),
-          asked
-        ),
+      () => validateTextProbeAnswer(refusal(opacity), asked),
       (error) =>
         error.code === 'live_font_text_probe_opacity_invalid' &&
-        error.message.includes('record 3 alpha NaN')
+        error.message.includes('record 3 ReactTextView')
     )
-    assert.throws(
-      () => validateTextProbeAnswer(native({ code: 'opacity_invalid' }), asked),
-      {
-        code: 'live_font_text_probe_opacity_invalid',
-      }
+    // iOS writes it with sorted keys; key order does not matter.
+    const ios = JSON.parse(
+      '{"error":{"code":"text_probe_opacity_invalid","kind":"RCTParagraphComponentView","record":0},"platform":"ios","token":"t1","version":1}'
     )
+    assert.throws(() => validateTextProbeAnswer(ios, { platform: 'ios', token: 't1' }), {
+      code: 'live_font_text_probe_opacity_invalid',
+    })
     for (const [name, answer] of Object.entries({
-      'another native code': native({ code: 'layout_missing' }),
-      'an inherited name': native({ code: 'toString' }),
-      'another token': native({ code: 'opacity_invalid' }, { token: 't9' }),
-      'another platform': native({ code: 'opacity_invalid' }, { platform: 'ios' }),
-      'no code': native({ detail: 'x' }),
-      'an extra error field': native({ code: 'opacity_invalid', at: 3 }),
-      'error beside records': { ...native({ code: 'opacity_invalid' }), records: [] },
+      'another native code': refusal({ ...opacity, code: 'text_probe_layout_missing' }),
+      'the old short code': refusal({ ...opacity, code: 'opacity_invalid' }),
+      'an inherited name': refusal({ ...opacity, code: 'toString' }),
+      'another token': refusal(opacity, { token: 't9' }),
+      'another platform': refusal(opacity, { platform: 'ios' }),
+      'another version': refusal(opacity, { version: 2 }),
+      'no record index': refusal({ code: opacity.code, kind: opacity.kind }),
+      'a negative record index': refusal({ ...opacity, record: -1 }),
+      'a fractional record index': refusal({ ...opacity, record: 1.5 }),
+      'no kind': refusal({ code: opacity.code, record: 3 }),
+      'an extra error field': refusal({ ...opacity, detail: 'x' }),
+      'error beside records': { ...refusal(opacity), records: [] },
+      'error beside windows and records': {
+        ...refusal(opacity),
+        records: [],
+        windows: [],
+      },
     }))
       assert.throws(
         () => validateTextProbeAnswer(answer, asked),
@@ -928,6 +1044,121 @@ describe('matchTextProbe, iOS accessibility groups (TEA rulings 2026-11-14)', ()
     )
     assert.equal(result.code, 'live_font_text_probe_unmatched')
     assert.deepEqual(result.unmatchedRecords, [3])
+  })
+
+  test('a ReactSwitch with no text stays empty; one with text pairs like a text view', () => {
+    const empty = match([], [record('', [900, 700, 1000, 760], { kind: 'ReactSwitch' })])
+    assert.deepEqual([empty.pass, empty.empty, empty.pairs], [true, [0], []])
+    const labelled = match(
+      [node('On', [900, 700, 1000, 760])],
+      [record('On', [900, 700, 1000, 760], { kind: 'ReactSwitch' })]
+    )
+    assert.deepEqual(
+      [labelled.pass, labelled.pairs.map((pair) => pair.via)],
+      [true, ['text']]
+    )
+    assert.equal(
+      match([], [record('On', [900, 700, 1000, 760], { kind: 'ReactSwitch' })]).pass,
+      false
+    )
+  })
+
+  // TEA ruling r45, iOS 791123d1: a tab button's label pairs with its text record, so its icon
+  // glyph had nowhere to go. It attaches to a node exact text took, identity first.
+  const TAB = node('Home', [0, 784, 100, 840], 'tab-home')
+  const TILE = node('Bottom', [16, 784, 386, 844], 'garment-tile-default-bottom')
+  const ICON = '\uf015'
+  const tabRecords = (ancestor) => [
+    iosRecord('Home', [20, 822, 80, 838]),
+    iosRecord('Bottom', [40, 786, 120, 800]),
+    iosRecord(
+      ICON,
+      [37, 801, 63, 819],
+      ancestor === undefined ? {} : { accessibilityAncestor: ancestor }
+    ),
+  ]
+  const attachedOf = (result) =>
+    result.attached.map((entry) => [entry.node, entry.records])
+
+  test('without an ancestor a leftover record attaches to the smallest node that holds it', () => {
+    for (const ancestor of [undefined, null]) {
+      const result = ios([TAB, TILE], tabRecords(ancestor))
+      assert.equal(result.pass, true, JSON.stringify(result.unmatchedRecords))
+      assert.deepEqual(attachedOf(result), [[0, [2]]])
+      assert.deepEqual(
+        result.pairs.filter((pair) => pair.via === 'attached').map((pair) => pair.record),
+        [2]
+      )
+    }
+    // Two smallest holders of one size are ambiguous.
+    const twin = node('Home', [0, 784, 100, 840], 'tab-home-copy')
+    const tied = ios(
+      [TAB, twin],
+      [
+        ...tabRecords().filter((r) => r.text !== 'Bottom'),
+        iosRecord('Home', [21, 822, 81, 838]),
+      ]
+    )
+    assert.equal(tied.code, 'live_font_text_probe_ambiguous')
+    // A record no node holds is still unmatched.
+    const outside = ios(
+      [TAB],
+      [iosRecord('Home', [20, 822, 80, 838]), iosRecord(ICON, [200, 100, 230, 130])]
+    )
+    assert.deepEqual(
+      [outside.code, outside.unmatchedRecords],
+      ['live_font_text_probe_unmatched', [1]]
+    )
+  })
+
+  test('an ancestor identifier decides before geometry, and one no node carries fails', () => {
+    // The ancestor names the tile, though the tab is the smaller holder.
+    const named = ios([TAB, TILE], tabRecords({ identifier: TILE.id, rect: TILE.box }))
+    assert.equal(named.pass, true)
+    assert.deepEqual(attachedOf(named), [[1, [2]]])
+    // An identifier no node carries: unmatched, even though the tab holds it.
+    const missing = ios(
+      [TAB, TILE],
+      tabRecords({ identifier: 'tab-gone', rect: TAB.box })
+    )
+    assert.deepEqual(
+      [missing.code, missing.unmatchedRecords],
+      ['live_font_text_probe_unmatched', [2]]
+    )
+    // A node with that identifier whose box misses the ancestor's rect is no such node.
+    const far = ios(
+      [TAB, TILE],
+      tabRecords({ identifier: 'tab-home', rect: [300, 0, 400, 50] })
+    )
+    assert.equal(far.code, 'live_font_text_probe_unmatched')
+    // Two nodes of that identifier: the better overlap with the ancestor's rect; a tie is ambiguous.
+    const rows = [
+      node('8 PM', [16, 100, 86, 180], 'hourly-item'),
+      node('9 PM', [90, 100, 160, 180], 'hourly-item'),
+    ]
+    const rowRecords = (rect) => [
+      iosRecord('8 PM', [20, 102, 80, 120]),
+      iosRecord('9 PM', [94, 102, 154, 120]),
+      iosRecord('☀️', [94, 130, 154, 160], {
+        accessibilityAncestor: { identifier: 'hourly-item', rect },
+      }),
+    ]
+    assert.deepEqual(attachedOf(ios(rows, rowRecords([90, 100, 160, 180]))), [[1, [2]]])
+    const tie = ios(rows, rowRecords([16, 100, 160, 180]))
+    assert.equal(tie.code, 'live_font_text_probe_ambiguous')
+  })
+
+  test('an ancestor naming an open node makes it a group', () => {
+    const result = ios(
+      [hourly],
+      hourlyRecords.map((each) => ({
+        ...each,
+        accessibilityAncestor: { identifier: 'hourly-item', rect: hourly.box },
+      }))
+    )
+    assert.equal(result.pass, true)
+    assert.deepEqual(result.groups, [{ node: 0, records: [0, 1, 2] }])
+    assert.deepEqual(result.attached, [])
   })
 
   test('a whole-window node (the app element) is out of matching and takes nothing', () => {

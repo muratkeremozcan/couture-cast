@@ -269,8 +269,8 @@ const maskText = (text) => (HOUR_LABEL.test(text) ? HOUR_TOKEN : text)
  * Each judged record is a fact: `key` is its entry key (entryKeys: hour labels masked), or for
  * a record an iOS accessibility group took, the group's entry key, `>`, then the record's own
  * `["",text]#n` (n counting that text among the group's records in screen order); `parityKey`
- * is the hierarchy node's parity key. Volatile records and hidden records no node took are
- * judged with no key. Scrolled-away, covered and empty records are never judged. A capture with
+ * is the hierarchy node's parity key. Hidden records no node took are judged with no key, and
+ * so are volatile records until allFacts keys them (volatileKeys). Scrolled-away, covered and empty records are never judged. A capture with
  * no probe answer fails as live_font_text_probe_missing.
  */
 export function textLayout(capture, platform, naming) {
@@ -292,8 +292,20 @@ export function textLayout(capture, platform, naming) {
   })
   const facts = pairedFacts(match, { answer, nodes, names })
   const paired = new Set(match.pairs.map((pair) => pair.record))
-  for (const { record } of match.volatile)
-    facts.push({ key: null, via: 'volatile', id: '', record: answer.records[record] })
+  // Keyed across the capture's pages by allFacts (volatileKeys) when the regions carry ids.
+  const regionIds = Array.isArray(capture.volatileRegionIds)
+    ? capture.volatileRegionIds
+    : []
+  for (const { record, region } of match.volatile)
+    facts.push({
+      key: null,
+      via: 'volatile',
+      id: '',
+      record: answer.records[record],
+      volatile: true,
+      region: typeof regionIds[region] === 'string' ? regionIds[region] : null,
+      contentTop: answer.records[record].viewRect[1] + (capture.contentOffset ?? 0),
+    })
   for (const index of match.hiddenRecords)
     if (!paired.has(index))
       facts.push({ key: null, via: 'hidden', id: '', record: answer.records[index] })
@@ -306,11 +318,17 @@ export function textLayout(capture, platform, naming) {
 
 /**
  * The judged facts of the paired records, scrolled-away ones left out. A record an iOS group
- * took is keyed as the group's key, `>`, then its own `["",text]#n`; a node with no name
+ * took, or one attached to a node exact text took (TEA ruling r45), is keyed as that node's
+ * key, `>`, then its own `["",text]#n` among the node's records; a node with no name
  * (a page node no stitch place names) leaves its records unkeyed.
  */
 function pairedFacts(match, { answer, nodes, names }) {
-  const groupOf = new Map(match.groups.map((group) => [group.node, group.records]))
+  const groupOf = new Map(
+    [...match.groups, ...(match.attached ?? [])].map((entry) => [
+      entry.node,
+      entry.records,
+    ])
+  )
   const groupSuffix = (pair) => {
     const text = maskText(answer.records[pair.record].text)
     const members = groupOf.get(pair.node)
@@ -330,7 +348,10 @@ function pairedFacts(match, { answer, nodes, names }) {
       const named = names.get(node.key)
       const own = named?.key ?? null
       return {
-        key: own !== null && pair.via === 'group' ? `${own}${groupSuffix(pair)}` : own,
+        key:
+          own !== null && (pair.via === 'group' || pair.via === 'attached')
+            ? `${own}${groupSuffix(pair)}`
+            : own,
         parityKey: named?.parityKey ?? null,
         via: pair.via,
         id: node.id ?? '',
@@ -355,7 +376,7 @@ function ownNames(capture) {
 export function pageCaptures(capture) {
   const pages = capture?.pages ?? []
   if (pages.length < 2) return []
-  const { taken, places } = stitchPlaces(
+  const { taken, places, offsets } = stitchPlaces(
     pages.map((page) => page.nodes),
     { expectedShift: capture.pageShift }
   )
@@ -404,6 +425,10 @@ export function pageCaptures(capture) {
       nodes,
       window: page.window,
       volatileRegions: page.volatileRegions ?? [],
+      ...(page.volatileRegionIds ? { volatileRegionIds: page.volatileRegionIds } : {}),
+      // Where this page sits below page 0, so a volatile record keeps one key on every page.
+      contentOffset: offsets[p],
+      page: p,
       textProbe: page.textProbe,
     }
     const naming = new Map(
@@ -419,12 +444,91 @@ export function pageCaptures(capture) {
 
 /** Every judged fact of a capture and its later pages, each with its page. */
 function allFacts(capture, platform) {
-  return [
+  return volatileKeys([
     ...textLayout(capture, platform).facts.map((fact) => ({ ...fact, page: 0 })),
     ...pageCaptures(capture).flatMap(({ page, capture: pageCapture, naming }) =>
       textLayout(pageCapture, platform, naming).facts.map((fact) => ({ ...fact, page }))
     ),
-  ]
+  ])
+}
+
+/** How far apart, in capture units, two page reads of one volatile record may sit. */
+const VOLATILE_PLACE_TOLERANCE = 4
+/** The prefix that marks a volatile record's key (TEA ruling r45). */
+export const VOLATILE_KEY_PREFIX = 'volatile:'
+
+/**
+ * TEA ruling r45: a volatile record is keyed `volatile:["<region testID>","<text>"]#n`, hour
+ * labels masked, n counting that text in that region in screen order over the whole capture
+ * (each page placed below page 0 by its stitch offset; one record read on two pages, at one
+ * place within VOLATILE_PLACE_TOLERANCE, is one key). A record whose region has no id (a
+ * capture from before the regions carried them) stays unkeyed.
+ */
+function volatileKeys(facts) {
+  const places = new Map()
+  const placeOf = (fact) => {
+    const group = JSON.stringify([fact.region, maskText(fact.record.text)])
+    const left = fact.record.viewRect[0]
+    if (!places.has(group)) places.set(group, [])
+    const list = places.get(group)
+    let place = list.find(
+      (entry) =>
+        Math.abs(entry.top - fact.contentTop) <= VOLATILE_PLACE_TOLERANCE &&
+        Math.abs(entry.left - left) <= VOLATILE_PLACE_TOLERANCE
+    )
+    if (!place) {
+      place = { top: fact.contentTop, left }
+      list.push(place)
+    }
+    return { group, place }
+  }
+  const placed = facts.map((fact) =>
+    fact.volatile && fact.region !== null ? placeOf(fact) : null
+  )
+  for (const list of places.values())
+    list.sort((a, b) => a.top - b.top || a.left - b.left)
+  return facts.map((fact, index) => {
+    const at = placed[index]
+    if (!at) return fact
+    const n = places.get(at.group).indexOf(at.place)
+    return { ...fact, key: `${VOLATILE_KEY_PREFIX}${at.group}#${n}` }
+  })
+}
+
+/** The sorted, distinct volatile keys of a capture and its pages. */
+export function captureVolatileKeys(capture, platform) {
+  if (!capture?.textProbe) return []
+  return [
+    ...new Set(
+      allFacts(capture, platform)
+        .filter((fact) => fact.volatile && fact.key !== null)
+        .map((fact) => fact.key)
+    ),
+  ].sort()
+}
+
+/** The leg's captures a volatile clip is compared across, by stage name. */
+const VOLATILE_STAGES = [
+  'before',
+  'settled',
+  'updated',
+  'coldBefore',
+  'cold',
+  'coldBeforeUpdated',
+  'coldUpdated',
+]
+
+/**
+ * Each of a leg's captures (`change`) with its volatile keys: what a residual proposal carries
+ * and what a determinism proof must match exactly.
+ */
+export function legVolatileKeys(change, platform = change?.platform) {
+  return Object.fromEntries(
+    VOLATILE_STAGES.filter((stage) => change?.[stage]).map((stage) => [
+      stage,
+      captureVolatileKeys(change[stage], platform),
+    ])
+  )
 }
 
 /**
@@ -471,6 +575,11 @@ export function textProbeSummary(capture, platform) {
       node: identityOf(nodes[group.node]),
       records: group.records.map((index) => records[index].text),
     })),
+    // TEA ruling r45: records attached to a node exact text took.
+    attached: (match.attached ?? []).map((entry) => ({
+      node: identityOf(nodes[entry.node]),
+      records: entry.records.map((index) => records[index].text),
+    })),
     volatile: regions
       .map((region, at) => ({
         region,
@@ -479,6 +588,11 @@ export function textProbeSummary(capture, platform) {
           .map((entry) => records[entry.record].text),
       }))
       .filter((entry) => entry.records.length),
+    // TEA ruling r45: the capture's volatile keys over all its pages, written with each capture
+    // file (textProbeMatch.volatileKeys) so two runs can be diffed; a page's own summary has none.
+    ...(capture.page === undefined
+      ? { volatileKeys: captureVolatileKeys(capture, platform) }
+      : {}),
     covered: match.covered,
     // A text scrolled away here counts as offscreen only when no later page shows it.
     offscreen: match.offscreen
@@ -579,50 +693,96 @@ function verticalClip(record, tolerance) {
 }
 
 /**
- * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14 and
- * r44 P1-2), given the cold launches at the leg's starting scale (`start`) and target scale
- * (`target`), keyed. `staleBox` when its box kept the starting launch's height and that height
- * is not the target launch's (the first face, which also needs its node to be a stale miss,
- * markStaleClips). `staleContent` when the clip is vertical (content past the clip at the top or
- * the bottom; a left, right or ellipsis cut alone never is) and its box has the target launch's
- * height while its content keeps the starting launch's content height, and that content height
- * is not the target launch's (the second face: a fresh box around stale text, whose parity
- * passes). Text whose height the scale does not change shows neither face, nor does a full clip
- * (no clipRect: nothing of the text can be brought into view, r44 P1-1). `boxMiss` is whether
- * its box misses the target launch's height, the stale miss of a text no parity key names.
+ * The two faces of the 6.8 bug a clip may show (TD-05 as amended, TEA rulings 2026-11-14, r44
+ * P1-2 and r45), given the cold launches at the leg's starting scale (`start`) and target scale
+ * (`target`) and the leg's live `before` capture, keyed. `staleBox` when its box kept the
+ * starting launch's height and that height is not the target launch's (the first face, which
+ * also needs its node to be a stale miss, markStaleClips). `staleContent` when the clip is
+ * vertical (content past the clip at the top or the bottom; a left, right or ellipsis cut alone
+ * never is), its box has the target launch's height, and its content keeps a content height
+ * that is not the target launch's: the starting launch's (`staleContentFrom: 'startCold'`), or
+ * the live before capture's for the same key, a layout carried over from the leg before
+ * (`'before'`). Text whose height the scale does not change shows neither face, nor does a full
+ * clip (no clipRect: nothing of the text can be brought into view, r44 P1-1). `boxMiss` is
+ * whether its box misses the target launch's height, the stale miss of a text no parity key
+ * names.
  */
-function faces(record, startRecord, targetRecord, tolerance) {
+function faces(record, { start, target, before }, tolerance) {
   const height = rectHeight(record.viewRect)
-  if (startRecord === undefined || targetRecord === undefined || record.clipRect === null)
-    return {
-      staleBox: false,
-      staleContent: false,
-      boxMiss:
-        targetRecord !== undefined &&
-        !near(height, rectHeight(targetRecord.viewRect), tolerance),
-    }
-  const [startBox, targetBox] = [startRecord, targetRecord].map((other) =>
-    rectHeight(other.viewRect)
-  )
-  const [startContent, targetContent] = [startRecord, targetRecord].map((other) =>
-    rectHeight(other.contentRect)
-  )
+  const boxMiss =
+    target !== undefined && !near(height, rectHeight(target.viewRect), tolerance)
+  const none = { staleBox: false, staleContent: false, staleContentFrom: null, boxMiss }
+  if (target === undefined || record.clipRect === null) return none
+  const targetBox = rectHeight(target.viewRect)
+  const targetContent = rectHeight(target.contentRect)
+  const content = rectHeight(record.contentRect)
+  const freshBox = near(height, targetBox, tolerance)
+  const keptFrom = (source) =>
+    source !== undefined &&
+    !near(rectHeight(source.contentRect), targetContent, tolerance) &&
+    near(content, rectHeight(source.contentRect), tolerance)
+  const second = verticalClip(record, tolerance) && freshBox
+  const staleContentFrom = !second
+    ? null
+    : keptFrom(start)
+      ? 'startCold'
+      : keptFrom(before)
+        ? 'before'
+        : null
   return {
-    staleBox: near(height, startBox, tolerance) && !near(startBox, targetBox, tolerance),
-    staleContent:
-      verticalClip(record, tolerance) &&
-      !near(startContent, targetContent, tolerance) &&
-      near(height, targetBox, tolerance) &&
-      near(rectHeight(record.contentRect), startContent, tolerance),
-    boxMiss: !near(height, targetBox, tolerance),
+    staleBox:
+      start !== undefined &&
+      near(height, rectHeight(start.viewRect), tolerance) &&
+      !near(rectHeight(start.viewRect), targetBox, tolerance),
+    staleContent: staleContentFrom !== null,
+    staleContentFrom,
+    boxMiss,
   }
 }
 
-function layoutClips(capture, platform, { cold, base } = {}) {
+/**
+ * The clip one judged fact makes, given its counterparts (`start`, `target`, `before`, each
+ * keyed, undefined when unkeyed or absent). TEA ruling r45: a volatile key shows a face only
+ * when both cold launches and the before capture hold it too; missing in any, it is a clip with
+ * no face, so it fails.
+ */
+function clipOf(fact, { content, cut, start, target, before }, tolerance) {
+  const { record } = fact
+  const comparable =
+    !fact.volatile ||
+    (start !== undefined && target !== undefined && before !== undefined)
+  const shown = faces(record, { start, target, before }, tolerance)
+  return {
+    reason: 'clipped_by_layout',
+    key: fact.key,
+    parityKey: fact.parityKey ?? null,
+    via: fact.via,
+    id: fact.id,
+    text: record.text,
+    pages: [fact.page],
+    content,
+    ...cut,
+    height: rectHeight(record.viewRect),
+    baseHeight: start ? rectHeight(start.viewRect) : null,
+    targetHeight: target ? rectHeight(target.viewRect) : null,
+    ...(fact.volatile ? { volatile: true, comparable } : {}),
+    ...(comparable
+      ? shown
+      : {
+          staleBox: false,
+          staleContent: false,
+          staleContentFrom: null,
+          boxMiss: shown.boxMiss,
+        }),
+  }
+}
+
+function layoutClips(capture, platform, { cold, base, before } = {}) {
   const tolerance = HEIGHT_TOLERANCE[platform]
-  const [coldRecords, baseRecords] = [
+  const [coldRecords, baseRecords, beforeRecords] = [
     recordsByKey(cold, platform),
     recordsByKey(base, platform),
+    recordsByKey(before, platform),
   ]
   const clips = []
   const byKey = new Map()
@@ -640,23 +800,18 @@ function layoutClips(capture, platform, { cold, base } = {}) {
       seen.pages.push(fact.page)
       continue
     }
-    const baseRecord = keyed ? baseRecords.get(fact.key) : undefined
-    const targetRecord = keyed ? coldRecords.get(fact.key) : undefined
-    const clip = {
-      reason: 'clipped_by_layout',
-      key: fact.key,
-      parityKey: fact.parityKey ?? null,
-      via: fact.via,
-      id: fact.id,
-      text: record.text,
-      pages: [fact.page],
-      content,
-      ...cut,
-      height: rectHeight(record.viewRect),
-      baseHeight: baseRecord ? rectHeight(baseRecord.viewRect) : null,
-      targetHeight: targetRecord ? rectHeight(targetRecord.viewRect) : null,
-      ...faces(record, baseRecord, targetRecord, tolerance),
-    }
+    const counterpart = (records) => (keyed ? records.get(fact.key) : undefined)
+    const clip = clipOf(
+      fact,
+      {
+        content,
+        cut,
+        start: counterpart(baseRecords),
+        target: counterpart(coldRecords),
+        before: counterpart(beforeRecords),
+      },
+      tolerance
+    )
     if (keyed) byKey.set(fact.key, clip)
     clips.push(clip)
   }
@@ -908,7 +1063,11 @@ export function evaluateLiveFontChange({
     growth: { pass: growth.every((probe) => probe.pass), probes: growth },
     // TEA ruling 2026-11-14: a stale box keeps the height of the cold launch at the leg's
     // starting scale (the cold base launch only on a leg that starts at the base scale).
-    clipping: clippingWithLayout(settled, platform, coldBase, { cold, base: coldBefore }),
+    clipping: clippingWithLayout(settled, platform, coldBase, {
+      cold,
+      base: coldBefore,
+      before,
+    }),
     controls: controlsOnScreen(settled, requiredControls),
     // The settled captures only: `immediate` is read while the screen relays out, so its probe
     // answer, a moment after its hierarchy, may show another layout; it is judged for nothing.
@@ -944,6 +1103,7 @@ export function evaluateLiveFontChange({
     checks.postUpdateClipping = clippingWithLayout(updated, platform, coldBase, {
       cold: coldUpdated,
       base: coldBeforeUpdated,
+      before,
     })
   }
   markStaleClips(checks)
@@ -964,7 +1124,8 @@ function textPresence(capture, platform) {
   // Every page counts (TEA ruling 2026-11-14): a key once however many pages show it, and a
   // text's invisible records as the most any one page draws, so an overlap is not counted twice.
   for (const fact of allFacts(capture, platform)) {
-    if (fact.key === null) continue
+    // A volatile record's presence differs between launches on grounds other than text size.
+    if (fact.key === null || fact.volatile) continue
     const { keys } = entry(maskText(fact.record.text))
     if (!keys.includes(fact.key)) keys.push(fact.key)
   }
@@ -1087,13 +1248,13 @@ const residualClip = (entry) =>
  * sorted.
  */
 export function clipKeys(checks) {
-  return keyedLayoutClips(checks)
+  return clipKeyEntries(checks)
     .map(([, key]) => key)
     .sort()
 }
 
 /** Every keyed layout clip of a leg with its entry key (clipKeys), in check order. */
-function keyedLayoutClips(checks) {
+export function clipKeyEntries(checks) {
   return [
     ...(checks.clipping?.clipped ?? []).map((entry) => [entry, 'cold']),
     ...(checks.postUpdateClipping?.clipped ?? []).map((entry) => [entry, 'updated']),
@@ -1299,6 +1460,12 @@ function splitClipKey(key) {
   }
   const rest = staged[2]
   if (nodeKey(rest)) return { face, stage: staged[1], node: rest, record: null }
+  // TEA ruling r45: a volatile record's key, `volatile:["<region testID>","<text>"]#n`.
+  if (
+    rest.startsWith(VOLATILE_KEY_PREFIX) &&
+    nodeKey(rest.slice(VOLATILE_KEY_PREFIX.length))
+  )
+    return { face, stage: staged[1], node: rest, record: null, volatile: true }
   for (const cut of rest.matchAll(/\]#\d+>/g)) {
     const end = cut.index + cut[0].length - 1
     const [node, record] = [rest.slice(0, end), rest.slice(end + 1)]
@@ -1319,18 +1486,22 @@ function splitClipKey(key) {
  * the run's clip keys must equal `clippedKeys` exactly, as a multiset, faces included. The run's
  * clips reach this point only when each shows a face (classify makes any other clip structural).
  */
-function clipProblem(checks, baseline) {
+function clipProblem(checks, baseline, captures) {
   const run = clipKeys(checks)
   if (!Array.isArray(baseline.clippedKeys))
     return 'baseline clippedKeys must be a list of clip keys'
   const bad = baseline.clippedKeys.find((key) => splitClipKey(key) === null)
   if (bad !== undefined)
     return `baseline clippedKeys must be a list of clip keys: ${JSON.stringify(bad)}`
+  const volatileKey = baseline.clippedKeys.find((key) => splitClipKey(key).volatile)
+  const unproven =
+    volatileKey === undefined ? null : volatileProofProblem(baseline, captures)
+  if (unproven) return `volatile clipped key ${volatileKey}: ${unproven}`
   const stale = new Set(baseline.staleKeys)
   // A first-face clip of a text only later pages show has no parity key, so no stale key can
   // name it; its record proved it stale (markStaleClips), and the run must clip it so.
   const pageOnly = new Set(
-    keyedLayoutClips(checks)
+    clipKeyEntries(checks)
       .filter(([entry]) => entry.parityKey === null && entry.face === 'staleBox')
       .map(([, key]) => key)
   )
@@ -1350,6 +1521,47 @@ function clipProblem(checks, baseline) {
       .filter(Boolean)
       .join('; ')
   return null
+}
+
+/** A leg's volatile keys by stage in one canonical form: stages and keys sorted. */
+const canonicalVolatileKeys = (byStage) =>
+  JSON.stringify(
+    Object.keys(byStage)
+      .sort()
+      .map((stage) => [stage, [...byStage[stage]].sort()])
+  )
+
+/**
+ * TEA ruling r45: a volatile key may be listed only when the region data is proven
+ * deterministic. The entry carries `volatileProof: { runs: [{ run, volatileKeys }, ...] }`: at
+ * least two runs with distinct ids, each run's `volatileKeys` (its proposal's, by stage) equal
+ * to every other's and to this run's (legVolatileKeys), stages and keys alike. Why it fails, or
+ * null.
+ */
+function volatileProofProblem(baseline, captures) {
+  const runs = baseline.volatileProof?.runs
+  if (!Array.isArray(runs) || runs.length < 2)
+    return 'no volatileProof listing two runs or more'
+  const ids = runs.map((entry) => entry?.run)
+  if (
+    ids.some((id) => typeof id !== 'string' || id === '') ||
+    new Set(ids).size !== ids.length
+  )
+    return 'volatileProof runs need distinct run ids'
+  const shaped = (byStage) =>
+    byStage !== null &&
+    typeof byStage === 'object' &&
+    !Array.isArray(byStage) &&
+    Object.values(byStage).every(
+      (keys) => Array.isArray(keys) && keys.every((key) => typeof key === 'string')
+    )
+  if (!runs.every((entry) => shaped(entry.volatileKeys)))
+    return 'volatileProof runs need volatileKeys by stage'
+  const current = canonicalVolatileKeys(legVolatileKeys(captures))
+  const differs = runs.find(
+    (entry) => canonicalVolatileKeys(entry.volatileKeys) !== current
+  )
+  return differs ? `volatile keys of run ${differs.run} differ from this run's` : null
 }
 
 /**
@@ -1495,7 +1707,7 @@ function residualApproved(checks, baseline, environment) {
     )
   const problem =
     exactnessProblem(checks, baseline, environment.captures) ??
-    clipProblem(checks, baseline)
+    clipProblem(checks, baseline, environment.captures)
   return problem ? unapproved(problem) : { pass: true }
 }
 
@@ -1516,6 +1728,9 @@ export function proposedResidualEntry(checks, captures) {
     // TD-05 as amended 2026-11-14: the run's exact layout clips, none included, and whether
     // every one is a stale key's own clip with its box at the starting-scale cold height.
     clippedKeys: clipKeys(checks),
+    // TEA ruling r45: each capture's volatile keys, so two runs' proposals can prove the region
+    // data deterministic (volatileProof) before a volatile key is listed.
+    volatileKeys: legVolatileKeys(captures),
     review: {
       verdict: classify(checks),
       structuralPass: !structural(checks),

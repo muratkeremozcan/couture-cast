@@ -53,7 +53,10 @@ const POLL_MS = 250
  * like text, a multi-line one scrolls its own content and is reported only.
  */
 export const TEXT_PROBE_KINDS = {
-  android: ['ReactTextView', 'PreparedLayoutTextView', 'ReactEditText'],
+  // ReactSwitch (TEA ruling 2026-11-14, r45): a CompoundButton, so a TextView; React Native
+  // never gives it text, so it arrives empty and stays in the empty class. Text it ever carries
+  // is paired and judged like ReactTextView's.
+  android: ['ReactTextView', 'PreparedLayoutTextView', 'ReactEditText', 'ReactSwitch'],
   ios: ['RCTParagraphComponentView', 'RCTTextInputComponentView'],
 }
 export const INPUT_KINDS = new Set(['ReactEditText', 'RCTTextInputComponentView'])
@@ -89,14 +92,15 @@ const RECORD_FIELDS = [
 ].sort()
 const ANSWER_FIELDS = ['platform', 'records', 'token', 'version', 'windows']
 /**
- * An answer the native probe gives instead of records when it cannot read the screen within the
- * contract: `{ version, token, platform, error: { code, detail? } }`. Each native code it may
- * send maps to the harness code it fails with; any other native code fails as
- * live_font_text_probe_invalid. Align the keys here with the native side.
+ * The refusal the native probe answers with instead of windows and records (wire contract r44
+ * P3-1): `{ version, token, platform, error: { code, record, kind } }`, `record` the index of the
+ * first refused record and `kind` its kind. Each native code maps to the harness code it fails
+ * with; any other code fails as live_font_text_probe_invalid.
  */
 const ERROR_ANSWER_FIELDS = ['error', 'platform', 'token', 'version']
+const ERROR_FIELDS = ['code', 'kind', 'record']
 export const TEXT_PROBE_NATIVE_ERRORS = {
-  opacity_invalid: 'live_font_text_probe_opacity_invalid',
+  text_probe_opacity_invalid: 'live_font_text_probe_opacity_invalid',
 }
 const WINDOW_FIELDS = ['focused', 'id', 'rect', 'z']
 
@@ -177,12 +181,37 @@ const validOpacity = (record) =>
   record.opacity >= 0 &&
   record.opacity <= 1
 
+/**
+ * `accessibilityAncestor` (TEA ruling r45, wire contract r44 4): every iOS record carries the
+ * text view's own or its nearest accessibility element ancestor's identifier with its rect,
+ * `{ identifier, rect }` (a non-empty string, a rect in the form of viewRect), or null when none
+ * has one; Android records omit the field. The iOS attachment rule matches by it first
+ * (matchTextProbe).
+ */
+const ANCESTOR_FIELDS = ['identifier', 'rect']
+const validAncestor = (ancestor) =>
+  ancestor === undefined ||
+  ancestor === null ||
+  (sameFields(ancestor, ANCESTOR_FIELDS) &&
+    typeof ancestor.identifier === 'string' &&
+    ancestor.identifier !== '' &&
+    isRect(ancestor.rect))
+/** The record field sets each platform's contract takes, offWindow optional on both. */
+const FIELD_SETS = {
+  android: [RECORD_FIELDS, WITH_OFF_WINDOW],
+  ios: [
+    [...RECORD_FIELDS, 'accessibilityAncestor'].sort(),
+    [...WITH_OFF_WINDOW, 'accessibilityAncestor'].sort(),
+  ],
+}
+
 /** Why `record` breaks the contract, or null. `unknown:*` kinds are judged by the caller. */
 function recordProblem(record, platform, windowIds) {
-  if (!sameFields(record, RECORD_FIELDS) && !sameFields(record, WITH_OFF_WINDOW))
+  if (!FIELD_SETS[platform].some((fields) => sameFields(record, fields)))
     return `fields ${JSON.stringify(Object.keys(record ?? {}).sort())}`
   if (!TEXT_PROBE_KINDS[platform].includes(record.kind)) return `kind ${record.kind}`
   if (!windowIds.has(record.window)) return `window ${record.window}`
+  if (!validAncestor(record.accessibilityAncestor)) return 'accessibilityAncestor'
   return (
     [...RECORD_RULES, ...OFF_WINDOW_RULES].find(([, holds]) => !holds(record))?.[0] ??
     null
@@ -194,11 +223,10 @@ function nativeError(answer, { platform, token }) {
   if (!sameFields(answer, ERROR_ANSWER_FIELDS)) return null
   const { error } = answer
   const shaped =
-    error !== null &&
-    typeof error === 'object' &&
+    sameFields(error, ERROR_FIELDS) &&
     typeof error.code === 'string' &&
-    (sameFields(error, ['code']) ||
-      (sameFields(error, ['code', 'detail']) && typeof error.detail === 'string'))
+    isCount(error.record) &&
+    typeof error.kind === 'string'
   const stale =
     answer.version !== TEXT_PROBE_VERSION ||
     answer.token !== token ||
@@ -209,7 +237,7 @@ function nativeError(answer, { platform, token }) {
     Object.hasOwn(TEXT_PROBE_NATIVE_ERRORS, error.code)
       ? TEXT_PROBE_NATIVE_ERRORS[error.code]
       : 'live_font_text_probe_invalid',
-    `native ${error.code}${error.detail ? `: ${error.detail}` : ''}`
+    `native ${error.code}: record ${error.record} ${error.kind}`
   )
 }
 
@@ -688,34 +716,103 @@ function pairByText({ nodes, candidates, open, free, tolerance, nodeRank, record
   return pairs
 }
 
+/** The nodes `pick` would take, or every one tied for best when more than one ties. */
+function best(nodes, score) {
+  const ranked = nodes
+    .map((node) => ({ node, score: score(node) }))
+    .sort((a, b) => a.score - b.score)
+  return ranked.filter((entry) => entry.score === ranked[0]?.score).map((e) => e.node)
+}
+
 /**
- * IOS_ACCESSIBILITY_GROUPS: each leftover record joins the smallest open node (by area) whose
- * rect holds its rect within the tolerance; two smallest of one area make it ambiguous. A node
- * that takes at least one record is a group. Takes the grouped ids out of `open` and `free`.
+ * IOS_ACCESSIBILITY_GROUPS with the attachment rule (TEA ruling r45, identity first). Each
+ * leftover record, in screen order:
+ *   1. with an `accessibilityAncestor`, joins the node with that identifier whose box overlaps
+ *      the ancestor's rect best (ties are ambiguous); a record whose identifier no such node
+ *      carries stays free, so a visible one is unmatched. Geometry never decides it.
+ *   2. without one, joins the smallest open node (by area) whose rect holds its rect within
+ *      the tolerance (two smallest of one area are ambiguous);
+ *   3. else the smallest node of any kind (one exact text took, or a group) that holds it,
+ *      ties ambiguous.
+ * Window nodes take nothing. An open node that takes a record is a group; a node exact text
+ * took that takes one has it attached. Members are in screen order. Takes the ids it places
+ * out of `open` and `free`.
  */
-function groupLeftovers({ nodes, leftover, open, free, tolerance }) {
-  const openNodes = nodes.filter((node) => open.has(node.index))
-  const members = new Map(openNodes.map((node) => [node.index, []]))
+function resolveLeftovers({
+  nodes,
+  leftover,
+  open,
+  free,
+  tolerance,
+  windowNodes,
+  recordRank,
+}) {
+  const placeable = nodes.filter((node) => !windowNodes.includes(node))
+  const members = new Map()
   const ambiguous = []
-  for (const record of leftover) {
-    const holding = openNodes
-      .filter((node) => contains(node.box, recordRect(record), tolerance))
-      .sort((a, b) => area(a.box) - area(b.box))
-    if (!holding.length) continue
+  const place = (record, holding) => {
     free.delete(record.index)
-    const smallest = holding.filter((node) => area(node.box) === area(holding[0].box))
-    if (smallest.length > 1)
-      ambiguous.push({ record: record.index, nodes: smallest.map((node) => node.index) })
-    else members.get(holding[0].index).push(record.index)
+    if (holding.length > 1)
+      ambiguous.push({ record: record.index, nodes: holding.map((node) => node.index) })
+    else
+      members.set(holding[0].index, [
+        ...(members.get(holding[0].index) ?? []),
+        record.index,
+      ])
+  }
+  const holdingOf = (record, among) =>
+    among.filter((node) => contains(node.box, recordRect(record), tolerance))
+  const geometric = []
+  for (const record of leftover) {
+    const ancestor = record.accessibilityAncestor ?? null
+    if (ancestor === null) {
+      geometric.push(record)
+      continue
+    }
+    const named = placeable.filter(
+      (node) =>
+        node.id === ancestor.identifier && overlapRatio(node.box, ancestor.rect) > 0
+    )
+    if (named.length)
+      place(
+        record,
+        best(named, (node) => -overlapRatio(node.box, ancestor.rect))
+      )
+  }
+  const opened = new Set(open)
+  const rest = []
+  for (const record of geometric) {
+    const holding = holdingOf(
+      record,
+      placeable.filter((node) => opened.has(node.index))
+    )
+    if (holding.length)
+      place(
+        record,
+        best(holding, (node) => area(node.box))
+      )
+    else rest.push(record)
+  }
+  for (const record of rest) {
+    const holding = holdingOf(record, placeable)
+    if (holding.length)
+      place(
+        record,
+        best(holding, (node) => area(node.box))
+      )
   }
   const groups = []
-  for (const node of openNodes) {
+  const attached = []
+  for (const node of placeable) {
     const held = members.get(node.index)
-    if (!held.length) continue
-    open.delete(node.index)
-    groups.push({ node: node.index, records: held })
+    if (!held) continue
+    held.sort((a, b) => recordRank.get(a) - recordRank.get(b))
+    if (opened.has(node.index)) {
+      open.delete(node.index)
+      groups.push({ node: node.index, records: held })
+    } else attached.push({ node: node.index, records: held })
   }
-  return { groups, ambiguous }
+  return { groups, attached, ambiguous }
 }
 
 /**
@@ -743,9 +840,10 @@ function groupLeftovers({ nodes, leftover, open, free, tolerance }) {
  * already cut to what shows), the best overlap first, then the nearest centre, then screen
  * order, so five "68°F" labels pair by position whatever order either side lists them in. On
  * iOS (IOS_ACCESSIBILITY_GROUPS) nodes that cover the whole window are left out, and each
- * leftover node is a group: a leftover record joins the smallest group (by area) whose rect
- * holds its rect within the tolerance; two smallest groups of one area are ambiguous. A group
- * that holds no record, a visible record no node takes, and on Android any leftover node, are
+ * leftover record is placed by resolveLeftovers: by its accessibility ancestor's identifier
+ * when it reports one, else into the smallest open node (a group) whose rect holds it, else
+ * attached to the smallest node of any kind that holds it; ties are ambiguous. A group that
+ * holds no record, a visible record no node takes, and on Android any leftover node, are
  * unmatched. A covering window none of whose records pairs is a missing answer. Indexes refer to
  * `nodes` and `answer.records`.
  */
@@ -795,12 +893,23 @@ export function matchTextProbe({
   const leftover = candidates
     .filter((record) => free.has(record.index))
     .sort(byPosition(recordRect))
-  const { groups, ambiguous } = groupRule
-    ? groupLeftovers({ nodes: indexed, leftover, open, free, tolerance })
-    : { groups: [], ambiguous: [] }
-  for (const group of groups)
-    for (const record of group.records)
-      pairs.push({ node: group.node, record, via: 'group' })
+  const { groups, attached, ambiguous } = groupRule
+    ? resolveLeftovers({
+        nodes: indexed,
+        leftover,
+        open,
+        free,
+        tolerance,
+        windowNodes,
+        recordRank,
+      })
+    : { groups: [], attached: [], ambiguous: [] }
+  for (const [via, list] of [
+    ['group', groups],
+    ['attached', attached],
+  ])
+    for (const entry of list)
+      for (const record of entry.records) pairs.push({ node: entry.node, record, via })
   const unmatchedRecords = classes.visible
     .filter((record) => free.has(record.index))
     .map((record) => record.index)
@@ -820,6 +929,7 @@ export function matchTextProbe({
     code,
     pairs,
     groups,
+    attached,
     ambiguous,
     unmatchedRecords,
     unmatchedNodes,

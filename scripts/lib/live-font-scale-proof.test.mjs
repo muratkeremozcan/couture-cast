@@ -24,6 +24,7 @@ import {
   assertComposerControls,
   assertComposerFeedbackStable,
   assertLiveFontProof as assertLiveFontProofRaw,
+  captureVolatileKeys,
   clipKeys,
   evaluateLiveFontChange as evaluateLiveFontChangeRaw,
   expectedTextRatio,
@@ -33,6 +34,8 @@ import {
   proposedResidualEntry,
   requiredMounts,
   stageKeys,
+  textLayout,
+  textProbeSummary,
   WEATHER_BANNER_MARKER,
   WEATHER_STALE_TEXT,
   weatherBannerState,
@@ -2407,6 +2410,11 @@ describe('text layout clipping (F-00i)', () => {
     const change = secondFace()
     const { checks, verdict } = evaluateLiveFontChangeRaw(change)
     assert.deepEqual(faceOf(change), [[CONDITION, false, true, 'staleContent']])
+    assert.equal(
+      layoutClips(checks.clipping)[0].staleContentFrom,
+      'startCold',
+      'the face records which launch the content kept'
+    )
     assert.equal(verdict, 'known-residual')
     // Its parity passes, so it lists no stale key.
     const proposal = proposedResidualEntry(checks, change)
@@ -2605,5 +2613,263 @@ describe('text layout clipping (F-00i)', () => {
         probes: PROBES,
       })
     )
+  })
+
+  // TEA ruling r45, Android Release 0027bf63 Home and Settings 1.5 to 1.0: the content keeps
+  // the layout the live before capture had (1.5 text wrapped into a stale 1.0 box), a height
+  // neither cold launch shows.
+  const carried = 100
+  const rectHeight = (rect) => rect[3] - rect[1]
+  /** The return leg with the condition line's before content `height` tall, and settled's too. */
+  const carriedOver = ({ before = carried, settled = carried } = {}) => {
+    const change = returnLeg()
+    for (const [capture, height] of [
+      [change.before, before],
+      [change.settled, settled],
+    ]) {
+      const record = recordFor(capture, CONDITION)
+      record.contentRect = [
+        ...record.contentRect.slice(0, 3),
+        record.contentRect[1] + height,
+      ]
+    }
+    return change
+  }
+  const sourceOf = (change) =>
+    layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping).map((entry) => [
+      entry.text,
+      entry.face,
+      entry.staleContentFrom,
+    ])
+
+  test('the second face also holds content the live before capture laid out, and says so', () => {
+    const change = carriedOver()
+    const start = recordFor(change.coldBefore, CONDITION)
+    assert.notEqual(
+      rectHeight(start.contentRect),
+      carried,
+      'the start launch shows no such height'
+    )
+    assert.deepEqual(sourceOf(change), [[CONDITION, 'staleContent', 'before']])
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    assert.equal(verdict, 'known-residual')
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual(proposal.clippedKeys, [SECOND_FACE])
+    const entry = {
+      ...ENTRY,
+      staleKeys: [],
+      clippedKeys: [SECOND_FACE],
+      review: { ...ENTRY.review, growthFailing: [] },
+    }
+    assert.equal(prove(change, entry)().verdict, 'known-residual')
+  })
+
+  test('content that matches the before capture is no face when before matches the target launch', () => {
+    // A fresh layout: before, target and settled content all at the target launch's height, cut
+    // at the bottom by an overflow-hidden parent.
+    const change = returnLeg()
+    const target = rectHeight(recordFor(change.cold, CONDITION).contentRect)
+    const before = recordFor(change.before, CONDITION)
+    before.contentRect = [
+      ...before.contentRect.slice(0, 3),
+      before.contentRect[1] + target,
+    ]
+    const record = recordFor(change.settled, CONDITION)
+    record.clipRect = [...record.clipRect.slice(0, 3), record.clipRect[1] + target - 10]
+    assert.deepEqual(sourceOf(change), [[CONDITION, null, null]])
+    assert.equal(evaluateLiveFontChangeRaw(change).verdict, 'unexpected')
+  })
+
+  test('a before match cut only at the side, in a box not the target one, or at another height is no face', () => {
+    // Shorter than the box: the content fits vertically and runs past the right edge.
+    const sideways = carriedOver({ before: 30, settled: 30 })
+    const record = recordFor(sideways.settled, CONDITION)
+    record.contentRect = [
+      record.contentRect[0],
+      record.contentRect[1],
+      record.viewRect[2] + 40,
+      record.contentRect[3],
+    ]
+    assert.deepEqual(sourceOf(sideways), [[CONDITION, null, null]])
+    // The box grew 10 px past the target launch's.
+    const grown = carriedOver()
+    const box = recordFor(grown.settled, CONDITION)
+    box.viewRect = [...box.viewRect.slice(0, 3), box.viewRect[3] + 10]
+    box.clipRect = box.viewRect
+    box.visibleRect = box.viewRect
+    assert.deepEqual(sourceOf(grown), [[CONDITION, null, null]])
+    // Content at neither the before nor the starting launch's height.
+    assert.deepEqual(sourceOf(carriedOver({ settled: carried + 9 })), [
+      [CONDITION, null, null],
+    ])
+  })
+
+  // TEA ruling r45: volatile records keyed by region testID, masked text and screen order,
+  // judged for a face only when both cold launches and the before capture hold the key.
+  const REGION = 'community-spotlight'
+  const REGION_RECT = '[0,3000][1080,3200]'
+  const VOLATILE_KEY = `volatile:["${REGION}","Partnered"]#0`
+  const VOLATILE_CLIP = `staleBox:cold:${VOLATILE_KEY}`
+  /** `capture` with the spotlight region and a "Partnered" record `height` tall at `top`. */
+  const withSpotlight = (capture, height, { top = 3050, by = 0 } = {}) => {
+    capture.volatileRegions = [REGION_RECT]
+    capture.volatileRegionIds = [REGION]
+    capture.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, top, 400, top + height], {
+        contentRect: [81, top, 400, top + height + by],
+      })
+    )
+    return capture
+  }
+  /** The residual with a stale spotlight label: 40 at 1.0 and live, 60 at the cold 1.5. */
+  const volatileChange = ({ skip = [] } = {}) => {
+    const change = residualChange()
+    for (const [name, height, by] of [
+      ['before', 40, 0],
+      ['coldBefore', 40, 0],
+      ['cold', 60, 0],
+      ['settled', 40, 20],
+    ])
+      if (!skip.includes(name)) withSpotlight(change[name], height, { by })
+    return change
+  }
+
+  test('a volatile record is keyed by region, text and order, and a stale box clip on it has a face', () => {
+    const change = volatileChange()
+    const { checks, verdict } = evaluateLiveFontChangeRaw(change)
+    const [clip] = layoutClips(checks.clipping)
+    assert.deepEqual(
+      [clip.key, clip.via, clip.volatile, clip.comparable, clip.stale, clip.face],
+      [VOLATILE_KEY, 'volatile', true, true, true, 'staleBox']
+    )
+    assert.equal(verdict, 'known-residual')
+    const proposal = proposedResidualEntry(checks, change)
+    assert.deepEqual(proposal.clippedKeys, [VOLATILE_CLIP])
+    for (const stage of ['before', 'settled', 'coldBefore', 'cold'])
+      assert.deepEqual(proposal.volatileKeys[stage], [VOLATILE_KEY], stage)
+    // Written with each capture for a later two-run diff.
+    assert.deepEqual(textProbeSummary(change.settled, 'android').volatileKeys, [
+      VOLATILE_KEY,
+    ])
+  })
+
+  test('a volatile key missing from either cold launch or the before capture shows no face and fails', () => {
+    for (const skip of ['before', 'coldBefore', 'cold']) {
+      const change = volatileChange({ skip: [skip] })
+      const [clip] = layoutClips(evaluateLiveFontChangeRaw(change).checks.clipping)
+      assert.deepEqual(
+        [clip.key, clip.comparable, clip.face],
+        [VOLATILE_KEY, false, null],
+        skip
+      )
+      assert.throws(prove(change), { code: 'live_font_baseline_unexpected' }, skip)
+    }
+  })
+
+  test('a listed volatile key approves only with a determinism proof two runs make', () => {
+    const change = volatileChange()
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    const { volatileKeys } = proposedResidualEntry(checks, change)
+    const entry = { ...ENTRY, clippedKeys: [VOLATILE_CLIP] }
+    assert.throws(
+      prove(change, entry),
+      refused(/volatile clipped key .*no volatileProof/)
+    )
+    const runs = (...list) => ({ ...entry, volatileProof: { runs: list } })
+    const run = (id, keys = volatileKeys) => ({ run: id, volatileKeys: keys })
+    assert.equal(
+      prove(change, runs(run('run-a'), run('run-b')))().verdict,
+      'known-residual'
+    )
+    assert.throws(prove(change, runs(run('run-a'))), refused(/two runs or more/))
+    assert.throws(
+      prove(change, runs(run('run-a'), run('run-a'))),
+      refused(/distinct run ids/)
+    )
+    assert.throws(prove(change, runs(run('run-a'), run(''))), refused(/distinct run ids/))
+    assert.throws(
+      prove(change, runs(run('run-a'), run('run-b', { ...volatileKeys, settled: [] }))),
+      refused(/volatile keys of run run-b differ/)
+    )
+    assert.throws(
+      prove(change, runs(run('run-a'), run('run-b', { ...volatileKeys, extra: [] }))),
+      refused(/volatile keys of run run-b differ/)
+    )
+    assert.throws(
+      prove(change, runs(run('run-a'), run('run-b', 'all'))),
+      refused(/volatileKeys by stage/)
+    )
+    // Unlisted, the clip is outside clippedKeys.
+    assert.throws(
+      prove(change, ENTRY),
+      refused(/clip outside clippedKeys: staleBox:cold:volatile:/)
+    )
+  })
+
+  test('volatile keys count in screen order and one record on two pages keeps one key', () => {
+    const capture = probed(stage('settled'))
+    withSpotlight(capture, 40, { top: 3120 })
+    withSpotlight(capture, 40, { top: 3050 })
+    assert.deepEqual(captureVolatileKeys(capture, 'android'), [
+      `volatile:["${REGION}","Partnered"]#0`,
+      `volatile:["${REGION}","Partnered"]#1`,
+    ])
+    const facts = textLayout(capture, 'android').facts.filter((fact) => fact.volatile)
+    assert.equal(facts.length, 2)
+    // Page 1 shows the upper one again, SHIFT px higher.
+    const paged = withPages(capture)
+    const page = paged.pages[1]
+    page.volatileRegions = [`[0,${3000 - SHIFT}][1080,${3200 - SHIFT}]`]
+    page.volatileRegionIds = [REGION]
+    page.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 3050 - SHIFT, 400, 3090 - SHIFT])
+    )
+    assert.deepEqual(captureVolatileKeys(paged, 'android'), [
+      `volatile:["${REGION}","Partnered"]#0`,
+      `volatile:["${REGION}","Partnered"]#1`,
+    ])
+    // A region without its testID (a capture from before the ids) leaves its records unkeyed.
+    delete capture.volatileRegionIds
+    assert.deepEqual(captureVolatileKeys(capture, 'android'), [])
+  })
+
+  test('volatile keys never count as shown text in the hidden-text check', () => {
+    // The cold launch shows two spotlight "Partnered" labels, the live screen one, plus an
+    // opacity 0 copy outside the region: the region's own count says nothing about lost text.
+    const change = volatileChange()
+    withSpotlight(change.cold, 60, { top: 3130 })
+    change.settled.textProbe.records.push(
+      probeRecord('android', 'Partnered', [81, 1500, 400, 1540], { opacity: 0 })
+    )
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
+  })
+
+  // TEA ruling r45, iOS: a record attached to a node exact text took is keyed under it.
+  test('an attached record is keyed under its node and listed as attached', () => {
+    const capture = {
+      stage: 'cold',
+      window: '[0,0][402,874]',
+      nodes: [
+        { id: 'tab-home', text: 'Home', bounds: '[0,784][100,840]' },
+        { id: 'tab-settings', text: 'Settings', bounds: '[301,784][402,840]' },
+      ],
+    }
+    capture.textProbe = healthyAnswer(capture, 'ios')
+    capture.textProbe.records.push(
+      probeRecord('ios', '', [37, 791, 63, 819], {
+        accessibilityAncestor: { identifier: 'tab-home', rect: [0, 784, 100, 840] },
+      }),
+      probeRecord('ios', '', [340, 791, 364, 819], { accessibilityAncestor: null })
+    )
+    const { pass, facts } = textLayout(capture, 'ios')
+    assert.equal(pass, true)
+    assert.deepEqual(
+      facts.filter((fact) => fact.via === 'attached').map((fact) => fact.key),
+      ['["tab-home","Home"]#0>["",""]#0', '["tab-settings","Settings"]#0>["",""]#0']
+    )
+    assert.deepEqual(textProbeSummary(capture, 'ios').attached, [
+      { node: '["tab-home","Home"]', records: [''] },
+      { node: '["tab-settings","Settings"]', records: [''] },
+    ])
   })
 })
