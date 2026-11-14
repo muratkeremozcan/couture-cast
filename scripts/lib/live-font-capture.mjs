@@ -46,8 +46,8 @@ function readMarker(id, { markers, jsScales, environments }) {
  * `volatileDropped`: a region whose presence the app decides on grounds unrelated to text size.
  * With `markVolatile` the region's text stays, flagged `volatile: true`, so scroll pages can
  * still be aligned on it (stitchPages leaves it out of the result). `volatileRegions` holds the
- * bounds of each dropped region, so the text layout probe's records inside one are left out of
- * matching too (F-00i; they are still judged for clipping).
+ * bounds of each dropped region, so the text layout probe's records inside one that no kept node
+ * takes are left out of matching too (F-00i; they are still judged for clipping).
  */
 export function flattenHierarchy(
   tree,

@@ -429,10 +429,6 @@ describe('validateTextProbeAnswer', () => {
       'scrolled away yet visible': (a) => (a.records[0].scrolledAway = true),
       'visible without a clipRect': (a) => (a.records[0].clipRect = null),
       'hidden with a clipRect': (a) => (a.records[0].visibleRect = null),
-      'missing opacity': (a) => delete a.records[0].opacity,
-      'opacity above 1': (a) => (a.records[0].opacity = 1.5),
-      'negative opacity': (a) => (a.records[0].opacity = -0.1),
-      'opacity as text': (a) => (a.records[0].opacity = '1'),
       'offWindow as text': (a) => (a.records[0].offWindow = 'true'),
       'offWindow yet visible': (a) => (a.records[0].offWindow = true),
       'offWindow and scrolled away': (a) =>
@@ -455,6 +451,77 @@ describe('validateTextProbeAnswer', () => {
     assert.throws(() => validateTextProbeAnswer(null, asked), {
       code: 'live_font_text_probe_invalid',
     })
+  })
+
+  // TEA r44 P3-1: an opacity the judging cannot trust is refused, never coerced.
+  test('an opacity that is no finite number from 0 to 1 fails with its own code', () => {
+    const cases = {
+      NaN: Number.NaN,
+      infinite: Number.POSITIVE_INFINITY,
+      'above 1': 1.5,
+      negative: -0.1,
+      'as text': '1',
+      'NaN as text': 'NaN',
+      null: null,
+      missing: undefined,
+    }
+    for (const [name, opacity] of Object.entries(cases)) {
+      const answer = ok()
+      if (opacity === undefined) delete answer.records[1].opacity
+      else answer.records[1].opacity = opacity
+      assert.throws(
+        () => validateTextProbeAnswer(answer, asked),
+        (error) =>
+          error.code === 'live_font_text_probe_opacity_invalid' &&
+          /^live_font_text_probe_opacity_invalid: record 1 opacity /.test(error.message),
+        name
+      )
+    }
+    for (const opacity of [0, 0.0001, 1]) {
+      const answer = ok()
+      answer.records[1].opacity = opacity
+      assert.doesNotThrow(() => validateTextProbeAnswer(answer, asked), String(opacity))
+    }
+  })
+
+  test('the native error answer for an opacity fails with that code; any other is invalid', () => {
+    const native = (error, overrides = {}) => ({
+      version: 1,
+      token: 't1',
+      platform: 'android',
+      error,
+      ...overrides,
+    })
+    assert.throws(
+      () =>
+        validateTextProbeAnswer(
+          native({ code: 'opacity_invalid', detail: 'record 3 alpha NaN' }),
+          asked
+        ),
+      (error) =>
+        error.code === 'live_font_text_probe_opacity_invalid' &&
+        error.message.includes('record 3 alpha NaN')
+    )
+    assert.throws(
+      () => validateTextProbeAnswer(native({ code: 'opacity_invalid' }), asked),
+      {
+        code: 'live_font_text_probe_opacity_invalid',
+      }
+    )
+    for (const [name, answer] of Object.entries({
+      'another native code': native({ code: 'layout_missing' }),
+      'an inherited name': native({ code: 'toString' }),
+      'another token': native({ code: 'opacity_invalid' }, { token: 't9' }),
+      'another platform': native({ code: 'opacity_invalid' }, { platform: 'ios' }),
+      'no code': native({ detail: 'x' }),
+      'an extra error field': native({ code: 'opacity_invalid', at: 3 }),
+      'error beside records': { ...native({ code: 'opacity_invalid' }), records: [] },
+    }))
+      assert.throws(
+        () => validateTextProbeAnswer(answer, asked),
+        { code: 'live_font_text_probe_invalid' },
+        name
+      )
   })
 })
 
@@ -674,6 +741,58 @@ describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () 
     })
     assert.equal(result.pass, true)
     assert.deepEqual(result.volatile, [{ record: 0, region: 1 }])
+  })
+
+  // Android Release 0027bf63, Community: the spotlight section's testID drops its subtree from
+  // the hierarchy, but the subtitle under its heading is a sibling the region's bounds overlap,
+  // so the hierarchy keeps it; its record must pair and be judged like any other.
+  test('a region leaves out on the record side only what the hierarchy left out', () => {
+    const region = [0, 883, 1080, 2190]
+    const subtitle = 'Standout looks near you from the past week.'
+    const result = match(
+      [node(subtitle, [0, 969, 1080, 1017])],
+      [
+        record('Spotlight in US', [0, 883, 1080, 948]),
+        record(subtitle, [0, 969, 1080, 1017]),
+        record('#1', [79, 1051, 120, 1098]),
+      ],
+      { volatileRegions: [region] }
+    )
+    assert.equal(result.pass, true, JSON.stringify(result.unmatchedNodes))
+    assert.deepEqual(
+      result.pairs.map((pair) => [pair.node, pair.record, pair.via]),
+      [[0, 1, 'text']]
+    )
+    assert.deepEqual(result.volatile, [
+      { record: 0, region: 0 },
+      { record: 2, region: 0 },
+    ])
+    // A region record whose text no node shows is never owed one.
+    const alone = match([], [record('#1', [79, 1051, 120, 1098])], {
+      volatileRegions: [region],
+    })
+    assert.deepEqual([alone.pass, alone.volatile], [true, [{ record: 0, region: 0 }]])
+  })
+
+  test('a record in a volatile region never joins an iOS group', () => {
+    const result = matchTextProbe({
+      platform: 'ios',
+      nodes: [node('Card, Partnered', [0, 100, 400, 300], 'card')],
+      answer: answerFor(
+        't',
+        [
+          iosRecord('Card', [10, 110, 100, 130]),
+          iosRecord('Partnered', [10, 250, 100, 270]),
+        ],
+        { platform: 'ios', windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }] }
+      ),
+      window: [0, 0, 402, 874],
+      volatileRegions: [[0, 240, 400, 300]],
+      tolerance: 1,
+    })
+    assert.equal(result.pass, true)
+    assert.deepEqual(result.groups, [{ node: 0, records: [0] }])
+    assert.deepEqual(result.volatile, [{ record: 1, region: 0 }])
   })
 
   test('records under a focused covering window are left out and counted', () => {

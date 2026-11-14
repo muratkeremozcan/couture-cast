@@ -88,6 +88,16 @@ const RECORD_FIELDS = [
   'opacity',
 ].sort()
 const ANSWER_FIELDS = ['platform', 'records', 'token', 'version', 'windows']
+/**
+ * An answer the native probe gives instead of records when it cannot read the screen within the
+ * contract: `{ version, token, platform, error: { code, detail? } }`. Each native code it may
+ * send maps to the harness code it fails with; any other native code fails as
+ * live_font_text_probe_invalid. Align the keys here with the native side.
+ */
+const ERROR_ANSWER_FIELDS = ['error', 'platform', 'token', 'version']
+export const TEXT_PROBE_NATIVE_ERRORS = {
+  opacity_invalid: 'live_font_text_probe_opacity_invalid',
+}
 const WINDOW_FIELDS = ['focused', 'id', 'rect', 'z']
 
 const isRect = (value) =>
@@ -124,11 +134,6 @@ const RECORD_RULES = [
   ['maxLines', (record) => nullOr(isMaxLines)(record.maxLines)],
   ['unlimitedLineCount', (record) => nullOr(isCount)(record.unlimitedLineCount)],
   [
-    'opacity',
-    (record) =>
-      typeof record.opacity === 'number' && record.opacity >= 0 && record.opacity <= 1,
-  ],
-  [
     'scrolledAway with a visibleRect',
     (record) => !record.scrolledAway || record.visibleRect === null,
   ],
@@ -161,6 +166,17 @@ const OFF_WINDOW_RULES = [
   ],
 ]
 
+/**
+ * TEA r44 P3-1: an opacity that is no finite number from 0 to 1 (NaN, missing, null, text, out
+ * of range) is refused with its own code and never coerced, since only exactly 0 leaves a record
+ * out of judging.
+ */
+const validOpacity = (record) =>
+  typeof record.opacity === 'number' &&
+  Number.isFinite(record.opacity) &&
+  record.opacity >= 0 &&
+  record.opacity <= 1
+
 /** Why `record` breaks the contract, or null. `unknown:*` kinds are judged by the caller. */
 function recordProblem(record, platform, windowIds) {
   if (!sameFields(record, RECORD_FIELDS) && !sameFields(record, WITH_OFF_WINDOW))
@@ -170,6 +186,30 @@ function recordProblem(record, platform, windowIds) {
   return (
     [...RECORD_RULES, ...OFF_WINDOW_RULES].find(([, holds]) => !holds(record))?.[0] ??
     null
+  )
+}
+
+/** A native error answer for this ask fails with its mapped code; null for a record answer. */
+function nativeError(answer, { platform, token }) {
+  if (!sameFields(answer, ERROR_ANSWER_FIELDS)) return null
+  const { error } = answer
+  const shaped =
+    error !== null &&
+    typeof error === 'object' &&
+    typeof error.code === 'string' &&
+    (sameFields(error, ['code']) ||
+      (sameFields(error, ['code', 'detail']) && typeof error.detail === 'string'))
+  const stale =
+    answer.version !== TEXT_PROBE_VERSION ||
+    answer.token !== token ||
+    answer.platform !== platform
+  if (!shaped || stale)
+    return fail('live_font_text_probe_invalid', `error answer ${JSON.stringify(answer)}`)
+  return fail(
+    Object.hasOwn(TEXT_PROBE_NATIVE_ERRORS, error.code)
+      ? TEXT_PROBE_NATIVE_ERRORS[error.code]
+      : 'live_font_text_probe_invalid',
+    `native ${error.code}${error.detail ? `: ${error.detail}` : ''}`
   )
 }
 
@@ -209,18 +249,26 @@ function windowIdsOf(windows) {
  * The answer, checked against the wire contract: version 1, the token asked for, the run's
  * platform, windows with unique ids and at most one focused, and every record well formed. A
  * text view of a class the probe does not know fails as live_font_text_probe_unknown_view, so a
- * renderer change cannot hide text from the probe; any other breach fails as
+ * renderer change cannot hide text from the probe; an opacity that is no finite number from 0 to
+ * 1 fails as live_font_text_probe_opacity_invalid (TEA r44 P3-1), as does the native answer
+ * that reports one (TEXT_PROBE_NATIVE_ERRORS); any other breach fails as
  * live_font_text_probe_invalid.
  */
 export function validateTextProbeAnswer(answer, { platform, token }) {
   if (!TEXT_PROBE_KINDS[platform])
     fail('live_font_text_probe_invalid', `platform ${platform}`)
+  nativeError(answer, { platform, token })
   const problem = answerProblem(answer, { platform, token })
   if (problem) fail('live_font_text_probe_invalid', problem)
   const windowIds = windowIdsOf(answer.windows)
   for (const [index, record] of answer.records.entries()) {
     if (typeof record?.kind === 'string' && record.kind.startsWith('unknown:'))
       fail('live_font_text_probe_unknown_view', `record ${index} ${record.kind}`)
+    if (record !== null && typeof record === 'object' && !validOpacity(record))
+      fail(
+        'live_font_text_probe_opacity_invalid',
+        `record ${index} opacity ${String(record.opacity)}`
+      )
     const breach = recordProblem(record, platform, windowIds)
     if (breach) fail('live_font_text_probe_invalid', `record ${index} ${breach}`)
   }
@@ -537,7 +585,7 @@ export function coveredWindows(windows, tolerance) {
   return covered
 }
 
-/** Each record's class (see matchTextProbe) and, for a volatile one, its region's index. */
+/** Each record's class (see matchTextProbe) and, for one in a volatile region, the region's index. */
 function classifyRecords(records, coveredIds, volatileRegions) {
   const classes = {
     empty: [],
@@ -545,7 +593,7 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     invisible: [],
     offWindow: [],
     behind: [],
-    volatile: [],
+    regional: [],
     scrolled: [],
     hidden: [],
     visible: [],
@@ -562,11 +610,12 @@ function classifyRecords(records, coveredIds, volatileRegions) {
     // Wholly off its window with no scroll view to bring it in: drawn nowhere, so no clip.
     else if (record.offWindow === true) kind = 'offWindow'
     else if (coveredIds.has(record.window)) kind = 'behind'
-    else if (region >= 0) kind = 'volatile'
+    // In a volatile region: volatile only if no hierarchy node of its text takes it (matchTextProbe).
+    else if (region >= 0) kind = 'regional'
     else if (record.scrolledAway) kind = 'scrolled'
     else if (record.visibleRect === null) kind = 'hidden'
     classes[kind].push(record)
-    if (kind === 'volatile') regionOf.set(record.index, region)
+    if (kind === 'regional') regionOf.set(record.index, region)
   }
   return { classes, regionOf }
 }
@@ -681,7 +730,11 @@ function groupLeftovers({ nodes, leftover, open, free, tolerance }) {
  *              required, never judged, listed for review
  *   behind     in a window under a focused higher window that does not cover it whole (a
  *              centred dialog): out of matching, still judged for clipping
- *   volatile   centre inside a volatile region: out of matching, still judged for clipping
+ *   volatile   centre inside a volatile region and taken by no hierarchy node of its text: out
+ *              of matching, still judged for clipping. The hierarchy drops a region's subtree by
+ *              testID, so a text it keeps inside the region's rect (a sibling the region's
+ *              bounds overlap) pairs with its record like any other and is judged by its key:
+ *              a region leaves out on the record side only what it leaves out on the node side
  *   scrolled   scrolledAway: may match, never required, never judged
  *   hidden     visibleRect null but not scrolled away: a full clip, judged
  *   visible    must match a node
@@ -722,18 +775,23 @@ export function matchTextProbe({
     ...classes.scrolled,
     ...classes.offWindow,
   ]
-  const free = new Set(candidates.map((record) => record.index))
+  // A record in a volatile region pairs by exact text only, never joins a group, and is never
+  // owed a node: what no node takes is the region's own, volatile.
+  const textCandidates = [...candidates, ...classes.regional]
+  const free = new Set(textCandidates.map((record) => record.index))
   const nodeRank = ranks(indexed, (node) => node.box)
   const recordRank = ranks(records, recordRect)
   const pairs = pairByText({
     nodes: indexed,
-    candidates,
+    candidates: textCandidates,
     open,
     free,
     tolerance,
     nodeRank,
     recordRank,
   })
+  const volatile = classes.regional.filter((record) => free.has(record.index))
+  for (const record of volatile) free.delete(record.index)
   const leftover = candidates
     .filter((record) => free.has(record.index))
     .sort(byPosition(recordRect))
@@ -769,7 +827,7 @@ export function matchTextProbe({
       .filter((record) => free.has(record.index))
       .map((record) => record.index),
     hiddenRecords: classes.hidden.map((record) => record.index),
-    volatile: classes.volatile.map((record) => ({
+    volatile: volatile.map((record) => ({
       record: record.index,
       region: regionOf.get(record.index),
     })),
