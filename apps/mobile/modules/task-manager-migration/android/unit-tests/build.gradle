@@ -1,0 +1,90 @@
+// Versions follow the app's React Native 0.81 toolchain (AGP 8.11, Kotlin 2.1.20, SDK 36).
+//   gradle testDebugUnitTest   the PersistedTaskConsumersTest regression
+//                              (pr-task-manager-migration.yml)
+import groovy.json.JsonSlurper
+
+plugins {
+  id 'com.android.library' version '8.11.0'
+  id 'org.jetbrains.kotlin.android' version '2.1.20'
+}
+
+// The cleanup's own sources plus the expo-modules-core classes it and TaskService link against
+// (the task manager interfaces and the headless app loader), taken from the installed package.
+// Package and the task service provider pull in the rest of expo-modules-core and React Native,
+// so they stay out: TaskManagerMigrationPackage is linked in the app build, and the autolinking
+// spec (scripts/ci/mobile-android-autolinking.test.mjs) proves it is.
+def core = new File(gradle.ext.expoModulesCore, 'android/src/main/java')
+def stageSources = tasks.register('stageSources', Sync) {
+  into layout.buildDirectory.dir('staged-src')
+  from('../src/main/java') {
+    include 'expo/modules/taskmanagermigration/PersistedTaskConsumers.kt'
+    include 'expo/modules/taskmanagermigration/TaskManagerMigrationLifecycleListener.kt'
+  }
+  from(core) {
+    include 'expo/modules/apploader/AppLoaderProvider.kt'
+    include 'expo/modules/apploader/HeadlessAppLoader.java'
+    include 'expo/modules/core/interfaces/ApplicationLifecycleListener.java'
+    include 'expo/modules/core/interfaces/Consumer.java'
+    include 'expo/modules/core/interfaces/DoNotStrip.java'
+    include 'expo/modules/core/interfaces/SingletonModule.java'
+    include 'expo/modules/interfaces/taskManager/*.java'
+    exclude 'expo/modules/interfaces/taskManager/TaskServiceProviderInterface.java'
+  }
+}
+
+android {
+  namespace 'expo.modules.taskmanagermigration'
+  compileSdk 36
+  defaultConfig { minSdk 24 }
+  sourceSets {
+    main {
+      manifest.srcFile '../src/main/AndroidManifest.xml'
+      java.srcDirs = [layout.buildDirectory.dir('staged-src').get().asFile]
+    }
+    test.java.srcDirs = ['../src/test/java']
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions { jvmTarget = '17' }
+  testOptions {
+    unitTests {
+      includeAndroidResources = true
+      all {
+        testLogging {
+          events 'passed', 'skipped', 'failed'
+          exceptionFormat 'full'
+        }
+      }
+    }
+  }
+}
+
+tasks.named('preBuild') { dependsOn stageSources }
+
+// Robolectric runs the newer SDK runtimes only on Java 21; the tests run on 21 whatever JDK
+// compiled them.
+tasks.withType(Test).configureEach {
+  javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+// The version the installed expo-task-manager publishes, so a task manager bump runs the
+// regression against the new restore code.
+def taskManagerPublication = new JsonSlurper()
+  .parse(new File(gradle.ext.expoTaskManager, 'expo-module.config.json'))
+  .android.publication
+
+dependencies {
+  implementation 'androidx.core:core:1.13.1'
+  // expo-modules-core's interfaces annotate with javax.annotation.Nullable.
+  compileOnly 'com.google.code.findbugs:jsr305:3.0.2'
+  implementation [
+    taskManagerPublication.groupId,
+    taskManagerPublication.artifactId,
+    taskManagerPublication.version,
+  ].join(':')
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.16.1'
+  testImplementation 'androidx.test:core:1.6.1'
+}

@@ -34,6 +34,7 @@ import {
 } from '@/src/lib/community'
 import { EdgeToEdgeModal, useModalInsets } from '@/components/edge-to-edge-modal'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useGlyphBox } from '@/components/glyph-box'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { useComposeFieldReveal } from './compose-field-reveal'
 
@@ -134,6 +135,7 @@ function ComposeCheckboxRow({
   onToggle,
 }: ComposeCheckboxRowProps) {
   const palette = useHeroPalette()
+  const checkboxBox = useGlyphBox(22, false)
   return (
     <TouchableOpacity
       style={styles.confirmationRow}
@@ -149,6 +151,7 @@ function ComposeCheckboxRow({
       <View
         style={[
           styles.checkbox,
+          checkboxBox,
           {
             borderColor: checked ? palette.text : palette.mutedText,
             backgroundColor: checked ? ACCENT_GOLD : 'transparent',
@@ -927,10 +930,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
   },
+  // Story 6.15 F-00i: at the largest text sizes the label and the counter no longer fit on one
+  // line, so the counter wraps below the label instead of running past the sheet edge.
   captionHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'center',
+    columnGap: 8,
   },
   countText: {
     fontSize: 11,

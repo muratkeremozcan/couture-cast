@@ -1,14 +1,22 @@
-import React from 'react'
+import React, { useCallback, useState } from 'react'
 import { useAndroidNavigationIntent } from '@/components/android-share-card-presentation'
 import { ShareCardTabHeading } from '@/components/share-card-tab-heading'
 import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { Link, Tabs } from 'expo-router'
-import { Pressable, StyleSheet, useColorScheme, View } from 'react-native'
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  useColorScheme,
+  useWindowDimensions,
+  View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 
 import Colors from '@/constants/colors'
 import { useClientOnlyValue } from '@/components/use-client-only-value'
+import { TabBarLabel, tabBarGrowth } from '@/components/tab-bar-label'
 import { useMobileAnalytics } from '@/src/analytics/mobile-analytics'
 
 // You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
@@ -17,15 +25,22 @@ function TabBarIcon(props: {
   color: string
   focused: boolean
   tabId: string
+  /** How much taller the bar is than at the default text size (see tabBarGrowth). */
+  growth: number
 }) {
-  const { focused, tabId, ...iconProps } = props
+  const { focused, tabId, growth, ...iconProps } = props
 
   return (
     <View style={styles.iconContainer}>
       <FontAwesome size={28} style={styles.icon} {...iconProps} />
       {focused && (
         <View
-          style={[styles.activeIndicator, { backgroundColor: props.color }]}
+          // The bar grows upward with its labels and the icon with it, so the underline drops
+          // by the same amount to stay on the bar's bottom edge, below the label.
+          style={[
+            styles.activeIndicator,
+            { backgroundColor: props.color, bottom: INDICATOR_BOTTOM - growth },
+          ]}
           testID={`tab-${tabId}-active-indicator`}
         />
       )}
@@ -40,6 +55,19 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets()
   const analytics = useMobileAnalytics()
   const { t } = useTranslation()
+  const { fontScale } = useWindowDimensions()
+  // Story 6.15 F-00i: each label reports its height and the bar grows by what the text grew.
+  // iOS labels do not scale (Large Content Viewer), so the bar keeps its height there.
+  const [labelHeights, setLabelHeights] = useState<Record<string, number>>({})
+  const onLabelHeight = useCallback((label: string, height: number) => {
+    setLabelHeights((current) =>
+      current[label] === height ? current : { ...current, [label]: height }
+    )
+  }, [])
+  const growth = tabBarGrowth(
+    Object.values(labelHeights),
+    Platform.OS === 'ios' ? 1 : fontScale
+  )
   const tabLabels = {
     home: t('tabs.home', { defaultValue: 'Home' }),
     wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
@@ -68,9 +96,14 @@ export default function TabLayout() {
         tabBarStyle: {
           borderTopColor: palette.border,
           backgroundColor: palette.background,
-          height: 56 + insets.bottom,
+          height: 56 + growth + insets.bottom,
           paddingBottom: insets.bottom,
         },
+        tabBarLabel: ({ color, children }: { color: string; children: string }) => (
+          <TabBarLabel color={color} onHeight={onLabelHeight}>
+            {children}
+          </TabBarLabel>
+        ),
         // Disable the static render of the header on web
         // to prevent a hydration error in React Navigation v6.
         headerShown: useClientOnlyValue(false, true),
@@ -84,7 +117,13 @@ export default function TabLayout() {
           tabBarButtonTestID: 'tab-home',
           tabBarAccessibilityLabel: tabLabels.home,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon name="home" color={color} focused={focused} tabId="home" />
+            <TabBarIcon
+              growth={growth}
+              name="home"
+              color={color}
+              focused={focused}
+              tabId="home"
+            />
           ),
           headerRight: () => (
             <Link href="/modal" asChild>
@@ -118,6 +157,7 @@ export default function TabLayout() {
           tabBarAccessibilityLabel: tabLabels.wardrobe,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
+              growth={growth}
               name="shopping-bag"
               color={color}
               focused={focused}
@@ -137,7 +177,13 @@ export default function TabLayout() {
           tabBarButtonTestID: 'tab-community',
           tabBarAccessibilityLabel: tabLabels.community,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon name="users" color={color} focused={focused} tabId="community" />
+            <TabBarIcon
+              growth={growth}
+              name="users"
+              color={color}
+              focused={focused}
+              tabId="community"
+            />
           ),
         }}
         listeners={{
@@ -151,7 +197,13 @@ export default function TabLayout() {
           tabBarButtonTestID: 'tab-settings',
           tabBarAccessibilityLabel: tabLabels.settings,
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
-            <TabBarIcon name="cog" color={color} focused={focused} tabId="settings" />
+            <TabBarIcon
+              growth={growth}
+              name="cog"
+              color={color}
+              focused={focused}
+              tabId="settings"
+            />
           ),
         }}
         listeners={{
@@ -167,6 +219,9 @@ export default function TabLayout() {
     </Tabs>
   )
 }
+
+/** The underline's offset below the icon at the default text size. */
+const INDICATOR_BOTTOM = -23
 
 const styles = StyleSheet.create({
   headerButton: {
@@ -184,7 +239,7 @@ const styles = StyleSheet.create({
   },
   activeIndicator: {
     position: 'absolute',
-    bottom: -23,
+    bottom: INDICATOR_BOTTOM,
     width: 64,
     height: 4,
     borderTopLeftRadius: 4,

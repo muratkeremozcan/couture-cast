@@ -14,6 +14,12 @@ import {
 import { gradleRunLog, requireGradleWrapper } from './story68-gradle-precondition.mjs'
 
 const wrapper = path.resolve('apps/mobile/android/gradlew')
+// Debug stages the client ABIs; Release also stages armeabi-v7a and x86 for the all-ABI AAB
+// (TEA ruling, 2026-11-13).
+const TESTED_ABIS = {
+  Debug: ['arm64-v8a', 'x86_64'],
+  Release: ['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'],
+}
 const fixtures = new Set()
 
 function fixture(configuration, abi, extra = '') {
@@ -39,6 +45,8 @@ includeBuild 'unrelated-plugin'
     "tasks.register('pluginCheck') {}\n"
   )
   const native = configuration === 'Release' ? 'RelWithDebInfo' : 'Debug'
+  // One ABI, or several in one Gradle invocation, as a release AAB builds them.
+  const abis = abi.split(',')
   for (const name of ['react-native-worklets', 'react-native-reanimated'])
     fs.mkdirSync(path.join(projectRoot, name))
   fs.writeFileSync(
@@ -46,19 +54,25 @@ includeBuild 'unrelated-plugin'
     `
 class FixtureNativeTask extends DefaultTask {
   @Internal final DirectoryProperty soFolder = project.objects.directoryProperty()
+  @Internal final Property<String> abi = project.objects.property(String)
   @TaskAction void compileBinary() {
     def binary = soFolder.file('libworklets.so').get().asFile
     binary.parentFile.mkdirs()
-    binary.bytes = 'compiled-${configuration}-${abi}'.bytes
+    binary.bytes = ('compiled-${configuration}-' + abi.get()).bytes
   }
 }
 
-tasks.register('buildCMake${native}[${abi}][worklets]', FixtureNativeTask) {
-  soFolder.set(layout.buildDirectory.dir('intermediates/cxx/${native}/current-hash/obj/${abi}'))
-}
+${abis
+  .map(
+    (one) => `tasks.register('buildCMake${native}[${one}][worklets]', FixtureNativeTask) {
+  soFolder.set(layout.buildDirectory.dir('intermediates/cxx/${native}/current-hash/obj/${one}'))
+  abi.set('${one}')
+}`
+  )
+  .join('\n')}
 
 tasks.register('externalNativeBuild${configuration}') {
-  dependsOn 'buildCMake${native}[${abi}][worklets]'
+  ${abis.map((one) => `dependsOn 'buildCMake${native}[${one}][worklets]'`).join('\n  ')}
 }
 
 ${extra}
@@ -68,21 +82,26 @@ ${extra}
   fs.writeFileSync(
     path.join(projectRoot, 'react-native-reanimated/build.gradle'),
     `
-tasks.register('buildCMake${native}[${abi}][reanimated]') {
+${abis
+  .map(
+    (one) => `tasks.register('buildCMake${native}[${one}][reanimated]') {
   doLast {
-    def legacy = project(':react-native-worklets').file('build/intermediates/cmake/${configuration.toLowerCase()}/obj/${abi}/libworklets.so')
+    def legacy = project(':react-native-worklets').file('build/intermediates/cmake/${configuration.toLowerCase()}/obj/${one}/libworklets.so')
     if (!legacy.isFile()) throw new GradleException('legacy_worklets_import_missing')
-    if (legacy.text != 'compiled-${configuration}-${abi}') throw new GradleException('legacy_worklets_import_stale')
+    if (legacy.text != 'compiled-${configuration}-${one}') throw new GradleException('legacy_worklets_import_stale')
     rootProject.file('reanimated-imported.txt').text = legacy.text
+    rootProject.file('reanimated-imported-${one}.txt').text = legacy.text
   }
-}
+}`
+  )
+  .join('\n')}
 
 `
   )
   fs.writeFileSync(
     path.join(projectRoot, 'build.gradle'),
     `tasks.register('assemble${configuration}') {
-  dependsOn ':react-native-reanimated:buildCMake${native}[${abi}][reanimated]'
+  ${abis.map((one) => `dependsOn ':react-native-reanimated:buildCMake${native}[${one}][reanimated]'`).join('\n  ')}
   dependsOn gradle.includedBuild('unrelated-plugin').task(':pluginCheck')
 }
 
@@ -129,7 +148,7 @@ describe('worklets staging', () => {
   })
 
   for (const configuration of ['Debug', 'Release']) {
-    for (const abi of ['arm64-v8a', 'x86_64']) {
+    for (const abi of TESTED_ABIS[configuration]) {
       test(
         `stages exact ${configuration}/${abi} task output before the real native consumer`,
         budget(3),
@@ -180,7 +199,7 @@ describe('worklets staging', () => {
   }
 
   for (const configuration of ['Debug', 'Release']) {
-    for (const abi of ['arm64-v8a', 'x86_64']) {
+    for (const abi of TESTED_ABIS[configuration]) {
       test(
         `preserves AGP hardlink source bytes for ${configuration}/${abi}`,
         budget(1),
@@ -328,6 +347,65 @@ describe('worklets staging', () => {
     const { result, log } = run(input)
     assert.notEqual(result.status, 0)
     assert.match(log, /compiled_worklets_binary_required/)
+  })
+
+  test(
+    'stages every ABI of one all-ABI Release invocation from its own task output',
+    budget(2),
+    () => {
+      const all = TESTED_ABIS.Release.join(',')
+      const input = fixture('Release', all)
+      const baseline = run(input, false)
+      assert.notEqual(baseline.result.status, 0)
+      assert.match(baseline.log, /legacy_worklets_import_missing/)
+      const { plan, result, log } = run(input)
+      assert.equal(result.status, 0, log)
+      const proofs = verifyWorkletsStaging(plan)
+      assert.deepEqual(
+        proofs.map((proof) => proof.architecture),
+        TESTED_ABIS.Release
+      )
+      for (const proof of proofs) {
+        const expected = `compiled-Release-${proof.architecture}`
+        assert.equal(
+          proof.compiledSha256,
+          createHash('sha256').update(expected).digest('hex')
+        )
+        assert.match(
+          proof.legacyImported,
+          new RegExp(`/obj/${proof.architecture}/libworklets\\.so$`)
+        )
+        assert.equal(
+          fs.readFileSync(
+            path.join(input.projectRoot, `reanimated-imported-${proof.architecture}.txt`),
+            'utf8'
+          ),
+          expected
+        )
+      }
+      // One ABI's import swapped for another's fails that ABI's proof.
+      fs.copyFileSync(proofs[1].legacyImported, proofs[2].legacyImported)
+      assert.throws(() => verifyWorkletsStaging(plan), /worklets_staging_hash_mismatch/)
+    }
+  )
+
+  test('Release accepts armeabi-v7a and x86; Debug still refuses them', () => {
+    const input = fixture('Release', 'x86')
+    for (const architectures of ['armeabi-v7a', 'x86', TESTED_ABIS.Release.join(',')])
+      assert.deepEqual(
+        prepareWorkletsStaging({ ...input, architectures }).architectures,
+        architectures.split(',')
+      )
+    for (const architectures of ['armeabi-v7a', 'x86', TESTED_ABIS.Release.join(',')])
+      assert.throws(
+        () => prepareWorkletsStaging({ ...input, configuration: 'Debug', architectures }),
+        /worklets_build_selection_required/
+      )
+    for (const architectures of ['mips', 'x86,x86', 'arm64-v8a,armeabi'])
+      assert.throws(
+        () => prepareWorkletsStaging({ ...input, architectures }),
+        /worklets_build_selection_required/
+      )
   })
 
   test('rejects unsupported configurations and architecture input before writing an init script', () => {

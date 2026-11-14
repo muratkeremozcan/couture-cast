@@ -196,7 +196,7 @@ describe('mobile premium boundary', () => {
       }
     })
 
-    it('maps the manage entry by store: native for stores, web hint for Stripe, none for promotional', () => {
+    it('maps the manage entry by store: native for stores, web hint for Stripe, none for promotional and Test Store', () => {
       expect(resolvePremiumSectionState(activeSubscription, false)).toMatchObject({
         kind: 'entitled',
         plan: 'premium_monthly',
@@ -211,6 +211,9 @@ describe('mobile premium boundary', () => {
       ).toMatchObject({ manageEntry: 'web' })
       expect(
         resolvePremiumSectionState(entitled({ store: 'promotional' }), false)
+      ).toMatchObject({ manageEntry: 'none' })
+      expect(
+        resolvePremiumSectionState(entitled({ store: 'test_store' }), false)
       ).toMatchObject({ manageEntry: 'none' })
     })
 

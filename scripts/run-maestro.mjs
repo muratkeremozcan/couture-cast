@@ -91,6 +91,7 @@ import {
 } from './lib/maestro-launch-watchdog.mjs'
 import { runAndroidDeviceShards } from './lib/maestro-android-shards.mjs'
 import { waitForExpoStatus } from './lib/expo-dev-server.mjs'
+import { EXPO_GO_VERSION } from './lib/expo-go-version.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(scriptDir, '..')
@@ -201,7 +202,7 @@ const AUTO_BOOT_ANDROID = process.env.MOBILE_E2E_AUTO_BOOT_ANDROID !== '0'
 // MOBILE_E2E_ANDROID_HOST pins it and skips the probe entirely.
 let androidHost = process.env.MOBILE_E2E_ANDROID_HOST || '127.0.0.1'
 const REQUESTED_PLATFORM = process.env.MOBILE_E2E_PLATFORM || cliPlatform
-const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || '54.0.8'
+const EXPECTED_EXPO_GO_VERSION = process.env.MOBILE_E2E_EXPO_GO_VERSION || EXPO_GO_VERSION
 
 /**
  * The simulators this run drives.

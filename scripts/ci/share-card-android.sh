@@ -16,9 +16,18 @@ case "$sdk:$suite" in
   32:all-1|32:all-2|32:all-3|36:matrix-1|36:matrix-2|36:matrix-3|36:original|36:controls|36:interaction|36:release-font) ;;
   *) echo 'Explicit native CI suite must match the verified Android API' >&2; exit 2 ;;
 esac
-# Device permissions alone do not prove the emulator can use KVM.
-"$ANDROID_HOME/emulator/emulator" -accel-check 2>&1 | tee /tmp/cc68-accel-check.txt
-grep -q 'KVM .* is installed and usable' /tmp/cc68-accel-check.txt
+# Device permissions alone do not prove the emulator can use KVM. The check output stays in this
+# process: a fixed /tmp file is shared by every concurrent run on one machine, so a parallel test
+# that writes an unusable report there would fail this run.
+# The report prints before any verdict, so a failing check still shows why it failed.
+accel_status=0
+accel_check="$("$ANDROID_HOME/emulator/emulator" -accel-check 2>&1)" || accel_status=$?
+printf '%s\n' "$accel_check"
+if [ "$accel_status" -ne 0 ]; then
+  echo "emulator -accel-check exited $accel_status" >&2
+  exit "$accel_status"
+fi
+grep -q 'KVM .* is installed and usable' <<<"$accel_check"
 adb -s "$ANDROID_SERIAL" install apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
 node scripts/run-story68-native.mjs open --platform android --device "$ANDROID_SERIAL"
 node scripts/run-story68-native.mjs signin --platform android --device "$ANDROID_SERIAL"

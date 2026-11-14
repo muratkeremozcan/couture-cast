@@ -7,6 +7,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome'
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native'
 import {
   PlayfairDisplay_400Regular,
+  PlayfairDisplay_400Regular_Italic,
   PlayfairDisplay_700Bold,
 } from '@expo-google-fonts/playfair-display'
 import {
@@ -29,9 +30,10 @@ import {
 } from '@/src/analytics/mobile-analytics'
 import { trackMobileAlertReceived } from '@/src/analytics/track-events'
 import { initI18n } from '@/src/lib/i18n'
-import { registerBackgroundFetchAsync } from '@/src/lib/background-fetch'
+import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useTranslation } from 'react-i18next'
 
 const isExpoGoAndroid =
@@ -64,6 +66,9 @@ export default function RootLayout() {
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
     'Playfair Display': PlayfairDisplay_400Regular,
     'Playfair Display Bold': PlayfairDisplay_700Bold,
+    // Story 6.15: the comfort notes' face. Each face is its own family, so italic is a family,
+    // never fontStyle on the regular face (iOS drew it upright, Android drew italic sans).
+    'Playfair Display Italic': PlayfairDisplay_400Regular_Italic,
     'Space Grotesk': SpaceGrotesk_400Regular,
     'Space Grotesk Bold': SpaceGrotesk_700Bold,
     ...FontAwesome.font,
@@ -91,7 +96,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (loaded && i18nLoaded) {
       void SplashScreen.hideAsync()
-      void registerBackgroundFetchAsync()
+      void registerRitualBackgroundTaskAsync()
     }
   }, [loaded, i18nLoaded])
 
@@ -231,6 +236,7 @@ function RootLayoutNav() {
           <ThemeProvider value={theme}>
             {/* iOS labels the back button with the previous route's title; the tab
                 group has none, so it read "(tabs)". */}
+            <LiveFontMountMarker scope="root" />
             <AndroidShareCardPresentation
               pathname={pathname}
               navigationReady={Boolean(navigation?.key)}

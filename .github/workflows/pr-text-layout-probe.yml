@@ -1,0 +1,97 @@
+# Story 6.15 F-00i: the text layout probe (apps/mobile/modules/text-layout-probe), which the live
+# font-scale proof reads to judge clipping by rendered content. The native app lanes skip pull
+# requests, so this path-filtered workflow runs the Android record builder, wire writer and
+# receiver under Robolectric on every PR that touches the module, from the module's standalone
+# Gradle project: no prebuild, no React Native (the tests stand in classes of React Native's
+# names), no installed packages. The iOS rules run under `swift test` on a Mac
+# (apps/mobile/modules/text-layout-probe/ios/Package.swift); the module's linking is guarded by
+# scripts/ci/mobile-text-layout-probe-linking.test.mjs in the node test gate. PR Gate makes every
+# job that runs here required.
+name: Text layout probe module
+
+on:
+  pull_request:
+    paths:
+      - 'apps/mobile/modules/text-layout-probe/**'
+      - 'scripts/ci/junit-report-check.mjs'
+      - '.nvmrc'
+      - '.github/workflows/pr-text-layout-probe.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/mobile/modules/text-layout-probe/**'
+      - 'scripts/ci/junit-report-check.mjs'
+      - '.nvmrc'
+      - '.github/workflows/pr-text-layout-probe.yml'
+  workflow_dispatch:
+
+concurrency:
+  # The event keeps a push from cancelling a dispatched run.
+  group: >-
+    text-layout-probe-${{ github.event.pull_request.number || github.ref }}-${{
+    github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  robolectric:
+    name: Text layout records, wire and receiver
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The report check is a dependency-free script; the Gradle project needs no packages.
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      # Robolectric's SDK 35+ runtimes need Java 21.
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platforms;android-36
+
+      # The version the app's React Native 0.81 wrapper pins; AGP 8.11 does not support Gradle 9.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Cache Robolectric Android runtimes
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          # The build files pin the Robolectric version, which picks the runtimes.
+          key: >-
+            robolectric-${{
+            hashFiles('apps/mobile/modules/text-layout-probe/**/build.gradle') }}
+
+      - name: Robolectric tests for the text layout probe
+        run: |
+          set -euo pipefail
+          project=apps/mobile/modules/text-layout-probe/android/unit-tests
+          gradle -p "$project" testDebugUnitTest --console=plain
+          # Every case ran, at API 32 and 36 for the wire, and none was skipped, failed or errored.
+          reports="$project/build/test-results/testDebugUnitTest"
+          suite=expo.modules.textlayoutprobe.TextLayoutSnapshotTest
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 39
+          suite=expo.modules.textlayoutprobe.TextLayoutProbeWireTest
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 16
+
+      - name: Upload Robolectric reports
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: text-layout-probe-robolectric-reports
+          path: apps/mobile/modules/text-layout-probe/android/unit-tests/build/reports/tests
+          if-no-files-found: warn

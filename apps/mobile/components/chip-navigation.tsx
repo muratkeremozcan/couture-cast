@@ -100,6 +100,13 @@ export function MobileChipNavigation({
           )
         })}
       </ScrollView>
+      {/* The sticky row's bottom edge, for UI automation: Maestro's `below` compares top edges,
+          so a flow anchors on this to tap only content that has cleared the row. */}
+      <View
+        testID="chip-navigation-bottom-edge"
+        collapsable={false}
+        style={styles.bottomEdge}
+      />
     </View>
   )
 }
@@ -143,5 +150,13 @@ const styles = StyleSheet.create({
   },
   chipTextActive: {
     color: '#111111',
+  },
+  bottomEdge: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 1,
+    pointerEvents: 'none',
   },
 })

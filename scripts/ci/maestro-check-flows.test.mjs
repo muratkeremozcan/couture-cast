@@ -4,9 +4,7 @@ import { test } from 'node:test'
 import { parse } from 'yaml'
 import { CHECKED_FLOWS, checkFlows } from './maestro-check-flows.mjs'
 
-const workflow = parse(
-  fs.readFileSync('.github/workflows/pr-share-card-native.yml', 'utf8')
-)
+const workflow = parse(fs.readFileSync('.github/workflows/ios-native-jobs.yml', 'utf8'))
 
 test('every checked flow exists', () => {
   for (const flow of CHECKED_FLOWS) assert.ok(fs.existsSync(flow), flow)
@@ -23,7 +21,8 @@ test('a binary that accepts every flow reports nothing', () => {
 })
 
 // ios-build only keys and, on a miss, builds the client; the iOS checks that need no client run in
-// ios-expo-go on every device run.
+// ios-native-jobs.yml's ios-expo-go on every device run, and ios-flow-syntax runs this check on pull
+// requests.
 test('the Expo Go job runs the check after Maestro is installed, on every device run', () => {
   const steps = workflow.jobs['ios-expo-go'].steps
   const install = steps.findIndex((row) => row.run?.includes('maestro-install.mjs'))

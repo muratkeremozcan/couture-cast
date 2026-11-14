@@ -1,0 +1,15 @@
+# Story 6.15 D15 (S4-12): an unpaid failure shows the purchase error and creates no entitlement.
+# The driver checks the server separately after this flow.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- runFlow: open-sheet.yaml
+- tapOn:
+    text: '(?i)Test failed purchase'
+    label: 'Simulate a failed purchase'
+- extendedWaitUntil:
+    visible:
+      id: premium-purchase-error
+    timeout: 30000
+    label: 'The purchase error is shown'
+- runFlow: assert-unpaid.yaml

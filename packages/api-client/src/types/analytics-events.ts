@@ -684,6 +684,7 @@ const premiumStoreAnalyticsEnum = z.enum([
   'play_store',
   'stripe',
   'promotional',
+  'test_store',
 ])
 const premiumSurfaceAnalyticsEnum = z.enum(['mobile_settings', 'web_settings'])
 /** Why an entitlement stopped: expiration, refund/revocation, or transfer-loss. */

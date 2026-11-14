@@ -461,8 +461,9 @@ export const SHARE_SHEET_UITEST_MARKERS = Object.freeze([
 
 /**
  * The xcodegen spec for the presenter XCUITest, generated beside the copied sources so no
- * generated native project is edited. Every `ShareCardShareSheet*.swift` in native-tests is a
- * source, and `share-sheet-fixture.json` carries the localized copy the test may read.
+ * generated native project is edited. Every `ShareCardShareSheet*.swift` in native-tests and the
+ * shared `ShareCardComposerDismissal.swift` are sources, and `share-sheet-fixture.json` carries
+ * the localized copy the test may read.
  */
 export function shareSheetUITestProject(sources) {
   return [
@@ -871,7 +872,7 @@ export async function runShareSheetUITest(ctx) {
   const tests = path.join(ctx.root, 'apps/mobile/native-tests')
   const sources = fs
     .readdirSync(tests)
-    .filter((name) => /^ShareCardShareSheet\w*\.swift$/.test(name))
+    .filter((name) => /^ShareCard(ShareSheet\w*|ComposerDismissal)\.swift$/.test(name))
     .sort()
   if (!sources.includes(`${SHARE_SHEET_UITEST_CLASS}.swift`))
     throw new Error('share_sheet_ios_uitest_failed')

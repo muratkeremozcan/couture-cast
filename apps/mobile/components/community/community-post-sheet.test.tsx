@@ -146,6 +146,7 @@ import {
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
   paddingBottomOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']
@@ -830,6 +831,13 @@ describe('CommunityPostSheet (Story 6.1)', () => {
 })
 
 describe('R52 CommunityPostSheet over the system bars', () => {
+  // Story 6.15 review P3-1: iOS hides every view outside the accessibility modal view from the
+  // XCUITest hierarchy, so the modal's live-font marker must sit inside it.
+  it('puts the live-font marker inside the sheet that is the accessibility modal', () => {
+    renderSheet()
+    expect(liveFontMarkerPlacement().markerInside).toBe(true)
+  })
+
   it('covers the status and navigation bars and keeps the sheet above the gesture bar', () => {
     renderSheet()
     expect(lastModalProps()).toMatchObject({
@@ -932,5 +940,30 @@ describe('R16 CommunityPostSheet keeps the focused field in view', () => {
     // The marker automation reads: the whole photo section is in the frame.
     expect(screen.getByTestId('community-photo-in-view')).toBeInTheDocument()
     expect(screen.getByTestId('community-pick-image-button')).toBeVisible()
+  })
+})
+
+describe('6.15 CommunityPostSheet at the largest text sizes', () => {
+  afterEach(async () => {
+    await setViewport(414, 896)
+  })
+
+  // Story 6.15 F-00i: at Android 2.0 "0 of 280 characters" ran past the sheet edge beside
+  // "Caption (optional)". A narrow window stands in for the larger text: the counter wraps
+  // below the label and stays inside the sheet.
+  it('6.15-MOB-WRAP-02 wraps the caption counter below its label inside a narrow sheet', async () => {
+    await setViewport(180, 896)
+    renderSheet()
+    const count = screen.getByTestId('community-caption-count')
+    const caption = screen.getByTestId('community-caption-input')
+    await waitFor(() => expect(count).toBeVisible())
+    const field = caption.getBoundingClientRect()
+    const counter = count.getBoundingClientRect()
+    const label = screen.getByText('Caption (optional)').getBoundingClientRect()
+    expect(counter.right).toBeLessThanOrEqual(field.right + 0.5)
+    expect(counter.left).toBeGreaterThanOrEqual(field.left - 0.5)
+    // Wrapped onto its own line: native text does not shrink in a row the way web text does,
+    // so on a device a counter beside the label is the one that ran past the edge.
+    expect(counter.top).toBeGreaterThanOrEqual(label.bottom - 0.5)
   })
 })

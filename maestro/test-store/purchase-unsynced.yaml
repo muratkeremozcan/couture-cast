@@ -1,0 +1,15 @@
+# Story 6.15 D15 (S4-12 restore, TD-04): a successful Test Store purchase while the journey proxy
+# refuses the refresh, on the local leg, where no webhook arrives. RevenueCat holds the
+# entitlement and our server does not: the state a restore exists to repair.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- runFlow: open-sheet.yaml
+- tapOn:
+    text: '(?i)Test valid purchase'
+    label: 'Simulate a successful purchase'
+- extendedWaitUntil:
+    visible:
+      id: premium-activating
+    timeout: 30000
+    label: 'The SDK reported success; the server never heard of it'

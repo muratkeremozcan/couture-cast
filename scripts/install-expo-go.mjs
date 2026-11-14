@@ -7,8 +7,7 @@ import path from 'node:path'
 import { spawn } from 'node:child_process'
 import { pipeline } from 'node:stream/promises'
 
-const EXPO_GO_SDK_54_URL =
-  'https://github.com/expo/expo-go-releases/releases/download/Expo-Go-54.0.8/Expo-Go-54.0.8.apk'
+import { expoGoApkUrl } from './lib/expo-go-version.mjs'
 
 /**
  * Where a given APK URL is cached.
@@ -180,7 +179,7 @@ const isCompleteApk = (filePath) => {
 }
 
 const main = async () => {
-  const apkUrl = process.env.EXPO_GO_APK_URL || EXPO_GO_SDK_54_URL
+  const apkUrl = process.env.EXPO_GO_APK_URL || expoGoApkUrl()
   const downloadPath = cachePathFor(apkUrl)
 
   // Downloaded once per machine, not once per device.

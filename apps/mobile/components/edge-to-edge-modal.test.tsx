@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import React, { createElement } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -7,6 +9,7 @@ import {
   EDGE_TO_EDGE_MODAL_PROPS,
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
+  liveFontMarkerPlacement,
   modalRenders,
 } from '@/src/test-utils/edge-to-edge-modal'
 import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
@@ -126,6 +129,69 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
       value: 'web',
       configurable: true,
     })
+  })
+
+  /**
+   * Story 6.15 review P2-2: a view with accessibilityViewIsModal hides every other view from
+   * VoiceOver and from the XCUITest hierarchy Maestro reads, so the modal's mount marker goes
+   * inside it; next to it, the iOS composer capture saw no marker at all.
+   */
+  it('puts the mount marker inside the content view that is the accessibility modal', () => {
+    render(
+      <EdgeToEdgeModal visible>
+        <ReactNative.View testID="sheet" accessibilityViewIsModal>
+          <Text>Composer</Text>
+        </ReactNative.View>
+      </EdgeToEdgeModal>
+    )
+    const marker = document.querySelector('[data-testid^="live-font-mount-modal-"]')
+    expect(marker).not.toBeNull()
+    expect(screen.getByTestId('sheet').contains(marker)).toBe(true)
+    expect(screen.getByText('Composer')).toBeTruthy()
+  })
+
+  it('finds the accessibility modal view inside an overlay wrapper, a fragment or an array', () => {
+    const shapes = {
+      wrapper: (
+        <ReactNative.View testID="overlay">
+          <ReactNative.View testID="sheet" accessibilityViewIsModal>
+            <Text>Sheet</Text>
+          </ReactNative.View>
+        </ReactNative.View>
+      ),
+      fragment: (
+        <>
+          <ReactNative.View testID="backdrop" />
+          <ReactNative.View testID="sheet" accessibilityViewIsModal />
+        </>
+      ),
+      array: [
+        <ReactNative.View key="a" testID="backdrop" />,
+        <ReactNative.View key="b" testID="sheet" accessibilityViewIsModal />,
+      ],
+    }
+    for (const [shape, children] of Object.entries(shapes)) {
+      const view = render(<EdgeToEdgeModal visible>{children}</EdgeToEdgeModal>)
+      const marker = document.querySelector('[data-testid^="live-font-mount-modal-"]')
+      expect(screen.getByTestId('sheet').contains(marker), shape).toBe(true)
+      expect(liveFontMarkerPlacement(), shape).toEqual({
+        markerInside: true,
+        host: 'sheet',
+      })
+      view.unmount()
+    }
+  })
+
+  it('keeps the mount marker beside content that is not an accessibility modal', () => {
+    render(
+      <EdgeToEdgeModal visible>
+        <ReactNative.View testID="plain" />
+      </EdgeToEdgeModal>
+    )
+    expect(
+      document.querySelector('[data-testid^="live-font-mount-modal-"]')
+    ).not.toBeNull()
+    expect(liveFontMarkerPlacement().markerInside).toBe(false)
   })
 
   it('puts the content, its fields included, inside the keyboard view', () => {

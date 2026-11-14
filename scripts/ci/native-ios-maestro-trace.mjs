@@ -685,6 +685,102 @@ export function scheduleIosInFlowSample(
   }
 }
 
+/** Where a deadline-killed iOS flow's after-timeout hierarchy is kept, inside its Maestro output. */
+export const TIMEOUT_HIERARCHY_FILE = 'after-timeout-hierarchy.json'
+
+/**
+ * Story 6.15 (Codex RUNS-R3-01): a flow the deadline killed leaves no failed-step artifacts, so
+ * the screen at the kill was unknown. This reads the hierarchy once more through Maestro and keeps
+ * it beside the flow's output. `args` are the runner's own (Codex RUNS-R4-01): the pinned
+ * `--driver-host-port` and its reuse flag, never a bare `hierarchy`, which cold-starts a second
+ * runner (run 40938852299 shard 2). JVM and driver start took 37 to 59 s on the iOS 26.5
+ * simulator, hence 120 s. Returns the parsed hierarchy or null; never throws.
+ */
+export function captureIosTimeoutHierarchy({
+  maestroBinary,
+  args,
+  output,
+  spawn = spawnSync,
+  report = console.log,
+  timeoutMs = 120000,
+}) {
+  const began = Date.now()
+  let exitCode = null
+  try {
+    if (!Array.isArray(args) || !args.includes('hierarchy')) return null
+    const result = spawn(maestroBinary, args, {
+      encoding: 'utf8',
+      timeout: timeoutMs,
+      killSignal: 'SIGKILL',
+      maxBuffer: 30 * 1024 * 1024,
+    })
+    exitCode = result.status ?? null
+    if (result.status !== 0) return null
+    const hierarchy = JSON.parse(result.stdout)
+    fs.writeFileSync(
+      path.join(output, TIMEOUT_HIERARCHY_FILE),
+      JSON.stringify(hierarchy),
+      {
+        mode: 0o600,
+      }
+    )
+    return hierarchy
+  } catch {
+    return null
+  } finally {
+    report(
+      JSON.stringify({
+        iosTimeoutHierarchy: { exitCode, durationMs: Math.max(0, Date.now() - began) },
+      })
+    )
+  }
+}
+
+/**
+ * Whether the app under test is a running process in the simulator, from launchd's list:
+ * `{ running, pid, lastExitStatus }`, `{ running: false }` when launchd has no such job, or null
+ * when the list could not be read. Only numbers leave here, never the label.
+ */
+export function readIosAppProcess({ device, appId, spawn = spawnSync }) {
+  try {
+    const result = spawn('xcrun', ['simctl', 'spawn', device, 'launchctl', 'list'], {
+      encoding: 'utf8',
+      timeout: 15000,
+      killSignal: 'SIGKILL',
+      maxBuffer: 8 * 1024 * 1024,
+    })
+    if (result.status !== 0) return null
+    const row = String(result.stdout)
+      .split('\n')
+      .map((line) => line.split('\t'))
+      .find(
+        (fields) =>
+          fields.length >= 3 && fields[2].trim().startsWith(`UIKitApplication:${appId}[`)
+      )
+    if (!row) return { running: false }
+    const pid = /^\d+$/.test(row[0].trim()) ? Number(row[0].trim()) : null
+    const status = /^-?\d+$/.test(row[1].trim()) ? Number(row[1].trim()) : null
+    return { running: pid !== null, pid, lastExitStatus: status }
+  } catch {
+    return null
+  }
+}
+
+// Codex RUNS-R4-02 and RUNS-R5-01: the runner says whether the deadline killed the flow. After a
+// kill only the after-timeout read is the current screen, and when that read failed the screen is
+// unavailable: a failed-step hierarchy beside it is an earlier retry's, so it never stands in.
+// Ordinary failures keep the failed step.
+const hierarchySource = (deadlineKilled, failedStep, timeoutHierarchy) => {
+  if (deadlineKilled)
+    return timeoutHierarchy ? 'after-timeout' : 'unavailable-after-timeout'
+  return failedStep ? 'failed-step' : null
+}
+const earlierRetry = (deadlineKilled, failedStep) => deadlineKilled && failedStep !== null
+const currentHierarchy = (deadlineKilled, failedStep, timeoutHierarchy) =>
+  deadlineKilled ? timeoutHierarchy : failedStep
+const appProcessOf = ({ device, appId, spawn }) =>
+  device && appId ? readIosAppProcess({ device, appId, spawn }) : null
+
 /** Append a failed flow's progress to the run's receipt (nonfatal, iOS only). */
 export function recordIosFlowProgress({
   platform,
@@ -698,6 +794,8 @@ export function recordIosFlowProgress({
   root = process.cwd(),
   device = null,
   appId = null,
+  timeoutHierarchy = null,
+  deadlineKilled = false,
   spawn = spawnSync,
   report = console.log,
 }) {
@@ -709,12 +807,18 @@ export function recordIosFlowProgress({
     const hostSampled = output
       ? recordIosHostSample('flow-failure', { root, spawn, report })
       : false
-    const hierarchy = output ? failedStepHierarchy(output) : null
+    // After a deadline kill the after-timeout read is the screen; else the failed step is.
+    const failedStep = output ? failedStepHierarchy(output) : null
+    const hierarchy = currentHierarchy(deadlineKilled, failedStep, timeoutHierarchy)
     const geometry = openerGeometry(hierarchy)
     if (geometry?.centreCoveredBy) report(JSON.stringify({ openerObstructed: geometry }))
     const entry = {
       flow,
       hostSampled,
+      hierarchySource: hierarchySource(deadlineKilled, failedStep, timeoutHierarchy),
+      // Provenance only: an earlier retry's failed step existed beside a deadline kill.
+      earlierRetryHierarchy: earlierRetry(deadlineKilled, failedStep),
+      appProcess: appProcessOf({ device, appId, spawn }),
       systemSurface: systemSurfaceSummary(hierarchy),
       inputSurface: inputSurface(hierarchy),
       ...expoGoScreen(appId, hierarchy),

@@ -6,6 +6,7 @@ import type * as ReactNativeModule from 'react-native'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
+import { setViewport } from '@/src/test-utils/viewport'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -514,5 +515,22 @@ describe('WardrobeHubScreen', () => {
     await waitFor(() => {
       expect(screen.getByTestId('garment-tagging-modal')).toBeInTheDocument()
     })
+  })
+
+  // Story 6.15 F-00i: at iOS accessibility-medium Add garment ran past the screen edge beside the
+  // two links. A narrow window stands in for the larger text: the actions wrap inside the screen.
+  it('6.15-MOB-WRAP-03 wraps the hub actions so Add garment stays inside a narrow screen', async () => {
+    await setViewport(260, 896)
+    try {
+      renderScreen()
+      const add = await waitFor(() => screen.getByTestId('garment-capture-open'))
+      const screenBox = screen.getByTestId('wardrobe-screen').getBoundingClientRect()
+      const addBox = add.getBoundingClientRect()
+      // The content is padded 20 on each side.
+      expect(addBox.right).toBeLessThanOrEqual(screenBox.right - 20 + 0.5)
+      expect(addBox.left).toBeGreaterThanOrEqual(screenBox.left + 20 - 0.5)
+    } finally {
+      await setViewport(414, 896)
+    }
   })
 })

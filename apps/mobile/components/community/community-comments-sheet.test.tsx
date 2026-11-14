@@ -32,6 +32,7 @@ import {
   TEST_SAFE_AREA_INSETS,
   lastModalProps,
   paddingBottomOf,
+  liveFontMarkerPlacement,
 } from '@/src/test-utils/edge-to-edge-modal'
 import { CommunityCommentsSheet } from './community-comments-sheet'
 
@@ -213,6 +214,13 @@ afterEach(() => {
 })
 
 describe('Story 6.4 native comments sheet through real wrappers', () => {
+  // Story 6.15 review P3-1: iOS hides every view outside the accessibility modal view from the
+  // XCUITest hierarchy, so the modal's live-font marker must sit inside it.
+  it('puts the live-font marker inside the sheet that is the accessibility modal', () => {
+    renderSheet()
+    expect(liveFontMarkerPlacement().markerInside).toBe(true)
+  })
+
   it.each([
     [409, 'You already reported this comment for a different reason.', 'reason_changed'],
     [403, 'You cannot report your own comment.', 'self_report'],

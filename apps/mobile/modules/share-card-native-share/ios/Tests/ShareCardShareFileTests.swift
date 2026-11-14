@@ -1,6 +1,12 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 import XCTest
 @testable import ShareCardShareCore
 
@@ -48,6 +54,12 @@ final class ShareCardShareFileTests: XCTestCase {
     return file
   }
 
+  /// A file URI under `root`, written by hand so a `..` component survives. `root` carries no
+  /// trailing slash, so the separator is added here.
+  func uri(_ root: URL, _ relative: String) -> String {
+    root.absoluteString + (root.absoluteString.hasSuffix("/") ? "" : "/") + relative
+  }
+
   /// The share-cards-relative handoff path: a per-share directory holding the public name.
   func shareName() -> String { "cc69-share-\(UUID().uuidString.lowercased())/couturecast-card.png" }
 
@@ -86,18 +98,67 @@ final class ShareCardShareFileTests: XCTestCase {
       XCTAssertThrowsError(try ShareCardShareFile.validateFile(file.absoluteString, digest(data), root), relative)
     }
     // The file exists one level up; the URI reaches it through `..`.
-    let traversal = root.absoluteString + "share-cards/../" + name
+    let traversal = uri(root, "share-cards/../" + name)
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(traversal, digest(data), root))
     // Even a `..` that lands back inside share-cards is refused.
     let insideName = shareName()
     let inside = try write(data, "share-cards/\(insideName)", in: root)
-    let roundTrip = root.absoluteString + "share-cards/../share-cards/" + insideName
+    let roundTrip = uri(root, "share-cards/../share-cards/" + insideName)
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(roundTrip, digest(data), root))
     let directory = inside.deletingLastPathComponent().lastPathComponent
-    let viaDirectory = root.absoluteString + "share-cards/\(directory)/../\(insideName)"
+    let viaDirectory = uri(root, "share-cards/\(directory)/../\(insideName)")
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(viaDirectory, digest(data), root))
     XCTAssertThrowsError(try ShareCardShareFile.validateFile("https://example.invalid/\(name)", digest(data), root))
     XCTAssertThrowsError(try ShareCardShareFile.validateFile(inside.absoluteString, digest(data), nil))
+  }
+
+  /// Only a checksum is wrong, so every structural guard passes and the CRC check alone rejects it.
+  func testRejectsAChunkWhoseCrcDoesNotMatchItsBytes() throws {
+    let root = try cacheRoot()
+    let valid = [UInt8](png())
+    XCTAssertNoThrow(try ShareCardShareFile.validatePng(Data(valid)))
+    // IHDR's CRC is bytes 29 to 32: signature (8), length (4), type (4), payload (13).
+    var badCrc = valid
+    badCrc[32] ^= 0x01
+    // A payload byte changed under an unchanged CRC.
+    var badPayload = valid
+    badPayload[valid.count - 17] ^= 0x01
+    for corrupted in [Data(badCrc), Data(badPayload)] {
+      XCTAssertThrowsError(try ShareCardShareFile.validatePng(corrupted))
+      let file = try write(corrupted, "share-cards/\(shareName())", in: root)
+      XCTAssertThrowsError(try ShareCardShareFile.validateFile(file.absoluteString, digest(corrupted), root))
+    }
+  }
+
+  /// The per-share directory carries a real UUID, not just 36 characters after the prefix.
+  func testRejectsAShareDirectoryOf36CharactersThatIsNotAUuid() throws {
+    let root = try cacheRoot()
+    let data = png()
+    for id in ["zzzzzzzz-zzzz-zzzz-zzzz-zzzzzzzzzzzz", String(repeating: "0", count: 36)] {
+      XCTAssertEqual(id.count, 36)
+      XCTAssertFalse(ShareCardShareFile.isShareDirectoryName("cc69-share-\(id)"), id)
+      let file = try write(data, "share-cards/cc69-share-\(id)/couturecast-card.png", in: root)
+      XCTAssertThrowsError(try ShareCardShareFile.validateFile(file.absoluteString, digest(data), root), id)
+    }
+  }
+
+  /// A `..` between two real per-share directories still lands on a valid file; the `..` alone
+  /// refuses it.
+  func testRejectsADotDotBetweenTwoShareDirectories() throws {
+    let root = try cacheRoot()
+    let data = png()
+    let first = "cc69-share-\(UUID().uuidString.lowercased())"
+    let second = "cc69-share-\(UUID().uuidString.lowercased())"
+    _ = try write(data, "share-cards/\(first)/couturecast-card.png", in: root)
+    let target = try write(data, "share-cards/\(second)/couturecast-card.png", in: root)
+    XCTAssertEqual(try ShareCardShareFile.validateFile(target.absoluteString, digest(data), root), target)
+    let dotted = uri(root, "share-cards/\(first)/../\(second)/couturecast-card.png")
+    let url = try XCTUnwrap(URL(string: dotted))
+    XCTAssertTrue(url.pathComponents.contains(".."))
+    // The same file without the `..` passes, so only that component refuses it.
+    XCTAssertEqual(url.standardizedFileURL, target.standardizedFileURL)
+    XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
+    XCTAssertThrowsError(try ShareCardShareFile.validateFile(dotted, digest(data), root))
   }
 
   func testRejectsSymlinkEscapes() throws {

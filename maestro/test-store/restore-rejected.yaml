@@ -1,0 +1,14 @@
+# Story 6.15 D15 (TD-04): after the reinstall, a restore whose server refresh fails shows the
+# error and leaves the member unpaid. The journey proxy refuses that one refresh.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: assert-unpaid.yaml
+- tapOn:
+    id: premium-restore
+    label: 'Restore purchases'
+- extendedWaitUntil:
+    visible:
+      id: premium-purchase-error
+    timeout: 30000
+    label: 'The rejected restore shows its error'
+- runFlow: assert-unpaid.yaml

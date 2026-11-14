@@ -1,0 +1,22 @@
+# Story 6.15 D15: the app shows the server entitlement, and a paid member is offered no purchase
+# or restore control (manage is store-only, and a Test Store purchase has none to manage).
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: premium-status-line
+      text: ${PREMIUM_STATUS_ACTIVE}
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+    label: 'The app shows the entitlement'
+- assertNotVisible:
+    id: premium-subscribe-monthly
+- assertNotVisible:
+    id: premium-subscribe-annual
+- assertNotVisible:
+    id: premium-restore
+- assertNotVisible:
+    id: premium-manage
+- assertNotVisible:
+    id: premium-purchase-error

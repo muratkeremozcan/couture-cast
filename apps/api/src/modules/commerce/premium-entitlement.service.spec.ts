@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Prisma, PrismaClient } from '@prisma/client'
 import {
   PremiumEntitlementService,
@@ -258,5 +258,264 @@ describe('eraseProcessorData (Decision 7, Open question 5)', () => {
     stripeBilling.failNextCall()
 
     await expect(service.eraseProcessorData('user-1')).rejects.toThrow()
+  })
+})
+
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+describe('a test_store row is honored only under local and preview (story 6.15 D15)', () => {
+  const testStoreRow = existingRow({ store: 'test_store', synced_at: T0 })
+
+  function reader(
+    row: Record<string, unknown> | null,
+    complimentary = false
+  ): PremiumEntitlementService {
+    return new PremiumEntitlementService(
+      {
+        premiumEntitlement: { findUnique: vi.fn().mockResolvedValue(row) },
+      } as unknown as PrismaClient,
+      new FakeRevenueCatClient(),
+      new FakeStripeBillingClient(),
+      {
+        isActive: () => Promise.resolve(complimentary),
+        check: () => Promise.resolve('not_granted' as const),
+      }
+    )
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it('serves the row and grants paid access', async () => {
+      const entitlements = reader(testStoreRow)
+      await expect(entitlements.getEntitlement('user-1')).resolves.toMatchObject({
+        status: 'active',
+        store: 'test_store',
+      })
+      await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(true)
+      await expect(entitlements.premiumAccessSource('user-1')).resolves.toBe(
+        'subscription'
+      )
+    })
+  })
+
+  // NODE_ENV is `test` here, which must not open the Test Store either; `qa` is any other value.
+  describe.each([undefined, 'staging', 'production', 'qa'])(
+    'with TEST_ENV %s',
+    (testEnv) => {
+      beforeEach(() => {
+        vi.stubEnv('TEST_ENV', testEnv as string)
+      })
+
+      it.each(['active', 'grace_period'])(
+        'reads a %s row as absent and grants no paid access',
+        async (status) => {
+          const entitlements = reader({ ...testStoreRow, status })
+          await expect(entitlements.getEntitlement('user-1')).resolves.toBeNull()
+          await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(false)
+          await expect(entitlements.premiumAccessSource('user-1')).resolves.toBe('none')
+        }
+      )
+
+      it('still answers a complimentary grant as complimentary access', async () => {
+        const entitlements = reader(testStoreRow, true)
+        await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(true)
+        await expect(entitlements.premiumAccessSource('user-1')).resolves.toBe(
+          'complimentary'
+        )
+      })
+
+      it('keeps honoring the stores we sell', async () => {
+        const entitlements = reader(existingRow({ store: 'app_store', synced_at: T0 }))
+        await expect(entitlements.getEntitlement('user-1')).resolves.toMatchObject({
+          store: 'app_store',
+        })
+        await expect(entitlements.hasPremiumAccess('user-1')).resolves.toBe(true)
+      })
+    }
+  )
+})
+
+// Learning path Step 55: story 6.15 D15 r6. The ledger writers read an unhonored test_store row as
+// absent, so a real activation over it audits and emits from `none`, its cursor cannot discard
+// the real event, and a null snapshot over it writes nothing.
+describe('the ledger writers over a test_store row (story 6.15 D15 r6)', () => {
+  // The stray row's cursor is newer than the real purchase that lands on it.
+  const strayRow = existingRow({
+    store: 'test_store',
+    last_event_occurred_at: new Date(T0.getTime() + 60_000),
+    last_event_id: 'evt-test-store',
+  })
+  const realPurchase = { ...activeState, store: 'app_store' as const }
+
+  function writer(tx: StubTx): PremiumEntitlementService {
+    return new PremiumEntitlementService(
+      {
+        $transaction: (work: (client: unknown) => unknown) => work(tx),
+      } as unknown as PrismaClient,
+      new FakeRevenueCatClient(),
+      new FakeStripeBillingClient(),
+      {
+        isActive: () => Promise.resolve(false),
+        check: () => Promise.resolve('not_granted' as const),
+      }
+    )
+  }
+
+  function applyRealPurchase(tx: StubTx): Promise<EntitlementTransition> {
+    return writer(tx).applyLedgerEvent(tx as unknown as Prisma.TransactionClient, {
+      userId: 'user-1',
+      state: realPurchase,
+      occurredAt: T0,
+      eventId: 'evt-real',
+      provider: 'revenuecat',
+    })
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  describe.each([undefined, 'staging', 'production'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv as string)
+    })
+
+    it('applies a real purchase from none, with its audit row, despite the newer cursor', async () => {
+      const tx = stubTx(strayRow)
+      await expect(applyRealPurchase(tx)).resolves.toEqual({
+        applied: true,
+        from: 'none',
+        to: 'active',
+        store: 'app_store',
+        productId: 'premium_monthly',
+      })
+      expect(tx.premiumEntitlement.upsert).toHaveBeenCalledTimes(1)
+      expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('a pulled real entitlement over it also starts from none', async () => {
+      const tx = stubTx(strayRow)
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', realPurchase, 'pull-1')
+      ).resolves.toMatchObject({ applied: true, from: 'none', to: 'active' })
+      expect(tx.auditLog.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('a null snapshot over it writes nothing', async () => {
+      const tx = stubTx(strayRow)
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+      ).resolves.toBeNull()
+      expect(tx.premiumEntitlement.upsert).not.toHaveBeenCalled()
+      expect(tx.premiumEntitlement.update).not.toHaveBeenCalled()
+      expect(tx.auditLog.create).not.toHaveBeenCalled()
+    })
+  })
+
+  describe.each(['local', 'preview'])('with TEST_ENV %s', (testEnv) => {
+    beforeEach(() => {
+      vi.stubEnv('TEST_ENV', testEnv)
+    })
+
+    it('the newer test_store cursor drops the older event, as for any honored row', async () => {
+      const tx = stubTx(strayRow)
+      await expect(applyRealPurchase(tx)).resolves.toMatchObject({
+        applied: false,
+        from: 'active',
+        store: 'test_store',
+      })
+      expect(tx.premiumEntitlement.upsert).not.toHaveBeenCalled()
+    })
+
+    it('a pulled entitlement over it moves from active', async () => {
+      const tx = stubTx(strayRow)
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', realPurchase, 'pull-1')
+      ).resolves.toMatchObject({ applied: true, from: 'active', to: 'active' })
+      expect(tx.auditLog.create).not.toHaveBeenCalled()
+    })
+
+    it('a null snapshot over it expires the row', async () => {
+      const tx = stubTx(existingRow({ store: 'test_store' }))
+      await expect(
+        writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+      ).resolves.toMatchObject({
+        applied: true,
+        from: 'active',
+        to: 'expired',
+        store: 'test_store',
+      })
+    })
+  })
+})
+
+// Story 6.15 r38: drift_settled_at marks a row whose ledger entitlement is currently
+// unrepresentable. Every confirmed sync that moves synced_at clears it in the same write, or a
+// row settled once keeps a stale settle and sorts behind every never-settled row forever.
+describe('a confirmed sync clears the drift settle', () => {
+  const settledRow = existingRow({ drift_settled_at: new Date(T0.getTime() - 60_000) })
+
+  function writer(tx: StubTx): PremiumEntitlementService {
+    return new PremiumEntitlementService(
+      {
+        $transaction: (work: (client: unknown) => unknown) => work(tx),
+      } as unknown as PrismaClient,
+      new FakeRevenueCatClient(),
+      new FakeStripeBillingClient(),
+      {
+        isActive: () => Promise.resolve(false),
+        check: () => Promise.resolve('not_granted' as const),
+      }
+    )
+  }
+
+  function upsertUpdate(tx: StubTx): Record<string, unknown> {
+    const [args] = tx.premiumEntitlement.upsert.mock.calls[0] as [
+      { update: Record<string, unknown> },
+    ]
+    return args.update
+  }
+
+  it('a webhook apply', async () => {
+    const tx = stubTx(settledRow)
+    await apply(tx, new Date(T0.getTime() + 1_000), 'evt-newer')
+    expect(upsertUpdate(tx)).toMatchObject({
+      synced_at: expect.any(Date) as Date,
+      drift_settled_at: null,
+    })
+  })
+
+  it('a refresh or drift pull with an entitlement', async () => {
+    const tx = stubTx(settledRow)
+    await writer(tx).applyLedgerSnapshot('user-1', activeState, 'pull-1')
+    expect(upsertUpdate(tx)).toMatchObject({
+      synced_at: expect.any(Date) as Date,
+      drift_settled_at: null,
+    })
+  })
+
+  it('a pull with no entitlement that downgrades an active row', async () => {
+    const tx = stubTx(settledRow)
+    await writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+    expect(upsertUpdate(tx)).toMatchObject({ status: 'expired', drift_settled_at: null })
+  })
+
+  it('a pull with no entitlement over an already expired row', async () => {
+    const tx = stubTx({ ...settledRow, status: 'expired' })
+    await writer(tx).applyLedgerSnapshot('user-1', null, 'pull-1')
+    const [args] = tx.premiumEntitlement.update.mock.calls[0] as [
+      { data: Record<string, unknown> },
+    ]
+    expect(args.data).toMatchObject({
+      synced_at: expect.any(Date) as Date,
+      drift_settled_at: null,
+    })
   })
 })

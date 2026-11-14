@@ -1,4 +1,5 @@
 import type * as FocusEffectModule from '@/src/test-utils/focus-effect'
+import { liveFontMarkerPlacement } from '@/src/test-utils/edge-to-edge-modal'
 import React from 'react'
 import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -220,6 +221,12 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     fireEvent.click(tile)
     await waitFor(() => {
       expect(screen.getByTestId('garment-swap-modal')).toBeTruthy()
+    })
+    // Story 6.15 review P3-1: the swap sheet is the accessibility modal view, so the modal's
+    // live-font marker sits inside it, where iOS keeps it in the XCUITest hierarchy.
+    expect(liveFontMarkerPlacement()).toEqual({
+      markerInside: true,
+      host: 'garment-swap-modal',
     })
 
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))

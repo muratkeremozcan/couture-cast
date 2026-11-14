@@ -1,0 +1,18 @@
+# Story 6.15 D15: tap the monthly plan and wait for RevenueCat's Test Store sheet. The sheet
+# opens only after `getOfferings()` returned the `premium_monthly` package (premium.ts
+# `purchasePremiumPlan`), so it is the offerings proof. Same title on Android and iOS.
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: premium-subscribe-monthly
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: premium-subscribe-monthly
+    label: 'Buy the monthly plan'
+- extendedWaitUntil:
+    visible: '(?i)Test Store Purchase'
+    timeout: 30000
+    label: 'Offerings fetched: the Test Store sheet opened for the plan'

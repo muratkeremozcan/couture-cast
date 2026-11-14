@@ -26,6 +26,7 @@ import {
   startBackgroundSuites,
   summarizeNodeTestEvents,
 } from './node-test-gate.mjs'
+import { killOwnedGroup } from '../lib/owned-process.mjs'
 
 const repoRoot = fileURLToPath(new URL('../../', import.meta.url))
 
@@ -209,15 +210,18 @@ function groupAlive(pid) {
   }
 }
 
-/** Kills the group led by `pid`; a group that ended, or holds only a zombie, is not an error. */
+// The fixture files a background run executes. node --test runs each in its own worker whose
+// command line names the file as given (relative to the run's cwd), so the file name is what
+// identifies that worker (Antigravity r33).
+const BACKGROUND_FIXTURES = [...Object.keys(sources), 'blocked.test.mjs']
+
+/**
+ * Kills what is left of the group led by `pid`: only live members that are this suite's (the
+ * background gate, its node --test runner and reporter, or a worker running one of the fixture
+ * files), so a group id the OS gave to someone else after this one ended is never signalled.
+ */
 function killGroup(pid) {
-  try {
-    process.kill(-checkedGroup(pid), 'SIGKILL')
-  } catch (error) {
-    if (error.code === 'ESRCH') return
-    if (error.code === 'EPERM' && liveMembers(pid).length === 0) return
-    throw error
-  }
+  killOwnedGroup(checkedGroup(pid), ['node-test-gate', ...BACKGROUND_FIXTURES])
 }
 
 /**
@@ -738,6 +742,18 @@ describe('node-test-gate attribution across Node 24 releases', () => {
         /empty\.test\.mjs reported no passing test; crash\.test\.mjs reported no passing test$/
       )
     })
+
+  // TEA, 2026-11-13: a gate run once ended with no summary; a runner killed by a signal is named.
+  test('a runner killed by a signal is reported with its signal', () => {
+    assert.throws(
+      () =>
+        assertNodeTestGate(
+          { passed: 1, failed: 0, skipped: 0, todo: 0, perFile: { 'a.test.mjs': 1 } },
+          { status: null, signal: 'SIGKILL' }
+        ),
+      /^Error: node_test_gate_failed: node --test exited by SIGKILL$/
+    )
+  })
 
   test('a test named like another path still counts; only a file named after itself is a wrapper', async () => {
     const [event] = await replay([
@@ -1695,4 +1711,41 @@ test('the local vitest rule matches the rule the share-card workflow applies to 
     rules && rules.length >= 1,
     'the workflow still checks the API entry report with the same rule'
   )
+})
+
+// Story 6.15: a suite the gate leaves to another runner must still run in CI. Each runElsewhere
+// file is run by some workflow step, by its path or through the apps/mobile npm script that
+// runs it, and the watchOS suite only with WATCHOS_REQUIRE_BUILD=1.
+test('every suite the gate leaves to another runner runs in some workflow step', () => {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'scripts/ci/node-test-suites.json'), 'utf8')
+  )
+  const scripts = JSON.parse(
+    fs.readFileSync(path.join(repoRoot, 'apps/mobile/package.json'), 'utf8')
+  ).scripts
+  const workflowsDir = path.join(repoRoot, '.github/workflows')
+  const steps = fs
+    .readdirSync(workflowsDir)
+    .filter((file) => /\.ya?ml$/.test(file))
+    .flatMap((file) =>
+      Object.values(
+        parse(fs.readFileSync(path.join(workflowsDir, file), 'utf8')).jobs ?? {}
+      ).flatMap((job) => job.steps ?? [])
+    )
+  const unscheduled = []
+  for (const file of Object.keys(manifest.runElsewhere)) {
+    const relative = path.relative('apps/mobile', file)
+    const runners = Object.entries(scripts)
+      .filter(([name, command]) => name !== 'test' && command.includes(relative))
+      .map(([name]) => name)
+    const runs = steps.some(
+      (step) =>
+        String(step.run ?? '').includes(file) ||
+        runners.some((name) =>
+          new RegExp(`npm run ${name}(?![\\w:-])`).test(step.run ?? '')
+        )
+    )
+    if (!runs) unscheduled.push(file)
+  }
+  assert.deepEqual(unscheduled, [])
 })

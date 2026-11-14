@@ -1,3 +1,5 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 // Change-based lane selection (scripts/ci/lanes.mjs): real merged pull requests replayed against
 // the map, the glob matcher held to minimatch, and every repository file a test reads checked
 // to wake the lanes that run that test.
@@ -206,6 +208,21 @@ const STARTS = {
     'supabase/migrations/20260101000000_x.sql',
     'playwright/tests/share-card-export.spec.ts',
   ],
+  'revenuecat-bundle': [
+    'apps/mobile/src/lib/revenuecat-key.ts',
+    'apps/mobile/src/lib/premium.ts',
+    'apps/mobile/app.config.ts',
+  ],
+  'ios-flow-syntax': [
+    'maestro/story68/share-sheet.yaml',
+    'maestro/story65/open-app.yaml',
+  ],
+  'ios-unit': [
+    'apps/mobile/native-tests/ShareCardHeaderSemantics.swift',
+    'apps/mobile/modules/share-card-native-share/ios/ShareCardShareFile.swift',
+    'apps/mobile/modules/share-card-photo-save/ios/Package.swift',
+    'apps/mobile/modules/accessibility-focus/ios/AccessibilityFocusTarget.swift',
+  ],
 }
 
 // Per lane, the replayed pull requests it skips. The other 51 touched a shared or unclaimed
@@ -226,6 +243,13 @@ const EXPECTED_SKIPS = {
   'playwright-unit': [209, 199, 180],
   maestro: [199, 148],
   'share-card': [199],
+  // Every replayed pull request that changed the mobile workspace or a package it imports.
+  'revenuecat-bundle': [209, 208, 199, 180, 148],
+  // No replayed pull request touched the iOS share-card flows.
+  'ios-flow-syntax': [209, 208, 204, 202, 199, 192, 180, 173, 148],
+  // Only the Swift packages and the header semantics controls wake it; no replayed pull request
+  // touched them.
+  'ios-unit': [209, 208, 204, 202, 199, 192, 180, 173, 148],
 }
 
 test('each lane skips exactly the replayed pull requests reviewed for it', () => {
@@ -254,8 +278,32 @@ test('a mobile-only pull request skips the web, API and preview lanes (#204, #19
       'playwright-unit',
       'maestro',
       'share-card',
+      'revenuecat-bundle',
     ])
   }
+})
+
+// Story 6.15 D6: the Linux Swift rules wake only for the Swift module sources.
+test('a JavaScript-only mobile change or a package change wakes no Swift rules job', () => {
+  for (const file of [
+    'apps/mobile/src/screens/home.tsx',
+    'apps/mobile/app/(tabs)/index.tsx',
+    'apps/mobile/components/share-card-composer.tsx',
+    'packages/utils/src/index.ts',
+    'packages/api-client/src/index.ts',
+  ])
+    assert.ok(!running([file]).includes('ios-unit'), file)
+})
+
+// Story 6.15 D15: the scan exports the whole app, so any mobile source can carry a Test Store key.
+test('any mobile source wakes the RevenueCat bundle scan', () => {
+  for (const file of [
+    'apps/mobile/src/lib/new-paywall.ts',
+    'apps/mobile/src/lib/revenuecat-key.ts',
+    'apps/mobile/app/(tabs)/index.tsx',
+    'packages/utils/src/index.ts',
+  ])
+    assert.ok(running([file]).includes('revenuecat-bundle'), file)
 })
 
 test('a shared package wakes every workspace that depends on it (#202: packages/testing)', () => {
@@ -385,6 +433,17 @@ const trackedDirs = new Set(
 )
 
 /**
+ * How the code just before a path literal uses it: an import loads the module it names, and an
+ * import, require.resolve or new URL resolves a directory to its index file.
+ */
+function referenceBefore(code, at) {
+  const before = code.slice(Math.max(0, at - 20), at)
+  const imported = /\b(?:from|import|require)\s*\(?\s*$/.test(before)
+  const resolved = /\b(?:require\.resolve|new\s+URL)\s*\(\s*$/.test(before)
+  return { imported, indexable: imported || resolved }
+}
+
+/**
  * Repository files a source names in a string literal, root-relative or relative to it, comments
  * left out. A literal naming a directory three or more levels deep stands for every file under
  * it, which catches paths a test builds from a directory and a file name; shallower ones
@@ -400,14 +459,23 @@ function filesNamed(source, file, modules = new Set()) {
     /(['"`])((?:\.{1,2}\/)*[\w@.-]+(?:\/[\w@.-]+)+)\/?\1/g
   )) {
     const literal = match[2]
-    const imported = /\b(?:from|import|require)\s*\(?\s*$/.test(
-      code.slice(Math.max(0, match.index - 20), match.index)
-    )
+    const { imported, indexable } = referenceBefore(code, match.index)
     for (const candidate of [
       path.posix.normalize(literal),
       path.posix.join(path.posix.dirname(file), literal),
     ]) {
-      const withExtension = ['', '.ts', '.tsx', '.js', '.mjs', '/index.ts', '/index.js']
+      // A directory resolves to its index only through an import, require.resolve or new URL;
+      // a directory literal elsewhere is a path spec ('apps/mobile' in vercel-preview-inputs.mjs),
+      // never a read of its index. Known gaps, where an index of a two-segment directory counts
+      // as no read (a directory of three or more segments still names every file inside it):
+      // a variable import; import.meta.resolve; createRequire(...)(dir); path.join or
+      // path.resolve onto the directory; more than 20 characters, or an inline comment, between
+      // the call and the literal; an index.tsx, index.mjs or index.cjs. No spec does any of
+      // these today. An over-match only wakes an extra lane, the safe direction.
+      const suffixes = ['', '.ts', '.tsx', '.js', '.mjs']
+      if (indexable || !trackedDirs.has(candidate))
+        suffixes.push('/index.ts', '/index.js')
+      const withExtension = suffixes
         .map((suffix) => `${candidate}${suffix}`)
         .find((name) => trackedSet.has(name))
       if (withExtension) {
@@ -454,6 +522,31 @@ function filesRead(file) {
   }
   return [...read]
 }
+
+test('a directory literal reads its index only when imported or resolved', () => {
+  // vercel-preview-inputs.mjs lists 'apps/mobile' as a path spec; apps/mobile/index.ts exists.
+  assert.ok(
+    !filesNamed("const outside = ['apps/mobile']", 'scripts/x.mjs').includes(
+      'apps/mobile/index.ts'
+    )
+  )
+  // A two-segment directory names no file inside it, so only the index rule can find these.
+  for (const reference of [
+    "import mobile from '../../apps/mobile'",
+    "require.resolve('../../apps/mobile')",
+    "new URL('../../apps/mobile', import.meta.url)",
+  ])
+    assert.ok(
+      filesNamed(reference, 'scripts/ci/x.mjs').includes('apps/mobile/index.ts'),
+      reference
+    )
+  assert.ok(
+    filesNamed(
+      "import { withHeadlessJsTimers } from '../../modules/headless-js-timers'",
+      'apps/mobile/src/lib/background-task.ts'
+    ).includes('apps/mobile/modules/headless-js-timers/index.ts')
+  )
+})
 
 test('the read guard follows imports to the files an imported module reads', () => {
   // db-reset-policy.spec.ts names no web file; it imports playwright/config/environments.ts,
@@ -686,6 +779,7 @@ test('a rename wakes the lanes of both paths and a removed file wakes its own', 
     'playwright-unit',
     'maestro',
     'share-card',
+    'revenuecat-bundle',
   ]
   const lanes = (...sets) => allLanes.filter((id) => sets.some((set) => set.includes(id)))
   // Web source moved under docs: the destination wakes nothing, the source wakes web.

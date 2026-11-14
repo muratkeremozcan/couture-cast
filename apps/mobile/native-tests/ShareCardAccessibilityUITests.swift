@@ -14,7 +14,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
   override func setUpWithError() throws {
     continueAfterFailure = false
     app.activate()
-    if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+    closeShareCardIfOpen(app)
     // The first test starts on the app runtime the rapid-watermark flow just relaunched. In run
     // 41076993191 its Settings tap left Settings closed, so no locale button existed after eight
     // swipes, while the eight later tests opened Settings from the same code.
@@ -33,7 +33,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
   override func tearDownWithError() throws {
     fixture("release")
     fixture("real")
-    if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+    closeShareCardIfOpen(app)
   }
 
   func element(_ id: String) -> XCUIElement {
@@ -74,11 +74,14 @@ final class ShareCardAccessibilityUITests: XCTestCase {
   }
 
   func openCard(waitForPreview: Bool = true) throws {
-    if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+    closeShareCardIfOpen(app)
     element("tab-home").tap()
     let opener = app.buttons.matching(identifier: "outfit-share-card-open").firstMatch
     for _ in 0..<8 where !opener.isHittable { app.swipeUp() }
-    XCTAssertTrue(opener.waitForExistence(timeout: 20))
+    // Run 43494979286 lost the opener with no trace of the screen; name what it showed instead.
+    let found = opener.waitForExistence(timeout: 20)
+    if !found { shareCardAuditContextLines("opener-missing", app).forEach { print($0) } }
+    XCTAssertTrue(found, "outfit share-card opener present")
     focusSequence = try baselineFocusSequence()
     opener.tap()
     if waitForPreview { XCTAssertTrue(loaded().waitForExistence(timeout: 20)) }
@@ -264,7 +267,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
   func testAllLocalesAndWatermarkOFFFullLabels() throws {
     fixture("real")
     for locale in ["en-US", "en-CA", "fr-FR", "fr-CA", "de-DE", "es-419", "it-IT", "pt-BR", "pt-PT", "tr-TR"] {
-      if element("share-card-cancel").exists { element("share-card-cancel").tap() }
+      closeShareCardIfOpen(app)
       element("tab-settings").tap()
       let choice = element("locale-btn-\(locale)")
       for _ in 0..<8 where !choice.isHittable { app.swipeDown() }
@@ -276,7 +279,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       element("share-card-watermark").tap()
       XCTAssertTrue(loaded().waitForExistence(timeout: 20))
       try audit("open")
-      element("share-card-cancel").tap()
+      closeShareCard(app)
     }
     element("tab-settings").tap()
     let english = element("locale-btn-en-US")
@@ -294,7 +297,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertTrue(element("share-card-feedback").waitForExistence(timeout: 20))
     try audit("saved")
     let opener = app.buttons.matching(identifier: "outfit-share-card-open").firstMatch
-    element("share-card-cancel").tap()
+    closeShareCard(app)
     XCTAssertFalse(element("share-card-title").exists)
     XCTAssertTrue(opener.exists)
     XCTAssertTrue(opener.isHittable)
@@ -321,7 +324,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertTrue(element("share-card-error").waitForExistence(timeout: 20))
     try audit("storage-failure")
     fixture("real")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
   }
 
   func testDeniedPermanentLimitedAndPendingTraversal() throws {
@@ -346,7 +349,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     element("share-card-save").tap()
     XCTAssertTrue(element("share-card-feedback").waitForExistence(timeout: 20))
     try audit("pending")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
     fixture("release")
     fixture("real")
   }
@@ -364,7 +367,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     try audit("pending")
     exactFeedback(labels["saving"] as! String)
     print("CC68_NATIVE_BEHAVIOR_PASS owned-saving")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
     try openCard()
     exactFeedback(labels["finishingSave"] as! String)
     try assertPostedShareCardFocus(self, after: focusSequence, label: labels["cancel"] as! String,
@@ -383,7 +386,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertNotEqual(String(describing: watermark.value), previous)
     XCTAssertTrue(loaded().waitForExistence(timeout: 20))
     print("CC68_NATIVE_BEHAVIOR_PASS watermark-reenabled")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
   }
 
   func testPreparingCancelAndRetryTraversal() throws {
@@ -393,7 +396,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertTrue(element("share-card-feedback").waitForExistence(timeout: 20))
     XCTAssertFalse(loaded().exists)
     try audit("preparing")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
     fixture("release")
     // Preparation never reached Save. The harness matrix proves no late asset through
     // the OS photo resources (M-CANCEL:preparation-before-commit).
@@ -404,7 +407,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     fixture("real")
     try openCard()
     try audit("open")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
   }
 
   func testUnavailableAndOfflineTraversal() throws {
@@ -413,7 +416,7 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertTrue(element("share-card-error").waitForExistence(timeout: 20))
     XCTAssertFalse(element("share-card-save").isEnabled)
     try audit("unavailable")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
     fixture("real")
     try openCard()
     fixture("offline")
@@ -422,6 +425,6 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     XCTAssertTrue(element("share-card-error").waitForExistence(timeout: 20))
     try audit("offline")
     fixture("real")
-    element("share-card-cancel").tap()
+    closeShareCard(app)
   }
 }

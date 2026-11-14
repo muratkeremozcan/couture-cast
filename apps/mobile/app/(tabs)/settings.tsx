@@ -61,6 +61,7 @@ import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useAppTheme } from '@/src/theme/theme-context'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
+import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 
 /** Exported so the screen test advances virtual time by the real bound rather
  *  than by a copy of it that silently stops matching when this changes. */
@@ -398,6 +399,7 @@ export default function SettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.container} testID="settings-screen">
+          <LiveFontMountMarker scope="settings" />
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle} testID="settings-language-title">
               {t('settings.language', { defaultValue: 'Language' })}

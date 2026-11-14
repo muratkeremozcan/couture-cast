@@ -35,12 +35,17 @@ import {
  */
 export const subscriptionPlanSchema = z.enum(['premium_monthly', 'premium_annual'])
 
-/** Mirrors the EntitlementStore database enum; `promotional` = operator grants. */
+/**
+ * Mirrors the EntitlementStore database enum; `promotional` = operator grants. `test_store` is
+ * the RevenueCat Test Store, which the API writes only under an explicit local or preview
+ * `TEST_ENV` (story 6.15 D15).
+ */
 export const entitlementStoreSchema = z.enum([
   'app_store',
   'play_store',
   'stripe',
   'promotional',
+  'test_store',
 ])
 
 /**
@@ -154,6 +159,30 @@ export type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>
 export type CheckoutSessionRequest = z.infer<typeof checkoutSessionRequestSchema>
 export type CheckoutSessionResponse = z.infer<typeof checkoutSessionResponseSchema>
 export type PortalSessionResponse = z.infer<typeof portalSessionResponseSchema>
+
+/** Where a member manages a subscription, by the store that bills it. */
+export type SubscriptionManageEntry = 'web' | 'store' | 'none'
+
+/**
+ * Stripe-billed subscriptions are managed on the web (the Customer Portal); App Store and Play
+ * Store ones in the store's own flow; promotional grants and RevenueCat Test Store purchases
+ * (story 6.15 D15, local and preview only) have no store subscription to manage. Web and mobile
+ * both read this, so a new store is decided once.
+ */
+export function subscriptionManageEntry(
+  store: EntitlementStore
+): SubscriptionManageEntry {
+  switch (store) {
+    case 'stripe':
+      return 'web'
+    case 'promotional':
+    case 'test_store':
+      return 'none'
+    case 'app_store':
+    case 'play_store':
+      return 'store'
+  }
+}
 export type BillingWebhookResponse = z.infer<typeof billingWebhookResponseSchema>
 
 // --- Error messages --------------------------------------------------------
@@ -261,12 +290,12 @@ export function registerSubscriptionContracts(
     path: '/api/v1/commerce/subscription/refresh',
     tags: ['subscription'],
     summary: 'Refresh the subscription from the entitlement ledger',
-    description: `Synchronously pulls the RevenueCat ledger and applies the snapshot, beating webhook latency after a purchase. Rate limited per user (10-second minimum interval; inside the window the local state is served — syncedAt tells the caller which happened). A ledger failure returns 503 ("${SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE}") rather than stale-as-fresh.`,
+    description: `Synchronously pulls the RevenueCat ledger and applies the snapshot, beating webhook latency after a purchase. Rate limited per user (10-second minimum interval; inside the window the local state is served — syncedAt tells the caller which happened). A ledger entitlement this API can never represent (an unsupported store, no product, no or invalid expiry, or a one-time purchase) also serves the local state, with syncedAt unchanged. A transient ledger failure returns 503 ("${SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE}") rather than stale-as-fresh.`,
     security: [{ bearerAuth: [] }],
     responses: {
       200: {
         description:
-          'Subscription state after the ledger pull (or local state inside the rate-limit window)',
+          'Subscription state after the ledger pull, or the local state inside the rate-limit window or when the ledger entitlement cannot be represented',
         content: {
           'application/json': { schema: registeredSubscriptionResponseSchema },
         },

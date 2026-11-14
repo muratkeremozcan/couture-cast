@@ -10,11 +10,24 @@ import {
 } from './native-ios-siri-preferences.mjs'
 import { collectSimulatorLogCounts, logCounter } from './native-ios-log-counts.mjs'
 import { cleanupOwnedDevice } from './native-ios-device-cleanup.mjs'
+import { killOwned } from '../lib/owned-process.mjs'
 
 const device = 'A63391DE-17A2-4B16-9C93-16B986580C99'
-const directoryFor = (t) => {
+/**
+ * A test's directory, removed when the test ends. `reap` names pid files in it whose process
+ * (running the given command) the test owns: each is killed first, while its pid file is still
+ * there, however the test ended (TEA, r32).
+ */
+const directoryFor = (t, { reap = [] } = {}) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-runtime-diagnostics-'))
-  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  t.after(() => {
+    for (const [file, command] of reap) {
+      const pidFile = path.join(directory, file)
+      if (fs.existsSync(pidFile))
+        killOwned(Number(fs.readFileSync(pidFile, 'utf8')), command)
+    }
+    fs.rmSync(directory, { recursive: true, force: true })
+  })
   fs.writeFileSync(path.join(directory, 'owned-startup-device.txt'), device)
   return directory
 }
@@ -86,15 +99,9 @@ test('a stuck or oversized log query is bounded and returns partial evidence wit
 })
 
 test('a grandchild that keeps the pipes open cannot hold the query past its deadline', async (t) => {
-  const directory = directoryFor(t)
+  // A grandchild this test never spawned: only a live one still running its writer is ours.
+  const directory = directoryFor(t, { reap: [['grandchild.pid', 'setInterval']] })
   const pidFile = path.join(directory, 'grandchild.pid')
-  t.after(() => {
-    try {
-      process.kill(Number(fs.readFileSync(pidFile, 'utf8')), 'SIGKILL')
-    } catch {
-      // already gone
-    }
-  })
   const r = await collectSimulatorLogCounts(device, directory, {
     binary: process.execPath,
     args: [
@@ -127,11 +134,7 @@ test('refused kills (EPERM) still end the query at the grace bound with every at
   const directory = directoryFor(t)
   let pid = null
   t.after(() => {
-    try {
-      process.kill(pid, 'SIGKILL')
-    } catch {
-      // already gone
-    }
+    killOwned(pid, 'setInterval')
   })
   const r = await collectSimulatorLogCounts(device, directory, {
     binary: process.execPath,

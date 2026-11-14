@@ -25,6 +25,7 @@ import {
   resolveStripeWebhookSecret,
 } from './billing-webhook-secrets.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { appliesRevenueCatTestStore } from '../../config/runtime-environment.js'
 
 // Re-exported so existing importers keep one import site. The definitions live
 // in a Nest-free module because suites outside the Nest runtime import them.
@@ -36,6 +37,7 @@ export {
 }
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
+  honorsEntitlementStore,
   PremiumEntitlementService,
   type EntitlementTransition,
   type LedgerEntitlementState,
@@ -121,14 +123,22 @@ const rcStoreMap: Readonly<Record<string, EntitlementStore>> = {
   PROMOTIONAL: 'promotional',
 }
 
-/** RevenueCat store strings arrive uppercase; unknown stores map to null. */
+/**
+ * RevenueCat store strings arrive uppercase; unknown stores map to null. `TEST_STORE` maps to
+ * `test_store` only where {@link appliesRevenueCatTestStore} opens it (story 6.15 D15); everywhere
+ * else it stays an unsupported store, so every transition below records it and changes nothing.
+ */
 export function mapRevenueCatStore(
   store: string | null | undefined
 ): EntitlementStore | null {
   if (!store) {
     return null
   }
-  return rcStoreMap[store.toUpperCase()] ?? null
+  const normalized = store.toUpperCase()
+  if (normalized === 'TEST_STORE') {
+    return appliesRevenueCatTestStore() ? 'test_store' : null
+  }
+  return rcStoreMap[normalized] ?? null
 }
 
 /**
@@ -275,6 +285,13 @@ const REVENUECAT_TRANSITION_TABLE: Readonly<
  * end) likewise degrades to record-only rather than bouncing.
  */
 export function planRevenueCatTransition(event: RevenueCatEvent): TransitionPlan {
+  // A store we do not sell (AMAZON, anything new, and TEST_STORE outside an explicit local or
+  // preview TEST_ENV) never touches the ledger, a TRANSFER included: a transfer revokes the losing
+  // member's row and hands its real store to the gaining member, so an unsupported-store transfer
+  // could change paid access (story 6.15 R3-01, D15).
+  if (event.store && mapRevenueCatStore(event.store) === null) {
+    return RECORD_ONLY
+  }
   if (event.type === 'TRANSFER') {
     return { kind: 'transfer' }
   }
@@ -303,17 +320,35 @@ export function planRevenueCatTransition(event: RevenueCatEvent): TransitionPlan
   }
 }
 
+/** The store a TRANSFER moves: the event's own, else the losing row's. */
+function resolveTransferStore(
+  event: RevenueCatEvent,
+  losingRow: PremiumEntitlement | null
+): EntitlementStore | null {
+  return mapRevenueCatStore(event.store) ?? losingRow?.store ?? null
+}
+
+/** Story 6.15 D15: true when this environment does not honor the resolved TRANSFER store. */
+function transfersUnhonoredStore(
+  event: RevenueCatEvent,
+  losingRow: PremiumEntitlement | null
+): boolean {
+  const store = resolveTransferStore(event, losingRow)
+  return store !== null && !honorsEntitlementStore(store)
+}
+
 /**
  * The gaining side of a TRANSFER: the event's store/product/expiry when
  * carried; otherwise the losing row's — a TRANSFER moves an existing
- * subscription, so the loser's record is the authoritative fallback. Neither
- * known → null, and the caller writes no entitlement.
+ * subscription, so the loser's record is the authoritative fallback. The
+ * caller passes the losing row only when this environment honors its store.
+ * Neither known → null, and the caller writes no entitlement.
  */
 function resolveTransferGainState(
   event: RevenueCatEvent,
   losingRow: PremiumEntitlement | null
 ): LedgerEntitlementState | null {
-  const store = mapRevenueCatStore(event.store) ?? losingRow?.store ?? null
+  const store = resolveTransferStore(event, losingRow)
   const productId = event.product_id ?? losingRow?.product_id ?? null
   const currentPeriodEnd =
     event.expiration_at_ms !== null && event.expiration_at_ms !== undefined
@@ -668,6 +703,7 @@ export class BillingWebhookService {
     let lossTransition: EntitlementTransition | null = null
     let gainTransition: EntitlementTransition | null = null
     let gainSkipped = false
+    let unhonoredSkipped = false
 
     try {
       await interactiveTransaction(this.prisma, async (tx) => {
@@ -675,6 +711,7 @@ export class BillingWebhookService {
         lossTransition = null
         gainTransition = null
         gainSkipped = false
+        unhonoredSkipped = false
         await tx.billingEvent.create({
           data: {
             provider: 'revenuecat',
@@ -697,15 +734,27 @@ export class BillingWebhookService {
                 where: { user_id: losingUserId },
               })
 
-        if (losingUserId !== null && losingRow !== null) {
+        // The event stays recorded; the ledger rows stay as they were.
+        if (transfersUnhonoredStore(event, losingRow)) {
+          unhonoredSkipped = true
+          return
+        }
+
+        // An honored event store can still meet a losing row this environment does not honor
+        // (an APP_STORE TRANSFER over a test_store row in production). That row counts as absent:
+        // nothing revokes it, and the gain comes only from the event's own fields.
+        const honoredLosingRow =
+          losingRow !== null && honorsEntitlementStore(losingRow.store) ? losingRow : null
+
+        if (losingUserId !== null && honoredLosingRow !== null) {
           lossTransition = await this.entitlements.applyLedgerEvent(tx, {
             userId: losingUserId,
             state: {
               status: 'revoked',
-              store: losingRow.store,
-              productId: losingRow.product_id,
+              store: honoredLosingRow.store,
+              productId: honoredLosingRow.product_id,
               willRenew: false,
-              currentPeriodEnd: losingRow.current_period_end,
+              currentPeriodEnd: honoredLosingRow.current_period_end,
             },
             occurredAt,
             eventId: event.id,
@@ -714,7 +763,7 @@ export class BillingWebhookService {
         }
 
         if (gainingUserId !== null) {
-          const gainState = resolveTransferGainState(event, losingRow)
+          const gainState = resolveTransferGainState(event, honoredLosingRow)
           if (gainState !== null) {
             gainTransition = await this.entitlements.applyLedgerEvent(tx, {
               userId: gainingUserId,
@@ -735,6 +784,11 @@ export class BillingWebhookService {
       throw error
     }
 
+    if (unhonoredSkipped)
+      this.logger.info(
+        { eventId: event.id },
+        'TRANSFER recorded without transition: its store is not honored in this environment'
+      )
     if (gainSkipped)
       this.logger.warn(
         { eventId: event.id },

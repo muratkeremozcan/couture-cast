@@ -1,0 +1,720 @@
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+//
+// IO-free helpers that turn Maestro hierarchies and adb output into the captures the live
+// font-scale oracle (live-font-scale-proof.mjs) judges. scripts/run-live-font-proof.mjs does the
+// device IO.
+
+const MARKER = /^live-font-mount-([a-z]+)-([a-z0-9]+)$/
+const SCALE = /^live-font-scale-([a-z]+)-(\d+(?:\.\d+)?)$/
+
+function attributes(node) {
+  return node?.attributes ?? {}
+}
+
+const matchesPrefix = (id, prefixes) =>
+  id !== '' && prefixes.some((prefix) => id.startsWith(prefix))
+
+/** iOS repeats a static text as an identical element inside the one that labels it. */
+function repeatsParent(entry, parentEntry) {
+  return (
+    entry !== undefined &&
+    parentEntry !== undefined &&
+    entry.text === parentEntry.text &&
+    entry.bounds === parentEntry.bounds &&
+    (entry.id === '' || entry.id === parentEntry.id)
+  )
+}
+
+/** UIKit's scroll indicators: their value text ("0%") changes as the page scrolls. */
+function iosSystemNode(attrs) {
+  return /^(Vertical|Horizontal) scroll bar\b/.test(attrs.accessibilityText ?? '')
+}
+
+/** Sorts a test-build marker id into the reading it carries. */
+function readMarker(id, { markers, jsScales, environments }) {
+  if (MARKER.test(id)) markers.push(id)
+  const reading = SCALE.exec(id)
+  if (reading) jsScales.push(Number(reading[2]))
+  if (id.startsWith('live-font-env-')) environments.push(id)
+}
+
+/**
+ * Text nodes with their parent's bounds. Android puts a TextView's string in `text`; iOS puts a
+ * static text's label in `accessibilityText` when `text` is empty, so it falls back to that.
+ * A node whose id starts with a `volatile` prefix is dropped with its subtree and counted in
+ * `volatileDropped`: a region whose presence the app decides on grounds unrelated to text size.
+ * With `markVolatile` the region's text stays, flagged `volatile: true`, so scroll pages can
+ * still be aligned on it (stitchPages leaves it out of the result). `volatileRegions` holds the
+ * bounds of each dropped region, so the text layout probe's records inside one are left out of
+ * matching too (F-00i; they are still judged for clipping).
+ */
+export function flattenHierarchy(
+  tree,
+  { platform, volatile = [], markVolatile = false }
+) {
+  const nodes = []
+  let volatileDropped = 0
+  const volatileRegions = []
+  const controls = []
+  const markers = []
+  const jsScales = []
+  const environments = []
+  const record = ({ entry, parentEntry, id, bounds, isVolatile }) => {
+    const repeat = platform === 'ios' && repeatsParent(entry, parentEntry)
+    if (entry && !repeat) nodes.push(entry)
+    if (id && bounds && !isVolatile) controls.push({ id, bounds })
+    return repeat
+  }
+  const walk = (node, parentBounds, inVolatile, parentEntry) => {
+    const attrs = attributes(node)
+    if (platform === 'ios' && iosSystemNode(attrs)) return
+    const id = attrs['resource-id'] ?? ''
+    const bounds = attrs.bounds
+    readMarker(id, { markers, jsScales, environments })
+    const isVolatile = inVolatile || matchesPrefix(id, volatile)
+    // A region's own bounds, whether its text is dropped or kept flagged on a scroll page.
+    if (isVolatile && !inVolatile && bounds) volatileRegions.push(bounds)
+    if (isVolatile && !markVolatile) {
+      volatileDropped += countText(node, platform)
+      return
+    }
+    const entry = textEntry({
+      attrs,
+      id,
+      bounds,
+      parentBounds,
+      isVolatile,
+      platform,
+    })
+    // A skipped repeat hands its descendants the entry it repeats, so a deeper copy with that
+    // entry's id still matches it.
+    const repeat = record({ entry, parentEntry, id, bounds, isVolatile })
+    for (const child of node?.children ?? [])
+      walk(
+        child,
+        bounds ?? parentBounds,
+        isVolatile,
+        repeat ? parentEntry : (entry ?? parentEntry)
+      )
+  }
+  // On iOS the root's other windows (the status bar, under an empty-bounds container) are the
+  // system's, so only windows with bounds are read.
+  if (platform === 'ios')
+    for (const child of tree?.children ?? []) {
+      if (!/^\[0,0\]\[0,0\]$/.test(attributes(child).bounds ?? '[0,0][0,0]'))
+        walk(child, undefined, false)
+    }
+  else walk(tree, undefined, false)
+  // Every marked window reads the same scale; disagreeing readings are no reading.
+  const jsFontScale =
+    jsScales.length && new Set(jsScales).size === 1 ? jsScales[0] : undefined
+  const environment = new Set(environments.map((id) => id.slice(id.indexOf('~'))))
+  return {
+    nodes,
+    controls,
+    markers: markers.sort(),
+    jsFontScale,
+    environment: environment.size === 1 ? parseEnvironment(environments[0]) : undefined,
+    volatileDropped,
+    volatileRegions,
+  }
+}
+
+/** The flattened node for a view with text: the text with the parent's bounds. */
+function textEntry({ attrs, id, bounds, parentBounds, isVolatile, platform }) {
+  const text = nodeText(attrs, platform)
+  if (!text || !bounds) return undefined
+  return {
+    text,
+    id,
+    bounds,
+    ...(parentBounds ? { parent: parentBounds } : {}),
+    ...(isVolatile ? { volatile: true } : {}),
+  }
+}
+
+/** Android's `text`; on iOS a static text's `accessibilityText` when `text` is empty. */
+function nodeText(attrs, platform) {
+  return attrs.text || (platform === 'ios' ? (attrs.accessibilityText ?? '') : '')
+}
+
+function countText(node, platform) {
+  const own = nodeText(attributes(node), platform) ? 1 : 0
+  return (node?.children ?? []).reduce(
+    (sum, child) => sum + countText(child, platform),
+    own
+  )
+}
+
+/** The marker scopes `markers` carry. */
+export function mountScopes(markers) {
+  return [
+    ...new Set(
+      markers
+        .map((marker) => /^live-font-mount-([a-z]+)-/.exec(marker)?.[1])
+        .filter(Boolean)
+    ),
+  ]
+}
+
+/**
+ * `scopes` plus every scope `markers` carry. After a leg's before capture the runner rereads
+ * for each scope that capture showed (Home kept mounted under Community or Settings, Home under
+ * the composer's modal), since the identity check requires each of them in every stage.
+ */
+export function widenMounts(scopes, markers) {
+  return [...new Set([...scopes, ...mountScopes(markers)])]
+}
+
+/**
+ * The scopes the runner rereads for on one screen: `base` (root and the screen's own) at each
+ * launch, widened by every scope a before capture shows until the next launch.
+ */
+export function mountTracker(base) {
+  let scopes = [...base]
+  return {
+    launched() {
+      scopes = [...base]
+    },
+    captured(stage, markers) {
+      if (stage === 'before') scopes = widenMounts(scopes, markers)
+    },
+    scopes: () => scopes,
+  }
+}
+
+/** The scopes among `scopes` that no mount marker in `markers` carries. */
+export function missingMounts(markers, scopes) {
+  const seen = new Set(mountScopes(markers))
+  return scopes.filter((scope) => !seen.has(scope))
+}
+
+/**
+ * Reads until a read carries every scope in `scopes`, at most `attempts` times; the last read is
+ * returned either way, so a marker still missing reaches the identity check. `read` returns an
+ * object with the flattened `markers`.
+ */
+export function readWithMounts(read, scopes, attempts = 3) {
+  for (let attempt = 1; ; attempt += 1) {
+    const result = read()
+    if (attempt >= attempts || missingMounts(result.markers, scopes).length === 0)
+      return result
+  }
+}
+
+/** The mount markers joined in order: one string that changes when any marked mount changes. */
+export function rootIdentity(markers) {
+  return markers.length ? markers.join(',') : undefined
+}
+
+/**
+ * The locales and layout direction the system last reported to MainActivity, read from its
+ * ActivityRecord in `dumpsys activity activities`: the configuration the Activity itself
+ * received, which a per-app locale change updates in place.
+ */
+export function activityConfiguration(dumpsys, component) {
+  // A record starts on a `* ... ActivityRecord{... <component> ...}` line and runs to the
+  // next `* ` line; other lines (topResumedActivity=, Resumed:) only mention the component.
+  const lines = String(dumpsys).split('\n')
+  const start = lines.findIndex(
+    (line) => /^\s*\* .*ActivityRecord\{/.test(line) && line.includes(` ${component} `)
+  )
+  if (start < 0) return undefined
+  const end = lines.findIndex((line, index) => index > start && /^\s*\* /.test(line))
+  const record = lines.slice(start, end < 0 ? undefined : end).join('\n')
+  const match = /CurrentConfiguration=\{[^[]*\[([^\]]*)\]\s+(ld(?:rtl|ltr))/.exec(record)
+  if (!match) return undefined
+  return { locales: match[1].split(','), rtl: match[2] === 'ldrtl' }
+}
+
+/** The resumed MainActivity's token from `dumpsys activity top -a`. */
+export function activityToken(dumpsys, component) {
+  const pattern = new RegExp(
+    `ACTIVITY ${component.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ([0-9a-f]+) pid=(\\d+)`,
+    'g'
+  )
+  const matches = [...String(dumpsys).matchAll(pattern)]
+  if (matches.length !== 1) return undefined
+  return matches[0][1]
+}
+
+/**
+ * MainActivity onCreate calls in the Android event log. The platform logs
+ * `wm_on_create_called: [token,<fully qualified class>,<reason>,<ms>]`, the class from
+ * getComponentName().getClassName(), so a match is on that field, never on the flattened
+ * `package/.Activity` component (Codex R4-05). The count is `undefined` when the log is
+ * unavailable or its ring buffer is full enough to have dropped entries, which the caller must
+ * not read as zero. `bufferStats` is `adb logcat -b events -g` output.
+ */
+export function countOnCreate(eventLog, className, bufferStats) {
+  if (typeof eventLog !== 'string' || typeof bufferStats !== 'string') return undefined
+  const ring =
+    /ring buffer is (\d+(?:\.\d+)?) ?([KMG]i?B)? .*?\((\d+(?:\.\d+)?) ?([KMG]i?B)? consumed/.exec(
+      bufferStats
+    )
+  if (!ring) return undefined
+  const bytes = (value, unit) =>
+    Number(value) * ({ KiB: 1024, KB: 1024, MiB: 1048576, MB: 1048576 }[unit] ?? 1)
+  if (bytes(ring[3], ring[4]) >= 0.9 * bytes(ring[1], ring[2])) return undefined
+  let count = 0
+  for (const line of eventLog.split('\n')) {
+    const match = /wm_on_create_called: \[([^\]]*)\]/.exec(line)
+    if (match && match[1].split(',').map((field) => field.trim())[1] === className)
+      count += 1
+  }
+  return count
+}
+
+function edges(node) {
+  const match =
+    /^\[(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]\[(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)\]/.exec(
+      String(node.bounds)
+    )
+  return match ? [Number(match[2]), Number(match[4])] : [0, 0]
+}
+const top = (node) => edges(node)[0]
+
+const identityOf = (node) => JSON.stringify([node.id ?? '', node.text])
+
+const median = (values) =>
+  [...values].sort((x, y) => x - y)[Math.floor(values.length / 2)]
+
+/**
+ * The step for two pages that share no moving text (a page of only a tall image): the median
+ * step measured so far in this stitch, since every drag is the same length, or the drag's own
+ * length before any was measured.
+ */
+function fallbackStep(steps, expectedShift) {
+  if (steps.length) return median(steps)
+  if (expectedShift > 0) return expectedShift
+  throw new Error('live_font_scroll_pages_disjoint')
+}
+
+/**
+ * Joins scrolled pages into one text multiset. A node at the same identity and position on
+ * every page is fixed chrome (tab bar, sticky header) and counts once. Each page is offset from
+ * the previous one by the median shift of the moving identities that appear exactly once on
+ * both pages; a node whose identity and shifted top or bottom match one already taken is the
+ * same node seen again. Either edge counts because the hierarchy clips a node cut by the
+ * viewport, so a node half off screen keeps only its visible edge. Pages that share no moving
+ * text take the step from fallbackStep.
+ */
+export function stitchPages(pages, options = {}) {
+  return stitchPlaces(pages, options).taken.map(({ key }) => key)
+}
+
+/**
+ * The stitch behind stitchPages, with where each page node went (F-00i, every page probed):
+ * `taken` is the stitched text in order (page 0's own text first, then each later page's new
+ * text), `offsets` each page's shift from page 0, and `places[p][i]` the index in `taken` of
+ * node i of page p. A chrome node on a later page takes the place of its page 0 copy; a volatile
+ * node, or a chrome node page 0 does not show, has none (-1).
+ */
+export function stitchPlaces(pages, { tolerance = 4, expectedShift } = {}) {
+  if (!pages.length) return { taken: [], offsets: [], places: [] }
+  const at = (page, node) =>
+    page.some(
+      (other) =>
+        identityOf(other) === identityOf(node) &&
+        Math.abs(top(other) - top(node)) <= tolerance
+    )
+  const chrome = (node) => pages.length > 1 && pages.every((page) => at(page, node))
+  const taken = []
+  const places = [
+    pages[0].map((node) => {
+      if (node.volatile) return -1
+      const [y, bottom] = edges(node)
+      taken.push({ key: identityOf(node), y, bottom })
+      return taken.length - 1
+    }),
+  ]
+  const offsets = [0]
+  let offset = 0
+  const steps = []
+  for (let index = 1; index < pages.length; index += 1) {
+    const once = (page) => {
+      const counts = new Map()
+      for (const node of page)
+        counts.set(identityOf(node), (counts.get(identityOf(node)) ?? 0) + 1)
+      return new Map(
+        page
+          .filter((node) => counts.get(identityOf(node)) === 1 && !chrome(node))
+          .map((node) => [identityOf(node), node])
+      )
+    }
+    const [a, b] = [once(pages[index - 1]), once(pages[index])]
+    const shifts = [...a.keys()]
+      .filter((key) => b.has(key))
+      .map((key) => top(a.get(key)) - top(b.get(key)))
+    const step = shifts.length ? median(shifts) : fallbackStep(steps, expectedShift)
+    steps.push(step)
+    offset += step
+    offsets.push(offset)
+    const place = []
+    places.push(place)
+    for (const node of pages[index]) {
+      place.push(-1)
+      if (node.volatile) continue
+      if (chrome(node)) {
+        place[place.length - 1] = pages[0].findIndex(
+          (first) =>
+            identityOf(first) === identityOf(node) &&
+            Math.abs(top(first) - top(node)) <= tolerance
+        )
+        if (place.at(-1) >= 0) place[place.length - 1] = places[0][place.at(-1)]
+        continue
+      }
+      const key = identityOf(node)
+      const [y, bottom] = edges(node).map((edge) => edge + offset)
+      // The same text whose box shares an edge with, or overlaps, one already taken is that node
+      // again: a viewport edge or a sticky header clips a tall text differently on each page,
+      // so the taken box grows to everything any page has shown of it.
+      const seen = taken.find(
+        (entry) =>
+          entry.key === key &&
+          (Math.abs(entry.y - y) <= tolerance ||
+            Math.abs(entry.bottom - bottom) <= tolerance ||
+            (y < entry.bottom - tolerance && bottom > entry.y + tolerance))
+      )
+      if (seen) {
+        seen.y = Math.min(seen.y, y)
+        seen.bottom = Math.max(seen.bottom, bottom)
+        place[place.length - 1] = taken.indexOf(seen)
+      } else {
+        taken.push({ key, y, bottom })
+        place[place.length - 1] = taken.length - 1
+      }
+    }
+  }
+  return { taken, offsets, places }
+}
+
+/**
+ * Two hierarchies show the same layout when their app text nodes and bounds are identical.
+ * System UI (the status-bar clock) is ignored, since it changes on its own.
+ */
+export function sameLayout(a, b) {
+  const shape = (nodes) =>
+    JSON.stringify(
+      nodes
+        .filter((node) => !/^com\.android\.systemui:/.test(node.id ?? ''))
+        .map((node) => [node.id, node.text, node.bounds])
+    )
+  return shape(a) === shape(b)
+}
+
+/** iOS content-size categories and the multiplier React Native applies to text for each. */
+export const IOS_CONTENT_SIZES = {
+  'extra-small': 0.823,
+  small: 0.882,
+  medium: 0.941,
+  large: 1,
+  'extra-large': 1.118,
+  'extra-extra-large': 1.235,
+  'extra-extra-extra-large': 1.353,
+  'accessibility-medium': 1.786,
+  'accessibility-large': 2.143,
+  'accessibility-extra-large': 2.643,
+  'accessibility-extra-extra-large': 3.143,
+  'accessibility-extra-extra-extra-large': 3.571,
+}
+
+const near = (a, b) => Math.abs(Number(a) - Number(b)) <= 0.01
+
+/**
+ * The continuity and provenance of a live change, checked before the oracle judges it (R2-05,
+ * R2-03). `before`, `immediate` and `settled` must come from one launch and `cold` from
+ * another, so a cold capture relabeled as a live stage is refused. The OS setting and the
+ * scale JavaScript reports must both match the declared scale at each end, so a scale change
+ * the app never received cannot pass.
+ */
+export function assertLiveProvenance({ before, immediate, settled, cold, platform }) {
+  const expected = {
+    before: 'before',
+    immediate: 'immediate',
+    settled: 'settled',
+    cold: 'cold',
+  }
+  for (const [name, capture] of Object.entries({ before, immediate, settled, cold }))
+    if (capture?.stage !== expected[name])
+      throw new Error(`live_font_provenance_stage:${name}`)
+  const launches = [before, immediate, settled].map((capture) => capture.launch)
+  if (launches.some((launch) => launch === undefined) || new Set(launches).size !== 1)
+    throw new Error('live_font_provenance_launch_changed')
+  if (cold.launch === before.launch) throw new Error('live_font_provenance_cold_is_live')
+  for (const capture of [before, settled]) {
+    const os =
+      platform === 'ios' ? IOS_CONTENT_SIZES[capture.osScale] : Number(capture.osScale)
+    if (!near(os, capture.fontScale))
+      throw new Error(`live_font_provenance_os_scale:${capture.stage}`)
+    if (!near(capture.jsFontScale, capture.fontScale))
+      throw new Error(`live_font_provenance_js_scale:${capture.stage}`)
+  }
+  return { launch: before.launch, coldLaunch: cold.launch }
+}
+
+/**
+ * The configuration the app reports through its test-build marker:
+ * `live-font-env-<scope>~<react native>~<scheme>~<ltr|rtl>~<density>~<language>`.
+ */
+export function parseEnvironment(id) {
+  const [, reactNativeVersion, scheme, direction, density, language] =
+    String(id).split('~')
+  if (!language) return undefined
+  return { reactNativeVersion, scheme, direction, density: Number(density), language }
+}
+
+/** The installed app's configuration from a flattened hierarchy, or an empty reading. */
+export function readEnvironment(flat) {
+  return flat.environment ?? {}
+}
+
+/**
+ * The window's bounds. Maestro's root node carries none, so this is the largest node anchored
+ * at the window's origin: the full-screen root view on Android, the application element on iOS,
+ * whose subtree also lists content scrolled off screen. Without one, the union of every node.
+ */
+export function windowBounds(tree) {
+  let union
+  let window
+  const walk = (node) => {
+    const match = /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(
+      node?.attributes?.bounds ?? ''
+    )
+    const box = match?.slice(1).map(Number)
+    // An empty box (iOS lists the status bar's container at [0,0][0,0]) is no window.
+    if (box && box[2] > box[0] && box[3] > box[1]) {
+      const [l, t, r, b] = box
+      union = union
+        ? [
+            Math.min(union[0], l),
+            Math.min(union[1], t),
+            Math.max(union[2], r),
+            Math.max(union[3], b),
+          ]
+        : [l, t, r, b]
+      const area = (box) => (box[2] - box[0]) * (box[3] - box[1])
+      if (l === 0 && t === 0 && (!window || area([l, t, r, b]) > area(window)))
+        window = [l, t, r, b]
+    }
+    for (const child of node?.children ?? []) walk(child)
+  }
+  walk(tree)
+  const found = window ?? union
+  return found ? `[${found[0]},${found[1]}][${found[2]},${found[3]}]` : undefined
+}
+
+/**
+ * The same layout up to one vertical shift of at most `maxShift` for the scrolled app nodes,
+ * with fixed chrome unmoved. Returning
+ * to the top of a scroll view on Android can leave the content a few pixels off after the
+ * stretch overscroll, with nothing else changed.
+ */
+export function sameLayoutShifted(a, b, maxShift = 12) {
+  const app = (nodes) =>
+    nodes.filter((node) => !/^com\.android\.systemui:/.test(node.id ?? ''))
+  const [left, right] = [app(a), app(b)]
+  if (left.length !== right.length || !left.length) return false
+  const box = (node) =>
+    /^\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]$/.exec(node.bounds)?.slice(1).map(Number)
+  let shift
+  for (let index = 0; index < left.length; index += 1) {
+    const [x, y] = [left[index], right[index]]
+    if (x.id !== y.id || x.text !== y.text) return false
+    const [p, q] = [box(x), box(y)]
+    if (!p || !q || p[0] !== q[0] || p[2] !== q[2]) return false
+    // Fixed chrome (header, chips, tab bar) does not move; scrolled content moves together.
+    const top = q[1] - p[1]
+    if (top === 0) continue
+    shift ??= top
+    if (top !== shift) return false
+  }
+  return shift === undefined || Math.abs(shift) <= maxShift
+}
+
+/**
+ * Why the screen did not come back to the capture after the scroll-through. When a text the
+ * capture shows changed height, the scroll made the screen measure its text again: the settled
+ * capture was stale until an interaction (a relayout on scroll). Otherwise the content only
+ * moved: the scroll position was lost.
+ */
+export function restoreFailure(captured, after, tolerance = 2) {
+  const heights = new Map()
+  for (const node of captured) {
+    const [y, bottom] = edges(node)
+    heights.set(identityOf(node), bottom - y)
+  }
+  const relaid = after.some((node) => {
+    const before = heights.get(identityOf(node))
+    const [y, bottom] = edges(node)
+    return before !== undefined && Math.abs(bottom - y - before) > tolerance
+  })
+  return relaid ? 'live_font_relayout_on_scroll' : 'live_font_scroll_not_restored'
+}
+
+/**
+ * The device timezone of the approved residual runs (Android release and debug, 2026-11-13).
+ * Their reports record none; the status bar clock in their captures matches the host's Central
+ * time stamps (7:41 at 19:41 CST, 9:23 at 21:24 CST), so the emulator ran on America/Chicago.
+ */
+export const LIVE_FONT_TIMEZONE = 'America/Chicago'
+
+function timezoneFailure(detail) {
+  const error = new Error(`live_font_timezone_pin_failed:${detail}`)
+  error.code = 'live_font_timezone_pin_failed'
+  return error
+}
+
+/**
+ * The device timezone a run captures in, set before its first capture (TEA, 2026-11-13: an
+ * approved residual's stale keys hold time labels, so they are exact only in one timezone).
+ * Android pins `requested` (default LIVE_FONT_TIMEZONE) with `cmd alarm set-timezone` and reads
+ * `persist.sys.timezone` back; `adb(...args)` runs one adb command on the device and returns its
+ * stdout. `previous` is the timezone to put back when the run ends. `onPrevious(previous)` hears it
+ * as soon as it is read, before the device is changed, so a pin that fails after the change (a
+ * readback that differs, an adb failure) still leaves the caller what to restore. An iOS
+ * simulator follows the host, so the run records `hostTimezone`, and a `requested` timezone other
+ * than the host's fails since nothing can pin it.
+ */
+export function runTimezone({
+  platform,
+  requested,
+  hostTimezone,
+  adb,
+  onPrevious = () => undefined,
+}) {
+  if (platform === 'ios') {
+    if (!hostTimezone) throw timezoneFailure('host timezone unknown')
+    if (requested && requested !== hostTimezone)
+      throw timezoneFailure(
+        `${requested} requested, the simulator follows the host's ${hostTimezone}`
+      )
+    return { timezone: hostTimezone }
+  }
+  const timezone = requested || LIVE_FONT_TIMEZONE
+  let previous
+  let read
+  try {
+    previous = adb('shell', 'getprop', 'persist.sys.timezone').trim()
+    onPrevious(previous)
+    adb('shell', 'cmd', 'alarm', 'set-timezone', timezone)
+    read = adb('shell', 'getprop', 'persist.sys.timezone').trim()
+  } catch (error) {
+    throw timezoneFailure(`${timezone}: ${error.message}`)
+  }
+  if (read !== timezone)
+    throw timezoneFailure(`${timezone} set, ${read || 'nothing'} read`)
+  return { timezone, previous }
+}
+
+/**
+ * A status bar the proof sets on the simulator under test (`xcrun simctl status_bar override`),
+ * derived from its UDID: battery 1 to 99%, 0 to 4 cellular bars, 0 to 2 Wi-Fi bars, so an
+ * unmarked simulator (100%, three Wi-Fi bars) never matches. Maestro 2.8 serves `hierarchy` for
+ * every iOS simulator through the one port 22087, so with a driver already up for another
+ * booted simulator a read returns that simulator's screen; the status bar names the device.
+ */
+export function deviceFingerprint(udid) {
+  let hash = 2166136261
+  for (const character of String(udid)) {
+    hash ^= character.charCodeAt(0)
+    hash = Math.imul(hash, 16777619) >>> 0
+  }
+  return {
+    battery: 1 + (hash % 99),
+    cellular: Math.floor(hash / 99) % 5,
+    wifi: Math.floor(hash / 495) % 3,
+  }
+}
+
+function statusTexts(tree) {
+  const texts = []
+  const walk = (node) => {
+    const attrs = attributes(node)
+    for (const value of [
+      attrs.accessibilityText,
+      attrs.text,
+      attrs.value,
+      attrs['resource-id'],
+    ])
+      if (value) texts.push(String(value))
+    for (const child of node?.children ?? []) walk(child)
+  }
+  // The status bar is the root's window with empty bounds (see flattenHierarchy).
+  for (const child of tree?.children ?? [])
+    if (/^\[0,0\]\[0,0\]$/.test(attributes(child).bounds ?? '[0,0][0,0]')) walk(child)
+  return texts
+}
+
+/**
+ * Fails closed on a hierarchy that came from another device or another build: on iOS the status
+ * bar must carry the device's fingerprint, and on both platforms an environment marker must name
+ * the React Native version the run read from the installed build.
+ */
+export function assertHierarchySource(
+  tree,
+  { platform, fingerprint, reactNativeVersion }
+) {
+  if (platform === 'ios' && fingerprint) {
+    const texts = statusTexts(tree)
+    // Each number stands on its own: 5% must not match 85% on another simulator.
+    const expected = [
+      `${fingerprint.battery}% battery power`,
+      `${fingerprint.cellular} of 4 bars`,
+      `${fingerprint.wifi} of 3 Wi-Fi bars`,
+    ]
+    // The parts hold only digits, letters, spaces, % and -, none of them special in a pattern.
+    const whole = (part) => new RegExp(`(^|\\D)${part}`)
+    const missing = expected.filter(
+      (part) => !texts.some((text) => whole(part).test(text))
+    )
+    if (missing.length)
+      throw new Error(`live_font_hierarchy_wrong_device:${missing.join('|')}`)
+  }
+  if (reactNativeVersion) {
+    // A dump without the environment marker cannot show the build, and on Android this is the
+    // only source check, so it fails closed.
+    const seen = flattenHierarchy(tree, { platform }).environment?.reactNativeVersion
+    if (seen !== reactNativeVersion)
+      throw new Error(`live_font_hierarchy_wrong_build:${seen ?? 'missing'}`)
+  }
+}
+
+/**
+ * Waits for two identical hierarchies at least `stableMs` apart, within `timeoutMs`, then takes
+ * the capture. `read` returns a flattened hierarchy ({ nodes, markers }); every read feeds the
+ * mount tracker, so a scope one dump of a before settle drops (iOS loses a 1x1 marker view now
+ * and then) is still reread for when `capture` is taken. Throws `deadlineError` when the screen
+ * never settles.
+ */
+export async function settleCapture({
+  read,
+  capture,
+  mounts,
+  stage,
+  pause,
+  now,
+  deadlineError,
+  timeoutMs = 60_000,
+  stableMs = 1000,
+  intervalMs = 500,
+}) {
+  const nodes = () => {
+    const flat = read()
+    mounts.captured(stage, flat.markers)
+    return flat.nodes
+  }
+  const deadline = now() + timeoutMs
+  let previous = nodes()
+  let since = now()
+  while (now() < deadline) {
+    await pause(intervalMs)
+    const current = nodes()
+    if (!sameLayout(current, previous)) {
+      previous = current
+      since = now()
+    } else if (now() - since >= stableMs) return capture()
+  }
+  throw new Error(deadlineError)
+}

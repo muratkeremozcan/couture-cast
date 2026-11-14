@@ -262,8 +262,14 @@ describe('Release live-font native runner commands', () => {
     const end = source.indexOf("} else if (command === 'build')", start)
     for (const clean of [undefined, 'yes']) {
       let observed
+      let probeModeCheck
       vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
         ownedEnv: () => undefined,
+        // Story 6.15 F-00i: the generated project is checked against the requested probe mode.
+        assertNativeProbeMode: (input) => {
+          assert.ok(observed, 'checked after the prebuild ran')
+          probeModeCheck = input
+        },
         prebuildArgs,
         prebuildEnv,
         IOS_POD_INSTALL,
@@ -285,6 +291,9 @@ describe('Release live-font native runner commands', () => {
       assert.equal(observed.args.includes('--clean'), clean === 'yes')
       assert.equal(observed.options.env.CC68_RELEASE_PROOF_LOOPBACK, '1')
       assert.equal(observed.options.env.STORY68_NATIVE_TEST_BUILD, '1')
+      assert.equal(probeModeCheck.platform, 'android')
+      assert.equal(probeModeCheck.mobileDirectory, '/owned/repo/apps/mobile')
+      assert.deepEqual(probeModeCheck.env, observed.options.env)
     }
   })
 

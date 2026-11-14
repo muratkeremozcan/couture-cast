@@ -9,6 +9,7 @@ import type {
   CommunitySponsoredFeedItem as CommunityFeedItem,
 } from '@couture/api-client/contracts/http'
 import { useHeroPalette } from '@/components/hero/hero-theme'
+import { useGlyphBox } from '@/components/glyph-box'
 import { resolveRenderableCommunitySponsorship } from '@/src/lib/commerce'
 import { useSponsoredCtaShown } from '@/src/features/community/sponsored-cta-shown'
 import { CommunitySponsoredShop, withDisclosure } from './community-sponsored-shop'
@@ -285,6 +286,7 @@ export function CommunityCard({
 }: CommunityCardProps) {
   const { t } = useTranslation()
   const palette = useHeroPalette()
+  const avatarBox = useGlyphBox(32, true)
 
   const itemId = item.id
   const expiresAt = item.imageAccess.expiresAt
@@ -439,7 +441,11 @@ export function CommunityCard({
       <View style={styles.header}>
         <View style={styles.authorRow}>
           <View
-            style={[styles.avatarPlaceholder, { backgroundColor: palette.subtleSurface }]}
+            style={[
+              styles.avatarPlaceholder,
+              avatarBox,
+              { backgroundColor: palette.subtleSurface },
+            ]}
           >
             <Text style={[styles.avatarText, { color: palette.text }]}>
               {authorName.charAt(0).toUpperCase()}
@@ -599,8 +605,12 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
   },
+  // Story 6.15 F-00i: at the largest text sizes the climate pill alone is wider than a spotlight
+  // card, so the pills wrap and a pill wraps its own text instead of running past the card edge.
   headerTags: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    flexShrink: 1,
     alignItems: 'center',
     gap: 6,
   },
@@ -614,6 +624,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   climatePill: {
+    flexShrink: 1,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,

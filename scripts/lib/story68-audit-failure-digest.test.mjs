@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { describe, test } from 'node:test'
 import {
+  closedShareCardAuditReport,
+  readAuditResult,
   failedAuditContext,
   failedAuditIssues,
   failedAuditTestDigest,
@@ -43,21 +45,70 @@ describe('failed audit test digest', () => {
   test('caps the digest size', () => {
     const noisy = [
       "Test Case '-[A.B testX]' started.",
-      ...Array.from({ length: 200 }, (_, i) => `    t = ${i}s ${'x'.repeat(900)}`),
+      // Short words, so no token mask can shrink a line below the cap (agy re-check P3-1).
+      ...Array.from({ length: 200 }, (_, i) => `    t = ${i}s ${'step '.repeat(180)}`),
       '/a/b/C.swift:1: error: boom',
-      ...Array.from({ length: 200 }, () => 'y'.repeat(900)),
+      ...Array.from({ length: 200 }, () => 'wait '.repeat(180)),
       "Test Case '-[A.B testX]' failed (1.0 seconds).",
     ].join('\n')
     const [digest] = failedAuditTestDigest(noisy)
     assert.ok(digest.lines.length <= 24)
     assert.ok(digest.lines.every((line) => line.length <= 300))
+    assert.ok(digest.lines.some((line) => line.length === 300))
   })
 
   test('the runner prints the digest before it throws', () => {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
-    const print = source.indexOf('tests: failedAuditTestDigest(auditText)')
+    const print = source.indexOf('...xcodebuildFailureReport(auditText)')
     const thrown = source.indexOf("throw new Error('ios_accessibility_audit_failed')")
     assert.ok(print > 0 && print < thrown)
+    // A run with no failed test case still says why (dispatch 43393273500 shard 3 printed three
+    // empty arrays): the exit code and the xcresult counts sit beside the log tail.
+    const failure = source.slice(source.lastIndexOf('iosAuditFailure: {', print), print)
+    assert.match(failure, /exitCode: code,/)
+    assert.match(failure, /counts: closed\.counts,/)
+    assert.match(failure, /resultError,/)
+    // Antigravity audit-diag P1: the log is read before the result bundle, which may be absent.
+    const log = source.indexOf('const auditText = fs.readFileSync(auditLog)')
+    const bundle = source.indexOf('readAuditResult({')
+    assert.ok(log > 0 && bundle > log)
+    assert.equal(
+      source.includes("JSON.parse(\n      run('xcrun', ['xcresulttool'"),
+      false
+    )
+  })
+
+  test('a missing or unreadable result bundle still yields a failing report', () => {
+    const read = (text) => () => text
+    const missing = readAuditResult({
+      result: '/r.xcresult',
+      exists: () => false,
+      read: read('{}'),
+    })
+    assert.deepEqual(missing, { summary: {}, tree: {}, resultError: 'missing' })
+    const broken = readAuditResult({
+      result: '/r.xcresult',
+      exists: () => true,
+      read: () => {
+        throw new Error('owned_command_failed:xcrun:64')
+      },
+    })
+    assert.equal(broken.resultError, 'unreadable')
+    const ok = readAuditResult({
+      result: '/r.xcresult',
+      exists: () => true,
+      read: read('{"result":"Passed"}'),
+    })
+    assert.deepEqual(ok, {
+      summary: { result: 'Passed' },
+      tree: { result: 'Passed' },
+      resultError: null,
+    })
+    for (const { summary, tree } of [missing, broken]) {
+      const closed = closedShareCardAuditReport(summary, tree, '')
+      assert.equal(closed.passed, false)
+      assert.equal(closed.counts.total, 0)
+    }
   })
 
   test('lists the audit issues the Swift handler refused, in order', () => {
@@ -97,10 +148,12 @@ describe('failed audit test digest', () => {
 
   test('caps the issue list and each issue line', () => {
     const issues = failedAuditIssues(
-      Array.from({ length: 100 }, () => `CC68_AUDIT_ISSUE ${'z'.repeat(900)}`).join('\n')
+      Array.from({ length: 100 }, () => `CC68_AUDIT_ISSUE ${'zone '.repeat(180)}`).join(
+        '\n'
+      )
     )
     assert.equal(issues.length, 40)
-    assert.ok(issues.every((line) => line.length <= 400))
+    assert.ok(issues.every((line) => line.length === 400))
   })
 
   test('the Swift issue line keeps the CC68_AUDIT_ISSUE prefix and five pipe separated fields', () => {
@@ -179,4 +232,83 @@ describe('failed audit test digest', () => {
     )
     assert.match(query, /func shareCardAuditIssueLine\(/)
   })
+})
+
+// Antigravity audit-diag P3: xcodebuild footers carry runner paths, DerivedData, simulator UDIDs and
+// can echo a token; the public job log gets the line with each masked, or withheld.
+// Antigravity re-check P2-1 and P3-1: each 5-field record is masked field by field, a secret
+// line is withheld before any mask, and long camelCase test names stay readable.
+test('public log lines mask each record field and withhold secrets first', () => {
+  assert.deepEqual(
+    failedAuditIssues(
+      [
+        'CC68_AUDIT_ISSUE open|1|/Users/murat/project/x.png|Today|Contrast',
+        'CC68_AUDIT_ISSUE open|2|none|a@b.example|Contrast',
+        'CC68_AUDIT_ISSUE open|3|[/private/var/x]|id:AFA0777F-372A-445A-B8D4-08C287947144|Label',
+        'CC68_AUDIT_ISSUE home|4|share-card-cancel|testAllLocalesAndWatermarkOFFFullLabelsAndMore|Trait',
+      ].join('\n')
+    ),
+    [
+      'open|1|<path>|Today|Contrast',
+      'open|2|none|<email>|Contrast',
+      'open|3|[<path>]|id:<uuid>|Label',
+      'home|4|share-card-cancel|testAllLocalesAndWatermarkOFFFullLabelsAndMore|Trait',
+    ]
+  )
+  const { tail } = xcodebuildFailureReport(
+    [
+      'Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH',
+      'token abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGH|end',
+      '\tresult path:/Users/runner/x.xcresult; DerivedData=/tmp/dd',
+    ].join('\n')
+  )
+  assert.deepEqual(tail, [
+    '[withheld: secret-shaped line]',
+    'token <token>|end',
+    'result path:<path>; DerivedData=<path>',
+  ])
+})
+
+test('a public failure report masks paths, UDIDs, emails and tokens in every section', () => {
+  const log = [
+    'CC68_AUDIT_ISSUE open|1|/Users/runner/work/couture-cast/couture-cast/x.png|a@b.example|Contrast',
+    "Test Case '-[ShareCardAccessibilityUITests testOpen]' started.",
+    '    /Users/runner/work/couture-cast/couture-cast/apps/mobile/native-tests/ShareCardAccessibilityUITests.swift:42: error: -[ShareCardAccessibilityUITests testOpen] : failed',
+    "Test Case '-[ShareCardAccessibilityUITests testOpen]' failed (3.1 seconds).",
+  ].join('\n')
+  const failed = xcodebuildFailureReport(log)
+  assert.equal(failed.tests[0].test, 'testOpen')
+  assert.ok(
+    failed.tests[0].lines.some((line) =>
+      line.startsWith('ShareCardAccessibilityUITests.swift:42: error:')
+    )
+  )
+  const footer = [
+    'Ineligible destinations for the "ShareCardAccessibility" scheme:',
+    '\t{ platform:iOS Simulator, id:AFA0777F-372A-445A-B8D4-08C287947144, OS:26.5, name:cc68-startup-probe }',
+    'Testing failed:',
+    '\tShareCardAccessibilityUITests encountered an error (Failed to install or launch the test runner. If you believe this error represents a bug, please attach the result bundle at /Users/runner/work/couture-cast/couture-cast/_bmad-output/test-artifacts/story-6-8/runtime/accessibility-ios-1731500000000.xcresult)',
+    'Writing result bundle at path: /Users/runner/Library/Developer/Xcode/DerivedData/ShareCardAccessibility-abcdef/Logs/Test/Run.xcresult',
+    'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0',
+    'owner contact ops@couturecast.example in file:///private/var/folders/x/y',
+    '** TEST FAILED **',
+  ].join('\n')
+  const report = xcodebuildFailureReport(footer)
+  const text = JSON.stringify(report)
+  for (const leaked of [
+    /\/Users\//,
+    /DerivedData/,
+    /AFA0777F/,
+    /@couturecast/,
+    /eyJ/,
+    /file:\/\//,
+    /\/private\//,
+  ])
+    assert.doesNotMatch(text, leaked, String(leaked))
+  assert.ok(report.tail.includes('** TEST FAILED **'))
+  assert.ok(report.tail.some((line) => line.includes('<uuid>')))
+  assert.ok(report.tail.some((line) => line.includes('<path>')))
+  assert.ok(report.tail.includes('[withheld: secret-shaped line]'))
+  for (const section of [failed.issues, failed.context])
+    assert.doesNotMatch(JSON.stringify(section), /\/Users\/|@b\.example/)
 })

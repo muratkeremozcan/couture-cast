@@ -18,7 +18,9 @@ import {
 } from '@couture/testing'
 import {
   PREMIUM_REQUIRED_MESSAGE,
+  premiumAccessResponseSchema,
   SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE,
+  subscriptionResponseSchema,
 } from '../src/contracts/http.js'
 import { RequestAuthGuard } from '../src/modules/auth/security.guards.js'
 import type { AuthenticatedRequest } from '../src/modules/auth/security.types.js'
@@ -27,6 +29,7 @@ import { PremiumEntitlementGuard } from '../src/modules/commerce/premium-entitle
 import { PremiumEntitlementService } from '../src/modules/commerce/premium-entitlement.service.js'
 import {
   FakeRevenueCatClient,
+  RealRevenueCatClient,
   RevenueCatClient,
 } from '../src/modules/commerce/revenuecat-client.js'
 import { SubscriptionService } from '../src/modules/commerce/subscription.service.js'
@@ -59,6 +62,9 @@ const databaseUrl =
   'postgresql://postgres:postgres@127.0.0.1:54322/postgres'
 
 const prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } })
+// A year from the real clock: the database compares Test Store expiries with now() (date bomb
+// guard, src/testing/integration-clock-literals.guard.spec.ts).
+const TEST_STORE_EXPIRY = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
 
 let schemaReady = false
 
@@ -384,6 +390,255 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
       expect(envelope(response).message).toBe(SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE)
     })
 
+    // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+    // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+    // Story 6.15 R3-01 and R4-01: a ledger entitlement from a store we do not sell, or one our model
+    // cannot represent, keeps the paying member's row through the real projection. Retrying cannot
+    // change what the ledger holds, so the refresh answers 200 with that unchanged local state.
+    // Each shape runs under every TEST_ENV; `qa` stands for any value other than local and preview.
+    // D15 opens only the representable Test Store shape, and only under local and preview.
+    const refreshEnvironments = [
+      undefined,
+      'staging',
+      'production',
+      'qa',
+      'local',
+      'preview',
+    ] as const
+    for (const [label, premium, subscriptions] of [
+      [
+        'a Test Store monthly entitlement',
+        {
+          expires_date: TEST_STORE_EXPIRY,
+          product_identifier: 'premium_monthly',
+        },
+        { premium_monthly: { store: 'test_store' } },
+      ],
+      [
+        'a Test Store lifetime entitlement',
+        { expires_date: null, product_identifier: 'premium_life' },
+        { premium_life: { store: 'test_store' } },
+      ],
+      [
+        'an Amazon lifetime entitlement',
+        { expires_date: null, product_identifier: 'premium_life' },
+        { premium_life: { store: 'amazon' } },
+      ],
+      [
+        'a supported lifetime entitlement',
+        { expires_date: null, product_identifier: 'premium_life' },
+        { premium_life: { store: 'app_store' } },
+      ],
+      [
+        'a malformed expiry',
+        { expires_date: 'soon', product_identifier: 'premium_monthly' },
+        { premium_monthly: { store: 'stripe' } },
+      ],
+      [
+        'a missing product',
+        { expires_date: TEST_STORE_EXPIRY, product_identifier: null },
+        {},
+      ],
+    ] as const)
+      for (const testEnv of refreshEnvironments) {
+        if (
+          (testEnv === 'local' || testEnv === 'preview') &&
+          label === 'a Test Store monthly entitlement'
+        ) {
+          continue
+        }
+        it(`keeps a paid row when the ledger holds ${label} (TEST_ENV ${testEnv ?? 'unset'})`, async (context) => {
+          if (!requireSchema(context)) return
+          const savedEnv = process.env.TEST_ENV
+          if (testEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = testEnv
+
+          await seedEntitlement(subscriberId, 'active')
+          const before = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: subscriberId },
+          })
+          vi.stubGlobal(
+            'fetch',
+            vi.fn(() =>
+              Promise.resolve(
+                new Response(
+                  JSON.stringify({
+                    subscriber: { entitlements: { premium }, subscriptions },
+                  }),
+                  {
+                    status: 200,
+                  }
+                )
+              )
+            )
+          )
+          const real = new RealRevenueCatClient('sk_test_rc_key')
+          const pull = vi
+            .spyOn(fakeLedger, 'getSubscriberEntitlement')
+            .mockImplementation((userId) => real.getSubscriberEntitlement(userId))
+          try {
+            const response = await postRefresh(subscriberId)
+
+            expect(response.status).toBe(200)
+            expect(pull).toHaveBeenCalledTimes(1)
+            expect(
+              await prisma.premiumEntitlement.findUnique({
+                where: { user_id: subscriberId },
+              })
+            ).toEqual(before)
+            expect(subscriptionResponseSchema.parse(response.body).data).toMatchObject({
+              status: 'active',
+              store: before?.store,
+              productId: before?.product_id,
+              willRenew: before?.will_renew,
+              currentPeriodEnd: before?.current_period_end.toISOString(),
+              syncedAt: before?.synced_at.toISOString(),
+            })
+          } finally {
+            pull.mockRestore()
+            vi.unstubAllGlobals()
+            if (savedEnv === undefined) delete process.env.TEST_ENV
+            else process.env.TEST_ENV = savedEnv
+          }
+        })
+      }
+
+    // Story 6.15 r38 P3-1: a 200 whose shape changed (a key the projection reads renamed or gone)
+    // says nothing about the member, so it is not one of the permanent answers above: refresh
+    // stays an honest 503 and the row is untouched.
+    for (const [shape, subscriber] of [
+      [
+        'a renamed product_identifier',
+        {
+          entitlements: { premium: { expires_date: null, product_id: 'premium_life' } },
+          subscriptions: {},
+        },
+      ],
+      [
+        'a renamed expires_date',
+        {
+          entitlements: {
+            premium: { expiry: null, product_identifier: 'premium_monthly' },
+          },
+          subscriptions: { premium_monthly: { store: 'play_store' } },
+        },
+      ],
+      [
+        'a renamed subscriptions',
+        {
+          entitlements: {
+            premium: { expires_date: null, product_identifier: 'premium_life' },
+          },
+          subscription_records: { premium_life: { store: 'play_store' } },
+        },
+      ],
+      [
+        'a renamed store',
+        {
+          entitlements: {
+            premium: { expires_date: null, product_identifier: 'premium_life' },
+          },
+          subscriptions: { premium_life: { store_name: 'play_store' } },
+        },
+      ],
+    ] as const) {
+      it(`answers 503 and keeps a paid row when the ledger response has ${shape}`, async (context) => {
+        if (!requireSchema(context)) return
+
+        await seedEntitlement(subscriberId, 'active')
+        const before = await prisma.premiumEntitlement.findUnique({
+          where: { user_id: subscriberId },
+        })
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(() =>
+            Promise.resolve(new Response(JSON.stringify({ subscriber }), { status: 200 }))
+          )
+        )
+        const real = new RealRevenueCatClient('sk_test_rc_key')
+        const pull = vi
+          .spyOn(fakeLedger, 'getSubscriberEntitlement')
+          .mockImplementation((userId) => real.getSubscriberEntitlement(userId))
+        try {
+          const response = await postRefresh(subscriberId)
+
+          expect(response.status).toBe(503)
+          expect(envelope(response).message).toBe(SUBSCRIPTION_LEDGER_UNAVAILABLE_MESSAGE)
+          expect(pull).toHaveBeenCalledTimes(1)
+          expect(
+            await prisma.premiumEntitlement.findUnique({
+              where: { user_id: subscriberId },
+            })
+          ).toEqual(before)
+        } finally {
+          pull.mockRestore()
+          vi.unstubAllGlobals()
+        }
+      })
+    }
+
+    // Learning path Step 55: story 6.15 D15. Under an explicit local or preview TEST_ENV a Test
+    // Store entitlement on the ledger converges on refresh: the row, the status read and the
+    // access read all report test_store premium.
+    for (const testEnv of ['local', 'preview'] as const) {
+      it(`applies a Test Store entitlement on refresh (TEST_ENV ${testEnv})`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        process.env.TEST_ENV = testEnv
+        vi.stubGlobal(
+          'fetch',
+          vi.fn(() =>
+            Promise.resolve(
+              new Response(
+                JSON.stringify({
+                  subscriber: {
+                    entitlements: {
+                      premium: {
+                        expires_date: TEST_STORE_EXPIRY,
+                        product_identifier: 'premium_monthly',
+                      },
+                    },
+                    subscriptions: { premium_monthly: { store: 'TEST_STORE' } },
+                  },
+                }),
+                { status: 200 }
+              )
+            )
+          )
+        )
+        const real = new RealRevenueCatClient('sk_test_rc_key')
+        const pull = vi
+          .spyOn(fakeLedger, 'getSubscriberEntitlement')
+          .mockImplementation((userId) => real.getSubscriberEntitlement(userId))
+        try {
+          const response = await postRefresh(subscriberId)
+
+          expect(response.status).toBe(200)
+          expect(subscriptionResponseSchema.parse(response.body).data).toMatchObject({
+            status: 'active',
+            store: 'test_store',
+            productId: 'premium_monthly',
+            currentPeriodEnd: TEST_STORE_EXPIRY,
+          })
+          expect(
+            await prisma.premiumEntitlement.findUnique({
+              where: { user_id: subscriberId },
+            })
+          ).toMatchObject({ status: 'active', store: 'test_store' })
+          const access = await get('/api/v1/commerce/premium/access', subscriberId)
+          expect(access.status).toBe(200)
+          expect(premiumAccessResponseSchema.parse(access.body)).toEqual({
+            data: { premium: true, source: 'subscription' },
+          })
+        } finally {
+          pull.mockRestore()
+          vi.unstubAllGlobals()
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+
     it('serves local state inside the 10-second window instead of re-hammering the ledger', async (context) => {
       if (!requireSchema(context)) return
 
@@ -420,6 +675,121 @@ describe('5.2 premium entitlement core against real PostgreSQL and real HTTP', (
         willRenew: false,
       })
     })
+  })
+
+  // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
+  // Story 6.15 D15: a stray test_store row (a preview database served by an API whose TEST_ENV is
+  // not local or preview, a restored dump) grants nothing and reads as absent there.
+  // Learning path Step 55: story 6.15 D15 r6. A ledger with no entitlement expires a test_store
+  // row only where it is honored; elsewhere the refresh writes nothing over it.
+  describe('a null ledger pull over a test_store row (story 6.15 D15 r6)', () => {
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'expires' : 'leaves'} the row under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await prisma.premiumEntitlement.create({
+            data: buildPremiumEntitlementCreateInput(
+              createPremiumEntitlement({
+                userId: subscriberId,
+                status: 'active',
+                store: 'test_store',
+                lastEventId: `${namespace}-test-store-seed`,
+              })
+            ),
+          })
+          const before = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: subscriberId },
+          })
+          const auditsBefore = await prisma.auditLog.count({
+            where: { user_id: subscriberId, event_type: 'premium_entitlement_changed' },
+          })
+
+          const response = await postRefresh(subscriberId)
+
+          expect(response.status).toBe(200)
+          const after = await prisma.premiumEntitlement.findUnique({
+            where: { user_id: subscriberId },
+          })
+          const auditsAfter = await prisma.auditLog.count({
+            where: { user_id: subscriberId, event_type: 'premium_entitlement_changed' },
+          })
+          if (open) {
+            expect(after).toMatchObject({ status: 'expired', store: 'test_store' })
+            expect(auditsAfter).toBe(auditsBefore + 1)
+          } else {
+            expect(after).toEqual(before)
+            expect(auditsAfter).toBe(auditsBefore)
+          }
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
+  })
+
+  describe('a test_store row on every reader (story 6.15 D15)', () => {
+    async function seedTestStoreRow(): Promise<void> {
+      await prisma.premiumEntitlement.create({
+        data: buildPremiumEntitlementCreateInput(
+          createPremiumEntitlement({
+            userId: subscriberId,
+            status: 'active',
+            store: 'test_store',
+            lastEventId: `${namespace}-test-store-seed`,
+          })
+        ),
+      })
+    }
+
+    for (const testEnv of [
+      undefined,
+      'staging',
+      'production',
+      'local',
+      'preview',
+    ] as const) {
+      const open = testEnv === 'local' || testEnv === 'preview'
+      it(`${open ? 'honors' : 'ignores'} it under TEST_ENV ${testEnv ?? 'unset'}`, async (context) => {
+        if (!requireSchema(context)) return
+        const savedEnv = process.env.TEST_ENV
+        if (testEnv === undefined) delete process.env.TEST_ENV
+        else process.env.TEST_ENV = testEnv
+        try {
+          await seedTestStoreRow()
+
+          const status = await get('/api/v1/commerce/subscription', subscriberId)
+          expect(status.status).toBe(200)
+          expect(subscriptionResponseSchema.parse(status.body).data).toMatchObject(
+            open
+              ? { status: 'active', store: 'test_store' }
+              : { status: 'none', store: null }
+          )
+          const access = await get('/api/v1/commerce/premium/access', subscriberId)
+          expect(premiumAccessResponseSchema.parse(access.body)).toEqual({
+            data: open
+              ? { premium: true, source: 'subscription' }
+              : { premium: false, source: 'none' },
+          })
+          const guarded = await get('/api/v1/premium-fixture', subscriberId)
+          expect(guarded.status).toBe(open ? 200 : 403)
+        } finally {
+          if (savedEnv === undefined) delete process.env.TEST_ENV
+          else process.env.TEST_ENV = savedEnv
+        }
+      })
+    }
   })
 
   describe('premium guard over HTTP (5.2-API-011)', () => {

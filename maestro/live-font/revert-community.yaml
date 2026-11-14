@@ -1,0 +1,11 @@
+# Story 6.15 live font-scale proof (scripts/run-live-font-proof.mjs). Learning path Step 55.
+appId: ${MAESTRO_APP_ID}
+---
+- scrollUntilVisible:
+    element:
+      id: community-filter-chip-auto
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: community-filter-chip-auto
+- waitForAnimationToEnd

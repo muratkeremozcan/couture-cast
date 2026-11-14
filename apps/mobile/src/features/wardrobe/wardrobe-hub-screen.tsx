@@ -344,7 +344,9 @@ const styles = StyleSheet.create({
   header: { gap: 16 },
   title: { fontSize: 28, fontWeight: '700' },
   subtitle: { marginTop: 6, opacity: 0.7 },
-  headerActions: { alignItems: 'center', flexDirection: 'row', gap: 8 },
+  // Story 6.15 F-00i: at iOS XXXL and the accessibility sizes the three actions are wider than
+  // the screen, so they wrap instead of pushing Add garment past the edge.
+  headerActions: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   secondaryButton: {
     alignItems: 'center',
     borderRadius: 8,

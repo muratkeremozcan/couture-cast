@@ -792,3 +792,33 @@ describe('CommunityCard (Story 6.1)', () => {
     ).toEqual([])
   })
 })
+
+describe('6.15 CommunityCard at the largest text sizes', () => {
+  // Story 6.15 F-00i: at Android 2.0 the climate pill alone was wider than a spotlight card and
+  // ran past its edge ("Temperate and dr"). A card narrower than the pill stands in for the
+  // larger text: the pill wraps its own text and stays inside the card.
+  it('6.15-MOB-WRAP-01 keeps the climate pill and its text inside a card narrower than the pill', async () => {
+    render(
+      <div
+        data-testid="narrow-host"
+        style={{ width: 120, display: 'flex', flexDirection: 'column' }}
+      >
+        <CommunityCard
+          item={item({ climateBand: 'temperate_dry' })}
+          onReport={vi.fn()}
+          onWithdraw={vi.fn()}
+          onImageExpiry={vi.fn()}
+          onOpen={vi.fn()}
+        />
+      </div>
+    )
+    const pill = screen.getByTestId('community-card-climate-pill-post-a')
+    await waitFor(() => expect(pill).toBeVisible())
+    // The card sits 16 in from each side of its host.
+    const cardRight = screen.getByTestId('narrow-host').getBoundingClientRect().right - 16
+    const pillBox = pill.getBoundingClientRect()
+    const textBox = screen.getByText('Temperate and dry').getBoundingClientRect()
+    expect(pillBox.right).toBeLessThanOrEqual(cardRight + 0.5)
+    expect(textBox.right).toBeLessThanOrEqual(pillBox.right + 0.5)
+  })
+})

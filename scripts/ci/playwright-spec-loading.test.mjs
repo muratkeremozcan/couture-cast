@@ -13,18 +13,10 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 const cli = createRequire(import.meta.url).resolve('@playwright/test/cli')
 
 test('the local suite lists every spec without a load error', () => {
-  // Specs import the shared packages' dist. A job may run this before it builds them
-  // (browser-acceptance's harness step does), so build first, as prepare:playwright does:
-  // the Prisma client before @couture/testing, which compiles against it. An unchanged
-  // package is skipped (scripts/build-workspace-package.mjs).
-  for (const script of ['db:generate', 'build:packages']) {
-    const built = spawnSync('npm', ['run', script], {
-      cwd: root,
-      encoding: 'utf8',
-      timeout: 300_000,
-    })
-    assert.equal(built.status, 0, `${script}\n${built.stdout}\n${built.stderr}`)
-  }
+  // Specs import the shared packages' dist and the Prisma client. This suite declares the
+  // `packages` need, so the gate runs it only after the step that builds them, and the test
+  // itself writes nothing: a discovered test that ran db:generate and build:packages
+  // regenerated a shared node_modules from an older worktree's schema (story 6.15, 2026-11-14).
   const listed = spawnSync(process.execPath, [cli, 'test', '--list'], {
     cwd: root,
     encoding: 'utf8',

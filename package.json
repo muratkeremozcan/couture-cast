@@ -136,6 +136,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@couture/eslint-config": "workspace:*",
+    "@expo/env": "2.0.12",
     "@faker-js/faker": "10.1.0",
     "@lhci/cli": "0.15.1",
     "@openapitools/openapi-generator-cli": "2.31.0",
@@ -156,6 +157,7 @@
     "axe-core": "4.10.0",
     "cross-env": "10.1.0",
     "dotenv": "17.2.3",
+    "dotenv-expand": "11.0.7",
     "esbuild": "0.25.12",
     "eslint": "8.57.1",
     "eslint-config-prettier": "10.1.8",

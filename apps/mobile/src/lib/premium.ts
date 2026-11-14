@@ -24,12 +24,15 @@
 //    made visible.
 import {
   premiumAccessResponseSchema,
+  subscriptionManageEntry,
   subscriptionResponseSchema,
   type PremiumAccess,
   type Subscription,
+  type SubscriptionManageEntry,
   type SubscriptionPlan,
 } from '@couture/api-client/contracts/http'
 import { Platform } from 'react-native'
+import { revenueCatKeyEnv, selectRevenueCatApiKey } from './revenuecat-key'
 import { createMobileApiClient } from './api-client'
 import { withRequestTimeout } from './commerce'
 import { resolveMobileAccessToken } from './mobile-auth'
@@ -111,7 +114,7 @@ export type PremiumSectionRenderState =
       productId: string
       currentPeriodEnd: string
       showGraceBanner: boolean
-      manageEntry: 'store' | 'web' | 'none'
+      manageEntry: SubscriptionManageEntry
     }
 
 /**
@@ -168,15 +171,7 @@ export function resolvePremiumSectionState(
         productId: subscription.productId,
         currentPeriodEnd: subscription.currentPeriodEnd,
         showGraceBanner: subscription.status === 'grace_period',
-        // Manage entry by store: store-billed subscriptions open the native
-        // manage flow; Stripe-billed ones are managed on the web (the portal
-        // is the web surface's); promotional grants have nothing to manage.
-        manageEntry:
-          subscription.store === 'stripe'
-            ? 'web'
-            : subscription.store === 'promotional'
-              ? 'none'
-              : 'store',
+        manageEntry: subscriptionManageEntry(subscription.store),
       }
   }
 }
@@ -253,13 +248,11 @@ async function loadPurchasesModule(): Promise<PurchasesModule | null> {
 }
 
 function resolveRevenueCatApiKey(): string | undefined {
-  if (Platform.OS === 'ios') {
-    return process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY
-  }
-  if (Platform.OS === 'android') {
-    return process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY
-  }
-  return undefined
+  return selectRevenueCatApiKey({
+    os: Platform.OS,
+    dev: __DEV__,
+    env: revenueCatKeyEnv(),
+  })
 }
 
 /**

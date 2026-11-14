@@ -43,6 +43,24 @@ final class ShareCardAnchorConfigurationTests: XCTestCase {
     XCTAssertEqual(code, .presenterUnavailable)
   }
 
+  /// Coordinates up to 100,000 points are a frame; one past it is malformed and falls back to the
+  /// presenter's center.
+  func testAnchorCoordinatesStayWithinOneHundredThousandPoints() throws {
+    let edge: [String: Any] = ["x": 100_000, "y": -100_000, "width": 100_000, "height": 100_000]
+    XCTAssertEqual(
+      ShareCardAnchorConfiguration.anchor(from: edge),
+      CGRect(x: 100_000, y: -100_000, width: 100_000, height: 100_000))
+    for key in ["x", "y", "width", "height"] {
+      var past: [String: Any] = ["x": 1, "y": 2, "width": 3, "height": 4]
+      past[key] = 100_001
+      XCTAssertNil(ShareCardAnchorConfiguration.anchor(from: past), key)
+      let configured = ShareCardAnchorConfiguration.configure(
+        presenterView: View(), bounds: CGRect(x: 0, y: 0, width: 390, height: 844),
+        anchor: ShareCardAnchorConfiguration.anchor(from: past), fromWindow: { $0 })
+      XCTAssertEqual(try configured.get().sourceRect, CGRect(x: 195, y: 422, width: 0, height: 0), key)
+    }
+  }
+
   func testAnchorParsingAcceptsOnlyFiniteNonNegativeFrames() {
     XCTAssertEqual(
       ShareCardAnchorConfiguration.anchor(from: ["x": 24.5, "y": 700, "width": 160, "height": 48]),

@@ -7,6 +7,7 @@ import {
   type PremiumEntitlementStatus,
   type Prisma,
 } from '@prisma/client'
+import { appliesRevenueCatTestStore } from '../../config/runtime-environment.js'
 import { createBaseLogger } from '../../logger/pino.config.js'
 import {
   ComplimentaryAccessService,
@@ -75,6 +76,26 @@ export type EntitlementTransition = {
 
 const statusOf = (row: PremiumEntitlement | null): PremiumEntitlementStatus | 'none' =>
   row?.status ?? 'none'
+
+/**
+ * Story 6.15 D15: whether this API honors a mirror row from `store`. A `test_store` row counts
+ * only where {@link appliesRevenueCatTestStore} holds. Elsewhere (an API whose TEST_ENV is unset,
+ * staging or production reading a preview database or a restored dump) the row is no paid access,
+ * reads as absent, and a transfer never moves it.
+ */
+export function honorsEntitlementStore(store: EntitlementStore): boolean {
+  return store !== 'test_store' || appliesRevenueCatTestStore()
+}
+
+/**
+ * The ledger writers' view of the existing mirror row: a row from a store this API does not
+ * honor counts as absent, so the next write starts from `none` (audit row and activation
+ * telemetry included), its ordering cursor cannot discard a real event, and a null snapshot
+ * over it writes nothing (story 6.15 D15 r6).
+ */
+function honoredRow(row: PremiumEntitlement | null): PremiumEntitlement | null {
+  return row !== null && honorsEntitlementStore(row.store) ? row : null
+}
 
 export type EntitlementTelemetryEmission =
   | {
@@ -174,12 +195,16 @@ export class PremiumEntitlementService {
     this.logger.info({ userId }, 'Processor-side billing data erased')
   }
 
-  /** Null means "never subscribed"; the controller serializes that as status 'none'. */
+  /**
+   * Null means "never subscribed"; the controller serializes that as status 'none'. A row from
+   * a store this API does not honor reads as absent (story 6.15 D15), for the status read, the
+   * refresh answer and the checkout and portal guards alike.
+   */
   async getEntitlement(userId: string): Promise<EntitlementView | null> {
     const row = await this.prisma.premiumEntitlement.findUnique({
       where: { user_id: userId },
     })
-    if (!row) {
+    if (!row || !honorsEntitlementStore(row.store)) {
       return null
     }
     return {
@@ -230,9 +255,10 @@ export class PremiumEntitlementService {
   private async hasPaidAccess(userId: string): Promise<boolean> {
     const row = await this.prisma.premiumEntitlement.findUnique({
       where: { user_id: userId },
-      select: { status: true },
+      select: { status: true, store: true },
     })
-    return row?.status === 'active' || row?.status === 'grace_period'
+    if (!row || !honorsEntitlementStore(row.store)) return false
+    return row.status === 'active' || row.status === 'grace_period'
   }
 
   /**
@@ -246,9 +272,9 @@ export class PremiumEntitlementService {
     tx: Prisma.TransactionClient,
     input: ApplyLedgerEventInput
   ): Promise<EntitlementTransition> {
-    const existing = await tx.premiumEntitlement.findUnique({
-      where: { user_id: input.userId },
-    })
+    const existing = honoredRow(
+      await tx.premiumEntitlement.findUnique({ where: { user_id: input.userId } })
+    )
 
     if (existing && !this.shouldApply(existing, input.occurredAt, input.eventId)) {
       return {
@@ -283,6 +309,9 @@ export class PremiumEntitlementService {
         will_renew: input.state.willRenew,
         current_period_end: input.state.currentPeriodEnd,
         synced_at: syncedAt,
+        // A confirmed sync ends any drift settle (story 6.15 r38): a non-null
+        // drift_settled_at always means the ledger is currently unrepresentable.
+        drift_settled_at: null,
         last_event_occurred_at: input.occurredAt,
         last_event_id: input.eventId,
       },
@@ -323,9 +352,9 @@ export class PremiumEntitlementService {
     const eventId = `pull:${pullId}`
 
     return interactiveTransaction(this.prisma, async (tx) => {
-      const existing = await tx.premiumEntitlement.findUnique({
-        where: { user_id: userId },
-      })
+      const existing = honoredRow(
+        await tx.premiumEntitlement.findUnique({ where: { user_id: userId } })
+      )
 
       if (!state) {
         if (!existing) {
@@ -337,6 +366,7 @@ export class PremiumEntitlementService {
             where: { user_id: userId },
             data: {
               synced_at: occurredAt,
+              drift_settled_at: null,
               last_event_occurred_at: occurredAt,
               last_event_id: eventId,
             },
@@ -381,6 +411,7 @@ export class PremiumEntitlementService {
           will_renew: state.willRenew,
           current_period_end: state.currentPeriodEnd,
           synced_at: occurredAt,
+          drift_settled_at: null,
           last_event_occurred_at: occurredAt,
           last_event_id: eventId,
         },

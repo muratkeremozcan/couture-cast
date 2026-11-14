@@ -1,0 +1,187 @@
+# Story 6.15 D6: the Apple module checks that run on Linux, on every pull request whose lane
+# selects them (scripts/ci/lanes.mjs: ios-unit, ios-flow-syntax):
+# - the Foundation-only rules of the share, photo-save and accessibility-focus modules (activity
+#   mapper, outcome reducer, anchor configuration, ShareCardShareFile, the PNG file rules with the
+#   cross-prefix test, and the focus rules) and the share-card header semantics controls, in
+#   swift-linux;
+# - the iOS Maestro flow syntax, in ios-flow-syntax.
+# Owner rule, 2026-11-13: no macOS job runs on a pull request or a merge to main. The
+# LinkPresentation header tests, the AccessibilityFocusTarget XCTest and the watchOS prebuild
+# suite run nightly and on demand in pr-share-native-unit.yml, pr-accessibility-focus.yml and
+# watchos-native.yml; the iOS app builds and journeys in ios-native-jobs.yml. PR Gate makes each
+# job here required whenever it runs.
+name: Apple native checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # The event keeps a dispatch or schedule from cancelling a push run on main.
+  group: >-
+    apple-native-${{ github.event.pull_request.number || github.ref }}-${{
+    github.event_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # The lanes this push wakes (scripts/ci/lanes.mjs). Each job a lane gates needs this one and
+  # is skipped when its lane is false; this job's summary says why. It installs nothing, so it
+  # holds the jobs it gates for seconds.
+  lanes:
+    name: Lanes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      plan: ${{ steps.lanes.outputs.plan }}
+      coverage_shards: ${{ steps.lanes.outputs.coverage_shards }}
+    steps:
+      - name: Checkout the lane map and workspace manifests
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          sparse-checkout: |
+            scripts/ci/lanes.mjs
+            apps/*/package.json
+            packages/*/package.json
+          sparse-checkout-cone-mode: false
+
+      - name: Plan the lanes
+        id: lanes
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LANES_WORKFLOW: pr-apple-native.yml
+        run: node scripts/ci/lanes.mjs
+
+  # The Foundation-only Swift rules on Linux, in the Swift 6.1.2 toolchain. The packages declare
+  # tools version 5.9, so this compiler and the Swift 6.3 of the nightly Xcode 26.4 or later
+  # both build them in the Swift 5 language mode; 6.1.2 stays because the mutant runs (27 of 27
+  # killed) and the hang study below used it. swift-crypto stands in for CryptoKit here (each
+  # Package.swift), and apple-native-workflow.test.mjs bans Apple-only imports from these sources.
+  # The tests run on one CPU (taskset): on a multi-core Linux host the XCTest runner of Swift
+  # 6.1.2 and 6.2.1 hung inside a test in 20 to 40% of runs (main thread in ppoll, local Docker
+  # on arm64, 2026-11-12), even for the six pure focus rules; pinned to one CPU it passed every
+  # run. The build stays parallel.
+  swift-linux:
+    name: Swift module rules (Linux)
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['ios-unit']
+    runs-on: ubuntu-latest
+    container: swift:6.1.2-noble
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Record the Swift toolchain
+        run: swift --version
+
+      # swift-crypto with its BoringSSL is most of the build, and it changes only with the
+      # manifests or the toolchain, so the build directories are kept under those; a source
+      # change rebuilds just the module.
+      - name: Restore the Swift build directories
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/mobile/modules/share-card-native-share/ios/.build
+            apps/mobile/modules/share-card-photo-save/ios/.build
+            apps/mobile/modules/accessibility-focus/ios/.build
+          key: swift-linux-6.1.2-${{ hashFiles('apps/mobile/modules/*/ios/Package.swift') }}
+
+      - name: Share module rules (mapping, outcome, anchor and share file)
+        if: ${{ !cancelled() }}
+        # A cold build with swift-crypto takes 2 to 3 minutes; a hung test run fails here, named.
+        timeout-minutes: 8
+        working-directory: apps/mobile/modules/share-card-native-share/ios
+        run: |
+          set -euo pipefail
+          swift build --build-tests
+          taskset -c 0 swift test --skip-build 2>&1 | tee "$RUNNER_TEMP/share-rules.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/share-rules.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: Photo-save PNG file rules, with the cross-prefix test
+        if: ${{ !cancelled() }}
+        # A cold build with swift-crypto takes 2 to 3 minutes; a hung test run fails here, named.
+        timeout-minutes: 8
+        working-directory: apps/mobile/modules/share-card-photo-save/ios
+        run: |
+          set -euo pipefail
+          swift build --build-tests
+          taskset -c 0 swift test --skip-build 2>&1 | tee "$RUNNER_TEMP/photo-save-rules.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/photo-save-rules.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      - name: Accessibility-focus rules
+        if: ${{ !cancelled() }}
+        # A cold build with swift-crypto takes 2 to 3 minutes; a hung test run fails here, named.
+        timeout-minutes: 8
+        working-directory: apps/mobile/modules/accessibility-focus/ios
+        run: |
+          set -euo pipefail
+          swift build --build-tests
+          taskset -c 0 swift test --skip-build 2>&1 | tee "$RUNNER_TEMP/focus-rules.log"
+          # XCTest's summary: "Executed N tests, with S tests skipped and F failures ...".
+          summary=$(grep -Eo 'Executed [0-9]+ tests?(, with [0-9]+ tests? skipped)?' "$RUNNER_TEMP/focus-rules.log" | tail -1 || true)
+          count=$(echo "$summary" | grep -Eo '^Executed [0-9]+' | grep -Eo '[0-9]+' || true)
+          skipped=$(echo "$summary" | grep -Eo 'with [0-9]+ tests? skipped' | grep -Eo '[0-9]+' || true)
+          ran=$((${count:-0} - ${skipped:-0}))
+          if [ "$ran" -le 0 ]; then echo "::error::swift test ran zero tests ($count executed, ${skipped:-0} skipped)"; exit 1; fi
+          echo "swift test ran $ran tests (${skipped:-0} skipped)"
+
+      # The share-card header selection controls compile with plain swiftc; on Linux the share
+      # module's CoreGraphics shim stands in. ios-native-jobs.yml runs them on macOS too.
+      - name: Share-card header semantics controls
+        if: ${{ !cancelled() }}
+        timeout-minutes: 5
+        run: bash scripts/ci/share-card-header-semantics.sh
+
+  # `maestro check-syntax` over the iOS share-card flows needs no device, so it runs on Linux on
+  # every pull request that changes them, beside the full journeys in ios-native-jobs.yml. About two
+  # minutes: Java, the pinned Maestro CLI and the check.
+  ios-flow-syntax:
+    name: iOS Maestro flow syntax (Linux)
+    needs: lanes
+    if: fromJSON(needs.lanes.outputs.plan)['ios-flow-syntax']
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      # Both scripts import Node built-ins only, so no dependency install.
+      - name: Install the pinned Maestro CLI
+        timeout-minutes: 5
+        run: node scripts/maestro-install.mjs
+
+      - name: Check the iOS Maestro flows with the pinned CLI
+        run: node scripts/ci/maestro-check-flows.mjs

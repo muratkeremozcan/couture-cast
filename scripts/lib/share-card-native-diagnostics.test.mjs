@@ -93,6 +93,8 @@ function invokeMaestro(t, capture) {
     logSize: () => 0,
     recordIosFlowTiming: () => undefined,
     recordIosFlowProgress: () => undefined,
+    afterTimeoutHierarchy: () => null,
+    iosDeadlineKill: () => false,
     scheduleIosInFlowSample: () => false,
     inMatrixSection: () => true,
     localesForShard: () => [...LOCALES],
@@ -273,6 +275,81 @@ describe('native flow diagnostics capture', () => {
   // Story 6.15: a deadline kill on the iOS 26.5 simulator leaves Maestro no failure artifacts, so
   // the after-failure screenshot and the app log are the only screen and app evidence; simctl
   // answered in seconds on that host, and the old 1.5 s limit killed both.
+  // Codex RUNS-R4-02: open-app.yaml retries, so beside an after-timeout read the failed-step
+  // hierarchy and screenshot are an earlier attempt's.
+  test("after a deadline kill the after-timeout hierarchy and a fresh screenshot win over an earlier retry's failed step", async (t) => {
+    const { collectNativeFlowDiagnostics } = await helper()
+    const directory = fixture(t)
+    const output = path.join(directory, 'maestro-current')
+    const flowDir = path.join(output, 'open-app')
+    fs.mkdirSync(path.join(flowDir, 'screen-hierarchy'), { recursive: true })
+    fs.mkdirSync(path.join(flowDir, 'screenshots'))
+    const sharp = (await import('sharp')).default
+    await sharp({
+      create: { width: 1179, height: 2556, channels: 3, background: '#ff0000' },
+    })
+      .png()
+      .toFile(path.join(flowDir, 'screenshots/failure.png'))
+    fs.writeFileSync(
+      path.join(flowDir, 'screen-hierarchy/failure.json'),
+      JSON.stringify(hierarchy)
+    )
+    const failed = command('assertVisible', 'tab-home')
+    failed.metadata.artifacts = [
+      { type: 'SCREENSHOT', path: 'screenshots/failure.png' },
+      { type: 'SCREEN_HIERARCHY', path: 'screen-hierarchy/failure.json' },
+    ]
+    fs.writeFileSync(path.join(flowDir, 'commands.json'), JSON.stringify([failed]))
+    const input = {
+      ...context,
+      flow: 'maestro/story65/open-app.yaml',
+      platform: 'ios',
+      exitCode: 1,
+      deadlineKilled: false,
+      root,
+      directory,
+      output,
+      device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+      startedAt: Date.now() - 240000,
+    }
+    const execute = () => ({ status: 1, stdout: '' })
+    const ordinary = await collectNativeFlowDiagnostics(input, { execute })
+    assert.equal(ordinary.screen.source, 'maestro-failed-step')
+    const earlierNodes = ordinary.screen.nodeCount
+    // Each capture owns a fresh private directory.
+    fs.rmSync(path.join(output, 'failure-private'), { recursive: true, force: true })
+    fs.writeFileSync(
+      path.join(output, 'after-timeout-hierarchy.json'),
+      JSON.stringify({ attributes: {}, children: [] })
+    )
+    const deadline = { ...input, exitCode: 124, deadlineKilled: true }
+    const killed = await collectNativeFlowDiagnostics(deadline, { execute })
+    assert.equal(killed.captures.hierarchy, true)
+    assert.notEqual(killed.screen.source, 'maestro-failed-step')
+    assert.notEqual(killed.screen.nodeCount, earlierNodes)
+    // Codex RUNS-R5-01: a kill whose after-timeout read failed or returned malformed output has no
+    // current hierarchy, and a fresh screenshot is tried; the earlier retry's artifacts stay out.
+    for (const written of [null, 'not json']) {
+      fs.rmSync(path.join(output, 'failure-private'), { recursive: true, force: true })
+      fs.rmSync(path.join(output, 'after-timeout-hierarchy.json'), { force: true })
+      if (written)
+        fs.writeFileSync(path.join(output, 'after-timeout-hierarchy.json'), written)
+      const calls = []
+      const unread = await collectNativeFlowDiagnostics(deadline, {
+        execute: (binary, args) => {
+          calls.push(args)
+          return { status: 1, stdout: '' }
+        },
+      })
+      assert.equal(unread.captures.hierarchy, false, String(written))
+      assert.notEqual(unread.screen.source, 'maestro-failed-step', String(written))
+      assert.ok(
+        calls.some((args) => args.includes('screenshot')),
+        String(written)
+      )
+    }
+  })
+
   test('the capture child outlives its platform capture limit: 50 s on iOS, 15 s on Android', async () => {
     const { recordNativeFlowDiagnostics } = await helper()
     const timeouts = {}
@@ -287,6 +364,34 @@ describe('native flow diagnostics capture', () => {
         }
       )
     assert.deepEqual(timeouts, { ios: 50000, android: 15000 })
+  })
+
+  test('an iOS deadline kill takes its screen from the after-timeout hierarchy', async (t) => {
+    const { collectNativeFlowDiagnostics } = await helper()
+    const directory = fixture(t)
+    const output = path.join(directory, 'maestro-current')
+    fs.mkdirSync(output)
+    fs.writeFileSync(
+      path.join(output, 'after-timeout-hierarchy.json'),
+      JSON.stringify(hierarchy)
+    )
+    const result = await collectNativeFlowDiagnostics(
+      {
+        ...context,
+        flow: 'maestro/story65/open-app.yaml',
+        platform: 'ios',
+        exitCode: 124,
+        deadlineKilled: true,
+        root,
+        directory,
+        output,
+        device: 'AFA0777F-372A-445A-B8D4-08C287947144',
+        startedAt: Date.now() - 240000,
+      },
+      { execute: () => ({ status: 1, stdout: '' }) }
+    )
+    assert.equal(result.captures.hierarchy, true)
+    assert.ok(result.screen.nodeCount > 0)
   })
 
   test('an iOS failure gives each simctl capture 15 s and the whole capture 45 s; Android keeps 1.5 s and 10 s', async (t) => {

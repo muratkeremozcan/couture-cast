@@ -2,8 +2,14 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
+// Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 import XCTest
+#if canImport(CryptoKit)
 import CryptoKit
+#else
+import Crypto
+#endif
 @testable import ShareCardPngFile
 
 final class ShareCardPhotoSaveTests: XCTestCase {
@@ -69,6 +75,23 @@ final class ShareCardPhotoSaveTests: XCTestCase {
     XCTAssertThrowsError(try ShareCardPngFile.validatePng(metadataBeforeEnd))
     for (width, height) in [(1081, 1350), (1080, 1349), (1350, 1080), (540, 675)] {
       XCTAssertThrowsError(try ShareCardPngFile.validatePng(png(width: UInt32(width), height: UInt32(height))), "\(width)x\(height)")
+    }
+  }
+
+  /// Only a checksum is wrong, so every structural guard passes and the CRC check alone rejects it.
+  func testRejectsAChunkWhoseCrcDoesNotMatchItsBytes() throws {
+    let valid = [UInt8](png())
+    XCTAssertNoThrow(try ShareCardPngFile.validatePng(Data(valid)))
+    // IHDR's CRC is bytes 29 to 32: signature (8), length (4), type (4), payload (13).
+    var badCrc = valid
+    badCrc[32] ^= 0x01
+    // A payload byte changed under an unchanged CRC.
+    var badPayload = valid
+    badPayload[valid.count - 17] ^= 0x01
+    for corrupted in [Data(badCrc), Data(badPayload)] {
+      XCTAssertThrowsError(try ShareCardPngFile.validatePng(corrupted))
+      let cached = try cacheFile(corrupted)
+      XCTAssertThrowsError(try ShareCardPngFile.validateFile(cached.file.absoluteString, cached.digest, cached.root))
     }
   }
 
