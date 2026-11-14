@@ -33,14 +33,60 @@ enum TextLayoutProbeWire {
     /// The nearest accessibility element with an identifier at or above the view; nil for none.
     var accessibilityAncestor: AccessibilityAncestor? = nil
     /// The frame of the topmost accessibility-modal view of the window when the view lies outside
-    /// it (behind it); nil when there is none or the view is inside it.
+    /// it (behind it), and whether that view is opaque over its frame; nil when there is none or
+    /// the view is inside it.
     var behindModal: BehindModal? = nil
   }
 
   /// A view behind the window's topmost `accessibilityViewIsModal` view: that view's frame in
-  /// window coordinates, written like viewRect.
+  /// window coordinates, written like viewRect, and `opaque` (`modalOpaque`): whether the modal
+  /// view paints its whole frame opaquely, so nothing inside the frame behind it shows. A
+  /// transparent one (React Native's transparent Modal, a clear or dimmed backdrop) leaves what
+  /// lies behind it on view.
   struct BehindModal: Equatable {
     let rect: CGRect
+    let opaque: Bool
+  }
+
+  /// What the modal opacity check reads of one view.
+  struct Paint {
+    /// Drawn whole: not hidden, alpha and layer opacity exactly 1, and no layer mask (which can
+    /// hide any part of it and everything under it).
+    let shown: Bool
+    /// The frame in window coordinates, written like viewRect.
+    let rect: CGRect
+    /// It clips its subviews to its bounds.
+    let clips: Bool
+    /// It paints its whole rect: a background color at alpha exactly 1 with square corners.
+    let fills: Bool
+  }
+
+  /// Whether `modal` is opaque over its whole frame (TEA ruling r46): the modal view itself, or a
+  /// view under it whose frame covers the modal view's frame, fills its rect (`Paint.fills`), and
+  /// it and every view from the window down to it are drawn whole (`Paint.shown`), none clipping
+  /// to a rect that leaves part of the modal frame out. `ancestors` are the modal view's own,
+  /// from the window down (or in any order). An opaque view covering only part of the frame, a
+  /// hidden or faded one, or one under a hidden or faded view does not count; `isOpaque` is a
+  /// drawing hint and is not read. Frames compare as the wire writes them, to a thousandth.
+  static func modalOpaque<Node>(
+    _ modal: Node,
+    ancestors: [Node],
+    children: (Node) -> [Node],
+    paint: (Node) -> Paint
+  ) -> Bool {
+    let frame = wire(paint(modal).rect)
+    func covers(_ rect: CGRect) -> Bool {
+      let r = wire(rect)
+      return r[0] <= frame[0] && r[1] <= frame[1] && r[2] >= frame[2] && r[3] >= frame[3]
+    }
+    func passes(_ found: Paint) -> Bool { found.shown && (!found.clips || covers(found.rect)) }
+    func fills(_ node: Node) -> Bool {
+      let found = paint(node)
+      guard passes(found) else { return false }
+      if found.fills && covers(found.rect) { return true }
+      return children(node).contains(where: fills)
+    }
+    return ancestors.allSatisfy { passes(paint($0)) } && fills(modal)
   }
 
   /// One accessibility element, listed apart from the text records (TEA ruling 2026-11-14): never
@@ -147,16 +193,18 @@ enum TextLayoutProbeWire {
     return found
   }
 
-  /// `behindModal` of a record's view: the modal view's frame when the window has a topmost modal
-  /// view and the view is not it or inside it (`contains(modal, view)`); nil otherwise.
+  /// `behindModal` of a record's view: the modal view's frame and `opaque` (its `modalOpaque`,
+  /// read once per window) when the window has a topmost modal view and the view is not it or
+  /// inside it (`contains(modal, view)`); nil otherwise.
   static func behindModal<Node>(
     _ node: Node,
     modal: Node?,
+    opaque: Bool,
     contains: (Node, Node) -> Bool,
     rect: (Node) -> CGRect
   ) -> BehindModal? {
     guard let modal, !contains(modal, node) else { return nil }
-    return BehindModal(rect: rect(modal))
+    return BehindModal(rect: rect(modal), opaque: opaque)
   }
 
   /// An accessibility element with a non-empty accessibilityIdentifier (React Native's testID)
@@ -480,8 +528,9 @@ enum TextLayoutProbeWire {
           "accessibilityAncestor": record.accessibilityAncestor.map { ancestor -> Any in
             ["identifier": ancestor.identifier, "rect": wire(ancestor.rect)]
           } ?? NSNull(),
-          "behindModal": record.behindModal.map { modal -> Any in ["rect": wire(modal.rect)] }
-            ?? NSNull(),
+          "behindModal": record.behindModal.map { modal -> Any in
+            ["rect": wire(modal.rect), "opaque": modal.opaque]
+          } ?? NSNull(),
         ]
       },
       "elements": elements.map { element -> [String: Any] in

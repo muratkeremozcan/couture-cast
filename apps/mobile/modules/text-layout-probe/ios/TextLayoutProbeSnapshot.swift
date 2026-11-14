@@ -35,8 +35,34 @@ enum TextLayoutProbeSnapshot {
     TLPParagraphReader.isParagraphLikeView(view)
   }
 
+  /// What the modal opacity check reads of a view. The background is the layer's: React Native's
+  /// view returns its backgroundColor prop even when a shaped sublayer paints it (non-uniform
+  /// corners or borders), and then leaves the layer's own background nil, so such a view does not
+  /// count as filling its rect.
+  private static func paint(_ view: UIView, in window: UIWindow) -> TextLayoutProbeWire.Paint {
+    let layer = view.layer
+    return .init(
+      shown: !view.isHidden && view.alpha >= 1 && layer.opacity >= 1 && layer.mask == nil,
+      rect: view.convert(view.bounds, to: window),
+      clips: view.clipsToBounds || layer.masksToBounds,
+      fills: (layer.backgroundColor?.alpha ?? 0) >= 1 && layer.cornerRadius <= 0)
+  }
+
+  /// The views from the window down to `view`'s parent.
+  private static func ancestors(_ view: UIView, in window: UIWindow) -> [UIView] {
+    var found: [UIView] = []
+    var parent = view.superview
+    while let ancestor = parent {
+      found.append(ancestor)
+      if ancestor === window { break }
+      parent = ancestor.superview
+    }
+    return found.reversed()
+  }
+
   /// Every text view, hidden and faded ones included, with the opacity it draws with and, when
-  /// the window has an accessibility-modal view it lies outside, that view's frame.
+  /// the window has an accessibility-modal view it lies outside, that view's frame and whether it
+  /// is opaque over it.
   private static func collect(
     _ view: UIView,
     in window: UIWindow,
@@ -46,6 +72,12 @@ enum TextLayoutProbeSnapshot {
   ) {
     let modal = TextLayoutProbeWire.topmostModal(
       view, children: { $0.subviews }, hidden: invisible, isModal: { $0.accessibilityViewIsModal })
+    let opaque =
+      modal.map { modal in
+        TextLayoutProbeWire.modalOpaque(
+          modal, ancestors: ancestors(modal, in: window), children: { $0.subviews },
+          paint: { paint($0, in: window) })
+      } ?? false
     TextLayoutProbeWire.collect(
       view,
       layer: { .init(alpha: $0.alpha, opacity: $0.layer.opacity, hidden: $0.isHidden) },
@@ -54,7 +86,8 @@ enum TextLayoutProbeSnapshot {
         guard var found = record(view, in: window, id: id) else { return nil }
         found.accessibilityAncestor = accessibilityAncestor(view, in: window)
         found.behindModal = TextLayoutProbeWire.behindModal(
-          view, modal: modal, contains: { holder, inner in inner.isDescendant(of: holder) },
+          view, modal: modal, opaque: opaque,
+          contains: { holder, inner in inner.isDescendant(of: holder) },
           rect: { $0.convert($0.bounds, to: window) })
         recorded.insert(ObjectIdentifier(view))
         return found

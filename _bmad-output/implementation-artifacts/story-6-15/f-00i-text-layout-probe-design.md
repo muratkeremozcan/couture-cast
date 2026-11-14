@@ -5,7 +5,8 @@ Updated: 2026-11-14. Story 6.15, TD-01 and F-00i. Learning path Step 55. The r44
 accessibilityAncestor) are in the wire contract below, with the answer-level `elements` list and
 the iOS `behindModal` field from the label-element and accessibility-modal rulings, and the r45
 rulings (offWindow needs the whole untranslated rect within reach; Android lines, padding clips
-and scroll travel mapped through the view's global transform; no answer below API 29).
+and scroll travel mapped through the view's global transform; no answer below API 29). r46:
+`behindModal` carries `opaque`, and only an opaque modal view leaves the records behind it out.
 
 ## Problem
 
@@ -298,9 +299,30 @@ read null. The plain tag is not read, since other code can set it.
 iOS `behindModal` (accessibility-modal ruling: same rule as partial cover; records behind the
 modal leave matching but stay clip-judged with key null, unless the modal view's frame contains
 them, then they are left out like a whole cover). Each iOS record carries `behindModal`: null, or
-`{"rect": [left, top, right, bottom]}`, the frame in window points to a thousandth of the topmost
-shown view with `accessibilityViewIsModal` true in the record's window, when the record's view is
-neither that view nor inside it. Topmost is the last such view in tree order (a later sibling or a
-deeper view draws above); a hidden or alpha-0 view and everything under it are passed over. No
-modal view in the window gives null. Android records omit the field: modal content there is its
-own window, judged by the covered-window rule.
+`{"rect": [left, top, right, bottom], "opaque": boolean}`, the frame in window points to a
+thousandth of the topmost shown view with `accessibilityViewIsModal` true in the record's window,
+when the record's view is neither that view nor inside it. Topmost is the last such view in tree
+order (a later sibling or a deeper view draws above); a hidden or alpha-0 view and everything under
+it are passed over. No modal view in the window gives null. Android records omit the field: modal
+content there is its own window, judged by the covered-window rule.
+
+`opaque` (TEA ruling r46, PROBE_F3D): the harness classifies `invisible` and `offWindow` before
+`behindModal`, and a record is `modalCovered` only when `opaque` is true and `rect` contains it; a
+transparent backdrop (React Native's transparent `Modal`) leaves the records behind it clip-judged
+with key null. Native reads `opaque` once per window from the modal view, so every record behind
+the same modal view carries the same value. It is true only when all of these hold:
+
+- the modal view itself, or a view under it whose frame covers the modal view's whole frame
+  (equal or larger, compared to a thousandth as the wire writes them), paints an opaque
+  background: its layer's backgroundColor at alpha exactly 1 and a corner radius of 0;
+- that view, every view between it and the modal view, the modal view and every view from the
+  window down to it are drawn whole: not hidden, alpha and layer opacity exactly 1, no layer mask;
+- none of those views clips (clipsToBounds or masksToBounds) to a rect that leaves part of the
+  modal frame out.
+
+`isOpaque` is a drawing hint and is not read. The layer's backgroundColor is read because React
+Native's view returns its backgroundColor prop even when a shaped sublayer paints it (non-uniform
+corners or borders) and leaves the layer's own background nil; such a view does not count. A
+clear modal view over a full-size `rgba(0, 0, 0, 0.5)` backdrop, a black backdrop at alpha 0.4,
+an opaque card over part of the frame, two opaque halves, and a hidden or faded opaque child all
+give false. Reading false where the view does cover only leaves those records clip-judged.

@@ -984,6 +984,10 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     var text = false
     var drawsSubtree = false
     var modal = false
+    /// What the modal opacity check reads: alpha, background alpha and clipping.
+    var alpha: CGFloat = 1
+    var background: CGFloat = 0
+    var clips = false
     var children: [AXNode] = []
     weak var parent: AXNode?
 
@@ -1136,14 +1140,16 @@ final class TextLayoutProbeRulesTests: XCTestCase {
   }
 
   // TEA ruling 2026-11-14: a record behind the window's topmost accessibilityViewIsModal view
-  // carries `behindModal: {rect}`, that view's frame; inside it, or with no modal view, null.
+  // carries `behindModal: {rect, opaque}`, that view's frame; inside it, or with no modal view,
+  // null.
 
   private func modal(_ root: AXNode) -> AXNode? {
     Wire.topmostModal(root, children: { $0.children }, hidden: { $0.hidden }, isModal: { $0.modal })
   }
 
-  private func behind(_ node: AXNode, _ root: AXNode) -> Wire.BehindModal? {
-    Wire.behindModal(node, modal: modal(root), contains: { $0.contains($1) }, rect: { $0.rect })
+  private func behind(_ node: AXNode, _ root: AXNode, opaque: Bool = false) -> Wire.BehindModal? {
+    Wire.behindModal(
+      node, modal: modal(root), opaque: opaque, contains: { $0.contains($1) }, rect: { $0.rect })
   }
 
   func testARecordBehindAModalSheetGetsTheSheetsRectAndOneInsideItNull() {
@@ -1153,7 +1159,9 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let sheet = AXNode(rect: sheetRect, [AXNode([sheetText])])
     sheet.modal = true
     let root = AXNode([AXNode([behindText]), sheet])
-    XCTAssertEqual(behind(behindText, root), Wire.BehindModal(rect: sheetRect))
+    XCTAssertEqual(behind(behindText, root), Wire.BehindModal(rect: sheetRect, opaque: false))
+    XCTAssertEqual(
+      behind(behindText, root, opaque: true), Wire.BehindModal(rect: sheetRect, opaque: true))
     XCTAssertNil(behind(sheetText, root))
     // The modal view itself is inside it.
     XCTAssertNil(behind(sheet, root))
@@ -1184,7 +1192,7 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let between = AXNode(text: true)
     outer.children.append(between)
     between.parent = outer
-    XCTAssertEqual(behind(between, root), Wire.BehindModal(rect: nested.rect))
+    XCTAssertEqual(behind(between, root), Wire.BehindModal(rect: nested.rect, opaque: false))
     XCTAssertNil(modal(AXNode([hiddenLast, hiddenHolder])))
   }
 
@@ -1193,14 +1201,116 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       kind: "RCTParagraphComponentView", text: "Behind", viewRect: .zero, visibleRect: nil,
       clipRect: nil, contentRect: .zero, lineCount: 1, maxLines: nil, ellipsized: 0,
       unlimitedLineCount: 1, window: 0, scrolledAway: false, offWindow: false)
-    record.behindModal = .init(rect: CGRect(x: 0, y: 400.0004, width: 390, height: 444))
-    let data = try Wire.json(
-      token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)], records: [record])
-    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-    let first = try XCTUnwrap((json["records"] as? [[String: Any]])?.first)
-    let found = try XCTUnwrap(first["behindModal"] as? [String: Any])
-    XCTAssertEqual(Set(found.keys), ["rect"])
-    XCTAssertEqual(found["rect"] as? [Double], [0, 400, 390, 844])
+    for opaque in [false, true] {
+      record.behindModal = .init(
+        rect: CGRect(x: 0, y: 400.0004, width: 390, height: 444), opaque: opaque)
+      let data = try Wire.json(
+        token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)], records: [record])
+      let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+      let first = try XCTUnwrap((json["records"] as? [[String: Any]])?.first)
+      let found = try XCTUnwrap(first["behindModal"] as? [String: Any])
+      XCTAssertEqual(Set(found.keys), ["opaque", "rect"])
+      XCTAssertEqual(found["rect"] as? [Double], [0, 400, 390, 844])
+      XCTAssertEqual(found["opaque"] as? Bool, opaque)
+      // A JSON boolean, never a number.
+      let text = String(decoding: data, as: UTF8.self)
+      XCTAssertTrue(text.contains("\"opaque\":\(opaque)"), text)
+    }
+  }
+
+  // TEA ruling r46 (PROBE_F3D): `opaque` is true only when the modal view, or a view under it
+  // whose frame covers the modal view's frame, paints an opaque background and it and every view
+  // above it are drawn whole. React Native's transparent Modal leaves what lies behind on view.
+
+  private let screen = CGRect(x: 0, y: 0, width: 390, height: 844)
+
+  private func opaque(_ modal: AXNode, ancestors: [AXNode] = []) -> Bool {
+    Wire.modalOpaque(
+      modal, ancestors: ancestors, children: { $0.children },
+      paint: { node in
+        Wire.Paint(
+          shown: !node.hidden && node.alpha >= 1, rect: node.rect, clips: node.clips,
+          fills: node.background >= 1)
+      })
+  }
+
+  private func view(
+    _ rect: CGRect, background: CGFloat = 0, alpha: CGFloat = 1, hidden: Bool = false,
+    clips: Bool = false, _ children: [AXNode] = []
+  ) -> AXNode {
+    let node = AXNode(rect: rect, children)
+    node.background = background
+    node.alpha = alpha
+    node.hidden = hidden
+    node.clips = clips
+    return node
+  }
+
+  func testATransparentModalWithAClearOrDimmedBackdropIsNotOpaque() {
+    // RN transparent Modal: a clear modal view over a full-size backdrop of rgba(0, 0, 0, 0.5).
+    XCTAssertFalse(opaque(view(screen, [view(screen, background: 0.5)])))
+    // A black backdrop faded to 0.4 by its alpha.
+    XCTAssertFalse(opaque(view(screen, [view(screen, background: 1, alpha: 0.4)])))
+    // A clear backdrop, with an opaque card in the middle.
+    let card = view(CGRect(x: 20, y: 300, width: 350, height: 240), background: 1)
+    XCTAssertFalse(opaque(view(screen, [view(screen, [card])])))
+    // Nothing under it at all.
+    XCTAssertFalse(opaque(view(screen)))
+  }
+
+  func testAModalWithAnOpaqueFullSizeChildIsOpaque() {
+    XCTAssertTrue(opaque(view(screen, [view(screen, background: 1)])))
+    // Deeper down, or larger than the frame.
+    let larger = view(screen.insetBy(dx: -10, dy: -10), background: 1)
+    XCTAssertTrue(opaque(view(screen, [view(screen, [larger])])))
+    // The modal view itself.
+    XCTAssertTrue(opaque(view(screen, background: 1)))
+    // A sheet: the frame is the sheet's, not the window's.
+    let sheet = CGRect(x: 0, y: 400, width: 390, height: 444)
+    XCTAssertTrue(opaque(view(sheet, [view(sheet, background: 1)])))
+    // Frames compare to a thousandth, as the wire writes them.
+    let rounded = view(screen.insetBy(dx: 0.0002, dy: 0.0002), background: 1)
+    XCTAssertTrue(opaque(view(screen, [rounded])))
+  }
+
+  func testAnOpaqueChildCoveringOnlyPartOfTheModalIsNotOpaque() {
+    XCTAssertFalse(
+      opaque(view(screen, [view(CGRect(x: 0, y: 100, width: 390, height: 744), background: 1)])))
+    XCTAssertFalse(
+      opaque(view(screen, [view(CGRect(x: 0, y: 0, width: 389, height: 844), background: 1)])))
+    // Two halves do not add up: each one covers only part.
+    XCTAssertFalse(
+      opaque(
+        view(screen, [
+          view(CGRect(x: 0, y: 0, width: 390, height: 422), background: 1),
+          view(CGRect(x: 0, y: 422, width: 390, height: 422), background: 1),
+        ])))
+    XCTAssertFalse(
+      opaque(view(screen, [view(screen.insetBy(dx: 0.002, dy: 0.002), background: 1)])))
+  }
+
+  func testAHiddenOrFadedOpaqueChildIsNotOpaque() {
+    XCTAssertFalse(opaque(view(screen, [view(screen, background: 1, hidden: true)])))
+    XCTAssertFalse(opaque(view(screen, [view(screen, background: 1, alpha: 0.99)])))
+    // Under a hidden, a faded or a clipping holder that leaves part of the frame out.
+    XCTAssertFalse(
+      opaque(view(screen, [view(screen, hidden: true, [view(screen, background: 1)])])))
+    XCTAssertFalse(opaque(view(screen, [view(screen, alpha: 0.5, [view(screen, background: 1)])])))
+    let half = CGRect(x: 0, y: 0, width: 390, height: 422)
+    XCTAssertFalse(opaque(view(screen, [view(half, clips: true, [view(screen, background: 1)])])))
+    // A holder clipping to the whole frame cuts nothing.
+    XCTAssertTrue(opaque(view(screen, [view(screen, clips: true, [view(screen, background: 1)])])))
+  }
+
+  func testAModalUnderAFadedOrClippingAncestorIsNotOpaque() {
+    let modal = view(screen, background: 1)
+    XCTAssertTrue(opaque(modal, ancestors: [view(screen), view(screen, clips: true)]))
+    XCTAssertFalse(opaque(modal, ancestors: [view(screen), view(screen, alpha: 0.5)]))
+    XCTAssertFalse(opaque(modal, ancestors: [view(screen, hidden: true)]))
+    XCTAssertFalse(
+      opaque(modal, ancestors: [view(CGRect(x: 0, y: 0, width: 390, height: 422), clips: true)]))
+    // A faded modal view draws its opaque child faded.
+    XCTAssertFalse(opaque(view(screen, alpha: 0.5, [view(screen, background: 1)])))
   }
 
   // Antigravity r43 P3: a field wider than its text rect starts at its leading edge whatever
