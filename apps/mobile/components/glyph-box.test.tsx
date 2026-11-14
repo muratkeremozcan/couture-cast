@@ -42,6 +42,8 @@ describe('6.15 glyph box', () => {
     expect(glyphBoxSide(30, 1)).toBe(30)
     expect(glyphBoxSide(30, 0.85)).toBe(30)
     expect(glyphBoxSide(30, Number.NaN)).toBe(30)
+    // Unrounded: a 22.3 box stays 22.3, so Yoga places it exactly as it did before the fix.
+    expect(glyphBoxSide(22.3, 1)).toBe(22.3)
   })
 
   it('6.15-MOB-GLYPH-02 scales the side by the text size above it', () => {

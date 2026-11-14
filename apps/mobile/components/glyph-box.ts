@@ -10,10 +10,14 @@
 // is narrower than it is tall, so the box stays shorter than its text.
 import { PixelRatio, useWindowDimensions } from 'react-native'
 
-/** The side of a glyph box drawn at `base` at the default text size, never smaller than `base`. */
+/**
+ * The side of a glyph box drawn at `base` at the default text size, never smaller than `base`.
+ * At or below the default size it is `base` exactly: rounding it to the pixel grid made a 22 box
+ * 58 px where Yoga drew 57 or 58 by position (2.625 density), so the default look moved 1 px.
+ */
 export function glyphBoxSide(base: number, fontScale: number): number {
-  const scale = Number.isFinite(fontScale) && fontScale > 1 ? fontScale : 1
-  return PixelRatio.roundToNearestPixel(base * scale)
+  if (!(Number.isFinite(fontScale) && fontScale > 1)) return base
+  return PixelRatio.roundToNearestPixel(base * fontScale)
 }
 
 /**
