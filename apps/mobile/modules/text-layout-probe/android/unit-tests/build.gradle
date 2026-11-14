@@ -1,0 +1,61 @@
+// Versions follow the app's React Native 0.81 toolchain (AGP 8.11, Kotlin 2.1.20, SDK 36).
+//   gradle testDebugUnitTest   the record builder, wire and receiver tests (pr-text-layout-probe.yml)
+plugins {
+  id 'com.android.library' version '8.11.0'
+  id 'org.jetbrains.kotlin.android' version '2.1.20'
+}
+
+// The probe's sources without the Expo package, which links against expo-modules-core and is
+// linked in the app build; the autolinking spec (scripts/ci/mobile-android-autolinking.test.mjs)
+// proves a probe build lists it and every other build does not.
+def stageSources = tasks.register('stageSources', Sync) {
+  into layout.buildDirectory.dir('staged-src')
+  from('../src/main/java') {
+    include 'expo/modules/textlayoutprobe/TextLayoutSnapshot.kt'
+    include 'expo/modules/textlayoutprobe/TextLayoutProbeWire.kt'
+    include 'expo/modules/textlayoutprobe/TextLayoutProbeReceiver.kt'
+  }
+}
+
+android {
+  namespace 'expo.modules.textlayoutprobe'
+  compileSdk 36
+  defaultConfig { minSdk 24 }
+  sourceSets {
+    main {
+      manifest.srcFile '../src/main/AndroidManifest.xml'
+      java.srcDirs = [layout.buildDirectory.dir('staged-src').get().asFile]
+    }
+    test.java.srcDirs = ['../src/test/java']
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_17
+    targetCompatibility JavaVersion.VERSION_17
+  }
+  kotlinOptions { jvmTarget = '17' }
+  testOptions {
+    unitTests {
+      includeAndroidResources = true
+      all {
+        testLogging {
+          events 'passed', 'skipped', 'failed'
+          exceptionFormat 'full'
+        }
+      }
+    }
+  }
+}
+
+tasks.named('preBuild') { dependsOn stageSources }
+
+// Robolectric runs the newer SDK runtimes only on Java 21; the tests run on 21 whatever JDK
+// compiled them.
+tasks.withType(Test).configureEach {
+  javaLauncher = javaToolchains.launcherFor { languageVersion = JavaLanguageVersion.of(21) }
+}
+
+dependencies {
+  testImplementation 'junit:junit:4.13.2'
+  testImplementation 'org.robolectric:robolectric:4.16.1'
+  testImplementation 'androidx.test:core:1.6.1'
+}

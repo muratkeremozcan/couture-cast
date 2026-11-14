@@ -1,0 +1,6 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": {
+    "appDelegateSubscribers": ["TextLayoutProbeAppDelegateSubscriber"]
+  }
+}

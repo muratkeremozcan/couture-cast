@@ -1,0 +1,6 @@
+android/build/
+android/unit-tests/build/
+android/unit-tests/.gradle/
+android/unit-tests/local.properties
+ios/.build/
+ios/.swiftpm/

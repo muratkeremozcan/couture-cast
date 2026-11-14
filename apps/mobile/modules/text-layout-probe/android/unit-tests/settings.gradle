@@ -1,0 +1,21 @@
+// Standalone build of the text layout probe's record builder, wire writer and receiver with their
+// Robolectric tests (Story 6.15 F-00i). The module's own build.gradle needs the generated app; this
+// one needs neither a prebuild nor React Native: the tests stand in classes of React Native's
+// names (src/test/java/com/facebook/react), which the probe looks up by name. The PR job
+// (pr-text-layout-probe.yml) runs it directly:
+//   gradle -p apps/mobile/modules/text-layout-probe/android/unit-tests testDebugUnitTest
+pluginManagement {
+  repositories {
+    google()
+    mavenCentral()
+    gradlePluginPortal()
+  }
+}
+dependencyResolutionManagement {
+  repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+  repositories {
+    google()
+    mavenCentral()
+  }
+}
+rootProject.name = 'text-layout-probe-unit-tests'
