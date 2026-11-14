@@ -62,7 +62,8 @@ import {
   screenRunSteps,
 } from './lib/live-font-journey.mjs'
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
-import { requiredMounts } from './lib/live-font-scale-proof.mjs'
+import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
+import { createTextProbe } from './lib/live-font-text-probe.mjs'
 import { ageWeatherSnapshot } from './lib/live-font-weather.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
@@ -132,6 +133,8 @@ const maestroRun = createSyncMaestro({
   maestro: (args, options) => run('maestro', args, options),
 })
 const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+// F-00i: the text layout probe of the installed proof build, asked once per capture.
+const textProbe = createTextProbe({ platform, device, appId, adbBinary })
 
 function maestro(flow) {
   maestroRun(
@@ -265,6 +268,9 @@ function makeCapture(screenName, stage, scale) {
     return { tree: read, flat: flattened, markers: flattened.markers }
   }, mounts.scopes())
   mounts.captured(stage, flat.markers)
+  // F-00i: the laid-out text of the screen the hierarchy just showed. Three asks without a whole
+  // answer, or an answer that breaks the wire contract, fail the run with the probe's code.
+  const answer = textProbe.read()
   sequence += 1
   const capture = {
     stage,
@@ -279,7 +285,12 @@ function makeCapture(screenName, stage, scale) {
     nodes: flat.nodes,
     controls: flat.controls,
     window: windowBounds(tree),
+    volatileRegions: flat.volatileRegions,
+    textProbe: answer,
   }
+  // How the answer paired with the hierarchy, kept with the capture for review; the oracle
+  // pairs it again from the records when it judges.
+  capture.textProbeMatch = textProbeSummary(capture, platform)
   Object.defineProperty(capture, 'file', {
     value: `${screenName}-${String(sequence).padStart(3, '0')}-${stage}-${scale}`,
     enumerable: false,
@@ -631,6 +642,8 @@ const androidApi =
     : undefined
 // A 4 MiB event buffer holds a whole journey's wm_on_create_called entries.
 if (platform === 'android') adb('logcat', '-b', 'events', '-G', '4M')
+// The probe answers in the main buffer; 4 MiB keeps one answer whole however much the app logs.
+if (platform === 'android') adb('logcat', '-b', 'main', '-G', '4M')
 const previousScale = readScale()
 guard.step('font-scale', () => {
   if (platform === 'android' && previousScale === 'null')
