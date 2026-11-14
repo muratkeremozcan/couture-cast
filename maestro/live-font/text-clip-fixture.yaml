@@ -7,6 +7,17 @@ env:
   APP_SCHEME: couturecast-story68
 ---
 - openLink: ${APP_SCHEME}://text-clip-fixture
+# iOS sometimes asks before handing the link to the app (Open in "CoutureCast Story68"?, seen
+# 2026-11-14 on accessibility-medium, absent on the next launches). Answer it when it shows.
+- extendedWaitUntil:
+    visible: 'Open in .*'
+    timeout: 5000
+    optional: true
+- runFlow:
+    when:
+      visible: 'Open in .*'
+    commands:
+      - tapOn: 'Open'
 - extendedWaitUntil:
     visible:
       id: text-clip-healthy
