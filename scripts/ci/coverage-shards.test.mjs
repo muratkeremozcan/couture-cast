@@ -70,24 +70,61 @@ test('the workflow matrix runs exactly the shards this file knows', () => {
 
 // TEA review of 8586f43c: the mobile shard's plugin prebuild suites run after its tests, so the
 // recorded outcome must read them too, or a red plugin suite shows the shard as passed.
+/**
+ * The text of the step named `name`: from its `- name:` line to the next step of any kind (a line
+ * of six spaces and a dash) or the end of its job (the next two-space key), whichever comes first.
+ */
+function stepBlock(workflow, name) {
+  const start = workflow.indexOf(`\n      - name: ${name}\n`)
+  if (start < 0) return undefined
+  const rest = workflow.slice(start + 1)
+  const next = rest.slice(1).search(/\n {6}- |\n {2}[A-Za-z0-9_-]+:/)
+  return next < 0 ? rest : rest.slice(0, next + 1)
+}
+
 test("a shard's recorded outcome includes the mobile plugin prebuild suites", () => {
   // Text, not a YAML parser: the merge job runs this file with no dependency install.
   const workflow = readFileSync('.github/workflows/pr-checks.yml', 'utf8')
-  const plugins = workflow.indexOf(
-    '      - name: Mobile plugin prebuild suites\n        id: plugins\n'
+  const plugins = stepBlock(workflow, 'Mobile plugin prebuild suites')
+  const record = stepBlock(workflow, "Record this shard's result")
+  assert.ok(plugins, 'the plugin step exists')
+  assert.match(plugins, /\n {8}id: plugins\n/)
+  assert.ok(record, 'the record step exists')
+  assert.ok(
+    workflow.indexOf(record) > workflow.indexOf(plugins),
+    'the record step follows'
   )
-  const record = workflow.indexOf("      - name: Record this shard's result\n")
-  assert.ok(plugins > 0, 'the plugin step carries id plugins')
-  assert.ok(record > plugins, 'the record step follows the plugin step')
-  const recordStep = workflow.slice(
-    record,
-    workflow.indexOf('\n      - name:', record + 1)
-  )
-  assert.match(recordStep, /\n {10}OUTCOME: \$\{\{ steps\.tests\.outcome \}\}\n/)
-  assert.match(
-    recordStep,
-    /\n {10}PLUGINS_OUTCOME: \$\{\{ steps\.plugins\.outcome \}\}\n/
-  )
+  assert.match(record, /\n {10}OUTCOME: \$\{\{ steps\.tests\.outcome \}\}\n/)
+  assert.match(record, /\n {10}PLUGINS_OUTCOME: \$\{\{ steps\.plugins\.outcome \}\}\n/)
+})
+
+// Antigravity r11 (P3): the step block ends at the next step of any kind or the job's end.
+test('stepBlock ends at the next step of any kind or the end of the job', () => {
+  const workflow = [
+    'jobs:',
+    '  first:',
+    '    steps:',
+    '      - name: Plugins',
+    '        if: always()',
+    '        id: plugins',
+    '      - uses: actions/upload-artifact@v4',
+    '        with:',
+    '          OUTCOME: elsewhere',
+    '      - name: Record',
+    '        env:',
+    '          OUTCOME: here',
+    '  second:',
+    '    steps:',
+    '      - name: Other',
+    '          PLUGINS_OUTCOME: not-in-record',
+    '',
+  ].join('\n')
+  assert.match(stepBlock(workflow, 'Plugins'), /id: plugins/)
+  assert.doesNotMatch(stepBlock(workflow, 'Plugins'), /upload-artifact/)
+  const record = stepBlock(workflow, 'Record')
+  assert.match(record, /OUTCOME: here/)
+  assert.doesNotMatch(record, /not-in-record|second:/)
+  assert.equal(stepBlock(workflow, 'Missing'), undefined)
 })
 
 // Antigravity handover r2 (P3): a cancelled plugin step must not record a passed shard.
