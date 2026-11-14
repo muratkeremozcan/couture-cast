@@ -265,6 +265,13 @@ test('the driver crashing mid-run quarantines the planted leak and keeps the fai
   assert.match(result.stdout, /test_store_command_failed/)
   assert.match(result.stderr, /test_store_evidence_leak/)
   assert.ok(!result.stdout.includes(result.member))
+  // TEA (Story 6.15): on iOS the first call pins this simulator's runner port and lets Maestro
+  // install the runner (scripts/lib/maestro-driver-sync.mjs).
+  assert.match(
+    result.maestroArgs[0],
+    /^--device stub-device --driver-host-port 17[2-4]\d\d (?:test|hierarchy) /
+  )
+  assert.doesNotMatch(result.maestroArgs[0], /--no-reinstall-driver/)
   await assertCleaned(result)
 })
 

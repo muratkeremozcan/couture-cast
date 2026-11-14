@@ -162,6 +162,8 @@ function run(binary, args, { timeout = 180_000 } = {}) {
 }
 const adb = (...args) => run(adbBinary, ['-s', device, ...args])
 // Every Maestro invocation goes through the driver lifecycle (scripts/lib/maestro-driver-sync.mjs).
+// On iOS that is one XCUITest runner per simulator for the whole run, on a port of its own, and
+// hierarchy reads go through it too.
 const maestroRun = createSyncMaestro({
   platform,
   device,

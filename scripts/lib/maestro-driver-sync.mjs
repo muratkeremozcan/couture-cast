@@ -22,6 +22,26 @@
 // port below every ephemeral range. `maestro hierarchy` has no port option in 2.8, so a hierarchy
 // read whose driver failed to start is read once more, after the stale record ages out: the read
 // changes nothing on the device, and each retry is logged.
+//
+// On iOS (device run 2026-11-14, Settings swipe ETIMEDOUT): Maestro restarted the XCUITest runner
+// on every call (uninstall, install, `xcodebuild test-without-building` on a random port), and
+// one restart drew a port an idle Gradle daemon held, so its status check polled that daemon for
+// 2 min. So, on iOS, as the native suites do (scripts/ci/native-ios-maestro-driver.mjs), one
+// runner serves the whole run on one pinned port, on a port of this simulator's own
+// (scripts/lib/maestro-ios-driver-port.mjs) because two simulators run at once: the first call,
+// and the first after a failure, start a runner on a port proven free on every address; every
+// call after a completed one passes --no-reinstall-driver, after a status check of that port. A
+// runner that answers is reused (no xcodebuild starts); a port that accepts and closes, or answers
+// with something that is not HTTP, is another process's, and the call fails at once with
+// maestro_driver_port_in_use. Any failed call stops the runner, so the next starts a fresh one.
+// Hierarchy reads go through the same runner.
+import {
+  PORT_IN_USE,
+  createIosDriverPortIo,
+  iosDriverPortCandidates,
+  isRunnerOf,
+  portBusyReason,
+} from './maestro-ios-driver-port.mjs'
 import {
   MAESTRO_DRIVER_PACKAGES,
   NO_REINSTALL_DRIVER_ARG,
@@ -114,12 +134,164 @@ export function waitOutStaleSessions({
   }
 }
 
+/** How long a runner of this simulator that was told to stop may keep its port. */
+const IOS_RUNNER_EXIT_MS = 10_000
+
+/** The coded refusal: its message and `code` both lead with maestro_driver_port_in_use. */
+const portInUse = (detail, cause) =>
+  Object.assign(new Error(`${PORT_IN_USE}:${detail}`, cause ? { cause } : undefined), {
+    code: PORT_IN_USE,
+  })
+
+/**
+ * The iOS runner lifecycle of one simulator: `run(args, options)` as createSyncMaestro returns.
+ * `io` is the host side (createIosDriverPortIo), whose `stop(device)` stops the simulator's
+ * xcodebuild runner, and `onExit(fn)` runs `fn` when the process exits.
+ */
+export function createIosDriver({
+  device,
+  maestro,
+  io = createIosDriverPortIo(),
+  onExit = (fn) => process.once('exit', fn),
+  now = Date.now,
+  sleep = sleepSync,
+  log = (message) => process.stderr.write(`${message}\n`),
+}) {
+  const candidates = iosDriverPortCandidates(device)
+  let port = null
+  let reusable = false
+  let exitHooked = false
+
+  /** Stops this simulator's runner: its xcodebuild, then a runner app that outlives it. */
+  const stopRunner = () => {
+    reusable = false
+    io.stop(device)
+    if (port === null) return
+    for (const listener of io.listeners(port) ?? [])
+      if (isRunnerOf(listener.command, device)) io.kill(listener.pid)
+  }
+
+  /** Null once `candidate` is free; this simulator's own runner is given time to let go. */
+  const busyReason = (candidate) => {
+    const deadline = now() + IOS_RUNNER_EXIT_MS
+    for (;;) {
+      const listeners = io.listeners(candidate)
+      const reason = portBusyReason({
+        port: candidate,
+        listeners,
+        probe: io.probe(candidate, { bind: true }),
+      })
+      if (reason === null) return null
+      const own =
+        listeners?.length > 0 &&
+        listeners.every((listener) => isRunnerOf(listener.command, device))
+      if (!own || now() >= deadline) return reason
+      for (const listener of listeners) io.kill(listener.pid)
+      sleep(500)
+    }
+  }
+
+  /** Reserves the first free candidate (the current port first) for a fresh runner. */
+  const selectPort = () => {
+    io.stop(device)
+    const order =
+      port === null ? candidates : [port, ...candidates.filter((c) => c !== port)]
+    const busy = []
+    for (const candidate of order) {
+      if (!io.reserve(candidate, device)) {
+        busy.push(`${candidate} reserved by another runner`)
+        continue
+      }
+      const reason = busyReason(candidate)
+      if (reason === null) {
+        if (port !== null && port !== candidate) io.release(port)
+        port = candidate
+        if (!exitHooked) {
+          exitHooked = true
+          onExit(() => {
+            io.stop(device)
+            if (port !== null) io.release(port)
+          })
+        }
+        if (busy.length) log(`maestro_ios_driver_port: ${port} after ${busy.join('; ')}`)
+        return
+      }
+      io.release(candidate)
+      busy.push(reason)
+    }
+    port = null
+    throw portInUse(busy.join('; '))
+  }
+
+  /** The command line with the pinned port (a global option) and, on reuse, no reinstall. */
+  const withDriverArgs = (args, reuse) => {
+    const at = subcommandAt(args)
+    return [
+      ...args.slice(0, at),
+      DRIVER_HOST_PORT_ARG,
+      String(port),
+      args[at],
+      ...(reuse ? [NO_REINSTALL_DRIVER_ARG] : []),
+      ...args.slice(at + 1),
+    ]
+  }
+
+  /** What holds the port other than this simulator's runner, or null when nothing does. */
+  const heldBy = (status) => {
+    const listeners = io.listeners(port)
+    const foreign = (listeners ?? []).filter(
+      (listener) => !isRunnerOf(listener.command, device)
+    )
+    if (!foreign.length && !['closed', 'other'].includes(status)) return null
+    return portBusyReason({
+      port,
+      listeners: foreign,
+      probe: { connect: { '127.0.0.1': status } },
+    })
+  }
+
+  const prepare = (args) => {
+    if (reusable) {
+      // Maestro's own status check, made first: a runner that answers is reused as it is.
+      const status = io.probe(port).connect['127.0.0.1']
+      if (status === 'http') return withDriverArgs(args, true)
+      if (status !== 'refused' && status !== 'silent') {
+        const held = heldBy(status) ?? `${port} connect 127.0.0.1 ${status}`
+        stopRunner()
+        throw portInUse(held)
+      }
+      // Gone, or wedged: a fresh runner, on this port while it is free.
+      log(`maestro_ios_driver_${status === 'refused' ? 'gone' : 'unresponsive'}: ${port}`)
+      stopRunner()
+    }
+    selectPort()
+    return withDriverArgs(args, false)
+  }
+
+  return function run(args, options) {
+    const driverArgs = prepare(args)
+    try {
+      const result = maestro(driverArgs, options)
+      reusable = true
+      return result
+    } catch (error) {
+      // Who holds the port, read before the stop; then the next call starts a fresh runner.
+      const held = heldBy(io.probe(port).connect['127.0.0.1'])
+      stopRunner()
+      if (!held) throw error
+      const wrapped = portInUse(`${held}; ${error.message}`, error)
+      Object.defineProperty(wrapped, 'output', { value: error.output ?? error.message })
+      throw wrapped
+    }
+  }
+}
+
 /**
  * A runner's Maestro driver lifecycle. `adb(args)` runs adb on the device and returns stdout,
  * throwing on failure; `maestro(args)` runs Maestro and throws an Error on failure, with its whole
  * output as `error.output` (or in the message). Returns `run(args, options)`, which runs one Maestro command line (its
  * subcommand `test` or `hierarchy`) with the driver handled, passes `options` through to
- * `maestro`, and returns stdout.
+ * `maestro`, and returns stdout. On iOS, `ios` overrides createIosDriver's options.
  */
 export function createSyncMaestro({
   platform,
@@ -129,8 +301,18 @@ export function createSyncMaestro({
   read,
   now,
   sleep,
+  ios,
   log = (message) => process.stderr.write(`${message}\n`),
 }) {
+  if (platform === 'ios')
+    return createIosDriver({
+      device,
+      maestro,
+      ...(now ? { now } : {}),
+      ...(sleep ? { sleep } : {}),
+      log,
+      ...ios,
+    })
   let installed = false
 
   /** Whether both driver packages are on the device and the instrumentation is registered. */
