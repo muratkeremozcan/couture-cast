@@ -1078,10 +1078,12 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     var text = false
     var drawsSubtree = false
     var modal = false
-    /// What the modal opacity check reads: alpha, background alpha and clipping.
+    /// What the modal opacity check reads: alpha, background alpha, clipping, corners and mask.
     var alpha: CGFloat = 1
     var background: CGFloat = 0
     var clips = false
+    var cornerRadius: CGFloat = 0
+    var mask = false
     var children: [AXNode] = []
     weak var parent: AXNode?
 
@@ -1407,20 +1409,22 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       modal, ancestors: ancestors, children: { $0.children },
       paint: { node in
         Wire.Paint(
-          shown: !node.hidden && node.alpha >= 1, rect: node.rect, clips: node.clips,
-          fills: node.background >= 1)
+          shown: !node.hidden && node.alpha >= 1 && !node.mask, rect: node.rect, clips: node.clips,
+          rounded: node.cornerRadius > 0, fills: node.background >= 1 && node.cornerRadius <= 0)
       })
   }
 
   private func view(
     _ rect: CGRect, background: CGFloat = 0, alpha: CGFloat = 1, hidden: Bool = false,
-    clips: Bool = false, _ children: [AXNode] = []
+    clips: Bool = false, cornerRadius: CGFloat = 0, mask: Bool = false, _ children: [AXNode] = []
   ) -> AXNode {
     let node = AXNode(rect: rect, children)
     node.background = background
     node.alpha = alpha
     node.hidden = hidden
     node.clips = clips
+    node.cornerRadius = cornerRadius
+    node.mask = mask
     return node
   }
 
@@ -1478,6 +1482,30 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertFalse(opaque(view(screen, [view(half, clips: true, [view(screen, background: 1)])])))
     // A holder clipping to the whole frame cuts nothing.
     XCTAssertTrue(opaque(view(screen, [view(screen, clips: true, [view(screen, background: 1)])])))
+  }
+
+  // TEA ruling r47 P2 (R47_F3): a clipping view with rounded corners (or a mask) between the
+  // opaque fill and the modal frame, the modal view itself included, cuts the fill's corners, so
+  // what lies behind shows there: not opaque. A square clipping view cuts nothing.
+  func testR47ARoundedClippingViewOverASquareOpaqueFillIsNotOpaque() {
+    let fill = { self.view(self.screen, background: 1) }
+    // The rounded sheet itself clips its opaque square child.
+    XCTAssertFalse(opaque(view(screen, clips: true, cornerRadius: 12, [fill()])))
+    // A rounded clipping holder between the modal view and the fill, at any depth.
+    XCTAssertFalse(opaque(view(screen, [view(screen, clips: true, cornerRadius: 12, [fill()])])))
+    let deep = view(screen, clips: true, cornerRadius: 0.5, [view(screen, [fill()])])
+    XCTAssertFalse(opaque(view(screen, [deep])))
+    // A rounded clipping holder larger than the frame still rounds what it holds.
+    let larger = view(screen.insetBy(dx: -10, dy: -10), clips: true, cornerRadius: 12, [fill()])
+    XCTAssertFalse(opaque(view(screen, [larger])))
+    // A masked clipping holder.
+    XCTAssertFalse(opaque(view(screen, [view(screen, clips: true, mask: true, [fill()])])))
+    // A square clipping modal view or holder cuts nothing.
+    XCTAssertTrue(opaque(view(screen, clips: true, [fill()])))
+    XCTAssertTrue(opaque(view(screen, [view(screen, clips: true, [fill()])])))
+    // Rounded corners without clipping round only that view's own background, not its children.
+    let unclipped = view(screen, cornerRadius: 12, [fill()])
+    XCTAssertTrue(opaque(view(screen, cornerRadius: 12, [unclipped])))
   }
 
   func testAModalUnderAFadedOrClippingAncestorIsNotOpaque() {

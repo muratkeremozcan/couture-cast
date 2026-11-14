@@ -45,6 +45,7 @@ enum TextLayoutProbeSnapshot {
       shown: !view.isHidden && view.alpha >= 1 && layer.opacity >= 1 && layer.mask == nil,
       rect: view.convert(view.bounds, to: window),
       clips: view.clipsToBounds || layer.masksToBounds,
+      rounded: layer.cornerRadius > 0,
       fills: (layer.backgroundColor?.alpha ?? 0) >= 1 && layer.cornerRadius <= 0)
   }
 

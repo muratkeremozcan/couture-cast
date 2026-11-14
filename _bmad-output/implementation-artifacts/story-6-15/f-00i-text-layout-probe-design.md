@@ -319,7 +319,11 @@ the same modal view carries the same value. It is true only when all of these ho
 - that view, every view between it and the modal view, the modal view and every view from the
   window down to it are drawn whole: not hidden, alpha and layer opacity exactly 1, no layer mask;
 - none of those views clips (clipsToBounds or masksToBounds) to a rect that leaves part of the
-  modal frame out.
+  modal frame out;
+- no view from the modal view down to the opaque view, the modal view included, clips with a
+  layer corner radius above 0 (TEA ruling r47 P2, R47_F3): its rounded corners cut the fill's
+  corners, so what lies behind shows there. A square clipping view cuts nothing; a corner radius
+  without clipping rounds only that view's own background.
 
 `isOpaque` is a drawing hint and is not read. The layer's backgroundColor is read because React
 Native's view returns its backgroundColor prop even when a shaped sublayer paints it (non-uniform

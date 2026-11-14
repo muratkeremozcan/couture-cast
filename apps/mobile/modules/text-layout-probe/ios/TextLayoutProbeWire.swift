@@ -60,6 +60,9 @@ enum TextLayoutProbeWire {
     let rect: CGRect
     /// It clips its subviews to its bounds.
     let clips: Bool
+    /// Its corners are rounded (a layer corner radius above 0): when it clips, the corners of
+    /// everything under it are cut away.
+    let rounded: Bool
     /// It paints its whole rect: a background color at alpha exactly 1 with square corners.
     let fills: Bool
   }
@@ -67,10 +70,13 @@ enum TextLayoutProbeWire {
   /// Whether `modal` is opaque over its whole frame (TEA ruling r46): the modal view itself, or a
   /// view under it whose frame covers the modal view's frame, fills its rect (`Paint.fills`), and
   /// it and every view from the window down to it are drawn whole (`Paint.shown`), none clipping
-  /// to a rect that leaves part of the modal frame out. `ancestors` are the modal view's own,
-  /// from the window down (or in any order). An opaque view covering only part of the frame, a
-  /// hidden or faded one, or one under a hidden or faded view does not count; `isOpaque` is a
-  /// drawing hint and is not read. Frames compare as the wire writes them, to a thousandth.
+  /// to a rect that leaves part of the modal frame out. A clipping view with rounded corners from
+  /// the modal view down to the fill, the modal view included, cuts the fill's corners, so the
+  /// fill under it does not count (TEA ruling r47 P2); a mask already fails `shown`. `ancestors`
+  /// are the modal view's own, from the window down (or in any order). An opaque view covering
+  /// only part of the frame, a hidden or faded one, or one under a hidden or faded view does not
+  /// count; `isOpaque` is a drawing hint and is not read. Frames compare as the wire writes them,
+  /// to a thousandth.
   static func modalOpaque<Node>(
     _ modal: Node,
     ancestors: [Node],
@@ -87,6 +93,7 @@ enum TextLayoutProbeWire {
       let found = paint(node)
       guard passes(found) else { return false }
       if found.fills && covers(found.rect) { return true }
+      if found.clips && found.rounded { return false }
       return children(node).contains(where: fills)
     }
     return ancestors.allSatisfy { passes(paint($0)) } && fills(modal)
