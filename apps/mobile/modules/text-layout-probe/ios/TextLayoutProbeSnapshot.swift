@@ -85,6 +85,7 @@ enum TextLayoutProbeSnapshot {
       read: { view in
         guard var found = record(view, in: window, id: id) else { return nil }
         found.accessibilityAncestor = accessibilityAncestor(view, in: window)
+        found.accessibilityHidden = accessibilityHidden(view, in: window)
         found.behindModal = TextLayoutProbeWire.behindModal(
           view, modal: modal, opaque: opaque,
           contains: { holder, inner in inner.isDescendant(of: holder) },
@@ -132,6 +133,41 @@ enum TextLayoutProbeSnapshot {
       isElement: { $0.isAccessibilityElement },
       identifier: { $0.accessibilityIdentifier },
       rect: { $0.convert($0.bounds, to: window) })
+  }
+
+  /// Whether VoiceOver cannot reach the record's view (`TextLayoutProbeWire.accessibilityHidden`),
+  /// read from the view up to the window as React Native leaves them. The record's own view counts
+  /// as an element the way it presents its text: a paragraph (isAccessibilityElement always NO)
+  /// through an element of its accessibilityElements, empty when its `accessible` prop is false;
+  /// a TextInput through its backing text field or text view, which carries the input's
+  /// `accessible` and `accessibilityElementsHidden` props (its accessibilityElement).
+  private static func accessibilityHidden(_ view: UIView, in window: UIWindow) -> Bool {
+    let backing =
+      NSStringFromClass(type(of: view)) == "RCTTextInputComponentView"
+      ? backingTextView(view) : nil
+    return TextLayoutProbeWire.accessibilityHidden(
+      view,
+      parent: { $0 === window ? nil : $0.superview },
+      isElement: { node in
+        if node.isAccessibilityElement { return true }
+        guard node === view else { return false }
+        if let backing { return backing.isAccessibilityElement }
+        return presentsElement(node)
+      },
+      elementsHidden: { node in
+        node.accessibilityElementsHidden
+          || (node === view && backing?.accessibilityElementsHidden == true)
+      })
+  }
+
+  /// A paragraph's text reaches VoiceOver through its accessibilityElements: React Native returns
+  /// none when the Text's `accessible` prop is false, and otherwise marks the first one an element
+  /// unless an accessible ancestor coopts its label (then that ancestor is the element).
+  private static func presentsElement(_ view: UIView) -> Bool {
+    guard TLPParagraphReader.isParagraphLikeView(view) else { return false }
+    return (view.accessibilityElements ?? []).contains { element in
+      (element as? NSObject)?.isAccessibilityElement == true
+    }
   }
 
   private static func record(_ view: UIView, in window: UIWindow, id: Int)

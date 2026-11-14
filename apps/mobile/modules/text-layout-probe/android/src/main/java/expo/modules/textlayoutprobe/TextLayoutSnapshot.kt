@@ -89,7 +89,9 @@ data class ProbeRecord(
   val window: Int,
   val scrolledAway: Boolean,
   val offWindow: Boolean = false,
-  val opacity: Double = 1.0
+  val opacity: Double = 1.0,
+  /** Hidden from accessibility: [TextLayoutSnapshot.accessibilityHidden]. */
+  val accessibilityHidden: Boolean
 )
 
 /**
@@ -296,7 +298,8 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       window = window,
       scrolledAway = cuts.scrolledAway,
       offWindow = cuts.offWindow,
-      opacity = effectiveOpacity(view)
+      opacity = effectiveOpacity(view),
+      accessibilityHidden = accessibilityHidden(view)
     )
   }
 
@@ -679,6 +682,41 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       } else {
         rect.intersect(area) == null
       }
+
+    /**
+     * Whether TalkBack cannot reach the view (TEA ruling, accessibility-hidden records): true when
+     * the view or any ancestor up to the window root has importantForAccessibility
+     * NO_HIDE_DESCENDANTS, or the view itself has NO with no ancestor that is important for
+     * accessibility and focusable as a group ([groups]). React Native sets these on the views:
+     * `importantForAccessibility` as given, `aria-hidden` as no-hide-descendants (View), and
+     * `accessible` as focusability, so an accessible ancestor is the group that reads the text.
+     */
+    fun accessibilityHidden(view: View): Boolean {
+      var current: View? = view
+      while (current != null) {
+        if (current.importantForAccessibility == View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS) {
+          return true
+        }
+        current = current.parent as? View
+      }
+      if (view.importantForAccessibility != View.IMPORTANT_FOR_ACCESSIBILITY_NO) return false
+      var parent = view.parent as? View
+      while (parent != null) {
+        if (groups(parent)) return false
+        parent = parent.parent as? View
+      }
+      return true
+    }
+
+    /**
+     * An ancestor that reads the text views under it as one accessibility node: important for
+     * accessibility and focusable, by keyboard focus (React Native's `accessible`) or as a screen
+     * reader group (`setScreenReaderFocusable`, API 28).
+     */
+    private fun groups(view: View): Boolean =
+      view.isImportantForAccessibility &&
+        (view.isFocusable ||
+          (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && view.isScreenReaderFocusable))
 
     /**
      * The opacity the view draws with: the product of its own and every ancestor's alpha up to the

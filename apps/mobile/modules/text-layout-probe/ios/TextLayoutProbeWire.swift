@@ -36,6 +36,9 @@ enum TextLayoutProbeWire {
     /// it (behind it), and whether that view is opaque over its frame; nil when there is none or
     /// the view is inside it.
     var behindModal: BehindModal? = nil
+    /// Hidden from accessibility (`accessibilityHidden(_:parent:isElement:elementsHidden:)`): no
+    /// accessibility element at or above the view, or accessibilityElementsHidden at or above it.
+    var accessibilityHidden = false
   }
 
   /// A view behind the window's topmost `accessibilityViewIsModal` view: that view's frame in
@@ -231,6 +234,30 @@ enum TextLayoutProbeWire {
       current = parent(candidate)
     }
     return nil
+  }
+
+  /// Whether VoiceOver cannot reach a record's view (TEA ruling, accessibility-hidden records):
+  /// true when any node from the view up to the walk's end (`parent` nil; the window) has
+  /// `elementsHidden` (accessibilityElementsHidden, which React Native's `aria-hidden` and
+  /// `accessibilityElementsHidden` props set), or when neither the view nor any node above it is
+  /// an accessibility element (`isElement`). The snapshot reads React Native's own settings as the
+  /// views carry them: a paragraph answers isAccessibilityElement NO and presents its text through
+  /// accessibilityElements instead, and a TextInput carries its accessibility props on its backing
+  /// text field, so `isElement` and `elementsHidden` of the record's own view read those.
+  static func accessibilityHidden<Node>(
+    _ node: Node,
+    parent: (Node) -> Node?,
+    isElement: (Node) -> Bool,
+    elementsHidden: (Node) -> Bool
+  ) -> Bool {
+    var reached = false
+    var current: Node? = node
+    while let candidate = current {
+      if elementsHidden(candidate) { return true }
+      if isElement(candidate) { reached = true }
+      current = parent(candidate)
+    }
+    return !reached
   }
 
   /// One view on the way from a text view up to its window, for its effective opacity.
@@ -531,6 +558,7 @@ enum TextLayoutProbeWire {
           "behindModal": record.behindModal.map { modal -> Any in
             ["rect": wire(modal.rect), "opaque": modal.opaque]
           } ?? NSNull(),
+          "accessibilityHidden": record.accessibilityHidden,
         ]
       },
       "elements": elements.map { element -> [String: Any] in

@@ -86,9 +86,9 @@ jobs:
           # none was skipped, failed or errored.
           reports="$project/build/test-results/testDebugUnitTest"
           suite=expo.modules.textlayoutprobe.TextLayoutSnapshotTest
-          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 69
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 73
           suite=expo.modules.textlayoutprobe.TextLayoutProbeWireTest
-          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 23
+          node scripts/ci/junit-report-check.mjs "$reports/TEST-$suite.xml" "$suite" 25
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}

@@ -1751,6 +1751,136 @@ class TextLayoutSnapshotTest {
     assertEquals(snapshot.elements, snapshot().elements)
   }
 
+  // TEA ruling: native flags a record hidden from accessibility. Android: importantForAccessibility
+  // no-hide-descendants on the view or any ancestor, or no on the view itself with no ancestor
+  // that is important for accessibility and focusable as a group.
+
+  private fun hidden(snapshot: ProbeSnapshot, text: String) = only(snapshot, text).accessibilityHidden
+
+  private fun hiddenText(context: Context, value: String, mode: Int) =
+    label(context, value).apply { importantForAccessibility = mode }
+
+  /**
+   * apps/mobile/components/home/home-spotlight-teaser.tsx: the Partnered pill's Text carries
+   * `accessible={false}` (not focusable), `importantForAccessibility="no-hide-descendants"` and
+   * `aria-hidden`, beside the accessible link (a focusable group with the link label) and the Shop
+   * control, whose texts they read.
+   */
+  @Test
+  fun theSpotlightTeasersPartneredPillIsHiddenAndTheLinkAndShopTextsAreNot() {
+    host { context ->
+      val link = FrameLayout(context).apply {
+        contentDescription = "Look of the week by Ada, 3 reactions, Partnered with Acme"
+        isFocusable = true
+        isClickable = true
+        addView(column(context, label(context, "Look of the week"), label(context, "Ada")))
+      }.testId("home-spotlight-teaser-link")
+      val pill = FrameLayout(context).apply {
+        addView(
+          label(context, "Partnered").apply {
+            isFocusable = false
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+          }
+        )
+      }.testId("home-spotlight-teaser-partnered")
+      val shop = FrameLayout(context).apply {
+        contentDescription = "Shop at Acme"
+        isFocusable = true
+        addView(label(context, "Shop at Acme"))
+      }.testId("home-spotlight-teaser-shop")
+      column(context, column(context, link, column(context, pill, shop))).testId("home-spotlight-teaser")
+    }
+    val snapshot = snapshot()
+    assertTrue(hidden(snapshot, "Partnered"))
+    assertFalse(hidden(snapshot, "Look of the week"))
+    assertFalse(hidden(snapshot, "Ada"))
+    assertFalse(hidden(snapshot, "Shop at Acme"))
+    // The pill still draws: it keeps its record at full opacity.
+    assertEquals(1.0, only(snapshot, "Partnered").opacity, 0.0)
+  }
+
+  @Test
+  fun noHideDescendantsOnAnyAncestorHidesTheTextEvenInsideAFocusableGroup() {
+    host { context ->
+      column(
+        context,
+        FrameLayout(context).apply {
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+          addView(
+            FrameLayout(context).apply {
+              contentDescription = "Card"
+              isFocusable = true
+              addView(column(context, label(context, "Under hide descendants")))
+            }
+          )
+        },
+        label(context, "Beside it")
+      )
+    }
+    val snapshot = snapshot()
+    assertTrue(hidden(snapshot, "Under hide descendants"))
+    assertFalse(hidden(snapshot, "Beside it"))
+  }
+
+  @Test
+  fun aTextMarkedNoIsHiddenUnlessAnImportantFocusableAncestorGroupsIt() {
+    host { context ->
+      column(
+        context,
+        // No group above: hidden.
+        hiddenText(context, "Loose no", View.IMPORTANT_FOR_ACCESSIBILITY_NO),
+        // An accessible ancestor (React Native's accessible: focusable, important by AUTO) reads it.
+        FrameLayout(context).apply {
+          isFocusable = true
+          addView(column(context, hiddenText(context, "Grouped no", View.IMPORTANT_FOR_ACCESSIBILITY_NO)))
+        },
+        // A screen reader group reads it too.
+        FrameLayout(context).apply {
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+          isScreenReaderFocusable = true
+          addView(hiddenText(context, "Screen reader group no", View.IMPORTANT_FOR_ACCESSIBILITY_NO))
+        },
+        // Focusable but not important for accessibility: no group.
+        FrameLayout(context).apply {
+          isFocusable = true
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+          addView(hiddenText(context, "Unimportant focusable no", View.IMPORTANT_FOR_ACCESSIBILITY_NO))
+        },
+        // Important for accessibility but not focusable: no group.
+        FrameLayout(context).apply {
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_YES
+          addView(hiddenText(context, "Important unfocusable no", View.IMPORTANT_FOR_ACCESSIBILITY_NO))
+        }
+      )
+    }
+    val snapshot = snapshot()
+    assertTrue(hidden(snapshot, "Loose no"))
+    assertFalse(hidden(snapshot, "Grouped no"))
+    assertFalse(hidden(snapshot, "Screen reader group no"))
+    assertTrue(hidden(snapshot, "Unimportant focusable no"))
+    assertTrue(hidden(snapshot, "Important unfocusable no"))
+  }
+
+  @Test
+  fun anOrdinaryTextAndATextUnderAnAncestorMarkedNoAreNotHidden() {
+    host { context ->
+      column(
+        context,
+        label(context, "Plain"),
+        hiddenText(context, "Marked yes", View.IMPORTANT_FOR_ACCESSIBILITY_YES),
+        // NO on an ancestor leaves out that ancestor alone.
+        FrameLayout(context).apply {
+          importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+          addView(label(context, "Under an ancestor marked no"))
+        }
+      )
+    }
+    val snapshot = snapshot()
+    assertFalse(hidden(snapshot, "Plain"))
+    assertFalse(hidden(snapshot, "Marked yes"))
+    assertFalse(hidden(snapshot, "Under an ancestor marked no"))
+  }
+
   @Test
   fun theTestIdKeyIsReadFromReactNativesRClassOrElseByName() {
     val ownLoader = javaClass.classLoader

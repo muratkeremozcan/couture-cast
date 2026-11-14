@@ -369,12 +369,15 @@ final class TextLayoutProbeRulesTests: XCTestCase {
       [
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
         "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
-        "opacity", "accessibilityAncestor", "behindModal",
+        "opacity", "accessibilityAncestor", "behindModal", "accessibilityHidden",
       ])
     XCTAssertEqual(Set(json.keys), ["version", "token", "platform", "windows", "records", "elements"])
     XCTAssertEqual((json["elements"] as? [[String: Any]])?.count, 0)
     XCTAssertTrue(record["accessibilityAncestor"] is NSNull)
     XCTAssertTrue(record["behindModal"] is NSNull)
+    // A JSON boolean, false unless the snapshot found the view hidden.
+    XCTAssertEqual(record["accessibilityHidden"] as? Bool, false)
+    XCTAssertTrue(wireText(data).contains("\"accessibilityHidden\":false"))
     XCTAssertTrue(record["visibleRect"] is NSNull)
     XCTAssertTrue(record["clipRect"] is NSNull)
     XCTAssertTrue(record["maxLines"] is NSNull)
@@ -1170,6 +1173,90 @@ final class TextLayoutProbeRulesTests: XCTestCase {
   func testNoModalViewGivesNull() {
     let text = AXNode(text: true)
     XCTAssertNil(behind(text, AXNode([AXNode([text]), AXNode()])))
+  }
+
+  // TEA ruling: native flags a record hidden from accessibility. iOS: no accessibility element at
+  // or above the view up to the window, or accessibilityElementsHidden at or above it.
+
+  private func hiddenFromAccessibility(_ node: AXNode) -> Bool {
+    Wire.accessibilityHidden(
+      node, parent: { $0.parent }, isElement: { $0.isElement },
+      elementsHidden: { $0.elementsHidden })
+  }
+
+  private func wireText(_ data: Data) -> String { String(decoding: data, as: UTF8.self) }
+
+  func testATextWithNoAccessibilityElementAtOrAboveItIsAccessibilityHidden() {
+    let loose = AXNode(text: true)
+    let root = AXNode([AXNode([AXNode([loose])])])
+    XCTAssertTrue(hiddenFromAccessibility(loose))
+    // The walk runs to its end: an element at the top of the chain reaches it.
+    root.isElement = true
+    XCTAssertFalse(hiddenFromAccessibility(loose))
+  }
+
+  func testATextThatIsItsOwnElementOrSitsInsideOneIsNotAccessibilityHidden() {
+    let own = AXNode(element: "Title", text: true)
+    let inside = AXNode(text: true)
+    let root = AXNode([AXNode([own]), AXNode(element: "Save", [AXNode([inside])])])
+    XCTAssertFalse(hiddenFromAccessibility(own))
+    XCTAssertFalse(hiddenFromAccessibility(inside))
+    XCTAssertEqual(root.children.count, 2)
+  }
+
+  func testAccessibilityElementsHiddenOnTheTextOrAnyAncestorHidesIt() {
+    // On the text itself, even when it is its own element.
+    let own = AXNode(element: "Partnered", text: true)
+    own.elementsHidden = true
+    // Above the element the text sits in, at any depth up to the window.
+    let inside = AXNode(text: true)
+    let element = AXNode(element: "Card", [inside])
+    let holder = AXNode([AXNode([element])])
+    holder.elementsHidden = true
+    let root = AXNode([AXNode([own]), holder])
+    root.isElement = true
+    XCTAssertTrue(hiddenFromAccessibility(own))
+    XCTAssertTrue(hiddenFromAccessibility(inside))
+    holder.elementsHidden = false
+    XCTAssertFalse(hiddenFromAccessibility(inside))
+  }
+
+  /// apps/mobile/components/home/home-spotlight-teaser.tsx: the Partnered pill's Text has
+  /// `accessible={false}` (its paragraph presents no element), `accessibilityElementsHidden` and
+  /// `aria-hidden` (accessibilityElementsHidden on its own view), and sits beside the accessible
+  /// link, whose texts it reaches.
+  func testTheSpotlightTeasersPartneredPillIsHiddenAndItsLinkTextIsNot() {
+    let partnered = AXNode(text: true)
+    partnered.elementsHidden = true
+    let heading = AXNode(text: true)
+    let link = AXNode(
+      element: "Look of the week by Ada, 3 reactions", identifier: "home-spotlight-teaser-link",
+      [AXNode([heading])])
+    let pill = AXNode(identifier: "home-spotlight-teaser-partnered", [partnered])
+    let shop = AXNode(element: "Shop", identifier: "home-spotlight-teaser-shop")
+    let sponsored = AXNode(identifier: "home-spotlight-teaser-sponsored", [pill, shop])
+    let section = AXNode(identifier: "home-spotlight-teaser", [AXNode([link, sponsored])])
+    let root = AXNode([section])
+    XCTAssertTrue(hiddenFromAccessibility(partnered))
+    XCTAssertFalse(hiddenFromAccessibility(heading))
+    // Without its hidden flag the pill's text still reaches no element: hidden all the same.
+    partnered.elementsHidden = false
+    XCTAssertTrue(hiddenFromAccessibility(partnered))
+    XCTAssertEqual(root.children.count, 1)
+  }
+
+  func testTheJsonWritesAccessibilityHiddenAsABoolean() throws {
+    var record = Wire.Record(
+      kind: "RCTParagraphComponentView", text: "Partnered", viewRect: .zero, visibleRect: nil,
+      clipRect: nil, contentRect: .zero, lineCount: 1, maxLines: nil, ellipsized: 0,
+      unlimitedLineCount: 1, window: 0, scrolledAway: false, offWindow: false)
+    record.accessibilityHidden = true
+    let data = try Wire.json(
+      token: "t", windows: [.init(id: 0, rect: window, z: 0, focused: true)], records: [record])
+    let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let first = try XCTUnwrap((json["records"] as? [[String: Any]])?.first)
+    XCTAssertEqual(first["accessibilityHidden"] as? Bool, true)
+    XCTAssertTrue(wireText(data).contains("\"accessibilityHidden\":true"), wireText(data))
   }
 
   func testTheTopmostModalIsTheLastShownOneInTreeOrder() {

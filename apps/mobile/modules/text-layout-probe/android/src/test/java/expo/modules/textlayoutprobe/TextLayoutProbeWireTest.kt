@@ -38,7 +38,8 @@ class TextLayoutProbeWireTest {
     unlimitedLineCount = 2,
     window = 0,
     scrolledAway = false,
-    opacity = 0.25
+    opacity = 0.25,
+    accessibilityHidden = false
   )
 
   private val windows = listOf(ProbeWindow(0, ProbeRect(0, 0, 1080, 2400), 0, true))
@@ -76,7 +77,7 @@ class TextLayoutProbeWireTest {
       setOf(
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
         "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
-        "opacity"
+        "opacity", "accessibilityHidden"
       ),
       first.keys().asSequence().toSet()
     )
@@ -87,7 +88,8 @@ class TextLayoutProbeWireTest {
     assertFalse(first.getBoolean("scrolledAway"))
     assertFalse(first.getBoolean("offWindow"))
     assertEquals(0.25, first.getDouble("opacity"), 0.0)
-    assertTrue(json.contains("\"opacity\":0.25}"))
+    assertTrue(json.contains("\"opacity\":0.25,\"accessibilityHidden\":false}"))
+    assertFalse(first.getBoolean("accessibilityHidden"))
     assertEquals(
       setOf("version", "token", "platform", "windows", "records", "elements"),
       parsed.keys().asSequence().toSet()
@@ -182,6 +184,18 @@ class TextLayoutProbeWireTest {
     assertTrue(first.getBoolean("offWindow"))
     assertFalse(first.getBoolean("scrolledAway"))
     assertTrue(first.isNull("clipRect"))
+  }
+
+  // TEA ruling: native flags a record hidden from accessibility, a JSON boolean on every record.
+  @Test
+  fun accessibilityHiddenIsWrittenAsABooleanOnEveryRecord() {
+    val records = listOf(record("Partnered").copy(accessibilityHidden = true), record("Look"))
+    val json = TextLayoutProbeWire.json("h", ProbeSnapshot(windows, records))
+    val parsed = JSONObject(reassemble("h", TextLayoutProbeWire.lines("h", json))).getJSONArray("records")
+    assertTrue(parsed.getJSONObject(0).getBoolean("accessibilityHidden"))
+    assertFalse(parsed.getJSONObject(1).getBoolean("accessibilityHidden"))
+    assertTrue(json, json.contains("\"accessibilityHidden\":true}"))
+    assertTrue(json, json.contains("\"accessibilityHidden\":false}"))
   }
 
   @Test

@@ -7,6 +7,7 @@ the iOS `behindModal` field from the label-element and accessibility-modal rulin
 rulings (offWindow needs the whole untranslated rect within reach; Android lines, padding clips
 and scroll travel mapped through the view's global transform; no answer below API 29). r46:
 `behindModal` carries `opaque`, and only an opaque modal view leaves the records behind it out.
+Every record on both platforms carries `accessibilityHidden` from the accessibility-hidden ruling.
 
 ## Problem
 
@@ -326,3 +327,33 @@ corners or borders) and leaves the layer's own background nil; such a view does 
 clear modal view over a full-size `rgba(0, 0, 0, 0.5)` backdrop, a black backdrop at alpha 0.4,
 an opaque card over part of the frame, two opaque halves, and a hidden or faded opaque child all
 give false. Reading false where the view does cover only leaves those records clip-judged.
+
+## Accessibility-hidden records, 2026-11-14
+
+TEA ruling: native flags a record that is hidden from accessibility (no accessible element on its
+ancestor chain, accessibilityElementsHidden or isAccessibilityElement false, Android
+importantForAccessibility no or no-hide-descendants). Every record on both platforms carries
+`accessibilityHidden`, a required JSON boolean. It says nothing about drawing: a hidden record
+keeps its rects and opacity.
+
+- iOS: true when any view from the record's view up to the window, both included, has
+  `accessibilityElementsHidden` true, or when neither the record's view nor any view above it up
+  to the window is an accessibility element (`isAccessibilityElement`). The record's own view
+  counts as an element the way React Native presents its text: a paragraph answers
+  `isAccessibilityElement` NO and presents its text through `accessibilityElements`, which is
+  empty when the Text has `accessible={false}`, so it counts when one of those is an element; a
+  TextInput carries its `accessible` and `accessibilityElementsHidden` props on its backing text
+  field or text view (its `accessibilityElement`), so those are read there.
+- Android: true when the record's view or any ancestor up to the window root has
+  `importantForAccessibility` NO_HIDE_DESCENDANTS, or the view itself has NO and no ancestor is
+  important for accessibility (`isImportantForAccessibility`) and focusable as a group
+  (`isFocusable`, React Native's `accessible`, or `isScreenReaderFocusable`). NO on an ancestor
+  leaves that ancestor out of the tree and nothing under it.
+- React Native sets these as the views carry them: `importantForAccessibility` as given,
+  `aria-hidden` as accessibilityElementsHidden on iOS and no-hide-descendants on Android, and
+  `accessible` as `isAccessibilityElement` (iOS views), the paragraph's elements (iOS Text) and
+  focusability (Android). The probe reads these settings from the views.
+- Real case: the Partnered pill Text in `apps/mobile/components/home/home-spotlight-teaser.tsx`
+  (`accessible={false}`, `accessibilityElementsHidden`, `importantForAccessibility`
+  no-hide-descendants, `aria-hidden`), beside the accessible link, is `true` on both platforms;
+  the link's own texts and the Shop control's text are `false`.
