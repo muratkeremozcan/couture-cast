@@ -69,13 +69,17 @@ import {
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
 import { createTextProbe } from './lib/live-font-text-probe.mjs'
-import { createVolatileProofCheck } from './lib/live-font-volatile-proof.mjs'
+import {
+  CAPTURE_HASHES,
+  captureHashes,
+  createVolatileProofCheck,
+} from './lib/live-font-volatile-proof.mjs'
 import { ageWeatherSnapshot } from './lib/live-font-weather.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
 // Loaded by URL: the manifest module is a recorded input of the leg (evidence-manifest.mjs lists
 // it as a path), and its own literals name every other leg's harness, which this leg does not read.
-const { changedInputs } = await import(
+const { changedInputs, writeManifest } = await import(
   new URL('./lib/evidence-manifest.mjs', import.meta.url).href
 )
 
@@ -817,11 +821,15 @@ try {
       timezone: pinned.timezone,
       weatherBanner: weather.weatherBanner,
       androidDensity,
+      // The inputs at a proof run's manifest sha, recomputed from git, against HEAD's.
       volatileProofCheck: createVolatileProofCheck({
         platform,
         repoRoot: root,
-        changed: (manifest) =>
-          changedInputs(manifest, { cwd: root, requireClean: false }),
+        changed: (sha) =>
+          changedInputs(
+            writeManifest({ leg: 'live-font', rev: sha, cwd: root, requireClean: false }),
+            { cwd: root, requireClean: false }
+          ),
       }),
     })
     for (const leg of report.legs) {
@@ -871,6 +879,15 @@ guard.finish((restoreErrors) => {
     restoreErrors,
     results,
   }
+  // TEA ruling r48: every capture of the run bound by its sha256 under the run's HEAD, so a later
+  // volatile proof can name this run (live-font-volatile-proof.mjs).
+  const head = spawnSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' })
+  if (head.status === 0)
+    fs.writeFileSync(
+      path.join(out, CAPTURE_HASHES),
+      JSON.stringify(captureHashes({ dir: out, sha: head.stdout.trim(), fs }), null, 2),
+      { mode: 0o600 }
+    )
   fs.writeFileSync(
     path.join(out, 'live-font-report.json'),
     JSON.stringify(report, null, 2),

@@ -197,12 +197,16 @@ const validAncestor = (ancestor) =>
     ancestor.identifier !== '' &&
     isRect(ancestor.rect))
 /**
- * `behindModal` (TEA ruling r46, iOS only, required): null, or `{ rect }`, the frame of the
- * accessibilityViewIsModal view the text sits behind, in the form of viewRect. Android records
- * omit it.
+ * `behindModal` (TEA rulings r46 and r48, iOS only, required): null, or `{ rect, opaque }`, the
+ * frame of the accessibilityViewIsModal view the text sits behind, in the form of viewRect, and
+ * whether that view (or a full-size descendant with an opaque background) is opaque over it.
+ * Android records omit it.
  */
 const validModal = (modal) =>
-  modal === null || (sameFields(modal, ['rect']) && isRect(modal.rect))
+  modal === null ||
+  (sameFields(modal, ['opaque', 'rect']) &&
+    isRect(modal.rect) &&
+    typeof modal.opaque === 'boolean')
 const IOS_FIELDS = [...RECORD_FIELDS, 'accessibilityAncestor', 'behindModal'].sort()
 /** The record field sets each platform's contract takes, offWindow optional on both. */
 const FIELD_SETS = {
@@ -670,18 +674,19 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
-    // TEA ruling r46: behind an accessibilityViewIsModal view whose frame holds it, it is left
-    // out like a whole cover; behind one that does not, like a partial cover (behind).
-    else if (
-      record.behindModal &&
-      contains(record.behindModal.rect, recordRect(record), tolerance)
-    )
-      kind = 'modalCovered'
     // TEA ruling 2026-11-14: opacity exactly 0 draws nothing (the inactive copy of a stacked
     // tab icon); anything above 0, a fade caught mid-way, is matched and judged.
     else if (record.opacity === 0) kind = 'invisible'
     // Wholly off its window with no scroll view to bring it in: drawn nowhere, so no clip.
     else if (record.offWindow === true) kind = 'offWindow'
+    // TEA rulings r46 and r48: behind an accessibilityViewIsModal view that is opaque over it
+    // (native says so; an answer from before the field never is) and whose frame holds it, it is
+    // left out like a whole cover; behind any other (a transparent backdrop), like a partial cover.
+    else if (
+      record.behindModal?.opaque === true &&
+      contains(record.behindModal.rect, recordRect(record), tolerance)
+    )
+      kind = 'modalCovered'
     else if (coveredIds.has(record.window) || record.behindModal) kind = 'behind'
     // In a volatile region: volatile only if no hierarchy node of its text takes it (matchTextProbe).
     else if (region >= 0) kind = 'regional'
@@ -866,8 +871,8 @@ function resolveLeftovers({
  * TEA ruling r46: each hierarchy node no text record took (after text pairing, groups and
  * attachment), in screen order, pairs with one accessibility element of the same label: by
  * identity first (the element's identifier is the node's testID and its frame touches the
- * node's box; the best overlap, a tie ambiguous), else by frame (every edge within the
- * tolerance; two such elements ambiguous). An element with a text view inside stands in only
+ * node's box; the best overlap, a tie ambiguous), else, for an element with no identifier
+ * only, by frame (every edge within the tolerance; two such elements ambiguous). An element with a text view inside stands in only
  * when a text record lies inside it, so a probe that drops a text record cannot hide it behind
  * its own element. Each element pairs once; it is never judged and never counts as text.
  * Returns the pairs `{ node, element, label }`, with `ambiguous` beside them.
@@ -900,9 +905,14 @@ function pairElements({ nodes, open, elements, records, tolerance, nodeRank }) {
         element.identifier === node.id &&
         overlapRatio(element.rect, node.box) > 0
     )
+    // TEA ruling r48: an element with an identifier never stands in for a node with another
+    // testID; only one with none falls back to label and frame.
     const chosen = named.length
       ? best(named, ({ element }) => -overlapRatio(element.rect, node.box))
-      : eligible.filter(({ element }) => sameFrame(element.rect, node.box))
+      : eligible.filter(
+          ({ element }) =>
+            element.identifier === null && sameFrame(element.rect, node.box)
+        )
     if (!chosen.length) continue
     open.delete(node.index)
     if (chosen.length > 1) {
@@ -955,11 +965,12 @@ function attachToElements({
  * leaves out. Every record falls in one class:
  *   empty      text '' (no text to cut), left out
  *   covered    in a window a focused higher window covers whole, left out
- *   modalCovered  behind an accessibilityViewIsModal view whose frame holds it (iOS
- *              `behindModal`, TEA ruling r46), left out like a whole cover
  *   invisible  opacity exactly 0: left out of matching and judging, listed for review
  *   offWindow  wholly off its window, no scroll view to bring it in: may match, never
  *              required, never judged, listed for review
+ *   modalCovered  behind an accessibilityViewIsModal view that is opaque over it and whose
+ *              frame holds it (iOS `behindModal`, TEA rulings r46 and r48), left out like a
+ *              whole cover; checked after invisible and offWindow
  *   behind     in a window under a focused higher window that does not cover it whole (a
  *              centred dialog), or behind a modal view whose frame does not hold it: out of
  *              matching, still judged for clipping, with no key

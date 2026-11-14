@@ -4,6 +4,7 @@
 // F-00: the oracle judged on recorded and derived hierarchies before it judges any device run.
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { describe, test } from 'node:test'
 import {
@@ -2812,6 +2813,28 @@ describe('text layout clipping (F-00i)', () => {
     assert.deepEqual(glyphFaces(relaid)[1], ['\u21c4', null, null])
   })
 
+  // TEA ruling r48 (r46 PROBE_F2C): a flex-squeezed layout on a downward leg keeps the start
+  // launch's height and line count but not its width: no kept layout, no second face.
+  test('PROBE_F2C: a squeezed layout with the source height and line count but another width is no second face', () => {
+    const squeezed = secondFace()
+    recordFor(squeezed.coldBefore, CONDITION).lineCount = 2
+    const record = recordFor(squeezed.settled, CONDITION)
+    record.lineCount = 2
+    record.contentRect = [
+      record.contentRect[0],
+      record.contentRect[1],
+      record.contentRect[2] - 30,
+      record.contentRect[3],
+    ]
+    assert.deepEqual(faceOf(squeezed), [[CONDITION, false, false, null]])
+    assert.throws(prove(squeezed), { code: 'live_font_baseline_unexpected' })
+    // The whole layout kept, width included, is the second face.
+    const kept = secondFace()
+    recordFor(kept.coldBefore, CONDITION).lineCount = 2
+    recordFor(kept.settled, CONDITION).lineCount = 2
+    assert.deepEqual(faceOf(kept), [[CONDITION, false, true, 'staleContent']])
+  })
+
   // TEA ruling r45: volatile records keyed by region testID, masked text and screen order,
   // judged for a face only when both cold launches and the before capture hold the key.
   const REGION = 'community-spotlight'
@@ -2877,17 +2900,35 @@ describe('text layout clipping (F-00i)', () => {
   // TEA ruling r47 (r45 P2-1): the proof names committed runs; the harness reads them at HEAD
   // and recomputes their keys, so nothing the entry states is trusted.
   const SHA_A = 'a'.repeat(40)
-  /** A fake repository at HEAD: path to bytes, and the manifests whose inputs changed. */
+  /**
+   * A fake repository at HEAD: path to bytes, the commits HEAD descends from, and the shas whose
+   * recomputed live-font inputs differ from HEAD's.
+   */
   const repository = () => {
     const files = new Map()
     const changedShas = new Set()
+    const commits = new Set([SHA_A])
     return {
       files,
       changedShas,
+      commits,
       read: (file) => (files.has(file) ? Buffer.from(files.get(file)) : null),
-      changed: (manifest) =>
-        changedShas.has(manifest.sha) ? [{ path: 'apps/mobile' }] : [],
+      ancestor: (sha) => commits.has(sha),
+      changed: (sha) => (changedShas.has(sha) ? [{ path: 'apps/mobile' }] : []),
     }
+  }
+  /** Writes the run's capture hash list from the captures it holds now, under `sha`. */
+  const rehash = (repo, dir, sha = SHA_A) => {
+    const captures = {}
+    for (const [file, bytes] of repo.files)
+      if (file.startsWith(`${dir}/community-`))
+        captures[file.slice(dir.length + 1, -'.json'.length)] = createHash('sha256')
+          .update(Buffer.from(bytes))
+          .digest('hex')
+    repo.files.set(
+      `${dir}/capture-hashes.json`,
+      JSON.stringify({ version: 1, leg: 'live-font', sha, captures })
+    )
   }
   /** Commits `change`'s captures as one run under `dir`, as launch `launch`, at `sha`. */
   const commitRun = (
@@ -2907,6 +2948,7 @@ describe('text layout clipping (F-00i)', () => {
       }
       repo.files.set(`${dir}/${name}.json`, JSON.stringify(capture))
     }
+    rehash(repo, dir, sha)
     const manifest = JSON.stringify({ leg: 'live-font', sha, inputs: {} })
     repo.files.set(
       manifestAt === 'root'
@@ -2928,6 +2970,7 @@ describe('text layout clipping (F-00i)', () => {
     const check = createVolatileProofCheck({
       platform: 'android',
       read: repo.read,
+      ancestor: repo.ancestor,
       changed: repo.changed,
     })
     const entry = { ...ENTRY, clippedKeys: [VOLATILE_CLIP], volatileProof: { runs } }
@@ -2995,6 +3038,7 @@ describe('text layout clipping (F-00i)', () => {
     const check = createVolatileProofCheck({
       platform: 'android',
       read: sameLaunch.read,
+      ancestor: sameLaunch.ancestor,
       changed: sameLaunch.changed,
     })
     assert.throws(
@@ -3049,10 +3093,63 @@ describe('text layout clipping (F-00i)', () => {
         return entry
       },
       'another head': ({ entry, repo }) => {
+        repo.commits.add('b'.repeat(40))
         repo.files.set(
           `${RUN_B}/manifest.json`,
           JSON.stringify({ leg: 'live-font', sha: 'b'.repeat(40), inputs: {} })
         )
+        rehash(repo, RUN_B, 'b'.repeat(40))
+        return entry
+      },
+      // TEA ruling r48 (r46 PROBE_F5): a sha no commit HEAD descends from, a manifest of no
+      // inputs, captures of another platform or stage, and an unbound capture.
+      'a forged sha': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'live-font', sha: '0'.repeat(40), inputs: {} })
+        )
+        rehash(repo, RUN_B, '0'.repeat(40))
+        return entry
+      },
+      'null inputs': ({ entry, repo }) => {
+        repo.files.set(
+          `${RUN_B}/manifest.json`,
+          JSON.stringify({ leg: 'live-font', sha: SHA_A, inputs: null })
+        )
+        return entry
+      },
+      'a manifest that is no JSON': ({ entry, repo }) => {
+        repo.files.set(`${RUN_B}/manifest.json`, '{ "leg": ')
+        return entry
+      },
+      'a capture of another platform': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        const capture = JSON.parse(repo.files.get(file))
+        capture.textProbe.platform = 'ios'
+        repo.files.set(file, JSON.stringify(capture))
+        rehash(repo, RUN_B)
+        return entry
+      },
+      'a capture of another stage': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        repo.files.set(
+          file,
+          JSON.stringify({ ...JSON.parse(repo.files.get(file)), stage: 'cold' })
+        )
+        rehash(repo, RUN_B)
+        return entry
+      },
+      'a capture that does not hash as listed': ({ entry, repo }) => {
+        const file = `${RUN_B}/${entry.volatileProof.runs[1].evidence.settled}.json`
+        repo.files.set(file, `${repo.files.get(file)} `)
+        return entry
+      },
+      'no capture hash list': ({ entry, repo }) => {
+        repo.files.delete(`${RUN_B}/capture-hashes.json`)
+        return entry
+      },
+      'a hash list of another sha': ({ entry, repo }) => {
+        rehash(repo, RUN_B, 'c'.repeat(40))
         return entry
       },
       'a manifest of another leg': ({ entry, repo }) => {
@@ -3073,6 +3170,7 @@ describe('text layout clipping (F-00i)', () => {
           (record) => record.text !== 'Partnered'
         )
         repo.files.set(file, JSON.stringify(capture))
+        rehash(repo, RUN_B)
         return entry
       },
     }
@@ -3084,7 +3182,16 @@ describe('text layout clipping (F-00i)', () => {
       'an uncommitted capture': /is not committed/,
       'no manifest': /no committed manifest/,
       'another head': /different heads/,
-      'a manifest of another leg': /no live-font manifest/,
+      'a manifest of another leg': /malformed or of another leg/,
+      'a forged sha': /is no commit HEAD descends from/,
+      'null inputs': /malformed or of another leg/,
+      'a manifest that is no JSON': /is unreadable/,
+      'a capture of another platform': /is no android settled capture/,
+      'a capture of another stage': /is no android settled capture/,
+      'a capture that does not hash as listed':
+        /does not hash as capture-hashes.json lists/,
+      'no capture hash list': /no committed capture-hashes.json/,
+      'a hash list of another sha': /capture-hashes.json names c{40}, the manifest a{40}/,
       'inputs changed since the build': /inputs changed since/,
       'other volatile keys': /volatile keys of run 1 .* differ/,
     }
@@ -3238,11 +3345,11 @@ describe('text layout clipping (F-00i)', () => {
   // TEA ruling r46: behind an accessibility-modal view a record leaves matching like a partial
   // cover and stays judged with no key, unless the modal view's frame holds it.
   test('a clip behind a modal view fails with no key; one the modal frame holds is left out', () => {
-    const behindSheet = (sheet) => {
+    const behindSheet = (sheet, opaque = true) => {
       const change = withAll(fixedChange())
       // Both temperature labels sit behind the sheet; the first is cut.
       for (const each of change.settled.textProbe.records)
-        if (each.text === TEMPERATURE) each.behindModal = { rect: sheet }
+        if (each.text === TEMPERATURE) each.behindModal = { rect: sheet, opaque }
       const record = recordFor(change.settled, TEMPERATURE)
       record.contentRect = [...record.contentRect.slice(0, 3), record.contentRect[3] + 30]
       // The hierarchy lists nothing behind an accessibility-modal view.
@@ -3268,5 +3375,53 @@ describe('text layout clipping (F-00i)', () => {
       TEMPERATURE,
       TEMPERATURE,
     ])
+    // PROBE_F3D: a transparent full-window backdrop hides nothing; the clip still fails.
+    const backdrop = behindSheet([0, 0, 1080, 2400], false)
+    const seen = evaluateLiveFontChangeRaw(backdrop)
+    assert.deepEqual(
+      layoutClips(seen.checks.clipping).map((entry) => [
+        entry.via,
+        entry.key,
+        entry.text,
+      ]),
+      [['behind', null, TEMPERATURE]]
+    )
+    assert.deepEqual(seen.checks.textProbe.stages.settled.modalCovered, [])
+  })
+
+  // TEA ruling r48 (r46 PROBE_F3B): an iOS button whose label text shows on a record at the cold
+  // launch but is gone live, while a glyph inside it remains, keeps its node as a group of the
+  // glyph; that must still fail as lost text.
+  test('PROBE_F3B: a label gone live while a glyph keeps its button a group fails as lost text', () => {
+    const SUBMIT = { id: 'btn-submit', text: 'Submit', bounds: '[20,1500][300,1560]' }
+    const withButton = (capture, records) => {
+      const shown = { ...capture, nodes: [...capture.nodes, SUBMIT] }
+      const answer = healthyAnswer(shown, 'ios')
+      answer.records = [
+        ...answer.records.filter((record) => record.text !== 'Submit'),
+        ...records.map(([text, rect]) => probeRecord('ios', text, rect)),
+      ]
+      return { ...shown, textProbe: answer }
+    }
+    const both = [
+      ['Submit', [40, 1510, 200, 1550]],
+      ['*', [210, 1510, 230, 1530]],
+    ]
+    const change = { ...fixedChange(), platform: 'ios' }
+    change.before = withButton(change.before, both)
+    change.cold = withButton(change.cold, both)
+    change.settled = withButton(change.settled, [both[1]])
+    const { checks } = evaluateLiveFontChangeRaw(change)
+    assert.equal(checks.textProbe.pass, true, 'the glyph keeps the button a group')
+    assert.deepEqual(checks.textProbe.stages.settled.groups, [
+      { node: '["btn-submit","Submit"]', records: ['*'] },
+    ])
+    assert.deepEqual(
+      checks.textHidden.hidden.map((entry) => [entry.stage, entry.text, entry.groups]),
+      [['settled', 'Submit', 1]]
+    )
+    // Both launches show it so: the app's own state, nothing lost.
+    change.cold = withButton(change.cold, [both[1]])
+    assert.equal(evaluateLiveFontChangeRaw(change).checks.textHidden.pass, true)
   })
 })

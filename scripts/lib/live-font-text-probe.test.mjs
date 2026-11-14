@@ -480,13 +480,19 @@ describe('validateTextProbeAnswer', () => {
       else answer.records[0].behindModal = modal
       return answer
     }
-    for (const modal of [null, { rect: [0, 300, 402, 874] }])
+    for (const modal of [
+      null,
+      { rect: [0, 300, 402, 874], opaque: true },
+      { rect: [0, 0, 402, 874], opaque: false },
+    ])
       assert.doesNotThrow(() => validateTextProbeAnswer(iosAnswer(modal), iosAsked))
     for (const [name, modal] of Object.entries({
       missing: undefined,
       'inverted rect': { rect: [402, 300, 0, 874] },
-      'no rect': {},
-      'extra field': { rect: [0, 300, 402, 874], id: 'sheet' },
+      'no rect': { opaque: true },
+      'no opaque (the r46 shape)': { rect: [0, 300, 402, 874] },
+      'opaque not a boolean': { rect: [0, 300, 402, 874], opaque: 1 },
+      'extra field': { rect: [0, 300, 402, 874], opaque: true, id: 'sheet' },
       'a boolean': true,
     }))
       assert.throws(
@@ -496,7 +502,7 @@ describe('validateTextProbeAnswer', () => {
           /record 0 (behindModal|fields)/.test(error.message),
         name
       )
-    for (const modal of [null, { rect: [0, 300, 402, 874] }]) {
+    for (const modal of [null, { rect: [0, 300, 402, 874], opaque: true }]) {
       const answer = ok()
       answer.records[0].behindModal = modal
       assert.throws(
@@ -959,6 +965,18 @@ describe('matchTextProbe, accessibility elements (TEA ruling r46)', () => {
       [elsewhere.code, elsewhere.unmatchedNodes],
       ['live_font_text_probe_unmatched', [0]]
     )
+    // TEA ruling r48 (r46 PROBE_F3A): another testID never stands in, whatever its frame.
+    const save = node('Save', [20, 700, 180, 750], 'btn-save')
+    const cancel = element('Save', save.box, { identifier: 'btn-cancel' })
+    const mismatch = iosMatch([save], [], [cancel])
+    assert.deepEqual(
+      [mismatch.code, mismatch.elements],
+      ['live_font_text_probe_unmatched', []]
+    )
+    // Nor for a node with no testID; an element with none still pairs by frame.
+    const bare = node('Save', save.box, '')
+    assert.equal(iosMatch([bare], [], [cancel]).code, 'live_font_text_probe_unmatched')
+    assert.equal(iosMatch([bare], [], [element('Save', save.box)]).pass, true)
     // Another label: no pair.
     const other = iosMatch(
       [imageNode],
@@ -1058,13 +1076,47 @@ describe('matchTextProbe, accessibility elements (TEA ruling r46)', () => {
   })
 
   // TEA ruling r46: behind an accessibility-modal view, like a partial or a whole cover.
-  test('records behind a modal view leave matching; one its frame holds is left out', () => {
-    const sheet = { rect: [0, 300, 402, 874] }
+  test('records behind a modal view leave matching; one an opaque modal frame holds is left out', () => {
+    const sheet = { rect: [0, 300, 402, 874], opaque: true }
     const outside = iosRecord('Community', [121, 63, 281, 99], { behindModal: sheet })
     const inside = iosRecord('Shoes', [16, 600, 386, 640], { behindModal: sheet })
     const result = iosMatch([], [outside, inside], [])
     assert.equal(result.pass, true)
     assert.deepEqual([result.behind, result.modalCovered], [[0], [1]])
+  })
+
+  // TEA ruling r48 (r46 PROBE_F3D): a transparent backdrop (React Native's transparent Modal)
+  // covers nothing; opacity 0 and off-window come first.
+  test('a transparent or unflagged modal frame leaves its records behind; invisible and offWindow come first', () => {
+    const shoes = (behindModal, extra = {}) =>
+      iosRecord('Shoes', [16, 600, 386, 640], { behindModal, ...extra })
+    const result = iosMatch([], [shoes({ rect: [0, 0, 402, 874], opaque: false })], [])
+    assert.deepEqual([result.behind, result.modalCovered], [[0], []])
+    // An answer stored before `opaque` reads as not opaque.
+    const older = iosMatch([], [shoes({ rect: [0, 0, 402, 874] })], [])
+    assert.deepEqual([older.behind, older.modalCovered], [[0], []])
+    const sheet = { rect: [0, 0, 402, 874], opaque: true }
+    const ordered = iosMatch(
+      [],
+      [
+        shoes(sheet, { opacity: 0 }),
+        iosRecord('Parked', [16, 700, 386, 740], {
+          behindModal: sheet,
+          offWindow: true,
+          visibleRect: null,
+          clipRect: null,
+        }),
+      ],
+      []
+    )
+    assert.deepEqual(
+      [
+        ordered.invisible.map((each) => each.record),
+        ordered.offWindow.map((each) => each.record),
+        ordered.modalCovered,
+      ],
+      [[0], [1], []]
+    )
   })
 })
 

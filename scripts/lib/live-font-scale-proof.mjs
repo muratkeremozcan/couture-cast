@@ -729,14 +729,6 @@ function verticalClip(record, tolerance) {
  * whether its box misses the target launch's height, the stale miss of a text no parity key
  * names.
  */
-/** Content past its clipRect at the left or the right by more than `tolerance`. */
-function horizontalClip(record, tolerance) {
-  const clip = record.clipRect
-  if (clip === null) return false
-  const [left, , right] = record.contentRect
-  return left < clip[0] - tolerance || right > clip[2] + tolerance
-}
-
 function faces(record, { start, target, before }, tolerance) {
   const height = rectHeight(record.viewRect)
   const boxMiss =
@@ -753,17 +745,16 @@ function faces(record, { start, target, before }, tolerance) {
   const targetContent = rectHeight(target.contentRect)
   const content = rectHeight(record.contentRect)
   const freshBox = near(height, targetBox, tolerance)
-  // TEA ruling r47 (r45 P2-2): the kept layout has its source's line count too. TEA ruling r48:
-  // a side cut is allowed only when the content keeps its whole source layout, its width as
-  // well as its height (the 1.5 cloud glyph in a fresh 1.0 box, Android 0027bf63).
-  const sideCut = horizontalClip(record, tolerance)
+  // TEA rulings r47 and r48 (r45 P2-2, r46 PROBE_F2C): the content keeps its whole source
+  // layout, its width and height and its line count, whether or not it is cut at the side (the
+  // 1.5 cloud glyph in a fresh 1.0 box, Android 0027bf63); a squeezed layout that shares only a
+  // height is no kept one.
   const keptFrom = (source) =>
     source !== undefined &&
     !near(rectHeight(source.contentRect), targetContent, tolerance) &&
     near(content, rectHeight(source.contentRect), tolerance) &&
-    record.lineCount === source.lineCount &&
-    (!sideCut ||
-      near(rectWidth(record.contentRect), rectWidth(source.contentRect), tolerance))
+    near(rectWidth(record.contentRect), rectWidth(source.contentRect), tolerance) &&
+    record.lineCount === source.lineCount
   const second = verticalClip(record, tolerance) && freshBox
   const staleContentFrom = !second
     ? null
@@ -1178,7 +1169,7 @@ function textPresence(capture, platform) {
   const presence = new Map()
   const entry = (text) => {
     if (!presence.has(text))
-      presence.set(text, { keys: [], invisible: 0, offWindow: 0, elements: 0 })
+      presence.set(text, { keys: [], invisible: 0, offWindow: 0, elements: 0, groups: 0 })
     return presence.get(text)
   }
   // Every page counts (TEA ruling 2026-11-14): a key once however many pages show it, and a
@@ -1208,13 +1199,21 @@ function textPresence(capture, platform) {
  */
 function pageCounts(page, platform) {
   const match = textLayout(page, platform).match
-  const counts = { invisible: new Map(), offWindow: new Map(), elements: new Map() }
+  const counts = {
+    invisible: new Map(),
+    offWindow: new Map(),
+    elements: new Map(),
+    groups: new Map(),
+  }
   const add = (kind, text) =>
     counts[kind].set(maskText(text), (counts[kind].get(maskText(text)) ?? 0) + 1)
   for (const kind of ['invisible', 'offWindow'])
     for (const { record, comparable } of match?.[kind] ?? [])
       if (comparable) add(kind, page.textProbe.records[record].text)
   for (const { label } of match?.elements ?? []) add('elements', label)
+  // TEA ruling r48 (r46 PROBE_F3B): an iOS group shows its node's label, not a record of it.
+  const nodes = [...keyed(page).values()]
+  for (const group of match?.groups ?? []) add('groups', nodes[group.node].text)
   return counts
 }
 
@@ -1222,7 +1221,9 @@ function pageCounts(page, platform) {
  * TEA ruling 2026-11-14: an invisible or off-window record must not hide lost text. A text the
  * cold launch at the same scale shows on more paired records than the live capture does, while
  * the live capture draws it at opacity 0 or wholly off the window, or shows it only as an
- * accessibility element's label (TEA ruling r46: elements never count as text), failed to show:
+ * accessibility element's label (TEA ruling r46: elements never count as text) or as the label
+ * of an iOS group of other records (TEA ruling r48, a button whose text is gone while its glyph
+ * stays), failed to show:
  * live_font_text_hidden. `stages` holds
  * [stage, live capture, cold capture] triples; a missing capture is skipped.
  */
@@ -1234,7 +1235,7 @@ function hiddenText(platform, stages) {
     for (const [text, { keys }] of then) {
       const shown = now.get(text)
       if (
-        (shown?.invisible || shown?.offWindow || shown?.elements) &&
+        (shown?.invisible || shown?.offWindow || shown?.elements || shown?.groups) &&
         shown.keys.length < keys.length
       )
         hidden.push({
@@ -1244,6 +1245,7 @@ function hiddenText(platform, stages) {
           invisible: shown.invisible,
           ...(shown.offWindow ? { offWindow: shown.offWindow } : {}),
           ...(shown.elements ? { elements: shown.elements } : {}),
+          ...(shown.groups ? { groups: shown.groups } : {}),
         })
     }
   }
