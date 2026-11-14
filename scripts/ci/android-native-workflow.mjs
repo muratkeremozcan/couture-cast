@@ -288,7 +288,10 @@ function networkProblems(job, script, check) {
   // ignored.
   check(
     (script.match(/\|\| true/g) ?? []).length <= 1 &&
-      /kill -- "-\$tarpit" "-\$metro" 2> \/dev\/null \|\| true/.test(script) &&
+      /kill -- "-\$tarpit" "-\$metro" "\$\{pids\[@\]\}" 2> \/dev\/null \|\| true/.test(
+        script
+      ) &&
+      /descendants "\$metro"/.test(script) &&
       /trap stop_services EXIT/.test(script),
     `${NETWORK_SCRIPT}: stop the tarpit and Metro on exit, and ignore no other status`
   )

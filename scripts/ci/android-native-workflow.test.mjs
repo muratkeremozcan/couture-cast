@@ -391,7 +391,7 @@ describe('android-network-timeout.sh', () => {
       stub(path.join(bin, 'adb'), 'exit 0')
       stub(path.join(bin, 'sleep'), 'exit 0')
       stub(path.join(maestroBin, 'maestro'), 'exit "${MAESTRO_EXIT:-0}"')
-      for (const tool of ['grep', 'mkdir', 'seq', 'cp', 'basename', 'cat'])
+      for (const tool of ['grep', 'mkdir', 'seq', 'cp', 'basename', 'cat', 'pgrep'])
         fs.symlinkSync(
           spawnSync('/usr/bin/which', [tool], { encoding: 'utf8' }).stdout.trim(),
           path.join(bin, tool)
@@ -413,15 +413,24 @@ describe('android-network-timeout.sh', () => {
       const child = fs.existsSync(childFile)
         ? Number(fs.readFileSync(childFile, 'utf8').trim())
         : undefined
-      let childAlive = false
-      if (child)
+      // The group kill is delivered asynchronously and a killed orphan stays visible until init
+      // reaps it, so the child gets up to 5 s to disappear (Linux CI saw it still listed at once).
+      const alive = (pid) => {
         try {
-          process.kill(child, 0)
-          childAlive = true
-          process.kill(child, 'SIGKILL')
+          process.kill(pid, 0)
+          return true
         } catch {
-          childAlive = false
+          return false
         }
+      }
+      let childAlive = false
+      if (child) {
+        const deadline = Date.now() + 5000
+        while (alive(child) && Date.now() < deadline)
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50)
+        childAlive = alive(child)
+        if (childAlive) process.kill(child, 'SIGKILL')
+      }
       return { status: result.status, calls, childAlive }
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })

@@ -27,8 +27,22 @@ tarpit=$!
   EXPO_PUBLIC_SUPABASE_ANON_KEY=network-timeout-placeholder \
   npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &
 metro=$!
+# Every descendant of a pid, deepest first, so a service that left its own process group (or a
+# shell where job control could not give it one) still stops with its children.
+descendants() {
+  local child
+  for child in $(pgrep -P "$1" 2> /dev/null); do
+    descendants "$child"
+    echo "$child"
+  done
+}
 stop_services() {
-  kill -- "-$tarpit" "-$metro" 2> /dev/null || true
+  local -a pids=()
+  local pid
+  while read -r pid; do
+    [ -n "$pid" ] && pids+=("$pid")
+  done < <(descendants "$tarpit"; echo "$tarpit"; descendants "$metro"; echo "$metro")
+  kill -- "-$tarpit" "-$metro" "${pids[@]}" 2> /dev/null || true
 }
 trap stop_services EXIT
 
