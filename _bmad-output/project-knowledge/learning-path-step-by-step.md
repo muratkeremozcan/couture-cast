@@ -18,7 +18,7 @@ Added Steps 40 to 55:
 - Step 52: Story 6.12, SLA monitoring and escalation, `56509fa8` (PR #196), merged on 2026-11-05.
 - Step 53: Story 6.13, immutable moderation history, `63bd6fcd` (PR #197), merged on 2026-11-06.
 - Step 54: Story 6.14, complimentary full access, `1fa40089` (PR #198), merged on 2026-11-10.
-- Step 55: Story 6.15, Expo SDK 58 upgrade for live font-scale layout, in progress: Step 0 of five on draft PR #226, nothing merged yet.
+- Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -26,6 +26,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Closed Story 6.15 at its Step 0 by owner ruling on 2026-11-14: PRs #226 and #229 merged and PR #230 closes it; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, backlog in `sprint-status.yaml`.
 Added Step 55 for Story 6.15 while its Step 0 is in progress on draft PR #226, with Step 55 in `Current position` and `The whole project in plain English`.
 Step 55 departs from instruction 2 the same way Steps 38, 39 and 49 did, because Steps 1 to 4 of the story have not started.
 Step 55 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -122,8 +123,8 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In progress: Step 55, Story 6.15, Expo SDK 58 upgrade for live font-scale layout, status `drafted` in `sprint-status.yaml`.
-  Step 0 of five is a draft, PR #226 on `feat/story-6-15-expo-sdk-58`, still on SDK 54; Steps 1 to 4 have not started.
+- Closing: Step 55, Story 6.15, SDK 54 readiness and the live font-scale proof, `done` in `sprint-status.yaml` with PR #230.
+  PRs #226 (`814ce811`) and #229 (`f49027e4`) merged on SDK 54; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, `backlog`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`.
   Step 55 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 - Latest completed step: Step 54, Story 6.14, complimentary full access, status `done`, merged as `1fa40089` (PR #198) on 2026-11-10.
@@ -10735,6 +10736,8 @@ carries the fix.
 The story climbs from SDK 54 through 55, 56 and 57 to 58 in five pull requests, one SDK at a time,
 and `main` holds a green, shippable Android app after each one.
 Step 0, PR #226, stays on SDK 54.
+Story 6.15 closed after Step 0 and its review follow-ups (PRs #229 and #230) by owner ruling on
+2026-11-14; Steps 1 to 4 moved to Story 6.15b, so the clipping stays until that story lands.
 It moves the app off the deprecated background fetch API and two retired `app.json` keys, adds a
 live font-scale proof that runs on a device, and reshapes CI, so each later step is a version bump
 with a proof attached.

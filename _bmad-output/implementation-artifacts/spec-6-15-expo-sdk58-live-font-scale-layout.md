@@ -3,7 +3,7 @@ title: 'CC-6.15 Expo SDK 58 upgrade for live font-scale layout'
 type: 'upgrade'
 ticket: '6-15-expo-sdk58-live-font-scale-layout'
 created: '2026-11-12'
-status: 'drafted'
+status: 'done'
 baseline_revision: 'a01e03072885f747d18ffb7246fe2ea235c9efb7'
 route: 'full'
 route_source: 'owner'
@@ -44,6 +44,8 @@ The upstream fix is React Native commit `45904c866882f136edde55df2fe453327057d38
 It first ships in stable 0.87.0 and is present through 0.88.1.
 `enableFontScaleChangesUpdatingLayout` is false on 0.81.5 and true on 0.87 and 0.88; commit `4b2aef2` removes the flag in 0.89.
 Expo SDK 57 pins 0.86.3, which lacks the fix. Expo SDK 58 pins 0.88.1 with React 19.3.0 (`expo@58.0.25`, read from the `sdk-58` `bundledNativeModules.json` on 2026-11-12).
+
+**Scope at close (owner ruling, 2026-11-14):** Story 6.15 closed after Step 0 (PR #226, `814ce811`) and its review follow-ups (PR #229, `f49027e4`, and PR #230). Steps 1 to 4 below, SDK 55 to 58, moved to Story 6.15b (`6-15b-expo-sdk-55-58-upgrade`, backlog); this spec stays their plan.
 
 **Approach:** One story, five sequential steps: pre-work on SDK 54, then SDK 55, 56, 57 and 58, one SDK at a time as Expo recommends.
 Each step is its own pull request, merged to `main` through the full merge gate before the next step starts, so `main` holds a green app at every SDK. Shippable at every step means Android, the only platform distributed today (`deploy-mobile.yml:56` builds Android only); every iOS release stays held until the D11 physical-device gates pass (coordinator 2026-11-12, R2-01).
