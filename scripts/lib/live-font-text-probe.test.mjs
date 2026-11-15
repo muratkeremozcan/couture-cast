@@ -631,6 +631,9 @@ describe('validateTextProbeAnswer', () => {
       'scrolled away yet visible': (a) => (a.records[0].scrolledAway = true),
       'visible without a clipRect': (a) => (a.records[0].clipRect = null),
       'hidden with a clipRect': (a) => (a.records[0].visibleRect = null),
+      'no scrollViewport': (a) => delete a.records[0].scrollViewport,
+      'scrollViewport not a rect': (a) => (a.records[0].scrollViewport = [0, 0, 10]),
+      'scrollViewport upside down': (a) => (a.records[0].scrollViewport = [0, 10, 10, 0]),
       'offWindow as text': (a) => (a.records[0].offWindow = 'true'),
       'offWindow yet visible': (a) => (a.records[0].offWindow = true),
       'offWindow and scrolled away': (a) =>
@@ -1356,22 +1359,196 @@ describe('matchTextProbe, accessibility-hidden records (TEA ruling r49)', () => 
   })
 })
 
+// TEA ruling r49 P2-1 (probe 2a): the card above, 14 px away, whose label mentions "Archived",
+// took the badge that sits wholly inside the card below.
+// TEA ruling r49 P2-1 (probe 2a): the card above, 14 px away, whose label mentions "Archived",
+// took the badge that sits wholly inside the card below, an element no hierarchy node stands
+// for.
+describe('matchTextProbe, accessibility-hidden records held by an element (TEA ruling r49)', () => {
+  const element = (identifier, label, rect) => ({
+    hasText: true,
+    identifier,
+    label,
+    rect,
+    window: 1,
+  })
+  /** `withNodes` lists the elements a hierarchy node stands for. */
+  const probe = (
+    elements,
+    { rect = [20, 194, 120, 212], withNodes = elements, extraNodes = [] } = {}
+  ) =>
+    matchTextProbe({
+      platform: 'ios',
+      nodes: [
+        ...withNodes.map((each) => node(each.label, each.rect, each.identifier)),
+        ...extraNodes,
+      ],
+      answer: answerFor(
+        't',
+        [iosRecord('Archived', rect, { accessibilityHidden: true })],
+        {
+          platform: 'ios',
+          windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+          elements,
+        }
+      ),
+      window: [0, 0, 402, 874],
+      tolerance: 1,
+      // The element paths alone: with the iOS group rule a node box that holds the badge takes
+      // it first.
+      groupRule: false,
+    })
+  const ownerOf = (result) => {
+    const pair = result.pairs.find((each) => each.record === 0)
+    return pair ? [pair.node, pair.via] : null
+  }
+  const above = element('card-1', 'Saved item, Archived', [16, 100, 386, 180])
+  const below = element('card-2', 'Winter coat', [16, 192, 386, 272])
+  const list = element('list', 'Saved items, Archived', [0, 90, 402, 800])
+
+  test('an identified element whose frame holds the record decides it', () => {
+    // The card below holds the badge; its label lacks the word: unmatched, never stolen.
+    const stolen = probe([above, below], { withNodes: [above] })
+    assert.deepEqual(
+      [stolen.code, stolen.unmatchedRecords, ownerOf(stolen)],
+      ['live_font_text_probe_unmatched', [0], null]
+    )
+    const labelled = element('card-2', 'Winter coat, Archived', [16, 192, 386, 272])
+    const hidden = element('card-2', 'Winter coat, Archived', [16, 192, 386, 272])
+    hidden.hasText = false
+    assert.deepEqual(ownerOf(probe([list, hidden], { withNodes: [list, hidden] })), [
+      1,
+      'attached',
+    ])
+    assert.deepEqual(ownerOf(probe([above, labelled])), [1, 'attached'])
+    // Held by no identified element, it may still join one that borders it.
+    assert.deepEqual(ownerOf(probe([above], { rect: [20, 182, 120, 198] })), [
+      0,
+      'accessibilityHidden',
+    ])
+  })
+
+  // TEA ruling r52 P2-4 a (probe 4a): the card below holds the badge but carries no identifier,
+  // or is a hierarchy node only; the card above still took the badge across the gap.
+  test('a record joins a bordering element only when nothing else holds it apart from it', () => {
+    const anonymous = { ...below, identifier: null }
+    const blocked = probe([above, anonymous], { withNodes: [above] })
+    assert.deepEqual([blocked.unmatchedRecords, ownerOf(blocked)], [[0], null])
+    const viaNode = probe([above], {
+      extraNodes: [node('Winter coat', [16, 192, 386, 272], 'card-2')],
+    })
+    assert.deepEqual([viaNode.unmatchedRecords, ownerOf(viaNode)], [[0], null])
+    // A container that also holds the bordering element blocks nothing.
+    const list = { ...anonymous, rect: [0, 90, 402, 800], label: 'Saved items' }
+    assert.deepEqual(ownerOf(probe([above, list], { withNodes: [above] })), [
+      0,
+      'accessibilityHidden',
+    ])
+  })
+
+  // TEA ruling r52 P2-4 b (probe 4b, mutant M2): of the smallest holders, those whose label
+  // holds the words own the record; one owns, several are ambiguous, none leaves it unmatched.
+  // The cards' own text records pair their nodes first, as a card's title does on device.
+  test('among tied smallest holders the ones whose label holds the words decide', () => {
+    const frame = [16, 192, 386, 272]
+    const tied = (labels) => {
+      const elements = labels.map((label, index) =>
+        element(`card-${index}`, label, frame)
+      )
+      return matchTextProbe({
+        platform: 'ios',
+        nodes: elements.map((each) => node(each.label, frame, each.identifier)),
+        answer: answerFor(
+          't',
+          [
+            iosRecord('Archived', [20, 194, 120, 212], { accessibilityHidden: true }),
+            ...labels.map((label) => iosRecord(label, frame)),
+          ],
+          {
+            platform: 'ios',
+            windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+            elements,
+          }
+        ),
+        window: [0, 0, 402, 874],
+        tolerance: 1,
+        groupRule: false,
+      })
+    }
+    assert.deepEqual(tied(['Winter coat', 'Winter coat, Archived']).hiddenAttached, [
+      { record: 0, element: 1, node: 1 },
+    ])
+    assert.deepEqual(tied(['Coat, Archived', 'Winter coat, Archived']).hiddenAmbiguous, [
+      { record: 0, elements: [0, 1] },
+    ])
+    const none = tied(['Winter coat', 'Summer coat'])
+    assert.deepEqual([none.unmatchedRecords, none.hiddenAttached], [[0], []])
+  })
+})
+
 describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () => {
-  // r48 P3-1 (probe F6_overflowRegionOf_left_col): a scrolled-away record in the right column,
-  // its centre in the band of a volatile region on the left, was taken as that region's chip.
-  test('a scrolled-away record joins a region sideways only past the window edge the region reaches', () => {
-    const away = (text, rect) =>
-      record(text, rect, { visibleRect: null, scrolledAway: true })
-    const kindOf = (rect, regions) =>
-      match([], [away('Cold and dry', rect)], { volatileRegions: regions }).kinds[0]
-    // The 6c85bbb4 chip row: the region reaches the right window edge, the chip lies past it.
-    assert.equal(kindOf([1315, 545, 1615, 616], [[0, 475, 1080, 645]]), 'volatile')
-    // Past the left edge too.
-    assert.equal(kindOf([-400, 545, -100, 616], [[0, 475, 1080, 645]]), 'volatile')
-    // A left-column region, a record in the right column on the window.
-    assert.equal(kindOf([500, 120, 620, 160], [[0, 100, 200, 180]]), 'scrolled')
-    // Past the right window edge, but the region stops mid-window.
-    assert.equal(kindOf([1315, 120, 1615, 160], [[0, 100, 200, 180]]), 'scrolled')
+  // r48 P3-1 (probe F6_overflowRegionOf_left_col) and TEA ruling r49 P2-2 (probe 2b): a record
+  // scrolled away sideways joins the region that holds the viewport it scrolls in; window
+  // geometry missed a padded carousel and a straddling chip and gave a sibling's record away.
+  test('a scrolled-away record joins a region sideways through its scroll viewport', () => {
+    const kindOf = (rect, scrollViewport, regions, window = [0, 0, 1080, 2400]) =>
+      match(
+        [],
+        [record('Chip', rect, { visibleRect: null, scrolledAway: true, scrollViewport })],
+        { volatileRegions: regions, window }
+      ).kinds[0]
+    // The 6c85bbb4 chip row, its viewport the row.
+    assert.equal(
+      kindOf([1315, 545, 1615, 616], [0, 475, 1080, 645], [[0, 475, 1080, 645]]),
+      'volatile'
+    )
+    // A padded carousel: region and viewport inset 16 from each window edge.
+    const padded = [16, 120, 384, 160]
+    assert.equal(
+      kindOf([420, 125, 520, 155], padded, [padded], [0, 0, 400, 800]),
+      'volatile'
+    )
+    // A chip that starts just inside the window edge.
+    const row = [0, 120, 400, 160]
+    assert.equal(kindOf([390, 125, 470, 155], row, [row], [0, 0, 400, 800]), 'volatile')
+    // A sibling carousel at the edge: the record scrolls in its own viewport, outside the region.
+    assert.equal(
+      kindOf(
+        [420, 125, 520, 155],
+        [0, 120, 240, 160],
+        [[250, 120, 400, 160]],
+        [0, 0, 400, 800]
+      ),
+      'scrolled'
+    )
+    // Another column: its viewport on the right, the region on the left.
+    assert.equal(
+      kindOf([500, 120, 620, 160], [400, 100, 1080, 180], [[0, 100, 200, 180]]),
+      'scrolled'
+    )
+    // r52 P2-1: a carousel its outer scroll view cuts at 2200; the hierarchy cuts the region
+    // there too, and the viewport native now gives, cut the same way, lies in it.
+    assert.equal(
+      kindOf([1315, 2150, 1615, 2190], [0, 2100, 1080, 2200], [[0, 2100, 1080, 2200]]),
+      'volatile'
+    )
+    // CodeRabbit on PR 230: a scrolled-away record whose own centre falls in a sibling region
+    // belongs to the region of the viewport it scrolls in, here none.
+    assert.equal(
+      kindOf(
+        [420, 125, 520, 155],
+        [0, 120, 240, 160],
+        [[400, 120, 650, 160]],
+        [0, 0, 1080, 800]
+      ),
+      'scrolled'
+    )
+    // No viewport known: no region this way.
+    assert.equal(kindOf([1315, 545, 1615, 616], null, [[0, 475, 1080, 645]]), 'scrolled')
+    assert.equal(
+      kindOf([1315, 545, 1615, 616], undefined, [[0, 475, 1080, 645]]),
+      'scrolled'
+    )
   })
 
   test('a scrolled-away record is listed offscreen and passes; a visible one would not', () => {

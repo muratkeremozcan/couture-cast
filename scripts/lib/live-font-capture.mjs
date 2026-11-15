@@ -324,7 +324,7 @@ function anchorShifts(a, b, { tolerance }) {
   return [...a.keys()]
     .filter((key) => b.has(key) && !SYSTEM_UI.test(a.get(key).id ?? ''))
     .filter((key) => Math.abs(height(a.get(key)) - height(b.get(key))) <= tolerance)
-    .map((key) => top(a.get(key)) - top(b.get(key)))
+    .map((key) => ({ text: a.get(key).text, shift: top(a.get(key)) - top(b.get(key)) }))
 }
 
 /**
@@ -336,34 +336,44 @@ const measuresDrag = (shift, expectedShift) =>
 
 /**
  * The step of the drag that reaches the bottom when no anchor measured a whole drag (r48
- * P2-1): that drag moves only the travel left. Its anchors are the shifts a drag can make,
- * above `tolerance` (a fixed node, such as a sticky chip's record, shifts by 0) and at most a
- * whole drag (a repeated text paired with a lower copy shifts backwards). With none, the page
- * shares no moving text and the step stays unmeasured (null); when every anchor sits within
- * SHIFT_SPREAD of their median, that median is the step; anchors that disagree fail as
- * live_font_scroll_short_drag_ambiguous, since any one step would place some text twice.
+ * P2-1, r49 P2-4): that drag moves only the travel left. Its anchors are the shifts a drag can
+ * make, above `tolerance` (a fixed node, such as a sticky chip's record, shifts by 0) and at
+ * most a whole drag (a repeated text paired with a lower copy shifts backwards). With none, the
+ * page shares no moving text and the step stays unmeasured (null). Anchors that do not all sit
+ * within SHIFT_SPREAD of their median fail as live_font_scroll_short_drag_ambiguous, since any
+ * one step would place some text twice; agreeing anchors of fewer than two texts fail as
+ * live_font_scroll_short_drag_unconfirmed, since one repeated label can pair with another copy
+ * by chance. Two texts or more that agree give their median.
  */
-function shortFinalStep(shifts, { tolerance, expectedShift }) {
-  const anchors = shifts.filter(
-    (shift) => shift > tolerance && shift <= (1 + SHIFT_SPREAD) * expectedShift
+function shortFinalStep(entries, { tolerance, expectedShift }) {
+  const anchors = entries.filter(
+    ({ shift }) => shift > tolerance && shift <= (1 + SHIFT_SPREAD) * expectedShift
   )
   if (!anchors.length) return null
-  const step = median(anchors)
-  if (anchors.every((shift) => Math.abs(shift - step) <= SHIFT_SPREAD * step)) return step
-  throw new Error(
-    `live_font_scroll_short_drag_ambiguous: final drag anchors ${anchors.join(', ')} px disagree`
-  )
+  const shifts = anchors.map(({ shift }) => shift)
+  const step = median(shifts)
+  if (!shifts.every((shift) => Math.abs(shift - step) <= SHIFT_SPREAD * step))
+    throw new Error(
+      `live_font_scroll_short_drag_ambiguous: final drag anchors ${shifts.join(', ')} px disagree`
+    )
+  const texts = new Set(anchors.map(({ text }) => text))
+  if (texts.size < 2)
+    throw new Error(
+      `live_font_scroll_short_drag_unconfirmed: final drag of ${step} px measured by ${texts.size} text`
+    )
+  return step
 }
 
 /**
  * The step of each drag, by its index: the median of the shifts that measure it (`measured`),
- * else, for the drag that reaches the bottom (the last page: scrollPages stops when a drag shows
- * the same page again), shortFinalStep over its `anchors`, else fallbackStep.
+ * else, for the last drag of a scroll-through the capture records reached the bottom
+ * (`reachedBottom`, scrollPages: the next drag showed the same page), shortFinalStep over its
+ * `anchors`, else fallbackStep (r49 P2-4: a last page not known to be the bottom is never short).
  */
-function dragSteps(measured, anchors, { tolerance, expectedShift }) {
+function dragSteps(measured, anchors, { tolerance, expectedShift, reachedBottom }) {
   const last = measured.length - 1
   const short =
-    expectedShift > 0 && last >= 0 && !measured[last].length
+    reachedBottom === true && expectedShift > 0 && last >= 0 && !measured[last].length
       ? shortFinalStep(anchors[last], { tolerance, expectedShift })
       : null
   const steps = measured.filter((shifts) => shifts.length).map(median)
@@ -372,6 +382,28 @@ function dragSteps(measured, anchors, { tolerance, expectedShift }) {
     if (at === last && short !== null) return short
     return fallbackStep(steps, expectedShift)
   }
+}
+
+/**
+ * The identities shown once on, and at one place across, every page but the last (r49 P2-4):
+ * fixed chrome,
+ * whatever they do on the last page (a sticky header that jitters 6 px there). Only a list of
+ * three pages or more has two earlier pages to show it, since every drag moves the content.
+ */
+function stillBeforeLast(list, tolerance) {
+  if (list.length < 3) return new Set()
+  const earlier = list.slice(0, -1)
+  return new Set(
+    list[0]
+      .filter((node) =>
+        earlier.every((page) => {
+          // Shown once on the page, so a repeated label's other copy never stands for it.
+          const copies = page.filter((other) => identityOf(other) === identityOf(node))
+          return copies.length === 1 && Math.abs(top(copies[0]) - top(node)) <= tolerance
+        })
+      )
+      .map(identityOf)
+  )
 }
 
 /**
@@ -399,7 +431,10 @@ export function stitchPages(pages, options = {}) {
  * its records by the true step (Android 6c85bbb4 Community before 1.0, pages 4 to 5: 837 px
  * where the drags before were 847).
  */
-export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = {}) {
+export function stitchPlaces(
+  pages,
+  { tolerance = 4, expectedShift, records, reachedBottom = false } = {}
+) {
   if (!pages.length) return { taken: [], offsets: [], places: [] }
   const at = (page, node) =>
     page.some(
@@ -407,7 +442,36 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = 
         identityOf(other) === identityOf(node) &&
         Math.abs(top(other) - top(node)) <= tolerance
     )
-  const chrome = (node) => pages.length > 1 && pages.every((page) => at(page, node))
+  const still = stillBeforeLast(pages, tolerance)
+  // On the last page a still identity is chrome in one node only, the one nearest its still
+  // place (CodeRabbit on PR 230): another node of that text there is new content.
+  const last = pages.at(-1)
+  const stillOnLast = new Set(
+    [...still].flatMap((identity) => {
+      const place = top(pages[0].find((node) => identityOf(node) === identity))
+      const nearest = last
+        .filter((node) => identityOf(node) === identity)
+        .sort((a, b) => Math.abs(top(a) - place) - Math.abs(top(b) - place))[0]
+      return nearest ? [nearest] : []
+    })
+  )
+  const heldStill = (node) =>
+    still.has(identityOf(node)) && (!last.includes(node) || stillOnLast.has(node))
+  const chrome = (node) =>
+    pages.length > 1 && (heldStill(node) || pages.every((page) => at(page, node)))
+  // A chrome node's page 0 copy: the same identity, nearest top (chrome held still before the
+  // last page may stand elsewhere on it); -1 when page 0 shows none there.
+  const firstCopy = (node) => {
+    const copies = pages[0]
+      .map((first, index) => ({ first, index }))
+      .filter(({ first }) => identityOf(first) === identityOf(node))
+      .sort(
+        (a, b) => Math.abs(top(a.first) - top(node)) - Math.abs(top(b.first) - top(node))
+      )
+    if (!copies.length) return -1
+    const near = Math.abs(top(copies[0].first) - top(node)) <= tolerance
+    return near || heldStill(node) ? copies[0].index : -1
+  }
   const taken = []
   const places = [
     pages[0].map((node) => {
@@ -439,8 +503,12 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = 
           (list ?? []).filter((record) => record.text !== '').map(asNode)
         )
       : null
-  // A record fixed on screen (a sticky chip) shifts by 0, never within SHIFT_SPREAD of a drag.
-  const byRecords = recordPages ? shifts(recordPages, () => false) : []
+  // A record fixed on screen (a sticky chip) shifts by 0, never within SHIFT_SPREAD of a drag;
+  // one fixed on every page but the last is chrome there too.
+  const stillRecords = recordPages ? stillBeforeLast(recordPages, tolerance) : new Set()
+  const byRecords = recordPages
+    ? shifts(recordPages, (node) => stillRecords.has(identityOf(node)))
+    : []
   // Every page's measured shifts first, so a page that shares no moving text takes the median
   // of all measured steps, the later ones too.
   const anchors = shifts(pages, chrome).map((own, at) => [
@@ -448,9 +516,9 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = 
     ...(byRecords[at] ?? []),
   ])
   const measured = anchors.map((list) =>
-    list.filter((shift) => measuresDrag(shift, expectedShift))
+    list.map(({ shift }) => shift).filter((shift) => measuresDrag(shift, expectedShift))
   )
-  const stepOf = dragSteps(measured, anchors, { tolerance, expectedShift })
+  const stepOf = dragSteps(measured, anchors, { tolerance, expectedShift, reachedBottom })
   const offsets = [0]
   let offset = 0
   for (let index = 1; index < pages.length; index += 1) {
@@ -462,11 +530,7 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = 
       place.push(-1)
       if (node.volatile) continue
       if (chrome(node)) {
-        place[place.length - 1] = pages[0].findIndex(
-          (first) =>
-            identityOf(first) === identityOf(node) &&
-            Math.abs(top(first) - top(node)) <= tolerance
-        )
+        place[place.length - 1] = firstCopy(node)
         if (place.at(-1) >= 0) place[place.length - 1] = places[0][place.at(-1)]
         continue
       }

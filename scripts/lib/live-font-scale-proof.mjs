@@ -395,6 +395,7 @@ export function pageCaptures(capture) {
     {
       expectedShift: capture.pageShift,
       records: pages.map((page) => page.textProbe?.records ?? []),
+      reachedBottom: capture.reachedBottom === true,
     }
   )
   const own = [...keyed(capture)]
@@ -1408,35 +1409,123 @@ function hiddenText(platform, stages) {
 const COMPARED_KINDS = new Set(['visible', 'hidden', 'regional'])
 
 /**
- * The masked texts of a capture's probe records with their copies (r48 P3-1): of each text, the
- * most records any one page holds, those of COMPARED_KINDS when `compared`, else of any record
- * but an empty one. A page's probe answer holds every text view laid out, scrolled away ones too,
- * so the pages of one scroll-through repeat the same records, and the copies are the most one
- * page holds, never a sum over pages.
+ * The masked texts of a capture's probe records with their copies over the scroll-through
+ * (r48 P3-1, r49 P3-1): those of COMPARED_KINDS when `compared`, else of any record but an
+ * empty one, each copy counted once however many pages show it. A page's records sit in the
+ * content at their viewRect moved by the page's contentOffset (pageCaptures), so two pages'
+ * records of one text there (a top or bottom edge within the tolerance, or overlapping rows,
+ * and overlapping columns) are one copy; a record at one screen place on every page, of any kind
+ * there (a sticky header), is one copy too. Two copies each compared on its own page are two.
  */
 function recordTexts(capture, platform, compared) {
-  const texts = new Map()
-  const pages = [capture, ...pageCaptures(capture).map((page) => page.capture)]
-  for (const page of pages) {
+  const tolerance = HEIGHT_TOLERANCE[platform]
+  const pages = [
+    { page: capture, offset: 0 },
+    ...pageCaptures(capture).map(({ capture: page }) => ({
+      page,
+      offset: page.contentOffset ?? 0,
+    })),
+  ]
+  // Every page's records, each with its kind; stickiness reads all of them (a sticky header the
+  // last page keeps in a volatile region is still one copy), the count only the compared ones.
+  const every = pages.map(({ page, offset }) => {
     const { match } = textLayout(page, platform)
-    if (!match) continue
-    const counts = new Map()
-    page.textProbe.records.forEach((record, index) => {
-      if (record.text === '') return
-      if (compared && !COMPARED_KINDS.has(match.kinds[index])) return
-      const text = maskText(record.text)
-      counts.set(text, (counts.get(text) ?? 0) + 1)
+    if (!match) return []
+    return page.textProbe.records.flatMap((record, index) => {
+      if (record.text === '') return []
+      const [left, top, right, bottom] = record.viewRect
+      return [
+        {
+          text: maskText(record.text),
+          kind: match.kinds[index],
+          screen: record.viewRect,
+          content: [left, top + offset, right, bottom + offset],
+        },
+      ]
     })
-    for (const [text, count] of counts)
-      texts.set(text, Math.max(texts.get(text) ?? 0, count))
-  }
+  })
+  const placed = every.map((list) =>
+    compared ? list.filter(({ kind }) => COMPARED_KINDS.has(kind)) : list
+  )
+  const near = (a, b) => Math.abs(a - b) <= tolerance
+  const sameScreen = (a, b) =>
+    a.text === b.text && near(a.screen[0], b.screen[0]) && near(a.screen[1], b.screen[1])
+  const sameCopy = (a, b) =>
+    a.text === b.text &&
+    a.content[0] < b.content[2] + tolerance &&
+    b.content[0] < a.content[2] + tolerance &&
+    (near(a.content[1], b.content[1]) ||
+      near(a.content[3], b.content[3]) ||
+      (a.content[1] < b.content[3] - tolerance &&
+        b.content[1] < a.content[3] - tolerance))
+  // Sticky: at one screen place on every page, and no other page holds a record of its text at
+  // its content place at another screen place (r52 P2-3 A: two copies one drag apart share a
+  // screen place, but each is a moving copy seen again; after a short last drag the sticky chip
+  // overlaps itself in content place at the same screen place, and stays sticky).
+  // A moving copy seen again: another page holds a record of its text at its content place at
+  // another screen place.
+  const moving = (entry, page) =>
+    every.some(
+      (list, other) =>
+        other !== page &&
+        list.some((each) => sameCopy(each, entry) && !sameScreen(each, entry))
+    )
+  const lastPage = placed.length - 1
+  const sticky = (entry, page) =>
+    pages.length > 1 &&
+    every.every((list) => list.some((other) => sameScreen(other, entry))) &&
+    !moving(entry, page)
+  // Fixed chrome by the stitch's rule (CodeRabbit on PR 230): at one screen place on every page
+  // but the last, three pages or more, and no moving copy; on the last page it is the record of
+  // its text nearest that place, whatever it does there (a header that jitters 6 px).
+  const stillBeforeLast = (entry, page) =>
+    pages.length >= 3 &&
+    page < lastPage &&
+    every
+      .slice(0, lastPage)
+      .every((list) => list.some((other) => sameScreen(other, entry))) &&
+    !moving(entry, page)
+  const screenGap = (a, b) =>
+    Math.abs(a.screen[0] - b.screen[0]) + Math.abs(a.screen[1] - b.screen[1])
+  // One to one (r52 P2-3 C): an earlier copy is seen again by at most one record of a page, so
+  // the count is never below any page's own.
+  const copies = []
+  placed.forEach((list, page) => {
+    const before = copies.length
+    const seen = new Set()
+    const claimed = new Set()
+    if (page === lastPage)
+      copies.forEach((copy, index) => {
+        if (!copy.fixed) return
+        // From every record of the page, so a fixed record drawn nowhere there is the one
+        // claimed and a compared content copy of its text stays counted.
+        const nearest = every[page]
+          .filter((entry) => entry.text === copy.text && !claimed.has(entry))
+          .sort((a, b) => screenGap(a, copy) - screenGap(b, copy))[0]
+        if (!nearest) return
+        claimed.add(nearest)
+        seen.add(index)
+      })
+    for (const entry of list) {
+      if (claimed.has(entry)) continue
+      const fixed = sticky(entry, page) || stillBeforeLast(entry, page)
+      const same = fixed ? sameScreen : sameCopy
+      const match = copies.findIndex(
+        (copy, index) => index < before && !seen.has(index) && same(copy, entry)
+      )
+      if (match >= 0) seen.add(match)
+      else copies.push({ ...entry, fixed })
+    }
+  })
+  const texts = new Map()
+  for (const { text } of copies) texts.set(text, (texts.get(text) ?? 0) + 1)
   return texts
 }
 
 /**
  * TEA ruling on Antigravity r47 P2 (R47_F3B): a text the cold launch at the same scale shows as a
- * compared record (COMPARED_KINDS) that the live capture has fewer records of, on any page, is
- * lost (r48 P3-1: two copies at the cold launch and one live lose one): live_font_text_lost,
+ * compared record (COMPARED_KINDS) that the live capture has fewer copies of over its pages
+ * (recordTexts) is lost (r48 P3-1: two copies at the cold launch and one live lose one): live_font_text_lost,
  * whatever the hierarchy or a group's composite label says. A text the live capture still has a
  * record of, drawn nowhere or only behind a label, is the hidden text check's (hiddenText).
  * `stages` holds [stage, live capture, cold capture] triples; a missing capture is skipped.

@@ -106,7 +106,7 @@ export async function stablePage({
  * The scroll-through: the page at the top, then one page per drag until a drag shows the same
  * page again (the bottom). `page(index)` reads settled page `index` (stablePage; 0 the top) and
  * `dragUp()` scrolls one step down the content. Returns the distinct pages in order and the
- * number of drags made, which the caller undoes. A screen that still shows a new page after
+ * number of drags made, which the caller undoes, and `reachedBottom` true. A screen that still shows a new page after
  * `maxDrags` drags never reached its bottom, so its last pages would go unread: it fails as
  * live_font_scroll_bottom_unreached.
  */
@@ -115,7 +115,8 @@ export async function scrollPages({ page, dragUp, maxDrags = MAX_DRAGS }) {
   for (let drags = 0; drags < maxDrags; drags += 1) {
     dragUp()
     const next = await page(pages.length)
-    if (sameLayout(next.nodes, pages.at(-1).nodes)) return { pages, drags }
+    if (sameLayout(next.nodes, pages.at(-1).nodes))
+      return { pages, drags, reachedBottom: true }
     pages.push(next)
   }
   const error = new Error(
@@ -128,19 +129,33 @@ export async function scrollPages({ page, dragUp, maxDrags = MAX_DRAGS }) {
 /**
  * What a capture keeps of its scroll-through: `fullText`, the stitched text of every page
  * (stitchPages, stepping `expectedShift` across a page that shares no text with its neighbour),
- * and, for a screen that scrolls, `pages` with each page's probe answer and `pageShift`, which
- * the judge reads to name and judge each page's text. A screen of one page keeps neither.
+ * and, for a screen that scrolls, `pages` with each page's probe answer, `pageShift` and
+ * `reachedBottom` (scrollPages saw the last drag show the same page again, so the last page is
+ * the bottom and its step may be short, r49 P2-4), which the judge reads to name and judge each
+ * page's text. A screen of one page keeps none of them.
  */
-export function attachPages(capture, pages, expectedShift) {
+export function attachPages(
+  capture,
+  pages,
+  expectedShift,
+  { reachedBottom = false } = {}
+) {
   if (pages.length < 2) {
     capture.fullText = undefined
     return capture
   }
+  // The probe records measure a step beside the nodes, as the judge's stitch (pageCaptures)
+  // takes them (r52 P2-2): a drag whose hierarchy boxes the viewport clamps still moves them.
   capture.fullText = stitchPages(
     pages.map((page) => page.nodes),
-    { expectedShift }
+    {
+      expectedShift,
+      reachedBottom,
+      records: pages.map((page) => page.textProbe?.records ?? []),
+    }
   )
   capture.pages = pages
   capture.pageShift = expectedShift
+  capture.reachedBottom = reachedBottom === true
   return capture
 }

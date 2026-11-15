@@ -80,7 +80,8 @@ final class TextLayoutProbeRulesTests: XCTestCase {
           kind: "RCTParagraphComponentView", text: "Away", viewRect: viewRect,
           visibleRect: cuts.visible, clipRect: cuts.clip, contentRect: viewRect, lineCount: 1,
           maxLines: nil, ellipsized: 0, unlimitedLineCount: 1, window: 0,
-          scrolledAway: cuts.scrolledAway, offWindow: cuts.offWindow)
+          scrolledAway: cuts.scrolledAway, offWindow: cuts.offWindow,
+          scrollViewport: cuts.scrollViewport)
       },
       descends: { _ in false },
       into: &out)
@@ -148,6 +149,51 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     XCTAssertTrue(json["visibleRect"] is NSNull)
     XCTAssertEqual(json["clipRect"] as? [Double], [615, 200, 735, 240])
     XCTAssertEqual(json["scrolledAway"] as? Bool, true)
+    // TEA ruling r49 P2-2: the viewport it scrolls in, which ties it to its volatile region.
+    XCTAssertEqual(record.scrollViewport, viewport)
+    XCTAssertEqual(json["scrollViewport"] as? [Double], [0, 200, 390, 240])
+  }
+
+  // TEA ruling r49 P2-2: the viewport is the nearest sideways scroll view's frame cut by every
+  // clipper above it and the window; a vertical scroll view alone gives none.
+  func testScrollViewportIsTheNearestSidewaysScrollViewCutByWhatIsAboveIt() throws {
+    let sideways = try XCTUnwrap(
+      Wire.travel(
+        content: 1800, insetStart: 0, insetEnd: 0, bounds: 300, offset: 0, enabled: true))
+    let down = try XCTUnwrap(
+      Wire.travel(
+        content: 2000, insetStart: 0, insetEnd: 0, bounds: 700, offset: 0, enabled: true))
+    let page = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 100, width: 390, height: 700), clips: true, scrollY: down)
+    // A padded card that clips, holding a 300 pt carousel that reaches past its right edge.
+    let card = Wire.Ancestor(rect: CGRect(x: 16, y: 150, width: 358, height: 80), clips: true)
+    let carousel = Wire.Ancestor(
+      rect: CGRect(x: 16, y: 160, width: 400, height: 60), clips: true, scrollX: sideways)
+    // Nearest first, as the walk collects them.
+    XCTAssertEqual(
+      Wire.scrollViewport([carousel, card, page], window),
+      CGRect(x: 16, y: 160, width: 358, height: 60))
+    // Of two sideways scroll views, the inner one.
+    let inner = Wire.Ancestor(
+      rect: CGRect(x: 40, y: 170, width: 100, height: 40), clips: true, scrollX: sideways)
+    XCTAssertEqual(
+      Wire.scrollViewport([inner, carousel, card, page], window),
+      CGRect(x: 40, y: 170, width: 100, height: 40))
+    XCTAssertNil(Wire.scrollViewport([card, page], window))
+    // A carousel scrolled wholly out of its page's band shows no viewport.
+    let below = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 5000, width: 390, height: 60), clips: true, scrollX: sideways)
+    XCTAssertNil(Wire.scrollViewport([below, page], window))
+    // r52 P2-1: a carousel straddling its page's bottom edge shows only to that edge; the
+    // page's travel never widens the viewport back to the carousel's uncut box.
+    let straddling = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 700, width: 390, height: 200), clips: true, scrollX: sideways)
+    XCTAssertEqual(
+      Wire.scrollViewport([straddling, page], window),
+      CGRect(x: 0, y: 700, width: 390, height: 100))
+    // The record of a text with no sideways scroll view writes null.
+    let (_, json) = try scrolledRecord(CGRect(x: 0, y: 944, width: 200, height: 40), [page])
+    XCTAssertTrue(json["scrollViewport"] is NSNull)
   }
 
   func testAZeroHeightClipperCutsToNothingWithoutScrollingAway() {
@@ -461,7 +507,9 @@ final class TextLayoutProbeRulesTests: XCTestCase {
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
         "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
         "opacity", "accessibilityAncestor", "behindModal", "accessibilityHidden",
+        "scrollViewport",
       ])
+    XCTAssertTrue(record["scrollViewport"] is NSNull)
     XCTAssertEqual(Set(json.keys), ["version", "token", "platform", "windows", "records", "elements"])
     XCTAssertEqual((json["elements"] as? [[String: Any]])?.count, 0)
     XCTAssertTrue(record["accessibilityAncestor"] is NSNull)

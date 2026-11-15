@@ -3622,11 +3622,13 @@ describe('text layout clipping (F-00i)', () => {
         visibleRect: [1000, 535, 1080, 582],
         contentRect: [1000, 535, 1198, contentBottom],
       })
+    // The chip row's viewport, which the records scrolled away sideways scroll in.
     const away = (text, rect, contentBottom = rect[3]) =>
       probeRecord('android', text, rect, {
         visibleRect: null,
         contentRect: [rect[0], rect[1], rect[2], contentBottom],
         scrolledAway: true,
+        scrollViewport: [0, 493, 1080, 627],
       })
     for (const [name, record] of [
       ['before', shown()],
@@ -4032,6 +4034,194 @@ describe('text layout clipping (F-00i)', () => {
       evaluateLiveFontChangeRaw(leg([submit, star], [submit, second, star])).checks
         .textLost.pass,
       true
+    )
+    // r49 P3-1 (probe 8b): two copies each compared on its own scroll page are two copies, a
+    // copy seen on both pages is one, and a sticky one at one screen place on every page is one.
+    const SHIFT = 1200
+    /** A capture whose page n sits `offsets[n]` below page 0 (a whole drag each by default). */
+    const pagedAt = (capture, offsets, lists, extra = {}) => {
+      const moved = (by) => (node) => {
+        const [left, top, right, bottom] = parseBounds(node.bounds)
+        return { ...node, bounds: `[${left},${top - by}][${right},${bottom - by}]` }
+      }
+      const record = ([text, rect, overrides]) =>
+        probeRecord('ios', text, rect, overrides)
+      const pages = lists.map((list, index) => {
+        const nodes = capture.nodes.map(moved(offsets[index]))
+        const answer = healthyAnswer({ ...capture, nodes }, 'ios')
+        answer.records.push(...list.map(record))
+        return { nodes, volatileRegions: [], window: capture.window, textProbe: answer }
+      })
+      return {
+        ...capture,
+        textProbe: pages[0].textProbe,
+        pages,
+        pageShift: SHIFT,
+        ...extra,
+      }
+    }
+    const paged = (capture, ...lists) =>
+      pagedAt(
+        capture,
+        lists.map((_, index) => index * SHIFT),
+        lists
+      )
+    const away = { visibleRect: null, scrolledAway: true }
+    const near = ['Save', [40, 300, 200, 340]]
+    const far = ['Save', [40, 1700, 200, 1740]]
+    const scrolledFar = [...far, away]
+    const farOnPage1 = ['Save', [40, 500, 200, 540]]
+    const nearOnPage1 = ['Save', [40, -900, 200, -860], away]
+    const crossLeg = (settledPage0, settledPage1) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.cold = paged(change.cold, [near, scrolledFar], [nearOnPage1, farOnPage1])
+      change.settled = paged(change.settled, settledPage0, settledPage1)
+      return evaluateLiveFontChangeRaw(change).checks.textLost
+    }
+    assert.deepEqual(
+      crossLeg([near], [nearOnPage1]).lost.filter(({ text }) => text === 'Save'),
+      [{ stage: 'settled', text: 'Save' }]
+    )
+    assert.equal(
+      crossLeg([near, scrolledFar], [nearOnPage1, farOnPage1]).lost.some(
+        ({ text }) => text === 'Save'
+      ),
+      false
+    )
+    const chip = ['Sticky chip', [200, 80, 300, 110]]
+    // Sticky across three pages and drawn nowhere on the last at the cold launch: still one copy.
+    const sticky = { ...fixedChange(), platform: 'ios' }
+    sticky.cold = paged(
+      sticky.cold,
+      [near, chip],
+      [nearOnPage1, chip],
+      [[...chip, { opacity: 0 }]]
+    )
+    sticky.settled = paged(sticky.settled, [near, chip], [nearOnPage1, chip], [chip])
+    assert.equal(
+      evaluateLiveFontChangeRaw(sticky).checks.textLost.lost.some(
+        ({ text }) => text === 'Sticky chip'
+      ),
+      false
+    )
+    assert.equal(
+      crossLeg([near, scrolledFar, chip], [nearOnPage1, farOnPage1, chip]).lost.some(
+        ({ text }) => text === 'Sticky chip'
+      ),
+      false
+    )
+    // r52 P2-3 A (mutant M11): two copies one drag apart share a screen place across the two
+    // pages, yet each is a moving copy seen again, so they stay two.
+    const apart = (settledPage0, settledPage1) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.cold = paged(
+        change.cold,
+        [near, ['Save', [40, 1500, 200, 1540], away]],
+        [nearOnPage1, ['Save', [40, 300, 200, 340]]]
+      )
+      change.settled = paged(change.settled, settledPage0, settledPage1)
+      return evaluateLiveFontChangeRaw(change).checks.textLost.lost
+    }
+    assert.deepEqual(
+      apart([near], [nearOnPage1]).filter(({ text }) => text === 'Save'),
+      [{ stage: 'settled', text: 'Save' }]
+    )
+    // TEA hold on r52 P2-3 A: a short last drag (20 px, less than the chip's height) puts the
+    // sticky chip of the last two pages at overlapping content places; it is the same screen
+    // place, so it stays one sticky copy, and the cold launch owes the live screen no second one.
+    const shortLast = { ...fixedChange(), platform: 'ios' }
+    shortLast.cold = pagedAt(
+      shortLast.cold,
+      [0, SHIFT, SHIFT + 20],
+      [[near, chip], [chip], [chip]],
+      {
+        reachedBottom: true,
+      }
+    )
+    shortLast.settled = paged(shortLast.settled, [near, chip], [chip], [chip])
+    assert.equal(
+      evaluateLiveFontChangeRaw(shortLast).checks.textLost.lost.some(
+        ({ text }) => text === 'Sticky chip'
+      ),
+      false
+    )
+    // CodeRabbit on PR 230: a header still on the pages before the last and 6 px off on the last
+    // (a short last drag) is one copy, as the stitch counts it.
+    const header = (top) => ['Community', [0, top, 400, top + 40]]
+    const jitter = { ...fixedChange(), platform: 'ios' }
+    jitter.cold = pagedAt(
+      jitter.cold,
+      [0, SHIFT, SHIFT + 200],
+      [[header(20)], [header(20)], [header(26)]],
+      { reachedBottom: true }
+    )
+    jitter.settled = paged(jitter.settled, [header(20)], [header(20)], [header(20)])
+    assert.equal(
+      evaluateLiveFontChangeRaw(jitter).checks.textLost.lost.some(
+        ({ text }) => text === 'Community'
+      ),
+      false
+    )
+    // TEA hold on the CodeRabbit fix: the sticky chip drawn nowhere on the last page, a content
+    // copy of its text there. The fixed copy claims the invisible chip, so the content copy
+    // still counts and losing it live is lost.
+    const content = ['Sticky chip', [200, 1500, 300, 1530]]
+    const swallow = (lastSettled) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.cold = paged(
+        change.cold,
+        [near, chip],
+        [nearOnPage1, chip],
+        [[...chip, { opacity: 0 }], content]
+      )
+      change.settled = paged(
+        change.settled,
+        [near, chip],
+        [nearOnPage1, chip],
+        lastSettled
+      )
+      return evaluateLiveFontChangeRaw(change).checks.textLost.lost.filter(
+        ({ text }) => text === 'Sticky chip'
+      )
+    }
+    assert.deepEqual(swallow([chip]), [{ stage: 'settled', text: 'Sticky chip' }])
+    assert.deepEqual(swallow([chip, content]), [])
+    // CodeRabbit on PR 230, accepted residual (TEA): three Save buttons at one screen place a drag
+    // apart; a ScrollView mounts all three on every page, so each page holds the others as
+    // records at their own content places, and they count three. A virtualized list that
+    // unmounts the far copies stays indistinguishable from a sticky header (design doc).
+    const button = (top, overrides) => ['Save', [40, top, 200, top + 40], overrides]
+    const three = (moved) =>
+      [0, 1, 2].map((page) =>
+        [0, 1, 2].map((index) =>
+          button(300 + (index - page) * SHIFT, index === page ? undefined : moved)
+        )
+      )
+    const buttons = { ...fixedChange(), platform: 'ios' }
+    buttons.cold = paged(buttons.cold, ...three(away))
+    buttons.settled = paged(buttons.settled, [button(300)], [button(300)], [button(300)])
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(buttons).checks.textLost.lost.filter(
+        ({ text }) => text === 'Save'
+      ),
+      [{ stage: 'settled', text: 'Save' }]
+    )
+    // r52 P2-3 C: two copies on one page are two, though both overlap one earlier copy.
+    const pair = { ...fixedChange(), platform: 'ios' }
+    pair.cold = paged(
+      pair.cold,
+      [near],
+      [
+        ['Save', [40, -900, 120, -860]],
+        ['Save', [120, -900, 200, -860]],
+      ]
+    )
+    pair.settled = paged(pair.settled, [near], [nearOnPage1])
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(pair).checks.textLost.lost.filter(
+        ({ text }) => text === 'Save'
+      ),
+      [{ stage: 'settled', text: 'Save' }]
     )
     // Scrolled away at the cold launch on every page, it may be a volatile card's text below the
     // region's visible cut (the hierarchy cuts a region to what shows): not compared.

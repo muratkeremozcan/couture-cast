@@ -13,7 +13,7 @@
 //     windows: [{ id, rect, z, focused }],
 //     records: [{ kind, text, window, viewRect, visibleRect|null, clipRect|null, contentRect,
 //                 scrolledAway, lineCount, maxLines|null, ellipsized, unlimitedLineCount|null,
-//                 opacity, accessibilityHidden, offWindow? }] }
+//                 opacity, accessibilityHidden, scrollViewport|null, offWindow? }] }
 // Rects are [left, top, right, bottom]: screen pixels on Android (as uiautomator bounds), window
 // points on iOS (as Maestro iOS bounds). `visibleRect` is the view cut by every clipping ancestor
 // and the window; `clipRect` is the view cut by every clipping ancestor except scroll views and
@@ -24,7 +24,10 @@
 // (TEA ruling r49, both platforms, required) is true when the text view is hidden from
 // accessibility (importantForAccessibility no-hide-descendants, accessibilityElementsHidden, or
 // not accessible inside an accessible parent), so no hierarchy node carries its text. Stored
-// answers from before the field read as false in the matcher only.
+// answers from before the field read as false in the matcher only. `scrollViewport` (TEA ruling
+// r49 P2-2, both platforms, required) is the viewport of the nearest scroll view that can move
+// the text sideways, cut by everything above it and the window, or null when none holds it; a
+// record scrolled away sideways joins the volatile region that holds that viewport.
 //
 // Android: `am broadcast -a com.couturecast.textlayoutprobe.DUMP --es token <t> -p <package>`,
 // then `logcat -d -s TextLayoutProbe` lines `begin <t> <chunks> <sha256>`, `chunk <t> <i>
@@ -94,6 +97,7 @@ const RECORD_FIELDS = [
   'unlimitedLineCount',
   'opacity',
   'accessibilityHidden',
+  'scrollViewport',
 ].sort()
 const ANSWER_FIELDS = ['elements', 'platform', 'records', 'token', 'version', 'windows']
 /**
@@ -134,6 +138,7 @@ const isMaxLines = (value) => Number.isSafeInteger(value) && value > 0
 const RECORD_RULES = [
   ['text', (record) => typeof record.text === 'string'],
   ['accessibilityHidden', (record) => typeof record.accessibilityHidden === 'boolean'],
+  ['scrollViewport', (record) => nullOr(isRect)(record.scrollViewport)],
   ['viewRect', (record) => isRect(record.viewRect)],
   ['contentRect', (record) => isRect(record.contentRect)],
   ['visibleRect', (record) => nullOr(isRect)(record.visibleRect)],
@@ -661,7 +666,7 @@ export function coveredWindows(windows, tolerance) {
 }
 
 /** Each record's class (see matchTextProbe) and, for one in a volatile region, the region's index. */
-function classifyRecords(records, coveredIds, volatileRegions, tolerance, window) {
+function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
   const classes = {
     empty: [],
     covered: [],
@@ -677,7 +682,7 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance, window
   const regionOf = new Map()
   const kinds = []
   for (const record of records) {
-    const region = regionOfRecord(record, volatileRegions, window, tolerance)
+    const region = regionOfRecord(record, volatileRegions)
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
@@ -734,34 +739,32 @@ const volatileRegionOf = (record, volatileRegions) => {
 }
 
 /**
- * A record scrolled out sideways past a volatile region's edge, its centre within the region's
- * height (a filter chip the row scrolled off screen, Android 6c85bbb4 Community cold 1.5 "Cold
- * and dry" at x 1315): the region's index, or -1. The hierarchy cuts a region to what shows, so
- * the chip's own centre lies outside it. Since r48 P3-1 the record lies wholly past a window
- * edge the region reaches (within the tolerance), so the region is cut there by the window and
- * the record continues its row; a record beside a region that stops inside the window (another
- * column) is none of its own, and with no window known none is.
+ * A record scrolled out sideways in a volatile region (a filter chip the row scrolled off screen,
+ * Android 6c85bbb4 Community cold 1.5 "Cold and dry" at x 1315): the index of the region whose
+ * box holds the centre of the record's `scrollViewport`, the viewport of the nearest scroll
+ * view that can move it sideways, or -1. The hierarchy cuts a region to what shows, so the
+ * chip's own centre lies outside it; the viewport it scrolls in ties it to the region (TEA ruling
+ * r49 P2-2), whatever the padding or the window edge. A record with no viewport, or from an
+ * answer before the field, belongs to no region this way.
  */
-const overflowRegionOf = (record, volatileRegions, window, tolerance) => {
-  if (!window) return -1
-  const rect = recordRect(record)
-  const [, y] = centre(rect)
+const overflowRegionOf = (record, volatileRegions) => {
+  if (!isRect(record.scrollViewport)) return -1
+  const [x, y] = centre(record.scrollViewport)
   return volatileRegions.findIndex(
-    (region) =>
-      y >= region[1] &&
-      y <= region[3] &&
-      ((rect[0] >= window[2] - tolerance && region[2] >= window[2] - tolerance) ||
-        (rect[2] <= window[0] + tolerance && region[0] <= window[0] + tolerance))
+    (region) => x >= region[0] && x <= region[2] && y >= region[1] && y <= region[3]
   )
 }
 
-/** The volatile region a record belongs to: by its centre, or, scrolled away, by overflow. */
-const regionOfRecord = (record, volatileRegions, window, tolerance) => {
-  const region = volatileRegionOf(record, volatileRegions)
-  return region < 0 && record.scrolledAway
-    ? overflowRegionOf(record, volatileRegions, window, tolerance)
-    : region
-}
+/**
+ * The volatile region a record belongs to: scrolled away in a sideways scroll view, by that
+ * viewport; else by its centre.
+ */
+const regionOfRecord = (record, volatileRegions) =>
+  // A record scrolled away in a sideways scroll view belongs to the region of that viewport
+  // first (CodeRabbit on PR 230): its own centre may fall in a sibling region.
+  record.scrolledAway && isRect(record.scrollViewport)
+    ? overflowRegionOf(record, volatileRegions)
+    : volatileRegionOf(record, volatileRegions)
 
 /** Rank of each item in screen order: top to bottom, left to right, then list order. */
 const ranks = (items, rectOf) =>
@@ -1030,21 +1033,57 @@ function hiddenOwner(record, { nodes, elements, tolerance }) {
   const text = normalized(record.text)
   if (text === '') return null
   const rect = recordRect(record)
+  const identified = elements
+    .map((element, index) => ({ element, index }))
+    .filter(({ element }) => element.identifier !== null)
+  // TEA ruling r49 P2-1, r52 P2-4 b: the smallest identified elements whose frame holds the
+  // record decide it: of those, the ones whose label holds its words own it (several are
+  // ambiguous), and none leaves it unmatched.
+  const holders = best(
+    identified.filter(({ element }) => contains(element.rect, rect, tolerance)),
+    ({ element }) => area(element.rect)
+  )
+  if (holders.length)
+    return ownerOf(
+      holders.filter(({ element }) => holdsWords(normalized(element.label), text)),
+      nodes
+    )
+  // TEA ruling r52 P2-4 a: held by no identified element, it joins the nearest element that
+  // borders it, but only when nothing else holds it apart from that element: no element (with an
+  // identifier or none) and no hierarchy node whose box holds the record without holding the
+  // element too (the badge of a card with no identifier, beside another card).
+  // An element or node named by the record's own text is the record's own box (the pill's
+  // element in the Home teaser), no container.
+  const holdsRecord = [
+    ...elements
+      .filter((element) => normalized(element.label) !== text)
+      .map((element) => element.rect),
+    ...nodes
+      .filter((node) => normalized(node.text ?? '') !== text)
+      .map((node) => node.box),
+  ].filter((box) => contains(box, rect, tolerance))
   const reach = bordersReach(record, rect, tolerance)
   const nearest = best(
-    elements
-      .map((element, index) => ({ element, index }))
-      .filter(
-        ({ element }) =>
-          element.identifier !== null &&
-          holdsWords(normalized(element.label), text) &&
-          gap(element.rect, rect) <= reach
-      ),
+    identified.filter(
+      ({ element }) =>
+        holdsWords(normalized(element.label), text) &&
+        gap(element.rect, rect) <= reach &&
+        holdsRecord.every((box) => contains(box, element.rect, tolerance))
+    ),
     ({ element }) => gap(element.rect, rect)
   )
-  if (nearest.length > 1) return { ambiguous: { elements: nearest.map((e) => e.index) } }
-  if (!nearest.length) return null
-  const [{ element, index }] = nearest
+  return ownerOf(nearest, nodes)
+}
+
+/**
+ * The element of `candidates` that owns a flagged record and its hierarchy node (hiddenOwner):
+ * `{ element, node }`, `{ ambiguous }` with the tied element or node indexes, or null.
+ */
+function ownerOf(candidates, nodes) {
+  if (candidates.length > 1)
+    return { ambiguous: { elements: candidates.map((each) => each.index) } }
+  if (!candidates.length) return null
+  const [{ element, index }] = candidates
   const owners = best(
     nodes.filter(
       (node) =>
@@ -1062,9 +1101,10 @@ function hiddenOwner(record, { nodes, elements, tolerance }) {
  * TEA ruling r49: a record native flags `accessibilityHidden` (a decorative pill or caption whose
  * words an accessible parent's label carries) that is still free after every other pairing joins
  * the nearest identified accessibility element (an identifier, not null) whose label holds its
- * text as whole words, whitespace normalized, and whose frame holds or borders the record
- * (bordersReach, r48 P2-2); nearest by the gap between the element's frame and the record's
- * rect, and two elements at one gap are ambiguous. It joins the hierarchy node of that
+ * text as whole words, whitespace normalized: the smallest identified element whose frame holds
+ * the record, which leaves it unmatched when its label lacks those words (TEA ruling r49 P2-1),
+ * or, when no identified element holds it, the nearest whose frame borders it (bordersReach, r48
+ * P2-2). Two elements of one area, or at one gap, are ambiguous. It joins the hierarchy node of that
  * element (its testID and label, frames overlapping; of several, the best overlap, a tie
  * ambiguous): the node's group when the node is one, else its attached records, so each node
  * keeps one member list. It is keyed as that node's key, `>`, then its own `["",text]#n`, and
@@ -1180,8 +1220,7 @@ export function matchTextProbe({
     records,
     covers,
     volatileRegions,
-    tolerance,
-    window
+    tolerance
   )
   const indexed = nodes.map((node, index) => ({ ...node, index }))
   const windowNodes =

@@ -5,6 +5,7 @@
 // probe is synchronous and would block a holder in this one.
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import fs from 'node:fs'
 import net from 'node:net'
 import os from 'node:os'
@@ -121,19 +122,145 @@ test('a port reservation holds against another live runner and is reclaimed from
   const alive = new Set([101, 202])
   const runner = (pid) =>
     createIosDriverPortIo({ reservations, pid, alive: (other) => alive.has(other) })
-  assert.equal(runner(101).reserve(17234, 'A'), true)
-  assert.equal(runner(202).reserve(17234, 'B'), false)
+  const a = runner(101)
+  const b = runner(202)
+  assert.equal(a.reserve(17234, 'A'), true)
+  assert.equal(b.reserve(17234, 'B'), false)
   // Only the holder releases it.
-  runner(202).release(17234)
-  assert.equal(runner(202).reserve(17234, 'B'), false)
+  b.release(17234)
+  assert.equal(b.reserve(17234, 'B'), false)
   alive.delete(101)
-  assert.equal(runner(202).reserve(17234, 'B'), true)
+  assert.equal(b.reserve(17234, 'B'), true)
   const { device, pid } = JSON.parse(
     fs.readFileSync(path.join(reservations, '17234.json'), 'utf8')
   )
   assert.deepEqual({ device, pid }, { device: 'B', pid: 202 })
-  runner(202).release(17234)
+  // Reserving a port it holds keeps its lock.
+  assert.equal(b.reserve(17234, 'B'), true)
+  b.release(17234)
   assert.equal(fs.existsSync(path.join(reservations, '17234.json')), false)
+})
+
+// r49 P2-3: a lock is its runner's by pid and token. Two io of one process never share a port,
+// and only the io that holds a lock releases it.
+test('a lock of this process under another token is live, and only its own io releases it', (t) => {
+  const reservations = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-driver-ports-'))
+  t.after(() => fs.rmSync(reservations, { recursive: true, force: true }))
+  const first = createIosDriverPortIo({ reservations, pid: 303, alive: () => false })
+  const second = createIosDriverPortIo({ reservations, pid: 303, alive: () => false })
+  assert.equal(first.reserve(17240, 'DEV-1'), true)
+  assert.equal(second.reserve(17240, 'DEV-2'), false)
+  second.release(17240)
+  const lock = path.join(reservations, '17240.json')
+  assert.equal(JSON.parse(fs.readFileSync(lock, 'utf8')).device, 'DEV-1')
+  first.release(17240)
+  assert.equal(fs.existsSync(lock), false)
+  // A lock of this pid with no token is an earlier process's (pid reuse): left behind.
+  fs.writeFileSync(lock, `${JSON.stringify({ device: 'OLD', pid: 303 })}\n`)
+  assert.equal(second.reserve(17240, 'DEV-2'), true)
+  second.release(17240)
+})
+
+// r49 P2-3 (probe 3b): a runner killed after placing its takeover marker blocked the port for
+// good. A marker records its runner's pid and token; a dead one passes the takeover on.
+test('a takeover marker whose runner died passes the takeover to the next generation', (t) => {
+  const reservations = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-driver-ports-'))
+  t.after(() => fs.rmSync(reservations, { recursive: true, force: true }))
+  const lock = path.join(reservations, '17205.json')
+  const raw = `${JSON.stringify({ device: 'DEAD', pid: 999999 })}\n`
+  fs.writeFileSync(lock, raw)
+  const hash = createHash('sha256').update(raw).digest('hex').slice(0, 16)
+  const marker = (generation) =>
+    path.join(reservations, `17205.takeover.${hash}.${generation}`)
+  fs.writeFileSync(marker(0), `${JSON.stringify({ pid: 888888, token: 'gone' })}\n`)
+  const live = new Set([101, 777])
+  const runner = createIosDriverPortIo({
+    reservations,
+    pid: 101,
+    alive: (other) => live.has(other),
+  })
+  assert.equal(runner.reserve(17205, 'DEV-A'), true)
+  assert.deepEqual(fs.readdirSync(reservations), ['17205.json'])
+  runner.release(17205)
+  // A live runner's marker stops the takeover: it is that runner's to finish.
+  fs.writeFileSync(lock, raw)
+  fs.writeFileSync(marker(0), `${JSON.stringify({ pid: 777, token: 'busy' })}\n`)
+  assert.equal(runner.reserve(17205, 'DEV-A'), false)
+  assert.equal(fs.readFileSync(lock, 'utf8'), raw)
+  // r52 P3-1: five dead generations no longer block the port; the winner removes them all.
+  fs.rmSync(marker(0))
+  const dead = `${JSON.stringify({ pid: 888888, token: 'gone' })}\n`
+  for (const generation of [0, 1, 2, 3, 4]) fs.writeFileSync(marker(generation), dead)
+  assert.equal(runner.reserve(17205, 'DEV-A'), true)
+  assert.deepEqual(fs.readdirSync(reservations), ['17205.json'])
+  runner.release(17205)
+  // A runaway walk fails with its own error and leaves the lock and the dead markers.
+  fs.writeFileSync(lock, raw)
+  for (const generation of [0, 1, 2]) fs.writeFileSync(marker(generation), dead)
+  const capped = createIosDriverPortIo({
+    reservations,
+    pid: 101,
+    alive: (other) => live.has(other),
+    markerLimit: 3,
+  })
+  assert.throws(() => capped.reserve(17205, 'DEV-A'), {
+    code: 'maestro_driver_port_takeover_runaway',
+  })
+  assert.equal(fs.readFileSync(lock, 'utf8'), raw)
+  assert.equal(fs.readdirSync(reservations).length, 4)
+})
+
+// r49 mutant M14b: a takeover that removed the dead lock and linked a new one left the port
+// without a lock in between, where any runner could claim it.
+test('a lock is never absent while it is taken over', (t) => {
+  const reservations = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-driver-ports-'))
+  t.after(() => fs.rmSync(reservations, { recursive: true, force: true }))
+  const lock = path.join(reservations, '17206.json')
+  fs.writeFileSync(lock, `${JSON.stringify({ device: 'DEAD', pid: 999999 })}\n`)
+  const absent = []
+  let watching = false
+  const files = new Proxy(fs, {
+    get(target, name) {
+      const value = target[name]
+      if (typeof value !== 'function') return value
+      return (...args) => {
+        if (watching && !fs.existsSync(lock)) absent.push(String(name))
+        if (name === 'linkSync' && String(args[1]).includes('.takeover.')) watching = true
+        const result = value.apply(target, args)
+        if (watching && !fs.existsSync(lock)) absent.push(`after ${String(name)}`)
+        return result
+      }
+    },
+  })
+  const runner = createIosDriverPortIo({
+    reservations,
+    pid: 101,
+    alive: () => false,
+    files,
+  })
+  assert.equal(runner.reserve(17206, 'DEV-A'), true)
+  assert.equal(watching, true, 'the takeover ran')
+  assert.deepEqual(absent, [])
+})
+
+// r49 P3-2: a filesystem without hard links fails with its own error.
+test('a filesystem without hard links fails as maestro_driver_port_lock_unsupported', (t) => {
+  const reservations = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-driver-ports-'))
+  t.after(() => fs.rmSync(reservations, { recursive: true, force: true }))
+  for (const code of ['EPERM', 'EOPNOTSUPP']) {
+    const files = {
+      ...fs,
+      linkSync: () => {
+        throw Object.assign(new Error(code), { code })
+      },
+    }
+    const runner = createIosDriverPortIo({ reservations, pid: 101, files })
+    assert.throws(() => runner.reserve(17207, 'DEV-A'), {
+      code: 'maestro_driver_port_lock_unsupported',
+      message: new RegExp(`^maestro_driver_port_lock_unsupported: ${code}`),
+    })
+    assert.deepEqual(fs.readdirSync(reservations), [])
+  }
 })
 
 // r48 P2-3 (probe F4): two runners that both found a dead runner's lock both removed it and

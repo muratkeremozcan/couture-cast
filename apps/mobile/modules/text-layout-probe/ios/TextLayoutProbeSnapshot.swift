@@ -208,7 +208,7 @@ enum TextLayoutProbeSnapshot {
         unlimitedLineCount: measure.unlimitedLineCount,
         window: id,
         scrolledAway: cuts.scrolledAway,
-        offWindow: cuts.offWindow)
+        offWindow: cuts.offWindow, scrollViewport: cuts.scrollViewport)
     }
     // Any other text renderer is reported, so a renderer change cannot hide text from the probe.
     let text: String?
@@ -273,7 +273,7 @@ enum TextLayoutProbeSnapshot {
       visibleRect: cuts.visible, clipRect: cuts.clip, contentRect: content,
       lineCount: input.lineCount, maxLines: input.maxLines, ellipsized: input.ellipsized,
       unlimitedLineCount: input.unlimitedLineCount, window: id, scrolledAway: cuts.scrolledAway,
-      offWindow: cuts.offWindow)
+      offWindow: cuts.offWindow, scrollViewport: cuts.scrollViewport)
   }
 
   /// The UITextField or UITextView inside a text input component view, nearest first.
@@ -295,7 +295,7 @@ enum TextLayoutProbeSnapshot {
       kind: "unknown:\(className)", text: text, viewRect: viewRect, visibleRect: cuts.visible,
       clipRect: cuts.clip, contentRect: viewRect, lineCount: 0, maxLines: nil, ellipsized: 0,
       unlimitedLineCount: nil, window: id, scrolledAway: cuts.scrolledAway,
-      offWindow: cuts.offWindow)
+      offWindow: cuts.offWindow, scrollViewport: cuts.scrollViewport)
   }
 
   private static func clip(_ view: UIView, _ viewRect: CGRect, _ window: UIWindow)

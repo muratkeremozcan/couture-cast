@@ -594,6 +594,37 @@ class TextLayoutSnapshotTest {
     assertTrue(json.isNull("visibleRect"))
     assertEquals(record.clipRect, json.rectOf("clipRect"))
     assertTrue(json.getBoolean("scrolledAway"))
+    // TEA ruling r49 P2-2: the viewport it scrolls in, which ties it to its volatile region.
+    assertEquals(viewport.intersect(window), record.scrollViewport)
+    assertEquals(record.scrollViewport, json.rectOf("scrollViewport"))
+  }
+
+  // TEA ruling r49 P2-2: the nearest sideways scroll view's viewport, cut by what is above it; a
+  // vertical scroll view alone gives none.
+  @Test
+  fun scrollViewportIsTheNearestSidewaysScrollViewCutByWhatIsAboveIt() {
+    val sideways = ScrollTravel(0, 1400)
+    val down = ScrollTravel(0, 1300)
+    val window = ProbeRect(0, 0, 1080, 2400)
+    val page = TextLayoutSnapshot.Level(listOf(ProbeRect(0, 200, 1080, 2200)), scrollY = down)
+    // A padded card that clips, holding a carousel that reaches past its right edge.
+    val card = TextLayoutSnapshot.Level(listOf(ProbeRect(44, 400, 1036, 620)))
+    val carousel = TextLayoutSnapshot.Level(listOf(ProbeRect(44, 420, 1200, 600)), scrollX = sideways)
+    assertEquals(ProbeRect(44, 420, 1036, 600), TextLayoutSnapshot.scrollViewport(listOf(carousel, card, page), window))
+    val inner = TextLayoutSnapshot.Level(listOf(ProbeRect(100, 440, 400, 580)), scrollX = sideways)
+    assertEquals(
+      ProbeRect(100, 440, 400, 580),
+      TextLayoutSnapshot.scrollViewport(listOf(inner, carousel, card, page), window)
+    )
+    assertNull(TextLayoutSnapshot.scrollViewport(listOf(card, page), window))
+    val below = TextLayoutSnapshot.Level(listOf(ProbeRect(0, 9000, 1080, 9200)), scrollX = sideways)
+    assertNull(TextLayoutSnapshot.scrollViewport(listOf(below, card), window))
+    // r52 P2-1: a carousel straddling its page's bottom edge shows only to that edge; the page's
+    // travel never widens the viewport back to the carousel's uncut box.
+    val straddling = TextLayoutSnapshot.Level(listOf(ProbeRect(0, 2100, 1080, 2400)), scrollX = sideways)
+    assertEquals(ProbeRect(0, 2100, 1080, 2200), TextLayoutSnapshot.scrollViewport(listOf(straddling, page), window))
+    val cuts = TextLayoutSnapshot.cuts(ProbeRect(1315, 545, 1615, 616), listOf(carousel, card, page), window)
+    assertEquals(ProbeRect(44, 420, 1036, 600), cuts.scrollViewport)
   }
 
   @Test

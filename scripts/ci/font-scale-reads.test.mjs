@@ -22,7 +22,9 @@
 // A banned name (allowFontScaling, maxFontSizeMultiplier, getFontScale) passes only in the one
 // function BANNED_ALLOWED gives it, and only in the form its test there accepts. Names are scoped
 // by the TypeScript AST's function bodies, so code after a function never inherits its
-// allowance, and a name spelled as a string (`dimensions['fontScale']`) counts as the name.
+// allowance, and a name spelled as a string (`dimensions['fontScale']`) counts as the name. A key
+// folds through parentheses, `+` of strings, plain templates and string constants; a key on a
+// dimensions value or PixelRatio that folds to nothing fails as unverifiable (r49 P2-5).
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import path from 'node:path'
@@ -144,19 +146,186 @@ function scopeOf(node) {
   return names.length > 0 ? names.join('.') : typeName
 }
 
+/** The expression inside any parentheses, non-null assertions, `as` and `satisfies`. */
+function unwrap(node) {
+  let current = node
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isNonNullExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isSatisfiesExpression(current)
+  )
+    current = current.expression
+  return current
+}
+
+/** Folding follows at most this many names, so a cycle of constants ends. */
+const FOLD_DEPTH = 20
+
 /**
- * The name a node reads or binds: an identifier, or a string a property is named by (r48 P2-4),
- * as an element access (`dimensions['fontScale']`, a template without substitutions too), a
- * computed property name, or a quoted property name in an object or a destructuring. Null for
- * any other node, so a string that names no property (a log line, a test ID) passes.
+ * The declaration a name refers to, through the checker (CodeRabbit on PR 230): lexical, so a
+ * parameter that shadows a constant, or another function's binding of the same name, is its own.
  */
-function nameOf(node) {
+function declarationOf(identifier, checker) {
+  const symbol = checker.getSymbolAtLocation(identifier)
+  return symbol?.valueDeclaration ?? symbol?.declarations?.[0] ?? null
+}
+
+/** The value of the variable a name refers to, or null; `constOnly` for a `const` only. */
+function initializerOf(identifier, checker, constOnly) {
+  const declaration = declarationOf(identifier, checker)
+  if (!declaration || !ts.isVariableDeclaration(declaration) || !declaration.initializer)
+    return null
+  if (constOnly && (ts.getCombinedNodeFlags(declaration) & ts.NodeFlags.Const) === 0)
+    return null
+  return declaration.initializer
+}
+
+/**
+ * The string a key expression always is (r49 P2-5), or null: a string or plain template, in
+ * parentheses or not, a `+` of such strings, or a `const` holding one (by its declaration, so a
+ * shadowing parameter is no constant).
+ */
+function foldKey(expression, checker, depth = 0) {
+  if (depth > FOLD_DEPTH) return null
+  const node = unwrap(expression)
+  if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))
+    return node.text
+  if (ts.isIdentifier(node)) {
+    const value = initializerOf(node, checker, true)
+    return value ? foldKey(value, checker, depth + 1) : null
+  }
+  if (
+    ts.isBinaryExpression(node) &&
+    node.operatorToken.kind === ts.SyntaxKind.PlusToken
+  ) {
+    const left = foldKey(node.left, checker, depth + 1)
+    const right = foldKey(node.right, checker, depth + 1)
+    return left === null || right === null ? null : left + right
+  }
+  return null
+}
+
+/**
+ * Whether an expression is a window or screen dimensions value or PixelRatio, where any key may
+ * be the font scale: useWindowDimensions(), Dimensions.get(...), PixelRatio, Dimensions, or a
+ * variable whose declaration holds one of them.
+ */
+function dimensionsValue(expression, checker, depth = 0) {
+  if (depth > FOLD_DEPTH) return false
+  const node = unwrap(expression)
+  if (ts.isIdentifier(node)) {
+    if (['PixelRatio', 'Dimensions'].includes(node.text)) return true
+    const value = initializerOf(node, checker, false)
+    return value ? dimensionsValue(value, checker, depth + 1) : false
+  }
+  if (ts.isCallExpression(node)) {
+    const callee = unwrap(node.expression)
+    if (ts.isIdentifier(callee)) return callee.text === 'useWindowDimensions'
+    return (
+      ts.isPropertyAccessExpression(callee) &&
+      callee.name.text === 'get' &&
+      ts.isIdentifier(unwrap(callee.expression)) &&
+      unwrap(callee.expression).text === 'Dimensions'
+    )
+  }
+  return false
+}
+
+/**
+ * The sources of `files` with one type checker over them all: no library and no module
+ * resolution, which binding names to their declarations needs neither.
+ */
+function checkedSources(files) {
+  const sources = new Map(
+    Object.entries(files).map(([file, text]) => [
+      file,
+      ts.createSourceFile(
+        file,
+        text,
+        ts.ScriptTarget.Latest,
+        true,
+        file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
+      ),
+    ])
+  )
+  const host = {
+    getSourceFile: (file) => sources.get(file),
+    // The guard only reads: an emit, which it never asks for, writes nothing.
+    writeFile: () => undefined,
+    getDefaultLibFileName: () => 'lib.d.ts',
+    useCaseSensitiveFileNames: () => true,
+    getCanonicalFileName: (file) => file,
+    getCurrentDirectory: () => '',
+    getNewLine: () => '\n',
+    fileExists: (file) => sources.has(file),
+    readFile: () => undefined,
+  }
+  const program = ts.createProgram(
+    [...sources.keys()],
+    { noLib: true, noResolve: true, types: [], jsx: ts.JsxEmit.Preserve },
+    host
+  )
+  return { sources, checker: program.getTypeChecker() }
+}
+
+/**
+ * The value a destructuring takes apart, for the property `element` of its pattern: a
+ * declaration's value, or the right side of an assignment (`({ [k]: s } = dims)`); null else.
+ */
+function patternSource(element) {
+  let current = element.parent
+  while (
+    current.parent &&
+    (ts.isBindingElement(current.parent) ||
+      ts.isObjectBindingPattern(current.parent) ||
+      ts.isParenthesizedExpression(current.parent))
+  )
+    current = current.parent
+  const parent = current.parent
+  if (ts.isVariableDeclaration(parent) && parent.name === current)
+    return parent.initializer ?? null
+  if (
+    ts.isBinaryExpression(parent) &&
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    unwrap(parent.left) === current
+  )
+    return parent.right
+  return null
+}
+
+/**
+ * The name a node reads or binds (r48 P2-4, r49 P2-5): an identifier; a string a property is
+ * named by as a quoted property name in an object or a destructuring, or a JSX attribute; or,
+ * for an element access or a computed property name, its key folded to a string (foldKey). A
+ * key that folds to no string, on a dimensions value or PixelRatio (dimensionsValue), is
+ * `UNVERIFIABLE`: it might be the font scale. Null for any other node, so a string that names
+ * no property (a log line, a test ID) passes.
+ */
+function nameOf(node, names) {
   if (ts.isIdentifier(node)) return node.text
+  if (ts.isElementAccessExpression(node) || ts.isComputedPropertyName(node))
+    return keyName(node, names)
+  return quotedName(node)
+}
+
+/** An element access's or a computed property name's key, folded (nameOf). */
+function keyName(node, { checker }) {
+  const access = ts.isElementAccessExpression(node)
+  const key = foldKey(access ? node.argumentExpression : node.expression, checker)
+  if (key !== null) return key
+  if (access) return dimensionsValue(node.expression, checker) ? UNVERIFIABLE : null
+  const element = node.parent
+  if (!ts.isBindingElement(element) && !ts.isPropertyAssignment(element)) return null
+  const value = patternSource(element)
+  return value && dimensionsValue(value, checker) ? UNVERIFIABLE : null
+}
+
+/** A string naming a property: quoted in an object or a destructuring, or a JSX attribute. */
+function quotedName(node) {
   if (!ts.isStringLiteral(node) && !ts.isNoSubstitutionTemplateLiteral(node)) return null
   const parent = node.parent
   const named =
-    (ts.isElementAccessExpression(parent) && parent.argumentExpression === node) ||
-    ts.isComputedPropertyName(parent) ||
     (ts.isBindingElement(parent) && parent.propertyName === node) ||
     ((ts.isPropertyAssignment(parent) || ts.isPropertySignature(parent)) &&
       parent.name === node) ||
@@ -164,27 +333,29 @@ function nameOf(node) {
   return named ? node.text : null
 }
 
+/** A key nothing can fold, on a value whose keys include the font scale. */
+const UNVERIFIABLE = Symbol('unverifiable font-scale key')
+
 export function fontScaleReads(files) {
   const problems = []
+  const { sources, checker } = checkedSources(files)
   for (const [file, text] of Object.entries(files)) {
-    const source = ts.createSourceFile(
-      file,
-      text,
-      ts.ScriptTarget.Latest,
-      true,
-      file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
-    )
+    const source = sources.get(file)
     const lines = text.split('\n')
     const flagged = new Set()
+    const names = { checker }
     const visit = (node) => {
-      const name = nameOf(node)
+      const name = nameOf(node, names)
       if (name !== null) {
         const scope = scopeOf(node)
-        const allowed = BANNED_NAMES.has(name)
-          ? (BANNED_ALLOWED[file]?.[scope]?.[name]?.(node, source) ?? false)
-          : name === FONT_SCALE
-            ? (ALLOWED[file] ?? []).includes(scope)
-            : true
+        const allowed =
+          name === UNVERIFIABLE
+            ? false
+            : BANNED_NAMES.has(name)
+              ? (BANNED_ALLOWED[file]?.[scope]?.[name]?.(node, source) ?? false)
+              : name === FONT_SCALE
+                ? (ALLOWED[file] ?? []).includes(scope)
+                : true
         if (!allowed)
           flagged.add(source.getLineAndCharacterOfPosition(node.getStart(source)).line)
       }
@@ -353,6 +524,86 @@ describe('font-scale reads in app code', () => {
       '}',
     ].join('\n')
     assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': glyph }), [])
+  })
+
+  // r49 P2-5 (probe 5.ast_guard): parentheses, a concatenation, a template and a const key all
+  // passed; a key nothing folds, on a dimensions value, is unverifiable.
+  test('a font-scale key in parentheses, folded or unverifiable is caught', () => {
+    const reads = [
+      'export function AppText() {',
+      "  const a = useWindowDimensions()[('fontScale')]",
+      "  const { [('fontScale')]: b } = useWindowDimensions()",
+      "  const c = useWindowDimensions()['font' + 'Scale']",
+      "  const KEY = 'font' + `Scale`",
+      '  const d = useWindowDimensions()[KEY]',
+      '  const dims = Dimensions.get(`window`)',
+      '  const e = dims[`font${suffix}`]',
+      '  const f = PixelRatio[name]',
+      '  const { [name]: g } = useWindowDimensions()',
+      '  const h = rows[index]',
+      "  const i = { [('maxFontSize' + 'Multiplier')]: 2 }",
+      '  ;({ [name]: g } = useWindowDimensions())',
+      '  const j = { [name]: 2 }',
+      '}',
+    ].join('\n')
+    assert.deepEqual(
+      fontScaleReads({ 'components/app-text.tsx': reads }).map(
+        (line) => line.split(' ')[0]
+      ),
+      [2, 3, 4, 6, 8, 9, 10, 12, 13].map((line) => `components/app-text.tsx:${line}`)
+    )
+  })
+
+  // r52 mutant M9a: a const key folds to its value, so a safe one passes and the font scale is
+  // reported by name; neither is left unverifiable.
+  test('a const key folds to its value on a dimensions value', () => {
+    const safe = [
+      'export function AppText() {',
+      "  const KEY = 'width'",
+      '  return useWindowDimensions()[KEY]',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': safe }), [])
+    const scale = safe.replace("'width'", "'fontScale'")
+    assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': scale }), [
+      'components/app-text.tsx:3 return useWindowDimensions()[KEY]',
+    ])
+    // Folded, the font scale passes where it is allowed, which an unverifiable key never does.
+    const allowed = scale.replace(
+      'export function AppText()',
+      'export function glyphBoxSide()'
+    )
+    assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': allowed }), [])
+  })
+
+  // CodeRabbit on PR 230: names resolve to their declarations, so a parameter that shadows a
+  // constant is unverifiable, and another function's binding of the same name is no dimensions
+  // value.
+  test('a key and a dimensions binding resolve by declaration, not by spelling', () => {
+    const shadowed = [
+      "const KEY = 'width'",
+      'export function AppText(KEY) {',
+      '  return useWindowDimensions()[KEY]',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': shadowed }), [
+      'components/app-text.tsx:3 return useWindowDimensions()[KEY]',
+    ])
+    const sameName = [
+      'export function Screen() {',
+      '  const value = useWindowDimensions()',
+      '  return value.width',
+      '}',
+      'export function lookup(value, key) {',
+      '  return value[key]',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/screen.tsx': sameName }), [])
+    // The dimensions binding itself still is one.
+    const own = sameName.replace('return value.width', 'return value[key]')
+    assert.deepEqual(fontScaleReads({ 'components/screen.tsx': own }), [
+      'components/screen.tsx:3 return value[key]',
+    ])
   })
 
   test('the scan covers every app source under apps/mobile, not three folders', () => {

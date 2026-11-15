@@ -77,7 +77,7 @@ class TextLayoutProbeWireTest {
       setOf(
         "kind", "text", "viewRect", "visibleRect", "clipRect", "contentRect", "lineCount",
         "maxLines", "ellipsized", "unlimitedLineCount", "window", "scrolledAway", "offWindow",
-        "opacity", "accessibilityHidden"
+        "opacity", "accessibilityHidden", "scrollViewport"
       ),
       first.keys().asSequence().toSet()
     )
@@ -88,7 +88,8 @@ class TextLayoutProbeWireTest {
     assertFalse(first.getBoolean("scrolledAway"))
     assertFalse(first.getBoolean("offWindow"))
     assertEquals(0.25, first.getDouble("opacity"), 0.0)
-    assertTrue(json.contains("\"opacity\":0.25,\"accessibilityHidden\":false}"))
+    assertTrue(json.contains("\"opacity\":0.25,\"accessibilityHidden\":false,\"scrollViewport\":null}"))
+    assertTrue(first.isNull("scrollViewport"))
     assertFalse(first.getBoolean("accessibilityHidden"))
     assertEquals(
       setOf("version", "token", "platform", "windows", "records", "elements"),
@@ -208,6 +209,17 @@ class TextLayoutProbeWireTest {
   }
 
   // TEA ruling: native flags a record hidden from accessibility, a JSON boolean on every record.
+  // TEA ruling r49 P2-2: the sideways scroll viewport travels as a rect, or null without one.
+  @Test
+  fun scrollViewportIsWrittenAsARectOrNull() {
+    val records = listOf(record("Chip").copy(scrollViewport = ProbeRect(0, 493, 1080, 627)), record("Look"))
+    val json = TextLayoutProbeWire.json("v", ProbeSnapshot(windows, records))
+    val parsed = JSONObject(reassemble("v", TextLayoutProbeWire.lines("v", json))).getJSONArray("records")
+    val viewport = parsed.getJSONObject(0).getJSONArray("scrollViewport")
+    assertEquals(listOf(0, 493, 1080, 627), (0 until 4).map { viewport.getInt(it) })
+    assertTrue(parsed.getJSONObject(1).isNull("scrollViewport"))
+  }
+
   @Test
   fun accessibilityHiddenIsWrittenAsABooleanOnEveryRecord() {
     val records = listOf(record("Partnered").copy(accessibilityHidden = true), record("Look"))
@@ -215,8 +227,8 @@ class TextLayoutProbeWireTest {
     val parsed = JSONObject(reassemble("h", TextLayoutProbeWire.lines("h", json))).getJSONArray("records")
     assertTrue(parsed.getJSONObject(0).getBoolean("accessibilityHidden"))
     assertFalse(parsed.getJSONObject(1).getBoolean("accessibilityHidden"))
-    assertTrue(json, json.contains("\"accessibilityHidden\":true}"))
-    assertTrue(json, json.contains("\"accessibilityHidden\":false}"))
+    assertTrue(json, json.contains("\"accessibilityHidden\":true,"))
+    assertTrue(json, json.contains("\"accessibilityHidden\":false,"))
   }
 
   @Test

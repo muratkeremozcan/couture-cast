@@ -97,6 +97,15 @@ const bind = (host) => new Promise((resolve) => {
 })()
 `
 
+/** Link errors of a filesystem without hard links, where no lock can be placed atomically. */
+const LINK_UNSUPPORTED = new Set(['EPERM', 'EOPNOTSUPP', 'ENOTSUP', 'ENOSYS', 'EXDEV'])
+/**
+ * Takeover generations of one dead lock walked before the takeover fails as
+ * maestro_driver_port_takeover_runaway (r52 P3-1): every dead generation is a crashed runner's
+ * leftover, so a real host never comes near it.
+ */
+const MARKER_RUNAWAY = 1000
+
 /** Every host call is bounded: a hung lsof, ps, pgrep or probe fails its call at 30 s. */
 const SPAWN_OPTIONS = { encoding: 'utf8', timeout: 30_000, killSignal: 'SIGKILL' }
 const boundedSpawn = (command, args) => spawnSync(command, args, SPAWN_OPTIONS)
@@ -131,8 +140,113 @@ export function createIosDriverPortIo({
       return error.code === 'EPERM'
     }
   },
+  files = fs,
+  markerLimit = MARKER_RUNAWAY,
 } = {}) {
   const lockOf = (port) => path.join(reservations, `${port}.json`)
+  /** The token of each port lock this io holds, so only its own lock is ever released. */
+  const held = new Map()
+  const readOrNull = (file) => {
+    try {
+      return files.readFileSync(file, 'utf8')
+    } catch (error) {
+      if (error.code === 'ENOENT') return null
+      throw error
+    }
+  }
+  const parsed = (raw) => {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
+  }
+  /**
+   * Links `source` to `target`, which fails when `target` exists: true when linked, false when
+   * it exists. A filesystem without hard links fails as maestro_driver_port_lock_unsupported
+   * (r49 P3-2), since no lock could be placed atomically there.
+   */
+  const place = (source, target) => {
+    try {
+      files.linkSync(source, target)
+      return true
+    } catch (error) {
+      if (error.code === 'EEXIST') return false
+      if (LINK_UNSUPPORTED.has(error.code))
+        throw Object.assign(
+          new Error(
+            `maestro_driver_port_lock_unsupported: ${error.code} linking in ${reservations}`
+          ),
+          { code: 'maestro_driver_port_lock_unsupported', cause: error }
+        )
+      throw error
+    }
+  }
+  /**
+   * Whether a lock or takeover marker's runner is alive (r49 P2-3): another process by its pid,
+   * this process by its token, so a record of this process under another token (another io, or
+   * this one's earlier reservation) is live and only a record whose token this io holds is its
+   * own. A record that cannot be read is no runner's.
+   */
+  const liveRecord = (record, own) =>
+    record !== null &&
+    typeof record === 'object' &&
+    (record.pid === pid
+      ? typeof record.token === 'string' && record.token !== own
+      : Number.isSafeInteger(record.pid) && record.pid > 0 && alive(record.pid))
+  /**
+   * Takes over the lock of `port` from a dead runner (r49 P2-3): true when this runner's record
+   * (`temporary`) replaced it, false when the lock is live, changed, or another runner is taking
+   * it over. Markers are named after the lock's exact content and a generation, and each holds
+   * its runner's pid and token, placed whole by a link: one runner places a generation, so one
+   * wins, and a generation whose runner died passes the takeover to the next, until one places
+   * or a live marker is found (r52 P3-1: a cap left the port dead for good), MARKER_RUNAWAY at
+   * most. Dead markers are removed only by the winner, since removing one elsewhere could let
+   * two runners win. The winner reads the lock again and, while it still holds that content,
+   * renames its own record over it, so the lock is never absent. It then removes its marker and
+   * the dead generations below it; a late runner that places a marker for content the lock no
+   * longer holds finds it changed and removes its own.
+   */
+  const takeOver = (port, temporary, token) => {
+    const lock = lockOf(port)
+    const raw = readOrNull(lock)
+    if (raw === null || liveRecord(parsed(raw), held.get(port))) return false
+    const base = `${port}.takeover.${createHash('sha256').update(raw).digest('hex').slice(0, 16)}`
+    const markerTemporary = path.join(reservations, `${port}.${pid}.${token}.marker.tmp`)
+    files.writeFileSync(markerTemporary, `${JSON.stringify({ pid, token })}\n`, {
+      flag: 'wx',
+      mode: 0o600,
+    })
+    const dead = []
+    try {
+      for (let generation = 0; ; generation += 1) {
+        if (generation >= markerLimit)
+          throw Object.assign(
+            new Error(
+              `maestro_driver_port_takeover_runaway: ${generation} dead takeover markers for port ${port} in ${reservations}`
+            ),
+            { code: 'maestro_driver_port_takeover_runaway' }
+          )
+        const marker = path.join(reservations, `${base}.${generation}`)
+        if (!place(markerTemporary, marker)) {
+          const other = readOrNull(marker)
+          if (other === null || liveRecord(parsed(other), token)) return false
+          dead.push(marker)
+          continue
+        }
+        try {
+          if (readOrNull(lock) !== raw) return false
+          files.renameSync(temporary, lock)
+          for (const each of dead) files.rmSync(each, { force: true })
+          return true
+        } finally {
+          files.rmSync(marker, { force: true })
+        }
+      }
+    } finally {
+      files.rmSync(markerTemporary, { force: true })
+    }
+  }
   return {
     /** Every process listening on `port` on any address, with its full command; null if unknown. */
     listeners(port) {
@@ -161,84 +275,50 @@ export function createIosDriverPortIo({
       return JSON.parse(probed.stdout)
     },
     /**
-     * Claims `port` for `device` unless a live runner of another device holds its lock. A lock
-     * appears whole or not at all: written to a temporary file, then linked into place, which
-     * fails when a lock exists. A lock whose runner died (or that cannot be read) is taken over
-     * by one runner only (r48 P2-3): each runner wanting it creates a takeover marker named
-     * after that lock's exact content, exclusively, so one wins; the winner reads the lock again
-     * and, while it still holds that content, renames its own record over it. A runner that
-     * loses, or finds another runner's lock by then, reads the lock afresh. A marker whose
-     * runner died between the two steps keeps that lock, and the port is skipped.
+     * Claims `port` for `device` unless a live runner holds its lock. A lock appears whole or
+     * not at all: written to a temporary file, then linked into place, which fails when a lock
+     * exists, and a lock is never absent while it is taken over. A lock whose runner died (or
+     * that cannot be read) is taken over by one runner only (r48 P2-3, r49 P2-3): see takeOver.
+     * A runner that loses, or finds another runner's lock by then, reads the lock afresh, three
+     * times at most.
      */
     reserve(port, device) {
-      fs.mkdirSync(reservations, { recursive: true, mode: 0o700 })
-      const token = randomUUID()
-      const record = `${JSON.stringify({ device, pid, token })}\n`
+      files.mkdirSync(reservations, { recursive: true, mode: 0o700 })
       const lock = lockOf(port)
+      const own = held.get(port)
+      if (own !== undefined && parsed(readOrNull(lock))?.token === own) return true
+      const token = randomUUID()
       const temporary = path.join(reservations, `${port}.${pid}.${token}.tmp`)
-      const read = () => {
-        try {
-          return fs.readFileSync(lock, 'utf8')
-        } catch (error) {
-          if (error.code === 'ENOENT') return null
-          throw error
-        }
-      }
-      const holderOf = (raw) => {
-        try {
-          return JSON.parse(raw)
-        } catch {
-          return null
-        }
-      }
       const mine = () => {
-        const holder = holderOf(read())
+        const holder = parsed(readOrNull(lock))
         return holder?.pid === pid && holder?.token === token
       }
-      fs.writeFileSync(temporary, record, { flag: 'wx', mode: 0o600 })
+      files.writeFileSync(temporary, `${JSON.stringify({ device, pid, token })}\n`, {
+        flag: 'wx',
+        mode: 0o600,
+      })
       try {
         for (let attempt = 0; attempt < 3; attempt += 1) {
-          try {
-            fs.linkSync(temporary, lock)
-            return mine()
-          } catch (error) {
-            if (error.code !== 'EEXIST') throw error
+          if (place(temporary, lock) || takeOver(port, temporary, token)) {
+            if (!mine()) return false
+            held.set(port, token)
+            return true
           }
-          const raw = read()
-          if (raw === null) continue
-          const holder = holderOf(raw)
-          if (holder && holder.pid !== pid && alive(holder.pid)) return false
-          // A lock its runner left behind when it died, or this runner's own.
-          const marker = path.join(
-            reservations,
-            `${port}.takeover.${createHash('sha256').update(raw).digest('hex').slice(0, 16)}`
-          )
-          try {
-            fs.writeFileSync(marker, `${pid}\n`, { flag: 'wx', mode: 0o600 })
-          } catch (error) {
-            if (error.code !== 'EEXIST') throw error
-            continue
-          }
-          try {
-            if (read() !== raw) continue
-            fs.renameSync(temporary, lock)
-            return mine()
-          } finally {
-            fs.rmSync(marker, { force: true })
-          }
+          const holder = parsed(readOrNull(lock))
+          if (liveRecord(holder, own)) return false
         }
         return false
       } finally {
-        fs.rmSync(temporary, { force: true })
+        files.rmSync(temporary, { force: true })
       }
     },
     release(port) {
-      try {
-        if (JSON.parse(fs.readFileSync(lockOf(port), 'utf8')).pid === pid)
-          fs.rmSync(lockOf(port), { force: true })
-      } catch {
-        // Already gone.
-      }
+      const token = held.get(port)
+      held.delete(port)
+      if (token === undefined) return
+      const holder = parsed(readOrNull(lockOf(port)))
+      if (holder?.pid === pid && holder?.token === token)
+        files.rmSync(lockOf(port), { force: true })
     },
     kill(other) {
       spawn('kill', ['-TERM', String(other)])

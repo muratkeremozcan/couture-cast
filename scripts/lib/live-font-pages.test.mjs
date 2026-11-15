@@ -16,6 +16,8 @@ import {
   scrollPages,
   stablePage,
 } from './live-font-pages.mjs'
+import { healthyAnswer, probeRecord } from './fixtures/live-font-text-probe-records.mjs'
+import { pageCaptures } from './live-font-scale-proof.mjs'
 
 const at = (text, y) => ({ text, id: '', bounds: `[0,${y}][100,${y + 40}]` })
 const layout = (name) => ({
@@ -176,6 +178,8 @@ describe('scrollPages', () => {
       ['top', 'middle', 'bottom']
     )
     assert.equal(result.drags, 2)
+    // r49 P2-4: the last page is the bottom, which the capture records.
+    assert.equal(result.reachedBottom, true)
   })
 
   // Android 6c85bbb4 Community: a feed longer than the cap stopped 13 pages down every time.
@@ -233,6 +237,62 @@ describe('attachPages', () => {
     )
     assert.deepEqual(capture.pages, [first, second])
     assert.equal(capture.pageShift, 500)
+    assert.equal(capture.reachedBottom, false)
+    assert.equal(
+      attachPages({ nodes: first.nodes }, [first, second], 500, { reachedBottom: true })
+        .reachedBottom,
+      true
+    )
+  })
+
+  // r52 P2-2: the stitch of the capture saw no probe records, so on a short last drag whose
+  // hierarchy boxes the viewport clamps it stepped a whole drag and listed cards twice, while the
+  // judge (pageCaptures) stitched with the records.
+  test('a short last drag is stitched with the probe records, as the judge stitches it', () => {
+    const box = (id, text, top, bottom) => ({
+      id,
+      text,
+      bounds: `[0,${top}][400,${bottom}]`,
+    })
+    const record = (text, top, bottom) =>
+      probeRecord('android', text, [0, top, 400, bottom])
+    const page = (nodes, records) => ({
+      nodes,
+      window: '[0,0][1080,2400]',
+      volatileRegions: [],
+      textProbe: { ...healthyAnswer({ nodes: [] }, 'android'), records },
+    })
+    const pages = [
+      page(
+        [box('a', 'A', 100, 150), box('b', 'B', 700, 750), box('c', 'C', 1100, 1150)],
+        [record('A', 100, 150), record('B', 700, 750), record('C', 1100, 1150)]
+      ),
+      page(
+        [box('b', 'B', 100, 150), box('c', 'C', 500, 550), box('d', 'D', 900, 950)],
+        [record('B', 100, 150), record('C', 500, 550), record('D', 900, 950)]
+      ),
+      // The last drag moves 200 px; a sticky header clamps C and D, so no node measures it.
+      page(
+        [box('c', 'C', 330, 350), box('d', 'D', 720, 750), box('e', 'E', 1100, 1150)],
+        [record('C', 300, 350), record('D', 700, 750), record('E', 1100, 1150)]
+      ),
+    ]
+    const capture = attachPages(
+      { nodes: pages[0].nodes, window: '[0,0][1080,2400]' },
+      pages,
+      600,
+      {
+        reachedBottom: true,
+      }
+    )
+    assert.deepEqual(
+      capture.fullText.map((key) => JSON.parse(key)[1]),
+      ['A', 'B', 'C', 'D', 'E']
+    )
+    assert.deepEqual(
+      pageCaptures(capture).map(({ capture: each }) => each.contentOffset),
+      [600, 800]
+    )
   })
 
   test('a screen of one page keeps no pages and no stitched text', () => {
