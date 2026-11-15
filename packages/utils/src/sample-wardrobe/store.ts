@@ -100,19 +100,30 @@ export function createGuestPreviewStore(options: {
   }
 
   return {
-    async load() {
+    load() {
+      // Queued, so it reads only after every write and removal asked for before it.
       const loadEpoch = currentEpoch
-      let raw: string | null = null
-      try {
-        raw = await adapter.read()
-      } catch {
-        failStorage()
-      }
-      if (loadEpoch !== currentEpoch) return snapshot()
-      state = parseGuestPreviewState(raw, now(), catalog)
-      if (state === null && raw !== null) removeStored()
-      emit()
-      return snapshot()
+      return new Promise<GuestPreviewSnapshot>((resolve) => {
+        enqueue(async () => {
+          let raw: string | null = null
+          let readable = true
+          try {
+            raw = await adapter.read()
+          } catch {
+            readable = false
+            failStorage()
+          }
+          // A failed read, or nothing back from a store that failed a write, says nothing
+          // about the state held in memory, so that state stays.
+          const blind = !readable || (!persistent && raw === null)
+          if (loadEpoch === currentEpoch && !(blind && state !== null)) {
+            state = parseGuestPreviewState(raw, now(), catalog)
+            if (state === null && raw !== null) removeStored()
+            emit()
+          }
+          resolve(snapshot())
+        })
+      })
     },
     snapshot() {
       expireIfNeeded()
@@ -129,6 +140,8 @@ export function createGuestPreviewStore(options: {
       if (!state || expireIfNeeded()) return null
       const next = normalizeGuestPreviewState(change(state), state, catalog)
       if (!next) return state
+      // A new epoch, so a load queued before this change cannot land over it.
+      currentEpoch += 1
       state = next
       persist(state)
       emit()

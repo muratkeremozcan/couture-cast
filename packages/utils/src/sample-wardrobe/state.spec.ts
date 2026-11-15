@@ -431,6 +431,77 @@ describe('guest preview store (U-STORE-EPOCH, storage failure)', () => {
     expect((await loading).state).toBeNull()
   })
 
+  // Review F1: a load waits for the writes and removals queued before it, and never
+  // replaces the in-memory state with what a failing or empty store returns.
+  it('keeps an update that a load right after it would read before the write lands', async () => {
+    const adapter = memoryAdapter(stored())
+    const store = createGuestPreviewStore({
+      adapter,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    await store.load()
+    const ungatedRead = () => Promise.resolve(adapter.value())
+    adapter.holdNext()
+    store.update((state) => ({ ...state, weather: 'cool-windy' }))
+    await adapter.held()
+    adapter.read = ungatedRead
+    const loading = store.load()
+    adapter.release()
+    expect((await loading).state?.weather).toBe('cool-windy')
+    expect(store.snapshot().state?.weather).toBe('cool-windy')
+  })
+
+  it('does not bring back a cleared state that a load reads before the removal lands', async () => {
+    const adapter = memoryAdapter(stored())
+    const store = createGuestPreviewStore({
+      adapter,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    await store.load()
+    const ungatedRead = () => Promise.resolve(adapter.value())
+    adapter.holdNext()
+    store.clear()
+    await adapter.held()
+    adapter.read = ungatedRead
+    const loading = store.load()
+    adapter.release()
+    expect((await loading).state).toBeNull()
+    expect(adapter.value()).toBeNull()
+  })
+
+  it('keeps the in-memory state when a later read throws', async () => {
+    const adapter = memoryAdapter()
+    const store = createGuestPreviewStore({
+      adapter,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    const started = store.start()
+    await store.flush()
+    adapter.read = () => Promise.reject(new Error('denied'))
+    const loaded = await store.load()
+    expect(loaded.persistent).toBe(false)
+    expect(loaded.state).toEqual(started)
+  })
+
+  it('keeps the in-memory state when storage failed and reads back nothing', async () => {
+    const adapter = memoryAdapter()
+    const store = createGuestPreviewStore({
+      adapter,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    adapter.holdNext()
+    const started = store.start()
+    await adapter.held()
+    adapter.failNext()
+    await store.flush()
+    expect(adapter.value()).toBeNull()
+    expect((await store.load()).state).toEqual(started)
+  })
+
   it('expires on access at 24 hours and removes the stored text (L-EXPIRY)', async () => {
     let now = START
     const adapter = memoryAdapter()
