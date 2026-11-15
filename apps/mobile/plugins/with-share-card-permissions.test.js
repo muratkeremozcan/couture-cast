@@ -104,6 +104,37 @@ test('the Android merger proof retries a rate-limited or dropped download and no
     }),
     true
   )
+  assert.equal(
+    isTransientResolutionFailure({
+      status: 1,
+      stderr:
+        'java.io.IOException: Server returned HTTP response code: 504 for URL: https://services.gradle.org/distributions/gradle-8.14.3-bin.zip',
+    }),
+    true
+  )
+  assert.equal(
+    isTransientResolutionFailure({
+      status: 1,
+      stderr: 'java.net.SocketTimeoutException: Connect timed out',
+    }),
+    true
+  )
+  assert.equal(
+    isTransientResolutionFailure({
+      status: 1,
+      stderr:
+        'Server returned HTTP response code: 404 for URL: https://example.test/x.zip',
+    }),
+    false
+  )
+  assert.equal(
+    isTransientResolutionFailure({
+      status: 1,
+      stderr:
+        'Could not find com.android.tools.build:manifest-merger:99.0.0. Searched in the following locations',
+    }),
+    false
+  )
   assert.equal(isTransientResolutionFailure(conflict), false)
   assert.equal(
     isTransientResolutionFailure({ ...passed, stdout: 'status code 429' }),
@@ -145,8 +176,8 @@ test('the Android merger proof retries a rate-limited or dropped download and no
 
 test(
   'generated and officially merged Android permissions keep add-only export and image-picker needs',
-  // Up to three merges with 60 s of waits between them when Maven rate-limits the runner.
-  { timeout: 360000 },
+  // Prebuild (50 s cap) plus up to three merges (120 s cap each) and 60 s of waits: 470 s.
+  { timeout: 480000 },
   async (t) => {
     const {
       generateAndroidPermissionProof,

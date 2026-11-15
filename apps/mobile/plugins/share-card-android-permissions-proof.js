@@ -29,9 +29,11 @@ function gradleJavaHome(env) {
  * run 43719645437 failed this suite on a 429 for gson and kotlin-stdlib. Those failures
  * say nothing about the manifests, so the merge is retried after a wait. Any other failure
  * (a merge conflict, a missing library manifest, an unresolvable version) fails at once.
+ * The wrapper's own distribution download (HttpURLConnection) words its errors differently,
+ * so both spellings are matched.
  */
 const TRANSIENT_RESOLUTION_FAILURE =
-  /Too Many Requests|status code 429|status code 5\d\d|Connection reset|Read timed out|Connect timed out|connect timed out|Remote host terminated the handshake/i
+  /Too Many Requests|status code 429|status code 5\d\d|HTTP response code: (?:429|5\d\d)|Connection reset|Connection timed out|Read timed out|Connect timed out|SocketTimeoutException|ConnectTimeoutException|Remote host terminated the handshake/i
 const MERGE_RETRY_DELAYS_MS = [20000, 40000]
 
 function isTransientResolutionFailure(result) {
