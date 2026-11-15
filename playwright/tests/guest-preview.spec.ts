@@ -10,7 +10,10 @@ import type { Page, Request } from '@playwright/test'
 import { SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
-import { isAllowedGuestPreviewRequest } from '../support/helpers/guest-preview-requests'
+import {
+  isAllowedGuestPreviewRequest,
+  isVercelPreviewToolbarRequest,
+} from '../support/helpers/guest-preview-requests'
 import {
   commerceAccessToken,
   createLocationForUser,
@@ -26,10 +29,12 @@ type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
 /**
  * E1: every request the guest page makes is recorded. `isAllowedGuestPreviewRequest`
- * allows only the safe methods GET, HEAD and OPTIONS to the web origin outside `/api/` and
- * `/ingest/`, plus the Vercel toolbar on a preview deployment; anything else (the API
- * origin, the Supabase origin, any other host, or a write to any origin) lands in
- * `offAllowlist`, so a direct browser write cannot slip past a path check.
+ * allows only the safe methods GET, HEAD and OPTIONS to the web origin outside `/api/`,
+ * GET, HEAD and POST to the web origin's `/ingest/` PostHog proxy (a keyed build such as
+ * production loads the SDK bundle and sends guest_preview_* batches there; their content
+ * is proven by the analytics wire test), plus the Vercel toolbar on a preview deployment.
+ * Anything else (the API origin, the Supabase origin, any other host, or a write to any
+ * other path) lands in `offAllowlist`, so a direct browser write cannot slip past.
  */
 function recordRequests(page: Page, webOrigin: string) {
   const all: Request[] = []
@@ -46,7 +51,7 @@ function recordRequests(page: Page, webOrigin: string) {
     const url = new URL(request.url())
     offAllowlist.push(`${request.method()} ${url.origin}${url.pathname}`)
   })
-  return { all, offAllowlist }
+  return { all, offAllowlist, webOrigin }
 }
 
 async function enableAnalyticsHook(page: Page) {
@@ -66,6 +71,20 @@ const capturedEvents = (page: Page) =>
       (window as unknown as { __capturedAnalyticsEvents?: CapturedEvent[] })
         .__capturedAnalyticsEvents ?? []
   )
+
+/**
+ * Every POST the page made, as method and URL. The Vercel preview toolbar's own login check
+ * (vercel run 43738587377) is the deployment's traffic, not the page's, so it is left out on a
+ * preview origin only.
+ */
+const posts = (requests: { all: Request[]; webOrigin: string }) =>
+  requests.all
+    .filter(
+      (request) =>
+        request.method() === 'POST' &&
+        !isVercelPreviewToolbarRequest({ url: request.url() }, requests.webOrigin)
+    )
+    .map((request) => `POST ${request.url()}`)
 
 async function passGate(page: Page, birthdate = '2000-01-15') {
   await page.getByTestId('guest-preview-birthdate').fill(birthdate)
@@ -100,6 +119,9 @@ test.describe('Guest preview (signed out)', () => {
       await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
     ).toBeNull()
     expect(requests.offAllowlist).toEqual([])
+    // PR 236 review: /ingest/ is on the allowlist for keyed builds, so the refused gate is
+    // also held to no POST at all: no SDK event or batch leaves for an under-13 visitor.
+    expect(posts(requests)).toEqual([])
     expect(await capturedEvents(page)).toEqual([])
   })
 
@@ -109,6 +131,9 @@ test.describe('Guest preview (signed out)', () => {
     const webOrigin = new URL(testInfo.project.use.baseURL ?? page.url()).origin
     const requests = recordRequests(page, webOrigin)
     await page.goto('/preview')
+    // Nothing is sent before eligibility, even to the /ingest/ proxy (PR 236 review).
+    await expect(page.getByTestId('guest-preview-gate')).toBeVisible()
+    expect(posts(requests)).toEqual([])
     await passGate(page)
     await expect(page.getByTestId('guest-preview-label')).toHaveText(LABEL)
     await choose(page, 'guest-preview-thermal-cold')
