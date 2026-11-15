@@ -1,0 +1,46 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane (M-RESUME, D3): the app is killed on the finish step. The next launch finds
+# the Google session without an account and opens the finish step again; Cancel then ends signed
+# out, and Home stays signed out.
+# Runner: checks the Auth user for ${GOOGLE_EMAIL} is gone and no app user exists.
+appId: ${MAESTRO_APP_ID}
+name: 'Google finish relaunch'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-create-account'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/finish-step.yaml
+- stopApp
+# Like the launcher icon: the development client reloads its most recent bundle, the runner's
+# Metro, with the stored Google session.
+- launchApp:
+    clearState: false
+    stopApp: true
+# Not open-app.yaml: it waits for the tab bar, which the resumed finish step covers, and its way
+# back to the tabs would leave the step.
+- runFlow: steps/finish-step.yaml
+- tapOn:
+    id: 'finish-signup-cancel'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 20000
+    label: 'Cancel returned to Sign in'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'
+- back
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 20000
+    label: 'Home is signed out after Cancel'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'

@@ -83,19 +83,21 @@ test(
   async ({ page }) => {
     const person = standInPerson('google-new-adult')
     const { authorizes } = await armGoogleStandIn(page, person)
-    const exchange = page.waitForResponse(
-      (response) =>
-        response.url().includes('/auth/v1/token') &&
-        response.url().includes('grant_type=pkce')
-    )
+    // The body is read the moment the response arrives: the callback page navigates on at once,
+    // and Chromium drops a response body once its page has gone.
+    const exchange = page
+      .waitForResponse(
+        (response) =>
+          response.url().includes('/auth/v1/token') &&
+          response.url().includes('grant_type=pkce')
+      )
+      .then((response) => response.json() as Promise<object>)
     await continueWithGoogle(page, '/signin')
 
     await expect(page).toHaveURL(`${WEB}/signup/finish`)
     // Privacy Policy: Auth hands back the provider's access token, and the session the browser
     // stores drops it; the rest of this test runs on that stripped session.
-    expect(Object.keys((await (await exchange).json()) as object)).toContain(
-      'provider_token'
-    )
+    expect(Object.keys(await exchange)).toContain('provider_token')
     const stored = await page.evaluate(() =>
       window.localStorage.getItem('couturecast.auth-session')
     )

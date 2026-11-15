@@ -1,0 +1,39 @@
+# Story 6.17 M lane: taps "Continue with Google". The runner queued the identity the mock OIDC
+# provider answers this authorize with, because a device browser cannot add a login_hint
+# (scripts/e2e-real-session/mock-oidc.mjs). Custom Tabs then follows GoTrue's authorize, the
+# mock's authorize, GoTrue's callback and the couturecast-story65 redirect with no screen of its
+# own. A fresh Chrome can raise its first-run screens first; each step acts only when its
+# screen is up (maestro/subflows/dismiss-chrome-first-run.yaml), so a finished first run costs
+# only the short wait.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: 'google-sign-in'
+    label: 'Continue with Google'
+- extendedWaitUntil:
+    visible:
+      text: '(Use without an account|Accept & continue|No thanks)'
+    timeout: 4000
+    optional: true
+    label: 'Chrome first run, when it shows'
+- repeat:
+    times: 3
+    commands:
+      - runFlow:
+          when:
+            visible: 'Use without an account'
+          commands:
+            - tapOn: 'Use without an account'
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: 'Accept & continue'
+          commands:
+            - tapOn: 'Accept & continue'
+            - waitForAnimationToEnd
+      - runFlow:
+          when:
+            visible: 'No thanks'
+          commands:
+            - tapOn: 'No thanks'
+            - waitForAnimationToEnd

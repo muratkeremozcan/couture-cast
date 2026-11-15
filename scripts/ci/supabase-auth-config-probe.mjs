@@ -16,6 +16,8 @@
  *   `email` and `profile` (OpenID is implied).
  * It prints no key, token or client secret; the client id is shown by its first 12 characters.
  */
+import { realpathSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
 
 /** @param {unknown} settings */
 export function settingsProblems(settings) {
@@ -96,4 +98,8 @@ async function main() {
   )
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) await main()
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href
+)
+  await main()

@@ -1,0 +1,21 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane (AC2, D4): a Google identity whose verified address already has an account
+# signs in from the Sign in door with no finish step.
+# Runner: creates the app account for ${GOOGLE_EMAIL} through the product signup endpoint first,
+# queues the identity, then checks the address still has exactly one app user.
+appId: ${MAESTRO_APP_ID}
+name: 'Google existing member'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-sign-in'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+    label: 'The Sign in door shows Continue with Google'
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/assert-member-home.yaml

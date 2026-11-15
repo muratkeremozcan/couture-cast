@@ -1,10 +1,21 @@
 // Learning path Step 57: Google sign-in.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
 // Story 6.17 D10: the stand-in's URL rules and the mock OIDC provider, without a browser.
+import { readFileSync } from 'node:fs'
+import path from 'node:path'
 import type { AddressInfo } from 'node:net'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import {
+  MOCK_OIDC_URL,
+  mockOidcContainerArgs,
+} from '../../../scripts/e2e-real-session/mock-oidc-container.mjs'
 import { createMockOidcServer } from '../../../scripts/e2e-real-session/mock-oidc.mjs'
-import { publicMockUrl, recordAuthorize, rewriteAuthorizeUrl } from './google-stand-in'
+import {
+  MOCK_OIDC_ORIGIN,
+  recordAuthorize,
+  rewriteAuthorizeUrl,
+  ticketedMockUrl,
+} from './google-stand-in'
 
 const AUTH = 'http://127.0.0.1:53051/auth/v1/authorize'
 
@@ -43,11 +54,11 @@ describe('recordAuthorize', () => {
   })
 })
 
-describe('publicMockUrl', () => {
-  it('moves the internal host to the published port and adds the ticket', () => {
+describe('ticketedMockUrl', () => {
+  it('keeps the mock URL GoTrue answered with and adds the ticket', () => {
     expect(
-      publicMockUrl(
-        'http://couturecast-mock-oidc:8080/realms/cc/protocol/openid-connect/auth?client_id=c&state=s',
+      ticketedMockUrl(
+        'http://127.0.0.1:53052/realms/cc/protocol/openid-connect/auth?client_id=c&state=s',
         't-1'
       )
     ).toBe(
@@ -55,11 +66,37 @@ describe('publicMockUrl', () => {
     )
   })
 
-  it('refuses any other host', () => {
+  it('refuses any other origin', () => {
+    expect(ticketedMockUrl('http://127.0.0.1:530520/realms/cc', 't')).toBeNull()
+    expect(ticketedMockUrl('http://localhost:53052/realms/cc', 't')).toBeNull()
     expect(
-      publicMockUrl('http://couturecast-mock-oidc.evil:8080/realms/cc', 't')
+      ticketedMockUrl('http://couturecast-mock-oidc:8080/realms/cc/protocol', 't')
     ).toBeNull()
-    expect(publicMockUrl('https://accounts.google.com/o/oauth2/v2/auth', 't')).toBeNull()
+    expect(
+      ticketedMockUrl('https://accounts.google.com/o/oauth2/v2/auth', 't')
+    ).toBeNull()
+  })
+})
+
+describe('mock OIDC topology', () => {
+  it('gives GoTrue, the helper and the containers one origin', () => {
+    const config = readFileSync(
+      path.resolve(__dirname, '../../../supabase/config.toml'),
+      'utf8'
+    )
+    const keycloak = /\[auth\.external\.keycloak\][^[]*?\nurl = "([^"]+)"/.exec(config)
+    expect(keycloak?.[1]).toBe(`${MOCK_OIDC_URL}/realms/cc`)
+    expect(MOCK_OIDC_ORIGIN).toBe(MOCK_OIDC_URL)
+  })
+
+  it("runs the mock in GoTrue's namespace and publishes it on host loopback only", () => {
+    const [mock, forwarder] = mockOidcContainerArgs()
+    expect(mock.join(' ')).toContain('--network container:supabase_auth_couture-cast')
+    expect(mock).not.toContain('-p')
+    expect(mock.join(' ')).toContain('MOCK_OIDC_HOST=0.0.0.0')
+    expect(forwarder.join(' ')).toContain('--network supabase_network_couture-cast')
+    expect(forwarder.join(' ')).toContain('-p 127.0.0.1:53052:53052')
+    expect(forwarder.at(-1)).toContain('net.connect(53052, "supabase_auth_couture-cast")')
   })
 })
 
@@ -71,6 +108,9 @@ describe('mock OIDC provider', () => {
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
   })
   afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())))
+  beforeEach(async () => {
+    expect((await fetch(`${base}/__control/reset`, { method: 'POST' })).status).toBe(200)
+  })
 
   const oidc = '/realms/cc/protocol/openid-connect'
   const redirect = 'http://127.0.0.1:54321/auth/v1/callback'
@@ -84,13 +124,20 @@ describe('mock OIDC provider', () => {
     return ((await response.json()) as { ticket: string }).ticket
   }
 
-  async function authorize(loginHint: string) {
+  async function queue(claims: object) {
+    return fetch(`${base}/__control/next-identity`, {
+      method: 'POST',
+      body: JSON.stringify(claims),
+    })
+  }
+
+  async function authorize(loginHint?: string) {
     const query = new URLSearchParams({
       client_id: 'couturecast-e2e',
       redirect_uri: redirect,
       state: 'opaque',
       response_type: 'code',
-      login_hint: loginHint,
+      ...(loginHint === undefined ? {} : { login_hint: loginHint }),
     })
     const response = await fetch(`${base}${oidc}/auth?${query}`, { redirect: 'manual' })
     expect(response.status).toBe(302)
@@ -134,6 +181,79 @@ describe('mock OIDC provider', () => {
       expect(location.searchParams.get('error')).toBe('access_denied')
       expect(location.searchParams.get('code')).toBeNull()
     }
+  })
+
+  async function userinfoFor(location: URL) {
+    const token = await fetch(`${base}${oidc}/token`, {
+      method: 'POST',
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code: location.searchParams.get('code')!,
+        client_id: 'couturecast-e2e',
+      }),
+    })
+    expect(token.status).toBe(200)
+    const { access_token } = (await token.json()) as { access_token: string }
+    const userinfo = await fetch(`${base}${oidc}/userinfo`, {
+      headers: { authorization: `Bearer ${access_token}` },
+    })
+    return (await userinfo.json()) as unknown
+  }
+
+  it('gives an authorize without login_hint the queued identity, once', async () => {
+    const claims = { sub: 's-q', email: 'queued@synthetic.test', email_verified: true }
+    expect((await queue(claims)).status).toBe(201)
+    const first = await authorize()
+    expect(first.searchParams.get('state')).toBe('opaque')
+    expect(await userinfoFor(first)).toEqual(claims)
+    const second = await authorize()
+    expect(second.searchParams.get('error')).toBe('access_denied')
+    expect(second.searchParams.get('code')).toBeNull()
+  })
+
+  it('holds one queued identity at a time and refuses one without sub and email', async () => {
+    expect((await queue({ sub: 's-a', email: 'a@synthetic.test' })).status).toBe(201)
+    expect((await queue({ sub: 's-b', email: 'b@synthetic.test' })).status).toBe(409)
+    expect((await queue({ email: 'c@synthetic.test' })).status).toBe(400)
+    expect(await userinfoFor(await authorize())).toEqual({
+      sub: 's-a',
+      email: 'a@synthetic.test',
+    })
+  })
+
+  it('answers access_denied for a queued deny identity', async () => {
+    expect(
+      (await queue({ sub: 's-d', email: 'd@synthetic.test', deny: true })).status
+    ).toBe(201)
+    const location = await authorize()
+    expect(location.searchParams.get('error')).toBe('access_denied')
+    expect(location.searchParams.get('code')).toBeNull()
+  })
+
+  it('clears the queued identity on reset', async () => {
+    expect((await queue({ sub: 's-r', email: 'r@synthetic.test' })).status).toBe(201)
+    expect((await fetch(`${base}/__control/reset`, { method: 'POST' })).status).toBe(200)
+    expect((await authorize()).searchParams.get('error')).toBe('access_denied')
+  })
+
+  it('takes the ticket over the queued identity when login_hint is present', async () => {
+    const claims = { sub: 's-t', email: 't@synthetic.test' }
+    expect((await queue({ sub: 's-q2', email: 'q2@synthetic.test' })).status).toBe(201)
+    expect(await userinfoFor(await authorize(await ticket(claims)))).toEqual(claims)
+    expect(await userinfoFor(await authorize())).toEqual({
+      sub: 's-q2',
+      email: 'q2@synthetic.test',
+    })
+  })
+
+  it('answers a request it cannot parse with 400 and keeps serving', async () => {
+    const query = new URLSearchParams({
+      client_id: 'couturecast-e2e',
+      redirect_uri: 'not a url',
+    })
+    const broken = await fetch(`${base}${oidc}/auth?${query}`, { redirect: 'manual' })
+    expect(broken.status).toBe(400)
+    expect((await fetch(`${base}/__control/requests`)).status).toBe(200)
   })
 
   it('refuses a wrong client', async () => {

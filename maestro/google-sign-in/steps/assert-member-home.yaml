@@ -1,0 +1,14 @@
+# Story 6.17 AC1, AC2: Home as a member. The account is new to the isolated database and has no
+# location, so Home asks for one; that card only renders for a verified member, and the
+# signed-out welcome is gone.
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: 'hero-no-location-state'
+    timeout: 45000
+    label: 'Home shows the member surface'
+- assertNotVisible:
+    id: 'home-signed-out-welcome'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'

@@ -1,0 +1,10 @@
+# Story 6.17 D3: types ${BIRTHDATE} into the finish step and submits it.
+appId: ${MAESTRO_APP_ID}
+---
+- tapOn:
+    id: 'finish-signup-birthdate'
+- inputText: ${BIRTHDATE}
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'finish-signup-create'

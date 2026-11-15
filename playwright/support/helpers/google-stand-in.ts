@@ -4,13 +4,14 @@
 //
 // The app always asks Supabase for `provider=google`. Local GoTrue cannot reach a Google double,
 // so this helper (1) records the app's authorize request exactly as sent, (2) rewrites only its
-// `provider` to `keycloak`, and (3) carries the browser to the harness mock OIDC server, choosing
-// the identity with a one-time ticket. Everything after that (GoTrue's callback, the PKCE code
-// exchange, identity linking, the app's callback page) runs for real.
+// `provider` to `keycloak`, and (3) sends the browser on to the harness mock OIDC server with a
+// one-time ticket that chooses the identity. Everything after that (the mock's authorize,
+// GoTrue's callback, the PKCE code exchange, identity linking, the app's callback page) runs in
+// the browser for real.
 import type { Page, Route } from '@playwright/test'
 
-export const MOCK_OIDC_INTERNAL_ORIGIN = 'http://couturecast-mock-oidc:8080'
-export const MOCK_OIDC_PUBLIC_ORIGIN = 'http://127.0.0.1:53052'
+/** The mock's one origin, for GoTrue and every browser (`mock-oidc-container.mjs`). */
+export const MOCK_OIDC_ORIGIN = 'http://127.0.0.1:53052'
 
 export type StandInIdentity = {
   sub: string
@@ -40,12 +41,10 @@ export function rewriteAuthorizeUrl(url: string): string | null {
   return parsed.toString()
 }
 
-/** The mock's internal URL GoTrue redirects to, as the browser can reach it, with the ticket. */
-export function publicMockUrl(url: string, ticket: string): string | null {
-  if (!url.startsWith(`${MOCK_OIDC_INTERNAL_ORIGIN}/`)) return null
-  const parsed = new URL(
-    MOCK_OIDC_PUBLIC_ORIGIN + url.slice(MOCK_OIDC_INTERNAL_ORIGIN.length)
-  )
+/** The mock authorize URL GoTrue redirects to, with the ticket as its `login_hint`. */
+export function ticketedMockUrl(url: string, ticket: string): string | null {
+  if (!url.startsWith(`${MOCK_OIDC_ORIGIN}/`)) return null
+  const parsed = new URL(url)
   parsed.searchParams.set('login_hint', ticket)
   return parsed.toString()
 }
@@ -71,14 +70,13 @@ async function hop(route: Route, url: string) {
  * Arms the stand-in for the next Google start on `page`. Returns the recorded authorize
  * requests (one per start) so a test can assert what the app asked Supabase for.
  *
- * The two hops the browser cannot make itself (GoTrue's authorize, answered with a redirect to
- * the mock's container-only host, and the mock's own authorize) run here, server side. The
- * browser is then sent to the URL the mock returned: GoTrue's real `/auth/v1/callback` with the
- * one-time code and GoTrue's own state, from which everything runs in the browser. Playwright
- * does not route the hop after a fulfilled redirect, so the chain cannot be left to the browser.
+ * GoTrue's authorize (with the provider swapped) runs here, server side, because the ticket must
+ * go onto the mock URL it answers with: Playwright does not route the hop after a fulfilled
+ * redirect, so the browser cannot be handed the rewritten request and intercepted again. The
+ * browser is then redirected to that mock URL and runs every later hop itself.
  */
 export async function armGoogleStandIn(page: Page, identity: StandInIdentity) {
-  const created = await fetch(`${MOCK_OIDC_PUBLIC_ORIGIN}/__control/tickets`, {
+  const created = await fetch(`${MOCK_OIDC_ORIGIN}/__control/tickets`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(identity),
@@ -94,15 +92,12 @@ export async function armGoogleStandIn(page: Page, identity: StandInIdentity) {
       const original = route.request().url()
       authorizes.push(recordAuthorize(original))
       const toProvider = await hop(route, rewriteAuthorizeUrl(original)!)
-      const mockUrl = toProvider.location && publicMockUrl(toProvider.location, ticket)
+      const mockUrl = toProvider.location && ticketedMockUrl(toProvider.location, ticket)
       if (toProvider.status !== 302 || !mockUrl)
         throw new Error(
           `GoTrue authorize did not redirect to the mock (${toProvider.status}).`
         )
-      const fromProvider = await hop(route, mockUrl)
-      if (fromProvider.status !== 302 || !fromProvider.location)
-        throw new Error(`The mock authorize did not redirect (${fromProvider.status}).`)
-      await route.fulfill({ status: 302, headers: { location: fromProvider.location } })
+      await route.fulfill({ status: 302, headers: { location: mockUrl } })
     }
   )
   return { authorizes }

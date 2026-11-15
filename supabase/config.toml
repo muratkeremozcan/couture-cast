@@ -291,13 +291,16 @@ client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
 secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
 skip_nonce_check = false
 
-# Story 6.17 D10, TEA-13: the real-session lane's Google stand-in, a mock OIDC server the lane
-# starts on the Supabase network. Local only; hosted projects keep keycloak off.
+# Story 6.17 D10, TEA-13: the Google stand-in, a mock OIDC server the real-session lane and the
+# Google device flows start inside GoTrue's network namespace, published on the host's same
+# port, so GoTrue, a host browser and a device browser all reach it at this one URL
+# (scripts/e2e-real-session/mock-oidc-container.mjs). Local only; hosted projects keep keycloak
+# off.
 [auth.external.keycloak]
 enabled = true
 client_id = "couturecast-e2e"
 secret = "env(SUPABASE_AUTH_EXTERNAL_KEYCLOAK_SECRET)"
-url = "http://couturecast-mock-oidc:8080/realms/cc"
+url = "http://127.0.0.1:53052/realms/cc"
 
 [auth.external.apple]
 enabled = false
