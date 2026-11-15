@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { assertNativeFlowFailure } from '../lib/share-card-native-failure.mjs'
+import { assertNativeBuildFailure } from '../lib/native-build-failure.mjs'
 import {
   assertNativeFlowDiagnostics,
   writeRedactedNativeFailureImage,
@@ -70,6 +71,22 @@ for (const platform of ['android', 'ios']) {
   }
   assertNativeFlowFailure(record)
   if (record.platform !== platform) throw new Error('invalid_native_flow_failure')
+  failures.set(name, record)
+}
+// A failed native build's closed record (scripts/lib/native-build-failure.mjs); its log stays
+// private.
+for (const platform of ['android', 'ios']) {
+  const name = `native-build-failure-${platform}.json`
+  const file = path.join(directory, name)
+  if (!fs.existsSync(file)) continue
+  let record
+  try {
+    record = JSON.parse(fs.readFileSync(file))
+  } catch {
+    throw new Error('invalid_native_build_failure')
+  }
+  assertNativeBuildFailure(record)
+  if (record.platform !== platform) throw new Error('invalid_native_build_failure')
   failures.set(name, record)
 }
 // Validate the entire diagnostic projection before copying any older proof.

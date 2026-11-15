@@ -21,6 +21,7 @@ import {
 import { LOCALES } from '../ci/native-ios-shards.mjs'
 import { describe, test } from 'node:test'
 import { talkbackFailureSummary } from './story68-talkback-failure.mjs'
+import { summarizeNativeBuildFailure } from './native-build-failure.mjs'
 import {
   bundleBuilds,
   focusLatencies,
@@ -267,6 +268,83 @@ describe('owned Play emulator', () => {
 })
 
 describe('Android build environment', () => {
+  // Dispatch 43693424172 android36-controls: native_build_failed left nothing public. A failed
+  // build writes its closed record from the private log, after clearing an earlier one.
+  test('a failed build records its closed failure from the private log and still fails', () => {
+    const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
+    const marker = "} else if (command === 'build') {"
+    const start = source.indexOf(marker) + marker.length
+    const end = source.indexOf('\n} else if', start)
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-build-failure-unit-'))
+    try {
+      fs.writeFileSync(path.join(directory, 'native-build-failure-android.json'), 'stale')
+      const written = []
+      let clock = 0
+      assert.throws(
+        () =>
+          vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
+            ownedEnv: () => undefined,
+            option: () => undefined,
+            path,
+            fs: {
+              openSync: () => 1,
+              closeSync: () => undefined,
+              rmSync: (file, options) => fs.rmSync(file, options),
+              readFileSync: (file, encoding) => fs.readFileSync(file, encoding),
+            },
+            performance: { now: () => (clock += 529000) },
+            privateJson: (name, value) => written.push([name, value]),
+            summarizeNativeBuildFailure,
+            directory,
+            platform: 'android',
+            root: directory,
+            adb: '/owned/android-sdk/platform-tools/adb',
+            process: { arch: 'arm64', env: {} },
+            read: () => ({ STORY68_NATIVE_TEST_BUILD: '1' }),
+            IOS_DERIVED_DATA,
+            MOBILE_DIRECTORY,
+            buildSelection,
+            nativeBuildCommand,
+            nativeBuildEnv,
+            nativeProjectDirectory,
+            assertNativeProbeMode: () => undefined,
+            prepareWorkletsStaging: () => ({ args: [] }),
+            verifyWorkletsStaging: () => assert.fail('a failed build verifies nothing'),
+            spawnSync: () => {
+              assert.equal(
+                fs.existsSync(path.join(directory, 'native-build-failure-android.json')),
+                false,
+                'the earlier record is cleared before the build'
+              )
+              fs.writeFileSync(
+                path.join(directory, 'build-android-Debug.log'),
+                '> Task :app:compileDebugKotlin FAILED\nAvery Example\n'
+              )
+              return { status: 1, signal: null }
+            },
+            console: { log: () => undefined },
+          }),
+        /native_build_failed/
+      )
+      assert.deepEqual(written, [
+        [
+          'native-build-failure-android.json',
+          {
+            platform: 'android',
+            configuration: 'Debug',
+            durationMs: 529000,
+            exitCode: 1,
+            signal: null,
+            classification: 'unknown',
+            failedTasks: [':app:compileDebugKotlin'],
+          },
+        ],
+      ])
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
   test('actual Android build preserves SDK selection, stages the selected variant and verifies postbuild hashes', () => {
     const source = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
     const marker = "} else if (command === 'build') {"
@@ -284,7 +362,10 @@ describe('Android build environment', () => {
           ownedEnv: () => undefined,
           option: () => undefined,
           path,
-          fs: { openSync: () => 1, closeSync: () => undefined },
+          fs: { openSync: () => 1, closeSync: () => undefined, rmSync: () => undefined },
+          performance,
+          privateJson: () => assert.fail('a passing build writes no failure record'),
+          summarizeNativeBuildFailure,
           directory,
           platform: 'android',
           root: directory,
