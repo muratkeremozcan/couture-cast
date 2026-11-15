@@ -29,6 +29,7 @@ import {
   runGuestConversionLeg,
   runPrivateMaestro,
   startIssuedCodeFile,
+  verifyScreenshotsArePublishable,
 } from './guest-preview-conversion.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -416,10 +417,122 @@ describe('publishRedactedTree', () => {
     assert.equal(fs.existsSync(path.join(to, 'report.xml')), false)
   })
 
+  test('leaves every image out when told to, and still publishes the redacted text', () => {
+    const from = fresh('debug-noimg')
+    fs.writeFileSync(path.join(from, 'screenshot-failed.png'), Buffer.from([0x89, 0x00]))
+    fs.writeFileSync(path.join(from, 'hierarchy.json'), `{"text":"${CODE}"}`)
+    const to = path.join(fresh('debug-noimg-to'), 'out')
+    publishRedactedTree(from, to, [CODE], { images: false })
+    assert.equal(fs.existsSync(path.join(to, 'screenshot-failed.png')), false)
+    assert.equal(
+      fs.readFileSync(path.join(to, 'hierarchy.json'), 'utf8'),
+      '{"text":"[REDACTED]"}'
+    )
+  })
+
   test('does nothing for a missing directory', () => {
     const to = path.join(fresh('debug-none'), 'out')
     publishRedactedTree(path.join(scratch, 'absent'), to, [CODE])
     assert.equal(fs.existsSync(to), false)
+  })
+
+  // S1: the code field is unmasked, so a screenshot may show the code from the moment it
+  // is typed until the carryover review is on screen.
+  const MARKER = 'guest-preview-review-proposed'
+  const commandsTree = (commands) => {
+    const directory = fresh('commands')
+    fs.mkdirSync(path.join(directory, '2026-11-15_133600'), { recursive: true })
+    fs.writeFileSync(
+      path.join(directory, '2026-11-15_133600', 'commands-(verify).json'),
+      JSON.stringify(commands)
+    )
+    return directory
+  }
+  const step = (command, status) => ({ command, metadata: status ? { status } : {} })
+  const waitCode = step(
+    { assertConditionCommand: { id: 'signin-code-input' } },
+    'COMPLETED'
+  )
+  const typeCode = (status) => step({ inputTextCommand: { text: CODE } }, status)
+  const submit = (status) => step({ tapOnElement: { text: 'Verify code' } }, status)
+  const review = (status) =>
+    step({ assertConditionCommand: { visible: { idRegex: MARKER } } }, status)
+
+  test('screenshots publish when the failure came before the code step started', () => {
+    const failedWait = step(
+      { assertConditionCommand: { id: 'signin-code-input' } },
+      'FAILED'
+    )
+    for (const status of ['PENDING', 'SKIPPED'])
+      assert.equal(
+        verifyScreenshotsArePublishable(
+          commandsTree([failedWait, typeCode(status), submit(status)]),
+          CODE,
+          MARKER
+        ),
+        true,
+        status
+      )
+    assert.equal(
+      verifyScreenshotsArePublishable(commandsTree([failedWait]), CODE, MARKER),
+      true
+    )
+  })
+
+  test('a code step logged unresolved or with no status still keeps images out', () => {
+    const unresolved = step({ inputTextCommand: { text: '${MAESTRO_OTP}' } }, 'COMPLETED')
+    for (const commands of [
+      [waitCode, unresolved, submit('COMPLETED')],
+      [waitCode, typeCode(), submit()],
+    ])
+      assert.equal(
+        verifyScreenshotsArePublishable(commandsTree(commands), CODE, MARKER),
+        false
+      )
+  })
+
+  test('screenshots stay out from the typed code until the review is visible', () => {
+    for (const commands of [
+      [waitCode, typeCode('FAILED'), submit()],
+      [waitCode, typeCode('COMPLETED'), submit('FAILED')],
+      [waitCode, typeCode('COMPLETED'), submit('COMPLETED'), review('FAILED')],
+      [waitCode, typeCode('COMPLETED'), submit('COMPLETED'), review()],
+    ])
+      assert.equal(
+        verifyScreenshotsArePublishable(commandsTree(commands), CODE, MARKER),
+        false,
+        JSON.stringify(commands.map((item) => item.metadata.status ?? 'not run'))
+      )
+  })
+
+  test('screenshots publish once the review was visible after the code', () => {
+    const tree = commandsTree([
+      waitCode,
+      typeCode('COMPLETED'),
+      submit('COMPLETED'),
+      review('COMPLETED'),
+      step({ tapOnElement: { id: 'guest-preview-review-use' } }, 'FAILED'),
+    ])
+    assert.equal(verifyScreenshotsArePublishable(tree, CODE, MARKER), true)
+  })
+
+  test('no command log, an unreadable one or a missing directory keeps every image out', () => {
+    assert.equal(verifyScreenshotsArePublishable(fresh('no-log'), CODE, MARKER), false)
+    const broken = fresh('broken-log')
+    fs.writeFileSync(path.join(broken, 'commands-(verify).json'), '{not json')
+    assert.equal(verifyScreenshotsArePublishable(broken, CODE, MARKER), false)
+    assert.equal(
+      verifyScreenshotsArePublishable(path.join(scratch, 'absent'), CODE, MARKER),
+      false
+    )
+  })
+
+  test('the verify step decides on screenshots from its own debug output', () => {
+    const verify = runner.slice(runner.indexOf('const runGuestVerifyFlow'))
+    assert.match(
+      verify,
+      /images: verifyScreenshotsArePublishable\(\s*privateDir,\s*code,\s*'guest-preview-review-proposed'\s*\)/
+    )
   })
 
   test('the verify step publishes its debug output before the private directory goes', () => {

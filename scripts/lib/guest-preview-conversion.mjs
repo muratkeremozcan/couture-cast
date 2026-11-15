@@ -343,7 +343,12 @@ export function publishRedacted(from, to, secrets) {
  * @param {string[]} secrets
  * @param {{ skip?: string[] }} [options] paths relative to `fromDir` left out
  */
-export function publishRedactedTree(fromDir, toDir, secrets, { skip = [] } = {}) {
+export function publishRedactedTree(
+  fromDir,
+  toDir,
+  secrets,
+  { skip = [], images = true } = {}
+) {
   if (!fs.existsSync(fromDir)) return
   for (const entry of fs.readdirSync(fromDir, { recursive: true, withFileTypes: true })) {
     if (!entry.isFile()) continue
@@ -353,9 +358,62 @@ export function publishRedactedTree(fromDir, toDir, secrets, { skip = [] } = {})
     const to = path.join(toDir, relative)
     fs.mkdirSync(path.dirname(to), { recursive: true })
     const bytes = fs.readFileSync(from)
-    if (bytes.includes(0)) fs.writeFileSync(to, bytes)
-    else fs.writeFileSync(to, redactSecrets(bytes.toString('utf8'), secrets))
+    if (!bytes.includes(0))
+      fs.writeFileSync(to, redactSecrets(bytes.toString('utf8'), secrets))
+    else if (images) fs.writeFileSync(to, bytes)
   }
+}
+
+/**
+ * Whether the verify step's screenshots can be published. The scan cannot read text in an
+ * image and the sign-in code field is not masked, so a screenshot may show the code from
+ * the moment it is typed until the app leaves the sign-in screen. Images are safe only when
+ * Maestro's command log shows the code step never started, or that the carryover review
+ * (`leftSignInMarker`) was visible after it. A missing or unreadable log, or a code step
+ * with any other status or none, keeps them all out.
+ *
+ * @param {string} debugDir
+ * @param {string} code
+ * @param {string} leftSignInMarker
+ * @returns {boolean}
+ */
+export function verifyScreenshotsArePublishable(debugDir, code, leftSignInMarker) {
+  if (!fs.existsSync(debugDir)) return false
+  const logs = fs
+    .readdirSync(debugDir, { recursive: true, withFileTypes: true })
+    .filter((entry) => entry.isFile() && /^commands-.*\.json$/.test(entry.name))
+  if (logs.length === 0) return false
+  for (const entry of logs) {
+    let commands
+    try {
+      commands = JSON.parse(
+        fs.readFileSync(path.join(entry.parentPath, entry.name), 'utf8')
+      )
+    } catch {
+      return false
+    }
+    if (!Array.isArray(commands)) return false
+    // The code step, found by the code itself, its variable or any text input (the flow
+    // types nothing else), so a log that records it unresolved still counts.
+    const typed = commands.findIndex((item) => {
+      const text = JSON.stringify(item?.command ?? null)
+      return (
+        text.includes(code) || text.includes('MAESTRO_OTP') || text.includes('inputText')
+      )
+    })
+    if (typed === -1) continue
+    const status = commands[typed]?.metadata?.status
+    // Not started: the failure came before the code reached the screen.
+    if (status === 'PENDING' || status === 'SKIPPED') continue
+    const left = commands.findIndex(
+      (item, index) =>
+        index > typed &&
+        item?.metadata?.status === 'COMPLETED' &&
+        JSON.stringify(item?.command ?? null).includes(leftSignInMarker)
+    )
+    if (left === -1) return false
+  }
+  return true
 }
 
 /**

@@ -112,6 +112,7 @@ import {
   localGuestAuthAdmin,
   publishRedacted,
   publishRedactedTree,
+  verifyScreenshotsArePublishable,
   readMailpitCode,
   recordGuestAccount,
   recordIssuedCode,
@@ -3638,7 +3639,8 @@ const runGuestVerifyFlow = async (target, maestroEnv, code) => {
           path.resolve(projectRoot, getFlowReportPath(GUEST_CONVERSION_VERIFY_FLOW)),
           [code]
         )
-        // Screenshots and command logs for the next device failure, through the same scan.
+        // Command logs, and screenshots when safe, for the next device failure, through the
+        // same scan.
         publishRedactedTree(
           privateDir,
           path.resolve(
@@ -3647,7 +3649,15 @@ const runGuestVerifyFlow = async (target, maestroEnv, code) => {
             'guest-preview-conversion-verify'
           ),
           [code],
-          { skip: ['report.xml'] }
+          {
+            skip: ['report.xml'],
+            // Screenshots only when none can show the typed code (S1).
+            images: verifyScreenshotsArePublishable(
+              privateDir,
+              code,
+              'guest-preview-review-proposed'
+            ),
+          }
         )
       }
     }
