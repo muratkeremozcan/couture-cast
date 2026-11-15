@@ -98,8 +98,13 @@ tags:
 - tapOn:
     id: 'location-label-input'
 # Picking a candidate prefills the label with its city (`Sentinelville`, 13
-# characters); 40 clears it with room to spare.
-- eraseText: 40
+# characters), so 13 presses clear it. Two commands, because each DEL can take
+# 10 s on a loaded emulator (UiAutomator waits that long for idle before every
+# press) and each command has a 120 s device deadline: 7 and 6 presses are 70 s
+# and 60 s at worst. The old single `eraseText: 40` needed up to 400 s. The
+# `Home` assertion on the saved row proves the label was fully cleared.
+- eraseText: 7
+- eraseText: 6
 - inputText: 'Home'
 - runFlow:
     when:
