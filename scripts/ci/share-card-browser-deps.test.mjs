@@ -195,14 +195,21 @@ describe('apt source rewrite', () => {
     const { provisionShareCardBrowsers } = await helper()
     let installed = false
     const f = fixture({
-      readSource: async () => 'URIs: https://unknown.invalid/ubuntu\n',
+      readSource: async () =>
+        '# deb http://archive.ubuntu.com/ubuntu noble main\nURIs: https://user:secret@unknown.invalid/ubuntu\n',
       install: async () => {
         installed = true
       },
     })
+    // Main run 43680002723 all-1 (ubuntu-26.04): the refusal named no source, so the runner's
+    // configuration could not be told apart. It names each active source line, credentials masked.
+    await assert.rejects(provisionShareCardBrowsers(f.options), {
+      message:
+        'official_ubuntu_archive_required: /etc/apt/sources.list: URIs: https://***@unknown.invalid/ubuntu; /etc/apt/sources.list.d/ubuntu.sources: URIs: https://***@unknown.invalid/ubuntu',
+    })
     await assert.rejects(
-      provisionShareCardBrowsers(f.options),
-      /official_ubuntu_archive_required/
+      provisionShareCardBrowsers(fixture({ readSource: async () => '# none\n' }).options),
+      { message: 'official_ubuntu_archive_required: no active apt source line' }
     )
     assert.equal(f.writes.length, 0)
     assert.equal(installed, false)
