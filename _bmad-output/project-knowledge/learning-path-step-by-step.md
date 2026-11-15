@@ -11546,6 +11546,10 @@ Hard-won lessons from the implementation and code review of this story:
   left white typed text on the light page, the Google entry was fixed to the dark theme, and
   sign-in's labels were black on the dark page. All three screens now take the OS scheme tokens,
   pinned by tests that render both schemes.
+- The independent review found the door, built for web, never reached mobile: a round trip
+  started on signup returned to sign-in. It also found the web resume ran only when the root
+  layout mounted, so a client-side link out of a legal page escaped the finish step. Both
+  clients now share the door helpers and decide the resume from the server status.
 
 Story/Task mapping:
 
@@ -11661,6 +11665,8 @@ Shared, Vitest:
   proves ten locales with one key set and the clients' base-language fallbacks.
 - [`packages/utils/src/federated-signin/session-storage.spec.ts`](../../packages/utils/src/federated-signin/session-storage.spec.ts):
   proves the stored session drops Google's tokens and nothing else changes.
+- [`packages/utils/src/federated-signin/door.spec.ts`](../../packages/utils/src/federated-signin/door.spec.ts):
+  proves the door URLs both clients return to and the finish step's web and mobile paths.
 
 E2E, Playwright:
 
