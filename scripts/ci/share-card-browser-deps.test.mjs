@@ -207,6 +207,20 @@ describe('apt source rewrite', () => {
       message:
         'official_ubuntu_archive_required: /etc/apt/sources.list: URIs: https://***@unknown.invalid/ubuntu; /etc/apt/sources.list.d/ubuntu.sources: URIs: https://***@unknown.invalid/ubuntu',
     })
+    // CodeRabbit on PR 232: APT takes the last `@` of the authority as the credential separator,
+    // so an email-style user name masks through that one.
+    await assert.rejects(
+      provisionShareCardBrowsers(
+        fixture({
+          readSource: async () =>
+            'URIs: https://build@example.org:secret@unknown.invalid/ubuntu\n',
+        }).options
+      ),
+      (error) =>
+        !error.message.includes('secret') &&
+        !error.message.includes('example.org') &&
+        error.message.includes('URIs: https://***@unknown.invalid/ubuntu')
+    )
     await assert.rejects(
       provisionShareCardBrowsers(fixture({ readSource: async () => '# none\n' }).options),
       { message: 'official_ubuntu_archive_required: no active apt source line' }

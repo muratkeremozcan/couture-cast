@@ -75,6 +75,10 @@ const sourceSetBlock = [
   '    }',
 ].join('\n')
 
+// The template opens release with comment lines before its signingConfig.
+const RELEASE_SIGNING =
+  /(^ {8}release \{\n(?: {12}\/\/.*\n)* {12}signingConfig signingConfigs\.)(?:debug|pinnedTest)\n/m
+
 function replaceOnce(contents, pattern, replacer, label) {
   const matches = contents.match(new RegExp(pattern.source, `${pattern.flags}g`)) ?? []
   if (matches.length !== 1)
@@ -89,7 +93,15 @@ function replaceOnce(contents, pattern, replacer, label) {
  * `releaseProof`, release is signed with the pinned key as well (the local Release font proof).
  */
 function addMinifiedDebuggable(contents, { releaseProof = false } = {}) {
-  if (contents.includes(`${BUILD_TYPE} {`)) return contents
+  // A prebuild without --clean passes a file this edit already made: only the release signing
+  // follows the option then (CodeRabbit on PR 232).
+  if (contents.includes(`${BUILD_TYPE} {`))
+    return replaceOnce(
+      contents,
+      RELEASE_SIGNING,
+      `$1${releaseProof ? SIGNING_CONFIG : 'debug'}\n`,
+      'release build type signed with signingConfigs.debug or signingConfigs.pinnedTest'
+    )
   if (/^\s*debuggableVariants\s*=/m.test(contents))
     throw new Error('with-minified-debuggable: debuggableVariants is already set')
   let next = replaceOnce(
@@ -114,7 +126,6 @@ function addMinifiedDebuggable(contents, { releaseProof = false } = {}) {
   if (releaseProof)
     next = replaceOnce(
       next,
-      // The template opens release with comment lines before its signingConfig.
       /(^ {8}release \{\n(?: {12}\/\/.*\n)* {12}signingConfig signingConfigs\.)debug\n/m,
       `$1${SIGNING_CONFIG}\n`,
       'release build type signed with signingConfigs.debug'

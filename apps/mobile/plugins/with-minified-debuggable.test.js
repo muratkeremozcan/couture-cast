@@ -240,6 +240,11 @@ test('only the local Release proof build signs release with the pinned test keys
     )
   )
   assert.equal(addMinifiedDebuggable(proof, { releaseProof: true }), proof)
+  // CodeRabbit on PR 232: a prebuild without --clean passes an already edited file, so the
+  // release signing follows the option both ways.
+  const normal = addMinifiedDebuggable(TEMPLATE)
+  assert.equal(addMinifiedDebuggable(normal, { releaseProof: true }), proof)
+  assert.equal(addMinifiedDebuggable(proof, { releaseProof: false }), normal)
   assert.throws(
     () =>
       addMinifiedDebuggable(

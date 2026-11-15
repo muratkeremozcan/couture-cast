@@ -59,12 +59,13 @@ export async function provisionShareCardBrowsers({
     )
   ) {
     // Name every active source line, so a runner image with a new archive layout can be told
-    // apart from a broken one (main run 43680002723 all-1 refused with no detail).
+    // apart from a broken one (main run 43680002723 all-1 refused with no detail). The mask runs
+    // to the authority's last `@`, the credential separator APT reads.
     const active = plans.flatMap(({ file, before }) =>
       before
         .split('\n')
         .filter((line) => sourceLine.test(line))
-        .map((line) => `${file}: ${line.trim().replace(/\/\/[^/@\s]+@/g, '//***@')}`)
+        .map((line) => `${file}: ${line.trim().replace(/\/\/[^/?#\s]*@/g, '//***@')}`)
     )
     throw new Error(
       `official_ubuntu_archive_required: ${active.length ? active.join('; ') : 'no active apt source line'}`
