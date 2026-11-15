@@ -20,6 +20,7 @@ declare global {
   interface Window {
     __enableAnalyticsTestHook?: boolean
     __capturedAnalyticsEvents?: CapturedAnalyticsEvent[]
+    __analyticsIdentityResets?: number
   }
 }
 
@@ -122,6 +123,18 @@ export const browserAnalytics: BrowserAnalyticsClient = {
     initializeBrowserAnalytics()
     return posthog.get_distinct_id() || undefined
   },
+}
+
+/**
+ * Story 6.16 TEA-4: rotates the anonymous id before a guest leaves the preview for
+ * signup or sign-in, so a later identify cannot merge preview history into a member.
+ */
+export function resetBrowserAnalyticsIdentity(): void {
+  if (isAnalyticsTestMode()) {
+    window.__analyticsIdentityResets = (window.__analyticsIdentityResets ?? 0) + 1
+  }
+  if (!getPostHogToken() || !initialized) return
+  posthog.reset()
 }
 
 export function initializeBrowserAnalytics(): BrowserAnalyticsClient {

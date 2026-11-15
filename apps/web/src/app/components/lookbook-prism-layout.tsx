@@ -9,6 +9,7 @@ import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
 import type { ClimateBand } from '@couture/api-client/contracts/http'
 import posthog from 'posthog-js'
 import { I18nextProvider, useTranslation } from 'react-i18next'
+import { getGuestPreviewStrings } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
@@ -515,6 +516,13 @@ export function LookbookPrismLayout() {
           <div className="space-y-4">
             <h3 className="lookbook-display text-xl font-semibold text-[#111111]">
               Primary Recommended Look
+              {/* Story 6.16 D9: this hero is a demonstration, never a visitor's result. */}
+              <span
+                data-testid="hero-example-label"
+                className="lookbook-metrics ml-3 rounded-full border border-[#C9A14A] px-2 py-0.5 align-middle text-[11px] uppercase text-[#8A691F]"
+              >
+                {getGuestPreviewStrings(i18n.language).chrome.exampleLabel}
+              </span>
             </h3>
 
             <div

@@ -10,6 +10,7 @@ import {
 const posthog = vi.hoisted(() => ({
   init: vi.fn(),
   capture: vi.fn(),
+  reset: vi.fn(),
   get_distinct_id: vi.fn(() => 'distinct-web'),
 }))
 vi.mock('posthog-js', () => ({ default: posthog }))
@@ -161,6 +162,29 @@ describe('U-SHARE-SANITIZER-WEB: share_card_shared before_send', () => {
     expect(() => shareCardSharedBeforeSend(hostile)).not.toThrow()
     expect(shareCardSharedBeforeSend(hostile)).toBeNull()
     expect(warn).toHaveBeenCalledWith(SHARE_CARD_ANALYTICS_DROPPED)
+  })
+})
+
+describe('browser analytics identity reset (6.16 TEA-4)', () => {
+  it('rotates the anonymous id once initialized, and counts it in test mode', async () => {
+    vi.stubEnv('POSTHOG_API_KEY', 'phc_project')
+    window.__enableAnalyticsTestHook = true
+    window.__analyticsIdentityResets = 0
+    const { initializeBrowserAnalytics, resetBrowserAnalyticsIdentity } = await import(
+      './browser-analytics'
+    )
+    resetBrowserAnalyticsIdentity()
+    expect(posthog.reset).not.toHaveBeenCalled()
+    initializeBrowserAnalytics()
+    resetBrowserAnalyticsIdentity()
+    expect(posthog.reset).toHaveBeenCalledOnce()
+    expect(window.__analyticsIdentityResets).toBe(2)
+  })
+
+  it('does nothing without a token', async () => {
+    const { resetBrowserAnalyticsIdentity } = await import('./browser-analytics')
+    resetBrowserAnalyticsIdentity()
+    expect(posthog.reset).not.toHaveBeenCalled()
   })
 })
 

@@ -154,20 +154,25 @@ export const SAMPLE_ART: Readonly<Record<SampleArtKey, readonly SampleArtPath[]>
     { d: 'M18 52 L57 52 L57 56 L18 56 Z', tone: 'secondary' },
   ],
   sneakers: [
-    { d: 'M7 38 L25 31 L35 38 L54 42 Q58 44 58 50 L58 54 L7 54 Z', tone: 'primary' },
-    { d: 'M7 50 L58 50 L58 54 L7 54 Z', tone: 'secondary' },
+    { d: 'M7 27 L25 20 L35 27 L54 31 Q58 33 58 39 L58 43 L7 43 Z', tone: 'primary' },
+    { d: 'M7 39 L58 39 L58 43 L7 43 Z', tone: 'secondary' },
   ],
   loafers: [
-    { d: 'M8 42 Q14 34 26 36 L46 40 Q58 42 58 50 L58 53 L8 53 Z', tone: 'primary' },
-    { d: 'M30 38 L44 41', tone: 'secondary', stroke: true },
+    { d: 'M8 31 Q14 23 26 25 L46 29 Q58 31 58 39 L58 42 L8 42 Z', tone: 'primary' },
+    { d: 'M30 27 L44 30', tone: 'secondary', stroke: true },
   ],
   sandals: [
-    { d: 'M8 48 Q8 44 14 44 L54 46 Q58 47 58 50 L58 53 L8 53 Z', tone: 'secondary' },
-    { d: 'M18 46 L26 34 L34 46 M38 46 L44 36 L50 46', tone: 'primary', stroke: true },
+    { d: 'M8 37 Q8 33 14 33 L54 35 Q58 36 58 39 L58 42 L8 42 Z', tone: 'secondary' },
+    { d: 'M18 35 L26 23 L34 35 M38 35 L44 25 L50 35', tone: 'primary', stroke: true },
   ],
   scarf: [
-    { d: 'M14 10 L50 10 L50 20 L37 22 L41 56 L30 56 L27 22 L14 20 Z', tone: 'primary' },
-    { d: 'M30 50 L41 50 M30 53 L41 53', tone: 'secondary', stroke: true },
+    { d: 'M16 10 Q32 22 48 10 L50 18 Q32 32 14 18 Z', tone: 'primary' },
+    { d: 'M34 24 L42 54 L34 56 L28 26 Z M24 24 L30 50 L23 52 L19 26 Z', tone: 'primary' },
+    {
+      d: 'M34 56 L35 60 M38 55 L39 59 M23 52 L24 56 M27 51 L28 55',
+      tone: 'secondary',
+      stroke: true,
+    },
   ],
   beanie: [
     { d: 'M14 40 Q14 12 32 12 Q50 12 50 40 Z', tone: 'primary' },

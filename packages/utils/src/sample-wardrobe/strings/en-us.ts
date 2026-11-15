@@ -5,6 +5,7 @@
 export const enUS = {
   chrome: {
     entry: 'Try a sample wardrobe',
+    exampleLabel: 'Example',
     sampleLabel:
       'Sample wardrobe. Example weather and outfits, not your closet or live forecast.',
     supporting: 'Change a preference to see how this example responds.',
@@ -44,7 +45,7 @@ export const enUS = {
       'This is the only sample look that suits these settings. Try another weather example or comfort setting.',
     browseWardrobe: 'Browse the sample wardrobe',
     swap: 'Swap {category}',
-    swapTitle: 'Choose a {category}',
+    swapTitle: 'Swap the {category}',
     current: 'Current',
     noSuitableAlternative: 'No suitable alternative in this sample wardrobe.',
     undoSwaps: 'Undo swaps',
@@ -111,6 +112,8 @@ export const enUS = {
     saving: 'Saving…',
     saved: 'Your comfort preferences are saved.',
     kept: 'Your account preferences are unchanged.',
+    rejected:
+      "Your account can't save preferences yet. Guardian approval or an age check comes first.",
     failed:
       "We couldn't save your preferences. Your choice is kept, so you can try again.",
     loadFailed: "We couldn't load your account preferences.",

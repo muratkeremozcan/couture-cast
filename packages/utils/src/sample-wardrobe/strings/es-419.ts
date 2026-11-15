@@ -5,6 +5,7 @@ import type { GuestPreviewStrings } from './en-us'
 export const es419: GuestPreviewStrings = {
   chrome: {
     entry: 'Prueba un guardarropa de muestra',
+    exampleLabel: 'Ejemplo',
     sampleLabel:
       'Guardarropa de muestra. Clima y atuendos de ejemplo; no es tu clóset ni un pronóstico en tiempo real.',
     supporting: 'Cambia una preferencia para ver cómo responde este ejemplo.',
@@ -115,6 +116,8 @@ export const es419: GuestPreviewStrings = {
     saving: 'Guardando…',
     saved: 'Tus preferencias de comodidad se guardaron.',
     kept: 'Las preferencias de tu cuenta no cambiaron.',
+    rejected:
+      'Tu cuenta todavía no puede guardar preferencias. Primero se necesita la aprobación de un tutor o una verificación de edad.',
     failed:
       'No pudimos guardar tus preferencias. Tu elección se conserva para que puedas intentarlo de nuevo.',
     loadFailed: 'No pudimos cargar las preferencias de tu cuenta.',

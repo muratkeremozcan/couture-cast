@@ -5,6 +5,7 @@ import type { GuestPreviewStrings } from './en-us'
 export const frCA: GuestPreviewStrings = {
   chrome: {
     entry: "Essayer une garde-robe d'exemple",
+    exampleLabel: 'Exemple',
     sampleLabel:
       "Garde-robe d'exemple. Météo et tenues présentées à titre d'exemple; ce n'est ni votre garde-robe ni une prévision en temps réel.",
     supporting: 'Modifiez une préférence pour voir comment cet exemple réagit.',
@@ -115,6 +116,8 @@ export const frCA: GuestPreviewStrings = {
     saving: 'Enregistrement…',
     saved: 'Vos préférences de confort sont enregistrées.',
     kept: 'Les préférences de votre compte sont inchangées.',
+    rejected:
+      "Votre compte ne peut pas encore enregistrer de préférences. L'approbation d'un parent ou une vérification d'âge doit d'abord avoir lieu.",
     failed:
       "Nous n'avons pas pu enregistrer vos préférences. Votre choix est conservé; vous pouvez réessayer.",
     loadFailed: "Nous n'avons pas pu charger les préférences de votre compte.",

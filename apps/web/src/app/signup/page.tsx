@@ -1,7 +1,14 @@
 import Link from 'next/link'
+import { parsePreviewFrom } from '@couture/utils'
 import { SignupForm } from './signup-form'
 
-export default function SignupPage() {
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>
+}) {
+  const { from } = await searchParams
+  const fromPreview = parsePreviewFrom(from) !== null
   return (
     <main
       id="main-content"
@@ -30,7 +37,7 @@ export default function SignupPage() {
         </section>
 
         <div className="w-full max-w-lg">
-          <SignupForm />
+          <SignupForm fromPreview={fromPreview} />
         </div>
       </div>
     </main>

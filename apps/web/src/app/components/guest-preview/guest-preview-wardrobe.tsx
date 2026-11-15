@@ -1,0 +1,196 @@
+'use client'
+// Story 6.16 D6: browse the sample wardrobe by category and collection, inspect an item,
+// and return to the outfit with every choice kept.
+import { useRef, useState } from 'react'
+import {
+  formatPreviewString,
+  SAMPLE_CATALOG,
+  SAMPLE_COLLECTION_FILTERS,
+  SAMPLE_GARMENT_CATEGORIES,
+  sampleGarmentText,
+  type GuestPreviewStrings,
+  type SampleCollectionFilter,
+  type SampleGarment,
+  type SampleGarmentCategory,
+} from '@couture/utils'
+import { AccessibleModal } from '../accessible-modal'
+import { GuestPreviewChoiceGroup } from './guest-preview-choice-group'
+import { SampleGarmentArt } from './sample-garment-art'
+
+type CategoryFilter = SampleGarmentCategory | 'all'
+
+export function GuestPreviewWardrobe({
+  strings,
+  collection,
+  usableIds,
+  onCollection,
+  onUse,
+  onInspect,
+  onBackToOutfit,
+  onCategory,
+}: {
+  strings: GuestPreviewStrings
+  collection: SampleCollectionFilter
+  /** Garments that can replace a slot of the current outfit in this context. */
+  usableIds: ReadonlySet<string>
+  onCollection: (collection: SampleCollectionFilter) => void
+  onUse: (garment: SampleGarment) => void
+  onInspect: () => void
+  onBackToOutfit: () => void
+  onCategory: () => void
+}) {
+  const [category, setCategory] = useState<CategoryFilter>('all')
+  const [open, setOpen] = useState<SampleGarment | null>(null)
+  const invoker = useRef<HTMLElement | null>(null)
+  const { values } = strings
+  const items = SAMPLE_CATALOG.garments.filter(
+    (garment) =>
+      (category === 'all' || garment.category === category) &&
+      (collection === 'all' || garment.collections.includes(collection))
+  )
+  const openText = open ? sampleGarmentText(open, strings) : null
+
+  return (
+    <section
+      aria-labelledby="guest-preview-wardrobe-heading"
+      data-testid="guest-preview-wardrobe"
+      className="space-y-5"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2
+          id="guest-preview-wardrobe-heading"
+          className="lookbook-display text-2xl font-semibold text-[#111111]"
+        >
+          {strings.wardrobe.heading}
+        </h2>
+        <button
+          type="button"
+          onClick={onBackToOutfit}
+          data-testid="guest-preview-back-to-outfit"
+          className="min-h-11 rounded-lg border border-[#111111] px-4 text-sm font-semibold"
+        >
+          {strings.wardrobe.backToOutfit}
+        </button>
+      </div>
+      <GuestPreviewChoiceGroup
+        legend={strings.wardrobe.category}
+        name="category"
+        testId="guest-preview-category"
+        value={category}
+        options={[
+          { value: 'all' as const, label: strings.wardrobe.allCategories },
+          ...SAMPLE_GARMENT_CATEGORIES.map((key) => ({
+            value: key,
+            label: values.categoryTitle[key],
+          })),
+        ]}
+        onChange={(next) => {
+          setCategory(next)
+          onCategory()
+        }}
+      />
+      <GuestPreviewChoiceGroup
+        legend={strings.preferences.collection}
+        name="collection"
+        testId="guest-preview-collection"
+        value={collection}
+        options={SAMPLE_COLLECTION_FILTERS.map((key) => ({
+          value: key,
+          label: values.collection[key],
+        }))}
+        onChange={onCollection}
+      />
+      <p
+        role="status"
+        className="text-sm text-[#5C5C66]"
+        data-testid="guest-preview-item-count"
+      >
+        {items.length === 0
+          ? strings.wardrobe.empty
+          : formatPreviewString(strings.wardrobe.count, { count: items.length })}
+      </p>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {items.map((garment) => {
+          const text = sampleGarmentText(garment, strings)
+          return (
+            <li key={garment.id}>
+              <button
+                type="button"
+                data-testid="guest-preview-item"
+                data-garment-id={garment.id}
+                onClick={(event) => {
+                  invoker.current = event.currentTarget
+                  setOpen(garment)
+                  onInspect()
+                }}
+                className="flex min-h-11 w-full flex-col items-center gap-2 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-3 text-center hover:border-[#C9A14A]"
+              >
+                <SampleGarmentArt garment={garment} />
+                <span className="text-sm font-medium text-[#111111]">{text.name}</span>
+                <span className="text-xs text-[#5C5C66]">
+                  {values.categoryTitle[garment.category]}
+                </span>
+              </button>
+            </li>
+          )
+        })}
+      </ul>
+      <AccessibleModal
+        isOpen={open !== null}
+        onClose={() => setOpen(null)}
+        titleId="guest-preview-item-title"
+        title={openText?.name ?? ''}
+        description={strings.chrome.sampleLabel}
+        descriptionId="guest-preview-item-label"
+        invokingElementRef={invoker}
+        closeLabel={strings.chrome.close}
+      >
+        {open && openText ? (
+          <div className="space-y-4" data-testid="guest-preview-item-detail">
+            <div className="flex items-center gap-4">
+              <span className="rounded-lg bg-[#F5F5F7] p-2">
+                <SampleGarmentArt
+                  garment={open}
+                  label={openText.description}
+                  className="h-24 w-24"
+                />
+              </span>
+              <p className="text-sm">{openText.description}</p>
+            </div>
+            <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+              <dt className="font-medium">{strings.wardrobe.category}</dt>
+              <dd>{values.categoryTitle[open.category]}</dd>
+              {open.material ? (
+                <>
+                  <dt className="font-medium">{strings.wardrobe.material}</dt>
+                  <dd>{values.material[open.material]}</dd>
+                </>
+              ) : null}
+              <dt className="font-medium">{strings.wardrobe.comfortRange}</dt>
+              <dd>{open.comfortRanges.map((range) => values.range[range]).join(', ')}</dd>
+              <dt className="font-medium">{strings.wardrobe.windResistant}</dt>
+              <dd>{open.windResistant ? strings.wardrobe.yes : strings.wardrobe.no}</dd>
+              <dt className="font-medium">{strings.wardrobe.waterResistant}</dt>
+              <dd>{open.waterResistant ? strings.wardrobe.yes : strings.wardrobe.no}</dd>
+            </dl>
+            {usableIds.has(open.id) ? (
+              <button
+                type="button"
+                data-testid="guest-preview-use-item"
+                onClick={() => {
+                  onUse(open)
+                  setOpen(null)
+                }}
+                className="min-h-11 w-full rounded-lg bg-[#C9A14A] px-4 text-sm font-semibold text-[#111111]"
+              >
+                {formatPreviewString(strings.outfit.swap, {
+                  category: values.category[open.category],
+                })}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </AccessibleModal>
+    </section>
+  )
+}

@@ -4,6 +4,7 @@ import type { GuestPreviewStrings } from './en-us'
 export const deDE: GuestPreviewStrings = {
   chrome: {
     entry: 'Beispielgarderobe ausprobieren',
+    exampleLabel: 'Beispiel',
     sampleLabel:
       'Beispielgarderobe. Beispielwetter und Beispieloutfits, nicht Ihr Kleiderschrank und keine Live-Vorhersage.',
     supporting: 'Ändern Sie eine Einstellung, um zu sehen, wie dieses Beispiel reagiert.',
@@ -113,6 +114,8 @@ export const deDE: GuestPreviewStrings = {
     saving: 'Wird gespeichert…',
     saved: 'Ihre Komforteinstellungen sind gespeichert.',
     kept: 'Ihre Kontoeinstellungen sind unverändert.',
+    rejected:
+      'Ihr Konto kann noch keine Einstellungen speichern. Zuerst ist die Zustimmung eines Erziehungsberechtigten oder eine Altersprüfung nötig.',
     failed:
       'Ihre Einstellungen konnten nicht gespeichert werden. Ihre Auswahl bleibt erhalten, Sie können es erneut versuchen.',
     loadFailed: 'Ihre Kontoeinstellungen konnten nicht geladen werden.',

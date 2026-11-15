@@ -3,6 +3,9 @@ import {
   communityReactionSinkPropertiesSchema,
   analyticsEventNameSchema,
   shareCardSharedPropertiesSchema,
+  guestPreviewInteractedEventSchema,
+  guestPreviewSignupClickedEventSchema,
+  guestPreviewStartedEventSchema,
   guardianConsentGrantedPropertiesSchema,
   moderationActionPropertiesSchema,
   ritualCreatedPropertiesSchema,
@@ -120,6 +123,9 @@ export const analyticsPropertySchemas = {
   location_saved: locationSavedPropertiesSchema,
   location_search_failed: locationSearchFailedPropertiesSchema,
   share_card_shared: shareCardSharedPropertiesSchema,
+  guest_preview_started: guestPreviewStartedEventSchema,
+  guest_preview_interacted: guestPreviewInteractedEventSchema,
+  guest_preview_signup_clicked: guestPreviewSignupClickedEventSchema,
 }
 
 const formatCapturedEvents = (events: readonly MemoryTrackedAnalyticsEvent[]) =>

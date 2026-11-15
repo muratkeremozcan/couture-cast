@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
+import { GuestPreviewEntry } from './components/guest-preview/guest-preview-entry'
 import { LookbookPrismLayout } from './components/lookbook-prism-layout'
 import { StickyBottomNav } from './components/sticky-bottom-nav'
 
@@ -76,7 +77,7 @@ export default function Home() {
             insight to recommend looks that respect the commute, the meeting, and the
             vibe.
           </p>
-          <div>
+          <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/signup"
               className="inline-flex rounded-full border border-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-200 transition hover:bg-amber-300 hover:text-black"
@@ -86,6 +87,7 @@ export default function Home() {
             >
               Start signup
             </Link>
+            <GuestPreviewEntry />
           </div>
           <AnalyticsEventActions />
         </section>

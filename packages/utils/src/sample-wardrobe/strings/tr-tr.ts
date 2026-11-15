@@ -4,6 +4,7 @@ import type { GuestPreviewStrings } from './en-us'
 export const trTR: GuestPreviewStrings = {
   chrome: {
     entry: 'Örnek gardırobu deneyin',
+    exampleLabel: 'Örnek',
     sampleLabel:
       'Örnek gardırop. Örnek hava ve kombinler; sizin dolabınız veya canlı hava tahmini değildir.',
     supporting: 'Bu örneğin nasıl değiştiğini görmek için bir tercihi değiştirin.',
@@ -110,6 +111,8 @@ export const trTR: GuestPreviewStrings = {
     saving: 'Kaydediliyor…',
     saved: 'Konfor tercihleriniz kaydedildi.',
     kept: 'Hesap tercihleriniz değişmedi.',
+    rejected:
+      'Hesabınız henüz tercihleri kaydedemez. Önce veli onayı veya yaş kontrolü gerekiyor.',
     failed: 'Tercihleriniz kaydedilemedi. Seçiminiz korunuyor, tekrar deneyebilirsiniz.',
     loadFailed: 'Hesap tercihleriniz yüklenemedi.',
     continue: 'Devam edin',
