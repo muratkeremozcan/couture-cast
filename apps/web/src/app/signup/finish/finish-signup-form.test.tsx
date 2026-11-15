@@ -23,6 +23,11 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
   finishWebFederatedSignup: session.finish,
 }))
 const preview = vi.hoisted(() => ({ clear: vi.fn() }))
+const guardian = vi.hoisted(() => ({ invite: vi.fn() }))
+vi.mock('../../../lib/guardian', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  inviteGuardianFromWeb: guardian.invite,
+}))
 vi.mock('../../../lib/guest-preview', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   webGuestPreviewStore: () => ({ clear: preview.clear }),
@@ -156,5 +161,68 @@ describe('W-UNDERAGE: the refusal clears stored guest preview state', () => {
     fireEvent.change(input, { target: { value: birthdate(10) } })
     fireEvent.click(screen.getByRole('button', { name: strings.create }))
     await waitFor(() => expect(preview.clear).toHaveBeenCalledTimes(1))
+  })
+})
+
+// D3: a teen created through Google lands on the email signup's guardian invitation step.
+describe('W-TEEN-GUARDIAN: the guardian step after a 13 to 15 account is created', () => {
+  async function createTeen() {
+    session.finish.mockResolvedValue({
+      kind: 'created',
+      account: { userId: 'teen-google-1', guardianConsentRequired: true },
+    })
+    const input = await renderForm()
+    fireEvent.change(input, { target: { value: birthdate(14) } })
+    fireEvent.click(screen.getByRole('button', { name: strings.create }))
+    await screen.findByText(strings.guardianTitle)
+    expect(screen.getByTestId('finish-signup-outcome').textContent).toBe(
+      strings.createdGuardianPending
+    )
+  }
+
+  it('refuses an invalid guardian address and sends nothing', async () => {
+    await createTeen()
+    fireEvent.change(screen.getByLabelText(strings.guardianEmail), {
+      target: { value: 'not-an-address' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: strings.sendInvite }))
+    await screen.findByText(strings.invalidGuardianEmail)
+    expect(guardian.invite).not.toHaveBeenCalled()
+  })
+
+  it('sends the invite with the chosen consent level and shows the link', async () => {
+    guardian.invite.mockResolvedValue({
+      guardianEmail: 'guardian@synthetic.test',
+      invitationLink: 'https://couturecast.synthetic.test/guardian/accept?token=t',
+    })
+    await createTeen()
+    fireEvent.change(screen.getByLabelText(strings.guardianEmail), {
+      target: { value: 'guardian@synthetic.test' },
+    })
+    fireEvent.change(screen.getByLabelText(strings.consentLevel), {
+      target: { value: 'full_access' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: strings.sendInvite }))
+    await screen.findByText(
+      strings.inviteSent.replace('{email}', 'guardian@synthetic.test')
+    )
+    expect(guardian.invite).toHaveBeenCalledWith({
+      teenId: 'teen-google-1',
+      guardianEmail: 'guardian@synthetic.test',
+      consentLevel: 'full_access',
+    })
+    expect(
+      screen.getByText('https://couturecast.synthetic.test/guardian/accept?token=t')
+    ).toBeTruthy()
+  })
+
+  it('says the invite failed when the request fails', async () => {
+    guardian.invite.mockRejectedValue(new Error('down'))
+    await createTeen()
+    fireEvent.change(screen.getByLabelText(strings.guardianEmail), {
+      target: { value: 'guardian@synthetic.test' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: strings.sendInvite }))
+    await screen.findByText(strings.inviteFailed)
   })
 })
