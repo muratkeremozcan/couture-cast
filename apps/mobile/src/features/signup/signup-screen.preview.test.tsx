@@ -2,7 +2,11 @@
 // verified sign-in. The signup response itself never authenticates anyone.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { GUEST_PREVIEW_STRINGS } from '@couture/utils'
+import {
+  createGuestPreviewStore,
+  GUEST_PREVIEW_STRINGS,
+  SAMPLE_CATALOG,
+} from '@couture/utils'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn() }))
 vi.mock('expo-router', () => ({
@@ -10,6 +14,8 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ from: 'preview' }),
 }))
 import SignupRoute from '../../../app/signup'
+import { setMobileGuestPreviewStoreForTests } from '../../lib/guest-preview-store'
+import { SignupRefusedError } from '../../lib/signup'
 import { SignupScreen } from './signup-screen'
 
 const detail = GUEST_PREVIEW_STRINGS['en-US'].conversionDetail
@@ -22,6 +28,29 @@ function fill() {
     target: { value: '2000-04-15' },
   })
   fireEvent.click(screen.getByLabelText('Create account'))
+}
+
+/** A started preview in memory; `stored()` reads what the adapter holds. */
+async function startedPreview() {
+  let value: string | null = null
+  const store = createGuestPreviewStore({
+    catalog: SAMPLE_CATALOG,
+    adapter: {
+      read: () => Promise.resolve(value),
+      write: (text) => {
+        value = text
+        return Promise.resolve()
+      },
+      remove: () => {
+        value = null
+        return Promise.resolve()
+      },
+    },
+  })
+  setMobileGuestPreviewStoreForTests(store)
+  store.start()
+  await store.flush()
+  return { stored: () => value }
 }
 
 describe('mobile signup from the guest preview', () => {
@@ -71,5 +100,43 @@ describe('mobile signup from the guest preview', () => {
     unmount()
     render(<SignupScreen submitSignup={vi.fn()} />)
     expect(screen.queryByTestId('signup-back-to-preview')).toBeNull()
+  })
+
+  it('discards the preview when the client age check refuses the visitor', async () => {
+    const preview = await startedPreview()
+    const submitSignup = vi.fn()
+    render(<SignupScreen submitSignup={submitSignup} fromPreview />)
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'kid@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2020-01-01' },
+    })
+    fireEvent.click(screen.getByLabelText('Create account'))
+    await waitFor(() => expect(preview.stored()).toBeNull())
+    expect(submitSignup).not.toHaveBeenCalled()
+    setMobileGuestPreviewStoreForTests(undefined)
+  })
+
+  it('discards the preview when the server refuses the visitor (E-GATE-SERVER-WINS)', async () => {
+    const preview = await startedPreview()
+    const submitSignup = vi
+      .fn()
+      .mockRejectedValue(new SignupRefusedError('You must be 13 or older'))
+    render(<SignupScreen submitSignup={submitSignup} fromPreview />)
+    fill()
+    await screen.findByText('You must be 13 or older')
+    await waitFor(() => expect(preview.stored()).toBeNull())
+    setMobileGuestPreviewStoreForTests(undefined)
+  })
+
+  it('keeps the preview after a signup failure the visitor can retry', async () => {
+    const preview = await startedPreview()
+    const submitSignup = vi.fn().mockRejectedValue(new Error('Email already registered'))
+    render(<SignupScreen submitSignup={submitSignup} fromPreview />)
+    fill()
+    await screen.findByText('Email already registered')
+    expect(preview.stored()).not.toBeNull()
+    setMobileGuestPreviewStoreForTests(undefined)
   })
 })

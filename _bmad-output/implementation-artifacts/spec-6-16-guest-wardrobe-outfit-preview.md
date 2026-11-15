@@ -569,6 +569,11 @@ navigation and identity boundaries.
   - The no-writes proof moved from an env-gated solo run to the request allowlist plus the
     real-session lane, so it runs on every PR (TEA E1).
   - The mobile connection note shows at all times (TEA-9).
+  - A 403 from signup is a refusal of the person (`SignupRefusedError`); from the preview it
+    clears guest state on both clients, as the client age check does. Mobile lacked both clears.
+  - The first page view after the preview drops its `$prev_pageview_*` keys (web) and
+    `previous_screen` (mobile) when they name the preview; the real-SDK wire test found the leak
+    (TEA P1).
 
 ## Review Triage Log
 

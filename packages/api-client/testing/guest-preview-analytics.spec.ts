@@ -192,6 +192,40 @@ describe('guest preview privacy boundary', () => {
     ).not.toBeNull()
   })
 
+  it('keeps the first view after the preview without naming the preview', () => {
+    const web = webAnalyticsPrivacyFilter(
+      event('$pageview', {
+        $pathname: '/signup',
+        $prev_pageview_pathname: '/preview/continue',
+        $prev_pageview_duration: 12,
+        $prev_pageview_max_scroll: 0,
+      })
+    ) as { properties: Record<string, unknown> } | null
+    expect(web?.properties.$pathname).toBe('/signup')
+    expect(
+      Object.keys(web?.properties ?? {}).filter((key) =>
+        key.startsWith('$prev_pageview_')
+      )
+    ).toEqual([])
+    const mobile = mobileAnalyticsPrivacyFilter(
+      event('$screen', { $screen_name: '/signup', previous_screen: '/preview' })
+    ) as { properties: Record<string, unknown> } | null
+    expect(mobile?.properties.$screen_name).toBe('/signup')
+    expect(mobile?.properties).not.toHaveProperty('previous_screen')
+    // Any other previous view keeps its keys.
+    const other = webAnalyticsPrivacyFilter(
+      event('$pageview', {
+        $pathname: '/signup',
+        $prev_pageview_pathname: '/',
+        $prev_pageview_duration: 12,
+      })
+    ) as { properties: Record<string, unknown> } | null
+    expect(other?.properties).toMatchObject({
+      $prev_pageview_pathname: '/',
+      $prev_pageview_duration: 12,
+    })
+  })
+
   it('knows the preview routes so a non-view event templates them', () => {
     expect(templateAnalyticsRoute('/preview?view=wardrobe', 'web')).toBe('/preview')
     expect(templateAnalyticsRoute('/preview/continue', 'web')).toBe('/preview/continue')

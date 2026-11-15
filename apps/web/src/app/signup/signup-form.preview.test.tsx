@@ -10,6 +10,7 @@ import {
   SAMPLE_CATALOG,
 } from '@couture/utils'
 import { setWebGuestPreviewStoreForTests } from '../../lib/guest-preview'
+import { SignupRefusedError } from '../../lib/signup'
 import SignupPage from './page'
 import { SignupForm } from './signup-form'
 
@@ -23,6 +24,29 @@ function fill() {
     target: { value: '2000-04-15' },
   })
   fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
+}
+
+/** A started preview in memory; `stored()` reads what the adapter holds. */
+async function startedPreview() {
+  let value: string | null = null
+  const store = createGuestPreviewStore({
+    catalog: SAMPLE_CATALOG,
+    adapter: {
+      read: () => Promise.resolve(value),
+      write: (text) => {
+        value = text
+        return Promise.resolve()
+      },
+      remove: () => {
+        value = null
+        return Promise.resolve()
+      },
+    },
+  })
+  setWebGuestPreviewStoreForTests(store)
+  store.start()
+  await store.flush()
+  return { stored: () => value }
 }
 
 describe('signup from the guest preview', () => {
@@ -67,25 +91,8 @@ describe('signup from the guest preview', () => {
     expect(screen.queryByTestId('signup-sign-in-to-continue')).toBeNull()
   })
 
-  it('discards the preview when signup finds the visitor under 13 (E-GATE-SERVER-WINS)', async () => {
-    let value: string | null = null
-    const store = createGuestPreviewStore({
-      catalog: SAMPLE_CATALOG,
-      adapter: {
-        read: () => Promise.resolve(value),
-        write: (text) => {
-          value = text
-          return Promise.resolve()
-        },
-        remove: () => {
-          value = null
-          return Promise.resolve()
-        },
-      },
-    })
-    setWebGuestPreviewStoreForTests(store)
-    store.start()
-    await store.flush()
+  it('discards the preview when the client age check refuses the visitor', async () => {
+    const preview = await startedPreview()
     const submitSignup = vi.fn()
     render(<SignupForm submitSignup={submitSignup} fromPreview />)
     fireEvent.change(screen.getByLabelText('Email'), {
@@ -95,8 +102,30 @@ describe('signup from the guest preview', () => {
       target: { value: '2020-01-01' },
     })
     fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
-    await waitFor(() => expect(value).toBeNull())
+    await waitFor(() => expect(preview.stored()).toBeNull())
     expect(submitSignup).not.toHaveBeenCalled()
+    setWebGuestPreviewStoreForTests(undefined)
+  })
+
+  it('discards the preview when the server refuses the visitor (E-GATE-SERVER-WINS)', async () => {
+    const preview = await startedPreview()
+    const submitSignup = vi
+      .fn()
+      .mockRejectedValue(new SignupRefusedError('You must be 13 or older'))
+    render(<SignupForm submitSignup={submitSignup} fromPreview />)
+    fill()
+    await screen.findByText('You must be 13 or older')
+    await waitFor(() => expect(preview.stored()).toBeNull())
+    setWebGuestPreviewStoreForTests(undefined)
+  })
+
+  it('keeps the preview after a signup failure the visitor can retry', async () => {
+    const preview = await startedPreview()
+    const submitSignup = vi.fn().mockRejectedValue(new Error('Email already registered'))
+    render(<SignupForm submitSignup={submitSignup} fromPreview />)
+    fill()
+    await screen.findByText('Email already registered')
+    expect(preview.stored()).not.toBeNull()
     setWebGuestPreviewStoreForTests(undefined)
   })
 

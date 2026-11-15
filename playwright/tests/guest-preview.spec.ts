@@ -180,7 +180,74 @@ test.describe('Guest preview (signed out)', () => {
     await expect(page.getByTestId('guest-preview-gate')).toBeVisible()
   })
 
-  test('[P0] [6.16-E2E-006] signup under 13 from the preview discards it (E-GATE-SERVER-WINS)', async ({
+  test('[P0] [6.16-E2E-010] the gate turns on the 13th birthday in the visitor’s own date', async ({
+    page,
+  }) => {
+    await page.goto('/preview')
+    // The browser's local calendar date, the one the gate reads, at run time.
+    const [birthdayTomorrow, birthdayToday] = await page.evaluate(() => {
+      const iso = (date: Date) =>
+        `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      const today = new Date()
+      const tomorrow = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate() + 1
+      )
+      return [
+        iso(
+          new Date(tomorrow.getFullYear() - 13, tomorrow.getMonth(), tomorrow.getDate())
+        ),
+        iso(new Date(today.getFullYear() - 13, today.getMonth(), today.getDate())),
+      ]
+    })
+    await passGate(page, birthdayTomorrow)
+    await expect(page.getByTestId('guest-preview-gate-error')).toHaveText(
+      'You must be 13 or older'
+    )
+    await expect(page.getByTestId('guest-preview-outfit')).toHaveCount(0)
+    await passGate(page, birthdayToday)
+    await expect(page.getByTestId('guest-preview-outfit')).toBeVisible()
+  })
+
+  test(
+    '[P0] [6.16-E2E-011] a server age refusal at signup wins over the preview gate (E-GATE-SERVER-WINS)',
+    // The 403 is the scenario under test, so the failed-request monitor stays off here.
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ page }) => {
+      await page.goto('/preview')
+      await passGate(page)
+      await page.getByTestId('guest-preview-create-account').click()
+      await expect(page).toHaveURL(/\/signup\?from=preview$/)
+      expect(
+        await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
+      ).not.toBeNull()
+      // The client rule passes this birthdate; the server refuses it with the body the API's
+      // ForbiddenException sends, as it would on a clock or rule mismatch.
+      await page.route('**/api/v1/auth/signup', (route) =>
+        route.fulfill({
+          status: 403,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            statusCode: 403,
+            message: 'You must be 13 or older',
+            error: 'Forbidden',
+          }),
+        })
+      )
+      await page.getByLabel('Email').fill('guest-preview-server-refusal@example.test')
+      await page.getByLabel('Birthdate').fill('2000-01-15')
+      await page.getByRole('button', { name: 'Create account' }).click()
+      await expect(page.getByText('You must be 13 or older').first()).toBeVisible()
+      await expect
+        .poll(() => page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY))
+        .toBeNull()
+      await page.getByTestId('signup-back-to-preview').click()
+      await expect(page.getByTestId('guest-preview-gate')).toBeVisible()
+    }
+  )
+
+  test('[P0] [6.16-E2E-006] signup under 13 from the preview discards it (client age check)', async ({
     page,
   }) => {
     await page.goto('/preview')

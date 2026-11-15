@@ -19,7 +19,7 @@ import {
 import { getI18n } from '../../i18n'
 import { webGuestPreviewStore } from '../../lib/guest-preview'
 import { inviteGuardianFromWeb } from '../../lib/guardian'
-import { submitWebSignup } from '../../lib/signup'
+import { SignupRefusedError, submitWebSignup } from '../../lib/signup'
 
 type SignupFormProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
@@ -89,6 +89,9 @@ export function SignupForm({
       setAccountCreated(true)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Signup failed')
+      // D2: the server's refusal outranks the preview gate, as the client's does.
+      if (fromPreview && error instanceof SignupRefusedError)
+        webGuestPreviewStore().clear()
     } finally {
       setIsSubmitting(false)
     }

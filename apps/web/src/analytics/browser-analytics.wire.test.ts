@@ -1,5 +1,7 @@
 // Learning path Step 49: Native platform sharing.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-49-native-platform-sharing
+// Learning path Step 56: Guest wardrobe and outfit preview (T-SERIALIZED-WEB).
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 import { webcrypto } from 'node:crypto'
 import { createElement } from 'react'
 import { gunzipSync } from 'node:zlib'
@@ -328,6 +330,43 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
       const external = events.find(({ event }) => event === 'external_link_tapped')
       expect(external?.properties.url).toBe('https://weather.example')
       expectNoLeak(serialized)
+    } finally {
+      window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
+    }
+  })
+
+  // Story 6.16 T-SERIALIZED-WEB (D10): the real SDK with history_change page views, read
+  // from the serialized batches. The non-preview views in the same run prove the SDK was
+  // recording, so an empty result for the preview cannot pass by sending nothing at all.
+  it('T-SERIALIZED-WEB: no page view or page leave names the guest preview', async () => {
+    await drain()
+    const leave = () => window.dispatchEvent(new Event('pagehide'))
+    try {
+      window.history.pushState({}, '', '/wardrobe')
+      leave()
+      window.history.pushState({}, '', '/preview')
+      window.history.pushState({}, '', '/preview?view=wardrobe')
+      leave()
+      window.history.pushState({}, '', '/preview/continue')
+      leave()
+      window.history.pushState({}, '', '/signup')
+      const { events } = await drain()
+      const views = events.filter(
+        ({ event }) => event === '$pageview' || event === '$pageleave'
+      )
+      const named = (pattern: RegExp) =>
+        views.filter(({ properties }) =>
+          ['$pathname', '$current_url', '$prev_pageview_pathname'].some(
+            (key) => typeof properties[key] === 'string' && pattern.test(properties[key])
+          )
+        )
+      expect(named(/\/preview(\/|\?|$)/)).toEqual([])
+      expect(
+        views
+          .filter(({ event }) => event === '$pageview')
+          .map(({ properties }) => properties.$pathname)
+      ).toEqual(['/wardrobe', '/signup'])
+      expect(views.some(({ event }) => event === '$pageleave')).toBe(true)
     } finally {
       window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
     }

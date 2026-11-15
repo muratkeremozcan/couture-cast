@@ -11296,6 +11296,10 @@ Hard-won lessons from the implementation and code review of this story:
   proves it by an origin allowlist (GET from the web origin only, nothing under `/api/` or
   `/ingest/`), and the row-count test runs in the real-session lane, which owns its database and
   runs one test at a time.
+- Playwright's analytics test mode turns page views off, so a check there that no page view names
+  the preview passes with the filter deleted. The real SDK in the wire test found the first page
+  after the preview still naming it in `$prev_pageview_pathname`; the filter now drops the previous
+  view keys when they name the preview.
 
 Story/Task mapping:
 
@@ -11375,7 +11379,8 @@ API, Vitest:
 - [`apps/api/src/modules/personalization/ritual-generation.engine.golden.spec.ts`](../../apps/api/src/modules/personalization/ritual-generation.engine.golden.spec.ts):
   proves the ritual and capsule engines reproduce the recorded outputs after the rule move.
 - [`packages/api-client/testing/guest-preview-analytics.spec.ts`](../../packages/api-client/testing/guest-preview-analytics.spec.ts):
-  proves the three events, their closed enums, the URL-key drop and the preview view drop.
+  proves the three events, their closed enums, the URL-key drop, the preview view drop and the
+  previous-view keys dropped on the view after the preview.
 
 Web, Vitest:
 
@@ -11389,7 +11394,11 @@ Web, Vitest:
 - [`apps/web/src/app/signin/page.preview.test.tsx`](../../apps/web/src/app/signin/page.preview.test.tsx):
   proves the review only follows a preview sign-in and other sign-ins clear guest state.
 - [`apps/web/src/app/signup/signup-form.preview.test.tsx`](../../apps/web/src/app/signup/signup-form.preview.test.tsx):
-  proves the preview links and that an under-13 signup discards the preview.
+  proves the preview links, that a client or server age refusal discards the preview, and that a
+  retryable failure keeps it.
+- [`apps/web/src/analytics/browser-analytics.wire.test.ts`](../../apps/web/src/analytics/browser-analytics.wire.test.ts):
+  proves with the real posthog-js and history page views that no serialized page view or page
+  leave names the preview, while views elsewhere still arrive.
 
 Mobile, Vitest:
 
@@ -11406,13 +11415,16 @@ Mobile, Vitest:
   proves the file adapter, analytics, the verified comfort client and the next step.
 - [`apps/mobile/src/screens/signin-preview.test.tsx`](../../apps/mobile/src/screens/signin-preview.test.tsx):
   proves the review only follows a preview sign-in.
+- [`apps/mobile/src/features/signup/signup-screen.preview.test.tsx`](../../apps/mobile/src/features/signup/signup-screen.preview.test.tsx):
+  proves the preview links and that a client or server age refusal discards the preview.
 - [`apps/mobile/src/screens/hero-session-restore.test.tsx`](../../apps/mobile/src/screens/hero-session-restore.test.tsx):
   proves signed-out Home sends no ritual request and loads once the session restores.
 
 End to end, Playwright:
 
 - [`playwright/tests/guest-preview.spec.ts`](../../playwright/tests/guest-preview.spec.ts): proves
-  the gate, zero API calls, controls, history, tampering, analytics and the AC2 timing.
+  the gate and its 13th-birthday boundary, the origin allowlist, controls, history, tampering, a
+  server age refusal at signup, analytics and the AC2 timing.
 - [`playwright/tests/guest-preview-real-session.spec.ts`](../../playwright/tests/guest-preview-real-session.spec.ts):
   proves the guest-to-account carryover through the real local OTP and a database read.
 

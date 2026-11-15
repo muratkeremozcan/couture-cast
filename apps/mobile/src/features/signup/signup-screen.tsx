@@ -16,7 +16,8 @@ import {
 } from '@couture/utils'
 import { Text, View } from '@/components/themed'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
-import { submitMobileSignup } from '@/src/lib/signup'
+import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
+import { SignupRefusedError, submitMobileSignup } from '@/src/lib/signup'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 
 type SignupScreenProps = {
@@ -79,6 +80,8 @@ export function SignupScreen({
 
     if (!gate.allowed) {
       setErrorMessage(AGE_GATE_MESSAGES.underage)
+      // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
+      if (fromPreview) mobileGuestPreviewStore().clear()
       return
     }
 
@@ -100,6 +103,9 @@ export function SignupScreen({
       setAccountCreated(true)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Signup failed')
+      // D2: the server's refusal outranks the preview gate, as the client's does.
+      if (fromPreview && error instanceof SignupRefusedError)
+        mobileGuestPreviewStore().clear()
     } finally {
       setIsSubmitting(false)
     }
