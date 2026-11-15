@@ -6,10 +6,11 @@
 // L-MEMBER-OPENS-PREVIEW and the AC2 timing record.
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Page, Request, TestInfo } from '@playwright/test'
+import type { Page, Request } from '@playwright/test'
 import { SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
+import { isAllowedGuestPreviewRequest } from '../support/helpers/guest-preview-requests'
 import {
   commerceAccessToken,
   createLocationForUser,
@@ -24,40 +25,26 @@ const LABEL =
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
 /**
- * E1: every request the guest page makes must be a GET to the web origin outside `/api/`
- * and `/ingest/` (pages, RSC payloads, `_next` assets). A request to the API origin, the
- * Supabase origin or any other host lands in `offAllowlist`, so a direct browser write to
- * Supabase cannot slip past a path-only check.
+ * E1: every request the guest page makes is recorded, and any request outside
+ * `isAllowedGuestPreviewRequest` (the API origin, the Supabase origin, any other host, or
+ * a write) lands in `offAllowlist`, so a direct browser write cannot slip past a path check.
  */
 function recordRequests(page: Page, webOrigin: string) {
   const all: Request[] = []
   const offAllowlist: string[] = []
   page.on('request', (request) => {
     all.push(request)
+    if (
+      isAllowedGuestPreviewRequest(
+        { method: request.method(), url: request.url() },
+        webOrigin
+      )
+    )
+      return
     const url = new URL(request.url())
-    const allowed =
-      url.origin === webOrigin &&
-      request.method() === 'GET' &&
-      !/^\/(api|ingest)\//.test(url.pathname)
-    if (!allowed) offAllowlist.push(`${request.method()} ${url.origin}${url.pathname}`)
+    offAllowlist.push(`${request.method()} ${url.origin}${url.pathname}`)
   })
   return { all, offAllowlist }
-}
-
-/**
- * A Vercel preview deployment injects its toolbar, which posts to vercel.live. The header
- * on the app's own documents turns it off, so the allowlist stays strict on every lane and
- * no API request gains a header CORS would refuse.
- */
-async function skipVercelToolbar(page: Page, testInfo: TestInfo) {
-  const webOrigin = new URL(testInfo.project.use.baseURL ?? 'http://localhost').origin
-  await page.route(`${webOrigin}/**`, (route) => {
-    const request = route.request()
-    if (request.resourceType() !== 'document') return route.fallback()
-    return route.continue({
-      headers: { ...request.headers(), 'x-vercel-skip-toolbar': '1' },
-    })
-  })
 }
 
 async function enableAnalyticsHook(page: Page) {
@@ -94,7 +81,6 @@ const garmentIds = (page: Page) =>
 
 test.describe('Guest preview (signed out)', () => {
   test.use({ authSessionEnabled: false })
-  test.beforeEach(({ page }, testInfo) => skipVercelToolbar(page, testInfo))
 
   test('[P0] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({
     page,
@@ -391,7 +377,6 @@ test.describe('Guest preview (signed out)', () => {
 // parser accepts; so @local-lane. The location lets Home load its ritual without a 400.
 test.describe('Guest preview (member) @local-lane', () => {
   test.use({ authSessionEnabled: false })
-  test.beforeEach(({ page }, testInfo) => skipVercelToolbar(page, testInfo))
 
   test('[P0] [6.16-E2E-009] a signed-in member opening /preview returns to the app', async ({
     page,
