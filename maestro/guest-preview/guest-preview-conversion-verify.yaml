@@ -1,0 +1,64 @@
+# Story 6.16 owner: E-CONV-REAL-STACK on mobile, step 2 of 2. Not a standalone flow: the
+# signed-out runner runs it right after maestro/guest-preview-conversion.yaml, on the
+# sign-in screen that flow leaves open.
+#
+# MAESTRO_OTP arrives only as process environment, never argv or artifacts. The runner keeps
+# this run's debug output in a private directory, publishes only a redacted log and report,
+# and lists the code for the artifact secret scan (scripts/lib/guest-preview-conversion.mjs).
+# Nothing here asserts on the code itself, so no failure message can carry it.
+appId: ${MAESTRO_APP_ID}
+name: 'Guest preview conversion verify'
+tags:
+  - guest-preview
+  - maestro
+env:
+  CODE_LABEL: 'Email code'
+  VERIFY: 'Verify code'
+  PROPOSED_THERMAL: 'Thermal comfort: I tend to feel cold'
+  PROPOSED_WIND: 'Wind tolerance: Wind bothers me'
+  PROPOSED_RAIN: 'Rain preparedness: For any chance of rain'
+  SAVED: 'Your comfort preferences are saved.'
+---
+- extendedWaitUntil:
+    visible:
+      id: 'signin-code-input'
+    timeout: 15000
+# The same field selection maestro/story65/signin-verify.yaml proved on each platform.
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - tapOn:
+          id: 'signin-code-input'
+- runFlow:
+    when:
+      platform: Android
+    commands:
+      - tapOn:
+          text: ${CODE_LABEL}
+          index: 1
+- waitForAnimationToEnd
+- inputText: ${MAESTRO_OTP}
+- hideKeyboard:
+    optional: true
+- tapOn: ${VERIFY}
+
+# D7, D8: a preview sign-in with a stored proposal lands on the carryover review.
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-review-proposed'
+    timeout: 30000
+    label: 'The verified sign-in reached the carryover review'
+- assertVisible: ${PROPOSED_THERMAL}
+- assertVisible: ${PROPOSED_WIND}
+- assertVisible: ${PROPOSED_RAIN}
+- tapOn:
+    id: 'guest-preview-review-use'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-review-result'
+      text: ${SAVED}
+    timeout: 20000
+    label: 'The proposal was saved to the account'
+- assertVisible:
+    id: 'guest-preview-review-continue'

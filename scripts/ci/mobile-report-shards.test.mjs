@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { parse } from 'yaml'
+import { matrixRows } from './workflow-step-shadowing.mjs'
 
 const workflow = parse(
   readFileSync(
@@ -14,8 +15,9 @@ const workflow = parse(
   )
 )
 
+// Every matrix row reports, the Story 6.16 signed-out shard included.
 test('the report expects one result per matrix shard', () => {
-  const shards = workflow.jobs['mobile-e2e-android'].strategy.matrix.shard
+  const shards = matrixRows(workflow.jobs['mobile-e2e-android'].strategy.matrix)
   const reports = Object.values(workflow.jobs)
     .flatMap((job) => job.steps ?? [])
     .filter((step) =>

@@ -28,7 +28,11 @@ import os from 'node:os'
 import { fileURLToPath, URL } from 'node:url'
 import path from 'node:path'
 import { MAESTRO_BIN, MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
-import { localDatabaseUrl, localSupabasePorts } from './lib/local-supabase-ports.mjs'
+import {
+  localDatabaseUrl,
+  localMailpitUrl,
+  localSupabasePorts,
+} from './lib/local-supabase-ports.mjs'
 import {
   assertGenericMaestroFlows,
   discoverRunnableMaestroFlows,
@@ -91,6 +95,31 @@ import {
 } from './lib/maestro-launch-watchdog.mjs'
 import { runAndroidDeviceShards } from './lib/maestro-android-shards.mjs'
 import { waitForExpoStatus } from './lib/expo-dev-server.mjs'
+import {
+  assertAuthModePlatform,
+  assertFirstLaunchFlows,
+  metroEnvForAuthMode,
+  resolveMaestroAuthMode,
+  selectMaestroFlows,
+} from './lib/maestro-auth-mode.mjs'
+import {
+  GUEST_CONVERSION_FLOW,
+  GUEST_CONVERSION_VERIFY_FLOW,
+  cleanupGuestAccounts,
+  comfortMismatch,
+  deviceSupabaseUrl,
+  guestConversionEmail,
+  localGuestAuthAdmin,
+  publishRedacted,
+  readMailpitCode,
+  recordGuestAccount,
+  recordIssuedCode,
+  resolveGuestStateDir,
+  resolveLocalSupabase,
+  runGuestConversionLeg,
+  runPrivateMaestro,
+  startIssuedCodeFile,
+} from './lib/guest-preview-conversion.mjs'
 import { EXPO_GO_VERSION } from './lib/expo-go-version.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
@@ -147,8 +176,35 @@ for (let index = 0; index < cliArgs.length; index += 1) {
  */
 const discoverFlows = () => discoverRunnableMaestroFlows(projectRoot)
 
-const flowsToRun = FLOW_PATHS.length > 0 ? FLOW_PATHS : discoverFlows()
+/**
+ * Story 6.16 (TEA-8): `--signed-out` runs the guest preview flows against a
+ * Metro bundle with no baked member token. See scripts/lib/maestro-auth-mode.mjs.
+ */
+const AUTH_MODE = resolveMaestroAuthMode(cliArgs)
+const SIGNED_OUT = AUTH_MODE === 'signed-out'
+
+const flowsToRun = selectMaestroFlows({
+  mode: AUTH_MODE,
+  requested: FLOW_PATHS,
+  discovered: discoverFlows(),
+})
 assertGenericMaestroFlows(flowsToRun)
+if (SIGNED_OUT)
+  assertFirstLaunchFlows(flowsToRun, (flow) =>
+    fs.readFileSync(path.resolve(projectRoot, flow), 'utf8')
+  )
+
+/**
+ * Story 6.16 E-CONV-REAL-STACK: the guest conversion leg's run state. The write-ahead
+ * account record outlives the run (a killed run's accounts are cleaned by the next), and
+ * CI scans the artifacts for every code listed in the issued-code file.
+ */
+const guestConversion = {
+  stateDir: resolveGuestStateDir(process.env, projectRoot),
+  otpFile: process.env.MOBILE_E2E_ISSUED_OTP_FILE?.trim() || undefined,
+  /** @type {{ url: string, anonKey: string, serviceRoleKey: string } | undefined} */
+  supabase: undefined,
+}
 const WRITE_ARTIFACTS =
   process.argv.includes('--ci') ||
   process.argv.includes('--artifacts') ||
@@ -3421,6 +3477,267 @@ const applyMobileFixtureEnv = (mobileIdentity, mobileApiBaseUrl) => {
   process.env.REPLACEMENT_GARMENT_ID = mobileIdentity.garmentIds?.at(-1) ?? ''
 }
 
+/** `supabase status`, for a local run whose shell does not export the local keys. */
+const readSupabaseStatus = () => {
+  const status = spawnSync('npx', ['supabase', 'status', '-o', 'json'], {
+    cwd: projectRoot,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+    timeout: 60_000,
+  })
+  if (status.status !== 0)
+    throw new Error(
+      'Local Supabase is not running. Start it with Mailpit (`npm run supabase:start`) or export SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.'
+    )
+  return JSON.parse(status.stdout)
+}
+
+const mailpitReachable = async () => {
+  try {
+    const response = await fetch(`${localMailpitUrl()}/api/v1/messages?limit=1`, {
+      signal: AbortSignal.timeout(3_000),
+    })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Story 6.16: a signed-out run starts its issued-code list and, when the conversion flow
+ * runs, points the API and the bundle at the local Supabase whose Auth mails the code to
+ * Mailpit. A stack that cannot do that refuses the conversion flow by name.
+ *
+ * @param {'android' | 'ios'} platform
+ * @returns {Promise<void>}
+ */
+const prepareSignedOutStack = async (platform) => {
+  if (!SIGNED_OUT) return
+  startIssuedCodeFile(guestConversion.otpFile)
+  if (!flowsToRun.includes(GUEST_CONVERSION_FLOW)) return
+  let cause
+  try {
+    const supabase = resolveLocalSupabase(process.env, readSupabaseStatus)
+    guestConversion.supabase = supabase
+    // The API verifies the app's real session against this Auth. The service role key
+    // stays in this process, for cleanup.
+    process.env.SUPABASE_URL = supabase.url
+    process.env.SUPABASE_ANON_KEY = supabase.anonKey
+    process.env.EXPO_PUBLIC_SUPABASE_URL = deviceSupabaseUrl(
+      supabase.url,
+      platform === 'android' ? androidHost : '127.0.0.1'
+    )
+    process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY = supabase.anonKey
+    if (!(await mailpitReachable()))
+      cause = `Mailpit is not reachable at ${localMailpitUrl()}; local Supabase must run with Mailpit`
+  } catch (error) {
+    cause = error instanceof Error ? error.message : String(error)
+  }
+  if (cause) {
+    flowRefusals.set(GUEST_CONVERSION_FLOW, cause)
+    log(`REFUSE ${GUEST_CONVERSION_FLOW} (${cause})`)
+    return
+  }
+  process.env.GUEST_PREVIEW_EMAIL = guestConversionEmail()
+}
+
+/**
+ * The app users with this address, read from the run's database.
+ *
+ * @param {string} email
+ * @returns {Promise<string[]>}
+ */
+const appUserIdsByEmail = async (email) => {
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
+  try {
+    const users = await prisma.user.findMany({
+      where: { email: { equals: email, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    return users.map((user) => user.id)
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+/**
+ * Why the converted account's saved comfort row is not the proposal, or undefined.
+ *
+ * @param {string} email
+ * @returns {Promise<string | undefined>}
+ */
+const readGuestComfortCause = async (email) => {
+  const userIds = await appUserIdsByEmail(email)
+  if (userIds.length !== 1)
+    return `the converted address has ${userIds.length} app users, expected exactly one`
+  const prisma = new PrismaClient({ datasourceUrl: mobileE2eDatabaseUrl() })
+  try {
+    const row = await prisma.comfortPreferences.findUnique({
+      where: { user_id: userIds[0] },
+    })
+    return comfortMismatch(row)
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+/**
+ * Step 2 of the conversion: the code reaches Maestro only as MAESTRO_OTP in this child's
+ * environment. Its output and debug files stay in a private directory; only a redacted
+ * log and report reach the artifacts.
+ *
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @param {string} code
+ * @returns {Promise<void>}
+ */
+const runGuestVerifyFlow = async (target, maestroEnv, code) => {
+  const device = androidSerial || DEFAULT_ADB_DEVICE
+  const privateDir = fs.mkdtempSync(path.join(os.tmpdir(), 'guest-preview-verify-'))
+  const report = path.join(privateDir, 'report.xml')
+  try {
+    const driverArgs = await maestroDriverReuse.argsFor(target.platform, device)
+    const udid = androidSerial ? ['--udid', androidSerial] : []
+    const args = withTestOptions(
+      [
+        '--platform',
+        target.platform,
+        ...udid,
+        'test',
+        ...buildMaestroFlowEnvArgs(),
+        '--format',
+        'junit',
+        '--output',
+        report,
+        '--test-output-dir',
+        privateDir,
+        '--debug-output',
+        privateDir,
+        maestroFlowPath(GUEST_CONVERSION_VERIFY_FLOW, target.platform),
+      ],
+      driverArgs
+    )
+    log(`Running Maestro flow ${GUEST_CONVERSION_VERIFY_FLOW} (output kept private)`)
+    try {
+      await runPrivateMaestro({
+        commands: [['maestro'], [MAESTRO_BIN]],
+        args,
+        env: { ...maestroEnv, MAESTRO_OTP: code },
+        secrets: [code],
+        timeoutMs: CI_FLOW_TIMEOUT_MS,
+        logFile: WRITE_ARTIFACTS
+          ? getFlowLogPath(GUEST_CONVERSION_VERIFY_FLOW)
+          : undefined,
+      })
+    } finally {
+      maestroDriverReuse.recordInvocation(target.platform, device)
+      if (WRITE_ARTIFACTS)
+        publishRedacted(
+          report,
+          path.resolve(projectRoot, getFlowReportPath(GUEST_CONVERSION_VERIFY_FLOW)),
+          [code]
+        )
+    }
+  } finally {
+    fs.rmSync(privateDir, { recursive: true, force: true })
+  }
+}
+
+/**
+ * Story 6.16: records the guest address before the conversion flow creates its accounts,
+ * and hands back the leg that runs once the flow passed.
+ *
+ * @param {string} flowPath
+ * @param {{ platform: 'android' | 'ios' }} target
+ * @param {NodeJS.ProcessEnv} maestroEnv
+ * @returns {{ finish: (passed: boolean) => Promise<string | undefined> } | undefined}
+ */
+const beginGuestConversion = (flowPath, target, maestroEnv) => {
+  if (flowPath !== GUEST_CONVERSION_FLOW) return undefined
+  const email = process.env.GUEST_PREVIEW_EMAIL ?? ''
+  recordGuestAccount(guestConversion.stateDir, email)
+  const sinceMs = Date.now()
+  return {
+    finish: async (passed) =>
+      passed
+        ? runGuestConversionLeg({
+            readCode: () =>
+              readMailpitCode({ mailpitUrl: localMailpitUrl(), email, sinceMs }),
+            recordCode: (code) => recordIssuedCode(guestConversion.otpFile, code),
+            runVerifyFlow: (code) => runGuestVerifyFlow(target, maestroEnv, code),
+            verifyComfort: () => readGuestComfortCause(email),
+          })
+        : undefined,
+  }
+}
+
+/**
+ * Deletes the app user and the Auth user of every guest address recorded, this run's and
+ * any a killed run left. A failure is reported and its row kept for the next run.
+ *
+ * @param {string} apiSetupBaseUrl
+ * @returns {Promise<void>}
+ */
+const cleanupGuestConversionAccounts = async (apiSetupBaseUrl) => {
+  /** @type {ReturnType<typeof localGuestAuthAdmin> | undefined} */
+  let auth
+  try {
+    const summary = await cleanupGuestAccounts({
+      directory: guestConversion.stateDir,
+      deleteAppUser: async (email) => {
+        for (const userId of await appUserIdsByEmail(email)) {
+          // eslint-disable-next-line no-await-in-loop -- one user at a time
+          await cleanupMobileE2EIdentity(apiSetupBaseUrl, {
+            userId,
+            accessToken: buildMobileE2EAccessToken(userId),
+          })
+        }
+      },
+      deleteAuthUser: async (email) => {
+        auth ??= localGuestAuthAdmin(
+          guestConversion.supabase ??
+            resolveLocalSupabase(process.env, readSupabaseStatus)
+        )
+        await auth.deleteByEmail(email)
+      },
+    })
+    if (summary.recorded > 0)
+      log(`Guest conversion cleanup: ${summary.settled} account(s) deleted`)
+    for (const failure of summary.failed)
+      console.error(
+        `[maestro:runner] Guest account cleanup failed, kept for the next run: ${failure}`
+      )
+  } catch (error) {
+    console.error('[maestro:runner] Guest account cleanup failed')
+    console.error(error)
+  }
+}
+
+/**
+ * Create the run's fixture members and publish their env, or, on a signed-out
+ * run, publish only the API address: a guest flow starts with no session and
+ * signs up through the app's real auth path when it converts.
+ *
+ * @param {string} apiSetupBaseUrl
+ * @param {string} mobileApiBaseUrl
+ * @param {{ accessToken: string, userId: string }[]} mobileIdentities collected in place
+ * @returns {Promise<{ accessToken: string, userId: string } | undefined>}
+ */
+const provisionMobileFixture = async (
+  apiSetupBaseUrl,
+  mobileApiBaseUrl,
+  mobileIdentities
+) => {
+  if (SIGNED_OUT) {
+    process.env.EXPO_PUBLIC_API_BASE_URL = mobileApiBaseUrl
+    return undefined
+  }
+  const mobileIdentity = await createMobileIdentities(apiSetupBaseUrl, mobileIdentities)
+  applyMobileFixtureEnv(mobileIdentity, mobileApiBaseUrl)
+  await guardWeatherDoubleFlows(apiSetupBaseUrl, mobileIdentity.accessToken)
+  return mobileIdentity
+}
+
 /**
  * The app/health URL pairs to try, best candidate first.
  *
@@ -3483,13 +3800,16 @@ const findRunningExpoServer = async (portPairs) => {
  */
 const startExpoDevServer = (platform, metroPort) => {
   log(`Starting Expo dev server for mobile smoke (metro port ${metroPort})`)
+  // A signed-out run starts Metro with no member token and the app's real auth
+  // path. `start-mobile-server.sh` passes `--clear`, so no transform cached by a
+  // member run can carry the inlined token into this bundle.
   const serverProcess = spawn('npm', ['run', 'start:mobile:server'], {
     detached: process.platform !== 'win32',
     stdio: 'inherit',
-    env: {
+    env: metroEnvForAuthMode(AUTH_MODE, {
       ...process.env,
       MOBILE_E2E_PLATFORM: platform,
-    },
+    }),
   })
   managedProcesses.set(serverProcess, 'Expo dev server')
   serverProcess.on('exit', (code) => {
@@ -3636,6 +3956,9 @@ const buildMaestroFlowEnvArgs = () => [
   // Empty on iOS: `subflows/open-link.yaml` then keeps a plain `openLink`.
   '-e',
   `MAESTRO_EXPO_GO_OPEN_URL=${process.env.MAESTRO_EXPO_GO_OPEN_URL ?? ''}`,
+  // Story 6.16: the synthetic address the guest conversion signs up; empty otherwise.
+  '-e',
+  `GUEST_PREVIEW_EMAIL=${process.env.GUEST_PREVIEW_EMAIL ?? ''}`,
 ]
 
 /**
@@ -4298,6 +4621,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     const built = buildSingleFlowMaestroArgs(flowPath, target)
     const maestroArgs = withTestOptions(built.maestroArgs, driverArgs)
     const { maestroLogFile } = built
+    const conversion = beginGuestConversion(flowPath, target, maestroEnv)
 
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     const flowStartedAt = Date.now()
@@ -4338,7 +4662,8 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
       flowStartedAt,
       target.platform
     )
-    for (const cause of [doubleCause, restoreCause]) {
+    const conversionCause = await conversion?.finish(flowPasses.has(flowPath))
+    for (const cause of [doubleCause, restoreCause, conversionCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
   }
@@ -4418,6 +4743,16 @@ const runParallelSuite = async (target, maestroEnv, mobileIdentities, flowFailur
 const resolveExpoServerReuse = async (portPairs) => {
   let resolvedPair
   let startServer = START_SERVER
+
+  // A running dev server's env is unknowable from here, and a member one bakes
+  // a token in, so a signed-out run always starts its own.
+  if (SIGNED_OUT) {
+    if (!startServer)
+      throw new Error(
+        'Signed-out mode starts its own Expo dev server: MOBILE_E2E_SKIP_SERVER=1 would reuse a bundle that may carry a member token.'
+      )
+    return { resolvedPair, startServer }
+  }
 
   if (startServer) {
     const runningPair = await findRunningExpoServer(portPairs)
@@ -4518,6 +4853,8 @@ const awaitExpoGoAndWarmBundle = async (target, healthUrl) => {
  * @returns {Promise<void>}
  */
 const cleanupMobileRun = async (apiSetupBaseUrl, mobileIdentities, children) => {
+  // Before the API stops: app user cleanup lists garments through it.
+  if (SIGNED_OUT) await cleanupGuestConversionAccounts(apiSetupBaseUrl)
   for (const identity of mobileIdentities) {
     log('Cleaning authenticated mobile E2E fixture')
     try {
@@ -4577,6 +4914,8 @@ const run = async () => {
   const metroPort = await chooseMetroPort()
   process.env.MOBILE_E2E_METRO_PORT = String(metroPort)
   const target = await ensureMaestroTarget()
+  assertAuthModePlatform(AUTH_MODE, target.platform, PARALLEL_DEVICES)
+  log(`Maestro auth mode: ${AUTH_MODE} (${flowsToRun.length} flow(s))`)
 
   // Decide how Android addresses this machine BEFORE anything is derived from
   // it. `mobileApiBaseUrl` below is baked into the bundle as
@@ -4640,6 +4979,8 @@ const run = async () => {
    * @type {{ apiProcess?: import('node:child_process').ChildProcess, workerProcess?: import('node:child_process').ChildProcess, serverProcess?: import('node:child_process').ChildProcess }}
    */
   const children = {}
+  // Before the API starts: it verifies the guest's real Supabase session.
+  await prepareSignedOutStack(target.platform)
   let mobileIdentity
   /** @type {{ accessToken: string, userId: string }[]} */
   const mobileIdentities = []
@@ -4651,9 +4992,11 @@ const run = async () => {
         mobileApiBaseUrl,
         deterministicFlagEnv,
       })
-      mobileIdentity = await createMobileIdentities(apiSetupBaseUrl, mobileIdentities)
-      applyMobileFixtureEnv(mobileIdentity, mobileApiBaseUrl)
-      await guardWeatherDoubleFlows(apiSetupBaseUrl, mobileIdentity.accessToken)
+      mobileIdentity = await provisionMobileFixture(
+        apiSetupBaseUrl,
+        mobileApiBaseUrl,
+        mobileIdentities
+      )
     } else if (!process.env.EXPO_PUBLIC_API_BASE_URL) {
       throw new Error(
         'MOBILE_E2E_SKIP_API=1 requires EXPO_PUBLIC_API_BASE_URL and an externally managed test identity.'
@@ -4679,7 +5022,11 @@ const run = async () => {
     await reverseAndroidPorts(androidHostPorts(metroPort))
   }
 
-  const portPairs = buildPortPairs(target.platform, metroPort)
+  // A signed-out run waits only on the Metro it starts: the env override and
+  // 8081 fallbacks could answer from a member server left running.
+  const portPairs = buildPortPairs(target.platform, metroPort).filter(
+    (pair) => !SIGNED_OUT || pair.health === `http://127.0.0.1:${metroPort}`
+  )
   const { resolvedPair: reusedPair, startServer } =
     await resolveExpoServerReuse(portPairs)
 
