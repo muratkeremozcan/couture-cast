@@ -195,6 +195,43 @@ android {
 }
 `
 
+// The Release font proof installs its Release APK over the debug dev client the lane signed in
+// with (scripts/ci/share-card-android-release-font.sh), so the session carries over. Android
+// refuses that over-install across certificates, so the local proof's Release build
+// (CC68_RELEASE_PROOF_LOOPBACK=1) is signed with the pinned key too; every other Release keeps
+// the template signing (U-05).
+test('only the local Release proof build signs release with the pinned test keystore', () => {
+  const { addMinifiedDebuggable } = withMinifiedDebuggable
+  const releaseSigning = (gradle) =>
+    /^ {8}release \{\n {12}signingConfig signingConfigs\.(\w+)\n/m.exec(gradle)?.[1]
+  assert.equal(releaseSigning(addMinifiedDebuggable(TEMPLATE)), 'debug')
+  assert.equal(
+    releaseSigning(addMinifiedDebuggable(TEMPLATE, { releaseProof: false })),
+    'debug'
+  )
+  const proof = addMinifiedDebuggable(TEMPLATE, { releaseProof: true })
+  assert.equal(releaseSigning(proof), 'pinnedTest')
+  assert.equal(
+    proof,
+    expectedGradle(TEMPLATE).replace(
+      '        release {\n            signingConfig signingConfigs.debug\n',
+      '        release {\n            signingConfig signingConfigs.pinnedTest\n'
+    )
+  )
+  assert.equal(addMinifiedDebuggable(proof, { releaseProof: true }), proof)
+  assert.throws(
+    () =>
+      addMinifiedDebuggable(
+        TEMPLATE.replace(
+          '        release {\n            signingConfig signingConfigs.debug\n',
+          '        release {\n'
+        ),
+        { releaseProof: true }
+      ),
+    /expected one release build type signed with signingConfigs.debug, found 0/
+  )
+})
+
 test('the edit matches the independent expectation, is idempotent and refuses an unknown template', () => {
   const { addMinifiedDebuggable } = withMinifiedDebuggable
   const once = addMinifiedDebuggable(TEMPLATE)

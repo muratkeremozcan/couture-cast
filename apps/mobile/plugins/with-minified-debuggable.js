@@ -16,6 +16,13 @@
 // keystore committed next to this file. `release` keeps the template's signing so the Release
 // over-install from the previous step (U-05) keeps its certificate. The keystore signs local test
 // builds only; production signing is EAS-managed and never uses it.
+//
+// The one exception is the local Release font proof build (CC68_RELEASE_PROOF_LOOPBACK=1, which
+// app.config.ts allows only in an isolated Story 6.8 test build): the proof installs its Release
+// APK over the pinned-signed dev client the lane signed in with, so the session carries over, and
+// Android refuses that over-install across certificates. That build signs release with the
+// pinned key too. Signing in again on a fresh Release install instead passed one main run in
+// three (signin-request killed at 120 s, runs 43680002723 attempts 1 and 2).
 const fs = require('node:fs')
 const path = require('node:path')
 const { withAppBuildGradle, withDangerousMod } = require('@expo/config-plugins')
@@ -77,8 +84,11 @@ function replaceOnce(contents, pattern, replacer, label) {
   return contents.replace(pattern, replacer)
 }
 
-/** Returns the app build.gradle with the build type, signing and debuggable variant added. */
-function addMinifiedDebuggable(contents) {
+/**
+ * Returns the app build.gradle with the build type, signing and debuggable variant added; with
+ * `releaseProof`, release is signed with the pinned key as well (the local Release font proof).
+ */
+function addMinifiedDebuggable(contents, { releaseProof = false } = {}) {
   if (contents.includes(`${BUILD_TYPE} {`)) return contents
   if (/^\s*debuggableVariants\s*=/m.test(contents))
     throw new Error('with-minified-debuggable: debuggableVariants is already set')
@@ -101,6 +111,13 @@ function addMinifiedDebuggable(contents) {
     `$1${SIGNING_CONFIG}\n`,
     'debug build type signed with signingConfigs.debug'
   )
+  if (releaseProof)
+    next = replaceOnce(
+      next,
+      /(^ {8}release \{\n {12}signingConfig signingConfigs\.)debug\n/m,
+      `$1${SIGNING_CONFIG}\n`,
+      'release build type signed with signingConfigs.debug'
+    )
   // After `release`, so `initWith release` copies its proguard files and settings.
   next = replaceOnce(
     next,
@@ -115,7 +132,9 @@ function withMinifiedDebuggable(config) {
   config = withAppBuildGradle(config, (mod) => {
     if (mod.modResults.language !== 'groovy')
       throw new Error('with-minified-debuggable: app build.gradle must be Groovy')
-    mod.modResults.contents = addMinifiedDebuggable(mod.modResults.contents)
+    mod.modResults.contents = addMinifiedDebuggable(mod.modResults.contents, {
+      releaseProof: process.env.CC68_RELEASE_PROOF_LOOPBACK === '1',
+    })
     return mod
   })
   return withDangerousMod(config, [
