@@ -367,8 +367,17 @@ describe('assertTextProbeLinked', () => {
     }
     return { exec, calls }
   }
-  const check = (exec, platform = 'ios') =>
-    assertTextProbeLinked({ platform, device: DEVICE, appId: APP, exec, callMs: 5000 })
+  const check = (exec, platform = 'ios', options = {}) =>
+    assertTextProbeLinked({
+      platform,
+      device: DEVICE,
+      appId: APP,
+      androidApi: 34,
+      exec,
+      callMs: 5000,
+      registerMs: 0,
+      ...options,
+    })
 
   test('passes an iOS build whose executable carries the probe notification', (t) => {
     const { exec, calls } = fakeBundle(t, {
@@ -450,24 +459,179 @@ describe('assertTextProbeLinked', () => {
     })
   })
 
-  test('the driver checks once, after its first launch and before any capture', () => {
-    const driver = fs.readFileSync(
-      new URL('../run-live-font-proof.mjs', import.meta.url),
-      'utf8'
+  // PR 237 review P1: Dirent reports a symlink as neither a file nor a folder.
+  test('passes an iOS build that reaches the probe binary only through symlinks', (t) => {
+    const { exec } = fakeBundle(t, { CoutureCastStory68: machO('RCTAppDelegate') })
+    const bundle = exec().trim()
+    const versions = path.join(path.dirname(bundle), 'Versions/A')
+    fs.mkdirSync(versions, { recursive: true })
+    fs.writeFileSync(
+      path.join(versions, 'TextLayoutProbe'),
+      machO(TEXT_PROBE_NOTIFICATION)
     )
-    const loop = driver.indexOf('for (const name of screens) {')
-    const checkAt = driver.indexOf(
-      'assertTextProbeLinked({ platform, device, appId, adbBinary })'
+    const framework = path.join(bundle, 'Frameworks/TextLayoutProbe.framework')
+    fs.mkdirSync(framework, { recursive: true })
+    fs.symlinkSync(versions, path.join(framework, 'Current'))
+    fs.symlinkSync(
+      path.join(versions, 'TextLayoutProbe'),
+      path.join(framework, 'TextLayoutProbe')
     )
-    assert.ok(loop > 0 && checkAt > loop, 'inside the screen loop')
-    assert.equal(driver.split('assertTextProbeLinked(').length, 2, 'one call')
-    assert.ok(checkAt > driver.indexOf('launch()', loop), 'after the first launch')
-    for (const capture of ['await runScreenJourney(', 'await proveConfigChange(name'])
-      assert.ok(checkAt < driver.indexOf(capture, loop), `before ${capture}`)
-    // Not inside a try: a missing probe ends the run instead of failing one screen.
-    const block = driver.slice(driver.lastIndexOf('\n    }\n', checkAt), checkAt)
-    assert.match(block, /if \(!probeLinked\) \{\n\s*$/)
+    assert.doesNotThrow(() => check(exec))
   })
+
+  test('a symlink loop or a dangling link ends the walk, still failing an unlinked build', (t) => {
+    const { exec } = fakeBundle(t, {
+      CoutureCastStory68: machO('RCTAppDelegate'),
+      'Frameworks/hermes.framework/hermes': machO('hermes'),
+    })
+    const bundle = exec().trim()
+    fs.symlinkSync('..', path.join(bundle, 'Frameworks/hermes.framework/Up'))
+    fs.symlinkSync(bundle, path.join(bundle, 'Frameworks/Self'))
+    fs.symlinkSync('missing', path.join(bundle, 'Frameworks/Dangling'))
+    assert.throws(() => check(exec), { code: 'live_font_probe_not_linked' })
+  })
+})
+
+// PR 237 review P1: the receiver counts only in the Registered Receivers section, in the block of
+// the app's own process; below API 29 the probe never registers, which is its own failure.
+describe('assertTextProbeLinked on Android', () => {
+  const DEVICE = 'emulator-5554'
+  const APP = 'com.couturecast.story68'
+  const OTHER = 'com.couturecast.story65'
+  const receivers = (...blocks) =>
+    [
+      'ACTIVITY MANAGER BROADCAST STATE (dumpsys activity broadcasts)',
+      '  Registered Receivers:',
+      ...blocks.flat(),
+      '',
+      '  Receiver Resolver Table:',
+      '    Non-Data Actions:',
+      `        ${TEXT_PROBE_ACTION}:`,
+      `          BroadcastFilter{3 10123/u0 ReceiverList{1 4321 ${APP}/10123/u0 remote:2}}`,
+      `            Action: "${TEXT_PROBE_ACTION}"`,
+      '',
+      '  Historical broadcasts [foreground]:',
+      `  #0: BroadcastRecord{5 u0 ${TEXT_PROBE_ACTION}}`,
+      `    Intent { act=${TEXT_PROBE_ACTION} flg=0x400010 pkg=${APP} (has extras) }`,
+    ].join('\n')
+  const block = (process, action) => [
+    `  * ReceiverList{1 4321 ${process}/10123/u0 remote:2}`,
+    '    app=4321:' + process + '/u0a123 pid=4321 uid=10123 user=0',
+    '    Filter #0: BroadcastFilter{3 10123/u0 ReceiverList{1}}',
+    `      Action: "${action}"`,
+  ]
+  const check = (outputs, options = {}) => {
+    const calls = []
+    const exec = (binary, args) => {
+      calls.push({ binary, args })
+      return outputs[Math.min(calls.length, outputs.length) - 1]
+    }
+    let clock = 0
+    const run = () =>
+      assertTextProbeLinked({
+        platform: 'android',
+        device: DEVICE,
+        appId: APP,
+        androidApi: 34,
+        exec,
+        callMs: 5000,
+        registerMs: 3000,
+        sleep: (ms) => {
+          clock += ms
+        },
+        now: () => clock,
+        ...options,
+      })
+    return { run, calls }
+  }
+
+  test('passes the app whose own receiver list carries the probe action', () => {
+    const { run, calls } = check([
+      receivers(
+        block(OTHER, 'android.intent.action.SCREEN_ON'),
+        block(APP, TEXT_PROBE_ACTION)
+      ),
+    ])
+    assert.doesNotThrow(run)
+    assert.deepEqual(calls, [
+      {
+        binary: 'adb',
+        args: ['-s', DEVICE, 'shell', 'dumpsys', 'activity', 'broadcasts'],
+      },
+    ])
+  })
+
+  test('another package registering the same action does not count', () => {
+    const { run } = check([
+      receivers(
+        block(OTHER, TEXT_PROBE_ACTION),
+        block(APP, 'android.intent.action.SCREEN_ON')
+      ),
+    ])
+    assert.throws(run, {
+      code: 'live_font_probe_not_linked',
+      message:
+        /com\.couturecast\.story68 registered no com\.couturecast\.textlayoutprobe\.DUMP receiver/,
+    })
+  })
+
+  test('a process whose name only starts with the app id does not count', () => {
+    const { run } = check([receivers(block(`${APP}.debug`, TEXT_PROBE_ACTION))])
+    assert.throws(run, { code: 'live_font_probe_not_linked' })
+  })
+
+  test('the action outside the Registered Receivers section does not count', () => {
+    // receivers() always lists the app's filter in the resolver table and its broadcast history.
+    const { run } = check([receivers(block(APP, 'android.intent.action.SCREEN_ON'))])
+    assert.throws(run, { code: 'live_font_probe_not_linked' })
+  })
+
+  test('waits for the launched app to register, then gives up at the deadline', () => {
+    const unregistered = receivers(block(APP, 'android.intent.action.SCREEN_ON'))
+    const registered = receivers(block(APP, TEXT_PROBE_ACTION))
+    const late = check([unregistered, unregistered, registered])
+    assert.doesNotThrow(late.run)
+    assert.equal(late.calls.length, 3)
+    const never = check([unregistered])
+    assert.throws(never.run, { code: 'live_font_probe_not_linked' })
+    assert.equal(
+      never.calls.length,
+      4,
+      'one read a second for three seconds, then the last'
+    )
+  })
+
+  test('below API 29 the run fails as unsupported, never as an unlinked build', () => {
+    const { run, calls } = check([receivers()], { androidApi: 28 })
+    assert.throws(run, {
+      code: 'live_font_probe_api_unsupported',
+      message:
+        /Android API 28 is below 29, where the text layout probe registers no receiver/,
+    })
+    assert.deepEqual(calls, [])
+    assert.throws(check([receivers()], { androidApi: undefined }).run, {
+      code: 'live_font_text_probe_invalid',
+    })
+  })
+})
+
+// PR 237 review P1: once, before the first screen, so no screen's catch can skip it.
+test('the driver checks the probe once, before its first screen and outside any screen', () => {
+  const driver = fs.readFileSync(
+    new URL('../run-live-font-proof.mjs', import.meta.url),
+    'utf8'
+  )
+  const call =
+    "  if (platform === 'android') launch()\n  assertTextProbeLinked({ platform, device, appId, adbBinary, androidApi })\n  for (const name of screens) {\n"
+  assert.equal(driver.split('assertTextProbeLinked(').length, 2, 'one call')
+  const at = driver.indexOf(call)
+  assert.ok(at > 0, 'right before the screen loop, the Android app launched first')
+  // Inside the run's own try, whose catch ends the run and still writes the report.
+  assert.ok(driver.lastIndexOf('\ntry {\n', at) > driver.lastIndexOf('\n} catch', at))
+  assert.ok(
+    at < driver.indexOf("if (steps.includes('read-version'))"),
+    'before read-version'
+  )
 })
 
 describe('boundedCall', () => {

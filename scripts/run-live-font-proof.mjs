@@ -730,8 +730,6 @@ guard.step('timezone', () => {
 })
 // The weather banner state the run sets up, and how (ageWeatherSnapshot).
 let weather
-// Whether the installed build carries the text layout probe, checked once before the first capture.
-let probeLinked = false
 let runError
 const started = Date.now()
 const results = []
@@ -776,6 +774,13 @@ try {
       previousTimezone = previous
     },
   })
+  // F-00i (nightly run 43707223465): a build without the probe would fail every capture after
+  // three asks each, screen after screen, so the run checks once, before its first screen, and
+  // stops with live_font_probe_not_linked. Before the loop (PR 237 review P1), so no screen's own
+  // catch, a failed read-version included, can skip it; the outer catch writes the report. The
+  // Android receiver registers only in a running app, so that check launches it first.
+  if (platform === 'android') launch()
+  assertTextProbeLinked({ platform, device, appId, adbBinary, androidApi })
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
     mounts = mountTracker(requiredMounts(SCREENS[name]?.mount))
@@ -802,13 +807,6 @@ try {
         })
         continue
       }
-    }
-    // F-00i (nightly run 43707223465): a build without the probe would fail every capture after
-    // three asks each, screen after screen, so the run stops here with live_font_probe_not_linked.
-    // Outside the screen's own catch on purpose: the outer one ends the run and writes the report.
-    if (!probeLinked) {
-      assertTextProbeLinked({ platform, device, appId, adbBinary })
-      probeLinked = true
     }
     if (steps.includes('config-change')) {
       try {
