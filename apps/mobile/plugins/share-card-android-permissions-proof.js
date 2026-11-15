@@ -23,6 +23,41 @@ function gradleJavaHome(env) {
   }
   return env.JAVA_HOME
 }
+/**
+ * The merger's Maven artifacts download fresh on every CI runner. Maven Central answers a
+ * busy runner pool with HTTP 429, and a 5xx or a dropped connection happens too; PR 233's
+ * run 43719645437 failed this suite on a 429 for gson and kotlin-stdlib. Those failures
+ * say nothing about the manifests, so the merge is retried after a wait. Any other failure
+ * (a merge conflict, a missing library manifest, an unresolvable version) fails at once.
+ */
+const TRANSIENT_RESOLUTION_FAILURE =
+  /Too Many Requests|status code 429|status code 5\d\d|Connection reset|Read timed out|Connect timed out|connect timed out|Remote host terminated the handshake/i
+const MERGE_RETRY_DELAYS_MS = [20000, 40000]
+
+function isTransientResolutionFailure(result) {
+  if (result.status === 0) return false
+  return TRANSIENT_RESOLUTION_FAILURE.test(
+    `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  )
+}
+
+/** Runs `run` until it succeeds, fails for a real reason, or the waits run out. */
+function runWithResolutionRetry(
+  run,
+  { delaysMs = MERGE_RETRY_DELAYS_MS, wait = sleepSync } = {}
+) {
+  let result = run()
+  for (const delay of delaysMs) {
+    if (!isTransientResolutionFailure(result)) return result
+    wait(delay)
+    result = run()
+  }
+  return result
+}
+
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
 const { AndroidConfig } = require('@expo/config-plugins')
 const {
   assertCommand,
@@ -109,7 +144,13 @@ async function generateAndroidPermissionProof(t) {
     path.join(proof, 'build.gradle'),
     `
 plugins { id 'java' }
-repositories { google(); mavenCentral() }
+repositories {
+  google()
+  // Google's mirror of Maven Central first, so the merger's Central artifacts rarely meet
+  // Central's rate limit; Central itself stays as the fallback for anything not mirrored.
+  maven { url 'https://maven-central.storage-download.googleapis.com/maven2/' }
+  mavenCentral()
+}
 dependencies { runtimeOnly 'com.android.tools.build:manifest-merger:${mergerVersion}' }
 tasks.register('processMainManifest', JavaExec) {
   classpath = configurations.runtimeClasspath
@@ -122,33 +163,35 @@ tasks.register('processMainManifest', JavaExec) {
 `
   )
   const javaHome = gradleJavaHome(process.env)
-  const merged = spawnSync(
-    path.join(owned.root, 'android/gradlew'),
-    [
-      '--project-dir',
-      proof,
-      '--project-cache-dir',
-      path.join(proof, '.gradle'),
-      '--no-daemon',
-      '--max-workers=1',
-      '--console=plain',
-      'processMainManifest',
-    ],
-    {
-      cwd: proof,
-      encoding: 'utf8',
-      timeout: 120000,
-      env: {
-        ...process.env,
-        ...(javaHome ? { JAVA_HOME: javaHome } : {}),
-        CC68_PERMISSION_MAIN: main,
-        CC68_PERMISSION_APPLICATION_ID: JSON.parse(
-          fs.readFileSync(path.join(owned.root, 'app.json'), 'utf8')
-        ).expo.android.package,
-        CC68_PERMISSION_LIBRARIES: libraries.join(path.delimiter),
-        CC68_PERMISSION_MERGED: output,
-      },
-    }
+  const merged = runWithResolutionRetry(() =>
+    spawnSync(
+      path.join(owned.root, 'android/gradlew'),
+      [
+        '--project-dir',
+        proof,
+        '--project-cache-dir',
+        path.join(proof, '.gradle'),
+        '--no-daemon',
+        '--max-workers=1',
+        '--console=plain',
+        'processMainManifest',
+      ],
+      {
+        cwd: proof,
+        encoding: 'utf8',
+        timeout: 120000,
+        env: {
+          ...process.env,
+          ...(javaHome ? { JAVA_HOME: javaHome } : {}),
+          CC68_PERMISSION_MAIN: main,
+          CC68_PERMISSION_APPLICATION_ID: JSON.parse(
+            fs.readFileSync(path.join(owned.root, 'app.json'), 'utf8')
+          ).expo.android.package,
+          CC68_PERMISSION_LIBRARIES: libraries.join(path.delimiter),
+          CC68_PERMISSION_MERGED: output,
+        },
+      }
+    )
   )
   assertCommand(merged, 'Official Android manifest merger failed')
   const generated = await AndroidConfig.Manifest.readAndroidManifestAsync(main)
@@ -164,4 +207,8 @@ tasks.register('processMainManifest', JavaExec) {
   )
   return { generated, manifest }
 }
-module.exports = { generateAndroidPermissionProof }
+module.exports = {
+  generateAndroidPermissionProof,
+  isTransientResolutionFailure,
+  runWithResolutionRetry,
+}

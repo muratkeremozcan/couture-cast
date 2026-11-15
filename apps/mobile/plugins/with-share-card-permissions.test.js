@@ -79,9 +79,74 @@ test(
   }
 )
 
+test('the Android merger proof retries a rate-limited or dropped download and nothing else', () => {
+  const {
+    isTransientResolutionFailure,
+    runWithResolutionRetry,
+  } = require('./share-card-android-permissions-proof')
+  const tooMany = {
+    status: 1,
+    stdout: '',
+    stderr:
+      "Could not GET 'https://repo.maven.apache.org/maven2/com/google/code/gson/gson/2.11.0/gson-2.11.0.pom'. Received status code 429 from server: Too Many Requests",
+  }
+  const conflict = {
+    status: 1,
+    stdout: 'Error: Attribute application@allowBackup value=(false) is also present',
+    stderr: '',
+  }
+  const passed = { status: 0, stdout: 'BUILD SUCCESSFUL', stderr: '' }
+  assert.equal(isTransientResolutionFailure(tooMany), true)
+  assert.equal(
+    isTransientResolutionFailure({
+      status: 1,
+      stderr: 'Received status code 503 from server',
+    }),
+    true
+  )
+  assert.equal(isTransientResolutionFailure(conflict), false)
+  assert.equal(
+    isTransientResolutionFailure({ ...passed, stdout: 'status code 429' }),
+    false
+  )
+
+  const waits = []
+  const sequence = [tooMany, tooMany, passed]
+  assert.deepEqual(
+    runWithResolutionRetry(() => sequence.shift(), { wait: (ms) => waits.push(ms) }),
+    passed
+  )
+  assert.deepEqual(waits, [20000, 40000])
+
+  const conflictWaits = []
+  let conflictRuns = 0
+  const result = runWithResolutionRetry(
+    () => {
+      conflictRuns += 1
+      return conflict
+    },
+    { wait: (ms) => conflictWaits.push(ms) }
+  )
+  assert.equal(result, conflict)
+  assert.equal(conflictRuns, 1)
+  assert.deepEqual(conflictWaits, [])
+
+  let limitedRuns = 0
+  const exhausted = runWithResolutionRetry(
+    () => {
+      limitedRuns += 1
+      return tooMany
+    },
+    { wait: () => undefined }
+  )
+  assert.equal(exhausted, tooMany)
+  assert.equal(limitedRuns, 3)
+})
+
 test(
   'generated and officially merged Android permissions keep add-only export and image-picker needs',
-  { timeout: 180000 },
+  // Up to three merges with 60 s of waits between them when Maven rate-limits the runner.
+  { timeout: 360000 },
   async (t) => {
     const {
       generateAndroidPermissionProof,
