@@ -372,6 +372,67 @@ describe('I-SHARE-WIRE-WEB: the serialized posthog-js batch', () => {
     }
   })
 
+  // Story 6.16 T-SERIALIZED-WEB (D10), PR 236 review: the guest_preview_* events as the
+  // real SDK serializes them on a preview route, after posthog-js has added its own
+  // properties and before_send has run. Business keys are exactly the allowlisted ones,
+  // no URL or person key rides along, and the signup handoff rotates the distinct id.
+  it('T-SERIALIZED-WEB: guest_preview_* batches carry only allowlisted keys', async () => {
+    await drain()
+    const { guestPreviewAnalytics } = await import('../lib/guest-preview')
+    try {
+      window.history.pushState({}, '', '/preview?view=wardrobe')
+      guestPreviewAnalytics.started()
+      guestPreviewAnalytics.interacted('control_changed', 'thermal')
+      guestPreviewAnalytics.signupClicked('create_account')
+      window.history.pushState({}, '', '/signup?from=preview')
+      const { events } = await drain()
+      const guest = events.filter(({ event }) => event.startsWith('guest_preview_'))
+      const business = (properties: Record<string, unknown>) =>
+        Object.keys(properties)
+          .filter(
+            (key) => !key.startsWith('$') && key !== 'distinct_id' && key !== 'token'
+          )
+          .sort()
+      expect(guest.map(({ event, properties }) => [event, business(properties)])).toEqual(
+        [
+          ['guest_preview_started', ['catalog_version', 'platform']],
+          [
+            'guest_preview_interacted',
+            ['action', 'catalog_version', 'control', 'platform'],
+          ],
+          ['guest_preview_signup_clicked', ['action', 'catalog_version', 'platform']],
+        ]
+      )
+      for (const { properties, ...envelope } of guest) {
+        for (const key of [
+          '$current_url',
+          '$pathname',
+          '$host',
+          '$referrer',
+          '$referring_domain',
+          '$prev_pageview_pathname',
+          '$set',
+          '$set_once',
+          'plan_tier',
+        ])
+          expect(properties, key).not.toHaveProperty(key)
+        expect(envelope).not.toHaveProperty('$set')
+        expect(envelope).not.toHaveProperty('$set_once')
+        expect(properties.$process_person_profile).toBe(false)
+      }
+      const signupView = events.find(
+        ({ event, properties }) =>
+          event === '$pageview' && properties.$pathname === '/signup'
+      )
+      expect(signupView).toBeDefined()
+      expect(signupView!.properties.distinct_id).not.toBe(
+        guest[0]!.properties.distinct_id
+      )
+    } finally {
+      window.history.pushState({}, '', '/community/posts/post-123?ref=private-campaign')
+    }
+  })
+
   it('U-ANALYTICS-PRIVACY-WEB: exceptions leave as type and code locations only', async () => {
     const error = new Error(
       `Invalid token=guardian-secret for Alice Smith, DOB 2011-04-01, email teen%40example.test ${invitationToken} https://cdn.test/private/${personalUuid}/private-photo.jpg?token=photo-secret`
