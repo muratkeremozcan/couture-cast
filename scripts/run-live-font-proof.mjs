@@ -430,7 +430,7 @@ const settledPage = (capture, index) =>
 async function fullText(capture) {
   const size = windowSize(capture)
   if (!size) throw new Error('live_font_window_bounds_required')
-  const { pages, drags } = await scrollPages({
+  const { pages, drags, reachedBottom } = await scrollPages({
     page: (index) => settledPage(capture, index),
     dragUp: () => drag(size, true),
   })
@@ -460,7 +460,9 @@ async function fullText(capture) {
   // A page of only a tall image shares no text with its neighbors; the stitch then steps by
   // the drag's length. F-00i: every page keeps its probe answer, judged page by page.
   pages[0].image = pageImage(capture.file, 0)
-  attachPages(capture, pages, Math.round(size.height * (DRAG_FROM - DRAG_TO)))
+  attachPages(capture, pages, Math.round(size.height * (DRAG_FROM - DRAG_TO)), {
+    reachedBottom,
+  })
   persist(capture)
   return capture
 }

@@ -414,8 +414,14 @@ describe('stitchPages', () => {
     const page0 = [card(1, 100), card(2, 400), card(3, 700), card(4, 1000)]
     const page1 = [card(3, 100), card(4, 400), card(5, 700), card(6, 1000)]
     const page2 = [card(4, 200), card(5, 500), card(6, 800), card(7, 1100)]
-    const { taken, offsets } = stitchPlaces([page0, page1, page2], { expectedShift: 600 })
+    const bottom = { expectedShift: 600, reachedBottom: true }
+    const { taken, offsets } = stitchPlaces([page0, page1, page2], bottom)
     assert.deepEqual(offsets, [0, 600, 800])
+    // r49 P2-4: a last page the capture does not record as the bottom is never short.
+    assert.deepEqual(
+      stitchPlaces([page0, page1, page2], { expectedShift: 600 }).offsets,
+      [0, 600, 1200]
+    )
     assert.deepEqual(
       taken.map(({ key }) => JSON.parse(key)[1]),
       ['Card 1', 'Card 2', 'Card 3', 'Card 4', 'Card 5', 'Card 6', 'Card 7']
@@ -435,22 +441,65 @@ describe('stitchPages', () => {
     const pages = [page0, [...page1, comments(150)], [...page2, comments(560)]]
     assert.deepEqual(
       stitchPlaces(pages, {
-        expectedShift: 600,
+        ...bottom,
         records: pages.map((page) => [...page.map(record), chip]),
       }).offsets,
       [0, 600, 800]
     )
     // Anchors of the short drag that disagree (200 and 300) fail loudly.
     const split = [card(4, 200), card(5, 400), card(7, 1100)]
-    assert.throws(() => stitchPlaces([page0, page1, split], { expectedShift: 600 }), {
+    assert.throws(() => stitchPlaces([page0, page1, split], bottom), {
       message: /^live_font_scroll_short_drag_ambiguous/,
     })
     // Only the drag that reaches the bottom may be short: a short middle step keeps the old
     // fallback (the median measured step).
     assert.deepEqual(
-      stitchPlaces([page0, page1, page2, [card(9, 300 - 600)]], { expectedShift: 600 })
-        .offsets,
+      stitchPlaces([page0, page1, page2, [card(9, 300 - 600)]], bottom).offsets,
       [0, 600, 1200, 1800]
+    )
+  })
+
+  // r49 P2-4 (probes 4a to 4c): on the short last page a sticky header that jittered 6 px
+  // measured 6 px (alone, the step; beside the cards, a disagreement), and one repeated label
+  // paired with another copy confirmed a step by itself.
+  test('a short final step needs two agreeing texts, and chrome held still stays chrome', () => {
+    const card = (n, y) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${y}][100,${y + 100}]`,
+    })
+    const header = (y) => ({
+      id: 'header',
+      text: 'Community',
+      bounds: `[0,${y}][400,${y + 40}]`,
+    })
+    const bottom = { expectedShift: 600, reachedBottom: true }
+    const page0 = [header(20), card(1, 100), card(2, 400), card(3, 700), card(4, 1000)]
+    const page1 = [header(20), card(3, 100), card(4, 400), card(5, 700), card(6, 1000)]
+    const page2 = [header(26), card(4, 200), card(5, 500), card(6, 800), card(7, 1100)]
+    const { offsets, taken, places } = stitchPlaces([page0, page1, page2], bottom)
+    assert.deepEqual(offsets, [0, 600, 800])
+    // The header is taken once and the jittered copy takes its page 0 place.
+    assert.equal(taken.filter(({ key }) => JSON.parse(key)[1] === 'Community').length, 1)
+    assert.equal(places[2][0], places[0][0])
+    // The jittered header alone on the last page measures no step: no moving text, fallback.
+    assert.deepEqual(
+      stitchPlaces([page0, page1, [header(26), card(9, 900)]], bottom).offsets,
+      [0, 600, 1200]
+    )
+    // One label shared by chance confirms nothing.
+    const details = (y) => ({
+      id: '',
+      text: 'View details',
+      bounds: `[0,${y}][100,${y + 40}]`,
+    })
+    assert.throws(
+      () =>
+        stitchPlaces(
+          [page0, [...page1, details(900)], [card(8, 300), details(720)]],
+          bottom
+        ),
+      { message: /^live_font_scroll_short_drag_unconfirmed/ }
     )
   })
 

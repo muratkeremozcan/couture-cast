@@ -4033,6 +4033,68 @@ describe('text layout clipping (F-00i)', () => {
         .textLost.pass,
       true
     )
+    // r49 P3-1 (probe 8b): two copies each compared on its own scroll page are two copies, a
+    // copy seen on both pages is one, and a sticky one at one screen place on every page is one.
+    const SHIFT = 1200
+    const paged = (capture, ...lists) => {
+      const moved = (by) => (node) => {
+        const [left, top, right, bottom] = parseBounds(node.bounds)
+        return { ...node, bounds: `[${left},${top - by}][${right},${bottom - by}]` }
+      }
+      const record = ([text, rect, overrides]) =>
+        probeRecord('ios', text, rect, overrides)
+      const pages = lists.map((list, index) => {
+        const nodes = capture.nodes.map(moved(index * SHIFT))
+        const answer = healthyAnswer({ ...capture, nodes }, 'ios')
+        answer.records.push(...list.map(record))
+        return { nodes, volatileRegions: [], window: capture.window, textProbe: answer }
+      })
+      return { ...capture, textProbe: pages[0].textProbe, pages, pageShift: SHIFT }
+    }
+    const away = { visibleRect: null, scrolledAway: true }
+    const near = ['Save', [40, 300, 200, 340]]
+    const far = ['Save', [40, 1700, 200, 1740]]
+    const scrolledFar = [...far, away]
+    const farOnPage1 = ['Save', [40, 500, 200, 540]]
+    const nearOnPage1 = ['Save', [40, -900, 200, -860], away]
+    const crossLeg = (settledPage0, settledPage1) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.cold = paged(change.cold, [near, scrolledFar], [nearOnPage1, farOnPage1])
+      change.settled = paged(change.settled, settledPage0, settledPage1)
+      return evaluateLiveFontChangeRaw(change).checks.textLost
+    }
+    assert.deepEqual(
+      crossLeg([near], [nearOnPage1]).lost.filter(({ text }) => text === 'Save'),
+      [{ stage: 'settled', text: 'Save' }]
+    )
+    assert.equal(
+      crossLeg([near, scrolledFar], [nearOnPage1, farOnPage1]).lost.some(
+        ({ text }) => text === 'Save'
+      ),
+      false
+    )
+    const chip = ['Sticky chip', [200, 80, 300, 110]]
+    // Sticky across three pages and drawn nowhere on the last at the cold launch: still one copy.
+    const sticky = { ...fixedChange(), platform: 'ios' }
+    sticky.cold = paged(
+      sticky.cold,
+      [near, chip],
+      [nearOnPage1, chip],
+      [[...chip, { opacity: 0 }]]
+    )
+    sticky.settled = paged(sticky.settled, [near, chip], [nearOnPage1, chip], [chip])
+    assert.equal(
+      evaluateLiveFontChangeRaw(sticky).checks.textLost.lost.some(
+        ({ text }) => text === 'Sticky chip'
+      ),
+      false
+    )
+    assert.equal(
+      crossLeg([near, scrolledFar, chip], [nearOnPage1, farOnPage1, chip]).lost.some(
+        ({ text }) => text === 'Sticky chip'
+      ),
+      false
+    )
     // Scrolled away at the cold launch on every page, it may be a volatile card's text below the
     // region's visible cut (the hierarchy cuts a region to what shows): not compared.
     assert.equal(

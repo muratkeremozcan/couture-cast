@@ -1030,18 +1030,29 @@ function hiddenOwner(record, { nodes, elements, tolerance }) {
   const text = normalized(record.text)
   if (text === '') return null
   const rect = recordRect(record)
-  const reach = bordersReach(record, rect, tolerance)
-  const nearest = best(
-    elements
-      .map((element, index) => ({ element, index }))
-      .filter(
-        ({ element }) =>
-          element.identifier !== null &&
-          holdsWords(normalized(element.label), text) &&
-          gap(element.rect, rect) <= reach
-      ),
-    ({ element }) => gap(element.rect, rect)
+  const identified = elements
+    .map((element, index) => ({ element, index }))
+    .filter(({ element }) => element.identifier !== null)
+  // TEA ruling r49 P2-1: an identified element whose frame holds the record owns it, the
+  // smallest of several; one whose label lacks the record's words leaves it unmatched, and only
+  // a record no identified element holds may join one that borders it.
+  const holders = best(
+    identified.filter(({ element }) => contains(element.rect, rect, tolerance)),
+    ({ element }) => area(element.rect)
   )
+  const reach = bordersReach(record, rect, tolerance)
+  const nearest = holders.length
+    ? holders.every(({ element }) => holdsWords(normalized(element.label), text))
+      ? holders
+      : []
+    : best(
+        identified.filter(
+          ({ element }) =>
+            holdsWords(normalized(element.label), text) &&
+            gap(element.rect, rect) <= reach
+        ),
+        ({ element }) => gap(element.rect, rect)
+      )
   if (nearest.length > 1) return { ambiguous: { elements: nearest.map((e) => e.index) } }
   if (!nearest.length) return null
   const [{ element, index }] = nearest
@@ -1062,9 +1073,10 @@ function hiddenOwner(record, { nodes, elements, tolerance }) {
  * TEA ruling r49: a record native flags `accessibilityHidden` (a decorative pill or caption whose
  * words an accessible parent's label carries) that is still free after every other pairing joins
  * the nearest identified accessibility element (an identifier, not null) whose label holds its
- * text as whole words, whitespace normalized, and whose frame holds or borders the record
- * (bordersReach, r48 P2-2); nearest by the gap between the element's frame and the record's
- * rect, and two elements at one gap are ambiguous. It joins the hierarchy node of that
+ * text as whole words, whitespace normalized: the smallest identified element whose frame holds
+ * the record, which leaves it unmatched when its label lacks those words (TEA ruling r49 P2-1),
+ * or, when no identified element holds it, the nearest whose frame borders it (bordersReach, r48
+ * P2-2). Two elements of one area, or at one gap, are ambiguous. It joins the hierarchy node of that
  * element (its testID and label, frames overlapping; of several, the best overlap, a tie
  * ambiguous): the node's group when the node is one, else its attached records, so each node
  * keeps one member list. It is keyed as that node's key, `>`, then its own `["",text]#n`, and

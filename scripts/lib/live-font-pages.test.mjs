@@ -176,6 +176,8 @@ describe('scrollPages', () => {
       ['top', 'middle', 'bottom']
     )
     assert.equal(result.drags, 2)
+    // r49 P2-4: the last page is the bottom, which the capture records.
+    assert.equal(result.reachedBottom, true)
   })
 
   // Android 6c85bbb4 Community: a feed longer than the cap stopped 13 pages down every time.
@@ -233,6 +235,12 @@ describe('attachPages', () => {
     )
     assert.deepEqual(capture.pages, [first, second])
     assert.equal(capture.pageShift, 500)
+    assert.equal(capture.reachedBottom, false)
+    assert.equal(
+      attachPages({ nodes: first.nodes }, [first, second], 500, { reachedBottom: true })
+        .reachedBottom,
+      true
+    )
   })
 
   test('a screen of one page keeps no pages and no stitched text', () => {

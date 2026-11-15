@@ -1356,6 +1356,70 @@ describe('matchTextProbe, accessibility-hidden records (TEA ruling r49)', () => 
   })
 })
 
+// TEA ruling r49 P2-1 (probe 2a): the card above, 14 px away, whose label mentions "Archived",
+// took the badge that sits wholly inside the card below.
+// TEA ruling r49 P2-1 (probe 2a): the card above, 14 px away, whose label mentions "Archived",
+// took the badge that sits wholly inside the card below, an element no hierarchy node stands
+// for.
+describe('matchTextProbe, accessibility-hidden records held by an element (TEA ruling r49)', () => {
+  const element = (identifier, label, rect) => ({
+    hasText: true,
+    identifier,
+    label,
+    rect,
+    window: 1,
+  })
+  /** `withNodes` lists the elements a hierarchy node stands for. */
+  const probe = (elements, { rect = [20, 194, 120, 212], withNodes = elements } = {}) =>
+    matchTextProbe({
+      platform: 'ios',
+      nodes: withNodes.map((each) => node(each.label, each.rect, each.identifier)),
+      answer: answerFor(
+        't',
+        [iosRecord('Archived', rect, { accessibilityHidden: true })],
+        {
+          platform: 'ios',
+          windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+          elements,
+        }
+      ),
+      window: [0, 0, 402, 874],
+      tolerance: 1,
+      // The element paths alone: with the iOS group rule a node box that holds the badge takes
+      // it first.
+      groupRule: false,
+    })
+  const ownerOf = (result) => {
+    const pair = result.pairs.find((each) => each.record === 0)
+    return pair ? [pair.node, pair.via] : null
+  }
+  const above = element('card-1', 'Saved item, Archived', [16, 100, 386, 180])
+  const below = element('card-2', 'Winter coat', [16, 192, 386, 272])
+  const list = element('list', 'Saved items, Archived', [0, 90, 402, 800])
+
+  test('an identified element whose frame holds the record decides it', () => {
+    // The card below holds the badge; its label lacks the word: unmatched, never stolen.
+    const stolen = probe([above, below], { withNodes: [above] })
+    assert.deepEqual(
+      [stolen.code, stolen.unmatchedRecords, ownerOf(stolen)],
+      ['live_font_text_probe_unmatched', [0], null]
+    )
+    const labelled = element('card-2', 'Winter coat, Archived', [16, 192, 386, 272])
+    const hidden = element('card-2', 'Winter coat, Archived', [16, 192, 386, 272])
+    hidden.hasText = false
+    assert.deepEqual(ownerOf(probe([list, hidden], { withNodes: [list, hidden] })), [
+      1,
+      'attached',
+    ])
+    assert.deepEqual(ownerOf(probe([above, labelled])), [1, 'attached'])
+    // Held by no identified element, it may still join one that borders it.
+    assert.deepEqual(ownerOf(probe([above], { rect: [20, 182, 120, 198] })), [
+      0,
+      'accessibilityHidden',
+    ])
+  })
+})
+
 describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () => {
   // r48 P3-1 (probe F6_overflowRegionOf_left_col): a scrolled-away record in the right column,
   // its centre in the band of a volatile region on the left, was taken as that region's chip.

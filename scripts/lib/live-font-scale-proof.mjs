@@ -395,6 +395,7 @@ export function pageCaptures(capture) {
     {
       expectedShift: capture.pageShift,
       records: pages.map((page) => page.textProbe?.records ?? []),
+      reachedBottom: capture.reachedBottom === true,
     }
   )
   const own = [...keyed(capture)]
@@ -1408,35 +1409,77 @@ function hiddenText(platform, stages) {
 const COMPARED_KINDS = new Set(['visible', 'hidden', 'regional'])
 
 /**
- * The masked texts of a capture's probe records with their copies (r48 P3-1): of each text, the
- * most records any one page holds, those of COMPARED_KINDS when `compared`, else of any record
- * but an empty one. A page's probe answer holds every text view laid out, scrolled away ones too,
- * so the pages of one scroll-through repeat the same records, and the copies are the most one
- * page holds, never a sum over pages.
+ * The masked texts of a capture's probe records with their copies over the scroll-through
+ * (r48 P3-1, r49 P3-1): those of COMPARED_KINDS when `compared`, else of any record but an
+ * empty one, each copy counted once however many pages show it. A page's records sit in the
+ * content at their viewRect moved by the page's contentOffset (pageCaptures), so two pages'
+ * records of one text there (a top or bottom edge within the tolerance, or overlapping rows,
+ * and overlapping columns) are one copy; a record at one screen place on every page, of any kind
+ * there (a sticky header), is one copy too. Two copies each compared on its own page are two.
  */
 function recordTexts(capture, platform, compared) {
-  const texts = new Map()
-  const pages = [capture, ...pageCaptures(capture).map((page) => page.capture)]
-  for (const page of pages) {
+  const tolerance = HEIGHT_TOLERANCE[platform]
+  const pages = [
+    { page: capture, offset: 0 },
+    ...pageCaptures(capture).map(({ capture: page }) => ({
+      page,
+      offset: page.contentOffset ?? 0,
+    })),
+  ]
+  // Every page's records, each with its kind; stickiness reads all of them (a sticky header the
+  // last page keeps in a volatile region is still one copy), the count only the compared ones.
+  const every = pages.map(({ page, offset }) => {
     const { match } = textLayout(page, platform)
-    if (!match) continue
-    const counts = new Map()
-    page.textProbe.records.forEach((record, index) => {
-      if (record.text === '') return
-      if (compared && !COMPARED_KINDS.has(match.kinds[index])) return
-      const text = maskText(record.text)
-      counts.set(text, (counts.get(text) ?? 0) + 1)
+    if (!match) return []
+    return page.textProbe.records.flatMap((record, index) => {
+      if (record.text === '') return []
+      const [left, top, right, bottom] = record.viewRect
+      return [
+        {
+          text: maskText(record.text),
+          kind: match.kinds[index],
+          screen: record.viewRect,
+          content: [left, top + offset, right, bottom + offset],
+        },
+      ]
     })
-    for (const [text, count] of counts)
-      texts.set(text, Math.max(texts.get(text) ?? 0, count))
+  })
+  const placed = every.map((list) =>
+    compared ? list.filter(({ kind }) => COMPARED_KINDS.has(kind)) : list
+  )
+  const near = (a, b) => Math.abs(a - b) <= tolerance
+  const sameScreen = (a, b) =>
+    a.text === b.text && near(a.screen[0], b.screen[0]) && near(a.screen[1], b.screen[1])
+  const sticky = (entry) =>
+    pages.length > 1 &&
+    every.every((list) => list.some((other) => sameScreen(other, entry)))
+  const sameCopy = (a, b) =>
+    a.text === b.text &&
+    a.content[0] < b.content[2] + tolerance &&
+    b.content[0] < a.content[2] + tolerance &&
+    (near(a.content[1], b.content[1]) ||
+      near(a.content[3], b.content[3]) ||
+      (a.content[1] < b.content[3] - tolerance &&
+        b.content[1] < a.content[3] - tolerance))
+  const copies = []
+  for (const list of placed) {
+    const before = copies.length
+    for (const entry of list) {
+      const known = copies
+        .slice(0, before)
+        .some((copy) => (sticky(entry) ? sameScreen(copy, entry) : sameCopy(copy, entry)))
+      if (!known) copies.push(entry)
+    }
   }
+  const texts = new Map()
+  for (const { text } of copies) texts.set(text, (texts.get(text) ?? 0) + 1)
   return texts
 }
 
 /**
  * TEA ruling on Antigravity r47 P2 (R47_F3B): a text the cold launch at the same scale shows as a
- * compared record (COMPARED_KINDS) that the live capture has fewer records of, on any page, is
- * lost (r48 P3-1: two copies at the cold launch and one live lose one): live_font_text_lost,
+ * compared record (COMPARED_KINDS) that the live capture has fewer copies of over its pages
+ * (recordTexts) is lost (r48 P3-1: two copies at the cold launch and one live lose one): live_font_text_lost,
  * whatever the hierarchy or a group's composite label says. A text the live capture still has a
  * record of, drawn nowhere or only behind a label, is the hidden text check's (hiddenText).
  * `stages` holds [stage, live capture, cold capture] triples; a missing capture is skipped.
