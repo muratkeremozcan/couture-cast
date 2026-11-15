@@ -196,6 +196,25 @@ describe('failed audit test digest', () => {
       swift,
       /element\("tab-home"\)\.tap\(\)\n\s+try settleHome\(\)\n\s+try app\.performAccessibilityAudit/
     )
+    // Runs 43740466527 and 43746880534: preparing was audited while the composer still slid in.
+    // Every audit waits for the composer to settle, then takes the screen it judges.
+    assert.match(
+      swift,
+      /settleComposer\(state\)\n\s+\/\/ [^\n]+\n\s+let judged = app\.screenshot\(\)\.pngRepresentation\n\s+try app\.performAccessibilityAudit\(for: \.all\) \{ issue in\n/
+    )
+    const settle = /func settleComposer\(_ state: String\) \{\n([\s\S]*?)\n {2}\}\n/.exec(
+      swift
+    )?.[1]
+    assert.ok(settle, 'settleComposer')
+    for (const rule of [
+      'let opener = element("outfit-share-card-open")',
+      'let title = element("share-card-title")',
+      'let deadline = Date().addingTimeInterval(10)',
+      'if let frame, frame == previous, !(opener.exists && opener.isHittable) { return }',
+      'RunLoop.current.run(until: Date().addingTimeInterval(0.5))',
+      'XCTFail("Composer still moving 10 s before the audit: \\(state)")',
+    ])
+      assert.ok(settle.includes(rule), rule)
     // iOS 26.5 canary shard 3 failed preparing with no screenshot: every refused issue keeps the
     // screen the audit judged, named with the state, past a passing run's cleanup.
     const refused = /if !allowed \{\n([\s\S]*?)\n\s+\}\n\s+return allowed\n/.exec(
@@ -205,7 +224,12 @@ describe('failed audit test digest', () => {
     assert.match(refused, /^\s+print\(shareCardAuditIssueLine\(state, issue\)\)\n/)
     assert.match(
       refused,
-      /let screen = XCTAttachment\(data: self\.app\.screenshot\(\)\.pngRepresentation, uniformTypeIdentifier: "public\.png"\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)$/
+      /let screen = XCTAttachment\(data: judged, uniformTypeIdentifier: "public\.png"\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)\n/
+    )
+    // The screen after the audit is kept too, under a name the export never publishes.
+    assert.match(
+      refused,
+      /let after = XCTAttachment\(data: self\.app\.screenshot\(\)\.pngRepresentation, uniformTypeIdentifier: "public\.png"\)\n\s+after\.name = "audit-after-\\\(state\)"\n\s+after\.lifetime = \.keepAlways\n\s+self\.add\(after\)$/
     )
     // A PNG named audit-failure-<state> is what share-card-audit-screens.mjs exports and the
     // public evidence publishes as audit-failure-<state>.png.
