@@ -19,13 +19,16 @@ import {
   IOS_RELEASE_APP,
   JOBS_WORKFLOW,
   LIVE_FONT_ARTIFACT,
+  LIVE_FONT_EVIDENCE_JOB,
   LIVE_FONT_INSTALL,
   LIVE_FONT_JOB,
+  LIVE_FONT_MERGE,
   LIVE_FONT_PREBUILD,
   LIVE_FONT_PROBE_ENV,
   LIVE_FONT_PROOF,
   LIVE_FONT_RELEASE_BUILD,
   LIVE_FONT_SCAN,
+  LIVE_FONT_RESULT,
   LIVE_FONT_SCREENS,
   MACOS_JOBS,
   MANDATORY,
@@ -842,7 +845,7 @@ describe('ios-native workflows validator', () => {
     rejected(
       `${name} downloading another artifact`,
       new RegExp(
-        `${name}: download only the shard reports, or on a dispatch the scanned client`
+        `${name}: download only the shard reports or the live font legs' proofs, or on a dispatch the scanned client`
       ),
       (jobs) => {
         jobs[name].steps.push({
@@ -862,7 +865,7 @@ describe('ios-native workflows validator', () => {
   })
   rejected(
     'a shard downloading every artifact',
-    /download only the shard reports, or on a dispatch the scanned client/,
+    /download only the shard reports or the live font legs' proofs, or on a dispatch the scanned client/,
     (jobs) => {
       jobs['ios-shard'].steps.push({ uses: 'actions/download-artifact@v4' })
     }
@@ -935,11 +938,21 @@ describe('the iOS live font-scale proof', () => {
     assert.equal(proof['timeout-minutes'], 120)
   })
 
-  test('runs the driver on the Release build of every screen, and its exit decides the job', () => {
+  // Dispatches 43740466527 and 43746880534: the four screens took 4 to 5 hours on one runner.
+  test('runs one leg per screen, none cancelling a sibling, each named by its screen', () => {
     assert.deepEqual(LIVE_FONT_SCREENS, ['home', 'community', 'settings', 'composer'])
+    assert.deepEqual(job.strategy, {
+      'fail-fast': false,
+      matrix: { screen: ['home', 'community', 'settings', 'composer'] },
+    })
+    assert.equal(job.name, 'iOS live font scale (${{ matrix.screen }})')
+    assert.deepEqual(proof.env, { SCREEN: '${{ matrix.screen }}' })
+  })
+
+  test("runs the driver on the Release build of its leg's screen, and its exit decides the leg", () => {
     assert.equal(
       LIVE_FONT_PROOF,
-      'node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens home,community,settings,composer --out "$RUNNER_TEMP/live-font-ios"'
+      'node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens "$SCREEN" --out "$RUNNER_TEMP/live-font-ios"'
     )
     const lines = proof.run.split('\n').map((line) => line.trim())
     // The last command is the driver, so its status is the step's.
@@ -982,14 +995,20 @@ describe('the iOS live font-scale proof', () => {
       const runProof = (exit) =>
         spawnSync('/bin/bash', ['--noprofile', '--norc', '-e', '-c', proof.run], {
           encoding: 'utf8',
-          env: { PATH: bin, HOME: dir, RUNNER_TEMP: dir, DRIVER_EXIT: String(exit) },
+          env: {
+            PATH: bin,
+            HOME: dir,
+            RUNNER_TEMP: dir,
+            SCREEN: 'settings',
+            DRIVER_EXIT: String(exit),
+          },
         }).status
       assert.equal(runProof(0), 0)
       assert.equal(runProof(1), 1)
       const calls = fs.readFileSync(path.join(dir, 'calls'), 'utf8').trim().split('\n')
       assert.equal(
         calls[0],
-        `scripts/run-live-font-proof.mjs --platform ios --device SIM-UDID --build release --screens home,community,settings,composer --out ${dir}/live-font-ios`
+        `scripts/run-live-font-proof.mjs --platform ios --device SIM-UDID --build release --screens settings --out ${dir}/live-font-ios`
       )
     } finally {
       fs.rmSync(dir, { recursive: true, force: true })
@@ -998,7 +1017,7 @@ describe('the iOS live font-scale proof', () => {
 
   test('uploads the proof after its secret scan, on a pass or a failure, for a week', () => {
     assert.deepEqual(upload.with, {
-      name: 'ios-live-font-proof',
+      name: 'ios-live-font-proof-${{ matrix.screen }}',
       path: '${{ runner.temp }}/live-font-ios/',
       'retention-days': 7,
       'if-no-files-found': 'error',
@@ -1061,11 +1080,72 @@ describe('the iOS live font-scale proof', () => {
       },
     ],
     [
-      'a live font proof without the composer',
+      'a live font matrix without the composer',
+      /ios-live-font: one leg per screen/,
+      (live) => {
+        live.strategy.matrix.screen = live.strategy.matrix.screen.filter(
+          (screen) => screen !== 'composer'
+        )
+      },
+    ],
+    [
+      'live font legs that cancel their siblings',
+      /ios-live-font: one leg per screen/,
+      (live) => {
+        live.strategy['fail-fast'] = true
+      },
+    ],
+    [
+      'a live font matrix whose include adds a leg',
+      /ios-live-font: one leg per screen/,
+      (live) => {
+        live.strategy.matrix.include = [{ screen: 'home', extra: true }]
+      },
+    ],
+    [
+      'live font legs that all share one name',
+      /ios-live-font: one leg per screen/,
+      (live) => {
+        live.name = 'iOS live font scale'
+      },
+    ],
+    [
+      'a live font proof of every screen on each leg',
       /ios-live-font: ".*" does not execute: node scripts\/run-live-font-proof\.mjs/,
       (live) => {
         const row = step(live, (item) => item.id === 'live_font')
-        row.run = row.run.replace(',composer', '')
+        row.run = row.run.replace('"$SCREEN"', 'home,community,settings,composer')
+      },
+    ],
+    [
+      'a live font proof whose screen is spliced into the script',
+      /ios-live-font: the proof step must set exactly SCREEN/,
+      (live) => {
+        delete step(live, (item) => item.id === 'live_font').env
+      },
+    ],
+    [
+      "a live font proof whose screen is not the leg's",
+      /ios-live-font: the proof step must set exactly SCREEN/,
+      (live) => {
+        step(live, (item) => item.id === 'live_font').env.SCREEN = 'home'
+      },
+    ],
+    [
+      'a live font host evidence upload every leg names alike',
+      /ios-live-font: every upload must be named after its leg's screen/,
+      (live) => {
+        step(live, (item) =>
+          item.with?.name?.startsWith('ios-live-font-host')
+        ).with.name = 'ios-live-font-host'
+      },
+    ],
+    [
+      'a live font proof upload every leg names alike',
+      /ios-live-font: every upload must be named after its leg's screen/,
+      (live) => {
+        step(live, (item) => item.with?.name === LIVE_FONT_ARTIFACT.name).with.name =
+          'ios-live-font-proof'
       },
     ],
     [
@@ -1082,8 +1162,8 @@ describe('the iOS live font-scale proof', () => {
       (live) => {
         const row = step(live, (item) => item.id === 'live_font')
         row.run = row.run.replace(
-          'composer --out "$RUNNER_TEMP/live-font-ios"',
-          'composer --out "$RUNNER_TEMP/live-font-ios" || true'
+          '"$SCREEN" --out "$RUNNER_TEMP/live-font-ios"',
+          '"$SCREEN" --out "$RUNNER_TEMP/live-font-ios" || true'
         )
       },
     ],
@@ -1260,6 +1340,110 @@ describe('the iOS live font-scale proof', () => {
     rejected(title, expected, (jobs) => change(jobs[LIVE_FONT_JOB]))
 })
 
+// Story 6.15 AC3: the legs' proofs, merged. A skipped or killed leg has no report and fails it.
+describe('the iOS live font legs evidence', () => {
+  const job = source[J].jobs[LIVE_FONT_EVIDENCE_JOB]
+
+  test('runs after every leg on any result, outside the canary, on ubuntu', () => {
+    assert.ok(TEST_JOBS.includes(LIVE_FONT_EVIDENCE_JOB))
+    assert.ok(!MACOS_JOBS.includes(LIVE_FONT_EVIDENCE_JOB))
+    assert.equal(job['runs-on'], 'ubuntu-latest')
+    assert.equal(job.needs, LIVE_FONT_JOB)
+    assert.equal(job.if, '${{ always() && !inputs.ios26-canary }}')
+    assert.equal(job['timeout-minutes'], 5)
+  })
+
+  test("downloads every leg's proof and merges it with the legs' result", () => {
+    assert.deepEqual(
+      step(job, (row) => row.uses === 'actions/download-artifact@v4').with,
+      { pattern: 'ios-live-font-proof-*', path: '/tmp/ios-live-font' }
+    )
+    const merge = step(job, (row) => row.run?.includes('ios-live-font-legs.mjs merge'))
+    assert.deepEqual(merge.env, {
+      CC68_LIVE_FONT_RESULT: '${{ needs.ios-live-font.result }}',
+    })
+    assert.deepEqual(merge.run.split('\n').filter(Boolean), [
+      LIVE_FONT_MERGE,
+      LIVE_FONT_RESULT,
+    ])
+  })
+
+  for (const [title, expected, change] of [
+    [
+      'legs evidence that waits for nothing',
+      /ios-live-font-evidence: run after every ios-live-font leg/,
+      (evidence) => {
+        delete evidence.needs
+      },
+    ],
+    [
+      'legs evidence skipped when a leg fails',
+      /ios-live-font-evidence: run after every ios-live-font leg/,
+      (evidence) => {
+        evidence.if = '${{ !inputs.ios26-canary }}'
+      },
+    ],
+    [
+      'legs evidence under the canary',
+      /ios-live-font-evidence: run after every ios-live-font leg/,
+      (evidence) => {
+        evidence.if = 'always()'
+      },
+    ],
+    [
+      'legs evidence without the proofs',
+      /ios-live-font-evidence: download every leg's proof/,
+      (evidence) => {
+        evidence.steps = evidence.steps.filter(
+          (row) => row.uses !== 'actions/download-artifact@v4'
+        )
+      },
+    ],
+    [
+      'legs evidence downloading every artifact',
+      /ios-live-font-evidence: download only the shard reports or the live font legs' proofs/,
+      (evidence) => {
+        step(evidence, (row) => row.uses === 'actions/download-artifact@v4').with = {
+          path: '/tmp/ios-live-font',
+        }
+      },
+    ],
+    [
+      "legs evidence that ignores the legs' result",
+      /ios-live-font-evidence: ".*" does not execute: test "\$CC68_LIVE_FONT_RESULT" = success/,
+      (evidence) => {
+        const row = step(evidence, (item) => item.run?.includes('ios-live-font-legs.mjs'))
+        row.run = `${LIVE_FONT_MERGE}\n`
+      },
+    ],
+    [
+      "legs evidence without the legs' result",
+      /ios-live-font-evidence: download every leg's proof, then merge them with the legs' result/,
+      (evidence) => {
+        delete step(evidence, (item) => item.run?.includes('ios-live-font-legs.mjs')).env
+      },
+    ],
+    [
+      'legs evidence that never merges',
+      /ios-live-font-evidence: ".*" must exist once/,
+      (evidence) => {
+        evidence.steps = evidence.steps.filter(
+          (row) => !row.run?.includes('ios-live-font-legs.mjs')
+        )
+      },
+    ],
+    [
+      'legs evidence whose merge may fail quietly',
+      /ios-live-font-evidence: ".*" must exist once/,
+      (evidence) => {
+        const row = step(evidence, (item) => item.run?.includes('ios-live-font-legs.mjs'))
+        row.run = row.run.replace('/tmp/ios-live-font\n', '/tmp/ios-live-font || true\n')
+      },
+    ],
+  ])
+    rejected(title, expected, (jobs) => change(jobs[LIVE_FONT_EVIDENCE_JOB]))
+})
+
 // IOS-R2-04 at the shell boundary: each mandatory step, run as GitHub runs it (bash -e) with
 // every command it calls stubbed, passes when its checks pass and fails when any one fails.
 describe('mandatory checks fail their step', () => {
@@ -1309,6 +1493,8 @@ describe('mandatory checks fail their step', () => {
       'node',
       'native-ios-shards.mjs merge',
     ],
+    [LIVE_FONT_MERGE]: ['node', 'ios-live-font-legs.mjs merge'],
+    [LIVE_FONT_RESULT]: [null, null, { CC68_LIVE_FONT_RESULT: 'failure' }],
     'tar -C "$(dirname "$APP")" -cf "$RUNNER_TEMP/ios-client/client.tar" "$(basename "$APP")"':
       ['tar', '-cf'],
     'tar -C "$(dirname "$APP")" -xf "$RUNNER_TEMP/ios-client/client.tar"': ['tar', '-xf'],
@@ -1375,6 +1561,7 @@ describe('mandatory checks fail their step', () => {
           GITHUB_ENV: path.join(dir, 'env'),
           GITHUB_OUTPUT: path.join(dir, 'output'),
           CC68_SHARD_RESULT: 'success',
+          CC68_LIVE_FONT_RESULT: 'success',
           APP: dir,
           ...env,
         },
