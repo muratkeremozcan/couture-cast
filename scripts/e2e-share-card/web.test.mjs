@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
-import { shareCardWebCommand } from './web.mjs'
+import { shareCardWebCommand, waitForAuthHarness } from './web.mjs'
 
 function owned(envFiles = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-web-command-'))
@@ -94,4 +94,66 @@ test('a missing or development subcommand is refused before reading the runtime'
         }),
       /usage: node scripts\/e2e-share-card\/web\.mjs build\|start/
     )
+})
+
+// Dispatch 43687651012 browser-acceptance: `web.mjs build` read auth-harness.json 43 s after the
+// owned auth proxy started in the background, before the proxy wrote it (ENOENT). The build now
+// waits for a whole harness file, and names an auth service that already exited.
+test('the web build waits for the owned auth harness, bounded, and names a dead auth service', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-web-auth-wait-'))
+  try {
+    const harness = path.join(root, 'auth-harness.json')
+    const exitFile = path.join(root, 'cc68-auth.exit')
+    let clock = 0
+    const timing = {
+      now: () => clock,
+      delay: async (ms) => {
+        clock += ms
+      },
+    }
+    let polls = 0
+    const appearing = {
+      ...timing,
+      delay: async (ms) => {
+        clock += ms
+        polls += 1
+        // A half-written file first, then the whole one.
+        if (polls === 2) fs.writeFileSync(harness, '{"proxyUrl":')
+        if (polls === 4)
+          fs.writeFileSync(
+            harness,
+            JSON.stringify({ proxyUrl: 'http://127.0.0.1:53068' })
+          )
+      },
+    }
+    assert.deepEqual(
+      await waitForAuthHarness({
+        directory: root,
+        exitFile,
+        timeoutMs: 60_000,
+        ...appearing,
+      }),
+      { proxyUrl: 'http://127.0.0.1:53068' }
+    )
+    assert.equal(polls, 4)
+
+    fs.rmSync(harness)
+    clock = 0
+    await assert.rejects(
+      waitForAuthHarness({ directory: root, exitFile, timeoutMs: 60_000, ...timing }),
+      { message: 'owned_auth_harness_timeout: no auth-harness.json after 60000 ms' }
+    )
+
+    fs.writeFileSync(exitFile, '1\n')
+    clock = 0
+    await assert.rejects(
+      waitForAuthHarness({ directory: root, exitFile, timeoutMs: 60_000, ...timing }),
+      {
+        message: 'owned_auth_harness_exited: the owned auth service exited with status 1',
+      }
+    )
+    assert.equal(clock, 0)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
 })

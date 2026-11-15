@@ -62,10 +62,53 @@ export function shareCardWebCommand(command, { root, directory, env }) {
   }
 }
 
+/**
+ * The owned auth harness, once the auth proxy (started in the background, scripts/e2e-share-card/
+ * auth.mjs) has written all of it: a build that read it first failed ENOENT (dispatch
+ * 43687651012 browser-acceptance). Fails as owned_auth_harness_exited when the service already
+ * recorded its exit, and as owned_auth_harness_timeout after `timeoutMs`.
+ */
+export async function waitForAuthHarness({
+  directory,
+  exitFile = null,
+  timeoutMs = 120_000,
+  now = Date.now,
+  delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+}) {
+  const started = now()
+  for (;;) {
+    if (exitFile && fs.existsSync(exitFile))
+      throw new Error(
+        `owned_auth_harness_exited: the owned auth service exited with status ${fs.readFileSync(exitFile, 'utf8').trim()}`
+      )
+    try {
+      const harness = JSON.parse(
+        fs.readFileSync(path.join(directory, 'auth-harness.json'), 'utf8')
+      )
+      if (typeof harness?.proxyUrl === 'string') return harness
+    } catch {
+      // Not written yet, or written in part: the proxy writes it once it listens.
+    }
+    if (now() - started >= timeoutMs)
+      throw new Error(
+        `owned_auth_harness_timeout: no auth-harness.json after ${timeoutMs} ms`
+      )
+    await delay(500)
+  }
+}
+
 if (
   process.argv[1] &&
   pathToFileURL(fs.realpathSync(process.argv[1])).href === import.meta.url
 ) {
+  await waitForAuthHarness({
+    directory: path.resolve(
+      process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
+    ),
+    // The CI job records each owned service's exit there (pr-share-card-native.yml); a local
+    // /tmp may hold one from an earlier run.
+    exitFile: process.env.GITHUB_ACTIONS === 'true' ? '/tmp/cc68-auth.exit' : null,
+  })
   const { program, args, cwd, env } = shareCardWebCommand(process.argv[2], {
     root,
     directory: path.resolve(
