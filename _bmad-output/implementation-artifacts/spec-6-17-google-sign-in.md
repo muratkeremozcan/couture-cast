@@ -591,5 +591,14 @@ real-Google run. iOS Maestro and VoiceOver run nightly and on dispatch.
     Google's access token (now stripped on both clients), analytics differs by client and
     `profile_completed` carries age, three processors were missing, a failed under-13 deletion
     falls to the sweep, and the mobile apps sell no subscription yet.
+  - Antigravity round (2f59e42e..HEAD), all fixed in the PR: the door now rides the mobile round
+    trip as on web (redirectTo and the marker, the browser session still watching the bare
+    callback URL), so Cancel, refusals and the cold callback return to the page that started,
+    and a sign-in on a root sign-in screen goes Home; the web resume reruns on every route
+    change, and the mobile resume asks the server status like web, so an identity stored
+    without the marker resumes and an email code clears the marker; an under-13 refusal clears
+    the stored guest preview whichever door started, with the mobile write awaited before
+    Continue; the privacy text now names the account id server events carry, a failed Cancel
+    delete falling to the sweep, the whole 13 to 15 lock and the coordinates OpenWeather gets.
   - Out of scope, existing behavior: unauthenticated email signup lets anyone pre-register an
     address with a birthdate of their choosing; the address owner then signs in to that row.

@@ -18,6 +18,7 @@ const sdk = vi.hoisted(() => ({
   createOptions: [] as unknown[],
   signInWithOAuth: vi.fn(),
   exchangeCodeForSession: vi.fn(),
+  verifyOtp: vi.fn(),
   signOut: vi.fn(),
   openAuthSessionAsync: vi.fn(),
   createURL: vi.fn(),
@@ -74,6 +75,7 @@ vi.mock('@supabase/supabase-js', () => ({
         stopAutoRefresh: vi.fn().mockResolvedValue(undefined),
         signInWithOAuth: sdk.signInWithOAuth,
         exchangeCodeForSession: sdk.exchangeCodeForSession,
+        verifyOtp: sdk.verifyOtp,
         signOut: sdk.signOut,
       },
     }
@@ -217,11 +219,12 @@ describe('U-PKCE-CONFIG and U-START-PARAMS (native)', () => {
 
   // Android's Custom Tabs polyfill reports success only for a URL that starts with the return
   // URL; Auth puts `code` first, so a return URL carrying `?from=preview` read as a dismissal.
-  it('completes a preview conversion whose callback carries extra query after the return URL', async () => {
+  // The door (Antigravity P1-1) rides the same query, so the return URL stays bare for it too.
+  it('completes a signup-door preview conversion whose callback carries extra query after the return URL', async () => {
     answers('/api/v1/user/profile', unauthorized)
     answers('/api/v1/auth/signup/federated', json({ status: 'needs_birthdate' }))
     sdk.openAuthSessionAsync.mockImplementation((_url: string, returnUrl: string) => {
-      const callback = `${REDIRECT}?code=preview-code&from=preview`
+      const callback = `${REDIRECT}?code=preview-code&from=preview&door=signup`
       return Promise.resolve(
         callback.startsWith(returnUrl)
           ? { type: 'success', url: callback }
@@ -229,11 +232,32 @@ describe('U-PKCE-CONFIG and U-START-PARAMS (native)', () => {
       )
     })
     const { session } = await load()
-    await expect(session.startNativeGoogleSignIn({ from: 'preview' })).resolves.toEqual({
-      kind: 'no_account',
-    })
+    await expect(
+      session.startNativeGoogleSignIn({ from: 'preview', door: 'signup' })
+    ).resolves.toEqual({ kind: 'no_account' })
+    const { redirectTo } = (
+      sdk.signInWithOAuth.mock.calls[0]![0] as { options: { redirectTo: string } }
+    ).options
+    expect(redirectTo).toBe(`${REDIRECT}?from=preview&door=signup`)
+    expect(sdk.openAuthSessionAsync.mock.calls[0]![1]).toBe(REDIRECT)
     expect(sdk.exchangeCodeForSession.mock.calls).toEqual([['preview-code']])
-    expect(sdk.secure.get(FINISH_MARKER)).toContain('preview')
+    expect(JSON.parse(sdk.secure.get(FINISH_MARKER) ?? 'null')).toEqual({
+      from: 'preview',
+      door: 'signup',
+    })
+    await expect(session.federatedFinishResumeHref()).resolves.toBe(
+      '/signup-finish?door=signup&from=preview'
+    )
+  })
+
+  it('leaves the sign-in door out of the redirect', async () => {
+    answers('/api/v1/user/profile', json(profile('app-native-member')))
+    const { session } = await load()
+    await session.startNativeGoogleSignIn({ door: 'signin' })
+    const { redirectTo } = (
+      sdk.signInWithOAuth.mock.calls[0]![0] as { options: { redirectTo: string } }
+    ).options
+    expect(redirectTo).toBe(REDIRECT)
   })
 
   it('holds the in-flight flag only while the browser session is open', async () => {
@@ -539,5 +563,53 @@ describe('sign-off additions: switch, finish marker and callback fragment', () =
       session.completeNativeOAuth(`${REDIRECT}?from=preview#error=access_denied`)
     ).resolves.toEqual({ kind: 'cancelled' })
     expect(sdk.exchangeCodeForSession).not.toHaveBeenCalled()
+  })
+})
+
+// Antigravity P1-2: as on web, the server's status decides whether a launch resumes the finish
+// step; the marker carries only the preview hint and the door.
+describe('resume decided by the server status', () => {
+  it('M-FAIL-SLOW-API then relaunch: an identity stored without the marker resumes', async () => {
+    answers('/api/v1/user/profile', json({ message: 'unavailable' }, 503))
+    answers('/api/v1/auth/signup/federated', json({ status: 'needs_birthdate' }))
+    const { session } = await load()
+    await expect(
+      session.completeNativeOAuth(`${REDIRECT}?code=slow-resume`)
+    ).resolves.toEqual({ kind: 'unavailable' })
+    expect(sdk.secure.has(FINISH_MARKER)).toBe(false)
+    await expect(session.federatedFinishResumeHref()).resolves.toBe('/signup-finish')
+  })
+
+  it('a complete status never resumes and clears a stale marker', async () => {
+    const { session } = await load()
+    await waitingIdentity(session, 'stale-marker', json({ status: 'complete' }))
+    await expect(session.federatedFinishResumeHref()).resolves.toBeNull()
+    expect(sdk.secure.has(FINISH_MARKER)).toBe(false)
+  })
+
+  it('no stored identity never resumes and asks the server nothing', async () => {
+    const status = answers(
+      '/api/v1/auth/signup/federated',
+      json({ status: 'needs_birthdate' })
+    )
+    const { session } = await load()
+    await expect(session.federatedFinishResumeHref()).resolves.toBeNull()
+    expect(status).toEqual([])
+  })
+
+  it('an email code verified over a waiting Google identity clears its marker', async () => {
+    const { session } = await load()
+    await waitingIdentity(session, 'waiting-then-otp')
+    sdk.verifyOtp.mockImplementation(() => {
+      sdk.current = {
+        access_token: 'signed-native-otp',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: 'supabase-native-otp', email: 'otp@synthetic.test' },
+      }
+      return Promise.resolve({ data: { session: sdk.current }, error: null })
+    })
+    answers('/api/v1/user/profile', json(profile('app-native-otp')))
+    await session.verifyNativeOtp('otp@synthetic.test', '123456')
+    expect(sdk.secure.has(FINISH_MARKER)).toBe(false)
   })
 })

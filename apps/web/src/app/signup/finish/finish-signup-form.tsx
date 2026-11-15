@@ -101,8 +101,9 @@ export function FinishSignupForm({
           await continueToApp()
           return
         case 'underage':
-          // The age refusal outranks the preview's self-reported gate (6.16 D2).
-          if (fromPreview) webGuestPreviewStore().clear()
+          // The age refusal outranks the preview's self-reported gate (6.16 D2), and any guest
+          // preview stored on this device goes with it, whichever door started (D3).
+          webGuestPreviewStore().clear()
           setPhase({ kind: 'underage' })
           return
         case 'guardian_minor':

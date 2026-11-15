@@ -8,6 +8,7 @@ import {
   GOOGLE_BUTTON_THEME,
   GOOGLE_G_MARK_PATHS,
   GOOGLE_G_MARK_VIEWBOX,
+  type SignInDoor,
 } from '@couture/utils'
 import { useSchemeColors } from '@/components/themed'
 import type { NativeOAuthOutcome } from '@/src/lib/native-session'
@@ -15,18 +16,24 @@ import type { NativeOAuthOutcome } from '@/src/lib/native-session'
 type GoogleSignInButtonProps = {
   /** Carried through the round trip; only `preview` survives it. */
   from?: string | null
+  /** D5: the page that started the round trip; failures and Cancel return there. */
+  door?: SignInDoor
   /** Google's neutral button for the OS scheme unless a screen asks for one. */
   theme?: 'light' | 'dark'
   onOutcome: (outcome: NativeOAuthOutcome) => void
   /** Injected by tests; the screen uses the real round trip. */
-  start?: (options: { from?: string | null }) => Promise<NativeOAuthOutcome>
+  start?: (options: {
+    from?: string | null
+    door?: SignInDoor
+  }) => Promise<NativeOAuthOutcome>
 }
 
-const defaultStart = async (options: { from?: string | null }) =>
+const defaultStart = async (options: { from?: string | null; door?: SignInDoor }) =>
   (await import('../../lib/native-session.js')).startNativeGoogleSignIn(options)
 
 export function GoogleSignInButton({
   from = null,
+  door = 'signin',
   theme,
   onOutcome,
   start = defaultStart,
@@ -45,7 +52,7 @@ export function GoogleSignInButton({
       disabled={opening}
       onPress={() => {
         setOpening(true)
-        void start({ from })
+        void start({ from, door })
           .catch((): NativeOAuthOutcome => ({ kind: 'unavailable' }))
           .then((outcome) => {
             setOpening(false)
@@ -108,6 +115,7 @@ export function SignupGoogleEntry({
     <>
       <GoogleSignInButton
         from={fromPreview ? 'preview' : null}
+        door="signup"
         onOutcome={(outcome) => {
           if (outcome.kind === 'member' || outcome.kind === 'no_account')
             onSignedIn(outcome.kind)

@@ -20,6 +20,10 @@ vi.mock(
   () => import('../../../../../packages/api-client/src/contracts/http/index')
 )
 
+// The root layout mounts the bridge once; Next.js reports each client-side route change here.
+const nav = vi.hoisted(() => ({ pathname: '/' }))
+vi.mock('next/navigation', () => ({ usePathname: () => nav.pathname }))
+
 const sdk = vi.hoisted(() => ({
   session: null as Session | null,
   createClient: vi.fn(),
@@ -86,6 +90,7 @@ const member = json({
 })
 
 function at(path: string) {
+  nav.pathname = path
   window.history.replaceState(null, '', path)
   replace = vi.fn()
   Object.defineProperty(window, 'location', {
@@ -113,13 +118,18 @@ function at(path: string) {
 }
 
 /** Mounts the bridge and lets the session start, the profile check and the status settle. */
-async function mountBridge() {
-  const { SessionBridge } = await import('./session-bridge')
-  render(<SessionBridge />)
+async function settle() {
   for (let turn = 0; turn < 20; turn++)
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 5))
     })
+}
+
+async function mountBridge() {
+  const { SessionBridge } = await import('./session-bridge')
+  const view = render(<SessionBridge />)
+  await settle()
+  return { rerender: () => view.rerender(<SessionBridge />) }
 }
 
 beforeEach(() => {
@@ -204,4 +214,20 @@ describe('W-RESUME: a stored identity without an account returns to the finish s
       expect(replace).not.toHaveBeenCalled()
     }
   )
+
+  // Antigravity P1-2: a Link from a legal page is a client-side navigation, which never
+  // remounts the root layout's bridge; the resume must run again on the new route.
+  it('resumes after a client-side navigation out of an exempt legal page', async () => {
+    at('/privacy')
+    const seen = server(unauthorized, needsBirthdate)
+    const bridge = await mountBridge()
+    expect(replace).not.toHaveBeenCalled()
+    const before = seen.status
+    window.history.replaceState(null, '', '/')
+    nav.pathname = '/'
+    bridge.rerender()
+    await settle()
+    expect(seen.status).toBeGreaterThan(before)
+    expect(replace.mock.calls).toEqual([['/signup/finish']])
+  })
 })

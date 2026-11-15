@@ -22,6 +22,11 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
   cancelWebFederatedSignup: session.cancel,
   finishWebFederatedSignup: session.finish,
 }))
+const preview = vi.hoisted(() => ({ clear: vi.fn() }))
+vi.mock('../../../lib/guest-preview', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  webGuestPreviewStore: () => ({ clear: preview.clear }),
+}))
 import { FinishSignupForm } from './finish-signup-form'
 
 const strings = getFederatedSignInStrings('en-US')
@@ -139,5 +144,17 @@ describe('E-CANCEL: Cancel deletes the waiting identity, then leaves', () => {
     expect(replace).not.toHaveBeenCalled()
     settle()
     await waitFor(() => expect(replace).toHaveBeenCalledWith(destination))
+  })
+})
+
+// Antigravity P2-1, D3: an age refusal clears any guest preview stored on this device, whichever
+// door started the round trip, not only a conversion that carried from=preview.
+describe('W-UNDERAGE: the refusal clears stored guest preview state', () => {
+  it.each([{ fromPreview: false }, { fromPreview: true }])('%j', async (props) => {
+    session.finish.mockResolvedValue({ kind: 'underage' })
+    const input = await renderForm(props)
+    fireEvent.change(input, { target: { value: birthdate(10) } })
+    fireEvent.click(screen.getByRole('button', { name: strings.create }))
+    await waitFor(() => expect(preview.clear).toHaveBeenCalledTimes(1))
   })
 })

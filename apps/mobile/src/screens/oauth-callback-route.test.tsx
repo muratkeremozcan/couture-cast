@@ -122,4 +122,22 @@ describe('M-CALLBACK-COLD: the callback route after a cold start', () => {
       })
     ).toEqual({ pathname: '/signin', params: { google: 'refused' } })
   })
+
+  // Antigravity P1-1, D5: a round trip started on /signup returns to /signup.
+  it('carries the signup door to the finish step and back to /signup on a failure', async () => {
+    flow.complete.mockResolvedValue({ kind: 'no_account' })
+    expect(await cold({ code: 'cold-door', door: 'signup', from: 'preview' })).toEqual({
+      pathname: '/signup-finish',
+      params: { door: 'signup', from: 'preview' },
+    })
+    expect(flow.complete.mock.calls).toEqual([
+      ['couturecast://auth/callback?code=cold-door&from=preview&door=signup'],
+    ])
+    flow.router.replace.mockReset()
+    flow.complete.mockResolvedValue({ kind: 'cancelled' })
+    expect(await cold({ error: 'access_denied', door: 'signup' })).toEqual({
+      pathname: '/signup',
+      params: { google: 'cancelled' },
+    })
+  })
 })

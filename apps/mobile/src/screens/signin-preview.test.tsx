@@ -19,7 +19,12 @@ vi.mock('../lib/native-session', () => ({
 }))
 const route = vi.hoisted(() => ({
   params: {} as Record<string, string>,
-  router: { back: vi.fn(), replace: vi.fn(), push: vi.fn() },
+  router: {
+    back: vi.fn(),
+    replace: vi.fn(),
+    push: vi.fn(),
+    canGoBack: vi.fn(() => true),
+  },
 }))
 vi.mock('expo-router', () => ({
   router: route.router,

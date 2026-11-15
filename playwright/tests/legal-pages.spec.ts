@@ -47,6 +47,10 @@ test.describe('Story 6.17 legal pages', () => {
       await expect(google).toContainText(
         'You leave without finishing: once it is more than a day old, our daily cleanup deletes it.'
       )
+      // Antigravity P2-2: a failed DELETE on Cancel falls to the sweep too.
+      await expect(google).toContainText(
+        'Cancel on the birthdate step: we delete it right away, or, if that attempt fails, our daily cleanup deletes it once it is more than a day old.'
+      )
     })
 
     test('the Privacy Policy describes analytics as each client sends it', async ({
@@ -59,7 +63,30 @@ test.describe('Story 6.17 legal pages', () => {
       )
       // profile_completed carries age and guardian_consent_required (telemetry.service).
       await expect(analytics).toContainText(
-        'also carries your age and whether guardian consent is required'
+        'also carries your age at signup and whether guardian consent is required'
+      )
+      // Antigravity P2-2: some server events send the account id itself, so nothing here may
+      // call every event pseudonymous.
+      await expect(analytics).toContainText(
+        'Events our servers send identify your account by its internal account id (a random id, not your name or email address) or by a keyed hash of that id.'
+      )
+      await expect(analytics).not.toContainText('pseudonymous')
+    })
+
+    test('the Privacy Policy states the whole 13 to 15 lock and what OpenWeather receives', async ({
+      page,
+    }) => {
+      await page.goto('/privacy')
+      // JwtAuthGuard refuses a pending teen on every signed-in endpoint, not only wardrobe.
+      await expect(
+        page.getByRole('region', { name: 'Guardian consent for ages 13 to 15' })
+      ).toContainText(
+        'the teen account can invite a guardian and nothing more: wardrobe, community, saved places, and every other signed-in feature stay locked.'
+      )
+      await expect(
+        page.getByRole('region', { name: 'Who processes your information' })
+      ).toContainText(
+        'It receives the place or city you enter and the coordinates of the places you get forecasts for.'
       )
     })
 

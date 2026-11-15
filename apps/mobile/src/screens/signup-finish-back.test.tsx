@@ -135,13 +135,19 @@ describe('Android Back on the finish step', () => {
     expect(flow.router.replace).toHaveBeenCalledWith('/signin')
   })
 
-  it('from the preview, Back cancels and returns to the preview', async () => {
-    flow.params = { from: 'preview' }
+  // D5 (the web TEA ruling, Antigravity P1-1): Back returns to the door that started the round
+  // trip, which keeps the preview hint and its Back to preview link.
+  it.each([
+    [{ from: 'preview' }, '/signin?from=preview'],
+    [{ door: 'signup' }, '/signup'],
+    [{ door: 'signup', from: 'preview' }, '/signup?from=preview'],
+  ])('Back with %j cancels and returns to %s', async (params, destination) => {
+    flow.params = params
     await openFinishStep()
     act(() => {
       expect(back.press()).toBe(true)
     })
-    await waitFor(() => expect(flow.router.replace).toHaveBeenCalledWith('/preview'))
+    await waitFor(() => expect(flow.router.replace).toHaveBeenCalledWith(destination))
     expect(flow.cancel).toHaveBeenCalledTimes(1)
   })
 

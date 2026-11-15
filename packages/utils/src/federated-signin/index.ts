@@ -11,7 +11,7 @@ export {
   GOOGLE_G_MARK_PATHS,
   GOOGLE_G_MARK_VIEWBOX,
 } from './google-mark'
-export { finishStepHref, parseSignInDoor, type SignInDoor } from './door'
+export { finishStepHref, parseSignInDoor, signInDoorHref, type SignInDoor } from './door'
 export {
   stripProviderTokens,
   withoutProviderTokens,

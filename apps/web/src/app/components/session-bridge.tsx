@@ -1,5 +1,6 @@
 'use client'
-import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
 import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-session'
 
@@ -7,8 +8,9 @@ import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-sess
 const FINISH_EXEMPT_PATHS = ['/signup/finish', '/auth/callback', '/privacy', '/terms']
 
 /**
- * Story 6.17 D3: a stored identity with no account (a reload, a closed tab, a new tab) goes
- * back to the finish step. The server's status decides; nothing branches on the provider.
+ * Story 6.17 D3: a stored identity with no account (a reload, a closed tab, a new tab, or a
+ * client-side link out of a legal page) goes back to the finish step. The server's status
+ * decides; nothing branches on the provider.
  */
 function resumeFederatedFinish() {
   if (FINISH_EXEMPT_PATHS.includes(window.location.pathname)) return
@@ -20,6 +22,13 @@ function resumeFederatedFinish() {
     .catch(() => undefined)
 }
 export function SessionBridge() {
+  // The bridge mounts once in the root layout, so a client-side navigation (a Link from
+  // /privacy to /) never remounts it; the resume runs again on every route change instead.
+  const pathname = usePathname()
+  const [sessionReady, setSessionReady] = useState(false)
+  useEffect(() => {
+    if (sessionReady) resumeFederatedFinish()
+  }, [pathname, sessionReady])
   useEffect(() => {
     const stopLanguageSync = syncDocumentLanguage()
     activateBrowserLocale()
@@ -30,7 +39,7 @@ export function SessionBridge() {
         if (stopped) stop()
         else {
           cleanup = stop
-          resumeFederatedFinish()
+          setSessionReady(true)
         }
       })
       .catch(() => undefined)

@@ -11,6 +11,7 @@ import {
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
+  getFederatedSignInStrings,
   getGuestPreviewStrings,
   INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
@@ -30,6 +31,8 @@ type SignupScreenProps = {
   onPreviewNavigate?: (href: SignupPreviewHref) => void
   /** Story 6.17 D2: a Google round trip that signed someone in or needs the finish step. */
   onGoogleSignedIn?: (outcome: 'member' | 'no_account') => void
+  /** Story 6.17 D5: a round trip that ended back on this door, named by the cold callback. */
+  googleOutcome?: 'cancelled' | 'unavailable' | 'refused' | null
 }
 
 type SignupPreviewHref = '/preview' | '/signin?from=preview'
@@ -40,6 +43,7 @@ export function SignupScreen({
   fromPreview = false,
   onPreviewNavigate = () => undefined,
   onGoogleSignedIn = () => undefined,
+  googleOutcome = null,
 }: SignupScreenProps) {
   const styles = useStyles()
   const { announce } = useAccessibilityAnnouncer()
@@ -51,7 +55,9 @@ export function SignupScreen({
   const [guardianEmail, setGuardianEmail] = useState('')
   const [consentLevel, setConsentLevel] =
     useState<GuardianInvitationInput['consentLevel']>('read_only')
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(() =>
+    googleOutcome ? getFederatedSignInStrings(i18n.language)[googleOutcome] : null
+  )
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [pendingTeenId, setPendingTeenId] = useState<string | null>(null)

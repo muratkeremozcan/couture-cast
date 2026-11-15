@@ -68,7 +68,9 @@ vi.mock('expo-localization', () => ({
   getCalendars: () => [{ timeZone: 'America/Chicago' }],
   getLocales: () => [{ languageTag: 'en-US' }],
 }))
+import { createGuestPreviewStore, SAMPLE_CATALOG } from '@couture/utils'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
+import { setMobileGuestPreviewStoreForTests } from '@/src/lib/guest-preview-store'
 import SignupFinishRoute from '../../app/signup-finish'
 
 async function submit(birthdate: string) {
@@ -176,4 +178,51 @@ describe('finish step form', () => {
       getComputedStyle(screen.getByTestId('finish-signup-inline-message')).color
     ).not.toBe(errorColor)
   })
+})
+
+// Antigravity P2-1, D3: an age refusal clears any guest preview stored on this device, whichever
+// door started the round trip, and Continue leaves only once that removal is written.
+describe('under-13 refusal and the stored guest preview', () => {
+  it.each<Record<string, string>>([{}, { from: 'preview' }])(
+    'clears it with params %j before Continue',
+    async (params) => {
+      let value: string | null = null
+      let finishRemove: () => void = () => undefined
+      const adapter = {
+        read: () => Promise.resolve(value),
+        write: (text: string) => {
+          value = text
+          return Promise.resolve()
+        },
+        remove: () =>
+          new Promise<void>((resolve) => {
+            finishRemove = () => {
+              value = null
+              resolve()
+            }
+          }),
+      }
+      const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
+      setMobileGuestPreviewStoreForTests(store)
+      store.start()
+      store.update((state) => ({
+        ...state,
+        conversion: { intent: 'guest-preview-carryover' },
+      }))
+      await store.flush()
+      expect(value).not.toBeNull()
+
+      flow.params = params
+      flow.finish.mockResolvedValue({ kind: 'underage' })
+      await submit('2016-05-17')
+      await screen.findByTestId('finish-signup-outcome')
+      await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(flow.router.replace).not.toHaveBeenCalled()
+      finishRemove()
+      await waitFor(() => expect(flow.router.replace).toHaveBeenCalledWith('/'))
+      expect(value).toBeNull()
+      setMobileGuestPreviewStoreForTests(undefined)
+    }
+  )
 })

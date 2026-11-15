@@ -28,7 +28,12 @@ vi.mock('../lib/native-session', () => ({
 }))
 const route = vi.hoisted(() => ({
   params: {} as Record<string, string>,
-  router: { back: vi.fn(), replace: vi.fn(), push: vi.fn() },
+  router: {
+    back: vi.fn(),
+    replace: vi.fn(),
+    push: vi.fn(),
+    canGoBack: vi.fn(() => true),
+  },
 }))
 vi.mock('expo-router', () => ({
   router: route.router,
@@ -88,6 +93,7 @@ beforeEach(() => {
   auth.google.mockReset().mockResolvedValue({ kind: 'member' })
   route.params = {}
   route.router.back.mockReset()
+  route.router.canGoBack.mockReset().mockReturnValue(true)
   route.router.replace.mockReset()
   route.router.push.mockReset()
 })
@@ -101,7 +107,7 @@ describe('Google on the mobile sign-in door', () => {
     await waitFor(() =>
       expect(route.router.replace).toHaveBeenCalledWith('/preview-continue')
     )
-    expect(auth.google).toHaveBeenCalledWith({ from: 'preview' })
+    expect(auth.google).toHaveBeenCalledWith({ from: 'preview', door: 'signin' })
     expect(route.router.back).not.toHaveBeenCalled()
     expect(adapter.value()).not.toBeNull()
   })
@@ -110,9 +116,18 @@ describe('Google on the mobile sign-in door', () => {
     const adapter = await seed(true)
     await continueWithGoogle()
     await waitFor(() => expect(route.router.back).toHaveBeenCalled())
-    expect(auth.google).toHaveBeenCalledWith({ from: null })
+    expect(auth.google).toHaveBeenCalledWith({ from: null, door: 'signin' })
     expect(route.router.replace).not.toHaveBeenCalled()
     expect(adapter.value()).toBeNull()
+  })
+
+  // Antigravity P1-1: a cold callback replaces into /signin, so sign-in can be the stack's root.
+  it('a member signed in on a root sign-in screen goes Home instead of back', async () => {
+    await seed(false)
+    route.router.canGoBack.mockReturnValue(false)
+    await continueWithGoogle()
+    await waitFor(() => expect(route.router.replace).toHaveBeenCalledWith('/'))
+    expect(route.router.back).not.toHaveBeenCalled()
   })
 
   it('L-G-NEW: no account goes to the finish step carrying from=preview', async () => {

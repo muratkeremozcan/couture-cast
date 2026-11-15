@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { View, Text, TextInput, Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { router, useLocalSearchParams } from 'expo-router'
+import { router, useLocalSearchParams, type Href } from 'expo-router'
 import {
+  finishStepHref,
   getFederatedSignInStrings,
   getGuestPreviewStrings,
   parsePreviewFrom,
@@ -51,16 +52,25 @@ export default function SignInScreen() {
   useEffect(() => {
     if (googleMessage) announce('error', googleMessage)
   }, [announce, googleMessage])
+  // A signed-in member returns to the screen that opened sign-in. Sign-in can also be the
+  // stack's root (a cold OAuth callback replaced into it), where there is nothing to go
+  // back to, so Home takes its place.
+  const leaveSignedIn = async () => {
+    if (await continuesToPreviewReview(fromPreview)) router.replace('/preview-continue')
+    else if (router.canGoBack()) router.back()
+    else router.replace('/')
+  }
   // Story 6.17 D2, D6: Google follows the same destination rule as the email code.
   const onGoogleOutcome = async (outcome: NativeOAuthOutcome) => {
     setGoogleMessage(null)
     if (outcome.kind === 'member') {
-      if (await continuesToPreviewReview(fromPreview)) router.replace('/preview-continue')
-      else router.back()
+      await leaveSignedIn()
       return
     }
     if (outcome.kind === 'no_account') {
-      router.replace(fromPreview ? '/signup-finish?from=preview' : '/signup-finish')
+      router.replace(
+        finishStepHref(fromPreview ? 'preview' : null, 'signin', '/signup-finish') as Href
+      )
       return
     }
     setGoogleMessage(googleStrings[outcome.kind])
@@ -72,9 +82,7 @@ export default function SignInScreen() {
         traceShareCardOpener('signin-verify-press', code.length)
         await verifyNativeOtp(email, code)
         traceShareCardOpener('signin-verify-ok')
-        if (await continuesToPreviewReview(fromPreview))
-          router.replace('/preview-continue')
-        else router.back()
+        await leaveSignedIn()
       } else {
         await requestNativeOtp(email)
         setSent(true)

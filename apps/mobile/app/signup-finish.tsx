@@ -1,24 +1,31 @@
 // Story 6.17 D3: route for the Google finish step.
-import { useCallback } from 'react'
-import { router, useLocalSearchParams, useNavigation } from 'expo-router'
-import { parsePreviewFrom } from '@couture/utils'
+import { useCallback, useRef } from 'react'
+import { router, useLocalSearchParams, useNavigation, type Href } from 'expo-router'
+import { parsePreviewFrom, parseSignInDoor, signInDoorHref } from '@couture/utils'
 import { FinishSignupScreen } from '@/src/features/signup/finish-signup-screen'
 import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
 import { continuesToPreviewReview } from '@/src/lib/post-signin-destination'
 
 export default function SignupFinishRoute() {
-  const { from } = useLocalSearchParams<{ from?: string }>()
+  const { from, door } = useLocalSearchParams<{ from?: string; door?: string }>()
   const fromPreview = parsePreviewFrom(from) !== null
+  // D5: Cancel and refusals return to the page that started the round trip.
+  const doorHref = signInDoorHref(parseSignInDoor(door), { fromPreview }) as Href
   const navigation = useNavigation()
   const setTitle = useCallback(
     (title: string) => navigation.setOptions({ title }),
     [navigation]
   )
+  const clearing = useRef<Promise<void>>(Promise.resolve())
   return (
     <FinishSignupScreen
       onTitleChange={setTitle}
       onUnderage={() => {
-        if (fromPreview) mobileGuestPreviewStore().clear()
+        // D3: an age refusal clears any guest preview stored on this device, whichever door
+        // started, and the write lands before Continue leaves the screen.
+        const store = mobileGuestPreviewStore()
+        store.clear()
+        clearing.current = store.flush().catch(() => undefined)
       }}
       onExit={(exit) => {
         if (exit === 'continue') {
@@ -27,10 +34,8 @@ export default function SignupFinishRoute() {
           )
           return
         }
-        if (exit === 'home') router.replace('/')
-        else if (exit === 'cancelled')
-          router.replace(fromPreview ? '/preview' : '/signin')
-        else router.replace(fromPreview ? '/signin?from=preview' : '/signin')
+        if (exit === 'home') void clearing.current.then(() => router.replace('/'))
+        else router.replace(doorHref)
       }}
     />
   )

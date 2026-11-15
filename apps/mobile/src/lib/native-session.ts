@@ -12,7 +12,13 @@ import {
   userProfileResponseSchema,
   type SignupResponse,
 } from '@couture/api-client/contracts/http'
-import { parsePreviewFrom, withoutProviderTokens } from '@couture/utils'
+import {
+  finishStepHref,
+  parsePreviewFrom,
+  parseSignInDoor,
+  type SignInDoor,
+  withoutProviderTokens,
+} from '@couture/utils'
 import { createMobileApiClient } from './api-client'
 import { setNativeOAuthInFlight } from './native-oauth-flight'
 import {
@@ -303,6 +309,8 @@ export async function verifyNativeOtp(email: string, token: string) {
       'Sign-in code could not be verified.'
     )
   localSignedOut = false
+  // The code's session replaced any Google identity waiting on the finish step.
+  await clearFederatedFinishMarker()
   // Auth has spent the one-time code, so a slow account check (a cold API on a busy host)
   // would strand the person with a code that cannot be sent again. The session is valid;
   // check the account again before asking them to start over.
@@ -378,24 +386,30 @@ export const FEDERATED_FINISH_MARKER_KEY = 'couturecast.federated-finish'
 
 export async function readFederatedFinishMarker(): Promise<{
   from: 'preview' | null
+  door: SignInDoor
 } | null> {
   try {
     const secure = await import('expo-secure-store')
     const raw = await secure.getItemAsync(FEDERATED_FINISH_MARKER_KEY)
     if (raw === null) return null
     const parsed: unknown = JSON.parse(raw)
-    const from =
-      parsed && typeof parsed === 'object' && 'from' in parsed ? parsed.from : null
-    return { from: parsePreviewFrom(typeof from === 'string' ? from : null) }
+    const field = (name: string) => {
+      const value: unknown =
+        parsed && typeof parsed === 'object' && name in parsed
+          ? (parsed as Record<string, unknown>)[name]
+          : null
+      return typeof value === 'string' ? value : null
+    }
+    return { from: parsePreviewFrom(field('from')), door: parseSignInDoor(field('door')) }
   } catch {
     return null
   }
 }
 
-async function writeFederatedFinishMarker(from: 'preview' | null) {
+async function writeFederatedFinishMarker(from: 'preview' | null, door: SignInDoor) {
   try {
     const secure = await import('expo-secure-store')
-    await secure.setItemAsync(FEDERATED_FINISH_MARKER_KEY, JSON.stringify({ from }))
+    await secure.setItemAsync(FEDERATED_FINISH_MARKER_KEY, JSON.stringify({ from, door }))
   } catch {
     // Without storage the finish step still works; only a relaunch loses the way back.
   }
@@ -438,7 +452,7 @@ function oauthProvider(): 'google' | 'keycloak' | null {
  * identity is signed out first, so the verifier and the next session belong to the chooser.
  */
 export async function startNativeGoogleSignIn(
-  options: { from?: string | null } = {}
+  options: { from?: string | null; door?: SignInDoor } = {}
 ): Promise<NativeOAuthOutcome> {
   const provider = oauthProvider()
   if (!provider) return { kind: 'unavailable' }
@@ -458,12 +472,15 @@ export async function startNativeGoogleSignIn(
       : declared
     const schemeOption = typeof scheme === 'string' ? { scheme } : {}
     // The browser session watches for the bare callback URL. Android's Custom Tabs polyfill
-    // accepts only a URL that starts with it, and Auth appends `code` before `from=preview`,
-    // so the preview marker rides only in `redirectTo`.
+    // accepts only a URL that starts with it, and Auth appends `code` before `from` and
+    // `door`, so the preview hint and the door ride only in `redirectTo` (D5).
     const returnUrl = Linking.createURL('auth/callback', schemeOption)
+    const queryParams: Record<string, string> = {}
+    if (fromPreview) queryParams.from = 'preview'
+    if (parseSignInDoor(options.door) === 'signup') queryParams.door = 'signup'
     const redirectTo = Linking.createURL('auth/callback', {
       ...schemeOption,
-      ...(fromPreview ? { queryParams: { from: 'preview' } } : {}),
+      ...(Object.keys(queryParams).length ? { queryParams } : {}),
     })
     localSignedOut = false
     const { data, error } = await client.auth.signInWithOAuth({
@@ -570,6 +587,7 @@ async function dropCodeVerifier() {
 export function completeNativeOAuth(url: string): Promise<NativeOAuthOutcome> {
   const params = callbackParams(url)
   const from = parsePreviewFrom(params.get('from'))
+  const door = parseSignInDoor(params.get('door'))
   const providerError = params.get('error')
   if (providerError || !params.get('code')) void dropCodeVerifier()
   if (providerError) {
@@ -596,7 +614,7 @@ export function completeNativeOAuth(url: string): Promise<NativeOAuthOutcome> {
       }
       localSignedOut = false
       const outcome = await settleFederatedSession(data.session)
-      if (outcome.kind === 'no_account') await writeFederatedFinishMarker(from)
+      if (outcome.kind === 'no_account') await writeFederatedFinishMarker(from, door)
       else await clearFederatedFinishMarker()
       return outcome
     } catch {
@@ -613,18 +631,30 @@ export function completeNativeOAuth(url: string): Promise<NativeOAuthOutcome> {
 
 /**
  * Story 6.17 D3: where a launch should resume a finish step left open (a killed app), or null.
- * Needs both the marker and the stored Google identity; a member never resumes.
+ * As on web, the server's status decides, so an identity stored without the marker (a slow
+ * account check during the round trip) resumes too; the marker carries only the preview hint
+ * and the door. A member never resumes.
  */
 export async function federatedFinishResumeHref(): Promise<string | null> {
   if (member) return null
-  const marker = await readFederatedFinishMarker()
-  if (!marker) return null
   const identity = await readNativeFederatedIdentity().catch(() => null)
   if (!identity) {
     await clearFederatedFinishMarker()
     return null
   }
-  return marker.from === 'preview' ? '/signup-finish?from=preview' : '/signup-finish'
+  let status
+  try {
+    status = await fetchMobileFederatedSignupStatus(identity.accessToken)
+  } catch {
+    return null
+  }
+  if (member) return null
+  if (status !== 'needs_birthdate') {
+    await clearFederatedFinishMarker()
+    return null
+  }
+  const marker = await readFederatedFinishMarker()
+  return finishStepHref(marker?.from ?? null, marker?.door ?? 'signin', '/signup-finish')
 }
 
 /** The Google identity waiting on the finish step, or null when there is none. */

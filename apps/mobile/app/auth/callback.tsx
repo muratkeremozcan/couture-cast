@@ -4,12 +4,18 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { router, useLocalSearchParams } from 'expo-router'
-import { getFederatedSignInStrings, parsePreviewFrom } from '@couture/utils'
+import { router, useLocalSearchParams, type Href } from 'expo-router'
+import {
+  finishStepHref,
+  getFederatedSignInStrings,
+  parsePreviewFrom,
+  parseSignInDoor,
+  signInDoorHref,
+} from '@couture/utils'
 import { Text, View } from '@/components/themed'
 import { continuesToPreviewReview } from '@/src/lib/post-signin-destination'
 
-const CALLBACK_PARAMS = ['code', 'error', 'error_code', 'from'] as const
+const CALLBACK_PARAMS = ['code', 'error', 'error_code', 'from', 'door'] as const
 
 export default function OAuthCallbackRoute() {
   const params =
@@ -24,6 +30,7 @@ export default function OAuthCallbackRoute() {
   }
   const callbackUrl = `couturecast://auth/callback?${query.toString()}`
   const fromPreview = parsePreviewFrom(params.from ?? null) !== null
+  const door = parseSignInDoor(params.door ?? null)
 
   useEffect(() => {
     let active = true
@@ -38,12 +45,15 @@ export default function OAuthCallbackRoute() {
           return
         }
         if (outcome.kind === 'no_account') {
-          router.replace(fromPreview ? '/signup-finish?from=preview' : '/signup-finish')
+          router.replace(
+            finishStepHref(fromPreview ? 'preview' : null, door, '/signup-finish') as Href
+          )
           return
         }
-        // The in-process path shows the same fixed message on the sign-in screen.
+        // D5: back to the door that started, which shows the same fixed message the
+        // in-process path does.
         router.replace(
-          `/signin?google=${outcome.kind}${fromPreview ? '&from=preview' : ''}`
+          signInDoorHref(door, { google: outcome.kind, fromPreview }) as Href
         )
       })
       .catch(() => {
@@ -52,7 +62,7 @@ export default function OAuthCallbackRoute() {
     return () => {
       active = false
     }
-  }, [callbackUrl, fromPreview])
+  }, [callbackUrl, door, fromPreview])
 
   return (
     <View style={styles.container}>
