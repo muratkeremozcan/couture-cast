@@ -19,6 +19,7 @@ import { inviteGuardianFromMobile } from '@/src/lib/guardian'
 import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
 import { SignupRefusedError, submitMobileSignup } from '@/src/lib/signup'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { SignupGoogleEntry } from './google-sign-in-button'
 
 type SignupScreenProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
@@ -27,6 +28,8 @@ type SignupScreenProps = {
   fromPreview?: boolean
   /** Story 6.16 D8: the route performs navigation, so this screen stays router-free. */
   onPreviewNavigate?: (href: SignupPreviewHref) => void
+  /** Story 6.17 D2: a Google round trip that signed someone in or needs the finish step. */
+  onGoogleSignedIn?: (outcome: 'member' | 'no_account') => void
 }
 
 type SignupPreviewHref = '/preview' | '/signin?from=preview'
@@ -36,6 +39,7 @@ export function SignupScreen({
   inviteGuardian = inviteGuardianFromMobile,
   fromPreview = false,
   onPreviewNavigate = () => undefined,
+  onGoogleSignedIn = () => undefined,
 }: SignupScreenProps) {
   const { announce } = useAccessibilityAnnouncer()
   const { i18n } = useTranslation()
@@ -162,6 +166,11 @@ export function SignupScreen({
       </Text>
 
       <View style={styles.form}>
+        <SignupGoogleEntry
+          fromPreview={fromPreview}
+          onSignedIn={onGoogleSignedIn}
+          onFailure={setErrorMessage}
+        />
         <Text style={styles.label}>Email</Text>
         <TextInput
           accessibilityLabel="Email"

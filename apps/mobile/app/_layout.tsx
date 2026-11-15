@@ -35,7 +35,7 @@ import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-an
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useTranslation } from 'react-i18next'
-import { getGuestPreviewStrings } from '@couture/utils'
+import { getFederatedSignInStrings, getGuestPreviewStrings } from '@couture/utils'
 
 const isExpoGoAndroid =
   Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
@@ -289,6 +289,16 @@ function RootLayoutNav() {
                   name="preview"
                   options={{ title: getGuestPreviewStrings(i18n.language).chrome.entry }}
                 />
+                {/* Story 6.17 D3, D5: the Google finish step and its callback. */}
+                <Stack.Screen
+                  name="signup-finish"
+                  options={{
+                    title: getFederatedSignInStrings(i18n.language).finishTitle,
+                    headerBackVisible: false,
+                    gestureEnabled: false,
+                  }}
+                />
+                <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
                 <Stack.Screen
                   name="preview-continue"
                   options={{

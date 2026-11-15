@@ -8,6 +8,8 @@ import { test } from 'node:test'
 import { parse } from 'yaml'
 
 import {
+  E2E_OAUTH_PROVIDER_SENTINEL,
+  E2E_OAUTH_PROVIDER_VARIABLE,
   EXPORT_SHAPES,
   TEST_STORE_KEY_VARIABLE,
   exportCommand,
@@ -50,6 +52,43 @@ test('finds a test_ key packed against the previous string in a Hermes string ta
     'entry.hbc': 'Invalid timing functionsubscribetest_previewonly0key00000Cannot set',
   })
   assert.deepEqual(scanExport(root, 'test_ci0synthetic0key0000'), ['entry.hbc'])
+})
+
+// Learning path Step 57: Google sign-in. Story 6.17 D10: the OAuth stand-in switch is
+// development-only, so a release bundle holding its planted sentinel fails.
+test('finds the planted OAuth stand-in sentinel, and only when it was inlined', (t) => {
+  const root = exportTree(t, {
+    'leaky.hbc': `provider${E2E_OAUTH_PROVIDER_SENTINEL}keycloak`,
+    'clean.hbc': 'provider google signInWithOAuth keycloak',
+  })
+  assert.deepEqual(scanExport(root, undefined, [E2E_OAUTH_PROVIDER_SENTINEL]), [
+    'leaky.hbc',
+  ])
+  assert.deepEqual(scanExport(root, undefined), [])
+})
+
+// Story 6.17 TEA sign-off, U-SEAM-BUNDLE: the CLI's per-shape check is what CI runs, and it must
+// look for the planted sentinel as well as the key. Read through a dynamic import so a missing
+// export fails this test alone.
+// RED until the scan exports `scanReleaseExport(out, key)`, the per-shape check its CLI loop calls.
+test('the per-shape release check reports the planted sentinel and the Test Store key', async (t) => {
+  const bundleScan = await import('./revenuecat-bundle-scan.mjs')
+  assert.equal(
+    typeof bundleScan.scanReleaseExport,
+    'function',
+    'revenuecat-bundle-scan.mjs must export scanReleaseExport(out, key), used by its CLI loop'
+  )
+  const root = exportTree(t, {
+    '_expo/static/js/ios/entry.hbc': `provider${E2E_OAUTH_PROVIDER_SENTINEL}`,
+    '_expo/static/js/android/entry.hbc': 'var k="secretvalue123";',
+    'metadata.json': '{}',
+  })
+  assert.deepEqual(bundleScan.scanReleaseExport(root, 'secretvalue123').sort(), [
+    '_expo/static/js/android/entry.hbc',
+    '_expo/static/js/ios/entry.hbc',
+  ])
+  const clean = exportTree(t, { 'entry.hbc': 'provider google signInWithOAuth' })
+  assert.deepEqual(bundleScan.scanReleaseExport(clean, 'secretvalue123'), [])
 })
 
 test('reads one variable from a dotenv file, quoted or not', (t) => {
@@ -130,6 +169,7 @@ test('the scan exports production and preview, each with its env files and EAS p
     NODE_ENV: 'production',
     EAS_BUILD_PROFILE: 'production',
     [TEST_STORE_KEY_VARIABLE]: key,
+    [E2E_OAUTH_PROVIDER_VARIABLE]: E2E_OAUTH_PROVIDER_SENTINEL,
   })
   assert.deepEqual(preview.args, [
     'expo',

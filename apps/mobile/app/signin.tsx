@@ -1,10 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router, useLocalSearchParams } from 'expo-router'
-import { getGuestPreviewStrings, parsePreviewFrom } from '@couture/utils'
-import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
-import { requestNativeOtp, verifyNativeOtp } from '@/src/lib/native-session'
+import {
+  getFederatedSignInStrings,
+  getGuestPreviewStrings,
+  parsePreviewFrom,
+} from '@couture/utils'
+import {
+  GoogleSignInButton,
+  SignInDivider,
+} from '@/src/features/signup/google-sign-in-button'
+import { continuesToPreviewReview } from '@/src/lib/post-signin-destination'
+import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import {
+  requestNativeOtp,
+  verifyNativeOtp,
+  type NativeOAuthOutcome,
+} from '@/src/lib/native-session'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
   NativeSignInError,
@@ -15,29 +28,41 @@ const FAILURE_KEYS: Record<NativeSignInFailure, string> = {
   code_invalid: 'community.notifications.signinCodeInvalid',
   unavailable: 'community.notifications.signinUnavailable',
 }
-/**
- * Story 6.16 D7, D8: a sign-in that came from the preview with a stored carryover intent
- * goes to the review step. Any other sign-in deletes guest state, so a proposal left on a
- * shared device never reaches whoever signs in next.
- */
-async function continuesToPreviewReview(fromPreview: boolean): Promise<boolean> {
-  const store = mobileGuestPreviewStore()
-  const snapshot = await store.load()
-  if (fromPreview && snapshot.state?.conversion) return true
-  store.clear()
-  await store.flush()
-  return false
-}
-
 export default function SignInScreen() {
   const { t, i18n } = useTranslation()
-  const { from } = useLocalSearchParams<{ from?: string }>()
+  const { from, google } = useLocalSearchParams<{ from?: string; google?: string }>()
   const fromPreview = parsePreviewFrom(from) !== null
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
+  const googleStrings = getFederatedSignInStrings(i18n.language)
+  // Story 6.17 D5: a cold-started callback that signed nobody in names its outcome; only the
+  // three fixed names show anything.
+  const [googleMessage, setGoogleMessage] = useState<string | null>(() =>
+    google === 'cancelled' || google === 'unavailable' || google === 'refused'
+      ? googleStrings[google]
+      : null
+  )
+  const { announce } = useAccessibilityAnnouncer()
+  useEffect(() => {
+    if (googleMessage) announce('error', googleMessage)
+  }, [announce, googleMessage])
+  // Story 6.17 D2, D6: Google follows the same destination rule as the email code.
+  const onGoogleOutcome = async (outcome: NativeOAuthOutcome) => {
+    setGoogleMessage(null)
+    if (outcome.kind === 'member') {
+      if (await continuesToPreviewReview(fromPreview)) router.replace('/preview-continue')
+      else router.back()
+      return
+    }
+    if (outcome.kind === 'no_account') {
+      router.replace(fromPreview ? '/signup-finish?from=preview' : '/signup-finish')
+      return
+    }
+    setGoogleMessage(googleStrings[outcome.kind])
+  }
   const submit = async () => {
     setBusy(true)
     try {
@@ -64,6 +89,18 @@ export default function SignInScreen() {
   }
   return (
     <View style={styles.container}>
+      <GoogleSignInButton
+        from={fromPreview ? 'preview' : null}
+        onOutcome={(outcome) => {
+          void onGoogleOutcome(outcome)
+        }}
+      />
+      {googleMessage ? (
+        <Text testID="google-sign-in-status" accessibilityRole="alert">
+          {googleMessage}
+        </Text>
+      ) : null}
+      <SignInDivider />
       <Text>{t('community.notifications.email')}</Text>
       <TextInput
         accessibilityLabel={t('community.notifications.email')}

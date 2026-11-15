@@ -8,8 +8,19 @@ import {
 } from '@supabase/supabase-js'
 import Constants from 'expo-constants'
 import { AppState } from 'react-native'
-import { userProfileResponseSchema } from '@couture/api-client/contracts/http'
+import {
+  userProfileResponseSchema,
+  type SignupResponse,
+} from '@couture/api-client/contracts/http'
+import { parsePreviewFrom } from '@couture/utils'
 import { createMobileApiClient } from './api-client'
+import { setNativeOAuthInFlight } from './native-oauth-flight'
+import {
+  abandonMobileFederatedSignup,
+  FederatedSignupError,
+  fetchMobileFederatedSignupStatus,
+  submitMobileFederatedSignup,
+} from './signup'
 import { setMobileApplicationUserId } from './mobile-auth'
 import { secureSessionStorage } from './secure-session-storage'
 import { codeRejected, NativeSignInError } from './native-signin-error'
@@ -78,6 +89,8 @@ export function nativeSupabase(): Promise<SupabaseClient> {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: false,
+        // Story 6.17 D1: Google returns a one-time code bound to a verifier kept in SecureStore.
+        flowType: 'pkce',
         lock: processLock,
         // Sessions routinely exceed SecureStore's 2048-byte value limit; see the module.
         storage: secureSessionStorage(secure),
@@ -345,5 +358,350 @@ export async function signOutNativeSession() {
       }),
     ])
     clearTimeout(timer)
+  }
+}
+
+/** Story 6.17: what a finished Google round trip means for the person. */
+export type NativeOAuthOutcome =
+  | { kind: 'member' }
+  | { kind: 'no_account' }
+  | { kind: 'refused' }
+  | { kind: 'cancelled' }
+  | { kind: 'unavailable' }
+
+/**
+ * Story 6.17 D3: set while a Google identity waits on the finish step, so the next launch
+ * routes back to it. It holds no address and no token, only where the person came from.
+ */
+export const FEDERATED_FINISH_MARKER_KEY = 'couturecast.federated-finish'
+
+export async function readFederatedFinishMarker(): Promise<{
+  from: 'preview' | null
+} | null> {
+  try {
+    const secure = await import('expo-secure-store')
+    const raw = await secure.getItemAsync(FEDERATED_FINISH_MARKER_KEY)
+    if (raw === null) return null
+    const parsed: unknown = JSON.parse(raw)
+    const from =
+      parsed && typeof parsed === 'object' && 'from' in parsed ? parsed.from : null
+    return { from: parsePreviewFrom(typeof from === 'string' ? from : null) }
+  } catch {
+    return null
+  }
+}
+
+async function writeFederatedFinishMarker(from: 'preview' | null) {
+  try {
+    const secure = await import('expo-secure-store')
+    await secure.setItemAsync(FEDERATED_FINISH_MARKER_KEY, JSON.stringify({ from }))
+  } catch {
+    // Without storage the finish step still works; only a relaunch loses the way back.
+  }
+}
+
+export async function clearFederatedFinishMarker() {
+  try {
+    const secure = await import('expo-secure-store')
+    await secure.deleteItemAsync(FEDERATED_FINISH_MARKER_KEY)
+  } catch {
+    // Nothing stored.
+  }
+}
+
+/**
+ * Story 6.17 D10: the provider name. The real-stack test lane swaps in a Keycloak stand-in,
+ * only in a development bundle of an isolated story build; anywhere else the request is
+ * refused. A release bundle drops this whole branch with `__DEV__`, and the bundle scan
+ * proves the variable is absent.
+ */
+function oauthProvider(): 'google' | 'keycloak' | null {
+  if (__DEV__) {
+    const requested = process.env.EXPO_PUBLIC_E2E_OAUTH_PROVIDER?.trim()
+    if (requested) {
+      const extra: unknown = Constants.expoConfig?.extra
+      const isolated =
+        !!extra &&
+        typeof extra === 'object' &&
+        'isolatedNativeBuild' in extra &&
+        extra.isolatedNativeBuild === true
+      return requested === 'keycloak' && isolated ? 'keycloak' : null
+    }
+  }
+  return 'google'
+}
+
+/**
+ * Story 6.17 D1, D2: opens Google's account chooser in the system browser session
+ * (ASWebAuthenticationSession, Custom Tabs) and completes in process. A member or a waiting
+ * identity is signed out first, so the verifier and the next session belong to the chooser.
+ */
+export async function startNativeGoogleSignIn(
+  options: { from?: string | null } = {}
+): Promise<NativeOAuthOutcome> {
+  const provider = oauthProvider()
+  if (!provider) return { kind: 'unavailable' }
+  try {
+    const client = await nativeSupabase()
+    const stored = await client.auth.getSession()
+    if (member || stored.data.session) await signOutNativeSession()
+    await clearFederatedFinishMarker()
+    const Linking = await import('expo-linking')
+    const WebBrowser = await import('expo-web-browser')
+    const fromPreview = parsePreviewFrom(options.from ?? null) !== null
+    // The app declares two schemes; the callback always uses the first (couturecast, or an
+    // isolated story build's own), named explicitly so expo-linking need not guess.
+    const declared: unknown = Constants.expoConfig?.scheme
+    const scheme: unknown = Array.isArray(declared)
+      ? (declared as unknown[])[0]
+      : declared
+    const redirectTo = Linking.createURL('auth/callback', {
+      ...(typeof scheme === 'string' ? { scheme } : {}),
+      ...(fromPreview ? { queryParams: { from: 'preview' } } : {}),
+    })
+    localSignedOut = false
+    const { data, error } = await client.auth.signInWithOAuth({
+      provider,
+      options: {
+        redirectTo,
+        queryParams: { prompt: 'select_account' },
+        skipBrowserRedirect: true,
+      },
+    })
+    if (error || !data.url) return { kind: 'unavailable' }
+    setNativeOAuthInFlight(true)
+    try {
+      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+      if (result.type !== 'success') return { kind: 'cancelled' }
+      return await completeNativeOAuth(result.url)
+    } finally {
+      setNativeOAuthInFlight(false)
+    }
+  } catch {
+    return { kind: 'unavailable' }
+  }
+}
+
+async function refuseFederatedIdentity(): Promise<NativeOAuthOutcome> {
+  await clearFederatedFinishMarker()
+  await signOutNativeSession().catch(() => undefined)
+  return { kind: 'refused' }
+}
+
+/** Verification with the OTP path's retry for a cold API; a denial stops at once. */
+async function verifyWithRetry(
+  next: Session
+): Promise<'member' | 'denied' | 'unavailable'> {
+  for (let attempt = 0; attempt < ACCOUNT_CHECK_ATTEMPTS; attempt++) {
+    if (attempt)
+      await new Promise((resolve) => setTimeout(resolve, ACCOUNT_CHECK_RETRY_MS))
+    try {
+      await acceptSession(next)
+      return member ? 'member' : 'denied'
+    } catch {
+      // Transient: try again.
+    }
+  }
+  return 'unavailable'
+}
+
+/**
+ * After a session exists: a member is done; a denied profile check asks the API whether the
+ * finish step applies. `complete` gets exactly one more verification (TEA-3).
+ */
+async function settleFederatedSession(next: Session): Promise<NativeOAuthOutcome> {
+  const first = await verifyWithRetry(next)
+  if (first === 'member') return { kind: 'member' }
+  if (first === 'unavailable') return { kind: 'unavailable' }
+  let status
+  try {
+    status = await fetchMobileFederatedSignupStatus(next.access_token)
+  } catch (error) {
+    return error instanceof FederatedSignupError && error.status === 401
+      ? refuseFederatedIdentity()
+      : { kind: 'unavailable' }
+  }
+  if (status === 'needs_birthdate') return { kind: 'no_account' }
+  const second = await verifyWithRetry(next)
+  if (second === 'member') return { kind: 'member' }
+  return second === 'denied' ? refuseFederatedIdentity() : { kind: 'unavailable' }
+}
+
+const exchanges = new Map<string, Promise<NativeOAuthOutcome>>()
+/**
+ * The last settled exchange, so a late second delivery of the same code gets its outcome
+ * instead of spending a used code; entries leave `exchanges` once they settle.
+ */
+let lastSettled: { code: string; flight: Promise<NativeOAuthOutcome> } | undefined
+
+function callbackParams(url: string): URLSearchParams {
+  try {
+    const parsed = new URL(url)
+    const params = new URLSearchParams(parsed.search)
+    new URLSearchParams(parsed.hash.replace(/^#/, '')).forEach((value, key) => {
+      if (!params.has(key)) params.set(key, value)
+    })
+    return params
+  } catch {
+    return new URLSearchParams()
+  }
+}
+
+/**
+ * Story 6.17 D5: completes a Google round trip from its callback URL. Never throws. One
+ * exchange per code, whether the URL came back in process or through the router.
+ */
+/** A round trip that ends without a session leaves no PKCE verifier behind. */
+async function dropCodeVerifier() {
+  try {
+    const storage = secureSessionStorage(await import('expo-secure-store'))
+    await storage.removeItem(`${authStorageKey}-code-verifier`)
+  } catch {
+    // Nothing stored.
+  }
+}
+
+export function completeNativeOAuth(url: string): Promise<NativeOAuthOutcome> {
+  const params = callbackParams(url)
+  const from = parsePreviewFrom(params.get('from'))
+  const providerError = params.get('error')
+  if (providerError || !params.get('code')) void dropCodeVerifier()
+  if (providerError) {
+    // TEA-11: Auth refuses a provider address it cannot treat as verified with
+    // access_denied plus this code; that is a refusal of the identity, not a cancel.
+    if (params.get('error_code') === 'provider_email_needs_verification')
+      return Promise.resolve({ kind: 'refused' })
+    return Promise.resolve(
+      providerError === 'access_denied' ? { kind: 'cancelled' } : { kind: 'unavailable' }
+    )
+  }
+  const code = params.get('code')
+  if (!code) return Promise.resolve({ kind: 'unavailable' })
+  const existing = exchanges.get(code)
+  if (existing) return existing
+  if (lastSettled?.code === code) return lastSettled.flight
+  const flight = (async (): Promise<NativeOAuthOutcome> => {
+    try {
+      const client = await nativeSupabase()
+      const { data, error } = await client.auth.exchangeCodeForSession(code)
+      if (error || !data.session) {
+        await dropCodeVerifier()
+        return { kind: 'unavailable' }
+      }
+      localSignedOut = false
+      const outcome = await settleFederatedSession(data.session)
+      if (outcome.kind === 'no_account') await writeFederatedFinishMarker(from)
+      else await clearFederatedFinishMarker()
+      return outcome
+    } catch {
+      return { kind: 'unavailable' }
+    }
+  })()
+  exchanges.set(code, flight)
+  void flight.then(() => {
+    exchanges.delete(code)
+    lastSettled = { code, flight }
+  })
+  return flight
+}
+
+/**
+ * Story 6.17 D3: where a launch should resume a finish step left open (a killed app), or null.
+ * Needs both the marker and the stored Google identity; a member never resumes.
+ */
+export async function federatedFinishResumeHref(): Promise<string | null> {
+  if (member) return null
+  const marker = await readFederatedFinishMarker()
+  if (!marker) return null
+  const identity = await readNativeFederatedIdentity().catch(() => null)
+  if (!identity) {
+    await clearFederatedFinishMarker()
+    return null
+  }
+  return marker.from === 'preview' ? '/signup-finish?from=preview' : '/signup-finish'
+}
+
+/** The Google identity waiting on the finish step, or null when there is none. */
+export async function readNativeFederatedIdentity(): Promise<{
+  accessToken: string
+  email: string | null
+} | null> {
+  if (localSignedOut) return null
+  const client = await nativeSupabase()
+  const { data, error } = await client.auth.getSession()
+  if (error || !data.session) return null
+  return {
+    accessToken: data.session.access_token,
+    email: data.session.user.email ?? null,
+  }
+}
+
+export type NativeFederatedFinishResult =
+  | { kind: 'created'; account: SignupResponse }
+  | { kind: 'signed_in' }
+  | { kind: 'underage' }
+  | { kind: 'guardian_minor' }
+  | { kind: 'refused' }
+  | { kind: 'no_session' }
+  | { kind: 'unavailable' }
+
+/**
+ * Story 6.17 D3: submits the birthdate for the waiting identity, then verifies the new account
+ * like any sign-in. Under 13 the server deletes the identity, so this signs out.
+ */
+export async function finishNativeFederatedSignup(
+  birthdate: string
+): Promise<NativeFederatedFinishResult> {
+  const identity = await readNativeFederatedIdentity()
+  if (!identity) return { kind: 'no_session' }
+  let account: SignupResponse
+  try {
+    account = await submitMobileFederatedSignup(identity.accessToken, { birthdate })
+  } catch (error) {
+    const status = error instanceof FederatedSignupError ? error.status : undefined
+    if (status === 409) {
+      const client = await nativeSupabase()
+      const { data } = await client.auth.getSession()
+      if (!data.session) return { kind: 'no_session' }
+      const outcome = await settleFederatedSession(data.session)
+      if (outcome.kind === 'member') {
+        await clearFederatedFinishMarker()
+        return { kind: 'signed_in' }
+      }
+      return outcome.kind === 'refused' ? { kind: 'refused' } : { kind: 'unavailable' }
+    }
+    if (status === 403) {
+      if (
+        error instanceof FederatedSignupError &&
+        error.code === 'federated_guardian_minor'
+      )
+        return { kind: 'guardian_minor' }
+      await clearFederatedFinishMarker()
+      await signOutNativeSession().catch(() => undefined)
+      return { kind: 'underage' }
+    }
+    if (status === 401) {
+      await refuseFederatedIdentity()
+      return { kind: 'refused' }
+    }
+    return { kind: 'unavailable' }
+  }
+  await clearFederatedFinishMarker()
+  const client = await nativeSupabase()
+  const { data } = await client.auth.getSession()
+  if (data.session) await verifyWithRetry(data.session)
+  return { kind: 'created', account }
+}
+
+/** Story 6.17 D3 Cancel: deletes a waiting identity that has no account, then signs out. */
+export async function cancelNativeFederatedSignup(): Promise<void> {
+  const identity = await readNativeFederatedIdentity()
+  await clearFederatedFinishMarker()
+  try {
+    if (identity) await abandonMobileFederatedSignup(identity.accessToken)
+  } catch {
+    // The orphan sweep removes an identity whose deletion did not land.
+  } finally {
+    await signOutNativeSession().catch(() => undefined)
   }
 }
