@@ -89,6 +89,8 @@ export async function session(account: number): Promise<Session> {
   return verified.data.session!
 }
 type TimelineWindow = Window & typeof globalThis & { __shareCardTimeline?: string[] }
+/** How long a failure report waits to read the page timeline. */
+const TIMELINE_READ_MS = 2000
 // Init script. Records what a missing download needs to name its cause: the share
 // dialog appearing, hiding behind another dialog and leaving, Download's busy state, the status and alert text,
 // each download handoff, and visibility and connectivity changes.
@@ -253,9 +255,21 @@ export function nextDownload(page: Page): Promise<Download> {
   return page
     .waitForEvent('download', { timeout: DOWNLOAD_WAIT_MS })
     .catch(async (error: unknown) => {
-      const timeline = await page
-        .evaluate(() => (window as TimelineWindow).__shareCardTimeline ?? ['no timeline'])
-        .catch((reason: unknown) => [`timeline unreadable: ${String(reason)}`])
+      // A hung renderer must not stall the failure report past the test timeout.
+      let deadline: ReturnType<typeof setTimeout> | undefined
+      const timeline = await Promise.race([
+        page
+          .evaluate(
+            () => (window as TimelineWindow).__shareCardTimeline ?? ['no timeline']
+          )
+          .catch((reason: unknown) => [`timeline unreadable: ${String(reason)}`]),
+        new Promise<string[]>((resolve) => {
+          deadline = setTimeout(
+            () => resolve([`timeline unread after ${TIMELINE_READ_MS} ms`]),
+            TIMELINE_READ_MS
+          )
+        }),
+      ]).finally(() => clearTimeout(deadline))
       throw new Error(
         [
           `share_card_download_missing: no download within ${DOWNLOAD_WAIT_MS} ms.`,
