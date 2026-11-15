@@ -539,7 +539,7 @@ navigation and identity boundaries.
 - A signup that ends underage from the preview clears guest state.
 - Analytics: three closed-enum events, URL keys dropped on them, page and screen views dropped on
   preview routes, and PostHog `reset()` before the signup or sign-in handoff.
-- E2E: the shared Playwright lane allows only GET from the web origin outside `/api/` and
+- E2E: the shared Playwright lane allows only GET, HEAD and OPTIONS from the web origin outside `/api/` and
   `/ingest/`; the row-count test and the real-OTP carryover run in the real-session lane (8 tests).
   Android Maestro guest flows run in their own signed-out shard (TEA-8).
 

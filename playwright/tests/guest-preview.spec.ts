@@ -25,9 +25,11 @@ const LABEL =
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
 /**
- * E1: every request the guest page makes is recorded, and any request outside
- * `isAllowedGuestPreviewRequest` (the API origin, the Supabase origin, any other host, or
- * a write) lands in `offAllowlist`, so a direct browser write cannot slip past a path check.
+ * E1: every request the guest page makes is recorded. `isAllowedGuestPreviewRequest`
+ * allows only the safe methods GET, HEAD and OPTIONS to the web origin outside `/api/` and
+ * `/ingest/`, plus the Vercel toolbar on a preview deployment; anything else (the API
+ * origin, the Supabase origin, any other host, or a write to any origin) lands in
+ * `offAllowlist`, so a direct browser write cannot slip past a path check.
  */
 function recordRequests(page: Page, webOrigin: string) {
   const all: Request[] = []

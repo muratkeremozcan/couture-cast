@@ -11293,7 +11293,7 @@ Hard-won lessons from the implementation and code review of this story:
 - A router mock that returns a new object each render re-ran the session effect forever; Next.js
   hands out a stable router, and the mocks do too.
 - Global row counts only prove "no writes" when the journey runs alone. The shared Playwright suite
-  proves it by an origin allowlist (GET from the web origin only, nothing under `/api/` or
+  proves it by an origin allowlist (GET, HEAD and OPTIONS from the web origin only, nothing under `/api/` or
   `/ingest/`), and the row-count test runs in the real-session lane, which owns its database and
   runs one test at a time.
 - Playwright's analytics test mode turns page views off, so a check there that no page view names

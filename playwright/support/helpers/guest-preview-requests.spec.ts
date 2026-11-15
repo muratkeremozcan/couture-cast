@@ -10,7 +10,7 @@ const allowed = (method: string, url: string, webOrigin: string) =>
   isAllowedGuestPreviewRequest({ method, url }, webOrigin)
 
 describe('guest preview request allowlist', () => {
-  it('allows only GET from the web origin outside /api/ and /ingest/', () => {
+  it('allows only safe methods from the web origin outside /api/ and /ingest/', () => {
     expect(allowed('GET', `${LOCAL}/preview?view=wardrobe`, LOCAL)).toBe(true)
     expect(allowed('GET', `${LOCAL}/_next/static/chunk.js`, LOCAL)).toBe(true)
     expect(allowed('POST', `${LOCAL}/preview`, LOCAL)).toBe(false)
@@ -20,6 +20,18 @@ describe('guest preview request allowlist', () => {
     expect(allowed('POST', 'http://127.0.0.1:54321/rest/v1/garment_items', LOCAL)).toBe(
       false
     )
+  })
+
+  it('allows the safe methods GET, HEAD and OPTIONS on the web origin, and no write', () => {
+    for (const base of [LOCAL, PREVIEW]) {
+      for (const method of ['GET', 'HEAD', 'OPTIONS'])
+        expect(allowed(method, `${base}/preview`, base), `${method} ${base}`).toBe(true)
+      for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'])
+        expect(allowed(method, `${base}/preview`, base), `${method} ${base}`).toBe(false)
+      for (const method of ['HEAD', 'OPTIONS'])
+        for (const path of ['/api/v1/ritual', '/ingest/e/'])
+          expect(allowed(method, `${base}${path}`, base), `${method} ${path}`).toBe(false)
+    }
   })
 
   it('exempts the Vercel toolbar only on a Vercel preview deployment (V1)', () => {
