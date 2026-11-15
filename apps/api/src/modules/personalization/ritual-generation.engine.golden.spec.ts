@@ -200,8 +200,8 @@ describe('ritual generation golden outputs (6.16 U-ENGINE-GOLDEN)', () => {
   })
 
   it('reproduces the unavailable-weather outputs', async () => {
-    const rows = LOCALES.map((locale) =>
-      generateRitualScenarios({
+    const rows = LOCALES.map((locale) => {
+      const result = generateRitualScenarios({
         userId: 'golden-user',
         targetLocalDate: '2026-11-15',
         locale,
@@ -214,9 +214,11 @@ describe('ritual generation golden outputs (6.16 U-ENGINE-GOLDEN)', () => {
         eligibleCapsules: noCapsules,
         weather: { status: 'unavailable' },
       })
-    )
-    await expect(`${JSON.stringify(rows, null, 1)}\n`).toMatchFileSnapshot(
-      './__golden__/ritual-generation-engine-unavailable.golden.json'
+      const digest = createHash('sha256').update(JSON.stringify(result)).digest('hex')
+      return `${locale}|unavailable ${digest}`
+    })
+    await expect(`${rows.join('\n')}\n`).toMatchFileSnapshot(
+      './__golden__/ritual-generation-engine-unavailable.golden.txt'
     )
   })
 
