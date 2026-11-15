@@ -213,12 +213,14 @@ function captureProblem(capture, stage, { platform, scales }) {
     return `is no ${platform} ${CAPTURE_STAGE[stage]} capture`
   if (launchOf(capture) === null)
     return 'has no launch identity: an integer pid and an identity root'
-  // TEA ruling on Antigravity r47 P2: a cold stage is the cold launch at that stage's scale.
+  // TEA ruling on Antigravity r47 P2, every stage since r48 P2-4: each capture is at that
+  // stage's scale in this leg (a cold launch at its own, the live before and settled reads at
+  // the scales the change ran from and to).
   if (
-    CAPTURE_STAGE[stage] === 'cold' &&
-    (scales?.[stage] === undefined || Number(capture.fontScale) !== Number(scales[stage]))
+    scales?.[stage] === undefined ||
+    Number(capture.fontScale) !== Number(scales[stage])
   )
-    return `is no cold launch at ${stage}'s scale ${scales?.[stage]}`
+    return `is no capture at ${stage}'s scale ${scales?.[stage]}`
   return null
 }
 

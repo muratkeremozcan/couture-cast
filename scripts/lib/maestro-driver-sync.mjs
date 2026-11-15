@@ -275,8 +275,14 @@ export function createIosDriver({
       reusable = true
       return result
     } catch (error) {
-      // Who holds the port, read before the stop; then the next call starts a fresh runner.
-      const held = heldBy(io.probe(port).connect['127.0.0.1'])
+      // Who holds the port, read before the stop; then the next call starts a fresh runner. A
+      // probe that fails here is logged and leaves the Maestro failure as the error (r48 P2-3).
+      let held = null
+      try {
+        held = heldBy(io.probe(port).connect['127.0.0.1'])
+      } catch (probeError) {
+        log(probeError.message)
+      }
       stopRunner()
       if (!held) throw error
       const wrapped = portInUse(`${held}; ${error.message}`, error)

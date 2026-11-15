@@ -18,7 +18,7 @@
 // list, derived from its UDID, in a range below every ephemeral range and clear of the 17001
 // (Android) and 17101 (iOS native suites) pins; two runners on one host reserve a port through a
 // lock file before checking it, so two simulators never share one.
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -160,28 +160,77 @@ export function createIosDriverPortIo({
         )
       return JSON.parse(probed.stdout)
     },
-    /** Claims `port` for `device` unless a live runner of another device holds its lock. */
+    /**
+     * Claims `port` for `device` unless a live runner of another device holds its lock. A lock
+     * appears whole or not at all: written to a temporary file, then linked into place, which
+     * fails when a lock exists. A lock whose runner died (or that cannot be read) is taken over
+     * by one runner only (r48 P2-3): each runner wanting it creates a takeover marker named
+     * after that lock's exact content, exclusively, so one wins; the winner reads the lock again
+     * and, while it still holds that content, renames its own record over it. A runner that
+     * loses, or finds another runner's lock by then, reads the lock afresh. A marker whose
+     * runner died between the two steps keeps that lock, and the port is skipped.
+     */
     reserve(port, device) {
       fs.mkdirSync(reservations, { recursive: true, mode: 0o700 })
-      const record = `${JSON.stringify({ device, pid })}\n`
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      const token = randomUUID()
+      const record = `${JSON.stringify({ device, pid, token })}\n`
+      const lock = lockOf(port)
+      const temporary = path.join(reservations, `${port}.${pid}.${token}.tmp`)
+      const read = () => {
         try {
-          fs.writeFileSync(lockOf(port), record, { flag: 'wx', mode: 0o600 })
-          return true
+          return fs.readFileSync(lock, 'utf8')
         } catch (error) {
-          if (error.code !== 'EEXIST') throw error
+          if (error.code === 'ENOENT') return null
+          throw error
         }
-        let holder
-        try {
-          holder = JSON.parse(fs.readFileSync(lockOf(port), 'utf8'))
-        } catch {
-          holder = null
-        }
-        if (holder && holder.pid !== pid && alive(holder.pid)) return false
-        // A lock its runner left behind when it died, or this runner's own.
-        fs.rmSync(lockOf(port), { force: true })
       }
-      return false
+      const holderOf = (raw) => {
+        try {
+          return JSON.parse(raw)
+        } catch {
+          return null
+        }
+      }
+      const mine = () => {
+        const holder = holderOf(read())
+        return holder?.pid === pid && holder?.token === token
+      }
+      fs.writeFileSync(temporary, record, { flag: 'wx', mode: 0o600 })
+      try {
+        for (let attempt = 0; attempt < 3; attempt += 1) {
+          try {
+            fs.linkSync(temporary, lock)
+            return mine()
+          } catch (error) {
+            if (error.code !== 'EEXIST') throw error
+          }
+          const raw = read()
+          if (raw === null) continue
+          const holder = holderOf(raw)
+          if (holder && holder.pid !== pid && alive(holder.pid)) return false
+          // A lock its runner left behind when it died, or this runner's own.
+          const marker = path.join(
+            reservations,
+            `${port}.takeover.${createHash('sha256').update(raw).digest('hex').slice(0, 16)}`
+          )
+          try {
+            fs.writeFileSync(marker, `${pid}\n`, { flag: 'wx', mode: 0o600 })
+          } catch (error) {
+            if (error.code !== 'EEXIST') throw error
+            continue
+          }
+          try {
+            if (read() !== raw) continue
+            fs.renameSync(temporary, lock)
+            return mine()
+          } finally {
+            fs.rmSync(marker, { force: true })
+          }
+        }
+        return false
+      } finally {
+        fs.rmSync(temporary, { force: true })
+      }
     },
     release(port) {
       try {

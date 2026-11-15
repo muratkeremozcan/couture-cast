@@ -314,24 +314,64 @@ const asNode = (record) => {
 const SHIFT_SPREAD = 0.1
 
 /**
- * The shifts from page `a` to page `b` that the moving identities shown once on both measure
- * truly (Android 6c85bbb4 Community): never a system UI node (the status-bar clock changes on
- * its own), only a node of the same height on both pages (the hierarchy clamps a box the
- * viewport cuts, so its top moves less), and, given the drag's length, only a shift within
- * SHIFT_SPREAD of it (an id-less text each card repeats, such as "Comments", pairs with another
- * card's copy).
+ * The shifts from page `a` to page `b` of the moving identities shown once on both (Android
+ * 6c85bbb4 Community): never a system UI node (the status-bar clock changes on its own) and
+ * only a node of the same height on both pages (the hierarchy clamps a box the viewport cuts,
+ * so its top moves less).
  */
-function measuredShifts(a, b, { tolerance, expectedShift }) {
+function anchorShifts(a, b, { tolerance }) {
   const height = (node) => edges(node)[1] - edges(node)[0]
   return [...a.keys()]
     .filter((key) => b.has(key) && !SYSTEM_UI.test(a.get(key).id ?? ''))
     .filter((key) => Math.abs(height(a.get(key)) - height(b.get(key))) <= tolerance)
     .map((key) => top(a.get(key)) - top(b.get(key)))
-    .filter(
-      (shift) =>
-        !(expectedShift > 0) ||
-        Math.abs(shift - expectedShift) <= SHIFT_SPREAD * expectedShift
-    )
+}
+
+/**
+ * Given the drag's length, only a shift within SHIFT_SPREAD of it measures the drag truly: an
+ * id-less text each card repeats, such as "Comments", pairs with another card's copy.
+ */
+const measuresDrag = (shift, expectedShift) =>
+  !(expectedShift > 0) || Math.abs(shift - expectedShift) <= SHIFT_SPREAD * expectedShift
+
+/**
+ * The step of the drag that reaches the bottom when no anchor measured a whole drag (r48
+ * P2-1): that drag moves only the travel left. Its anchors are the shifts a drag can make,
+ * above `tolerance` (a fixed node, such as a sticky chip's record, shifts by 0) and at most a
+ * whole drag (a repeated text paired with a lower copy shifts backwards). With none, the page
+ * shares no moving text and the step stays unmeasured (null); when every anchor sits within
+ * SHIFT_SPREAD of their median, that median is the step; anchors that disagree fail as
+ * live_font_scroll_short_drag_ambiguous, since any one step would place some text twice.
+ */
+function shortFinalStep(shifts, { tolerance, expectedShift }) {
+  const anchors = shifts.filter(
+    (shift) => shift > tolerance && shift <= (1 + SHIFT_SPREAD) * expectedShift
+  )
+  if (!anchors.length) return null
+  const step = median(anchors)
+  if (anchors.every((shift) => Math.abs(shift - step) <= SHIFT_SPREAD * step)) return step
+  throw new Error(
+    `live_font_scroll_short_drag_ambiguous: final drag anchors ${anchors.join(', ')} px disagree`
+  )
+}
+
+/**
+ * The step of each drag, by its index: the median of the shifts that measure it (`measured`),
+ * else, for the drag that reaches the bottom (the last page: scrollPages stops when a drag shows
+ * the same page again), shortFinalStep over its `anchors`, else fallbackStep.
+ */
+function dragSteps(measured, anchors, { tolerance, expectedShift }) {
+  const last = measured.length - 1
+  const short =
+    expectedShift > 0 && last >= 0 && !measured[last].length
+      ? shortFinalStep(anchors[last], { tolerance, expectedShift })
+      : null
+  const steps = measured.filter((shifts) => shifts.length).map(median)
+  return (at) => {
+    if (measured[at].length) return median(measured[at])
+    if (at === last && short !== null) return short
+    return fallbackStep(steps, expectedShift)
+  }
 }
 
 /**
@@ -341,7 +381,8 @@ function measuredShifts(a, b, { tolerance, expectedShift }) {
  * both pages; a node whose identity and shifted top or bottom match one already taken is the
  * same node seen again. Either edge counts because the hierarchy clips a node cut by the
  * viewport, so a node half off screen keeps only its visible edge. Only shifts that measure the
- * drag truly count (measuredShifts); pages that share none take the step from fallbackStep.
+ * drag truly count (measuresDrag); the drag that reaches the bottom may be shorter
+ * (shortFinalStep); pages that share none take the step from fallbackStep.
  */
 export function stitchPages(pages, options = {}) {
   return stitchPlaces(pages, options).taken.map(({ key }) => key)
@@ -387,12 +428,11 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = 
     )
   }
   const shifts = (list, fixed) =>
-    list.slice(1).map((page, at) =>
-      measuredShifts(once(list[at], fixed), once(page, fixed), {
-        tolerance,
-        expectedShift,
-      })
-    )
+    list
+      .slice(1)
+      .map((page, at) =>
+        anchorShifts(once(list[at], fixed), once(page, fixed), { tolerance })
+      )
   const recordPages =
     expectedShift > 0 && Array.isArray(records) && records.length === pages.length
       ? records.map((list) =>
@@ -403,16 +443,18 @@ export function stitchPlaces(pages, { tolerance = 4, expectedShift, records } = 
   const byRecords = recordPages ? shifts(recordPages, () => false) : []
   // Every page's measured shifts first, so a page that shares no moving text takes the median
   // of all measured steps, the later ones too.
-  const measured = shifts(pages, chrome).map((own, at) => [
+  const anchors = shifts(pages, chrome).map((own, at) => [
     ...own,
     ...(byRecords[at] ?? []),
   ])
-  const steps = measured.filter((shifts) => shifts.length).map(median)
+  const measured = anchors.map((list) =>
+    list.filter((shift) => measuresDrag(shift, expectedShift))
+  )
+  const stepOf = dragSteps(measured, anchors, { tolerance, expectedShift })
   const offsets = [0]
   let offset = 0
   for (let index = 1; index < pages.length; index += 1) {
-    const shifts = measured[index - 1]
-    offset += shifts.length ? median(shifts) : fallbackStep(steps, expectedShift)
+    offset += stepOf(index - 1)
     offsets.push(offset)
     const place = []
     places.push(place)

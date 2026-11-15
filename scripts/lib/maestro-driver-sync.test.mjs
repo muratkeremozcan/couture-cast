@@ -183,6 +183,7 @@ function fakeMac(t) {
         : `127.0.0.1:${socket.port}`
   const wildcard = (address) => address === '0.0.0.0' || address === '::'
   const probe = (args) => {
+    if (host.probeFails) return { status: 1, stdout: '' }
     const sockets = socketsOn(Number(args[2]))
     const connect = {}
     for (const address of ['127.0.0.1', '::1'])
@@ -505,16 +506,41 @@ test('iOS: a failed call whose port another process holds says so, keeping the o
   )
 })
 
+// r48 P2-3: a port probe that throws in the failure path hid the Maestro failure behind it.
+test('iOS: a failed call whose port probe throws keeps the Maestro failure', (t) => {
+  const mac = fakeMac(t)
+  const run = mac.run(SIM)
+  run(iosFlow(SIM))
+  const failure = Object.assign(new Error('real_maestro_failure'), {
+    output: 'whole output',
+  })
+  mac.during = () => {
+    mac.probeFails = true
+    throw failure
+  }
+  assert.throws(
+    () => run(iosFlow(SIM)),
+    (error) => error === failure
+  )
+  assert.ok(
+    mac.logs.some((line) => line.startsWith('maestro_driver_port_probe_failed:')),
+    mac.logs.join('\n')
+  )
+  // The runner is still stopped, so the next call starts a fresh one.
+  mac.probeFails = false
+  const before = mac.xcodebuilds().length
+  run(iosFlow(SIM))
+  assert.equal(mac.xcodebuilds().length, before + 1)
+})
+
 test('iOS: a runner that went away is restarted on its port; exit stops it and frees the port', (t) => {
   const mac = fakeMac(t)
   const run = mac.run(SIM)
   const [port] = iosDriverPortCandidates(SIM)
   run(iosFlow(SIM))
   const lock = path.join(mac.reservations, `${port}.json`)
-  assert.deepEqual(JSON.parse(fs.readFileSync(lock, 'utf8')), {
-    device: SIM,
-    pid: process.pid,
-  })
+  const { device, pid } = JSON.parse(fs.readFileSync(lock, 'utf8'))
+  assert.deepEqual({ device, pid }, { device: SIM, pid: process.pid })
   mac.spawn('kill', ['-TERM', ...[...mac.processes.keys()].map(String)])
   run(iosFlow(SIM))
   assert.ok(!mac.calls[1].includes('--no-reinstall-driver'))

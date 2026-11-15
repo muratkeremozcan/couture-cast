@@ -361,3 +361,29 @@ keeps its rects and opacity.
   (`accessible={false}`, `accessibilityElementsHidden`, `importantForAccessibility`
   no-hide-descendants, `aria-hidden`), beside the accessible link, is `true` on both platforms;
   the link's own texts and the Shop control's text are `false`.
+
+## Harness rules after Antigravity r48, 2026-11-14
+
+- Short final drag (P2-1): the drag that reaches the bottom moves only the travel left. When no
+  anchor of that last page measures a whole drag, its anchors are the shifts a drag can make
+  (above the tolerance, at most a whole drag). If they agree within SHIFT_SPREAD of their median,
+  that median is the step; if they disagree, the stitch fails as
+  `live_font_scroll_short_drag_ambiguous`. A page that shares no moving text keeps the median
+  fallback. Only the last page may be short.
+- Accessibility-hidden attach (P2-2): a flagged record joins an identified element only when the
+  element's label holds the record's text as whole words and the element's frame holds the
+  record or sits within one of the record's lines of it (at least the tolerance). The Home
+  teaser's pill sits 3 px below its link and the in-app browser caption 6 px below the shop
+  button.
+- iOS driver port lock (P2-3): a lock is written to a temporary file and linked into place. A
+  dead runner's lock is taken over by one runner only, through an exclusive takeover marker named
+  after that lock's content; the winner reads the lock again and renames its own record over it
+  only while the content is unchanged. A failing port probe in the failure path is logged, and
+  the Maestro failure stays the error.
+- Volatile proof scales (P2-4): every proof capture, live before, settled and updated included,
+  is at its stage's scale in the leg. The font-scale guard also reads property names spelled as
+  strings: element access (string or plain template), computed names, quoted names.
+- Sideways overflow and lost copies (P3-1): a scrolled-away record joins a volatile region
+  sideways only when it lies wholly past a window edge that region reaches. Lost text compares
+  copies: of each text, the most records one page holds, so two copies at the cold launch and one
+  live lose one.

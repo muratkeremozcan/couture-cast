@@ -47,7 +47,11 @@ stop_services() {
 trap stop_services EXIT
 
 # Metro answers its status route once it listens; then one Android bundle request builds the
-# bundle, so the app's first load does not wait for a cold build.
+# bundle, so the app's first load does not wait for a cold build. The request is the one the app
+# makes: the bundle URL Metro's own Android manifest names, entry and transform options included.
+# A fixed entry path went stale when package.json main moved to index.ts, and the app's first
+# load built its bundle cold (android-native run 43653227338).
+# -g: the query is Metro's, and curl would read [ ] { } in it as a URL glob (Antigravity r50).
 for _ in $(seq 1 90); do
   if curl -fsS --max-time 5 http://127.0.0.1:8081/status 2> /dev/null | grep -q 'packager-status:running'; then
     break
@@ -55,15 +59,15 @@ for _ in $(seq 1 90); do
   sleep 2
 done
 curl -fsS --max-time 5 http://127.0.0.1:8081/status | grep -q 'packager-status:running'
-curl -fsS --max-time 600 -o /dev/null \
-  'http://127.0.0.1:8081/node_modules/expo-router/entry.bundle?platform=android&dev=true&minify=false'
+bundle=$(curl -fsS --max-time 30 -H 'expo-platform: android' -H 'accept: application/expo+json,application/json' http://127.0.0.1:8081/ | node scripts/lib/expo-manifest-bundle-url.mjs http://127.0.0.1:8081)
+curl -fsS -g --max-time 600 -o /dev/null "$bundle"
 # The tarpit must hold its port before the flow starts; a dead one would refuse at once.
 kill -0 "$tarpit"
 
 adb -s "$ANDROID_SERIAL" install -r "$apk"
 "$HOME/.maestro/bin/maestro" --device "$ANDROID_SERIAL" test \
   -e MAESTRO_APP_ID=com.couturecast.app \
-  -e 'APP_URL=mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081' \
+  -e 'APP_URL=mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081&disableOnboarding=1' \
   --test-output-dir "$evidence/maestro" \
   maestro/network-timeout/dev-client-timeout.yaml
 # The flow's closing screenshot, where this Maestro writes it; the flow already passed.
