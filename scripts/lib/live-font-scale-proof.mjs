@@ -1497,7 +1497,9 @@ function recordTexts(capture, platform, compared) {
     if (page === lastPage)
       copies.forEach((copy, index) => {
         if (!copy.fixed) return
-        const nearest = list
+        // From every record of the page, so a fixed record drawn nowhere there is the one
+        // claimed and a compared content copy of its text stays counted.
+        const nearest = every[page]
           .filter((entry) => entry.text === copy.text && !claimed.has(entry))
           .sort((a, b) => screenGap(a, copy) - screenGap(b, copy))[0]
         if (!nearest) return

@@ -4162,6 +4162,30 @@ describe('text layout clipping (F-00i)', () => {
       ),
       false
     )
+    // TEA hold on the CodeRabbit fix: the sticky chip drawn nowhere on the last page, a content
+    // copy of its text there. The fixed copy claims the invisible chip, so the content copy
+    // still counts and losing it live is lost.
+    const content = ['Sticky chip', [200, 1500, 300, 1530]]
+    const swallow = (lastSettled) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.cold = paged(
+        change.cold,
+        [near, chip],
+        [nearOnPage1, chip],
+        [[...chip, { opacity: 0 }], content]
+      )
+      change.settled = paged(
+        change.settled,
+        [near, chip],
+        [nearOnPage1, chip],
+        lastSettled
+      )
+      return evaluateLiveFontChangeRaw(change).checks.textLost.lost.filter(
+        ({ text }) => text === 'Sticky chip'
+      )
+    }
+    assert.deepEqual(swallow([chip]), [{ stage: 'settled', text: 'Sticky chip' }])
+    assert.deepEqual(swallow([chip, content]), [])
     // CodeRabbit on PR 230, accepted residual (TEA): three Save buttons at one screen place a drag
     // apart; a ScrollView mounts all three on every page, so each page holds the others as
     // records at their own content places, and they count three. A virtualized list that
