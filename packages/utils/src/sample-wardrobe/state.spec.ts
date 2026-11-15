@@ -6,6 +6,7 @@ import { SAMPLE_CATALOG } from './catalog'
 import {
   createGuestPreviewState,
   evaluateGuestPreviewGate,
+  GUEST_PREVIEW_CONVERSION_INTENT,
   GUEST_PREVIEW_MAX_BYTES,
   GUEST_PREVIEW_RETENTION_MS,
   guestPreviewStateSchema,
@@ -15,6 +16,7 @@ import {
   resetGuestPreviewState,
   serializeGuestPreviewState,
   toSampleSelectionInput,
+  withoutConversionIntent,
   type GuestPreviewState,
 } from './state'
 import { createGuestPreviewStore, type GuestPreviewStorageAdapter } from './store'
@@ -263,6 +265,19 @@ describe('guest preview ids (U-STATE-ID-ALLOWLIST)', () => {
       toSampleSelectionInput({ ...state, selectedLookId: 'sample:l:city-wool' })
         .selectedLookId
     ).toBe('sample:l:city-wool')
+  })
+})
+
+describe('conversion intent removal (review F3)', () => {
+  it('returns the same state with no intent, leaving the input unchanged', () => {
+    const state: GuestPreviewState = {
+      ...createGuestPreviewState(START, SAMPLE_CATALOG),
+      conversion: { intent: GUEST_PREVIEW_CONVERSION_INTENT },
+    }
+    const next = withoutConversionIntent(state)
+    expect(next).not.toHaveProperty('conversion')
+    expect({ ...next, conversion: state.conversion }).toEqual(state)
+    expect(state.conversion).toEqual({ intent: GUEST_PREVIEW_CONVERSION_INTENT })
   })
 })
 

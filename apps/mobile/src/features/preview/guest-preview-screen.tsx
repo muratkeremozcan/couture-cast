@@ -16,6 +16,7 @@ import {
   selectSampleOutfit,
   toggleSampleVote,
   toSampleSelectionInput,
+  withoutConversionIntent,
   type GuestPreviewSnapshot,
   type GuestPreviewState,
   type GuestPreviewView,
@@ -48,7 +49,11 @@ function useSnapshot(enabled: boolean): GuestPreviewSnapshot | null {
       if (active) setSnapshot(next)
     })
     void store.load().then((loaded) => {
-      if (active) setSnapshot(loaded)
+      if (!active) return
+      setSnapshot(loaded)
+      // Review F3: a guest who comes back to the preview has left signup or sign-in, so a
+      // stored carryover intent no longer stands.
+      if (loaded.state?.conversion) store.update(withoutConversionIntent)
     })
     return () => {
       active = false
@@ -93,8 +98,11 @@ export function GuestPreviewScreen() {
   const [swapCategory, setSwapCategory] = useState<SampleGarmentCategory | null>(null)
 
   useEffect(() => {
-    if (session === 'member') router.replace('/')
-  }, [session])
+    if (session !== 'member') return
+    // Review F3: guest state left on this device never reaches a member.
+    store.clear()
+    router.replace('/')
+  }, [session, store])
 
   const update = (change: (current: GuestPreviewState) => GuestPreviewState) => {
     setNoAlternative(false)

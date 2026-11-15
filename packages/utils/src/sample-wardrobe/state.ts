@@ -221,3 +221,10 @@ export function evaluateGuestPreviewGate(
   if (!evaluation.gate.allowed) return { eligible: false, reason: 'underage' }
   return { eligible: true }
 }
+
+/** Review F3: the same state with no stored carryover intent. */
+export function withoutConversionIntent(state: GuestPreviewState): GuestPreviewState {
+  const next = { ...state }
+  delete next.conversion
+  return next
+}

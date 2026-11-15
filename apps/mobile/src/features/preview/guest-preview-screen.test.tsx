@@ -48,6 +48,7 @@ vi.mock('@/src/analytics/mobile-analytics', () => ({
 
 import { setMobileGuestPreviewStoreForTests } from '@/src/lib/guest-preview'
 import { initI18n } from '@/src/lib/i18n'
+import { GuestPreviewReviewScreen } from './guest-preview-review-screen'
 import { GuestPreviewScreen } from './guest-preview-screen'
 
 const en = GUEST_PREVIEW_STRINGS['en-US']
@@ -112,6 +113,47 @@ describe('mobile guest preview session check (D1)', () => {
     await render(<GuestPreviewScreen />)
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
     expect(screen.queryByTestId('guest-preview-gate')).toBeNull()
+  })
+
+  // Review F3: guest state left on a shared device never reaches a member.
+  function useStoredIntent() {
+    const store = useStore()
+    store.start()
+    store.update((state) => ({
+      ...state,
+      conversion: { intent: 'guest-preview-carryover' as const },
+    }))
+    return store.flush()
+  }
+  const storedConversion = () =>
+    (JSON.parse(adapter.value() ?? '{}') as { conversion?: unknown }).conversion
+
+  it('clears guest state when a verified member opens the preview', async () => {
+    await useStoredIntent()
+    session.state = 'member'
+    await render(<GuestPreviewScreen />)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
+  })
+
+  it('drops a stored intent when the preview opens signed out, and keeps the preview', async () => {
+    await useStoredIntent()
+    await render(<GuestPreviewScreen />)
+    expect(await screen.findByTestId('guest-preview-outfit')).toBeTruthy()
+    await waitFor(() => expect(storedConversion()).toBeUndefined())
+    expect(adapter.value()).not.toBeNull()
+  })
+
+  it('shows a member no proposal on the review after a guest backed out', async () => {
+    await useStoredIntent()
+    const guest = await render(<GuestPreviewScreen />)
+    await screen.findByTestId('guest-preview-outfit')
+    await waitFor(() => expect(storedConversion()).toBeUndefined())
+    await guest.unmount()
+    navigation.replace.mockClear()
+    await render(<GuestPreviewReviewScreen />)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    expect(screen.queryByTestId('guest-preview-review-proposed')).toBeNull()
   })
 
   it('shows a status while restoring and a retry when the session is unavailable', async () => {

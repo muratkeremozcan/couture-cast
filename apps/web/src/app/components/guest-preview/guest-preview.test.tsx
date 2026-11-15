@@ -13,6 +13,7 @@ import {
 import type * as GuestPreviewLib from '../../../lib/guest-preview'
 import { setWebGuestPreviewStoreForTests } from '../../../lib/guest-preview'
 import { GuestPreview } from './guest-preview'
+import { GuestPreviewReview } from './guest-preview-review'
 
 const navigation = vi.hoisted(() => {
   const push = vi.fn()
@@ -96,6 +97,46 @@ describe('guest preview session check (D1)', () => {
     expect(screen.getByTestId('guest-preview-checking').textContent).toBe(
       en.chrome.checkingSession
     )
+  })
+
+  // Review F3: guest state left on a shared browser never reaches a member.
+  function useStoredIntent() {
+    const store = useStore()
+    store.start()
+    store.update((state) => ({
+      ...state,
+      conversion: { intent: 'guest-preview-carryover' as const },
+    }))
+    return store.flush()
+  }
+  const storedConversion = () =>
+    (JSON.parse(adapter.value() ?? '{}') as { conversion?: unknown }).conversion
+
+  it('clears guest state when a verified member opens the preview', async () => {
+    await useStoredIntent()
+    session.resolve.mockResolvedValue('member')
+    render(<GuestPreview />)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
+  })
+
+  it('drops a stored intent when the preview opens signed out, and keeps the preview', async () => {
+    await useStoredIntent()
+    render(<GuestPreview />)
+    expect(await screen.findByTestId('guest-preview-outfit')).toBeInTheDocument()
+    await waitFor(() => expect(storedConversion()).toBeUndefined())
+    expect(adapter.value()).not.toBeNull()
+  })
+
+  it('shows a member no proposal on /preview/continue after a guest backed out', async () => {
+    await useStoredIntent()
+    const guest = render(<GuestPreview />)
+    await screen.findByTestId('guest-preview-outfit')
+    await waitFor(() => expect(storedConversion()).toBeUndefined())
+    guest.unmount()
+    render(<GuestPreviewReview />)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    expect(screen.queryByTestId('guest-preview-review-proposed')).toBeNull()
   })
 
   it('keeps an unverifiable session and offers a retry (L-RESTORE)', async () => {

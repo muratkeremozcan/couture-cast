@@ -73,7 +73,11 @@ function useWebPreviewSession(): [WebPreviewSession | 'checking', () => void] {
     void resolveWebPreviewSession().then((resolved) => {
       if (!active) return
       setSession(resolved)
-      if (resolved === 'member') router.replace('/')
+      if (resolved === 'member') {
+        // Review F3: guest state left on this browser never reaches a member.
+        webGuestPreviewStore().clear()
+        router.replace('/')
+      }
     })
     const recheck = () => setAttempt((count) => count + 1)
     window.addEventListener('couture:session', recheck)

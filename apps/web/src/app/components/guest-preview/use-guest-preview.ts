@@ -1,7 +1,11 @@
 'use client'
 // Story 6.16: React view of the web guest preview store, kept in step with other tabs.
 import { useEffect, useState } from 'react'
-import type { GuestPreviewSnapshot, GuestPreviewStore } from '@couture/utils'
+import {
+  withoutConversionIntent,
+  type GuestPreviewSnapshot,
+  type GuestPreviewStore,
+} from '@couture/utils'
 import { GUEST_PREVIEW_STORAGE_KEY } from '../../../lib/guest-preview'
 
 export function useGuestPreviewSnapshot(store: GuestPreviewStore, enabled: boolean) {
@@ -14,7 +18,11 @@ export function useGuestPreviewSnapshot(store: GuestPreviewStore, enabled: boole
       if (active) setSnapshot(next)
     })
     void store.load().then((loaded) => {
-      if (active) setSnapshot(loaded)
+      if (!active) return
+      setSnapshot(loaded)
+      // Review F3: a guest who comes back to the preview has left signup or sign-in, so a
+      // stored carryover intent no longer stands.
+      if (loaded.state?.conversion) store.update(withoutConversionIntent)
     })
     // TEA-6: an exit, reset or sign-in in another tab is adopted here, and this tab's
     // queued writes from before it are dropped.
