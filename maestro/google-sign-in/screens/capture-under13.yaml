@@ -1,0 +1,33 @@
+# Story 6.17 M lane screens: the Create account door, the finish step form and the under-13
+# outcome, captured with the ${SCREEN_MODE} (light or dark) suffix. The runner
+# (scripts/run-google-native.mjs --screens) sets the system night mode before the app starts.
+appId: ${MAESTRO_APP_ID}
+name: 'Capture Google signup screens'
+tags:
+  - google-sign-in-screens
+---
+- runFlow: ../steps/open-home.yaml
+- tapOn:
+    id: 'home-create-account'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+- waitForAnimationToEnd
+- takeScreenshot: signup-${SCREEN_MODE}
+- runFlow: ../steps/continue-with-google.yaml
+- runFlow: ../steps/finish-step.yaml
+- tapOn:
+    id: 'finish-signup-birthdate'
+- inputText: ${BIRTHDATE}
+- hideKeyboard
+- waitForAnimationToEnd
+- takeScreenshot: finish-form-${SCREEN_MODE}
+- tapOn:
+    id: 'finish-signup-create'
+- extendedWaitUntil:
+    visible:
+      id: 'finish-signup-outcome'
+    timeout: 30000
+- waitForAnimationToEnd
+- takeScreenshot: under13-outcome-${SCREEN_MODE}

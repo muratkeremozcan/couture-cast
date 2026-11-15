@@ -8,6 +8,10 @@
  *   REDIS_URL=redis://127.0.0.1:<port> node scripts/run-google-native.mjs \
  *     --apk apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk \
  *     --device emulator-5554 [--flows google-new-account,google-under13] [--evidence <dir>]
+ *     [--screens <dir>]
+ *
+ * `--screens` also captures the signup door, the finish step, the under-13 outcome and a teen's
+ * guardian step in light and dark mode (maestro/google-sign-in/screens/) into that directory.
  *
  * The client is built beforehand, with STORY65_NATIVE_TEST_BUILD=1 so it is
  * com.couturecast.story65 with the couturecast-story65 scheme (apps/mobile/app.config.ts), the
@@ -59,6 +63,8 @@ import {
 } from './e2e-real-session/stack.mjs'
 import {
   GOOGLE_NATIVE_APP_ID,
+  GOOGLE_NATIVE_CAPTURES,
+  GOOGLE_NATIVE_SCREEN_MODES,
   GOOGLE_NATIVE_FLOW_DIR,
   GOOGLE_NATIVE_PORTS,
   devClientUrl,
@@ -322,7 +328,7 @@ async function main() {
   }
 
   /** One flow: records, queues, clears and opens the app, runs Maestro, checks the state. */
-  const runFlow = async (flow, strings, database) => {
+  const runFlow = async (flow, strings, database, extraEnv = {}) => {
     const started = Date.now()
     const email = harnessEmail()
     const otpEmail = flow.otpEmail ? harnessEmail() : undefined
@@ -336,9 +342,10 @@ async function main() {
       'shell',
       `am start -a android.intent.action.VIEW -d '${devClientUrl()}' ${GOOGLE_NATIVE_APP_ID}`
     )
-    const output = path.join(maestroDir, flow.name)
+    const label = flow.name.replace('/', '-')
+    const output = path.join(maestroDir, label)
     fs.mkdirSync(output, { recursive: true })
-    const env = flowEnv(flow, { email, otpEmail, strings })
+    const env = { ...flowEnv(flow, { email, otpEmail, strings }), ...extraEnv }
     const maestro = run(
       maestroBinary(),
       [
@@ -364,9 +371,11 @@ async function main() {
       }
     )
     const text = redactSecrets(`${maestro.stdout}\n${maestro.stderr}`, secrets)
-    fs.writeFileSync(path.join(logDir, `maestro-${flow.name}.log`), text)
+    fs.writeFileSync(path.join(logDir, `maestro-${label}.log`), text)
     const problems =
-      maestro.status === 0 ? await checkFlow(flow, database, email, memberId) : []
+      maestro.status === 0 && flow.expect
+        ? await checkFlow(flow, database, email, memberId)
+        : []
     const result = {
       flow: flow.name,
       passed: maestro.status === 0 && problems.length === 0,
@@ -534,6 +543,29 @@ async function main() {
       owner.assertRunning()
       state.results.push(await runFlow(flow, strings, database))
     }
+    if (args.screens) {
+      // Each mode is set before a cleared app starts, so the app reads it at launch.
+      const screens = path.resolve(args.screens)
+      fs.mkdirSync(screens, { recursive: true })
+      for (const mode of GOOGLE_NATIVE_SCREEN_MODES) {
+        adbRun('shell', 'cmd', 'uimode', 'night', mode === 'dark' ? 'yes' : 'no')
+        for (const capture of GOOGLE_NATIVE_CAPTURES) {
+          owner.assertRunning()
+          state.results.push(
+            await runFlow(capture, strings, database, { SCREEN_MODE: mode })
+          )
+          // Maestro writes takeScreenshot files only inside the flow's own output folder.
+          const output = path.join(maestroDir, capture.name.replace('/', '-'))
+          for (const entry of fs.readdirSync(output, { recursive: true }))
+            if (String(entry).endsWith(`-${mode}.png`))
+              fs.copyFileSync(
+                path.join(output, String(entry)),
+                path.join(screens, path.basename(String(entry)))
+              )
+        }
+      }
+      adbRun('shell', 'cmd', 'uimode', 'night', 'no')
+    }
     return state.results.every((result) => result.passed) ? 0 : 1
   }
 
@@ -588,7 +620,7 @@ async function main() {
     })
   const exitCode = await lifecycle.done
   const passed = state.results.filter((result) => result.passed).length
-  log(`${passed}/${flows.length} flow(s) passed; exit code ${exitCode}.`)
+  log(`${passed}/${state.results.length} flow(s) passed; exit code ${exitCode}.`)
   return exitCode
 }
 

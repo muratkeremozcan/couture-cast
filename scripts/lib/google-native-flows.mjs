@@ -82,6 +82,17 @@ export const GOOGLE_NATIVE_FLOWS = Object.freeze([
   },
 ])
 
+/**
+ * `--screens <dir>`: flows under maestro/google-sign-in/screens/ that capture the signup door,
+ * the finish step form, the under-13 outcome and a teen's guardian step, in light and dark mode.
+ * Their addresses are recorded and cleaned up like the flows'; they prove nothing about state.
+ */
+export const GOOGLE_NATIVE_SCREEN_MODES = Object.freeze(['light', 'dark'])
+export const GOOGLE_NATIVE_CAPTURES = Object.freeze([
+  { name: 'screens/capture-under13', birthdate: 'under13' },
+  { name: 'screens/capture-teen', birthdate: 'teen' },
+])
+
 /** The flows a `--flows a,b` argument names, in table order; every name must exist. */
 export function selectGoogleNativeFlows(argument) {
   if (!argument) return [...GOOGLE_NATIVE_FLOWS]
@@ -111,6 +122,7 @@ export function birthdateYearsAgo(age, now = new Date()) {
 
 export function flowBirthdate(flow, now = new Date()) {
   if (flow.birthdate === 'under13') return birthdateYearsAgo(10, now)
+  if (flow.birthdate === 'teen') return birthdateYearsAgo(14, now)
   if (flow.birthdate === 'adult') return birthdateYearsAgo(30, now)
   return undefined
 }

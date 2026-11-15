@@ -8,6 +8,7 @@ import path from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import {
+  GOOGLE_NATIVE_CAPTURES,
   GOOGLE_NATIVE_FLOWS,
   GOOGLE_NATIVE_FLOW_DIR,
   GOOGLE_NATIVE_PORTS,
@@ -71,6 +72,20 @@ describe('Google device flow table', () => {
         otpEmail: 'b@example.test',
         strings,
       })
+      const missing = [...variablesOf(path.join(flowDir, `${flow.name}.yaml`))].filter(
+        (name) => !(name in env)
+      )
+      assert.deepEqual(missing, [], `${flow.name} reads values the runner never passes`)
+    }
+  })
+
+  test('gives every screen capture flow each value it reads', () => {
+    for (const flow of GOOGLE_NATIVE_CAPTURES) {
+      const env = {
+        ...flowEnv(flow, { email: 'a@example.test', strings }),
+        SCREEN_MODE: 'dark',
+      }
+      assert.ok(env.BIRTHDATE, `${flow.name} types a birthdate`)
       const missing = [...variablesOf(path.join(flowDir, `${flow.name}.yaml`))].filter(
         (name) => !(name in env)
       )
