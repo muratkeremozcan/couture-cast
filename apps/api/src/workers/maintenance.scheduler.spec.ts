@@ -56,6 +56,8 @@ function schedulerCall(
   return calls.find((call) => call[0] === jobName)
 }
 
+// Learning path Step 57: Google sign-in.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
 describe('Story 6.17 TEA-4: registerOrphanAuthUserSweepScheduler', () => {
   it('registers one daily scheduler at 04:00 UTC', async () => {
     const { queue, calls } = createQueue()

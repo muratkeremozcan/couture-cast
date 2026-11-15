@@ -19,6 +19,7 @@ const secondaryRoutes = [
   '/guardian/accept',
   '/guardian/dashboard',
   '/teen/dashboard',
+  // Learning path Step 57 (#step-57-google-sign-in): the public legal pages Story 6.17 adds.
   '/privacy',
   '/terms',
 ] as const

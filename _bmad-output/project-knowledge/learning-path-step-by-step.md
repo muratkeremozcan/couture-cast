@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
 Updated: 2026-11-15.
-Added Steps 40 to 56:
+Added Steps 40 to 57:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -19,7 +19,8 @@ Added Steps 40 to 56:
 - Step 53: Story 6.13, immutable moderation history, `63bd6fcd` (PR #197), merged on 2026-11-06.
 - Step 54: Story 6.14, complimentary full access, `1fa40089` (PR #198), merged on 2026-11-10.
 - Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
-- Step 56: Story 6.16, guest wardrobe and outfit preview, in review on `feat/story-6-16-guest-wardrobe-outfit-preview`.
+- Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
+- Step 57: Story 6.17, Google sign-in, in review on `feat/story-6-17-google-sign-in`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -27,6 +28,9 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 57 for Story 6.17 while its PR is in review, with Step 57 in `Current position` and `The whole project in plain English`.
+Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+Moved Step 56 to completed after PR #234 merged as `08ac8314`.
 Added Step 56 for Story 6.16 while its PR is in review, with Step 56 in `Current position` and `The whole project in plain English`.
 Step 56 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Closed Story 6.15 at its Step 0 by owner ruling on 2026-11-14: PRs #226 and #229 merged and PR #230 closes it; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, backlog in `sprint-status.yaml`.
@@ -126,14 +130,17 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 56, Story 6.16, guest wardrobe and outfit preview, `in-progress` in `sprint-status.yaml`.
+- In review: Step 57, Story 6.17, Google sign-in, `review` in `sprint-status.yaml`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
+  Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
+- Latest completed step: Step 56, Story 6.16, guest wardrobe and outfit preview, status `done`, merged as `08ac8314` (PR #234) on 2026-11-15.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-16-guest-wardrobe-outfit-preview.md`.
   Step 56 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 - Closing: Step 55, Story 6.15, SDK 54 readiness and the live font-scale proof, `done` in `sprint-status.yaml` with PR #230.
   PRs #226 (`814ce811`) and #229 (`f49027e4`) merged on SDK 54; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, `backlog`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`.
   Step 55 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
-- Latest completed step: Step 54, Story 6.14, complimentary full access, status `done`, merged as `1fa40089` (PR #198) on 2026-11-10.
+- Step 54, Story 6.14, complimentary full access, status `done`, merged as `1fa40089` (PR #198) on 2026-11-10.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-14-complimentary-full-access.md`.
   Step 54 was written before review and merge, and its `Evidence boundaries` section records the production checks run after merge.
   No grant exists in production yet, and dispatch stays off: both wait on owner actions listed there.
@@ -286,6 +293,7 @@ Read it before changing or adding a numbered step.
 |   54 | Let the owner give a member everything free. Keep the gift out of billing.   |
 |   55 | Climb one SDK at a time to the fix. Make text grow live with no restart.     |
 |   56 | Let visitors try a sample closet first. Save only comfort, and only on yes.  |
+|   57 | Sign in with Google. Ask a new person only their birthdate.                  |
 
 ## Special feature: AI garment tagging
 
@@ -11456,3 +11464,240 @@ Evidence boundaries:
 - Mobile runs on the same core in Vitest browser mode; the Android Maestro guest flow runs in its own
   signed-out shard (TEA-8). The mobile conversion note is shown at all times, because the app has
   no network-state dependency to show it only offline.
+
+## Step 57: Google sign-in
+
+User/business impact:
+
+Creating an account took two steps on every platform: signup stored an email and a birthdate and
+signed nobody in, then Sign in sent a six-digit code to the mailbox.
+For a teen on a phone that detour is where most attempts stop.
+Story 6.17 adds "Continue with Google" to sign-in and signup on web, iOS and Android.
+A returning member picks a Google account and is in. A new address answers one question, a
+birthdate, on "Finish creating your account"; the server runs the same age gate as email signup.
+Ages 13 to 15 land in the existing guardian consent state with the guardian invitation step.
+Under 13 is refused and the Google identity Supabase created is deleted. Email codes still work.
+
+Key takeaways:
+
+1. **One provider, one flow, every platform.**
+   Supabase's Google provider runs through the system browser with PKCE: a page redirect on web,
+   ASWebAuthenticationSession and Custom Tabs on mobile. The decision record in D1 explains why
+   the native Google SDK was turned down (iOS nonce bypass, signing-key fingerprints before store
+   enrollment, a deprecated Android SDK).
+2. **The address comes from the verified identity, never the body.**
+   `POST /api/v1/auth/signup/federated` takes only `{ birthdate }` (strict) and reads the address
+   from `GET /auth/v1/user` with the bearer, twice: once to learn it, again inside the address
+   lock, so a cancel in one tab and a finish in another cannot strand an account.
+3. **Refusal deletes what Supabase already kept.**
+   Supabase creates the Auth user, with Google's name and avatar, before CoutureCast knows the age.
+   An under-13 refusal and a cancelled finish delete it through the Auth Admin API, only while no
+   account owns the address.
+4. **An orphan sweep covers what no click deletes.**
+   A closed tab leaves an identity with no account. A daily sweep deletes Auth users older than a
+   day that no account owns, inside the same lock, only for users this database holds in
+   `auth.users`, and only where `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` names the worker.
+5. **The code never stays in a URL.**
+   The callback takes `code`, `error` and the fragment out of the address bar before anything
+   else runs, exchanges the code once even under a double effect, and shows fixed copy for every
+   provider error.
+6. **The 6.16 conversion rides through Google.**
+   `from=preview` is the only state the round trip keeps; the destination rule is the one email
+   sign-in uses, now shared in `post-signin-destination.ts` on both clients.
+7. **No Google token is stored anywhere.**
+   The app reads only the verified address. Both clients store the Supabase session through
+   `withoutProviderTokens`, which drops `provider_token` and `provider_refresh_token` before the
+   session reaches localStorage or SecureStore.
+8. **Public legal pages, every sentence backed by code.**
+   Google's consent screen needs a home page, a privacy policy and terms before it leaves
+   Testing. `/privacy` and `/terms` render on the server for signed-out visitors, and the test
+   pins each sentence a review against the code had to correct (D12).
+
+Hard-won lessons from the implementation and code review of this story:
+
+- The first sweep ran at every worker boot. The E2E worker boots against an isolated database
+  with the laptop's service role key, so it would have deleted every local Auth user that database
+  did not hold. The sweep now needs an explicit flag, refuses test environments, and checks
+  pairing with `auth.users` before each deletion (TEA-14).
+- A unit spec reached the real local Auth server through `.env.local` before the sweep moved
+  behind the worker runtime's mock; unit runs now blank the service role key.
+- A guardian-only account claiming age 12 hit the under-13 branch first and deleted its Auth user;
+  the guardian check now runs first and nothing is deleted while any row owns the address.
+- A 404 from a wrong `SUPABASE_URL` looked like "already deleted"; only Auth's `user_not_found`
+  counts now.
+- GoTrue repeats OAuth errors in the URL fragment and reports an unverified provider address as
+  `access_denied` with `error_code=provider_email_needs_verification`; that is a refusal, not a
+  cancel (TEA-11, TEA-12).
+- Local GoTrue ignores a URL override for the Google provider, so the real-stack lane signs in
+  through a Keycloak stand-in on a mock OIDC server; app code always asks for `google`.
+- A server page imported a door helper from a `'use client'` module. Vitest and the build passed;
+  only the real server render crashed, caught by the real-session lane. Helpers a server page
+  calls live in `@couture/utils`.
+- Android's Custom Tabs polyfill treats a callback as a success only when it starts with the
+  return URL. Auth puts `code` before `from=preview`, so a return URL carrying `?from=preview`
+  turned every preview conversion into "cancelled". The browser session now watches the bare
+  callback URL; only the Android device lane showed it.
+- The finish step's default seams were new functions on every render, so each state change
+  re-read the identity and an under-13 refusal flipped to "Your Google sign-in has ended".
+- The first privacy text claimed no Google token was stored. Supabase returns Google's access
+  token with the session, and supabase-js persisted it on the device; the text review against the
+  code found it, and both clients now strip it.
+- Light and dark captures on a device found what unit tests did not: signup's fixed dark colors
+  left white typed text on the light page, the Google entry was fixed to the dark theme, and
+  sign-in's labels were black on the dark page. All three screens now take the OS scheme tokens,
+  pinned by tests that render both schemes.
+
+Story/Task mapping:
+
+- Task 1 (register 6-17), Task 2 (Google Cloud, Supabase and env setup)
+- Task 3 (contract, OpenAPI, federated endpoints, Auth Admin, orphan sweep)
+- Task 4 (web PKCE, callback, finish step, Google button), Task 5 (mobile equivalents)
+- Task 6 (6.16 conversion through Google), Task 7 (localization and accessibility)
+- Task 8 (TEA specs and journeys), Task 9 (real Google evidence), Task 10 (this step)
+- D12 (public privacy and terms pages, consent screen published)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`, decisions D1 to D12, the
+  I/O matrix and the Plan Change Log
+- `_bmad-output/test-artifacts/test-design/cc617-google-sign-in-test-design.md`, the risk register
+  and rulings TEA-1 to TEA-15
+- `_bmad-output/test-artifacts/story-6-17/`, the evidence directory
+
+Cross-links:
+
+- Step 43 provides the verified web and native sessions and the real-session Playwright lane.
+- Step 54 provides the complimentary grant CLI the owner runs after a family member signs up.
+- Step 56 provides the guest preview whose conversion this step carries through Google.
+
+Sequence to follow:
+
+1. `packages/api-client/src/contracts/http/auth.ts` (the federated contract).
+2. `apps/api/src/modules/auth/auth.service.ts`, `auth.controller.ts` and
+   `access-token-identity.service.ts`.
+3. `apps/api/src/modules/auth/supabase-auth-admin.ts` and `orphan-auth-user-sweep.ts`.
+4. `apps/web/src/lib/web-session.ts`, `oauth-callback-url.ts`, then
+   `apps/web/src/app/auth/callback/page.tsx` and `apps/web/src/app/signup/finish/`.
+5. `apps/mobile/src/lib/native-session.ts`, `native-oauth-flight.ts`, `app/+native-intent.tsx`,
+   `app/auth/callback.tsx` and `src/features/signup/finish-signup-screen.tsx`.
+6. `packages/utils/src/federated-signin/` (copy, the Google mark and `session-storage.ts`) and
+   `supabase/config.toml`.
+7. `apps/web/src/app/privacy/page.tsx`, `apps/web/src/app/terms/page.tsx` and
+   `apps/web/src/app/components/legal-page.tsx`.
+
+Task owner map:
+
+- Story 6.17 Task 3 owner: create accounts for verified federated identities in `apps/api/src/modules/auth/auth.service.ts`, routed by `apps/api/src/modules/auth/auth.controller.ts`, delete refused identities through `apps/api/src/modules/auth/supabase-auth-admin.ts`, and sweep orphans in `apps/api/src/modules/auth/orphan-auth-user-sweep.ts`, scheduled by `apps/api/src/workers/maintenance.scheduler.ts` and `apps/api/src/workers/community.bootstrap.ts`.
+- Story 6.17 Task 4 owner: run the web round trip in `apps/web/src/lib/web-session.ts`, `apps/web/src/lib/oauth-callback-url.ts`, `apps/web/src/app/auth/callback/page.tsx` and `apps/web/src/app/signup/finish/finish-signup-form.tsx`, entered from `apps/web/src/app/components/google-sign-in-button.tsx`.
+- Story 6.17 Task 5 owner: run the mobile round trip in `apps/mobile/src/lib/native-session.ts`, `apps/mobile/src/lib/native-oauth-flight.ts`, `apps/mobile/app/+native-intent.tsx`, `apps/mobile/app/auth/callback.tsx` and `apps/mobile/src/features/signup/finish-signup-screen.tsx`, entered from `apps/mobile/src/features/signup/google-sign-in-button.tsx`.
+
+Tests that cover this step:
+
+API, Vitest:
+
+- [`apps/api/integration/federated-signup.integration.spec.ts`](../../apps/api/integration/federated-signup.integration.spec.ts):
+  proves the three federated verbs on a real database: the bearer-only address, the strict body,
+  the age gate, guardian-only rows, the shared lock against cancel and email signup, and 503 with
+  nothing written when Auth is down.
+- [`apps/api/integration/orphan-auth-user-sweep.integration.spec.ts`](../../apps/api/integration/orphan-auth-user-sweep.integration.spec.ts):
+  proves the 24-hour boundary, the skips, paging, failure handling and the `auth.users` pairing.
+- [`apps/api/src/modules/auth/supabase-auth-admin.spec.ts`](../../apps/api/src/modules/auth/supabase-auth-admin.spec.ts):
+  proves the Admin API calls, `user_not_found`, fail-closed configuration and paging by total.
+- [`apps/api/src/modules/auth/orphan-auth-user-sweep.spec.ts`](../../apps/api/src/modules/auth/orphan-auth-user-sweep.spec.ts):
+  proves the sweep's gate and that the flag is documented.
+- [`apps/api/src/workers/maintenance.scheduler.spec.ts`](../../apps/api/src/workers/maintenance.scheduler.spec.ts):
+  proves the daily 04:00 UTC sweep schedule and its removal when the flag is off.
+- [`apps/api/src/workers/community.bootstrap.spec.ts`](../../apps/api/src/workers/community.bootstrap.spec.ts):
+  proves the hosted worker runs the sweep only behind the flag (with `bootstrap.spec.ts`,
+  `maintenance.processor.spec.ts` and `community-worker-runtime.spec.ts`).
+
+Web, Vitest:
+
+- [`apps/web/src/lib/web-session.google.test.ts`](../../apps/web/src/lib/web-session.google.test.ts):
+  proves PKCE, the exact start, every callback outcome, one exchange per code, one re-check and
+  a stored session without Google's tokens.
+- [`apps/web/src/lib/oauth-callback-url.test.ts`](../../apps/web/src/lib/oauth-callback-url.test.ts):
+  proves only `from=preview` survives the callback URL.
+- [`apps/web/src/app/auth/callback/page.test.tsx`](../../apps/web/src/app/auth/callback/page.test.tsx):
+  proves the callback page's outcome routing and that the code leaves the address bar.
+- [`apps/web/src/app/signup/finish/finish-signup-form.test.tsx`](../../apps/web/src/app/signup/finish/finish-signup-form.test.tsx):
+  proves the finish form's inline birthdate messages, refusals, Cancel and the guardian step.
+- [`apps/web/src/app/signin/page.google.test.tsx`](../../apps/web/src/app/signin/page.google.test.tsx):
+  proves the sign-in door's Google outcomes and fixed messages.
+- [`apps/web/src/app/components/session-bridge.resume.test.tsx`](../../apps/web/src/app/components/session-bridge.resume.test.tsx):
+  proves an abandoned finish step resumes from the server status, and the callback, finish and
+  legal pages are left alone.
+- [`apps/web/src/analytics/browser-analytics.test.ts`](../../apps/web/src/analytics/browser-analytics.test.ts):
+  proves an OAuth `code` is masked like other credentials.
+
+Mobile, Vitest:
+
+- [`apps/mobile/src/lib/native-session.google.test.ts`](../../apps/mobile/src/lib/native-session.google.test.ts):
+  proves the native start, the bare return URL Android needs, every callback outcome, the
+  stand-in refusal and a SecureStore session without Google's tokens.
+- [`apps/mobile/src/lib/native-intent.oauth.test.ts`](../../apps/mobile/src/lib/native-intent.oauth.test.ts):
+  proves the callback link is dropped while a round trip waits and routed on a cold start, and
+  that nothing else matches.
+- [`apps/mobile/src/lib/app-scheme.test.ts`](../../apps/mobile/src/lib/app-scheme.test.ts):
+  proves both URL schemes the callback can arrive on.
+- [`apps/mobile/src/screens/finish-signup-outcomes.test.tsx`](../../apps/mobile/src/screens/finish-signup-outcomes.test.tsx):
+  proves outcomes stay on screen, the header title per phase and the under-13 error alert.
+- [`apps/mobile/src/screens/signup-finish-back.test.tsx`](../../apps/mobile/src/screens/signup-finish-back.test.tsx):
+  proves Android Back on the finish step acts as Cancel.
+- [`apps/mobile/src/screens/home-federated-resume.test.tsx`](../../apps/mobile/src/screens/home-federated-resume.test.tsx):
+  proves Home resumes an abandoned finish step on focus.
+- [`apps/mobile/src/screens/oauth-callback-route.test.tsx`](../../apps/mobile/src/screens/oauth-callback-route.test.tsx):
+  proves the cold-start callback route hands a fixed outcome to sign-in.
+- [`apps/mobile/src/screens/signin-google.test.tsx`](../../apps/mobile/src/screens/signin-google.test.tsx):
+  proves the sign-in door's Google outcomes and the email code's destination rule.
+- [`apps/mobile/src/screens/google-entry-schemes.test.tsx`](../../apps/mobile/src/screens/google-entry-schemes.test.tsx):
+  proves Google's button and the "or" rule follow the OS scheme with legible contrast.
+- [`apps/mobile/src/screens/signin-schemes.test.tsx`](../../apps/mobile/src/screens/signin-schemes.test.tsx):
+  proves sign-in's page, labels, fields and button follow the OS scheme.
+
+Shared, Vitest:
+
+- [`packages/utils/src/federated-signin/strings.spec.ts`](../../packages/utils/src/federated-signin/strings.spec.ts):
+  proves ten locales with one key set and the clients' base-language fallbacks.
+- [`packages/utils/src/federated-signin/session-storage.spec.ts`](../../packages/utils/src/federated-signin/session-storage.spec.ts):
+  proves the stored session drops Google's tokens and nothing else changes.
+
+E2E, Playwright:
+
+- [`playwright/tests/google-sign-in-real-session.spec.ts`](../../playwright/tests/google-sign-in-real-session.spec.ts):
+  proves the web round trip on the real stack through the Keycloak stand-in: new adult, teen,
+  under 13, linking, resume, cancel, preview conversion and a stored session without the token.
+- [`playwright/tests/legal-pages.spec.ts`](../../playwright/tests/legal-pages.spec.ts):
+  proves the legal pages render signed out without JavaScript, link from every entry point and
+  keep each corrected sentence.
+- [`playwright/tests/accessibility-hardening.spec.ts`](../../playwright/tests/accessibility-hardening.spec.ts):
+  proves axe and landmark checks cover `/privacy` and `/terms`.
+- [`playwright/support/helpers/google-stand-in.spec.ts`](../../playwright/support/helpers/google-stand-in.spec.ts):
+  proves the stand-in helper swaps only the provider and records what the app asked for.
+
+Mobile E2E, Maestro:
+
+- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): seven Android flows (new account,
+  existing member, under 13, cancelled chooser, Back on the finish step, relaunch resume, preview
+  conversion) and two capture flows for light and dark screens, run by
+  `scripts/run-google-native.mjs`.
+
+CI script, node:test:
+
+- [`scripts/ci/revenuecat-bundle-scan.test.mjs`](../../scripts/ci/revenuecat-bundle-scan.test.mjs):
+  proves the release bundle scan also fails on the planted OAuth stand-in sentinel.
+- [`scripts/ci/supabase-auth-config-probe.test.mjs`](../../scripts/ci/supabase-auth-config-probe.test.mjs):
+  proves the hosted Auth configuration probe.
+- [`scripts/lib/google-native-flows.test.mjs`](../../scripts/lib/google-native-flows.test.mjs):
+  proves the Maestro flow table.
+- [`scripts/ci/android-native-workflow.test.mjs`](../../scripts/ci/android-native-workflow.test.mjs):
+  proves the Android workflow runs the Google lane.
+
+Evidence boundaries:
+
+- The Google OAuth consent screen is published (In production) with the public `/privacy` and
+  `/terms` pages; those URLs answer on production once this PR deploys.
+- Real Google is exercised by hand; CI signs in through the Keycloak stand-in only.
+- The orphan sweep runs on production only after `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` is set on
+  the hosted community worker at release.
+- The legal pages are engineering copy matched to the code, not counsel-reviewed text.

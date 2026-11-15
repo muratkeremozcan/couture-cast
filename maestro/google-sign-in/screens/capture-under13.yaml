@@ -15,7 +15,16 @@ tags:
     timeout: 15000
 - waitForAnimationToEnd
 - takeScreenshot: signin-${SCREEN_MODE}
-# Sign in has no focused field, so Back leaves the screen.
+# Typed text, to prove the input's text color. The label and its EditText share one accessible
+# name; index 1 is the input (maestro/story65/signin-request.yaml).
+- tapOn:
+    text: 'Email'
+    index: 1
+- inputText: ${GOOGLE_EMAIL}
+- hideKeyboard
+- waitForAnimationToEnd
+- takeScreenshot: signin-typed-${SCREEN_MODE}
+# The keyboard is closed, so Back leaves the screen.
 - back
 - extendedWaitUntil:
     visible:

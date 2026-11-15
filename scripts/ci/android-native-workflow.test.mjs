@@ -558,6 +558,8 @@ describe('android-network-timeout.sh', () => {
 })
 
 // Story 6.17 M lane: the Google sign-in flows on the isolated client, nightly and on dispatch.
+// Learning path Step 57: Google sign-in.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
 describe('android-native.yml android-google-sign-in', () => {
   const google = (workflow) => workflow.jobs[GOOGLE_JOB]
   const rejectedGoogle = (title, expected, change) =>

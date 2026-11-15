@@ -1,3 +1,5 @@
+// Learning path Step 57: Google sign-in.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
 // Story 6.17 H-SETTINGS and H-AUTHORIZE: the rules the hosted probe applies.
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
