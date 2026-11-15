@@ -845,7 +845,7 @@ jobs:
           node scripts/e2e-share-card/web.mjs start > "$CC68_HARNESS_DIR/web-startup-private.log" 2>&1 &
           node scripts/e2e-share-card/wait-web.mjs
           # TEMPORARY burn-in for the webkit download flake; reverted before merge.
-          npx playwright test --config playwright/share-card.config.ts --repeat-each 3 --reporter=list
+          npx playwright test --config playwright/share-card.config.ts --project webkit --repeat-each 5 --reporter=list
       - name: Report owned background service exits
         if: always()
         # Logs stay private: they can carry owned-runtime credentials.
