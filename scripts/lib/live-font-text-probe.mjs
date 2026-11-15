@@ -13,7 +13,7 @@
 //     windows: [{ id, rect, z, focused }],
 //     records: [{ kind, text, window, viewRect, visibleRect|null, clipRect|null, contentRect,
 //                 scrolledAway, lineCount, maxLines|null, ellipsized, unlimitedLineCount|null,
-//                 opacity, accessibilityHidden, offWindow? }] }
+//                 opacity, accessibilityHidden, scrollViewport|null, offWindow? }] }
 // Rects are [left, top, right, bottom]: screen pixels on Android (as uiautomator bounds), window
 // points on iOS (as Maestro iOS bounds). `visibleRect` is the view cut by every clipping ancestor
 // and the window; `clipRect` is the view cut by every clipping ancestor except scroll views and
@@ -24,7 +24,10 @@
 // (TEA ruling r49, both platforms, required) is true when the text view is hidden from
 // accessibility (importantForAccessibility no-hide-descendants, accessibilityElementsHidden, or
 // not accessible inside an accessible parent), so no hierarchy node carries its text. Stored
-// answers from before the field read as false in the matcher only.
+// answers from before the field read as false in the matcher only. `scrollViewport` (TEA ruling
+// r49 P2-2, both platforms, required) is the viewport of the nearest scroll view that can move
+// the text sideways, cut by everything above it and the window, or null when none holds it; a
+// record scrolled away sideways joins the volatile region that holds that viewport.
 //
 // Android: `am broadcast -a com.couturecast.textlayoutprobe.DUMP --es token <t> -p <package>`,
 // then `logcat -d -s TextLayoutProbe` lines `begin <t> <chunks> <sha256>`, `chunk <t> <i>
@@ -94,6 +97,7 @@ const RECORD_FIELDS = [
   'unlimitedLineCount',
   'opacity',
   'accessibilityHidden',
+  'scrollViewport',
 ].sort()
 const ANSWER_FIELDS = ['elements', 'platform', 'records', 'token', 'version', 'windows']
 /**
@@ -134,6 +138,7 @@ const isMaxLines = (value) => Number.isSafeInteger(value) && value > 0
 const RECORD_RULES = [
   ['text', (record) => typeof record.text === 'string'],
   ['accessibilityHidden', (record) => typeof record.accessibilityHidden === 'boolean'],
+  ['scrollViewport', (record) => nullOr(isRect)(record.scrollViewport)],
   ['viewRect', (record) => isRect(record.viewRect)],
   ['contentRect', (record) => isRect(record.contentRect)],
   ['visibleRect', (record) => nullOr(isRect)(record.visibleRect)],
@@ -661,7 +666,7 @@ export function coveredWindows(windows, tolerance) {
 }
 
 /** Each record's class (see matchTextProbe) and, for one in a volatile region, the region's index. */
-function classifyRecords(records, coveredIds, volatileRegions, tolerance, window) {
+function classifyRecords(records, coveredIds, volatileRegions, tolerance) {
   const classes = {
     empty: [],
     covered: [],
@@ -677,7 +682,7 @@ function classifyRecords(records, coveredIds, volatileRegions, tolerance, window
   const regionOf = new Map()
   const kinds = []
   for (const record of records) {
-    const region = regionOfRecord(record, volatileRegions, window, tolerance)
+    const region = regionOfRecord(record, volatileRegions)
     let kind = 'visible'
     if (record.text === '') kind = 'empty'
     else if (coveredIds.get(record.window)?.whole) kind = 'covered'
@@ -734,32 +739,27 @@ const volatileRegionOf = (record, volatileRegions) => {
 }
 
 /**
- * A record scrolled out sideways past a volatile region's edge, its centre within the region's
- * height (a filter chip the row scrolled off screen, Android 6c85bbb4 Community cold 1.5 "Cold
- * and dry" at x 1315): the region's index, or -1. The hierarchy cuts a region to what shows, so
- * the chip's own centre lies outside it. Since r48 P3-1 the record lies wholly past a window
- * edge the region reaches (within the tolerance), so the region is cut there by the window and
- * the record continues its row; a record beside a region that stops inside the window (another
- * column) is none of its own, and with no window known none is.
+ * A record scrolled out sideways in a volatile region (a filter chip the row scrolled off screen,
+ * Android 6c85bbb4 Community cold 1.5 "Cold and dry" at x 1315): the index of the region whose
+ * box holds the centre of the record's `scrollViewport`, the viewport of the nearest scroll
+ * view that can move it sideways, or -1. The hierarchy cuts a region to what shows, so the
+ * chip's own centre lies outside it; the viewport it scrolls in ties it to the region (TEA ruling
+ * r49 P2-2), whatever the padding or the window edge. A record with no viewport, or from an
+ * answer before the field, belongs to no region this way.
  */
-const overflowRegionOf = (record, volatileRegions, window, tolerance) => {
-  if (!window) return -1
-  const rect = recordRect(record)
-  const [, y] = centre(rect)
+const overflowRegionOf = (record, volatileRegions) => {
+  if (!isRect(record.scrollViewport)) return -1
+  const [x, y] = centre(record.scrollViewport)
   return volatileRegions.findIndex(
-    (region) =>
-      y >= region[1] &&
-      y <= region[3] &&
-      ((rect[0] >= window[2] - tolerance && region[2] >= window[2] - tolerance) ||
-        (rect[2] <= window[0] + tolerance && region[0] <= window[0] + tolerance))
+    (region) => x >= region[0] && x <= region[2] && y >= region[1] && y <= region[3]
   )
 }
 
 /** The volatile region a record belongs to: by its centre, or, scrolled away, by overflow. */
-const regionOfRecord = (record, volatileRegions, window, tolerance) => {
+const regionOfRecord = (record, volatileRegions) => {
   const region = volatileRegionOf(record, volatileRegions)
   return region < 0 && record.scrolledAway
-    ? overflowRegionOf(record, volatileRegions, window, tolerance)
+    ? overflowRegionOf(record, volatileRegions)
     : region
 }
 
@@ -1192,8 +1192,7 @@ export function matchTextProbe({
     records,
     covers,
     volatileRegions,
-    tolerance,
-    window
+    tolerance
   )
   const indexed = nodes.map((node, index) => ({ ...node, index }))
   const windowNodes =

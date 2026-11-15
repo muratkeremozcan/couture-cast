@@ -631,6 +631,9 @@ describe('validateTextProbeAnswer', () => {
       'scrolled away yet visible': (a) => (a.records[0].scrolledAway = true),
       'visible without a clipRect': (a) => (a.records[0].clipRect = null),
       'hidden with a clipRect': (a) => (a.records[0].visibleRect = null),
+      'no scrollViewport': (a) => delete a.records[0].scrollViewport,
+      'scrollViewport not a rect': (a) => (a.records[0].scrollViewport = [0, 0, 10]),
+      'scrollViewport upside down': (a) => (a.records[0].scrollViewport = [0, 10, 10, 0]),
       'offWindow as text': (a) => (a.records[0].offWindow = 'true'),
       'offWindow yet visible': (a) => (a.records[0].offWindow = true),
       'offWindow and scrolled away': (a) =>
@@ -1421,21 +1424,51 @@ describe('matchTextProbe, accessibility-hidden records held by an element (TEA r
 })
 
 describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () => {
-  // r48 P3-1 (probe F6_overflowRegionOf_left_col): a scrolled-away record in the right column,
-  // its centre in the band of a volatile region on the left, was taken as that region's chip.
-  test('a scrolled-away record joins a region sideways only past the window edge the region reaches', () => {
-    const away = (text, rect) =>
-      record(text, rect, { visibleRect: null, scrolledAway: true })
-    const kindOf = (rect, regions) =>
-      match([], [away('Cold and dry', rect)], { volatileRegions: regions }).kinds[0]
-    // The 6c85bbb4 chip row: the region reaches the right window edge, the chip lies past it.
-    assert.equal(kindOf([1315, 545, 1615, 616], [[0, 475, 1080, 645]]), 'volatile')
-    // Past the left edge too.
-    assert.equal(kindOf([-400, 545, -100, 616], [[0, 475, 1080, 645]]), 'volatile')
-    // A left-column region, a record in the right column on the window.
-    assert.equal(kindOf([500, 120, 620, 160], [[0, 100, 200, 180]]), 'scrolled')
-    // Past the right window edge, but the region stops mid-window.
-    assert.equal(kindOf([1315, 120, 1615, 160], [[0, 100, 200, 180]]), 'scrolled')
+  // r48 P3-1 (probe F6_overflowRegionOf_left_col) and TEA ruling r49 P2-2 (probe 2b): a record
+  // scrolled away sideways joins the region that holds the viewport it scrolls in; window
+  // geometry missed a padded carousel and a straddling chip and gave a sibling's record away.
+  test('a scrolled-away record joins a region sideways through its scroll viewport', () => {
+    const kindOf = (rect, scrollViewport, regions, window = [0, 0, 1080, 2400]) =>
+      match(
+        [],
+        [record('Chip', rect, { visibleRect: null, scrolledAway: true, scrollViewport })],
+        { volatileRegions: regions, window }
+      ).kinds[0]
+    // The 6c85bbb4 chip row, its viewport the row.
+    assert.equal(
+      kindOf([1315, 545, 1615, 616], [0, 475, 1080, 645], [[0, 475, 1080, 645]]),
+      'volatile'
+    )
+    // A padded carousel: region and viewport inset 16 from each window edge.
+    const padded = [16, 120, 384, 160]
+    assert.equal(
+      kindOf([420, 125, 520, 155], padded, [padded], [0, 0, 400, 800]),
+      'volatile'
+    )
+    // A chip that starts just inside the window edge.
+    const row = [0, 120, 400, 160]
+    assert.equal(kindOf([390, 125, 470, 155], row, [row], [0, 0, 400, 800]), 'volatile')
+    // A sibling carousel at the edge: the record scrolls in its own viewport, outside the region.
+    assert.equal(
+      kindOf(
+        [420, 125, 520, 155],
+        [0, 120, 240, 160],
+        [[250, 120, 400, 160]],
+        [0, 0, 400, 800]
+      ),
+      'scrolled'
+    )
+    // Another column: its viewport on the right, the region on the left.
+    assert.equal(
+      kindOf([500, 120, 620, 160], [400, 100, 1080, 180], [[0, 100, 200, 180]]),
+      'scrolled'
+    )
+    // No viewport known: no region this way.
+    assert.equal(kindOf([1315, 545, 1615, 616], null, [[0, 475, 1080, 645]]), 'scrolled')
+    assert.equal(
+      kindOf([1315, 545, 1615, 616], undefined, [[0, 475, 1080, 645]]),
+      'scrolled'
+    )
   })
 
   test('a scrolled-away record is listed offscreen and passes; a visible one would not', () => {

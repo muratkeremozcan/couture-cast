@@ -39,6 +39,9 @@ enum TextLayoutProbeWire {
     /// Hidden from accessibility (`accessibilityHidden(_:parent:isElement:elementsHidden:)`): no
     /// accessibility element at or above the view, or accessibilityElementsHidden at or above it.
     var accessibilityHidden = false
+    /// The viewport of the nearest scroll view that can move the view sideways (`scrollViewport`);
+    /// nil when none holds it or nothing of that viewport shows.
+    var scrollViewport: CGRect? = nil
   }
 
   /// A view behind the window's topmost `accessibilityViewIsModal` view: that view's frame in
@@ -372,6 +375,7 @@ enum TextLayoutProbeWire {
     let clip: CGRect?
     let scrolledAway: Bool
     let offWindow: Bool
+    var scrollViewport: CGRect? = nil
   }
 
   /// Off the window: a translation put it there. The view has no reach (clip nil), lies wholly
@@ -453,6 +457,35 @@ enum TextLayoutProbeWire {
     return cut(viewRect, CGRect(x: x.lo, y: y.lo, width: x.hi - x.lo, height: y.hi - y.lo))
   }
 
+  /// The viewport of the nearest scroll view that can move the view sideways (TEA ruling r49
+  /// P2-2): that scroll view's frame cut by every clipping ancestor above it, outer scroll
+  /// views' bands included, and the window; nil when no such scroll view holds the view or none
+  /// of its viewport lies within reach. The harness ties a text scrolled away sideways to the
+  /// volatile region that holds this viewport.
+  static func scrollViewport(_ ancestors: [Ancestor], _ window: CGRect) -> CGRect? {
+    var x: Span? = (window.minX, window.maxX)
+    var y: Span? = (window.minY, window.maxY)
+    var onScreen = CGAffineTransform.identity
+    var viewport: CGRect? = nil
+    for ancestor in ancestors.reversed() {
+      onScreen = linear(ancestor.transform).concatenating(onScreen)
+      if ancestor.clips {
+        x = narrow(x, ancestor.rect.minX, ancestor.rect.maxX)
+        y = narrow(y, ancestor.rect.minY, ancestor.rect.maxY)
+      }
+      if ancestor.scrollX != nil {
+        viewport = nil
+        if let x, let y {
+          viewport = cut(
+            ancestor.rect, CGRect(x: x.lo, y: y.lo, width: x.hi - x.lo, height: y.hi - y.lo))
+        }
+      }
+      x = widen(x, ancestor.scrollX, scale: onScreen.a)
+      y = widen(y, ancestor.scrollY, scale: onScreen.d)
+    }
+    return viewport
+  }
+
   /// The view and its ancestors as they would lie with every translation removed. Removing a
   /// view's translation moves it and everything inside it rigidly by that translation as the
   /// linear parts of the views outside it map it, so each rect moves back by the sum of those
@@ -499,7 +532,8 @@ enum TextLayoutProbeWire {
         untranslatedClip: reach(back.viewRect, back.ancestors, window))
     }
     return Cuts(
-      visible: visible, clip: clip, scrolledAway: visible == nil && clip != nil, offWindow: off)
+      visible: visible, clip: clip, scrolledAway: visible == nil && clip != nil, offWindow: off,
+      scrollViewport: scrollViewport(ancestors, window))
   }
 
   /// Window stacking: by windowLevel, then by scene order; z counts up from 0 at the bottom.
@@ -566,6 +600,7 @@ enum TextLayoutProbeWire {
             ["rect": wire(modal.rect), "opaque": modal.opaque]
           } ?? NSNull(),
           "accessibilityHidden": record.accessibilityHidden,
+          "scrollViewport": record.scrollViewport.map(wire) ?? NSNull(),
         ]
       },
       "elements": elements.map { element -> [String: Any] in

@@ -3622,11 +3622,13 @@ describe('text layout clipping (F-00i)', () => {
         visibleRect: [1000, 535, 1080, 582],
         contentRect: [1000, 535, 1198, contentBottom],
       })
+    // The chip row's viewport, which the records scrolled away sideways scroll in.
     const away = (text, rect, contentBottom = rect[3]) =>
       probeRecord('android', text, rect, {
         visibleRect: null,
         contentRect: [rect[0], rect[1], rect[2], contentBottom],
         scrolledAway: true,
+        scrollViewport: [0, 493, 1080, 627],
       })
     for (const [name, record] of [
       ['before', shown()],

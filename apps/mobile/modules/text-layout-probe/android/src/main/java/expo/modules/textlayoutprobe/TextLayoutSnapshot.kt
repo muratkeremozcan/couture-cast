@@ -61,7 +61,9 @@ data class ProbeCuts(
   val visible: ProbeRect?,
   val clip: ProbeRect?,
   val scrolledAway: Boolean,
-  val offWindow: Boolean
+  val offWindow: Boolean,
+  /** [TextLayoutSnapshot.scrollViewport]. */
+  val scrollViewport: ProbeRect? = null
 )
 
 /** One axis of a rect. */
@@ -91,7 +93,9 @@ data class ProbeRecord(
   val offWindow: Boolean = false,
   val opacity: Double = 1.0,
   /** Hidden from accessibility: [TextLayoutSnapshot.accessibilityHidden]. */
-  val accessibilityHidden: Boolean
+  val accessibilityHidden: Boolean,
+  /** The viewport of the nearest scroll view that moves it sideways: [TextLayoutSnapshot.scrollViewport]. */
+  val scrollViewport: ProbeRect? = null
 )
 
 /**
@@ -298,6 +302,7 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
       window = window,
       scrolledAway = cuts.scrolledAway,
       offWindow = cuts.offWindow,
+      scrollViewport = cuts.scrollViewport,
       opacity = effectiveOpacity(view),
       accessibilityHidden = accessibilityHidden(view)
     )
@@ -501,7 +506,44 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
           untranslated(viewRect, levels, own).let { (rect, moved) ->
             offWindow(viewRect, windowRect, clip, rect, reach(rect, moved, windowRect))
           }
-      return ProbeCuts(visible, clip, scrolledAway = visible == null && clip != null, offWindow = off)
+      return ProbeCuts(
+        visible,
+        clip,
+        scrolledAway = visible == null && clip != null,
+        offWindow = off,
+        scrollViewport = scrollViewport(levels, windowRect)
+      )
+    }
+
+    /**
+     * The viewport of the nearest scroll view that can move the view sideways (TEA ruling r49
+     * P2-2): that scroll view's box cut by every level's cuts above it and its own, outer scroll
+     * views' bands included, and the window; null when no such scroll view holds the view or none
+     * of its viewport lies within reach. The harness ties a text scrolled away sideways to the
+     * volatile region that holds this viewport.
+     */
+    fun scrollViewport(levels: List<Level>, windowRect: ProbeRect): ProbeRect? {
+      var x: Span? = Span(windowRect.left, windowRect.right)
+      var y: Span? = Span(windowRect.top, windowRect.bottom)
+      var scaleX = 1f
+      var scaleY = 1f
+      var viewport: ProbeRect? = null
+      for (level in levels.asReversed()) {
+        scaleX *= level.transform.scaleX
+        scaleY *= level.transform.scaleY
+        for (cut in level.cuts) {
+          x = x?.narrow(cut.left, cut.right)
+          y = y?.narrow(cut.top, cut.bottom)
+        }
+        if (level.scrollX != null) {
+          val across = x
+          val down = y
+          viewport = if (across != null && down != null) ProbeRect(across.lo, down.lo, across.hi, down.hi) else null
+        }
+        x = widen(x, level.scrollX, scaleX)
+        y = widen(y, level.scrollY, scaleY)
+      }
+      return viewport
     }
 
     /**

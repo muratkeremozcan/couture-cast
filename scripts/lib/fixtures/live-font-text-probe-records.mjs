@@ -35,6 +35,8 @@ export function probeRecord(platform, text, rect, overrides = {}) {
     opacity: 1,
     // TEA ruling r49: required on both platforms; a healthy text view is in the tree.
     accessibilityHidden: false,
+    // TEA ruling r49 P2-2: required on both platforms; no sideways scroll view holds it.
+    scrollViewport: null,
     // iOS records always carry their accessibility ancestor (wire contract r44 4), Android none.
     ...(platform === 'ios' ? { accessibilityAncestor: null, behindModal: null } : {}),
     ...overrides,

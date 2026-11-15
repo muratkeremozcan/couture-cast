@@ -70,6 +70,7 @@ object TextLayoutProbeWire {
       out.append(",\"offWindow\":").append(record.offWindow)
       out.append(",\"opacity\":").append(number(record.opacity))
       out.append(",\"accessibilityHidden\":").append(record.accessibilityHidden)
+      out.append(",\"scrollViewport\":").append(rect(record.scrollViewport))
       out.append('}')
     }
     out.append("],\"elements\":[")
