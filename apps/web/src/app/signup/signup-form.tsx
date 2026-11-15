@@ -1,6 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   type GuardianInvitationInput,
   type GuardianInvitationResponse,
@@ -11,20 +13,29 @@ import {
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
+  getGuestPreviewStrings,
   INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
+import { getI18n } from '../../i18n'
+import { webGuestPreviewStore } from '../../lib/guest-preview'
 import { inviteGuardianFromWeb } from '../../lib/guardian'
-import { submitWebSignup } from '../../lib/signup'
+import { SignupRefusedError, submitWebSignup } from '../../lib/signup'
 
 type SignupFormProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
   inviteGuardian?: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
+  /** Story 6.16 D8: the visitor came from the guest preview (`?from=preview`). */
+  fromPreview?: boolean
 }
 
 export function SignupForm({
   submitSignup = submitWebSignup,
   inviteGuardian = inviteGuardianFromWeb,
+  fromPreview = false,
 }: SignupFormProps) {
+  const { i18n } = useTranslation('translation', { i18n: getI18n() })
+  const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
+  const [accountCreated, setAccountCreated] = useState(false)
   const [email, setEmail] = useState('')
   const [birthdate, setBirthdate] = useState('')
   const [guardianEmail, setGuardianEmail] = useState('')
@@ -55,6 +66,8 @@ export function SignupForm({
 
     if (!gate.allowed) {
       setErrorMessage(AGE_GATE_MESSAGES.underage)
+      // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
+      if (fromPreview) webGuestPreviewStore().clear()
       return
     }
 
@@ -63,6 +76,7 @@ export function SignupForm({
     try {
       const response = await submitSignup({ email, birthdate })
       if (response.guardianConsentRequired) {
+        setAccountCreated(true)
         setPendingTeenId(response.userId)
         setSuccessMessage(
           'Account created. Guardian consent is required before wardrobe access is enabled.'
@@ -72,8 +86,12 @@ export function SignupForm({
 
       setPendingTeenId(null)
       setSuccessMessage('Account created. You can continue to onboarding.')
+      setAccountCreated(true)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Signup failed')
+      // D2: the server's refusal outranks the preview gate, as the client's does.
+      if (fromPreview && error instanceof SignupRefusedError)
+        webGuestPreviewStore().clear()
     } finally {
       setIsSubmitting(false)
     }
@@ -191,6 +209,16 @@ export function SignupForm({
         </p>
       ) : null}
 
+      {fromPreview && accountCreated ? (
+        <Link
+          href="/signin?from=preview"
+          data-testid="signup-sign-in-to-continue"
+          className="inline-flex min-h-11 items-center rounded-full border border-amber-300 px-5 text-sm font-semibold text-amber-200"
+        >
+          {previewStrings.signInToContinue}
+        </Link>
+      ) : null}
+
       <button
         type="submit"
         disabled={isSubmitting}
@@ -274,6 +302,16 @@ export function SignupForm({
             </p>
           ) : null}
         </div>
+      ) : null}
+
+      {fromPreview ? (
+        <Link
+          href="/preview"
+          data-testid="signup-back-to-preview"
+          className="inline-flex min-h-11 items-center text-sm text-neutral-200 underline underline-offset-4"
+        >
+          {previewStrings.backToPreview}
+        </Link>
       ) : null}
     </form>
   )

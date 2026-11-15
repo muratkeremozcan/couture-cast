@@ -1,7 +1,7 @@
 import { http, HttpResponse } from 'msw'
 import { describe, expect, it, vi } from 'vitest'
 import { useMswHandlers } from '../test-utils/msw/runtime'
-import { submitWebSignup } from './signup'
+import { SignupRefusedError, submitWebSignup } from './signup'
 
 describe('submitWebSignup', () => {
   it('posts the signup payload and returns an active adult account', async () => {
@@ -159,5 +159,34 @@ describe('submitWebSignup', () => {
     await expect(
       submitWebSignup({ email: 'teen@example.test', birthdate: '2012-01-31' })
     ).rejects.toThrow()
+  })
+
+  it('marks a 403 as a refusal of the person and other failures as retryable', async () => {
+    useMswHandlers(
+      http.post('/api/v1/auth/signup', async ({ request }) => {
+        const { email } = (await request.json()) as { email: string }
+        return email.startsWith('refused')
+          ? HttpResponse.json(
+              { statusCode: 403, message: 'You must be 13 or older', error: 'Forbidden' },
+              { status: 403 }
+            )
+          : HttpResponse.json(
+              { statusCode: 400, message: 'Email already registered' },
+              { status: 400 }
+            )
+      })
+    )
+    const refused = submitWebSignup({
+      email: 'refused@example.test',
+      birthdate: '2000-01-15',
+    })
+    await expect(refused).rejects.toBeInstanceOf(SignupRefusedError)
+    await expect(refused).rejects.toThrow('You must be 13 or older')
+    const taken = submitWebSignup({
+      email: 'taken@example.test',
+      birthdate: '2000-01-15',
+    })
+    await expect(taken).rejects.toThrow('Email already registered')
+    await expect(taken).rejects.not.toBeInstanceOf(SignupRefusedError)
   })
 })

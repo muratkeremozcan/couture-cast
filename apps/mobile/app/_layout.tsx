@@ -35,9 +35,12 @@ import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-an
 import { AppThemeProvider } from '@/src/theme/theme-context'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useTranslation } from 'react-i18next'
+import { getGuestPreviewStrings } from '@couture/utils'
 
 const isExpoGoAndroid =
   Platform.OS === 'android' && Constants.appOwnership === AppOwnership.Expo
+
+const GUEST_PREVIEW_ROUTE = /^\/preview(?:-continue)?(?:\/|$)/
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -111,7 +114,7 @@ function RootLayoutNav() {
   /* eslint-disable @typescript-eslint/no-unsafe-assignment */
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const router = useRouter()
   const navigation = useRootNavigationState()
@@ -167,8 +170,14 @@ function RootLayoutNav() {
 
   // Manual screen tracking for Expo Router
   // @see https://posthog.com/docs/libraries/react-native#screen-tracking
+  // Story 6.16 D10: the guest preview and its review are never recorded as screens, so no
+  // view is sent before eligibility; guest usage is counted by guest_preview_* only.
   useEffect(() => {
     if (previousPathname.current !== pathname) {
+      if (GUEST_PREVIEW_ROUTE.test(pathname)) {
+        previousPathname.current = undefined
+        return
+      }
       void mobileAnalyticsClient.screen(pathname, {
         previous_screen: previousPathname.current ?? null,
       })
@@ -275,6 +284,17 @@ function RootLayoutNav() {
                 <Stack.Screen
                   name="locations"
                   options={{ title: t('locations.title') }}
+                />
+                <Stack.Screen
+                  name="preview"
+                  options={{ title: getGuestPreviewStrings(i18n.language).chrome.entry }}
+                />
+                <Stack.Screen
+                  name="preview-continue"
+                  options={{
+                    title: getGuestPreviewStrings(i18n.language).review.heading,
+                    headerBackVisible: false,
+                  }}
                 />
               </Stack>
             </AndroidShareCardPresentation>

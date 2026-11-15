@@ -87,6 +87,9 @@ import { useReducedMotion } from '@/src/hooks/use-reduced-motion'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import { HomeSpotlightTeaserSlot } from '@/components/home/home-spotlight-teaser'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
+import { useMemberSessionState } from '@/src/lib/member-session'
+import { SignedOutWelcome } from '@/src/features/preview/signed-out-welcome'
+import { getGuestPreviewStrings } from '@couture/utils'
 
 type ScenarioType = 'morning' | 'midday' | 'evening'
 type SwapFocusTarget = number | { focus?: () => void }
@@ -217,6 +220,14 @@ function shareComposerIsOpen(open: boolean, owner: string | null, member: string
   return open && owner === member
 }
 
+/** The supported locale Home renders and caches under. */
+function activeHomeLocale(i18n: { resolvedLanguage?: string; language: string }) {
+  return (
+    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
+    defaultSupportedLocale
+  )
+}
+
 export default function TabOneScreen() {
   const openAndroidShareCard = useShareCardPresentationOpener()
   const shareCardInvoker = useRef<{
@@ -258,10 +269,11 @@ export default function TabOneScreen() {
     setShareCardSource(null)
     setShareCardOpen(false)
   }, [applicationUserId])
+  // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
+  // welcome card and sends nothing; an unverifiable session keeps its retry state.
+  const [sessionState, retrySession] = useMemberSessionState()
   const cacheOwner = ritualCacheOwner(applicationUserId)
-  const activeLocale =
-    resolveSupportedLocale(i18n.resolvedLanguage ?? i18n.language) ??
-    defaultSupportedLocale
+  const activeLocale = activeHomeLocale(i18n)
   const palette = useHeroPalette()
   const errorMarkBox = useGlyphBox(52, true)
   const modalInsets = useModalInsets()
@@ -434,8 +446,9 @@ export default function TabOneScreen() {
       hasTrackedTabView.current = true
       analytics.capture('tab_one_viewed')
     }
+    if (sessionState !== 'member') return
     void loadData()
-  }, [activeLocale, analyticsUserId, applicationUserId])
+  }, [activeLocale, analyticsUserId, applicationUserId, sessionState])
 
   useEffect(() => {
     const rawParams = { source, size, slot, type, alertId, cardId, expiresAt }
@@ -801,7 +814,31 @@ export default function TabOneScreen() {
           </View>
         )}
 
-        {error === 'no-location' && !ritual ? (
+        {sessionState === 'signed-out' ? (
+          <SignedOutWelcome />
+        ) : sessionState === 'unavailable' ? (
+          <View
+            style={[
+              styles.errorState,
+              { backgroundColor: palette.surface, borderColor: palette.divider },
+            ]}
+            testID="home-session-unavailable"
+          >
+            <Text style={[styles.errorText, { color: palette.text }]}>
+              {getGuestPreviewStrings(i18n.language).chrome.sessionUnavailable}
+            </Text>
+            <Pressable
+              style={[styles.retryButton, { backgroundColor: palette.text }]}
+              onPress={retrySession}
+              accessibilityRole="button"
+              testID="home-session-retry"
+            >
+              <Text style={[styles.retryText, { color: palette.background }]}>
+                {getGuestPreviewStrings(i18n.language).chrome.retry}
+              </Text>
+            </Pressable>
+          </View>
+        ) : error === 'no-location' && !ritual ? (
           <View
             style={[
               styles.errorState,

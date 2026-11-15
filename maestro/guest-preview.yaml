@@ -1,0 +1,210 @@
+# Learning path Step 56: Guest wardrobe and outfit preview.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
+# Story 6.16 owner: the signed-out mobile guest preview, from a true first launch.
+#
+# Runs only in the signed-out shard (`run-maestro.mjs --signed-out`): Metro serves a bundle
+# with no baked member token, so Home shows the signed-out welcome and every step below is
+# what a visitor without an account sees. M-RESTART-RESUME is the relaunch near the end: the
+# preview comes back from device storage without the age gate and with the same outfit.
+#
+# Expected values come from the shared sample policy (packages/utils/src/sample-wardrobe):
+# the default mild-dry look is office-oxford (oxford-shirt first); thermal cold moves it to
+# winter-knit (fleece-zip first, ankle-boots as shoes); white-sneakers is a valid shoe swap
+# there; nine looks are rateable.
+appId: ${MAESTRO_APP_ID}
+name: 'Guest preview journey'
+tags:
+  - guest-preview
+  - maestro
+env:
+  UNDERAGE_BIRTHDATE: '2016-06-01'
+  ADULT_BIRTHDATE: '1990-05-05'
+  UNDERAGE_ERROR: 'You must be 13 or older'
+  SAMPLE_LABEL: 'Sample wardrobe. Example weather and outfits, not your closet or live forecast.'
+  ONE_REVIEWED: '1 of 9 reviewed'
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+# D1: a signed-out launch shows the welcome card in place of a failed ritual request.
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 30000
+    label: 'Signed-out Home shows the welcome card'
+- assertNotVisible:
+    id: 'hero-error-state'
+    label: 'No ritual error on a signed-out launch'
+- assertNotVisible:
+    id: 'home-session-unavailable'
+- assertNotVisible:
+    id: 'hero-no-location-state'
+
+- tapOn:
+    id: 'home-try-sample'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-gate'
+    timeout: 20000
+
+# D2: the self-reported age gate refuses an under-13 birthdate and clears the field.
+- tapOn:
+    id: 'guest-preview-birthdate'
+- inputText: ${UNDERAGE_BIRTHDATE}
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'guest-preview-gate-submit'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-gate-error'
+      text: ${UNDERAGE_ERROR}
+    timeout: 10000
+    label: 'Under-13 birthdate shows the gate error'
+
+- tapOn:
+    id: 'guest-preview-birthdate'
+- inputText: ${ADULT_BIRTHDATE}
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'guest-preview-gate-submit'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-outfit'
+    timeout: 15000
+    label: 'An eligible birthdate opens the preview'
+- assertNotVisible:
+    id: 'guest-preview-gate'
+- assertVisible:
+    id: 'guest-preview-label'
+    text: ${SAMPLE_LABEL}
+- assertVisible:
+    id: 'guest-preview-garment-oxford-shirt'
+    label: 'Default mild-dry look leads with the oxford shirt'
+
+# D5: thermal comfort changes the outfit.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-thermal-cold'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-thermal-cold'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-garment-fleece-zip'
+    direction: UP
+    centerElement: true
+- assertNotVisible:
+    id: 'guest-preview-garment-oxford-shirt'
+    label: 'Thermal cold replaced the default look'
+
+# Swap the shoes, then undo it.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-swap-shoes'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-swap-shoes'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-swap-option-white-sneakers'
+    timeout: 10000
+- tapOn:
+    id: 'guest-preview-swap-option-white-sneakers'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-garment-white-sneakers'
+    direction: DOWN
+    centerElement: true
+    label: 'The swap put white sneakers in the outfit'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-undo-swaps'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-undo-swaps'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-garment-ankle-boots'
+    direction: UP
+    centerElement: true
+    label: 'Undo restored the look shoes'
+- assertNotVisible:
+    id: 'guest-preview-garment-white-sneakers'
+
+# Rate one sample look.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-nav-preferences'
+    direction: UP
+- tapOn:
+    id: 'guest-preview-nav-preferences'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-vote-like-city-wool'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-vote-like-city-wool'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-feedback-progress'
+    direction: UP
+    centerElement: true
+- assertVisible:
+    id: 'guest-preview-feedback-progress'
+    text: ${ONE_REVIEWED}
+
+# The outfit view is stored with the state, so return to it before the relaunch.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-nav-outfit'
+    direction: UP
+- tapOn:
+    id: 'guest-preview-nav-outfit'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-garment-fleece-zip'
+    timeout: 10000
+
+# M-RESTART-RESUME: stop the app and launch it again, keeping device storage.
+- runFlow: subflows/relaunch-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 30000
+- tapOn:
+    id: 'home-try-sample'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-outfit'
+    timeout: 20000
+    label: 'The stored preview resumed after the relaunch'
+- assertNotVisible:
+    id: 'guest-preview-gate'
+    label: 'The resumed preview skipped the age gate'
+- assertVisible:
+    id: 'guest-preview-garment-fleece-zip'
+    label: 'The resumed preview kept the cold-weather look'
+
+# Exit clears guest state and returns to the welcome card.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-exit'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-exit'
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 15000
+    label: 'Exit returned to the signed-out welcome'

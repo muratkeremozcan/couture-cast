@@ -1,7 +1,10 @@
 'use client'
-import { useState } from 'react'
+import Link from 'next/link'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { getGuestPreviewStrings, parsePreviewFrom } from '@couture/utils'
 import { getI18n } from '../../i18n'
+import { webGuestPreviewStore } from '../../lib/guest-preview'
 import {
   requestWebOtp,
   verifyWebOtp,
@@ -13,8 +16,29 @@ const FAILURE_KEYS: Record<WebSignInFailure, string> = {
   code_invalid: 'community.notifications.signinCodeInvalid',
   unavailable: 'community.notifications.signinUnavailable',
 }
+/**
+ * Story 6.16 D7, D8: a sign-in that came from the preview (`from=preview`) with a stored
+ * carryover intent goes to the review step. Any other sign-in deletes guest state, so a
+ * proposal left on a shared device never reaches whoever signs in next.
+ */
+async function destinationAfterSignIn(fromPreview: boolean): Promise<string> {
+  const store = webGuestPreviewStore()
+  const snapshot = await store.load()
+  if (fromPreview && snapshot.state?.conversion) return '/preview/continue'
+  store.clear()
+  await store.flush()
+  return '/'
+}
+
 export default function SignInPage() {
-  const { t } = useTranslation('translation', { i18n: getI18n() })
+  const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
+  const [fromPreview, setFromPreview] = useState(false)
+  useEffect(() => {
+    setFromPreview(
+      parsePreviewFrom(new URLSearchParams(window.location.search).get('from')) !== null
+    )
+  }, [])
+  const previewStrings = getGuestPreviewStrings(i18n.language)
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
@@ -31,8 +55,15 @@ export default function SignInPage() {
           setMessage(null)
           const action = sent ? verifyWebOtp(email, code) : requestWebOtp(email)
           void action
-            .then(() => {
-              if (sent) window.location.assign('/')
+            .then(async () => {
+              if (sent)
+                window.location.assign(
+                  await destinationAfterSignIn(
+                    parsePreviewFrom(
+                      new URLSearchParams(window.location.search).get('from')
+                    ) !== null
+                  )
+                )
               else {
                 setSent(true)
                 setMessage('community.notifications.codeSent')
@@ -89,6 +120,15 @@ export default function SignInPage() {
       <p role="status" aria-live="polite">
         {message ? t(message) : ''}
       </p>
+      {fromPreview ? (
+        <Link
+          href="/preview"
+          data-testid="signin-back-to-preview"
+          className="inline-flex min-h-11 items-center underline underline-offset-4"
+        >
+          {previewStrings.conversionDetail.backToPreview}
+        </Link>
+      ) : null}
     </main>
   )
 }

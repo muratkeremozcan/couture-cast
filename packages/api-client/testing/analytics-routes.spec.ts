@@ -97,6 +97,9 @@ const trackedEvents: Record<string, string> = {
   trackPremiumSubscribeTapped: 'premium_subscribe_tapped',
   trackLocaleSwitched: 'locale_switched',
   trackShareCardShared: 'share_card_shared',
+  trackGuestPreviewStarted: 'guest_preview_started',
+  trackGuestPreviewInteracted: 'guest_preview_interacted',
+  trackGuestPreviewSignupClicked: 'guest_preview_signup_clicked',
 }
 
 describe('analytics event allowlist covers every client event', () => {

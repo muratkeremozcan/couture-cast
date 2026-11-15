@@ -1,6 +1,14 @@
 // R52 owner: every overlay Modal spans the whole screen and keeps its content clear of the
 // system bars. R57/R61: it also lifts that content above the software keyboard.
-import React, { cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
+import React, {
+  Fragment,
+  cloneElement,
+  createElement,
+  isValidElement,
+  useEffect,
+  useRef,
+  useState,
+} from 'react'
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -109,7 +117,9 @@ function placeMarker(
       placed = result.placed
       return result.node
     })
-    return { node: placed ? next : node, placed }
+    // Spread as static children: a rebuilt array would read as an unkeyed list, and
+    // written siblings (a spacer and a sheet) carry no keys.
+    return { node: placed ? createElement(Fragment, null, ...next) : node, placed }
   }
   if (!isValidElement<MarkerHost>(node)) return { node, placed: false }
   // The host is tagged so a web test can tell the marker found it (react-native-web drops
@@ -139,7 +149,7 @@ function placeMarker(
  * hierarchy, so the marker goes inside that view wherever the content nests it; with no such
  * view it sits beside the content.
  */
-function withModalMarker(children: React.ReactNode) {
+export function withModalMarker(children: React.ReactNode) {
   // Production builds render no marker, so their content stays exactly as written.
   if (!liveFontMountMarkersEnabled()) return children
   const marker = <LiveFontMountMarker key="live-font-mount-marker" scope="modal" />

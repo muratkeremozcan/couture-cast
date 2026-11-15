@@ -11,7 +11,10 @@ vi.mock('../lib/native-session', () => ({
   requestNativeOtp: auth.request,
   verifyNativeOtp: auth.verify,
 }))
-vi.mock('expo-router', () => ({ router: { back: vi.fn() } }))
+vi.mock('expo-router', () => ({
+  router: { back: vi.fn(), replace: vi.fn() },
+  useLocalSearchParams: () => ({}),
+}))
 vi.mock('expo-localization', () => ({
   getCalendars: () => [{ timeZone: 'America/Chicago' }],
   getLocales: () => [{ languageTag: 'en-US' }],

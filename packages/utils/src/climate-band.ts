@@ -3,8 +3,8 @@
  * Story 6.1 Task 1: Canonical climate band vocabulary and classifier.
  *
  * Why this is NOT resolveComfortRangeFromTemperature:
- * resolveComfortRangeFromTemperature in ritual-generation.engine.ts and
- * capsule-recommendation.engine.ts answers "how warm should this one garment
+ * resolveComfortRangeFromTemperature in comfort-rules.ts (used by the ritual and
+ * capsule engines) answers "how warm should this one garment
  * be at this instant" for a single moment in time. In contrast, a climate band
  * answers "what weather pattern does this region sit in across the week" based
  * on aggregate daily forecasts (temperature midpoint mean and precipitation

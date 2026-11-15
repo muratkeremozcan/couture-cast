@@ -6,6 +6,14 @@ import {
 } from '@couture/api-client/contracts/http'
 import { resolveWebApiBaseUrl } from './api-client'
 
+/**
+ * Story 6.16 D2: the API refused the person (age or consent, HTTP 403), as opposed to a
+ * payload, address or network failure the visitor can retry.
+ */
+export class SignupRefusedError extends Error {
+  override name = 'SignupRefusedError'
+}
+
 async function readErrorMessage(response: Response) {
   try {
     const body = (await response.json()) as { message?: string }
@@ -30,7 +38,8 @@ export async function submitWebSignup(
   })
 
   if (!response.ok) {
-    throw new Error(await readErrorMessage(response))
+    const message = await readErrorMessage(response)
+    throw response.status === 403 ? new SignupRefusedError(message) : new Error(message)
   }
 
   return signupResponseSchema.parse(await response.json())

@@ -19,7 +19,7 @@
  *    caller's Redis on API port 4077: it runs `prisma migrate deploy`, the seed, the
  *    API build, the weather double, the API and both workers. Then serves the web
  *    build on 127.0.0.1:3077.
- * 6. Runs the two specs through `playwright/config/real-session.config.ts`, holds
+ * 6. Runs the real-session specs through `playwright/config/real-session.config.ts`, holds
  *    their output until the run's keys, OTP codes and JWTs are redacted from it,
  *    then prints it. The run passes only when Playwright exits 0 AND its JUnit
  *    report shows every expected test ran, none skipped (`junitOutcome`).
@@ -398,7 +398,7 @@ async function main() {
       WEB_E2E_BASE_URL: WEB_BASE_URL,
       STORY65_REAL_SESSION_DIR: directory,
       STORY65_REAL_SESSION_OTP_MODE: otpMode,
-      // A skip reason now throws: six skipped specs would exit 0.
+      // A skip reason now throws: skipped specs would exit 0.
       STORY65_REAL_SESSION_REQUIRED: 'true',
       PLAYWRIGHT_SKIP_DB_RESET: 'true',
     }
@@ -566,7 +566,7 @@ async function main() {
     const junit = path.join(raw, 'junit.xml')
     const outcome = junitOutcome(
       fs.existsSync(junit) ? fs.readFileSync(junit, 'utf8') : '',
-      // Playwright arguments may filter the specs; the full run must hold all six.
+      // Playwright arguments may filter the specs; the full run must hold every expected test.
       playwrightArgs.length === 0 ? EXPECTED_REAL_SESSION_TESTS : undefined
     )
     if (!outcome.ok) {

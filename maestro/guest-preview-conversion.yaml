@@ -1,0 +1,133 @@
+# Learning path Step 56: Guest wardrobe and outfit preview.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
+# Story 6.16 owner: E-CONV-REAL-STACK on mobile, step 1 of 2.
+#
+# From a true first launch (signed-out shard), a visitor sets a comfort proposal in the
+# preview, creates an account for ${GUEST_PREVIEW_EMAIL} and requests a sign-in code. The
+# runner (`run-maestro.mjs --signed-out`, scripts/lib/guest-preview-conversion.mjs) records
+# the address before this flow starts, reads the code local Supabase Auth sent to Mailpit,
+# then runs maestro/guest-preview/guest-preview-conversion-verify.yaml with the code in
+# MAESTRO_OTP only, and checks the saved comfort row equals the proposal (cold, low, high).
+#
+# The sign-in screen's label text and its EditText share one accessible name, so index 1 is
+# the input (the same shape maestro/story65/signin-request.yaml drives). Signup's Email and
+# Birthdate fields have the same shape.
+appId: ${MAESTRO_APP_ID}
+name: 'Guest preview conversion'
+tags:
+  - guest-preview
+  - maestro
+env:
+  ADULT_BIRTHDATE: '1990-05-05'
+  SIGNUP_CREATED: 'Account created. You can continue to onboarding.'
+  SEND_CODE: 'Send sign-in code'
+  CODE_SENT: 'Check your email for the sign-in code.'
+---
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+
+- runFlow: subflows/open-app.yaml
+
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 30000
+- tapOn:
+    id: 'home-try-sample'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-gate'
+    timeout: 20000
+- tapOn:
+    id: 'guest-preview-birthdate'
+- inputText: ${ADULT_BIRTHDATE}
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'guest-preview-gate-submit'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-outfit'
+    timeout: 15000
+
+# The proposal the runner checks in the database afterwards.
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-thermal-cold'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-thermal-cold'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-wind-low'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-wind-low'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-rain-high'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-rain-high'
+
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-create-account'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-create-account'
+
+# Signup (`/signup?from=preview`) with an adult birthdate.
+- extendedWaitUntil:
+    visible:
+      id: 'signup-back-to-preview'
+    timeout: 15000
+    label: 'Signup opened from the preview'
+- tapOn:
+    text: 'Email'
+    index: 1
+- waitForAnimationToEnd
+- inputText: ${GUEST_PREVIEW_EMAIL}
+- hideKeyboard:
+    optional: true
+- tapOn:
+    text: 'Birthdate'
+    index: 1
+- waitForAnimationToEnd
+- inputText: ${ADULT_BIRTHDATE}
+- hideKeyboard:
+    optional: true
+- tapOn: 'Create account'
+- extendedWaitUntil:
+    visible:
+      id: 'signup-success-message'
+      text: ${SIGNUP_CREATED}
+    timeout: 20000
+    label: 'The account was created'
+
+# Sign in to continue (`/signin?from=preview`), then request the code.
+- tapOn:
+    id: 'signup-sign-in-to-continue'
+- extendedWaitUntil:
+    visible:
+      id: 'signin-back-to-preview'
+    timeout: 15000
+    label: 'Sign-in opened from the preview'
+- tapOn:
+    text: 'Email'
+    index: 1
+- waitForAnimationToEnd
+- inputText: ${GUEST_PREVIEW_EMAIL}
+- hideKeyboard:
+    optional: true
+- tapOn: ${SEND_CODE}
+- extendedWaitUntil:
+    visible: ${CODE_SENT}
+    timeout: 20000
+    label: 'Local Supabase Auth sent the sign-in code'

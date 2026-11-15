@@ -138,7 +138,7 @@ export default defineConfig({
         find: /^react-native-svg$/,
         replacement: path.resolve(
           __dirname,
-          './src/test-utils/mocks/react-native-libraries.js'
+          './src/test-utils/mocks/react-native-svg.jsx'
         ),
       },
       {

@@ -16,6 +16,10 @@ import {
   templateAnalyticsRoute,
 } from './analytics-routes'
 import {
+  guestPreviewActionSchema,
+  guestPreviewControlSchema,
+  guestPreviewPlatformSchema,
+  guestPreviewSignupActionSchema,
   shareCardShareClientSchema,
   shareCardShareOutcomeSchema,
   shareCardShareTargetSchema,
@@ -103,6 +107,56 @@ const host = matching(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*(?::\d{1,5})?$/i)
 const catalogId = matching(/^[A-Za-z0-9_-]{1,128}$/)
 const regionCode = matching(/^(?:\*|[A-Z0-9]{2,3})$/)
 const locale = oneOf(supportedLocales)
+const guestPreviewCatalogVersion = matching(/^\d{4}-\d{2}-\d{2}\.\d+$/)
+
+/** Story 6.16 D10: guest preview events never carry a URL, path, host or referrer. */
+const GUEST_PREVIEW_EVENTS: ReadonlySet<string> = new Set([
+  'guest_preview_started',
+  'guest_preview_interacted',
+  'guest_preview_signup_clicked',
+])
+const URL_PROPERTIES: ReadonlySet<string> = new Set([
+  '$current_url',
+  '$pathname',
+  '$host',
+  '$referrer',
+  '$referring_domain',
+  '$prev_pageview_pathname',
+])
+/** The guest preview routes: web `/preview...`, mobile `/preview` and `/preview-continue`. */
+const GUEST_PREVIEW_PATH = /^(?:[a-z][a-z0-9+.-]*:\/\/[^/?#]*)?\/preview(?:[/?#-]|$)/i
+const SDK_VIEW_EVENTS: ReadonlySet<string> = new Set([
+  '$pageview',
+  '$pageleave',
+  '$screen',
+])
+
+/**
+ * D10: the gate and the preview are never recorded as page or screen views, so no view
+ * event is sent before eligibility and guest usage is counted only by guest_preview_*.
+ */
+function isGuestPreviewView(name: string, properties: Record<string, unknown>): boolean {
+  if (!SDK_VIEW_EVENTS.has(name)) return false
+  return ['$current_url', '$pathname', '$screen_name'].some((key) =>
+    namesGuestPreview(properties[key])
+  )
+}
+
+const namesGuestPreview = (value: unknown) =>
+  typeof value === 'string' && GUEST_PREVIEW_PATH.test(value)
+
+/**
+ * D10: the first view after the preview names the view before it ($prev_pageview_* on
+ * web, previous_screen on mobile). When that was the preview, on any event, the
+ * previous-view keys are dropped and the event itself is kept.
+ */
+function leftGuestPreview(properties: Record<string, unknown>): boolean {
+  return (
+    namesGuestPreview(properties.$prev_pageview_pathname) ||
+    namesGuestPreview(properties.previous_screen)
+  )
+}
+const PREVIOUS_VIEW_PROPERTY = /^(?:\$prev_pageview_|previous_screen$)/
 
 const absoluteUrl = /^([a-z][a-z0-9+.-]*:)\/\/([^/?#]*)([^?#]*)/i
 const webSchemes = new Set(['http:', 'https:'])
@@ -298,6 +352,23 @@ export const ANALYTICS_EVENT_PROPERTIES: Readonly<
     surface: oneOf(['mobile_settings', 'web_settings']),
   },
   locale_switched: { from_locale: locale, to_locale: locale, timestamp },
+  // Story 6.16 D10: guest preview usage. The URL-bearing common properties are also
+  // dropped for these (GUEST_PREVIEW_EVENTS), so no route or return path rides along.
+  guest_preview_started: {
+    platform: oneOf(guestPreviewPlatformSchema.options),
+    catalog_version: guestPreviewCatalogVersion,
+  },
+  guest_preview_interacted: {
+    platform: oneOf(guestPreviewPlatformSchema.options),
+    catalog_version: guestPreviewCatalogVersion,
+    action: oneOf(guestPreviewActionSchema.options),
+    control: oneOf(guestPreviewControlSchema.options),
+  },
+  guest_preview_signup_clicked: {
+    platform: oneOf(guestPreviewPlatformSchema.options),
+    catalog_version: guestPreviewCatalogVersion,
+    action: oneOf(guestPreviewSignupActionSchema.options),
+  },
   share_card_shared: {
     client: oneOf(shareCardShareClientSchema.options),
     target: oneOf(shareCardShareTargetSchema.options),
@@ -528,6 +599,32 @@ function envelope(
   return result
 }
 
+/** Copies only the properties a rule allows, each through its rule. */
+function sanitizeProperties(
+  properties: Record<string, unknown>,
+  eventRules: Readonly<Record<string, Rule>>,
+  platform: AnalyticsPlatform,
+  name: string
+): Record<string, unknown> {
+  const dropUrls = GUEST_PREVIEW_EVENTS.has(name)
+  // Guest preview events carry no previous view at all, as they carry no URL.
+  const dropPrevious = dropUrls || leftGuestPreview(properties)
+  const sanitized: Record<string, unknown> = {}
+  for (const key of Object.keys(properties)) {
+    if (dropUrls && URL_PROPERTIES.has(key)) continue
+    if (dropPrevious && PREVIOUS_VIEW_PROPERTY.test(key)) continue
+    const rule = has(eventRules, key)
+      ? eventRules[key]
+      : has(COMMON_PROPERTIES, key)
+        ? COMMON_PROPERTIES[key]
+        : undefined
+    if (!rule) continue
+    const value = rule(properties[key], platform)
+    if (value !== DROP) sanitized[key] = value
+  }
+  return sanitized
+}
+
 /**
  * The before_send hook for `platform`: returns a new event with only its envelope
  * (event, uuid, timestamp) and allowlisted properties, or null for an event outside the
@@ -553,17 +650,8 @@ export function createAnalyticsPrivacyFilter(platform: AnalyticsPlatform) {
           : undefined
       if (!eventRules) return null
       const properties = isPlainRecord(source.properties) ? source.properties : {}
-      const sanitized: Record<string, unknown> = {}
-      for (const key of Object.keys(properties)) {
-        const rule = has(eventRules, key)
-          ? eventRules[key]
-          : has(COMMON_PROPERTIES, key)
-            ? COMMON_PROPERTIES[key]
-            : undefined
-        if (!rule) continue
-        const value = rule(properties[key], platform)
-        if (value !== DROP) sanitized[key] = value
-      }
+      if (isGuestPreviewView(name, properties)) return null
+      const sanitized = sanitizeProperties(properties, eventRules, platform, name)
       // Set after the copy so no caller or SDK value can turn them off: PostHog adds no
       // GeoIP location and builds no person profile for any event (the IP itself is
       // dropped by the project's Discard client IP data setting).

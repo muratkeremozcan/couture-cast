@@ -43,6 +43,8 @@ blob-report/
 # Vitest 5 writes failure screenshots, attachments and reporter output under .vitest/.
 .vitest/
 .real-session-e2e/
+# Story 6.16: run-maestro.mjs --signed-out records guest accounts here, write-ahead.
+.maestro-guest-preview/
 downloads/
 pacts/
 pact/artifacts/

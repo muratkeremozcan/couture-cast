@@ -1,5 +1,10 @@
 // Story 4.3 Task 4 step 1 owner: implement pure capsule scoring and slot filling in apps/api/src/modules/personalization/capsule-recommendation.engine.ts
 import type { GarmentItem, OutfitCapsule, OutfitCapsuleGarment } from '@prisma/client'
+import {
+  COMFORT_RANGES,
+  needsOuterwear,
+  resolveComfortRangeFromTemperature,
+} from '@couture/utils'
 
 export type CapsuleWithJoins = OutfitCapsule & {
   garment_joins: (OutfitCapsuleGarment & {
@@ -15,17 +20,11 @@ export type CapsuleRecommendationCandidate = {
   autoFilledGarmentIds: string[]
 }
 
-/** Ordered comfort scale. Adjacency is measured as distance along this scale. */
-const COMFORT_RANGES = ['cold', 'cool', 'mild', 'warm', 'hot'] as const
-
 /**
  * Canonical slot order. Auto-filled garments are appended in this order so the
  * same capsule and wardrobe always produce the same garment sequence.
  */
 const CANONICAL_SLOT_ORDER = ['dress', 'top', 'bottom', 'shoes', 'outerwear'] as const
-
-/** Below this adjusted feels-like temperature an outerwear slot is required. */
-const OUTERWEAR_THRESHOLD_CELSIUS = 15
 
 const COMPLETE_CAPSULE_MULTIPLIER = 1.15
 const FAVORITE_CAPSULE_BONUS = 0.1
@@ -42,14 +41,6 @@ function getComfortScore(garmentRange: string | null, targetRange: string): numb
   if (distance === 0) return 1
   if (distance === 1) return 0.5
   return 0
-}
-
-function resolveTargetComfortRange(adjustedFeelsLike: number): string {
-  if (adjustedFeelsLike < 10) return 'cold'
-  if (adjustedFeelsLike < 15) return 'cool'
-  if (adjustedFeelsLike < 20) return 'mild'
-  if (adjustedFeelsLike < 25) return 'warm'
-  return 'hot'
 }
 
 /**
@@ -80,7 +71,7 @@ function resolveRequiredCategories(
   const hasDress = capsuleGarments.some((garment) => garment.category === 'dress')
   const required = hasDress ? ['dress', 'shoes'] : ['top', 'bottom', 'shoes']
 
-  if (adjustedFeelsLike < OUTERWEAR_THRESHOLD_CELSIUS) {
+  if (needsOuterwear(adjustedFeelsLike)) {
     required.push('outerwear')
   }
 
@@ -210,7 +201,7 @@ export function evaluateCapsuleForScenario(options: {
     return null
   }
 
-  const targetComfortRange = resolveTargetComfortRange(adjustedFeelsLike)
+  const targetComfortRange = resolveComfortRangeFromTemperature(adjustedFeelsLike)
   const candidates: CapsuleRecommendationCandidate[] = []
 
   for (const capsule of eligibleCapsules) {

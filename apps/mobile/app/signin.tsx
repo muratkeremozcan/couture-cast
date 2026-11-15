@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import { router } from 'expo-router'
+import { router, useLocalSearchParams } from 'expo-router'
+import { getGuestPreviewStrings, parsePreviewFrom } from '@couture/utils'
+import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
 import { requestNativeOtp, verifyNativeOtp } from '@/src/lib/native-session'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
@@ -13,8 +15,24 @@ const FAILURE_KEYS: Record<NativeSignInFailure, string> = {
   code_invalid: 'community.notifications.signinCodeInvalid',
   unavailable: 'community.notifications.signinUnavailable',
 }
+/**
+ * Story 6.16 D7, D8: a sign-in that came from the preview with a stored carryover intent
+ * goes to the review step. Any other sign-in deletes guest state, so a proposal left on a
+ * shared device never reaches whoever signs in next.
+ */
+async function continuesToPreviewReview(fromPreview: boolean): Promise<boolean> {
+  const store = mobileGuestPreviewStore()
+  const snapshot = await store.load()
+  if (fromPreview && snapshot.state?.conversion) return true
+  store.clear()
+  await store.flush()
+  return false
+}
+
 export default function SignInScreen() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const { from } = useLocalSearchParams<{ from?: string }>()
+  const fromPreview = parsePreviewFrom(from) !== null
   const [email, setEmail] = useState('')
   const [code, setCode] = useState('')
   const [sent, setSent] = useState(false)
@@ -27,7 +45,9 @@ export default function SignInScreen() {
         traceShareCardOpener('signin-verify-press', code.length)
         await verifyNativeOtp(email, code)
         traceShareCardOpener('signin-verify-ok')
-        router.back()
+        if (await continuesToPreviewReview(fromPreview))
+          router.replace('/preview-continue')
+        else router.back()
       } else {
         await requestNativeOtp(email)
         setSent(true)
@@ -88,11 +108,25 @@ export default function SignInScreen() {
         </Text>
       </Pressable>
       <Text accessibilityLiveRegion="polite">{message ? t(message) : ''}</Text>
+      {fromPreview ? (
+        <Pressable
+          testID="signin-back-to-preview"
+          accessibilityRole="link"
+          onPress={() => router.replace('/preview')}
+          style={styles.previewLink}
+        >
+          <Text style={styles.previewLinkText}>
+            {getGuestPreviewStrings(i18n.language).conversionDetail.backToPreview}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   )
 }
 const styles = StyleSheet.create({
   container: { padding: 24, gap: 16 },
+  previewLink: { minHeight: 44, justifyContent: 'center' },
+  previewLinkText: { textDecorationLine: 'underline' },
   title: { fontSize: 26, fontWeight: '600' },
   input: {
     minHeight: 48,

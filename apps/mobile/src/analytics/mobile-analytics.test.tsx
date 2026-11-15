@@ -59,6 +59,7 @@ import {
   MobileAnalyticsProvider,
   createMobileAnalyticsClient,
   mobileAnalyticsClient,
+  resetMobileAnalyticsIdentity,
   useMobileAnalytics,
 } from './mobile-analytics'
 
@@ -190,5 +191,20 @@ describe('mobile analytics facade', () => {
     })
     expect(rejectedCalls).toBe(1)
     expect(unhandled).toEqual([])
+  })
+})
+
+describe('resetMobileAnalyticsIdentity (6.16 TEA-4)', () => {
+  it('rotates the anonymous id and never throws', () => {
+    const reset = vi.fn()
+    resetMobileAnalyticsIdentity({ reset })
+    expect(reset).toHaveBeenCalledOnce()
+    expect(() =>
+      resetMobileAnalyticsIdentity({
+        reset: () => {
+          throw new Error('provider down')
+        },
+      })
+    ).not.toThrow()
   })
 })

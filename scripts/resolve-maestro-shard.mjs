@@ -19,6 +19,12 @@
  *
  * Usage:
  *   node scripts/resolve-maestro-shard.mjs --suite full --shard 3 --shards 6
+ *   node scripts/resolve-maestro-shard.mjs --suite full --auth signed-out
+ *
+ * `--auth member` (the default) packs every member flow and never a
+ * `maestro/guest-preview*.yaml` one. `--auth signed-out` (Story 6.16, TEA-8)
+ * lists every guest preview flow for the one signed-out job, unpacked, and the
+ * smoke suite holds none. `--shard` and `--shards` apply to member shards only.
  *
  * Prints GITHUB_OUTPUT-formatted lines to stdout (`empty=...` and, when a
  * shard has work, `list=...`), and a human-readable balance summary to
@@ -28,6 +34,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { NATIVE_MAESTRO_FLOWS } from './lib/native-maestro-flows.mjs'
+import { MAESTRO_AUTH_MODES, flowsForAuthMode } from './lib/maestro-auth-mode.mjs'
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -42,9 +49,14 @@ const fail = (message) => {
 }
 
 const SUITE = readArg('suite') || 'full'
-const SHARD = Number(readArg('shard'))
-const SHARDS = Number(readArg('shards'))
+const AUTH = readArg('auth') || 'member'
+const SIGNED_OUT = AUTH === 'signed-out'
+const SHARD = SIGNED_OUT ? 1 : Number(readArg('shard'))
+const SHARDS = SIGNED_OUT ? 1 : Number(readArg('shards'))
 
+if (!MAESTRO_AUTH_MODES.includes(AUTH)) {
+  fail(`--auth must be one of ${MAESTRO_AUTH_MODES.join(', ')}, got ${AUTH}`)
+}
 if (!Number.isInteger(SHARD) || SHARD < 1) {
   fail(`--shard must be a positive integer, got ${readArg('shard')}`)
 }
@@ -72,7 +84,18 @@ const discoverFullSuite = () =>
 
 const SMOKE_SUITE = ['analytics.yaml', 'premium-subscription.yaml', 'sanity.yaml']
 
-const flowNames = SUITE === 'smoke' ? SMOKE_SUITE : discoverFullSuite()
+const flowNames = flowsForAuthMode(
+  SUITE === 'smoke' ? SMOKE_SUITE : discoverFullSuite(),
+  AUTH
+)
+
+// The smoke suite has no guest preview flow, so its signed-out job has nothing
+// to run. Any other empty signed-out suite falls through to the zero-flow error.
+if (SIGNED_OUT && SUITE === 'smoke') {
+  console.log('empty=true')
+  console.error('The smoke suite has no signed-out flows. Skipping.')
+  process.exit(0)
+}
 
 // Zero flows is never legitimate, and has to be rejected before the
 // empty-shard branch below: that branch treats an empty shard as expected
@@ -80,7 +103,7 @@ const flowNames = SUITE === 'smoke' ? SMOKE_SUITE : discoverFullSuite()
 // shard. A bad suite input or a moved flow directory is a broken pipeline,
 // not a quietly passing one.
 if (flowNames.length === 0) {
-  fail(`Flow discovery found no flows to run. Suite input: '${SUITE}'.`)
+  fail(`Flow discovery found no flows to run. Suite input: '${SUITE}', auth: '${AUTH}'.`)
 }
 
 const durationsPath = path.join(projectRoot, 'scripts', 'maestro-flow-durations.json')
@@ -114,7 +137,7 @@ for (const name of sortedByDurationDesc) {
 }
 
 console.error(
-  `[shard] ${flowNames.length} flow(s) across ${SHARDS} shard(s), suite=${SUITE}:`
+  `[shard] ${flowNames.length} flow(s) across ${SHARDS} shard(s), suite=${SUITE}, auth=${AUTH}:`
 )
 bins.forEach((bin, index) => {
   const label = `shard ${index + 1}`

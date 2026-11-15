@@ -176,12 +176,26 @@ jobs:
     # the job's floor while the others sit idle. See that script for the
     # algorithm and `scripts/maestro-flow-durations.json` for the recorded
     # baseline it packs against.
+    #
+    # Story 6.16 (TEA-8): shard 10 is the signed-out lane. It runs every
+    # `maestro/guest-preview*.yaml` flow, and only those, against a Metro bundle
+    # with no baked member token (`run-maestro.mjs --signed-out`), so a guest
+    # flow sees a true first launch while the nine member shards keep their
+    # token bundle. It runs in parallel with them on the same ubuntu runner type.
+    # MAESTRO_MEMBER_SHARDS below is the member row count the resolver packs
+    # across; scripts/ci/maestro-signed-out-lane.test.mjs holds it to the matrix.
     strategy:
       # A failing shard must not cancel the others. The point of a suite is to
       # learn everything that is broken in one run.
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        auth: [member]
+        include:
+          - shard: 10
+            auth: signed-out
+    env:
+      MAESTRO_MEMBER_SHARDS: '9'
     # No PR job runs past 20 minutes. A shard is about 10.8 minutes of fixed cost
     # (setup, Supabase, emulator, API and Metro) plus its share of flows (269 s at
     # p95 with nine shards). Twelve shards saved about a minute a shard for three
@@ -215,6 +229,9 @@ jobs:
       # Loads the cached Supabase images while the dependencies install.
       - name: Preload the Supabase images
         uses: ./.github/actions/preload-supabase-images
+        with:
+          # The same list as the start below.
+          exclude: ${{ matrix.auth == 'signed-out' && 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy' || 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy' }}
 
       - name: Setup Node environment
         uses: ./.github/actions/install
@@ -349,6 +366,10 @@ jobs:
         uses: ./.github/actions/start-local-supabase
         # Normal start 2 minutes (p95 2.4, 300 runs); a stuck one fails here, named.
         timeout-minutes: 10
+        with:
+          # The action's default list; the signed-out row keeps Mailpit, where local Auth
+          # delivers the guest conversion's sign-in code (Story 6.16 E-CONV-REAL-STACK).
+          exclude: ${{ matrix.auth == 'signed-out' && 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy' || 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,mailpit,imgproxy' }}
 
       - name: Upload the Supabase start log
         # The start's own log names the command that failed or hung.
@@ -428,8 +449,9 @@ jobs:
           set -euo pipefail
           node ./scripts/resolve-maestro-shard.mjs \
             --suite "${{ inputs.suite }}" \
+            --auth "${{ matrix.auth }}" \
             --shard ${{ matrix.shard }} \
-            --shards ${{ strategy.job-total }} \
+            --shards "$MAESTRO_MEMBER_SHARDS" \
             >> "$GITHUB_OUTPUT"
 
       - name: Run Maestro suite
@@ -451,6 +473,9 @@ jobs:
           # provides this escape hatch for exactly this case.
           MAESTRO_DISABLE_ANDROID_XCRUN_SHIM: '1'
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          # Story 6.16: a signed-out run lists every sign-in code it read here, before the
+          # code reaches Maestro, for the artifact scan below. Member runs never write it.
+          MOBILE_E2E_ISSUED_OTP_FILE: ${{ runner.temp }}/guest-preview-otps.json
         with:
           api-level: ${{ env.ANDROID_API_LEVEL }}
           target: ${{ env.ANDROID_TARGET }}
@@ -494,7 +519,9 @@ jobs:
           # constructs do not survive between lines. Keeping the body in
           # scripts/ci-mobile-e2e.sh gets real bash and working strict mode, and
           # lets a developer run the exact CI path locally.
-          script: bash ./scripts/ci-mobile-e2e.sh ${{ steps.flows.outputs.list }}
+          # The signed-out row adds `--signed-out`; run-maestro.mjs then refuses
+          # any member flow, and a member row refuses any guest flow.
+          script: bash ./scripts/ci-mobile-e2e.sh ${{ matrix.auth == 'signed-out' && '--signed-out' || '' }} ${{ steps.flows.outputs.list }}
 
       # Blocks the upload when a log or report carries a secret this job
       # holds. Fails closed: if the scan cannot run, nothing is uploaded.
@@ -504,7 +531,10 @@ jobs:
         env:
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN maestro/artifacts
+          MOBILE_E2E_ISSUED_OTP_FILE: ${{ runner.temp }}/guest-preview-otps.json
+        # The signed-out row also fails on any sign-in code it issued; a missing list fails
+        # the scan, so a run that died before starting it uploads nothing unchecked.
+        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN ${{ matrix.auth == 'signed-out' && '--otp-file "$MOBILE_E2E_ISSUED_OTP_FILE"' || '' }} maestro/artifacts
 
       - uses: actions/upload-artifact@v4
         if: always() && steps.flows.outputs.empty != 'true' && steps.secret_scan.outcome == 'success'
@@ -563,11 +593,12 @@ jobs:
           # exactly one directory per shard.
           artifact-pattern: android-test-results-shard-*-attempt-*
           suite-result: ${{ needs.mobile-e2e-android.result }}
-          # Keep in step with the `shard:` matrix above. `strategy.job-total` is
-          # not readable from a job that only `needs:` the matrix, so this is a
-          # label rather than a derived value; the flow counts in the comment
-          # come from the reports themselves and are unaffected by it.
-          shards: '9'
+          # Keep in step with the matrix rows above: nine member shards plus the
+          # signed-out shard 10. `strategy.job-total` is not readable from a job
+          # that only `needs:` the matrix, so this is a label rather than a
+          # derived value; the flow counts in the comment come from the reports
+          # themselves and are unaffected by it.
+          shards: '10'
           platform: Android (Expo Go)
           device-label: API ${{ env.ANDROID_API_LEVEL }} · ${{ env.ANDROID_PROFILE }} · ${{ env.ANDROID_ARCH }}
           github-token: ${{ secrets.GITHUB_TOKEN }}

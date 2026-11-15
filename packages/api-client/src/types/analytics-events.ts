@@ -145,6 +145,12 @@ export const analyticsEventNameSchema = z.enum([
   // their own distinctId and never through TelemetryService. Closed enums and a
   // duration only; each SDK's before_send keeps just the allowlisted keys.
   'share_card_shared',
+  // Story 6.16. Client-side only, sent after the guest preview's eligibility gate.
+  // Closed enums only: no birthdate, age band, location, ids, votes, preference
+  // values, URLs or tokens. Never counted as activation.
+  'guest_preview_started',
+  'guest_preview_interacted',
+  'guest_preview_signup_clicked',
 ])
 
 export type AnalyticsEventName = z.infer<typeof analyticsEventNameSchema>
@@ -1127,6 +1133,93 @@ export const shareCardSharedPropertiesSchema = shareCardSharedEventSchema
 export type ShareCardSharedEvent = z.infer<typeof shareCardSharedEventSchema>
 export type ShareCardSharedProperties = z.infer<typeof shareCardSharedPropertiesSchema>
 
+// Story 6.16 D10: guest preview usage, reported apart from real activation. The three
+// events carry the platform, the sample catalog version and closed action and control
+// enums; `locale` comes from the common properties. They never carry which look,
+// garment, vote or preference value the visitor chose.
+export const GUEST_PREVIEW_STARTED_EVENT = 'guest_preview_started'
+export const GUEST_PREVIEW_INTERACTED_EVENT = 'guest_preview_interacted'
+export const GUEST_PREVIEW_SIGNUP_CLICKED_EVENT = 'guest_preview_signup_clicked'
+export const guestPreviewPlatformSchema = z.enum(['ios', 'android', 'web'])
+export const guestPreviewCatalogVersionSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}-\d{2}\.\d+$/)
+export const guestPreviewActionSchema = z.enum([
+  'control_changed',
+  'look_changed',
+  'garment_swapped',
+  'swaps_undone',
+  'look_voted',
+  'votes_reset',
+  'wardrobe_opened',
+  'item_inspected',
+  'preview_reset',
+  'preview_exited',
+])
+export const guestPreviewControlSchema = z.enum([
+  'weather',
+  'thermal',
+  'wind',
+  'rain',
+  'collection',
+  'category',
+])
+export const guestPreviewSignupActionSchema = z.enum(['create_account', 'sign_in'])
+
+export const guestPreviewStartedEventSchema = z
+  .object({
+    platform: guestPreviewPlatformSchema,
+    catalog_version: guestPreviewCatalogVersionSchema,
+  })
+  .strict()
+export const guestPreviewInteractedEventSchema = z
+  .object({
+    platform: guestPreviewPlatformSchema,
+    catalog_version: guestPreviewCatalogVersionSchema,
+    action: guestPreviewActionSchema,
+    control: guestPreviewControlSchema.optional(),
+  })
+  .strict()
+  .superRefine((event, context) => {
+    if ((event.action === 'control_changed') !== (event.control !== undefined))
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['control'],
+        message: 'control is required for control_changed and only for it',
+      })
+  })
+export const guestPreviewSignupClickedEventSchema = z
+  .object({
+    platform: guestPreviewPlatformSchema,
+    catalog_version: guestPreviewCatalogVersionSchema,
+    action: guestPreviewSignupActionSchema,
+  })
+  .strict()
+export type GuestPreviewStartedEvent = z.infer<typeof guestPreviewStartedEventSchema>
+export type GuestPreviewInteractedEvent = z.infer<
+  typeof guestPreviewInteractedEventSchema
+>
+export type GuestPreviewSignupClickedEvent = z.infer<
+  typeof guestPreviewSignupClickedEventSchema
+>
+
+/** Parses a guest preview event; throws on an extra key. Callers catch so analytics never blocks. */
+export function trackGuestPreviewStarted(
+  event: GuestPreviewStartedEvent
+): GuestPreviewStartedEvent {
+  return guestPreviewStartedEventSchema.parse(event)
+}
+export function trackGuestPreviewInteracted(
+  event: GuestPreviewInteractedEvent
+): GuestPreviewInteractedEvent {
+  return guestPreviewInteractedEventSchema.parse(event)
+}
+export function trackGuestPreviewSignupClicked(
+  event: GuestPreviewSignupClickedEvent
+): GuestPreviewSignupClickedEvent {
+  return guestPreviewSignupClickedEventSchema.parse(event)
+}
+
 export const analyticsEventSchemas = {
   community_reaction_added: communityReactionEventSchema,
   community_reaction_replaced: communityReactionEventSchema,
@@ -1181,6 +1274,9 @@ export const analyticsEventSchemas = {
   location_saved: locationSavedEventSchema,
   location_search_failed: locationSearchFailedEventSchema,
   share_card_shared: shareCardSharedEventSchema,
+  guest_preview_started: guestPreviewStartedEventSchema,
+  guest_preview_interacted: guestPreviewInteractedEventSchema,
+  guest_preview_signup_clicked: guestPreviewSignupClickedEventSchema,
 }
 
 export const ritualCreatedPropertiesSchema = z.object({

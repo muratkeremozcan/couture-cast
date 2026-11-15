@@ -2,7 +2,7 @@ import { http, HttpResponse } from 'msw'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { server } from '../test-utils/msw/server'
-import { submitMobileSignup } from './signup'
+import { SignupRefusedError, submitMobileSignup } from './signup'
 
 const activeSignup = {
   userId: 'user-1',
@@ -129,5 +129,34 @@ describe('submitMobileSignup', () => {
     await expect(
       submitMobileSignup({ email: 'adult@example.com', birthdate: '1990-01-01' })
     ).rejects.toThrow('Signup failed with status 502')
+  })
+
+  it('marks a 403 as a refusal of the person and other failures as retryable', async () => {
+    server.use(
+      http.post('*/api/v1/auth/signup', async ({ request }) => {
+        const { email } = (await request.json()) as { email: string }
+        return email.startsWith('refused')
+          ? HttpResponse.json(
+              { statusCode: 403, message: 'You must be 13 or older', error: 'Forbidden' },
+              { status: 403 }
+            )
+          : HttpResponse.json(
+              { statusCode: 400, message: 'Email already registered' },
+              { status: 400 }
+            )
+      })
+    )
+    const refused = submitMobileSignup({
+      email: 'refused@example.com',
+      birthdate: '2000-01-15',
+    })
+    await expect(refused).rejects.toBeInstanceOf(SignupRefusedError)
+    await expect(refused).rejects.toThrow('You must be 13 or older')
+    const taken = submitMobileSignup({
+      email: 'taken@example.com',
+      birthdate: '2000-01-15',
+    })
+    await expect(taken).rejects.toThrow('Email already registered')
+    await expect(taken).rejects.not.toBeInstanceOf(SignupRefusedError)
   })
 })

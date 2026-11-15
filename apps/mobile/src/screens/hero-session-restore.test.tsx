@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5: after a native cold start, Home's first load can run before the stored
@@ -78,13 +80,27 @@ describe('Home after a native cold start', () => {
     setMobileApplicationUserId(null)
   })
 
+  // Story 6.16 D1: a signed-out launch shows the welcome card and sends no ritual
+  // request; the restored identity then loads the ritual.
   it('loads the ritual once the restored session identity is ready', async () => {
+    const ritualRequests: (string | null)[] = []
+    server.use(
+      http.get('*/api/v1/ritual', ({ request }) => {
+        const authorization = request.headers.get('authorization')
+        ritualRequests.push(authorization)
+        return authorization === 'Bearer restored-token'
+          ? HttpResponse.json(mockRitualResponse)
+          : HttpResponse.json({ statusCode: 401 }, { status: 401 })
+      })
+    )
     await render(
       <AccessibilityAnnouncerProvider>
         <TabOneScreen />
       </AccessibilityAnnouncerProvider>
     )
-    await screen.findByTestId('hero-error-state')
+    await screen.findByTestId('home-signed-out-welcome')
+    expect(screen.queryByTestId('hero-error-state')).toBeNull()
+    expect(ritualRequests).toEqual([])
     // Session restore completes after the first load already failed.
     await act(async () => {
       token = 'restored-token'
@@ -93,5 +109,7 @@ describe('Home after a native cold start', () => {
     })
     await waitFor(() => expect(screen.getByText('Classic Trench Coat')).toBeTruthy())
     expect(screen.queryByTestId('hero-error-state')).toBeNull()
+    expect(screen.queryByTestId('home-signed-out-welcome')).toBeNull()
+    expect(ritualRequests).toEqual(['Bearer restored-token'])
   })
 })
