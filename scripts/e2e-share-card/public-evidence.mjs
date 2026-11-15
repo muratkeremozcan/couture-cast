@@ -28,6 +28,10 @@ import {
   selectPublicDiagnostics,
 } from '../ci/native-ios-public-diagnostics.mjs'
 import { projectStartupTimings } from '../ci/native-ios-startup-timings.mjs'
+import {
+  AUDIT_SCREEN_FILE,
+  assertPublicAuditScreen,
+} from '../lib/share-card-audit-screens.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -386,6 +390,13 @@ for (const name of fs.readdirSync(directory)) {
     )
   )
     fs.copyFileSync(path.join(directory, name), path.join(staging, name))
+  // The screen of a refused iOS audit issue (share-card-audit-screens.mjs): a fixed name per
+  // closed state, a PNG, and none of the private text the JSON scan refuses.
+  if (AUDIT_SCREEN_FILE.test(name)) {
+    const bytes = fs.readFileSync(path.join(directory, name))
+    assertPublicAuditScreen(bytes)
+    fs.writeFileSync(path.join(staging, name), bytes)
+  }
   if (/^original-proof-(android|ios)(-[a-z-]+)?\.json$/.test(name)) {
     const proof = JSON.parse(fs.readFileSync(path.join(directory, name)))
     closedJSON(name, {

@@ -205,8 +205,11 @@ describe('failed audit test digest', () => {
     assert.match(refused, /^\s+print\(shareCardAuditIssueLine\(state, issue\)\)\n/)
     assert.match(
       refused,
-      /let screen = XCTAttachment\(screenshot: self\.app\.screenshot\(\)\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)$/
+      /let screen = XCTAttachment\(data: self\.app\.screenshot\(\)\.pngRepresentation, uniformTypeIdentifier: "public\.png"\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)$/
     )
+    // A PNG named audit-failure-<state> is what share-card-audit-screens.mjs exports and the
+    // public evidence publishes as audit-failure-<state>.png.
+    assert.equal([...swift.matchAll(/"audit-failure-/g)].length, 1)
   })
 
   test('the failure report falls back to the log tail when no test case failed', () => {

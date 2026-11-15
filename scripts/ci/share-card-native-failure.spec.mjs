@@ -215,6 +215,54 @@ describe('native public evidence', () => {
     )
   })
 
+  // iOS 26.5 canary shard 3 failed preparing on "Potentially inaccessible text" with no screen.
+  // A failed audit run exports each refused issue's screen as audit-failure-<state>.png.
+  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
+  test('public evidence publishes the screen of a refused audit issue under its fixed name', (t) => {
+    const { directory, run } = evidenceFixture(t)
+    const screen = Buffer.concat([PNG, Buffer.from('IHDR pixels')])
+    fs.writeFileSync(path.join(directory, 'audit-failure-preparing.png'), screen)
+    fs.writeFileSync(path.join(directory, 'audit-failure-storage-failure.png'), screen)
+    // Names outside the closed states, or any other audit file, stay private.
+    fs.writeFileSync(path.join(directory, 'audit-failure-unknown.png'), screen)
+    fs.writeFileSync(path.join(directory, 'audit-failure-preparing.jpg'), screen)
+    fs.writeFileSync(path.join(directory, 'audit-failure-preparing_0.png'), screen)
+    const result = run()
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')).sort(), [
+      'audit-failure-preparing.png',
+      'audit-failure-storage-failure.png',
+    ])
+    assert.deepEqual(
+      fs.readFileSync(
+        path.join(directory, 'public-evidence/audit-failure-preparing.png')
+      ),
+      screen
+    )
+  })
+
+  test('an audit screen that is no PNG or carries private text fails the whole selection', (t) => {
+    for (const [bytes, code] of [
+      [Buffer.from('GIF89a not a png'), /invalid_audit_failure_screen/],
+      [
+        Buffer.concat([PNG, Buffer.from(`tEXt Comment ${personal}`)]),
+        /private_data_in_public_evidence/,
+      ],
+      [
+        Buffer.concat([PNG, Buffer.from('tEXt Author member@cc68.test')]),
+        /private_data_in_public_evidence/,
+      ],
+    ]) {
+      const { directory, run } = evidenceFixture(t)
+      fs.writeFileSync(path.join(directory, 'audit-failure-open.png'), bytes)
+      const result = run()
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, code)
+      assert.equal(result.stderr.includes('avery@personal.invalid'), false)
+      assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
+    }
+  })
+
   test('early CI evidence rejects unreviewed fields before publishing any proof', (t) => {
     const { directory, run } = evidenceFixture(t)
     for (const patch of [

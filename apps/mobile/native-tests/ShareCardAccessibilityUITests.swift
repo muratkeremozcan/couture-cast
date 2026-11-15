@@ -189,8 +189,9 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       if !allowed {
         print(shareCardAuditIssueLine(state, issue))
         // iOS 26.5 canary shard 3 failed preparing on "Potentially inaccessible text" with no
-        // picture of the screen, so the screen the audit judged is kept beside its issue.
-        let screen = XCTAttachment(screenshot: self.app.screenshot())
+        // picture of the screen, so the screen the audit judged is kept beside its issue, as a
+        // PNG that a failed run exports to audit-failure-<state>.png (share-card-audit-screens.mjs).
+        let screen = XCTAttachment(data: self.app.screenshot().pngRepresentation, uniformTypeIdentifier: "public.png")
         screen.name = "audit-failure-\(state)"
         screen.lifetime = .keepAlways
         self.add(screen)

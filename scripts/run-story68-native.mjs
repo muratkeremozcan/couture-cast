@@ -26,6 +26,7 @@ import {
 } from './lib/share-card-audit-report.mjs'
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
+import { clearAuditScreens, exportAuditScreens } from './lib/share-card-audit-screens.mjs'
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
@@ -1092,6 +1093,8 @@ if (command === 'prebuild') {
   // Resolve the container before the first focus read; a failure is retried by the next request.
   await readContainer().catch(() => undefined)
   const result = path.join(directory, `accessibility-ios-${Date.now()}.xcresult`)
+  // Only this run's refused issues may be published (share-card-audit-screens.mjs).
+  clearAuditScreens(directory)
   const auditLog = path.join(directory, 'accessibility-ios.log')
   const offset = fs.existsSync(auditLog) ? fs.statSync(auditLog).size : 0
   const audit = child(
@@ -1143,6 +1146,19 @@ if (command === 'prebuild') {
           },
         })
       )
+      // The screen of every refused audit issue, as audit-failure-<state>.png for the public
+      // evidence. A failed export is reported by its code and never replaces the audit failure.
+      try {
+        console.log(
+          JSON.stringify({
+            iosAuditFailureScreens: exportAuditScreens({ result, directory, run }),
+          })
+        )
+      } catch (error) {
+        console.log(
+          JSON.stringify({ iosAuditFailureScreens: error.message.split(':')[0] })
+        )
+      }
       // Antigravity audit-diag P2: earlier flows left the owned driver on its port and the
       // XCUITest bundle may have displaced it, so it is stopped and cleared first and the screen
       // is read through the owned port (one fresh runner, as after a deadline kill). Nothing here
