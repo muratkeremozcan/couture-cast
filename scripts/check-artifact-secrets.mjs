@@ -35,7 +35,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import zlib from 'node:zlib'
 import { fileURLToPath } from 'node:url'
-import { unzipSync } from 'fflate'
+import { gunzipSync, unzipSync } from 'fflate'
 
 /** Values shorter than this match too much random data to scan for meaningfully. */
 export const MIN_SECRET_LENGTH = 8
@@ -60,19 +60,35 @@ function startsWith(buffer, magic) {
 }
 
 /**
- * A gzip member header: the magic, compression method 8 (deflate, the only one RFC 1952
- * defines, so every gzip reader refuses another) and no reserved flag bit set. Two magic
- * bytes alone are too weak: a decoded base64 run starts with 1f 8b once in 65,536, and a
- * blob report holds about ten thousand runs (PR 229 pw-e2e, 2026-11-14, refused an upload
- * on one). Bytes no gzip reader can open hide nothing, so they are scanned as plain bytes.
+ * A gzip member header: the magic and compression method 8 (deflate, the only one RFC 1952
+ * defines, so every gzip reader refuses another). Two magic bytes alone are too weak: a decoded
+ * base64 run starts with 1f 8b once in 65,536 (PR 229 pw-e2e, 2026-11-14, refused an upload on
+ * one), and bytes no gzip reader can open hide nothing, so they are scanned as plain bytes. The
+ * flag byte is not judged here: readers that ignore its reserved bits inflate such a member
+ * (Antigravity r50 P1-1), so it opens through gunzip below.
  */
 function isGzipHeader(buffer) {
-  return (
-    startsWith(buffer, GZIP_MAGIC) &&
-    buffer.length >= 10 &&
-    buffer[2] === 8 &&
-    (buffer[3] & 0xe0) === 0
-  )
+  return startsWith(buffer, GZIP_MAGIC) && buffer.length >= 3 && buffer[2] === 8
+}
+
+/**
+ * The data inside a gzip member, as the most lenient reader sees it: node:zlib first (it also
+ * reads concatenated members), then fflate, which inflates a member whose flag byte sets the
+ * reserved bits that node:zlib refuses, as gzip -dc and Python do. Throws node:zlib's error when
+ * neither opens it.
+ */
+function gunzip(buffer) {
+  try {
+    return zlib.gunzipSync(buffer)
+  } catch (error) {
+    try {
+      return Buffer.from(
+        gunzipSync(new Uint8Array(buffer.buffer, buffer.byteOffset, buffer.length))
+      )
+    } catch {
+      throw error
+    }
+  }
 }
 
 /**
@@ -328,7 +344,7 @@ function zipEntriesAfterPreamble(buffer) {
 
 /** The layers inside an archive. Throws when the archive cannot be read. */
 function archiveChildren(buffer, kind) {
-  if (kind === 'gzip') return [{ label: 'gunzip', data: zlib.gunzipSync(buffer) }]
+  if (kind === 'gzip') return [{ label: 'gunzip', data: gunzip(buffer) }]
   const entries = kind === 'zip' ? zipEntries(buffer) : zipEntriesAfterPreamble(buffer)
   return entries.map((entry, index) => {
     const data = Buffer.from(entry)

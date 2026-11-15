@@ -210,6 +210,30 @@ describe('check-artifact-secrets', () => {
     )
   })
 
+  // Antigravity r50 P1-1: reserved flag bits make node:zlib refuse a member that fflate, gzip -dc
+  // and Python inflate, so a header check that skipped such bytes let a secret through.
+  it.each([0x20, 0x40, 0x80])(
+    'finds a value in gzip data with reserved flag bit %i set, in every layer',
+    (bit) => {
+      const flagged = zlib.gzipSync(Buffer.from(`token=${DUMMY_SECRET}`))
+      flagged.writeUInt8(flagged.readUInt8(3) | bit, 3)
+      write('logs/server.log.gz', flagged)
+      write(
+        'blob-report/report.jsonl',
+        JSON.stringify({ method: 'onAttach', body: flagged.toString('base64') })
+      )
+
+      const result = scan(['DUMMY_SECRET'])
+      expect(result.unreadable).toEqual([])
+      expect(result.findings.map((finding) => finding.location)).toEqual(
+        expect.arrayContaining([
+          `${path.join(workDir, 'logs/server.log.gz')}!gunzip`,
+          `${path.join(workDir, 'blob-report/report.jsonl')}!base64#1!gunzip`,
+        ])
+      )
+    }
+  )
+
   it('still refuses gzip data with a real header that does not inflate', () => {
     const real = zlib.gzipSync(Buffer.from(`token=${DUMMY_SECRET}`))
     const corrupt = Buffer.concat([real.subarray(0, 10), Buffer.alloc(40, 0xff)])
