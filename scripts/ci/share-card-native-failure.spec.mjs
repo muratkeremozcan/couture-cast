@@ -359,6 +359,46 @@ describe('native public evidence', () => {
     assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
   })
 
+  // Dispatch 43693424172 android36-controls: native_build_failed with the Gradle output only in
+  // the private build log. Its closed record crosses the boundary; nothing else of the log does.
+  test('public evidence retains exactly the closed native build failure record', (t) => {
+    const { directory, write, run } = evidenceFixture(t)
+    const record = {
+      platform: 'android',
+      configuration: 'Debug',
+      durationMs: 529000,
+      exitCode: 1,
+      signal: null,
+      classification: 'outofmemory',
+      failedTasks: [':app:compileDebugKotlin'],
+    }
+    write('native-build-failure-android.json', record)
+    fs.writeFileSync(path.join(directory, 'build-android-Debug.log'), personal)
+    const result = run()
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(
+      JSON.parse(
+        fs.readFileSync(
+          path.join(directory, 'public-evidence/native-build-failure-android.json')
+        )
+      ),
+      record
+    )
+    assert.equal(
+      fs.existsSync(path.join(directory, 'public-evidence/build-android-Debug.log')),
+      false
+    )
+    write('native-build-failure-android.json', { ...record, log: personal })
+    const refused = run()
+    assert.notEqual(refused.status, 0)
+    assert.match(refused.stderr, /invalid_native_build_failure/)
+    assert.equal(refused.stderr.includes(personal), false)
+    assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
+    write('native-build-failure-ios.json', record)
+    fs.rmSync(path.join(directory, 'native-build-failure-android.json'))
+    assert.notEqual(run().status, 0)
+  })
+
   test('public evidence rejects a platform mismatch in its fixed filename', (t) => {
     const { directory, write, run } = evidenceFixture(t)
     write('native-flow-failure-ios.json', {

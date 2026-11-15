@@ -29,6 +29,7 @@ import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
+import { summarizeNativeBuildFailure } from './lib/native-build-failure.mjs'
 import { nativeFlowTimeoutMs } from './ci/native-ios-flow-budget.mjs'
 import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
@@ -776,6 +777,11 @@ if (command === 'prebuild') {
     assertNativeProbeMode(probeModeCheck)
   }
 } else if (command === 'build') {
+  // A record an earlier build left would publish a failure this build did not have, also when
+  // this build fails before it runs (CodeRabbit on PR 232), so it is cleared first.
+  fs.rmSync(path.join(directory, `native-build-failure-${platform}.json`), {
+    force: true,
+  })
   ownedEnv()
   const { configuration, arch } = buildSelection({
     platform,
@@ -818,13 +824,32 @@ if (command === 'prebuild') {
     derivedData: option('derived-data') ?? IOS_DERIVED_DATA,
     workletsArgs: workletsStaging?.args ?? [],
   })
+  const buildStarted = performance.now()
   const result = spawnSync(binary, args, {
     cwd: path.join(root, nativeProjectDirectory(platform)),
     env: buildEnv,
     stdio: ['ignore', fd, fd],
   })
   fs.closeSync(fd)
-  if (result.status !== 0) throw new Error('native_build_failed')
+  if (result.status !== 0) {
+    // The log stays private; its closed record names the failed tasks and the cause for the
+    // public evidence (dispatch 43693424172 android36-controls failed with neither).
+    privateJson(
+      `native-build-failure-${platform}.json`,
+      summarizeNativeBuildFailure({
+        platform,
+        configuration,
+        durationMs: performance.now() - buildStarted,
+        status: result.status,
+        signal: result.signal,
+        log: fs.readFileSync(
+          path.join(directory, `build-${platform}-${configuration}.log`),
+          'utf8'
+        ),
+      })
+    )
+    throw new Error('native_build_failed')
+  }
   if (workletsStaging) verifyWorkletsStaging(workletsStaging)
   console.log(`Owned ${platform} ${configuration} native build passed.`)
 } else if (command === 'a11y' && platform === 'android') {

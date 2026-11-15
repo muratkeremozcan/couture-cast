@@ -195,14 +195,48 @@ describe('apt source rewrite', () => {
     const { provisionShareCardBrowsers } = await helper()
     let installed = false
     const f = fixture({
-      readSource: async () => 'URIs: https://unknown.invalid/ubuntu\n',
+      readSource: async () =>
+        '# deb http://archive.ubuntu.com/ubuntu noble main\nURIs: https://user:secret@unknown.invalid/ubuntu\n',
       install: async () => {
         installed = true
       },
     })
+    // Main run 43680002723 all-1 (ubuntu-26.04): the refusal named no source, so the runner's
+    // configuration could not be told apart. It names each active source line, credentials masked.
+    await assert.rejects(provisionShareCardBrowsers(f.options), {
+      message:
+        'official_ubuntu_archive_required: /etc/apt/sources.list: URIs: https://***@unknown.invalid/ubuntu; /etc/apt/sources.list.d/ubuntu.sources: URIs: https://***@unknown.invalid/ubuntu',
+    })
+    // CodeRabbit on PR 232: APT takes the last `@` of the authority as the credential separator,
+    // so an email-style user name masks through that one.
     await assert.rejects(
-      provisionShareCardBrowsers(f.options),
-      /official_ubuntu_archive_required/
+      provisionShareCardBrowsers(
+        fixture({
+          readSource: async () =>
+            'URIs: https://build@example.org:secret@unknown.invalid/ubuntu\n',
+        }).options
+      ),
+      (error) =>
+        !error.message.includes('secret') &&
+        !error.message.includes('example.org') &&
+        error.message.includes('URIs: https://***@unknown.invalid/ubuntu')
+    )
+    // CodeRabbit on PR 232: a `?` in the password is still userinfo to APT, so the mask runs to
+    // the authority's last `@` whatever the userinfo holds.
+    await assert.rejects(
+      provisionShareCardBrowsers(
+        fixture({
+          readSource: async () => 'URIs: https://build:sec?r#et@unknown.invalid/ubuntu\n',
+        }).options
+      ),
+      (error) =>
+        !error.message.includes('sec') &&
+        !error.message.includes('build') &&
+        error.message.includes('URIs: https://***@unknown.invalid/ubuntu')
+    )
+    await assert.rejects(
+      provisionShareCardBrowsers(fixture({ readSource: async () => '# none\n' }).options),
+      { message: 'official_ubuntu_archive_required: no active apt source line' }
     )
     assert.equal(f.writes.length, 0)
     assert.equal(installed, false)
