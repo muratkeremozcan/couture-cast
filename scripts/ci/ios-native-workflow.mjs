@@ -310,6 +310,8 @@ export const MANDATORY = [
       'bash scripts/ci/check-accessibility-focus-builds.sh ios-app "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios',
     ],
   ],
+  // PR 237 review P1: the prebuild links the probe, so it is as mandatory as the build.
+  [LIVE_FONT_JOB, (step) => step.id === 'prebuild', undefined, [LIVE_FONT_PREBUILD]],
   [
     LIVE_FONT_JOB,
     (step) => step.id === 'release_build',
@@ -931,7 +933,7 @@ function liveFontProblems(job, check) {
   )
   const at = (predicate) => stepIndex(job, predicate)
   const order = [
-    at(runs(LIVE_FONT_PREBUILD)),
+    at((step) => step.id === 'prebuild'),
     at((step) => step.id === 'release_build'),
     at(runs('native-ios-startup-probe.mjs')),
     at((step) => step.id === 'signin'),
@@ -945,14 +947,20 @@ function liveFontProblems(job, check) {
     ),
     `${LIVE_FONT_JOB}: prebuild, build the Release test build, install it, sign in, run the proof, scan it, then upload it`
   )
-  for (const [label, predicate] of [
-    ['prebuild', runs(LIVE_FONT_PREBUILD)],
-    ['Release build', (step) => step.id === 'release_build'],
+  // PR 237 review P1: the body is the one command, so no inline assignment, unset or export can
+  // change the variable the step's env sets.
+  for (const [label, id, command] of [
+    ['prebuild', 'prebuild', LIVE_FONT_PREBUILD],
+    ['Release build', 'release_build', LIVE_FONT_RELEASE_BUILD],
   ]) {
-    const row = steps(job).filter(predicate)
+    const row = steps(job).filter((step) => step.id === id)
     check(
       row.length === 1 && same(row[0].env, LIVE_FONT_PROBE_ENV),
       `${LIVE_FONT_JOB}: the ${label} step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1', which links the text layout probe the proof reads`
+    )
+    check(
+      row.length === 1 && typeof row[0].run === 'string' && row[0].run.trim() === command,
+      `${LIVE_FONT_JOB}: the ${label} step must run exactly \`${command}\` and nothing else`
     )
   }
   check(

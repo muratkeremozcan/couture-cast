@@ -1329,6 +1329,78 @@ describe('the iOS live font-scale proof', () => {
           true
       },
     ],
+    // PR 237 review P1: every way a body or a condition can drop the variable the env sets.
+    [
+      'a live font prebuild that overrides the probe inline',
+      /ios-live-font: the prebuild step must run exactly `node scripts\/run-story68-native\.mjs prebuild --platform ios`/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild').run =
+          `COUTURE_TEXT_LAYOUT_PROBE=0 ${LIVE_FONT_PREBUILD}`
+      },
+    ],
+    [
+      'a live font prebuild that unsets the probe first',
+      /ios-live-font: the prebuild step must run exactly/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild').run =
+          `unset COUTURE_TEXT_LAYOUT_PROBE\n${LIVE_FONT_PREBUILD}\n`
+      },
+    ],
+    [
+      'a live font prebuild that exports the probe off first',
+      /ios-live-font: the prebuild step must run exactly/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild').run =
+          `export COUTURE_TEXT_LAYOUT_PROBE=0\n${LIVE_FONT_PREBUILD}\n`
+      },
+    ],
+    [
+      'a live font prebuild commented out',
+      /ios-live-font: "Generate the Release test build's native project" does not execute: node scripts\/run-story68-native\.mjs prebuild/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild').run =
+          `# ${LIVE_FONT_PREBUILD}\ntrue\n`
+      },
+    ],
+    [
+      'a live font prebuild skipped on a dispatch',
+      /ios-live-font: "Generate the Release test build's native project" must exist once/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild').if =
+          "${{ github.event_name != 'workflow_dispatch' }}"
+      },
+    ],
+    [
+      'a live font prebuild allowed to fail',
+      /ios-live-font: "Generate the Release test build's native project" must exist once/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild')['continue-on-error'] = true
+      },
+    ],
+    [
+      'a live font Release build that overrides the probe inline',
+      /ios-live-font: the Release build step must run exactly `node scripts\/run-story68-native\.mjs build --platform ios --configuration Release`/,
+      (live) => {
+        step(live, (item) => item.id === 'release_build').run =
+          `COUTURE_TEXT_LAYOUT_PROBE=0 ${LIVE_FONT_RELEASE_BUILD}`
+      },
+    ],
+    [
+      'a live font Release build that unsets the probe first',
+      /ios-live-font: the Release build step must run exactly/,
+      (live) => {
+        step(live, (item) => item.id === 'release_build').run =
+          `unset COUTURE_TEXT_LAYOUT_PROBE\n${LIVE_FONT_RELEASE_BUILD}\n`
+      },
+    ],
+    [
+      'a live font Release build that exports the probe off first',
+      /ios-live-font: the Release build step must run exactly/,
+      (live) => {
+        step(live, (item) => item.id === 'release_build').run =
+          `export COUTURE_TEXT_LAYOUT_PROBE=0\n${LIVE_FONT_RELEASE_BUILD}\n`
+      },
+    ],
     [
       'a live font proof without its secret scan',
       /ios-live-font: "a mandatory check" must exist once/,
@@ -1511,6 +1583,7 @@ describe('mandatory checks fail their step', () => {
       'node',
       'native-ios-runtime-fits.mjs',
     ],
+    [LIVE_FONT_PREBUILD]: ['node', 'prebuild --platform ios'],
     [LIVE_FONT_RELEASE_BUILD]: ['node', 'build --platform ios --configuration Release'],
     [LIVE_FONT_INSTALL]: ['node', 'native-ios-startup-probe.mjs'],
     'xcrun simctl launch "$device" com.couturecast.story68': ['xcrun', 'simctl launch'],
