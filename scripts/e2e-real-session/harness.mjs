@@ -279,7 +279,7 @@ export function envKeysToBlank(fileKeys, provided) {
  * Playwright runs have no owned harness, so the specs skip with this reason. Under
  * `run.mjs` (and the CI job) STORY65_REAL_SESSION_REQUIRED=true turns a reason into
  * an error: a harness that drifted (a renamed file, a different DATABASE_URL shape)
- * must fail the run, because six skipped tests exit 0.
+ * must fail the run, because skipped tests exit 0.
  *
  * @param {NodeJS.ProcessEnv | Record<string, string | undefined>} [env]
  * @returns {string | undefined}
@@ -312,11 +312,12 @@ function skipReasonFor(env) {
 }
 
 /**
- * The tests the two real-session specs hold: one in `community-real-session.spec.ts`
- * and five in `community-real-session-identity.spec.ts`. A full run must report
- * exactly this many, none skipped.
+ * The tests the real-session specs hold: one in `community-real-session.spec.ts`,
+ * five in `community-real-session-identity.spec.ts` and one in
+ * `guest-preview-real-session.spec.ts` (Story 6.16). A full run must report exactly
+ * this many, none skipped.
  */
-export const EXPECTED_REAL_SESSION_TESTS = 6
+export const EXPECTED_REAL_SESSION_TESTS = 7
 
 /**
  * Whether a JUnit report shows a complete passing run: `expected` tests (any count

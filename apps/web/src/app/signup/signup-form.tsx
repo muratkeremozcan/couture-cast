@@ -17,6 +17,7 @@ import {
   INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
+import { webGuestPreviewStore } from '../../lib/guest-preview'
 import { inviteGuardianFromWeb } from '../../lib/guardian'
 import { submitWebSignup } from '../../lib/signup'
 
@@ -65,6 +66,8 @@ export function SignupForm({
 
     if (!gate.allowed) {
       setErrorMessage(AGE_GATE_MESSAGES.underage)
+      // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
+      if (fromPreview) webGuestPreviewStore().clear()
       return
     }
 

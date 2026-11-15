@@ -3,7 +3,7 @@
  * `scripts/e2e-real-session/run.mjs` uses it: that script starts the isolated
  * database, the Auth proxy, the API on 4077 and the real-auth web build on 3077
  * before Playwright runs, so this config starts nothing, resets nothing and runs
- * only the two real-session specs, one at a time, with no retries.
+ * only the real-session specs, one at a time, with no retries.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -39,7 +39,7 @@ const metadata = { environment: 'local', apiBaseUrl: API_BASE_URL, baseUrl: WEB_
 export default defineConfig({
   ...localConfig,
   testDir: path.resolve(__dirname, '../tests'),
-  testMatch: /community-real-session(-identity)?\.spec\.ts$/,
+  testMatch: /(community-real-session(-identity)?|guest-preview-real-session)\.spec\.ts$/,
   webServer: undefined,
   globalSetup: undefined,
   globalTeardown: undefined,

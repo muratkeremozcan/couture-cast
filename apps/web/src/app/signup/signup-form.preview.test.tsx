@@ -2,7 +2,12 @@
 // verified sign-in. The signup response itself never authenticates anyone.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { GUEST_PREVIEW_STRINGS } from '@couture/utils'
+import {
+  createGuestPreviewStore,
+  GUEST_PREVIEW_STRINGS,
+  SAMPLE_CATALOG,
+} from '@couture/utils'
+import { setWebGuestPreviewStoreForTests } from '../../lib/guest-preview'
 import SignupPage from './page'
 import { SignupForm } from './signup-form'
 
@@ -58,6 +63,39 @@ describe('signup from the guest preview', () => {
     await screen.findByText('Email already registered')
     expect(screen.getByTestId('signup-back-to-preview')).toBeInTheDocument()
     expect(screen.queryByTestId('signup-sign-in-to-continue')).toBeNull()
+  })
+
+  it('discards the preview when signup finds the visitor under 13 (E-GATE-SERVER-WINS)', async () => {
+    let value: string | null = null
+    const store = createGuestPreviewStore({
+      catalog: SAMPLE_CATALOG,
+      adapter: {
+        read: () => Promise.resolve(value),
+        write: (text) => {
+          value = text
+          return Promise.resolve()
+        },
+        remove: () => {
+          value = null
+          return Promise.resolve()
+        },
+      },
+    })
+    setWebGuestPreviewStoreForTests(store)
+    store.start()
+    await store.flush()
+    const submitSignup = vi.fn()
+    render(<SignupForm submitSignup={submitSignup} fromPreview />)
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'kid@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2020-01-01' },
+    })
+    fireEvent.submit(screen.getByRole('button', { name: 'Create account' }))
+    await waitFor(() => expect(value).toBeNull())
+    expect(submitSignup).not.toHaveBeenCalled()
+    setWebGuestPreviewStoreForTests(undefined)
   })
 
   it('shows no preview links without from=preview', async () => {
