@@ -3,10 +3,12 @@ import { describe, expect, it } from 'vitest'
 import type { GarmentItem } from '@prisma/client'
 import type { CapsuleWithJoins } from './capsule-recommendation.engine.js'
 import {
-  generateRitualScenarios,
   getRainAmountThreshold,
   getRainProbThreshold,
   getWindThreshold,
+} from '@couture/utils'
+import {
+  generateRitualScenarios,
   type ComfortPreferencesInput,
   type EngineWeatherInput,
 } from './ritual-generation.engine.js'
@@ -140,6 +142,50 @@ const SPARSE_WARDROBE: GarmentItem[] = [
 ]
 const noCapsules: CapsuleWithJoins[] = []
 
+function capsule(
+  id: string,
+  garmentIds: readonly string[],
+  isFavorite = false
+): CapsuleWithJoins {
+  const garments = garmentIds.map((garmentId) => {
+    const found = WARDROBE_WITH_DRESS.find((item) => item.id === garmentId)
+    if (!found) throw new Error(`golden capsule ${id} references unknown ${garmentId}`)
+    return found
+  })
+  return {
+    id,
+    user_id: 'golden-user',
+    name: id,
+    description: null,
+    occasions: ['casual'],
+    is_favorite: isFavorite,
+    revision: 1,
+    idempotency_key: null,
+    idempotency_payload_hash: null,
+    created_at: new Date('2026-01-01T00:00:00Z'),
+    updated_at: new Date('2026-01-01T00:00:00Z'),
+    garment_joins: garments.map((garmentItem, index) => ({
+      id: `join-${id}-${index}`,
+      user_id: 'golden-user',
+      capsule_id: id,
+      garment_id: garmentItem.id,
+      garment_order: index,
+      created_at: new Date('2026-01-01T00:00:00Z'),
+      garment: garmentItem,
+    })),
+  } as unknown as CapsuleWithJoins
+}
+
+// Capsules exercise evaluateCapsuleForScenario, which reads the shared comfort range
+// and outerwear cutoff: complete, dress, favorite, with outerwear, and partial (auto-fill).
+const GOLDEN_CAPSULES: CapsuleWithJoins[] = [
+  capsule('capsule-complete-mild', ['top-mild', 'bottom-mild', 'shoes-mild']),
+  capsule('capsule-dress-warm', ['dress-warm', 'shoes-warm']),
+  capsule('capsule-favorite-cold', ['top-cold', 'bottom-cold', 'shoes-cold'], true),
+  capsule('capsule-outer-cool', ['outer-cool', 'top-cool', 'bottom-cool', 'shoes-cool']),
+  capsule('capsule-partial-hot', ['top-hot', 'bottom-hot']),
+]
+
 function weather(input: WeatherCase): EngineWeatherInput {
   const shared = { ...input, condition: 'clear', source: 'hourly' as const }
   return {
@@ -182,6 +228,22 @@ function recordGrid(): string[] {
             rows.push(
               `${locale}|${runsColdWarm}|${windTolerance}|${precipPreparedness}|${index} ${digest}`
             )
+            if (locale !== 'en-US') return
+            const withCapsules = generateRitualScenarios({
+              userId: 'golden-user',
+              targetLocalDate: '2026-11-15',
+              locale,
+              comfortPreferences,
+              eligibleGarments: WARDROBE_WITH_DRESS,
+              eligibleCapsules: GOLDEN_CAPSULES,
+              weather: weather(weatherCase),
+            })
+            const capsuleDigest = createHash('sha256')
+              .update(JSON.stringify(withCapsules.scenarios))
+              .digest('hex')
+            rows.push(
+              `${locale}|${runsColdWarm}|${windTolerance}|${precipPreparedness}|${index}|capsules ${capsuleDigest}`
+            )
           })
         }
       }
@@ -193,7 +255,7 @@ function recordGrid(): string[] {
 describe('ritual generation golden outputs (6.16 U-ENGINE-GOLDEN)', () => {
   it('reproduces the recorded comfort-rule outputs for the boundary grid', async () => {
     const grid = recordGrid()
-    expect(grid).toHaveLength(LOCALES.length * 27 * WEATHER_CASES.length)
+    expect(grid).toHaveLength((LOCALES.length + 1) * 27 * WEATHER_CASES.length)
     await expect(`${grid.join('\n')}\n`).toMatchFileSnapshot(
       './__golden__/ritual-generation-engine.golden.txt'
     )

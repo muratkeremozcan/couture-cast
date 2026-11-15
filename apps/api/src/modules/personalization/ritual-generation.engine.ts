@@ -28,7 +28,10 @@ import {
   getRainProbThreshold,
   getWindThreshold,
   needsOuterwear,
+  rainAmountExceeds,
+  rainProbabilityExceeds,
   resolveComfortRangeFromTemperature,
+  windExceeds,
   type ComfortRange,
 } from '@couture/utils'
 import {
@@ -164,11 +167,9 @@ export function toDatabaseDate(localDate: string): Date {
 }
 
 // ---------------------------------------------------------------------------
-// Comfort thresholds live in @couture/utils (Story 6.16) so the guest sample
-// policy applies the same rules. They are re-exported here for existing callers.
+// Comfort thresholds and comparisons live in @couture/utils (Story 6.16) so the
+// guest sample policy applies the same rules.
 // ---------------------------------------------------------------------------
-
-export { getRainAmountThreshold, getRainProbThreshold, getWindThreshold }
 
 // ---------------------------------------------------------------------------
 // Temperature localization (verbatim from RitualService).
@@ -1008,8 +1009,7 @@ function buildComfortNotes(
   else if (adjustedFeelsLike < 25) notes.push(dict.warm)
   else notes.push(dict.hot)
 
-  const windLimit = getWindThreshold(windTolerance)
-  if (weather.windSpeed > windLimit) {
+  if (windExceeds(weather.windSpeed, windTolerance)) {
     const windSpeed = Math.round(weather.windSpeed * 10) / 10
     notes.push(dict.windy.replace('{windSpeed}', windSpeed.toString()))
   }
@@ -1091,7 +1091,7 @@ function generateAvailableScenario(
   }
 
   const windThreshold = getWindThreshold(windTolerance)
-  if (weather.windSpeed > windThreshold) {
+  if (windExceeds(weather.windSpeed, windTolerance)) {
     const windSpeedFormatted = Math.round(weather.windSpeed * 10) / 10
     badgesList.push({
       key: 'wind_layer',
@@ -1112,14 +1112,19 @@ function generateAvailableScenario(
   const roundedAmount = Math.round(weather.precipitationAmount * 10) / 10
   const roundedAmountThreshold = Math.round(rainAmountThreshold * 10) / 10
 
-  if (roundedProb > roundedProbThreshold || roundedAmount > roundedAmountThreshold) {
+  const probabilityExceeds = rainProbabilityExceeds(
+    weather.precipitationProbability,
+    precipPreparedness
+  )
+  const amountExceeds = rainAmountExceeds(weather.precipitationAmount, precipPreparedness)
+  if (probabilityExceeds || amountExceeds) {
     const rainBullets: string[] = []
-    if (roundedProb > roundedProbThreshold) {
+    if (probabilityExceeds) {
       rainBullets.push(
         `Precipitation probability is ${roundedProb}%, which exceeds your threshold of ${roundedProbThreshold}%.`
       )
     }
-    if (roundedAmount > roundedAmountThreshold) {
+    if (amountExceeds) {
       rainBullets.push(
         `Precipitation amount is ${roundedAmount} mm, which exceeds your threshold of ${roundedAmountThreshold} mm.`
       )

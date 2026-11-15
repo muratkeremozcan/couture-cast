@@ -104,6 +104,9 @@ export {
   getWindThreshold,
   needsOuterwear,
   OUTERWEAR_THRESHOLD_CELSIUS,
+  rainAmountExceeds,
+  rainProbabilityExceeds,
   resolveComfortRangeFromTemperature,
+  windExceeds,
 } from './comfort-rules'
 export type { ComfortRange, ComfortRun, ComfortTolerance } from './comfort-rules'

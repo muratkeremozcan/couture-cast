@@ -7,8 +7,9 @@
  * apply one rule set. `ritual-generation.engine.golden.spec.ts` proves the
  * engine's outputs did not change with the move.
  *
- * Comparisons stay with each caller: the engine treats wind and rain as
- * exceeded only when strictly greater than the threshold.
+ * Wind and rain count only when strictly greater than the threshold. Rain
+ * compares rounded percent and rounded millimetres, as the engine's rain badge
+ * always has; the engine's comfort note keeps its own raw-probability check.
  */
 
 export type ComfortRun = 'cold' | 'neutral' | 'warm'
@@ -81,4 +82,28 @@ export function resolveComfortRangeFromTemperature(
 
 export function needsOuterwear(adjustedFeelsLike: number): boolean {
   return adjustedFeelsLike < OUTERWEAR_THRESHOLD_CELSIUS
+}
+
+export function windExceeds(windSpeed: number, windTolerance: ComfortTolerance): boolean {
+  return windSpeed > getWindThreshold(windTolerance)
+}
+
+export function rainProbabilityExceeds(
+  precipitationProbability: number,
+  precipPreparedness: ComfortTolerance
+): boolean {
+  return (
+    Math.round(precipitationProbability * 100) >
+    Math.round(getRainProbThreshold(precipPreparedness) * 100)
+  )
+}
+
+export function rainAmountExceeds(
+  precipitationAmount: number,
+  precipPreparedness: ComfortTolerance
+): boolean {
+  return (
+    Math.round(precipitationAmount * 10) / 10 >
+    Math.round(getRainAmountThreshold(precipPreparedness) * 10) / 10
+  )
 }

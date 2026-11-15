@@ -8,7 +8,10 @@ import {
   getWindThreshold,
   needsOuterwear,
   OUTERWEAR_THRESHOLD_CELSIUS,
+  rainAmountExceeds,
+  rainProbabilityExceeds,
   resolveComfortRangeFromTemperature,
+  windExceeds,
 } from './comfort-rules'
 
 describe('comfort rules (shared by the ritual engine and the 6.16 sample policy)', () => {
@@ -57,5 +60,27 @@ describe('comfort rules (shared by the ritual engine and the 6.16 sample policy)
       warm: ['mild', 'hot'],
       hot: ['warm'],
     })
+  })
+
+  it('counts wind only when strictly above the tolerance', () => {
+    expect(windExceeds(3, 'low')).toBe(false)
+    expect(windExceeds(3.01, 'low')).toBe(true)
+    expect(windExceeds(6.5, 'medium')).toBe(true)
+    expect(windExceeds(6.5, 'high')).toBe(false)
+    expect(windExceeds(8.01, 'high')).toBe(true)
+  })
+
+  it('compares rain on rounded percent and rounded millimetres like the rain badge', () => {
+    expect(rainProbabilityExceeds(0.204, 'high')).toBe(false)
+    expect(rainProbabilityExceeds(0.21, 'high')).toBe(true)
+    expect(rainProbabilityExceeds(0.6, 'medium')).toBe(true)
+    expect(rainProbabilityExceeds(0.6, 'low')).toBe(false)
+    expect(rainProbabilityExceeds(0.705, 'low')).toBe(true)
+    expect(rainAmountExceeds(0.14, 'high')).toBe(false)
+    expect(rainAmountExceeds(0.15, 'high')).toBe(true)
+    expect(rainAmountExceeds(1.2, 'medium')).toBe(true)
+    expect(rainAmountExceeds(1.2, 'low')).toBe(false)
+    expect(rainAmountExceeds(2.04, 'low')).toBe(false)
+    expect(rainAmountExceeds(2.05, 'low')).toBe(true)
   })
 })
