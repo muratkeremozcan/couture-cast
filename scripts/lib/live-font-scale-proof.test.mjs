@@ -4145,6 +4145,43 @@ describe('text layout clipping (F-00i)', () => {
       ),
       false
     )
+    // CodeRabbit on PR 230: a header still on the pages before the last and 6 px off on the last
+    // (a short last drag) is one copy, as the stitch counts it.
+    const header = (top) => ['Community', [0, top, 400, top + 40]]
+    const jitter = { ...fixedChange(), platform: 'ios' }
+    jitter.cold = pagedAt(
+      jitter.cold,
+      [0, SHIFT, SHIFT + 200],
+      [[header(20)], [header(20)], [header(26)]],
+      { reachedBottom: true }
+    )
+    jitter.settled = paged(jitter.settled, [header(20)], [header(20)], [header(20)])
+    assert.equal(
+      evaluateLiveFontChangeRaw(jitter).checks.textLost.lost.some(
+        ({ text }) => text === 'Community'
+      ),
+      false
+    )
+    // CodeRabbit on PR 230, accepted residual (TEA): three Save buttons at one screen place a drag
+    // apart; a ScrollView mounts all three on every page, so each page holds the others as
+    // records at their own content places, and they count three. A virtualized list that
+    // unmounts the far copies stays indistinguishable from a sticky header (design doc).
+    const button = (top, overrides) => ['Save', [40, top, 200, top + 40], overrides]
+    const three = (moved) =>
+      [0, 1, 2].map((page) =>
+        [0, 1, 2].map((index) =>
+          button(300 + (index - page) * SHIFT, index === page ? undefined : moved)
+        )
+      )
+    const buttons = { ...fixedChange(), platform: 'ios' }
+    buttons.cold = paged(buttons.cold, ...three(away))
+    buttons.settled = paged(buttons.settled, [button(300)], [button(300)], [button(300)])
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(buttons).checks.textLost.lost.filter(
+        ({ text }) => text === 'Save'
+      ),
+      [{ stage: 'settled', text: 'Save' }]
+    )
     // r52 P2-3 C: two copies on one page are two, though both overlap one earlier copy.
     const pair = { ...fixedChange(), platform: 'ios' }
     pair.cold = paged(

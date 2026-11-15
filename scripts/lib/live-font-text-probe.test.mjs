@@ -1532,6 +1532,17 @@ describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () 
       kindOf([1315, 2150, 1615, 2190], [0, 2100, 1080, 2200], [[0, 2100, 1080, 2200]]),
       'volatile'
     )
+    // CodeRabbit on PR 230: a scrolled-away record whose own centre falls in a sibling region
+    // belongs to the region of the viewport it scrolls in, here none.
+    assert.equal(
+      kindOf(
+        [420, 125, 520, 155],
+        [0, 120, 240, 160],
+        [[400, 120, 650, 160]],
+        [0, 0, 1080, 800]
+      ),
+      'scrolled'
+    )
     // No viewport known: no region this way.
     assert.equal(kindOf([1315, 545, 1615, 616], null, [[0, 475, 1080, 645]]), 'scrolled')
     assert.equal(

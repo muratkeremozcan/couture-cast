@@ -437,3 +437,21 @@ with no re-review.
 - Port lock takeover (P3-1): generations are walked until one places or a live marker is found,
   with a runaway bound (`maestro_driver_port_takeover_runaway`); only the winner removes dead
   markers.
+
+## Harness rules after the CodeRabbit review of PR 230, 2026-11-14
+
+Owner rule: one local review (r52) and one CodeRabbit review, findings fixed in PR 230.
+
+- A record scrolled away in a sideways scroll view takes its region from its `scrollViewport`
+  only; a record with no viewport keeps the centre rule.
+- On the last page a still identity is chrome in one node only, the one nearest its still place;
+  another node of that text there is new content with its own place.
+- Copy counting takes the stitch's still-before-last rule: a record at one screen place on every
+  page but the last (three pages or more), and no moving copy, is one copy, matched on the last
+  page to the record of its text nearest that place (a header that jitters 6 px).
+- The font-scale guard resolves constant keys and dimensions bindings through the TypeScript
+  checker, by declaration: a shadowing parameter is unverifiable and a same-named binding in
+  another function is no dimensions value.
+- Kept as the accepted residual: records at one screen place on every page with no record of each
+  other on any page (a virtualized list that unmounts the far copies) read as one sticky copy. A
+  ScrollView mounts every copy on every page, and the moving-copy veto counts them apart.

@@ -443,9 +443,22 @@ export function stitchPlaces(
         Math.abs(top(other) - top(node)) <= tolerance
     )
   const still = stillBeforeLast(pages, tolerance)
+  // On the last page a still identity is chrome in one node only, the one nearest its still
+  // place (CodeRabbit on PR 230): another node of that text there is new content.
+  const last = pages.at(-1)
+  const stillOnLast = new Set(
+    [...still].flatMap((identity) => {
+      const place = top(pages[0].find((node) => identityOf(node) === identity))
+      const nearest = last
+        .filter((node) => identityOf(node) === identity)
+        .sort((a, b) => Math.abs(top(a) - place) - Math.abs(top(b) - place))[0]
+      return nearest ? [nearest] : []
+    })
+  )
+  const heldStill = (node) =>
+    still.has(identityOf(node)) && (!last.includes(node) || stillOnLast.has(node))
   const chrome = (node) =>
-    pages.length > 1 &&
-    (still.has(identityOf(node)) || pages.every((page) => at(page, node)))
+    pages.length > 1 && (heldStill(node) || pages.every((page) => at(page, node)))
   // A chrome node's page 0 copy: the same identity, nearest top (chrome held still before the
   // last page may stand elsewhere on it); -1 when page 0 shows none there.
   const firstCopy = (node) => {
@@ -457,7 +470,7 @@ export function stitchPlaces(
       )
     if (!copies.length) return -1
     const near = Math.abs(top(copies[0].first) - top(node)) <= tolerance
-    return near || still.has(identityOf(node)) ? copies[0].index : -1
+    return near || heldStill(node) ? copies[0].index : -1
   }
   const taken = []
   const places = [

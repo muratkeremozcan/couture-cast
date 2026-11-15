@@ -755,13 +755,16 @@ const overflowRegionOf = (record, volatileRegions) => {
   )
 }
 
-/** The volatile region a record belongs to: by its centre, or, scrolled away, by overflow. */
-const regionOfRecord = (record, volatileRegions) => {
-  const region = volatileRegionOf(record, volatileRegions)
-  return region < 0 && record.scrolledAway
+/**
+ * The volatile region a record belongs to: scrolled away in a sideways scroll view, by that
+ * viewport; else by its centre.
+ */
+const regionOfRecord = (record, volatileRegions) =>
+  // A record scrolled away in a sideways scroll view belongs to the region of that viewport
+  // first (CodeRabbit on PR 230): its own centre may fall in a sibling region.
+  record.scrolledAway && isRect(record.scrollViewport)
     ? overflowRegionOf(record, volatileRegions)
-    : region
-}
+    : volatileRegionOf(record, volatileRegions)
 
 /** Rank of each item in screen order: top to bottom, left to right, then list order. */
 const ranks = (items, rectOf) =>

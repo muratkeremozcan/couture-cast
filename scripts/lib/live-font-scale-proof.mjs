@@ -1462,27 +1462,57 @@ function recordTexts(capture, platform, compared) {
   // its content place at another screen place (r52 P2-3 A: two copies one drag apart share a
   // screen place, but each is a moving copy seen again; after a short last drag the sticky chip
   // overlaps itself in content place at the same screen place, and stays sticky).
-  const sticky = (entry, page) =>
-    pages.length > 1 &&
-    every.every((list) => list.some((other) => sameScreen(other, entry))) &&
-    !every.some(
+  // A moving copy seen again: another page holds a record of its text at its content place at
+  // another screen place.
+  const moving = (entry, page) =>
+    every.some(
       (list, other) =>
         other !== page &&
         list.some((each) => sameCopy(each, entry) && !sameScreen(each, entry))
     )
+  const lastPage = placed.length - 1
+  const sticky = (entry, page) =>
+    pages.length > 1 &&
+    every.every((list) => list.some((other) => sameScreen(other, entry))) &&
+    !moving(entry, page)
+  // Fixed chrome by the stitch's rule (CodeRabbit on PR 230): at one screen place on every page
+  // but the last, three pages or more, and no moving copy; on the last page it is the record of
+  // its text nearest that place, whatever it does there (a header that jitters 6 px).
+  const stillBeforeLast = (entry, page) =>
+    pages.length >= 3 &&
+    page < lastPage &&
+    every
+      .slice(0, lastPage)
+      .every((list) => list.some((other) => sameScreen(other, entry))) &&
+    !moving(entry, page)
+  const screenGap = (a, b) =>
+    Math.abs(a.screen[0] - b.screen[0]) + Math.abs(a.screen[1] - b.screen[1])
   // One to one (r52 P2-3 C): an earlier copy is seen again by at most one record of a page, so
   // the count is never below any page's own.
   const copies = []
   placed.forEach((list, page) => {
     const before = copies.length
     const seen = new Set()
+    const claimed = new Set()
+    if (page === lastPage)
+      copies.forEach((copy, index) => {
+        if (!copy.fixed) return
+        const nearest = list
+          .filter((entry) => entry.text === copy.text && !claimed.has(entry))
+          .sort((a, b) => screenGap(a, copy) - screenGap(b, copy))[0]
+        if (!nearest) return
+        claimed.add(nearest)
+        seen.add(index)
+      })
     for (const entry of list) {
-      const same = sticky(entry, page) ? sameScreen : sameCopy
+      if (claimed.has(entry)) continue
+      const fixed = sticky(entry, page) || stillBeforeLast(entry, page)
+      const same = fixed ? sameScreen : sameCopy
       const match = copies.findIndex(
         (copy, index) => index < before && !seen.has(index) && same(copy, entry)
       )
       if (match >= 0) seen.add(match)
-      else copies.push(entry)
+      else copies.push({ ...entry, fixed })
     }
   })
   const texts = new Map()

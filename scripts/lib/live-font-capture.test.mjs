@@ -503,6 +503,30 @@ describe('stitchPages', () => {
     )
   })
 
+  // CodeRabbit on PR 230: a still header and a new label of the same id-less text on the last
+  // page; only the header's copy is chrome, the label is new text with its own place.
+  test('still chrome on the last page is one node, nearest its place', () => {
+    const save = (y) => ({ id: '', text: 'Save', bounds: `[0,${y}][100,${y + 40}]` })
+    const card = (n, y) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${y}][100,${y + 100}]`,
+    })
+    const pages = [
+      [save(20), card(1, 100), card(2, 400), card(3, 700), card(4, 1000)],
+      [save(20), card(3, 100), card(4, 400), card(5, 700), card(6, 1000)],
+      [save(26), card(4, 200), card(5, 500), card(6, 800), save(1100)],
+    ]
+    const { taken, places } = stitchPlaces(pages, {
+      expectedShift: 600,
+      reachedBottom: true,
+    })
+    assert.equal(taken.filter(({ key }) => JSON.parse(key)[1] === 'Save').length, 2)
+    assert.equal(places[2][0], places[0][0])
+    assert.notEqual(places[2][4], places[0][0])
+    assert.ok(places[2][4] >= 0)
+  })
+
   // Android 6c85bbb4 Community, before 1.0 launch 005, pages 4 to 5: the viewport clamps every
   // shared box of the spotlight card (39 px tall on page 4, 26 on page 5), so no node measures
   // the step, and the drags before it were 847 px. Its probe records, never cut, moved 837.
