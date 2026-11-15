@@ -232,9 +232,14 @@ export function nextDownload(page: Page): Promise<Download> {
   }
   const finished = (request: Request) => {
     if (!prepare(request)) return
-    void request.response().then((response) => {
-      note(`prepare ${preparePurpose(request)} answered ${response?.status() ?? 'none'}`)
-    })
+    // A diagnostic only: a response that cannot be read (page closing) is noted, never thrown.
+    void request.response().then(
+      (response) =>
+        note(
+          `prepare ${preparePurpose(request)} answered ${response?.status() ?? 'none'}`
+        ),
+      () => note(`prepare ${preparePurpose(request)} response unreadable`)
+    )
   }
   const failed = (request: Request) => {
     if (prepare(request))

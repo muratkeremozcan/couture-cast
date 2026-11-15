@@ -37,7 +37,6 @@ import {
   remainingMs,
   saveModerationEvidenceFile,
 } from './moderation'
-import { BLOB_DOWNLOAD_URL_LIFETIME_MS } from './blob-download'
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import {
   APPEAL_PATH,
@@ -782,6 +781,7 @@ describe('U-WEB-CLIENT: getModerationSlaFromWeb', () => {
 })
 
 describe('U-WEB-EVIDENCE-SAVE: the evidence download keeps its URL through the handoff', () => {
+  // Literal times on purpose: a shorter shared lifetime must fail here, not move with it.
   it('clicks one anchor, removes it, and revokes the URL only after the shared lifetime', async () => {
     vi.useFakeTimers()
     const createObjectURL = vi.fn(() => 'blob:evidence')
@@ -813,7 +813,7 @@ describe('U-WEB-EVIDENCE-SAVE: the evidence download keeps its URL through the h
         { href: 'blob:evidence', download: 'moderation-evidence-x.json' },
       ])
       expect(document.querySelector('a[download]')).toBeNull()
-      await vi.advanceTimersByTimeAsync(BLOB_DOWNLOAD_URL_LIFETIME_MS - 1)
+      await vi.advanceTimersByTimeAsync(39_999)
       expect(revokeObjectURL).not.toHaveBeenCalled()
       await vi.advanceTimersByTimeAsync(1)
       expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:evidence')

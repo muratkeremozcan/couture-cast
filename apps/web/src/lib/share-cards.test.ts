@@ -16,7 +16,6 @@ import {
   canShareCardFiles,
   captureShareCardShared,
   downloadShareCard,
-  SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS,
   handOffShareCardFile,
   prepareShareCardFromWeb,
   shareCardCapabilitiesFromWeb,
@@ -111,7 +110,7 @@ describe('web share-card immutable download boundary', () => {
         'handoff_failure'
       )
       expect(document.querySelector('a[download]')).toBeNull()
-      await vi.advanceTimersByTimeAsync(SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS - 1)
+      await vi.advanceTimersByTimeAsync(39_999)
       expect(revokeObjectURL).not.toHaveBeenCalled()
       await vi.advanceTimersByTimeAsync(1)
       expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:approved')
@@ -155,7 +154,7 @@ describe('web share-card immutable download boundary', () => {
       })
       expect(click).not.toHaveBeenCalled()
       expect(document.querySelector('a[download]')).toBeNull()
-      await vi.advanceTimersByTimeAsync(SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS - 1)
+      await vi.advanceTimersByTimeAsync(39_999)
       expect(revokeObjectURL).not.toHaveBeenCalled()
       await vi.advanceTimersByTimeAsync(1)
       expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:cancelled')
