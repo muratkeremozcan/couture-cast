@@ -76,8 +76,15 @@ export const IOS_RELEASE_APP =
   '/tmp/cc68-ios-build/Build/Products/Release-iphonesimulator/CoutureCastStory68.app'
 export const LIVE_FONT_SCREENS = ['home', 'community', 'settings', 'composer']
 export const LIVE_FONT_OUT = '"$RUNNER_TEMP/live-font-ios"'
+export const LIVE_FONT_PREBUILD =
+  'node scripts/run-story68-native.mjs prebuild --platform ios'
 export const LIVE_FONT_RELEASE_BUILD =
   'node scripts/run-story68-native.mjs build --platform ios --configuration Release'
+// Story 6.15 F-00i: plugins/with-text-layout-probe.js links the text layout probe only when
+// COUTURE_TEXT_LAYOUT_PROBE=1 at prebuild, and the build checks the project against the same
+// variable (assertNativeProbeMode), so both steps carry it. Without it the Release build ships no
+// probe and every capture fails as live_font_text_probe_missing (nightly run 43707223465).
+export const LIVE_FONT_PROBE_ENV = Object.freeze({ COUTURE_TEXT_LAYOUT_PROBE: '1' })
 export const LIVE_FONT_INSTALL = `node scripts/ci/native-ios-startup-probe.mjs --for-native-flow --app ${IOS_RELEASE_APP}`
 export const LIVE_FONT_PROOF = `node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens ${LIVE_FONT_SCREENS.join(',')} --out ${LIVE_FONT_OUT}`
 export const LIVE_FONT_SCAN = `node scripts/ci/native-ios-app-secret-scan.mjs ${LIVE_FONT_OUT} "$CC68_HARNESS_DIR"`
@@ -881,7 +888,7 @@ function liveFontProblems(job, check) {
   )
   const at = (predicate) => stepIndex(job, predicate)
   const order = [
-    at(runs('run-story68-native.mjs prebuild --platform ios')),
+    at(runs(LIVE_FONT_PREBUILD)),
     at((step) => step.id === 'release_build'),
     at(runs('native-ios-startup-probe.mjs')),
     at((step) => step.id === 'signin'),
@@ -895,6 +902,16 @@ function liveFontProblems(job, check) {
     ),
     `${LIVE_FONT_JOB}: prebuild, build the Release test build, install it, sign in, run the proof, scan it, then upload it`
   )
+  for (const [label, predicate] of [
+    ['prebuild', runs(LIVE_FONT_PREBUILD)],
+    ['Release build', (step) => step.id === 'release_build'],
+  ]) {
+    const row = steps(job).filter(predicate)
+    check(
+      row.length === 1 && same(row[0].env, LIVE_FONT_PROBE_ENV),
+      `${LIVE_FONT_JOB}: the ${label} step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1', which links the text layout probe the proof reads`
+    )
+  }
   check(
     steps(job).filter(liveFontUpload).length === 1,
     `${LIVE_FONT_JOB}: upload the scanned proof once as ${LIVE_FONT_ARTIFACT.name}, kept for ${LIVE_FONT_ARTIFACT['retention-days']} days, failing when it is missing`

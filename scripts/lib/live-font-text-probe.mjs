@@ -612,6 +612,90 @@ export function createTextProbe({
   }
 }
 
+// Linking (nightly run 43707223465) ---------------------------------------------------------------
+
+// The first four bytes of a Mach-O file or a universal binary, in either byte order.
+const MACH_O_MAGIC = new Set([
+  0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe, 0xcafebabe, 0xbebafeca,
+])
+
+function machOFiles(directory, fs) {
+  const found = []
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name)
+    if (entry.isDirectory()) found.push(...machOFiles(file, fs))
+    else if (entry.isFile()) {
+      const head = Buffer.alloc(4)
+      const fd = fs.openSync(file, 'r')
+      try {
+        if (
+          fs.readSync(fd, head, 0, 4, 0) === 4 &&
+          MACH_O_MAGIC.has(head.readUInt32BE(0))
+        )
+          found.push(file)
+      } finally {
+        fs.closeSync(fd)
+      }
+    }
+  }
+  return found
+}
+
+/**
+ * Throws live_font_probe_not_linked unless the installed build carries the text layout probe.
+ * A build prebuilt without COUTURE_TEXT_LAYOUT_PROBE=1 has none (plugins/with-text-layout-probe.js),
+ * and every capture then asks three times before it fails as live_font_text_probe_missing: the
+ * nightly iOS run 43707223465 spent its proof that way on all four screens. The driver checks once,
+ * after its first launch and before its first capture, and stops the run on a missing probe.
+ *   iOS      a Mach-O file in the installed app bundle (the executable for static pods, a
+ *            framework for dynamic ones) holds the notification name the probe listens for.
+ *   Android  the running app registered the probe's receiver (Application.onCreate, API 29 and
+ *            later), so `dumpsys activity broadcasts` lists a filter for its action. A broadcast
+ *            sent earlier shows as `act=`, never as a filter's `Action: "..."`.
+ */
+export function assertTextProbeLinked({
+  platform,
+  device,
+  appId,
+  adbBinary = 'adb',
+  exec = boundedCall,
+  fs = nodeFs,
+  callMs = TEXT_PROBE_CALL_MS,
+}) {
+  if (!TEXT_PROBE_KINDS[platform])
+    fail('live_font_text_probe_invalid', `platform ${platform}`)
+  const call = (binary, args) => exec(binary, args, { timeout: callMs })
+  if (platform === 'android') {
+    const broadcasts = call(adbBinary, [
+      '-s',
+      device,
+      'shell',
+      'dumpsys',
+      'activity',
+      'broadcasts',
+    ])
+    if (!broadcasts.includes(`Action: "${TEXT_PROBE_ACTION}"`))
+      fail(
+        'live_font_probe_not_linked',
+        `${appId} registered no ${TEXT_PROBE_ACTION} receiver; prebuild with COUTURE_TEXT_LAYOUT_PROBE=1`
+      )
+    return
+  }
+  const bundle = call('xcrun', [
+    'simctl',
+    'get_app_container',
+    device,
+    appId,
+    'app',
+  ]).trim()
+  const marker = Buffer.from(TEXT_PROBE_NOTIFICATION, 'utf8')
+  if (!machOFiles(bundle, fs).some((file) => fs.readFileSync(file).includes(marker)))
+    fail(
+      'live_font_probe_not_linked',
+      `no binary in ${path.basename(bundle)} carries ${TEXT_PROBE_NOTIFICATION}; prebuild with COUTURE_TEXT_LAYOUT_PROBE=1`
+    )
+}
+
 // Matching (TEA change 5 and the rulings of 2026-11-14) -----------------------------------------
 
 const area = (rect) => (rect[2] - rect[0]) * (rect[3] - rect[1])

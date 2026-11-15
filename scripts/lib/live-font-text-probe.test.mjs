@@ -15,6 +15,7 @@ import { describe, test } from 'node:test'
 import { probeRecord } from './fixtures/live-font-text-probe-records.mjs'
 import {
   assembleLogcatAnswer,
+  assertTextProbeLinked,
   boundedCall,
   coveredWindows,
   createTextProbe,
@@ -339,6 +340,133 @@ describe('createTextProbe on iOS', () => {
     const { probe: silent, calls } = fakeIos(t, [])
     assert.throws(() => silent.read(), { code: 'live_font_text_probe_missing' })
     assert.equal(calls.filter((call) => call.args.includes('notifyutil')).length, 3)
+  })
+})
+
+// Nightly run 43707223465: a Release build prebuilt without COUTURE_TEXT_LAYOUT_PROBE=1 carried
+// no probe, and the run spent its whole proof on live_font_text_probe_missing. The driver now
+// checks the installed build once, before its first capture.
+describe('assertTextProbeLinked', () => {
+  const DEVICE = '1B2C3D4E-0000-1111-2222-333344445555'
+  const APP = 'com.couturecast.story68'
+  const MACH_O = Buffer.from([0xcf, 0xfa, 0xed, 0xfe])
+  const machO = (...parts) => Buffer.concat([MACH_O, Buffer.from(parts.join('\0'))])
+
+  function fakeBundle(t, files) {
+    const container = fs.mkdtempSync(path.join(os.tmpdir(), 'text-probe-link-'))
+    t.after(() => fs.rmSync(container, { recursive: true, force: true }))
+    const bundle = path.join(container, 'CoutureCastStory68.app')
+    for (const [name, bytes] of Object.entries(files)) {
+      fs.mkdirSync(path.dirname(path.join(bundle, name)), { recursive: true })
+      fs.writeFileSync(path.join(bundle, name), bytes)
+    }
+    const calls = []
+    const exec = (binary, args, options) => {
+      calls.push({ binary, args, options })
+      return `${bundle}\n`
+    }
+    return { exec, calls }
+  }
+  const check = (exec, platform = 'ios') =>
+    assertTextProbeLinked({ platform, device: DEVICE, appId: APP, exec, callMs: 5000 })
+
+  test('passes an iOS build whose executable carries the probe notification', (t) => {
+    const { exec, calls } = fakeBundle(t, {
+      CoutureCastStory68: machO('RCTAppDelegate', TEXT_PROBE_NOTIFICATION),
+      'main.jsbundle': 'var a=1',
+    })
+    assert.doesNotThrow(() => check(exec))
+    assert.deepEqual(calls, [
+      {
+        binary: 'xcrun',
+        args: ['simctl', 'get_app_container', DEVICE, APP, 'app'],
+        options: { timeout: 5000 },
+      },
+    ])
+  })
+
+  test('passes an iOS build that links the probe as a framework', (t) => {
+    const { exec } = fakeBundle(t, {
+      CoutureCastStory68: machO('RCTAppDelegate'),
+      'Frameworks/TextLayoutProbe.framework/TextLayoutProbe': machO(
+        TEXT_PROBE_NOTIFICATION
+      ),
+    })
+    assert.doesNotThrow(() => check(exec))
+  })
+
+  test('fails an iOS build without the probe as live_font_probe_not_linked', (t) => {
+    const { exec } = fakeBundle(t, {
+      CoutureCastStory68: machO('RCTAppDelegate', 'ExpoModulesProvider'),
+      'Frameworks/hermes.framework/hermes': machO('hermes'),
+      'main.jsbundle': 'var a=1',
+    })
+    assert.throws(() => check(exec), {
+      code: 'live_font_probe_not_linked',
+      message:
+        /no binary in CoutureCastStory68\.app carries com\.couturecast\.textlayoutprobe\.dump; prebuild with COUTURE_TEXT_LAYOUT_PROBE=1/,
+    })
+  })
+
+  test('the notification name outside any binary does not count as linked', (t) => {
+    const { exec } = fakeBundle(t, {
+      CoutureCastStory68: machO('RCTAppDelegate'),
+      'main.jsbundle': `var n="${TEXT_PROBE_NOTIFICATION}"`,
+      'Info.plist': TEXT_PROBE_NOTIFICATION,
+    })
+    assert.throws(() => check(exec), { code: 'live_font_probe_not_linked' })
+  })
+
+  test('on Android, only a registered receiver filter for the probe action counts', () => {
+    const registered = [
+      'ACTIVITY MANAGER BROADCAST STATE (dumpsys activity broadcasts)',
+      '  Registered Receivers:',
+      `  * ReceiverList{1 4321 ${APP}/10123/u0 remote:2}`,
+      '    Filter #0: BroadcastFilter{3 10123/u0 ReceiverList{1}}',
+      `      Action: "${TEXT_PROBE_ACTION}"`,
+    ].join('\n')
+    // An earlier run's broadcast stays in the history after the app is replaced.
+    const historyOnly = [
+      '  Registered Receivers:',
+      `  * ReceiverList{1 4321 ${APP}/10123/u0 remote:2}`,
+      '      Action: "android.intent.action.SCREEN_ON"',
+      '  Historical broadcasts [foreground]:',
+      `  #0: BroadcastRecord{5 u0 ${TEXT_PROBE_ACTION}}`,
+      `    Intent { act=${TEXT_PROBE_ACTION} flg=0x400010 pkg=${APP} (has extras) }`,
+    ].join('\n')
+    const calls = []
+    const exec = (output) => (binary, args) => {
+      calls.push({ binary, args })
+      return output
+    }
+    assert.doesNotThrow(() => check(exec(registered), 'android'))
+    assert.deepEqual(calls[0], {
+      binary: 'adb',
+      args: ['-s', DEVICE, 'shell', 'dumpsys', 'activity', 'broadcasts'],
+    })
+    assert.throws(() => check(exec(historyOnly), 'android'), {
+      code: 'live_font_probe_not_linked',
+      message: /registered no com\.couturecast\.textlayoutprobe\.DUMP receiver/,
+    })
+  })
+
+  test('the driver checks once, after its first launch and before any capture', () => {
+    const driver = fs.readFileSync(
+      new URL('../run-live-font-proof.mjs', import.meta.url),
+      'utf8'
+    )
+    const loop = driver.indexOf('for (const name of screens) {')
+    const checkAt = driver.indexOf(
+      'assertTextProbeLinked({ platform, device, appId, adbBinary })'
+    )
+    assert.ok(loop > 0 && checkAt > loop, 'inside the screen loop')
+    assert.equal(driver.split('assertTextProbeLinked(').length, 2, 'one call')
+    assert.ok(checkAt > driver.indexOf('launch()', loop), 'after the first launch')
+    for (const capture of ['await runScreenJourney(', 'await proveConfigChange(name'])
+      assert.ok(checkAt < driver.indexOf(capture, loop), `before ${capture}`)
+    // Not inside a try: a missing probe ends the run instead of failing one screen.
+    const block = driver.slice(driver.lastIndexOf('\n    }\n', checkAt), checkAt)
+    assert.match(block, /if \(!probeLinked\) \{\n\s*$/)
   })
 })
 

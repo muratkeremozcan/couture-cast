@@ -21,6 +21,8 @@ import {
   LIVE_FONT_ARTIFACT,
   LIVE_FONT_INSTALL,
   LIVE_FONT_JOB,
+  LIVE_FONT_PREBUILD,
+  LIVE_FONT_PROBE_ENV,
   LIVE_FONT_PROOF,
   LIVE_FONT_RELEASE_BUILD,
   LIVE_FONT_SCAN,
@@ -952,6 +954,18 @@ describe('the iOS live font-scale proof', () => {
     assert.ok(LIVE_FONT_INSTALL.endsWith(`--app ${IOS_RELEASE_APP}`))
   })
 
+  // Nightly run 43707223465: without the variable the Release build shipped no text layout
+  // probe and every screen failed as live_font_text_probe_missing.
+  test('links the text layout probe into the Release build it prebuilds and builds', () => {
+    assert.deepEqual(LIVE_FONT_PROBE_ENV, { COUTURE_TEXT_LAYOUT_PROBE: '1' })
+    const prebuild = step(job, (row) => row.id === 'prebuild')
+    assert.equal(prebuild.run, LIVE_FONT_PREBUILD)
+    assert.deepEqual(prebuild.env, { COUTURE_TEXT_LAYOUT_PROBE: '1' })
+    assert.deepEqual(step(job, (row) => row.id === 'release_build').env, {
+      COUTURE_TEXT_LAYOUT_PROBE: '1',
+    })
+  })
+
   test('the step fails when the driver exits nonzero, as bash -e runs it', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-live-font-'))
     try {
@@ -1204,6 +1218,35 @@ describe('the iOS live font-scale proof', () => {
         step(live, (item) => item.with?.name === LIVE_FONT_ARTIFACT.name).with[
           'if-no-files-found'
         ] = 'warn'
+      },
+    ],
+    [
+      'a live font prebuild without the text layout probe',
+      /ios-live-font: the prebuild step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1'/,
+      (live) => {
+        delete step(live, (item) => item.id === 'prebuild').env
+      },
+    ],
+    [
+      'a live font Release build without the text layout probe',
+      /ios-live-font: the Release build step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1'/,
+      (live) => {
+        delete step(live, (item) => item.id === 'release_build').env
+      },
+    ],
+    [
+      'a live font prebuild that turns the probe off',
+      /ios-live-font: the prebuild step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1'/,
+      (live) => {
+        step(live, (item) => item.id === 'prebuild').env.COUTURE_TEXT_LAYOUT_PROBE = '0'
+      },
+    ],
+    [
+      'a live font Release build with the probe as a boolean',
+      /ios-live-font: the Release build step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1'/,
+      (live) => {
+        step(live, (item) => item.id === 'release_build').env.COUTURE_TEXT_LAYOUT_PROBE =
+          true
       },
     ],
     [

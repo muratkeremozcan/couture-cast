@@ -68,7 +68,7 @@ import {
 } from './lib/live-font-pages.mjs'
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
-import { createTextProbe } from './lib/live-font-text-probe.mjs'
+import { assertTextProbeLinked, createTextProbe } from './lib/live-font-text-probe.mjs'
 import {
   CAPTURE_HASHES,
   captureHashes,
@@ -730,6 +730,8 @@ guard.step('timezone', () => {
 })
 // The weather banner state the run sets up, and how (ageWeatherSnapshot).
 let weather
+// Whether the installed build carries the text layout probe, checked once before the first capture.
+let probeLinked = false
 let runError
 const started = Date.now()
 const results = []
@@ -800,6 +802,13 @@ try {
         })
         continue
       }
+    }
+    // F-00i (nightly run 43707223465): a build without the probe would fail every capture after
+    // three asks each, screen after screen, so the run stops here with live_font_probe_not_linked.
+    // Outside the screen's own catch on purpose: the outer one ends the run and writes the report.
+    if (!probeLinked) {
+      assertTextProbeLinked({ platform, device, appId, adbBinary })
+      probeLinked = true
     }
     if (steps.includes('config-change')) {
       try {

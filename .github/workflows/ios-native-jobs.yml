@@ -1086,8 +1086,12 @@ jobs:
       - *prepare_runtime
       # app.config.ts reads STORY68_NATIVE_TEST_BUILD=1 from the runtime's public build env:
       # bundle id com.couturecast.story68 and the live font mount markers the proof reads.
+      # COUTURE_TEXT_LAYOUT_PROBE=1 links the text layout probe (plugins/with-text-layout-probe.js),
+      # which answers the proof on every capture; the build checks the project against it again.
       - name: Generate the Release test build's native project
         id: prebuild
+        env:
+          COUTURE_TEXT_LAYOUT_PROBE: '1'
         run: node scripts/run-story68-native.mjs prebuild --platform ios
       - name: Mark the owned iOS build-service window
         id: build_window
@@ -1095,6 +1099,8 @@ jobs:
       - name: Build the Release test build
         id: release_build
         timeout-minutes: 45
+        env:
+          COUTURE_TEXT_LAYOUT_PROBE: '1'
         run: node scripts/run-story68-native.mjs build --platform ios --configuration Release
       - name: Release the owned iOS build services
         if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
