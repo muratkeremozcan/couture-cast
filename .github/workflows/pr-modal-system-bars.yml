@@ -13,6 +13,8 @@ on:
       - 'package-lock.json'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
       - 'scripts/ci/junit-report-check.mjs'
+      - 'scripts/ci/gradle-resolution-retry.mjs'
+      - 'scripts/lib/transient-resolution-retry.cjs'
       - 'apps/mobile/package.json'
       - 'apps/mobile/app.config.ts'
       - 'apps/mobile/app.json'
@@ -28,6 +30,8 @@ on:
       - 'package-lock.json'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
       - 'scripts/ci/junit-report-check.mjs'
+      - 'scripts/ci/gradle-resolution-retry.mjs'
+      - 'scripts/lib/transient-resolution-retry.cjs'
       - 'apps/mobile/package.json'
       - 'apps/mobile/app.config.ts'
       - 'apps/mobile/app.json'
@@ -70,6 +74,26 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Gradle's plugins, dependencies and wrapper distribution, so a run does not download them
+      # all from Maven Central and the plugin portal again; main writes the cache, every other
+      # ref reads it.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
+      # Robolectric fetches its Android runtimes (SDK 28 and 33) outside Gradle's cache.
+      - name: Cache Robolectric Android runtimes
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          # The build file pins the Robolectric version; the test's @Config picks the SDKs.
+          key: >-
+            robolectric-modal-system-bars-${{
+            hashFiles('apps/mobile/modules/modal-system-bars/android/build.gradle',
+            'apps/mobile/modules/modal-system-bars/android/src/test/**') }}
+          restore-keys: robolectric-modal-system-bars-
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -89,7 +113,10 @@ jobs:
         working-directory: apps/mobile/android
         run: |
           set -euo pipefail
-          ./gradlew --max-workers=2 :modal-system-bars:testDebugUnitTest \
+          # A 429 or 5xx from Maven Central or the plugin portal (run 43767969866) is retried
+          # twice, after 20 s and 40 s; any other failure fails here at once.
+          node ../../../scripts/ci/gradle-resolution-retry.mjs -- ./gradlew --max-workers=2 \
+            :modal-system-bars:testDebugUnitTest \
             --tests expo.modules.modalsystembars.ModalSystemBarsTest --console=plain
           # Both SDK branches ran (at least two cases), and none was skipped, failed or errored.
           report=../modules/modal-system-bars/android/build/test-results/testDebugUnitTest
