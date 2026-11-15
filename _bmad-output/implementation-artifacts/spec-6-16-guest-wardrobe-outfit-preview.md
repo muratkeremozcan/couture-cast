@@ -548,10 +548,10 @@ Full plan, reconciled to the frozen Intent and Decisions (this spec wins on any 
 `_bmad-output/test-artifacts/test-design/cc616-guest-wardrobe-outfit-preview-test-design.md`.
 17 risks, 11 high; R4 (guest state or a pending carryover crossing identities) scores 9 until
 every `L-*` ordered pair is built and its seeded defect is proved red.
-93 scenario entries: P0 43 (eligibility 11, isolation 8, lifecycle pairs 12, conversion 12),
+97 scenario entries: P0 47 (eligibility 11, isolation 8, lifecycle pairs 16, conversion 12),
 P1 46 (functional 26, accessibility and honesty 10, telemetry 10), member regression 4.
 Entries marked W and M run on both platforms.
-19 seeded-defect proofs (S-1 to S-19) run in a throwaway worktree and are recorded under
+20 seeded-defect proofs (S-1 to S-20) run in a throwaway worktree and are recorded under
 `_bmad-output/test-artifacts/story-6-16/`.
 
 TEA rulings on the frozen spec (clarifications, no decision reversed):
@@ -565,6 +565,10 @@ TEA rulings on the frozen spec (clarifications, no decision reversed):
   minutes; otherwise it runs nightly with iOS.
 - TEA-4: `reset()` before the signup handoff gives a visitor who cancels a new anonymous id for the
   rest of the preview. Accepted; `T-RESET-BEFORE-HANDOFF` asserts it and that nothing merges.
+- TEA-5: padded whitespace in the gate passes because D2 reuses the signup rule, which trims.
+- TEA-6: web guest state lives in shared `localStorage`, so the web store listens to the `storage`
+  event; an external change bumps the epoch, drops queued writes and re-reads
+  (`L-CROSS-TAB-*`, S-20).
 
 Red-first order for the build:
 
@@ -584,7 +588,7 @@ Red-first order for the build:
 9. Telemetry: `T-*` red against the real serialized SDK payloads.
 10. Accessibility and honesty: `W-A11Y-*`, `M-A11Y-*`, `*-HONEST-*`.
 11. `E-NO-DB-WRITES`, `E-GATE-SERVER-WINS`, `E-CONV-REAL-STACK`, then the `G-*` suites unfiltered.
-12. Seeded defects S-1 to S-19, learning path Step 56, evidence.
+12. Seeded defects S-1 to S-20, learning path Step 56, evidence.
 
 Build rules the tests rely on:
 

@@ -203,6 +203,8 @@ export const frFR: GuestPreviewStrings = {
     'layer-rain':
       '{garment} : vous garde au sec avec {rainPercent} % de risque de pluie, au-delà de votre seuil de {rainThresholdPercent} %.',
     'no-layer': 'Il fait {range}, une couche extérieure est inutile.',
+    'layer-unavailable':
+      "Cette garde-robe d'exemple n'a aucune couche extérieure offrant la protection nécessaire par ce temps.",
     'wind-within':
       'Un vent de {windSpeed} m/s ne dépasse pas votre tolérance de {windThreshold} m/s.',
     'rain-within':

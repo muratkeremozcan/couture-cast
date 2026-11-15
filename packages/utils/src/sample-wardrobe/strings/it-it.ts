@@ -202,6 +202,8 @@ export const itIT: GuestPreviewStrings = {
     'layer-rain':
       "{garment} ti tiene all'asciutto: probabilità di pioggia {rainPercent}%, sopra la tua soglia ({rainThresholdPercent}%).",
     'no-layer': 'Con tempo {range} puoi fare a meno del capospalla.',
+    'layer-unavailable':
+      'Questo guardaroba di esempio non ha un capospalla con la protezione che serve con questo tempo.',
     'wind-within':
       'Vento a {windSpeed} m/s: entro la tua tolleranza di {windThreshold} m/s.',
     'rain-within':

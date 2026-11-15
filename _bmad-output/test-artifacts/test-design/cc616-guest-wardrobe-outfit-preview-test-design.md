@@ -70,7 +70,8 @@ from the locale catalog, serialized payload keys. No `>= 400`, no truthy checks 
 
 - U-AGE-BOUNDARY: 12 years 364 days blocked with `AGE_GATE_MESSAGES.underage`; 13 on the birthday
   passes; 15 (`pending_guardian_consent`) passes; 16 passes; 29 February birthdate in a non-leap year.
-- U-AGE-INVALID: empty, `2010-02-30`, `2010-2-3`, a future date, padded whitespace.
+- U-AGE-INVALID: empty, `2010-02-30`, `2010-2-3` and a future date are refused. Padded whitespace
+  passes, as it does at signup (ruling TEA-5).
 - U-STATE-STRICT: the strict schema rejects any extra key (`birthdate`, `age`, `band`); a stored
   eligible state serializes exactly `{ eligible: true, expiresAt }` under `eligibility`.
 - U-STATE-ELIGIBILITY: `expiresAt` equals `startedAt` plus 24 h; a state past `expiresAt`, or with
@@ -126,6 +127,14 @@ held in the storage adapter or the API route double; no sleeps.
   reset wins in both orders. Same shape: L-EXIT-THEN-WRITE, L-EXPIRY-THEN-WRITE,
   L-SIGNIN-THEN-WRITE.
 - L-RESET-KEEPS-START: reset keeps `startedAt` and `expiresAt` (ruling TEA-1).
+- L-CROSS-TAB-EXIT (W): two tabs share the preview; tab B exits; tab A's next change and every
+  queued tab A write leave the key absent, and tab A shows the gate.
+- L-CROSS-TAB-SIGNIN (W): tab B signs in from the plain entry and guest state is deleted; tab A
+  cannot write it back.
+- L-CROSS-TAB-UPDATE (W): tab B changes comfort; tab A adopts the stored state before its next
+  change, so neither tab silently overwrites the other with stale choices (ruling TEA-6).
+- U-STORE-UPDATE-VALIDATES: an update that produces an invalid state or an unknown id leaves the
+  in-memory state unchanged and writes nothing.
 - L-RESTORE-SLOW (W and M): restore held; web `/preview` shows "Checking your session", mobile Home
   shows the existing loading state; no gate, no welcome card, no ritual request until it settles.
 - L-RESTORE-TRANSIENT (W and M): the profile check fails with 500 or a network error; the retry
@@ -281,6 +290,9 @@ held in the storage adapter or the API route double; no sleeps.
   minutes; otherwise it runs nightly with iOS.
 - TEA-4: `reset()` before handoff gives a visitor who cancels signup a new anonymous id for the rest
   of the preview. Accepted; T-RESET-BEFORE-HANDOFF asserts it and no merge.
+- TEA-5: padded whitespace in the gate passes because D2 reuses the signup rule, which trims.
+- TEA-6: web guest state lives in shared `localStorage`, so the web store listens to the `storage`
+  event; an external change bumps the epoch, drops queued writes and re-reads.
 - No disagreement with D1 to D10 beyond these clarifications.
 
 ## Seeded-defect proofs
@@ -309,6 +321,7 @@ must turn the named scenario red.
 | S-17 | Mobile signed-out Home fetches the ritual                 | M-HOME-SIGNED-OUT-NO-FETCH        |
 | S-18 | `from` accepts any value                                  | U-FROM-LITERAL                    |
 | S-19 | `reset()` skipped before signup handoff                   | T-RESET-BEFORE-HANDOFF            |
+| S-20 | Web store ignores the `storage` event                     | L-CROSS-TAB-EXIT                  |
 
 ## Red-first order for the build
 
@@ -325,7 +338,7 @@ must turn the named scenario red.
 9. Telemetry: T-\* red against the serialized payload recorders.
 10. Accessibility and honesty.
 11. E-NO-DB-WRITES, E-GATE-SERVER-WINS, E-CONV-REAL-STACK, then G-\* unfiltered.
-12. Seeded defects S-1 to S-19, learning path Step 56, evidence.
+12. Seeded defects S-1 to S-20, learning path Step 56, evidence.
 
 ## What the tests can and cannot prove
 

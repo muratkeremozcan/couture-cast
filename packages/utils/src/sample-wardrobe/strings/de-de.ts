@@ -203,6 +203,8 @@ export const deDE: GuestPreviewStrings = {
     'layer-rain':
       '{garment}: hält Sie bei {rainPercent}% Regenwahrscheinlichkeit trocken, mehr als Ihre {rainThresholdPercent}%.',
     'no-layer': 'Es ist {range} genug, um auf eine Außenschicht zu verzichten.',
+    'layer-unavailable':
+      'Diese Beispielgarderobe hat keine Außenschicht mit dem Schutz, den dieses Wetter braucht.',
     'wind-within':
       'Wind mit {windSpeed} m/s liegt innerhalb Ihrer Toleranz von {windThreshold} m/s.',
     'rain-within':

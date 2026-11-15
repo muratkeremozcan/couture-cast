@@ -201,6 +201,8 @@ export const enUS = {
     'layer-rain':
       '{garment} keeps you dry at a {rainPercent}% chance of rain, above your {rainThresholdPercent}%.',
     'no-layer': 'It is {range} enough to skip an outer layer.',
+    'layer-unavailable':
+      'This sample wardrobe has no layer with the protection this weather needs.',
     'wind-within':
       'Wind of {windSpeed} m/s is within your {windThreshold} m/s tolerance.',
     'rain-within':

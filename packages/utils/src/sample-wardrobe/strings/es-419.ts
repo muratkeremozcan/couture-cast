@@ -205,6 +205,8 @@ export const es419: GuestPreviewStrings = {
     'layer-rain':
       '{garment} te protege de la lluvia con un {rainPercent}% de probabilidad, por encima de tu {rainThresholdPercent}%.',
     'no-layer': 'Con clima {range}, no hace falta una capa exterior.',
+    'layer-unavailable':
+      'Este guardarropa de ejemplo no tiene una capa exterior con la protección que pide este clima.',
     'wind-within':
       'Un viento de {windSpeed} m/s está dentro de tu tolerancia de {windThreshold} m/s.',
     'rain-within':

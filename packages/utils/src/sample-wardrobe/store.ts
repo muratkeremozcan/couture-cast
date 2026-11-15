@@ -6,6 +6,7 @@ import type { SampleCatalog } from './types'
 import {
   createGuestPreviewState,
   isGuestPreviewExpired,
+  normalizeGuestPreviewState,
   parseGuestPreviewState,
   resetGuestPreviewState,
   serializeGuestPreviewState,
@@ -35,6 +36,11 @@ export type GuestPreviewStore = {
   reset(): GuestPreviewState | null
   /** "Exit preview" and identity changes: drop everything, including stored text. */
   clear(): void
+  /**
+   * G1: another tab or process changed the stored state. Drops this store's queued
+   * writes and adopts what storage now holds, so an exit or sign-in elsewhere sticks.
+   */
+  syncExternal(): Promise<GuestPreviewSnapshot>
   epoch(): number
   /** Resolves when every queued storage operation has settled. */
   flush(): Promise<void>
@@ -121,7 +127,9 @@ export function createGuestPreviewStore(options: {
     },
     update(change) {
       if (!state || expireIfNeeded()) return null
-      state = change(state)
+      const next = normalizeGuestPreviewState(change(state), state, catalog)
+      if (!next) return state
+      state = next
       persist(state)
       emit()
       return state
@@ -139,6 +147,25 @@ export function createGuestPreviewStore(options: {
       state = null
       removeStored()
       emit()
+    },
+    syncExternal() {
+      currentEpoch += 1
+      const syncEpoch = currentEpoch
+      return new Promise<GuestPreviewSnapshot>((resolve) => {
+        enqueue(async () => {
+          let raw: string | null = null
+          try {
+            raw = await adapter.read()
+          } catch {
+            failStorage()
+          }
+          if (syncEpoch === currentEpoch) {
+            state = parseGuestPreviewState(raw, now(), catalog)
+            emit()
+          }
+          resolve(snapshot())
+        })
+      })
     },
     epoch() {
       return currentEpoch

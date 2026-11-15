@@ -203,6 +203,8 @@ export const ptPT: GuestPreviewStrings = {
     'layer-rain':
       '{garment} protege da chuva com probabilidade de {rainPercent}%, acima do seu limite de {rainThresholdPercent}%.',
     'no-layer': 'Com tempo {range}, pode dispensar a camada exterior.',
+    'layer-unavailable':
+      'Este roupeiro de exemplo não tem camada exterior com a proteção que este tempo exige.',
     'wind-within':
       'Vento a {windSpeed} m/s fica dentro da sua tolerância de {windThreshold} m/s.',
     'rain-within':

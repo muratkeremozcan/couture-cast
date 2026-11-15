@@ -199,6 +199,8 @@ export const trTR: GuestPreviewStrings = {
     'layer-rain':
       '{garment}, %{rainPercent} yağmur ihtimalinde sizi kuru tutar; bu, %{rainThresholdPercent} olan eşiğinizin üzerinde.',
     'no-layer': 'Hava {range}, dış giyime gerek yok.',
+    'layer-unavailable':
+      'Bu örnek gardıropta bu havanın gerektirdiği korumayı sağlayan dış giyim yok.',
     'wind-within':
       '{windSpeed} m/s rüzgâr, {windThreshold} m/s olan toleransınızın içinde.',
     'rain-within':

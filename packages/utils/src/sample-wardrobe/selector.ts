@@ -105,6 +105,7 @@ export type SampleExplanationKey =
   | 'layer-wind'
   | 'layer-rain'
   | 'no-layer'
+  | 'layer-unavailable'
   | 'wind-within'
   | 'rain-within'
   | 'liked-first'
@@ -319,7 +320,11 @@ function layerExplanation(
   layer: SampleGarment | null,
   context: SampleContext
 ): SampleExplanation[] {
-  if (!layer) return [{ key: 'no-layer', params: { range: context.range } }]
+  if (!layer) {
+    // G3: a needed layer the catalog cannot supply is said plainly, never as "no layer needed".
+    const key = needsLayer(context) ? 'layer-unavailable' : 'no-layer'
+    return [{ key, params: { range: context.range } }]
+  }
   const items: SampleExplanation[] = []
   if (context.coldLayer) {
     items.push({

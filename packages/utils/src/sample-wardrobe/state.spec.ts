@@ -496,3 +496,109 @@ describe('guest preview store (U-STORE-EPOCH, storage failure)', () => {
     expect(store.start().startedAt).toBeGreaterThanOrEqual(before)
   })
 })
+
+describe('guest preview store validation and other tabs (G1, G2)', () => {
+  it('leaves state untouched when a change breaks the schema or the window (G2)', async () => {
+    const store = createGuestPreviewStore({
+      adapter: memoryAdapter(),
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    const started = store.start()
+    const broken = store.update((state) => ({ ...state, view: 'community' as never }))
+    expect(broken).toBe(started)
+    const stretched = store.update((state) => ({
+      ...state,
+      startedAt: START + HOUR,
+      eligibility: {
+        eligible: true,
+        expiresAt: START + HOUR + GUEST_PREVIEW_RETENTION_MS,
+      },
+    }))
+    expect(stretched).toBe(started)
+    expect(store.snapshot().state).toBe(started)
+    await store.flush()
+  })
+
+  it('drops ids outside the catalog in memory, as a load would (G2)', async () => {
+    const store = createGuestPreviewStore({
+      adapter: memoryAdapter(),
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    store.start()
+    const next = store.update((state) => ({
+      ...state,
+      selectedLookId: 'sample:l:nope',
+      votes: { 'sample:l:city-wool': 'like', '../x': 'like' },
+    }))
+    expect(next?.selectedLookId).toBeUndefined()
+    expect(next?.votes).toEqual({ 'sample:l:city-wool': 'like' })
+    await store.flush()
+  })
+
+  it('adopts an exit made in another tab and drops its own queued write (L-CROSS-TAB-EXIT)', async () => {
+    const shared = memoryAdapter()
+    const tabA = createGuestPreviewStore({
+      adapter: shared,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    const tabB = createGuestPreviewStore({
+      adapter: shared,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    tabA.start()
+    await tabA.flush()
+    await tabB.load()
+    shared.holdNext()
+    tabA.update((state) => ({ ...state, weather: 'warm-rainy' }))
+    await shared.held()
+    tabA.update((state) => ({ ...state, weather: 'cool-windy' }))
+    tabB.clear()
+    const synced = tabA.syncExternal()
+    shared.release()
+    await tabB.flush()
+    expect((await synced).state).toBeNull()
+    await tabA.flush()
+    expect(shared.value()).toBeNull()
+    expect(tabA.update((state) => state)).toBeNull()
+  })
+
+  it('adopts a change made in another tab (L-CROSS-TAB-UPDATE)', async () => {
+    const shared = memoryAdapter()
+    const tabA = createGuestPreviewStore({
+      adapter: shared,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    const tabB = createGuestPreviewStore({
+      adapter: shared,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    tabA.start()
+    await tabA.flush()
+    await tabB.load()
+    tabB.update((state) => ({ ...state, weather: 'cool-windy' }))
+    await tabB.flush()
+    expect((await tabA.syncExternal()).state?.weather).toBe('cool-windy')
+  })
+
+  it('keeps the newest sync when two arrive together, and survives a failed read', async () => {
+    const shared = memoryAdapter(stored())
+    const store = createGuestPreviewStore({
+      adapter: shared,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    const first = store.syncExternal()
+    const second = store.syncExternal()
+    // The first sync is superseded before it runs, so only the second adopts storage.
+    expect((await first).state).toBeNull()
+    expect((await second).state).toEqual(createGuestPreviewState(START, SAMPLE_CATALOG))
+    shared.read = () => Promise.reject(new Error('denied'))
+    expect(await store.syncExternal()).toEqual({ state: null, persistent: false })
+  })
+})

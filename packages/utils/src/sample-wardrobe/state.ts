@@ -117,6 +117,26 @@ export function parseGuestPreviewState(
   return keepCatalogIds(state, catalog)
 }
 
+/**
+ * G2: validates an in-memory change before it is kept. Returns the state with ids outside
+ * the catalog dropped, exactly as a later load would, or null when the change breaks the
+ * schema or moves the fixed 24-hour window.
+ */
+export function normalizeGuestPreviewState(
+  next: GuestPreviewState,
+  previous: GuestPreviewState | null,
+  catalog: SampleCatalog
+): GuestPreviewState | null {
+  const parsed = guestPreviewStateSchema.safeParse(next)
+  if (!parsed.success) return null
+  const state = parsed.data
+  if (state.catalogVersion !== catalog.catalogVersion) return null
+  if (state.eligibility.expiresAt !== state.startedAt + GUEST_PREVIEW_RETENTION_MS)
+    return null
+  if (previous && state.startedAt !== previous.startedAt) return null
+  return keepCatalogIds(state, catalog)
+}
+
 function keepCatalogIds(
   state: GuestPreviewState,
   catalog: SampleCatalog

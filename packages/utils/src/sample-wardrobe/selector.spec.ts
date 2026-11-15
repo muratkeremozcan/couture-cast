@@ -435,3 +435,20 @@ describe('sample feedback votes (U-VOTES)', () => {
     expect(progress.cards.every((card) => card.feedbackCard)).toBe(true)
   })
 })
+
+describe('sample policy layer gaps (G3)', () => {
+  it('says layer-unavailable when a needed layer has no candidate', () => {
+    const noOuterwear: SampleCatalog = {
+      ...SAMPLE_CATALOG,
+      garments: SAMPLE_CATALOG.garments.filter(
+        (garment) => garment.category !== 'outerwear'
+      ),
+    }
+    const result = selectSampleOutfit(input({ weather: 'cool-windy' }), noOuterwear)
+    expect(result.garments.some((garment) => garment.category === 'outerwear')).toBe(
+      false
+    )
+    expect(keys(result)).toContain('layer-unavailable')
+    expect(keys(result)).not.toContain('no-layer')
+  })
+})
