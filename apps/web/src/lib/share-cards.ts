@@ -53,6 +53,14 @@ export function shareCardErrorKey(error: unknown): string {
     return 'previewChanged'
   return error instanceof Error && error.message === 'offline' ? 'offline' : 'unknown'
 }
+/**
+ * How long the download's object URL lives after the click. The click only starts the
+ * browser's own load of the URL; WebKit resolves a Blob URL in its network process
+ * later, and revoking it first drops the download with no error to report. A loaded
+ * runner or a slow phone can take more than a second, so the URL stays for 40 s, the
+ * window FileSaver.js uses. The same bytes already sit in the open dialog's preview.
+ */
+export const SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS = 40_000
 export async function downloadShareCard(card: PreparedShareCard, signal: AbortSignal) {
   const bytes = await validateWebShareCard(card)
   if (signal.aborted) throw abortError('Download cancelled')
@@ -66,8 +74,8 @@ export async function downloadShareCard(card: PreparedShareCard, signal: AbortSi
     anchor.click()
   } finally {
     anchor.remove()
-    // Browsers need the URL through the handoff task. No disk completion is claimed.
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    // No disk completion is claimed; the URL is released after a bounded wait.
+    setTimeout(() => URL.revokeObjectURL(url), SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS)
   }
 }
 
