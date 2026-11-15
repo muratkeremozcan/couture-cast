@@ -91,7 +91,9 @@ export function GuestPreviewReview() {
         }
         client.current = verified
         const account = await verified.read()
-        if (active) setStatus({ kind: 'ready', account, proposal })
+        // W2: the member may have changed while the read was in flight.
+        if (!active || webSessionIdentity() !== verified.memberId) return
+        setStatus({ kind: 'ready', account, proposal })
       } catch {
         if (active) setStatus({ kind: 'load-failed' })
       }

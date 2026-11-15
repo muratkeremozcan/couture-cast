@@ -5,6 +5,9 @@ export const itIT: GuestPreviewStrings = {
   chrome: {
     entry: 'Prova un guardaroba di esempio',
     exampleLabel: 'Esempio',
+    welcomeHeading: 'Outfit per il meteo di oggi',
+    welcomeBody:
+      'Prova prima un guardaroba di esempio, oppure accedi per vedere outfit con i tuoi capi.',
     sampleLabel:
       'Guardaroba di esempio. Meteo e outfit sono esempi, non il tuo armadio né previsioni in tempo reale.',
     supporting: 'Cambia una preferenza per vedere come risponde questo esempio.',

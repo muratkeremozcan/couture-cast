@@ -6,6 +6,9 @@ export const enCA: GuestPreviewStrings = {
   chrome: {
     entry: 'Try a sample wardrobe',
     exampleLabel: 'Example',
+    welcomeHeading: "Outfits for today's weather",
+    welcomeBody:
+      'Try a sample wardrobe first, or sign in to see outfits from your own closet.',
     sampleLabel:
       'Sample wardrobe. Example weather and outfits, not your closet or live forecast.',
     supporting: 'Change a preference to see how this example responds.',

@@ -5,6 +5,9 @@ export const trTR: GuestPreviewStrings = {
   chrome: {
     entry: 'Örnek gardırobu deneyin',
     exampleLabel: 'Örnek',
+    welcomeHeading: 'Bugünün havasına göre kombinler',
+    welcomeBody:
+      'Önce örnek gardırobu deneyin ya da kendi dolabınızdan kombinler görmek için giriş yapın.',
     sampleLabel:
       'Örnek gardırop. Örnek hava ve kombinler; sizin dolabınız veya canlı hava tahmini değildir.',
     supporting: 'Bu örneğin nasıl değiştiğini görmek için bir tercihi değiştirin.',

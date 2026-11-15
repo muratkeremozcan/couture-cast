@@ -236,6 +236,18 @@ describe('preview carryover review (D8)', () => {
     expect(screen.queryByTestId('guest-preview-review-result')).toBeNull()
   })
 
+  it('never shows account values read for a member who has since changed (L-G-A-B)', async () => {
+    const client = server()
+    client.read.mockImplementationOnce(() => {
+      member.id = 'member-b'
+      return Promise.resolve(ACCOUNT)
+    })
+    render(<GuestPreviewReview />)
+    await waitFor(() => expect(client.read).toHaveBeenCalled())
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(screen.queryByTestId('guest-preview-review-account')).toBeNull()
+  })
+
   it('offers a retry when account values cannot be loaded', async () => {
     api.verified.mockRejectedValueOnce(new Error('down'))
     render(<GuestPreviewReview />)

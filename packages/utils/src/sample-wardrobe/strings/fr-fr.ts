@@ -5,6 +5,9 @@ export const frFR: GuestPreviewStrings = {
   chrome: {
     entry: "Essayer une garde-robe d'exemple",
     exampleLabel: 'Exemple',
+    welcomeHeading: 'Des tenues pour la météo du jour',
+    welcomeBody:
+      "Essayez d'abord une garde-robe d'exemple, ou connectez-vous pour voir des tenues issues de votre propre garde-robe.",
     sampleLabel:
       "Garde-robe d'exemple. Météo et tenues fictives : ce n'est pas votre garde-robe ni une prévision en direct.",
     supporting: 'Modifiez une préférence pour voir comment cet exemple réagit.',

@@ -17,13 +17,14 @@ const FAILURE_KEYS: Record<WebSignInFailure, string> = {
   unavailable: 'community.notifications.signinUnavailable',
 }
 /**
- * Story 6.16 D7, D8: after a verified sign-in, a pending preview carryover goes to the
- * review step; any other sign-in deletes guest state so it never meets a member.
+ * Story 6.16 D7, D8: a sign-in that came from the preview (`from=preview`) with a stored
+ * carryover intent goes to the review step. Any other sign-in deletes guest state, so a
+ * proposal left on a shared device never reaches whoever signs in next.
  */
-async function destinationAfterSignIn(): Promise<string> {
+async function destinationAfterSignIn(fromPreview: boolean): Promise<string> {
   const store = webGuestPreviewStore()
   const snapshot = await store.load()
-  if (snapshot.state?.conversion) return '/preview/continue'
+  if (fromPreview && snapshot.state?.conversion) return '/preview/continue'
   store.clear()
   await store.flush()
   return '/'
@@ -55,7 +56,14 @@ export default function SignInPage() {
           const action = sent ? verifyWebOtp(email, code) : requestWebOtp(email)
           void action
             .then(async () => {
-              if (sent) window.location.assign(await destinationAfterSignIn())
+              if (sent)
+                window.location.assign(
+                  await destinationAfterSignIn(
+                    parsePreviewFrom(
+                      new URLSearchParams(window.location.search).get('from')
+                    ) !== null
+                  )
+                )
               else {
                 setSent(true)
                 setMessage('community.notifications.codeSent')

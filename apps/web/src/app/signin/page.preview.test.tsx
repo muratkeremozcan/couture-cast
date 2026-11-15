@@ -99,6 +99,22 @@ describe('sign-in after the guest preview', () => {
     expect(adapter.value()).toBeNull()
   })
 
+  it('clears a stored intent when the sign-in did not come from the preview (L-G-THEN-A-ELSEWHERE)', async () => {
+    at('')
+    const adapter = memoryAdapter()
+    const store = createGuestPreviewStore({ adapter, catalog: SAMPLE_CATALOG })
+    setWebGuestPreviewStoreForTests(store)
+    store.start()
+    store.update((state) => ({
+      ...state,
+      conversion: { intent: 'guest-preview-carryover' },
+    }))
+    await store.flush()
+    await signIn()
+    await waitFor(() => expect(assign).toHaveBeenCalledWith('/'))
+    expect(adapter.value()).toBeNull()
+  })
+
   it('offers the way back to the preview only for the exact literal', async () => {
     at('?from=preview')
     const { unmount } = render(<SignInPage />)

@@ -5,6 +5,9 @@ export const deDE: GuestPreviewStrings = {
   chrome: {
     entry: 'Beispielgarderobe ausprobieren',
     exampleLabel: 'Beispiel',
+    welcomeHeading: 'Outfits für das Wetter von heute',
+    welcomeBody:
+      'Probieren Sie zuerst eine Beispielgarderobe aus oder melden Sie sich an, um Outfits aus Ihrem eigenen Kleiderschrank zu sehen.',
     sampleLabel:
       'Beispielgarderobe. Beispielwetter und Beispieloutfits, nicht Ihr Kleiderschrank und keine Live-Vorhersage.',
     supporting: 'Ändern Sie eine Einstellung, um zu sehen, wie dieses Beispiel reagiert.',
