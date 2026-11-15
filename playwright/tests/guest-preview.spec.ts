@@ -69,6 +69,12 @@ const capturedEvents = (page: Page) =>
         .__capturedAnalyticsEvents ?? []
   )
 
+/** Every POST the page made, as method and URL. */
+const posts = (requests: { all: Request[] }) =>
+  requests.all
+    .filter((request) => request.method() === 'POST')
+    .map((request) => `POST ${request.url()}`)
+
 async function passGate(page: Page, birthdate = '2000-01-15') {
   await page.getByTestId('guest-preview-birthdate').fill(birthdate)
   await page.getByTestId('guest-preview-gate-submit').click()
@@ -102,6 +108,9 @@ test.describe('Guest preview (signed out)', () => {
       await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
     ).toBeNull()
     expect(requests.offAllowlist).toEqual([])
+    // PR 236 review: /ingest/ is on the allowlist for keyed builds, so the refused gate is
+    // also held to no POST at all: no SDK event or batch leaves for an under-13 visitor.
+    expect(posts(requests)).toEqual([])
     expect(await capturedEvents(page)).toEqual([])
   })
 
@@ -111,6 +120,9 @@ test.describe('Guest preview (signed out)', () => {
     const webOrigin = new URL(testInfo.project.use.baseURL ?? page.url()).origin
     const requests = recordRequests(page, webOrigin)
     await page.goto('/preview')
+    // Nothing is sent before eligibility, even to the /ingest/ proxy (PR 236 review).
+    await expect(page.getByTestId('guest-preview-gate')).toBeVisible()
+    expect(posts(requests)).toEqual([])
     await passGate(page)
     await expect(page.getByTestId('guest-preview-label')).toHaveText(LABEL)
     await choose(page, 'guest-preview-thermal-cold')

@@ -15,12 +15,6 @@ describe('guest preview request allowlist', () => {
     expect(allowed('GET', `${LOCAL}/_next/static/chunk.js`, LOCAL)).toBe(true)
     expect(allowed('POST', `${LOCAL}/preview`, LOCAL)).toBe(false)
     expect(allowed('GET', `${LOCAL}/api/v1/ritual`, LOCAL)).toBe(false)
-    expect(allowed('GET', `${LOCAL}/ingest/static/exception-autocapture.js`, LOCAL)).toBe(
-      true
-    )
-    expect(allowed('POST', `${LOCAL}/ingest/i/v0/e/`, LOCAL)).toBe(true)
-    expect(allowed('PUT', `${LOCAL}/ingest/i/v0/e/`, LOCAL)).toBe(false)
-    expect(allowed('DELETE', `${LOCAL}/ingest/e/`, LOCAL)).toBe(false)
     expect(allowed('POST', 'https://us.i.posthog.com/i/v0/e/', LOCAL)).toBe(false)
     expect(allowed('GET', 'http://localhost:4000/api/v1/ritual', LOCAL)).toBe(false)
     expect(allowed('POST', 'http://127.0.0.1:54321/rest/v1/garment_items', LOCAL)).toBe(
@@ -60,5 +54,39 @@ describe('guest preview request allowlist', () => {
       false
     )
     expect(allowed('POST', 'http://vercel.live/login/validate', PREVIEW)).toBe(false)
+  })
+
+  it('allows only the two /ingest/ shapes the PostHog proxy forwards (PR 236 review)', () => {
+    for (const path of ['/ingest/e/', '/ingest/i/v0/e/', '/ingest/batch', '/ingest/e'])
+      expect(allowed('POST', `${LOCAL}${path}`, LOCAL), `POST ${path}`).toBe(true)
+    for (const method of ['GET', 'HEAD'])
+      expect(
+        allowed(method, `${LOCAL}/ingest/static/exception-autocapture.js`, LOCAL),
+        method
+      ).toBe(true)
+    const refused: [string, string][] = [
+      ['POST', '/ingest/flags/'],
+      ['POST', '/ingest/decide/'],
+      ['POST', '/ingest/s/'],
+      ['GET', '/ingest/array/key/config'],
+      ['GET', '/ingest/static/lazy-recorder.js'],
+      ['GET', '/ingest/static/surveys.js'],
+      ['POST', '/ingest/static/exception-autocapture.js'],
+      ['GET', '/ingest/i/v0/e/'],
+      ['PUT', '/ingest/e/'],
+      ['OPTIONS', '/ingest/e/'],
+      ['POST', '/ingest/..%2fapi/v1/ritual'],
+      ['POST', '/ingest/e/extra'],
+      ['GET', '/INGEST/static/surveys.js'],
+    ]
+    for (const [method, path] of refused)
+      expect(allowed(method, `${LOCAL}${path}`, LOCAL), `${method} ${path}`).toBe(false)
+  })
+
+  it('compares /api decoded, slash-collapsed and in any case (PR 236 review)', () => {
+    for (const path of ['//api/v1/ritual', '/%61pi/v1/ritual', '/API/v1/ritual', '/api'])
+      expect(allowed('GET', `${LOCAL}${path}`, LOCAL), path).toBe(false)
+    expect(allowed('GET', `${LOCAL}/%E0%A4%A`, LOCAL)).toBe(false)
+    expect(allowed('GET', `${LOCAL}/apiary`, LOCAL)).toBe(true)
   })
 })
