@@ -66,7 +66,7 @@ if (process.env.CC68_CI_FAILURE === 'cleanup' && args.includes('prebuild') && fl
           .trim()
           .split('\n')
           .map((line) => JSON.parse(line))
-        assert.equal(records.length, 7)
+        assert.equal(records.length, 8)
         for (const record of records.slice(0, 2))
           assert.deepEqual(record.flags, {
             STORY68_NATIVE_TEST_BUILD: '1',
@@ -92,7 +92,17 @@ if (process.env.CC68_CI_FAILURE === 'cleanup' && args.includes('prebuild') && fl
           'install',
           'apps/mobile/android/app/build/outputs/apk/release/app-release.apk',
         ])
+        // The sign-in flow waits for an app the runner opened, so the Release activity starts.
         assert.deepEqual(records[4].args, [
+          '-s',
+          'emulator-5554',
+          'shell',
+          'am',
+          'start',
+          '-n',
+          'com.couturecast.story68/.MainActivity',
+        ])
+        assert.deepEqual(records[5].args, [
           'scripts/run-story68-native.mjs',
           'signin',
           '--platform',
@@ -100,9 +110,9 @@ if (process.env.CC68_CI_FAILURE === 'cleanup' && args.includes('prebuild') && fl
           '--device',
           'emulator-5554',
         ])
-        assert.equal(records[5].args.includes('release-live-font'), true)
-        assert.equal(records[5].flags.CC68_RELEASE_PROOF_LOOPBACK, null)
-        assert.deepEqual(records[6].args, [
+        assert.equal(records[6].args.includes('release-live-font'), true)
+        assert.equal(records[6].flags.CC68_RELEASE_PROOF_LOOPBACK, null)
+        assert.deepEqual(records[7].args, [
           'scripts/run-story68-native.mjs',
           'prebuild',
           '--platform',
@@ -110,7 +120,7 @@ if (process.env.CC68_CI_FAILURE === 'cleanup' && args.includes('prebuild') && fl
           '--clean',
           'yes',
         ])
-        assert.equal(records[6].flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
+        assert.equal(records[7].flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
       } finally {
         fs.rmSync(directory, { recursive: true })
       }
