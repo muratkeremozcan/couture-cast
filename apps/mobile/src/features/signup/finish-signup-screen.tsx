@@ -1,7 +1,7 @@
 // Story 6.17 D3: "Finish creating your account" on iOS and Android. The Google identity is
 // already verified; the only question is the birthdate, and the server's age gate decides.
 import { useEffect, useRef, useState } from 'react'
-import { BackHandler, Pressable, ScrollView, StyleSheet, TextInput } from 'react-native'
+import { BackHandler, Pressable, ScrollView, TextInput } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   guardianInvitationInputSchema,
@@ -10,7 +10,7 @@ import {
   type SignupResponse,
 } from '@couture/api-client/contracts/http'
 import { evaluateBirthdateInput, getFederatedSignInStrings } from '@couture/utils'
-import { Text, View } from '@/components/themed'
+import { Text, View, createSchemeStyles } from '@/components/themed'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
 import type {
@@ -41,14 +41,26 @@ type FinishSignupScreenProps = {
 
 const session = () => import('../../lib/native-session.js')
 
+// Module-level, so each default keeps one identity across renders: the identity read below runs
+// once per `readIdentity`, and a fresh default on every render would re-read it after each state
+// change, replacing an under-13 refusal (identity signed out) with the no-session text and a
+// teen's guardian step with the form again.
+const readSessionIdentity: typeof ReadIdentity = async () =>
+  (await session()).readNativeFederatedIdentity()
+const finishSession = async (birthdate: string) =>
+  (await session()).finishNativeFederatedSignup(birthdate)
+const cancelSession = async () => (await session()).cancelNativeFederatedSignup()
+const ignoreUnderage = () => undefined
+
 export function FinishSignupScreen({
   onExit,
-  onUnderage = () => undefined,
-  readIdentity = async () => (await session()).readNativeFederatedIdentity(),
-  finish = async (birthdate) => (await session()).finishNativeFederatedSignup(birthdate),
-  cancel = async () => (await session()).cancelNativeFederatedSignup(),
+  onUnderage = ignoreUnderage,
+  readIdentity = readSessionIdentity,
+  finish = finishSession,
+  cancel = cancelSession,
   inviteGuardian = inviteGuardianFromMobile,
 }: FinishSignupScreenProps) {
+  const styles = useStyles()
   const { i18n } = useTranslation()
   const strings = getFederatedSignInStrings(i18n.language)
   const { announce } = useAccessibilityAnnouncer()
@@ -190,7 +202,7 @@ export function FinishSignupScreen({
 
   if (phase.kind === 'created')
     return (
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView style={styles.page} contentContainerStyle={styles.container}>
         <Text
           testID="finish-signup-outcome"
           accessibilityRole="alert"
@@ -214,12 +226,10 @@ export function FinishSignupScreen({
 
   return (
     <ScrollView
+      style={styles.page}
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
     >
-      <Text accessibilityRole="header" style={styles.title}>
-        {strings.finishTitle}
-      </Text>
       <Text style={styles.body}>{strings.finishIntro}</Text>
       {phase.email ? (
         <View style={styles.field}>
@@ -237,7 +247,7 @@ export function FinishSignupScreen({
           accessibilityLabel={strings.birthdate}
           accessibilityHint={strings.birthdateHint}
           placeholder="YYYY-MM-DD"
-          placeholderTextColor="#737373"
+          placeholderTextColor={styles.placeholder.color}
           value={birthdate}
           onChangeText={setBirthdate}
           style={styles.input}
@@ -300,6 +310,7 @@ function GuardianInvitePanel({
   teenId: string
   inviteGuardian: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
 }) {
+  const styles = useStyles()
   const { i18n } = useTranslation()
   const strings = getFederatedSignInStrings(i18n.language)
   const [guardianEmail, setGuardianEmail] = useState('')
@@ -357,7 +368,9 @@ function GuardianInvitePanel({
             onPress={() => setConsentLevel(level)}
             style={[styles.segment, consentLevel === level ? styles.segmentActive : null]}
           >
-            <Text>{level === 'read_only' ? strings.readOnly : strings.fullAccess}</Text>
+            <Text style={styles.segmentText}>
+              {level === 'read_only' ? strings.readOnly : strings.fullAccess}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -383,68 +396,80 @@ function GuardianInvitePanel({
   )
 }
 
-const styles = StyleSheet.create({
-  container: { flexGrow: 1, paddingHorizontal: 24, paddingVertical: 32, gap: 14 },
-  title: { fontSize: 26, fontWeight: '700', lineHeight: 32 },
-  body: { fontSize: 15, lineHeight: 22 },
-  hint: { fontSize: 13, lineHeight: 18, color: '#737373' },
-  field: { gap: 6 },
-  label: { fontSize: 13, fontWeight: '600' },
+/** Layout plus the OS light/dark chrome tokens (`constants/colors.ts`), as the signup screen. */
+const useStyles = createSchemeStyles((colors) => ({
+  page: { flex: 1, backgroundColor: colors.background },
+  container: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingVertical: 32,
+    gap: 14,
+    backgroundColor: colors.background,
+  },
+  body: { fontSize: 15, lineHeight: 22, color: colors.text },
+  hint: { fontSize: 13, lineHeight: 18, color: colors.mutedText },
+  placeholder: { color: colors.mutedText },
+  field: { gap: 6, backgroundColor: 'transparent' },
+  label: { fontSize: 13, fontWeight: '600', color: colors.text },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderColor: '#a3a3a3',
+    borderColor: colors.strongBorder,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
+    color: colors.text,
   },
-  error: { fontSize: 14, color: '#b91c1c' },
-  success: { fontSize: 15, lineHeight: 22, color: '#15803d' },
+  error: { fontSize: 14, color: colors.dangerText },
+  success: { fontSize: 15, lineHeight: 22, color: colors.successText },
   button: {
     minHeight: 48,
     borderRadius: 999,
-    backgroundColor: '#C9A14A',
+    backgroundColor: colors.accent,
     paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  buttonText: { color: '#111827', fontSize: 15, fontWeight: '700' },
+  buttonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
   secondary: {
     minHeight: 48,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: '#a3a3a3',
+    borderColor: colors.strongBorder,
     paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  secondaryText: { fontSize: 15, fontWeight: '600' },
+  secondaryText: { fontSize: 15, fontWeight: '600', color: colors.text },
   disabled: { opacity: 0.6 },
   card: {
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(201, 161, 74, 0.4)',
+    borderColor: colors.noticeBorder,
     borderRadius: 20,
     padding: 16,
+    backgroundColor: colors.noticeSurface,
   },
   eyebrow: {
     fontSize: 12,
     letterSpacing: 2,
     textTransform: 'uppercase',
     fontWeight: '700',
+    color: colors.noticeText,
   },
-  segmentRow: { flexDirection: 'row', gap: 10 },
+  segmentRow: { flexDirection: 'row', gap: 10, backgroundColor: 'transparent' },
   segment: {
     minHeight: 44,
     flex: 1,
     borderWidth: 1,
-    borderColor: '#a3a3a3',
+    borderColor: colors.strongBorder,
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  segmentActive: { borderColor: '#C9A14A', borderWidth: 2 },
-})
+  segmentActive: { borderColor: colors.accent, borderWidth: 2 },
+  segmentText: { color: colors.text },
+}))

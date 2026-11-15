@@ -208,6 +208,32 @@ describe('U-PKCE-CONFIG and U-START-PARAMS (native)', () => {
       ([args]) => (args as { options: { redirectTo: string } }).options.redirectTo
     )
     expect(redirects).toEqual([`${REDIRECT}?from=preview`, REDIRECT])
+    // The browser session always watches the bare callback URL.
+    const returnUrls = sdk.openAuthSessionAsync.mock.calls.map(
+      ([, returnUrl]) => returnUrl as string
+    )
+    expect(returnUrls).toEqual([REDIRECT, REDIRECT])
+  })
+
+  // Android's Custom Tabs polyfill reports success only for a URL that starts with the return
+  // URL; Auth puts `code` first, so a return URL carrying `?from=preview` read as a dismissal.
+  it('completes a preview conversion whose callback carries extra query after the return URL', async () => {
+    answers('/api/v1/user/profile', unauthorized)
+    answers('/api/v1/auth/signup/federated', json({ status: 'needs_birthdate' }))
+    sdk.openAuthSessionAsync.mockImplementation((_url: string, returnUrl: string) => {
+      const callback = `${REDIRECT}?code=preview-code&from=preview`
+      return Promise.resolve(
+        callback.startsWith(returnUrl)
+          ? { type: 'success', url: callback }
+          : { type: 'dismiss' }
+      )
+    })
+    const { session } = await load()
+    await expect(session.startNativeGoogleSignIn({ from: 'preview' })).resolves.toEqual({
+      kind: 'no_account',
+    })
+    expect(sdk.exchangeCodeForSession.mock.calls).toEqual([['preview-code']])
+    expect(sdk.secure.get(FINISH_MARKER)).toContain('preview')
   })
 
   it('holds the in-flight flag only while the browser session is open', async () => {

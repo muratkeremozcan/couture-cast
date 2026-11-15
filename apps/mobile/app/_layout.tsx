@@ -289,7 +289,11 @@ function RootLayoutNav() {
                   name="preview"
                   options={{ title: getGuestPreviewStrings(i18n.language).chrome.entry }}
                 />
-                {/* Story 6.17 D3, D5: the Google finish step and its callback. */}
+                {/* Signup names itself in its own heading; an untitled header would show the
+                    raw route name "signup". */}
+                <Stack.Screen name="signup" options={{ title: '' }} />
+                {/* Story 6.17 D3, D5: the Google finish step and its callback. The header
+                    carries the finish step's title; the screen renders no second one. */}
                 <Stack.Screen
                   name="signup-finish"
                   options={{

@@ -456,8 +456,13 @@ export async function startNativeGoogleSignIn(
     const scheme: unknown = Array.isArray(declared)
       ? (declared as unknown[])[0]
       : declared
+    const schemeOption = typeof scheme === 'string' ? { scheme } : {}
+    // The browser session watches for the bare callback URL. Android's Custom Tabs polyfill
+    // accepts only a URL that starts with it, and Auth appends `code` before `from=preview`,
+    // so the preview marker rides only in `redirectTo`.
+    const returnUrl = Linking.createURL('auth/callback', schemeOption)
     const redirectTo = Linking.createURL('auth/callback', {
-      ...(typeof scheme === 'string' ? { scheme } : {}),
+      ...schemeOption,
       ...(fromPreview ? { queryParams: { from: 'preview' } } : {}),
     })
     localSignedOut = false
@@ -472,7 +477,7 @@ export async function startNativeGoogleSignIn(
     if (error || !data.url) return { kind: 'unavailable' }
     setNativeOAuthInFlight(true)
     try {
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo)
+      const result = await WebBrowser.openAuthSessionAsync(data.url, returnUrl)
       if (result.type !== 'success') return { kind: 'cancelled' }
       return await completeNativeOAuth(result.url)
     } finally {
