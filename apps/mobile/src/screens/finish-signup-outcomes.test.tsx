@@ -50,6 +50,7 @@ const flow = vi.hoisted(() => ({
   read: vi.fn(),
   params: {} as Record<string, string>,
   router: { back: vi.fn(), replace: vi.fn(), push: vi.fn() },
+  setOptions: vi.fn(),
 }))
 vi.mock('@/src/lib/native-session', () => ({
   readNativeFederatedIdentity: flow.read,
@@ -60,6 +61,7 @@ vi.mock('expo-router', async () => ({
   router: flow.router,
   useRouter: () => flow.router,
   useLocalSearchParams: () => flow.params,
+  useNavigation: () => ({ setOptions: flow.setOptions }),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
 vi.mock('expo-localization', () => ({
@@ -95,7 +97,12 @@ beforeEach(() => {
   flow.router.replace.mockReset()
   flow.router.push.mockReset()
   flow.router.back.mockReset()
+  flow.setOptions.mockReset()
 })
+
+/** The header title the route last set. */
+const headerTitle = () =>
+  (flow.setOptions.mock.calls.at(-1)?.[0] as { title?: string } | undefined)?.title
 
 describe('finish step outcomes', () => {
   it('keeps the under-13 refusal after the identity is signed out', async () => {
@@ -115,6 +122,8 @@ describe('finish step outcomes', () => {
       'You must be 13 or older to use CoutureCast.'
     )
     expect(flow.read).toHaveBeenCalledTimes(1)
+    // The refusal is no longer the finish step: the header drops its title.
+    expect(headerTitle()).toBe('')
   })
 
   it('keeps the guardian step for a teen while the identity stays signed in', async () => {
@@ -130,5 +139,41 @@ describe('finish step outcomes', () => {
       /guardian needs to approve/
     )
     expect(flow.read).toHaveBeenCalledTimes(1)
+    // The account exists: the header no longer says to finish creating it.
+    expect(headerTitle()).toBe('')
+  })
+})
+
+describe('finish step form', () => {
+  it('titles the header while the form shows', async () => {
+    await render(
+      <AccessibilityAnnouncerProvider>
+        <SignupFinishRoute />
+      </AccessibilityAnnouncerProvider>
+    )
+    await screen.findByTestId('finish-signup-birthdate')
+    expect(headerTitle()).toBe('Finish creating your account')
+  })
+
+  it('shows an under-13 birthdate as an error alert and guidance as a hint', async () => {
+    await render(
+      <AccessibilityAnnouncerProvider>
+        <SignupFinishRoute />
+      </AccessibilityAnnouncerProvider>
+    )
+    const input = await screen.findByTestId('finish-signup-birthdate')
+    await userEvent.fill(input, '2016-05-17')
+    const underage = await screen.findByTestId('finish-signup-inline-message')
+    expect(underage.getAttribute('role')).toBe('alert')
+    const errorColor = getComputedStyle(underage).color
+    await userEvent.fill(input, '2012-05-17')
+    await waitFor(() =>
+      expect(
+        screen.getByTestId('finish-signup-inline-message').getAttribute('role')
+      ).toBeNull()
+    )
+    expect(
+      getComputedStyle(screen.getByTestId('finish-signup-inline-message')).color
+    ).not.toBe(errorColor)
   })
 })

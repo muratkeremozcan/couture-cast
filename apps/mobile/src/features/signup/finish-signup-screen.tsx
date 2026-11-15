@@ -33,6 +33,11 @@ type FinishSignupScreenProps = {
   onExit: (exit: FinishSignupExit) => void
   /** Story 6.16 D2: an age refusal outranks the preview's self-reported gate. */
   onUnderage?: () => void
+  /**
+   * The header title for the current phase: the finish step's title while the form shows,
+   * none once the step has an outcome (a refusal, or an account that already exists).
+   */
+  onTitleChange?: (title: string) => void
   readIdentity?: typeof ReadIdentity
   finish?: (birthdate: string) => Promise<NativeFederatedFinishResult>
   cancel?: () => Promise<void>
@@ -52,6 +57,56 @@ const finishSession = async (birthdate: string) =>
 const cancelSession = async () => (await session()).cancelNativeFederatedSignup()
 const ignoreUnderage = () => undefined
 
+/**
+ * D3: the email signup's inline birthdate messages, as signup-screen.tsx shows them. An
+ * under-13 birthdate is an error (styled, an alert, announced); the rest are guidance.
+ */
+function birthdateNotice(birthdate: string) {
+  const check = evaluateBirthdateInput(birthdate)
+  return {
+    message: check.message,
+    error: check.gate?.accountStatus === 'blocked_underage' ? check.message : null,
+  }
+}
+
+/** Announcements and the header title, which follow the phase and the messages. */
+function useFinishStepChrome({
+  phase,
+  message,
+  inlineError,
+  onTitleChange,
+}: {
+  phase: Phase['kind']
+  message: string | null
+  inlineError: string | null
+  onTitleChange?: (title: string) => void
+}) {
+  const { i18n } = useTranslation()
+  const strings = getFederatedSignInStrings(i18n.language)
+  const { announce } = useAccessibilityAnnouncer()
+
+  useEffect(() => {
+    if (message) announce('error', message)
+  }, [announce, message])
+
+  useEffect(() => {
+    if (inlineError) announce('error', inlineError)
+  }, [announce, inlineError])
+
+  const headerTitle = phase === 'loading' || phase === 'form' ? strings.finishTitle : ''
+  useEffect(() => {
+    onTitleChange?.(headerTitle)
+  }, [headerTitle, onTitleChange])
+
+  // Outcome texts are announced too: VoiceOver ignores an alert role on plain text.
+  useEffect(() => {
+    if (phase === 'underage') announce('error', strings.underage)
+    else if (phase === 'refused') announce('error', strings.refused)
+    else if (phase === 'no_session') announce('error', strings.noSession)
+    else if (phase === 'created') announce('feedback', strings.createdGuardianPending)
+  }, [announce, phase, strings])
+}
+
 export function FinishSignupScreen({
   onExit,
   onUnderage = ignoreUnderage,
@@ -59,18 +114,17 @@ export function FinishSignupScreen({
   finish = finishSession,
   cancel = cancelSession,
   inviteGuardian = inviteGuardianFromMobile,
+  onTitleChange,
 }: FinishSignupScreenProps) {
   const styles = useStyles()
   const { i18n } = useTranslation()
   const strings = getFederatedSignInStrings(i18n.language)
-  const { announce } = useAccessibilityAnnouncer()
   const [phase, setPhase] = useState<Phase>({ kind: 'loading' })
   const [birthdate, setBirthdate] = useState('')
   const [message, setMessage] = useState<string | null>(null)
   const [busy, setBusy] = useState<'create' | 'cancel' | null>(null)
   const birthdateRef = useRef<TextInput>(null)
-  // D3: the email signup's inline birthdate messages, as signup-screen.tsx shows them.
-  const inlineMessage = evaluateBirthdateInput(birthdate).message
+  const { message: inlineMessage, error: inlineError } = birthdateNotice(birthdate)
 
   useEffect(() => {
     let active = true
@@ -93,18 +147,7 @@ export function FinishSignupScreen({
     if (phase.kind === 'form') birthdateRef.current?.focus()
   }, [phase.kind])
 
-  useEffect(() => {
-    if (message) announce('error', message)
-  }, [announce, message])
-
-  // Outcome texts are announced too: VoiceOver ignores an alert role on plain text.
-  useEffect(() => {
-    if (phase.kind === 'underage') announce('error', strings.underage)
-    else if (phase.kind === 'refused') announce('error', strings.refused)
-    else if (phase.kind === 'no_session') announce('error', strings.noSession)
-    else if (phase.kind === 'created')
-      announce('feedback', strings.createdGuardianPending)
-  }, [announce, phase.kind, strings])
+  useFinishStepChrome({ phase: phase.kind, message, inlineError, onTitleChange })
 
   function cancelFinish() {
     setBusy('cancel')
@@ -174,12 +217,11 @@ export function FinishSignupScreen({
     phase.kind === 'refused' ||
     phase.kind === 'no_session'
   ) {
-    const text =
-      phase.kind === 'underage'
-        ? strings.underage
-        : phase.kind === 'refused'
-          ? strings.refused
-          : strings.noSession
+    const text = {
+      underage: strings.underage,
+      refused: strings.refused,
+      no_session: strings.noSession,
+    }[phase.kind]
     return (
       <View style={styles.container}>
         <Text
@@ -257,7 +299,8 @@ export function FinishSignupScreen({
           <Text
             testID="finish-signup-inline-message"
             accessibilityLiveRegion="polite"
-            style={styles.hint}
+            accessibilityRole={inlineError ? 'alert' : undefined}
+            style={inlineError ? styles.error : styles.hint}
           >
             {inlineMessage}
           </Text>

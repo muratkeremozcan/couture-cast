@@ -1,6 +1,6 @@
 // Story 6.17 D2: "Continue with Google", drawn to Google's sign-in branding guidelines.
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, useColorScheme, View } from 'react-native'
 import Svg, { Path } from 'react-native-svg'
 import { useTranslation } from 'react-i18next'
 import {
@@ -9,11 +9,13 @@ import {
   GOOGLE_G_MARK_PATHS,
   GOOGLE_G_MARK_VIEWBOX,
 } from '@couture/utils'
+import { useSchemeColors } from '@/components/themed'
 import type { NativeOAuthOutcome } from '@/src/lib/native-session'
 
 type GoogleSignInButtonProps = {
   /** Carried through the round trip; only `preview` survives it. */
   from?: string | null
+  /** Google's neutral button for the OS scheme unless a screen asks for one. */
   theme?: 'light' | 'dark'
   onOutcome: (outcome: NativeOAuthOutcome) => void
   /** Injected by tests; the screen uses the real round trip. */
@@ -25,14 +27,15 @@ const defaultStart = async (options: { from?: string | null }) =>
 
 export function GoogleSignInButton({
   from = null,
-  theme = 'light',
+  theme,
   onOutcome,
   start = defaultStart,
 }: GoogleSignInButtonProps) {
   const { i18n } = useTranslation()
   const strings = getFederatedSignInStrings(i18n.language)
   const [opening, setOpening] = useState(false)
-  const colours = GOOGLE_BUTTON_THEME[theme]
+  const scheme = useColorScheme() === 'dark' ? 'dark' : 'light'
+  const colours = GOOGLE_BUTTON_THEME[theme ?? scheme]
   return (
     <Pressable
       testID="google-sign-in"
@@ -66,17 +69,25 @@ export function GoogleSignInButton({
   )
 }
 
-/** The "or" rule between Google and the email form. */
-export function SignInDivider({ tone = 'light' }: { tone?: 'light' | 'dark' }) {
+/**
+ * The rule's line on each scheme's page: at least 3:1 (WCAG 1.4.11) on white and on black.
+ * The label takes the scheme's muted text, which clears 4.5:1 on both.
+ */
+export const SIGN_IN_DIVIDER_LINE = { light: '#8E8E93', dark: '#636366' } as const
+
+/** The "or" rule between Google and the email form, in the OS scheme's colors. */
+export function SignInDivider() {
   const { i18n } = useTranslation()
   const label = getFederatedSignInStrings(i18n.language).divider
-  const line = tone === 'dark' ? 'rgba(255,255,255,0.2)' : '#d4d4d4'
+  const line = SIGN_IN_DIVIDER_LINE[useColorScheme() === 'dark' ? 'dark' : 'light']
+  const colors = useSchemeColors()
   return (
     <View style={styles.divider} accessible accessibilityLabel={label}>
-      <View style={[styles.rule, { backgroundColor: line }]} />
-      <Text style={[styles.dividerText, tone === 'dark' ? styles.dividerTextDark : null]}>
-        {label}
-      </Text>
+      <View
+        testID="sign-in-divider-rule"
+        style={[styles.rule, { backgroundColor: line }]}
+      />
+      <Text style={[styles.dividerText, { color: colors.mutedText }]}>{label}</Text>
       <View style={[styles.rule, { backgroundColor: line }]} />
     </View>
   )
@@ -97,14 +108,13 @@ export function SignupGoogleEntry({
     <>
       <GoogleSignInButton
         from={fromPreview ? 'preview' : null}
-        theme="dark"
         onOutcome={(outcome) => {
           if (outcome.kind === 'member' || outcome.kind === 'no_account')
             onSignedIn(outcome.kind)
           else onFailure(getFederatedSignInStrings(i18n.language)[outcome.kind])
         }}
       />
-      <SignInDivider tone="dark" />
+      <SignInDivider />
     </>
   )
 }
@@ -123,7 +133,7 @@ const styles = StyleSheet.create({
   },
   label: { fontSize: 15, fontWeight: '500', flexShrink: 1, textAlign: 'center' },
   divider: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 24 },
-  rule: { flex: 1, height: StyleSheet.hairlineWidth },
-  dividerText: { fontSize: 14, color: '#525252' },
-  dividerTextDark: { color: '#d4d4d4' },
+  // One device pixel and more: a hairline at 3:1 still read as missing on a dense screen.
+  rule: { flex: 1, height: 1 },
+  dividerText: { fontSize: 14 },
 })

@@ -56,6 +56,7 @@ vi.mock('expo-router', async () => ({
   router: flow.router,
   useRouter: () => flow.router,
   useLocalSearchParams: () => flow.params,
+  useNavigation: () => ({ setOptions: vi.fn() }),
   useFocusEffect: (await import('../test-utils/focus-effect.js')).useFocusEffect,
 }))
 vi.mock('expo-localization', () => ({
