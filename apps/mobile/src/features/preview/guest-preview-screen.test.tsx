@@ -18,13 +18,15 @@ import {
   SAMPLE_CATALOG,
   type GuestPreviewStorageAdapter,
 } from '@couture/utils'
+import { screenFocus } from '../../test-utils/focus-effect.js'
 import { press } from '@/src/test-utils/press'
 
 const navigation = vi.hoisted(() => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn() }))
-vi.mock('expo-router', () => ({
+vi.mock('expo-router', async () => ({
   router: navigation,
   useRouter: () => navigation,
   useLocalSearchParams: () => ({}),
+  useFocusEffect: (await import('../../test-utils/focus-effect.js')).useFocusEffect,
 }))
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -101,11 +103,16 @@ beforeAll(async () => {
 })
 
 beforeEach(() => {
+  navigation.push.mockClear()
+  navigation.replace.mockClear()
   session.state = 'signed-out'
   useStore()
 })
 
-afterEach(() => setMobileGuestPreviewStoreForTests(undefined))
+afterEach(() => {
+  screenFocus.reset()
+  setMobileGuestPreviewStoreForTests(undefined)
+})
 
 describe('mobile guest preview session check (D1)', () => {
   it('sends a verified member back to Home', async () => {
@@ -154,6 +161,47 @@ describe('mobile guest preview session check (D1)', () => {
     await render(<GuestPreviewReviewScreen />)
     await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
     expect(screen.queryByTestId('guest-preview-review-proposed')).toBeNull()
+  })
+
+  // TEA M1: the preview stays mounted under signup and sign-in. A sign-in there makes the
+  // session a member while the preview is not focused; acting then cleared the intent and
+  // replaced the review with Home.
+  it('does nothing while unfocused when the session becomes a member', async () => {
+    await useStoredIntent()
+    const view = await render(<GuestPreviewScreen />)
+    await screen.findByTestId('guest-preview-outfit')
+    await waitFor(() => expect(storedConversion()).toBeUndefined())
+    press(screen.getByTestId('guest-preview-create-account'))
+    await waitFor(() =>
+      expect(storedConversion()).toEqual({ intent: 'guest-preview-carryover' })
+    )
+    act(() => screenFocus.set(false))
+    session.state = 'member'
+    await view.rerender(<GuestPreviewScreen />)
+    await new Promise((resolve) => setTimeout(resolve, 50))
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(storedConversion()).toEqual({ intent: 'guest-preview-carryover' })
+    // Focused again as a member, it clears guest state and goes Home.
+    act(() => screenFocus.set(true))
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
+  })
+
+  it('drops the intent when Back returns to the mounted preview signed out', async () => {
+    await render(<GuestPreviewScreen />)
+    fireEvent.change(await screen.findByTestId('guest-preview-birthdate'), {
+      target: { value: '2000-01-15' },
+    })
+    press(screen.getByTestId('guest-preview-gate-submit'))
+    await screen.findByTestId('guest-preview-outfit')
+    press(screen.getByTestId('guest-preview-create-account'))
+    await waitFor(() =>
+      expect(storedConversion()).toEqual({ intent: 'guest-preview-carryover' })
+    )
+    act(() => screenFocus.set(false))
+    act(() => screenFocus.set(true))
+    await waitFor(() => expect(storedConversion()).toBeUndefined())
+    expect(screen.getByTestId('guest-preview-outfit')).toBeTruthy()
   })
 
   it('shows a status while restoring and a retry when the session is unavailable', async () => {

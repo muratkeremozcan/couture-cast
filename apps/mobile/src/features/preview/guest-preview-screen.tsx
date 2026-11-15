@@ -1,8 +1,8 @@
 // Story 6.16 owner: the mobile guest preview. It resolves the stored session first (D1),
 // gates on self-reported age (D2), then runs the shared sample policy over local guest
 // state (D5, D7). Members go back to Home; nothing here calls a member API.
-import { router } from 'expo-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { router, useFocusEffect } from 'expo-router'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ScrollView, Text, View, Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
@@ -49,11 +49,7 @@ function useSnapshot(enabled: boolean): GuestPreviewSnapshot | null {
       if (active) setSnapshot(next)
     })
     void store.load().then((loaded) => {
-      if (!active) return
-      setSnapshot(loaded)
-      // Review F3: a guest who comes back to the preview has left signup or sign-in, so a
-      // stored carryover intent no longer stands.
-      if (loaded.state?.conversion) store.update(withoutConversionIntent)
+      if (active) setSnapshot(loaded)
     })
     return () => {
       active = false
@@ -97,12 +93,34 @@ export function GuestPreviewScreen() {
   const [announcement, setAnnouncement] = useState('')
   const [swapCategory, setSwapCategory] = useState<SampleGarmentCategory | null>(null)
 
-  useEffect(() => {
-    if (session !== 'member') return
-    // Review F3: guest state left on this device never reaches a member.
-    store.clear()
-    router.replace('/')
-  }, [session, store])
+  // TEA M1: the preview stays mounted under signup and sign-in, so it acts on the session
+  // only while focused. A sign-in from the preview makes the session a member while the
+  // preview is hidden; acting then would clear the intent and replace the review with Home.
+  useFocusEffect(
+    useCallback(() => {
+      if (session === 'member') {
+        // Review F3: guest state left on this device never reaches a member.
+        store.clear()
+        router.replace('/')
+        return
+      }
+      if (session !== 'signed-out') return
+      // Review F3: a guest back on the preview has left signup or sign-in, so a stored
+      // carryover intent no longer stands. Back pops to this mounted screen, so this runs
+      // on focus, and once more when the first load lands.
+      const dropIntent = (current: GuestPreviewSnapshot) => {
+        if (current.state?.conversion) store.update(withoutConversionIntent)
+      }
+      dropIntent(store.snapshot())
+      let focused = true
+      void store.load().then((loaded) => {
+        if (focused) dropIntent(loaded)
+      })
+      return () => {
+        focused = false
+      }
+    }, [session, store])
+  )
 
   const update = (change: (current: GuestPreviewState) => GuestPreviewState) => {
     setNoAlternative(false)

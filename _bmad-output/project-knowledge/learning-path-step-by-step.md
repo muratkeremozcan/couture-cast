@@ -11300,6 +11300,9 @@ Hard-won lessons from the implementation and code review of this story:
   the preview passes with the filter deleted. The real SDK in the wire test found the first page
   after the preview still naming it in `$prev_pageview_pathname`; the filter now drops the previous
   view keys when they name the preview.
+- An Expo Router stack keeps the preview mounted under signup and sign-in. Its member redirect
+  fired on the new session right after the code was verified, cleared the carryover intent and
+  replaced the review with Home; it now acts only while the preview is focused.
 
 Story/Task mapping:
 
@@ -11425,6 +11428,8 @@ End to end, Playwright:
 - [`playwright/tests/guest-preview.spec.ts`](../../playwright/tests/guest-preview.spec.ts): proves
   the gate and its 13th-birthday boundary, the origin allowlist, controls, history, tampering, a
   server age refusal at signup, analytics and the AC2 timing.
+- [`playwright/support/helpers/guest-preview-requests.spec.ts`](../../playwright/support/helpers/guest-preview-requests.spec.ts):
+  proves the request allowlist, with the Vercel toolbar allowed only on a preview deployment.
 - [`playwright/tests/guest-preview-real-session.spec.ts`](../../playwright/tests/guest-preview-real-session.spec.ts):
   proves the guest-to-account carryover through the real local OTP and a database read, and that a
   full guest journey leaves every table count unchanged.
