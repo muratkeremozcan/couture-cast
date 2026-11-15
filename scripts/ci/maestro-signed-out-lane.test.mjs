@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 (TEA-8): guest preview flows run in their own signed-out shard of
 // pr-mobile-e2e.yml, so the member shards keep their token bundle and a guest flow sees a
 // true first launch. The resolver runs from a copy whose maestro/ holds guest flows,

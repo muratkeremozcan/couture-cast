@@ -11426,7 +11426,21 @@ End to end, Playwright:
   the gate and its 13th-birthday boundary, the origin allowlist, controls, history, tampering, a
   server age refusal at signup, analytics and the AC2 timing.
 - [`playwright/tests/guest-preview-real-session.spec.ts`](../../playwright/tests/guest-preview-real-session.spec.ts):
-  proves the guest-to-account carryover through the real local OTP and a database read.
+  proves the guest-to-account carryover through the real local OTP and a database read, and that a
+  full guest journey leaves every table count unchanged.
+
+End to end, Maestro (Android, signed-out shard):
+
+- [`maestro/guest-preview.yaml`](../../maestro/guest-preview.yaml): proves the signed-out welcome
+  card, the gate, controls, a swap and undo, a vote, the resume after a relaunch and exit.
+- [`maestro/guest-preview-conversion.yaml`](../../maestro/guest-preview-conversion.yaml) with
+  [`maestro/guest-preview/guest-preview-conversion-verify.yaml`](../../maestro/guest-preview/guest-preview-conversion-verify.yaml):
+  proves the mobile carryover through a real Mailpit code and the saved comfort row.
+- [`scripts/lib/guest-preview-conversion.test.mjs`](../../scripts/lib/guest-preview-conversion.test.mjs),
+  [`scripts/lib/maestro-auth-mode.test.mjs`](../../scripts/lib/maestro-auth-mode.test.mjs) and
+  [`scripts/ci/maestro-signed-out-lane.test.mjs`](../../scripts/ci/maestro-signed-out-lane.test.mjs):
+  prove the signed-out mode, the code kept to the child's environment, the write-ahead account
+  record and cleanup, and the shard wiring.
 
 Evidence boundaries:
 

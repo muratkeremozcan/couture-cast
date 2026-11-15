@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 (TEA-8): the signed-out Maestro mode. Running run-maestro.mjs rebuilds shared
 // packages at import, so its wiring is read from source; the helpers carry the behavior.
 import assert from 'node:assert/strict'
