@@ -147,14 +147,13 @@ const namesGuestPreview = (value: unknown) =>
 
 /**
  * D10: the first view after the preview names the view before it ($prev_pageview_* on
- * web, previous_screen on mobile). When that was the preview, the previous-view keys are
- * dropped and the view itself is kept.
+ * web, previous_screen on mobile). When that was the preview, on any event, the
+ * previous-view keys are dropped and the event itself is kept.
  */
-function leftGuestPreview(name: string, properties: Record<string, unknown>): boolean {
+function leftGuestPreview(properties: Record<string, unknown>): boolean {
   return (
-    SDK_VIEW_EVENTS.has(name) &&
-    (namesGuestPreview(properties.$prev_pageview_pathname) ||
-      namesGuestPreview(properties.previous_screen))
+    namesGuestPreview(properties.$prev_pageview_pathname) ||
+    namesGuestPreview(properties.previous_screen)
   )
 }
 const PREVIOUS_VIEW_PROPERTY = /^(?:\$prev_pageview_|previous_screen$)/
@@ -608,7 +607,8 @@ function sanitizeProperties(
   name: string
 ): Record<string, unknown> {
   const dropUrls = GUEST_PREVIEW_EVENTS.has(name)
-  const dropPrevious = leftGuestPreview(name, properties)
+  // Guest preview events carry no previous view at all, as they carry no URL.
+  const dropPrevious = dropUrls || leftGuestPreview(properties)
   const sanitized: Record<string, unknown> = {}
   for (const key of Object.keys(properties)) {
     if (dropUrls && URL_PROPERTIES.has(key)) continue

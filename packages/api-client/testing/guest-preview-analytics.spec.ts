@@ -226,6 +226,65 @@ describe('guest preview privacy boundary', () => {
     })
   })
 
+  // Review F2: posthog-js may attach the previous view to any event on the next page.
+  it('drops the previous-view keys on any event after the preview and on guest events', () => {
+    const after = webAnalyticsPrivacyFilter(
+      event('ritual_created', {
+        ritual_type: 'daily_outfit',
+        weather_context: 'hero_cta',
+        $pathname: '/',
+        $prev_pageview_pathname: '/preview?view=wardrobe',
+        $prev_pageview_duration: 9,
+      })
+    ) as { properties: Record<string, unknown> } | null
+    expect(after?.properties.ritual_type).toBe('daily_outfit')
+    expect(
+      Object.keys(after?.properties ?? {}).filter((key) =>
+        key.startsWith('$prev_pageview_')
+      )
+    ).toEqual([])
+    const guest = webAnalyticsPrivacyFilter(
+      event(GUEST_PREVIEW_INTERACTED_EVENT, {
+        ...base,
+        action: 'control_changed',
+        control: 'thermal',
+        $prev_pageview_duration: 9,
+        $prev_pageview_max_scroll: 0,
+      })
+    ) as { properties: Record<string, unknown> } | null
+    expect(
+      Object.keys(guest?.properties ?? {}).filter((key) =>
+        key.startsWith('$prev_pageview_')
+      )
+    ).toEqual([])
+  })
+
+  // TEA ruling on F2: a non-view SDK event on a preview route keeps the route template,
+  // and never its query string or a return intent.
+  it('keeps only the route template on non-view events fired on a preview route', () => {
+    const query = '?from=preview&intent=guest-preview-carryover&birthdate=2000-01-15'
+    const exception = webAnalyticsPrivacyFilter(
+      event('$exception', {
+        $current_url: `https://couturecast.app/preview/continue${query}`,
+        $pathname: `/preview/continue${query}`,
+        $exception_level: 'error',
+      })
+    )
+    const opened = mobileAnalyticsPrivacyFilter(
+      event('Application Opened', {
+        url: `couturecast://preview-continue${query}`,
+        from_background: false,
+      })
+    )
+    const serialized = JSON.stringify([exception, opened])
+    expect(exception).not.toBeNull()
+    expect(opened).not.toBeNull()
+    for (const leak of ['?', 'from=', 'intent', 'carryover', 'birthdate', '2000-01-15'])
+      expect(serialized).not.toContain(leak)
+    expect(serialized).toContain('/preview/continue')
+    expect(serialized).toContain('/preview-continue')
+  })
+
   it('knows the preview routes so a non-view event templates them', () => {
     expect(templateAnalyticsRoute('/preview?view=wardrobe', 'web')).toBe('/preview')
     expect(templateAnalyticsRoute('/preview/continue', 'web')).toBe('/preview/continue')
