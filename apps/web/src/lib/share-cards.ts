@@ -18,6 +18,7 @@ import {
 import { currentI18n } from '../i18n'
 import { browserAnalytics } from '../analytics/browser-analytics'
 import { createWebApiClient } from './api-client'
+import { BLOB_DOWNLOAD_URL_LIFETIME_MS } from './blob-download'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 export async function validateWebShareCard(card: PreparedShareCard) {
   const bytes = decodeShareCardBase64(card.pngBase64)
@@ -53,14 +54,8 @@ export function shareCardErrorKey(error: unknown): string {
     return 'previewChanged'
   return error instanceof Error && error.message === 'offline' ? 'offline' : 'unknown'
 }
-/**
- * How long the download's object URL lives after the click. The click only starts the
- * browser's own load of the URL; WebKit resolves a Blob URL in its network process
- * later, and revoking it first drops the download with no error to report. A loaded
- * runner or a slow phone can take more than a second, so the URL stays for 40 s, the
- * window FileSaver.js uses. The same bytes already sit in the open dialog's preview.
- */
-export const SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS = 40_000
+/** The share card's download URL follows the shared Blob-URL lifetime. */
+export const SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS = BLOB_DOWNLOAD_URL_LIFETIME_MS
 export async function downloadShareCard(card: PreparedShareCard, signal: AbortSignal) {
   const bytes = await validateWebShareCard(card)
   if (signal.aborted) throw abortError('Download cancelled')
