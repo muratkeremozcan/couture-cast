@@ -18,15 +18,42 @@
 const TRANSIENT_RESOLUTION_FAILURE =
   /Too Many Requests|status code 429|status code 5\d\d|HTTP response code: (?:429|5\d\d)|Connection reset|Connection timed out|Read timed out|Connect timed out|SocketTimeoutException|ConnectTimeoutException|Remote host terminated the handshake/i
 
-/** Waits before the second and third attempts. */
-const RESOLUTION_RETRY_DELAYS_MS = [20000, 40000]
+/**
+ * Gradle's marks of a failing test: the test task's FAILED line, a failed case
+ * (`ModalSystemBarsTest > appliesLightBarsOnApi33 FAILED`), or the closing summary.
+ */
+const GRADLE_TEST_FAILURE =
+  /^> Task \S*[Tt]est\S* FAILED\s*$|^\S+ > .+ FAILED\s*$|There were failing tests/m
 
-/** The transient download error a failed run printed, or undefined when it printed none. */
+/**
+ * An artifact download that failed: Gradle's `Could not GET` (or HEAD, resolve, download) and the
+ * `Server returned HTTP response code: 429 for URL:` that Robolectric's runtime fetch prints.
+ */
+const ARTIFACT_DOWNLOAD_FAILURE =
+  /Could not (?:GET|HEAD|resolve|download)\b|Server returned HTTP response code: \d{3} for URL:/
+
+/** Waits before the second and third attempts. */
+const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
+
+/**
+ * The transient download error a failed run printed, or undefined when it printed none. A run
+ * killed by a signal (a timeout) is not retried. Neither is a run with a failing test, since a
+ * test's own output can mention a timeout or a 429, unless a line it printed is an artifact
+ * download that failed transiently (Robolectric fetching its Android runtime, for one).
+ */
 function transientResolutionFailure(result) {
-  if (result.status === 0) return undefined
-  const match = TRANSIENT_RESOLUTION_FAILURE.exec(
-    `${result.stdout ?? ''}\n${result.stderr ?? ''}`
-  )
+  if (result.status === 0 || result.signal) return undefined
+  const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  if (GRADLE_TEST_FAILURE.test(output)) {
+    const download = output
+      .split('\n')
+      .find(
+        (line) =>
+          ARTIFACT_DOWNLOAD_FAILURE.test(line) && TRANSIENT_RESOLUTION_FAILURE.test(line)
+      )
+    return download ? TRANSIENT_RESOLUTION_FAILURE.exec(download)[0] : undefined
+  }
+  const match = TRANSIENT_RESOLUTION_FAILURE.exec(output)
   return match ? match[0] : undefined
 }
 
@@ -72,6 +99,8 @@ function sleepSync(ms) {
 }
 
 module.exports = {
+  ARTIFACT_DOWNLOAD_FAILURE,
+  GRADLE_TEST_FAILURE,
   RESOLUTION_RETRY_DELAYS_MS,
   TRANSIENT_RESOLUTION_FAILURE,
   isTransientResolutionFailure,

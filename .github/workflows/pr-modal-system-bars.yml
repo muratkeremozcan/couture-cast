@@ -82,9 +82,11 @@ jobs:
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
-      # Robolectric fetches its Android runtimes (SDK 28 and 33) outside Gradle's cache.
-      - name: Cache Robolectric Android runtimes
-        uses: actions/cache@v4
+      # Robolectric fetches its Android runtimes (SDK 28 and 33) outside Gradle's cache. Restore
+      # and save are split so only main writes the cache, like Setup Gradle above.
+      - name: Restore Robolectric Android runtimes
+        id: robolectric_cache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.m2/repository/org/robolectric
           # The build file pins the Robolectric version; the test's @Config picks the SDKs.
@@ -110,6 +112,7 @@ jobs:
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
 
       - name: Robolectric tests for the modal system bars module
+        id: robolectric_tests
         working-directory: apps/mobile/android
         run: |
           set -euo pipefail
@@ -123,6 +126,14 @@ jobs:
           report="$report/TEST-expo.modules.modalsystembars.ModalSystemBarsTest.xml"
           node ../../../scripts/ci/junit-report-check.mjs "$report" \
             expo.modules.modalsystembars.ModalSystemBarsTest 2
+
+      # The runtimes are complete once the tests have run; a pull request only reads them.
+      - name: Save Robolectric Android runtimes
+        if: ${{ !cancelled() && github.ref == 'refs/heads/main' && steps.robolectric_cache.outputs.cache-hit != 'true' && steps.robolectric_tests.outcome == 'success' }}
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: ${{ steps.robolectric_cache.outputs.cache-primary-key }}
 
       - name: Upload Robolectric reports
         if: ${{ !cancelled() }}
