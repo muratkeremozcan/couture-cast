@@ -11,6 +11,7 @@ import {
 import { getI18n } from '../../i18n'
 import { destinationAfterSignIn } from '../../lib/post-signin-destination'
 import { GoogleSignInButton, SignInDivider } from '../components/google-sign-in-button'
+import { LegalLinks } from '../components/legal-page'
 import {
   requestWebOtp,
   verifyWebOtp,
@@ -151,6 +152,7 @@ export default function SignInPage() {
           {previewStrings.conversionDetail.backToPreview}
         </Link>
       ) : null}
+      <LegalLinks />
     </main>
   )
 }

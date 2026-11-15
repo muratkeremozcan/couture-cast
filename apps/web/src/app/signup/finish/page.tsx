@@ -1,4 +1,5 @@
 import { parsePreviewFrom, parseSignInDoor } from '@couture/utils'
+import { LegalLinks } from '../../components/legal-page'
 import { FinishSignupForm } from './finish-signup-form'
 
 export default async function FinishSignupPage({
@@ -19,6 +20,7 @@ export default async function FinishSignupPage({
           fromPreview={parsePreviewFrom(from) !== null}
           door={parseSignInDoor(typeof door === 'string' ? door : null)}
         />
+        <LegalLinks className="mt-8 text-neutral-300" />
       </div>
     </main>
   )

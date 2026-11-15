@@ -19,6 +19,8 @@ const secondaryRoutes = [
   '/guardian/accept',
   '/guardian/dashboard',
   '/teen/dashboard',
+  '/privacy',
+  '/terms',
 ] as const
 const viewports = [
   { name: 'desktop', width: 1440, height: 900 },

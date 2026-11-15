@@ -258,6 +258,25 @@ An adult does steps 1 to 3 and lands signed in. A returning member does steps 1 
 - 44-point targets, keyboard and screen-reader order, focus on the first field of the finish
   step, and announced errors, as the existing signup screens do.
 
+### D12. Public Privacy Policy and Terms of Service
+
+- Google's consent screen cannot leave Testing without a home page, a privacy policy and terms
+  links on an authorized domain, so the web app gains `/privacy` and `/terms`.
+- Server-rendered, signed out, indexable: no session check and no redirect. The session bridge
+  exempts both paths from the finish-step resume, because the finish step and Google's consent
+  screen link to them mid-signup.
+- Every statement is backed by code: Google's address, name and photo stay in Supabase Auth and
+  the app reads only the verified address (D4); birthdate for the age gate; under-13 and
+  cancelled identities deleted at once and abandoned ones by the daily sweep after a day
+  (D3, TEA-4); guardian consent for ages 13 to 15; pseudonymous analytics with no address or
+  code (D5); account erasure on request through the 6.13 erasure route; contact
+  `muratkerem@gmail.com`, approved by the owner. No certification or retention figure the code
+  does not enforce.
+- English only. The legal text is the reference wording reviewers check against the code, and
+  a translation would need its own review; the pages are not in the ten-locale catalogs.
+- Linked from the home page, signup, sign-in and the finish step; both routes are in
+  `WEB_ANALYTICS_ROUTES` and the Story 3.8 axe and landmark matrix.
+
 ## Boundaries & Constraints
 
 **Always:**
@@ -546,5 +565,18 @@ real-Google run. iOS Maestro and VoiceOver run nightly and on dispatch.
     branching on the provider (TEA-7); the sweep runs only with
     `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` on the hosted worker and checks `auth.users` pairing
     (TEA-14); a guardian-only row is checked before any refusal deletes an identity (TEA-2).
+  - TEA sign-off rounds (API two rounds, web and mobile one each), changes each with its reason:
+    the sweep runs only with `ORPHAN_AUTH_USER_SWEEP_ENABLED=true`, refuses test environments,
+    checks `auth.users` pairing and throws before deleting at the page cap (TEA-14); a 404 counts
+    as deleted only with `user_not_found`; the finish-step 403 carries a machine code
+    (`underage`, `federated_guardian_minor`); the door (`door=signup`) rides the round trip so
+    failures and Cancel return to the page that started (D5); a stored identity without an
+    account resumes the finish step from the server's status, so a new tab resumes too (D3);
+    the callback drops the PKCE verifier on failure; Android Back on the finish form is Cancel;
+    the guardian step is localized; the door helpers live in `@couture/utils` because a server
+    page calls them (the E lane caught the client-only import).
+  - TEA-15 done in the Supabase dashboard at the owner's request (the Management API call was
+    refused by the session's permission classifier); the hosted probe still passes.
+  - D12 added: publishing the Google consent screen needs public privacy and terms pages.
   - Out of scope, existing behavior: unauthenticated email signup lets anyone pre-register an
     address with a birthdate of their choosing; the address owner then signs in to that row.

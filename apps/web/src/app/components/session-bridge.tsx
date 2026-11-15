@@ -1,8 +1,10 @@
 'use client'
 import { useEffect } from 'react'
+import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
 import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-session'
 
-const FINISH_EXEMPT_PATHS = ['/signup/finish', '/auth/callback']
+// The legal pages stay readable mid-signup: Google's consent screen and the finish step link there.
+const FINISH_EXEMPT_PATHS = ['/signup/finish', '/auth/callback', '/privacy', '/terms']
 
 /**
  * Story 6.17 D3: a stored identity with no account (a reload, a closed tab, a new tab) goes
@@ -17,7 +19,6 @@ function resumeFederatedFinish() {
     })
     .catch(() => undefined)
 }
-import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
 export function SessionBridge() {
   useEffect(() => {
     const stopLanguageSync = syncDocumentLanguage()

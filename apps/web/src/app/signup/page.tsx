@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { parsePreviewFrom } from '@couture/utils'
+import { LegalLinks } from '../components/legal-page'
 import { SignupForm } from './signup-form'
 
 export default async function SignupPage({
@@ -39,6 +40,7 @@ export default async function SignupPage({
           >
             Back home
           </Link>
+          <LegalLinks className="text-neutral-300" />
         </section>
 
         <div className="w-full max-w-lg">

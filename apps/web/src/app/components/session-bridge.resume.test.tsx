@@ -193,11 +193,15 @@ describe('W-RESUME: a stored identity without an account returns to the finish s
     expect(replace).not.toHaveBeenCalled()
   })
 
-  it.each(['/signup/finish', '/auth/callback'])('leaves %s alone', async (path) => {
-    at(path)
-    sessionStorage.setItem(FINISH_MARKER, JSON.stringify({ from: null }))
-    server(unauthorized, needsBirthdate)
-    await mountBridge()
-    expect(replace).not.toHaveBeenCalled()
-  })
+  // The legal pages too: Google's consent screen and the finish step link to them mid-signup.
+  it.each(['/signup/finish', '/auth/callback', '/privacy', '/terms'])(
+    'leaves %s alone',
+    async (path) => {
+      at(path)
+      sessionStorage.setItem(FINISH_MARKER, JSON.stringify({ from: null }))
+      server(unauthorized, needsBirthdate)
+      await mountBridge()
+      expect(replace).not.toHaveBeenCalled()
+    }
+  )
 })
