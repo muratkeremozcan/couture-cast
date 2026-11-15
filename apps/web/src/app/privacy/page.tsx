@@ -47,14 +47,16 @@ export default function PrivacyPage() {
         </LegalList>
       </LegalSection>
 
-      {/* Story 6.17 D4: the app reads only the verified address; no Google field or token is stored. */}
+      {/* Story 6.17 D4: the app reads only the verified address. Both clients store the session
+          through withoutProviderTokens (@couture/utils), which drops Google's tokens. */}
       <LegalSection title="Signing in with Google">
         <p>
           When you choose Continue with Google, Google shares your email address, name,
           and profile photo with Supabase Auth, the sign-in service CoutureCast uses.
           Supabase keeps them with your sign-in identity. CoutureCast reads only your
           verified email address: it never copies your Google name or photo into its own
-          records, and it stores no Google token.
+          records. No Google token is kept on our servers or in the sign-in session stored
+          on your device.
         </p>
         <p>
           A new Google sign-in becomes a CoutureCast account only after you enter your
@@ -62,7 +64,10 @@ export default function PrivacyPage() {
           these cases:
         </p>
         <LegalList>
-          <li>The birthdate shows you are under 13: we delete it right away.</li>
+          <li>
+            The birthdate shows you are under 13: we delete it right away, or, if that
+            attempt fails, our daily cleanup deletes it once it is more than a day old.
+          </li>
           <li>You choose Cancel on the birthdate step: we delete it right away.</li>
           <li>
             You leave without finishing: once it is more than a day old, our daily cleanup
@@ -86,13 +91,17 @@ export default function PrivacyPage() {
         </p>
       </LegalSection>
 
-      {/* apps/web/src/analytics/browser-analytics.ts; apps/api telemetry.service.ts keyed ids. */}
+      {/* Web: apps/web/src/analytics/browser-analytics.ts through the /ingest proxy. Mobile:
+          apps/mobile/src/config/posthog.ts, direct to PostHog. Server: telemetry.service.ts,
+          keyed ids; profile_completed carries age and guardian_consent_required. */}
       <LegalSection title="Analytics">
         <p>
-          We use PostHog, through our own servers, to count page views, a fixed list of
-          product events, and errors. Analytics events carry a pseudonymous identifier,
-          never your email address or a sign-in code. Session recording, heatmaps, and
-          automatic click capture are off.
+          We use PostHog to count page views, a fixed list of product events, and errors.
+          The website sends them through our own servers; the mobile app sends them to
+          PostHog directly. Events carry a pseudonymous identifier, never your email
+          address or a sign-in code. The event recorded when you finish signup also
+          carries your age and whether guardian consent is required. Session recording,
+          heatmaps, and automatic click capture are off.
         </p>
       </LegalSection>
 
@@ -103,8 +112,16 @@ export default function PrivacyPage() {
           <li>Vercel: the website and the app&apos;s server functions.</li>
           <li>Northflank and Upstash: background jobs and their queues.</li>
           <li>PostHog: the analytics described above.</li>
+          <li>Grafana Cloud: performance traces and metrics from our servers.</li>
+          <li>
+            OpenWeather: forecasts and place search. It receives the place or city you
+            enter.
+          </li>
+          <li>
+            Expo, with Apple and Google delivery: push notifications you turn on in the
+            mobile app.
+          </li>
           <li>Stripe: payment for subscriptions bought on the website.</li>
-          <li>RevenueCat: subscription status for purchases made in the mobile app.</li>
           <li>Google: only if you choose to sign in with Google.</li>
         </LegalList>
       </LegalSection>

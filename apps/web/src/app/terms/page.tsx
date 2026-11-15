@@ -60,9 +60,9 @@ export default function TermsPage() {
       <LegalSection title="Subscriptions">
         <p>
           Premium subscriptions bought on the website are billed through Stripe, and you
-          manage or cancel them from the billing portal linked in Settings. Subscriptions
-          bought in the mobile app are billed by Apple or Google under their store terms,
-          and you manage or cancel them there.
+          manage or cancel them from the billing portal linked in Settings. The mobile
+          apps do not offer in-app subscriptions yet; when they do, Apple or Google will
+          bill them under their store terms.
         </p>
       </LegalSection>
 

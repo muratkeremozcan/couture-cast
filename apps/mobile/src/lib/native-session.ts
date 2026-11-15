@@ -12,7 +12,7 @@ import {
   userProfileResponseSchema,
   type SignupResponse,
 } from '@couture/api-client/contracts/http'
-import { parsePreviewFrom } from '@couture/utils'
+import { parsePreviewFrom, withoutProviderTokens } from '@couture/utils'
 import { createMobileApiClient } from './api-client'
 import { setNativeOAuthInFlight } from './native-oauth-flight'
 import {
@@ -93,7 +93,8 @@ export function nativeSupabase(): Promise<SupabaseClient> {
         flowType: 'pkce',
         lock: processLock,
         // Sessions routinely exceed SecureStore's 2048-byte value limit; see the module.
-        storage: secureSessionStorage(secure),
+        // Story 6.17: the stored session carries no Google token (Privacy Policy).
+        storage: withoutProviderTokens(secureSessionStorage(secure), authStorageKey),
       },
     })
   })()

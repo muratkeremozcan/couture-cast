@@ -83,9 +83,25 @@ test(
   async ({ page }) => {
     const person = standInPerson('google-new-adult')
     const { authorizes } = await armGoogleStandIn(page, person)
+    const exchange = page.waitForResponse(
+      (response) =>
+        response.url().includes('/auth/v1/token') &&
+        response.url().includes('grant_type=pkce')
+    )
     await continueWithGoogle(page, '/signin')
 
     await expect(page).toHaveURL(`${WEB}/signup/finish`)
+    // Privacy Policy: Auth hands back the provider's access token, and the session the browser
+    // stores drops it; the rest of this test runs on that stripped session.
+    expect(Object.keys((await (await exchange).json()) as object)).toContain(
+      'provider_token'
+    )
+    const stored = await page.evaluate(() =>
+      window.localStorage.getItem('couturecast.auth-session')
+    )
+    expect(stored).toContain('"access_token"')
+    expect(stored).not.toContain('provider_token')
+    expect(stored).not.toContain('provider_refresh_token')
     // What the app asked Supabase for, before the stand-in swapped the provider (D1, D5).
     expect(authorizes).toEqual([
       {

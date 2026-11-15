@@ -166,6 +166,27 @@ describe('U-PKCE-CONFIG: the web client runs the PKCE flow and consumes no URL i
       persistSession: true,
     })
   })
+
+  // Privacy Policy: the stored session carries no Google token.
+  it('stores the session in localStorage without Google tokens', async () => {
+    const { startWebGoogleSignIn } = await load()
+    await startWebGoogleSignIn({})
+    const { storage } = (
+      sdk.createClient.mock.calls[0]![2] as {
+        auth: { storage: { setItem: (key: string, value: string) => unknown } }
+      }
+    ).auth
+    await storage.setItem(
+      'couturecast.auth-session',
+      JSON.stringify({
+        access_token: 'supabase-access',
+        provider_token: 'google-access',
+        provider_refresh_token: 'google-refresh',
+      })
+    )
+    const stored = localStorage.getItem('couturecast.auth-session') ?? ''
+    expect(JSON.parse(stored)).toEqual({ access_token: 'supabase-access' })
+  })
 })
 
 describe('U-START-PARAMS: one Google start, exactly these options', () => {

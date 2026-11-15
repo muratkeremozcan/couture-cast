@@ -170,6 +170,19 @@ describe('U-PKCE-CONFIG and U-START-PARAMS (native)', () => {
       flowType: 'pkce',
       detectSessionInUrl: false,
     })
+    // Privacy Policy: the session reaches SecureStore without Google tokens.
+    const { storage } = (
+      sdk.createOptions[0] as {
+        auth: { storage: { setItem: (key: string, value: string) => Promise<void> } }
+      }
+    ).auth
+    await storage.setItem(
+      'couturecast.auth-session',
+      JSON.stringify({ access_token: 'supabase-access', provider_token: 'google-access' })
+    )
+    const stored = [...sdk.secure.values()].join('')
+    expect(stored).toContain('supabase-access')
+    expect(stored).not.toContain('google-access')
     expect(sdk.signInWithOAuth.mock.calls).toEqual([
       [
         {

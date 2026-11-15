@@ -9,7 +9,9 @@ import {
   finishStepHref,
   parsePreviewFrom,
   parseSignInDoor,
+  type AuthSessionStorage,
   type SignInDoor,
+  withoutProviderTokens,
 } from '@couture/utils'
 import { createWebApiClient } from './api-client'
 import {
@@ -61,6 +63,28 @@ function codeRejected(error: unknown) {
   const status: unknown = error.status
   return typeof status === 'number' && status >= 400 && status < 500 && status !== 429
 }
+/**
+ * The browser's localStorage, or memory where storage is blocked (the SDK's own fallback),
+ * wrapped so the stored session carries no Google token (Privacy Policy, Story 6.17).
+ */
+function webAuthStorage(): AuthSessionStorage {
+  try {
+    const probe = `${authStorageKey}-probe`
+    window.localStorage.setItem(probe, probe)
+    window.localStorage.removeItem(probe)
+    return withoutProviderTokens(window.localStorage, authStorageKey)
+  } catch {
+    const memory = new Map<string, string>()
+    return withoutProviderTokens(
+      {
+        getItem: (key) => memory.get(key) ?? null,
+        setItem: (key, value) => void memory.set(key, value),
+        removeItem: (key) => void memory.delete(key),
+      },
+      authStorageKey
+    )
+  }
+}
 export function webSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -68,6 +92,7 @@ export function webSupabase() {
   client ??= createClient(url, key, {
     auth: {
       storageKey: authStorageKey,
+      storage: webAuthStorage(),
       persistSession: true,
       autoRefreshToken: true,
       // Story 6.17 D1, D5: Google returns a one-time code to /auth/callback, which exchanges

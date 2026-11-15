@@ -267,11 +267,20 @@ An adult does steps 1 to 3 and lands signed in. A returning member does steps 1 
   screen link to them mid-signup.
 - Every statement is backed by code: Google's address, name and photo stay in Supabase Auth and
   the app reads only the verified address (D4); birthdate for the age gate; under-13 and
-  cancelled identities deleted at once and abandoned ones by the daily sweep after a day
-  (D3, TEA-4); guardian consent for ages 13 to 15; pseudonymous analytics with no address or
-  code (D5); account erasure on request through the 6.13 erasure route; contact
-  `muratkerem@gmail.com`, approved by the owner. No certification or retention figure the code
-  does not enforce.
+  cancelled identities deleted at once, a failed deletion and abandoned identities by the daily
+  sweep after a day (D3, TEA-4); guardian consent for ages 13 to 15; pseudonymous analytics with
+  no address or code, website events through `/ingest`, mobile events direct to PostHog, and
+  `profile_completed` carrying age and whether guardian consent is required (D5); account
+  erasure on request through the 6.13 erasure route; contact `muratkerem@gmail.com`, approved
+  by the owner. No certification or retention figure the code does not enforce.
+- Processors as production runs them: Supabase, Vercel, Northflank, Upstash, PostHog, Grafana
+  Cloud (OTLP export is configured in production), OpenWeather (the only production weather
+  mode), Expo push with Apple and Google delivery, Stripe, and Google. RevenueCat is left out:
+  store enrollment has not happened, so the mobile apps sell nothing.
+- No Google token is stored. Both clients wrap their auth storage with `withoutProviderTokens`
+  (`@couture/utils`), which drops `provider_token` and `provider_refresh_token` before the
+  session reaches localStorage or SecureStore and on every read; the real-session lane pins
+  that Auth returned the token and the stored session lacks it.
 - English only. The legal text is the reference wording reviewers check against the code, and
   a translation would need its own review; the pages are not in the ten-locale catalogs.
 - Linked from the home page, signup, sign-in and the finish step; both routes are in
@@ -578,5 +587,9 @@ real-Google run. iOS Maestro and VoiceOver run nightly and on dispatch.
   - TEA-15 done in the Supabase dashboard at the owner's request (the Management API call was
     refused by the session's permission classifier); the hosted probe still passes.
   - D12 added: publishing the Google consent screen needs public privacy and terms pages.
+    TEA's text review corrected five claims against the code: the stored session held
+    Google's access token (now stripped on both clients), analytics differs by client and
+    `profile_completed` carries age, three processors were missing, a failed under-13 deletion
+    falls to the sweep, and the mobile apps sell no subscription yet.
   - Out of scope, existing behavior: unauthenticated email signup lets anyone pre-register an
     address with a birthdate of their choosing; the address owner then signs in to that row.
