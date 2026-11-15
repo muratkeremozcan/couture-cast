@@ -110,3 +110,5 @@ export {
   windExceeds,
 } from './comfort-rules'
 export type { ComfortRange, ComfortRun, ComfortTolerance } from './comfort-rules'
+
+export * from './sample-wardrobe'
