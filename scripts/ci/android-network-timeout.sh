@@ -51,6 +51,7 @@ trap stop_services EXIT
 # makes: the bundle URL Metro's own Android manifest names, entry and transform options included.
 # A fixed entry path went stale when package.json main moved to index.ts, and the app's first
 # load built its bundle cold (android-native run 43653227338).
+# -g: the query is Metro's, and curl would read [ ] { } in it as a URL glob (Antigravity r50).
 for _ in $(seq 1 90); do
   if curl -fsS --max-time 5 http://127.0.0.1:8081/status 2> /dev/null | grep -q 'packager-status:running'; then
     break
@@ -59,7 +60,7 @@ for _ in $(seq 1 90); do
 done
 curl -fsS --max-time 5 http://127.0.0.1:8081/status | grep -q 'packager-status:running'
 bundle=$(curl -fsS --max-time 30 -H 'expo-platform: android' -H 'accept: application/expo+json,application/json' http://127.0.0.1:8081/ | node scripts/lib/expo-manifest-bundle-url.mjs http://127.0.0.1:8081)
-curl -fsS --max-time 600 -o /dev/null "$bundle"
+curl -fsS -g --max-time 600 -o /dev/null "$bundle"
 # The tarpit must hold its port before the flow starts; a dead one would refuse at once.
 kill -0 "$tarpit"
 

@@ -507,7 +507,7 @@ describe('android-network-timeout.sh', () => {
     // host Metro listens on, so the app's first load is not a cold build of a different entry.
     assert.match(
       calls,
-      /^curl -fsS --max-time 600 -o \/dev\/null http:\/\/127\.0\.0\.1:8081\/apps\/mobile\/index\.ts\.bundle\?platform=android&dev=true&transform\.engine=hermes$/m
+      /^curl -fsS -g --max-time 600 -o \/dev\/null http:\/\/127\.0\.0\.1:8081\/apps\/mobile\/index\.ts\.bundle\?platform=android&dev=true&transform\.engine=hermes$/m
     )
     // The same run: without disableOnboarding=1 the dev menu onboarding covered the mounted app.
     assert.match(

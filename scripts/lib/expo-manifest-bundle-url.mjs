@@ -6,7 +6,7 @@
 // names, on another origin. The nightly network-timeout job warms Metro with exactly the request
 // the development client will make, so the app's first load finds the bundle built. Reads the
 // manifest JSON on stdin, prints `<origin><path and query of launchAsset.url>`, and fails on a
-// manifest without one.
+// manifest without one or with one that is not an http or https URL.
 import { fileURLToPath } from 'node:url'
 import fs from 'node:fs'
 
@@ -25,8 +25,16 @@ export function manifestBundleUrl(manifestText, origin) {
   const named = manifest?.launchAsset?.url
   if (typeof named !== 'string' || named === '')
     throw new Error('expo_manifest_no_launch_asset_url')
-  const url = new URL(named)
-  return `${new URL(origin).origin}${url.pathname}${url.search}`
+  // Relative to the origin when relative; only an http or https URL moves onto it, since the path
+  // of another scheme need not start with a slash (Antigravity r50 P2-1).
+  const base = new URL(origin)
+  const url = new URL(named, base)
+  if (
+    (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+    !url.pathname.startsWith('/')
+  )
+    throw new Error('expo_manifest_launch_asset_not_http')
+  return `${base.origin}${url.pathname}${url.search}`
 }
 
 if (
