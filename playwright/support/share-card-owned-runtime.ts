@@ -8,7 +8,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { createClient, type Session } from '@supabase/supabase-js'
-import type { BrowserContext, Download, Locator, Page } from '@playwright/test'
+import type { BrowserContext, Download, Locator, Page, Request } from '@playwright/test'
 import type { InterceptNetworkCallFn } from '@seontechnologies/playwright-utils/intercept-network-call'
 import { decodeShareCardBase64, validateShareCardPng } from '@couture/api-client'
 import { afterInitialCommunityVerification } from '../../scripts/lib/story68-browser-watermark.mjs'
@@ -88,8 +88,69 @@ export async function session(account: number): Promise<Session> {
   )
   return verified.data.session!
 }
+type TimelineWindow = Window & typeof globalThis & { __shareCardTimeline?: string[] }
+/** How long a failure report waits to read the page timeline. */
+const TIMELINE_READ_MS = 2000
+// Init script. Records what a missing download needs to name its cause: the share
+// dialog appearing, hiding behind another dialog and leaving, Download's busy state, the status and alert text,
+// each download handoff, and visibility and connectivity changes.
+function shareCardTimeline() {
+  const target = window as TimelineWindow
+  if (target.__shareCardTimeline) return
+  const entries: string[] = []
+  target.__shareCardTimeline = entries
+  const started = performance.now()
+  const note = (text: string) => {
+    entries.push(`${Math.round(performance.now() - started)} ms ${text}`)
+    if (entries.length > 120) entries.shift()
+  }
+  // A capturing listener sees the anchor click without replacing click(), which
+  // the handoff probe in share-card-export.spec.ts shadows.
+  document.addEventListener(
+    'click',
+    (event) => {
+      const anchor = event.target
+      if (anchor instanceof HTMLAnchorElement && anchor.download)
+        note(`download handoff ${anchor.download}`)
+    },
+    true
+  )
+  document.addEventListener('visibilitychange', () =>
+    note(`visibility ${document.visibilityState}`)
+  )
+  target.addEventListener('online', () => note('online'))
+  target.addEventListener('offline', () => note('offline'))
+  let last = ''
+  const observe = () => {
+    const dialog = document.querySelector('[aria-labelledby="share-card-title"]')
+    const save = dialog?.querySelector('[data-testid="share-card-save"]')
+    const state = dialog
+      ? [
+          dialog.getAttribute('aria-hidden') === 'true'
+            ? 'dialog hidden'
+            : 'dialog shown',
+          `save busy=${save?.getAttribute('aria-busy') ?? 'false'}`,
+          `unavailable=${save?.getAttribute('aria-disabled') ?? 'false'}`,
+          `status="${dialog.querySelector('[role="status"]')?.textContent?.trim() ?? ''}"`,
+          `alert="${dialog.querySelector('[role="alert"]')?.textContent?.trim() ?? ''}"`,
+        ].join(' ')
+      : 'no dialog'
+    if (state !== last) note((last = state))
+  }
+  const start = () =>
+    new MutationObserver(observe).observe(document.documentElement, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ['aria-busy', 'aria-disabled', 'aria-hidden', 'aria-labelledby'],
+    })
+  if (document.documentElement) start()
+  else document.addEventListener('DOMContentLoaded', start, { once: true })
+}
 export async function identify(context: BrowserContext, account = 0) {
   const member = await session(account)
+  await context.addInitScript(shareCardTimeline)
   await context.addInitScript((value) => {
     if (!sessionStorage.getItem('cc68-session-initialized')) {
       localStorage.setItem('couturecast.auth-session', JSON.stringify(value))
@@ -149,9 +210,81 @@ export async function activateFocused(control: Locator) {
   await expect(control).toBeFocused()
   await control.press('Enter')
 }
+const preparePurpose = (request: Request) => {
+  try {
+    return String((request.postDataJSON() as { purpose?: unknown } | null)?.purpose)
+  } catch {
+    return 'unreadable'
+  }
+}
+// A save that never hands off fails well inside the test timeout, so the error names
+// where the save stopped: no save preparation sent (the click was dropped), a
+// preparation that never answered or failed, or an answered one with no handoff.
+const DOWNLOAD_WAIT_MS = 30000
 // playwright-utils deviation: handleDownload saves the file but does not expose
 // Download.suggestedFilename, which these cases assert.
-export const nextDownload = (page: Page) => page.waitForEvent('download')
+export function nextDownload(page: Page): Promise<Download> {
+  const started = Date.now()
+  const preparations: string[] = []
+  const note = (text: string) => preparations.push(`${Date.now() - started} ms ${text}`)
+  const prepare = (request: Request) =>
+    request.url().endsWith('/api/v1/share-cards/prepare') && request.method() === 'POST'
+  const sent = (request: Request) => {
+    if (prepare(request)) note(`prepare ${preparePurpose(request)} sent`)
+  }
+  const finished = (request: Request) => {
+    if (!prepare(request)) return
+    // A diagnostic only: a response that cannot be read (page closing) is noted, never thrown.
+    void request.response().then(
+      (response) =>
+        note(
+          `prepare ${preparePurpose(request)} answered ${response?.status() ?? 'none'}`
+        ),
+      () => note(`prepare ${preparePurpose(request)} response unreadable`)
+    )
+  }
+  const failed = (request: Request) => {
+    if (prepare(request))
+      note(
+        `prepare ${preparePurpose(request)} failed ${request.failure()?.errorText ?? ''}`
+      )
+  }
+  page.on('request', sent)
+  page.on('requestfinished', finished)
+  page.on('requestfailed', failed)
+  return page
+    .waitForEvent('download', { timeout: DOWNLOAD_WAIT_MS })
+    .catch(async (error: unknown) => {
+      // A hung renderer must not stall the failure report past the test timeout.
+      let deadline: ReturnType<typeof setTimeout> | undefined
+      const timeline = await Promise.race([
+        page
+          .evaluate(
+            () => (window as TimelineWindow).__shareCardTimeline ?? ['no timeline']
+          )
+          .catch((reason: unknown) => [`timeline unreadable: ${String(reason)}`]),
+        new Promise<string[]>((resolve) => {
+          deadline = setTimeout(
+            () => resolve([`timeline unread after ${TIMELINE_READ_MS} ms`]),
+            TIMELINE_READ_MS
+          )
+        }),
+      ]).finally(() => clearTimeout(deadline))
+      throw new Error(
+        [
+          `share_card_download_missing: no download within ${DOWNLOAD_WAIT_MS} ms.`,
+          `Preparations since the wait began: ${preparations.join('; ') || 'none'}.`,
+          `Page timeline (ms since load): ${timeline.join('; ')}.`,
+        ].join('\n'),
+        { cause: error }
+      )
+    })
+    .finally(() => {
+      page.off('request', sent)
+      page.off('requestfinished', finished)
+      page.off('requestfailed', failed)
+    })
+}
 export async function downloadedDigest(download: Download, file: string) {
   // saveAs works for local and remote browsers; Download.path() only for local ones.
   await download.saveAs(file)

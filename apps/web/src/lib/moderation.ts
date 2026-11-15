@@ -36,6 +36,7 @@ import {
   type ModerationSlaSummary,
 } from '@couture/api-client/contracts/http'
 import { createWebApiClient } from './api-client'
+import { BLOB_DOWNLOAD_URL_LIFETIME_MS } from './blob-download'
 import { getI18n } from '../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 
@@ -334,8 +335,8 @@ export function saveModerationEvidenceFile(file: ModerationEvidenceFile): void {
   document.body.append(link)
   link.click()
   link.remove()
-  // On a later tick, because some browsers abort a download whose URL is revoked during the click.
-  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+  // WebKit loads the URL after the click returns; revoking it first drops the download.
+  window.setTimeout(() => URL.revokeObjectURL(url), BLOB_DOWNLOAD_URL_LIFETIME_MS)
 }
 
 /** Why a decision or an appeal step did not apply. `offline` is a request that never got an answer. */

@@ -110,8 +110,9 @@ describe('web share-card immutable download boundary', () => {
         'handoff_failure'
       )
       expect(document.querySelector('a[download]')).toBeNull()
+      await vi.advanceTimersByTimeAsync(39_999)
       expect(revokeObjectURL).not.toHaveBeenCalled()
-      await vi.advanceTimersByTimeAsync(1000)
+      await vi.advanceTimersByTimeAsync(1)
       expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:approved')
     } finally {
       vi.useRealTimers()
@@ -153,8 +154,9 @@ describe('web share-card immutable download boundary', () => {
       })
       expect(click).not.toHaveBeenCalled()
       expect(document.querySelector('a[download]')).toBeNull()
+      await vi.advanceTimersByTimeAsync(39_999)
       expect(revokeObjectURL).not.toHaveBeenCalled()
-      await vi.advanceTimersByTimeAsync(1000)
+      await vi.advanceTimersByTimeAsync(1)
       expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:cancelled')
     } finally {
       vi.useRealTimers()

@@ -18,6 +18,7 @@ import {
 import { currentI18n } from '../i18n'
 import { browserAnalytics } from '../analytics/browser-analytics'
 import { createWebApiClient } from './api-client'
+import { BLOB_DOWNLOAD_URL_LIFETIME_MS } from './blob-download'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 export async function validateWebShareCard(card: PreparedShareCard) {
   const bytes = decodeShareCardBase64(card.pngBase64)
@@ -53,6 +54,8 @@ export function shareCardErrorKey(error: unknown): string {
     return 'previewChanged'
   return error instanceof Error && error.message === 'offline' ? 'offline' : 'unknown'
 }
+/** The share card's download URL follows the shared Blob-URL lifetime. */
+export const SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS = BLOB_DOWNLOAD_URL_LIFETIME_MS
 export async function downloadShareCard(card: PreparedShareCard, signal: AbortSignal) {
   const bytes = await validateWebShareCard(card)
   if (signal.aborted) throw abortError('Download cancelled')
@@ -66,8 +69,8 @@ export async function downloadShareCard(card: PreparedShareCard, signal: AbortSi
     anchor.click()
   } finally {
     anchor.remove()
-    // Browsers need the URL through the handoff task. No disk completion is claimed.
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
+    // No disk completion is claimed; the URL is released after a bounded wait.
+    setTimeout(() => URL.revokeObjectURL(url), SHARE_CARD_DOWNLOAD_URL_LIFETIME_MS)
   }
 }
 

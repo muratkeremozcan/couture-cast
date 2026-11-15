@@ -35,6 +35,7 @@ import {
   type ModerationDecisionFailure,
   type ModerationRequestError,
   remainingMs,
+  saveModerationEvidenceFile,
 } from './moderation'
 import { useMswHandlers } from '../test-utils/msw/runtime'
 import {
@@ -776,5 +777,56 @@ describe('U-WEB-CLIENT: getModerationSlaFromWeb', () => {
     const reason = moderationFailureReason(await rejection())
     expect(reason).toBe('unavailable')
     expect(isTerminalFailure(reason)).toBe(false)
+  })
+})
+
+describe('U-WEB-EVIDENCE-SAVE: the evidence download keeps its URL through the handoff', () => {
+  // Literal times on purpose: a shorter shared lifetime must fail here, not move with it.
+  it('clicks one anchor, removes it, and revokes the URL only after the shared lifetime', async () => {
+    vi.useFakeTimers()
+    const createObjectURL = vi.fn(() => 'blob:evidence')
+    const revokeObjectURL = vi.fn()
+    const original = {
+      create: Object.getOwnPropertyDescriptor(URL, 'createObjectURL'),
+      revoke: Object.getOwnPropertyDescriptor(URL, 'revokeObjectURL'),
+    }
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: createObjectURL,
+    })
+    Object.defineProperty(URL, 'revokeObjectURL', {
+      configurable: true,
+      value: revokeObjectURL,
+    })
+    const clicked: { href: string; download: string }[] = []
+    const click = vi
+      .spyOn(HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push({ href: this.href, download: this.download })
+      })
+    try {
+      saveModerationEvidenceFile({
+        text: '{}',
+        fileName: 'moderation-evidence-x.json',
+      } as Parameters<typeof saveModerationEvidenceFile>[0])
+      expect(clicked).toEqual([
+        { href: 'blob:evidence', download: 'moderation-evidence-x.json' },
+      ])
+      expect(document.querySelector('a[download]')).toBeNull()
+      await vi.advanceTimersByTimeAsync(39_999)
+      expect(revokeObjectURL).not.toHaveBeenCalled()
+      await vi.advanceTimersByTimeAsync(1)
+      expect(revokeObjectURL).toHaveBeenCalledExactlyOnceWith('blob:evidence')
+    } finally {
+      click.mockRestore()
+      for (const [name, descriptor] of [
+        ['createObjectURL', original.create],
+        ['revokeObjectURL', original.revoke],
+      ] as const) {
+        if (descriptor) Object.defineProperty(URL, name, descriptor)
+        else Reflect.deleteProperty(URL, name)
+      }
+      vi.useRealTimers()
+    }
   })
 })
