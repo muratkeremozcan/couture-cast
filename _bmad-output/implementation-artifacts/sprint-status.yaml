@@ -30,7 +30,7 @@
 # - Dev moves story to 'review', SM/Code-Review validates, then Dev moves to 'done'
 
 generated: 2026-07-07
-last_updated: 2026-11-10
+last_updated: 2026-11-15
 project: couture-cast
 project_key: couture-cast
 tracking_system: file-system
@@ -118,3 +118,5 @@ development_status:
   6-15b-expo-sdk-55-58-upgrade: backlog
   # Guest sample wardrobe and outfit preview; acquisition work, no Community Beta gate.
   6-16-guest-wardrobe-outfit-preview: done
+  # Google sign-in on web, iOS and Android; age gate and guardian consent unchanged.
+  6-17-google-sign-in: in-progress
