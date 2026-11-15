@@ -7,6 +7,14 @@
  *
  * Flow state stays isolated by the flows themselves (each launches the app). Driver state does
  * too: any failed flow stops the runner of this device, so the next flow gets a fresh one.
+ *
+ * Every iOS flow passes `--no-reinstall-driver`, the first one and the first after a failure
+ * too. Maestro 2.8 ends each invocation with LocalXCTestInstaller.close(), which uninstalls the
+ * driver, and so kills the runner it started, whenever reinstallDriver is set: the first flow of
+ * every shard used to restart the runner it had just started (live font proof, nightly run
+ * 43707223465: a restart before every call). With the flag, an invocation that finds no runner
+ * answering starts one and leaves it running. A flow with no reuse mark first stops this
+ * device's runner, so it still starts from a fresh one.
  */
 import fs from 'node:fs'
 import path from 'node:path'
@@ -28,16 +36,26 @@ const readState = (directory) => {
 export const iosDriverGlobalArgs = (platform) =>
   platform === 'ios' ? ['--driver-host-port', String(IOS_DRIVER_PORT)] : []
 
-/** `test` options: skip the reinstall only while a flow has already completed on this device. */
-export function iosDriverTestArgs({ platform, directory, device }) {
+/**
+ * `test` and `hierarchy` options on iOS: always `--no-reinstall-driver`, so the runner outlives
+ * the invocation. Without a reuse mark for this device (the first flow, or the first after a
+ * failure) this device's runner is stopped first, so the invocation starts a fresh one.
+ */
+export function iosDriverTestArgs({ platform, directory, device, spawn }) {
   if (platform !== 'ios') return []
   const state = readState(directory)
-  return state?.device === device && state.port === IOS_DRIVER_PORT
-    ? ['--no-reinstall-driver']
-    : []
+  if (!(state?.device === device && state.port === IOS_DRIVER_PORT))
+    stopIosDriver(device, spawn)
+  return ['--no-reinstall-driver']
 }
 
-/** SIGTERM of the xcodebuild runner(s) of this simulator only; other devices are untouched. */
+/** The XCUITest runner app Maestro 2.8 installs on the simulator. */
+export const IOS_DRIVER_RUNNER_BUNDLE = 'dev.mobile.maestro-driver-iosUITests.xctrunner'
+
+/**
+ * SIGTERM of the xcodebuild runner(s) of this simulator only, then the runner app on it, which
+ * a later `--no-reinstall-driver` call would otherwise reuse; other devices are untouched.
+ */
 export function stopIosDriver(device, spawn = spawnSync) {
   if (!UDID.test(device)) return { stopped: 0 }
   const listed = spawn('pgrep', ['-f', `xcodebuild test-without-building.*${device}`], {
@@ -48,6 +66,11 @@ export function stopIosDriver(device, spawn = spawnSync) {
     .map(Number)
     .filter((pid) => Number.isSafeInteger(pid) && pid > 1 && pid !== process.pid)
   if (pids.length) spawn('kill', ['-TERM', ...pids.map(String)], { encoding: 'utf8' })
+  // A runner that is not running makes terminate exit nonzero; that is the state wanted.
+  spawn('xcrun', ['simctl', 'terminate', device, IOS_DRIVER_RUNNER_BUNDLE], {
+    encoding: 'utf8',
+    timeout: 30_000,
+  })
   return { stopped: pids.length }
 }
 

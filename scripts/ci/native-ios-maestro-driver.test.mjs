@@ -5,6 +5,7 @@ import os from 'node:os'
 import path from 'node:path'
 import {
   IOS_DRIVER_PORT,
+  IOS_DRIVER_RUNNER_BUNDLE,
   iosDriverGlobalArgs,
   iosDriverTestArgs,
   recordIosDriverFlow,
@@ -23,26 +24,46 @@ test('only iOS pins the driver port', () => {
   assert.deepEqual(iosDriverGlobalArgs('android'), [])
 })
 
-test('the first flow installs; later flows skip the reinstall until a failure', () => {
+// Maestro 2.8 kills a runner started without --no-reinstall-driver as it exits (nightly run
+// 43707223465), so every iOS flow passes the flag; one with no reuse mark stops this device's
+// runner first and so still starts from a fresh one.
+test('every iOS flow keeps its runner; a flow with no reuse mark stops the old one first', () => {
   const directory = tmp()
-  const args = () => iosDriverTestArgs({ platform: 'ios', directory, device })
-  assert.deepEqual(args(), [])
-  recordIosDriverFlow({ platform: 'ios', directory, device, ok: true })
+  const calls = []
+  const spawn = (command, args) => {
+    calls.push([command, ...args].join(' '))
+    return { stdout: '' }
+  }
+  const args = () => iosDriverTestArgs({ platform: 'ios', directory, device, spawn })
   assert.deepEqual(args(), ['--no-reinstall-driver'])
-  recordIosDriverFlow({
-    platform: 'ios',
-    directory,
-    device,
-    ok: false,
-    spawn: () => ({ stdout: '' }),
-  })
-  assert.deepEqual(args(), [])
+  assert.deepEqual(calls, [
+    `pgrep -f xcodebuild test-without-building.*${device}`,
+    `xcrun simctl terminate ${device} ${IOS_DRIVER_RUNNER_BUNDLE}`,
+  ])
+  recordIosDriverFlow({ platform: 'ios', directory, device, ok: true })
+  calls.length = 0
+  assert.deepEqual(args(), ['--no-reinstall-driver'])
+  assert.deepEqual(calls, [], 'a marked runner is reused as it is')
+  recordIosDriverFlow({ platform: 'ios', directory, device, ok: false, spawn })
+  calls.length = 0
+  assert.deepEqual(args(), ['--no-reinstall-driver'])
+  assert.equal(calls.length, 2, 'after a failure the next flow stops the runner first')
 })
 
 test('a driver warmed on another device is never reused', () => {
   const directory = tmp()
+  const calls = []
+  const spawn = (command, args) => {
+    calls.push([command, ...args].join(' '))
+    return { stdout: '' }
+  }
   recordIosDriverFlow({ platform: 'ios', directory, device: other, ok: true })
-  assert.deepEqual(iosDriverTestArgs({ platform: 'ios', directory, device }), [])
+  assert.deepEqual(iosDriverTestArgs({ platform: 'ios', directory, device, spawn }), [
+    '--no-reinstall-driver',
+  ])
+  assert.ok(
+    calls.includes(`xcrun simctl terminate ${device} ${IOS_DRIVER_RUNNER_BUNDLE}`)
+  )
 })
 
 test('android never records or reuses a driver', () => {
@@ -68,6 +89,15 @@ test('stopping signals only the runners of this device and never the harness', (
     `xcodebuild test-without-building.*${device}`,
   ])
   assert.deepEqual(calls[1], ['kill', '-TERM', '4242', '77'])
+  // The runner app goes too, so a later --no-reinstall-driver flow cannot reuse it.
+  assert.deepEqual(calls[2], [
+    'xcrun',
+    'simctl',
+    'terminate',
+    device,
+    IOS_DRIVER_RUNNER_BUNDLE,
+  ])
+  assert.equal(calls.length, 3)
 })
 
 test('a device name that is not a simulator id is refused before any process is listed', () => {

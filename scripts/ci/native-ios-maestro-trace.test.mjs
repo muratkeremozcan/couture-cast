@@ -1157,7 +1157,10 @@ function runnerAfterTimeout({ platform, directory, events }) {
     device: 'AFA0777F-372A-445A-B8D4-08C287947144',
     maestroBinary: '/owned/maestro',
     iosDriverGlobalArgs,
-    iosDriverTestArgs,
+    iosDriverTestArgs: (options) => {
+      events.push({ step: 'args' })
+      return iosDriverTestArgs({ ...options, spawn: () => ({ stdout: '' }) })
+    },
     recordIosDriverFlow: (options) => {
       events.push({ step: 'driver', ok: options.ok })
       return recordIosDriverFlow({ ...options, spawn: () => ({ stdout: '' }) })
@@ -1192,10 +1195,16 @@ test('after an iOS deadline kill the runner stops the failed runner, then reads 
   const read = runnerAfterTimeout({ platform: 'ios', directory, events })
   const hierarchy = read('ios', { status: null, deadline: { timedOut: true } }, '/out')
   assert.deepEqual(hierarchy, { attributes: {}, children: [] })
-  // Stop first, so the read starts one fresh runner on the pinned port with no reuse flag.
+  // Stop first, so the read starts one fresh runner on the pinned port. It still passes
+  // --no-reinstall-driver: without it Maestro 2.8 kills the runner as the read exits.
   assert.deepEqual(events, [
     { step: 'driver', ok: false },
-    { step: 'capture', args: OWNED_ARGS, output: '/out' },
+    { step: 'args' },
+    {
+      step: 'capture',
+      args: [...OWNED_ARGS, '--no-reinstall-driver'],
+      output: '/out',
+    },
   ])
   for (const [where, result] of [
     ['android', { status: null, deadline: { timedOut: true } }],
