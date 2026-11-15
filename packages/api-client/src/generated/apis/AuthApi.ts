@@ -13,6 +13,8 @@
 
 import * as runtime from '../runtime'
 import type {
+  FederatedSignupInput,
+  FederatedSignupStatusResponse,
   GuardianConsentInput,
   SignupInput,
   SignupResponse,
@@ -21,6 +23,10 @@ import type {
 
 export interface ApiV1AuthGuardianConsentPostRequest {
   guardianConsentInput: GuardianConsentInput
+}
+
+export interface ApiV1AuthSignupFederatedPostRequest {
+  federatedSignupInput: FederatedSignupInput
 }
 
 export interface ApiV1AuthSignupPostRequest {
@@ -85,6 +91,176 @@ export class AuthApi extends runtime.BaseAPI {
     initOverrides?: RequestInit | runtime.InitOverrideFunction
   ): Promise<TrackedResponse> {
     const response = await this.apiV1AuthGuardianConsentPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1AuthSignupFederatedDelete without sending the request
+   */
+  async apiV1AuthSignupFederatedDeleteRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/auth/signup/federated`
+
+    return {
+      path: urlPath,
+      method: 'DELETE',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Story 6.17 D3: deletes the Auth identity when its address has no account; does nothing otherwise.
+   * Abandon the finish step
+   */
+  async apiV1AuthSignupFederatedDeleteRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<void>> {
+    const requestOptions = await this.apiV1AuthSignupFederatedDeleteRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.VoidApiResponse(response)
+  }
+
+  /**
+   * Story 6.17 D3: deletes the Auth identity when its address has no account; does nothing otherwise.
+   * Abandon the finish step
+   */
+  async apiV1AuthSignupFederatedDelete(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<void> {
+    await this.apiV1AuthSignupFederatedDeleteRaw(initOverrides)
+  }
+
+  /**
+   * Creates request options for apiV1AuthSignupFederatedGet without sending the request
+   */
+  async apiV1AuthSignupFederatedGetRequestOpts(): Promise<runtime.RequestOpts> {
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/auth/signup/federated`
+
+    return {
+      path: urlPath,
+      method: 'GET',
+      headers: headerParameters,
+      query: queryParameters,
+    }
+  }
+
+  /**
+   * Story 6.17 D3: called after a Google sign-in whose profile check answered 401.
+   * Decide whether a federated identity needs the finish step
+   */
+  async apiV1AuthSignupFederatedGetRaw(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<FederatedSignupStatusResponse>> {
+    const requestOptions = await this.apiV1AuthSignupFederatedGetRequestOpts()
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Story 6.17 D3: called after a Google sign-in whose profile check answered 401.
+   * Decide whether a federated identity needs the finish step
+   */
+  async apiV1AuthSignupFederatedGet(
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<FederatedSignupStatusResponse> {
+    const response = await this.apiV1AuthSignupFederatedGetRaw(initOverrides)
+    return await response.value()
+  }
+
+  /**
+   * Creates request options for apiV1AuthSignupFederatedPost without sending the request
+   */
+  async apiV1AuthSignupFederatedPostRequestOpts(
+    requestParameters: ApiV1AuthSignupFederatedPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['federatedSignupInput'] == null) {
+      throw new runtime.RequiredError(
+        'federatedSignupInput',
+        'Required parameter "federatedSignupInput" was null or undefined when calling apiV1AuthSignupFederatedPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/auth/signup/federated`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['federatedSignupInput'],
+    }
+  }
+
+  /**
+   * Story 6.17 D3: runs the signup age gate on the submitted birthdate and creates the account for the verified bearer address. Under 13 deletes the Auth identity.
+   * Create the account for a verified federated identity
+   */
+  async apiV1AuthSignupFederatedPostRaw(
+    requestParameters: ApiV1AuthSignupFederatedPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<SignupResponse>> {
+    const requestOptions =
+      await this.apiV1AuthSignupFederatedPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Story 6.17 D3: runs the signup age gate on the submitted birthdate and creates the account for the verified bearer address. Under 13 deletes the Auth identity.
+   * Create the account for a verified federated identity
+   */
+  async apiV1AuthSignupFederatedPost(
+    requestParameters: ApiV1AuthSignupFederatedPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<SignupResponse> {
+    const response = await this.apiV1AuthSignupFederatedPostRaw(
       requestParameters,
       initOverrides
     )

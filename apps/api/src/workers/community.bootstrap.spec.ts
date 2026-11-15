@@ -100,6 +100,7 @@ function idleSweeps(overrides: Record<string, () => Promise<unknown>> = {}) {
       .mockResolvedValue({ subjects: 0, posts: 0, comments: 0 }),
     sweepModerationSla: vi.fn().mockResolvedValue({ skipped: 1, recorded: 0 }),
     sweepModerationHistoryRetention: vi.fn().mockResolvedValue({ skipped: true }),
+    sweepOrphanAuthUsers: vi.fn().mockResolvedValue({ skipped: true }),
     ...overrides,
   }
 }
@@ -318,6 +319,82 @@ describe('dedicated community worker bootstrap', () => {
       await bootstrap.performShutdown()
       await vi.advanceTimersByTimeAsync(600_000)
       expect(calls).toEqual([1_000])
+    })
+  })
+
+  // Learning path Step 57: Google sign-in.
+  // Story 6.17 TEA-14: the orphan Auth user sweep deletes Auth users, so the hosted worker runs it
+  // only when ORPHAN_AUTH_USER_SWEEP_ENABLED names it, and never in a local or preview test stack.
+  describe('U-W-ORPHAN-GATE: the orphan Auth user sweep runs only where it is named', () => {
+    const dayMs = 86_400_000
+
+    function runtimeWithOrphanSweep(sweepOrphanAuthUsers: () => Promise<unknown>) {
+      harness.createCommunityWorkerRuntime.mockResolvedValue({
+        worker: { on: vi.fn(), close: vi.fn() },
+        sweeps: idleSweeps({ sweepOrphanAuthUsers }),
+        readiness: { selector: 'fixture', engineVersion: 'x', startupDurationMs: 1 },
+        close: harness.communityClose,
+      })
+    }
+
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    it.each([
+      ['the flag is unset', {}],
+      [
+        'TEST_ENV is local',
+        { ORPHAN_AUTH_USER_SWEEP_ENABLED: 'true', TEST_ENV: 'local' },
+      ],
+      [
+        'TEST_ENV is preview',
+        { ORPHAN_AUTH_USER_SWEEP_ENABLED: 'true', TEST_ENV: 'preview' },
+      ],
+    ])('neither composes nor schedules the sweep when %s', async (_label, env) => {
+      vi.stubEnv('ORPHAN_AUTH_USER_SWEEP_ENABLED', '')
+      vi.stubEnv('TEST_ENV', '')
+      vi.stubEnv('VERCEL_ENV', '')
+      for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+      const sweep = vi.fn().mockResolvedValue({ skipped: true })
+      runtimeWithOrphanSweep(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ orphanAuthUsers: expect.anything() as unknown })
+      )
+      expect(sweep).not.toHaveBeenCalled()
+      // Only the history retention keeps a daily timer.
+      expect(
+        setIntervalSpy.mock.calls.filter(([, delay]) => delay === dayMs)
+      ).toHaveLength(1)
+      setIntervalSpy.mockRestore()
+      await bootstrap.performShutdown()
+    })
+
+    it('composes the sweep, runs it at boot and daily when the flag names the worker', async () => {
+      vi.stubEnv('ORPHAN_AUTH_USER_SWEEP_ENABLED', 'true')
+      vi.stubEnv('TEST_ENV', '')
+      vi.stubEnv('VERCEL_ENV', '')
+      const setIntervalSpy = vi.spyOn(globalThis, 'setInterval')
+      const sweep = vi.fn().mockResolvedValue({ scanned: 0, deleted: 0, failed: 0 })
+      runtimeWithOrphanSweep(sweep)
+      const bootstrap = freshProcess()
+      await bootstrap.startCommunityWorkers()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          orphanAuthUsers: expect.objectContaining({
+            run: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
+      expect(sweep).toHaveBeenCalledTimes(1)
+      expect(
+        setIntervalSpy.mock.calls.filter(([, delay]) => delay === dayMs)
+      ).toHaveLength(2)
+      setIntervalSpy.mockRestore()
+      await bootstrap.performShutdown()
     })
   })
 

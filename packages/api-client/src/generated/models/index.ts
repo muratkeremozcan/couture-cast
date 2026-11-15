@@ -7404,6 +7404,43 @@ export interface FavoriteOutfitCapsuleInput {
 /**
  *
  * @export
+ * @interface FederatedSignupInput
+ */
+export interface FederatedSignupInput {
+  /**
+   * Invariant enforced at runtime and NOT expressible in this schema: beyond the YYYY-MM-DD pattern, the value must be a real calendar date. The pattern alone accepts 2026-02-31 and 2026-13-01; both are rejected here.
+   * @type {string}
+   * @memberof FederatedSignupInput
+   */
+  birthdate: string
+}
+/**
+ * needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session.
+ * @export
+ * @interface FederatedSignupStatusResponse
+ */
+export interface FederatedSignupStatusResponse {
+  /**
+   *
+   * @type {FederatedSignupStatusResponseStatusEnum}
+   * @memberof FederatedSignupStatusResponse
+   */
+  status: FederatedSignupStatusResponseStatusEnum
+}
+
+/**
+ * @export
+ */
+export const FederatedSignupStatusResponseStatusEnum = {
+  needs_birthdate: 'needs_birthdate',
+  complete: 'complete',
+} as const
+export type FederatedSignupStatusResponseStatusEnum =
+  (typeof FederatedSignupStatusResponseStatusEnum)[keyof typeof FederatedSignupStatusResponseStatusEnum]
+
+/**
+ *
+ * @export
  * @interface ForbiddenHttpError
  */
 export interface ForbiddenHttpError {

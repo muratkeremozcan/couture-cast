@@ -32,7 +32,7 @@ const normalizeHeaderValue = (
   return normalized.length > 0 ? normalized : undefined
 }
 
-const parseBearerToken = (
+export const parseBearerToken = (
   authorizationHeader: string | string[] | undefined
 ): string | undefined => {
   const headerValue = normalizeHeaderValue(authorizationHeader)
