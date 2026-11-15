@@ -158,6 +158,25 @@ test(
       /proguardFiles getDefaultProguardFile\("proguard-android\.txt"\), "proguard-rules\.pro"/
     )
 
+    // Dispatch 43685963017: the template's release block opens with comments before its
+    // signingConfig, so the Release proof edit is checked against the real prebuilt file.
+    const proof = withMinifiedDebuggable.addMinifiedDebuggable(control.gradle, {
+      releaseProof: true,
+    })
+    assert.match(
+      proof,
+      /^ {8}release \{\n(?: {12}\/\/.*\n)* {12}signingConfig signingConfigs\.pinnedTest\n/m,
+      'the Release proof signs release with the pinned key'
+    )
+    assert.equal(
+      proof.replace(
+        /(^ {8}release \{\n(?: {12}\/\/.*\n)* {12}signingConfig signingConfigs\.)pinnedTest\n/m,
+        '$1debug\n'
+      ),
+      candidate.gradle,
+      'the Release proof changes only the release signing config'
+    )
+
     const copied = path.join(candidate.appDir, 'couturecast-test-only.keystore')
     assert.equal(sha256(copied), PINNED_KEYSTORE_SHA256)
     assert.ok(fs.existsSync(path.join(candidate.appDir, 'src/debug/AndroidManifest.xml')))
@@ -203,7 +222,9 @@ android {
 test('only the local Release proof build signs release with the pinned test keystore', () => {
   const { addMinifiedDebuggable } = withMinifiedDebuggable
   const releaseSigning = (gradle) =>
-    /^ {8}release \{\n {12}signingConfig signingConfigs\.(\w+)\n/m.exec(gradle)?.[1]
+    /^ {8}release \{\n(?: {12}\/\/.*\n)* {12}signingConfig signingConfigs\.(\w+)\n/m.exec(
+      gradle
+    )?.[1]
   assert.equal(releaseSigning(addMinifiedDebuggable(TEMPLATE)), 'debug')
   assert.equal(
     releaseSigning(addMinifiedDebuggable(TEMPLATE, { releaseProof: false })),

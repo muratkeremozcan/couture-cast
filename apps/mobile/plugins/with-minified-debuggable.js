@@ -114,7 +114,8 @@ function addMinifiedDebuggable(contents, { releaseProof = false } = {}) {
   if (releaseProof)
     next = replaceOnce(
       next,
-      /(^ {8}release \{\n {12}signingConfig signingConfigs\.)debug\n/m,
+      // The template opens release with comment lines before its signingConfig.
+      /(^ {8}release \{\n(?: {12}\/\/.*\n)* {12}signingConfig signingConfigs\.)debug\n/m,
       `$1${SIGNING_CONFIG}\n`,
       'release build type signed with signingConfigs.debug'
     )
