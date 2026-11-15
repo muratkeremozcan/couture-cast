@@ -22,6 +22,16 @@
 import type { GarmentItem } from '@prisma/client'
 import type { CapsuleOccasion } from '@couture/api-client'
 import {
+  adjustFeelsLike,
+  CLOSE_COMFORT_MATCHES,
+  getRainAmountThreshold,
+  getRainProbThreshold,
+  getWindThreshold,
+  needsOuterwear,
+  resolveComfortRangeFromTemperature,
+  type ComfortRange,
+} from '@couture/utils'
+import {
   evaluateCapsuleForScenario,
   type CapsuleWithJoins,
 } from './capsule-recommendation.engine.js'
@@ -154,46 +164,11 @@ export function toDatabaseDate(localDate: string): Date {
 }
 
 // ---------------------------------------------------------------------------
-// Comfort thresholds (verbatim from RitualService).
+// Comfort thresholds live in @couture/utils (Story 6.16) so the guest sample
+// policy applies the same rules. They are re-exported here for existing callers.
 // ---------------------------------------------------------------------------
 
-const WIND_THRESHOLD_M_S: Record<WindTolerance, number> = {
-  low: 3,
-  medium: 5,
-  high: 8,
-} as const
-
-const PRECIP_PROB_THRESHOLD: Record<PrecipPreparedness, number> = {
-  high: 0.2,
-  medium: 0.4,
-  low: 0.7,
-} as const
-
-const PRECIP_AMOUNT_THRESHOLD_MM: Record<PrecipPreparedness, number> = {
-  high: 0.1,
-  medium: 0.5,
-  low: 2.0,
-} as const
-
-export function getWindThreshold(windTolerance: WindTolerance): number {
-  return WIND_THRESHOLD_M_S[windTolerance] ?? 5.0
-}
-
-export function getRainProbThreshold(precipPreparedness: PrecipPreparedness): number {
-  return PRECIP_PROB_THRESHOLD[precipPreparedness] ?? 0.3
-}
-
-export function getRainAmountThreshold(precipPreparedness: PrecipPreparedness): number {
-  return PRECIP_AMOUNT_THRESHOLD_MM[precipPreparedness] ?? 0.1
-}
-
-function resolveComfortRangeFromTemperature(adjustedFeelsLike: number): string {
-  if (adjustedFeelsLike < 10) return 'cold'
-  if (adjustedFeelsLike < 15) return 'cool'
-  if (adjustedFeelsLike < 20) return 'mild'
-  if (adjustedFeelsLike < 25) return 'warm'
-  return 'hot'
-}
+export { getRainAmountThreshold, getRainProbThreshold, getWindThreshold }
 
 // ---------------------------------------------------------------------------
 // Temperature localization (verbatim from RitualService).
@@ -943,22 +918,14 @@ export interface RitualGenerationResult {
   ]
 }
 
-const CLOSE_COMFORT_MATCHES: Record<string, string[]> = {
-  cold: ['cool'],
-  cool: ['mild', 'cold'],
-  mild: ['cool', 'warm'],
-  warm: ['mild', 'hot'],
-  hot: ['warm'],
-}
-
 function pickBestGarment(
   candidates: readonly GarmentItem[],
-  targetComfortRange: string
+  targetComfortRange: ComfortRange
 ): GarmentItem | undefined {
   const exact = candidates.find((g) => g.comfort_range === targetComfortRange)
   if (exact) return exact
 
-  const preferences = CLOSE_COMFORT_MATCHES[targetComfortRange] || []
+  const preferences = CLOSE_COMFORT_MATCHES[targetComfortRange]
   for (const pref of preferences) {
     const match = candidates.find((g) => g.comfort_range === pref)
     if (match) return match
@@ -979,7 +946,7 @@ function pickBestGarment(
 function selectGenericGarments(
   requiredCategories: readonly string[],
   eligibleGarments: readonly GarmentItem[],
-  targetComfortRange: string,
+  targetComfortRange: ComfortRange,
   excludedGarmentIds: ReadonlySet<string> = new Set()
 ): { garmentIds: string[]; usedPlaceholder: boolean } {
   let usedPlaceholder = false
@@ -1017,9 +984,7 @@ function buildComfortNotes(
   locale: SupportedLocale
 ): string {
   const { runsColdWarm, windTolerance, precipPreparedness } = comfortPreferences
-  let adjustedFeelsLike = weather.feelsLike
-  if (runsColdWarm === 'cold') adjustedFeelsLike -= 3
-  else if (runsColdWarm === 'warm') adjustedFeelsLike += 3
+  const adjustedFeelsLike = adjustFeelsLike(weather.feelsLike, runsColdWarm)
 
   const dict = comfortNotesTranslations[locale]
   const notes: string[] = []
@@ -1073,9 +1038,7 @@ function generateAvailableScenario(
     (capsule) => !excludedCapsuleIds.has(capsule.id)
   )
 
-  let adjustedFeelsLike = weather.feelsLike
-  if (runsColdWarm === 'cold') adjustedFeelsLike -= 3
-  else if (runsColdWarm === 'warm') adjustedFeelsLike += 3
+  const adjustedFeelsLike = adjustFeelsLike(weather.feelsLike, runsColdWarm)
 
   const capsuleEval = evaluateCapsuleForScenario({
     capsules: eligibleCapsules,
@@ -1086,7 +1049,7 @@ function generateAvailableScenario(
   const recommendedCapsule = capsuleEval?.capsule
 
   let requiredCategories: string[]
-  if (adjustedFeelsLike < 15) {
+  if (needsOuterwear(adjustedFeelsLike)) {
     requiredCategories = ['outerwear', 'top', 'bottom', 'shoes']
   } else {
     const hasDress = eligibleGarments.some((g) => g.category === 'dress')
@@ -1286,7 +1249,7 @@ function generateUnavailableScenario(
     (garment) => !excludedGarmentIds.has(garment.id)
   )
 
-  const targetComfortRange =
+  const targetComfortRange: ComfortRange =
     comfortPreferences.runsColdWarm === 'cold'
       ? 'cool'
       : comfortPreferences.runsColdWarm === 'warm'

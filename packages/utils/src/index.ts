@@ -93,3 +93,17 @@ export {
   spotlightCountryCodes,
 } from './spotlight-area'
 export type { CanonicalSpotlightArea, SpotlightAreaSource } from './spotlight-area'
+
+export {
+  adjustFeelsLike,
+  CLOSE_COMFORT_MATCHES,
+  COMFORT_RANGES,
+  COMFORT_RUN_OFFSET_CELSIUS,
+  getRainAmountThreshold,
+  getRainProbThreshold,
+  getWindThreshold,
+  needsOuterwear,
+  OUTERWEAR_THRESHOLD_CELSIUS,
+  resolveComfortRangeFromTemperature,
+} from './comfort-rules'
+export type { ComfortRange, ComfortRun, ComfortTolerance } from './comfort-rules'
