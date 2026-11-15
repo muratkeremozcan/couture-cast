@@ -2,9 +2,15 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { getGuestPreviewStrings, parsePreviewFrom } from '@couture/utils'
+import {
+  getFederatedSignInStrings,
+  getGuestPreviewStrings,
+  parsePreviewFrom,
+  type FederatedSignInStrings,
+} from '@couture/utils'
 import { getI18n } from '../../i18n'
-import { webGuestPreviewStore } from '../../lib/guest-preview'
+import { destinationAfterSignIn } from '../../lib/post-signin-destination'
+import { GoogleSignInButton, SignInDivider } from '../components/google-sign-in-button'
 import {
   requestWebOtp,
   verifyWebOtp,
@@ -17,26 +23,31 @@ const FAILURE_KEYS: Record<WebSignInFailure, string> = {
   unavailable: 'community.notifications.signinUnavailable',
 }
 /**
- * Story 6.16 D7, D8: a sign-in that came from the preview (`from=preview`) with a stored
- * carryover intent goes to the review step. Any other sign-in deletes guest state, so a
- * proposal left on a shared device never reaches whoever signs in next.
+ * Story 6.17 D5: the callback sends a Google round trip that did not sign anyone in back
+ * here with one fixed outcome name; provider text from the URL is never rendered.
  */
-async function destinationAfterSignIn(fromPreview: boolean): Promise<string> {
-  const store = webGuestPreviewStore()
-  const snapshot = await store.load()
-  if (fromPreview && snapshot.state?.conversion) return '/preview/continue'
-  store.clear()
-  await store.flush()
-  return '/'
+const GOOGLE_OUTCOME_KEYS = {
+  cancelled: 'cancelled',
+  unavailable: 'unavailable',
+  refused: 'refused',
+} as const satisfies Record<string, keyof FederatedSignInStrings>
+
+function googleOutcomeKey(value: string | null) {
+  return value && Object.hasOwn(GOOGLE_OUTCOME_KEYS, value)
+    ? GOOGLE_OUTCOME_KEYS[value as keyof typeof GOOGLE_OUTCOME_KEYS]
+    : null
 }
 
 export default function SignInPage() {
   const { t, i18n } = useTranslation('translation', { i18n: getI18n() })
   const [fromPreview, setFromPreview] = useState(false)
+  const [googleMessage, setGoogleMessage] = useState<string | null>(null)
+  const googleStrings = getFederatedSignInStrings(i18n.language)
   useEffect(() => {
-    setFromPreview(
-      parsePreviewFrom(new URLSearchParams(window.location.search).get('from')) !== null
-    )
+    const params = new URLSearchParams(window.location.search)
+    setFromPreview(parsePreviewFrom(params.get('from')) !== null)
+    const outcome = googleOutcomeKey(params.get('google'))
+    if (outcome) setGoogleMessage(outcome)
   }, [])
   const previewStrings = getGuestPreviewStrings(i18n.language)
   const [email, setEmail] = useState('')
@@ -47,6 +58,17 @@ export default function SignInPage() {
   return (
     <main id="main-content" className="mx-auto flex max-w-md flex-col gap-5 p-6">
       <h1 className="text-3xl font-semibold">{t('community.notifications.signin')}</h1>
+      <GoogleSignInButton
+        from={fromPreview ? 'preview' : null}
+        shape="rect"
+        onUnavailable={() => setGoogleMessage('unavailable')}
+      />
+      {googleMessage ? (
+        <p role="alert" data-testid="google-sign-in-status">
+          {googleStrings[googleMessage as keyof FederatedSignInStrings]}
+        </p>
+      ) : null}
+      <SignInDivider />
       <form
         className="flex flex-col gap-4"
         onSubmit={(event) => {

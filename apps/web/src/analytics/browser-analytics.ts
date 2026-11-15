@@ -176,7 +176,8 @@ export function initializeBrowserAnalytics(): BrowserAnalyticsClient {
       // properties (the filter never sends them). Credentials in its query string are
       // masked there too.
       mask_personal_data_properties: true,
-      custom_personal_data_properties: ['token', 'focusToken', 'email'],
+      // Story 6.17 D5: an OAuth code is a credential too, should one ever reach a URL property.
+      custom_personal_data_properties: ['token', 'focusToken', 'email', 'code'],
       advanced_disable_flags: true,
       save_referrer: false,
       save_campaign_params: false,

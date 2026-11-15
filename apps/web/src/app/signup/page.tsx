@@ -7,8 +7,13 @@ export default async function SignupPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>
 }) {
-  const { from } = await searchParams
+  const { from, google } = await searchParams
   const fromPreview = parsePreviewFrom(from) !== null
+  // Story 6.17 D5: only the three fixed outcome names; anything else shows nothing.
+  const googleOutcome =
+    google === 'cancelled' || google === 'unavailable' || google === 'refused'
+      ? google
+      : null
   return (
     <main
       id="main-content"
@@ -37,7 +42,7 @@ export default async function SignupPage({
         </section>
 
         <div className="w-full max-w-lg">
-          <SignupForm fromPreview={fromPreview} />
+          <SignupForm fromPreview={fromPreview} googleOutcome={googleOutcome} />
         </div>
       </div>
     </main>

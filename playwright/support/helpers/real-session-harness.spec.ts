@@ -333,8 +333,8 @@ describe('the run fails unless the specs ran (R56)', () => {
   const junit = (attributes: string) =>
     `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites id="" name="" ${attributes} time="12.5">\n<testsuite name="x" tests="9" skipped="0"/>\n</testsuites>`
 
-  it('R56-RS-01 passes the eight expected tests with no failure, error or skip', () => {
-    expect(EXPECTED_REAL_SESSION_TESTS).toBe(8)
+  it('R56-RS-01 passes the seventeen expected tests with no failure, error or skip', () => {
+    expect(EXPECTED_REAL_SESSION_TESTS).toBe(17)
     expect(
       junitOutcome(junit('tests="8" failures="0" skipped="0" errors="0"'), 8)
     ).toEqual({ ok: true, tests: 8 })

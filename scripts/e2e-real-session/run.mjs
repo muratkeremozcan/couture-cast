@@ -52,6 +52,7 @@ import {
 } from '../local-storage-buckets.mjs'
 import { RAW_DIR, finalizeArtifacts, resetArtifacts } from './artifacts.mjs'
 import { startAuthProxy } from './auth-proxy.mjs'
+import { startMockOidcContainer } from './mock-oidc-container.mjs'
 import { deleteRecordedUsers, localAuthUsers } from './cleanup-users.mjs'
 import {
   API_BASE_URL,
@@ -351,6 +352,9 @@ async function main() {
   const state = {
     /** @type {Awaited<ReturnType<typeof startAuthProxy>> | undefined} */
     proxy: undefined,
+    /** Story 6.17 D10: the Google stand-in's mock OIDC container. */
+    /** @type {{ close: () => Promise<void> } | undefined} */
+    mockOidc: undefined,
     /** @type {{ name: string; url: string } | undefined} */
     database: undefined,
     /** Playwright's stdout and stderr, printed only once it is redacted. */
@@ -384,6 +388,11 @@ async function main() {
     })
     owner.assertRunning()
     log(`Auth proxy listening at ${state.proxy.proxyUrl}.`)
+
+    // Story 6.17 D10: GoTrue's Keycloak provider (supabase/config.toml) points at this mock.
+    state.mockOidc = await startMockOidcContainer()
+    owner.assertRunning()
+    log('Mock OIDC provider (Google stand-in) is running.')
     const database = /** @type {{ name: string; url: string }} */ (state.database)
 
     // Read by playwright/config/real-session.config.ts after the local config has
@@ -584,6 +593,12 @@ async function main() {
       await state.proxy?.close()
     } catch (error) {
       log(`Closing the Auth proxy failed: ${error.message}`)
+      code = 1
+    }
+    try {
+      await state.mockOidc?.close()
+    } catch (error) {
+      log(`Removing the mock OIDC container failed: ${error.message}`)
       code = 1
     }
     // Codes before cleanup: cleanup empties the identities file the Mailpit
