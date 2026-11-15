@@ -1459,13 +1459,16 @@ function recordTexts(capture, platform, compared) {
       (a.content[1] < b.content[3] - tolerance &&
         b.content[1] < a.content[3] - tolerance))
   // Sticky: at one screen place on every page, and no other page holds a record of its text at
-  // its content place (r52 P2-3 A: two copies one drag apart share a screen place, but each is a
-  // moving copy seen again).
+  // its content place at another screen place (r52 P2-3 A: two copies one drag apart share a
+  // screen place, but each is a moving copy seen again; after a short last drag the sticky chip
+  // overlaps itself in content place at the same screen place, and stays sticky).
   const sticky = (entry, page) =>
     pages.length > 1 &&
     every.every((list) => list.some((other) => sameScreen(other, entry))) &&
     !every.some(
-      (list, other) => other !== page && list.some((each) => sameCopy(each, entry))
+      (list, other) =>
+        other !== page &&
+        list.some((each) => sameCopy(each, entry) && !sameScreen(each, entry))
     )
   // One to one (r52 P2-3 C): an earlier copy is seen again by at most one record of a page, so
   // the count is never below any page's own.

@@ -425,9 +425,10 @@ with no re-review.
 - The capture's own stitch (`attachPages`) takes the probe records, as the judge's stitch does
   (P2-2), so both place a short last drag alike.
 - Copies (P2-3): a record at one screen place on every page is one sticky copy only when no other
-  page holds a record of its text at its content place; copies match one to one, so the count is
-  never below any page's own. Residual: a virtualized list that unmounts the far copy stays
-  indistinguishable from a sticky header.
+  page holds a record of its text at its content place at another screen place (a short last
+  drag overlaps the sticky chip with itself in content place, at the same screen place). Copies
+  match one to one, so the count is never below any page's own. Residual: a virtualized list
+  that unmounts the far copy stays indistinguishable from a sticky header.
 - Accessibility-hidden attach (P2-4): among the smallest identified holders, those whose label holds
   the words own the record (several are ambiguous, none leaves it unmatched). Bordering applies only
   when no element (any identifier) and no hierarchy node holds the record without also holding the
