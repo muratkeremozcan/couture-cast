@@ -486,6 +486,26 @@ describe('guest preview store (U-STORE-EPOCH, storage failure)', () => {
     expect(adapter.value()).toBeNull()
   })
 
+  // TEA G4: a load already reading when the update happens must not land over it.
+  it('keeps an update made while a load is already reading', async () => {
+    const adapter = memoryAdapter(stored())
+    const store = createGuestPreviewStore({
+      adapter,
+      catalog: SAMPLE_CATALOG,
+      now: () => START,
+    })
+    await store.load()
+    adapter.holdNext()
+    const loading = store.load()
+    await adapter.held()
+    store.update((state) => ({ ...state, weather: 'cool-windy' }))
+    adapter.release()
+    await loading
+    await store.flush()
+    expect(store.snapshot().state?.weather).toBe('cool-windy')
+    expect(adapter.value()).toContain('cool-windy')
+  })
+
   it('keeps the in-memory state when a later read throws', async () => {
     const adapter = memoryAdapter()
     const store = createGuestPreviewStore({
