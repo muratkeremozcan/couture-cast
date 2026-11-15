@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { View, Text, TextInput, Pressable, StyleSheet } from 'react-native'
+import { View, Text, TextInput, Pressable } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { router, useLocalSearchParams } from 'expo-router'
 import {
@@ -11,6 +11,7 @@ import {
   GoogleSignInButton,
   SignInDivider,
 } from '@/src/features/signup/google-sign-in-button'
+import { createSchemeStyles } from '@/components/themed'
 import { continuesToPreviewReview } from '@/src/lib/post-signin-destination'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import {
@@ -29,6 +30,7 @@ const FAILURE_KEYS: Record<NativeSignInFailure, string> = {
   unavailable: 'community.notifications.signinUnavailable',
 }
 export default function SignInScreen() {
+  const styles = useStyles()
   const { t, i18n } = useTranslation()
   const { from, google } = useLocalSearchParams<{ from?: string; google?: string }>()
   const fromPreview = parsePreviewFrom(from) !== null
@@ -87,8 +89,9 @@ export default function SignInScreen() {
       setBusy(false)
     }
   }
+  const canSubmit = !busy && Boolean(email) && (!sent || Boolean(code))
   return (
-    <View style={styles.container}>
+    <View testID="signin-screen" style={styles.container}>
       <GoogleSignInButton
         from={fromPreview ? 'preview' : null}
         onOutcome={(outcome) => {
@@ -96,14 +99,20 @@ export default function SignInScreen() {
         }}
       />
       {googleMessage ? (
-        <Text testID="google-sign-in-status" accessibilityRole="alert">
+        <Text
+          testID="google-sign-in-status"
+          accessibilityRole="alert"
+          style={styles.body}
+        >
           {googleMessage}
         </Text>
       ) : null}
       <SignInDivider />
-      <Text>{t('community.notifications.email')}</Text>
+      <Text style={styles.label}>{t('community.notifications.email')}</Text>
       <TextInput
+        testID="signin-email-input"
         accessibilityLabel={t('community.notifications.email')}
+        placeholderTextColor={styles.placeholder.color}
         autoComplete="email"
         keyboardType="email-address"
         autoCapitalize="none"
@@ -114,9 +123,10 @@ export default function SignInScreen() {
       />
       {sent && (
         <>
-          <Text>{t('community.notifications.code')}</Text>
+          <Text style={styles.label}>{t('community.notifications.code')}</Text>
           <TextInput
             accessibilityLabel={t('community.notifications.code')}
+            placeholderTextColor={styles.placeholder.color}
             autoComplete="one-time-code"
             keyboardType="number-pad"
             testID="signin-code-input"
@@ -132,19 +142,21 @@ export default function SignInScreen() {
       )}
       <Pressable
         accessibilityRole="button"
-        disabled={busy || !email || (sent && !code)}
+        disabled={!canSubmit}
         onPress={() => {
           void submit()
         }}
-        style={styles.button}
+        style={[styles.button, canSubmit ? null : styles.buttonDisabled]}
       >
-        <Text>
+        <Text style={styles.buttonText}>
           {t(
             sent ? 'community.notifications.verify' : 'community.notifications.sendCode'
           )}
         </Text>
       </Pressable>
-      <Text accessibilityLiveRegion="polite">{message ? t(message) : ''}</Text>
+      <Text accessibilityLiveRegion="polite" style={styles.body}>
+        {message ? t(message) : ''}
+      </Text>
       {fromPreview ? (
         <Pressable
           testID="signin-back-to-preview"
@@ -160,23 +172,34 @@ export default function SignInScreen() {
     </View>
   )
 }
-const styles = StyleSheet.create({
-  container: { padding: 24, gap: 16 },
+/**
+ * Layout plus the OS light/dark chrome tokens (`constants/colors.ts`), as signup draws them.
+ * The plain React Native text here had no color, so the dark page showed black labels.
+ */
+const useStyles = createSchemeStyles((colors) => ({
+  container: { flex: 1, padding: 24, gap: 16, backgroundColor: colors.background },
+  body: { fontSize: 15, lineHeight: 22, color: colors.text },
+  label: { fontSize: 13, fontWeight: '600', color: colors.text },
+  placeholder: { color: colors.mutedText },
   previewLink: { minHeight: 44, justifyContent: 'center' },
-  previewLinkText: { textDecorationLine: 'underline' },
-  title: { fontSize: 26, fontWeight: '600' },
+  previewLinkText: { textDecorationLine: 'underline', color: colors.text },
   input: {
     minHeight: 48,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#777',
-    borderRadius: 8,
+    borderColor: colors.strongBorder,
+    borderRadius: 14,
+    fontSize: 16,
+    color: colors.text,
   },
   button: {
     minHeight: 48,
     padding: 14,
-    backgroundColor: '#C9A14A',
-    borderRadius: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 999,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-})
+  buttonDisabled: { opacity: 0.6 },
+  buttonText: { color: colors.onAccent, fontSize: 15, fontWeight: '700' },
+}))
