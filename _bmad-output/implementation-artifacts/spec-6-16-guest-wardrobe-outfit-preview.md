@@ -520,7 +520,28 @@ navigation and identity boundaries.
 
 ## Implementation Notes
 
-Pending build.
+- Comfort rules live in `packages/utils/src/comfort-rules.ts`. A per-cell SHA-256 golden of 1377
+  ritual and capsule lines, recorded on `6086faa8` in a throwaway worktree, stayed byte-identical
+  after the move; the notes path keeps its raw rain check (TEA-2).
+- The sample wardrobe is `packages/utils/src/sample-wardrobe/`: catalog `2026-11-15.1` (34
+  garments, 12 looks, 9 feedback cards), vector art, the selector, the zod state schema, an
+  epoch-ordered store and the comfort carryover. Both clients use it with their own storage
+  adapter: `localStorage` on web, one JSON file in the document directory on mobile.
+- Preview copy for all ten locales lives with the shared core, so the explanation keys and the
+  strings ship together and both clients render the same sentence from the same result.
+- Web adds `/preview` and `/preview/continue`; mobile adds `/preview`, `/preview-continue` and a
+  signed-out Home welcome card. Home and the preview read the stored session once through
+  `useMemberSessionState` and retry a failed read at 1, 2 and 4 seconds before showing an
+  unavailable state with the session kept.
+- The review only follows a sign-in whose URL carries `from=preview` while an intent is stored;
+  any other sign-in clears guest state. It writes only on a difference, reads back, goes stale when
+  the member changes, and shows the localized rejected copy on a 403 (TEA-7).
+- A signup that ends underage from the preview clears guest state.
+- Analytics: three closed-enum events, URL keys dropped on them, page and screen views dropped on
+  preview routes, and PostHog `reset()` before the signup or sign-in handoff.
+- E2E: the shared Playwright lane allows only GET from the web origin outside `/api/` and
+  `/ingest/`; the row-count test and the real-OTP carryover run in the real-session lane (8 tests).
+  Android Maestro guest flows run in their own signed-out shard (TEA-8).
 
 ## Plan Change Log
 
@@ -537,6 +558,17 @@ Pending build.
     requirement, which the draft's "protection requirement" allows, and labels it as sample policy.
   - Analytics: added the `reset()` handoff, because `identify` would otherwise merge the anonymous
     preview history into the member.
+- 2026-11-15: Build changes, each with its reason:
+  - Preview strings moved from the client catalogs into `@couture/utils`, so the explanation keys
+    and their copy cannot drift between clients.
+  - Added the `layer-unavailable` explanation for a context whose required layer has no sample, so
+    the outfit never claims protection it lacks (TEA G3).
+  - Added the Home welcome strings and the hero Example label (D9).
+  - The review needs `from=preview` on the sign-in, and checks the member after the read (TEA W1,
+    W2).
+  - The no-writes proof moved from an env-gated solo run to the request allowlist plus the
+    real-session lane, so it runs on every PR (TEA E1).
+  - The mobile connection note shows at all times (TEA-9).
 
 ## Review Triage Log
 

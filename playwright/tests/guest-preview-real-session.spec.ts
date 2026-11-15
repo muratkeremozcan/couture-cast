@@ -40,15 +40,16 @@ test('6.16 guest preview carries comfort settings into a real verified account',
     const signup = page.waitForResponse('**/api/v1/auth/signup')
     await page.getByRole('button', { name: 'Create account' }).click()
     const { userId } = (await (await signup).json()) as { userId: string }
-    // The signup response authenticates nobody: the account still holds signup's defaults.
+    // The signup response authenticates nobody: the account still holds signup's schema
+    // defaults, and nothing from the preview.
     const defaults = await prisma.comfortPreferences.findUnique({
       where: { user_id: userId },
     })
-    expect([
-      defaults?.runs_cold_warm,
-      defaults?.wind_tolerance,
-      defaults?.precip_preparedness,
-    ]).not.toEqual(['cold', 'low', 'high'])
+    expect({
+      runs: defaults?.runs_cold_warm,
+      wind: defaults?.wind_tolerance,
+      rain: defaults?.precip_preparedness,
+    }).toEqual({ runs: 'neutral', wind: 'medium', rain: 'medium' })
 
     const account = await createRealCommunityAuthAccount({
       email,
