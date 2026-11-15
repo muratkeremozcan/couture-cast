@@ -108,6 +108,28 @@ export function recordGuestAccount(directory, email) {
 }
 
 /**
+ * Review F4: a retried conversion flow may already have signed up its address, so each
+ * attempt after the first signs up a fresh one. The new address is recorded before the
+ * Maestro arguments carry it, and every earlier one stays recorded for cleanup.
+ *
+ * @param {{ directory: string, args: string[], generate?: () => string }} options
+ * @returns {string} the address this attempt signs up
+ */
+export function nextGuestConversionAttempt({
+  directory,
+  args,
+  generate = () => guestConversionEmail(),
+}) {
+  const index = args.findIndex((arg) => arg.startsWith('GUEST_PREVIEW_EMAIL='))
+  if (index === -1)
+    throw new Error('The conversion flow arguments carry no GUEST_PREVIEW_EMAIL.')
+  const email = generate()
+  recordGuestAccount(directory, email)
+  args[index] = `GUEST_PREVIEW_EMAIL=${email}`
+  return email
+}
+
+/**
  * Starts the run's list of issued sign-in codes, empty. CI hands the file to
  * `check-artifact-secrets.mjs --otp-file`, which fails closed on a missing file.
  *

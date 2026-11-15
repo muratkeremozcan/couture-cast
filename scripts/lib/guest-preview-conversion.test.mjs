@@ -19,6 +19,7 @@ import {
   comfortMismatch,
   deviceSupabaseUrl,
   guestConversionEmail,
+  nextGuestConversionAttempt,
   publishRedacted,
   publishRedactedTree,
   readMailpitCode,
@@ -394,6 +395,67 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
   })
 })
 
+describe('nextGuestConversionAttempt (review F4)', () => {
+  test('a retry signs up a fresh address, recorded before the flow sees it', () => {
+    const directory = path.join(fresh('attempt'), 'state')
+    recordGuestAccount(directory, EMAIL)
+    const second = guestConversionEmail(() => '2f8f2c1e-3b4d-4c5e-9a6b-7c8d9e0f1a2b')
+    const args = [
+      'test',
+      '-e',
+      `GUEST_PREVIEW_EMAIL=${EMAIL}`,
+      '-e',
+      'OTHER=1',
+      'flow.yaml',
+    ]
+    const seen = []
+    const email = nextGuestConversionAttempt({
+      directory,
+      args,
+      generate: () => {
+        seen.push(readIdentities(directory).map((row) => row.email))
+        return second
+      },
+    })
+    assert.equal(email, second)
+    assert.deepEqual(args, [
+      'test',
+      '-e',
+      `GUEST_PREVIEW_EMAIL=${second}`,
+      '-e',
+      'OTHER=1',
+      'flow.yaml',
+    ])
+    // Both addresses stay recorded, so cleanup deletes the account each attempt made.
+    assert.deepEqual(
+      readIdentities(directory).map((row) => row.email),
+      [EMAIL, second]
+    )
+    assert.deepEqual(seen, [[EMAIL]])
+  })
+
+  test('refuses arguments that carry no guest address', () => {
+    assert.throws(
+      () =>
+        nextGuestConversionAttempt({
+          directory: path.join(fresh('attempt-none'), 'state'),
+          args: ['test', 'flow.yaml'],
+          generate: () => EMAIL,
+        }),
+      /GUEST_PREVIEW_EMAIL/
+    )
+  })
+
+  test('the conversion flow retry starts each attempt with a fresh address', () => {
+    const conversion = runner.slice(runner.indexOf('const beginGuestConversion'))
+    assert.match(conversion, /nextGuestConversionAttempt\(/)
+    const serial = runner.slice(runner.indexOf('const runFlowsSerially'))
+    assert.match(serial, /conversion\?\.beforeAttempt\(\)/)
+    // The reset runs before the first attempt too; only later attempts change address.
+    assert.match(conversion, /attempts \+= 1\s*\n\s*if \(attempts === 1\) return/)
+  })
+})
+
 describe('publishRedactedTree', () => {
   test('publishes the verify debug output with text redacted and images kept', () => {
     const from = fresh('debug-from')
@@ -671,7 +733,7 @@ describe('run-maestro.mjs wiring', () => {
     const serial = body('runFlowsSerially')
     const begin = at(
       serial,
-      'const conversion = beginGuestConversion(flowPath, target, maestroEnv)'
+      'const conversion = beginGuestConversion(flowPath, target, maestroEnv, maestroArgs)'
     )
     assert.ok(begin < at(serial, 'await runMaestroCommandWithWatchdogRetry('))
     const outcome = at(serial, 'recordSingleFlowOutcome(')
@@ -684,7 +746,7 @@ describe('run-maestro.mjs wiring', () => {
     const leg = body('beginGuestConversion')
     assert.ok(
       at(leg, 'recordGuestAccount(guestConversion.stateDir, email)') <
-        at(leg, 'const sinceMs = Date.now()')
+        at(leg, 'let sinceMs = Date.now()')
     )
     assert.equal(GUEST_CONVERSION_FLOW, 'maestro/guest-preview-conversion.yaml')
   })

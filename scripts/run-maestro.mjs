@@ -109,6 +109,7 @@ import {
   comfortMismatch,
   deviceSupabaseUrl,
   guestConversionEmail,
+  nextGuestConversionAttempt,
   localGuestAuthAdmin,
   publishRedacted,
   publishRedactedTree,
@@ -3673,14 +3674,30 @@ const runGuestVerifyFlow = async (target, maestroEnv, code) => {
  * @param {string} flowPath
  * @param {{ platform: 'android' | 'ios' }} target
  * @param {NodeJS.ProcessEnv} maestroEnv
- * @returns {{ finish: (passed: boolean) => Promise<string | undefined> } | undefined}
+ * @param {string[]} maestroArgs the flow's arguments, which a retry updates in place
+ * @returns {{
+ *   beforeAttempt: () => void
+ *   finish: (passed: boolean) => Promise<string | undefined>
+ * } | undefined}
  */
-const beginGuestConversion = (flowPath, target, maestroEnv) => {
+const beginGuestConversion = (flowPath, target, maestroEnv, maestroArgs) => {
   if (flowPath !== GUEST_CONVERSION_FLOW) return undefined
-  const email = process.env.GUEST_PREVIEW_EMAIL ?? ''
+  let email = process.env.GUEST_PREVIEW_EMAIL ?? ''
   recordGuestAccount(guestConversion.stateDir, email)
-  const sinceMs = Date.now()
+  let sinceMs = Date.now()
+  let attempts = 0
   return {
+    // Called before every attempt; the first keeps the address recorded above.
+    beforeAttempt: () => {
+      attempts += 1
+      if (attempts === 1) return
+      email = nextGuestConversionAttempt({
+        directory: guestConversion.stateDir,
+        args: maestroArgs,
+      })
+      process.env.GUEST_PREVIEW_EMAIL = email
+      sinceMs = Date.now()
+    },
     finish: async (passed) =>
       passed
         ? runGuestConversionLeg({
@@ -4644,7 +4661,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     const built = buildSingleFlowMaestroArgs(flowPath, target)
     const maestroArgs = withTestOptions(built.maestroArgs, driverArgs)
     const { maestroLogFile } = built
-    const conversion = beginGuestConversion(flowPath, target, maestroEnv)
+    const conversion = beginGuestConversion(flowPath, target, maestroEnv, maestroArgs)
 
     log(`Running Maestro flow (${maestroArgs.join(' ')})`)
     const flowStartedAt = Date.now()
@@ -4658,9 +4675,11 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
           timeoutMs: CI_FLOW_TIMEOUT_MS,
         },
         flowPath,
-        mobileIdentity
-          ? () => resetMobileE2EPerFlowState(mobileIdentity, flowPath)
-          : () => Promise.resolve(),
+        async () => {
+          // Review F4: the attempt that stalled may have signed its address up already.
+          conversion?.beforeAttempt()
+          if (mobileIdentity) await resetMobileE2EPerFlowState(mobileIdentity, flowPath)
+        },
         launchStallCheckFor(
           flowPath,
           target.platform,
