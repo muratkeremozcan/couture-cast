@@ -577,7 +577,23 @@ navigation and identity boundaries.
 
 ## Review Triage Log
 
-Pending.
+- 2026-11-15, CI on `9542cf02` (TEA rulings R1 to R4), fixed in `9f044e1f`:
+  - R1: the Vercel preview toolbar posted to `vercel.live`; the guest spec skips it on the
+    app's own documents.
+  - R2: E2E-009 used a token the API rejects; it now signs up a real local member
+    (`@local-lane`).
+  - R3: the review read a transient null member during re-verification as a member change;
+    both clients now decide on the settled session. The verify step publishes redacted debug
+    output, with screenshots only when none can show the code (S1, `29a3d9e4`).
+  - R4: `EdgeToEdgeModal` rebuilt written children as an unkeyed list; it spreads them back.
+- 2026-11-15, Antigravity round on `6086faa8..9542cf02` (no P0 or P1), all accepted by TEA:
+  - F1 (P2): loads now queue behind writes, updates start an epoch, and a failed or empty read
+    keeps the state in memory (`cb8b14fb`).
+  - F2 (P2): previous-view keys drop on any event after the preview and on guest events;
+    non-view events on preview routes keep only the route template (`52cad94a`).
+  - F3 (P2): a member opening the preview clears guest state, and the preview opening signed
+    out drops a stored intent (`32bf8155`).
+  - F4 (P3): each conversion flow attempt signs up a fresh recorded address (`d85a664b`).
 
 ## Test Design (TEA)
 
@@ -613,6 +629,9 @@ TEA rulings on the frozen spec (clarifications, no decision reversed):
   shard. A sign-out step cannot work because the fixture token wins over the native session.
 - TEA-9: the mobile preview always shows that creating an account needs a connection. Accepted:
   it states a requirement and claims no network status, so no NetInfo dependency is added.
+- TEA-10: non-view SDK events on preview routes (`$exception`, Application Opened) keep the
+  templated route: it names a product surface and carries no query, id or age. Page and screen
+  views stay dropped, and a test pins that no query or return intent rides on these events.
 
 Red-first order for the build:
 
