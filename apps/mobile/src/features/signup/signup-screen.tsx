@@ -163,7 +163,7 @@ export function SignupScreen({
   }
 
   return (
-    <View style={styles.container}>
+    <View testID="signup-screen" style={styles.container}>
       <Text style={styles.eyebrow}>COPPA-ready signup</Text>
       <Text style={styles.title} accessibilityRole="header">
         Create your account with age verification first.

@@ -195,6 +195,7 @@ describe('Google device flow checks', () => {
     for (const name of [
       'google-under13',
       'google-finish-relaunch',
+      'google-signup-door-cancel',
       'google-cancel-chooser',
     ])
       assert.deepEqual(

@@ -11683,9 +11683,10 @@ E2E, Playwright:
 
 Mobile E2E, Maestro:
 
-- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): seven Android flows (new account,
+- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): eight Android flows (new account,
   existing member, under 13, cancelled chooser, Back on the finish step, relaunch resume, preview
-  conversion) and two capture flows for light and dark screens, run by
+  conversion, Cancel back to the Create account door) and two capture flows for light and dark
+  screens, run by
   `scripts/run-google-native.mjs`.
 
 CI script, node:test:

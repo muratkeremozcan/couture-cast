@@ -71,6 +71,10 @@ export const GOOGLE_NATIVE_FLOWS = Object.freeze([
     expect: { appUsers: 0, authUser: false },
   },
   {
+    name: 'google-signup-door-cancel',
+    expect: { appUsers: 0, authUser: false },
+  },
+  {
     name: 'google-under13',
     birthdate: 'under13',
     expect: { appUsers: 0, authUser: false },

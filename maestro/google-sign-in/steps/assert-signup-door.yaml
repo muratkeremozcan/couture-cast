@@ -1,0 +1,12 @@
+# Story 6.17 D5: the Create account door is the screen, and the finish step is gone.
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: 'signup-screen'
+    timeout: 20000
+    label: 'The Create account door is up'
+- assertVisible:
+    id: 'google-sign-in'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'

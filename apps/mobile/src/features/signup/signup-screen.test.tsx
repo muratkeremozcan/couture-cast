@@ -17,6 +17,8 @@ describe('SignupScreen', () => {
   it('shows the fixed Google outcome a cold callback hands back', () => {
     render(<SignupScreen submitSignup={vi.fn()} googleOutcome="cancelled" />)
     expect(screen.getByText('Google sign-in was cancelled.')).toBeTruthy()
+    // The Maestro door step asserts this root id positively.
+    expect(screen.getByTestId('signup-screen')).toBeTruthy()
   })
 
   it('shows the under-13 message before submitting', () => {

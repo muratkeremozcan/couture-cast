@@ -33,6 +33,9 @@ tags:
       id: 'google-sign-in'
     timeout: 20000
     label: 'Back ran Cancel and opened Sign in'
+# D5: back to the door that started, Sign in.
+- assertVisible:
+    id: 'signin-screen'
 - assertNotVisible:
     id: 'finish-signup-birthdate'
 - assertNotVisible:
@@ -47,6 +50,6 @@ tags:
     optional: true
     label: 'Sign in holds; nothing pushes the finish step back'
 - assertVisible:
-    id: 'google-sign-in'
+    id: 'signin-screen'
 - assertNotVisible:
     id: 'finish-signup-birthdate'
