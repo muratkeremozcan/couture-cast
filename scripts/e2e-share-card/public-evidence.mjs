@@ -375,24 +375,24 @@ if (iosDiagnostics.omitted.length) closedJSON(OMITTED_FILE, iosDiagnostics.omitt
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)
   // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.
-  await writeRedactedNativeFailureImage(
-    value,
-    path.join(staging, name.replace('.json', '-redacted.png'))
-  )
+  const redacted = path.join(staging, name.replace('.json', '-redacted.png'))
+  await writeRedactedNativeFailureImage(value, redacted)
+  assertPublicAuditScreen(fs.readFileSync(redacted))
 }
 
 for (const name of fs.readdirSync(directory)) {
   if (failures.has(name)) closedJSON(name, failures.get(name))
   if (proofs.has(name)) closedJSON(name, proofs.get(name))
+  // Every published PNG (PR 237 review P1): the saved originals, the native screens, the harness's
+  // screen of a failed audit and the screen of each refused iOS audit issue (a fixed name per
+  // closed state), each a whole PNG whose metadata shows no private text
+  // (share-card-audit-screens.mjs).
   if (
     /^(saved-original-(android|ios)(-[a-z-]+)?|native-(android|ios)-[A-Za-z0-9-]+)\.png$/.test(
       name
-    )
-  )
-    fs.copyFileSync(path.join(directory, name), path.join(staging, name))
-  // The screen of a refused iOS audit issue (share-card-audit-screens.mjs): a fixed name per
-  // closed state, a PNG, and none of the private text the JSON scan refuses.
-  if (AUDIT_SCREEN_FILE.test(name)) {
+    ) ||
+    AUDIT_SCREEN_FILE.test(name)
+  ) {
     const bytes = fs.readFileSync(path.join(directory, name))
     assertPublicAuditScreen(bytes)
     fs.writeFileSync(path.join(staging, name), bytes)

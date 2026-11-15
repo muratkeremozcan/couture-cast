@@ -200,7 +200,7 @@ describe('failed audit test digest', () => {
     // Every audit waits for the composer to settle, then takes the screen it judges.
     assert.match(
       swift,
-      /settleComposer\(state\)\n\s+\/\/ [^\n]+\n\s+let judged = app\.screenshot\(\)\.pngRepresentation\n\s+try app\.performAccessibilityAudit\(for: \.all\) \{ issue in\n/
+      /settleComposer\(state\)\n(\s+\/\/ [^\n]+\n)+\s+let composerShown = element\("share-card-title"\)\.exists\n\s+XCTAssertTrue\(composerShown, "Composer on screen before the audit: \\\(state\)"\)\n\s+\/\/ [^\n]+\n\s+let judged = app\.screenshot\(\)\.pngRepresentation\n\s+try app\.performAccessibilityAudit\(for: \.all\) \{ issue in\n/
     )
     const settle = /func settleComposer\(_ state: String\) \{\n([\s\S]*?)\n {2}\}\n/.exec(
       swift
@@ -224,7 +224,7 @@ describe('failed audit test digest', () => {
     assert.match(refused, /^\s+print\(shareCardAuditIssueLine\(state, issue\)\)\n/)
     assert.match(
       refused,
-      /let screen = XCTAttachment\(data: judged, uniformTypeIdentifier: "public\.png"\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)\n/
+      /let composerKept = composerShown && self\.element\("share-card-title"\)\.exists\n\s+XCTAssertTrue\(composerKept, "Composer on screen beside the refused issue: \\\(state\)"\)\n\s+if composerKept \{\n\s+let screen = XCTAttachment\(data: judged, uniformTypeIdentifier: "public\.png"\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)\n\s+\}\n/
     )
     // The screen after the audit is kept too, under a name the export never publishes.
     assert.match(

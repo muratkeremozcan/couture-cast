@@ -10,17 +10,33 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { describe, test } from 'node:test'
+import zlib from 'node:zlib'
 
+import {
+  IDAT,
+  IEND,
+  IHDR,
+  REAL_ANDROID_METADATA,
+  REAL_IOS_METADATA,
+  chunk,
+  iTXt,
+  pngFile,
+  tEXt,
+  zTXt,
+} from './fixtures/png-chunks.mjs'
 import {
   AUDIT_SCREEN_FILE,
   AUDIT_STATES,
+  NATIVE_AUDIT_SCREEN,
   assertPublicAuditScreen,
   clearAuditScreens,
   exportAuditScreens,
 } from './share-card-audit-screens.mjs'
 
-const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
-const png = (text) => Buffer.concat([PNG, Buffer.from(text)])
+const SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+// A whole PNG told apart from the others by an innocuous title.
+const png = (label) => pngFile([tEXt('Title', label)])
+const JWT = 'eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZSJ9.sig'
 const uuid = (n) => `9D127D44-07B2-4E1F-BDC7-${String(n).padStart(12, '0')}`
 
 /**
@@ -142,11 +158,8 @@ describe('share-card audit screens', () => {
   test('a screen that is no PNG or carries private text writes nothing public', (t) => {
     for (const [bytes, code] of [
       [Buffer.from('GIF89a'), 'invalid_audit_failure_screen'],
-      [
-        png('tEXt eyJhbGciOiJIUzI1NiJ9.eyJyb2xlIjoic2VydmljZSJ9.sig'),
-        'private_data_in_public_evidence',
-      ],
-      [png('tEXt service_role'), 'private_data_in_public_evidence'],
+      [pngFile([tEXt('Comment', JWT)]), 'private_data_in_public_evidence'],
+      [pngFile([tEXt('Comment', 'service_role')]), 'private_data_in_public_evidence'],
     ]) {
       const { directory, run } = fixture(t, [
         { name: `audit-failure-open_0_${uuid(1)}.png`, bytes, timestamp: 1 },
@@ -157,7 +170,89 @@ describe('share-card audit screens', () => {
       )
       assert.deepEqual(fs.readdirSync(directory), [])
     }
-    assert.doesNotThrow(() => assertPublicAuditScreen(png('IHDR')))
+  })
+
+  // PR 237 review P2: open is written first in name order, then storage-failure is refused.
+  test('one refused screen leaves no screen of any state behind', (t) => {
+    const { directory, run } = fixture(t, [
+      { name: `audit-failure-open_0_${uuid(1)}.png`, bytes: png('open'), timestamp: 1 },
+      {
+        name: `audit-failure-storage-failure_0_${uuid(2)}.png`,
+        bytes: pngFile([zTXt('Comment', `member@cc68.test ${JWT}`)]),
+        timestamp: 2,
+      },
+    ])
+    fs.writeFileSync(path.join(directory, 'audit-failure-saved.png'), png('stale'))
+    assert.throws(
+      () => exportAuditScreens({ result: 'r.xcresult', directory, run }),
+      /private_data_in_public_evidence/
+    )
+    assert.deepEqual(fs.readdirSync(directory), [])
+  })
+
+  // PR 237 review P2: only a .png regular file in the export folder is read.
+  test('an exported name that is no PNG or no regular file is skipped', (t) => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-audit-outside-'))
+    t.after(() => fs.rmSync(outside, { recursive: true, force: true }))
+    fs.writeFileSync(
+      path.join(outside, 'private.png'),
+      pngFile([tEXt('Comment', 'outside')])
+    )
+    const { directory, run } = fixture(t, [
+      {
+        name: `audit-failure-open_0_${uuid(1)}.png`,
+        file: 'manifest.json',
+        timestamp: 1,
+      },
+      { name: `audit-failure-saved_0_${uuid(2)}.png`, file: '.', timestamp: 1 },
+      {
+        name: `audit-failure-denied_0_${uuid(3)}.png`,
+        bytes: png('denied'),
+        file: `${uuid(3)}.txt`,
+        timestamp: 1,
+      },
+      {
+        name: `audit-failure-limited_0_${uuid(4)}.png`,
+        file: `${uuid(9)}.png`,
+        timestamp: 1,
+      },
+      {
+        name: `audit-failure-pending_0_${uuid(5)}.png`,
+        bytes: png('pending'),
+        timestamp: 1,
+      },
+    ])
+    const linking = (binary, args) => {
+      const result = run(binary, args)
+      const out = args[args.indexOf('--output-path') + 1]
+      fs.symlinkSync(path.join(outside, 'private.png'), path.join(out, `${uuid(9)}.png`))
+      return result
+    }
+    assert.deepEqual(
+      exportAuditScreens({ result: 'r.xcresult', directory, run: linking }),
+      ['pending']
+    )
+    assert.deepEqual(fs.readdirSync(directory), ['audit-failure-pending.png'])
+  })
+
+  // PR 237 review P2: a missing or unreadable timestamp sorts last, never first.
+  test('a screen without a usable timestamp never wins over a timed one', (t) => {
+    const { directory, run } = fixture(t, [
+      { name: `audit-failure-open_0_${uuid(1)}.png`, bytes: png('untimed') },
+      {
+        name: `audit-failure-open_0_${uuid(2)}.png`,
+        bytes: png('garbled'),
+        timestamp: 'x',
+      },
+      { name: `audit-failure-open_0_${uuid(3)}.png`, bytes: png('timed'), timestamp: 50 },
+    ])
+    assert.deepEqual(exportAuditScreens({ result: 'r.xcresult', directory, run }), [
+      'open',
+    ])
+    assert.deepEqual(
+      fs.readFileSync(path.join(directory, 'audit-failure-open.png')),
+      png('timed')
+    )
   })
 
   test('a failed export leaves no private folder behind', (t) => {
@@ -180,10 +275,12 @@ describe('share-card audit screens', () => {
     const { directory } = fixture(t, [])
     for (const name of [
       'audit-failure-open.png',
+      NATIVE_AUDIT_SCREEN,
       'native-ios-en-US.png',
       'accessibility-ios.json',
     ])
       fs.writeFileSync(path.join(directory, name), 'x')
+    assert.equal(NATIVE_AUDIT_SCREEN, 'native-ios-audit-failure.png')
     clearAuditScreens(directory)
     assert.deepEqual(fs.readdirSync(directory).sort(), [
       'accessibility-ios.json',
@@ -209,5 +306,120 @@ describe('share-card audit screens', () => {
       block,
       /try \{\n\s+console\.log\(\n\s+JSON\.stringify\(\{\n\s+iosAuditFailureScreens: exportAuditScreens\(\{ result, directory, run \}\),\n\s+\}\)\n\s+\)\n\s+\} catch \(error\) \{/
     )
+  })
+})
+
+// PR 237 review P1: the PNG is walked chunk by chunk; only whole files pass, and every metadata
+// chunk, compressed or not, is read for the private text the public diagnostics refuse.
+describe('assertPublicAuditScreen', () => {
+  test('passes the chunks real XCUITest, simctl and adb screenshots carry', () => {
+    assert.doesNotThrow(() => assertPublicAuditScreen(pngFile(REAL_IOS_METADATA)))
+    assert.doesNotThrow(() => assertPublicAuditScreen(pngFile(REAL_ANDROID_METADATA)))
+    assert.doesNotThrow(() => assertPublicAuditScreen(pngFile()))
+  })
+
+  test('pixels are never read as text', () => {
+    // Stored (uncompressed) deflate keeps the bytes literal inside the IDAT.
+    const literal = chunk(
+      'IDAT',
+      zlib.deflateSync(Buffer.from(`\0member@cc68.test /Users/x ${JWT}`), { level: 0 })
+    )
+    assert.doesNotThrow(() =>
+      assertPublicAuditScreen(Buffer.concat([SIGNATURE, IHDR, literal, IEND]))
+    )
+  })
+
+  test('refuses anything but a whole PNG', () => {
+    const whole = pngFile(REAL_IOS_METADATA)
+    for (const [label, bytes] of [
+      ['the signature alone', SIGNATURE],
+      [
+        'the signature before other bytes',
+        Buffer.concat([SIGNATURE, Buffer.from('<html>')]),
+      ],
+      ['bytes after IEND', Buffer.concat([whole, Buffer.from('member@cc68.test')])],
+      ['a second file after IEND', Buffer.concat([whole, whole])],
+      ['no IEND', Buffer.concat([SIGNATURE, IHDR, IDAT])],
+      ['no IDAT', Buffer.concat([SIGNATURE, IHDR, IEND])],
+      ['IHDR not first', Buffer.concat([SIGNATURE, IDAT, IHDR, IEND])],
+      [
+        'a short IHDR',
+        Buffer.concat([SIGNATURE, chunk('IHDR', Buffer.alloc(12)), IDAT, IEND]),
+      ],
+      ['a chunk cut short', whole.subarray(0, whole.length - 3)],
+      [
+        'a broken CRC',
+        Buffer.concat([
+          SIGNATURE,
+          IHDR,
+          IDAT,
+          Buffer.from([0, 0, 0, 0, 0x49, 0x45, 0x4e, 0x44, 0, 0, 0, 0]),
+        ]),
+      ],
+      [
+        'an IEND with data',
+        Buffer.concat([SIGNATURE, IHDR, IDAT, chunk('IEND', Buffer.from('x'))]),
+      ],
+      [
+        'a zTXt that does not inflate',
+        pngFile([chunk('zTXt', Buffer.from('Comment\0\0garbage'))]),
+      ],
+    ])
+      assert.throws(
+        () => assertPublicAuditScreen(bytes),
+        /^Error: invalid_audit_failure_screen/,
+        label
+      )
+  })
+
+  test('refuses private text in every metadata chunk, compressed or not', () => {
+    for (const [label, meta] of [
+      ['a JWT in a zTXt', zTXt('Comment', JWT)],
+      [
+        'service_role in a compressed iTXt',
+        iTXt('Comment', 'service_role', { compressed: true }),
+      ],
+      [
+        'an email in a compressed iTXt',
+        iTXt('Author', 'owner@personal.invalid', { compressed: true }),
+      ],
+      ['an email in an iTXt', iTXt('Author', 'owner@personal.invalid')],
+      ['an email in a tEXt', tEXt('Author', 'owner@personal.invalid')],
+      ['a fixture account in a tEXt', tEXt('Author', 'member@cc68.test')],
+      ['a local path in a tEXt', tEXt('Source', '/Users/runner/work/couture-cast/x.png')],
+      ['a private folder in a zTXt', zTXt('Source', 'at /private/var/folders/x')],
+      [
+        'a database URI in a tEXt',
+        tEXt('Source', 'postgres://postgres:pw@127.0.0.1:54322/postgres'),
+      ],
+      ['a Redis URI in a zTXt', zTXt('Source', 'redis://127.0.0.1:49240')],
+      ['a bearer header in a tEXt', tEXt('Header', 'Authorization: Bearer abc.def')],
+      ['a secret key in a tEXt', tEXt('Key', 'sb_secret_0123456789')],
+      ['a private key in a zTXt', zTXt('Key', '-----BEGIN PRIVATE KEY-----')],
+      ['a keyword alone', tEXt('service_role', 'x')],
+      [
+        'an email in UTF-16 inside eXIf',
+        chunk('eXIf', Buffer.from('MM\0*owner@personal.invalid', 'utf16le')),
+      ],
+      [
+        'an email in odd-aligned UTF-16 inside eXIf',
+        chunk(
+          'eXIf',
+          Buffer.concat([
+            Buffer.from([0x4d]),
+            Buffer.from('owner@personal.invalid', 'utf16le'),
+          ])
+        ),
+      ],
+      [
+        'a token in an unknown chunk',
+        chunk('prVt', Buffer.from(`\0\x01refresh_token=${JWT}`)),
+      ],
+    ])
+      assert.throws(
+        () => assertPublicAuditScreen(pngFile([meta])),
+        /^Error: private_data_in_public_evidence$/,
+        label
+      )
   })
 })

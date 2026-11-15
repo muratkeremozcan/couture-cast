@@ -196,6 +196,10 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     }
     if expectsPreview { print("CC68_PREVIEW_LABEL \(state): \(loaded().label)") }
     settleComposer(state)
+    // PR 237 review P2: the audit judges the composer, so it must be on screen first, and only a
+    // screen of it is ever kept beside an issue the audit refuses.
+    let composerShown = element("share-card-title").exists
+    XCTAssertTrue(composerShown, "Composer on screen before the audit: \(state)")
     // The screen the audit judges, kept only beside an issue it refuses.
     let judged = app.screenshot().pngRepresentation
     try app.performAccessibilityAudit(for: .all) { issue in
@@ -216,10 +220,14 @@ final class ShareCardAccessibilityUITests: XCTestCase {
         // beside its issue, as a PNG that a failed run exports to audit-failure-<state>.png
         // (share-card-audit-screens.mjs exports the earliest). The screen after the audit follows
         // as audit-after-<state>, in the xcresult only.
-        let screen = XCTAttachment(data: judged, uniformTypeIdentifier: "public.png")
-        screen.name = "audit-failure-\(state)"
-        screen.lifetime = .keepAlways
-        self.add(screen)
+        let composerKept = composerShown && self.element("share-card-title").exists
+        XCTAssertTrue(composerKept, "Composer on screen beside the refused issue: \(state)")
+        if composerKept {
+          let screen = XCTAttachment(data: judged, uniformTypeIdentifier: "public.png")
+          screen.name = "audit-failure-\(state)"
+          screen.lifetime = .keepAlways
+          self.add(screen)
+        }
         let after = XCTAttachment(data: self.app.screenshot().pngRepresentation, uniformTypeIdentifier: "public.png")
         after.name = "audit-after-\(state)"
         after.lifetime = .keepAlways

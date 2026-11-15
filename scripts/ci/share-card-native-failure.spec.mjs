@@ -6,6 +6,15 @@ import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
+import {
+  REAL_ANDROID_METADATA,
+  REAL_IOS_METADATA,
+  iTXt,
+  pngFile,
+  tEXt,
+  zTXt,
+} from '../lib/fixtures/png-chunks.mjs'
+
 const helper = () => import('../lib/share-card-native-failure.mjs')
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const personal =
@@ -217,10 +226,9 @@ describe('native public evidence', () => {
 
   // iOS 26.5 canary shard 3 failed preparing on "Potentially inaccessible text" with no screen.
   // A failed audit run exports each refused issue's screen as audit-failure-<state>.png.
-  const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13])
   test('public evidence publishes the screen of a refused audit issue under its fixed name', (t) => {
     const { directory, run } = evidenceFixture(t)
-    const screen = Buffer.concat([PNG, Buffer.from('IHDR pixels')])
+    const screen = pngFile(REAL_IOS_METADATA)
     fs.writeFileSync(path.join(directory, 'audit-failure-preparing.png'), screen)
     fs.writeFileSync(path.join(directory, 'audit-failure-storage-failure.png'), screen)
     // Names outside the closed states, or any other audit file, stay private.
@@ -241,26 +249,64 @@ describe('native public evidence', () => {
     )
   })
 
-  test('an audit screen that is no PNG or carries private text fails the whole selection', (t) => {
-    for (const [bytes, code] of [
-      [Buffer.from('GIF89a not a png'), /invalid_audit_failure_screen/],
-      [
-        Buffer.concat([PNG, Buffer.from(`tEXt Comment ${personal}`)]),
-        /private_data_in_public_evidence/,
-      ],
-      [
-        Buffer.concat([PNG, Buffer.from('tEXt Author member@cc68.test')]),
-        /private_data_in_public_evidence/,
-      ],
-    ]) {
-      const { directory, run } = evidenceFixture(t)
-      fs.writeFileSync(path.join(directory, 'audit-failure-open.png'), bytes)
-      const result = run()
-      assert.notEqual(result.status, 0)
-      assert.match(result.stderr, code)
-      assert.equal(result.stderr.includes('avery@personal.invalid'), false)
-      assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
-    }
+  // PR 237 review P1: every published PNG, not only the audit screens, is a whole PNG whose
+  // metadata shows no private text, compressed or not.
+  for (const name of [
+    'audit-failure-open.png',
+    'native-ios-audit-failure.png',
+    'native-ios-en-US.png',
+    'native-android-de-DE.png',
+    'saved-original-ios.png',
+    'saved-original-android-limited.png',
+  ])
+    test(`${name} that is no whole PNG or carries private text fails the whole selection`, (t) => {
+      for (const [bytes, code] of [
+        [Buffer.from('GIF89a not a png'), /invalid_audit_failure_screen/],
+        [
+          Buffer.concat([pngFile(REAL_IOS_METADATA), Buffer.from(personal)]),
+          /invalid_audit_failure_screen/,
+        ],
+        [pngFile([tEXt('Comment', personal)]), /private_data_in_public_evidence/],
+        [pngFile([zTXt('Comment', personal)]), /private_data_in_public_evidence/],
+        [
+          pngFile([iTXt('Author', 'avery@personal.invalid', { compressed: true })]),
+          /private_data_in_public_evidence/,
+        ],
+        [
+          pngFile([tEXt('Author', 'member@cc68.test')]),
+          /private_data_in_public_evidence/,
+        ],
+      ]) {
+        const { directory, run } = evidenceFixture(t)
+        fs.writeFileSync(path.join(directory, name), bytes)
+        const result = run()
+        assert.notEqual(result.status, 0)
+        assert.match(result.stderr, code)
+        assert.equal(result.stderr.includes('avery@personal.invalid'), false)
+        assert.deepEqual(fs.readdirSync(path.join(directory, 'public-evidence')), [])
+      }
+    })
+
+  test('real screenshot shapes publish unchanged', (t) => {
+    const { directory, run } = evidenceFixture(t)
+    const ios = pngFile(REAL_IOS_METADATA)
+    const android = pngFile(REAL_ANDROID_METADATA)
+    const original = pngFile()
+    fs.writeFileSync(path.join(directory, 'native-ios-audit-failure.png'), ios)
+    fs.writeFileSync(path.join(directory, 'native-android-de-DE.png'), android)
+    fs.writeFileSync(path.join(directory, 'saved-original-ios.png'), original)
+    const result = run()
+    assert.equal(result.status, 0, result.stderr)
+    for (const [name, bytes] of [
+      ['native-ios-audit-failure.png', ios],
+      ['native-android-de-DE.png', android],
+      ['saved-original-ios.png', original],
+    ])
+      assert.deepEqual(
+        fs.readFileSync(path.join(directory, 'public-evidence', name)),
+        bytes,
+        name
+      )
   })
 
   test('early CI evidence rejects unreviewed fields before publishing any proof', (t) => {
