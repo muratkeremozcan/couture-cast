@@ -196,9 +196,16 @@ describe('failed audit test digest', () => {
       swift,
       /element\("tab-home"\)\.tap\(\)\n\s+try settleHome\(\)\n\s+try app\.performAccessibilityAudit/
     )
+    // iOS 26.5 canary shard 3 failed preparing with no screenshot: every refused issue keeps the
+    // screen the audit judged, named with the state, past a passing run's cleanup.
+    const refused = /if !allowed \{\n([\s\S]*?)\n\s+\}\n\s+return allowed\n/.exec(
+      swift
+    )?.[1]
+    assert.ok(refused, 'the refused-issue block')
+    assert.match(refused, /^\s+print\(shareCardAuditIssueLine\(state, issue\)\)\n/)
     assert.match(
-      swift,
-      /if !allowed \{ print\(shareCardAuditIssueLine\(state, issue\)\) \}\n\s+return allowed/
+      refused,
+      /let screen = XCTAttachment\(screenshot: self\.app\.screenshot\(\)\)\n\s+screen\.name = "audit-failure-\\\(state\)"\n\s+screen\.lifetime = \.keepAlways\n\s+self\.add\(screen\)$/
     )
   })
 

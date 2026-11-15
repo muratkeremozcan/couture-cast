@@ -186,7 +186,15 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       // Apple's raster OCR heuristic has no AX element for this fixed artwork.
       // Coordinator-approved exception requires its exact issue signature/state.
       let allowed = Self.allowsRasterOCRIssue(type: issue.auditType, description: issue.compactDescription, detail: issue.detailedDescription, state: state, hasElement: issue.element != nil, previewVerified: previewVerified)
-      if !allowed { print(shareCardAuditIssueLine(state, issue)) }
+      if !allowed {
+        print(shareCardAuditIssueLine(state, issue))
+        // iOS 26.5 canary shard 3 failed preparing on "Potentially inaccessible text" with no
+        // picture of the screen, so the screen the audit judged is kept beside its issue.
+        let screen = XCTAttachment(screenshot: self.app.screenshot())
+        screen.name = "audit-failure-\(state)"
+        screen.lifetime = .keepAlways
+        self.add(screen)
+      }
       return allowed
     }
     let title = element("share-card-title")
