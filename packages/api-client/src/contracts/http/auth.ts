@@ -109,6 +109,22 @@ export const federatedSignupStatusResponseSchema = z
     ].join(' '),
   })
 
+/** Why the finish step refused the person, so clients branch on a code and never on copy. */
+export const federatedSignupRefusalCodeSchema = z.enum([
+  'underage',
+  'federated_guardian_minor',
+])
+
+export const federatedSignupForbiddenSchema = z
+  .object({
+    statusCode: z.literal(403),
+    error: z.literal('Forbidden'),
+    message: nonEmptyStringSchema,
+    code: federatedSignupRefusalCodeSchema,
+  })
+  .strict()
+
+export type FederatedSignupRefusalCode = z.infer<typeof federatedSignupRefusalCodeSchema>
 export type FederatedSignupInput = z.infer<typeof federatedSignupInputSchema>
 export type FederatedSignupStatus = z.infer<typeof federatedSignupStatusSchema>
 export type FederatedSignupStatusResponse = z.infer<
@@ -191,6 +207,10 @@ export function registerAuthContracts(
     'FederatedSignupStatusResponse',
     federatedSignupStatusResponseSchema
   )
+  const registeredFederatedSignupForbiddenSchema = registry.register(
+    'FederatedSignupForbidden',
+    federatedSignupForbiddenSchema
+  )
   const federatedErrors = {
     401: {
       description:
@@ -257,9 +277,9 @@ export function registerAuthContracts(
       },
       403: {
         description:
-          'Birthdate is under thirteen (the Auth identity is deleted), or a guardian account is under eighteen',
+          'Birthdate is under thirteen (code underage; the Auth identity is deleted when no account owns the address), or a guardian account is under eighteen (code federated_guardian_minor)',
         content: {
-          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+          'application/json': { schema: registeredFederatedSignupForbiddenSchema },
         },
       },
       409: {

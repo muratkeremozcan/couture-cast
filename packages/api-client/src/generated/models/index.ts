@@ -7404,6 +7404,66 @@ export interface FavoriteOutfitCapsuleInput {
 /**
  *
  * @export
+ * @interface FederatedSignupForbidden
+ */
+export interface FederatedSignupForbidden {
+  /**
+   *
+   * @type {FederatedSignupForbiddenStatusCodeEnum}
+   * @memberof FederatedSignupForbidden
+   */
+  statusCode: FederatedSignupForbiddenStatusCodeEnum
+  /**
+   *
+   * @type {FederatedSignupForbiddenErrorEnum}
+   * @memberof FederatedSignupForbidden
+   */
+  error: FederatedSignupForbiddenErrorEnum
+  /**
+   *
+   * @type {string}
+   * @memberof FederatedSignupForbidden
+   */
+  message: string
+  /**
+   *
+   * @type {FederatedSignupForbiddenCodeEnum}
+   * @memberof FederatedSignupForbidden
+   */
+  code: FederatedSignupForbiddenCodeEnum
+}
+
+/**
+ * @export
+ */
+export const FederatedSignupForbiddenStatusCodeEnum = {
+  NUMBER_403: 403,
+} as const
+export type FederatedSignupForbiddenStatusCodeEnum =
+  (typeof FederatedSignupForbiddenStatusCodeEnum)[keyof typeof FederatedSignupForbiddenStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const FederatedSignupForbiddenErrorEnum = {
+  Forbidden: 'Forbidden',
+} as const
+export type FederatedSignupForbiddenErrorEnum =
+  (typeof FederatedSignupForbiddenErrorEnum)[keyof typeof FederatedSignupForbiddenErrorEnum]
+
+/**
+ * @export
+ */
+export const FederatedSignupForbiddenCodeEnum = {
+  underage: 'underage',
+  federated_guardian_minor: 'federated_guardian_minor',
+} as const
+export type FederatedSignupForbiddenCodeEnum =
+  (typeof FederatedSignupForbiddenCodeEnum)[keyof typeof FederatedSignupForbiddenCodeEnum]
+
+/**
+ *
+ * @export
  * @interface FederatedSignupInput
  */
 export interface FederatedSignupInput {

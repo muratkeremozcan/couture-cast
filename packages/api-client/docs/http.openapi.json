@@ -940,6 +940,41 @@
         "additionalProperties": false,
         "description": "needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session."
       },
+      "FederatedSignupForbidden": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "underage",
+              "federated_guardian_minor"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "code"
+        ],
+        "additionalProperties": false
+      },
       "ApiHealthResponse": {
         "type": "object",
         "properties": {
@@ -20890,11 +20925,11 @@
             }
           },
           "403": {
-            "description": "Birthdate is under thirteen (the Auth identity is deleted), or a guardian account is under eighteen",
+            "description": "Birthdate is under thirteen (code underage; the Auth identity is deleted when no account owns the address), or a guardian account is under eighteen (code federated_guardian_minor)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                  "$ref": "#/components/schemas/FederatedSignupForbidden"
                 }
               }
             }

@@ -22,6 +22,7 @@ import {
 } from '../../analytics/analytics.service'
 import { createBaseLogger } from '../../logger/pino.config'
 import {
+  federatedSignupForbiddenSchema,
   federatedSignupInputSchema,
   federatedSignupStatusResponseSchema,
   guardianConsentInputSchema,
@@ -29,6 +30,7 @@ import {
   signupInputSchema,
   signupResponseSchema,
   type FederatedSignupInput,
+  type FederatedSignupRefusalCode,
   type FederatedSignupStatusResponse,
   type GuardianConsentInput,
   type SignupInput,
@@ -53,6 +55,17 @@ const FEDERATED_TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 20_000 }
 
 /** An age gate the caller already checked as allowed. */
 type AgeGate = AgeGateResult
+
+/** Story 6.17: a 403 with a machine code, so clients never branch on English copy. */
+const federatedRefusal = (code: FederatedSignupRefusalCode, message: string) =>
+  new ForbiddenException(
+    federatedSignupForbiddenSchema.parse({
+      statusCode: 403,
+      error: 'Forbidden',
+      message,
+      code,
+    })
+  )
 
 const accountConflict = () =>
   new ConflictException('This address already has a CoutureCast account.')
@@ -296,7 +309,10 @@ export class AuthService {
             select: { id: true },
           })
           if (grantedConsent)
-            throw new ForbiddenException(FEDERATED_GUARDIAN_MINOR_MESSAGE)
+            throw federatedRefusal(
+              'federated_guardian_minor',
+              FEDERATED_GUARDIAN_MINOR_MESSAGE
+            )
         }
         if (!gate.allowed) return { refused: true as const }
         await this.attachProfile(tx, row, birthdate, gate)
@@ -305,7 +321,7 @@ export class AuthService {
       FEDERATED_TRANSACTION_OPTIONS
     )
 
-    if (outcome.refused) throw new ForbiddenException(AGE_GATE_MESSAGES.underage)
+    if (outcome.refused) throw federatedRefusal('underage', AGE_GATE_MESSAGES.underage)
     return this.accountCreated(outcome.userId, gate)
   }
 

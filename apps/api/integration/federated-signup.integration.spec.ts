@@ -537,9 +537,10 @@ describe('A-FED-UNDER13: refusal deletes the Supabase identity and stores nothin
     const { bearer, user } = googleUser(email)
     const response = await federated('POST', bearer, { birthdate: birthdayTomorrow(13) })
     expect(response.status).toBe(403)
-    expect(((await response.json()) as { message: string }).message).toBe(
-      AGE_GATE_MESSAGES.underage
-    )
+    expect(await response.json()).toMatchObject({
+      message: AGE_GATE_MESSAGES.underage,
+      code: 'underage',
+    })
     expect(admin.deleteUser.mock.calls).toEqual([[user.id]])
     expect(await accountsFor(email)).toEqual([])
     expect(profileCompletedCalls()).toEqual([])
@@ -551,9 +552,10 @@ describe('A-FED-UNDER13: refusal deletes the Supabase identity and stores nothin
     admin.deleteUser.mockRejectedValueOnce(new Error('Auth Admin unavailable'))
     const response = await federated('POST', bearer, { birthdate: birthdate(10) })
     expect(response.status).toBe(403)
-    expect(((await response.json()) as { message: string }).message).toBe(
-      AGE_GATE_MESSAGES.underage
-    )
+    expect(await response.json()).toMatchObject({
+      message: AGE_GATE_MESSAGES.underage,
+      code: 'underage',
+    })
     expect(admin.deleteUser.mock.calls).toEqual([[user.id]])
     expect(await accountsFor(email)).toEqual([])
   })
@@ -697,9 +699,10 @@ describe('A-FED-GUARDIAN: guardian-only rows (D3, TEA-2)', () => {
       const { bearer } = googleUser(email)
       const response = await federated('POST', bearer, { birthdate: birthdate(age) })
       expect(response.status).toBe(403)
-      expect(((await response.json()) as { message: string }).message).toBe(
-        FEDERATED_GUARDIAN_MINOR_MESSAGE
-      )
+      expect(await response.json()).toMatchObject({
+        message: FEDERATED_GUARDIAN_MINOR_MESSAGE,
+        code: 'federated_guardian_minor',
+      })
       expect(FEDERATED_GUARDIAN_MINOR_MESSAGE).toBe(
         'Guardian accounts need an adult birthdate.'
       )
@@ -1016,9 +1019,10 @@ describe('A-FED-ROW-UNDER13 (TEA-2): a row without a profile is never an orphan,
     const { bearer } = googleUser(email)
     const response = await federated('POST', bearer, { birthdate: birthdate(12) })
     expect(response.status).toBe(403)
-    expect(((await response.json()) as { message: string }).message).toBe(
-      AGE_GATE_MESSAGES.underage
-    )
+    expect(await response.json()).toMatchObject({
+      message: AGE_GATE_MESSAGES.underage,
+      code: 'underage',
+    })
     expect(admin.deleteUser).not.toHaveBeenCalled()
     const accounts = await accountsFor(email)
     expect(accounts.map((account) => account.id)).toEqual([row.id])
