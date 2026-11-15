@@ -122,7 +122,19 @@ enabled = true
 # in emails.
 site_url = "http://127.0.0.1:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# Story 6.17 D5: OAuth returns to the web callback, the native couturecast scheme, the isolated
+# story schemes and the Expo Go exp form (local and dev only, TEA-5).
+additional_redirect_urls = [
+  "https://127.0.0.1:3000",
+  "http://127.0.0.1:3000/auth/callback**",
+  "http://localhost:3000/auth/callback**",
+  "couturecast://**",
+  "couturecast-story65://**",
+  "couturecast-story68://**",
+  "exp://**",
+  # TEA-13: the real-session lane's web origin.
+  "http://127.0.0.1:3077/auth/callback**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to the local API URL (http://127.0.0.1:<port>/auth/v1).
@@ -271,6 +283,25 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `slack`, `spotify`, `workos`, `zoom`.
+# Story 6.17: Google sign-in. Values come from the gitignored env files; local and CI start
+# without them, and the provider then answers its authorize request with an error.
+[auth.external.google]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+skip_nonce_check = false
+
+# Story 6.17 D10, TEA-13: the Google stand-in, a mock OIDC server the real-session lane and the
+# Google device flows start inside GoTrue's network namespace, published on the host's same
+# port, so GoTrue, a host browser and a device browser all reach it at this one URL
+# (scripts/e2e-real-session/mock-oidc-container.mjs). Local only; hosted projects keep keycloak
+# off.
+[auth.external.keycloak]
+enabled = true
+client_id = "couturecast-e2e"
+secret = "env(SUPABASE_AUTH_EXTERNAL_KEYCLOAK_SECRET)"
+url = "http://127.0.0.1:53052/realms/cc"
+
 [auth.external.apple]
 enabled = false
 client_id = ""

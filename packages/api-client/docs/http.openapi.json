@@ -909,6 +909,72 @@
           "consentLevel"
         ]
       },
+      "FederatedSignupInput": {
+        "type": "object",
+        "properties": {
+          "birthdate": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "description": "Invariant enforced at runtime and NOT expressible in this schema: beyond the YYYY-MM-DD pattern, the value must be a real calendar date. The pattern alone accepts 2026-02-31 and 2026-13-01; both are rejected here."
+          }
+        },
+        "required": [
+          "birthdate"
+        ],
+        "additionalProperties": false
+      },
+      "FederatedSignupStatusResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "needs_birthdate",
+              "complete"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "additionalProperties": false,
+        "description": "needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session."
+      },
+      "FederatedSignupForbidden": {
+        "type": "object",
+        "properties": {
+          "statusCode": {
+            "type": "number",
+            "enum": [
+              403
+            ]
+          },
+          "error": {
+            "type": "string",
+            "enum": [
+              "Forbidden"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1
+          },
+          "code": {
+            "type": "string",
+            "enum": [
+              "underage",
+              "federated_guardian_minor"
+            ]
+          }
+        },
+        "required": [
+          "statusCode",
+          "error",
+          "message",
+          "code"
+        ],
+        "additionalProperties": false
+      },
       "ApiHealthResponse": {
         "type": "object",
         "properties": {
@@ -20754,6 +20820,173 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/signup/federated": {
+      "get": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Decide whether a federated identity needs the finish step",
+        "description": "Story 6.17 D3: called after a Google sign-in whose profile check answered 401.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Where the identity goes next",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedSignupStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing bearer, an identity without a verified address, or an address that matches more than one account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth could not be reached to verify the identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Create the account for a verified federated identity",
+        "description": "Story 6.17 D3: runs the signup age gate on the submitted birthdate and creates the account for the verified bearer address. Under 13 deletes the Auth identity.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FederatedSignupInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created, or a profile attached to a profile-less account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignupResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload failed validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BadRequestHttpError"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing bearer, an identity without a verified address, or an address that matches more than one account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Birthdate is under thirteen (code underage; the Auth identity is deleted when no account owns the address), or a guardian account is under eighteen (code federated_guardian_minor)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FederatedSignupForbidden"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The address already has an account with a profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth could not be reached to verify the identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "auth"
+        ],
+        "summary": "Abandon the finish step",
+        "description": "Story 6.17 D3: deletes the Auth identity when its address has no account; does nothing otherwise.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Identity deleted, or kept because an account exists"
+          },
+          "401": {
+            "description": "Missing bearer, an identity without a verified address, or an address that matches more than one account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Auth could not be reached to verify the identity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceUnavailableHttpError"
                 }
               }
             }

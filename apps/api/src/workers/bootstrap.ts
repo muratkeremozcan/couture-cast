@@ -30,7 +30,14 @@ import {
   registerMaintenanceSchedulers,
   registerModerationHistoryScheduler,
   registerModerationSlaScheduler,
+  registerOrphanAuthUserSweepScheduler,
+  removeOrphanAuthUserSweepScheduler,
 } from './maintenance.scheduler'
+import {
+  createOrphanAuthUserSweep,
+  orphanAuthUserSweepEnabled,
+} from '../modules/auth/orphan-auth-user-sweep'
+import { SupabaseAuthAdmin } from '../modules/auth/supabase-auth-admin'
 import { createQueues, queueConfigs } from '../config/queues'
 import { getRedisConfig, redisOptionsFromConfig } from '../config/redis'
 import { AlertFanoutProcessor } from '../modules/alerts/alert-fanout.processor'
@@ -337,6 +344,16 @@ export async function startWorkers(state: WorkerProcessState) {
         prisma,
         flags: runtimeFlags,
       }),
+      // TEA-14: absent (off) unless ORPHAN_AUTH_USER_SWEEP_ENABLED names this worker.
+      ...(orphanAuthUserSweepEnabled()
+        ? {
+            orphanAuthUsers: createOrphanAuthUserSweep({
+              admin: new SupabaseAuthAdmin(),
+              prisma,
+              logger: logger.child({ feature: 'orphan-auth-users' }),
+            }),
+          }
+        : {}),
     })
     closeables.push({
       close: () => community.close(),
@@ -367,6 +384,7 @@ export async function startWorkers(state: WorkerProcessState) {
         }
       ),
       community: community.sweeps,
+      orphanAuthUsers: { run: community.sweeps.sweepOrphanAuthUsers },
       logger: logger.child({ feature: 'maintenance' }),
     })
 
@@ -374,6 +392,9 @@ export async function startWorkers(state: WorkerProcessState) {
     await registerCommunityMaintenanceSchedulers(maintenanceQueue)
     await registerModerationSlaScheduler(maintenanceQueue)
     await registerModerationHistoryScheduler(maintenanceQueue)
+    if (orphanAuthUserSweepEnabled())
+      await registerOrphanAuthUserSweepScheduler(maintenanceQueue)
+    else await removeOrphanAuthUserSweepScheduler(maintenanceQueue)
 
     workers.push(
       // Serial on purpose. Every sweep is a batched DB scan and two of them

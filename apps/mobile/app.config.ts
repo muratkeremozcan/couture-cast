@@ -68,6 +68,8 @@ export default ({ config }: ConfigContext) => ({
   extra: {
     ...config.extra,
     story65NativeFixtures: isolatedNative && !story68Native,
+    // Story 6.17 D10: the only builds where a development bundle may use the OAuth stand-in.
+    isolatedNativeBuild: isolatedNative,
     story68NativeFixtures: story68Native,
     // Story 6.15: the live font-scale proof reads mount markers from isolated native builds.
     liveFontMountMarkers: isolatedNative,

@@ -3,7 +3,10 @@
 import { act, render } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 const start = vi.hoisted(() => vi.fn())
-vi.mock('../../lib/web-session', () => ({ startWebSession: start }))
+vi.mock('../../lib/web-session', () => ({
+  startWebSession: start,
+  resolveFederatedFinishRoute: () => Promise.resolve(null),
+}))
 import { getI18n } from '../../i18n'
 import { SessionBridge } from './session-bridge'
 describe('session bridge lifecycle ownership', () => {
