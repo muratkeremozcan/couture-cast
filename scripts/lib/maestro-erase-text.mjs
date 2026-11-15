@@ -14,48 +14,69 @@ import { LineCounter, isMap, isPair, isScalar, isSeq, parseAllDocuments } from '
 
 export const MAX_ERASE_TEXT_COUNT = 10
 
-/** The count an `eraseText` value names, or the reason it names none that this rule accepts. */
-function checkCount(value) {
+/** What a bare `eraseText` erases, per Maestro's docs. */
+export const MAESTRO_DEFAULT_ERASE_COUNT = 50
+
+/** The count an `eraseText` value names: an integer, NaN when it is not a literal, or null when bare. */
+function countOf(value) {
   const raw = isMap(value)
     ? value.get('charactersToErase')
     : isScalar(value)
       ? value.value
       : value
-  if (raw === null || raw === undefined || raw === '')
-    return `bare eraseText erases Maestro's default 50 characters; name a count of 1 to ${MAX_ERASE_TEXT_COUNT}`
+  if (raw === null || raw === undefined || raw === '') return { raw, count: null }
   const count = typeof raw === 'number' ? raw : /^\d+$/.test(`${raw}`) ? Number(raw) : NaN
-  if (!Number.isInteger(count))
+  return { raw, count: Number.isInteger(count) ? count : NaN }
+}
+
+/** Why an `eraseText` value breaks this rule, or null when its count is bounded. */
+function checkCount(value) {
+  const { raw, count } = countOf(value)
+  if (count === null)
+    return `bare eraseText erases Maestro's default ${MAESTRO_DEFAULT_ERASE_COUNT} characters; name a count of 1 to ${MAX_ERASE_TEXT_COUNT}`
+  if (Number.isNaN(count))
     return `eraseText count ${raw} is not a literal integer, so its cost cannot be checked`
   if (count < 1 || count > MAX_ERASE_TEXT_COUNT)
     return `eraseText: ${count} is outside 1 to ${MAX_ERASE_TEXT_COUNT}; at 10 s per press under load it must fit the 120 s device deadline, so split it into several commands`
   return null
 }
 
-/** `eraseText` violations in one flow's source, as `line: reason`. */
-export function eraseTextViolations(source) {
+/**
+ * Every `eraseText` command in one flow's source, in document order, as `{ line, value }`. `value`
+ * is the command's YAML node (a scalar count or a `charactersToErase` mapping), or null for a bare
+ * list item. The deadline rule and the erased-count totals both walk these, so every form one
+ * accepts the other counts.
+ */
+function eraseTextCommands(source) {
   const lineCounter = new LineCounter()
-  const violations = []
+  const commands = []
   const line = (node) => (node?.range ? lineCounter.linePos(node.range[0]).line : '?')
   const visit = (node) => {
     if (isSeq(node))
       for (const item of node.items) {
         if (isScalar(item) && item.value === 'eraseText')
-          violations.push(`${line(item)}: ${checkCount(null)}`)
+          commands.push({ line: line(item), value: null })
         else visit(item)
       }
     else if (isMap(node))
       for (const pair of node.items) {
         if (!isPair(pair)) continue
-        if (isScalar(pair.key) && pair.key.value === 'eraseText') {
-          const reason = checkCount(pair.value)
-          if (reason) violations.push(`${line(pair.key)}: ${reason}`)
-        }
+        if (isScalar(pair.key) && pair.key.value === 'eraseText')
+          commands.push({ line: line(pair.key), value: pair.value })
         visit(pair.value)
       }
   }
   for (const document of parseAllDocuments(source, { lineCounter }))
     visit(document.contents)
-  return violations
+  return commands
+}
+
+/** `eraseText` violations in one flow's source, as `line: reason`. */
+export function eraseTextViolations(source) {
+  return eraseTextCommands(source).flatMap(({ line, value }) => {
+    const reason = checkCount(value)
+    return reason ? [`${line}: ${reason}`] : []
+  })
 }
 
 /** Every Maestro flow under `maestro/`, repo-relative and sorted. */
@@ -70,10 +91,14 @@ export function maestroFlowFiles(root, dir = 'maestro') {
     .sort()
 }
 
-/** The literal counts of every `eraseText` in a flow, in order. */
+/**
+ * The characters every `eraseText` in a flow erases, in order, in both the scalar and the
+ * `charactersToErase` form. A bare command counts Maestro's default; a non-literal count is NaN,
+ * so any total over it fails an exact check.
+ */
 export function eraseTextCounts(source) {
-  const counts = []
-  for (const match of source.matchAll(/^\s*-\s*eraseText:\s*(\d+)\s*$/gm))
-    counts.push(Number(match[1]))
-  return counts
+  return eraseTextCommands(source).map(({ value }) => {
+    const { count } = countOf(value)
+    return count === null ? MAESTRO_DEFAULT_ERASE_COUNT : count
+  })
 }

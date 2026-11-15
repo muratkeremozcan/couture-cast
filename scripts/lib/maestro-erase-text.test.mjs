@@ -14,6 +14,8 @@ import { sentinelPlace } from './weather-provider-double-data.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
+const erasedTotal = (source) =>
+  eraseTextCounts(source).reduce((sum, count) => sum + count, 0)
 
 describe('Maestro eraseText stays inside the 120 s device deadline', () => {
   test('every eraseText in maestro/ names a count of 1 to 10', () => {
@@ -92,11 +94,26 @@ describe('Maestro eraseText stays inside the 120 s device deadline', () => {
 
 describe('the flows that erase', () => {
   test('location capture erases exactly the prefilled sentinel city', () => {
-    const counts = eraseTextCounts(read('maestro/location-capture.yaml'))
-    assert.equal(
-      counts.reduce((sum, count) => sum + count, 0),
-      sentinelPlace('any nonce').name.length
-    )
+    const city = sentinelPlace('any nonce').name
+    assert.equal(city.length, 13)
+    assert.equal(erasedTotal(read('maestro/location-capture.yaml')), city.length)
+  })
+
+  test('the erased total counts every form the deadline rule accepts', () => {
+    const source = [
+      '- eraseText: 7',
+      '- eraseText: 6',
+      '- runFlow:',
+      '    commands:',
+      '      - eraseText:',
+      '          charactersToErase: 1',
+      '',
+    ].join('\n')
+    assert.deepEqual(eraseTextViolations(source), [])
+    assert.deepEqual(eraseTextCounts(source), [7, 6, 1])
+    assert.equal(erasedTotal(source), 14)
+    assert.notEqual(erasedTotal(source), sentinelPlace('any nonce').name.length)
+    assert.deepEqual(eraseTextCounts('- eraseText\n- eraseText: ${COUNT}\n'), [50, NaN])
   })
 
   test('the capsule name retry erases only typed text, in bounded chunks that cover a failed attempt', () => {
