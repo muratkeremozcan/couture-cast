@@ -60,6 +60,22 @@ function startsWith(buffer, magic) {
 }
 
 /**
+ * A gzip member header: the magic, compression method 8 (deflate, the only one RFC 1952
+ * defines, so every gzip reader refuses another) and no reserved flag bit set. Two magic
+ * bytes alone are too weak: a decoded base64 run starts with 1f 8b once in 65,536, and a
+ * blob report holds about ten thousand runs (PR 229 pw-e2e, 2026-11-14, refused an upload
+ * on one). Bytes no gzip reader can open hide nothing, so they are scanned as plain bytes.
+ */
+function isGzipHeader(buffer) {
+  return (
+    startsWith(buffer, GZIP_MAGIC) &&
+    buffer.length >= 10 &&
+    buffer[2] === 8 &&
+    (buffer[3] & 0xe0) === 0
+  )
+}
+
+/**
  * The base64 characters that depend only on `text`'s own bytes when it sits at
  * `offset` bytes past a 3-byte boundary inside a longer encoded string.
  */
@@ -251,13 +267,14 @@ function zipEntries(buffer) {
 }
 
 /**
- * `gzip` and `zip` are certain from the first bytes, so failing to open them fails
- * the scan. `zip-suffix` is a zip found only by its trailing directory record, as
- * with a preamble before the first entry; random binary can contain that record by
- * chance, so a `zip-suffix` that does not open is scanned as plain bytes.
+ * `gzip` (a whole member header, isGzipHeader) and `zip` are certain from the first
+ * bytes, so failing to open them fails the scan. `zip-suffix` is a zip found only by
+ * its trailing directory record, as with a preamble before the first entry; random
+ * binary can contain that record by chance, so a `zip-suffix` that does not open is
+ * scanned as plain bytes.
  */
 function containerKind(buffer) {
-  if (startsWith(buffer, GZIP_MAGIC)) return 'gzip'
+  if (isGzipHeader(buffer)) return 'gzip'
   if (startsWith(buffer, ZIP_MAGIC) || startsWith(buffer, EMPTY_ZIP_MAGIC)) return 'zip'
   return hasCentralDirectory(buffer) ? 'zip-suffix' : undefined
 }

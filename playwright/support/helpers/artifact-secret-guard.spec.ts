@@ -189,6 +189,37 @@ describe('check-artifact-secrets', () => {
     expect(scan(['DUMMY_QUOTED_SECRET']).findings[0]?.encoding).toBe('url-encoded')
   })
 
+  // PR 229 pw-e2e (2, 2), 2026-11-14: base64#9867 of a blob report decoded to bytes that
+  // began 1f 8b by chance, and gunzip refused them ("unknown compression method").
+  it('treats a base64 run that only starts with the gzip magic as plain bytes', () => {
+    const stray = Buffer.concat([
+      Buffer.from([0x1f, 0x8b, 0x09, 0x00]),
+      randomBytes(60),
+      Buffer.from(`token=${DUMMY_SECRET}`),
+    ])
+    write(
+      'blob-report/report.jsonl',
+      JSON.stringify({ method: 'onAttach', body: stray.toString('base64') })
+    )
+
+    const result = scan(['DUMMY_SECRET'])
+    expect(result.unreadable).toEqual([])
+    // The decoded layer is still searched as plain bytes.
+    expect(result.findings.map((finding) => finding.location)).toContain(
+      `${path.join(workDir, 'blob-report/report.jsonl')}!base64#1`
+    )
+  })
+
+  it('still refuses gzip data with a real header that does not inflate', () => {
+    const real = zlib.gzipSync(Buffer.from(`token=${DUMMY_SECRET}`))
+    const corrupt = Buffer.concat([real.subarray(0, 10), Buffer.alloc(40, 0xff)])
+    const file = write('logs/server.log.gz', corrupt)
+
+    expect(scan(['DUMMY_SECRET']).unreadable.map((entry) => entry.location)).toEqual([
+      file,
+    ])
+  })
+
   it('reports an archive it cannot open instead of passing it unchecked', () => {
     const corrupt = Buffer.from(blobReportWith({ A: 'b' }))
     corrupt.fill(0xff, 30, 60)
