@@ -111,6 +111,7 @@ import {
   guestConversionEmail,
   localGuestAuthAdmin,
   publishRedacted,
+  publishRedactedTree,
   readMailpitCode,
   recordGuestAccount,
   recordIssuedCode,
@@ -3631,12 +3632,24 @@ const runGuestVerifyFlow = async (target, maestroEnv, code) => {
       })
     } finally {
       maestroDriverReuse.recordInvocation(target.platform, device)
-      if (WRITE_ARTIFACTS)
+      if (WRITE_ARTIFACTS) {
         publishRedacted(
           report,
           path.resolve(projectRoot, getFlowReportPath(GUEST_CONVERSION_VERIFY_FLOW)),
           [code]
         )
+        // Screenshots and command logs for the next device failure, through the same scan.
+        publishRedactedTree(
+          privateDir,
+          path.resolve(
+            projectRoot,
+            MAESTRO_ARTIFACT_DIR,
+            'guest-preview-conversion-verify'
+          ),
+          [code],
+          { skip: ['report.xml'] }
+        )
+      }
     }
   } finally {
     fs.rmSync(privateDir, { recursive: true, force: true })

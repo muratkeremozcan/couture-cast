@@ -334,6 +334,31 @@ export function publishRedacted(from, to, secrets) {
 }
 
 /**
+ * Copies a Maestro debug directory for the artifacts: text files with every secret
+ * redacted, binary files (screenshots) as they are. The artifact scan still reads every
+ * copied byte and fails on any listed code left in them.
+ *
+ * @param {string} fromDir
+ * @param {string} toDir
+ * @param {string[]} secrets
+ * @param {{ skip?: string[] }} [options] paths relative to `fromDir` left out
+ */
+export function publishRedactedTree(fromDir, toDir, secrets, { skip = [] } = {}) {
+  if (!fs.existsSync(fromDir)) return
+  for (const entry of fs.readdirSync(fromDir, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile()) continue
+    const from = path.join(entry.parentPath, entry.name)
+    const relative = path.relative(fromDir, from)
+    if (skip.includes(relative)) continue
+    const to = path.join(toDir, relative)
+    fs.mkdirSync(path.dirname(to), { recursive: true })
+    const bytes = fs.readFileSync(from)
+    if (bytes.includes(0)) fs.writeFileSync(to, bytes)
+    else fs.writeFileSync(to, redactSecrets(bytes.toString('utf8'), secrets))
+  }
+}
+
+/**
  * Deletes the app user and the Auth user of every recorded address, then drops the rows
  * it settled. A failed row stays for the next run; a row of any other address refuses
  * the whole cleanup.

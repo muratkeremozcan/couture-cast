@@ -26,7 +26,12 @@ vi.mock('next/navigation', () => ({ useRouter: () => navigation.router }))
 const member = vi.hoisted(() => ({ id: 'member-a' as string | null, token: 'token-a' }))
 vi.mock('../../../lib/web-session', () => ({
   webSessionIdentity: () => member.id,
-  resolveWebSessionToken: () => Promise.resolve(member.token),
+  // The app's resolver awaits session verification; this one answers a little later with
+  // whoever is signed in by then, so a transient null has settled before it resolves.
+  resolveWebSessionToken: () =>
+    new Promise((resolve) =>
+      setTimeout(() => resolve(member.id ? member.token : undefined), 30)
+    ),
 }))
 
 const api = vi.hoisted(() => ({
@@ -247,6 +252,55 @@ describe('preview carryover review (D8)', () => {
     render(<GuestPreviewReview />)
     await waitFor(() => expect(client.read).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(screen.queryByTestId('guest-preview-review-account')).toBeNull()
+  })
+
+  // Session re-verification sets the member to null and back; only a settled different
+  // member or a settled sign-out discards the proposal.
+  const flipToNullAndBack = () => {
+    member.id = null
+    window.dispatchEvent(new Event('couture:session'))
+    setTimeout(() => {
+      member.id = 'member-a'
+      window.dispatchEvent(new Event('couture:session'))
+    }, 10)
+  }
+
+  it('reaches the review when the member flips to null and back during the read', async () => {
+    const client = server()
+    client.read.mockImplementationOnce(() => {
+      flipToNullAndBack()
+      return Promise.resolve(ACCOUNT)
+    })
+    render(<GuestPreviewReview />)
+    expect(await screen.findByTestId('guest-preview-review-use')).toBeInTheDocument()
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(adapter.value()).not.toBeNull()
+  })
+
+  it('saves when the member flips to null and back during the save', async () => {
+    const client = server()
+    const commit = client.write.getMockImplementation()
+    client.write.mockImplementationOnce((values) => {
+      flipToNullAndBack()
+      return commit?.(values) ?? Promise.resolve({ data: values })
+    })
+    render(<GuestPreviewReview />)
+    fireEvent.click(await screen.findByTestId('guest-preview-review-use'))
+    expect(await screen.findByTestId('guest-preview-review-result')).toBeInTheDocument()
+    expect(client.write).toHaveBeenCalledTimes(1)
+    expect(navigation.replace).not.toHaveBeenCalled()
+  })
+
+  it('discards the proposal when the read settles on a signed-out session', async () => {
+    const client = server()
+    client.read.mockImplementationOnce(() => {
+      member.id = null
+      return Promise.resolve(ACCOUNT)
+    })
+    render(<GuestPreviewReview />)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
     expect(screen.queryByTestId('guest-preview-review-account')).toBeNull()
   })
 

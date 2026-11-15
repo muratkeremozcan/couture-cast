@@ -32,7 +32,11 @@ vi.mock('@/src/lib/guest-preview', async (importOriginal) => ({
 }))
 
 import { setMobileGuestPreviewStoreForTests } from '@/src/lib/guest-preview'
-import { setMobileApplicationUserId } from '@/src/lib/mobile-auth'
+import {
+  mobileApplicationUserId,
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { initI18n } from '@/src/lib/i18n'
 import { GuestPreviewReviewScreen } from './guest-preview-review-screen'
 
@@ -98,13 +102,24 @@ beforeAll(async () => {
   await initI18n()
 })
 
+// The app's resolver awaits session verification; this one answers a little later with
+// whoever is signed in by then, so a transient null has settled before it resolves.
+let restoreResolver: () => void = () => undefined
+
 beforeEach(async () => {
+  restoreResolver = setMobileAccessTokenResolver(
+    () =>
+      new Promise((resolve) =>
+        setTimeout(() => resolve(mobileApplicationUserId() ? 'token' : undefined), 40)
+      )
+  )
   setMobileApplicationUserId('member-a')
   api.nextStep.mockResolvedValue('/wardrobe-onboarding')
   await seed()
 })
 
 afterEach(() => {
+  restoreResolver()
   setMobileGuestPreviewStoreForTests(undefined)
   setMobileApplicationUserId(null)
 })
@@ -223,6 +238,50 @@ describe('mobile carryover review (D8)', () => {
     await render(<GuestPreviewReviewScreen />)
     await waitFor(() => expect(client.read).toHaveBeenCalled())
     await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(screen.queryByTestId('guest-preview-review-account')).toBeNull()
+  })
+
+  // Session re-verification sets the member to null and back on an auth event; only a
+  // settled different member or a settled sign-out discards the proposal.
+  it('reaches the review when the member flips to null and back during the read', async () => {
+    const client = server()
+    client.read.mockImplementationOnce(() => {
+      setMobileApplicationUserId(null)
+      setTimeout(() => setMobileApplicationUserId('member-a'), 10)
+      return Promise.resolve(ACCOUNT)
+    })
+    await render(<GuestPreviewReviewScreen />)
+    expect(await screen.findByTestId('guest-preview-review-use')).toBeTruthy()
+    expect(navigation.replace).not.toHaveBeenCalled()
+    expect(adapter.value()).not.toBeNull()
+  })
+
+  it('saves when the member flips to null and back during the save', async () => {
+    const client = server()
+    const commit = client.write.getMockImplementation()
+    client.write.mockImplementationOnce((values) => {
+      setMobileApplicationUserId(null)
+      setTimeout(() => setMobileApplicationUserId('member-a'), 10)
+      return commit?.(values) ?? Promise.resolve({ data: values })
+    })
+    await render(<GuestPreviewReviewScreen />)
+    press(await screen.findByTestId('guest-preview-review-use'))
+    // The same member settles, so the carryover runs again; it reads first and finds the
+    // proposal saved, so the account is written once.
+    expect(await screen.findByTestId('guest-preview-review-result')).toBeTruthy()
+    expect(client.write).toHaveBeenCalledOnce()
+    expect(navigation.replace).not.toHaveBeenCalled()
+  })
+
+  it('discards the proposal when the read settles on a signed-out session', async () => {
+    const client = server()
+    client.read.mockImplementationOnce(() => {
+      setMobileApplicationUserId(null)
+      return Promise.resolve(ACCOUNT)
+    })
+    await render(<GuestPreviewReviewScreen />)
+    await waitFor(() => expect(navigation.replace).toHaveBeenCalledWith('/'))
+    await waitFor(() => expect(adapter.value()).toBeNull())
     expect(screen.queryByTestId('guest-preview-review-account')).toBeNull()
   })
 

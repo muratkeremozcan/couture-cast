@@ -61,6 +61,21 @@ function ComfortColumn({
   )
 }
 
+/**
+ * D8: who is signed in once session verification settles. Re-verification can set the
+ * member to null and back, so a mismatch seen mid-flight decides nothing until this
+ * answers: 'same', 'other' (a different member or signed out), or 'unknown' when the
+ * session cannot be read.
+ */
+async function settledIdentity(memberId: string): Promise<'same' | 'other' | 'unknown'> {
+  try {
+    const token = await resolveWebSessionToken()
+    return token && webSessionIdentity() === memberId ? 'same' : 'other'
+  } catch {
+    return 'unknown'
+  }
+}
+
 export function GuestPreviewReview() {
   const router = useRouter()
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
@@ -75,6 +90,11 @@ export function GuestPreviewReview() {
   useEffect(() => {
     mounted.current = true
     let active = true
+    const discard = () => {
+      client.current = null
+      store.clear()
+      router.replace('/')
+    }
     void (async () => {
       const snapshot = await store.load()
       const proposal = snapshot.state?.conversion ? snapshot.state.comfort : null
@@ -91,8 +111,14 @@ export function GuestPreviewReview() {
         }
         client.current = verified
         const account = await verified.read()
+        if (!active) return
         // W2: the member may have changed while the read was in flight.
-        if (!active || webSessionIdentity() !== verified.memberId) return
+        if (webSessionIdentity() !== verified.memberId) {
+          const identity = await settledIdentity(verified.memberId)
+          if (!active || client.current !== verified) return
+          if (identity === 'other') return discard()
+          if (identity === 'unknown') return setStatus({ kind: 'load-failed' })
+        }
         setStatus({ kind: 'ready', account, proposal })
       } catch {
         if (active) setStatus({ kind: 'load-failed' })
@@ -101,11 +127,10 @@ export function GuestPreviewReview() {
     // D8: a different member discards the proposal; a new account needs a new review.
     const onSession = () => {
       const verified = client.current
-      if (verified && webSessionIdentity() !== verified.memberId) {
-        client.current = null
-        store.clear()
-        router.replace('/')
-      }
+      if (!verified || webSessionIdentity() === verified.memberId) return
+      void settledIdentity(verified.memberId).then((identity) => {
+        if (active && client.current === verified && identity === 'other') discard()
+      })
     }
     window.addEventListener('couture:session', onSession)
     return () => {
@@ -120,18 +145,39 @@ export function GuestPreviewReview() {
     if (!verified || inFlight.current) return
     inFlight.current = true
     setStatus({ kind: 'saving', account, proposal })
-    const outcome = await applyComfortCarryover({
-      proposal,
-      read: verified.read,
-      write: verified.write,
-      isRejection: isConsentRejection,
-      isCurrent: () =>
-        mounted.current &&
-        client.current === verified &&
-        webSessionIdentity() === verified.memberId,
-    })
+    const carryover = () =>
+      applyComfortCarryover({
+        proposal,
+        read: verified.read,
+        write: verified.write,
+        isRejection: isConsentRejection,
+        isCurrent: () =>
+          mounted.current &&
+          client.current === verified &&
+          webSessionIdentity() === verified.memberId,
+      })
+    let outcome = await carryover()
+    if (outcome.status === 'stale' && mounted.current && client.current === verified) {
+      // A mid-flight identity flip; the carryover reads first, so running it again for
+      // the same settled member never writes twice.
+      const identity = await settledIdentity(verified.memberId)
+      if (identity === 'same' && client.current === verified) outcome = await carryover()
+      else if (identity === 'unknown') outcome = { status: 'failed' }
+      else if (client.current === verified) {
+        inFlight.current = false
+        client.current = null
+        store.clear()
+        router.replace('/')
+        return
+      }
+    }
     inFlight.current = false
-    if (outcome.status === 'stale') return
+    // Any other stale result still on this screen ends in a retry.
+    if (outcome.status === 'stale') {
+      if (mounted.current && client.current === verified)
+        setStatus({ kind: 'failed', account, proposal })
+      return
+    }
     if (outcome.status === 'saved') {
       store.clear()
       setStatus({ kind: 'saved' })

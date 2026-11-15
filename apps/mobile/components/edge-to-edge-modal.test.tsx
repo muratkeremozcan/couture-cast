@@ -1,6 +1,6 @@
 // Learning path Step 55: Expo SDK 58 upgrade for live font-scale layout.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
-import React, { createElement } from 'react'
+import React, { Fragment, createElement, isValidElement } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
@@ -12,7 +12,7 @@ import {
   liveFontMarkerPlacement,
   modalRenders,
 } from '@/src/test-utils/edge-to-edge-modal'
-import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
+import { EdgeToEdgeModal, useModalInsets, withModalMarker } from './edge-to-edge-modal'
 
 /**
  * react-native-web never reports a software keyboard, so the R57 cases drive the
@@ -180,6 +180,22 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
       })
       view.unmount()
     }
+  })
+
+  // Story 6.16 R4: written children (a spacer and a sheet, no keys) must stay static
+  // children after the marker goes in. A rebuilt array reads as an unkeyed list, and React
+  // Native logs a key error for it (react-dom in this test runner logs none, so the shape
+  // is checked directly).
+  it('returns written children with the marker as static children, never as a list', () => {
+    const written = [
+      <ReactNative.View testID="spacer" />,
+      <ReactNative.View testID="sheet" accessibilityViewIsModal />,
+    ]
+    const result = withModalMarker(written)
+    expect(Array.isArray(result)).toBe(false)
+    expect(isValidElement(result) && result.type).toBe(Fragment)
+    render(<EdgeToEdgeModal visible>{written}</EdgeToEdgeModal>)
+    expect(liveFontMarkerPlacement()).toEqual({ markerInside: true, host: 'sheet' })
   })
 
   it('keeps the mount marker beside content that is not an accessibility modal', () => {

@@ -20,6 +20,7 @@ import {
   deviceSupabaseUrl,
   guestConversionEmail,
   publishRedacted,
+  publishRedactedTree,
   readMailpitCode,
   recordGuestAccount,
   recordIssuedCode,
@@ -389,6 +390,43 @@ process.exit(Number(process.env.FAKE_EXIT ?? 0))
       CODE,
     ])
     assert.equal(fs.existsSync(path.join(directory, 'x.xml')), false)
+  })
+})
+
+describe('publishRedactedTree', () => {
+  test('publishes the verify debug output with text redacted and images kept', () => {
+    const from = fresh('debug-from')
+    fs.mkdirSync(path.join(from, 'run'), { recursive: true })
+    fs.writeFileSync(path.join(from, 'run', 'commands.json'), `{"text":"${CODE}"}`)
+    fs.writeFileSync(path.join(from, 'maestro.log'), `typed ${CODE} then waited`)
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0x01, 0x02])
+    fs.writeFileSync(path.join(from, 'run', 'screenshot.png'), png)
+    fs.writeFileSync(path.join(from, 'report.xml'), `<x>${CODE}</x>`)
+    const to = path.join(fresh('debug-to'), 'verify-debug')
+    publishRedactedTree(from, to, [CODE], { skip: ['report.xml'] })
+    assert.equal(
+      fs.readFileSync(path.join(to, 'run', 'commands.json'), 'utf8'),
+      '{"text":"[REDACTED]"}'
+    )
+    assert.equal(
+      fs.readFileSync(path.join(to, 'maestro.log'), 'utf8'),
+      'typed [REDACTED] then waited'
+    )
+    assert.deepEqual(fs.readFileSync(path.join(to, 'run', 'screenshot.png')), png)
+    assert.equal(fs.existsSync(path.join(to, 'report.xml')), false)
+  })
+
+  test('does nothing for a missing directory', () => {
+    const to = path.join(fresh('debug-none'), 'out')
+    publishRedactedTree(path.join(scratch, 'absent'), to, [CODE])
+    assert.equal(fs.existsSync(to), false)
+  })
+
+  test('the verify step publishes its debug output before the private directory goes', () => {
+    const verify = runner.slice(runner.indexOf('const runGuestVerifyFlow'))
+    const publish = verify.indexOf('publishRedactedTree(')
+    assert.ok(publish > 0)
+    assert.ok(publish < verify.indexOf('fs.rmSync(privateDir'))
   })
 })
 

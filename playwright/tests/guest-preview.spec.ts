@@ -6,10 +6,16 @@
 // L-MEMBER-OPENS-PREVIEW and the AC2 timing record.
 import fs from 'node:fs'
 import path from 'node:path'
-import type { Page, Request } from '@playwright/test'
+import type { Page, Request, TestInfo } from '@playwright/test'
 import { SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
-import { seedWebSession } from '../support/helpers/commerce-session'
+import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
+import {
+  commerceAccessToken,
+  createLocationForUser,
+  seedWebSession,
+  signUpCommerceUser,
+} from '../support/helpers/commerce-session'
 
 const STORAGE_KEY = 'couturecast.guest-preview'
 const LABEL =
@@ -36,6 +42,22 @@ function recordRequests(page: Page, webOrigin: string) {
     if (!allowed) offAllowlist.push(`${request.method()} ${url.origin}${url.pathname}`)
   })
   return { all, offAllowlist }
+}
+
+/**
+ * A Vercel preview deployment injects its toolbar, which posts to vercel.live. The header
+ * on the app's own documents turns it off, so the allowlist stays strict on every lane and
+ * no API request gains a header CORS would refuse.
+ */
+async function skipVercelToolbar(page: Page, testInfo: TestInfo) {
+  const webOrigin = new URL(testInfo.project.use.baseURL ?? 'http://localhost').origin
+  await page.route(`${webOrigin}/**`, (route) => {
+    const request = route.request()
+    if (request.resourceType() !== 'document') return route.fallback()
+    return route.continue({
+      headers: { ...request.headers(), 'x-vercel-skip-toolbar': '1' },
+    })
+  })
 }
 
 async function enableAnalyticsHook(page: Page) {
@@ -72,6 +94,7 @@ const garmentIds = (page: Page) =>
 
 test.describe('Guest preview (signed out)', () => {
   test.use({ authSessionEnabled: false })
+  test.beforeEach(({ page }, testInfo) => skipVercelToolbar(page, testInfo))
 
   test('[P0] [6.16-E2E-001] the gate blocks under-13 with no request, no storage and no event', async ({
     page,
@@ -364,13 +387,30 @@ test.describe('Guest preview (signed out)', () => {
   })
 })
 
-test.describe('Guest preview (member)', () => {
+// A real signed-up member with the local token, which only the local stack's identity
+// parser accepts; so @local-lane. The location lets Home load its ritual without a 400.
+test.describe('Guest preview (member) @local-lane', () => {
+  test.use({ authSessionEnabled: false })
+  test.beforeEach(({ page }, testInfo) => skipVercelToolbar(page, testInfo))
+
   test('[P0] [6.16-E2E-009] a signed-in member opening /preview returns to the app', async ({
     page,
-  }) => {
-    await seedWebSession(page, 'test-token-guest-preview-member')
+    request,
+  }, testInfo) => {
+    const apiBaseUrl = resolveApiBaseUrl(testInfo, { fallback: 'http://localhost:4000' })
+    const userId = await signUpCommerceUser(
+      request,
+      apiBaseUrl,
+      'guest-preview-member',
+      buildUniqueId('web', testInfo)
+    )
+    await createLocationForUser(request, apiBaseUrl, userId)
+    await seedWebSession(page, commerceAccessToken(userId))
     await page.goto('/preview')
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByTestId('guest-preview-gate')).toHaveCount(0)
+    expect(
+      await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
+    ).toBeNull()
   })
 })
