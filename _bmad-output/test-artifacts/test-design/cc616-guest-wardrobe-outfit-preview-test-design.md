@@ -300,6 +300,9 @@ held in the storage adapter or the API route double; no sleeps.
   shard. A sign-out step cannot work because the fixture token wins over the native session.
 - TEA-9: the mobile preview always shows that creating an account needs a connection. Accepted:
   it states a requirement and claims no network status, so no NetInfo dependency is added.
+- TEA-10: non-view SDK events on preview routes (`$exception`, Application Opened) keep the
+  templated route: it names a product surface and carries no query, id or age. Page and screen
+  views stay dropped, and a test pins that no query or return intent rides on these events.
 - No disagreement with D1 to D10 beyond these clarifications.
 
 ## Seeded-defect proofs
