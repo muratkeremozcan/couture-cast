@@ -10,7 +10,10 @@ import type { Page, Request } from '@playwright/test'
 import { SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { buildUniqueId, resolveApiBaseUrl } from '../support/helpers/api-test'
-import { isAllowedGuestPreviewRequest } from '../support/helpers/guest-preview-requests'
+import {
+  isAllowedGuestPreviewRequest,
+  isVercelPreviewToolbarRequest,
+} from '../support/helpers/guest-preview-requests'
 import {
   commerceAccessToken,
   createLocationForUser,
@@ -48,7 +51,7 @@ function recordRequests(page: Page, webOrigin: string) {
     const url = new URL(request.url())
     offAllowlist.push(`${request.method()} ${url.origin}${url.pathname}`)
   })
-  return { all, offAllowlist }
+  return { all, offAllowlist, webOrigin }
 }
 
 async function enableAnalyticsHook(page: Page) {
@@ -69,10 +72,18 @@ const capturedEvents = (page: Page) =>
         .__capturedAnalyticsEvents ?? []
   )
 
-/** Every POST the page made, as method and URL. */
-const posts = (requests: { all: Request[] }) =>
+/**
+ * Every POST the page made, as method and URL. The Vercel preview toolbar's own login check
+ * (vercel run 43738587377) is the deployment's traffic, not the page's, so it is left out on a
+ * preview origin only.
+ */
+const posts = (requests: { all: Request[]; webOrigin: string }) =>
   requests.all
-    .filter((request) => request.method() === 'POST')
+    .filter(
+      (request) =>
+        request.method() === 'POST' &&
+        !isVercelPreviewToolbarRequest({ url: request.url() }, requests.webOrigin)
+    )
     .map((request) => `POST ${request.url()}`)
 
 async function passGate(page: Page, birthdate = '2000-01-15') {

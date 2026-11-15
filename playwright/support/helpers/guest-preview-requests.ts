@@ -47,6 +47,19 @@ export function isAllowedGuestPreviewRequest(
             INGEST_SCRIPT_PATH.test(path)
     return SAFE_METHODS.has(request.method) && !/^\/api(?:\/|$)/i.test(path)
   }
+  return isVercelPreviewToolbarRequest(request, webOrigin)
+}
+
+/**
+ * The toolbar a Vercel preview deployment injects (`https://vercel.live`, under `/login/` and
+ * `/_next-live/`). The deployment adds it and the app never calls it, so it is neither app
+ * traffic nor an analytics event; on any other origin it is never excused.
+ */
+export function isVercelPreviewToolbarRequest(
+  request: { url: string },
+  webOrigin: string
+): boolean {
+  const url = new URL(request.url)
   return (
     new URL(webOrigin).hostname.endsWith('.vercel.app') &&
     url.origin === VERCEL_TOOLBAR_ORIGIN &&

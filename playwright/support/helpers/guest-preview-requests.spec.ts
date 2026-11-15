@@ -2,7 +2,10 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 E1 and V1: the request rule the guest journeys assert on.
 import { describe, expect, it } from 'vitest'
-import { isAllowedGuestPreviewRequest } from './guest-preview-requests'
+import {
+  isAllowedGuestPreviewRequest,
+  isVercelPreviewToolbarRequest,
+} from './guest-preview-requests'
 
 const LOCAL = 'http://localhost:3005'
 const PREVIEW = 'https://couture-cast-web-git-feat-x.vercel.app'
@@ -88,5 +91,28 @@ describe('guest preview request allowlist', () => {
       expect(allowed('GET', `${LOCAL}${path}`, LOCAL), path).toBe(false)
     expect(allowed('GET', `${LOCAL}/%E0%A4%A`, LOCAL)).toBe(false)
     expect(allowed('GET', `${LOCAL}/apiary`, LOCAL)).toBe(true)
+  })
+})
+
+describe('Vercel preview toolbar requests (excused from the no-POST checks)', () => {
+  const toolbar = (url: string, webOrigin: string) =>
+    isVercelPreviewToolbarRequest({ url }, webOrigin)
+
+  it('names the toolbar login check and assets on a preview origin', () => {
+    expect(toolbar('https://vercel.live/login/validate?hostname=x', PREVIEW)).toBe(true)
+    expect(toolbar('https://vercel.live/_next-live/feedback/feedback.js', PREVIEW)).toBe(
+      true
+    )
+  })
+
+  it('never excuses it off a preview origin, on another path, host or scheme', () => {
+    expect(toolbar('https://vercel.live/login/validate', LOCAL)).toBe(false)
+    expect(toolbar('https://vercel.live/login/validate', 'https://couturecast.app')).toBe(
+      false
+    )
+    expect(toolbar('https://vercel.live/other/path', PREVIEW)).toBe(false)
+    expect(toolbar('https://evil.vercel.live/login/validate', PREVIEW)).toBe(false)
+    expect(toolbar('http://vercel.live/login/validate', PREVIEW)).toBe(false)
+    expect(toolbar(`${PREVIEW}/ingest/e/`, PREVIEW)).toBe(false)
   })
 })
