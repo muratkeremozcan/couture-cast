@@ -40,10 +40,15 @@ test('6.16 guest preview carries comfort settings into a real verified account',
     const signup = page.waitForResponse('**/api/v1/auth/signup')
     await page.getByRole('button', { name: 'Create account' }).click()
     const { userId } = (await (await signup).json()) as { userId: string }
-    // The signup response authenticates nobody: no comfort row exists yet.
-    expect(
-      await prisma.comfortPreferences.findUnique({ where: { user_id: userId } })
-    ).toBeNull()
+    // The signup response authenticates nobody: the account still holds signup's defaults.
+    const defaults = await prisma.comfortPreferences.findUnique({
+      where: { user_id: userId },
+    })
+    expect([
+      defaults?.runs_cold_warm,
+      defaults?.wind_tolerance,
+      defaults?.precip_preparedness,
+    ]).not.toEqual(['cold', 'low', 'high'])
 
     const account = await createRealCommunityAuthAccount({
       email,
@@ -82,6 +87,47 @@ test('6.16 guest preview carries comfort settings into a real verified account',
     ).toBeNull()
     await page.getByTestId('guest-preview-review-continue').click()
     await expect(page).toHaveURL(/\/wardrobe\/onboarding$/)
+  } finally {
+    await prisma.$disconnect()
+  }
+})
+
+test('6.16 a full guest journey writes no row (E-NO-DB-WRITES)', async ({ page }) => {
+  const prisma = new PrismaClient()
+  const counts = async () => ({
+    user: await prisma.user.count(),
+    userProfile: await prisma.userProfile.count(),
+    guardianConsent: await prisma.guardianConsent.count(),
+    comfortPreferences: await prisma.comfortPreferences.count(),
+    garmentItem: await prisma.garmentItem.count(),
+    outfitRecommendation: await prisma.outfitRecommendation.count(),
+    outfitCapsule: await prisma.outfitCapsule.count(),
+    wardrobeOnboardingState: await prisma.wardrobeOnboardingState.count(),
+    silhouetteProfile: await prisma.silhouetteProfile.count(),
+    lookbookPost: await prisma.lookbookPost.count(),
+    premiumEntitlement: await prisma.premiumEntitlement.count(),
+    complimentaryAccessGrant: await prisma.complimentaryAccessGrant.count(),
+    telemetryEvent: await prisma.telemetryEvent.count(),
+  })
+  try {
+    // The lane runs one test at a time on its own database, so a whole-database count
+    // measures this journey alone.
+    const before = await counts()
+    await page.goto('/preview')
+    await page.getByTestId('guest-preview-birthdate').fill('1990-06-15')
+    await page.getByTestId('guest-preview-gate-submit').click()
+    await choose(page, 'guest-preview-thermal-cold')
+    await page.getByTestId('guest-preview-swap-shoes').click()
+    await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
+    await page.getByTestId('guest-preview-try-another').click()
+    await page.getByTestId('guest-preview-nav-preferences').click()
+    await page.getByTestId('guest-preview-vote-like').first().click()
+    await page.getByTestId('guest-preview-nav-wardrobe').click()
+    await page.getByTestId('guest-preview-item').first().click()
+    await page.keyboard.press('Escape')
+    await page.getByTestId('guest-preview-exit').click()
+    await expect(page).toHaveURL(/\/$/)
+    expect(await counts()).toEqual(before)
   } finally {
     await prisma.$disconnect()
   }

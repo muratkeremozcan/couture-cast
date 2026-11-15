@@ -11292,8 +11292,10 @@ Hard-won lessons from the implementation and code review of this story:
   the review now needs `from=preview` on the sign-in and a stored intent.
 - A router mock that returns a new object each render re-ran the session effect forever; Next.js
   hands out a stable router, and the mocks do too.
-- Global row counts only prove "no writes" when the journey runs alone; in the shared Playwright
-  suite the proof is zero `/api/` requests and no `sample:` id on the wire.
+- Global row counts only prove "no writes" when the journey runs alone. The shared Playwright suite
+  proves it by an origin allowlist (GET from the web origin only, nothing under `/api/` or
+  `/ingest/`), and the row-count test runs in the real-session lane, which owns its database and
+  runs one test at a time.
 
 Story/Task mapping:
 
@@ -11418,7 +11420,8 @@ Evidence boundaries:
 
 - AC2 measured on the local stack in Chromium: p95 17 ms over 30 changes and a first useful preview
   of 70 ms after the gate.
-- Row counts prove no writes only in the solo evidence run (`STORY616_DB_ISOLATION=1`).
+- Row counts run in the real-session lane on its own database, one test at a time; the shared lane
+  proves no writes by its request allowlist.
 - Mobile runs on the same core in Vitest browser mode; the Android Maestro guest flow runs in its own
   signed-out shard (TEA-8). The mobile conversion note is shown at all times, because the app has
   no network-state dependency to show it only offline.

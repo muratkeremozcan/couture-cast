@@ -574,6 +574,8 @@ TEA rulings on the frozen spec (clarifications, no decision reversed):
 - TEA-8: Maestro guest flows run in a signed-out mode of `scripts/run-maestro.mjs`: Metro without
   either E2E token and with `EXPO_PUBLIC_E2E_AUTH_MODE=real`, `clearState` on launch, in their own
   shard. A sign-out step cannot work because the fixture token wins over the native session.
+- TEA-9: the mobile preview always shows that creating an account needs a connection. Accepted:
+  it states a requirement and claims no network status, so no NetInfo dependency is added.
 
 Red-first order for the build:
 

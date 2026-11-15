@@ -7,7 +7,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import type { Page, Request } from '@playwright/test'
-import { PrismaClient } from '@prisma/client'
 import { SAMPLE_CATALOG } from '@couture/utils'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { seedWebSession } from '../support/helpers/commerce-session'
@@ -18,14 +17,25 @@ const LABEL =
 
 type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
-function recordRequests(page: Page) {
-  const api: string[] = []
+/**
+ * E1: every request the guest page makes must be a GET to the web origin outside `/api/`
+ * and `/ingest/` (pages, RSC payloads, `_next` assets). A request to the API origin, the
+ * Supabase origin or any other host lands in `offAllowlist`, so a direct browser write to
+ * Supabase cannot slip past a path-only check.
+ */
+function recordRequests(page: Page, webOrigin: string) {
   const all: Request[] = []
+  const offAllowlist: string[] = []
   page.on('request', (request) => {
     all.push(request)
-    if (new URL(request.url()).pathname.startsWith('/api/')) api.push(request.url())
+    const url = new URL(request.url())
+    const allowed =
+      url.origin === webOrigin &&
+      request.method() === 'GET' &&
+      !/^\/(api|ingest)\//.test(url.pathname)
+    if (!allowed) offAllowlist.push(`${request.method()} ${url.origin}${url.pathname}`)
   })
-  return { api, all }
+  return { all, offAllowlist }
 }
 
 async function enableAnalyticsHook(page: Page) {
@@ -68,7 +78,7 @@ test.describe('Guest preview (signed out)', () => {
   }) => {
     await enableAnalyticsHook(page)
     await page.goto('/preview')
-    const requests = recordRequests(page)
+    const requests = recordRequests(page, new URL(page.url()).origin)
     await passGate(page, '2020-01-01')
     await expect(page.getByTestId('guest-preview-gate-error')).toHaveText(
       'You must be 13 or older'
@@ -78,56 +88,34 @@ test.describe('Guest preview (signed out)', () => {
     expect(
       await page.evaluate((key) => localStorage.getItem(key), STORAGE_KEY)
     ).toBeNull()
-    expect(requests.api).toEqual([])
+    expect(requests.offAllowlist).toEqual([])
     expect(await capturedEvents(page)).toEqual([])
   })
 
-  test('[P0] [6.16-E2E-002] a full guest journey calls no API and writes no row', async ({
+  test('[P0] [6.16-E2E-002] a full guest journey talks only to the web origin', async ({
     page,
-  }) => {
-    const prisma = new PrismaClient()
-    const counts = async () => ({
-      user: await prisma.user.count(),
-      userProfile: await prisma.userProfile.count(),
-      guardianConsent: await prisma.guardianConsent.count(),
-      comfortPreferences: await prisma.comfortPreferences.count(),
-      garmentItem: await prisma.garmentItem.count(),
-      outfitRecommendation: await prisma.outfitRecommendation.count(),
-      outfitCapsule: await prisma.outfitCapsule.count(),
-      wardrobeOnboardingState: await prisma.wardrobeOnboardingState.count(),
-      silhouetteProfile: await prisma.silhouetteProfile.count(),
-      lookbookPost: await prisma.lookbookPost.count(),
-      premiumEntitlement: await prisma.premiumEntitlement.count(),
-      complimentaryAccessGrant: await prisma.complimentaryAccessGrant.count(),
-      telemetryEvent: await prisma.telemetryEvent.count(),
-    })
-    try {
-      const before = await counts()
-      const requests = recordRequests(page)
-      await page.goto('/preview')
-      await passGate(page)
-      await expect(page.getByTestId('guest-preview-label')).toHaveText(LABEL)
-      await choose(page, 'guest-preview-thermal-cold')
-      await page.getByTestId('guest-preview-swap-shoes').click()
-      await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
-      await page.getByTestId('guest-preview-try-another').click()
-      await page.getByTestId('guest-preview-nav-preferences').click()
-      await page.getByTestId('guest-preview-vote-like').first().click()
-      await page.getByTestId('guest-preview-nav-wardrobe').click()
-      await page.getByTestId('guest-preview-item').first().click()
-      await page.keyboard.press('Escape')
-      expect(requests.api).toEqual([])
-      expect(requests.all.filter((request) => request.url().includes('sample:'))).toEqual(
-        []
-      )
-      // Row counts are a whole-database measure, so they only prove this journey when it
-      // runs alone (the evidence run sets STORY616_DB_ISOLATION=1). In the shared suite,
-      // other specs write rows in parallel; the zero-request proof above holds either way.
-      if (process.env.STORY616_DB_ISOLATION === '1')
-        expect(await counts()).toEqual(before)
-    } finally {
-      await prisma.$disconnect()
-    }
+  }, testInfo) => {
+    const webOrigin = new URL(testInfo.project.use.baseURL ?? page.url()).origin
+    const requests = recordRequests(page, webOrigin)
+    await page.goto('/preview')
+    await passGate(page)
+    await expect(page.getByTestId('guest-preview-label')).toHaveText(LABEL)
+    await choose(page, 'guest-preview-thermal-cold')
+    await page.getByTestId('guest-preview-swap-shoes').click()
+    await page.getByTestId('guest-preview-swap-option-white-sneakers').click()
+    await page.getByTestId('guest-preview-try-another').click()
+    await page.getByTestId('guest-preview-nav-preferences').click()
+    await page.getByTestId('guest-preview-vote-like').first().click()
+    await page.getByTestId('guest-preview-nav-wardrobe').click()
+    await page.getByTestId('guest-preview-item').first().click()
+    await page.keyboard.press('Escape')
+    expect(requests.all.length).toBeGreaterThan(0)
+    expect(requests.offAllowlist).toEqual([])
+    expect(requests.all.filter((request) => request.url().includes('sample:'))).toEqual(
+      []
+    )
+    // Row counts run in the serial real-session lane with its own database
+    // (guest-preview-real-session.spec.ts), where nothing else writes in parallel.
   })
 
   test('[P0] [6.16-E2E-003] controls change the outfit and its explanation together (AC2)', async ({
