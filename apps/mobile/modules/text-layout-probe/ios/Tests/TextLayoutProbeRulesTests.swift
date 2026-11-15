@@ -184,6 +184,13 @@ final class TextLayoutProbeRulesTests: XCTestCase {
     let below = Wire.Ancestor(
       rect: CGRect(x: 0, y: 5000, width: 390, height: 60), clips: true, scrollX: sideways)
     XCTAssertNil(Wire.scrollViewport([below, page], window))
+    // r52 P2-1: a carousel straddling its page's bottom edge shows only to that edge; the
+    // page's travel never widens the viewport back to the carousel's uncut box.
+    let straddling = Wire.Ancestor(
+      rect: CGRect(x: 0, y: 700, width: 390, height: 200), clips: true, scrollX: sideways)
+    XCTAssertEqual(
+      Wire.scrollViewport([straddling, page], window),
+      CGRect(x: 0, y: 700, width: 390, height: 100))
     // The record of a text with no sideways scroll view writes null.
     let (_, json) = try scrolledRecord(CGRect(x: 0, y: 944, width: 200, height: 40), [page])
     XCTAssertTrue(json["scrollViewport"] is NSNull)

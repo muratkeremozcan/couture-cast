@@ -187,15 +187,27 @@ test('a takeover marker whose runner died passes the takeover to the next genera
   fs.writeFileSync(marker(0), `${JSON.stringify({ pid: 777, token: 'busy' })}\n`)
   assert.equal(runner.reserve(17205, 'DEV-A'), false)
   assert.equal(fs.readFileSync(lock, 'utf8'), raw)
-  // Bounded: every generation dead skips the port.
+  // r52 P3-1: five dead generations no longer block the port; the winner removes them all.
   fs.rmSync(marker(0))
-  for (const generation of [0, 1, 2, 3])
-    fs.writeFileSync(
-      marker(generation),
-      `${JSON.stringify({ pid: 888888, token: 'gone' })}\n`
-    )
-  assert.equal(runner.reserve(17205, 'DEV-A'), false)
+  const dead = `${JSON.stringify({ pid: 888888, token: 'gone' })}\n`
+  for (const generation of [0, 1, 2, 3, 4]) fs.writeFileSync(marker(generation), dead)
+  assert.equal(runner.reserve(17205, 'DEV-A'), true)
+  assert.deepEqual(fs.readdirSync(reservations), ['17205.json'])
+  runner.release(17205)
+  // A runaway walk fails with its own error and leaves the lock and the dead markers.
+  fs.writeFileSync(lock, raw)
+  for (const generation of [0, 1, 2]) fs.writeFileSync(marker(generation), dead)
+  const capped = createIosDriverPortIo({
+    reservations,
+    pid: 101,
+    alive: (other) => live.has(other),
+    markerLimit: 3,
+  })
+  assert.throws(() => capped.reserve(17205, 'DEV-A'), {
+    code: 'maestro_driver_port_takeover_runaway',
+  })
   assert.equal(fs.readFileSync(lock, 'utf8'), raw)
+  assert.equal(fs.readdirSync(reservations).length, 4)
 })
 
 // r49 mutant M14b: a takeover that removed the dead lock and linked a new one left the port

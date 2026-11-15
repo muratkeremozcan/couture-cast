@@ -4097,6 +4097,39 @@ describe('text layout clipping (F-00i)', () => {
       ),
       false
     )
+    // r52 P2-3 A (mutant M11): two copies one drag apart share a screen place across the two
+    // pages, yet each is a moving copy seen again, so they stay two.
+    const apart = (settledPage0, settledPage1) => {
+      const change = { ...fixedChange(), platform: 'ios' }
+      change.cold = paged(
+        change.cold,
+        [near, ['Save', [40, 1500, 200, 1540], away]],
+        [nearOnPage1, ['Save', [40, 300, 200, 340]]]
+      )
+      change.settled = paged(change.settled, settledPage0, settledPage1)
+      return evaluateLiveFontChangeRaw(change).checks.textLost.lost
+    }
+    assert.deepEqual(
+      apart([near], [nearOnPage1]).filter(({ text }) => text === 'Save'),
+      [{ stage: 'settled', text: 'Save' }]
+    )
+    // r52 P2-3 C: two copies on one page are two, though both overlap one earlier copy.
+    const pair = { ...fixedChange(), platform: 'ios' }
+    pair.cold = paged(
+      pair.cold,
+      [near],
+      [
+        ['Save', [40, -900, 120, -860]],
+        ['Save', [120, -900, 200, -860]],
+      ]
+    )
+    pair.settled = paged(pair.settled, [near], [nearOnPage1])
+    assert.deepEqual(
+      evaluateLiveFontChangeRaw(pair).checks.textLost.lost.filter(
+        ({ text }) => text === 'Save'
+      ),
+      [{ stage: 'settled', text: 'Save' }]
+    )
     // Scrolled away at the cold launch on every page, it may be a volatile card's text below the
     // region's visible cut (the hierarchy cuts a region to what shows): not compared.
     assert.equal(

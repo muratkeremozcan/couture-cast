@@ -1033,29 +1033,54 @@ function hiddenOwner(record, { nodes, elements, tolerance }) {
   const identified = elements
     .map((element, index) => ({ element, index }))
     .filter(({ element }) => element.identifier !== null)
-  // TEA ruling r49 P2-1: an identified element whose frame holds the record owns it, the
-  // smallest of several; one whose label lacks the record's words leaves it unmatched, and only
-  // a record no identified element holds may join one that borders it.
+  // TEA ruling r49 P2-1, r52 P2-4 b: the smallest identified elements whose frame holds the
+  // record decide it: of those, the ones whose label holds its words own it (several are
+  // ambiguous), and none leaves it unmatched.
   const holders = best(
     identified.filter(({ element }) => contains(element.rect, rect, tolerance)),
     ({ element }) => area(element.rect)
   )
+  if (holders.length)
+    return ownerOf(
+      holders.filter(({ element }) => holdsWords(normalized(element.label), text)),
+      nodes
+    )
+  // TEA ruling r52 P2-4 a: held by no identified element, it joins the nearest element that
+  // borders it, but only when nothing else holds it apart from that element: no element (with an
+  // identifier or none) and no hierarchy node whose box holds the record without holding the
+  // element too (the badge of a card with no identifier, beside another card).
+  // An element or node named by the record's own text is the record's own box (the pill's
+  // element in the Home teaser), no container.
+  const holdsRecord = [
+    ...elements
+      .filter((element) => normalized(element.label) !== text)
+      .map((element) => element.rect),
+    ...nodes
+      .filter((node) => normalized(node.text ?? '') !== text)
+      .map((node) => node.box),
+  ].filter((box) => contains(box, rect, tolerance))
   const reach = bordersReach(record, rect, tolerance)
-  const nearest = holders.length
-    ? holders.every(({ element }) => holdsWords(normalized(element.label), text))
-      ? holders
-      : []
-    : best(
-        identified.filter(
-          ({ element }) =>
-            holdsWords(normalized(element.label), text) &&
-            gap(element.rect, rect) <= reach
-        ),
-        ({ element }) => gap(element.rect, rect)
-      )
-  if (nearest.length > 1) return { ambiguous: { elements: nearest.map((e) => e.index) } }
-  if (!nearest.length) return null
-  const [{ element, index }] = nearest
+  const nearest = best(
+    identified.filter(
+      ({ element }) =>
+        holdsWords(normalized(element.label), text) &&
+        gap(element.rect, rect) <= reach &&
+        holdsRecord.every((box) => contains(box, element.rect, tolerance))
+    ),
+    ({ element }) => gap(element.rect, rect)
+  )
+  return ownerOf(nearest, nodes)
+}
+
+/**
+ * The element of `candidates` that owns a flagged record and its hierarchy node (hiddenOwner):
+ * `{ element, node }`, `{ ambiguous }` with the tied element or node indexes, or null.
+ */
+function ownerOf(candidates, nodes) {
+  if (candidates.length > 1)
+    return { ambiguous: { elements: candidates.map((each) => each.index) } }
+  if (!candidates.length) return null
+  const [{ element, index }] = candidates
   const owners = best(
     nodes.filter(
       (node) =>

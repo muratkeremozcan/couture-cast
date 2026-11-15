@@ -99,8 +99,12 @@ const bind = (host) => new Promise((resolve) => {
 
 /** Link errors of a filesystem without hard links, where no lock can be placed atomically. */
 const LINK_UNSUPPORTED = new Set(['EPERM', 'EOPNOTSUPP', 'ENOTSUP', 'ENOSYS', 'EXDEV'])
-/** Takeover markers of one dead lock tried before the port is skipped (r49 P2-3). */
-const MARKER_GENERATIONS = 4
+/**
+ * Takeover generations of one dead lock walked before the takeover fails as
+ * maestro_driver_port_takeover_runaway (r52 P3-1): every dead generation is a crashed runner's
+ * leftover, so a real host never comes near it.
+ */
+const MARKER_RUNAWAY = 1000
 
 /** Every host call is bounded: a hung lsof, ps, pgrep or probe fails its call at 30 s. */
 const SPAWN_OPTIONS = { encoding: 'utf8', timeout: 30_000, killSignal: 'SIGKILL' }
@@ -137,6 +141,7 @@ export function createIosDriverPortIo({
     }
   },
   files = fs,
+  markerLimit = MARKER_RUNAWAY,
 } = {}) {
   const lockOf = (port) => path.join(reservations, `${port}.json`)
   /** The token of each port lock this io holds, so only its own lock is ever released. */
@@ -194,8 +199,10 @@ export function createIosDriverPortIo({
    * (`temporary`) replaced it, false when the lock is live, changed, or another runner is taking
    * it over. Markers are named after the lock's exact content and a generation, and each holds
    * its runner's pid and token, placed whole by a link: one runner places a generation, so one
-   * wins, and a generation whose runner died passes the takeover to the next, up to
-   * MARKER_GENERATIONS. The winner reads the lock again and, while it still holds that content,
+   * wins, and a generation whose runner died passes the takeover to the next, until one places
+   * or a live marker is found (r52 P3-1: a cap left the port dead for good), MARKER_RUNAWAY at
+   * most. Dead markers are removed only by the winner, since removing one elsewhere could let
+   * two runners win. The winner reads the lock again and, while it still holds that content,
    * renames its own record over it, so the lock is never absent. It then removes its marker and
    * the dead generations below it; a late runner that places a marker for content the lock no
    * longer holds finds it changed and removes its own.
@@ -212,7 +219,14 @@ export function createIosDriverPortIo({
     })
     const dead = []
     try {
-      for (let generation = 0; generation < MARKER_GENERATIONS; generation += 1) {
+      for (let generation = 0; ; generation += 1) {
+        if (generation >= markerLimit)
+          throw Object.assign(
+            new Error(
+              `maestro_driver_port_takeover_runaway: ${generation} dead takeover markers for port ${port} in ${reservations}`
+            ),
+            { code: 'maestro_driver_port_takeover_runaway' }
+          )
         const marker = path.join(reservations, `${base}.${generation}`)
         if (!place(markerTemporary, marker)) {
           const other = readOrNull(marker)
@@ -229,7 +243,6 @@ export function createIosDriverPortIo({
           files.rmSync(marker, { force: true })
         }
       }
-      return false
     } finally {
       files.rmSync(markerTemporary, { force: true })
     }

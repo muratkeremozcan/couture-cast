@@ -619,6 +619,10 @@ class TextLayoutSnapshotTest {
     assertNull(TextLayoutSnapshot.scrollViewport(listOf(card, page), window))
     val below = TextLayoutSnapshot.Level(listOf(ProbeRect(0, 9000, 1080, 9200)), scrollX = sideways)
     assertNull(TextLayoutSnapshot.scrollViewport(listOf(below, card), window))
+    // r52 P2-1: a carousel straddling its page's bottom edge shows only to that edge; the page's
+    // travel never widens the viewport back to the carousel's uncut box.
+    val straddling = TextLayoutSnapshot.Level(listOf(ProbeRect(0, 2100, 1080, 2400)), scrollX = sideways)
+    assertEquals(ProbeRect(0, 2100, 1080, 2200), TextLayoutSnapshot.scrollViewport(listOf(straddling, page), window))
     val cuts = TextLayoutSnapshot.cuts(ProbeRect(1315, 545, 1615, 616), listOf(carousel, card, page), window)
     assertEquals(ProbeRect(44, 420, 1036, 600), cuts.scrollViewport)
   }

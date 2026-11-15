@@ -1373,10 +1373,16 @@ describe('matchTextProbe, accessibility-hidden records held by an element (TEA r
     window: 1,
   })
   /** `withNodes` lists the elements a hierarchy node stands for. */
-  const probe = (elements, { rect = [20, 194, 120, 212], withNodes = elements } = {}) =>
+  const probe = (
+    elements,
+    { rect = [20, 194, 120, 212], withNodes = elements, extraNodes = [] } = {}
+  ) =>
     matchTextProbe({
       platform: 'ios',
-      nodes: withNodes.map((each) => node(each.label, each.rect, each.identifier)),
+      nodes: [
+        ...withNodes.map((each) => node(each.label, each.rect, each.identifier)),
+        ...extraNodes,
+      ],
       answer: answerFor(
         't',
         [iosRecord('Archived', rect, { accessibilityHidden: true })],
@@ -1421,6 +1427,63 @@ describe('matchTextProbe, accessibility-hidden records held by an element (TEA r
       'accessibilityHidden',
     ])
   })
+
+  // TEA ruling r52 P2-4 a (probe 4a): the card below holds the badge but carries no identifier,
+  // or is a hierarchy node only; the card above still took the badge across the gap.
+  test('a record joins a bordering element only when nothing else holds it apart from it', () => {
+    const anonymous = { ...below, identifier: null }
+    const blocked = probe([above, anonymous], { withNodes: [above] })
+    assert.deepEqual([blocked.unmatchedRecords, ownerOf(blocked)], [[0], null])
+    const viaNode = probe([above], {
+      extraNodes: [node('Winter coat', [16, 192, 386, 272], 'card-2')],
+    })
+    assert.deepEqual([viaNode.unmatchedRecords, ownerOf(viaNode)], [[0], null])
+    // A container that also holds the bordering element blocks nothing.
+    const list = { ...anonymous, rect: [0, 90, 402, 800], label: 'Saved items' }
+    assert.deepEqual(ownerOf(probe([above, list], { withNodes: [above] })), [
+      0,
+      'accessibilityHidden',
+    ])
+  })
+
+  // TEA ruling r52 P2-4 b (probe 4b, mutant M2): of the smallest holders, those whose label
+  // holds the words own the record; one owns, several are ambiguous, none leaves it unmatched.
+  // The cards' own text records pair their nodes first, as a card's title does on device.
+  test('among tied smallest holders the ones whose label holds the words decide', () => {
+    const frame = [16, 192, 386, 272]
+    const tied = (labels) => {
+      const elements = labels.map((label, index) =>
+        element(`card-${index}`, label, frame)
+      )
+      return matchTextProbe({
+        platform: 'ios',
+        nodes: elements.map((each) => node(each.label, frame, each.identifier)),
+        answer: answerFor(
+          't',
+          [
+            iosRecord('Archived', [20, 194, 120, 212], { accessibilityHidden: true }),
+            ...labels.map((label) => iosRecord(label, frame)),
+          ],
+          {
+            platform: 'ios',
+            windows: [{ ...WINDOW, rect: [0, 0, 402, 874] }],
+            elements,
+          }
+        ),
+        window: [0, 0, 402, 874],
+        tolerance: 1,
+        groupRule: false,
+      })
+    }
+    assert.deepEqual(tied(['Winter coat', 'Winter coat, Archived']).hiddenAttached, [
+      { record: 0, element: 1, node: 1 },
+    ])
+    assert.deepEqual(tied(['Coat, Archived', 'Winter coat, Archived']).hiddenAmbiguous, [
+      { record: 0, elements: [0, 1] },
+    ])
+    const none = tied(['Winter coat', 'Summer coat'])
+    assert.deepEqual([none.unmatchedRecords, none.hiddenAttached], [[0], []])
+  })
 })
 
 describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () => {
@@ -1462,6 +1525,12 @@ describe('matchTextProbe, records out of matching (TEA rulings 2026-11-14)', () 
     assert.equal(
       kindOf([500, 120, 620, 160], [400, 100, 1080, 180], [[0, 100, 200, 180]]),
       'scrolled'
+    )
+    // r52 P2-1: a carousel its outer scroll view cuts at 2200; the hierarchy cuts the region
+    // there too, and the viewport native now gives, cut the same way, lies in it.
+    assert.equal(
+      kindOf([1315, 2150, 1615, 2190], [0, 2100, 1080, 2200], [[0, 2100, 1080, 2200]]),
+      'volatile'
     )
     // No viewport known: no region this way.
     assert.equal(kindOf([1315, 545, 1615, 616], null, [[0, 475, 1080, 645]]), 'scrolled')

@@ -458,30 +458,17 @@ enum TextLayoutProbeWire {
   }
 
   /// The viewport of the nearest scroll view that can move the view sideways (TEA ruling r49
-  /// P2-2): that scroll view's frame cut by every clipping ancestor above it, outer scroll
-  /// views' bands included, and the window; nil when no such scroll view holds the view or none
-  /// of its viewport lies within reach. The harness ties a text scrolled away sideways to the
-  /// volatile region that holds this viewport.
+  /// P2-2): where that scroll view shows now, its frame cut by every clipping ancestor above it,
+  /// outer scroll views' viewports included, and the window; nil when no such scroll view holds
+  /// the view or none of its viewport shows. It only narrows (r52 P2-1): an outer scroll view's
+  /// travel would keep a carousel its outer scroll view cuts at its uncut box. The harness ties a
+  /// text scrolled away sideways to the volatile region that holds this viewport.
   static func scrollViewport(_ ancestors: [Ancestor], _ window: CGRect) -> CGRect? {
-    var x: Span? = (window.minX, window.maxX)
-    var y: Span? = (window.minY, window.maxY)
-    var onScreen = CGAffineTransform.identity
+    var shown: CGRect? = window
     var viewport: CGRect? = nil
     for ancestor in ancestors.reversed() {
-      onScreen = linear(ancestor.transform).concatenating(onScreen)
-      if ancestor.clips {
-        x = narrow(x, ancestor.rect.minX, ancestor.rect.maxX)
-        y = narrow(y, ancestor.rect.minY, ancestor.rect.maxY)
-      }
-      if ancestor.scrollX != nil {
-        viewport = nil
-        if let x, let y {
-          viewport = cut(
-            ancestor.rect, CGRect(x: x.lo, y: y.lo, width: x.hi - x.lo, height: y.hi - y.lo))
-        }
-      }
-      x = widen(x, ancestor.scrollX, scale: onScreen.a)
-      y = widen(y, ancestor.scrollY, scale: onScreen.d)
+      if ancestor.clips { shown = cut(shown, ancestor.rect) }
+      if ancestor.scrollX != nil { viewport = cut(shown, ancestor.rect) }
     }
     return viewport
   }

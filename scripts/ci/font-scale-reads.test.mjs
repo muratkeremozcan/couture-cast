@@ -534,6 +534,28 @@ describe('font-scale reads in app code', () => {
     )
   })
 
+  // r52 mutant M9a: a const key folds to its value, so a safe one passes and the font scale is
+  // reported by name; neither is left unverifiable.
+  test('a const key folds to its value on a dimensions value', () => {
+    const safe = [
+      'export function AppText() {',
+      "  const KEY = 'width'",
+      '  return useWindowDimensions()[KEY]',
+      '}',
+    ].join('\n')
+    assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': safe }), [])
+    const scale = safe.replace("'width'", "'fontScale'")
+    assert.deepEqual(fontScaleReads({ 'components/app-text.tsx': scale }), [
+      'components/app-text.tsx:3 return useWindowDimensions()[KEY]',
+    ])
+    // Folded, the font scale passes where it is allowed, which an unverifiable key never does.
+    const allowed = scale.replace(
+      'export function AppText()',
+      'export function glyphBoxSide()'
+    )
+    assert.deepEqual(fontScaleReads({ 'components/glyph-box.ts': allowed }), [])
+  })
+
   test('the scan covers every app source under apps/mobile, not three folders', () => {
     const files = sourceFiles(mobileRoot)
     assert.ok(files.includes('index.ts'), 'the entry file is scanned')

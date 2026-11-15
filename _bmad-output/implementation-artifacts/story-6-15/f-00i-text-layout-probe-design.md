@@ -141,14 +141,14 @@ probe on fails the config spec.
 
 Each record carries these rect and visibility fields (rects `[left, top, right, bottom]`):
 
-| Field            | Meaning                                                                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `visibleRect`    | `viewRect` cut by every clipping ancestor and the window; null when nothing shows                                                                      |
-| `clipRect`       | `viewRect` cut by its reach (below); null when no part of it can be brought into view                                                                  |
-| `scrolledAway`   | `visibleRect` null and `clipRect` not null: only a scroll position hides it, on the window or wholly off it                                            |
-| `offWindow`      | a translation put it wholly outside the window and out of reach: the rule below (r44 P1-1)                                                             |
-| `opacity`        | the effective opacity, unrounded on both platforms; only exactly 0 is invisible. iOS records hidden views too, at 0, as Android does alpha             |
-| `scrollViewport` | the viewport of the nearest scroll view that can move the text sideways, cut by everything above it and the window; null when none holds it (r49 P2-2) |
+| Field            | Meaning                                                                                                                                                                            |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `visibleRect`    | `viewRect` cut by every clipping ancestor and the window; null when nothing shows                                                                                                  |
+| `clipRect`       | `viewRect` cut by its reach (below); null when no part of it can be brought into view                                                                                              |
+| `scrolledAway`   | `visibleRect` null and `clipRect` not null: only a scroll position hides it, on the window or wholly off it                                                                        |
+| `offWindow`      | a translation put it wholly outside the window and out of reach: the rule below (r44 P1-1)                                                                                         |
+| `opacity`        | the effective opacity, unrounded on both platforms; only exactly 0 is invisible. iOS records hidden views too, at 0, as Android does alpha                                         |
+| `scrollViewport` | where the nearest scroll view that can move the text sideways shows now, cut by every clipper above it and the window, never widened; null when none holds it (r49 P2-2, r52 P2-1) |
 
 Reach, per axis, from the window inward: every clipping ancestor cuts the band so far, and a
 scroll view that can move on that axis then widens it by its travel, whether or not it clips
@@ -390,8 +390,8 @@ keeps its rects and opacity.
 
 - `scrollViewport` (P2-2, wire, both platforms, required): the viewport of the nearest scroll view
   that can move the text sideways (Android a HorizontalScrollView with travel, iOS a UIScrollView
-  with horizontal travel), that scroll view's box cut by every clipper above it, outer scroll
-  views' bands included, and the window; null when none holds the text. A record scrolled away
+  with horizontal travel), where that scroll view shows now: its box cut by every clipper above it,
+  outer scroll views' viewports included, and the window, never widened by any travel (r52 P2-1); null when none holds the text. A record scrolled away
   sideways joins the volatile region whose box holds that viewport's centre; a record with no
   viewport joins none this way (fail closed). Window geometry missed padded carousels and gave a
   sibling carousel's record away.
@@ -414,3 +414,25 @@ keeps its rects and opacity.
 - Lost copies (P3-1): copies are counted over the scroll-through, each once: records of one text
   whose content places (viewRect moved by the page's contentOffset) overlap are one copy, and a
   record at one screen place on every page, of any kind there, is one copy.
+
+## Harness rules after Antigravity r52, 2026-11-14
+
+Owner rule: r52 is the one local review round of PR 230; its accepted findings are fixed in PR 230
+with no re-review.
+
+- `scrollViewport` narrows only (P2-1): a carousel its outer vertical scroll view cuts keeps the cut
+  viewport, so the chip joins the region the hierarchy cuts the same way. `reach` keeps widening.
+- The capture's own stitch (`attachPages`) takes the probe records, as the judge's stitch does
+  (P2-2), so both place a short last drag alike.
+- Copies (P2-3): a record at one screen place on every page is one sticky copy only when no other
+  page holds a record of its text at its content place; copies match one to one, so the count is
+  never below any page's own. Residual: a virtualized list that unmounts the far copy stays
+  indistinguishable from a sticky header.
+- Accessibility-hidden attach (P2-4): among the smallest identified holders, those whose label holds
+  the words own the record (several are ambiguous, none leaves it unmatched). Bordering applies only
+  when no element (any identifier) and no hierarchy node holds the record without also holding the
+  bordering element; an element or node named by the record's own text is the record's own box
+  (the teaser pill's element) and blocks nothing.
+- Port lock takeover (P3-1): generations are walked until one places or a live marker is found,
+  with a runaway bound (`maestro_driver_port_takeover_runaway`); only the winner removes dead
+  markers.

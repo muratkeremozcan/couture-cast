@@ -517,31 +517,18 @@ class TextLayoutSnapshot(private val classes: ReactNativeTextClasses) {
 
     /**
      * The viewport of the nearest scroll view that can move the view sideways (TEA ruling r49
-     * P2-2): that scroll view's box cut by every level's cuts above it and its own, outer scroll
-     * views' bands included, and the window; null when no such scroll view holds the view or none
-     * of its viewport lies within reach. The harness ties a text scrolled away sideways to the
-     * volatile region that holds this viewport.
+     * P2-2): where that scroll view shows now, its box cut by every level's cuts above it and its
+     * own, outer scroll views' viewports included, and the window; null when no such scroll view
+     * holds the view or none of its viewport shows. It only narrows (r52 P2-1): an outer scroll
+     * view's travel would keep a carousel its outer scroll view cuts at its uncut box. The
+     * harness ties a text scrolled away sideways to the volatile region that holds this viewport.
      */
     fun scrollViewport(levels: List<Level>, windowRect: ProbeRect): ProbeRect? {
-      var x: Span? = Span(windowRect.left, windowRect.right)
-      var y: Span? = Span(windowRect.top, windowRect.bottom)
-      var scaleX = 1f
-      var scaleY = 1f
+      var shown: ProbeRect? = windowRect
       var viewport: ProbeRect? = null
       for (level in levels.asReversed()) {
-        scaleX *= level.transform.scaleX
-        scaleY *= level.transform.scaleY
-        for (cut in level.cuts) {
-          x = x?.narrow(cut.left, cut.right)
-          y = y?.narrow(cut.top, cut.bottom)
-        }
-        if (level.scrollX != null) {
-          val across = x
-          val down = y
-          viewport = if (across != null && down != null) ProbeRect(across.lo, down.lo, across.hi, down.hi) else null
-        }
-        x = widen(x, level.scrollX, scaleX)
-        y = widen(y, level.scrollY, scaleY)
+        for (cut in level.cuts) shown = shown?.intersect(cut)
+        if (level.scrollX != null) viewport = shown
       }
       return viewport
     }

@@ -144,9 +144,15 @@ export function attachPages(
     capture.fullText = undefined
     return capture
   }
+  // The probe records measure a step beside the nodes, as the judge's stitch (pageCaptures)
+  // takes them (r52 P2-2): a drag whose hierarchy boxes the viewport clamps still moves them.
   capture.fullText = stitchPages(
     pages.map((page) => page.nodes),
-    { expectedShift, reachedBottom }
+    {
+      expectedShift,
+      reachedBottom,
+      records: pages.map((page) => page.textProbe?.records ?? []),
+    }
   )
   capture.pages = pages
   capture.pageShift = expectedShift

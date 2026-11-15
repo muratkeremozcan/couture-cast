@@ -1450,9 +1450,6 @@ function recordTexts(capture, platform, compared) {
   const near = (a, b) => Math.abs(a - b) <= tolerance
   const sameScreen = (a, b) =>
     a.text === b.text && near(a.screen[0], b.screen[0]) && near(a.screen[1], b.screen[1])
-  const sticky = (entry) =>
-    pages.length > 1 &&
-    every.every((list) => list.some((other) => sameScreen(other, entry)))
   const sameCopy = (a, b) =>
     a.text === b.text &&
     a.content[0] < b.content[2] + tolerance &&
@@ -1461,16 +1458,30 @@ function recordTexts(capture, platform, compared) {
       near(a.content[3], b.content[3]) ||
       (a.content[1] < b.content[3] - tolerance &&
         b.content[1] < a.content[3] - tolerance))
+  // Sticky: at one screen place on every page, and no other page holds a record of its text at
+  // its content place (r52 P2-3 A: two copies one drag apart share a screen place, but each is a
+  // moving copy seen again).
+  const sticky = (entry, page) =>
+    pages.length > 1 &&
+    every.every((list) => list.some((other) => sameScreen(other, entry))) &&
+    !every.some(
+      (list, other) => other !== page && list.some((each) => sameCopy(each, entry))
+    )
+  // One to one (r52 P2-3 C): an earlier copy is seen again by at most one record of a page, so
+  // the count is never below any page's own.
   const copies = []
-  for (const list of placed) {
+  placed.forEach((list, page) => {
     const before = copies.length
+    const seen = new Set()
     for (const entry of list) {
-      const known = copies
-        .slice(0, before)
-        .some((copy) => (sticky(entry) ? sameScreen(copy, entry) : sameCopy(copy, entry)))
-      if (!known) copies.push(entry)
+      const same = sticky(entry, page) ? sameScreen : sameCopy
+      const match = copies.findIndex(
+        (copy, index) => index < before && !seen.has(index) && same(copy, entry)
+      )
+      if (match >= 0) seen.add(match)
+      else copies.push(entry)
     }
-  }
+  })
   const texts = new Map()
   for (const { text } of copies) texts.set(text, (texts.get(text) ?? 0) + 1)
   return texts
