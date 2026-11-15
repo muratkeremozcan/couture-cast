@@ -10,12 +10,18 @@ const allowed = (method: string, url: string, webOrigin: string) =>
   isAllowedGuestPreviewRequest({ method, url }, webOrigin)
 
 describe('guest preview request allowlist', () => {
-  it('allows only safe methods from the web origin outside /api/ and /ingest/', () => {
+  it('allows only safe methods from the web origin outside /api/, and the /ingest/ proxy', () => {
     expect(allowed('GET', `${LOCAL}/preview?view=wardrobe`, LOCAL)).toBe(true)
     expect(allowed('GET', `${LOCAL}/_next/static/chunk.js`, LOCAL)).toBe(true)
     expect(allowed('POST', `${LOCAL}/preview`, LOCAL)).toBe(false)
     expect(allowed('GET', `${LOCAL}/api/v1/ritual`, LOCAL)).toBe(false)
-    expect(allowed('GET', `${LOCAL}/ingest/e/`, LOCAL)).toBe(false)
+    expect(allowed('GET', `${LOCAL}/ingest/static/exception-autocapture.js`, LOCAL)).toBe(
+      true
+    )
+    expect(allowed('POST', `${LOCAL}/ingest/i/v0/e/`, LOCAL)).toBe(true)
+    expect(allowed('PUT', `${LOCAL}/ingest/i/v0/e/`, LOCAL)).toBe(false)
+    expect(allowed('DELETE', `${LOCAL}/ingest/e/`, LOCAL)).toBe(false)
+    expect(allowed('POST', 'https://us.i.posthog.com/i/v0/e/', LOCAL)).toBe(false)
     expect(allowed('GET', 'http://localhost:4000/api/v1/ritual', LOCAL)).toBe(false)
     expect(allowed('POST', 'http://127.0.0.1:54321/rest/v1/garment_items', LOCAL)).toBe(
       false
@@ -29,8 +35,10 @@ describe('guest preview request allowlist', () => {
       for (const method of ['POST', 'PUT', 'PATCH', 'DELETE'])
         expect(allowed(method, `${base}/preview`, base), `${method} ${base}`).toBe(false)
       for (const method of ['HEAD', 'OPTIONS'])
-        for (const path of ['/api/v1/ritual', '/ingest/e/'])
-          expect(allowed(method, `${base}${path}`, base), `${method} ${path}`).toBe(false)
+        expect(allowed(method, `${base}/api/v1/ritual`, base), `${method} api`).toBe(
+          false
+        )
+      expect(allowed('OPTIONS', `${base}/ingest/e/`, base), 'OPTIONS ingest').toBe(false)
     }
   })
 

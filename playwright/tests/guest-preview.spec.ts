@@ -26,10 +26,12 @@ type CapturedEvent = { event: string; properties: Record<string, unknown> }
 
 /**
  * E1: every request the guest page makes is recorded. `isAllowedGuestPreviewRequest`
- * allows only the safe methods GET, HEAD and OPTIONS to the web origin outside `/api/` and
- * `/ingest/`, plus the Vercel toolbar on a preview deployment; anything else (the API
- * origin, the Supabase origin, any other host, or a write to any origin) lands in
- * `offAllowlist`, so a direct browser write cannot slip past a path check.
+ * allows only the safe methods GET, HEAD and OPTIONS to the web origin outside `/api/`,
+ * GET, HEAD and POST to the web origin's `/ingest/` PostHog proxy (a keyed build such as
+ * production loads the SDK bundle and sends guest_preview_* batches there; their content
+ * is proven by the analytics wire test), plus the Vercel toolbar on a preview deployment.
+ * Anything else (the API origin, the Supabase origin, any other host, or a write to any
+ * other path) lands in `offAllowlist`, so a direct browser write cannot slip past.
  */
 function recordRequests(page: Page, webOrigin: string) {
   const all: Request[] = []
