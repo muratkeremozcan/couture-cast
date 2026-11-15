@@ -777,6 +777,11 @@ if (command === 'prebuild') {
     assertNativeProbeMode(probeModeCheck)
   }
 } else if (command === 'build') {
+  // A record an earlier build left would publish a failure this build did not have, also when
+  // this build fails before it runs (CodeRabbit on PR 232), so it is cleared first.
+  fs.rmSync(path.join(directory, `native-build-failure-${platform}.json`), {
+    force: true,
+  })
   ownedEnv()
   const { configuration, arch } = buildSelection({
     platform,
@@ -818,10 +823,6 @@ if (command === 'prebuild') {
     arch,
     derivedData: option('derived-data') ?? IOS_DERIVED_DATA,
     workletsArgs: workletsStaging?.args ?? [],
-  })
-  // A record an earlier build left would publish a failure this build did not have.
-  fs.rmSync(path.join(directory, `native-build-failure-${platform}.json`), {
-    force: true,
   })
   const buildStarted = performance.now()
   const result = spawnSync(binary, args, {

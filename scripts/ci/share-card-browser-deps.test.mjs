@@ -221,6 +221,19 @@ describe('apt source rewrite', () => {
         !error.message.includes('example.org') &&
         error.message.includes('URIs: https://***@unknown.invalid/ubuntu')
     )
+    // CodeRabbit on PR 232: a `?` in the password is still userinfo to APT, so the mask runs to
+    // the authority's last `@` whatever the userinfo holds.
+    await assert.rejects(
+      provisionShareCardBrowsers(
+        fixture({
+          readSource: async () => 'URIs: https://build:sec?r#et@unknown.invalid/ubuntu\n',
+        }).options
+      ),
+      (error) =>
+        !error.message.includes('sec') &&
+        !error.message.includes('build') &&
+        error.message.includes('URIs: https://***@unknown.invalid/ubuntu')
+    )
     await assert.rejects(
       provisionShareCardBrowsers(fixture({ readSource: async () => '# none\n' }).options),
       { message: 'official_ubuntu_archive_required: no active apt source line' }

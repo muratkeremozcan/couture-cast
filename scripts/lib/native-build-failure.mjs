@@ -37,7 +37,9 @@ const signatures = [
 ]
 const classifications = new Set([...signatures.map(([id]) => id), 'killed', 'unknown'])
 const signals = new Set(['SIGKILL', 'SIGTERM', 'SIGINT', 'SIGABRT', 'SIGSEGV'])
-const TASK = /^:[A-Za-z0-9_.-]+(?::[A-Za-z0-9_.-]+)*$/
+// Project and task names; the task alone may carry a bounded bracket qualifier, the ABI of a
+// native task (`:app:buildCMakeDebug[arm64-v8a]`).
+const TASK = /^(?::[A-Za-z0-9_.-]+)+(?:\[[A-Za-z0-9_.-]{1,40}\])?$/
 const MAX_TASKS = 10
 const invalid = () => {
   throw new Error('invalid_native_build_failure')

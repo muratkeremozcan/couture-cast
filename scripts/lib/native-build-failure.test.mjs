@@ -83,6 +83,31 @@ describe('native build failure record', () => {
     assert.equal(failedTasks.join('').includes('Avery'), false)
   })
 
+  // CodeRabbit on PR 232: native tasks carry their ABI in brackets.
+  test('keeps an ABI-qualified native task, bounded', () => {
+    const log = [
+      '> Task :app:buildCMakeDebug[arm64-v8a] FAILED',
+      '> Task :app:buildCMakeDebug[x86_64] FAILED',
+      `> Task :app:buildCMakeDebug[${personal}] FAILED`,
+      `> Task :app:buildCMakeDebug[${'a'.repeat(41)}] FAILED`,
+    ].join('\n')
+    const record = summarizeNativeBuildFailure({ ...base, log })
+    assert.deepEqual(record.failedTasks, [
+      ':app:buildCMakeDebug[arm64-v8a]',
+      ':app:buildCMakeDebug[x86_64]',
+    ])
+    assertNativeBuildFailure(record)
+    for (const task of [
+      ':app:a[]',
+      ':app:a[x][y]',
+      ':app[x]:a',
+      `:app:a[${'a'.repeat(41)}]`,
+    ])
+      assert.throws(() => assertNativeBuildFailure({ ...record, failedTasks: [task] }), {
+        message: 'invalid_native_build_failure',
+      })
+  })
+
   test('the schema refuses any open field', () => {
     const record = summarizeNativeBuildFailure({ ...base, log: '' })
     assertNativeBuildFailure(record)

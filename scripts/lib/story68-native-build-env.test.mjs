@@ -277,6 +277,26 @@ describe('Android build environment', () => {
     const end = source.indexOf('\n} else if', start)
     const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-build-failure-unit-'))
     try {
+      // CodeRabbit on PR 232: a retry whose preparation throws must not leave the earlier
+      // record to publish, so the record is cleared before any preparation step.
+      fs.writeFileSync(path.join(directory, 'native-build-failure-android.json'), 'stale')
+      assert.throws(
+        () =>
+          vm.runInNewContext(`(() => {${source.slice(start, end)}})()`, {
+            ownedEnv: () => {
+              throw new Error('owned_env_required')
+            },
+            path,
+            fs: { rmSync: (file, options) => fs.rmSync(file, options) },
+            directory,
+            platform: 'android',
+          }),
+        /owned_env_required/
+      )
+      assert.equal(
+        fs.existsSync(path.join(directory, 'native-build-failure-android.json')),
+        false
+      )
       fs.writeFileSync(path.join(directory, 'native-build-failure-android.json'), 'stale')
       const written = []
       let clock = 0
