@@ -363,6 +363,11 @@ describe('android-native.yml', () => {
 // tarpit, Metro and the flow pass, and fails when any one of them does not.
 describe('android-network-timeout.sh', () => {
   const script = path.resolve(NETWORK_SCRIPT)
+  const MANIFEST = JSON.stringify({
+    launchAsset: {
+      url: 'http://10.0.2.2:8081/apps/mobile/index.ts.bundle?platform=android&dev=true&transform.engine=hermes',
+    },
+  })
   // `expectLeak`: the caller expects Metro's grandchild to survive, so it is read at once rather
   // than given time to exit. Every stub process left behind is killed before the run returns.
   const run = (env = {}, { scriptText, expectLeak = false } = {}) => {
@@ -384,10 +389,11 @@ describe('android-network-timeout.sh', () => {
             mode: 0o755,
           }
         )
-      // The tarpit stub lives as long as Metro's, so a slow Metro start cannot outlast it.
+      // The tarpit stub lives as long as Metro's, so a slow Metro start cannot outlast it. The
+      // manifest reader is the real one.
       stub(
         path.join(bin, 'node'),
-        `[ -n "$TARPIT_DIES" ] && exit 1\necho $$ >> "${dir}/stub-pids"\nexec /bin/sleep 30`
+        `if [ "$1" = scripts/lib/expo-manifest-bundle-url.mjs ]; then shift; exec "${process.execPath}" "${path.resolve('scripts/lib/expo-manifest-bundle-url.mjs')}" "$@"; fi\n[ -n "$TARPIT_DIES" ] && exit 1\necho $$ >> "${dir}/stub-pids"\nexec /bin/sleep 30`
       )
       // Metro's stub records the env it got and leaves a grandchild, as npx and expo start do. It
       // publishes the grandchild's pid in one rename, so a reader never sees half a pid.
@@ -398,9 +404,11 @@ describe('android-network-timeout.sh', () => {
       // Real Metro answers its status route only once it runs, so the stub does too: it answers
       // after Metro's grandchild exists. Without this the script could finish, and stop Metro,
       // before the grandchild was forked, and the leak check below would pass with no cleanup.
+      // Asked for the Android manifest, it answers with one whose launch asset names the bundle on
+      // the emulator's host alias, as Metro does for the device (MANIFEST overrides it).
       stub(
         path.join(bin, 'curl'),
-        `[ -n "$METRO_DOWN" ] && exit 7\ni=0\nwhile [ ! -f "${dir}/metro-child" ] && [ $i -lt 100 ]; do /bin/sleep 0.1; i=$((i + 1)); done\n[ -f "${dir}/metro-child" ] || exit 7\necho packager-status:running`
+        `[ -n "$METRO_DOWN" ] && exit 7\ni=0\nwhile [ ! -f "${dir}/metro-child" ] && [ $i -lt 100 ]; do /bin/sleep 0.1; i=$((i + 1)); done\n[ -f "${dir}/metro-child" ] || exit 7\ncase "$*" in *expo-platform*) printf '%s' "\${MANIFEST:-${MANIFEST.replace(/"/g, '\\"')}}"; exit 0;; esac\necho packager-status:running`
       )
       stub(path.join(bin, 'adb'), 'exit 0')
       stub(path.join(bin, 'sleep'), 'exit 0')
@@ -495,10 +503,23 @@ describe('android-network-timeout.sh', () => {
       calls,
       /^adb -s emulator-5554 install -r apps\/mobile\/android\/app\/build\/outputs\/apk\/debug\/app-debug\.apk$/m
     )
+    // Android native run 43653227338: the warm-up builds the bundle the manifest names, on the
+    // host Metro listens on, so the app's first load is not a cold build of a different entry.
     assert.match(
       calls,
-      /^maestro --device emulator-5554 test -e MAESTRO_APP_ID=com\.couturecast\.app -e APP_URL=mobile:\/\/expo-development-client\/\?url=http%3A%2F%2F10\.0\.2\.2%3A8081 --test-output-dir .*\/evidence\/maestro maestro\/network-timeout\/dev-client-timeout\.yaml$/m
+      /^curl -fsS --max-time 600 -o \/dev\/null http:\/\/127\.0\.0\.1:8081\/apps\/mobile\/index\.ts\.bundle\?platform=android&dev=true&transform\.engine=hermes$/m
     )
+    // The same run: without disableOnboarding=1 the dev menu onboarding covered the mounted app.
+    assert.match(
+      calls,
+      /^maestro --device emulator-5554 test -e MAESTRO_APP_ID=com\.couturecast\.app -e APP_URL=mobile:\/\/expo-development-client\/\?url=http%3A%2F%2F10\.0\.2\.2%3A8081&disableOnboarding=1 --test-output-dir .*\/evidence\/maestro maestro\/network-timeout\/dev-client-timeout\.yaml$/m
+    )
+  })
+
+  test('fails before the flow when the manifest names no bundle', () => {
+    const { status, calls } = run({ MANIFEST: '{}' })
+    assert.notEqual(status, 0)
+    assert.doesNotMatch(calls, /^maestro /m)
   })
 
   test('fails when the flow fails', () => {

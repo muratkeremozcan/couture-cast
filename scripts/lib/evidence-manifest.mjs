@@ -69,7 +69,11 @@ export const LEGS = {
   'network-timeout': {
     paths: [...SHARED_INPUTS],
     globs: [],
-    entries: ['scripts/ci/android-network-timeout.sh', 'scripts/lib/network-tarpit.mjs'],
+    entries: [
+      'scripts/ci/android-network-timeout.sh',
+      'scripts/lib/network-tarpit.mjs',
+      'scripts/lib/expo-manifest-bundle-url.mjs',
+    ],
   },
   'android-evidence': {
     paths: [...SHARED_INPUTS],

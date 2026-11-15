@@ -81,8 +81,13 @@ export const NETWORK_LINES = [
   'set -m',
   "curl -fsS --max-time 5 http://127.0.0.1:8081/status | grep -q 'packager-status:running'",
   'kill -0 "$tarpit"',
+  // The bundle the app's manifest names, built before the flow (run 43653227338 built it cold).
+  "bundle=$(curl -fsS --max-time 30 -H 'expo-platform: android' -H 'accept: application/expo+json,application/json' http://127.0.0.1:8081/ | node scripts/lib/expo-manifest-bundle-url.mjs http://127.0.0.1:8081)",
+  'curl -fsS --max-time 600 -o /dev/null "$bundle"',
   'adb -s "$ANDROID_SERIAL" install -r "$apk"',
-  '"$HOME/.maestro/bin/maestro" --device "$ANDROID_SERIAL" test -e MAESTRO_APP_ID=com.couturecast.app -e \'APP_URL=mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081\' --test-output-dir "$evidence/maestro" maestro/network-timeout/dev-client-timeout.yaml',
+  // disableOnboarding=1 finishes the dev menu onboarding for this launch; without it the
+  // onboarding sheet covers the app after it mounts (run 43653227338).
+  '"$HOME/.maestro/bin/maestro" --device "$ANDROID_SERIAL" test -e MAESTRO_APP_ID=com.couturecast.app -e \'APP_URL=mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081&disableOnboarding=1\' --test-output-dir "$evidence/maestro" maestro/network-timeout/dev-client-timeout.yaml',
 ]
 export const NETWORK_APK =
   'apk=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk'
