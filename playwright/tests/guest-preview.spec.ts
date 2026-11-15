@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16: the web guest preview end to end on the local stack.
 // W-GATE-*, W-NO-PROTECTED-CALLS, W-NAV-HISTORY, W-RELOAD-RESUME, W-RAPID-CHANGES,
 // W-GATE-TAMPER, E-NO-DB-WRITES, E-GATE-SERVER-WINS, T-NO-PAGEVIEW, T-BEFORE-ELIGIBILITY,

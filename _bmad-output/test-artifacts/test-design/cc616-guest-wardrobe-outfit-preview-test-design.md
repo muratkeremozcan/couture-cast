@@ -293,6 +293,11 @@ held in the storage adapter or the API route double; no sleeps.
 - TEA-5: padded whitespace in the gate passes because D2 reuses the signup rule, which trims.
 - TEA-6: web guest state lives in shared `localStorage`, so the web store listens to the `storage`
   event; an external change bumps the epoch, drops queued writes and re-reads.
+- TEA-7: the review shows the localized rejected copy on a 403 where D8 says server message;
+  accepted, because it states the same refusal in every locale.
+- TEA-8: Maestro guest flows run in a signed-out mode of `scripts/run-maestro.mjs`: Metro without
+  either E2E token and with `EXPO_PUBLIC_E2E_AUTH_MODE=real`, `clearState` on launch, in their own
+  shard. A sign-out step cannot work because the fixture token wins over the native session.
 - No disagreement with D1 to D10 beyond these clarifications.
 
 ## Seeded-defect proofs

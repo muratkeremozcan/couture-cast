@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 E-CONV-REAL-STACK (web): a guest signs up from the preview, signs in through
 // the real local OTP, and applies the preview's comfort settings through the verified API.
 // Runs only in the owned real-session lane (npm run test:pw-real-session).

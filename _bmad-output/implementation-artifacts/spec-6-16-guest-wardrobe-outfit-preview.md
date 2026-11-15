@@ -569,6 +569,11 @@ TEA rulings on the frozen spec (clarifications, no decision reversed):
 - TEA-6: web guest state lives in shared `localStorage`, so the web store listens to the `storage`
   event; an external change bumps the epoch, drops queued writes and re-reads
   (`L-CROSS-TAB-*`, S-20).
+- TEA-7: the review shows the localized rejected copy on a 403 where D8 says server message;
+  accepted, because it states the same refusal in every locale.
+- TEA-8: Maestro guest flows run in a signed-out mode of `scripts/run-maestro.mjs`: Metro without
+  either E2E token and with `EXPO_PUBLIC_E2E_AUTH_MODE=real`, `clearState` on launch, in their own
+  shard. A sign-out step cannot work because the fixture token wins over the native session.
 
 Red-first order for the build:
 

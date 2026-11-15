@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-13.
-Added Steps 40 to 55:
+Updated: 2026-11-15.
+Added Steps 40 to 56:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -19,6 +19,7 @@ Added Steps 40 to 55:
 - Step 53: Story 6.13, immutable moderation history, `63bd6fcd` (PR #197), merged on 2026-11-06.
 - Step 54: Story 6.14, complimentary full access, `1fa40089` (PR #198), merged on 2026-11-10.
 - Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
+- Step 56: Story 6.16, guest wardrobe and outfit preview, in review on `feat/story-6-16-guest-wardrobe-outfit-preview`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -26,6 +27,8 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 56 for Story 6.16 while its PR is in review, with Step 56 in `Current position` and `The whole project in plain English`.
+Step 56 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Closed Story 6.15 at its Step 0 by owner ruling on 2026-11-14: PRs #226 and #229 merged and PR #230 closes it; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, backlog in `sprint-status.yaml`.
 Added Step 55 for Story 6.15 while its Step 0 is in progress on draft PR #226, with Step 55 in `Current position` and `The whole project in plain English`.
 Step 55 departs from instruction 2 the same way Steps 38, 39 and 49 did, because Steps 1 to 4 of the story have not started.
@@ -123,6 +126,9 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
+- In review: Step 56, Story 6.16, guest wardrobe and outfit preview, `in-progress` in `sprint-status.yaml`.
+  Its plan is `_bmad-output/implementation-artifacts/spec-6-16-guest-wardrobe-outfit-preview.md`.
+  Step 56 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 - Closing: Step 55, Story 6.15, SDK 54 readiness and the live font-scale proof, `done` in `sprint-status.yaml` with PR #230.
   PRs #226 (`814ce811`) and #229 (`f49027e4`) merged on SDK 54; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, `backlog`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`.
@@ -279,6 +285,7 @@ Read it before changing or adding a numbered step.
 |   53 | Lock moderation history. Erasure may remove only who was involved.           |
 |   54 | Let the owner give a member everything free. Keep the gift out of billing.   |
 |   55 | Climb one SDK at a time to the fix. Make text grow live with no restart.     |
+|   56 | Let visitors try a sample closet first. Save only comfort, and only on yes.  |
 
 ## Special feature: AI garment tagging
 
@@ -11226,3 +11233,192 @@ flowchart TD
   Classes -->|"known-residual"| Baseline["reviewed entry in\nlive-font-residual-baselines.json"]
   Oracle --> Verdict["aggregate verdict\nnonzero exit on any failed leg"]
 ```
+
+## Step 56: Guest wardrobe and outfit preview
+
+User/business impact:
+
+A new visitor could not see CoutureCast work before creating an account and capturing a wardrobe.
+The landing hero was fixed text, and a signed-out mobile launch called the guarded ritual API with
+an empty token and showed "Unable to load daily recommendations".
+Story 6.16 adds an optional guest preview on web (`/preview`) and mobile (`/preview`).
+After a self-reported age gate, a visitor explores a first-party sample wardrobe, sees a complete
+sample outfit for an example weather, and watches the outfit and its explanation change as they
+move the real comfort settings, swap garments or rate nine looks.
+Nothing reaches an account except the three comfort values, and only after a verified sign-in that
+started in the preview and an explicit yes on one review screen.
+Signed-out mobile Home now shows a welcome card and sends no ritual request.
+
+Key takeaways:
+
+1. **One pure core, two thin clients.**
+   `packages/utils/src/sample-wardrobe/` holds the catalog, the art, the policy, the guest state,
+   the store, the strings and the comfort carryover.
+   Web and mobile only render and persist, so both say the same thing for the same state.
+2. **Share the rule, prove the move with a golden.**
+   The comfort thresholds, the thermal offset, the range resolver, the outerwear cutoff and the
+   close-match table moved from the ritual engine into `packages/utils/src/comfort-rules.ts`.
+   A golden of 1,377 engine cells (14 boundary weathers, every comfort setting, two locales, and
+   five capsules) was recorded on the old engine first and reproduced byte for byte after.
+   Seeded defects in the wind comparison and the capsule cutoff turn it red.
+3. **Fixtures sit on the thresholds.**
+   The three example weathers are chosen so each control flips something real: `mild-dry` with cold
+   adds a layer at 13 degrees, wind high drops the wind layer at 6.5 m/s, rain low drops the rain
+   layer at 0.6 and 1.2 mm, and warm reaches hot at exactly 25.
+4. **Outfit and explanation come from one result.**
+   `selectSampleOutfit` returns the look, the garments and a list of explanation keys with
+   parameters from the same context, so the copy cannot contradict the tiles.
+5. **Guest state is bounded and ordered.**
+   A strict zod schema, a fixed 24-hour window that reset never moves, ids filtered to the current
+   catalog, and an epoch on every queued write, so a late write cannot undo a reset, exit, expiry or
+   identity change.
+   Web adopts changes from other tabs through the `storage` event.
+6. **Only the verified review writes, and it reads first.**
+   `applyComfortCarryover` reads, writes only on a difference, reads back before success, and goes
+   stale when the member changes, so a timed-out write is never sent twice.
+7. **Analytics count usage, never activation.**
+   Three `guest_preview_*` events carry closed enums only; the privacy filter drops URL keys on them
+   and drops page and screen views on preview routes; the anonymous id rotates before the signup
+   handoff.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- The first golden passed no capsules, so the capsule engine, which this story also changed, was
+  never exercised; TEA's seeds in the capsule cutoff stayed green until capsules joined the grid.
+- Prettier reformats a JSON golden on commit; both goldens are now per-cell SHA-256 lines.
+- `localStorage` is shared across tabs: an exit in tab B was undone by tab A's next write until the
+  store learned `syncExternal`.
+- A sign-in from the plain `/signin` on a shared device used to pick up a stored carryover intent;
+  the review now needs `from=preview` on the sign-in and a stored intent.
+- A router mock that returns a new object each render re-ran the session effect forever; Next.js
+  hands out a stable router, and the mocks do too.
+- Global row counts only prove "no writes" when the journey runs alone; in the shared Playwright
+  suite the proof is zero `/api/` requests and no `sample:` id on the wire.
+
+Story/Task mapping:
+
+- Task 1 (register 6-16), Task 2 (engine golden and comfort-rules extraction)
+- Task 3 (catalog, art, strings, policy, state, store, carryover)
+- Task 4 (web preview), Task 5 (mobile Home welcome card and preview)
+- Task 6 (signup and sign-in `from=preview`, review screens), Task 7 (guest analytics)
+- Task 8 (localization, accessibility, labels, art fallback), Task 9 (Playwright and Maestro)
+- Task 10 (this learning path step and the evidence)
+
+Story reference:
+
+- `_bmad-output/implementation-artifacts/spec-6-16-guest-wardrobe-outfit-preview.md`, decisions D1
+  to D10, the I/O matrix and the Plan Change Log
+- `_bmad-output/test-artifacts/test-design/cc616-guest-wardrobe-outfit-preview-test-design.md`,
+  risks R1 to R17, rulings TEA-1 to TEA-8 and the scenario IDs cited here
+- `_bmad-output/test-artifacts/story-6-16/`, the evidence directory
+
+Cross-links:
+
+- Step 9 (Story 2.2 comfort calibration) provides the comfort API the review writes through.
+- Step 31 provides the capsule engine whose cutoff now reads the shared rules.
+- Step 43 provides the verified web and native sessions the preview resolves before guest mode,
+  and the real-session Playwright lane the carryover proof runs in.
+- Step 8 provides the analytics registry and the privacy filter the guest events join.
+
+Sequence to follow:
+
+1. `packages/utils/src/comfort-rules.ts` and
+   `apps/api/src/modules/personalization/ritual-generation.engine.golden.spec.ts`.
+2. `packages/utils/src/sample-wardrobe/catalog.ts`, `art.ts` and `selector.ts`.
+3. `packages/utils/src/sample-wardrobe/state.ts`, `store.ts` and `carryover.ts`.
+4. `packages/utils/src/sample-wardrobe/format.ts` and `strings/`.
+5. `apps/web/src/lib/guest-preview.ts`, then
+   `apps/web/src/app/components/guest-preview/guest-preview.tsx` and `guest-preview-review.tsx`.
+6. `apps/web/src/app/signin/page.tsx` and `apps/web/src/app/signup/signup-form.tsx`.
+7. `packages/api-client/src/types/analytics-events.ts` and
+   `packages/api-client/src/analytics-privacy.ts`.
+8. `apps/mobile/src/lib/member-session.ts`, `apps/mobile/app/(tabs)/index.tsx` and
+   `apps/mobile/src/features/preview/`.
+
+Task owner map:
+
+- Story 6.16 Task 2 owner: share the comfort rules in `packages/utils/src/comfort-rules.ts`, read by `apps/api/src/modules/personalization/ritual-generation.engine.ts` and `apps/api/src/modules/personalization/capsule-recommendation.engine.ts`, pinned by `apps/api/src/modules/personalization/ritual-generation.engine.golden.spec.ts`.
+- Story 6.16 Task 3 owner: define the catalog in `packages/utils/src/sample-wardrobe/catalog.ts`, the art in `packages/utils/src/sample-wardrobe/art.ts`, the policy in `packages/utils/src/sample-wardrobe/selector.ts`, the state in `packages/utils/src/sample-wardrobe/state.ts`, the store in `packages/utils/src/sample-wardrobe/store.ts`, the carryover in `packages/utils/src/sample-wardrobe/carryover.ts`, and the strings in `packages/utils/src/sample-wardrobe/strings/`.
+- Story 6.16 Task 4 owner: run the web preview from `apps/web/src/lib/guest-preview.ts` and `apps/web/src/app/components/guest-preview/`, routed at `apps/web/src/app/preview/page.tsx` and `apps/web/src/app/preview/continue/page.tsx`, entered from `apps/web/src/app/page.tsx`.
+- Story 6.16 Task 5 owner: gate Home on `apps/mobile/src/lib/member-session.ts` in `apps/mobile/app/(tabs)/index.tsx` with `apps/mobile/src/features/preview/signed-out-welcome.tsx`.
+- Story 6.16 Task 5 step 2 owner: run the mobile preview from `apps/mobile/src/lib/guest-preview-store.ts`, `apps/mobile/src/lib/guest-preview.ts` and `apps/mobile/src/features/preview/`, routed at `apps/mobile/app/preview.tsx` and `apps/mobile/app/preview-continue.tsx`.
+- Story 6.16 Task 6 owner: honor `from=preview` in `apps/web/src/app/signin/page.tsx`, `apps/web/src/app/signup/page.tsx`, `apps/web/src/app/signup/signup-form.tsx`, `apps/mobile/app/signin.tsx`, `apps/mobile/app/signup.tsx` and `apps/mobile/src/features/signup/signup-screen.tsx`.
+- Story 6.16 Task 7 owner: register the events in `packages/api-client/src/types/analytics-events.ts`, filter them in `packages/api-client/src/analytics-privacy.ts`, list the routes in `packages/api-client/src/analytics-routes.ts`, and rotate the id in `apps/web/src/analytics/browser-analytics.ts`.
+- Story 6.16 Task 9 owner: drive the web journeys in `playwright/tests/guest-preview.spec.ts` and the carryover in `playwright/tests/guest-preview-real-session.spec.ts`, counted in `scripts/e2e-real-session/harness.mjs`.
+
+Tests that cover this step:
+
+Shared core, Vitest:
+
+- [`packages/utils/src/comfort-rules.spec.ts`](../../packages/utils/src/comfort-rules.spec.ts):
+  proves every threshold, offset and band edge, and the rounded rain comparison at 0.204, 0.14 and
+  2.04.
+- [`packages/utils/src/sample-wardrobe/catalog.spec.ts`](../../packages/utils/src/sample-wardrobe/catalog.spec.ts):
+  proves 34 garments, 12 looks and 9 cards, complete cores, provenance, and that all 243 contexts
+  reach two or more looks with the right protective layer.
+- [`packages/utils/src/sample-wardrobe/selector.spec.ts`](../../packages/utils/src/sample-wardrobe/selector.spec.ts):
+  proves determinism, the five material pairs, still-suits, weather first, look cycling, empty
+  states, swaps and votes.
+- [`packages/utils/src/sample-wardrobe/state.spec.ts`](../../packages/utils/src/sample-wardrobe/state.spec.ts):
+  proves the age gate, the strict schema, the fixed window, id filtering, `from=preview`, epoch
+  ordering, storage failure, validation of changes and cross-tab sync.
+- [`packages/utils/src/sample-wardrobe/carryover.spec.ts`](../../packages/utils/src/sample-wardrobe/carryover.spec.ts):
+  proves read first, read back, a landed timeout written once, rejection and staleness.
+- [`packages/utils/src/sample-wardrobe/strings.spec.ts`](../../packages/utils/src/sample-wardrobe/strings.spec.ts):
+  proves the ten locales share one key set and placeholder set, the specified en-US copy, and no
+  leftover placeholder in any rendered explanation.
+
+API, Vitest:
+
+- [`apps/api/src/modules/personalization/ritual-generation.engine.golden.spec.ts`](../../apps/api/src/modules/personalization/ritual-generation.engine.golden.spec.ts):
+  proves the ritual and capsule engines reproduce the recorded outputs after the rule move.
+- [`packages/api-client/testing/guest-preview-analytics.spec.ts`](../../packages/api-client/testing/guest-preview-analytics.spec.ts):
+  proves the three events, their closed enums, the URL-key drop and the preview view drop.
+
+Web, Vitest:
+
+- [`apps/web/src/app/components/guest-preview/guest-preview.test.tsx`](../../apps/web/src/app/components/guest-preview/guest-preview.test.tsx):
+  proves the session check, the gate, every surface and control, storage failure, offline use and
+  cross-tab exit through the real store.
+- [`apps/web/src/app/components/guest-preview/guest-preview-review.test.tsx`](../../apps/web/src/app/components/guest-preview/guest-preview-review.test.tsx):
+  proves keep, use with read-back, double tap, failure, rejection and member change.
+- [`apps/web/src/lib/guest-preview.test.ts`](../../apps/web/src/lib/guest-preview.test.ts): proves
+  the session states, storage, analytics, the verified comfort client and the next step.
+- [`apps/web/src/app/signin/page.preview.test.tsx`](../../apps/web/src/app/signin/page.preview.test.tsx):
+  proves the review only follows a preview sign-in and other sign-ins clear guest state.
+- [`apps/web/src/app/signup/signup-form.preview.test.tsx`](../../apps/web/src/app/signup/signup-form.preview.test.tsx):
+  proves the preview links and that an under-13 signup discards the preview.
+
+Mobile, Vitest:
+
+- [`apps/mobile/src/features/preview/guest-preview-screen.test.tsx`](../../apps/mobile/src/features/preview/guest-preview-screen.test.tsx):
+  proves the session check, the gate, the surfaces, controls, swaps, votes, reset, exit and
+  storage failure through the real store.
+- [`apps/mobile/src/features/preview/guest-preview-review-screen.test.tsx`](../../apps/mobile/src/features/preview/guest-preview-review-screen.test.tsx):
+  proves the review on mobile, member change included.
+- [`apps/mobile/src/features/preview/signed-out-welcome.test.tsx`](../../apps/mobile/src/features/preview/signed-out-welcome.test.tsx):
+  proves the welcome card's three ways in.
+- [`apps/mobile/src/lib/member-session.test.tsx`](../../apps/mobile/src/lib/member-session.test.tsx):
+  proves restoring, member, signed out and unavailable with retry.
+- [`apps/mobile/src/lib/guest-preview.test.ts`](../../apps/mobile/src/lib/guest-preview.test.ts):
+  proves the file adapter, analytics, the verified comfort client and the next step.
+- [`apps/mobile/src/screens/signin-preview.test.tsx`](../../apps/mobile/src/screens/signin-preview.test.tsx):
+  proves the review only follows a preview sign-in.
+- [`apps/mobile/src/screens/hero-session-restore.test.tsx`](../../apps/mobile/src/screens/hero-session-restore.test.tsx):
+  proves signed-out Home sends no ritual request and loads once the session restores.
+
+End to end, Playwright:
+
+- [`playwright/tests/guest-preview.spec.ts`](../../playwright/tests/guest-preview.spec.ts): proves
+  the gate, zero API calls, controls, history, tampering, analytics and the AC2 timing.
+- [`playwright/tests/guest-preview-real-session.spec.ts`](../../playwright/tests/guest-preview-real-session.spec.ts):
+  proves the guest-to-account carryover through the real local OTP and a database read.
+
+Evidence boundaries:
+
+- AC2 measured on the local stack in Chromium: p95 17 ms over 30 changes and a first useful preview
+  of 70 ms after the gate.
+- Row counts prove no writes only in the solo evidence run (`STORY616_DB_ISOLATION=1`).
+- Mobile runs on the same core in Vitest browser mode; the Android Maestro guest flow runs in its own
+  signed-out shard (TEA-8). The mobile conversion note is shown at all times, because the app has
+  no network-state dependency to show it only offline.

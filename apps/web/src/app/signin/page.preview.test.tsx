@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 D7, D8: sign-in from the guest preview goes to the review step; any other
 // sign-in deletes guest state. `from` is honored only as the literal `preview`.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'

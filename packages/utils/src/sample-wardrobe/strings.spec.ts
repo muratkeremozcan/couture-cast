@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 U-CATALOG-STRINGS, U-VOTES progress text and the shared formatter.
 import { describe, expect, it } from 'vitest'
 import { AGE_GATE_MESSAGES, INVALID_BIRTHDATE_MESSAGE } from '../age'

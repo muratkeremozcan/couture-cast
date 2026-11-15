@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 I-CONV-UNCERTAIN, L-APPLY-THEN-SWITCH and L-READBACK-THEN-SWITCH at the unit level.
 import { describe, expect, it, vi } from 'vitest'
 import { applyComfortCarryover, sameComfort } from './carryover'

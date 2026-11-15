@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 W-CONV-*, L-APPLY-THEN-SWITCH and L-READBACK-THEN-SWITCH on web: the one
 // review step after a verified sign-in from the preview.
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'

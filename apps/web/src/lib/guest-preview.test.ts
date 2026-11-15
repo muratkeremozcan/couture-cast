@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16: the web guest preview lib. Session check (D1), storage adapter (D7),
 // guarded analytics (D10), and the verified comfort client and next step (D8).
 import { http, HttpResponse } from 'msw'

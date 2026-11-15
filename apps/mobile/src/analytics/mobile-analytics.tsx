@@ -86,6 +86,21 @@ export function createMobileAnalyticsClient(
 
 export const mobileAnalyticsClient = createMobileAnalyticsClient(posthogProviderClient)
 
+/**
+ * Story 6.16 TEA-4: rotates the anonymous id before a guest leaves the preview for
+ * signup or sign-in, so a later identify cannot merge preview history into a member.
+ * Analytics never changes app behavior, so a provider throw stops here.
+ */
+export function resetMobileAnalyticsIdentity(
+  client: { reset: () => void } = posthogProviderClient
+): void {
+  try {
+    client.reset()
+  } catch {
+    // Swallowed on purpose; see above.
+  }
+}
+
 export function MobileAnalyticsProvider({ children }: PropsWithChildren) {
   return (
     // Production analytics privacy: no touch or screen autocapture. Feature code sends

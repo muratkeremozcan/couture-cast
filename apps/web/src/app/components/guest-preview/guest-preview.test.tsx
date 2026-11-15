@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 W-GATE-*, W-* functional, W-STORAGE-DENIED, W-OFFLINE-AFTER-LOAD and
 // L-CROSS-TAB-* for the web guest preview, through the real store and policy.
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, TextInput } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import {
   type GuardianInvitationInput,
   type GuardianInvitationResponse,
@@ -10,6 +11,7 @@ import {
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
+  getGuestPreviewStrings,
   INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
 import { Text, View } from '@/components/themed'
@@ -20,13 +22,24 @@ import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announc
 type SignupScreenProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
   inviteGuardian?: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
+  /** Story 6.16 D8: the visitor came from the guest preview (`?from=preview`). */
+  fromPreview?: boolean
+  /** Story 6.16 D8: the route performs navigation, so this screen stays router-free. */
+  onPreviewNavigate?: (href: SignupPreviewHref) => void
 }
+
+type SignupPreviewHref = '/preview' | '/signin?from=preview'
 
 export function SignupScreen({
   submitSignup = submitMobileSignup,
   inviteGuardian = inviteGuardianFromMobile,
+  fromPreview = false,
+  onPreviewNavigate = () => undefined,
 }: SignupScreenProps) {
   const { announce } = useAccessibilityAnnouncer()
+  const { i18n } = useTranslation()
+  const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
+  const [accountCreated, setAccountCreated] = useState(false)
   const [email, setEmail] = useState('')
   const [birthdate, setBirthdate] = useState('')
   const [guardianEmail, setGuardianEmail] = useState('')
@@ -74,6 +87,7 @@ export function SignupScreen({
     try {
       const response = await submitSignup({ email, birthdate })
       if (response.guardianConsentRequired) {
+        setAccountCreated(true)
         setPendingTeenId(response.userId)
         setSuccessMessage(
           'Account created. Guardian consent is required before wardrobe access is enabled.'
@@ -83,6 +97,7 @@ export function SignupScreen({
 
       setPendingTeenId(null)
       setSuccessMessage('Account created. You can continue to onboarding.')
+      setAccountCreated(true)
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : 'Signup failed')
     } finally {
@@ -193,6 +208,13 @@ export function SignupScreen({
           </Text>
         ) : null}
 
+        <SignupPreviewLink
+          kind="continue"
+          visible={fromPreview && accountCreated}
+          label={previewStrings.signInToContinue}
+          onNavigate={onPreviewNavigate}
+        />
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={isSubmitting ? 'Creating account' : 'Create account'}
@@ -276,12 +298,54 @@ export function SignupScreen({
             ) : null}
           </View>
         ) : null}
+        <SignupPreviewLink
+          kind="back"
+          visible={fromPreview}
+          label={previewStrings.backToPreview}
+          onNavigate={onPreviewNavigate}
+        />
       </View>
     </View>
   )
 }
 
+/** Story 6.16 D8: the way back to the preview, and on to a verified sign-in. */
+function SignupPreviewLink({
+  kind,
+  visible,
+  label,
+  onNavigate,
+}: {
+  kind: 'continue' | 'back'
+  visible: boolean
+  label: string
+  onNavigate: (href: SignupPreviewHref) => void
+}) {
+  if (!visible) return null
+  return kind === 'continue' ? (
+    <Pressable
+      testID="signup-sign-in-to-continue"
+      accessibilityRole="button"
+      style={styles.button}
+      onPress={() => onNavigate('/signin?from=preview')}
+    >
+      <Text style={styles.buttonText}>{label}</Text>
+    </Pressable>
+  ) : (
+    <Pressable
+      testID="signup-back-to-preview"
+      accessibilityRole="link"
+      style={styles.previewLink}
+      onPress={() => onNavigate('/preview')}
+    >
+      <Text style={styles.previewLinkText}>{label}</Text>
+    </Pressable>
+  )
+}
+
 const styles = StyleSheet.create({
+  previewLink: { minHeight: 44, justifyContent: 'center' },
+  previewLinkText: { textDecorationLine: 'underline' },
   container: {
     flex: 1,
     paddingHorizontal: 24,

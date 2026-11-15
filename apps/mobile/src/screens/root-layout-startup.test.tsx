@@ -30,6 +30,8 @@ const layout = vi.hoisted(() => {
     cleanupCalls: 0,
     notificationListeners: 0,
     startupResult: (): Promise<void> => Promise.resolve(),
+    pathname: '/',
+    trackedScreens: [] as string[],
   }
 })
 
@@ -86,7 +88,7 @@ vi.mock('expo-router', () => {
   return {
     ErrorBoundary: () => null,
     Stack,
-    usePathname: () => '/',
+    usePathname: () => layout.pathname,
     useRouter: () => router,
     useRootNavigationState: () => ({ key: 'root' }),
   }
@@ -102,10 +104,18 @@ vi.mock('@react-navigation/native', () => ({
   DefaultTheme: {},
   ThemeProvider: ({ children }: { children: ReactNode }) => children,
 }))
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }))
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key, i18n: { language: 'en-US' } }),
+}))
 vi.mock('@/src/analytics/mobile-analytics', () => ({
   MobileAnalyticsProvider: ({ children }: { children: ReactNode }) => children,
-  mobileAnalyticsClient: { screen: () => Promise.resolve(), getDistinctId: () => '' },
+  mobileAnalyticsClient: {
+    screen: (name: string) => {
+      layout.trackedScreens.push(name)
+      return Promise.resolve()
+    },
+    getDistinctId: () => '',
+  },
 }))
 vi.mock('@/src/analytics/track-events', () => ({
   trackMobileAlertReceived: () => undefined,
@@ -163,6 +173,8 @@ describe('RootLayout startup', () => {
     layout.cleanupCalls = 0
     layout.notificationListeners = 0
     layout.startupResult = () => Promise.resolve()
+    layout.pathname = '/'
+    layout.trackedScreens.length = 0
     setOS(originalOS)
   })
 
@@ -215,5 +227,26 @@ describe('RootLayout startup', () => {
 
     expect(layout.statusBars.length).toBeGreaterThan(0)
     expect(layout.statusBars.every((props) => props.style === 'auto')).toBe(true)
+  })
+
+  // Story 6.16 D10: the guest preview and its review are never recorded as screens.
+  it.each(['/preview', '/preview-continue'])(
+    'sends no screen view for %s',
+    async (pathname) => {
+      layout.pathname = pathname
+      await mountLayout()
+      expect(layout.trackedScreens).toEqual([])
+      expect(
+        layout.screens.find((screen) => screen.name === 'preview')?.options
+      ).toMatchObject({
+        title: 'Try a sample wardrobe',
+      })
+    }
+  )
+
+  it('still sends screen views elsewhere', async () => {
+    layout.pathname = '/settings'
+    await mountLayout()
+    expect(layout.trackedScreens).toEqual(['/settings'])
   })
 })

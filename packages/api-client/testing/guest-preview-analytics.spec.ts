@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 U-EVENTS-SCHEMA and U-PRIVACY-ALLOWLIST: guest preview analytics carry
 // closed enums only, never a URL, and the preview is never recorded as a page view.
 import { describe, expect, it } from 'vitest'

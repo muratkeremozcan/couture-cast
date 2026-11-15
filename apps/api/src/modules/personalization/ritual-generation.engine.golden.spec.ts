@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import type { GarmentItem } from '@prisma/client'

@@ -1,3 +1,5 @@
+// Learning path Step 56: Guest wardrobe and outfit preview.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-56-guest-wardrobe-and-outfit-preview
 // Story 6.16 D8: signup from the guest preview keeps a way back and continues to a
 // verified sign-in. The signup response itself never authenticates anyone.
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
