@@ -14,8 +14,24 @@ const IMMUTABLE = 'public,max-age=31536000,immutable'
 
 type Answer = { status: number; headers: Record<string, string>; body: string }
 
+type RouteControls = {
+  /** Holds the fetch until it settles. */
+  gate?: Promise<void>
+  /** What reading the body throws. */
+  bodyError?: Error
+  /** What fulfilling throws. */
+  fulfillError?: Error
+  /** Every call in order, shared across routes and the context. */
+  log?: string[]
+}
+
 /** A route for `url` whose fetch answers `answer`, or throws `failure`. */
-function route(url: string, answer: Answer | Error, method = 'GET') {
+function route(
+  url: string,
+  answer: Answer | Error,
+  method = 'GET',
+  controls: RouteControls = {}
+) {
   const calls = {
     fetch: [] as unknown[],
     fulfill: [] as unknown[],
@@ -24,18 +40,26 @@ function route(url: string, answer: Answer | Error, method = 'GET') {
   }
   const fake = {
     request: () => ({ url: () => url, method: () => method }),
-    fetch: vi.fn((options: unknown) => {
+    fetch: vi.fn(async (options: unknown) => {
       calls.fetch.push(options)
-      if (answer instanceof Error) return Promise.reject(answer)
-      return Promise.resolve({
+      controls.log?.push('fetch')
+      await controls.gate
+      if (answer instanceof Error) throw answer
+      return {
         status: () => answer.status,
         headers: () => answer.headers,
-        body: () => Promise.resolve(Buffer.from(answer.body)),
-      })
+        body: () =>
+          controls.bodyError
+            ? Promise.reject(controls.bodyError)
+            : Promise.resolve(Buffer.from(answer.body)),
+      }
     }),
     fulfill: vi.fn((reply: unknown) => {
       calls.fulfill.push(reply)
-      return Promise.resolve()
+      controls.log?.push('fulfill')
+      return controls.fulfillError
+        ? Promise.reject(controls.fulfillError)
+        : Promise.resolve()
     }),
     continue: vi.fn(() => {
       calls.continue += 1
@@ -174,6 +198,127 @@ describe('createImmutableAssetCache', () => {
     await cache.handle(posted.route)
     expect(posted.calls.fallback).toBe(1)
     expect(posted.calls.fetch).toEqual([])
+  })
+
+  it('fetches an asset requested twice at once a single time and serves both', async () => {
+    const cache = createImmutableAssetCache()
+    let release = () => undefined as void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const first = route(ASSET, immutable('shared'), 'GET', { gate })
+    const second = route(ASSET, immutable('never fetched'), 'GET', { gate })
+    const both = Promise.all([cache.handle(first.route), cache.handle(second.route)])
+    release()
+    await both
+    const replay = {
+      status: 200,
+      headers: {
+        'cache-control': IMMUTABLE,
+        'content-type': 'application/javascript; charset=utf-8',
+      },
+      body: Buffer.from('shared'),
+    }
+    expect(first.calls.fetch).toEqual([{ maxRedirects: 0 }])
+    expect(second.calls.fetch).toEqual([])
+    expect(first.calls.fulfill).toEqual([replay])
+    expect(second.calls.fulfill).toEqual([replay])
+    expect(cache.stats()).toEqual({ fetched: 1, served: 1, kept: 1 })
+  })
+
+  it('lets a request waiting on an answer it may not keep fetch its own', async () => {
+    const cache = createImmutableAssetCache()
+    let release = () => undefined as void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const missing = { status: 404, headers: { 'cache-control': IMMUTABLE }, body: 'gone' }
+    const first = route(ASSET, missing, 'GET', { gate })
+    const second = route(ASSET, immutable('now here'), 'GET')
+    const both = Promise.all([cache.handle(first.route), cache.handle(second.route)])
+    release()
+    await both
+    expect(first.calls.fetch).toEqual([{ maxRedirects: 0 }])
+    expect(second.calls.fetch).toEqual([{ maxRedirects: 0 }])
+    expect(second.calls.fulfill).toEqual([
+      {
+        status: 200,
+        headers: {
+          'cache-control': IMMUTABLE,
+          'content-type': 'application/javascript; charset=utf-8',
+        },
+        body: Buffer.from('now here'),
+      },
+    ])
+    expect(cache.stats()).toEqual({ fetched: 2, served: 0, kept: 1 })
+  })
+
+  it('detach waits for every request in flight before it unroutes, so none outlives the context', async () => {
+    const cache = createImmutableAssetCache()
+    const log: string[] = []
+    const context = {
+      route: vi.fn(() => Promise.resolve()),
+      unroute: vi.fn(() => {
+        log.push('unroute')
+        return Promise.resolve()
+      }),
+    }
+    await cache.attach(context as unknown as BrowserContext)
+    let release = () => undefined as void
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    const slow = route(ASSET, immutable('late chunk'), 'GET', { gate, log })
+    const handling = cache.handle(slow.route)
+    let detached = false
+    const detaching = cache
+      .detach(context as unknown as BrowserContext)
+      .then(() => (detached = true))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(detached).toBe(false)
+    expect(log).toEqual(['fetch'])
+    release()
+    await Promise.all([handling, detaching])
+    expect(log).toEqual(['fetch', 'fulfill', 'unroute'])
+    expect(context.unroute).toHaveBeenCalledExactlyOnceWith(
+      '**/_next/static/**',
+      cache.handle
+    )
+  })
+
+  it.each([
+    [
+      'the body',
+      { bodyError: new Error('apiResponse.body: Response has been disposed') },
+    ],
+    [
+      'the fulfill',
+      {
+        fulfillError: new Error(
+          'route.fulfill: Target page, context or browser has been closed'
+        ),
+      },
+    ],
+    [
+      'the fulfill',
+      { fulfillError: new Error('route.fulfill: Route is already handled!') },
+    ],
+  ])('ends quietly when teardown disposes %s', async (_label, controls) => {
+    const cache = createImmutableAssetCache()
+    await expect(
+      cache.handle(route(ASSET, immutable('a'), 'GET', controls).route)
+    ).resolves.toBeUndefined()
+  })
+
+  it('still fails on any other error reading the body or fulfilling', async () => {
+    const cache = createImmutableAssetCache()
+    await expect(
+      cache.handle(
+        route(ASSET, immutable('a'), 'GET', { bodyError: new Error('read ECONNRESET') })
+          .route
+      )
+    ).rejects.toThrow('read ECONNRESET')
+    await expect(
+      cache.handle(
+        route(ASSET, immutable('b'), 'GET', {
+          fulfillError: new Error('route.fulfill: invalid headers'),
+        }).route
+      )
+    ).rejects.toThrow('route.fulfill: invalid headers')
   })
 
   it('routes only Next.js build output through the cache', async () => {

@@ -96,6 +96,8 @@ const immutableAssetPage = base.extend<
   page: async ({ page, immutableAssetCache }, use) => {
     await immutableAssetCache.attach(page.context())
     await use(page)
+    // Before the context closes, so no asset fetch is disposed into the report.
+    await immutableAssetCache.detach(page.context())
   },
 })
 
