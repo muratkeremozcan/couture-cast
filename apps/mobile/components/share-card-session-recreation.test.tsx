@@ -222,7 +222,7 @@ async function ready() {
   await waitFor(() =>
     expect(screen.queryByText(i18n.t('shareCard.preparing'))).not.toBeInTheDocument()
   )
-  fireEvent.load(await screen.findByTestId('share-card-preview'))
+  fireEvent.load(await screen.findByTestId('share-card-preview-image'))
   await waitFor(() =>
     expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
       'aria-disabled',
