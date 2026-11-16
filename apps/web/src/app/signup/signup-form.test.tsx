@@ -231,6 +231,12 @@ describe('SignupForm validation and failure paths', () => {
       'socket hang up',
       'Your account could not be created right now. Try again in a moment.',
     ],
+    // A network failure is a TypeError whose message is the browser's, never shown.
+    [
+      'a network failure',
+      new TypeError('Failed to fetch'),
+      'Your account could not be created right now. Try again in a moment.',
+    ],
   ])('surfaces a signup rejection that is %s', async (_label, reason, expected) => {
     const submitSignup = vi.fn().mockRejectedValue(reason)
     render(<SignupForm submitSignup={submitSignup} />)

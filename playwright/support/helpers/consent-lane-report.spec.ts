@@ -5,6 +5,10 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  loadEnvKeepingLocalStack,
+  loadLauncherEnv,
+} from '../../../scripts/lib/caller-owned-env.mjs'
+import {
   consentRunProblems,
   offRunProblems,
   type PlaywrightJsonReport,
@@ -111,6 +115,28 @@ describe('sharded default run (off)', () => {
   })
 })
 
+describe('the consent policy survives .env.local', () => {
+  it('keeps the caller-owned GUARDIAN_CONSENT_POLICY when an env file says otherwise', () => {
+    const env: NodeJS.ProcessEnv = {
+      GUARDIAN_CONSENT_POLICY: 'required_13_15',
+      E2E_CALLER_OWNED_ENV_KEYS: 'GUARDIAN_CONSENT_POLICY',
+    }
+    loadEnvKeepingLocalStack(() => {
+      env.GUARDIAN_CONSENT_POLICY = 'off'
+    }, env)
+    expect(env.GUARDIAN_CONSENT_POLICY).toBe('required_13_15')
+
+    const launcher: NodeJS.ProcessEnv = { ...env }
+    loadLauncherEnv(launcher, () => {
+      launcher.GUARDIAN_CONSENT_POLICY = 'off'
+    })
+    expect(launcher.GUARDIAN_CONSENT_POLICY).toBe('required_13_15')
+    expect(launcher.E2E_CALLER_OWNED_ENV_KEYS?.split(',')).toContain(
+      'GUARDIAN_CONSENT_POLICY'
+    )
+  })
+})
+
 describe('the live suite', () => {
   it('npm run test:pw-consent passes the file filter and the tag', () => {
     const scripts = (
@@ -119,6 +145,11 @@ describe('the live suite', () => {
       }
     ).scripts
     expect(scripts['test:pw-consent']).toContain('GUARDIAN_CONSENT_POLICY=required_13_15')
+    // Independent review of PR 244 (L-4): listed as caller-owned, so a developer's .env.local
+    // cannot override the lane's policy in the runner or in the stack it starts.
+    expect(scripts['test:pw-consent']).toContain(
+      'E2E_CALLER_OWNED_ENV_KEYS=GUARDIAN_CONSENT_POLICY'
+    )
     expect(scripts['test:pw-consent']).toContain(
       `--grep @consent-required '${CONSENT_E2E_FILE_FILTER}'`
     )

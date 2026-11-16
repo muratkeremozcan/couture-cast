@@ -236,20 +236,27 @@ describe('SignupScreen', () => {
     expect(screen.getByRole('button', { name: 'Create account' })).toBeEnabled()
   })
 
-  it('falls back to a generic message when the signup rejection is not an Error', async () => {
-    render(<SignupScreen submitSignup={vi.fn().mockRejectedValue('offline')} />)
+  it.each([
+    ['is not an Error', 'offline'],
+    // A network failure is a TypeError whose message is the platform's, never shown.
+    ['is a network failure', new TypeError('Network request failed')],
+  ])(
+    'falls back to a generic message when the signup rejection %s',
+    async (_label, reason) => {
+      render(<SignupScreen submitSignup={vi.fn().mockRejectedValue(reason)} />)
 
-    fireEvent.change(screen.getByLabelText('Birthdate'), {
-      target: { value: '2010-04-15' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+      fireEvent.change(screen.getByLabelText('Birthdate'), {
+        target: { value: '2010-04-15' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
-    await waitFor(() => {
-      expect(screen.getByTestId('signup-error-message').textContent).toBe(
-        'Your account could not be created right now. Try again in a moment.'
-      )
-    })
-  })
+      await waitFor(() => {
+        expect(screen.getByTestId('signup-error-message').textContent).toBe(
+          'Your account could not be created right now. Try again in a moment.'
+        )
+      })
+    }
+  )
 
   it('rejects a malformed guardian email before spending an invitation', async () => {
     const submitSignup = vi.fn().mockResolvedValue({

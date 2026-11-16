@@ -669,12 +669,18 @@ describe('round 3: a case with very many reports', () => {
 
   it('getCase reports the earliest due and accepted time whichever report holds them', async () => {
     const base = postCase().reports[0]!
-    const reports = [5, 2, 9].map((hours, index) => ({
+    // The earliest acceptance sits on the first report and the earliest due time on the
+    // middle one, so neither "use the first" nor "use the last" passes.
+    const reports = [
+      { dueMinutes: 20, acceptedHours: 9 },
+      { dueMinutes: 3, acceptedHours: 2 },
+      { dueMinutes: 30, acceptedHours: 5 },
+    ].map(({ dueMinutes, acceptedHours }, index) => ({
       ...base,
       id: `rep-${index}`,
       reporterId: `reporter-${index}`,
-      dueAt: new Date(NOW.getTime() + (index === 2 ? 3 : 10 + index) * 60_000),
-      acceptedAt: new Date(NOW.getTime() - hours * 3_600_000),
+      dueAt: new Date(NOW.getTime() + dueMinutes * 60_000),
+      acceptedAt: new Date(NOW.getTime() - acceptedHours * 3_600_000),
     }))
     const { service } = build(postCase({ reports }))
     const detail = (await service.getCase(AUTH, 'post.p1')).data

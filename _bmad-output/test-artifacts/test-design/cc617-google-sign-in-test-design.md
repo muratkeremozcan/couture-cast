@@ -511,6 +511,11 @@ Turning consent back on needs each of these first, red-first, in the PR that rem
 - B-6: an old invitation fails after approval or revoke (L-REVOKE-THEN-OLD-LINK, L-RESEND-VS-ACCEPT).
 - B-7: the 30 s lock cache invalidates across instances (A-LOCK-CACHE-INVALIDATE, L-OTP-STATUS-RACE).
 - B-12: a waiting teen with a stored session reaches the guardian step (E-TEEN-REOPEN, M-TEEN-REOPEN).
+- H-1 (independent review of PR 244): restore `private.has_active_guardian_consent` from
+  `20260420113000_add_guardian_shared_rls_policies` in a new migration, and bring back the guardian
+  grant cases removed from `packages/db/test/rls/{capsules,onboarding-silhouette,guardian-wardrobe}.spec.ts`
+  (git history at 9a3266da); `guardian-consent-off.spec.ts` then moves under the off policy only.
+- L-1: the emancipation sweep mails the aged-out message again only under `required_13_15`.
 - F-3: granted rows from the off period give capsule access and mail again under `required_13_15`;
   review every row granted before the switch (B-1 let a teen grant one to any adult) before it
   carries access.

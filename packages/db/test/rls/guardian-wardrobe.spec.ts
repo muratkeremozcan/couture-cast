@@ -6,16 +6,14 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-30-smart-tagging-and-comfort-metadata
 import { randomUUID } from 'node:crypto'
 import { describe, expect } from 'vitest'
-import {
-  adminPool,
-  buildClaims,
-  scenarioTest,
-  useRlsDatabase,
-  withRole,
-} from './harness.js'
+import { buildClaims, scenarioTest, useRlsDatabase, withRole } from './harness.js'
 
 describe.concurrent('guardian-aware RLS policies', () => {
   useRlsDatabase()
+
+  // Guardian consent is off (owner ruling 2026-11-16): the guardian grant cases that stood here
+  // moved to guardian-consent-off.spec.ts, which proves a granted row gives no read or write.
+  // They return with private.has_active_guardian_consent when consent is turned back on.
 
   scenarioTest(
     'allows teens to read and update their own wardrobe-scoped rows',
@@ -74,173 +72,6 @@ describe.concurrent('guardian-aware RLS policies', () => {
           )
 
           expect(updateLocationResult.rows).toEqual([{ label: 'Office' }])
-        }
-      )
-    }
-  )
-
-  scenarioTest(
-    'lets linked guardians read teen wardrobe data but blocks read-only mutations',
-    async ({ scenario: seeded }) => {
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-        async (client) => {
-          const garmentRows = await client.query<{
-            id: string
-          }>('SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1', [
-            seeded.teenId,
-          ])
-
-          expect(garmentRows.rows).toHaveLength(1)
-
-          const consentRows = await client.query<{
-            teen_id: string
-          }>('SELECT "teen_id" FROM public."GuardianConsent" WHERE "guardian_id" = $1', [
-            seeded.guardianReadOnlyId,
-          ])
-
-          expect(consentRows.rows).toEqual([{ teen_id: seeded.teenId }])
-
-          const updateResult = await client.query(
-            `UPDATE public."GarmentItem"
-           SET "category" = $1, "updated_at" = NOW()
-           WHERE "id" = $2
-           RETURNING "id"`,
-            ['outerwear', seeded.garmentId]
-          )
-
-          expect(updateResult.rowCount).toBe(0)
-        }
-      )
-    }
-  )
-
-  scenarioTest(
-    'grants wardrobe access from a single active guardian consent row',
-    async ({ scenario: seeded }) => {
-      const client = await adminPool.connect()
-
-      try {
-        await client.query('DELETE FROM public."GuardianConsent" WHERE "id" = $1', [
-          seeded.consentFullId,
-        ])
-      } finally {
-        client.release()
-      }
-
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.teenEmail, 'teen'),
-        async (client) => {
-          const teenGarments = await client.query(
-            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-
-          expect(teenGarments.rows).toEqual([{ id: seeded.garmentId }])
-        }
-      )
-
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-        async (client) => {
-          const guardianGarments = await client.query(
-            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-
-          expect(guardianGarments.rows).toEqual([{ id: seeded.garmentId }])
-        }
-      )
-    }
-  )
-
-  scenarioTest(
-    'lets full-access guardians mutate linked teen wardrobe rows',
-    async ({ scenario: seeded }) => {
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-        async (client) => {
-          const updateResult = await client.query<{
-            category: string
-          }>(
-            `UPDATE public."GarmentItem"
-           SET "category" = $1, "updated_at" = NOW()
-           WHERE "id" = $2
-           RETURNING "category"`,
-            ['outerwear', seeded.garmentId]
-          )
-
-          expect(updateResult.rows).toEqual([{ category: 'outerwear' }])
-
-          const insertResult = await client.query<{
-            id: string
-          }>(
-            `INSERT INTO public."OutfitRecommendation"
-            ("id", "user_id", "scenario", "updated_at")
-           VALUES ($1, $2, $3, NOW())
-           RETURNING "id"`,
-            [`guardian-created-outfit-${randomUUID()}`, seeded.teenId, 'school-run']
-          )
-
-          expect(insertResult.rows).toHaveLength(1)
-        }
-      )
-    }
-  )
-
-  scenarioTest(
-    'keeps remaining guardian wardrobe access after one guardian revokes consent',
-    async ({ scenario: seeded }) => {
-      const adminClient = await adminPool.connect()
-
-      try {
-        await adminClient.query(
-          `UPDATE public."GuardianConsent"
-         SET "revoked_at" = NOW(), "status" = 'revoked'
-         WHERE "id" = $1`,
-          [seeded.consentReadOnlyId]
-        )
-      } finally {
-        adminClient.release()
-      }
-
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-        async (client) => {
-          const revokedGuardianRows = await client.query(
-            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-
-          expect(revokedGuardianRows.rows).toHaveLength(0)
-        }
-      )
-
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-        async (client) => {
-          const remainingGuardianRows = await client.query(
-            'SELECT "id" FROM public."GarmentItem" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-
-          expect(remainingGuardianRows.rows).toEqual([{ id: seeded.garmentId }])
-
-          const updateResult = await client.query(
-            `UPDATE public."GarmentItem"
-           SET "category" = $1, "updated_at" = NOW()
-           WHERE "id" = $2
-           RETURNING "category"`,
-            ['bottom', seeded.garmentId]
-          )
-
-          expect(updateResult.rows).toEqual([{ category: 'bottom' }])
         }
       )
     }

@@ -17,6 +17,7 @@ import {
   type AnalyticsClient,
 } from '../../analytics/analytics.service'
 import { createBaseLogger } from '../../logger/pino.config'
+import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
 import { GuardianConsentStateService } from '../auth/guardian-consent-state.service'
 import { UserSessionService } from '../auth/user-session.service'
 import {
@@ -1034,6 +1035,7 @@ export class GuardianService {
         | {
             teenId: string
             revokedConsentCount: number
+            notified: boolean
           }
         | null
         | undefined
@@ -1124,24 +1126,28 @@ export class GuardianService {
                 },
               })
 
-              await tx.eventEnvelope.create({
-                data: {
-                  channel: 'email.guardian-consent-aged-out',
-                  user_id: teen.id,
-                  payload: {
-                    to: teen.email,
-                    teenId: teen.id,
-                    teenEmail: teen.email,
-                    emancipatedAt: emancipatedAt.toISOString(),
-                    message: 'You no longer require guardian consent',
-                    activeGuardianCount: activeGuardianConsents.length,
-                    revokedGuardianCount: revokeActiveConsents
-                      ? activeGuardianConsents.length
-                      : 0,
-                    revokedGuardianAccess: revokeActiveConsents,
+              // While guardian consent is off nobody needs a guardian, so nobody is told they
+              // no longer do (independent review of PR 244, L-1).
+              const notify = resolveGuardianConsentPolicy() !== 'off'
+              if (notify)
+                await tx.eventEnvelope.create({
+                  data: {
+                    channel: 'email.guardian-consent-aged-out',
+                    user_id: teen.id,
+                    payload: {
+                      to: teen.email,
+                      teenId: teen.id,
+                      teenEmail: teen.email,
+                      emancipatedAt: emancipatedAt.toISOString(),
+                      message: 'You no longer require guardian consent',
+                      activeGuardianCount: activeGuardianConsents.length,
+                      revokedGuardianCount: revokeActiveConsents
+                        ? activeGuardianConsents.length
+                        : 0,
+                      revokedGuardianAccess: revokeActiveConsents,
+                    },
                   },
-                },
-              })
+                })
 
               await this.logConsentAuditEvent(tx, {
                 eventType: 'guardian_consent_aged_out',
@@ -1164,6 +1170,7 @@ export class GuardianService {
                 revokedConsentCount: revokeActiveConsents
                   ? activeGuardianConsents.length
                   : 0,
+                notified: notify,
               }
             },
             {
@@ -1203,7 +1210,7 @@ export class GuardianService {
 
       teenIds.push(result.teenId)
       revokedConsentCount += result.revokedConsentCount
-      notificationsQueued += 1
+      if (result.notified) notificationsQueued += 1
       this.guardianConsentStateService.markTeenAccessGranted(result.teenId)
     }
 

@@ -496,9 +496,14 @@ const useStyles = createSchemeStyles((colors) => ({
   },
 }))
 
-/** A rejection's own message when it has one, else the localized fallback. */
+/**
+ * The server's own message for a refusal it explained; the localized fallback for anything
+ * else, a network failure ("Failed to fetch") included.
+ */
 function failureText(error: unknown, fallback: string) {
-  return error instanceof Error ? error.message : fallback
+  return error instanceof Error && !(error instanceof TypeError)
+    ? error.message
+    : fallback
 }
 
 /**

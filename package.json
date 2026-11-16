@@ -56,7 +56,7 @@
     "test:playwright-unit": "vitest run playwright/support/helpers",
     "test:pw-local": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true PLAYWRIGHT_DB_RESET=true TEST_ENV=local npx playwright test",
     "test:pw-real-session": "npm run prepare:playwright && node scripts/e2e-real-session/run.mjs",
-    "test:pw-consent": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true TEST_ENV=local GUARDIAN_CONSENT_POLICY=required_13_15 PLAYWRIGHT_JSON_OUTPUT_NAME=playwright/artifacts/consent-lane-report.json npx playwright test --grep @consent-required '^(?!.*real-session).*\\.spec\\.ts$' --reporter=list,json",
+    "test:pw-consent": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true TEST_ENV=local GUARDIAN_CONSENT_POLICY=required_13_15 E2E_CALLER_OWNED_ENV_KEYS=GUARDIAN_CONSENT_POLICY PLAYWRIGHT_JSON_OUTPUT_NAME=playwright/artifacts/consent-lane-report.json npx playwright test --grep @consent-required '^(?!.*real-session).*\\.spec\\.ts$' --reporter=list,json",
     "test:pw-complimentary": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true node scripts/e2e-complimentary/run.mjs",
     "test:pw-local-ui": "npm run prepare:playwright && cross-env PLAYWRIGHT_SHARED_DEPS_PREPARED=true TEST_ENV=local npx playwright test --ui",
     "fixtures:community-screening": "node scripts/community-moderation-fixtures.mjs",

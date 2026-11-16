@@ -1,6 +1,6 @@
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createGuardianProfileFixture,
   createTeenProfileFixture,
@@ -14,8 +14,14 @@ import {
   registerGuardianServiceLifecycle,
 } from '../../testing/guardian/guardian-service.fixture'
 
-describe('GuardianService emancipation', () => {
+describe('GuardianService emancipation under policy required_13_15', () => {
   registerGuardianServiceLifecycle()
+  beforeEach(() => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
+  })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
 
   it('emancipates pending teens on their eighteenth birthday and grants access', async () => {
     const today = new Date('2026-04-22T03:00:00.000Z')
@@ -499,5 +505,51 @@ describe('GuardianService emancipation', () => {
       expect(prisma.auditLogs).toHaveLength(0)
       expect(prisma.eventEnvelopes).toHaveLength(0)
     })
+  })
+})
+
+// Independent review of PR 244 (L-1): while guardian consent is off nobody needs a guardian,
+// so the sweep still settles the stored state but mails no "You no longer require guardian
+// consent" message.
+describe('GuardianService emancipation under policy off', () => {
+  registerGuardianServiceLifecycle()
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('settles a granted row at 18 and queues no aged-out mail', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'off')
+    const today = new Date('2026-04-22T03:00:00.000Z')
+    const teen = createTeenProfileFixture({
+      id: 'teen-off-birthday',
+      email: 'teen.off.birthday@example.com',
+      age: 18,
+      birthdate: new Date('2008-04-22T12:00:00.000Z'),
+    })
+    const { prisma, service } = createService()
+    prisma.users.set(teen.id, {
+      id: teen.id,
+      email: teen.email,
+      profile: {
+        user_id: teen.id,
+        birthdate: teen.birthdate,
+        preferences: {
+          compliance: {
+            accountStatus: 'pending_guardian_consent',
+            guardianConsentRequired: true,
+          },
+        },
+      },
+    })
+
+    const result = await service.emancipateEligibleTeens(today)
+
+    expect(result).toEqual({
+      processed: 1,
+      teenIds: [teen.id],
+      revokedConsentCount: 0,
+      notificationsQueued: 0,
+    })
+    expect(prisma.eventEnvelopes).toEqual([])
   })
 })
