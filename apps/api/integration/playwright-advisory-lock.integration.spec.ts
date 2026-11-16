@@ -23,13 +23,15 @@ const lockModule = path.join(repo, 'playwright/support/helpers/advisory-lock.ts'
  * A Playwright worker stand-in: its own process and database session. It takes
  * the lock `rounds` times, holding it `holdMs` each time and appending `enter`
  * and `leave` lines to the log every worker shares; with `crash`, it exits
- * holding the lock.
+ * holding the lock. With `startTogether`, it waits after loading until that
+ * many workers are loaded, so process start skew cannot space the workers out
+ * and let a lock with no exclusion pass.
  */
 function worker(
   directory: string,
   name: string,
   lockName: string,
-  options: { rounds: number; holdMs: number; crash?: boolean }
+  options: { rounds: number; holdMs: number; crash?: boolean; startTogether?: number }
 ) {
   const script = path.join(directory, `${name}.cts`)
   fs.writeFileSync(
@@ -37,7 +39,17 @@ function worker(
     `const fs = require('node:fs')
 const { acquireAdvisoryLock } = require(${JSON.stringify(lockModule)})
 const log = ${JSON.stringify(path.join(directory, 'events.log'))}
+const ready = ${JSON.stringify(path.join(directory, 'ready'))}
 void (async () => {
+${
+  options.startTogether
+    ? `fs.mkdirSync(ready, { recursive: true })
+fs.writeFileSync(require('node:path').join(ready, ${JSON.stringify(name)}), '')
+while (fs.readdirSync(ready).length < ${options.startTogether}) {
+  await new Promise((resolve) => setTimeout(resolve, 5))
+}`
+    : ''
+}
 for (let round = 0; round < ${options.rounds}; round += 1) {
   const release = await acquireAdvisoryLock(${JSON.stringify(databaseUrl)}, ${JSON.stringify(lockName)}, { timeoutMs: 30_000 })
   fs.appendFileSync(log, 'enter ${name}\\n')
@@ -192,7 +204,7 @@ describe('Playwright cross-worker advisory lock', () => {
   it('never lets two workers hold it at once', async () => {
     const exits = await Promise.all(
       ['a', 'b', 'c'].map((name) =>
-        worker(directory, name, lockName, { rounds: 3, holdMs: 150 })
+        worker(directory, name, lockName, { rounds: 3, holdMs: 150, startTogether: 3 })
       )
     )
     expect(exits).toEqual([0, 0, 0])
