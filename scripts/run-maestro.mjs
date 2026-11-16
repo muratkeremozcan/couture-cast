@@ -59,6 +59,11 @@ import {
 } from './lib/weather-provider-double-data.mjs'
 import { startExpoGoLinkEndpoint } from './lib/expo-go-link-endpoint.mjs'
 import {
+  ANDROID_LOG_BUFFER,
+  androidFailureCaptures,
+  createLineLog,
+} from './lib/android-flow-diagnostics.mjs'
+import {
   describeMissingReport,
   flowTitleOf,
   lastStartedMaestroCommand,
@@ -213,6 +218,8 @@ const WRITE_ARTIFACTS =
   process.argv.includes('--artifacts') ||
   process.env.MOBILE_E2E_ARTIFACTS === '1'
 const MAESTRO_ARTIFACT_DIR = process.env.MAESTRO_ARTIFACT_DIR || 'maestro/artifacts'
+/** Metro's output by line with its arrival time, saved for a failed Android flow. */
+const metroLog = createLineLog()
 
 /**
  * The ceiling one flow gets on the single-device serial path before it is
@@ -614,6 +621,22 @@ const suppressAndroidErrorDialogs = async () => {
     }
   } catch (error) {
     log(`Could not set hide_error_dialogs: ${error.message}`)
+  }
+}
+
+/**
+ * Grow every device log buffer, so a failed flow's log from its start is still on the device
+ * (ANDROID_LOG_BUFFER; CI run 43919975098 kept about 36 s). A refusal is logged, never thrown:
+ * the flows run with the default buffers.
+ *
+ * @returns {Promise<void>}
+ */
+const growAndroidLogBuffers = async () => {
+  try {
+    await captureProcess(resolveAdbBinary(), ANDROID_LOG_BUFFER, { timeoutMs: 15_000 })
+    log(`Device log buffers set to 16M on ${androidSerial || 'the attached device'}`)
+  } catch (error) {
+    log(`Could not grow the device log buffers: ${error.message}`)
   }
 }
 
@@ -3843,15 +3866,24 @@ const startExpoDevServer = (platform, metroPort) => {
   // A signed-out run starts Metro with no member token and the app's real auth
   // path. `start-mobile-server.sh` passes `--clear`, so no transform cached by a
   // member run can carry the inlined token into this bundle.
+  // With artifacts on, Metro's output also goes to metroLog, which a failed flow saves.
   const serverProcess = spawn('npm', ['run', 'start:mobile:server'], {
     detached: process.platform !== 'win32',
-    stdio: 'inherit',
+    stdio: WRITE_ARTIFACTS ? ['inherit', 'pipe', 'pipe'] : 'inherit',
     env: metroEnvForAuthMode(AUTH_MODE, {
       ...process.env,
       MOBILE_E2E_PLATFORM: platform,
     }),
   })
   managedProcesses.set(serverProcess, 'Expo dev server')
+  for (const [stream, out] of [
+    [serverProcess.stdout, process.stdout],
+    [serverProcess.stderr, process.stderr],
+  ])
+    stream?.on('data', (chunk) => {
+      out.write(chunk)
+      metroLog.write(chunk)
+    })
   serverProcess.on('exit', (code) => {
     if (code !== null && code !== 0) {
       console.error(`[maestro:runner] Expo dev server exited early with code ${code}`)
@@ -4498,12 +4530,12 @@ const recordSingleFlowOutcome = (
   const failuresBefore = flowFailures.length
   recordFlowOutcome(flowPath, maestroExitError, flowFailures, startedAtMs)
   if (flowFailures.length > failuresBefore && platform === 'android')
-    captureAndroidWindowStack(flowPath, serial)
+    captureAndroidWindowStack(flowPath, serial, startedAtMs)
 }
 
 /**
- * Save the Android window stack, device log tail and process list next to a
- * failed flow's artifacts.
+ * Save the Android window stack, device log, process list, Expo Go process id and Metro's output
+ * next to a failed flow's artifacts (androidFailureCaptures).
  *
  * Expo Go sometimes dims the whole screen for a developer sheet that never
  * draws (CI runs 38934394685 and 38959860317). The dimming window is not in the
@@ -4513,42 +4545,49 @@ const recordSingleFlowOutcome = (
  * the `device-logcat.txt` Maestro itself saves for a finished flow; CI's
  * artifact secret scan runs over all of it before upload.
  *
+ * CI run 43919975098 left only Expo Go's system splash and no Expo Go process, and the log
+ * tail of 4000 lines covered the last 36 s. The device log now runs from the flow's start,
+ * `pidof` says whether Expo Go is alive, and Metro's lines over the flow say whether it ever
+ * asked for the bundle.
+ *
  * @param {string} flowPath
  * @param {string} [serial] the device to capture, the run's current one by default
+ * @param {number} [startedAtMs] when the flow's first attempt began
  * @returns {void}
  */
-const captureAndroidWindowStack = (flowPath, serial = androidSerial) => {
+const captureAndroidWindowStack = (flowPath, serial = androidSerial, startedAtMs) => {
   if (!WRITE_ARTIFACTS || IOS_UDIDS.length > 0) return
   // Story 1.2b R28: a flow killed at its watchdog leaves no Maestro debug
   // output, so the device side of the stall is captured here too. In CI job
   // 120347100806 `community-feed.yaml` sat in Maestro's `pm clear` for both
   // attempts while the next flow's clear took 1.6 s, and nothing recorded what
-  // the device was doing. The log tail and the process list (a blocked
+  // the device was doing. The log and the process list (a blocked
   // `pm clear` is still running there after Maestro is killed) say.
-  const captures = [
-    ['windows', ['shell', 'dumpsys', 'window', 'windows'], 'window stack'],
-    ['logcat', ['logcat', '-d', '-t', '4000'], 'device log tail'],
-    ['processes', ['shell', 'ps', '-A', '-o', 'PID,PPID,S,TIME,ARGS'], 'process list'],
-  ]
-  for (const [suffix, args, label] of captures) {
+  const artifact = (suffix) =>
+    path.join(MAESTRO_ARTIFACT_DIR, `${getFlowName(flowPath)}-${suffix}.txt`)
+  for (const { suffix, args, label, describe } of androidFailureCaptures(startedAtMs)) {
     const result = spawnSync(resolveAdbBinary(), args, {
       encoding: 'utf8',
       timeout: 15_000,
       maxBuffer: 64 * 1024 * 1024,
       env: serial ? { ...process.env, ANDROID_SERIAL: serial } : process.env,
     })
-    if (result.status !== 0 || !result.stdout) {
+    const text = describe(result)
+    if (text === null) {
       log(`Could not capture the Android ${label} for ${flowPath}`)
       continue
     }
-    const target = path.join(
-      MAESTRO_ARTIFACT_DIR,
-      `${getFlowName(flowPath)}-${suffix}.txt`
-    )
     // A write error is logged, never thrown: it must not stop the remaining
     // flows or replace the failure it documents (R29).
-    saveDiagnostic(target, result.stdout, log, `the Android ${label} for ${flowPath}`)
+    saveDiagnostic(artifact(suffix), text, log, `the Android ${label} for ${flowPath}`)
   }
+  if (Number.isFinite(startedAtMs))
+    saveDiagnostic(
+      artifact('metro'),
+      metroLog.since(startedAtMs) || 'Metro printed nothing since the flow started.\n',
+      log,
+      `Metro's output for ${flowPath}`
+    )
 }
 
 /**
@@ -4969,6 +5008,7 @@ const run = async () => {
   // run this early.
   if (target.platform === 'android') {
     await forEachAndroidDevice(suppressAndroidErrorDialogs)
+    await forEachAndroidDevice(growAndroidLogBuffers)
     await forEachAndroidDevice(quietAndroidKeyboard)
     await forEachAndroidDevice(disableAndroidAnimations)
   }
