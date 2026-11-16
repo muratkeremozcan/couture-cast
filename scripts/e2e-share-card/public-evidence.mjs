@@ -28,6 +28,10 @@ import {
   selectPublicDiagnostics,
 } from '../ci/native-ios-public-diagnostics.mjs'
 import { projectStartupTimings } from '../ci/native-ios-startup-timings.mjs'
+import {
+  AUDIT_SCREEN_FILE,
+  assertPublicAuditScreen,
+} from '../lib/share-card-audit-screens.mjs'
 const directory = path.resolve(
   process.env.CC68_HARNESS_DIR ?? '_bmad-output/test-artifacts/story-6-8/runtime'
 )
@@ -370,22 +374,30 @@ if (startupTimings) closedJSON('native-ios-startup-timings.json', startupTimings
 if (iosDiagnostics.omitted.length) closedJSON(OMITTED_FILE, iosDiagnostics.omitted)
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)
-  // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.
-  await writeRedactedNativeFailureImage(
-    value,
-    path.join(staging, name.replace('.json', '-redacted.png'))
-  )
+  // Re-render from validated primitives. Never trust or copy a claimed redacted PNG. A screen
+  // whose source is unavailable renders none, so there is nothing to read (PR 237 review).
+  const redacted = path.join(staging, name.replace('.json', '-redacted.png'))
+  if (await writeRedactedNativeFailureImage(value, redacted))
+    assertPublicAuditScreen(fs.readFileSync(redacted))
 }
 
 for (const name of fs.readdirSync(directory)) {
   if (failures.has(name)) closedJSON(name, failures.get(name))
   if (proofs.has(name)) closedJSON(name, proofs.get(name))
+  // Every published PNG (PR 237 review P1): the saved originals, the native screens, the harness's
+  // screen of a failed audit and the screen of each refused iOS audit issue (a fixed name per
+  // closed state), each a whole PNG whose metadata shows no private text
+  // (share-card-audit-screens.mjs).
   if (
     /^(saved-original-(android|ios)(-[a-z-]+)?|native-(android|ios)-[A-Za-z0-9-]+)\.png$/.test(
       name
-    )
-  )
-    fs.copyFileSync(path.join(directory, name), path.join(staging, name))
+    ) ||
+    AUDIT_SCREEN_FILE.test(name)
+  ) {
+    const bytes = fs.readFileSync(path.join(directory, name))
+    assertPublicAuditScreen(bytes)
+    fs.writeFileSync(path.join(staging, name), bytes)
+  }
   if (/^original-proof-(android|ios)(-[a-z-]+)?\.json$/.test(name)) {
     const proof = JSON.parse(fs.readFileSync(path.join(directory, name)))
     closedJSON(name, {

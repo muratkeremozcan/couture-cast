@@ -14,14 +14,14 @@
 # it only on a miss; four ios-shard jobs and ios-expo-go restore exactly that scanned client and
 # run in parallel; ios-evidence proves every shard reported its exact cases; ios-app-build builds
 # the Release app beside them; ios-live-font builds the Story 6.8 Release test build and runs the
-# AC3 live font-scale proof on it, from the first minute, outside the canary. Without it the shards
+# AC3 live font-scale proof on it, one leg per screen, from the first minute, outside the canary,
+# and ios-live-font-evidence proves every leg reported its screen passing. Without it the shards
 # finish in about 75 minutes (client build up to 31 when its key misses, then the longest shard, 44
-# at p95). ios-live-font takes about 115 to 140 minutes (setup 15, Release build up to 31, simulator
-# and sign-in 10, the proof 17 to 22 per screen for four screens; limit 180). It holds one macOS
-# runner for the whole run, so under GitHub's limit of five macOS jobs at a time one more shard or
-# Expo Go job waits for a free runner: the shards finish at about 95 minutes on a cached client and
-# about 120 when the client builds. The nightly run takes about 140 minutes. The canary, which
-# skips ios-live-font, keeps the 75 minutes.
+# at p95). Each ios-live-font leg takes about 100 to 130 minutes (setup 15, Release build up to 31,
+# simulator and sign-in 10, the proof 45 to 70 for its screen; limit 180). The run then needs
+# about 700 macOS runner minutes, and GitHub runs five macOS jobs at a time, so jobs queue for a
+# runner and the nightly run takes about 3 hours. The canary, which skips ios-live-font, keeps the
+# 75 minutes.
 #
 # On a dispatch ios-build always builds the commit's own client, scans it and hands it to the
 # shards and Expo Go as an artifact of this run, kept for one day. Every cache save skips a
@@ -1034,13 +1034,20 @@ jobs:
   # or later SDK 56 needs, on its iOS 26 simulator. Everything else is ios-shard's own steps, by
   # alias: native Supabase, the API, the auth proxy, Maestro and the product-UI sign-in. It starts
   # with the run, beside the two builds. The canary skips it: its iOS 26 simulator is this job's on
-  # every night, so a canary run would repeat it. About 115 to 140 minutes: setup 15, the Release
-  # build up to 31, simulator and sign-in 10, the proof 17 to 22 per screen.
+  # every night, so a canary run would repeat it. One leg per screen
+  # (scripts/ci/ios-live-font-legs.mjs): a screen is 19 captures of about 37 Maestro calls each, so
+  # the four took 4 to 5 hours on one runner even with the XCUITest runner kept for the whole
+  # proof (dispatches 43740466527, 43746880534). Each leg takes about 100 to 130 minutes: setup 15,
+  # the Release build up to 31, simulator and sign-in 10, the proof 45 to 70 for its screen.
   ios-live-font:
-    name: iOS live font scale
+    name: iOS live font scale (${{ matrix.screen }})
     if: ${{ !inputs.ios26-canary }}
     runs-on: macos-26
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        screen: [home, community, settings, composer]
     env: *runtime_env
     steps:
       - uses: actions/checkout@v4
@@ -1086,8 +1093,12 @@ jobs:
       - *prepare_runtime
       # app.config.ts reads STORY68_NATIVE_TEST_BUILD=1 from the runtime's public build env:
       # bundle id com.couturecast.story68 and the live font mount markers the proof reads.
+      # COUTURE_TEXT_LAYOUT_PROBE=1 links the text layout probe (plugins/with-text-layout-probe.js),
+      # which answers the proof on every capture; the build checks the project against it again.
       - name: Generate the Release test build's native project
         id: prebuild
+        env:
+          COUTURE_TEXT_LAYOUT_PROBE: '1'
         run: node scripts/run-story68-native.mjs prebuild --platform ios
       - name: Mark the owned iOS build-service window
         id: build_window
@@ -1095,6 +1106,8 @@ jobs:
       - name: Build the Release test build
         id: release_build
         timeout-minutes: 45
+        env:
+          COUTURE_TEXT_LAYOUT_PROBE: '1'
         run: node scripts/run-story68-native.mjs build --platform ios --configuration Release
       - name: Release the owned iOS build services
         if: ${{ !cancelled() && steps.build_window.outcome == 'success' }}
@@ -1107,15 +1120,17 @@ jobs:
           device=$(cat /tmp/cc68-simulator)
           xcrun simctl launch "$device" com.couturecast.story68
           node scripts/run-story68-native.mjs signin --platform ios --device "$device"
-      # The driver exits nonzero unless every screen passed, and that fails the job.
-      - name: Live font-scale proof on Home, Community, Settings and the composer
+      # The driver exits nonzero unless this leg's screen passed, and that fails the leg.
+      - name: Live font-scale proof on this leg's screen
         id: live_font
         timeout-minutes: 120
+        env:
+          SCREEN: ${{ matrix.screen }}
         run: |
           device=$(cat /tmp/cc68-simulator)
           # The driver calls the pinned Maestro by name.
           export PATH="$HOME/.maestro/bin:$PATH"
-          node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens home,community,settings,composer --out "$RUNNER_TEMP/live-font-ios"
+          node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens "$SCREEN" --out "$RUNNER_TEMP/live-font-ios"
       - name: Record closed iOS host diagnostics
         if: ${{ !cancelled() && failure() }}
         run: node scripts/ci/native-host-evidence.mjs sample failure --platform ios
@@ -1129,7 +1144,7 @@ jobs:
         if: ${{ !cancelled() && steps.live_font_scan.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
-          name: ios-live-font-proof
+          name: ios-live-font-proof-${{ matrix.screen }}
           path: ${{ runner.temp }}/live-font-ios/
           retention-days: 7
           if-no-files-found: error
@@ -1139,13 +1154,43 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: ios-live-font-host
+          name: ios-live-font-host-${{ matrix.screen }}
           path: _bmad-output/test-artifacts/story-6-8/runtime/public-evidence/
           if-no-files-found: error
       - *clean_runtime
       - *supabase_logs
       - *supabase_stop
       - *delete_simulator
+
+  # Every screen's leg must report exactly that screen, passing; a skipped or killed leg has no
+  # report, so this job fails. The canary runs no leg and skips it.
+  ios-live-font-evidence:
+    if: ${{ always() && !inputs.ios26-canary }}
+    needs: ios-live-font
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.sha }}
+      # The run name carries this commit, which nightly triage matches; every job proves it
+      # checked out exactly that commit before anything else.
+      - name: Stop unless HEAD is the commit under test
+        env:
+          SHA: ${{ inputs.sha }}
+        run: |
+          echo "$SHA" | grep -Eqx '[0-9a-f]{40}' || { echo "::error::sha must be a full 40-character commit SHA, got '$SHA'"; exit 1; }
+          test "$(git rev-parse HEAD)" = "$SHA" || { echo "::error::checked out $(git rev-parse HEAD), expected $SHA"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: ios-live-font-proof-*
+          path: /tmp/ios-live-font
+      - name: Require every screen's leg to pass its live font proof
+        env:
+          CC68_LIVE_FONT_RESULT: ${{ needs.ios-live-font.result }}
+        run: |
+          node scripts/ci/ios-live-font-legs.mjs merge /tmp/ios-live-font
+          test "$CC68_LIVE_FONT_RESULT" = success
 
   # A skipped shard has no report, so this job fails.
   ios-evidence:

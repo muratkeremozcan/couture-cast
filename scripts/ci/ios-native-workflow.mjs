@@ -5,7 +5,8 @@
 //                            is cached and installed only from that scan, every shard with its own
 //                            runtime, budget and fail-closed evidence, a run that fails on a
 //                            skipped or partial shard, the AC3 live font-scale proof on the Release
-//                            test build (Story 6.15), and every job proving it checked out `sha`.
+//                            test build (Story 6.15), one leg per screen with a job that fails
+//                            unless every leg passed, and every job proving it checked out `sha`.
 //   ios-native.yml           nightly on main, which may write the caches, and a manual dispatch,
 //                            which saves none: ios-build builds and scans the dispatched commit's
 //                            own client and hands it to the shards and Expo Go as an artifact.
@@ -20,6 +21,7 @@ import { pathToFileURL } from 'node:url'
 import { parse } from 'yaml'
 import { helperProblems } from './ios-native-helpers.mjs'
 import { shardsOf } from './native-matrix-shards.mjs'
+import { LIVE_FONT_SCREENS } from './ios-live-font-legs.mjs'
 
 export const NIGHTLY_WORKFLOW = '.github/workflows/ios-native.yml'
 export const JOBS_WORKFLOW = '.github/workflows/ios-native-jobs.yml'
@@ -49,6 +51,7 @@ export const RUNNERS = {
   'ios-app-build': 'macos-26',
   'ios-live-font': 'macos-26',
   'ios-evidence': 'ubuntu-latest',
+  'ios-live-font-evidence': 'ubuntu-latest',
 }
 export const XCODE_CHOICES = {
   'ios-build': '26.4+',
@@ -61,35 +64,64 @@ const XCODE_LABELS = {
   '26.4+': '26.4 or later',
   [CONSUMER_XCODE]: '16.4, or 26.4 or later under the canary,',
 }
-export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence']
+// Story 6.15 AC3: proves every ios-live-font leg reported its screen passing.
+export const LIVE_FONT_EVIDENCE_JOB = 'ios-live-font-evidence'
+export const TEST_JOBS = [...MACOS_JOBS, 'ios-evidence', LIVE_FONT_EVIDENCE_JOB]
 export const HARNESS_DIRECTORY = '_bmad-output/test-artifacts/story-6-8/runtime'
 export const EVIDENCE_PATH = `${HARNESS_DIRECTORY}/public-evidence/`
 export const IOS_CLIENT =
   '/tmp/cc68-ios-build/Build/Products/Debug-iphonesimulator/CoutureCastStory68.app'
 
 // Story 6.15 AC3: ios-live-font builds the Story 6.8 Release test build in its own job, since the
-// bundle embeds the anon key of that job's stack, and runs the live font-scale driver on it with
-// every screen. The canary skips the job: it already runs on the canary's iOS 26 simulator.
+// bundle embeds the anon key of that job's stack, and runs the live font-scale driver on it, one
+// matrix leg per screen (scripts/ci/ios-live-font-legs.mjs: the four screens took 4 to 5 hours on
+// one runner). The canary skips the job: it already runs on the canary's iOS 26 simulator.
 export const LIVE_FONT_JOB = 'ios-live-font'
 export const LIVE_FONT_IF = '${{ !inputs.ios26-canary }}'
 export const IOS_RELEASE_APP =
   '/tmp/cc68-ios-build/Build/Products/Release-iphonesimulator/CoutureCastStory68.app'
-export const LIVE_FONT_SCREENS = ['home', 'community', 'settings', 'composer']
+export { LIVE_FONT_SCREENS }
+export const LIVE_FONT_NAME = 'iOS live font scale (${{ matrix.screen }})'
+// Every screen, no sibling cancelled: one failed screen still leaves the others' proofs.
+export const LIVE_FONT_STRATEGY = Object.freeze({
+  'fail-fast': false,
+  matrix: { screen: [...LIVE_FONT_SCREENS] },
+})
+// The leg's screen reaches the driver through the environment, never spliced into the script.
+export const LIVE_FONT_SCREEN_ENV = Object.freeze({ SCREEN: '${{ matrix.screen }}' })
 export const LIVE_FONT_OUT = '"$RUNNER_TEMP/live-font-ios"'
+export const LIVE_FONT_PREBUILD =
+  'node scripts/run-story68-native.mjs prebuild --platform ios'
 export const LIVE_FONT_RELEASE_BUILD =
   'node scripts/run-story68-native.mjs build --platform ios --configuration Release'
+// Story 6.15 F-00i: plugins/with-text-layout-probe.js links the text layout probe only when
+// COUTURE_TEXT_LAYOUT_PROBE=1 at prebuild, and the build checks the project against the same
+// variable (assertNativeProbeMode), so both steps carry it. Without it the Release build ships no
+// probe and every capture fails as live_font_text_probe_missing (nightly run 43707223465).
+export const LIVE_FONT_PROBE_ENV = Object.freeze({ COUTURE_TEXT_LAYOUT_PROBE: '1' })
 export const LIVE_FONT_INSTALL = `node scripts/ci/native-ios-startup-probe.mjs --for-native-flow --app ${IOS_RELEASE_APP}`
-export const LIVE_FONT_PROOF = `node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens ${LIVE_FONT_SCREENS.join(',')} --out ${LIVE_FONT_OUT}`
+export const LIVE_FONT_PROOF = `node scripts/run-live-font-proof.mjs --platform ios --device "$device" --build release --screens "$SCREEN" --out ${LIVE_FONT_OUT}`
 export const LIVE_FONT_SCAN = `node scripts/ci/native-ios-app-secret-scan.mjs ${LIVE_FONT_OUT} "$CC68_HARNESS_DIR"`
 const LIVE_FONT_SCAN_IF = "${{ !cancelled() && steps.live_font.outcome != 'skipped' }}"
 const LIVE_FONT_UPLOAD_IF =
   "${{ !cancelled() && steps.live_font_scan.outcome == 'success' }}"
 export const LIVE_FONT_ARTIFACT = {
-  name: 'ios-live-font-proof',
+  name: 'ios-live-font-proof-${{ matrix.screen }}',
   path: '${{ runner.temp }}/live-font-ios/',
   'retention-days': 7,
   'if-no-files-found': 'error',
 }
+export const LIVE_FONT_EVIDENCE_IF = '${{ always() && !inputs.ios26-canary }}'
+export const LIVE_FONT_LEGS_DIRECTORY = '/tmp/ios-live-font'
+export const LIVE_FONT_LEGS_DOWNLOAD = Object.freeze({
+  pattern: 'ios-live-font-proof-*',
+  path: LIVE_FONT_LEGS_DIRECTORY,
+})
+export const LIVE_FONT_MERGE = `node scripts/ci/ios-live-font-legs.mjs merge ${LIVE_FONT_LEGS_DIRECTORY}`
+export const LIVE_FONT_RESULT = 'test "$CC68_LIVE_FONT_RESULT" = success'
+export const LIVE_FONT_RESULT_ENV = Object.freeze({
+  CC68_LIVE_FONT_RESULT: '${{ needs.ios-live-font.result }}',
+})
 export const COMMIT = '${{ inputs.sha }}'
 export const NIGHTLY_COMMIT = '${{ github.sha }}'
 export const NIGHTLY_RUN_NAME = 'iOS native ${{ github.sha }}'
@@ -278,6 +310,8 @@ export const MANDATORY = [
       'bash scripts/ci/check-accessibility-focus-builds.sh ios-app "apps/mobile/ios/build/Build/Products/Release-iphonesimulator/$scheme.app/$scheme" apps/mobile/ios',
     ],
   ],
+  // PR 237 review P1: the prebuild links the probe, so it is as mandatory as the build.
+  [LIVE_FONT_JOB, (step) => step.id === 'prebuild', undefined, [LIVE_FONT_PREBUILD]],
   [
     LIVE_FONT_JOB,
     (step) => step.id === 'release_build',
@@ -300,6 +334,12 @@ export const MANDATORY = [
     (step) => step.id === 'live_font_scan',
     LIVE_FONT_SCAN_IF,
     [LIVE_FONT_SCAN],
+  ],
+  [
+    LIVE_FONT_EVIDENCE_JOB,
+    runs('ios-live-font-legs.mjs merge'),
+    undefined,
+    [LIVE_FONT_MERGE, LIVE_FONT_RESULT],
   ],
   [
     'ios-evidence',
@@ -815,15 +855,23 @@ function consumerProblems(jobs, check) {
   }
 }
 
+/** The downloads a job may make: the shard reports, the legs' proofs, or the client. */
+const allowedDownload = (name, step) =>
+  (name === 'ios-evidence' && step.with?.pattern === 'share-card-ios-shard-*') ||
+  (name === LIVE_FONT_EVIDENCE_JOB &&
+    step.uses === 'actions/download-artifact@v4' &&
+    step.if === undefined &&
+    same(step.with, LIVE_FONT_LEGS_DOWNLOAD)) ||
+  (['ios-shard', 'ios-expo-go'].includes(name) && clientDownload(step))
+
 /** Artifacts carry closed evidence, the shard reports, and on a dispatch the scanned client. */
 function artifactProblems(jobs, check) {
   for (const [name, job] of Object.entries(jobs))
     for (const step of steps(job)) {
       if (String(step.uses).startsWith('actions/download-artifact'))
         check(
-          (name === 'ios-evidence' && step.with?.pattern === 'share-card-ios-shard-*') ||
-            (['ios-shard', 'ios-expo-go'].includes(name) && clientDownload(step)),
-          `${name}: download only the shard reports, or on a dispatch the scanned client`
+          allowedDownload(name, step),
+          `${name}: download only the shard reports or the live font legs' proofs, or on a dispatch the scanned client`
         )
       if (!String(step.uses).startsWith('actions/upload-artifact')) continue
       check(
@@ -879,9 +927,13 @@ function liveFontProblems(job, check) {
     job?.needs === undefined && job?.if === LIVE_FONT_IF,
     `${LIVE_FONT_JOB}: start with the run, beside the builds, and skip only under the canary (${LIVE_FONT_IF})`
   )
+  check(
+    same(job?.strategy, LIVE_FONT_STRATEGY) && job?.name === LIVE_FONT_NAME,
+    `${LIVE_FONT_JOB}: one leg per screen (${LIVE_FONT_SCREENS.join(', ')}), named by its screen, none cancelling a sibling`
+  )
   const at = (predicate) => stepIndex(job, predicate)
   const order = [
-    at(runs('run-story68-native.mjs prebuild --platform ios')),
+    at((step) => step.id === 'prebuild'),
     at((step) => step.id === 'release_build'),
     at(runs('native-ios-startup-probe.mjs')),
     at((step) => step.id === 'signin'),
@@ -895,9 +947,37 @@ function liveFontProblems(job, check) {
     ),
     `${LIVE_FONT_JOB}: prebuild, build the Release test build, install it, sign in, run the proof, scan it, then upload it`
   )
+  // PR 237 review P1: the body is the one command, so no inline assignment, unset or export can
+  // change the variable the step's env sets.
+  for (const [label, id, command] of [
+    ['prebuild', 'prebuild', LIVE_FONT_PREBUILD],
+    ['Release build', 'release_build', LIVE_FONT_RELEASE_BUILD],
+  ]) {
+    const row = steps(job).filter((step) => step.id === id)
+    check(
+      row.length === 1 && same(row[0].env, LIVE_FONT_PROBE_ENV),
+      `${LIVE_FONT_JOB}: the ${label} step must set exactly COUTURE_TEXT_LAYOUT_PROBE: '1', which links the text layout probe the proof reads`
+    )
+    check(
+      row.length === 1 && typeof row[0].run === 'string' && row[0].run.trim() === command,
+      `${LIVE_FONT_JOB}: the ${label} step must run exactly \`${command}\` and nothing else`
+    )
+  }
   check(
     steps(job).filter(liveFontUpload).length === 1,
     `${LIVE_FONT_JOB}: upload the scanned proof once as ${LIVE_FONT_ARTIFACT.name}, kept for ${LIVE_FONT_ARTIFACT['retention-days']} days, failing when it is missing`
+  )
+  check(
+    steps(job).filter((step) => step.id === 'live_font').length === 1 &&
+      same(steps(job).find((step) => step.id === 'live_font').env, LIVE_FONT_SCREEN_ENV),
+    `${LIVE_FONT_JOB}: the proof step must set exactly SCREEN from the leg's matrix screen`
+  )
+  // upload-artifact v4 refuses a second artifact of one name in a run, so each leg names its own.
+  check(
+    steps(job)
+      .filter((step) => String(step.uses).startsWith('actions/upload-artifact'))
+      .every((step) => String(step.with?.name ?? '').endsWith('-${{ matrix.screen }}')),
+    `${LIVE_FONT_JOB}: every upload must be named after its leg's screen`
   )
   const proof = steps(job).find((step) => step.id === 'live_font')
   const limit = job?.['timeout-minutes']
@@ -912,6 +992,31 @@ function liveFontProblems(job, check) {
       /needs\.ios-build|ios-dev-client|Debug-iphonesimulator/.test(JSON.stringify(step))
     ),
     `${LIVE_FONT_JOB}: test the Release build this job made, never the development client`
+  )
+}
+
+/**
+ * Story 6.15 AC3: ios-live-font-evidence runs after every leg, whatever its result, outside the
+ * canary, downloads every leg's proof and fails unless each screen reported itself passing and
+ * every leg succeeded.
+ */
+function liveFontEvidenceProblems(job, check) {
+  check(
+    same(needsList(job), [LIVE_FONT_JOB]) && job?.if === LIVE_FONT_EVIDENCE_IF,
+    `${LIVE_FONT_EVIDENCE_JOB}: run after every ${LIVE_FONT_JOB} leg, on any result, outside the canary (${LIVE_FONT_EVIDENCE_IF})`
+  )
+  const download = stepIndex(
+    job,
+    (step) =>
+      step.uses === 'actions/download-artifact@v4' &&
+      same(step.with, LIVE_FONT_LEGS_DOWNLOAD)
+  )
+  const merge = stepIndex(job, runs('ios-live-font-legs.mjs merge'))
+  check(
+    download >= 0 &&
+      merge > download &&
+      same(steps(job)[merge].env, LIVE_FONT_RESULT_ENV),
+    `${LIVE_FONT_EVIDENCE_JOB}: download every leg's proof, then merge them with the legs' result in CC68_LIVE_FONT_RESULT`
   )
 }
 
@@ -1000,6 +1105,7 @@ export function iosNativeProblems(files) {
   artifactProblems(jobs, check)
   runtimeProblems(jobs, check)
   liveFontProblems(jobs[LIVE_FONT_JOB], check)
+  liveFontEvidenceProblems(jobs[LIVE_FONT_EVIDENCE_JOB], check)
   for (const [name, job] of Object.entries(jobs))
     for (const step of steps(job)) cacheStepProblems(name, job, step, check)
   return problems

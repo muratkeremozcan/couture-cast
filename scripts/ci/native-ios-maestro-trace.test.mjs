@@ -1144,23 +1144,27 @@ test('a killed flow falls back to the after-timeout hierarchy and records its so
 })
 
 // Codex RUNS-R4-01: the runner's own helper, run with the real driver-argument functions.
-function runnerAfterTimeout({ platform, directory, events }) {
+function runnerAfterTimeout({ platform, directory, events, terminated = { status: 0 } }) {
   const runner = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
   // iosDeadlineKill and afterTimeoutHierarchy, exactly as the runner defines them.
   const start = runner.indexOf('function iosDeadlineKill(')
   const helper = runner.indexOf('function afterTimeoutHierarchy(')
   const end = runner.indexOf('\nfunction ', helper + 1)
   assert.ok(start > 0 && helper > start && end > helper)
+  const driverSpawn = (binary) => (binary === 'xcrun' ? terminated : { stdout: '' })
   return vm.runInNewContext(`${runner.slice(start, end)}\nafterTimeoutHierarchy`, {
     platform,
     directory,
     device: 'AFA0777F-372A-445A-B8D4-08C287947144',
     maestroBinary: '/owned/maestro',
     iosDriverGlobalArgs,
-    iosDriverTestArgs,
+    iosDriverTestArgs: (options) => {
+      events.push({ step: 'args' })
+      return iosDriverTestArgs({ ...options, spawn: driverSpawn })
+    },
     recordIosDriverFlow: (options) => {
       events.push({ step: 'driver', ok: options.ok })
-      return recordIosDriverFlow({ ...options, spawn: () => ({ stdout: '' }) })
+      return recordIosDriverFlow({ ...options, spawn: driverSpawn })
     },
     captureIosTimeoutHierarchy: ({ args, output }) => {
       // The args array is built in the vm realm; compare it as plain data.
@@ -1192,10 +1196,16 @@ test('after an iOS deadline kill the runner stops the failed runner, then reads 
   const read = runnerAfterTimeout({ platform: 'ios', directory, events })
   const hierarchy = read('ios', { status: null, deadline: { timedOut: true } }, '/out')
   assert.deepEqual(hierarchy, { attributes: {}, children: [] })
-  // Stop first, so the read starts one fresh runner on the pinned port with no reuse flag.
+  // Stop first, so the read starts one fresh runner on the pinned port. It still passes
+  // --no-reinstall-driver: without it Maestro 2.8 kills the runner as the read exits.
   assert.deepEqual(events, [
     { step: 'driver', ok: false },
-    { step: 'capture', args: OWNED_ARGS, output: '/out' },
+    { step: 'args' },
+    {
+      step: 'capture',
+      args: [...OWNED_ARGS, '--no-reinstall-driver'],
+      output: '/out',
+    },
   ])
   for (const [where, result] of [
     ['android', { status: null, deadline: { timedOut: true } }],
@@ -1213,6 +1223,22 @@ test('after an iOS deadline kill the runner stops the failed runner, then reads 
     )
     assert.deepEqual(quiet, [])
   }
+})
+
+// PR 237 review: a runner that could not be stopped is never read through, and the deadline
+// kill keeps its own failure (the read returns null, nothing throws).
+test('after an iOS deadline kill a runner stop that did not finish skips the read', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-after-timeout-'))
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+  const events = []
+  const read = runnerAfterTimeout({
+    platform: 'ios',
+    directory,
+    events,
+    terminated: { error: Object.assign(new Error('x'), { code: 'ETIMEDOUT' }) },
+  })
+  assert.equal(read('ios', { status: null, deadline: { timedOut: true } }, '/out'), null)
+  assert.deepEqual(events, [{ step: 'driver', ok: false }, { step: 'args' }])
 })
 
 test('the runner reads the after-timeout hierarchy before it records the failure', () => {
