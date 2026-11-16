@@ -763,6 +763,40 @@ describe('native flow public evidence', () => {
     assert.equal(image.includes(Buffer.from('private.invalid')), false)
   })
 
+  // PR 237 review: an unavailable screen renders no redacted image, so none is read or published.
+  test('public projection of a diagnostics record without a screen publishes the record alone', async (t) => {
+    const { projectNativeFlowDiagnostics } = await helper()
+    const directory = fixture(t)
+    const summary = projectNativeFlowDiagnostics({
+      ...context,
+      root,
+      commands: [command('tapOnElement', 'tab-home')],
+      hierarchy,
+    })
+    assert.equal(summary.screen.source, 'unavailable')
+    assert.equal(summary.captures.screenshot, false)
+    fs.writeFileSync(
+      path.join(directory, 'native-flow-diagnostics-android.json'),
+      JSON.stringify(summary)
+    )
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/e2e-share-card/public-evidence.mjs'],
+      {
+        cwd: root,
+        encoding: 'utf8',
+        env: { ...process.env, CC68_HARNESS_DIR: directory },
+      }
+    )
+    assert.equal(result.status, 0, result.stderr)
+    assert.deepEqual(
+      fs
+        .readdirSync(path.join(directory, 'public-evidence'))
+        .filter((name) => name.startsWith('native-flow-diagnostics-')),
+      ['native-flow-diagnostics-android.json']
+    )
+  })
+
   test('public projection validates all diagnostics before copying any pre-existing proof', async (t) => {
     const { projectNativeFlowDiagnostics } = await helper()
     const directory = fixture(t)

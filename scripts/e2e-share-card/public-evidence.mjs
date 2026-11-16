@@ -374,10 +374,11 @@ if (startupTimings) closedJSON('native-ios-startup-timings.json', startupTimings
 if (iosDiagnostics.omitted.length) closedJSON(OMITTED_FILE, iosDiagnostics.omitted)
 for (const [name, value] of diagnostics) {
   closedJSON(name, value)
-  // Re-render from validated primitives. Never trust or copy a claimed redacted PNG.
+  // Re-render from validated primitives. Never trust or copy a claimed redacted PNG. A screen
+  // whose source is unavailable renders none, so there is nothing to read (PR 237 review).
   const redacted = path.join(staging, name.replace('.json', '-redacted.png'))
-  await writeRedactedNativeFailureImage(value, redacted)
-  assertPublicAuditScreen(fs.readFileSync(redacted))
+  if (await writeRedactedNativeFailureImage(value, redacted))
+    assertPublicAuditScreen(fs.readFileSync(redacted))
 }
 
 for (const name of fs.readdirSync(directory)) {
