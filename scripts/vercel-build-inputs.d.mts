@@ -28,8 +28,7 @@ export declare function workingTree(cwd: string): string
 export declare function equivalentCommits(
   cwd: string,
   project: Project,
-  head: string,
-  limit?: number
+  head: string
 ): string[]
 export declare function buildDecision(
   project: string,

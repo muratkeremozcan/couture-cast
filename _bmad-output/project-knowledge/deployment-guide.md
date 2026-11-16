@@ -274,7 +274,7 @@ uses fixed Vercel production domains and the
 
 Both projects are held to the pushed commit's source before tests start. A project whose build
 the ignored build step skipped keeps serving the last commit it built, so the `served-commits` job
-lists, per project, the commits on `main`'s first-parent history (at most 100) whose build inputs
+lists, per project, the commits on `main`'s whole first-parent history whose build inputs
 equal the pushed commit's, and each wait accepts any of them:
 
 - The web `/api/health` must report `status: ok` and one of the web project's commits.

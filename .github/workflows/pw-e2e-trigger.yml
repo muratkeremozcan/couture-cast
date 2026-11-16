@@ -93,8 +93,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.sha }}
-          # equivalentCommits walks at most 100 first-parent commits.
-          fetch-depth: 100
+          # The whole history: the commit still serving can be any number of merges back.
+          fetch-depth: 0
       - name: Setup Node
         uses: actions/setup-node@v4
         with:

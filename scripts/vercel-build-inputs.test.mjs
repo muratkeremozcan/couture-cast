@@ -813,7 +813,29 @@ describe('equivalentCommits', () => {
     assert.deepEqual(equivalentCommits(fixture, 'web', api), [api, ci, docs, web])
     assert.deepEqual(equivalentCommits(fixture, 'api', api), [api])
     assert.deepEqual(equivalentCommits(fixture, 'api', ci), [ci, docs, web, base])
-    assert.deepEqual(equivalentCommits(fixture, 'web', api, 2), [api, ci])
+  })
+
+  // CodeRabbit review of #243 (Major): production keeps serving its last build through any number
+  // of merges that change nothing it builds, so the walk has no limit.
+  test('reaches a serving commit more than 100 merges back', () => {
+    const base = git(fixture, 'rev-parse', 'HEAD')
+    for (let merge = 0; merge < 101; merge += 1)
+      git(fixture, 'commit', '-q', '--allow-empty', '-m', `docs-only merge ${merge}`)
+    const head = git(fixture, 'rev-parse', 'HEAD')
+    const commits = equivalentCommits(fixture, 'web', head)
+    // Every commit since the base changed nothing web builds, and the base itself is the last.
+    assert.equal(commits.length, 102)
+    assert.equal(commits[0], head)
+    assert.equal(commits.at(-1), base)
+  })
+
+  test('refuses a shallow clone, whose cut history would turn the serving commit away', () => {
+    const head = commit(fixture, { 'docs/guide.md': 'docs only' })
+    const shallow = path.join(scratch, 'shallow')
+    git(scratch, 'clone', '-q', '--depth=1', `file://${fixture}`, shallow)
+    assert.throws(() => equivalentCommits(shallow, 'web', head), {
+      message: 'equivalentCommits needs the whole history (checkout fetch-depth: 0)',
+    })
   })
 
   test('includes an earlier commit whose source a revert restored', () => {
@@ -880,6 +902,29 @@ describe('the preview deploys share the map', () => {
     assert.equal(inputsHash(fixture, 'api'), inputsHashAt(fixture, 'api', 'HEAD'))
     assert.equal(git(fixture, 'diff', '--cached', '--name-only'), staged)
   })
+
+  // CodeRabbit review of #243: a staged file HEAD lacks would otherwise reuse a deployment
+  // built without it.
+  test('a staged new file fails the project that builds from it, and the index keeps it', () => {
+    write(fixture, 'apps/web/src/new-page.tsx', 'staged addition')
+    git(fixture, 'add', '--', 'apps/web/src/new-page.tsx')
+    assert.throws(() => inputsHash(fixture, 'web'), {
+      message: 'the checkout has uncommitted changes to the build inputs',
+    })
+    assert.equal(inputsHash(fixture, 'api'), inputsHashAt(fixture, 'api', 'HEAD'))
+    assert.equal(
+      git(fixture, 'diff', '--cached', '--name-status'),
+      'A\tapps/web/src/new-page.tsx'
+    )
+  })
+
+  test('a staged deletion fails the project too', () => {
+    git(fixture, 'rm', '-q', '--', 'apps/api/src/main.ts')
+    assert.throws(() => inputsHash(fixture, 'api'), {
+      message: 'the checkout has uncommitted changes to the build inputs',
+    })
+    assert.equal(inputsHash(fixture, 'web'), inputsHashAt(fixture, 'web', 'HEAD'))
+  })
 })
 
 describe('production E2E accepts what each project serves', () => {
@@ -894,7 +939,8 @@ describe('production E2E accepts what each project serves', () => {
         'node scripts/vercel-build-inputs.mjs equivalent web "$GITHUB_SHA"\nnode scripts/vercel-build-inputs.mjs equivalent api "$GITHUB_SHA"\n',
       ]
     )
-    assert.equal(jobs['served-commits'].steps[0].with['fetch-depth'], 100)
+    // The whole of main's history: the commit still serving can be any number of merges back.
+    assert.equal(jobs['served-commits'].steps[0].with['fetch-depth'], 0)
     assert.deepEqual(jobs['served-commits'].outputs, {
       web: '${{ steps.commits.outputs.web }}',
       api: '${{ steps.commits.outputs.api }}',
@@ -927,7 +973,7 @@ describe('production E2E accepts what each project serves', () => {
     const { jobs } = workflow('pw-e2e-trigger.yml')
     const served = jobs['prod-served-commits']
     assert.equal(served.if, "inputs.test_env == 'prod' && inputs.custom_base_url == ''")
-    assert.equal(served.steps[0].with['fetch-depth'], 100)
+    assert.equal(served.steps[0].with['fetch-depth'], 0)
     assert.deepEqual(served.steps.map((step) => step.run).filter(Boolean), [
       'node scripts/vercel-build-inputs.mjs equivalent web "$GITHUB_SHA"',
     ])

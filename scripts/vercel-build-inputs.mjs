@@ -212,19 +212,28 @@ export function inputsHashAt(cwd, project, rev = 'HEAD') {
 }
 
 /**
- * The tree of the checkout's tracked files as they stand, edits not yet committed included,
- * written through a throwaway index so the checkout and its own index stay untouched.
+ * The tree of the checkout's tracked files as they stand, staged and unstaged edits, staged
+ * additions and deletions included, written through a copy of its index so the checkout and its
+ * own index stay untouched.
  * @param {string} cwd
  * @returns {string} the tree's object id
  */
 export function workingTree(cwd) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'vercel-build-inputs-'))
-  const env = { ...process.env, GIT_INDEX_FILE: path.join(dir, 'index') }
+  const index = path.join(dir, 'index')
+  const env = { ...process.env, GIT_INDEX_FILE: index }
   try {
-    for (const args of [
-      ['read-tree', 'HEAD'],
-      ['add', '--update', '--', ':/'],
-    ]) {
+    const own = git(['rev-parse', '--path-format=absolute', '--git-path', 'index'], cwd)
+    if (own.status !== 0) throw new Error(`git rev-parse failed (${failure(own)})`)
+    // The checkout's own index holds what is staged, new files included; with none, HEAD.
+    const steps = fs.existsSync(own.stdout.trim())
+      ? [['add', '--update', '--', ':/']]
+      : [
+          ['read-tree', 'HEAD'],
+          ['add', '--update', '--', ':/'],
+        ]
+    if (fs.existsSync(own.stdout.trim())) fs.copyFileSync(own.stdout.trim(), index)
+    for (const args of steps) {
       const result = git(args, cwd, { env })
       if (result.status !== 0)
         throw new Error(`git ${args[0]} failed (${failure(result)})`)
@@ -242,17 +251,23 @@ export function workingTree(cwd) {
 const SHA = /^[a-f0-9]{40}$/
 
 /**
- * The commits on `head`'s first-parent history, `head` first and at most `limit` of them, whose
- * `project` inputs equal `head`'s: any of them is a deployment of the source `head` builds.
+ * The commits on `head`'s whole first-parent history, `head` first, whose `project` inputs equal
+ * `head`'s: any of them is a deployment of the source `head` builds. The walk has no limit:
+ * production keeps serving its last build through any number of merges that change nothing it
+ * builds (263 commits on main took 11 s on 2026-11-16).
  * Production E2E accepts each, since the ignored build step leaves the last built one serving.
  * The list skips over commits with other inputs: when a build failed, the deployment before it
  * keeps serving, and a later commit that reverts to its source is skipped against it.
- * @param {string} cwd @param {Project} project @param {string} head @param {number} [limit]
+ * @param {string} cwd @param {Project} project @param {string} head
  * @returns {string[]}
  */
-export function equivalentCommits(cwd, project, head, limit = 100) {
+export function equivalentCommits(cwd, project, head) {
   if (!SHA.test(head)) throw new Error(`${JSON.stringify(head)} is not a commit SHA`)
-  const listed = git(['rev-list', '--first-parent', `--max-count=${limit}`, head], cwd)
+  // A shallow clone would cut the walk short and turn away the commit still serving.
+  const shallow = git(['rev-parse', '--is-shallow-repository'], cwd)
+  if (shallow.stdout?.trim() !== 'false')
+    throw new Error('equivalentCommits needs the whole history (checkout fetch-depth: 0)')
+  const listed = git(['rev-list', '--first-parent', head], cwd)
   if (listed.status !== 0)
     throw new Error(`git rev-list ${head} failed (${failure(listed)})`)
   const commits = listed.stdout.split('\n').filter(Boolean)
