@@ -47,6 +47,44 @@ describe('flattenHierarchy', () => {
     node({ 'resource-id': 'live-font-scale-root-1.5', bounds: '[0,0][1,1]' }),
   ])
 
+  // iOS run 43773613293, composer: XCUITest gives a switch its value as text ("1") and its name as
+  // accessibilityText. The node keeps both, so the probe's element (named by the label) can pair it.
+  test('an iOS node keeps an accessibility label apart from its text; Android reads none', () => {
+    const screen = node({ bounds: '[0,0][402,874]' }, [
+      node({ bounds: '[0,78][402,823]' }, [
+        node({
+          'resource-id': 'share-card-watermark',
+          text: '1',
+          accessibilityText: 'Show watermark',
+          bounds: '[313,125][378,173]',
+        }),
+        node({
+          text: '',
+          accessibilityText: 'Your share card',
+          bounds: '[24,78][378,109]',
+        }),
+        node({ text: 'Save', accessibilityText: 'Save', bounds: '[24,709][195,758]' }),
+      ]),
+    ])
+    const ios = flattenHierarchy({ children: [screen] }, { platform: 'ios' }).nodes
+    assert.deepEqual(
+      ios.map(({ text, label }) => [text, label]),
+      [
+        ['1', 'Show watermark'],
+        ['Your share card', undefined],
+        ['Save', undefined],
+      ]
+    )
+    const android = flattenHierarchy(screen, { platform: 'android' }).nodes
+    assert.deepEqual(
+      android.map(({ text, label }) => [text, label]),
+      [
+        ['1', undefined],
+        ['Save', undefined],
+      ]
+    )
+  })
+
   test('keeps text with its parent bounds, controls and sorted mount markers', () => {
     const { nodes, controls, markers } = flattenHierarchy(tree, { platform: 'android' })
     assert.deepEqual(nodes, [
@@ -501,6 +539,69 @@ describe('stitchPages', () => {
         ),
       { message: /^live_font_scroll_short_drag_unconfirmed/ }
     )
+  })
+
+  // iOS run 43773613293, Settings at extra-extra-extra-large: the last drag moved 5.4 pt. The
+  // probe records (exact points) all measured 5.4; the hierarchy's whole-point bounds round each
+  // edge, so the same cards measured 5 and 6, and 6 sat outside 10 percent of 5.4. A whole-unit
+  // anchor is read within one unit of the step (its rounding), the step itself from the exact
+  // records; anchors farther apart than that still fail.
+  test('a short final step reads whole-unit anchors within their rounding', () => {
+    const tops = [100.6, 400.4, 700.6, 1000.4, 1300.6]
+    const offsets = [0, 300, 305.4]
+    const shown = [
+      [1, 2, 3, 4],
+      [2, 3, 4, 5],
+      [2, 3, 4, 5],
+    ]
+    const y = (n, page) => tops[n - 1] - offsets[page]
+    const card = (n, top) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${Math.round(top)}][100,${Math.round(top) + 100}]`,
+    })
+    const pages = shown.map((cards, page) => cards.map((n) => card(n, y(n, page))))
+    const records = shown.map((cards, page) =>
+      cards.map((n) => ({
+        text: `Card ${n}`,
+        viewRect: [0, y(n, page), 100, y(n, page) + 100],
+      }))
+    )
+    const bottom = { expectedShift: 300, reachedBottom: true, records }
+    const stitched = stitchPlaces(pages, bottom)
+    assert.equal(stitched.offsets.length, 3)
+    assert.deepEqual(stitched.offsets.slice(0, 2), [0, 300])
+    assert.ok(Math.abs(stitched.offsets[2] - 305.4) < 1e-9, String(stitched.offsets[2]))
+    assert.deepEqual(
+      stitched.taken.map(({ key }) => JSON.parse(key)[1]),
+      ['Card 1', 'Card 2', 'Card 3', 'Card 4', 'Card 5']
+    )
+    // A whole-unit anchor more than its rounding off the step (8 against 5.4) places a text
+    // twice: ambiguous.
+    const moved = pages.map((page, at) =>
+      at === 2
+        ? page.map((node) => (node.id === 'c3' ? card(3, y(3, 1) - 8) : node))
+        : page
+    )
+    assert.throws(() => stitchPlaces(moved, bottom), {
+      message: /^live_font_scroll_short_drag_ambiguous/,
+    })
+    // Exact anchors that disagree (5.4 and 9.4) stay ambiguous.
+    const split = records.map((list, at) =>
+      at === 2
+        ? list.map((record) =>
+            record.text === 'Card 5'
+              ? {
+                  ...record,
+                  viewRect: record.viewRect.map((v, i) => (i % 2 ? v - 4 : v)),
+                }
+              : record
+          )
+        : list
+    )
+    assert.throws(() => stitchPlaces(pages, { ...bottom, records: split }), {
+      message: /^live_font_scroll_short_drag_ambiguous/,
+    })
   })
 
   // CodeRabbit on PR 230: a still header and a new label of the same id-less text on the last

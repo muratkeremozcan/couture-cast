@@ -134,14 +134,20 @@ export function flattenHierarchy(
   }
 }
 
-/** The flattened node for a view with text: the text with the parent's bounds. */
+/**
+ * The flattened node for a view with text: the text with the parent's bounds. On iOS a node whose
+ * `text` is not its accessibility label (a switch's value, "1" or "0", beside its name) keeps the
+ * label as `label`, the name the text layout probe's element carries (matchTextProbe).
+ */
 function textEntry({ attrs, id, bounds, parentBounds, isVolatile, platform }) {
   const text = nodeText(attrs, platform)
   if (!text || !bounds) return undefined
+  const label = platform === 'ios' ? (attrs.accessibilityText ?? '') : ''
   return {
     text,
     id,
     bounds,
+    ...(label !== '' && label !== text ? { label } : {}),
     ...(parentBounds ? { parent: parentBounds } : {}),
     ...(isVolatile ? { volatile: true } : {}),
   }
@@ -335,15 +341,25 @@ const measuresDrag = (shift, expectedShift) =>
   !(expectedShift > 0) || Math.abs(shift - expectedShift) <= SHIFT_SPREAD * expectedShift
 
 /**
+ * How far a shift read off whole-unit bounds may sit from the true one: the hierarchy rounds
+ * each edge of a fractional layout (iOS points) to a whole unit, so the difference of two edges
+ * is off by under one unit. Android's whole pixels are exact, and a text placed twice moves by a
+ * line or more, far beyond it.
+ */
+const WHOLE_UNIT = 1
+
+/**
  * The step of the drag that reaches the bottom when no anchor measured a whole drag (r48
  * P2-1, r49 P2-4): that drag moves only the travel left. Its anchors are the shifts a drag can
  * make, above `tolerance` (a fixed node, such as a sticky chip's record, shifts by 0) and at
  * most a whole drag (a repeated text paired with a lower copy shifts backwards). With none, the
- * page shares no moving text and the step stays unmeasured (null). Anchors that do not all sit
- * within SHIFT_SPREAD of their median fail as live_font_scroll_short_drag_ambiguous, since any
- * one step would place some text twice; agreeing anchors of fewer than two texts fail as
- * live_font_scroll_short_drag_unconfirmed, since one repeated label can pair with another copy
- * by chance. Two texts or more that agree give their median.
+ * page shares no moving text and the step stays unmeasured (null). The step is the median of
+ * the exact anchors (probe records), or of every anchor when none is exact. Anchors that do not
+ * all sit within SHIFT_SPREAD of it, plus their own `rounding` (WHOLE_UNIT for a hierarchy
+ * anchor, iOS run 43773613293 Settings: records 5.4, the same cards' nodes 5 and 6), fail as
+ * live_font_scroll_short_drag_ambiguous, since any one step would place some text twice; agreeing
+ * anchors of fewer than two texts fail as live_font_scroll_short_drag_unconfirmed, since one
+ * repeated label can pair with another copy by chance.
  */
 function shortFinalStep(entries, { tolerance, expectedShift }) {
   const anchors = entries.filter(
@@ -351,8 +367,14 @@ function shortFinalStep(entries, { tolerance, expectedShift }) {
   )
   if (!anchors.length) return null
   const shifts = anchors.map(({ shift }) => shift)
-  const step = median(shifts)
-  if (!shifts.every((shift) => Math.abs(shift - step) <= SHIFT_SPREAD * step))
+  const exact = anchors.filter(({ rounding }) => rounding === 0)
+  const step = median((exact.length ? exact : anchors).map(({ shift }) => shift))
+  if (
+    !anchors.every(
+      ({ shift, rounding = 0 }) =>
+        Math.abs(shift - step) <= SHIFT_SPREAD * step + rounding
+    )
+  )
     throw new Error(
       `live_font_scroll_short_drag_ambiguous: final drag anchors ${shifts.join(', ')} px disagree`
     )
@@ -511,9 +533,11 @@ export function stitchPlaces(
     : []
   // Every page's measured shifts first, so a page that shares no moving text takes the median
   // of all measured steps, the later ones too.
+  // A hierarchy anchor's shift is read off whole-unit bounds (one unit of rounding), a record's
+  // off the probe's exact rects (none).
   const anchors = shifts(pages, chrome).map((own, at) => [
-    ...own,
-    ...(byRecords[at] ?? []),
+    ...own.map((anchor) => ({ ...anchor, rounding: WHOLE_UNIT })),
+    ...(byRecords[at] ?? []).map((anchor) => ({ ...anchor, rounding: 0 })),
   ])
   const measured = anchors.map((list) =>
     list.map(({ shift }) => shift).filter((shift) => measuresDrag(shift, expectedShift))
