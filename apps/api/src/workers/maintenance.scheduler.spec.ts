@@ -13,6 +13,11 @@ import {
   MODERATION_SLA_SWEEP_JOB_NAME,
   registerMaintenanceSchedulers,
   registerModerationSlaScheduler,
+  ORPHAN_AUTH_USER_SWEEP_CRON_PATTERN,
+  ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
+  ORPHAN_AUTH_USER_SWEEP_TIMEZONE,
+  registerOrphanAuthUserSweepScheduler,
+  removeOrphanAuthUserSweepScheduler,
   TELEMETRY_EVENT_PRUNE_CRON_PATTERN,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
   WARDROBE_RETENTION_PURGE_CRON_PATTERN,
@@ -50,6 +55,36 @@ function schedulerCall(
 ): SchedulerCall | undefined {
   return calls.find((call) => call[0] === jobName)
 }
+
+// Learning path Step 57: Google sign-in.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+describe('Story 6.17 TEA-4: registerOrphanAuthUserSweepScheduler', () => {
+  it('registers one daily scheduler at 04:00 UTC', async () => {
+    const { queue, calls } = createQueue()
+    await registerOrphanAuthUserSweepScheduler(queue)
+    expect(ORPHAN_AUTH_USER_SWEEP_CRON_PATTERN).toBe('0 4 * * *')
+    expect(ORPHAN_AUTH_USER_SWEEP_TIMEZONE).toBe('UTC')
+    expect(calls()).toEqual([
+      [
+        ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
+        { pattern: '0 4 * * *', tz: 'UTC' },
+        { name: 'orphan-auth-user-sweep', data: {} },
+      ],
+    ])
+  })
+
+  it('removes the scheduler by its id when the gate is off', async () => {
+    const removeJobScheduler = vi.fn(() => Promise.resolve(true))
+    await removeOrphanAuthUserSweepScheduler({ removeJobScheduler } as unknown as Queue)
+    expect(removeJobScheduler).toHaveBeenCalledExactlyOnceWith('orphan-auth-user-sweep')
+  })
+
+  it('is not part of the five @Cron transcriptions', async () => {
+    const { queue, calls } = createQueue()
+    await registerMaintenanceSchedulers(queue)
+    expect(schedulerCall(calls(), ORPHAN_AUTH_USER_SWEEP_JOB_NAME)).toBeUndefined()
+  })
+})
 
 describe('registerMaintenanceSchedulers', () => {
   it('registers exactly the five sweeps and nothing else', async () => {

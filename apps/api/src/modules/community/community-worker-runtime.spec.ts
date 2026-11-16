@@ -424,6 +424,7 @@ describe('createCommunityWorkerRuntime', () => {
       'sweepExpiredUploads',
       'sweepModerationHistoryRetention',
       'sweepModerationSla',
+      'sweepOrphanAuthUsers',
       'sweepStalePendingReview',
     ])
     expect(harness.dispatchPending).toHaveBeenCalled()

@@ -13,6 +13,10 @@ import { describe, test } from 'node:test'
 import { killOwned } from '../lib/owned-process.mjs'
 import {
   CLIENT_BUILD,
+  GOOGLE_CLIENT_BUILD,
+  GOOGLE_JOB,
+  GOOGLE_PREBUILD_ENV,
+  GOOGLE_SCRIPT,
   LIMITS,
   MINIFIED_EVIDENCE,
   NETWORK_JOB,
@@ -35,7 +39,7 @@ const rejected = (title, expected, change) =>
   test(`${title} is rejected`, () => {
     const workflow = fresh()
     const script = change(workflow, source.script) ?? source.script
-    const problems = androidNativeProblems(workflow, script)
+    const problems = androidNativeProblems(workflow, script, source.googleScript)
     assert.ok(
       problems.some((problem) => expected.test(problem)),
       problems.join('\n') || 'no problem raised'
@@ -46,7 +50,10 @@ const network = (workflow) => workflow.jobs[NETWORK_JOB]
 
 describe('android-native.yml', () => {
   test('the committed workflow and script pass', () => {
-    assert.deepEqual(androidNativeProblems(source.workflow, source.script), [])
+    assert.deepEqual(
+      androidNativeProblems(source.workflow, source.script, source.googleScript),
+      []
+    )
   })
 
   test('runs nightly and on a manual dispatch only, on Linux, with fixed limits', () => {
@@ -55,8 +62,12 @@ describe('android-native.yml', () => {
       'schedule',
       'workflow_dispatch',
     ])
-    assert.deepEqual(Object.keys(workflow.jobs).sort(), [NETWORK_JOB, RELEASE_JOB])
-    assert.deepEqual(LIMITS, { [RELEASE_JOB]: 120, [NETWORK_JOB]: 60 })
+    assert.deepEqual(Object.keys(workflow.jobs).sort(), [
+      GOOGLE_JOB,
+      NETWORK_JOB,
+      RELEASE_JOB,
+    ])
+    assert.deepEqual(LIMITS, { [RELEASE_JOB]: 120, [NETWORK_JOB]: 60, [GOOGLE_JOB]: 75 })
     for (const [name, limit] of Object.entries(LIMITS)) {
       assert.equal(workflow.jobs[name]['runs-on'], 'ubuntu-latest')
       assert.equal(workflow.jobs[name]['timeout-minutes'], limit)
@@ -142,7 +153,7 @@ describe('android-native.yml', () => {
   })
 
   // Each job.
-  for (const name of [RELEASE_JOB, NETWORK_JOB]) {
+  for (const name of [RELEASE_JOB, NETWORK_JOB, GOOGLE_JOB]) {
     const job = (workflow) => workflow.jobs[name]
     rejected(
       `${name} on macOS`,
@@ -178,8 +189,11 @@ describe('android-native.yml', () => {
         job(w).steps.find((row) => row['timeout-minutes'])['timeout-minutes'] = 600
       }
     )
+    // The evidence upload is the job's last upload; a Supabase start-log upload may precede it.
     const upload = (w) =>
-      job(w).steps.find((row) => String(row.uses).startsWith('actions/upload-artifact'))
+      job(w)
+        .steps.filter((row) => String(row.uses).startsWith('actions/upload-artifact'))
+        .at(-1)
     for (const [what, change] of [
       ['kept for 90 days', (row) => (row.with['retention-days'] = 90)],
       ['kept for the default', (row) => delete row.with['retention-days']],
@@ -541,4 +555,98 @@ describe('android-network-timeout.sh', () => {
   test('requires an evidence directory', () => {
     assert.notEqual(run({ NETWORK_TIMEOUT_EVIDENCE: '' }).status, 0)
   })
+})
+
+// Story 6.17 M lane: the Google sign-in flows on the isolated client, nightly and on dispatch.
+// Learning path Step 57: Google sign-in.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+describe('android-native.yml android-google-sign-in', () => {
+  const google = (workflow) => workflow.jobs[GOOGLE_JOB]
+  const rejectedGoogle = (title, expected, change) =>
+    test(`${title} is rejected`, () => {
+      const workflow = fresh()
+      const googleScript = change(workflow, source.googleScript) ?? source.googleScript
+      const problems = androidNativeProblems(workflow, source.script, googleScript)
+      assert.ok(
+        problems.some((problem) => expected.test(problem)),
+        problems.join('\n') || 'no problem raised'
+      )
+    })
+
+  test('builds the isolated client and runs the flows on the emulator', () => {
+    const job = google(source.workflow)
+    assert.equal(job['timeout-minutes'], LIMITS[GOOGLE_JOB])
+    assert.deepEqual(
+      step(job, (row) => row.run === 'npx expo prebuild --platform android --no-install')
+        .env,
+      GOOGLE_PREBUILD_ENV
+    )
+    assert.equal(
+      step(job, (row) => row.id === 'google_client_build').run,
+      GOOGLE_CLIENT_BUILD
+    )
+    assert.equal(
+      step(job, (row) => row.id === 'google_sign_in').with.script,
+      `bash ${GOOGLE_SCRIPT}`
+    )
+  })
+
+  rejectedGoogle(
+    'the start-log upload widened to every outcome',
+    /upload its evidence once/,
+    (w) => {
+      step(google(w), (row) => row.name === 'Upload the Supabase start log').if =
+        'always()'
+    }
+  )
+  rejectedGoogle('a second evidence upload', /upload its evidence once/, (w) => {
+    const rows = google(w).steps
+    rows.splice(rows.length - 1, 0, { ...rows.at(-1), with: { ...rows.at(-1).with } })
+  })
+  rejectedGoogle(
+    'a client without the isolated build',
+    /isolated Story 6\.5 client/,
+    (w) => {
+      delete step(
+        google(w),
+        (row) => row.run === 'npx expo prebuild --platform android --no-install'
+      ).env.STORY65_NATIVE_TEST_BUILD
+    }
+  )
+  rejectedGoogle('Supabase without Mailpit', /with Mailpit/, (w) => {
+    step(google(w), (row) => row.uses === './.github/actions/start-local-supabase').with =
+      {
+        exclude: 'realtime,mailpit',
+      }
+  })
+  rejectedGoogle('a shared Redis', /job's own service/, (w) => {
+    google(w).env.REDIS_URL = 'redis://127.0.0.1:6380'
+  })
+  rejectedGoogle('the flows before the client build', /then run the flows/, (w) => {
+    const rows = google(w).steps
+    const at = rows.findIndex((row) => row.id === 'google_client_build')
+    const [build] = rows.splice(at, 1)
+    rows.splice(
+      rows.findIndex((row) => row.id === 'google_sign_in'),
+      0,
+      build
+    )
+  })
+  rejectedGoogle('flows after a skipped step', /after every earlier success/, (w) => {
+    step(google(w), (row) => row.id === 'google_sign_in').if = 'always()'
+  })
+  rejectedGoogle('a lax shell', /one strict shell/, (_, script) =>
+    script.replace('set -euo pipefail', 'set -u')
+  )
+  rejectedGoogle(
+    'a runner failure ignored',
+    /strict shell|does not execute/,
+    (_, script) =>
+      script.replace('--evidence "$evidence"', '--evidence "$evidence" || true')
+  )
+  rejectedGoogle(
+    'no runner at all',
+    /does not execute: node scripts\/run-google-native/,
+    (_, script) => script.replace(/^node scripts\/run-google-native.*$/m, '')
+  )
 })

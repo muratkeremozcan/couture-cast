@@ -129,7 +129,9 @@ export function isConsentRejection(error: unknown): boolean {
  * D8: the real next step. A teen whose guardian has not granted consent goes to the teen
  * dashboard, where the existing guardian flow continues; everyone else to onboarding.
  */
-export async function resolveMobileNextStep(): Promise<string> {
+export type MobileNextStep = '/signin' | '/teen-dashboard' | '/wardrobe-onboarding'
+
+export async function resolveMobileNextStep(): Promise<MobileNextStep> {
   try {
     const token = await resolveMobileAccessToken()
     if (!token) return '/signin'

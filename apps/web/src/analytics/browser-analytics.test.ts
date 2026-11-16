@@ -254,6 +254,9 @@ describe('U-ANALYTICS-PRIVACY-WEB: production posthog-js configuration', () => {
     mask_all_text: true,
     mask_all_element_attributes: true,
     mask_personal_data_properties: true,
+    // Story 6.17 D5 (learning path Step 57): a one-time OAuth code is masked like a token
+    // wherever posthog-js keeps a URL locally.
+    custom_personal_data_properties: ['token', 'focusToken', 'email', 'code'],
     person_profiles: 'identified_only',
     // No /flags or remote config request, and no stored initial URL or referrer.
     advanced_disable_flags: true,

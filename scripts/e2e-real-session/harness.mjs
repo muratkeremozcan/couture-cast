@@ -313,11 +313,12 @@ function skipReasonFor(env) {
 
 /**
  * The tests the real-session specs hold: one in `community-real-session.spec.ts`,
- * five in `community-real-session-identity.spec.ts` and two in
- * `guest-preview-real-session.spec.ts` (Story 6.16). A full run must report exactly
+ * five in `community-real-session-identity.spec.ts`, two in
+ * `guest-preview-real-session.spec.ts` (Story 6.16) and nine in
+ * `google-sign-in-real-session.spec.ts` (Story 6.17). A full run must report exactly
  * this many, none skipped.
  */
-export const EXPECTED_REAL_SESSION_TESTS = 8
+export const EXPECTED_REAL_SESSION_TESTS = 17
 
 /**
  * Whether a JUnit report shows a complete passing run: `expected` tests (any count

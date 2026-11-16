@@ -17,6 +17,7 @@ import {
   GUARDIAN_EMANCIPATION_JOB_NAME,
   MODERATION_HISTORY_RETENTION_JOB_NAME,
   MODERATION_SLA_SWEEP_JOB_NAME,
+  ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
@@ -65,6 +66,8 @@ export type MaintenanceSweeps = {
     sweepModerationSla: () => Promise<unknown>
     sweepModerationHistoryRetention: () => Promise<unknown>
   }
+  /** Story 6.17 TEA-4. Absent means off, as the moderation sweeps' hooks are. */
+  orphanAuthUsers?: { run: () => Promise<unknown> }
 }
 
 export type MaintenanceProcessorDeps = MaintenanceSweeps & {
@@ -176,6 +179,13 @@ export function createMaintenanceProcessor(deps: MaintenanceProcessorDeps) {
           'moderation_history_retention_completed',
           'moderation_history_retention_failed',
           () => deps.community.sweepModerationHistoryRetention()
+        )
+      case ORPHAN_AUTH_USER_SWEEP_JOB_NAME:
+        return run(
+          job.name,
+          'orphan_auth_user_sweep_job_completed',
+          'orphan_auth_user_sweep_job_failed',
+          () => deps.orphanAuthUsers?.run() ?? Promise.resolve({ skipped: true })
         )
       default:
         // Not thrown: an unknown name is almost always a scheduler left behind

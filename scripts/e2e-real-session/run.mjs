@@ -37,12 +37,10 @@
  * `.real-session-e2e/`). Only `artifacts/` inside it is meant for upload, and only
  * while `artifacts-complete.json` vouches for it (`artifacts.mjs verify`).
  */
-import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse as parseEnvFile } from 'dotenv'
-import pg from 'pg'
 import { localE2eDatabaseUrl, ROOT_ENV_FILES } from '../local-e2e-database.mjs'
 import {
   assertBucketsPresent,
@@ -52,13 +50,13 @@ import {
 } from '../local-storage-buckets.mjs'
 import { RAW_DIR, finalizeArtifacts, resetArtifacts } from './artifacts.mjs'
 import { startAuthProxy } from './auth-proxy.mjs'
+import { startMockOidcContainer } from './mock-oidc-container.mjs'
 import { deleteRecordedUsers, localAuthUsers } from './cleanup-users.mjs'
 import {
   API_BASE_URL,
   API_PORT,
   AUTH_PROXY_PORT,
   EXPECTED_REAL_SESSION_TESTS,
-  ISOLATED_DATABASE_NAME,
   MAILPIT_URL,
   RUN_STATE_FILES,
   WEATHER_DOUBLE_PORT,
@@ -67,9 +65,6 @@ import {
   WEB_PORT,
   envKeysToBlank,
   extractMailCode,
-  isLoopbackHost,
-  isolatedDatabaseName,
-  isolatedDatabaseUrl,
   junitOutcome,
   redactSecrets,
   resolveHarnessDir,
@@ -78,6 +73,14 @@ import {
 import { IDENTITIES_FILE, readIdentities } from './identities.mjs'
 import { startRunLifecycle } from './lifecycle.mjs'
 import { createProcessOwner } from './process-owner.mjs'
+import {
+  createIsolatedDatabase,
+  dropIsolatedDatabase,
+  resolveRedisUrl,
+  resolveSupabase,
+  tail,
+  waitForHealthy,
+} from './stack.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const webRoot = path.join(repoRoot, 'apps/web')
@@ -91,67 +94,6 @@ const skipWebBuild = cliArgs.includes('--skip-web-build')
 const playwrightArgs = cliArgs.filter((arg) => arg !== '--skip-web-build')
 
 const log = (message) => console.log(`[real-session] ${message}`)
-
-// Same contract and client default grants as pr-checks.yml and
-// apps/api/integration/helpers/isolated-community-database.ts. Eight RLS policies
-// call auth.jwt(), which only the Supabase `postgres` database defines, so a new
-// database needs it before `prisma migrate deploy` can apply them. Roles are
-// cluster-scoped and already exist in the local Supabase Postgres.
-const AUTH_BOOTSTRAP_SQL = `
-  CREATE SCHEMA auth;
-  CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $fn$
-    SELECT coalesce(
-      nullif(current_setting('request.jwt.claim', true), ''),
-      nullif(current_setting('request.jwt.claims', true), '')
-    )::jsonb
-  $fn$;
-  GRANT USAGE ON SCHEMA auth TO anon, authenticated, service_role;
-  ALTER DEFAULT PRIVILEGES IN SCHEMA public
-    GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO authenticated;
-`
-
-/** The URL and keys of the local Supabase; CI's start-local-supabase exports them. */
-function resolveSupabase(env) {
-  const keys = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
-  const resolved = Object.fromEntries(keys.map((key) => [key, env[key]?.trim() ?? '']))
-  if (keys.some((key) => !resolved[key])) {
-    let status
-    try {
-      status = JSON.parse(
-        execFileSync('npx', ['supabase', 'status', '-o', 'json'], {
-          cwd: repoRoot,
-          encoding: 'utf8',
-          stdio: ['ignore', 'pipe', 'ignore'],
-        })
-      )
-    } catch {
-      throw new Error(
-        'Local Supabase is not running. Start it with `npm run supabase:start` (Mailpit included) or export SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY.'
-      )
-    }
-    resolved.SUPABASE_URL ||= status.API_URL ?? ''
-    resolved.SUPABASE_ANON_KEY ||= status.ANON_KEY ?? ''
-    resolved.SUPABASE_SERVICE_ROLE_KEY ||= status.SERVICE_ROLE_KEY ?? ''
-  }
-  if (keys.some((key) => !resolved[key]))
-    throw new Error('The local Supabase URL or keys could not be resolved.')
-  if (!isLoopbackHost(new URL(resolved.SUPABASE_URL).hostname))
-    throw new Error(
-      'SUPABASE_URL must point at the local Supabase. Unset the remote value in this shell.'
-    )
-  return resolved
-}
-
-function resolveRedisUrl(env) {
-  const value = env.REDIS_URL?.trim()
-  if (!value)
-    throw new Error(
-      'Set REDIS_URL to a Redis this run owns, for example `docker run -d --rm --name real-session-redis -p 127.0.0.1:6390:6379 redis:7-alpine` and REDIS_URL=redis://127.0.0.1:6390. Sharing the development Redis would let another stack consume the queues of this run.'
-    )
-  if (!isLoopbackHost(new URL(value).hostname))
-    throw new Error('REDIS_URL must point at a Redis on this machine.')
-  return value
-}
 
 async function mailpitReachable() {
   try {
@@ -198,83 +140,12 @@ async function mailpitCodes(emails) {
   }
 }
 
-/**
- * Reserves the database's name before creating it, so a teardown that starts
- * while CREATE DATABASE is in flight still knows what to drop.
- *
- * @param {string} sourceUrl
- * @param {(database: { name: string; url: string }) => void} reserve
- */
-async function createIsolatedDatabase(sourceUrl, reserve) {
-  const name = isolatedDatabaseName()
-  const url = isolatedDatabaseUrl(sourceUrl, name)
-  reserve({ name, url })
-  const admin = new pg.Client({ connectionString: sourceUrl })
-  await admin.connect()
-  try {
-    await admin.query(`CREATE DATABASE "${name}" TEMPLATE template0`)
-  } finally {
-    await admin.end()
-  }
-  const isolated = new pg.Client({ connectionString: url })
-  await isolated.connect()
-  try {
-    await isolated.query(AUTH_BOOTSTRAP_SQL)
-  } finally {
-    await isolated.end()
-  }
-  return { name, url }
-}
-
-async function dropIsolatedDatabase(sourceUrl, name) {
-  // Only the UUID-named database this run created can be dropped.
-  if (!ISOLATED_DATABASE_NAME.test(name)) throw new Error('Refusing to drop ' + name)
-  const admin = new pg.Client({ connectionString: sourceUrl })
-  await admin.connect()
-  try {
-    await admin.query(`DROP DATABASE IF EXISTS "${name}" WITH (FORCE)`)
-  } finally {
-    await admin.end()
-  }
-}
-
 /** Keys the repo-level env files define, so the web build can be denied them. */
 function rootEnvFileKeys() {
   return ROOT_ENV_FILES.flatMap((file) => {
     const full = path.join(repoRoot, file)
     return fs.existsSync(full) ? Object.keys(parseEnvFile(fs.readFileSync(full))) : []
   })
-}
-
-/**
- * Polls `url` until it answers 200, the process behind it exits, the deadline
- * passes, or teardown begins (`assertRunning` throws).
- */
-async function waitForHealthy(url, handle, timeoutMs, readLog, assertRunning) {
-  const deadline = Date.now() + timeoutMs
-  let early
-  void handle.exited.then((result) => (early = result))
-  while (Date.now() < deadline) {
-    assertRunning()
-    if (early)
-      throw new Error(
-        `${handle.name} exited (${early.code ?? early.signal}) before ${url} answered.\n${readLog()}`
-      )
-    try {
-      if ((await fetch(url, { signal: AbortSignal.timeout(5_000) })).ok) return
-    } catch {
-      // Not listening yet.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 1_000))
-  }
-  throw new Error(
-    `Timed out after ${timeoutMs / 1000}s waiting for ${url}.\n${readLog()}`
-  )
-}
-
-function tail(file, lines = 60) {
-  if (!fs.existsSync(file)) return ''
-  return fs.readFileSync(file, 'utf8').split('\n').slice(-lines).join('\n')
 }
 
 function summarize(lines) {
@@ -303,7 +174,7 @@ async function main() {
   const logDir = path.join(directory, 'logs')
   fs.mkdirSync(directory, { recursive: true, mode: 0o700 })
 
-  const supabase = resolveSupabase(process.env)
+  const supabase = resolveSupabase(process.env, repoRoot)
   const redisUrl = resolveRedisUrl(process.env)
   const sourceDatabaseUrl =
     process.env.LOCAL_DATABASE_URL?.trim() || localE2eDatabaseUrl()
@@ -351,6 +222,9 @@ async function main() {
   const state = {
     /** @type {Awaited<ReturnType<typeof startAuthProxy>> | undefined} */
     proxy: undefined,
+    /** Story 6.17 D10: the Google stand-in's mock OIDC container. */
+    /** @type {{ close: () => Promise<void> } | undefined} */
+    mockOidc: undefined,
     /** @type {{ name: string; url: string } | undefined} */
     database: undefined,
     /** Playwright's stdout and stderr, printed only once it is redacted. */
@@ -384,6 +258,11 @@ async function main() {
     })
     owner.assertRunning()
     log(`Auth proxy listening at ${state.proxy.proxyUrl}.`)
+
+    // Story 6.17 D10: GoTrue's Keycloak provider (supabase/config.toml) points at this mock.
+    state.mockOidc = await startMockOidcContainer()
+    owner.assertRunning()
+    log('Mock OIDC provider (Google stand-in) is running.')
     const database = /** @type {{ name: string; url: string }} */ (state.database)
 
     // Read by playwright/config/real-session.config.ts after the local config has
@@ -584,6 +463,12 @@ async function main() {
       await state.proxy?.close()
     } catch (error) {
       log(`Closing the Auth proxy failed: ${error.message}`)
+      code = 1
+    }
+    try {
+      await state.mockOidc?.close()
+    } catch (error) {
+      log(`Removing the mock OIDC container failed: ${error.message}`)
       code = 1
     }
     // Codes before cleanup: cleanup empties the identities file the Mailpit

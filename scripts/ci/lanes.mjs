@@ -68,8 +68,10 @@ export const DOCS = [
 /** Files under DOCS that a lane's tests read; each wakes the lanes named. */
 export const DOC_INPUTS = {
   // apps/api/integration/community-worker-release-gate.spec.ts, moderation-history-gate.spec.ts
-  // and moderation-sla-operations.spec.ts assert on these runbooks and records.
-  '_bmad-output/project-knowledge/deployment-guide.md': ['coverage-api'],
+  // and moderation-sla-operations.spec.ts assert on these runbooks and records; the api unit
+  // suite's orphan-auth-user-sweep.spec.ts (Story 6.17) reads the guide too, and year-ahead
+  // reruns that suite.
+  '_bmad-output/project-knowledge/deployment-guide.md': ['coverage-api', 'year-ahead'],
   '_bmad-output/project-knowledge/couturecast_roadmap.md': ['coverage-api'],
   '_bmad-output/project-knowledge/moderation-sla-runbook.md': ['coverage-api'],
   '_bmad-output/test-artifacts/community-beta-gate-signatures.md': ['coverage-api'],

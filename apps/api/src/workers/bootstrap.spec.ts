@@ -10,7 +10,7 @@
 // and left the producer's connection open for the lifetime of the container.
 // `community.bootstrap.ts` had always retained the hook; this process had not,
 // and nothing failed when it did not.
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkerShutdownResources } from './shutdown-resources'
 import type * as WeatherConfigModule from '../modules/weather/providers/weather.config'
 import { createWorkerProcessState, performShutdown, startWorkers } from './bootstrap.js'
@@ -18,6 +18,8 @@ import { createWorkerProcessState, performShutdown, startWorkers } from './boots
 const harness = vi.hoisted(() => ({
   registerModerationSlaScheduler: vi.fn().mockResolvedValue(undefined),
   registerModerationHistoryScheduler: vi.fn().mockResolvedValue(undefined),
+  registerOrphanAuthUserSweepScheduler: vi.fn().mockResolvedValue(undefined),
+  removeOrphanAuthUserSweepScheduler: vi.fn().mockResolvedValue(undefined),
   initializeOpenTelemetry: vi.fn(() => false),
   shutdownOpenTelemetry: vi.fn().mockResolvedValue(undefined),
   exit: vi.fn(),
@@ -92,6 +94,8 @@ vi.mock('./maintenance.scheduler', () => ({
   registerMaintenanceSchedulers: vi.fn().mockResolvedValue(undefined),
   registerModerationSlaScheduler: harness.registerModerationSlaScheduler,
   registerModerationHistoryScheduler: harness.registerModerationHistoryScheduler,
+  registerOrphanAuthUserSweepScheduler: harness.registerOrphanAuthUserSweepScheduler,
+  removeOrphanAuthUserSweepScheduler: harness.removeOrphanAuthUserSweepScheduler,
   MODERATION_SLA_SWEEP_JOB_NAME: 'moderation-sla-sweep',
   MODERATION_HISTORY_RETENTION_JOB_NAME: 'moderation-history-retention',
 }))
@@ -193,6 +197,63 @@ describe('general worker bootstrap', () => {
     await bootstrap.startWorkers()
     expect(harness.registerModerationSlaScheduler).toHaveBeenCalledOnce()
     await bootstrap.performShutdown()
+  })
+
+  // Learning path Step 57: Google sign-in.
+  // Story 6.17 TEA-14: the general worker registers the orphan Auth user sweep only when
+  // ORPHAN_AUTH_USER_SWEEP_ENABLED names it, and never under a local or preview TEST_ENV.
+  describe('U-W-ORPHAN-GATE', () => {
+    afterEach(() => {
+      vi.unstubAllEnvs()
+    })
+
+    it.each([
+      ['the flag is unset', {}],
+      [
+        'TEST_ENV is local',
+        { ORPHAN_AUTH_USER_SWEEP_ENABLED: 'true', TEST_ENV: 'local' },
+      ],
+      [
+        'TEST_ENV is preview',
+        { ORPHAN_AUTH_USER_SWEEP_ENABLED: 'true', TEST_ENV: 'preview' },
+      ],
+    ])('neither registers nor composes the sweep when %s', async (_label, env) => {
+      vi.stubEnv('ORPHAN_AUTH_USER_SWEEP_ENABLED', '')
+      vi.stubEnv('TEST_ENV', '')
+      vi.stubEnv('VERCEL_ENV', '')
+      for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value)
+      harness.registerOrphanAuthUserSweepScheduler.mockClear()
+      harness.removeOrphanAuthUserSweepScheduler.mockClear()
+      const bootstrap = freshProcess()
+      await bootstrap.startWorkers()
+      expect(harness.registerOrphanAuthUserSweepScheduler).not.toHaveBeenCalled()
+      // A flag turned off after a deploy leaves no scheduler behind in Redis.
+      expect(harness.removeOrphanAuthUserSweepScheduler).toHaveBeenCalledOnce()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenLastCalledWith(
+        expect.not.objectContaining({ orphanAuthUsers: expect.anything() as unknown })
+      )
+      await bootstrap.performShutdown()
+    })
+
+    it('registers and composes the sweep when the flag names the worker', async () => {
+      vi.stubEnv('ORPHAN_AUTH_USER_SWEEP_ENABLED', 'true')
+      vi.stubEnv('TEST_ENV', '')
+      vi.stubEnv('VERCEL_ENV', '')
+      harness.registerOrphanAuthUserSweepScheduler.mockClear()
+      harness.removeOrphanAuthUserSweepScheduler.mockClear()
+      const bootstrap = freshProcess()
+      await bootstrap.startWorkers()
+      expect(harness.registerOrphanAuthUserSweepScheduler).toHaveBeenCalledOnce()
+      expect(harness.removeOrphanAuthUserSweepScheduler).not.toHaveBeenCalled()
+      expect(harness.createCommunityWorkerRuntime).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          orphanAuthUsers: expect.objectContaining({
+            run: expect.any(Function) as unknown,
+          }) as unknown,
+        })
+      )
+      await bootstrap.performShutdown()
+    })
   })
 
   it('U-W-OTEL: starts OpenTelemetry and closes it on shutdown', async () => {

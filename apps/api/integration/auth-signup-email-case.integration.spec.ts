@@ -8,7 +8,9 @@ import { PrismaClient } from '@prisma/client'
 import { BadRequestException } from '@nestjs/common'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import type { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { AuthService } from '../src/modules/auth/auth.service.js'
+import type { SupabaseAuthAdmin } from '../src/modules/auth/supabase-auth-admin.js'
 import type { AnalyticsClient } from '../src/analytics/analytics.service.js'
 import type { TelemetryService } from '../src/modules/telemetry/telemetry.service.js'
 
@@ -17,7 +19,9 @@ const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
 const service = new AuthService(
   { capture: () => undefined } as unknown as AnalyticsClient,
   prisma,
-  { captureEvent: () => Promise.resolve() } as unknown as TelemetryService
+  { captureEvent: () => Promise.resolve() } as unknown as TelemetryService,
+  {} as AccessTokenIdentityService,
+  {} as SupabaseAuthAdmin
 )
 const adult = { birthdate: '1990-01-01' }
 

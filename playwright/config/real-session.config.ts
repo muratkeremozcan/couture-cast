@@ -39,7 +39,8 @@ const metadata = { environment: 'local', apiBaseUrl: API_BASE_URL, baseUrl: WEB_
 export default defineConfig({
   ...localConfig,
   testDir: path.resolve(__dirname, '../tests'),
-  testMatch: /(community-real-session(-identity)?|guest-preview-real-session)\.spec\.ts$/,
+  testMatch:
+    /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session)\.spec\.ts$/,
   webServer: undefined,
   globalSetup: undefined,
   globalTeardown: undefined,

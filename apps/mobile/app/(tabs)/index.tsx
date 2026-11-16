@@ -64,7 +64,7 @@ import {
   trackMobileAffiliateCtaShown,
   trackMobileRitualCreated,
 } from '@/src/analytics/track-events'
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
+import { type Href, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router'
 
 import { processMobileDeepLink } from '@/src/lib/mobile-deep-link-handler'
 import { InfoBanner } from '@/components/info-banner'
@@ -272,6 +272,24 @@ export default function TabOneScreen() {
   // Story 6.16 D1: the ritual is a member request. A signed-out launch shows the
   // welcome card and sends nothing; an unverifiable session keeps its retry state.
   const [sessionState, retrySession] = useMemberSessionState()
+  // Story 6.17 D3: a Google identity that left the finish step returns to it. On focus only,
+  // so a screen pushed above Home is never hijacked (6.16 stacked-screen rule).
+  useFocusEffect(
+    useCallback(() => {
+      if (sessionState !== 'signed-out') return undefined
+      let active = true
+      // Imported lazily, as mobile-auth does, so Home's module graph keeps the SDK out.
+      void import('../../src/lib/native-session.js')
+        .then((session) => session.federatedFinishResumeHref())
+        .then((href) => {
+          if (active && href) router.push(href as Href)
+        })
+        .catch(() => undefined)
+      return () => {
+        active = false
+      }
+    }, [sessionState, router])
+  )
   const cacheOwner = ritualCacheOwner(applicationUserId)
   const activeLocale = activeHomeLocale(i18n)
   const palette = useHeroPalette()

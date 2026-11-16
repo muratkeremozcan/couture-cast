@@ -7,7 +7,9 @@ import {
   resetCleanupRegistry,
 } from '../../../test/factories.js'
 import type { AnalyticsClient } from '../../analytics/analytics.service'
+import type { AccessTokenIdentityService } from './access-token-identity.service'
 import { AuthService } from './auth.service'
+import type { SupabaseAuthAdmin } from './supabase-auth-admin'
 import type { TelemetryService } from '../telemetry/telemetry.service'
 
 const FIXED_TODAY = new Date('2026-04-16T12:00:00.000Z')
@@ -29,7 +31,14 @@ const createService = (findFirst = vi.fn(), create = vi.fn()) => {
   const telemetryService = { captureEvent } as unknown as TelemetryService
 
   return {
-    service: new AuthService(analyticsClient, prisma, telemetryService),
+    // The federated paths (Story 6.17) are covered by federated-signup.spec.ts.
+    service: new AuthService(
+      analyticsClient,
+      prisma,
+      telemetryService,
+      {} as AccessTokenIdentityService,
+      {} as SupabaseAuthAdmin
+    ),
     capture,
     findFirst,
     lock,

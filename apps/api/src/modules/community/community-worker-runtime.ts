@@ -127,6 +127,8 @@ export interface CommunitySweeps {
   sweepModerationSla: () => Promise<unknown>
   /** Story 6.13: the daily alert prune and enforcement drift check. */
   sweepModerationHistoryRetention: () => Promise<unknown>
+  /** Story 6.17 TEA-4: orphan Supabase Auth users. */
+  sweepOrphanAuthUsers: () => Promise<unknown>
 }
 
 /** What the process knows about its own screening posture once it is ready. */
@@ -449,6 +451,8 @@ export async function createCommunityWorkerRuntime(deps: {
   moderationSla?: { run: () => Promise<unknown> }
   /** Story 6.13: passed in the same way, for the same reason. Absent means off. */
   moderationHistoryRetention?: { run: () => Promise<unknown> }
+  /** Story 6.17 TEA-4: the auth module's orphan sweep, passed in the same way. Absent means off. */
+  orphanAuthUsers?: { run: () => Promise<unknown> }
   /** Overrides the environment selection; specs inject a pinned engine here. */
   engine?: CommunityModerationEngine
   meter?: CommunityModerationMeter
@@ -544,6 +548,8 @@ export async function createCommunityWorkerRuntime(deps: {
         deps.moderationSla?.run() ?? Promise.resolve({ skipped: 1, recorded: 0 }),
       sweepModerationHistoryRetention: () =>
         deps.moderationHistoryRetention?.run() ?? Promise.resolve({ skipped: true }),
+      sweepOrphanAuthUsers: () =>
+        deps.orphanAuthUsers?.run() ?? Promise.resolve({ skipped: true }),
     },
     ...(selection ? { readiness: selection.readiness } : {}),
     close: async () => {

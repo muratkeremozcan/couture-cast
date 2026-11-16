@@ -121,6 +121,35 @@ export async function registerModerationSlaScheduler(
 }
 
 /**
+ * Story 6.17 TEA-4: the orphan Auth user sweep, daily at 04:00 UTC. The hosted community worker
+ * does not subscribe to this queue, so it runs the same function at boot and on an interval.
+ */
+export const ORPHAN_AUTH_USER_SWEEP_JOB_NAME = 'orphan-auth-user-sweep'
+export const ORPHAN_AUTH_USER_SWEEP_CRON_PATTERN = '0 4 * * *'
+export const ORPHAN_AUTH_USER_SWEEP_TIMEZONE = 'UTC'
+
+/** Keyed on the scheduler id, so each worker start updates the one scheduler. */
+export async function registerOrphanAuthUserSweepScheduler(
+  queue: MaintenanceSchedulerQueue
+): Promise<void> {
+  await queue.upsertJobScheduler(
+    ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
+    { pattern: ORPHAN_AUTH_USER_SWEEP_CRON_PATTERN, tz: ORPHAN_AUTH_USER_SWEEP_TIMEZONE },
+    { name: ORPHAN_AUTH_USER_SWEEP_JOB_NAME, data: {} }
+  )
+}
+
+/**
+ * A gate turned off after a deploy must not leave the daily scheduler in Redis (TEA-14), so a
+ * worker that boots with the gate off removes it. Removing an absent scheduler is a no-op.
+ */
+export async function removeOrphanAuthUserSweepScheduler(
+  queue: Pick<Queue, 'removeJobScheduler'>
+): Promise<void> {
+  await queue.removeJobScheduler(ORPHAN_AUTH_USER_SWEEP_JOB_NAME)
+}
+
+/**
  * Story 6.13: the alert prune and enforcement drift check, daily. The hosted community worker does not
  * subscribe to this queue, so it runs the same function at boot and on an interval.
  */

@@ -13,12 +13,14 @@ import {
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
+  getFederatedSignInStrings,
   getGuestPreviewStrings,
   INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { webGuestPreviewStore } from '../../lib/guest-preview'
 import { inviteGuardianFromWeb } from '../../lib/guardian'
+import { GoogleSignInButton, SignInDivider } from '../components/google-sign-in-button'
 import { SignupRefusedError, submitWebSignup } from '../../lib/signup'
 
 type SignupFormProps = {
@@ -26,15 +28,21 @@ type SignupFormProps = {
   inviteGuardian?: (input: GuardianInvitationInput) => Promise<GuardianInvitationResponse>
   /** Story 6.16 D8: the visitor came from the guest preview (`?from=preview`). */
   fromPreview?: boolean
+  /** Story 6.17 D5: a Google round trip from this page that signed nobody in. */
+  googleOutcome?: 'cancelled' | 'unavailable' | 'refused' | null
 }
 
 export function SignupForm({
   submitSignup = submitWebSignup,
   inviteGuardian = inviteGuardianFromWeb,
   fromPreview = false,
+  googleOutcome = null,
 }: SignupFormProps) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
+  const googleMessage = googleOutcome
+    ? getFederatedSignInStrings(i18n.language)[googleOutcome]
+    : null
   const [accountCreated, setAccountCreated] = useState(false)
   const [email, setEmail] = useState('')
   const [birthdate, setBirthdate] = useState('')
@@ -146,6 +154,23 @@ export function SignupForm({
       className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8"
       onSubmit={onSubmit}
     >
+      {/* Story 6.17 D2: Google first; the email form below is unchanged. */}
+      <GoogleSignInButton
+        from={fromPreview ? 'preview' : null}
+        door="signup"
+        theme="dark"
+        onUnavailable={setErrorMessage}
+      />
+      {googleMessage && !errorMessage ? (
+        <p
+          data-testid="google-sign-in-status"
+          role="alert"
+          className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+        >
+          {googleMessage}
+        </p>
+      ) : null}
+      <SignInDivider tone="dark" />
       <div className="space-y-2">
         <label htmlFor="signup-email" className="text-sm font-medium text-neutral-100">
           Email

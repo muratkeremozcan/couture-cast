@@ -1,0 +1,24 @@
+# Story 6.17 M lane screens: a 14-year-old's guardian step after the finish step, captured
+# with the ${SCREEN_MODE} suffix.
+appId: ${MAESTRO_APP_ID}
+name: 'Capture Google teen guardian step'
+tags:
+  - google-sign-in-screens
+---
+- runFlow: ../steps/open-home.yaml
+- tapOn:
+    id: 'home-create-account'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+- runFlow: ../steps/continue-with-google.yaml
+- runFlow: ../steps/finish-step.yaml
+- runFlow: ../steps/enter-birthdate.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'finish-signup-outcome'
+    timeout: 30000
+# No hideKeyboard: on Android it is a Back press, which would leave the guardian step.
+- waitForAnimationToEnd
+- takeScreenshot: teen-guardian-${SCREEN_MODE}

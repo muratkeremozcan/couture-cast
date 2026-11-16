@@ -1,12 +1,35 @@
-import { router, useLocalSearchParams } from 'expo-router'
-import { parsePreviewFrom } from '@couture/utils'
+import { router, useLocalSearchParams, type Href } from 'expo-router'
+import { finishStepHref, parsePreviewFrom } from '@couture/utils'
 import { SignupScreen } from '@/src/features/signup/signup-screen'
+import { continuesToPreviewReview } from '@/src/lib/post-signin-destination'
 
 export default function SignupRoute() {
-  const { from } = useLocalSearchParams<{ from?: string }>()
+  const { from, google } = useLocalSearchParams<{ from?: string; google?: string }>()
+  const fromPreview = parsePreviewFrom(from) !== null
+  // D5: only the three fixed outcome names a cold callback hands over; anything else shows nothing.
+  const googleOutcome =
+    google === 'cancelled' || google === 'unavailable' || google === 'refused'
+      ? google
+      : null
   return (
     <SignupScreen
-      fromPreview={parsePreviewFrom(from) !== null}
+      fromPreview={fromPreview}
+      googleOutcome={googleOutcome}
+      onGoogleSignedIn={(outcome) => {
+        if (outcome === 'no_account') {
+          router.replace(
+            finishStepHref(
+              fromPreview ? 'preview' : null,
+              'signup',
+              '/signup-finish'
+            ) as Href
+          )
+          return
+        }
+        void continuesToPreviewReview(fromPreview).then((review) =>
+          router.replace(review ? '/preview-continue' : '/')
+        )
+      }}
       onPreviewNavigate={(href) =>
         href === '/preview' ? router.replace(href) : router.push(href)
       }

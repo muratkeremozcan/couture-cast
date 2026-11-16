@@ -745,18 +745,28 @@ no escape codes.
 **Variables the host injects** (values from the same stores the Vercel API uses; nothing is
 baked into the image):
 
-| Variable                    | Value                                                   |
-| --------------------------- | ------------------------------------------------------- |
-| `NODE_ENV`                  | `production`                                            |
-| `COMMUNITY_NSFW_SCREENER`   | `tensorflow`                                            |
-| `DATABASE_URL`              | production session pooler URL, verified (below)         |
-| `REDIS_URL`                 | production Upstash `rediss://` URL                      |
-| `REDIS_TLS`                 | `true`                                                  |
-| `SUPABASE_URL`              | production Supabase project URL                         |
-| `SUPABASE_SERVICE_ROLE_KEY` | production service role key                             |
-| `ANALYTICS_ID_SECRET`       | the API's value; the worker exits at startup without it |
-| `POSTHOG_API_KEY`           | the API's value; publication and refusal events         |
-| `POSTHOG_HOST`              | the API's value                                         |
+| Variable                         | Value                                                   |
+| -------------------------------- | ------------------------------------------------------- |
+| `NODE_ENV`                       | `production`                                            |
+| `COMMUNITY_NSFW_SCREENER`        | `tensorflow`                                            |
+| `DATABASE_URL`                   | production session pooler URL, verified (below)         |
+| `REDIS_URL`                      | production Upstash `rediss://` URL                      |
+| `REDIS_TLS`                      | `true`                                                  |
+| `SUPABASE_URL`                   | production Supabase project URL                         |
+| `SUPABASE_SERVICE_ROLE_KEY`      | production service role key                             |
+| `ANALYTICS_ID_SECRET`            | the API's value; the worker exits at startup without it |
+| `POSTHOG_API_KEY`                | the API's value; publication and refusal events         |
+| `POSTHOG_HOST`                   | the API's value                                         |
+| `ORPHAN_AUTH_USER_SWEEP_ENABLED` | `true` (Story 6.17), set at release; see below          |
+
+`ORPHAN_AUTH_USER_SWEEP_ENABLED=true` turns on the daily orphan Auth user sweep (Story 6.17,
+TEA-4). A Google sign-in creates a Supabase Auth user, with Google's name and avatar, before the
+finish step knows the person's age; a closed tab or a failed refusal deletion leaves that user with
+no account. The sweep deletes Auth users older than 24 hours that no account owns, inside the
+signup address lock, and only users this database holds in `auth.users`. It runs only on the
+worker this variable names and never under a local or preview `TEST_ENV` (TEA-14): a laptop or E2E
+worker pairs the local Auth server with an isolated database and would otherwise delete every local
+account that database lacks.
 
 The worker verifies the database's certificate. Prisma's `sslmode=require` alone encrypts without
 checking who answers, so the image carries the Supabase Root 2021 CA

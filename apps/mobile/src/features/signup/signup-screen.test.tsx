@@ -12,6 +12,15 @@ describe('SignupScreen', () => {
     vi.useRealTimers()
   })
 
+  // Story 6.17 D5 (Antigravity P1-1): a cold OAuth callback returns a signup-door round trip
+  // here with a fixed outcome name, shown as the in-process path shows it.
+  it('shows the fixed Google outcome a cold callback hands back', () => {
+    render(<SignupScreen submitSignup={vi.fn()} googleOutcome="cancelled" />)
+    expect(screen.getByText('Google sign-in was cancelled.')).toBeTruthy()
+    // The Maestro door step asserts this root id positively.
+    expect(screen.getByTestId('signup-screen')).toBeTruthy()
+  })
+
   it('shows the under-13 message before submitting', () => {
     render(<SignupScreen submitSignup={vi.fn()} />)
 
