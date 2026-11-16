@@ -237,3 +237,44 @@ export async function signInRealCommunityWeb(
   await page.locator('button[type="submit"]').click()
   await page.waitForURL('http://127.0.0.1:3077/')
 }
+
+/**
+ * Story 6.17 D10: an address the Google stand-in signs in with. GoTrue creates the Auth user
+ * during the OAuth flow, so the address is recorded write-ahead as pending and the run's cleanup
+ * deletes whatever user carries it, as it does for a stopped `createUser` call.
+ */
+export function recordStandInIdentity(email: string, label: string) {
+  recordPendingIdentity(harnessDirectory(), {
+    appUserId: null,
+    email,
+    mapping: 'no-app-account',
+    issueMode: 'generated',
+    label,
+  })
+}
+
+/**
+ * The local Auth users carrying `email` (case-insensitive) with their identity providers. The
+ * Admin listing omits identities, so each match is read again by id.
+ */
+export async function localAuthUsersByEmail(email: string) {
+  harnessDirectory()
+  const admin = adminClient()
+  const { data, error } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 })
+  if (error) throw new Error('Local Auth Admin listing failed.')
+  const matches = data.users.filter(
+    (user) => user.email?.toLowerCase() === email.toLowerCase()
+  )
+  return Promise.all(
+    matches.map(async (match) => {
+      const read = await admin.auth.admin.getUserById(match.id)
+      if (read.error || !read.data.user) throw new Error('Local Auth Admin read failed.')
+      return {
+        id: match.id,
+        providers: (read.data.user.identities ?? [])
+          .map((identity) => identity.provider)
+          .sort(),
+      }
+    })
+  )
+}

@@ -16,8 +16,6 @@ export const SafeAreaProvider = ({ children }) => (
     </SafeAreaInsetsContext.Provider>
   </SafeAreaFrameContext.Provider>
 )
-export const SafeAreaView = ({ children, ...props }) => (
-  <View {...props}>{children}</View>
-)
+export const SafeAreaView = ({ children, ...props }) => <View {...props}>{children}</View>
 export const useSafeAreaInsets = () => insets
 export const useSafeAreaFrame = () => frame

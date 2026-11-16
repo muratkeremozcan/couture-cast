@@ -5,8 +5,13 @@
 // holds; scripts/ci/android-release-abis.test.mjs shows the ABI verdict holds against a seeded
 // shell variable and .env.local.
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import { test } from 'node:test'
-import { resolveEnv, resolvedGradleProperties } from './resolved-app-config.mjs'
+import {
+  resolveEnv,
+  resolvedAppConfig,
+  resolvedGradleProperties,
+} from './resolved-app-config.mjs'
 
 test('the resolve environment drops every ambient variable and turns env files off', () => {
   assert.deepEqual(
@@ -55,4 +60,15 @@ test('a relative root resolves against the working directory', async () => {
   const result = resolvedAppConfig('.')
   assert.ok(result.config || result.error, JSON.stringify(Object.keys(result)))
   assert.ok(result.config, `relative root resolves the app config: ${result.error}`)
+})
+
+// Learning path Step 57: Google sign-in. Story 6.17 D7, D10 (TEA sign-off): the release config
+// keeps couturecast as the primary scheme, the one `Linking.createURL` builds the OAuth redirect
+// on, keeps the mobile alias, and is never an isolated build, so its development-only OAuth
+// stand-in switch stays off.
+test('the release config keeps the couturecast scheme first and is never an isolated build', () => {
+  const result = resolvedAppConfig(path.resolve(import.meta.dirname, '../..'))
+  assert.ok(result.config, `the app config resolves: ${result.error}`)
+  assert.deepEqual(result.config.scheme, ['couturecast', 'mobile'])
+  assert.equal(result.config.extra?.isolatedNativeBuild, false)
 })

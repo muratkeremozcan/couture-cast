@@ -13,6 +13,7 @@ import {
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   FEATURE_FLAGS_SYNC_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,
+  ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
@@ -87,6 +88,46 @@ describe('U-W-ROUTE: the SLA sweep on the maintenance queue', () => {
       { job: 'moderation-sla-sweep-typo' },
       'unknown_maintenance_job'
     )
+  })
+})
+
+describe('Story 6.17 TEA-4: the orphan Auth user sweep job', () => {
+  it('routes the job to the injected sweep and logs its counts', async () => {
+    const harness = build()
+    const run = vi.fn().mockResolvedValue({ scanned: 3, deleted: 1, failed: 0 })
+    const process = createMaintenanceProcessor({
+      ...harness.deps,
+      orphanAuthUsers: { run },
+    })
+    await process({ name: ORPHAN_AUTH_USER_SWEEP_JOB_NAME })
+    expect(run).toHaveBeenCalledOnce()
+    expect(harness.deps.logger.info).toHaveBeenCalledWith(
+      {
+        job: ORPHAN_AUTH_USER_SWEEP_JOB_NAME,
+        result: { scanned: 3, deleted: 1, failed: 0 },
+      },
+      'orphan_auth_user_sweep_job_completed'
+    )
+  })
+
+  it('skips without a sweep (the gate is off) and deletes nothing', async () => {
+    const harness = build()
+    await harness.process({ name: ORPHAN_AUTH_USER_SWEEP_JOB_NAME })
+    expect(harness.deps.logger.info).toHaveBeenCalledWith(
+      { job: ORPHAN_AUTH_USER_SWEEP_JOB_NAME, result: { skipped: true } },
+      'orphan_auth_user_sweep_job_completed'
+    )
+  })
+
+  it('rethrows a failed sweep so BullMQ retries it', async () => {
+    const harness = build()
+    const failure = new Error('auth down')
+    const process = createMaintenanceProcessor({
+      ...harness.deps,
+      orphanAuthUsers: { run: vi.fn().mockRejectedValue(failure) },
+    })
+    await expect(process({ name: ORPHAN_AUTH_USER_SWEEP_JOB_NAME })).rejects.toBe(failure)
+    expect(harness.deps.logger.error).toHaveBeenCalledOnce()
   })
 })
 

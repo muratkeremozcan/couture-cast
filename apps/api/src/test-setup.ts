@@ -11,6 +11,13 @@ if (
   throw new Error('REAL_CLOCK_OFFSET_DAYS is set but this worker runs on the real clock.')
 }
 
+// Story 6.17 TEA-14: a unit run never holds a real Auth Admin credential, so a SupabaseAuthAdmin
+// built by mistake fails closed. Empty, so a later dotenv load (load-env) cannot refill it.
+// The one exception opts in by name: the real Storage proof (`test:community-storage`) runs
+// against the CI job's local Supabase and needs its service role key.
+if (process.env.COMMUNITY_REAL_STORAGE_TEST !== 'true')
+  process.env.SUPABASE_SERVICE_ROLE_KEY = ''
+
 beforeAll(() => {
   const originalFetch =
     globalThis.fetch ||

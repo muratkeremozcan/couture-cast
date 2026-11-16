@@ -24,42 +24,14 @@ function gradleJavaHome(env) {
   return env.JAVA_HOME
 }
 /**
- * The merger's Maven artifacts download fresh on every CI runner. Maven Central answers a
- * busy runner pool with HTTP 429, and a 5xx or a dropped connection happens too; PR 233's
- * run 43719645437 failed this suite on a 429 for gson and kotlin-stdlib. Those failures
- * say nothing about the manifests, so the merge is retried after a wait. Any other failure
- * (a merge conflict, a missing library manifest, an unresolvable version) fails at once.
- * The wrapper's own distribution download (HttpURLConnection) words its errors differently,
- * so both spellings are matched.
+ * The merger's Maven artifacts download fresh on every CI runner, where Maven Central answers
+ * a busy runner pool with HTTP 429; scripts/lib/transient-resolution-retry.cjs retries such a
+ * download failure after a wait and fails any other merge failure at once.
  */
-const TRANSIENT_RESOLUTION_FAILURE =
-  /Too Many Requests|status code 429|status code 5\d\d|HTTP response code: (?:429|5\d\d)|Connection reset|Connection timed out|Read timed out|Connect timed out|SocketTimeoutException|ConnectTimeoutException|Remote host terminated the handshake/i
-const MERGE_RETRY_DELAYS_MS = [20000, 40000]
-
-function isTransientResolutionFailure(result) {
-  if (result.status === 0) return false
-  return TRANSIENT_RESOLUTION_FAILURE.test(
-    `${result.stdout ?? ''}\n${result.stderr ?? ''}`
-  )
-}
-
-/** Runs `run` until it succeeds, fails for a real reason, or the waits run out. */
-function runWithResolutionRetry(
-  run,
-  { delaysMs = MERGE_RETRY_DELAYS_MS, wait = sleepSync } = {}
-) {
-  let result = run()
-  for (const delay of delaysMs) {
-    if (!isTransientResolutionFailure(result)) return result
-    wait(delay)
-    result = run()
-  }
-  return result
-}
-
-function sleepSync(ms) {
-  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
-}
+const {
+  isTransientResolutionFailure,
+  runWithResolutionRetry,
+} = require('../../../scripts/lib/transient-resolution-retry.cjs')
 const { AndroidConfig } = require('@expo/config-plugins')
 const {
   assertCommand,

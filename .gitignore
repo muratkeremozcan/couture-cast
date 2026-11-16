@@ -45,6 +45,8 @@ blob-report/
 .real-session-e2e/
 # Story 6.16: run-maestro.mjs --signed-out records guest accounts here, write-ahead.
 .maestro-guest-preview/
+# Story 6.17: scripts/run-google-native.mjs records its Auth users and evidence here.
+.google-native-e2e/
 downloads/
 pacts/
 pact/artifacts/

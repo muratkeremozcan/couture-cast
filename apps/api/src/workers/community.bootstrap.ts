@@ -25,6 +25,12 @@ import {
 import { PostHogService } from '../posthog/posthog.service.js'
 import { TelemetryService } from '../modules/telemetry/telemetry.service.js'
 import { createBaseLogger } from '../logger/pino.config.js'
+import {
+  createOrphanAuthUserSweep,
+  ORPHAN_AUTH_USER_SWEEP_INTERVAL_MS,
+  orphanAuthUserSweepEnabled,
+} from '../modules/auth/orphan-auth-user-sweep'
+import { SupabaseAuthAdmin } from '../modules/auth/supabase-auth-admin'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
 
@@ -244,6 +250,16 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
         prisma,
         flags: runtimeFlags,
       }),
+      // TEA-14: absent (off) unless ORPHAN_AUTH_USER_SWEEP_ENABLED names this worker.
+      ...(orphanAuthUserSweepEnabled()
+        ? {
+            orphanAuthUsers: createOrphanAuthUserSweep({
+              admin: new SupabaseAuthAdmin(),
+              prisma,
+              logger: logger.child({ feature: 'orphan-auth-users' }),
+            }),
+          }
+        : {}),
     })
     state.workers.push(community.worker)
     state.closeRuntime = async () => {
@@ -291,6 +307,16 @@ export async function startCommunityWorkers(state: CommunityWorkerProcessState) 
       community.sweeps.sweepModerationHistoryRetention,
       { runAtStart: true }
     )
+    // Story 6.17 TEA-4: the production path for the orphan Auth user sweep, daily and once now,
+    // only on a worker the gate names (TEA-14).
+    if (orphanAuthUserSweepEnabled())
+      schedule(
+        state,
+        'orphan-auth-user-sweep',
+        ORPHAN_AUTH_USER_SWEEP_INTERVAL_MS,
+        community.sweeps.sweepOrphanAuthUsers,
+        { runAtStart: true }
+      )
 
     logger.info(
       {

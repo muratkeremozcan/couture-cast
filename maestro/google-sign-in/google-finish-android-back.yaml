@@ -1,0 +1,55 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane (D3): Android Back on the open finish step runs Cancel. It lands on Sign in and
+# stays there: popping to Home would let Home's resume push the finish step straight back.
+# Runner: checks the Auth user for ${GOOGLE_EMAIL} is gone and no app user exists.
+appId: ${MAESTRO_APP_ID}
+name: 'Google finish Android back'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-sign-in'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/finish-step.yaml
+# Android's hideKeyboard is a Back press. The birthdate field takes focus on mount, but the
+# keyboard may not be up yet, and then that press would reach the screen. Tapping the field makes
+# sure it is up, so hideKeyboard only closes it and the one Back below reaches the screen. The step
+# must still be up after it.
+- tapOn:
+    id: 'finish-signup-birthdate'
+- waitForAnimationToEnd
+- hideKeyboard
+- assertVisible:
+    id: 'finish-signup-birthdate'
+- back
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 20000
+    label: 'Back ran Cancel and opened Sign in'
+# D5: back to the door that started, Sign in.
+- assertVisible:
+    id: 'signin-screen'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'
+- assertNotVisible:
+    id: 'home-signed-out-welcome'
+- assertNotVisible:
+    id: 'hero-no-location-state'
+# No bounce: Sign in holds for five seconds, then is still the screen.
+- extendedWaitUntil:
+    notVisible:
+      id: 'google-sign-in'
+    timeout: 5000
+    optional: true
+    label: 'Sign in holds; nothing pushes the finish step back'
+- assertVisible:
+    id: 'signin-screen'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'
