@@ -262,8 +262,21 @@ const rectHeight = (rect) => rect[3] - rect[1]
 const rectWidth = (rect) => rect[2] - rect[0]
 /** A text input of more than one line (maxLines other than 1): it scrolls its own content. */
 const multilineInput = (record) => INPUT_KINDS.has(record.kind) && record.maxLines !== 1
-/** The one masking residual entry keys and the hidden-text count share: hour labels to HOUR_TOKEN. */
-const maskText = (text) => (HOUR_LABEL.test(text) ? HOUR_TOKEN : text)
+/**
+ * An hour label anywhere in a text, as a whole token: the hourly ribbon's own labels and the
+ * accessibility label iOS gives each hourly item ("Cloudy, 68 degrees Fahrenheit, and 3 PM,
+ * Precipitation: 0%"), whose condition and temperature follow that hour's forecast too.
+ */
+const CLOCK_TEXT = /(?<![\p{L}\p{N}])(?:[1-9]|1[0-2])\u202f(?:AM|PM)(?![\p{L}\p{N}])/u
+
+/**
+ * The one masking residual entry keys and the hidden-text count share: a text that shows the
+ * clock becomes HOUR_TOKEN, whole, since everything else it says follows the hour the run starts
+ * at (dispatches 43773613293 and 43800364098, two hours apart, moved every hourly key). Its key
+ * keeps its testID and its place among that testID's clock texts.
+ */
+export const maskClockText = (text) => (CLOCK_TEXT.test(text) ? HOUR_TOKEN : text)
+const maskText = maskClockText
 
 /**
  * The probe's records of one capture paired with the capture's text keys (matchTextProbe).
@@ -343,12 +356,18 @@ function pairedFacts(match, { answer, nodes, names }) {
       entry.records,
     ])
   )
+  // A member of a group the clock labels (an hourly item) is that hour's text too, whatever it
+  // reads: it is keyed by its place in the group.
+  const memberText = (pair, index) =>
+    maskText(nodes[pair.node].text) === HOUR_TOKEN
+      ? HOUR_TOKEN
+      : maskText(answer.records[index].text)
   const groupSuffix = (pair) => {
-    const text = maskText(answer.records[pair.record].text)
+    const text = memberText(pair, pair.record)
     const members = groupOf.get(pair.node)
     const before = members
       .slice(0, members.indexOf(pair.record))
-      .filter((index) => maskText(answer.records[index].text) === text).length
+      .filter((index) => memberText(pair, index) === text).length
     return `>${JSON.stringify(['', text])}#${before}`
   }
   return match.pairs

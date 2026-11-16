@@ -28,6 +28,8 @@ import {
   assertLiveFontProof as assertLiveFontProofRaw,
   captureVolatileKeys,
   clipKeys,
+  maskClockText,
+  HOUR_TOKEN,
   evaluateLiveFontChange as evaluateLiveFontChangeRaw,
   expectedTextRatio,
   fixExpectedFor,
@@ -3450,6 +3452,58 @@ describe('text layout clipping (F-00i)', () => {
       : [],
   })
 
+  // Dispatches 43773613293 and 43800364098, two hours apart: the hourly items' labels carry the
+  // hour and that hour's forecast ("Cloudy, ... 3 PM" became "Clear Sky, ... 7 PM"), and their
+  // members the hour and that hour's temperature, so every hourly clip key moved and an approved
+  // entry could never match the next run. A text that shows the clock is keyed by its testID and
+  // its place, and so is each member of a group the clock labels.
+  /** `change` as it reads with the ribbon at another hour: label, hour and temperature moved. */
+  const atSevenPm = (change) =>
+    JSON.parse(
+      JSON.stringify(change)
+        .replaceAll(
+          HOURLY,
+          'Clear Sky, 71 degrees Fahrenheit, and 7\u202fPM, Precipitation: 0%'
+        )
+        .replaceAll('3\u202fPM', '7\u202fPM')
+        .replaceAll('68°F', '71°F')
+    )
+  test('a ribbon read at another hour gives the same clip keys, by testID and place', () => {
+    const change = hourlyLeg({
+      settled: 'wrapped',
+      coldBefore: 'cold1',
+      cold: 'cold1353',
+    })
+    const keys = clipKeys(evaluateLiveFontChangeRaw(change).checks)
+    assert.ok(keys.length > 0, 'the wrapped ribbon clips')
+    assert.ok(
+      keys.every((key) => key.includes('["hourly-item","<hour>"]#0>["","<hour>"]#')),
+      JSON.stringify(keys)
+    )
+    assert.deepEqual(clipKeys(evaluateLiveFontChangeRaw(atSevenPm(change)).checks), keys)
+    // A clip the first run did not show still differs: the same ribbon at its fresh layout
+    // clips nothing, so an entry approved on the wrapped run approves nothing there.
+    const fresh = hourlyLeg({ settled: 'fresh1', coldBefore: 'cold1', cold: 'cold1' })
+    assert.notDeepEqual(
+      clipKeys(evaluateLiveFontChangeRaw(atSevenPm(fresh)).checks),
+      keys
+    )
+  })
+
+  test('only a text that shows the clock is masked; other text keeps its own key', () => {
+    assert.equal(maskClockText(HOURLY), HOUR_TOKEN)
+    assert.equal(maskClockText('3\u202fPM'), HOUR_TOKEN)
+    for (const text of [
+      'Hourly Forecast',
+      '68°F',
+      '13\u202fPM',
+      'Expand (48h)',
+      '3 PM',
+      '3\u202fPMS',
+    ])
+      assert.equal(maskClockText(text), text, JSON.stringify(text))
+  })
+
   test('a group member whose own box kept the starting launch box is stale on its record', () => {
     const change = hourlyLeg({
       settled: 'wrapped',
@@ -3470,9 +3524,10 @@ describe('text layout clipping (F-00i)', () => {
         clip.stale,
         clip.face,
       ]),
+      // The hourly item's label shows the clock, so its members are keyed by place.
       [
         ['["","<hour>"]#0', 'group', true, 'staleBox'],
-        ['["","68°F"]#0', 'group', true, 'staleBox'],
+        ['["","<hour>"]#1', 'group', true, 'staleBox'],
       ]
     )
     // A member whose box changed with the scale is no stale box: to the target launch's box, or
