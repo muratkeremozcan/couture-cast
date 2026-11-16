@@ -171,12 +171,15 @@ still count; it serves `main` instead (below).
 **Build inputs.** [One module](../../scripts/vercel-build-inputs.mjs) says which tracked files each
 project builds from, and every build decision asks it: the repository less the other app, tests,
 workflows and load scripts (`apps/mobile`, `docs`, `_bmad-output`, `.github`, `playwright`,
-`maestro`, `k6`, `pact`), and of `scripts/` only what a build runs: the root preinstall
-(`check-node-version.mjs`), each package's build (`build-workspace-package.mjs`), the API build
-command's `prisma-migrate-deploy.mjs`, and every script those reach by relative path. Other
-scripts are CI and test tooling; from 2026-11-13 to 16 they alone caused 27 of 40 API and 15 of
-28 web preview rebuilds on a branch that already had a preview.
-A new top-level path builds by default, and a new script builds once a build script references it.
+`maestro`, `k6`, `pact`), and of `scripts/` only the map itself and what a build runs: each
+package's build (`build-workspace-package.mjs`), and for the API the root preinstall
+(`check-node-version.mjs`, since web installs with `--ignore-scripts`) and its build command's
+`prisma-migrate-deploy.mjs`, plus every script their code reaches by a path relative to the script
+or to the repository root (comment lines do not count). Its spec resolves both projects' install
+and build commands through every npm hook and fails when that list drifts. Other scripts are CI
+and test tooling; from 2026-11-13 to 16 they alone caused 27 of 40 API and 15 of 28 web preview
+rebuilds on a branch that already had a preview. A new top-level path builds by default, and a new
+script builds once a build script references it.
 
 **Production builds of `main`.** Each `vercel.json` sets `ignoreCommand` to
 `node ../../scripts/vercel-build-inputs.mjs ignore <project>`. On a production deployment it
@@ -185,9 +188,15 @@ production deployment) and skips the build when they are equal, so a mobile, doc
 merge builds neither project and a web-only merge builds only web. Vercel's build clone has no git
 remote and ten commits of history (probe, 2026-11-12), so the step fetches the previous commit at
 depth 1 from the public repository Vercel names. It builds whenever the previous commit is missing
-or malformed, the fetch fails or the comparison fails, and it always builds a preview, since CI
-creates previews only when the checks need them. Replayed over the last 60 merges to `main`, it
-leaves 51 of 120 production builds.
+or malformed, the commit under test or the repository Vercel names is malformed, the fetch fails
+or the comparison fails, and it always builds a preview, since CI creates previews only when the
+checks need them. Replayed over the last 60 merges to `main`, it leaves 51 of 120 production
+builds.
+
+The step compares source only. A Redeploy of the deployed commit (the previous commit is the one
+under test) always builds, so **after changing a production environment variable or build
+setting, redeploy each project it affects**: the next merge may skip the build and leave the old
+values live, since `NEXT_PUBLIC_*`, `POSTHOG_*` and `PROD_API_BASE_URL` are read at build time.
 
 When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
 branch's changes against main, one job per project (`deploy-web`, `deploy-api`, 20 minutes each,
@@ -252,7 +261,10 @@ stylesheets again. [The fixtures](../../playwright/support/fixtures/merged-fixtu
 each `_next/static` response the server marks `immutable` for the rest of the worker
 ([asset cache](../../playwright/support/helpers/immutable-asset-cache.ts)); pages, RSC payloads
 and API calls still reach the server every time. Against production, 12 smoke and legal-page
-tests made 21 asset requests in place of 98.
+tests made 21 asset requests in place of 98. Concurrent requests for one asset share a single
+fetch, and each page's teardown drains the requests still in flight before the context closes,
+so no disposed fetch (whose call log would carry the preview's `_vercel_jwt` cookie) reaches the
+report.
 
 ## Production deployment verification
 
@@ -268,6 +280,11 @@ equal the pushed commit's, and each wait accepts any of them:
 - The web `/api/health` must report `status: ok` and one of the web project's commits.
 - The API `/api/health` must report `status: ok` and one of the API project's commits.
 - The web health test checks the commit the web wait observed (`EXPECTED_WEB_SHA`).
+- The list skips commits with other inputs: when a build failed, the deployment before it keeps
+  serving, and a later commit that reverts to its source is skipped against it, so that earlier
+  commit is the one serving.
+- [Manual E2E](../../.github/workflows/pw-e2e-trigger.yml) against production with no custom web
+  URL waits the same way for web and tests the commit it observed.
 - Playwright uses `DATABASE_URL_PROD` and fixed production web/API defaults unless overridden.
 
 The production workflow is a post-push verifier, not a deployment job or promotion gate. It does
