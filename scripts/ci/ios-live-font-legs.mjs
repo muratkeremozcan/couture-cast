@@ -32,8 +32,13 @@ export function legVerdict(screen, text) {
   if (report?.platform !== 'ios') reasons.push(`platform ${report?.platform}`)
   if (JSON.stringify(screens) !== JSON.stringify([screen]))
     reasons.push(`screens ${screens.join(',') || 'none'}`)
-  if (report?.verdict?.pass !== true)
-    reasons.push(...(report?.verdict?.reasons ?? ['no passing verdict']).map(String))
+  // PR 237 review: a failed verdict fails the leg even when it states no reason.
+  if (report?.verdict?.pass !== true) {
+    const stated = Array.isArray(report?.verdict?.reasons)
+      ? report.verdict.reasons.map(String)
+      : []
+    reasons.push(...(stated.length ? stated : ['no passing verdict']))
+  }
   return {
     screen,
     pass: reasons.length === 0,

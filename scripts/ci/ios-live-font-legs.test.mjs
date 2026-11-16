@@ -110,3 +110,35 @@ test('the merge command exits nonzero and names each failed leg', (t) => {
   })
   assert.equal(usage.status, 2)
 })
+
+// PR 237 review: a failed verdict that states no reason still fails its leg and the merge.
+test('a failed verdict with no stated reason fails the leg and the merge command', (t) => {
+  const failed = (screen) => report(screen, { verdict: { pass: false, reasons: [] } })
+  assert.deepEqual(legVerdict('home', failed('home')), {
+    screen: 'home',
+    pass: false,
+    wallSeconds: 4200,
+    reasons: ['no passing verdict'],
+  })
+  assert.deepEqual(
+    legVerdict('home', report('home', { verdict: { pass: false, reasons: 'clipped' } }))
+      .reasons,
+    ['no passing verdict']
+  )
+  const directory = downloaded(
+    t,
+    Object.fromEntries(LIVE_FONT_SCREENS.map((screen) => [screen, failed(screen)]))
+  )
+  assert.equal(mergeLiveFontLegs(directory).pass, false)
+  const result = spawnSync(
+    process.execPath,
+    ['scripts/ci/ios-live-font-legs.mjs', 'merge', directory],
+    { encoding: 'utf8' }
+  )
+  assert.equal(result.status, 1)
+  for (const screen of LIVE_FONT_SCREENS)
+    assert.match(
+      result.stderr,
+      new RegExp(`::error::live font ${screen}: no passing verdict`)
+    )
+})
