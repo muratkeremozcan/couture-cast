@@ -657,6 +657,50 @@ describe('stitchPages', () => {
     )
   })
 
+  // CodeRabbit on PR 242: on two pages nothing marks a sticky record as fixed, so two of them
+  // (shift 0) confirmed a zero step for a final drag of 900 between pages that share no text.
+  // Only texts an earlier drag moved can confirm that the last one barely moved.
+  test('stationary records never confirm a final drag that barely moved', () => {
+    const card = (n, y) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${y}][100,${y + 100}]`,
+    })
+    const chips = [
+      { text: 'Cold and wet', viewRect: [0, 50, 100, 90] },
+      { text: 'Sunny', viewRect: [120, 50, 220, 90] },
+    ]
+    const asRecords = (page) => [
+      ...page.map((node) => {
+        const [left, top, right, bottom] = node.bounds.match(/-?\d+/g).map(Number)
+        return { text: node.text, viewRect: [left, top, right, bottom] }
+      }),
+      ...chips,
+    ]
+    const two = [
+      [card(1, 100), card(2, 400)],
+      [card(3, 100), card(4, 400)],
+    ]
+    assert.deepEqual(
+      stitchPlaces(two, {
+        expectedShift: 900,
+        reachedBottom: true,
+        records: two.map(asRecords),
+      }).offsets,
+      [0, 900]
+    )
+    // Three pages: the chips stay put on every page, the last page shares no card.
+    const three = [...two, [card(7, 100), card(8, 400)]]
+    assert.deepEqual(
+      stitchPlaces(three, {
+        expectedShift: 900,
+        reachedBottom: true,
+        records: three.map(asRecords),
+      }).offsets,
+      [0, 900, 1800]
+    )
+  })
+
   // CodeRabbit on PR 230: a still header and a new label of the same id-less text on the last
   // page; only the header's copy is chrome, the label is new text with its own place.
   test('still chrome on the last page is one node, nearest its place', () => {

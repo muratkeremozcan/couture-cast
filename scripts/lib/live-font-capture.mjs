@@ -362,11 +362,11 @@ const WHOLE_UNIT = 1
  * anchors of fewer than two texts fail as live_font_scroll_short_drag_unconfirmed, since one
  * repeated label can pair with another copy by chance.
  */
-function shortFinalStep(entries, { tolerance, expectedShift }) {
+function shortFinalStep(entries, { tolerance, expectedShift, moved }) {
   const anchors = entries.filter(
     ({ shift }) => shift > tolerance && shift <= (1 + SHIFT_SPREAD) * expectedShift
   )
-  if (!anchors.length) return settledStep(entries, { tolerance })
+  if (!anchors.length) return settledStep(entries, { tolerance, moved })
   const shifts = anchors.map(({ shift }) => shift)
   const exact = anchors.filter(({ rounding }) => rounding === 0)
   const step = median((exact.length ? exact : anchors).map(({ shift }) => shift))
@@ -390,15 +390,17 @@ function shortFinalStep(entries, { tolerance, expectedShift }) {
 /**
  * The step of a drag that reaches the bottom by under `tolerance` (iOS dispatch 43852018196,
  * Settings: the last drag moved under a point): every anchor stayed within the tolerance, so the
- * step is their median, from the exact ones when there are any. Fewer than two texts confirm
- * nothing (one label shared by chance), and an anchor that moved farther leaves the step
- * unmeasured: null in both cases.
+ * step is the median of the anchors an earlier drag `moved`, from the exact ones when there are
+ * any. A text no drag moved may be fixed on screen (a sticky chip's record, which nothing marks
+ * fixed on two pages; CodeRabbit on PR 242), so it confirms nothing. Fewer than two moved texts,
+ * or an anchor that moved farther, leave the step unmeasured: null.
  */
-function settledStep(entries, { tolerance }) {
+function settledStep(entries, { tolerance, moved }) {
   if (!entries.every(({ shift }) => Math.abs(shift) <= tolerance)) return null
-  if (new Set(entries.map(({ text }) => text)).size < 2) return null
-  const exact = entries.filter(({ rounding }) => rounding === 0)
-  return median((exact.length ? exact : entries).map(({ shift }) => shift))
+  const confirmed = entries.filter(({ text }) => moved.has(text))
+  if (new Set(confirmed.map(({ text }) => text)).size < 2) return null
+  const exact = confirmed.filter(({ rounding }) => rounding === 0)
+  return median((exact.length ? exact : confirmed).map(({ shift }) => shift))
 }
 
 /**
@@ -409,9 +411,20 @@ function settledStep(entries, { tolerance }) {
  */
 function dragSteps(measured, anchors, { tolerance, expectedShift, reachedBottom }) {
   const last = measured.length - 1
+  // The texts an earlier drag moved by its whole length: moving content, never a sticky record.
+  const moved = new Set(
+    anchors
+      .slice(0, Math.max(last, 0))
+      .flatMap((list) =>
+        list.filter(
+          ({ shift }) => shift > tolerance && measuresDrag(shift, expectedShift)
+        )
+      )
+      .map(({ text }) => text)
+  )
   const short =
     reachedBottom === true && expectedShift > 0 && last >= 0 && !measured[last].length
-      ? shortFinalStep(anchors[last], { tolerance, expectedShift })
+      ? shortFinalStep(anchors[last], { tolerance, expectedShift, moved })
       : null
   const steps = measured.filter((shifts) => shifts.length).map(median)
   return (at) => {
