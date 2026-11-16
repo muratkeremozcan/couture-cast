@@ -373,7 +373,8 @@ function quietState(service, labels, label, pids) {
  * shows under another manager is left alone. Every attempt is recorded and nonfatal. The census
  * names, per entry, whether the runtime ran it ('running'), listed it idle ('idle'), listed a pid
  * it does not own ('unowned') or does not have it ('absent'), and the exit code of the boot-out,
- * so the next run shows which labels exist.
+ * so the next run shows which labels exist. A running service whose boot-out fails is frozen by
+ * pid, and its census adds the freeze's exit code (`freezeExit`).
  */
 export function bootoutQuietServices(device, ps, jobs, manager, execute, listed = '') {
   const labels = listedLabels(listed)
@@ -401,7 +402,25 @@ export function bootoutQuietServices(device, ps, jobs, manager, execute, listed 
       { fatal: false }
     )
     census[name].bootoutExit = result.exitCode ?? null
-    if (result.exitCode === 0) stopped.push(name)
+    if (result.exitCode === 0) {
+      stopped.push(name)
+      continue
+    }
+    // Dispatch 43973994370: a busy mediaanalysisd held its boot-out past the timeout and kept
+    // 215 percent of a three-core host. A running service whose boot-out fails is frozen by pid
+    // from the host (simulator processes are host processes): stopped, it takes no CPU, and
+    // launchd, seeing it alive, starts no other.
+    if (!service?.pid) continue
+    const frozen = execute(
+      'freeze-quiet-' + name,
+      'kill',
+      ['-STOP', String(service.pid)],
+      {
+        fatal: false,
+      }
+    )
+    census[name].freezeExit = frozen.exitCode ?? null
+    if (frozen.exitCode === 0) stopped.push(name)
   }
   const record = { policy: [...QUIET_SERVICES], stopped, census }
   console.log(JSON.stringify({ quietServices: record }))

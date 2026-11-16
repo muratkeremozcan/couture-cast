@@ -213,7 +213,8 @@ test('quiet services are stopped by exact listed label: running ones only when o
     console.log = log
   }
   // triald is listed idle (no pid): it is booted out too, before launchd can start it later.
-  assert.deepEqual(record.stopped, ['chronod', 'triald', 'mediaanalysisd'])
+  // healthd refused its boot-out and runs owned, so it is frozen by pid.
+  assert.deepEqual(record.stopped, ['chronod', 'healthd', 'triald', 'mediaanalysisd'])
   assert.deepEqual(record.policy, [
     'chronod',
     'healthd',
@@ -224,7 +225,11 @@ test('quiet services are stopped by exact listed label: running ones only when o
   ])
   assert.deepEqual(JSON.parse(lines.at(-1)).quietServices, record)
   assert.deepEqual(record.census.chronod, { state: 'running', bootoutExit: 0 })
-  assert.deepEqual(record.census.healthd, { state: 'running', bootoutExit: 1 })
+  assert.deepEqual(record.census.healthd, {
+    state: 'running',
+    bootoutExit: 1,
+    freezeExit: 0,
+  })
   assert.deepEqual(record.census.triald, { state: 'idle', bootoutExit: 0 })
   assert.deepEqual(record.census.siriactionsd, { state: 'absent', bootoutExit: null })
   assert.deepEqual(
@@ -232,13 +237,15 @@ test('quiet services are stopped by exact listed label: running ones only when o
     [
       'bootout-quiet-chronod',
       'bootout-quiet-healthd',
+      'freeze-quiet-healthd',
       'bootout-quiet-triald',
       'bootout-quiet-mediaanalysisd',
     ]
   )
-  assert.equal(calls[2].args.at(-1), 'system/com.apple.triald')
-  assert.equal(calls[2].options.fatal, false)
-  assert.equal(calls[3].args.at(-1), 'system/com.apple.mediaanalysisd')
+  assert.deepEqual(calls[2].args, ['-STOP', '111'])
+  assert.equal(calls[3].args.at(-1), 'system/com.apple.triald')
+  assert.equal(calls[3].options.fatal, false)
+  assert.equal(calls[4].args.at(-1), 'system/com.apple.mediaanalysisd')
   assert.deepEqual(calls[0].args, [
     'simctl',
     'spawn',
@@ -265,6 +272,58 @@ test('quiet services are stopped by exact listed label: running ones only when o
     'assistant_cdmd',
   ])
     assert.equal(QUIET_SERVICES.includes(kept), false, kept)
+})
+
+// Dispatch 43973994370, community leg: the boot-out of a running mediaanalysisd timed out
+// (SIGKILL after 11 s), the daemon kept 215 percent of a three-core host, and the app's sign-in
+// stalled until the flow failed. A running quiet service whose boot-out fails is frozen by pid
+// (SIGSTOP from the host: launchd sees it alive and starts no other); one with no pid has nothing
+// to freeze.
+test('a running quiet service whose boot-out fails is frozen by its pid', () => {
+  const calls = []
+  const execute = (operation, binary, args, options) => {
+    calls.push({ operation, binary, args, options })
+    if (operation === 'bootout-quiet-mediaanalysisd') return { exitCode: null }
+    if (operation === 'bootout-quiet-triald') return { exitCode: 5 }
+    return { exitCode: 0 }
+  }
+  const log = console.log
+  const lines = []
+  console.log = (line) => lines.push(line)
+  let record
+  try {
+    record = bootoutQuietServices(
+      'owned-uuid',
+      ps + '\n114 100 215 /s/mediaanalysisd',
+      simulatorJobs(jobsText + '\n114 0 com.apple.mediaanalysisd'),
+      100,
+      execute,
+      '- 0 com.apple.triald\n114 0 com.apple.mediaanalysisd'
+    )
+  } finally {
+    console.log = log
+  }
+  assert.deepEqual(record.census.mediaanalysisd, {
+    state: 'running',
+    bootoutExit: null,
+    freezeExit: 0,
+  })
+  assert.deepEqual(record.census.triald, { state: 'idle', bootoutExit: 5 })
+  assert.deepEqual(record.stopped, ['mediaanalysisd'])
+  assert.deepEqual(JSON.parse(lines.at(-1)).quietServices, record)
+  assert.deepEqual(
+    calls.find((call) => call.operation === 'freeze-quiet-mediaanalysisd'),
+    {
+      operation: 'freeze-quiet-mediaanalysisd',
+      binary: 'kill',
+      args: ['-STOP', '114'],
+      options: { fatal: false },
+    }
+  )
+  assert.equal(
+    calls.some((call) => call.operation === 'freeze-quiet-triald'),
+    false
+  )
 })
 
 // Dispatch 43393247650 shard 3: mediaanalysisd was listed idle at quiesce time, was left alone,
