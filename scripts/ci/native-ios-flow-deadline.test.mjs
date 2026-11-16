@@ -238,8 +238,13 @@ test('an uncaught error kills the owned group and writes the record even when lo
   fs.writeFileSync(
     preload,
     [
+      "import fs from 'node:fs'",
       "console.error = () => { throw Object.assign(new Error('write EPIPE'), { code: 'EPIPE' }) }",
-      "setTimeout(() => { throw new Error('injected') }, 300)",
+      // The error waits for the owned command to start: a fixed 300 ms ran out first on a loaded
+      // machine, so the group died before it wrote its pid (2026-11-16).
+      `const pidFile = ${JSON.stringify(pidFile)}`,
+      "const inject = () => { if (!fs.existsSync(pidFile)) return setTimeout(inject, 20); throw new Error('injected') }",
+      'setTimeout(inject, 20)',
       '',
     ].join('\n')
   )
