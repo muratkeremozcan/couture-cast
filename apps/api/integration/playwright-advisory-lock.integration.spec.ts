@@ -21,8 +21,9 @@ const lockModule = path.join(repo, 'playwright/support/helpers/advisory-lock.ts'
 
 /**
  * A Playwright worker stand-in: its own process and database session. It takes
- * the lock `rounds` times, holding it `holdMs` each time and logging when it
- * entered and left; with `crash`, it exits holding the lock.
+ * the lock `rounds` times, holding it `holdMs` each time and appending `enter`
+ * and `leave` lines to the log every worker shares; with `crash`, it exits
+ * holding the lock.
  */
 function worker(
   directory: string,
@@ -35,14 +36,14 @@ function worker(
     script,
     `const fs = require('node:fs')
 const { acquireAdvisoryLock } = require(${JSON.stringify(lockModule)})
-const log = ${JSON.stringify(path.join(directory, `${name}.log`))}
+const log = ${JSON.stringify(path.join(directory, 'events.log'))}
 void (async () => {
 for (let round = 0; round < ${options.rounds}; round += 1) {
   const release = await acquireAdvisoryLock(${JSON.stringify(databaseUrl)}, ${JSON.stringify(lockName)}, { timeoutMs: 30_000 })
-  fs.appendFileSync(log, 'enter ' + (performance.timeOrigin + performance.now()) + '\\n')
+  fs.appendFileSync(log, 'enter ${name}\\n')
   await new Promise((resolve) => setTimeout(resolve, ${options.holdMs}))
-  ${options.crash ? "fs.appendFileSync(log, 'crash\\n'); process.exit(0)" : ''}
-  fs.appendFileSync(log, 'leave ' + (performance.timeOrigin + performance.now()) + '\\n')
+  ${options.crash ? `fs.appendFileSync(log, 'crash ${name}\\n'); process.exit(0)` : ''}
+  fs.appendFileSync(log, 'leave ${name}\\n')
   await release()
 }
 })()
@@ -142,16 +143,18 @@ async function waitFor(condition: () => boolean, timeoutMs = 10_000) {
   }
 }
 
-function intervals(directory: string, name: string) {
-  const lines = fs
-    .readFileSync(path.join(directory, `${name}.log`), 'utf8')
-    .trim()
-    .split('\n')
-  const at = (line: string | undefined) => Number(line?.split(' ')[1])
-  const spans: { enter: number; leave: number }[] = []
-  for (let index = 0; index < lines.length; index += 2)
-    spans.push({ enter: at(lines[index]), leave: at(lines[index + 1]) })
-  return spans
+/**
+ * The workers' log lines in the order they were written. Each line is one
+ * O_APPEND write, so the file holds the writes in the order they happened. A
+ * worker writes `enter` after it gets the lock and `leave` before it releases
+ * it, so one holder at a time means every `enter` is followed by the same
+ * worker's `leave`. Timestamps cannot show this: each process adds its own
+ * performance.now() to its own timeOrigin, and on a loaded machine those
+ * anchors can disagree by more than the gap between one release and the next
+ * grant, which is under a millisecond.
+ */
+function events(directory: string) {
+  return fs.readFileSync(path.join(directory, 'events.log'), 'utf8').trim().split('\n')
 }
 
 describe('waiting for advisory-lock holders to go', () => {
@@ -193,29 +196,26 @@ describe('Playwright cross-worker advisory lock', () => {
       )
     )
     expect(exits).toEqual([0, 0, 0])
-    const spans = ['a', 'b', 'c']
-      .flatMap((name) => intervals(directory, name))
-      .sort((left, right) => left.enter - right.enter)
-    expect(spans).toHaveLength(9)
-    spans.slice(1).forEach((span, index) => {
-      expect(span.enter).toBeGreaterThanOrEqual(spans[index]!.leave)
-    })
+    const log = events(directory)
+    const holders = log
+      .filter((_, index) => index % 2 === 0)
+      .map((line) => line.replace(/^enter /, ''))
+    expect(log).toEqual(holders.flatMap((name) => [`enter ${name}`, `leave ${name}`]))
+    expect(holders.toSorted()).toEqual(['a', 'a', 'a', 'b', 'b', 'b', 'c', 'c', 'c'])
   }, 60_000)
 
   it('is free again when a holder dies without releasing it', async () => {
     expect(
       await worker(directory, 'crashed', lockName, { rounds: 1, holdMs: 0, crash: true })
     ).toBe(0)
-    expect(fs.readFileSync(path.join(directory, 'crashed.log'), 'utf8')).toContain(
-      'crash'
-    )
+    expect(events(directory)).toEqual(['enter crashed', 'crash crashed'])
     const release = await acquireAdvisoryLock(databaseUrl, lockName, { timeoutMs: 5_000 })
     await release()
   }, 60_000)
 
   it('leaves no worker or session behind when a run is cut short', async () => {
     const holding = worker(directory, 'holder', lockName, { rounds: 1, holdMs: 120_000 })
-    const log = path.join(directory, 'holder.log')
+    const log = path.join(directory, 'events.log')
     await waitFor(() => fs.existsSync(log))
     expect((await holders(lockName)).map(({ pid }) => typeof pid)).toEqual(['number'])
 
