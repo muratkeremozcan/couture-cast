@@ -1495,46 +1495,60 @@ describe('C-WEB-D-A11Y', () => {
     expect(document.activeElement).not.toBe(document.body)
   })
 
-  it('has no axe violation idle, with ban terms, confirming, failed or applied', async () => {
-    const standing = {
-      subjectStanding: {
-        active: true,
-        sanction: {
-          sanctionId: 's1',
-          kind: 'temporary' as const,
-          expiresAt: '2026-11-10T12:00:00.000Z',
-          appealStatus: 'not_requested' as const,
-        },
-        priorBanCount: 1,
-        allowedAppealSteps: ['requested' as const],
-      },
-    }
+  // TEA sign-off L-3a: one axe pass per state, each its own case. Five full passes in one case
+  // ran past the 5 s budget on a loaded host.
+  const AXE_STATES = [
+    'idle',
+    'with ban terms',
+    'confirming',
+    'failed',
+    'applied',
+  ] as const
+  async function reachDecisionState(state: (typeof AXE_STATES)[number]) {
     const view = await openCase(
       (_body, call) =>
         call === 1
           ? closed(409, 'action_not_applicable', { detail: 'target_erased' })()
           : json(decisionBody({ action: 'ban' })),
       {
-        ...standing,
+        subjectStanding: {
+          active: true,
+          sanction: {
+            sanctionId: 's1',
+            kind: 'temporary' as const,
+            expiresAt: '2026-11-10T12:00:00.000Z',
+            appealStatus: 'not_requested' as const,
+          },
+          priorBanCount: 1,
+          allowedAppealSteps: ['requested' as const],
+        },
         escalated: true,
         firstDecisionAt: '2026-11-03T09:00:00.000Z',
         allowedActions: ['resolve', 'ban'],
         banKinds: ['temporary', 'permanent'],
       }
     )
-    expect(await violations(view.container)).toEqual([])
+    if (state === 'idle') return view
     await chooseAction('ban')
-    expect(await violations(view.container)).toEqual([])
+    if (state === 'with ban terms') return view
     typeReason()
     await userEvent.click(submitButton())
-    expect(await violations(view.container)).toEqual([])
+    if (state === 'confirming') {
+      await screen.findByRole('button', { name: 'Yes, apply it' })
+      return view
+    }
     await userEvent.click(screen.getByRole('button', { name: 'Yes, apply it' }))
     await screen.findByRole('alert')
-    expect(await violations(view.container)).toEqual([])
+    if (state === 'failed') return view
     await userEvent.click(submitButton())
     await userEvent.click(screen.getByRole('button', { name: 'Yes, apply it' }))
     await waitFor(() => expect(view.reads).toHaveLength(2))
     await settle()
+    return view
+  }
+
+  it.each(AXE_STATES)('has no axe violation %s', async (state) => {
+    const view = await reachDecisionState(state)
     expect(await violations(view.container)).toEqual([])
   })
 })

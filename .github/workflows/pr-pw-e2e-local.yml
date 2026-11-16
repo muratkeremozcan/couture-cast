@@ -217,8 +217,9 @@ jobs:
     name: Real-session community E2E
     needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
-    # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12).
-    timeout-minutes: 15
+    # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12), before the guardian consent
+    # Playwright step below (a database reset, a web build and nine specs, about 5 minutes).
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       redis:
@@ -299,6 +300,18 @@ jobs:
       - name: Run real-session specs
         run: npm run test:pw-real-session
 
+      # Guardian consent is off in production (owner ruling 2026-11-16), but the waiting-teen
+      # path stays proven for the day it returns: the @consent-required cases, against an API
+      # started with GUARDIAN_CONSENT_POLICY=required_13_15 (allowed only in test environments).
+      # Its own run directory, so the default run's published artifacts stay as they were; the
+      # web build does not depend on the policy, so it is reused.
+      - name: Run real-session guardian consent specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          GUARDIAN_CONSENT_POLICY: required_13_15
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
+        run: npm run test:pw-real-session -- --skip-web-build
+
       # A fake cannot prove storage refuses an expired token, and this is the job with real Storage.
       # Its own isolated database, so a real-session failure neither hides this nor shares state with it.
       - name: Prove Storage refuses a late community upload
@@ -309,9 +322,55 @@ jobs:
           INTEGRATION_TEST_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
         run: npm run test:community-storage -w apps/api
 
+      # The @consent-required specs of the default local suite (guardian invite, accept,
+      # dashboard, revoke, and the comment hidden after a revoke), against the local stack with
+      # GUARDIAN_CONSENT_POLICY=required_13_15; the sharded suite skips them while consent is
+      # off. Last, because it resets the Supabase database the Storage proof above uses.
+      - name: Reset the database for the guardian consent specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+        run: npm run db:reset
+      - name: Build the web app for the guardian consent specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        run: npm run build --workspace web
+      - name: Run the guardian consent Playwright specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          # The job sets it for the real-session specs, which this run leaves out.
+          STORY65_REAL_SESSION_REQUIRED: ''
+        run: npm run test:pw-consent
+      # Every @consent-required test passed and none skipped, against the expected count.
+      - name: Check the guardian consent run report
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        run: npx tsx playwright/support/helpers/consent-lane-report-cli.ts consent playwright/artifacts/consent-lane-report.json
+      - name: Check guardian consent artifacts for secret values
+        id: consent_secret_scan
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN playwright/artifacts
+      - name: Upload guardian consent artifacts
+        # Only artifacts that passed the secret scan leave the runner.
+        if: ${{ !cancelled() && steps.consent_secret_scan.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardian-consent-e2e
+          path: playwright/artifacts
+          if-no-files-found: ignore
+          retention-days: 5
+
       # run.mjs deletes its users itself; this covers a run that was killed first.
       - name: Delete the Auth users the run created
         if: always()
+        run: node scripts/e2e-real-session/cleanup-users.mjs
+      - name: Delete the Auth users the guardian consent run created
+        if: always()
+        env:
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
         run: node scripts/e2e-real-session/cleanup-users.mjs
 
       # Fails closed: nothing is uploaded unless run.mjs finished publishing the
@@ -462,6 +521,16 @@ jobs:
           shards: '2'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The sharded run's API has guardian consent off: it must skip exactly the
+      # @consent-required tests, for the consent lane, and nothing else for that reason.
+      - name: Check the consent-lane skips of the sharded run
+        if: ${{ !cancelled() && needs.pw-e2e.result != 'skipped' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: merged-local-report.json
+        run: |
+          npx playwright merge-reports --reporter=json all-blob-reports
+          npx tsx playwright/support/helpers/consent-lane-report-cli.ts off merged-local-report.json
 
       # Proves every test ran in exactly one shard and writes the shard times to
       # the job summary. Reads the shards' psp-record-* artifacts and the jobs

@@ -43,6 +43,7 @@ blob-report/
 # Vitest 5 writes failure screenshots, attachments and reporter output under .vitest/.
 .vitest/
 .real-session-e2e/
+.real-session-e2e-consent/
 # Story 6.16: run-maestro.mjs --signed-out records guest accounts here, write-ahead.
 .maestro-guest-preview/
 # Story 6.17: scripts/run-google-native.mjs records its Auth users and evidence here.

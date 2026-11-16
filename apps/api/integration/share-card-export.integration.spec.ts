@@ -34,6 +34,11 @@ import {
   useShareCardApi,
 } from './helpers/share-card-api.js'
 import { updateGuardianConsent, updatePost } from './helpers/privacy-guards.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its live guardian consent checks need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 useShareCardApi()
 

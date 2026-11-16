@@ -123,6 +123,16 @@ describe('M-CALLBACK-COLD: the callback route after a cold start', () => {
     ).toEqual({ pathname: '/signin', params: { google: 'refused' } })
   })
 
+  // Owner's production loop (2026-11-15): a teen waiting on a guardian goes to the finish step,
+  // which shows the guardian invitation.
+  it('sends a teen waiting on a guardian to the finish step, keeping the door', async () => {
+    flow.complete.mockResolvedValue({ kind: 'awaiting_guardian' })
+    expect(await cold({ code: 'cold-teen', door: 'signup' })).toEqual({
+      pathname: '/signup-finish',
+      params: { door: 'signup' },
+    })
+  })
+
   // Antigravity P1-1, D5: a round trip started on /signup returns to /signup.
   it('carries the signup door to the finish step and back to /signup on a failure', async () => {
     flow.complete.mockResolvedValue({ kind: 'no_account' })

@@ -105,8 +105,7 @@ export const frCA: GuestPreviewStrings = {
     previewOnlyBody:
       "Articles d'exemple, tenues, J'aime, filtre de collection et changements.",
     stillRequired: 'Toujours requis',
-    stillRequiredBody:
-      "Configuration du compte, connexion vérifiée et approbation d'un tuteur, s'il y a lieu.",
+    stillRequiredBody: 'Configuration du compte et connexion vérifiée.',
     backToPreview: "Retour à l'aperçu",
     signInToContinue: 'Connectez-vous pour continuer',
   },
@@ -120,7 +119,7 @@ export const frCA: GuestPreviewStrings = {
     saved: 'Vos préférences de confort sont enregistrées.',
     kept: 'Les préférences de votre compte sont inchangées.',
     rejected:
-      "Votre compte ne peut pas encore enregistrer de préférences. L'approbation d'un parent ou une vérification d'âge doit d'abord avoir lieu.",
+      "Votre compte ne peut pas encore enregistrer de préférences. Une vérification d'âge doit d'abord avoir lieu.",
     failed:
       "Nous n'avons pas pu enregistrer vos préférences. Votre choix est conservé; vous pouvez réessayer.",
     loadFailed: "Nous n'avons pas pu charger les préférences de votre compte.",

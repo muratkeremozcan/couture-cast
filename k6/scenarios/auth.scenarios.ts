@@ -1,73 +1,60 @@
 import { describe, expect } from 'https://jslib.k6.io/k6chaijs/4.5.0.1/index.js'
 import { fail, sleep } from 'k6'
 import { apiUrl, authHeaders, uniqueEmail } from '../helpers/config'
-import {
-  extractInvitationToken,
-  type GuardianInvitationAcceptResponse,
-  type GuardianInvitationResponse,
-  signUp,
-} from '../helpers/api'
+import { signUp } from '../helpers/api'
 import { getJson, postJson, putJson } from '../helpers/http'
 
-// ── Scenario: Guardian write path ───────────────────────────────────────────
+// ── Scenario: Guardian write path (guardian consent off) ────────────────────
 
+/**
+ * Guardian consent is off (owner ruling 2026-11-16): a 13 to 15 year old is active at signup,
+ * and the guardian consent endpoints answer 409 guardian_consent_off before any other guard.
+ * The routes keep their names, so their latency thresholds still apply to the refusal.
+ */
 export function testGuardianWritePath() {
   // Sign up teen — data flows downstream so the call is outside the describe block
   const { status: teenStatus, body: teen } = signUp(uniqueEmail('teen'), '2012-05-18')
   describe('POST /api/v1/auth/signup (teen)', () => {
     expect(teenStatus, 'status is 201').to.equal(201)
-    expect(teen?.guardianConsentRequired, 'requires guardian consent').to.equal(true)
+    expect(teen?.accountStatus, 'is active').to.equal('active')
+    expect(teen?.guardianConsentRequired, 'needs no guardian').to.equal(false)
   })
   if (teenStatus !== 201) fail(`teen signup failed: ${teenStatus}`)
   if (!teen) fail('signup returned empty body')
 
-  const { status: inviteStatus, body: invitation } = postJson<GuardianInvitationResponse>(
-    apiUrl('/api/v1/guardian/invitations'),
+  const refused = (path: string, body: unknown, name: string) =>
+    postJson<{ code?: string }>(apiUrl(path), body, {
+      tags: { name },
+      expectedStatuses: [409],
+    })
+  const invitation = refused(
+    '/api/v1/guardian/invitations',
     {
       teenId: teen.userId,
       guardianEmail: uniqueEmail('guardian'),
       consentLevel: 'read_only',
     },
-    { tags: { name: 'guardian/invitations' } }
+    'guardian/invitations'
   )
-  describe('POST /api/v1/guardian/invitations', () => {
-    expect(inviteStatus, 'status is 201').to.equal(201)
-    expect(invitation?.teenId, 'targets teen').to.equal(teen.userId)
-    expect(invitation?.deliveryQueued, 'queues delivery').to.equal(true)
-  })
-  if (inviteStatus !== 201) fail(`guardian invitation failed: ${inviteStatus}`)
-  if (!invitation) fail('invitation returned empty body')
-
-  const token = extractInvitationToken(invitation.invitationLink)
-  const { status: acceptStatus, body: accepted } =
-    postJson<GuardianInvitationAcceptResponse>(
-      apiUrl('/api/v1/guardian/accept'),
-      { token },
-      { tags: { name: 'guardian/accept' } }
-    )
-  describe('POST /api/v1/guardian/accept', () => {
-    expect(acceptStatus, 'status is 200').to.equal(200)
-    expect(accepted?.teenId, 'links teen').to.equal(teen.userId)
-    expect(accepted?.guardianId.length, 'creates guardian').to.be.at.least(1)
-  })
-  if (acceptStatus !== 200) fail(`guardian accept failed: ${acceptStatus}`)
-  if (!accepted) fail('accept returned empty body')
-
-  const { status: revokeStatus, body: revoked } = postJson<{
-    teenId: string
-    guardianId: string
-  }>(
-    apiUrl('/api/v1/guardian/revoke'),
-    { guardianId: accepted.guardianId, teenId: teen.userId },
-    {
-      headers: authHeaders(accepted.guardianId, 'guardian'),
-      tags: { name: 'guardian/revoke' },
+  const accept = refused(
+    '/api/v1/guardian/accept',
+    { token: 'k6-no-token' },
+    'guardian/accept'
+  )
+  const revoke = refused(
+    '/api/v1/guardian/revoke',
+    { guardianId: teen.userId, teenId: teen.userId },
+    'guardian/revoke'
+  )
+  describe('guardian consent endpoints while consent is off', () => {
+    for (const [label, response] of [
+      ['invitations', invitation],
+      ['accept', accept],
+      ['revoke', revoke],
+    ] as const) {
+      expect(response.status, `${label} status is 409`).to.equal(409)
+      expect(response.body?.code, `${label} code`).to.equal('guardian_consent_off')
     }
-  )
-  describe('POST /api/v1/guardian/revoke', () => {
-    expect(revokeStatus, 'status is 200').to.equal(200)
-    expect(revoked?.teenId, 'targets teen').to.equal(teen.userId)
-    expect(revoked?.guardianId, 'targets guardian').to.equal(accepted.guardianId)
   })
 
   sleep(0.2)

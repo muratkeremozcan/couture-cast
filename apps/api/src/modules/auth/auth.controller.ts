@@ -31,6 +31,7 @@ function requireBearer(authorization: string | string[] | undefined) {
   return token
 }
 import type { RequestAuthContext } from './security.types'
+import { GuardianConsentPolicyGuard } from './guardian-consent-policy'
 
 @Controller('/api/v1/auth')
 export class AuthController {
@@ -74,7 +75,7 @@ export class AuthController {
 
   @Post('guardian-consent')
   @HttpCode(200)
-  @UseGuards(RequestAuthGuard, RolesGuard)
+  @UseGuards(GuardianConsentPolicyGuard, RequestAuthGuard, RolesGuard)
   @Roles('guardian', 'admin')
   grantGuardianConsent(
     @AuthContext() auth: RequestAuthContext,

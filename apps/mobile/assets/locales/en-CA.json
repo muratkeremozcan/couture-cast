@@ -790,7 +790,7 @@
       "rateLimited": "Too many reactions. Try again in a minute.",
       "total_one": "{{count}} reaction",
       "total_other": "{{count}} reactions",
-      "ineligible": "Reactions require age 13 or older. Members under 16 need active guardian consent."
+      "ineligible": "Reactions require age 13 or older."
     },
     "comments": {
       "title": "Comments",

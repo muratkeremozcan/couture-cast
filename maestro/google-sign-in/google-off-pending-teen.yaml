@@ -1,0 +1,24 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane, M-OFF-PENDING-TEEN (guardian consent off, owner ruling 2026-11-16): a teen the
+# 2026-11-15 production loop left waiting on a guardian signs in with Google from the Sign in
+# door and lands on Home as a member.
+# Runner: creates the teen account for ${GOOGLE_EMAIL} through the product signup endpoint, marks
+# it as still waiting, queues the identity, then checks the address keeps that one app user.
+appId: ${MAESTRO_APP_ID}
+name: 'Google teen left waiting, consent off'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-sign-in'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+    label: 'The Sign in door shows Continue with Google'
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/assert-member-home.yaml
+- assertNotVisible:
+    id: 'guardian-invite-email'

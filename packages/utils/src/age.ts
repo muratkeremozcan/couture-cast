@@ -3,6 +3,26 @@ export const AGE_GATE_MESSAGES = {
   guardianRequired: 'Guardian consent required',
 } as const
 
+/**
+ * Whether a 13 to 15 year old needs a guardian's approval before the account works.
+ * `off`: every 13+ account is active at creation (owner ruling, 2026-11-16).
+ * `required_13_15`: a 13 to 15 year old is `pending_guardian_consent` until a guardian approves.
+ *
+ * The one value that turns guardian consent back on. Before flipping it, the guardian endpoints
+ * need the caller checks the 2026-11-15 teen-path review asked for (B-1 in
+ * _bmad-output/test-artifacts/story-6-17/teen-path-findings.md): the API refuses every guardian
+ * consent endpoint while this is `off`.
+ */
+export type GuardianConsentPolicy = 'off' | 'required_13_15'
+export const GUARDIAN_CONSENT_POLICY: GuardianConsentPolicy = 'off'
+
+export function guardianConsentRequiredFor(
+  age: number,
+  policy: GuardianConsentPolicy = GUARDIAN_CONSENT_POLICY
+) {
+  return policy === 'required_13_15' && age >= 13 && age < 16
+}
+
 export const INVALID_BIRTHDATE_MESSAGE = 'Enter your birthdate as YYYY-MM-DD' as const
 
 export type AgeGateAccountStatus =
@@ -77,7 +97,11 @@ export function calculateAge(birthdate: Date, today = new Date()): number {
   return age
 }
 
-export function evaluateAgeGate(birthdate: Date, today = new Date()): AgeGateResult {
+export function evaluateAgeGate(
+  birthdate: Date,
+  today = new Date(),
+  policy: GuardianConsentPolicy = GUARDIAN_CONSENT_POLICY
+): AgeGateResult {
   const age = calculateAge(birthdate, today)
 
   if (age < 13) {
@@ -90,7 +114,7 @@ export function evaluateAgeGate(birthdate: Date, today = new Date()): AgeGateRes
     }
   }
 
-  if (age < 16) {
+  if (guardianConsentRequiredFor(age, policy)) {
     return {
       age,
       allowed: true,
@@ -111,7 +135,8 @@ export function evaluateAgeGate(birthdate: Date, today = new Date()): AgeGateRes
 
 export function evaluateBirthdateInput(
   input: string,
-  today = new Date()
+  today = new Date(),
+  policy: GuardianConsentPolicy = GUARDIAN_CONSENT_POLICY
 ): BirthdateAgeGateEvaluation {
   if (!input.trim()) {
     return {
@@ -122,7 +147,7 @@ export function evaluateBirthdateInput(
   }
 
   try {
-    const gate = evaluateAgeGate(parseBirthdateInput(input), today)
+    const gate = evaluateAgeGate(parseBirthdateInput(input), today, policy)
     return {
       kind: 'valid',
       gate,

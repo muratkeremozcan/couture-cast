@@ -930,15 +930,20 @@
             "type": "string",
             "enum": [
               "needs_birthdate",
-              "complete"
+              "complete",
+              "awaiting_guardian"
             ]
+          },
+          "accountId": {
+            "type": "string",
+            "minLength": 1
           }
         },
         "required": [
           "status"
         ],
         "additionalProperties": false,
-        "description": "needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session."
+        "description": "needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session. awaiting_guardian: the account is a teen account every signed-in endpoint refuses until a guardian approves; accountId names it for the guardian invitation."
       },
       "FederatedSignupForbidden": {
         "type": "object",

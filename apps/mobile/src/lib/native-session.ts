@@ -330,12 +330,18 @@ export async function verifyNativeOtp(email: string, token: string) {
       if (sessionDenied(error)) break
     }
   }
-  if (failure)
-    throw new NativeSignInError(
-      sessionDenied(failure) ? 'denied' : 'unavailable',
-      'Session verification is unavailable.'
-    )
-  if (!member) throw new NativeSignInError('denied', 'This account is unavailable.')
+  if (failure && !sessionDenied(failure))
+    throw new NativeSignInError('unavailable', 'Session verification is unavailable.')
+  if (failure || !member) {
+    // A denial is the server saying this identity has no account, unless the account is a
+    // teen the guardian lock refuses until a guardian approves.
+    if (await awaitingGuardian(data.session.access_token))
+      throw new NativeSignInError(
+        'awaiting_guardian',
+        'A guardian has to approve this account.'
+      )
+    throw new NativeSignInError('denied', 'This account is unavailable.')
+  }
 }
 export async function signOutNativeSession() {
   const client = await nativeSupabase()
@@ -374,6 +380,9 @@ export async function signOutNativeSession() {
 export type NativeOAuthOutcome =
   | { kind: 'member' }
   | { kind: 'no_account' }
+  // A teen whose guardian has not approved (or has revoked): the session stays, and the finish
+  // step shows the guardian invitation (the lock refuses every other signed-in request).
+  | { kind: 'awaiting_guardian' }
   | { kind: 'refused' }
   | { kind: 'cancelled' }
   | { kind: 'unavailable' }
@@ -538,13 +547,14 @@ async function settleFederatedSession(next: Session): Promise<NativeOAuthOutcome
   if (first === 'unavailable') return { kind: 'unavailable' }
   let status
   try {
-    status = await fetchMobileFederatedSignupStatus(next.access_token)
+    status = (await fetchMobileFederatedSignupStatus(next.access_token)).status
   } catch (error) {
     return error instanceof FederatedSignupError && error.status === 401
       ? refuseFederatedIdentity()
       : { kind: 'unavailable' }
   }
   if (status === 'needs_birthdate') return { kind: 'no_account' }
+  if (status === 'awaiting_guardian') return { kind: 'awaiting_guardian' }
   const second = await verifyWithRetry(next)
   if (second === 'member') return { kind: 'member' }
   return second === 'denied' ? refuseFederatedIdentity() : { kind: 'unavailable' }
@@ -644,7 +654,7 @@ export async function federatedFinishResumeHref(): Promise<string | null> {
   }
   let status
   try {
-    status = await fetchMobileFederatedSignupStatus(identity.accessToken)
+    status = (await fetchMobileFederatedSignupStatus(identity.accessToken)).status
   } catch {
     return null
   }
@@ -655,6 +665,26 @@ export async function federatedFinishResumeHref(): Promise<string | null> {
   }
   const marker = await readFederatedFinishMarker()
   return finishStepHref(marker?.from ?? null, marker?.door ?? 'signin', '/signup-finish')
+}
+
+async function awaitingGuardian(accessToken: string) {
+  return (await fetchNativeAwaitingGuardianAccount(accessToken)) !== null
+}
+
+/**
+ * The teen account a stored identity is waiting on a guardian for, or null. Only the
+ * identity-keyed status endpoint answers for such a teen; the finish step shows the guardian
+ * invitation for it instead of the birthdate question.
+ */
+export async function fetchNativeAwaitingGuardianAccount(
+  accessToken: string
+): Promise<string | null> {
+  try {
+    const status = await fetchMobileFederatedSignupStatus(accessToken)
+    return status.status === 'awaiting_guardian' ? (status.accountId ?? null) : null
+  } catch {
+    return null
+  }
 }
 
 /** The Google identity waiting on the finish step, or null when there is none. */

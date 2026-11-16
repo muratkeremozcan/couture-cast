@@ -7475,7 +7475,7 @@ export interface FederatedSignupInput {
   birthdate: string
 }
 /**
- * needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session.
+ * needs_birthdate: the verified address matches no account, or one account without a profile, so the finish step applies. complete: one account with a profile matches and the client re-verifies the session. awaiting_guardian: the account is a teen account every signed-in endpoint refuses until a guardian approves; accountId names it for the guardian invitation.
  * @export
  * @interface FederatedSignupStatusResponse
  */
@@ -7486,6 +7486,12 @@ export interface FederatedSignupStatusResponse {
    * @memberof FederatedSignupStatusResponse
    */
   status: FederatedSignupStatusResponseStatusEnum
+  /**
+   *
+   * @type {string}
+   * @memberof FederatedSignupStatusResponse
+   */
+  accountId?: string
 }
 
 /**
@@ -7494,6 +7500,7 @@ export interface FederatedSignupStatusResponse {
 export const FederatedSignupStatusResponseStatusEnum = {
   needs_birthdate: 'needs_birthdate',
   complete: 'complete',
+  awaiting_guardian: 'awaiting_guardian',
 } as const
 export type FederatedSignupStatusResponseStatusEnum =
   (typeof FederatedSignupStatusResponseStatusEnum)[keyof typeof FederatedSignupStatusResponseStatusEnum]

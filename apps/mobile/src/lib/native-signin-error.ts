@@ -4,7 +4,12 @@
  * code was wrong or expired, and `unavailable` is a transient failure worth retrying.
  * Kept free of SDK imports so the screen and its tests can use it directly.
  */
-export type NativeSignInFailure = 'denied' | 'code_invalid' | 'unavailable'
+export type NativeSignInFailure =
+  | 'denied'
+  | 'code_invalid'
+  | 'unavailable'
+  // A teen the guardian lock refuses until a guardian approves or re-approves.
+  | 'awaiting_guardian'
 export class NativeSignInError extends Error {
   constructor(
     readonly reason: NativeSignInFailure,

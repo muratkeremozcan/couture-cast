@@ -312,13 +312,53 @@ function skipReasonFor(env) {
 }
 
 /**
- * The tests the real-session specs hold: one in `community-real-session.spec.ts`,
- * five in `community-real-session-identity.spec.ts`, two in
- * `guest-preview-real-session.spec.ts` (Story 6.16) and nine in
- * `google-sign-in-real-session.spec.ts` (Story 6.17). A full run must report exactly
- * this many, none skipped.
+ * The tag on the guardian-consent cases, which run only in a lane started with
+ * GUARDIAN_CONSENT_POLICY=required_13_15. The default lane runs everything else.
  */
-export const EXPECTED_REAL_SESSION_TESTS = 17
+export const CONSENT_REQUIRED_TAG = '@consent-required'
+
+/**
+ * The guardian consent policy this lane's API runs under (apps/api guardian-consent-policy.ts);
+ * the API itself refuses an unknown value at boot.
+ *
+ * @param {Readonly<Record<string, string | undefined>>} [env]
+ * @returns {'off' | 'required_13_15'}
+ */
+export function realSessionConsentPolicy(env = process.env) {
+  return env.GUARDIAN_CONSENT_POLICY?.trim() === 'required_13_15'
+    ? 'required_13_15'
+    : 'off'
+}
+
+/**
+ * The tests a default (policy off) run holds: one in `community-real-session.spec.ts`,
+ * five in `community-real-session-identity.spec.ts`, two in
+ * `guest-preview-real-session.spec.ts` (Story 6.16) and eleven untagged ones in
+ * `google-sign-in-real-session.spec.ts` (Story 6.17, three of them the policy-off teen
+ * cases). A full run must report exactly this many, none skipped.
+ */
+export const EXPECTED_REAL_SESSION_TESTS = 19
+
+/** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
+export const EXPECTED_CONSENT_REQUIRED_TESTS = 5
+
+/** @param {'off' | 'required_13_15'} policy */
+export function expectedRealSessionTests(policy) {
+  return policy === 'required_13_15'
+    ? EXPECTED_CONSENT_REQUIRED_TESTS
+    : EXPECTED_REAL_SESSION_TESTS
+}
+
+/**
+ * The Playwright `grepInvert` that keeps a run to its policy's tests: under `off` it drops the
+ * tagged cases, under `required_13_15` everything untagged. A `--grep` on the command line still
+ * narrows either set.
+ *
+ * @param {'off' | 'required_13_15'} policy
+ */
+export function consentGrepInvert(policy) {
+  return policy === 'required_13_15' ? /^(?!.*@consent-required)/ : /@consent-required/
+}
 
 /**
  * Whether a JUnit report shows a complete passing run: `expected` tests (any count

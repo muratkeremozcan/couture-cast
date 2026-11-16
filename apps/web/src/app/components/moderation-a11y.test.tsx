@@ -38,31 +38,26 @@ const items = [
 ]
 
 describe('C-WEB-Q-A11Y: the queue', () => {
-  it('has no axe violation in the ready, empty, filtered-empty, error and forbidden states', async () => {
-    mockApi(queueHandler(() => json(page(items, 'c1'))))
-    const ready = render(<ModerationQueueView />)
-    await screen.findByRole('list', { name: 'Cases' })
-    expect(await violations(ready.container)).toEqual([])
-    ready.unmount()
-
-    mockApi(queueHandler(() => json(page([]))))
-    const empty = render(<ModerationQueueView />)
-    await screen.findByText('No open cases.')
-    expect(await violations(empty.container)).toEqual([])
-    empty.unmount()
-
-    mockApi(queueHandler(() => json({ statusCode: 500 }, 500)))
-    const failed = render(<ModerationQueueView />)
-    await screen.findByRole('alert')
-    expect(await violations(failed.container)).toEqual([])
-    failed.unmount()
-
-    mockApi(
-      queueHandler(() => json({ statusCode: 403, message: 'Insufficient role' }, 403))
-    )
-    const forbidden = render(<ModerationQueueView />)
-    await screen.findByRole('alert')
-    expect(await violations(forbidden.container)).toEqual([])
+  // TEA sign-off L-3a: one axe pass per state, each its own case, so a loaded host stays inside
+  // the 5 s budget.
+  it.each([
+    [
+      'ready',
+      () => json(page(items, 'c1')),
+      () => screen.findByRole('list', { name: 'Cases' }),
+    ],
+    ['empty', () => json(page([])), () => screen.findByText('No open cases.')],
+    ['error', () => json({ statusCode: 500 }, 500), () => screen.findByRole('alert')],
+    [
+      'forbidden',
+      () => json({ statusCode: 403, message: 'Insufficient role' }, 403),
+      () => screen.findByRole('alert'),
+    ],
+  ] as const)('has no axe violation in the %s state', async (_state, answer, shown) => {
+    mockApi(queueHandler(answer))
+    const view = render(<ModerationQueueView />)
+    await shown()
+    expect(await violations(view.container)).toEqual([])
   })
 
   it('has one h1, then one h2 per case, and names every list and control', async () => {
@@ -131,21 +126,19 @@ describe('C-WEB-Q-A11Y: the case view', () => {
     return view
   }
 
-  it('has no axe violation in the loaded, error and forbidden states', async () => {
+  it('has no axe violation in the loaded state', async () => {
     const loaded = await openDetail()
     expect(await violations(loaded.container)).toEqual([])
-    loaded.unmount()
+  })
 
-    mockApi(detailHandler(() => json(errorBody(503, 'audit_unavailable'), 503)))
-    const failed = render(<ModerationCaseDetailView caseId="post.p1" />)
+  it.each([
+    ['error', () => json(errorBody(503, 'audit_unavailable'), 503)],
+    ['forbidden', () => json({ statusCode: 403 }, 403)],
+  ] as const)('has no axe violation in the %s state', async (_state, answer) => {
+    mockApi(detailHandler(answer))
+    const view = render(<ModerationCaseDetailView caseId="post.p1" />)
     await screen.findByRole('alert')
-    expect(await violations(failed.container)).toEqual([])
-    failed.unmount()
-
-    mockApi(detailHandler(() => json({ statusCode: 403 }, 403)))
-    const forbidden = render(<ModerationCaseDetailView caseId="post.p1" />)
-    await screen.findByRole('alert')
-    expect(await violations(forbidden.container)).toEqual([])
+    expect(await violations(view.container)).toEqual([])
   })
 
   it.each([

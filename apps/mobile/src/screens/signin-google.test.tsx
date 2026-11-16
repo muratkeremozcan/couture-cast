@@ -130,6 +130,42 @@ describe('Google on the mobile sign-in door', () => {
     expect(route.router.back).not.toHaveBeenCalled()
   })
 
+  // Owner's production loop (2026-11-15): a teen waiting on a guardian goes to the guardian
+  // invitation on the finish step, through Google and through an email code alike.
+  it('a teen waiting on a guardian goes to the finish step from Google', async () => {
+    await seed(false)
+    auth.google.mockResolvedValue({ kind: 'awaiting_guardian' })
+    await continueWithGoogle()
+    await waitFor(() =>
+      expect(route.router.replace).toHaveBeenCalledWith('/signup-finish')
+    )
+    expect(route.router.back).not.toHaveBeenCalled()
+  })
+
+  it('a teen waiting on a guardian goes to the finish step from an email code', async () => {
+    await seed(false)
+    const { NativeSignInError } = await import('../lib/native-signin-error.js')
+    auth.verify.mockRejectedValue(
+      new NativeSignInError(
+        'awaiting_guardian',
+        'A guardian has to approve this account.'
+      )
+    )
+    await render(<SignInScreen />)
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'teen@synthetic.test' },
+    })
+    // One submit button: it sends the code, then verifies it.
+    const submit = screen.getByText('Send sign-in code').closest('[role="button"]')!
+    fireEvent.click(submit)
+    const code = await screen.findByTestId('signin-code-input')
+    fireEvent.change(code, { target: { value: '123456' } })
+    fireEvent.click(submit)
+    await waitFor(() =>
+      expect(route.router.replace).toHaveBeenCalledWith('/signup-finish')
+    )
+  })
+
   it('L-G-NEW: no account goes to the finish step carrying from=preview', async () => {
     route.params = { from: 'preview' }
     await seed(true)

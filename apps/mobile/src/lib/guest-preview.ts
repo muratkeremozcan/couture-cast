@@ -126,24 +126,22 @@ export function isConsentRejection(error: unknown): boolean {
 }
 
 /**
- * D8: the real next step. A teen whose guardian has not granted consent goes to the teen
- * dashboard, where the existing guardian flow continues; everyone else to onboarding.
+ * D8: the real next step, wardrobe onboarding for every member whose profile loads. A teen the
+ * guardian lock refuses never gets here (the profile answers 403), and with guardian consent off
+ * (2026-11-16) a teen without a guardian is a member like any other.
  */
-export type MobileNextStep = '/signin' | '/teen-dashboard' | '/wardrobe-onboarding'
+export type MobileNextStep = '/signin' | '/wardrobe-onboarding'
 
 export async function resolveMobileNextStep(): Promise<MobileNextStep> {
   try {
     const token = await resolveMobileAccessToken()
     if (!token) return '/signin'
-    const profile = userProfileResponseSchema.parse(
+    userProfileResponseSchema.parse(
       await withRequestDeadline(REQUEST_DEADLINE_MS, [], (signal) =>
         createMobileApiClient({ accessToken: token }).apiV1UserProfileGet({ signal })
       )
     )
-    const consented = profile.linkedGuardians.some((link) => link.status === 'granted')
-    return profile.user.role === 'teen' && !consented
-      ? '/teen-dashboard'
-      : '/wardrobe-onboarding'
+    return '/wardrobe-onboarding'
   } catch {
     return '/wardrobe-onboarding'
   }

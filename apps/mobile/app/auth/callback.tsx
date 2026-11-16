@@ -44,7 +44,8 @@ export default function OAuthCallbackRoute() {
           )
           return
         }
-        if (outcome.kind === 'no_account') {
+        // The finish step asks the status itself: the birthdate, or the guardian invitation.
+        if (outcome.kind === 'no_account' || outcome.kind === 'awaiting_guardian') {
           router.replace(
             finishStepHref(fromPreview ? 'preview' : null, door, '/signup-finish') as Href
           )

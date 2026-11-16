@@ -1,10 +1,8 @@
 // Story 6.5 owner: dedicated Fluid Compute HTTP-server export; REST retains 25 seconds.
 import 'reflect-metadata'
 import { NestFactory } from '@nestjs/core'
-import { Module } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
-import { AuthStateModule } from '../src/modules/auth/auth-state.module.js'
-import { CommunityModule } from '../src/modules/community/community.module.js'
+import { CommunityRealtimeModule } from '../src/realtime/community-realtime.module.js'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { CommunityAccessService } from '../src/modules/community/community-access.service.js'
 import { CommunityStreamRepository } from '../src/modules/community/community-stream.repository.js'
@@ -14,8 +12,6 @@ import {
   type CommunityRealtimeDependencies,
 } from '../src/realtime/community-realtime.server.js'
 
-@Module({ imports: [AuthStateModule, CommunityModule] })
-class CommunityRealtimeModule {}
 let dependencies: Promise<CommunityRealtimeDependencies> | undefined
 const runtime = createCommunityRealtimeServer(() => {
   dependencies ??= NestFactory.createApplicationContext(CommunityRealtimeModule, {

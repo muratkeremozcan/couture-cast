@@ -73,16 +73,27 @@ test.describe('Story 6.17 legal pages', () => {
       await expect(analytics).not.toContainText('pseudonymous')
     })
 
-    test('the Privacy Policy states the whole 13 to 15 lock and what OpenWeather receives', async ({
+    test('the Privacy Policy states that guardian consent ended and what OpenWeather receives', async ({
       page,
     }) => {
       await page.goto('/privacy')
-      // JwtAuthGuard refuses a pending teen on every signed-in endpoint, not only wardrobe.
+      // GUARDIAN_CONSENT_POLICY is off (2026-11-16): no page may still promise a guardian lock.
       await expect(
-        page.getByRole('region', { name: 'Guardian consent for ages 13 to 15' })
-      ).toContainText(
-        'the teen account can invite a guardian and nothing more: wardrobe, community, saved places, and every other signed-in feature stay locked.'
+        page.getByRole('region', { name: 'Who can use CoutureCast' })
+      ).toHaveText(
+        /CoutureCast is for people aged 13 and older\. Every signup, with email or with Google, asks for a birthdate\. Nobody under 13 can create an account\.$/
       )
+      await expect(
+        page.getByRole('region', { name: 'Earlier guardian consent records' })
+      ).toContainText(
+        "Until 16 November 2026, accounts for ages 13 to 15 needed a guardian's approval. CoutureCast no longer asks for it, and those accounts now work like any other."
+      )
+      for (const path of ['/privacy', '/terms']) {
+        await page.goto(path)
+        await expect(page.locator('main')).not.toContainText('until a guardian approves')
+        await expect(page.locator('main')).not.toContainText('stay locked')
+      }
+      await page.goto('/privacy')
       await expect(
         page.getByRole('region', { name: 'Who processes your information' })
       ).toContainText(

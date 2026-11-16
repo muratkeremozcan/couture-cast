@@ -101,7 +101,7 @@ export const trTR: GuestPreviewStrings = {
     previewOnlyBody:
       'Örnek parçalar, kombinler, beğeniler, koleksiyon filtresi ve değişiklikler.',
     stillRequired: 'Yine de gerekli',
-    stillRequiredBody: 'Hesap kurulumu, doğrulanmış giriş ve gerektiğinde veli onayı.',
+    stillRequiredBody: 'Hesap kurulumu ve doğrulanmış giriş.',
     backToPreview: 'Önizlemeye dönün',
     signInToContinue: 'Devam etmek için giriş yapın',
   },
@@ -114,8 +114,7 @@ export const trTR: GuestPreviewStrings = {
     saving: 'Kaydediliyor…',
     saved: 'Konfor tercihleriniz kaydedildi.',
     kept: 'Hesap tercihleriniz değişmedi.',
-    rejected:
-      'Hesabınız henüz tercihleri kaydedemez. Önce veli onayı veya yaş kontrolü gerekiyor.',
+    rejected: 'Hesabınız henüz tercihleri kaydedemez. Önce yaş kontrolü gerekiyor.',
     failed: 'Tercihleriniz kaydedilemedi. Seçiminiz korunuyor, tekrar deneyebilirsiniz.',
     loadFailed: 'Hesap tercihleriniz yüklenemedi.',
     continue: 'Devam edin',

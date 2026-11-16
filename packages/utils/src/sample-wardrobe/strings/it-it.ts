@@ -102,8 +102,7 @@ export const itIT: GuestPreviewStrings = {
     previewOnlyBody:
       'Capi di esempio, outfit, Mi piace, filtro della collezione e cambi.',
     stillRequired: 'Ancora necessario',
-    stillRequiredBody:
-      "Configurazione dell'account, accesso verificato e, se previsto, l'approvazione di un genitore o tutore.",
+    stillRequiredBody: "Configurazione dell'account e accesso verificato.",
     backToPreview: "Torna all'anteprima",
     signInToContinue: 'Accedi per continuare',
   },
@@ -117,7 +116,7 @@ export const itIT: GuestPreviewStrings = {
     saved: 'Le tue preferenze di comfort sono salvate.',
     kept: 'Le preferenze del tuo account non sono cambiate.',
     rejected:
-      'Il tuo account non può ancora salvare le preferenze. Prima serve l’approvazione di un genitore o una verifica dell’età.',
+      'Il tuo account non può ancora salvare le preferenze. Prima serve una verifica dell’età.',
     failed:
       'Non è stato possibile salvare le tue preferenze. La tua scelta resta, così puoi riprovare.',
     loadFailed: 'Non è stato possibile caricare le preferenze del tuo account.',

@@ -50,6 +50,7 @@ const createService = (findFirst = vi.fn(), create = vi.fn()) => {
 describe('AuthService', () => {
   afterEach(() => {
     resetCleanupRegistry()
+    vi.unstubAllEnvs()
   })
 
   it('blocks signup when the birthdate is younger than thirteen', async () => {
@@ -123,7 +124,8 @@ describe('AuthService', () => {
     })
   })
 
-  it('creates pending consent accounts for users aged thirteen through fifteen', async () => {
+  it('under policy required_13_15 creates pending consent accounts for users aged thirteen through fifteen', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
     const { service, create, captureEvent } = createService(
       vi.fn().mockResolvedValue(null),
       vi.fn().mockResolvedValue({ id: 'user-guardian' })
@@ -169,6 +171,55 @@ describe('AuthService', () => {
       userId: 'user-guardian',
       age: 15,
       guardianConsentRequired: true,
+    })
+  })
+
+  it('under policy off (the default) creates active accounts for users aged thirteen through fifteen', async () => {
+    const { service, create, captureEvent } = createService(
+      vi.fn().mockResolvedValue(null),
+      vi.fn().mockResolvedValue({ id: 'user-guardian' })
+    )
+
+    await expect(
+      service.signUp(
+        {
+          email: 'teen@example.com',
+          birthdate: '2011-04-15',
+        },
+        { today: FIXED_TODAY }
+      )
+    ).resolves.toEqual({
+      userId: 'user-guardian',
+      age: 15,
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+    })
+
+    expect(create).toHaveBeenCalledWith({
+      data: {
+        email: 'teen@example.com',
+        profile: {
+          create: {
+            birthdate: new Date('2011-04-15T12:00:00.000Z'),
+            preferences: {
+              compliance: {
+                accountStatus: 'active',
+                guardianConsentRequired: false,
+              },
+            },
+          },
+        },
+        comfort_profile: {
+          create: {},
+        },
+      },
+      select: { id: true },
+    })
+
+    expect(captureEvent).toHaveBeenCalledWith('user-guardian', 'profile_completed', {
+      userId: 'user-guardian',
+      age: 15,
+      guardianConsentRequired: false,
     })
   })
 

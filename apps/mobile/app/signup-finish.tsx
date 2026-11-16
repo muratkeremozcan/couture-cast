@@ -35,6 +35,12 @@ export default function SignupFinishRoute() {
           return
         }
         if (exit === 'home') void clearing.current.then(() => router.replace('/'))
+        else if (exit === 'until_approved')
+          // Every signed-in request refuses the teen until a guardian approves.
+          void import('../src/lib/native-session.js')
+            .then((session) => session.signOutNativeSession())
+            .catch(() => undefined)
+            .then(() => router.replace('/'))
         else router.replace(doorHref)
       }}
     />

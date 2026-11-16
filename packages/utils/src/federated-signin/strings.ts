@@ -20,6 +20,11 @@ export type FederatedSignInStrings = {
   cancel: string
   cancelling: string
   createdGuardianPending: string
+  awaitingGuardian: string
+  /** The guardian step's heading: the account exists, it waits on a guardian. */
+  guardianStepTitle: string
+  /** The guardian step's button, which ends the session. */
+  guardianStepLeave: string
   continue: string
   underage: string
   invalidBirthdate: string
@@ -40,6 +45,14 @@ export type FederatedSignInStrings = {
   inviteSent: string
   invalidGuardianEmail: string
   inviteFailed: string
+  /** The email signup page: eyebrow, heading and intro above the form. */
+  signupEyebrow: string
+  signupHeading: string
+  signupIntro: string
+  backHome: string
+  email: string
+  /** After an email signup: the account exists, sign in to use it. */
+  signupCreated: string
 }
 
 export const FEDERATED_SIGNIN_STRINGS: Readonly<
@@ -66,7 +79,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancel',
     cancelling: 'Cancelling…',
     createdGuardianPending:
-      'Account created. A guardian needs to approve your account before wardrobe features turn on.',
+      'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.',
+    awaitingGuardian:
+      'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
+    guardianStepTitle: 'Waiting for your guardian',
+    guardianStepLeave: 'Sign out',
     continue: 'Continue',
     underage: 'You must be 13 or older to use CoutureCast.',
     invalidBirthdate: 'Enter your birthdate as a full date.',
@@ -90,6 +107,13 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Guardian invitation sent to {email}. Share the link below if they do not see the email.',
     invalidGuardianEmail: 'Enter a valid guardian email address.',
     inviteFailed: 'The guardian invitation could not be sent. Try again.',
+    signupEyebrow: 'COPPA-ready signup',
+    signupHeading: 'Start with age verification before wardrobe access unlocks.',
+    signupIntro:
+      'CoutureCast asks for your birthdate and does not create accounts for children under 13.',
+    backHome: 'Back home',
+    email: 'Email',
+    signupCreated: 'Account created. Sign in with your email to continue.',
   },
   'en-CA': {
     continueWithGoogle: 'Continue with Google',
@@ -112,7 +136,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancel',
     cancelling: 'Cancelling…',
     createdGuardianPending:
-      'Account created. A guardian needs to approve your account before wardrobe features turn on.',
+      'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.',
+    awaitingGuardian:
+      'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
+    guardianStepTitle: 'Waiting for your guardian',
+    guardianStepLeave: 'Sign out',
     continue: 'Continue',
     underage: 'You must be 13 or older to use CoutureCast.',
     invalidBirthdate: 'Enter your birthdate as a full date.',
@@ -136,6 +164,13 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Guardian invitation sent to {email}. Share the link below if they do not see the email.',
     invalidGuardianEmail: 'Enter a valid guardian email address.',
     inviteFailed: 'The guardian invitation could not be sent. Try again.',
+    signupEyebrow: 'COPPA-ready signup',
+    signupHeading: 'Start with age verification before wardrobe access unlocks.',
+    signupIntro:
+      'CoutureCast asks for your birthdate and does not create accounts for children under 13.',
+    backHome: 'Back home',
+    email: 'Email',
+    signupCreated: 'Account created. Sign in with your email to continue.',
   },
   'es-419': {
     continueWithGoogle: 'Continuar con Google',
@@ -159,7 +194,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancelar',
     cancelling: 'Cancelando…',
     createdGuardianPending:
-      'Cuenta creada. Un tutor debe aprobar tu cuenta antes de que se activen las funciones del guardarropa.',
+      'Cuenta creada. Un tutor debe aprobar tu cuenta antes de que se activen las funciones del guardarropa. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
+    awaitingGuardian:
+      'Tu cuenta está esperando la aprobación de un tutor. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
+    guardianStepTitle: 'Esperando a tu tutor',
+    guardianStepLeave: 'Cerrar sesión',
     continue: 'Continuar',
     underage: 'Debes tener 13 años o más para usar CoutureCast.',
     invalidBirthdate: 'Escribe tu fecha de nacimiento completa.',
@@ -185,6 +224,15 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Invitación enviada a {email}. Comparte el enlace de abajo si no ve el correo.',
     invalidGuardianEmail: 'Escribe un correo válido para el tutor.',
     inviteFailed: 'No se pudo enviar la invitación al tutor. Vuelve a intentarlo.',
+    signupEyebrow: 'Registro compatible con COPPA',
+    signupHeading:
+      'Comienza con la verificación de edad antes de desbloquear el acceso al armario.',
+    signupIntro:
+      'CoutureCast te pide tu fecha de nacimiento y no crea cuentas para menores de 13 años.',
+    backHome: 'Volver al inicio',
+    email: 'Correo electrónico',
+    signupCreated:
+      'Cuenta creada. Inicia sesión con tu correo electrónico para continuar.',
   },
   'fr-CA': {
     continueWithGoogle: 'Continuer avec Google',
@@ -208,7 +256,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Annuler',
     cancelling: 'Annulation…',
     createdGuardianPending:
-      "Compte créé. Un parent ou tuteur doit approuver votre compte avant que les fonctions de garde-robe s'activent.",
+      "Compte créé. Un parent ou tuteur doit approuver votre compte avant que les fonctions de garde-robe s'activent. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+    awaitingGuardian:
+      "Votre compte attend l'approbation d'un parent ou tuteur. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+    guardianStepTitle: 'En attente de votre parent ou tuteur',
+    guardianStepLeave: 'Se déconnecter',
     continue: 'Continuer',
     underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
     invalidBirthdate: 'Entrez votre date de naissance complète.',
@@ -234,6 +286,15 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       "Invitation envoyée à {email}. Partagez le lien ci-dessous s'il ne voit pas le courriel.",
     invalidGuardianEmail: 'Entrez une adresse courriel valide pour le tuteur.',
     inviteFailed: "L'invitation au tuteur n'a pas pu être envoyée. Réessayez.",
+    signupEyebrow: 'Inscription conforme à la COPPA',
+    signupHeading:
+      "Commencez par la vérification de l'âge avant d'accéder à la garde-robe.",
+    signupIntro:
+      'CoutureCast demande votre date de naissance et ne crée pas de compte pour les enfants de moins de 13 ans.',
+    backHome: "Retour à l'accueil",
+    email: 'Adresse courriel',
+    signupCreated:
+      'Compte créé. Connectez-vous avec votre adresse courriel pour continuer.',
   },
   'fr-FR': {
     continueWithGoogle: 'Continuer avec Google',
@@ -257,7 +318,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Annuler',
     cancelling: 'Annulation…',
     createdGuardianPending:
-      "Compte créé. Un parent ou tuteur doit approuver votre compte avant l'activation des fonctions de garde-robe.",
+      "Compte créé. Un parent ou tuteur doit approuver votre compte avant l'activation des fonctions de garde-robe. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+    awaitingGuardian:
+      "Votre compte attend l'approbation d'un parent ou tuteur. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois votre compte approuvé.",
+    guardianStepTitle: 'En attente de votre parent ou tuteur',
+    guardianStepLeave: 'Se déconnecter',
     continue: 'Continuer',
     underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
     invalidBirthdate: 'Saisissez votre date de naissance complète.',
@@ -282,6 +347,15 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       "Invitation envoyée à {email}. Partagez le lien ci-dessous s'il ne voit pas l'e-mail.",
     invalidGuardianEmail: 'Saisissez une adresse e-mail valide pour le tuteur.',
     inviteFailed: "L'invitation au tuteur n'a pas pu être envoyée. Réessayez.",
+    signupEyebrow: 'Inscription conforme à la COPPA',
+    signupHeading:
+      "Commencez par la vérification de l'âge avant d'accéder à la garde-robe.",
+    signupIntro:
+      'CoutureCast demande votre date de naissance et ne crée pas de compte pour les enfants de moins de 13 ans.',
+    backHome: "Retour à l'accueil",
+    email: 'Adresse e-mail',
+    signupCreated:
+      'Compte créé. Connectez-vous avec votre adresse e-mail pour continuer.',
   },
   'tr-TR': {
     continueWithGoogle: 'Google ile devam et',
@@ -305,7 +379,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'İptal',
     cancelling: 'İptal ediliyor…',
     createdGuardianPending:
-      'Hesap oluşturuldu. Gardırop özellikleri açılmadan önce bir velinin hesabınızı onaylaması gerekir.',
+      'Hesap oluşturuldu. Gardırop özellikleri açılmadan önce bir velinin hesabınızı onaylaması gerekir. Aşağıdaki daveti gönderin, veliniz onayladığında tekrar giriş yapın.',
+    awaitingGuardian:
+      'Hesabınız bir velinin onayını bekliyor. Aşağıdaki daveti gönderin, veliniz onayladığında tekrar giriş yapın.',
+    guardianStepTitle: 'Velinizin onayı bekleniyor',
+    guardianStepLeave: 'Çıkış yap',
     continue: 'Devam',
     underage: "CoutureCast'i kullanmak için en az 13 yaşında olmalısınız.",
     invalidBirthdate: 'Doğum tarihinizi tam tarih olarak girin.',
@@ -328,6 +406,13 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Davet {email} adresine gönderildi. E-postayı görmezse aşağıdaki bağlantıyı paylaşın.',
     invalidGuardianEmail: 'Geçerli bir veli e-posta adresi girin.',
     inviteFailed: 'Veli daveti gönderilemedi. Tekrar deneyin.',
+    signupEyebrow: 'COPPA uyumlu kayıt',
+    signupHeading: 'Gardırop erişimi açılmadan önce yaş doğrulamasıyla başlayın.',
+    signupIntro:
+      'CoutureCast doğum tarihinizi sorar ve 13 yaşından küçük çocuklar için hesap oluşturmaz.',
+    backHome: 'Ana sayfaya dön',
+    email: 'E-posta adresi',
+    signupCreated: 'Hesap oluşturuldu. Devam etmek için e-posta adresinizle giriş yapın.',
   },
   'de-DE': {
     continueWithGoogle: 'Weiter mit Google',
@@ -351,7 +436,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Abbrechen',
     cancelling: 'Wird abgebrochen…',
     createdGuardianPending:
-      'Konto erstellt. Eine erziehungsberechtigte Person muss dein Konto genehmigen, bevor die Kleiderschrank-Funktionen aktiv werden.',
+      'Konto erstellt. Eine erziehungsberechtigte Person muss dein Konto genehmigen, bevor die Kleiderschrank-Funktionen aktiv werden. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
+    awaitingGuardian:
+      'Dein Konto wartet auf die Zustimmung eines Erziehungsberechtigten. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
+    guardianStepTitle: 'Warten auf deine erziehungsberechtigte Person',
+    guardianStepLeave: 'Abmelden',
     continue: 'Weiter',
     underage: 'Du musst mindestens 13 Jahre alt sein, um CoutureCast zu nutzen.',
     invalidBirthdate: 'Gib dein vollständiges Geburtsdatum ein.',
@@ -378,6 +467,15 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     invalidGuardianEmail:
       'Gib eine gültige E-Mail-Adresse der erziehungsberechtigten Person ein.',
     inviteFailed: 'Die Einladung konnte nicht gesendet werden. Versuche es erneut.',
+    signupEyebrow: 'COPPA-konforme Registrierung',
+    signupHeading:
+      'Starte mit der Altersprüfung, bevor dein Kleiderschrank freigeschaltet wird.',
+    signupIntro:
+      'CoutureCast fragt nach deinem Geburtsdatum und erstellt keine Konten für Kinder unter 13 Jahren.',
+    backHome: 'Zur Startseite',
+    email: 'E-Mail-Adresse',
+    signupCreated:
+      'Konto erstellt. Melde dich mit deiner E-Mail-Adresse an, um fortzufahren.',
   },
   'it-IT': {
     continueWithGoogle: 'Continua con Google',
@@ -401,7 +499,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Annulla',
     cancelling: 'Annullamento…',
     createdGuardianPending:
-      'Account creato. Un genitore o tutore deve approvare il tuo account prima che le funzioni del guardaroba si attivino.',
+      "Account creato. Un genitore o tutore deve approvare il tuo account prima che le funzioni del guardaroba si attivino. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
+    awaitingGuardian:
+      "Il tuo account è in attesa dell'approvazione di un genitore o tutore. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
+    guardianStepTitle: 'In attesa del tuo genitore o tutore',
+    guardianStepLeave: 'Esci',
     continue: 'Continua',
     underage: 'Devi avere almeno 13 anni per usare CoutureCast.',
     invalidBirthdate: 'Inserisci la tua data di nascita completa.',
@@ -426,6 +528,14 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       "Invito inviato a {email}. Condividi il link qui sotto se non vede l'email.",
     invalidGuardianEmail: 'Inserisci un indirizzo email valido per il tutore.',
     inviteFailed: "Non è stato possibile inviare l'invito al tutore. Riprova.",
+    signupEyebrow: 'Registrazione conforme al COPPA',
+    signupHeading:
+      "Inizia con la verifica dell'età prima di sbloccare l'accesso al guardaroba.",
+    signupIntro:
+      'CoutureCast chiede la tua data di nascita e non crea account per bambini sotto i 13 anni.',
+    backHome: 'Torna alla home',
+    email: 'Indirizzo email',
+    signupCreated: 'Account creato. Accedi con il tuo indirizzo email per continuare.',
   },
   'pt-BR': {
     continueWithGoogle: 'Continuar com o Google',
@@ -449,7 +559,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancelar',
     cancelling: 'Cancelando…',
     createdGuardianPending:
-      'Conta criada. Um responsável precisa aprovar sua conta antes que os recursos do guarda-roupa sejam ativados.',
+      'Conta criada. Um responsável precisa aprovar sua conta antes que os recursos do guarda-roupa sejam ativados. Envie o convite abaixo e entre de novo quando ele aprovar.',
+    awaitingGuardian:
+      'Sua conta está aguardando a aprovação de um responsável. Envie o convite abaixo e entre de novo quando ele aprovar.',
+    guardianStepTitle: 'Aguardando seu responsável',
+    guardianStepLeave: 'Sair',
     continue: 'Continuar',
     underage: 'Você precisa ter 13 anos ou mais para usar o CoutureCast.',
     invalidBirthdate: 'Digite sua data de nascimento completa.',
@@ -474,6 +588,14 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Convite enviado para {email}. Compartilhe o link abaixo se a pessoa não vir o e-mail.',
     invalidGuardianEmail: 'Digite um e-mail válido para o responsável.',
     inviteFailed: 'Não foi possível enviar o convite ao responsável. Tente de novo.',
+    signupEyebrow: 'Cadastro em conformidade com a COPPA',
+    signupHeading:
+      'Comece pela verificação de idade antes de liberar o acesso ao guarda-roupa.',
+    signupIntro:
+      'O CoutureCast pede sua data de nascimento e não cria contas para crianças menores de 13 anos.',
+    backHome: 'Voltar ao início',
+    email: 'Endereço de e-mail',
+    signupCreated: 'Conta criada. Entre com seu e-mail para continuar.',
   },
   'pt-PT': {
     continueWithGoogle: 'Continuar com o Google',
@@ -497,7 +619,11 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancelar',
     cancelling: 'A cancelar…',
     createdGuardianPending:
-      'Conta criada. Um encarregado de educação tem de aprovar a sua conta antes de as funcionalidades do guarda-roupa ficarem ativas.',
+      'Conta criada. Um encarregado de educação tem de aprovar a sua conta antes de as funcionalidades do guarda-roupa ficarem ativas. Envie o convite abaixo e volte a iniciar sessão quando ele aprovar.',
+    awaitingGuardian:
+      'A sua conta está a aguardar a aprovação de um encarregado de educação. Envie o convite abaixo e volte a iniciar sessão quando ele aprovar.',
+    guardianStepTitle: 'A aguardar o seu encarregado de educação',
+    guardianStepLeave: 'Terminar sessão',
     continue: 'Continuar',
     underage: 'Tem de ter 13 anos ou mais para usar o CoutureCast.',
     invalidBirthdate: 'Introduza a sua data de nascimento completa.',
@@ -524,6 +650,14 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
       'Convite enviado para {email}. Partilhe a ligação abaixo se não vir o email.',
     invalidGuardianEmail: 'Introduza um email válido do encarregado de educação.',
     inviteFailed: 'Não foi possível enviar o convite. Tente novamente.',
+    signupEyebrow: 'Registo em conformidade com a COPPA',
+    signupHeading:
+      'Comece pela verificação da idade antes de desbloquear o acesso ao guarda-roupa.',
+    signupIntro:
+      'O CoutureCast pede a sua data de nascimento e não cria contas para crianças com menos de 13 anos.',
+    backHome: 'Voltar ao início',
+    email: 'Endereço de e-mail',
+    signupCreated: 'Conta criada. Inicie sessão com o seu e-mail para continuar.',
   },
 }
 

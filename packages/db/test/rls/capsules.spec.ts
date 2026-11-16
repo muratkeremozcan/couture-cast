@@ -13,6 +13,10 @@ import {
 describe.concurrent('guardian-aware RLS policies', () => {
   useRlsDatabase()
 
+  // Guardian consent is off (owner ruling 2026-11-16): the guardian grant cases that stood here
+  // moved to guardian-consent-off.spec.ts, which proves a granted row gives no read or write.
+  // They return with private.has_active_guardian_consent when consent is turned back on.
+
   scenarioTest(
     '4.3-DB-003 lets the capsule owner read and mutate both capsule tables',
     async ({ scenario: seeded }) => {
@@ -71,133 +75,6 @@ describe.concurrent('guardian-aware RLS policies', () => {
             [seeded.capsuleId]
           )
           expect(deletedCapsule.rows).toEqual([{ id: seeded.capsuleId }])
-        }
-      )
-    }
-  )
-
-  scenarioTest(
-    '4.3-DB-003 gives read-only guardians capsule reads without any capsule write',
-    async ({ scenario: seeded }) => {
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-        async (client) => {
-          const capsules = await client.query(
-            'SELECT "id" FROM public."OutfitCapsule" WHERE "user_id" = $1',
-            [seeded.teenId]
-          )
-          expect(capsules.rows).toEqual([{ id: seeded.capsuleId }])
-
-          const joins = await client.query(
-            'SELECT "id" FROM public."OutfitCapsuleGarment" WHERE "capsule_id" = $1',
-            [seeded.capsuleId]
-          )
-          expect(joins.rows).toEqual([{ id: seeded.capsuleGarmentId }])
-
-          // UPDATE and DELETE are filtered to zero visible rows.
-          const blockedUpdate = await client.query(
-            `UPDATE public."OutfitCapsule"
-             SET "name" = $1, "updated_at" = NOW()
-             WHERE "id" = $2
-             RETURNING "id"`,
-            ['Blocked rename', seeded.capsuleId]
-          )
-          expect(blockedUpdate.rows).toHaveLength(0)
-
-          const blockedDelete = await client.query(
-            'DELETE FROM public."OutfitCapsule" WHERE "id" = $1 RETURNING "id"',
-            [seeded.capsuleId]
-          )
-          expect(blockedDelete.rows).toHaveLength(0)
-
-          const blockedJoinUpdate = await client.query(
-            `UPDATE public."OutfitCapsuleGarment"
-             SET "garment_order" = 1
-             WHERE "id" = $1
-             RETURNING "id"`,
-            [seeded.capsuleGarmentId]
-          )
-          expect(blockedJoinUpdate.rows).toHaveLength(0)
-
-          const blockedJoinDelete = await client.query(
-            'DELETE FROM public."OutfitCapsuleGarment" WHERE "id" = $1 RETURNING "id"',
-            [seeded.capsuleGarmentId]
-          )
-          expect(blockedJoinDelete.rows).toHaveLength(0)
-        }
-      )
-
-      // INSERT is refused by the WITH CHECK clause rather than filtered, and a
-      // refused statement aborts its transaction, so it needs its own session.
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianReadOnlyEmail, 'guardian'),
-        async (client) => {
-          await expect(
-            client.query(
-              `INSERT INTO public."OutfitCapsule"
-                ("id", "user_id", "name", "occasions", "updated_at")
-               VALUES ($1, $2, $3, $4::"CapsuleOccasion"[], NOW())`,
-              [
-                `read-only-capsule-${randomUUID()}`,
-                seeded.teenId,
-                'Blocked capsule',
-                ['work'],
-              ]
-            )
-          ).rejects.toMatchObject({ code: '42501' })
-        }
-      )
-    }
-  )
-
-  scenarioTest(
-    '4.3-DB-003 lets full-access guardians mutate linked teen capsules and joins',
-    async ({ scenario: seeded }) => {
-      await withRole(
-        'authenticated',
-        buildClaims(seeded.guardianFullAccessEmail, 'guardian'),
-        async (client) => {
-          const renamed = await client.query(
-            `UPDATE public."OutfitCapsule"
-             SET "name" = $1, "revision" = "revision" + 1, "updated_at" = NOW()
-             WHERE "id" = $2
-             RETURNING "name", "revision"`,
-            ['Guardian renamed capsule', seeded.capsuleId]
-          )
-          expect(renamed.rows).toEqual([
-            { name: 'Guardian renamed capsule', revision: 1 },
-          ])
-
-          const insertedCapsule = await client.query(
-            `INSERT INTO public."OutfitCapsule"
-              ("id", "user_id", "name", "occasions", "updated_at")
-             VALUES ($1, $2, $3, $4::"CapsuleOccasion"[], NOW())
-             RETURNING "id"`,
-            [
-              `guardian-capsule-${randomUUID()}`,
-              seeded.teenId,
-              'Guardian created',
-              ['casual'],
-            ]
-          )
-          expect(insertedCapsule.rows).toHaveLength(1)
-
-          const reorderedJoin = await client.query(
-            `UPDATE public."OutfitCapsuleGarment"
-             SET "garment_order" = 1
-             WHERE "id" = $1
-             RETURNING "garment_order"`,
-            [seeded.capsuleGarmentId]
-          )
-          expect(reorderedJoin.rows).toEqual([{ garment_order: 1 }])
-
-          const deletedJoin = await client.query(
-            'DELETE FROM public."OutfitCapsuleGarment" WHERE "id" = $1 RETURNING "id"',
-            [seeded.capsuleGarmentId]
-          )
-          expect(deletedJoin.rows).toEqual([{ id: seeded.capsuleGarmentId }])
         }
       )
     }

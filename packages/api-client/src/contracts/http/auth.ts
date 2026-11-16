@@ -94,18 +94,26 @@ export const federatedSignupInputSchema = z
   })
   .strict()
 
-export const federatedSignupStatusSchema = z.enum(['needs_birthdate', 'complete'])
+export const federatedSignupStatusSchema = z.enum([
+  'needs_birthdate',
+  'complete',
+  'awaiting_guardian',
+])
 
 export const federatedSignupStatusResponseSchema = z
   .object({
     status: federatedSignupStatusSchema,
+    // Only with awaiting_guardian: the teen account the guardian invitation names.
+    accountId: nonEmptyStringSchema.optional(),
   })
   .strict()
   .openapi({
     description: [
       'needs_birthdate: the verified address matches no account, or one account without a',
       'profile, so the finish step applies. complete: one account with a profile matches and',
-      'the client re-verifies the session.',
+      'the client re-verifies the session. awaiting_guardian: the account is a teen account',
+      'every signed-in endpoint refuses until a guardian approves; accountId names it for the',
+      'guardian invitation.',
     ].join(' '),
   })
 

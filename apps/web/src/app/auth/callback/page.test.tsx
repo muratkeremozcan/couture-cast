@@ -154,6 +154,19 @@ describe('U-CALLBACK-CLEAN: the address bar is clean before the exchange starts'
   })
 })
 
+// A teen waiting on a guardian goes to the finish step, which shows the guardian invitation.
+describe('W-AWAITING-GUARDIAN: the callback sends a waiting teen to the finish step', () => {
+  it.each([
+    ['/auth/callback?code=teen-code&state=s', '/signup/finish'],
+    ['/auth/callback?code=teen-code&door=signup&state=s', '/signup/finish?door=signup'],
+  ])('%s goes to %s', async (url, destination) => {
+    at(url)
+    flow.outcome = { kind: 'awaiting_guardian' }
+    await renderCallback()
+    await waitFor(() => expect(replace).toHaveBeenCalledWith(destination))
+  })
+})
+
 describe('W-FAIL-NO-RAW-ERROR: provider text never reaches the page or the next URL', () => {
   const raw = '<img src=x onerror=alert(1)> Provider free text that must stay unseen'
 

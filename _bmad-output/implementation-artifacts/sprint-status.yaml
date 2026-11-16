@@ -119,4 +119,4 @@ development_status:
   # Guest sample wardrobe and outfit preview; acquisition work, no Community Beta gate.
   6-16-guest-wardrobe-outfit-preview: done
   # Google sign-in on web, iOS and Android; age gate and guardian consent unchanged.
-  6-17-google-sign-in: review
+  6-17-google-sign-in: done

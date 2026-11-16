@@ -412,3 +412,112 @@ must turn the named scenario red.
   real client registration are proved only by H-AUTHORIZE and X-OWNER-RUN.
 - iOS Maestro, VoiceOver and the ASWebAuthenticationSession consent alert run nightly and on
   dispatch; PRs carry unit, component, web, E lane and Android proofs.
+
+## Addendum: pending teen sign-in loop (escaped, 2026-11-15)
+
+Updated: 2026-11-15. A 14-year-old who finished the Google signup returned to sign-in on every
+later Google sign-in in production. The guardian lock answers `GET /api/v1/user/profile` with 403
+for a pending teen, both clients read that 403 as "no account", and the next round trip got
+status `complete` and then a refused sign-out. The plan covered the first teen finish (E-TEEN)
+but never the ordered pair "teen pending, then sign in again". Lifecycle pairs must include every
+return visit for every non-terminal account state, not only the first transition into it.
+
+| ID                     | Scenario                                                            | Exact assertion                                                             |
+| ---------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A-FED-STATUS-PENDING   | Federated status for a guardian-locked teen                         | 200, `status` is `awaiting_guardian`, `accountId` is that teen's id         |
+| A-FED-STATUS-APPROVED  | Status after guardian approval                                      | `status` is `complete`                                                      |
+| A-FED-STATUS-UNCHANGED | Under-13 refusal and no row                                         | Same bodies as before the fix                                               |
+| A-LOCK-HOLDS           | Profile for the pending teen                                        | Still 403; the fix adds no lock bypass                                      |
+| E-TEEN-RESIGN          | Teen finishes, signs out, signs in with Google again                | Lands on the guardian invitation step; never `/signin`; no sign-out request |
+| E-TEEN-RESIGN-OTP      | Same pair through email OTP                                         | Same landing as E-TEEN-RESIGN                                               |
+| E-TEEN-CONTINUE        | Continue on the guardian step                                       | Signs out and shows the "sign in again once approved" text                  |
+| E-TEEN-APPROVED        | Guardian approves, then teen signs in with Google                   | Lands home signed in                                                        |
+| E-TEEN-REVOKED         | Guardian declines or revokes after approval, where the model has it | Route pinned to the state the builder names                                 |
+| U-W/M-AWAITING         | Web and mobile routing of `awaiting_guardian`                       | Both route to the guardian invitation step                                  |
+| M-TEEN-RESIGN          | Android Maestro re-sign-in for a seeded pending teen                | Guardian invitation screen, light and dark                                  |
+
+The repro runs against main first and must fail there before the fix lands.
+
+## Addendum: guardian consent off (owner ruling, 2026-11-16)
+
+Every 13+ account is active at creation; under-13 refusal is unchanged.
+One value switches consent: `GUARDIAN_CONSENT_POLICY` (`packages/utils/src/age.ts` default `off`,
+read by the API through `apps/api/src/modules/auth/guardian-consent-policy.ts`).
+Unset means `off`; an unknown value fails boot; `required_13_15` fails boot outside test
+environments (`NODE_ENV=test` or `TEST_ENV=local`) until B-1 is fixed.
+While `off`, the four guardian consent endpoints answer 409 `guardian_consent_off` before any guard
+or row, and migration `20261116120000_guardian_consent_off` makes waiting and revoked teens active,
+keeping consent and invitation rows.
+Those rows stay for audit and grant nothing while `off`: no capsule access and no guardian mail
+(TEA sign-off F-3), because nobody can revoke them.
+The API, the realtime function and all three worker processes refuse to start on a policy they may
+not run (F-1, F-4).
+
+### Lanes
+
+| Lane    | Policy           | Where                                                                                                                                |
+| ------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Default | `off`            | API unit and integration, web and mobile unit, real-session (19), Android Google flows                                               |
+| Consent | `required_13_15` | API `describe` blocks and files using `useGuardianConsentPolicy`, real-session `@consent-required` (5), Android `google-teen-resign` |
+
+### Default lane tests (policy off)
+
+| ID                                     | Layer            | Proves                                                                                                             |
+| -------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A-POLICY-CONFIG                        | API unit         | Unset is off; unknown value and out-of-test required_13_15 fail module compilation with exact messages             |
+| A-OFF-NEW-TEEN                         | API int          | Google and email at 13, 14, 15: active, status complete, lock open, profile 200, community access, no guardian row |
+| A-UNDER-13                             | API int          | Day before the 13th birthday refused by both doors; the birthday itself active                                     |
+| A-OFF-EXISTING                         | API int          | Seeded pending and revoked teens: status complete, lock open, profile 200, community access                        |
+| A-OFF-CONSENT-409                      | API int          | Four endpoints, with and without bearer: exact 409 body, no rows, no service call                                  |
+| L-POLICY-FLIP                          | API int          | Off-created teen stays active under required; a waiting teen gets through once off (fresh service, as a restart)   |
+| MIG-PENDING-ACTIVE                     | API int          | Pending and revoked become active; other rows and consent rows untouched; rerun changes 0                          |
+| A-LOCK-ROUTE-SWEEP                     | API unit         | Every route runs RequestAuthGuard or is named with a reason; consent endpoints run the policy guard first          |
+| A-FAILED-JOBS-AUTH                     | API unit (HTTP)  | B-8 fixed: 401 without bearer, 403 for adult, guardian and teen                                                    |
+| E-OFF-TEEN-GOOGLE, E-OFF-TEEN-EMAIL    | real-session     | A new 14-year-old by each door lands home; no guardian copy renders                                                |
+| E-OFF-RETURNING-PENDING                | real-session     | The production regression: a seeded waiting teen signs in by email code and by Google and lands home               |
+| M-OFF-NEW-TEEN, M-OFF-PENDING-TEEN     | Maestro Android  | `google-off-new-teen`, `google-off-pending-teen`                                                                   |
+| A-OFF-GUARDIAN-ACCESS                  | API unit, int    | A granted guardian gets 404 on the teen capsules (read, write) and no failure mail; required_13_15 keeps both      |
+| W-OFF-TEEN-CREATED, M-OFF-TEEN-CREATED | Web, mobile unit | An `active` 13 to 15 `created` answer goes home with no guardian step, field or title                              |
+| U-W-POLICY, U-RT-POLICY                | API unit         | AppModule, the realtime context and the three workers refuse a policy they may not run                             |
+
+Red on `ce02601b`: all 20 A-OFF and L-POLICY-FLIP cases and all three E-OFF cases fail for the
+expected reason (teen created pending, status `awaiting_guardian`, consent endpoints doing work).
+
+### Final sign-off follow-ups (TEA, 2026-11-16)
+
+| ID                   | Layer                                                            | Proves                                                                                                                                                                                |
+| -------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| N-1 doors in fr-FR   | Playwright (`sign-in-doors-locale.spec.ts`), web and mobile unit | `/signup` and `/signin` render the Google button, divider and page copy in the browser language; red with SessionBridge before the page                                               |
+| N-2 finish gap       | real-session E-OFF-TEEN-GOOGLE                                   | Create account sits at most 32 px under the birthdate hint when no message shows                                                                                                      |
+| N-3 signup next step | web and mobile unit, real-session E-OFF-TEEN-EMAIL               | After an email signup the page links to sign-in and Create account is gone                                                                                                            |
+| N-4 profile links    | API unit and HTTP parity                                         | Under off `/user/profile` names no linked teen or guardian and reads no consent row                                                                                                   |
+| N-5 fr copy          | utils unit                                                       | fr-FR and fr-CA say to sign in again once the account is approved                                                                                                                     |
+| L-1, L-2, L-3        | API unit and integration, web unit                               | The minimum of 150 000 reports on plain times; fault-injection cases give the claim 5 s while the marker case pins 500 ms; one axe pass per state; the MSW delay asserted by its call |
+
+### Re-enable checklist (gated by the boot refusal)
+
+Turning consent back on needs each of these first, red-first, in the PR that removes the
+`required_13_15` boot refusal:
+
+- B-1: invitations take the teen bearer and its own id, the response carries no link, accept needs
+  the invited guardian signed in by email code (A-INVITE-AUTH, A-INVITE-NO-LINK,
+  A-ACCEPT-GUARDIAN-ONLY, E-TEEN-OWN-INVITE-LINK, E-GUARDIAN-ACCEPT-OTP).
+- B-2: a real invite mail sender, or `deliveryQueued` made honest (A-INVITE-DELIVERY-HONEST).
+- B-3: guardian sign-in and a revoke UI with a real bearer (A-GUARDIAN-CAN-SIGN-IN,
+  E-GUARDIAN-REVOKE-UI).
+- B-4: the lock lifts at 16 on read (A-AGE-16-LIFT).
+- B-5: the in-transaction consent handlers named in A-LOCK-ROUTE-SWEEP refuse a waiting teen
+  (A-COMMENTS-PENDING).
+- B-6: an old invitation fails after approval or revoke (L-REVOKE-THEN-OLD-LINK, L-RESEND-VS-ACCEPT).
+- B-7: the 30 s lock cache invalidates across instances (A-LOCK-CACHE-INVALIDATE, L-OTP-STATUS-RACE).
+- B-12: a waiting teen with a stored session reaches the guardian step (E-TEEN-REOPEN, M-TEEN-REOPEN).
+- H-1 (independent review of PR 244): restore `private.has_active_guardian_consent` from
+  `20260420113000_add_guardian_shared_rls_policies` in a new migration, and bring back the guardian
+  grant cases removed from `packages/db/test/rls/{capsules,onboarding-silhouette,guardian-wardrobe}.spec.ts`
+  (git history at 9a3266da); `guardian-consent-off.spec.ts` then moves under the off policy only.
+- L-1: the emancipation sweep mails the aged-out message again only under `required_13_15`.
+- F-3: granted rows from the off period give capsule access and mail again under `required_13_15`;
+  review every row granted before the switch (B-1 let a teen grant one to any adult) before it
+  carries access.
+- B-9 to B-11: approved-teen reload, per-cause waiting copy, guardian event emission
+  (E-TEEN-APPROVED-RELOAD, E-TEEN-DECLINE-COPY), plus E-TEEN-TWO-DEVICES and E-TEEN-PREVIEW-LINK.

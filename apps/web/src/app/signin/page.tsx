@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  finishStepHref,
   getFederatedSignInStrings,
   getGuestPreviewStrings,
   parsePreviewFrom,
@@ -18,7 +19,7 @@ import {
   WebSignInError,
   type WebSignInFailure,
 } from '../../lib/web-session'
-const FAILURE_KEYS: Record<WebSignInFailure, string> = {
+const FAILURE_KEYS: Record<Exclude<WebSignInFailure, 'awaiting_guardian'>, string> = {
   denied: 'community.notifications.signinDenied',
   code_invalid: 'community.notifications.signinCodeInvalid',
   unavailable: 'community.notifications.signinUnavailable',
@@ -92,14 +93,17 @@ export default function SignInPage() {
                 setMessage('community.notifications.codeSent')
               }
             })
-            .catch((error: unknown) =>
+            .catch((error: unknown) => {
+              const reason =
+                error instanceof WebSignInError ? error.reason : 'unavailable'
+              // A teen waiting on a guardian goes to the guardian invitation, not a refusal.
+              if (reason === 'awaiting_guardian')
+                window.location.assign(
+                  finishStepHref(fromPreview ? 'preview' : null, 'signin')
+                )
               // Anything unclassified is treated as temporary, so the person retries.
-              setMessage(
-                FAILURE_KEYS[
-                  error instanceof WebSignInError ? error.reason : 'unavailable'
-                ]
-              )
-            )
+              else setMessage(FAILURE_KEYS[reason])
+            })
             .finally(() => setBusy(false))
         }}
       >

@@ -25,6 +25,11 @@ import { AccessTokenIdentityService } from '../src/modules/auth/access-token-ide
 import { AuthModule } from '../src/modules/auth/auth.module'
 import { ModerationModule } from '../src/modules/moderation/moderation.module'
 import { birthdateForAge } from '../src/testing/birthdate'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its guardian consent endpoint cases need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 const { trackedEvents, posthogCaptureMock, posthogShutdownMock } = vi.hoisted(() => {
   const trackedEvents: MemoryTrackedAnalyticsEvent[] = []

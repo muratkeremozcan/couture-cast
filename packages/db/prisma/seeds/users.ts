@@ -2,6 +2,7 @@ import { ConsentStatus, type Prisma, type PrismaClient } from '@prisma/client'
 import * as userFactories from '../../../testing/src/factories/user.factory.ts'
 import type { UserFixture } from '../../../testing/src/factories/user.factory.ts'
 import * as ageUtils from '../../../utils/src/age.ts'
+import type { GuardianConsentPolicy } from '../../../utils/src/age.ts'
 
 import { unwrapCjsNamespace } from './interop.js'
 import { SEEDED_PROFILE_FEATURE_FLAGS } from './feature-flags.js'
@@ -11,7 +12,7 @@ const { createGuardianUser, createTeenUser } = unwrapCjsNamespace(userFactories)
 // `prisma db seed` runs this graph, a named import from a workspace `.ts`
 // module resolves to a CJS namespace and the named export is not statically
 // visible. `5.4-DB-040` catches exactly that and caught it here.
-const { evaluateAgeGate } = unwrapCjsNamespace(ageUtils)
+const { evaluateAgeGate, GUARDIAN_CONSENT_POLICY } = unwrapCjsNamespace(ageUtils)
 
 export type SeededUsers = {
   guardians: { id: string; email: string }[]
@@ -158,10 +159,16 @@ export function getTeenFixtures(): UserFixture[] {
  * under-16 with a granted guardian is `active` exactly as acceptance would have
  * left them, and one without stays `pending_guardian_consent`. Adding a teen
  * fixture with no consent pair therefore seeds a pending account rather than a
- * silently over-privileged one.
+ * silently over-privileged one. Both follow `GUARDIAN_CONSENT_POLICY`: while it
+ * is `off` (owner ruling 2026-11-16) every 13+ fixture is active, as signup
+ * makes them.
  */
-function buildComplianceBlock(fixture: UserFixture, hasGrantedGuardian: boolean) {
-  const gate = evaluateAgeGate(fixture.birthdate)
+function buildComplianceBlock(
+  fixture: UserFixture,
+  hasGrantedGuardian: boolean,
+  policy: GuardianConsentPolicy
+) {
+  const gate = evaluateAgeGate(fixture.birthdate, new Date(), policy)
 
   return {
     accountStatus:
@@ -172,14 +179,15 @@ function buildComplianceBlock(fixture: UserFixture, hasGrantedGuardian: boolean)
 
 export function createUserProfileInput(
   fixture: UserFixture,
-  hasGrantedGuardian: boolean
+  hasGrantedGuardian: boolean,
+  policy: GuardianConsentPolicy = GUARDIAN_CONSENT_POLICY
 ) {
   return {
     display_name: fixture.displayName,
     birthdate: fixture.birthdate,
     preferences: {
       ...fixture.profilePreferences,
-      compliance: buildComplianceBlock(fixture, hasGrantedGuardian),
+      compliance: buildComplianceBlock(fixture, hasGrantedGuardian, policy),
     } as Prisma.InputJsonObject,
   }
 }

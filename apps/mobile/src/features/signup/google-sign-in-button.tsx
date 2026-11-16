@@ -107,7 +107,7 @@ export function SignupGoogleEntry({
   onFailure,
 }: {
   fromPreview: boolean
-  onSignedIn: (outcome: 'member' | 'no_account') => void
+  onSignedIn: (outcome: 'member' | 'no_account' | 'awaiting_guardian') => void
   onFailure: (message: string) => void
 }) {
   const { i18n } = useTranslation()
@@ -117,7 +117,11 @@ export function SignupGoogleEntry({
         from={fromPreview ? 'preview' : null}
         door="signup"
         onOutcome={(outcome) => {
-          if (outcome.kind === 'member' || outcome.kind === 'no_account')
+          if (
+            outcome.kind === 'member' ||
+            outcome.kind === 'no_account' ||
+            outcome.kind === 'awaiting_guardian'
+          )
             onSignedIn(outcome.kind)
           else onFailure(getFederatedSignInStrings(i18n.language)[outcome.kind])
         }}

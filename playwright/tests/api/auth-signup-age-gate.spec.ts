@@ -12,6 +12,12 @@ import {
   isProdEnvironment,
   resolveApiBaseUrl,
 } from '../../support/helpers/api-test'
+import {
+  CONSENT_LANE_ONLY,
+  CONSENT_OFF_ONLY,
+  CONSENT_REQUIRED_TAG,
+  e2eConsentPolicy,
+} from '../../support/helpers/guardian-consent-policy'
 
 test.describe('Signup age-gate API contracts', () => {
   test.beforeEach(({}, testInfo) => {
@@ -42,27 +48,52 @@ test.describe('Signup age-gate API contracts', () => {
     expect(extractErrorMessage(body)).toContain('You must be 13 or older')
   })
 
-  test('[P0] returns pending guardian consent for ages thirteen through fifteen', async ({
-    apiRequest,
-    validateSchema,
-  }, testInfo) => {
-    const payload = createSignupPayload(testInfo, 15, 'signup-guardian-required')
-    const { status, body } = await apiRequest({
-      method: 'POST',
-      path: '/api/v1/auth/signup',
-      baseUrl: resolveApiBaseUrl(testInfo),
-      body: payload,
+  // Owner ruling 2026-11-16: guardian consent is off, so 13 to 15 signs up active.
+  for (const age of [13, 14, 15])
+    test(`[P0] returns active status with no guardian for age ${age} while consent is off`, async ({
+      apiRequest,
+      validateSchema,
+    }, testInfo) => {
+      test.skip(e2eConsentPolicy() === 'required_13_15', CONSENT_OFF_ONLY)
+      const payload = createSignupPayload(testInfo, age, `signup-consent-off-${age}`)
+      const { status, body } = await apiRequest({
+        method: 'POST',
+        path: '/api/v1/auth/signup',
+        baseUrl: resolveApiBaseUrl(testInfo),
+        body: payload,
+      })
+
+      expect(status).toBe(201)
+      await validateSchema(signupResponseSchema, body, {
+        shape: { age, accountStatus: 'active', guardianConsentRequired: false },
+      })
     })
 
-    expect(status).toBe(201)
-    await validateSchema(signupResponseSchema, body, {
-      shape: {
-        age: 15,
-        accountStatus: 'pending_guardian_consent',
-        guardianConsentRequired: true,
-      },
-    })
-  })
+  test(
+    '[P0] returns pending guardian consent for ages thirteen through fifteen',
+    {
+      tag: CONSENT_REQUIRED_TAG,
+    },
+    async ({ apiRequest, validateSchema }, testInfo) => {
+      test.skip(e2eConsentPolicy() !== 'required_13_15', CONSENT_LANE_ONLY)
+      const payload = createSignupPayload(testInfo, 15, 'signup-guardian-required')
+      const { status, body } = await apiRequest({
+        method: 'POST',
+        path: '/api/v1/auth/signup',
+        baseUrl: resolveApiBaseUrl(testInfo),
+        body: payload,
+      })
+
+      expect(status).toBe(201)
+      await validateSchema(signupResponseSchema, body, {
+        shape: {
+          age: 15,
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      })
+    }
+  )
 
   test('[P0] returns active status for users sixteen and older', async ({
     apiRequest,
