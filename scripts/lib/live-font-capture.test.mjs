@@ -11,6 +11,7 @@ import {
   activityConfiguration,
   activityToken,
   assertHierarchySource,
+  readCheckedHierarchy,
   deviceFingerprint,
   assertLiveProvenance,
   countOnCreate,
@@ -46,6 +47,44 @@ describe('flattenHierarchy', () => {
     node({ 'resource-id': 'live-font-scale-home-1.5', bounds: '[0,0][1,1]' }),
     node({ 'resource-id': 'live-font-scale-root-1.5', bounds: '[0,0][1,1]' }),
   ])
+
+  // iOS run 43773613293, composer: XCUITest gives a switch its value as text ("1") and its name as
+  // accessibilityText. The node keeps both, so the probe's element (named by the label) can pair it.
+  test('an iOS node keeps an accessibility label apart from its text; Android reads none', () => {
+    const screen = node({ bounds: '[0,0][402,874]' }, [
+      node({ bounds: '[0,78][402,823]' }, [
+        node({
+          'resource-id': 'share-card-watermark',
+          text: '1',
+          accessibilityText: 'Show watermark',
+          bounds: '[313,125][378,173]',
+        }),
+        node({
+          text: '',
+          accessibilityText: 'Your share card',
+          bounds: '[24,78][378,109]',
+        }),
+        node({ text: 'Save', accessibilityText: 'Save', bounds: '[24,709][195,758]' }),
+      ]),
+    ])
+    const ios = flattenHierarchy({ children: [screen] }, { platform: 'ios' }).nodes
+    assert.deepEqual(
+      ios.map(({ text, label }) => [text, label]),
+      [
+        ['1', 'Show watermark'],
+        ['Your share card', undefined],
+        ['Save', undefined],
+      ]
+    )
+    const android = flattenHierarchy(screen, { platform: 'android' }).nodes
+    assert.deepEqual(
+      android.map(({ text, label }) => [text, label]),
+      [
+        ['1', undefined],
+        ['Save', undefined],
+      ]
+    )
+  })
 
   test('keeps text with its parent bounds, controls and sorted mount markers', () => {
     const { nodes, controls, markers } = flattenHierarchy(tree, { platform: 'android' })
@@ -503,6 +542,165 @@ describe('stitchPages', () => {
     )
   })
 
+  // iOS run 43773613293, Settings at extra-extra-extra-large: the last drag moved 5.4 pt. The
+  // probe records (exact points) all measured 5.4; the hierarchy's whole-point bounds round each
+  // edge, so the same cards measured 5 and 6, and 6 sat outside 10 percent of 5.4. A whole-unit
+  // anchor is read within one unit of the step (its rounding), the step itself from the exact
+  // records; anchors farther apart than that still fail.
+  test('a short final step reads whole-unit anchors within their rounding', () => {
+    const tops = [100.6, 400.4, 700.6, 1000.4, 1300.6]
+    const offsets = [0, 300, 305.4]
+    const shown = [
+      [1, 2, 3, 4],
+      [2, 3, 4, 5],
+      [2, 3, 4, 5],
+    ]
+    const y = (n, page) => tops[n - 1] - offsets[page]
+    const card = (n, top) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${Math.round(top)}][100,${Math.round(top) + 100}]`,
+    })
+    const pages = shown.map((cards, page) => cards.map((n) => card(n, y(n, page))))
+    const records = shown.map((cards, page) =>
+      cards.map((n) => ({
+        text: `Card ${n}`,
+        viewRect: [0, y(n, page), 100, y(n, page) + 100],
+      }))
+    )
+    const bottom = { expectedShift: 300, reachedBottom: true, records }
+    const stitched = stitchPlaces(pages, bottom)
+    assert.equal(stitched.offsets.length, 3)
+    assert.deepEqual(stitched.offsets.slice(0, 2), [0, 300])
+    assert.ok(Math.abs(stitched.offsets[2] - 305.4) < 1e-9, String(stitched.offsets[2]))
+    assert.deepEqual(
+      stitched.taken.map(({ key }) => JSON.parse(key)[1]),
+      ['Card 1', 'Card 2', 'Card 3', 'Card 4', 'Card 5']
+    )
+    // A whole-unit anchor more than its rounding off the step (8 against 5.4) places a text
+    // twice: ambiguous.
+    const moved = pages.map((page, at) =>
+      at === 2
+        ? page.map((node) => (node.id === 'c3' ? card(3, y(3, 1) - 8) : node))
+        : page
+    )
+    assert.throws(() => stitchPlaces(moved, bottom), {
+      message: /^live_font_scroll_short_drag_ambiguous/,
+    })
+    // Exact anchors that disagree (5.4 and 9.4) stay ambiguous.
+    const split = records.map((list, at) =>
+      at === 2
+        ? list.map((record) =>
+            record.text === 'Card 5'
+              ? {
+                  ...record,
+                  viewRect: record.viewRect.map((v, i) => (i % 2 ? v - 4 : v)),
+                }
+              : record
+          )
+        : list
+    )
+    assert.throws(() => stitchPlaces(pages, { ...bottom, records: split }), {
+      message: /^live_font_scroll_short_drag_ambiguous/,
+    })
+  })
+
+  // iOS dispatch 43852018196, Settings before extra-extra-extra-large: the scroll had already
+  // reached the bottom but one, and the last drag moved under a point (page 6 tops -140 where page
+  // 5 showed -139). With no anchor beyond the tolerance, the step fell back to a whole drag, so
+  // the Premium section was counted twice (42 texts against 33).
+  test('a final drag that barely moves takes the step its texts agree on', () => {
+    const tops = [100.4, 400.6, 700.4, 1000.6, 1300.4]
+    const offsets = [0, 300, 300.6]
+    const shown = [
+      [1, 2, 3, 4],
+      [2, 3, 4, 5],
+      [2, 3, 4, 5],
+    ]
+    const y = (n, page) => tops[n - 1] - offsets[page]
+    const card = (n, top) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${Math.round(top)}][100,${Math.round(top) + 100}]`,
+    })
+    const pages = shown.map((cards, page) => cards.map((n) => card(n, y(n, page))))
+    const records = shown.map((cards, page) =>
+      cards.map((n) => ({
+        text: `Card ${n}`,
+        viewRect: [0, y(n, page), 100, y(n, page) + 100],
+      }))
+    )
+    const bottom = { expectedShift: 300, reachedBottom: true, records }
+    const stitched = stitchPlaces(pages, bottom)
+    assert.deepEqual(stitched.offsets.slice(0, 2), [0, 300])
+    assert.ok(Math.abs(stitched.offsets[2] - 300.6) < 1e-9, String(stitched.offsets[2]))
+    assert.deepEqual(
+      stitched.taken.map(({ key }) => JSON.parse(key)[1]),
+      ['Card 1', 'Card 2', 'Card 3', 'Card 4', 'Card 5']
+    )
+    // Hierarchy bounds alone read the step to the whole unit and still place nothing twice.
+    assert.deepEqual(
+      stitchPlaces(pages, { expectedShift: 300, reachedBottom: true }).taken.length,
+      5
+    )
+    // A last page not known to be the bottom is never short.
+    assert.deepEqual(
+      stitchPlaces(pages, { expectedShift: 300, records }).offsets,
+      [0, 300, 600]
+    )
+    // One text that stayed put confirms nothing: a new page that shares one label by chance
+    // keeps the whole drag.
+    const lone = [pages[0], pages[1], [card(5, y(5, 1)), card(9, 900)]]
+    assert.deepEqual(
+      stitchPlaces(lone, { expectedShift: 300, reachedBottom: true }).offsets,
+      [0, 300, 600]
+    )
+  })
+
+  // CodeRabbit on PR 242: on two pages nothing marks a sticky record as fixed, so two of them
+  // (shift 0) confirmed a zero step for a final drag of 900 between pages that share no text.
+  // Only texts an earlier drag moved can confirm that the last one barely moved.
+  test('stationary records never confirm a final drag that barely moved', () => {
+    const card = (n, y) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${y}][100,${y + 100}]`,
+    })
+    const chips = [
+      { text: 'Cold and wet', viewRect: [0, 50, 100, 90] },
+      { text: 'Sunny', viewRect: [120, 50, 220, 90] },
+    ]
+    const asRecords = (page) => [
+      ...page.map((node) => {
+        const [left, top, right, bottom] = node.bounds.match(/-?\d+/g).map(Number)
+        return { text: node.text, viewRect: [left, top, right, bottom] }
+      }),
+      ...chips,
+    ]
+    const two = [
+      [card(1, 100), card(2, 400)],
+      [card(3, 100), card(4, 400)],
+    ]
+    assert.deepEqual(
+      stitchPlaces(two, {
+        expectedShift: 900,
+        reachedBottom: true,
+        records: two.map(asRecords),
+      }).offsets,
+      [0, 900]
+    )
+    // Three pages: the chips stay put on every page, the last page shares no card.
+    const three = [...two, [card(7, 100), card(8, 400)]]
+    assert.deepEqual(
+      stitchPlaces(three, {
+        expectedShift: 900,
+        reachedBottom: true,
+        records: three.map(asRecords),
+      }).offsets,
+      [0, 900, 1800]
+    )
+  })
+
   // CodeRabbit on PR 230: a still header and a new label of the same id-less text on the last
   // page; only the header's copy is chrome, the label is new text with its own place.
   test('still chrome on the last page is one node, nearest its place', () => {
@@ -945,6 +1143,66 @@ describe('hierarchy source (two booted simulators)', () => {
         fingerprint: print,
       })
     )
+  })
+
+  // Dispatch 43924119388, community leg: the first read lacked only the battery part of the
+  // fingerprint (cellular and Wi-Fi matched), and the message could not show what the status
+  // bar did say.
+  test('a wrong device names what the status bar showed', () => {
+    const print = deviceFingerprint(udidA)
+    const tree = dump('0.81.5', print)
+    tree.children[1].children[0].children.pop()
+    assert.throws(
+      () => assertHierarchySource(tree, { platform: 'ios', fingerprint: print }),
+      (error) =>
+        error.message.startsWith(
+          `live_font_hierarchy_wrong_device:${print.battery}% battery power seen `
+        ) && error.message.includes('of 3 Wi-Fi bars')
+    )
+  })
+
+  test('a status bar between updates is read again, another device never passes', () => {
+    const print = deviceFingerprint(udidA)
+    const good = dump('0.81.5', print)
+    const partial = dump('0.81.5', print)
+    partial.children[1].children[0].children.pop()
+    const check = (tree) =>
+      assertHierarchySource(tree, { platform: 'ios', fingerprint: print })
+    const reads = (trees) => {
+      const queue = [...trees]
+      const seen = []
+      return {
+        read: () => queue.shift(),
+        onRetry: (error) => seen.push(error.message.split(' ')[0]),
+        seen,
+      }
+    }
+    const transient = reads([partial, good])
+    assert.equal(readCheckedHierarchy({ ...transient, check }), good)
+    assert.equal(transient.seen.length, 1)
+    // Another simulator on every read fails after the third.
+    const other = dump('0.81.5', deviceFingerprint(udidB))
+    const wrong = reads([other, other, other, good])
+    assert.throws(() => readCheckedHierarchy({ ...wrong, check }), {
+      message: /^live_font_hierarchy_wrong_device/,
+    })
+    assert.equal(wrong.seen.length, 2)
+    // Another build fails at once.
+    const build = reads([dump('0.88.1', print), good])
+    assert.throws(
+      () =>
+        readCheckedHierarchy({
+          ...build,
+          check: (tree) =>
+            assertHierarchySource(tree, {
+              platform: 'ios',
+              fingerprint: print,
+              reactNativeVersion: '0.81.5',
+            }),
+        }),
+      { message: 'live_font_hierarchy_wrong_build:0.88.1' }
+    )
+    assert.equal(build.seen.length, 0)
   })
 
   test("a dump carrying another build's markers fails", () => {

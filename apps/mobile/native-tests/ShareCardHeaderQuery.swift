@@ -1,3 +1,4 @@
+import Vision
 import XCTest
 
 // The job log is the only place a failed audit is readable, so name each failing issue.
@@ -104,4 +105,39 @@ func assertNativeShareCardHeader(_ test: XCTestCase, label: String) throws {
 @MainActor
 func assertNoNewShareCardFocus(_ test: XCTestCase, after sequence: Int) throws {
   try requireNoNewShareCardFocus(readShareCardFocusObservation(test), after: sequence)
+}
+
+/// Apple's element detection reads the screen's pixels, and a text it reads that no element
+/// covers is "Potentially inaccessible text" with no element to name (shard 3, preparing, runs
+/// 43740466527, 43746880534 and 43773613293). So the screen the audit judged is read the same
+/// way, with Vision, and each text it shows is listed beside the smallest element whose frame
+/// holds the text's centre, or none: the line with none is the text the audit flagged.
+@MainActor
+func shareCardAuditTextLines(_ scope: String, _ app: XCUIApplication, screen png: Data) -> [String] {
+  func line(_ text: String, _ holder: String, _ rect: CGRect) -> String {
+    "CC68_AUDIT_ISSUE \(scope)-context|ocr|\(compactAuditText(text))|\(compactAuditText(holder))|\(Int(rect.minX)),\(Int(rect.minY)),\(Int(rect.width)),\(Int(rect.height))"
+  }
+  guard let image = UIImage(data: png)?.cgImage else { return [line("unreadable", "none", .zero)] }
+  let request = VNRecognizeTextRequest()
+  request.recognitionLevel = .accurate
+  request.usesLanguageCorrection = false
+  do {
+    try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+  } catch {
+    return [line("vision \(error.localizedDescription)", "none", .zero)]
+  }
+  let size = app.frame.size
+  let elements = app.descendants(matching: .any).allElementsBoundByIndex.prefix(120)
+    .map { (name: "\($0.identifier)/\($0.label)", frame: $0.frame) }
+    .filter { !$0.frame.isEmpty }
+  return (request.results ?? []).prefix(24).map { observation in
+    let box = observation.boundingBox
+    let rect = CGRect(
+      x: box.minX * size.width, y: (1 - box.maxY) * size.height,
+      width: box.width * size.width, height: box.height * size.height)
+    let centre = CGPoint(x: rect.midX, y: rect.midY)
+    let holder = elements.filter { $0.frame.contains(centre) }
+      .min { $0.frame.width * $0.frame.height < $1.frame.width * $1.frame.height }
+    return line(observation.topCandidates(1).first?.string ?? "", holder?.name ?? "none", rect)
+  }
 }

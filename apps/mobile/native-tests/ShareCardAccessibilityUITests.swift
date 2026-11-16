@@ -215,6 +215,13 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       let allowed = Self.allowsRasterOCRIssue(type: issue.auditType, description: issue.compactDescription, detail: issue.detailedDescription, state: state, hasElement: issue.element != nil, previewVerified: previewVerified)
       if !allowed {
         print(shareCardAuditIssueLine(state, issue))
+        // An issue with no element names no text: list what the screen exposes and every text the
+        // judged screen shows with the element that holds it, so the job log names the text.
+        if issue.element == nil {
+          // The text lines first: the job log keeps the first 40 context lines.
+          shareCardAuditTextLines(state, self.app, screen: judged).forEach { print($0) }
+          shareCardAuditContextLines(state, self.app).forEach { print($0) }
+        }
         // iOS 26.5 canary shard 3 failed preparing on "Potentially inaccessible text" with no
         // picture of the screen, so the screen the audit judged, taken just before it, is kept
         // beside its issue, as a PNG that a failed run exports to audit-failure-<state>.png

@@ -134,14 +134,20 @@ export function flattenHierarchy(
   }
 }
 
-/** The flattened node for a view with text: the text with the parent's bounds. */
+/**
+ * The flattened node for a view with text: the text with the parent's bounds. On iOS a node whose
+ * `text` is not its accessibility label (a switch's value, "1" or "0", beside its name) keeps the
+ * label as `label`, the name the text layout probe's element carries (matchTextProbe).
+ */
 function textEntry({ attrs, id, bounds, parentBounds, isVolatile, platform }) {
   const text = nodeText(attrs, platform)
   if (!text || !bounds) return undefined
+  const label = platform === 'ios' ? (attrs.accessibilityText ?? '') : ''
   return {
     text,
     id,
     bounds,
+    ...(label !== '' && label !== text ? { label } : {}),
     ...(parentBounds ? { parent: parentBounds } : {}),
     ...(isVolatile ? { volatile: true } : {}),
   }
@@ -335,24 +341,41 @@ const measuresDrag = (shift, expectedShift) =>
   !(expectedShift > 0) || Math.abs(shift - expectedShift) <= SHIFT_SPREAD * expectedShift
 
 /**
+ * How far a shift read off whole-unit bounds may sit from the true one: the hierarchy rounds
+ * each edge of a fractional layout (iOS points) to a whole unit, so the difference of two edges
+ * is off by under one unit. Android's whole pixels are exact, and a text placed twice moves by a
+ * line or more, far beyond it.
+ */
+const WHOLE_UNIT = 1
+
+/**
  * The step of the drag that reaches the bottom when no anchor measured a whole drag (r48
  * P2-1, r49 P2-4): that drag moves only the travel left. Its anchors are the shifts a drag can
  * make, above `tolerance` (a fixed node, such as a sticky chip's record, shifts by 0) and at
  * most a whole drag (a repeated text paired with a lower copy shifts backwards). With none, the
- * page shares no moving text and the step stays unmeasured (null). Anchors that do not all sit
- * within SHIFT_SPREAD of their median fail as live_font_scroll_short_drag_ambiguous, since any
- * one step would place some text twice; agreeing anchors of fewer than two texts fail as
- * live_font_scroll_short_drag_unconfirmed, since one repeated label can pair with another copy
- * by chance. Two texts or more that agree give their median.
+ * drag either barely moved (settledStep) or shares no moving text, and the step stays
+ * unmeasured (null). The step is the median of
+ * the exact anchors (probe records), or of every anchor when none is exact. Anchors that do not
+ * all sit within SHIFT_SPREAD of it, plus their own `rounding` (WHOLE_UNIT for a hierarchy
+ * anchor, iOS run 43773613293 Settings: records 5.4, the same cards' nodes 5 and 6), fail as
+ * live_font_scroll_short_drag_ambiguous, since any one step would place some text twice; agreeing
+ * anchors of fewer than two texts fail as live_font_scroll_short_drag_unconfirmed, since one
+ * repeated label can pair with another copy by chance.
  */
-function shortFinalStep(entries, { tolerance, expectedShift }) {
+function shortFinalStep(entries, { tolerance, expectedShift, moved }) {
   const anchors = entries.filter(
     ({ shift }) => shift > tolerance && shift <= (1 + SHIFT_SPREAD) * expectedShift
   )
-  if (!anchors.length) return null
+  if (!anchors.length) return settledStep(entries, { tolerance, moved })
   const shifts = anchors.map(({ shift }) => shift)
-  const step = median(shifts)
-  if (!shifts.every((shift) => Math.abs(shift - step) <= SHIFT_SPREAD * step))
+  const exact = anchors.filter(({ rounding }) => rounding === 0)
+  const step = median((exact.length ? exact : anchors).map(({ shift }) => shift))
+  if (
+    !anchors.every(
+      ({ shift, rounding = 0 }) =>
+        Math.abs(shift - step) <= SHIFT_SPREAD * step + rounding
+    )
+  )
     throw new Error(
       `live_font_scroll_short_drag_ambiguous: final drag anchors ${shifts.join(', ')} px disagree`
     )
@@ -365,6 +388,22 @@ function shortFinalStep(entries, { tolerance, expectedShift }) {
 }
 
 /**
+ * The step of a drag that reaches the bottom by under `tolerance` (iOS dispatch 43852018196,
+ * Settings: the last drag moved under a point): every anchor stayed within the tolerance, so the
+ * step is the median of the anchors an earlier drag `moved`, from the exact ones when there are
+ * any. A text no drag moved may be fixed on screen (a sticky chip's record, which nothing marks
+ * fixed on two pages; CodeRabbit on PR 242), so it confirms nothing. Fewer than two moved texts,
+ * or an anchor that moved farther, leave the step unmeasured: null.
+ */
+function settledStep(entries, { tolerance, moved }) {
+  if (!entries.every(({ shift }) => Math.abs(shift) <= tolerance)) return null
+  const confirmed = entries.filter(({ text }) => moved.has(text))
+  if (new Set(confirmed.map(({ text }) => text)).size < 2) return null
+  const exact = confirmed.filter(({ rounding }) => rounding === 0)
+  return median((exact.length ? exact : confirmed).map(({ shift }) => shift))
+}
+
+/**
  * The step of each drag, by its index: the median of the shifts that measure it (`measured`),
  * else, for the last drag of a scroll-through the capture records reached the bottom
  * (`reachedBottom`, scrollPages: the next drag showed the same page), shortFinalStep over its
@@ -372,9 +411,20 @@ function shortFinalStep(entries, { tolerance, expectedShift }) {
  */
 function dragSteps(measured, anchors, { tolerance, expectedShift, reachedBottom }) {
   const last = measured.length - 1
+  // The texts an earlier drag moved by its whole length: moving content, never a sticky record.
+  const moved = new Set(
+    anchors
+      .slice(0, Math.max(last, 0))
+      .flatMap((list) =>
+        list.filter(
+          ({ shift }) => shift > tolerance && measuresDrag(shift, expectedShift)
+        )
+      )
+      .map(({ text }) => text)
+  )
   const short =
     reachedBottom === true && expectedShift > 0 && last >= 0 && !measured[last].length
-      ? shortFinalStep(anchors[last], { tolerance, expectedShift })
+      ? shortFinalStep(anchors[last], { tolerance, expectedShift, moved })
       : null
   const steps = measured.filter((shifts) => shifts.length).map(median)
   return (at) => {
@@ -511,9 +561,11 @@ export function stitchPlaces(
     : []
   // Every page's measured shifts first, so a page that shares no moving text takes the median
   // of all measured steps, the later ones too.
+  // A hierarchy anchor's shift is read off whole-unit bounds (one unit of rounding), a record's
+  // off the probe's exact rects (none).
   const anchors = shifts(pages, chrome).map((own, at) => [
-    ...own,
-    ...(byRecords[at] ?? []),
+    ...own.map((anchor) => ({ ...anchor, rounding: WHOLE_UNIT })),
+    ...(byRecords[at] ?? []).map((anchor) => ({ ...anchor, rounding: 0 })),
   ])
   const measured = anchors.map((list) =>
     list.map(({ shift }) => shift).filter((shift) => measuresDrag(shift, expectedShift))
@@ -839,7 +891,9 @@ export function assertHierarchySource(
       (part) => !texts.some((text) => whole(part).test(text))
     )
     if (missing.length)
-      throw new Error(`live_font_hierarchy_wrong_device:${missing.join('|')}`)
+      throw new Error(
+        `live_font_hierarchy_wrong_device:${missing.join('|')} seen ${JSON.stringify(texts)}`
+      )
   }
   if (reactNativeVersion) {
     // A dump without the environment marker cannot show the build, and on Android this is the
@@ -847,6 +901,29 @@ export function assertHierarchySource(
     const seen = flattenHierarchy(tree, { platform }).environment?.reactNativeVersion
     if (seen !== reactNativeVersion)
       throw new Error(`live_font_hierarchy_wrong_build:${seen ?? 'missing'}`)
+  }
+}
+
+/** The source failures a fresh read can clear: a missing marker, a status bar mid-update. */
+const REREAD = /^live_font_hierarchy_(wrong_build:missing$|wrong_device:)/
+
+/**
+ * Reads a hierarchy and checks its source (assertHierarchySource), reading again up to
+ * `attempts` times when the failure can be a moment's: a window change between mounts drops the
+ * environment marker, and dispatch 43924119388 read a status bar whose battery part was missing
+ * while its cellular and Wi-Fi parts matched. Another device or build on every read still fails,
+ * on the last read; another build fails at once. `onRetry` hears each failure read again.
+ */
+export function readCheckedHierarchy({ read, check, attempts = 3, onRetry }) {
+  for (let attempt = 1; ; attempt += 1) {
+    const tree = read()
+    try {
+      check(tree)
+      return tree
+    } catch (error) {
+      if (attempt >= attempts || !REREAD.test(error.message)) throw error
+      onRetry?.(error)
+    }
   }
 }
 

@@ -54,7 +54,7 @@ export function Harness({ restore = vi.fn() }: { restore?: () => void }) {
 
 export async function ready() {
   const image = await screen.findByTestId('share-card-preview')
-  fireEvent.load(image)
+  fireEvent.load(screen.getByTestId('share-card-preview-image'))
   await waitFor(() =>
     expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
       'aria-disabled',
