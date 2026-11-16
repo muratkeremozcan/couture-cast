@@ -112,16 +112,26 @@ describe('age utilities', () => {
     expect(guardianConsentRequiredFor(age, policy)).toBe(required)
   })
 
-  it('under either policy a child under 13 is refused', () => {
-    for (const policy of ['off', 'required_13_15'] as const)
+  // TEA sign-off F-5: 12 is the last refused age, the day before the 13th birthday included.
+  it.each([
+    ['off', '2014-04-17T12:00:00.000Z', 11],
+    ['required_13_15', '2014-04-17T12:00:00.000Z', 11],
+    ['off', '2013-04-17T12:00:00.000Z', 12],
+    ['required_13_15', '2013-04-17T12:00:00.000Z', 12],
+  ] as const)(
+    'under %s a child born %s (age %i) is refused',
+    (policy, birthdate, age) => {
       expect(
-        evaluateAgeGate(
-          new Date('2014-04-17T12:00:00.000Z'),
-          new Date('2026-04-16T12:00:00.000Z'),
-          policy
-        )
-      ).toMatchObject({ age: 11, allowed: false, accountStatus: 'blocked_underage' })
-  })
+        evaluateAgeGate(new Date(birthdate), new Date('2026-04-16T12:00:00.000Z'), policy)
+      ).toEqual({
+        age,
+        allowed: false,
+        requiresGuardian: false,
+        accountStatus: 'blocked_underage',
+        message: AGE_GATE_MESSAGES.underage,
+      })
+    }
+  )
 
   it('allows users aged sixteen and older without guardian consent', () => {
     expect(

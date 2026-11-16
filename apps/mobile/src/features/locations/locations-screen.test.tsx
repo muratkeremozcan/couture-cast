@@ -93,7 +93,12 @@ function alertsReading(text: string) {
   )
 }
 
-describe('LocationsScreen', () => {
+// TEA sign-off F-6: 1.2b-MOB-05 failed once under host load 500+ with "locator.click: Timeout
+// 1ms exceeded". Vitest browser mode gives each provider action only what is left of the test
+// timeout (15 s by default), and these cases chain a 300 ms debounce, two or three network round
+// trips and live-region waits, so a loaded host spent the budget before the retry click. The
+// click was never slow; the budget was too tight for the slowest host the suite runs on.
+describe('LocationsScreen', { timeout: 30_000 }, () => {
   let saved: SavedLocation[]
   let restoreAccessTokenResolver: () => void
   const cleanups: (() => void)[] = []

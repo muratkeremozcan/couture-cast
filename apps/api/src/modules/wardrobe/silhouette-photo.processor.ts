@@ -6,6 +6,7 @@ import { createBaseLogger } from '../../logger/pino.config'
 import type { SilhouettePhotoModerationEngine } from './silhouette-photo-moderation.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
 
 type ProcessableSilhouetteProfile = SilhouetteProfile & { my_form_object_path: string }
 
@@ -111,11 +112,15 @@ export class SilhouettePhotoProcessor {
    * Decision 6 is scoped to teen actors (its literal scope): an actor with no
    * active `GuardianConsent` row gets the failure marked on the profile alone,
    * with no ModerationEvent and no notification, so this returns `null` and the
-   * caller writes nothing.
+   * caller writes nothing. While guardian consent is off no row counts as active.
    */
   private async loadGuardianNotificationContext(
     profile: ProcessableSilhouetteProfile
   ): Promise<GuardianNotificationContext | null> {
+    // Guardian consent off: granted rows stay for audit and reach no guardian (TEA F-3).
+    if (resolveGuardianConsentPolicy() === 'off') {
+      return null
+    }
     const activeConsents = await this.prisma.guardianConsent.findMany({
       where: { teen_id: profile.user_id, status: 'granted', revoked_at: null },
       include: { guardian: true },

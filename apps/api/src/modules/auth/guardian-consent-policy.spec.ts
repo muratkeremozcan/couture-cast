@@ -1,6 +1,9 @@
+import 'reflect-metadata'
 import { ConflictException } from '@nestjs/common'
+import { MODULE_METADATA } from '@nestjs/common/constants'
 import { Test } from '@nestjs/testing'
 import { describe, expect, it } from 'vitest'
+import { AppModule } from '../../app.module'
 import {
   GUARDIAN_CONSENT_OFF_CODE,
   GUARDIAN_CONSENT_OFF_MESSAGE,
@@ -64,6 +67,15 @@ describe('A-POLICY-CONFIG: GUARDIAN_CONSENT_POLICY', () => {
     ).toThrow(GUARDIAN_CONSENT_POLICY_REQUIRED_BLOCKED_MESSAGE)
     expect(GUARDIAN_CONSENT_POLICY_REQUIRED_BLOCKED_MESSAGE).toBe(
       'GUARDIAN_CONSENT_POLICY=required_13_15 is refused outside test environments until the guardian endpoints check their caller (teen-path finding B-1).'
+    )
+  })
+
+  // TEA sign-off F-1: the whole AppModule cannot compile under vitest (no decorator metadata
+  // for constructor injection), so the wiring is read from its module metadata and the provider
+  // itself is compiled below.
+  it('AppModule carries the boot check among its own providers', () => {
+    expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AppModule)).toContain(
+      guardianConsentPolicyBootCheck
     )
   })
 

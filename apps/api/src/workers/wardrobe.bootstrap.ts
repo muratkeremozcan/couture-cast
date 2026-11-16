@@ -25,6 +25,7 @@ import { PostHogService } from '../posthog/posthog.service'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
+import { resolveGuardianConsentPolicy } from '../modules/auth/guardian-consent-policy.js'
 
 const logger = createBaseLogger().child({ feature: 'wardrobe-worker' })
 const workers: Worker[] = []
@@ -136,6 +137,9 @@ export function createPaletteAnalysisEngine(): PaletteAnalysisEngine {
 
 async function startWardrobeWorker() {
   try {
+    // Refuse to start on a guardian consent policy this deployment may not run, as the API's
+    // AppModule does (TEA sign-off F-4).
+    resolveGuardianConsentPolicy()
     const startedQueues = createQueues()
     queues.push(...startedQueues)
     const colorExtractionQueue = startedQueues.find(

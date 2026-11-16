@@ -448,6 +448,10 @@ environments (`NODE_ENV=test` or `TEST_ENV=local`) until B-1 is fixed.
 While `off`, the four guardian consent endpoints answer 409 `guardian_consent_off` before any guard
 or row, and migration `20261116120000_guardian_consent_off` makes waiting and revoked teens active,
 keeping consent and invitation rows.
+Those rows stay for audit and grant nothing while `off`: no capsule access and no guardian mail
+(TEA sign-off F-3), because nobody can revoke them.
+The API, the realtime function and all three worker processes refuse to start on a policy they may
+not run (F-1, F-4).
 
 ### Lanes
 
@@ -458,20 +462,23 @@ keeping consent and invitation rows.
 
 ### Default lane tests (policy off)
 
-| ID                                  | Layer           | Proves                                                                                                             |
-| ----------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| A-POLICY-CONFIG                     | API unit        | Unset is off; unknown value and out-of-test required_13_15 fail module compilation with exact messages             |
-| A-OFF-NEW-TEEN                      | API int         | Google and email at 13, 14, 15: active, status complete, lock open, profile 200, community access, no guardian row |
-| A-UNDER-13                          | API int         | Day before the 13th birthday refused by both doors; the birthday itself active                                     |
-| A-OFF-EXISTING                      | API int         | Seeded pending and revoked teens: status complete, lock open, profile 200, community access                        |
-| A-OFF-CONSENT-409                   | API int         | Four endpoints, with and without bearer: exact 409 body, no rows, no service call                                  |
-| L-POLICY-FLIP                       | API int         | Off-created teen stays active under required; a waiting teen gets through once off (fresh service, as a restart)   |
-| MIG-PENDING-ACTIVE                  | API int         | Pending and revoked become active; other rows and consent rows untouched; rerun changes 0                          |
-| A-LOCK-ROUTE-SWEEP                  | API unit        | Every route runs RequestAuthGuard or is named with a reason; consent endpoints run the policy guard first          |
-| A-FAILED-JOBS-AUTH                  | API unit (HTTP) | B-8 fixed: 401 without bearer, 403 for adult, guardian and teen                                                    |
-| E-OFF-TEEN-GOOGLE, E-OFF-TEEN-EMAIL | real-session    | A new 14-year-old by each door lands home; no guardian copy renders                                                |
-| E-OFF-RETURNING-PENDING             | real-session    | The production regression: a seeded waiting teen signs in by email code and by Google and lands home               |
-| M-OFF-NEW-TEEN, M-OFF-PENDING-TEEN  | Maestro Android | `google-off-new-teen`, `google-off-pending-teen`                                                                   |
+| ID                                     | Layer            | Proves                                                                                                             |
+| -------------------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------ |
+| A-POLICY-CONFIG                        | API unit         | Unset is off; unknown value and out-of-test required_13_15 fail module compilation with exact messages             |
+| A-OFF-NEW-TEEN                         | API int          | Google and email at 13, 14, 15: active, status complete, lock open, profile 200, community access, no guardian row |
+| A-UNDER-13                             | API int          | Day before the 13th birthday refused by both doors; the birthday itself active                                     |
+| A-OFF-EXISTING                         | API int          | Seeded pending and revoked teens: status complete, lock open, profile 200, community access                        |
+| A-OFF-CONSENT-409                      | API int          | Four endpoints, with and without bearer: exact 409 body, no rows, no service call                                  |
+| L-POLICY-FLIP                          | API int          | Off-created teen stays active under required; a waiting teen gets through once off (fresh service, as a restart)   |
+| MIG-PENDING-ACTIVE                     | API int          | Pending and revoked become active; other rows and consent rows untouched; rerun changes 0                          |
+| A-LOCK-ROUTE-SWEEP                     | API unit         | Every route runs RequestAuthGuard or is named with a reason; consent endpoints run the policy guard first          |
+| A-FAILED-JOBS-AUTH                     | API unit (HTTP)  | B-8 fixed: 401 without bearer, 403 for adult, guardian and teen                                                    |
+| E-OFF-TEEN-GOOGLE, E-OFF-TEEN-EMAIL    | real-session     | A new 14-year-old by each door lands home; no guardian copy renders                                                |
+| E-OFF-RETURNING-PENDING                | real-session     | The production regression: a seeded waiting teen signs in by email code and by Google and lands home               |
+| M-OFF-NEW-TEEN, M-OFF-PENDING-TEEN     | Maestro Android  | `google-off-new-teen`, `google-off-pending-teen`                                                                   |
+| A-OFF-GUARDIAN-ACCESS                  | API unit, int    | A granted guardian gets 404 on the teen capsules (read, write) and no failure mail; required_13_15 keeps both      |
+| W-OFF-TEEN-CREATED, M-OFF-TEEN-CREATED | Web, mobile unit | An `active` 13 to 15 `created` answer goes home with no guardian step, field or title                              |
+| U-W-POLICY, U-RT-POLICY                | API unit         | AppModule, the realtime context and the three workers refuse a policy they may not run                             |
 
 Red on `ce02601b`: all 20 A-OFF and L-POLICY-FLIP cases and all three E-OFF cases fail for the
 expected reason (teen created pending, status `awaiting_guardian`, consent endpoints doing work).
@@ -493,5 +500,8 @@ Turning consent back on needs each of these first, red-first, in the PR that rem
 - B-6: an old invitation fails after approval or revoke (L-REVOKE-THEN-OLD-LINK, L-RESEND-VS-ACCEPT).
 - B-7: the 30 s lock cache invalidates across instances (A-LOCK-CACHE-INVALIDATE, L-OTP-STATUS-RACE).
 - B-12: a waiting teen with a stored session reaches the guardian step (E-TEEN-REOPEN, M-TEEN-REOPEN).
+- F-3: granted rows from the off period give capsule access and mail again under `required_13_15`;
+  review every row granted before the switch (B-1 let a teen grant one to any adult) before it
+  carries access.
 - B-9 to B-11: approved-teen reload, per-cause waiting copy, guardian event emission
   (E-TEEN-APPROVED-RELOAD, E-TEEN-DECLINE-COPY), plus E-TEEN-TWO-DEVICES and E-TEEN-PREVIEW-LINK.

@@ -7,10 +7,26 @@
 // Plan: _bmad-output/test-artifacts/test-design/cc617-google-sign-in-test-design.md
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
-import { evaluateBirthdateInput, getFederatedSignInStrings } from '@couture/utils'
+import {
+  AGE_GATE_MESSAGES,
+  evaluateBirthdateInput,
+  getFederatedSignInStrings,
+} from '@couture/utils'
 import { getI18n } from '../../../i18n'
+import type * as CoutureUtils from '@couture/utils'
 import type * as WebSession from '../../../lib/web-session'
 
+// The birthdate check under a chosen guardian consent policy, so the message a 13 to 15 year
+// old saw under required_13_15 stays proven for the day consent comes back.
+const agePolicy = vi.hoisted(() => ({ current: 'off' as 'off' | 'required_13_15' }))
+vi.mock('@couture/utils', async (importOriginal) => {
+  const utils = await importOriginal<typeof CoutureUtils>()
+  return {
+    ...utils,
+    evaluateBirthdateInput: (input: string, today?: Date) =>
+      utils.evaluateBirthdateInput(input, today, agePolicy.current),
+  }
+})
 const session = vi.hoisted(() => ({
   read: vi.fn(),
   cancel: vi.fn(),
@@ -31,6 +47,10 @@ const guardian = vi.hoisted(() => ({ invite: vi.fn() }))
 vi.mock('../../../lib/guardian', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   inviteGuardianFromWeb: guardian.invite,
+}))
+const destination = vi.hoisted(() => ({ next: vi.fn() }))
+vi.mock('../../../lib/post-signin-destination', () => ({
+  destinationAfterSignIn: destination.next,
 }))
 vi.mock('../../../lib/guest-preview', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -84,6 +104,8 @@ beforeEach(async () => {
   session.cancel.mockResolvedValue(undefined)
   session.awaiting.mockResolvedValue(null)
   session.signOut.mockResolvedValue(undefined)
+  destination.next.mockResolvedValue('/')
+  agePolicy.current = 'off'
 })
 
 afterEach(() => {
@@ -115,6 +137,16 @@ describe('D3: the email signup inline birthdate messages, announced', () => {
       expect(liveRegionOf(shown)).not.toBeNull()
     }
   )
+
+  it("under policy required_13_15 a birthdate 13 to 15 announces evaluateBirthdateInput's guardian message", async () => {
+    agePolicy.current = 'required_13_15'
+    const field = await renderForm()
+    fireEvent.change(field, { target: { value: birthdate(14) } })
+    const expected = evaluateBirthdateInput(birthdate(14)).message
+    expect(expected).toBe(AGE_GATE_MESSAGES.guardianRequired)
+    const shown = await screen.findByText(expected!)
+    expect(liveRegionOf(shown)).not.toBeNull()
+  })
 
   // Guardian consent is off (owner ruling 2026-11-16): a teen sees no guardian message.
   it.each([
@@ -171,12 +203,41 @@ describe('W-UNDERAGE: the refusal clears stored guest preview state', () => {
   })
 })
 
+// TEA sign-off F-2 (guardian consent off): the server creates a 13 to 15 year old active with
+// no guardian, and the client keys on that answer alone, never on the age it carries.
+describe('W-OFF-TEEN-CREATED: an active 13 to 15 account goes straight in', () => {
+  it.each([13, 14, 15])('age %i', async (age) => {
+    session.finish.mockResolvedValue({
+      kind: 'created',
+      account: {
+        userId: 'teen-google-off',
+        age,
+        accountStatus: 'active',
+        guardianConsentRequired: false,
+      },
+    })
+    const input = await renderForm()
+    fireEvent.change(input, { target: { value: birthdate(age) } })
+    fireEvent.click(screen.getByRole('button', { name: strings.create }))
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/'))
+    expect(destination.next).toHaveBeenCalledExactlyOnceWith(false)
+    expect(screen.queryByLabelText(strings.guardianEmail)).toBeNull()
+    expect(screen.queryByText(strings.guardianStepTitle)).toBeNull()
+    expect(screen.queryByText(strings.guardianTitle)).toBeNull()
+  })
+})
+
 // D3: a teen created through Google lands on the email signup's guardian invitation step.
 describe('W-TEEN-GUARDIAN: the guardian step after a 13 to 15 account is created', () => {
   async function createTeen() {
     session.finish.mockResolvedValue({
       kind: 'created',
-      account: { userId: 'teen-google-1', guardianConsentRequired: true },
+      account: {
+        userId: 'teen-google-1',
+        age: 14,
+        accountStatus: 'pending_guardian_consent',
+        guardianConsentRequired: true,
+      },
     })
     const input = await renderForm()
     fireEvent.change(input, { target: { value: birthdate(14) } })

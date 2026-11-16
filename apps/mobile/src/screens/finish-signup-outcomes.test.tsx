@@ -138,7 +138,12 @@ describe('finish step outcomes', () => {
   it('keeps the guardian step for a teen while the identity stays signed in', async () => {
     flow.finish.mockResolvedValue({
       kind: 'created',
-      account: { userId: 'teen-1', guardianConsentRequired: true },
+      account: {
+        userId: 'teen-1',
+        age: 14,
+        accountStatus: 'pending_guardian_consent',
+        guardianConsentRequired: true,
+      },
     })
     await submit('2012-05-17')
     await screen.findByTestId('finish-signup-outcome')
@@ -153,6 +158,44 @@ describe('finish step outcomes', () => {
   })
 })
 
+// TEA sign-off F-2 (guardian consent off): the server creates a 13 to 15 year old active with
+// no guardian, and the screen keys on that answer alone, never on the age it carries.
+describe('M-OFF-TEEN-CREATED: an active 13 to 15 account goes straight in', () => {
+  it('leaves for home with no guardian step', async () => {
+    const store = createGuestPreviewStore({
+      adapter: {
+        read: () => Promise.resolve(null),
+        write: () => Promise.resolve(),
+        remove: () => Promise.resolve(),
+      },
+      catalog: SAMPLE_CATALOG,
+    })
+    setMobileGuestPreviewStoreForTests(store)
+    try {
+      flow.finish.mockResolvedValue({
+        kind: 'created',
+        account: {
+          userId: 'teen-off-1',
+          age: 14,
+          accountStatus: 'active',
+          guardianConsentRequired: false,
+        },
+      })
+      await submit('2012-05-17')
+      await waitFor(() => expect(flow.router.replace).toHaveBeenCalledWith('/'))
+      expect(flow.router.replace).toHaveBeenCalledTimes(1)
+      expect(screen.queryByTestId('guardian-invite-email')).toBeNull()
+      expect(screen.queryByTestId('guardian-step-continue')).toBeNull()
+      expect(screen.queryByText('Waiting for your guardian')).toBeNull()
+      expect(
+        flow.setOptions.mock.calls.map(([options]) => options as { title?: string })
+      ).not.toContainEqual({ title: 'Waiting for your guardian' })
+    } finally {
+      setMobileGuestPreviewStoreForTests(undefined)
+    }
+  })
+})
+
 describe('finish step form', () => {
   it('titles the header while the form shows', async () => {
     await render(
@@ -162,6 +205,30 @@ describe('finish step form', () => {
     )
     await screen.findByTestId('finish-signup-birthdate')
     expect(headerTitle()).toBe('Finish creating your account')
+  })
+
+  // TEA sign-off: replaces the 13 to 15 guardian hint, which policy off removed, with the one
+  // guidance message a typed date still has, so the error-versus-hint split stays proven.
+  it('shows an under-13 birthdate as an error alert and a malformed date as a hint', async () => {
+    await render(
+      <AccessibilityAnnouncerProvider>
+        <SignupFinishRoute />
+      </AccessibilityAnnouncerProvider>
+    )
+    const input = await screen.findByTestId('finish-signup-birthdate')
+    await userEvent.fill(input, '2016-05-17')
+    const underage = await screen.findByTestId('finish-signup-inline-message')
+    expect(underage.getAttribute('role')).toBe('alert')
+    const errorColor = getComputedStyle(underage).color
+    await userEvent.fill(input, '2012-13-45')
+    await waitFor(() =>
+      expect(screen.getByTestId('finish-signup-inline-message').textContent).toBe(
+        'Enter your birthdate as YYYY-MM-DD'
+      )
+    )
+    const hint = screen.getByTestId('finish-signup-inline-message')
+    expect(hint.getAttribute('role')).toBeNull()
+    expect(getComputedStyle(hint).color).not.toBe(errorColor)
   })
 
   // Guardian consent is off (owner ruling 2026-11-16): a teen birthdate clears the alert and
