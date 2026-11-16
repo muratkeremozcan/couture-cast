@@ -11,6 +11,7 @@ import {
   activityConfiguration,
   activityToken,
   assertHierarchySource,
+  readCheckedHierarchy,
   deviceFingerprint,
   assertLiveProvenance,
   countOnCreate,
@@ -1098,6 +1099,66 @@ describe('hierarchy source (two booted simulators)', () => {
         fingerprint: print,
       })
     )
+  })
+
+  // Dispatch 43924119388, community leg: the first read lacked only the battery part of the
+  // fingerprint (cellular and Wi-Fi matched), and the message could not show what the status
+  // bar did say.
+  test('a wrong device names what the status bar showed', () => {
+    const print = deviceFingerprint(udidA)
+    const tree = dump('0.81.5', print)
+    tree.children[1].children[0].children.pop()
+    assert.throws(
+      () => assertHierarchySource(tree, { platform: 'ios', fingerprint: print }),
+      (error) =>
+        error.message.startsWith(
+          `live_font_hierarchy_wrong_device:${print.battery}% battery power seen `
+        ) && error.message.includes('of 3 Wi-Fi bars')
+    )
+  })
+
+  test('a status bar between updates is read again, another device never passes', () => {
+    const print = deviceFingerprint(udidA)
+    const good = dump('0.81.5', print)
+    const partial = dump('0.81.5', print)
+    partial.children[1].children[0].children.pop()
+    const check = (tree) =>
+      assertHierarchySource(tree, { platform: 'ios', fingerprint: print })
+    const reads = (trees) => {
+      const queue = [...trees]
+      const seen = []
+      return {
+        read: () => queue.shift(),
+        onRetry: (error) => seen.push(error.message.split(' ')[0]),
+        seen,
+      }
+    }
+    const transient = reads([partial, good])
+    assert.equal(readCheckedHierarchy({ ...transient, check }), good)
+    assert.equal(transient.seen.length, 1)
+    // Another simulator on every read fails after the third.
+    const other = dump('0.81.5', deviceFingerprint(udidB))
+    const wrong = reads([other, other, other, good])
+    assert.throws(() => readCheckedHierarchy({ ...wrong, check }), {
+      message: /^live_font_hierarchy_wrong_device/,
+    })
+    assert.equal(wrong.seen.length, 2)
+    // Another build fails at once.
+    const build = reads([dump('0.88.1', print), good])
+    assert.throws(
+      () =>
+        readCheckedHierarchy({
+          ...build,
+          check: (tree) =>
+            assertHierarchySource(tree, {
+              platform: 'ios',
+              fingerprint: print,
+              reactNativeVersion: '0.81.5',
+            }),
+        }),
+      { message: 'live_font_hierarchy_wrong_build:0.88.1' }
+    )
+    assert.equal(build.seen.length, 0)
   })
 
   test("a dump carrying another build's markers fails", () => {

@@ -878,7 +878,9 @@ export function assertHierarchySource(
       (part) => !texts.some((text) => whole(part).test(text))
     )
     if (missing.length)
-      throw new Error(`live_font_hierarchy_wrong_device:${missing.join('|')}`)
+      throw new Error(
+        `live_font_hierarchy_wrong_device:${missing.join('|')} seen ${JSON.stringify(texts)}`
+      )
   }
   if (reactNativeVersion) {
     // A dump without the environment marker cannot show the build, and on Android this is the
@@ -886,6 +888,29 @@ export function assertHierarchySource(
     const seen = flattenHierarchy(tree, { platform }).environment?.reactNativeVersion
     if (seen !== reactNativeVersion)
       throw new Error(`live_font_hierarchy_wrong_build:${seen ?? 'missing'}`)
+  }
+}
+
+/** The source failures a fresh read can clear: a missing marker, a status bar mid-update. */
+const REREAD = /^live_font_hierarchy_(wrong_build:missing$|wrong_device:)/
+
+/**
+ * Reads a hierarchy and checks its source (assertHierarchySource), reading again up to
+ * `attempts` times when the failure can be a moment's: a window change between mounts drops the
+ * environment marker, and dispatch 43924119388 read a status bar whose battery part was missing
+ * while its cellular and Wi-Fi parts matched. Another device or build on every read still fails,
+ * on the last read; another build fails at once. `onRetry` hears each failure read again.
+ */
+export function readCheckedHierarchy({ read, check, attempts = 3, onRetry }) {
+  for (let attempt = 1; ; attempt += 1) {
+    const tree = read()
+    try {
+      check(tree)
+      return tree
+    } catch (error) {
+      if (attempt >= attempts || !REREAD.test(error.message)) throw error
+      onRetry?.(error)
+    }
   }
 }
 
