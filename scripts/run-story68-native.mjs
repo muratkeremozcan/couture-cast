@@ -27,6 +27,10 @@ import {
 import { summarizeNativeFlowFailure } from './lib/share-card-native-failure.mjs'
 import { recordNativeFlowDiagnostics } from './lib/share-card-native-diagnostics.mjs'
 import { clearAuditScreens, exportAuditScreens } from './lib/share-card-audit-screens.mjs'
+import {
+  auditStatusBarClearArgs,
+  auditStatusBarOverrideArgs,
+} from './lib/story68-audit-status-bar.mjs'
 import { assertShareCardDialogStatusBar } from './lib/share-card-system-bars.mjs'
 import { withColdAndroidFontScale } from './lib/story68-cold-font-scale.mjs'
 import { runReleaseLiveFontCommand } from './lib/story68-release-live-font-command.mjs'
@@ -1103,6 +1107,9 @@ if (command === 'prebuild') {
   await new Promise((resolve) => control.listen(63068, '127.0.0.1', resolve))
   // Resolve the container before the first focus read; a failure is retried by the next request.
   await readContainer().catch(() => undefined)
+  // The audit reads the system status bar's pixels too: pinned, it draws no no-service dots for
+  // Vision to read as text (story68-audit-status-bar.mjs). Cleared in the finally below.
+  run('xcrun', auditStatusBarOverrideArgs(device))
   const result = path.join(directory, `accessibility-ios-${Date.now()}.xcresult`)
   const auditLog = path.join(directory, 'accessibility-ios.log')
   const offset = fs.existsSync(auditLog) ? fs.statSync(auditLog).size : 0
@@ -1189,6 +1196,12 @@ if (command === 'prebuild') {
     }
   } finally {
     await new Promise((resolve) => control.close(resolve))
+    // A failed clear is reported and never replaces the audit's own result.
+    try {
+      run('xcrun', auditStatusBarClearArgs(device))
+    } catch {
+      console.log(JSON.stringify({ auditStatusBarClear: 'failed' }))
+    }
   }
 } else if (command === 'serve') {
   const env = ownedEnv()
