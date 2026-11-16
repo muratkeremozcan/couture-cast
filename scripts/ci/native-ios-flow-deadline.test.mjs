@@ -21,6 +21,17 @@ function reapOwnedCommand(t, pidFile) {
   })
 }
 
+/**
+ * Whether `pid` still runs. A killed process whose parent already exited stays a zombie until
+ * launchd reaps it, and process.kill(pid, 0) still succeeds on it; on a loaded machine (load
+ * average 160, 2026-11-16) that outlasted this file's 5 s wait. A zombie runs nothing.
+ */
+function running(pid) {
+  const ps = spawnSync('ps', ['-o', 'stat=', '-p', String(pid)], { encoding: 'utf8' })
+  const state = ps.stdout.trim()
+  return ps.status === 0 && state !== '' && !state.startsWith('Z')
+}
+
 const delayedTermination =
   "process.on('SIGTERM',()=>setTimeout(()=>process.exit(143),300));setInterval(()=>{},1000)"
 
@@ -127,14 +138,10 @@ test('a worker stopped by its parent still kills the owned group and writes its 
   assert.equal(result.status, 143)
   assert.equal(result.deadline.timedOut, false)
   const pid = Number(fs.readFileSync(pidFile, 'utf8'))
-  let alive = true
+  let alive = running(pid)
   for (let i = 0; i < 50 && alive; i++) {
-    try {
-      process.kill(pid, 0)
-      spawnSync('sleep', ['0.1'])
-    } catch {
-      alive = false
-    }
+    spawnSync('sleep', ['0.1'])
+    alive = running(pid)
   }
   assert.equal(alive, false, 'the owned command must not outlive its worker')
 })
@@ -205,14 +212,10 @@ async function signalledWorker(t, signal) {
   const exited = new Promise((resolve) => worker.once('exit', (code) => resolve(code)))
   worker.kill(signal)
   const code = await exited
-  let alive = true
+  let alive = running(pid)
   for (let i = 0; i < 50 && alive; i++) {
-    try {
-      process.kill(pid, 0)
-      await new Promise((resolve) => setTimeout(resolve, 100))
-    } catch {
-      alive = false
-    }
+    await new Promise((resolve) => setTimeout(resolve, 100))
+    alive = running(pid)
   }
   return { code, alive, record: fs.existsSync(timingFile) }
 }
@@ -271,14 +274,10 @@ test('an uncaught error kills the owned group and writes the record even when lo
   assert.equal(result.status, 1)
   assert.equal(JSON.parse(fs.readFileSync(timingFile, 'utf8')).timedOut, false)
   const pid = Number(fs.readFileSync(pidFile, 'utf8'))
-  let alive = true
+  let alive = running(pid)
   for (let i = 0; i < 50 && alive; i++) {
-    try {
-      process.kill(pid, 0)
-      spawnSync('sleep', ['0.1'])
-    } catch {
-      alive = false
-    }
+    spawnSync('sleep', ['0.1'])
+    alive = running(pid)
   }
   assert.equal(alive, false, 'the owned command must not outlive its worker')
 })
