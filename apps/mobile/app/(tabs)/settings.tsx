@@ -393,13 +393,17 @@ export default function SettingsScreen() {
     // own bottom inset, so only the side insets apply here. Top and bottom insets again
     // left fixed bands of the navigation background that clipped the content.
     <SafeAreaView style={styles.safeArea} edges={['left', 'right']}>
+      {/* Beside the scroll view, so it stays in the viewport: inside the content, at half its
+          height, it fell below the window once the content grew past twice the window, and iOS
+          left it out of the hierarchy (live font run 43800364098, Settings at large after
+          accessibility-medium). */}
+      <LiveFontMountMarker scope="settings" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.container} testID="settings-screen">
-          <LiveFontMountMarker scope="settings" />
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle} testID="settings-language-title">
               {t('settings.language', { defaultValue: 'Language' })}
