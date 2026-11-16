@@ -18,6 +18,10 @@ import { test as webhookFixture } from '@seontechnologies/playwright-utils/webho
 import { test as recurse } from '@seontechnologies/playwright-utils/recurse/fixtures'
 import { resolveEnvironmentConfig } from '../../config/environments'
 import { drainApiProxy } from '../helpers/browser-api-proxy'
+import {
+  createImmutableAssetCache,
+  type ImmutableAssetCache,
+} from '../helpers/immutable-asset-cache'
 import coutureCastAuthProvider from '../auth-session/custom-auth-provider'
 
 // Register the provider in the fixture module, not only global setup, so UI mode,
@@ -77,6 +81,24 @@ const drainedProxyPage = base.extend({
   },
 })
 
+// One asset cache per worker: each test's page loads the web app's hashed build output from it
+// after the worker's first request for each file (helpers/immutable-asset-cache.ts).
+const immutableAssetPage = base.extend<
+  Record<never, never>,
+  { immutableAssetCache: ImmutableAssetCache }
+>({
+  immutableAssetCache: [
+    async ({}, use) => {
+      await use(createImmutableAssetCache())
+    },
+    { scope: 'worker' },
+  ],
+  page: async ({ page, immutableAssetCache }, use) => {
+    await immutableAssetCache.attach(page.context())
+    await use(page)
+  },
+})
+
 // Service-role headers belong to API seeding only. Browser contexts carry none, so
 // every page proves the app sends its own bearer (see environments.ts apiHeaders).
 const serviceRequest = base.extend({
@@ -113,7 +135,8 @@ export const test = mergeTests(
   networkRecorder,
   networkErrorMonitor,
   recurse,
-  drainedProxyPage
+  drainedProxyPage,
+  immutableAssetPage
 )
 
 // Capture Playwright test context and mock PostHog ingest endpoints before every test.
