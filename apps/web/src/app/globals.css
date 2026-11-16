@@ -154,3 +154,20 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Owner report 2026-11-16: a signed-in member saw the landing's Start signup and Sign in and ran
+ * Google sign-in again. lib/landing-session.ts names the session on <html data-session> before
+ * first paint; these rules show the matching landing actions from that first paint. With no
+ * attribute at all (the script could not run) the page stays the signed-out landing.
+ * A pending session keeps the signed-out actions' space but shows neither set.
+ */
+html:not([data-session='member']) [data-landing='member'] {
+  display: none !important;
+}
+html[data-session='member'] [data-landing='guest'] {
+  display: none !important;
+}
+html[data-session='pending'] [data-landing='guest'] {
+  visibility: hidden;
+}

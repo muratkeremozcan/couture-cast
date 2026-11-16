@@ -22,6 +22,7 @@ import {
 import { FetchError, ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 
 export { hasWebSession } from './commerce'
 
@@ -52,7 +53,7 @@ function readAccessToken(): string {
   const token =
     typeof window === 'undefined'
       ? null
-      : (window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
+      : (readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
   if (!token) {
     throw new LocationRequestError('signed_out', 'Sign in to manage locations.')
   }

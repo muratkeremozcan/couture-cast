@@ -97,7 +97,15 @@ export async function armGoogleStandIn(page: Page, identity: StandInIdentity) {
         throw new Error(
           `GoTrue authorize did not redirect to the mock (${toProvider.status}).`
         )
-      await route.fulfill({ status: 302, headers: { location: mockUrl } })
+      // Playwright's WebKit cannot fulfill a redirect status, so there the page replaces itself
+      // with the mock URL: the same single hop, with no history entry of its own.
+      if (page.context().browser()?.browserType().name() === 'webkit')
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/html',
+          body: `<!doctype html><script>location.replace(${JSON.stringify(mockUrl)})</script>`,
+        })
+      else await route.fulfill({ status: 302, headers: { location: mockUrl } })
     }
   )
   return { authorizes }

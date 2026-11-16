@@ -27,6 +27,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
+import { readStorage } from './browser-persistence'
 
 export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
 
@@ -65,7 +66,7 @@ export class WardrobeRequestError extends Error {
 }
 
 function readAccessToken(): string {
-  const token = window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
+  const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
   if (!token) {
     throw new Error('Your session expired. Sign in again before adding a garment.')
   }

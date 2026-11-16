@@ -114,9 +114,19 @@ for (const locale of ['en-US', 'de-DE']) {
         'The signed-in fixture session exists only on the local stack.'
       )
       for (const route of MEMBER_ROUTES)
-        test(`O-1 ${route} fits a phone, signed in`, async ({ page }) => {
+        test(`O-1 ${route} fits a phone, signed in`, async ({ page }, testInfo) => {
           await open(page, route)
           await expectNoOverflow(page, route)
+          // TEA opens these before sign-off: the header the owner reported, at 393 px.
+          if (route === '/wardrobe')
+            for (const colorScheme of SCHEMES) {
+              await page.setViewportSize({ width: 393, height: 852 })
+              await page.emulateMedia({ colorScheme })
+              await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
+                body: await page.locator('header').first().screenshot(),
+                contentType: 'image/png',
+              })
+            }
         })
     })
 

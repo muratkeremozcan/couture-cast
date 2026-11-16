@@ -33,13 +33,13 @@ export default function Home() {
         <nav
           aria-label="Primary"
           data-testid="primary-nav"
-          className="flex w-full gap-4 overflow-x-auto pb-1 text-sm uppercase tracking-wide sm:w-auto sm:gap-6"
+          className="flex w-full flex-wrap gap-x-4 gap-y-2 pb-1 text-sm uppercase tracking-wide sm:w-auto sm:gap-6"
         >
           {navLinks.map((link) => (
             <a
               key={link.href}
               href={link.href}
-              className="hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
+              className="whitespace-nowrap hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
               data-testid={link.testId}
               data-ph-event="nav_link_clicked"
               data-ph-label={link.label}
@@ -81,7 +81,9 @@ export default function Home() {
           <div className="flex flex-wrap items-center gap-3">
             <Link
               href="/signup"
-              className="inline-flex rounded-full border border-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-200 transition hover:bg-amber-300 hover:text-black"
+              data-testid="landing-sign-up"
+              data-landing="guest"
+              className="inline-flex rounded-full border border-amber-300 whitespace-nowrap px-5 py-3 text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-amber-200 transition hover:bg-amber-300 hover:text-black"
               data-ph-event="cta_clicked"
               data-ph-cta-label="Start signup"
               data-ph-cta-type="primary"

@@ -21,6 +21,7 @@ import {
   submitWebFederatedSignup,
 } from './signup'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 let client: SupabaseClient | undefined
 let member: string | null = null
 let principal: string | null = null
@@ -38,7 +39,7 @@ const authStorageKey = 'couturecast.auth-session'
 export const webSessionIdentity = () => member
 /** A stored session that verification has not yet named a member for, or cleared. */
 export const hasStoredWebSession = () =>
-  !localSignedOut && window.localStorage.getItem(authStorageKey) !== null
+  !localSignedOut && readStorage('local', authStorageKey) !== null
 /**
  * Why sign-in failed, in terms a person can act on: `denied` means this address has no
  * CoutureCast account that can sign in (retrying will not help); `code_invalid` means the
@@ -75,6 +76,8 @@ function webAuthStorage(): AuthSessionStorage {
   try {
     const probe = `${authStorageKey}-probe`
     window.localStorage.setItem(probe, probe)
+    // Safari's Block All Cookies can refuse reads as well as writes (TEA H-2).
+    window.localStorage.getItem(probe)
     window.localStorage.removeItem(probe)
     return withoutProviderTokens(window.localStorage, authStorageKey)
   } catch {
@@ -191,7 +194,7 @@ async function verifySession(session: Session | null) {
   }
 }
 export async function startWebSession() {
-  const fixture = window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  const fixture = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)
   if (process.env.NEXT_PUBLIC_E2E_AUTH === 'true' && fixture?.startsWith('test-token'))
     return () => undefined
   const auth = webSupabase().auth
@@ -352,7 +355,7 @@ type FinishMarker = { from: 'preview' | null; door: SignInDoor }
 
 export function readFederatedFinishMarker(): FinishMarker | null {
   try {
-    const raw = window.sessionStorage.getItem(FEDERATED_FINISH_MARKER_KEY)
+    const raw = readStorage('session', FEDERATED_FINISH_MARKER_KEY)
     if (raw === null) return null
     const parsed: unknown = JSON.parse(raw)
     const record = parsed && typeof parsed === 'object' ? parsed : {}

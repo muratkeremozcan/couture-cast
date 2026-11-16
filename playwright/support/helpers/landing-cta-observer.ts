@@ -19,7 +19,7 @@ export const MEMBER_LANDING_ACTIONS = [
   '[data-testid="landing-sign-out"]',
 ] as const
 
-export type LandingActionsSeen = { guest: string[]; member: string[] }
+export type LandingActionsSeen = { guest: string[]; member: string[]; states: string[] }
 
 declare global {
   interface Window {
@@ -31,7 +31,21 @@ declare global {
 export async function recordLandingActions(page: Page) {
   await page.addInitScript(
     ({ guest, member }) => {
-      const seen: LandingActionsSeen = { guest: [], member: [] }
+      const seen: LandingActionsSeen = { guest: [], member: [], states: [] }
+      // Every value <html data-session> takes, from the head script's on, in order. The init
+      // script runs before <html> exists, so the observer watches the document itself.
+      const state = () => {
+        const root = document.documentElement
+        if (!root) return
+        const value = root.getAttribute('data-session') ?? '(unset)'
+        if (seen.states[seen.states.length - 1] !== value) seen.states.push(value)
+      }
+      new MutationObserver(state).observe(document, {
+        attributes: true,
+        attributeFilter: ['data-session'],
+        childList: true,
+        subtree: true,
+      })
       window.__landingActionsSeen = seen
       const visible = (element: Element) => {
         if (!(element instanceof HTMLElement)) return false
@@ -43,6 +57,7 @@ export async function recordLandingActions(page: Page) {
         })
       }
       const sample = () => {
+        state()
         for (const [kind, selectors] of [
           ['guest', guest],
           ['member', member],
@@ -68,7 +83,7 @@ export async function recordLandingActions(page: Page) {
 /** What the page recorded since its last load. */
 export async function landingActionsSeen(page: Page): Promise<LandingActionsSeen> {
   return page.evaluate(() => {
-    const seen = window.__landingActionsSeen ?? { guest: [], member: [] }
-    return { guest: [...seen.guest], member: [...seen.member] }
+    const seen = window.__landingActionsSeen ?? { guest: [], member: [], states: [] }
+    return { guest: [...seen.guest], member: [...seen.member], states: [...seen.states] }
   })
 }

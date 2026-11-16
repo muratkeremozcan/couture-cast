@@ -15,6 +15,8 @@ export const itIT: GuestPreviewStrings = {
       "Crea un account per aggiungere i tuoi vestiti. Dopo l'accesso puoi scegliere di salvare le tue preferenze di comfort. I capi di esempio e i Mi piace dell'anteprima restano in questa anteprima.",
     createAccount: 'Crea account',
     signIn: 'Accedi',
+    openWardrobe: 'Apri il tuo guardaroba',
+    signOut: 'Esci',
     resetPreview: 'Reimposta anteprima',
     exitPreview: "Esci dall'anteprima",
     storageUnavailable: 'Questa anteprima potrebbe azzerarsi quando la chiudi.',

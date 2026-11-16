@@ -249,15 +249,18 @@ function WardrobeHubView() {
         <SkipToContent />
 
         <header className="border-b border-zinc-200 bg-white px-6 py-4 dark:border-zinc-800 dark:bg-zinc-900">
-          <div className="mx-auto flex max-w-5xl items-center justify-between">
+          {/* Owner report 2026-11-16, iPhone 16 Safari: on one row the actions squeezed the
+              title, wrapped Outfit capsules and pushed + Add Garment off the screen. Below the
+              sm breakpoint the title takes its own row and the actions wrap beneath it. */}
+          <div className="mx-auto flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Wardrobe Hub
             </h1>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               {/* The capsules route had no entry point anywhere in the app. */}
               <Link
                 href="/wardrobe/capsules"
-                className="flex min-h-[44px] items-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 data-testid="wardrobe-capsules-link"
               >
                 Outfit capsules
@@ -272,14 +275,14 @@ function WardrobeHubView() {
                     ? 'Unable to load your account. Reload the page to try again.'
                     : undefined
                 }
-                className="flex min-h-[44px] items-center rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 {t('wardrobe.silhouette.title')}
               </button>
               <button
                 ref={addGarmentButtonRef}
                 onClick={(event) => openCapture(event.currentTarget)}
-                className="min-h-[44px] rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+                className="min-h-[44px] whitespace-nowrap rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
               >
                 + Add Garment
               </button>
