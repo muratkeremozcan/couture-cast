@@ -604,6 +604,58 @@ describe('stitchPages', () => {
     })
   })
 
+  // iOS dispatch 43852018196, Settings before extra-extra-extra-large: the scroll had already
+  // reached the bottom but one, and the last drag moved under a point (page 6 tops -140 where page
+  // 5 showed -139). With no anchor beyond the tolerance, the step fell back to a whole drag, so
+  // the Premium section was counted twice (42 texts against 33).
+  test('a final drag that barely moves takes the step its texts agree on', () => {
+    const tops = [100.4, 400.6, 700.4, 1000.6, 1300.4]
+    const offsets = [0, 300, 300.6]
+    const shown = [
+      [1, 2, 3, 4],
+      [2, 3, 4, 5],
+      [2, 3, 4, 5],
+    ]
+    const y = (n, page) => tops[n - 1] - offsets[page]
+    const card = (n, top) => ({
+      id: `c${n}`,
+      text: `Card ${n}`,
+      bounds: `[0,${Math.round(top)}][100,${Math.round(top) + 100}]`,
+    })
+    const pages = shown.map((cards, page) => cards.map((n) => card(n, y(n, page))))
+    const records = shown.map((cards, page) =>
+      cards.map((n) => ({
+        text: `Card ${n}`,
+        viewRect: [0, y(n, page), 100, y(n, page) + 100],
+      }))
+    )
+    const bottom = { expectedShift: 300, reachedBottom: true, records }
+    const stitched = stitchPlaces(pages, bottom)
+    assert.deepEqual(stitched.offsets.slice(0, 2), [0, 300])
+    assert.ok(Math.abs(stitched.offsets[2] - 300.6) < 1e-9, String(stitched.offsets[2]))
+    assert.deepEqual(
+      stitched.taken.map(({ key }) => JSON.parse(key)[1]),
+      ['Card 1', 'Card 2', 'Card 3', 'Card 4', 'Card 5']
+    )
+    // Hierarchy bounds alone read the step to the whole unit and still place nothing twice.
+    assert.deepEqual(
+      stitchPlaces(pages, { expectedShift: 300, reachedBottom: true }).taken.length,
+      5
+    )
+    // A last page not known to be the bottom is never short.
+    assert.deepEqual(
+      stitchPlaces(pages, { expectedShift: 300, records }).offsets,
+      [0, 300, 600]
+    )
+    // One text that stayed put confirms nothing: a new page that shares one label by chance
+    // keeps the whole drag.
+    const lone = [pages[0], pages[1], [card(5, y(5, 1)), card(9, 900)]]
+    assert.deepEqual(
+      stitchPlaces(lone, { expectedShift: 300, reachedBottom: true }).offsets,
+      [0, 300, 600]
+    )
+  })
+
   // CodeRabbit on PR 230: a still header and a new label of the same id-less text on the last
   // page; only the header's copy is chrome, the label is new text with its own place.
   test('still chrome on the last page is one node, nearest its place', () => {

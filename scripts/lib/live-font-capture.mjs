@@ -353,7 +353,8 @@ const WHOLE_UNIT = 1
  * P2-1, r49 P2-4): that drag moves only the travel left. Its anchors are the shifts a drag can
  * make, above `tolerance` (a fixed node, such as a sticky chip's record, shifts by 0) and at
  * most a whole drag (a repeated text paired with a lower copy shifts backwards). With none, the
- * page shares no moving text and the step stays unmeasured (null). The step is the median of
+ * drag either barely moved (settledStep) or shares no moving text, and the step stays
+ * unmeasured (null). The step is the median of
  * the exact anchors (probe records), or of every anchor when none is exact. Anchors that do not
  * all sit within SHIFT_SPREAD of it, plus their own `rounding` (WHOLE_UNIT for a hierarchy
  * anchor, iOS run 43773613293 Settings: records 5.4, the same cards' nodes 5 and 6), fail as
@@ -365,7 +366,7 @@ function shortFinalStep(entries, { tolerance, expectedShift }) {
   const anchors = entries.filter(
     ({ shift }) => shift > tolerance && shift <= (1 + SHIFT_SPREAD) * expectedShift
   )
-  if (!anchors.length) return null
+  if (!anchors.length) return settledStep(entries, { tolerance })
   const shifts = anchors.map(({ shift }) => shift)
   const exact = anchors.filter(({ rounding }) => rounding === 0)
   const step = median((exact.length ? exact : anchors).map(({ shift }) => shift))
@@ -384,6 +385,20 @@ function shortFinalStep(entries, { tolerance, expectedShift }) {
       `live_font_scroll_short_drag_unconfirmed: final drag of ${step} px measured by ${texts.size} text`
     )
   return step
+}
+
+/**
+ * The step of a drag that reaches the bottom by under `tolerance` (iOS dispatch 43852018196,
+ * Settings: the last drag moved under a point): every anchor stayed within the tolerance, so the
+ * step is their median, from the exact ones when there are any. Fewer than two texts confirm
+ * nothing (one label shared by chance), and an anchor that moved farther leaves the step
+ * unmeasured: null in both cases.
+ */
+function settledStep(entries, { tolerance }) {
+  if (!entries.every(({ shift }) => Math.abs(shift) <= tolerance)) return null
+  if (new Set(entries.map(({ text }) => text)).size < 2) return null
+  const exact = entries.filter(({ rounding }) => rounding === 0)
+  return median((exact.length ? exact : entries).map(({ shift }) => shift))
 }
 
 /**
