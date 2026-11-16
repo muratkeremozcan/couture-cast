@@ -830,8 +830,20 @@ export function runTimezone({
 }
 
 /**
+ * The battery levels a simulator's status bar shows as set: it keeps the level as a fraction, and
+ * a level whose fraction times 100 falls below it is shown one lower (dispatch 43962043900: 57%
+ * read "56% battery power"; 0.57 * 100 is 56.99999999999999). Levels 29, 53, 57, 58 and 59 do
+ * that in double or single precision.
+ */
+const BATTERY_LEVELS = Array.from({ length: 99 }, (_, index) => index + 1).filter(
+  (level) =>
+    Math.floor((level / 100) * 100) === level &&
+    Math.floor(Math.fround(Math.fround(level / 100) * 100)) === level
+)
+
+/**
  * A status bar the proof sets on the simulator under test (`xcrun simctl status_bar override`),
- * derived from its UDID: battery 1 to 99%, 0 to 4 cellular bars, 0 to 2 Wi-Fi bars, so an
+ * derived from its UDID: a battery level from BATTERY_LEVELS, 0 to 4 cellular bars, 0 to 2 Wi-Fi bars, so an
  * unmarked simulator (100%, three Wi-Fi bars) never matches. Maestro 2.8 serves `hierarchy` for
  * every iOS simulator through the one port 22087, so with a driver already up for another
  * booted simulator a read returns that simulator's screen; the status bar names the device.
@@ -843,7 +855,7 @@ export function deviceFingerprint(udid) {
     hash = Math.imul(hash, 16777619) >>> 0
   }
   return {
-    battery: 1 + (hash % 99),
+    battery: BATTERY_LEVELS[hash % BATTERY_LEVELS.length],
     cellular: Math.floor(hash / 99) % 5,
     wifi: Math.floor(hash / 495) % 3,
   }
@@ -904,15 +916,13 @@ export function assertHierarchySource(
   }
 }
 
-/** The source failures a fresh read can clear: a missing marker, a status bar mid-update. */
-const REREAD = /^live_font_hierarchy_(wrong_build:missing$|wrong_device:)/
+/** The source failure a fresh read can clear: a window change between mounts drops the marker. */
+const REREAD = /^live_font_hierarchy_wrong_build:missing$/
 
 /**
  * Reads a hierarchy and checks its source (assertHierarchySource), reading again up to
- * `attempts` times when the failure can be a moment's: a window change between mounts drops the
- * environment marker, and dispatch 43924119388 read a status bar whose battery part was missing
- * while its cellular and Wi-Fi parts matched. Another device or build on every read still fails,
- * on the last read; another build fails at once. `onRetry` hears each failure read again.
+ * `attempts` times only when the environment marker is missing, which a window change between
+ * mounts causes. Another device or build fails at once. `onRetry` hears each failure read again.
  */
 export function readCheckedHierarchy({ read, check, attempts = 3, onRetry }) {
   for (let attempt = 1; ; attempt += 1) {
