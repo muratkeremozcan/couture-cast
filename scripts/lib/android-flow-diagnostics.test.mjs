@@ -12,6 +12,7 @@ import {
   createLineLog,
   describeExpoGoPid,
   logcatSinceArgs,
+  metroOutputSince,
 } from './android-flow-diagnostics.mjs'
 
 describe('logcatSinceArgs', () => {
@@ -95,11 +96,12 @@ describe('createLineLog', () => {
   test('keeps whole lines with the time each arrived, and returns those since a moment', () => {
     let now = 1000
     const metro = createLineLog({ now: () => now })
-    metro.write('Android Bundled 141ms apps/mobile/index.ts (1 module)\nAndroid ')
+    const out = metro.writer()
+    out.write('Android Bundled 141ms apps/mobile/index.ts (1 module)\nAndroid ')
     now = 2000
-    metro.write('Bundled 45ms node_modules/expo-file-system/legacy.ts (1 module)\n')
+    out.write('Bundled 45ms node_modules/expo-file-system/legacy.ts (1 module)\n')
     now = 3000
-    metro.write(Buffer.from(' WARN  late\n'))
+    out.write(Buffer.from(' WARN  late\n'))
     assert.equal(
       metro.since(1500),
       [
@@ -114,10 +116,57 @@ describe('createLineLog', () => {
   test('keeps at most maxLines, dropping the oldest', () => {
     let now = 0
     const metro = createLineLog({ now: () => (now += 1), maxLines: 2 })
-    for (const line of ['a', 'b', 'c']) metro.write(`${line}\n`)
+    const out = metro.writer()
+    for (const line of ['a', 'b', 'c']) out.write(`${line}\n`)
     assert.equal(
       metro.since(0),
       '1970-01-01T00:00:00.002Z b\n1970-01-01T00:00:00.003Z c\n'
+    )
+  })
+
+  // CodeRabbit on PR 242: one partial line for both streams spliced a stderr error into a
+  // stdout bundle line, and an error with no newline was never saved.
+  test('keeps each stream whole and shows an unterminated line without consuming it', () => {
+    let now = 0
+    const metro = createLineLog({ now: () => (now += 1) })
+    const out = metro.writer()
+    const err = metro.writer()
+    out.write('Android Bun')
+    err.write('Error: disconnected\n')
+    out.write('dled 45ms apps/mobile/index.ts\n')
+    err.write('Error: connection closed')
+    const lines = metro.since(0)
+    assert.equal(
+      lines,
+      [
+        '1970-01-01T00:00:00.002Z Error: disconnected',
+        '1970-01-01T00:00:00.003Z Android Bundled 45ms apps/mobile/index.ts',
+        '1970-01-01T00:00:00.004Z Error: connection closed',
+        '',
+      ].join('\n')
+    )
+    assert.equal(metro.since(0), lines, 'reading takes nothing away')
+    err.write(' by peer\n')
+    assert.match(metro.since(0), /Z Error: connection closed by peer\n$/)
+  })
+})
+
+describe('metroOutputSince', () => {
+  test('tells a Metro this run did not start apart from a Metro that said nothing', () => {
+    const metro = createLineLog({ now: () => 10 })
+    assert.equal(
+      metroOutputSince(metro, 0),
+      'Metro output was not captured: this run did not start Metro.\n'
+    )
+    const out = metro.writer()
+    assert.equal(
+      metroOutputSince(metro, 0),
+      'Metro printed nothing since the flow started.\n'
+    )
+    out.write('Android Bundled 9ms\n')
+    assert.equal(
+      metroOutputSince(metro, 0),
+      '1970-01-01T00:00:00.010Z Android Bundled 9ms\n'
     )
   })
 })

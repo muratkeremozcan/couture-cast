@@ -95,28 +95,60 @@ export function androidFailureCaptures(startedAtMs) {
 /**
  * A rolling record of a child's output by line, each stamped with the time it arrived, so the
  * runner can save what Metro printed over a failed flow (its "Android Bundled" lines are the
- * bundle requests). A partial line waits for its end; the oldest lines go past `maxLines`.
+ * bundle requests). Each `writer()` (stdout, stderr) keeps its own partial line, so two streams
+ * never splice into one line, and `since` also shows a partial line still waiting for its end,
+ * stamped with its last write, without consuming it (CodeRabbit on PR 242). The oldest lines go
+ * past `maxLines`. `capturing()` says whether any writer exists: a runner that reused a Metro it
+ * did not start has none, and its silence means nothing.
  *
  * @param {{ now?: () => number, maxLines?: number }} [options]
- * @returns {{ write: (chunk: string | Buffer) => void, since: (ms: number) => string }}
+ * @returns {{
+ *   writer: () => { write: (chunk: string | Buffer) => void },
+ *   since: (ms: number) => string,
+ *   capturing: () => boolean,
+ * }}
  */
 export function createLineLog({ now = Date.now, maxLines = 20_000 } = {}) {
   /** @type {{ at: number, text: string }[]} */
   const lines = []
-  let pending = ''
+  /** @type {{ at: number, text: string }[]} each writer's partial line */
+  const pending = []
+  const stamp = ({ at, text }) => `${new Date(at).toISOString()} ${text}\n`
   return {
-    write(chunk) {
-      const parts = (pending + String(chunk)).split('\n')
-      pending = parts.pop() ?? ''
-      const at = now()
-      for (const text of parts) lines.push({ at, text })
-      if (lines.length > maxLines) lines.splice(0, lines.length - maxLines)
+    writer() {
+      const partial = { at: 0, text: '' }
+      pending.push(partial)
+      return {
+        write(chunk) {
+          const parts = (partial.text + String(chunk)).split('\n')
+          const at = now()
+          partial.text = parts.pop() ?? ''
+          partial.at = at
+          for (const text of parts) lines.push({ at, text })
+          if (lines.length > maxLines) lines.splice(0, lines.length - maxLines)
+        },
+      }
     },
     since(ms) {
-      return lines
+      return [...lines, ...pending.filter(({ text }) => text)]
         .filter(({ at }) => at >= ms)
-        .map(({ at, text }) => `${new Date(at).toISOString()} ${text}\n`)
+        .sort((a, b) => a.at - b.at)
+        .map(stamp)
         .join('')
     },
+    capturing: () => pending.length > 0,
   }
+}
+
+/**
+ * The Metro artifact text for a failed flow: its lines since `startedAtMs`, or why there are none.
+ *
+ * @param {ReturnType<typeof createLineLog>} metroLog
+ * @param {number} startedAtMs
+ * @returns {string}
+ */
+export function metroOutputSince(metroLog, startedAtMs) {
+  if (!metroLog.capturing())
+    return 'Metro output was not captured: this run did not start Metro.\n'
+  return metroLog.since(startedAtMs) || 'Metro printed nothing since the flow started.\n'
 }

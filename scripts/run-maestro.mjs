@@ -62,6 +62,7 @@ import {
   ANDROID_LOG_BUFFER,
   androidFailureCaptures,
   createLineLog,
+  metroOutputSince,
 } from './lib/android-flow-diagnostics.mjs'
 import {
   describeMissingReport,
@@ -3879,11 +3880,14 @@ const startExpoDevServer = (platform, metroPort) => {
   for (const [stream, out] of [
     [serverProcess.stdout, process.stdout],
     [serverProcess.stderr, process.stderr],
-  ])
-    stream?.on('data', (chunk) => {
+  ]) {
+    if (!stream) continue
+    const record = metroLog.writer()
+    stream.on('data', (chunk) => {
       out.write(chunk)
-      metroLog.write(chunk)
+      record.write(chunk)
     })
+  }
   serverProcess.on('exit', (code) => {
     if (code !== null && code !== 0) {
       console.error(`[maestro:runner] Expo dev server exited early with code ${code}`)
@@ -4584,7 +4588,7 @@ const captureAndroidWindowStack = (flowPath, serial = androidSerial, startedAtMs
   if (Number.isFinite(startedAtMs))
     saveDiagnostic(
       artifact('metro'),
-      metroLog.since(startedAtMs) || 'Metro printed nothing since the flow started.\n',
+      metroOutputSince(metroLog, startedAtMs),
       log,
       `Metro's output for ${flowPath}`
     )
