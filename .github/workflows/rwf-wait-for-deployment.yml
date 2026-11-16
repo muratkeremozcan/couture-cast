@@ -15,7 +15,7 @@ on:
         type: string
         required: false
       expected_sha:
-        description: "Commit SHA to match (first 7 chars)"
+        description: "Commit SHA to match (first 7 chars), or several separated by spaces: commits with the same build inputs, any of which the deployment may serve"
         type: string
         required: true
       retries:
@@ -28,6 +28,10 @@ on:
         type: number
         required: false
         default: 30
+    outputs:
+      observed_sha:
+        description: "The commit the deployment serves, one of expected_sha"
+        value: ${{ jobs.wait.outputs.observed_sha }}
 
 jobs:
   wait:
@@ -45,9 +49,27 @@ jobs:
           SLEEP_SECONDS: ${{ inputs.sleep_seconds }}
         run: |
           echo "Waiting for deployment at ${HEALTH_URL}"
-          EXPECTED_SHORT="${EXPECTED_SHA:0:7}"
+          # A production build whose inputs equal the deployed ones is skipped
+          # (scripts/vercel-build-inputs.mjs), so the caller may accept several commits.
+          read -r -a EXPECTED <<< "${EXPECTED_SHA}"
+          if [ "${#EXPECTED[@]}" -eq 0 ]; then
+            echo "❌ expected_sha names no commit."
+            exit 1
+          fi
+          EXPECTED_LABEL="${EXPECTED[0]:0:7}"
+          if [ "${#EXPECTED[@]}" -gt 1 ]; then
+            EXPECTED_LABEL="${EXPECTED_LABEL} or one of $(( ${#EXPECTED[@]} - 1 )) earlier commits with the same inputs"
+          fi
+          expected() {
+            local sha
+            for sha in "${EXPECTED[@]}"; do
+              [ "${sha:0:7}" = "${1:0:7}" ] && return 0
+            done
+            return 1
+          }
 
           MATCHED=false
+          OBSERVED=""
 
           for i in $(seq 1 "${RETRIES}"); do
             RESPONSE=$(curl -s -f "${HEALTH_URL}" || true)
@@ -74,14 +96,15 @@ jobs:
               continue
             fi
 
-            if [ "${DEPLOYED_SHORT}" = "${EXPECTED_SHORT}" ]; then
+            if expected "${DEPLOYED_SHA}"; then
               echo "✅ Deployment healthy with expected SHA: ${DEPLOYED_SHORT}"
               MATCHED=true
+              OBSERVED="${DEPLOYED_SHA}"
               break
             fi
 
             echo "⏳ Health OK but waiting for correct deployment... (attempt ${i}/${RETRIES})"
-            echo "   Expected SHA: ${EXPECTED_SHORT}"
+            echo "   Expected SHA: ${EXPECTED_LABEL}"
             echo "   Deployed SHA: ${DEPLOYED_SHORT}"
             sleep "${SLEEP_SECONDS}"
           done
@@ -92,20 +115,20 @@ jobs:
             exit 1
           fi
 
-          FINAL_SHA=$(curl -s -f "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
-          echo "observed_sha=${FINAL_SHA}" >> "$GITHUB_OUTPUT"
-
           if [ "${MATCHED}" = "false" ]; then
+            FINAL_SHA=$(curl -s -f "${HEALTH_URL}" | jq -r '.gitSha // "unknown"')
             if [ "${FINAL_SHA}" = "unknown" ]; then
               echo "❌ Deployment never reported gitSha; refusing to continue without SHA match."
               exit 1
             fi
 
-            if [ "${FINAL_SHA:0:7}" != "${EXPECTED_SHORT}" ]; then
+            if ! expected "${FINAL_SHA}"; then
               echo "❌ Deployed SHA (${FINAL_SHA}) doesn't match expected (${EXPECTED_SHA}) after waiting."
               exit 1
             fi
+            OBSERVED="${FINAL_SHA}"
           fi
+          echo "observed_sha=${OBSERVED}" >> "$GITHUB_OUTPUT"
 
       - name: Poll secondary endpoint (optional)
         if: ${{ inputs.secondary_url != '' }}

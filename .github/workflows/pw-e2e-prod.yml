@@ -22,23 +22,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  wait-web:
+  # The ignored build step (ignoreCommand in apps/web/vercel.json and apps/api/vercel.json)
+  # skips a production build whose inputs equal the deployed ones, so a project can keep
+  # serving an earlier commit that builds the same source. Each wait accepts the commits on
+  # main's first-parent history with this commit's inputs (scripts/vercel-build-inputs.mjs).
+  served-commits:
     if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.commits.outputs.web }}
+      api: ${{ steps.commits.outputs.api }}
+    steps:
+      - name: Checkout main's recent history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          # equivalentCommits walks at most 100 first-parent commits.
+          fetch-depth: 100
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Commits each project may serve
+        id: commits
+        run: |
+          node scripts/vercel-build-inputs.mjs equivalent web "$GITHUB_SHA"
+          node scripts/vercel-build-inputs.mjs equivalent api "$GITHUB_SHA"
+
+  wait-web:
+    needs: served-commits
     uses: ./.github/workflows/rwf-wait-for-deployment.yml
     with:
       health_url: https://couture-cast-web.vercel.app/api/health
-      expected_sha: ${{ github.sha }}
+      expected_sha: ${{ needs.served-commits.outputs.web }}
       retries: 20
       sleep_seconds: 30
 
   wait-api:
-    # Web and API deploy independently, so the API is held to the same SHA.
+    # Web and API deploy independently, so the API is held to its own commits.
     # Its health endpoint is public; /api/v1/events/poll needs a bearer token.
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    needs: served-commits
     uses: ./.github/workflows/rwf-wait-for-deployment.yml
     with:
       health_url: https://couture-cast-api.vercel.app/api/health
-      expected_sha: ${{ github.sha }}
+      expected_sha: ${{ needs.served-commits.outputs.api }}
       retries: 20
       sleep_seconds: 30
 
@@ -51,4 +79,6 @@ jobs:
       gh_ref: ${{ github.sha }}
       deployment_ref: main
       custom_base_url: ''
+      # The web health test checks the commit the web deployment serves.
+      expected_web_sha: ${{ needs.wait-web.outputs.observed_sha }}
     secrets: inherit
