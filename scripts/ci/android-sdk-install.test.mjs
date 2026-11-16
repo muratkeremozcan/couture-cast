@@ -103,6 +103,19 @@ test('the install budget stops new attempts once it runs out', (t) => {
   )
 })
 
+test('a retry whose backoff would overrun the budget stops before sleeping', (t) => {
+  const result = runStep(t, 'echo "Warning: still failing"; exit 1', {
+    SDK_PACKAGES: 'emulator',
+    SDK_INSTALL_BUDGET_SECONDS: '30',
+  })
+  assert.equal(result.status, 1)
+  assert.equal(result.stdout.match(/left nothing behind/g).length, 1)
+  assert.match(
+    result.stdout,
+    /::error::Could not install emulator: the 30 s install budget ran out after 1 attempts\.\n$/
+  )
+})
+
 test('an sdkmanager call that stalls is cut off and the next attempt installs', (t) => {
   const work = mkdtempSync(path.join(os.tmpdir(), 'sdk-install-'))
   t.after(() => rmSync(work, { recursive: true, force: true }))

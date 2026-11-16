@@ -300,7 +300,16 @@ jobs:
               echo "Install attempt ${attempt} of $package left nothing behind; sdkmanager said:"
               tail -n 20 "$log" | sed 's/^/  | /'
               rm -rf "$dir"
-              if [ "$attempt" -lt 6 ]; then sleep "${backoff[$(( attempt - 1 ))]}"; fi
+              if [ "$attempt" -lt 6 ]; then
+                # Never sleep into the step timeout: stop now if the wait would leave
+                # less than 20 s for the next attempt.
+                wait_seconds="${backoff[$(( attempt - 1 ))]}"
+                if [ $(( budget - SECONDS - wait_seconds )) -lt 20 ]; then
+                  echo "::error::Could not install $package: the ${budget} s install budget ran out after ${attempt} attempts."
+                  exit 1
+                fi
+                sleep "$wait_seconds"
+              fi
             done
             echo "::error::Could not install $package after 6 attempts."
             exit 1
