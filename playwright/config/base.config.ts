@@ -42,6 +42,13 @@ export const baseConfig: PlaywrightTestConfig = defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
+    // Owner report 2026-11-16: the Wardrobe Hub header overflowed on an iPhone in Safari, so the
+    // phone-width guard also runs in WebKit with the iPhone 15 descriptor.
+    {
+      name: 'webkit-iphone',
+      use: { ...devices['iPhone 15'] },
+      testMatch: /mobile-viewport-overflow\.spec\.ts$/,
+    },
   ],
 })
 
