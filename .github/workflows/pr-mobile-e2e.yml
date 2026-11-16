@@ -270,25 +270,39 @@ jobs:
             system-images;android-${{ env.ANDROID_API_LEVEL }};${{ env.ANDROID_TARGET }};${{ env.ANDROID_ARCH }}
             emulator
         run: |
+          # Up to 6 attempts per package within one budget for the whole step. Run
+          # 43885395866 lost all 3 attempts at the system image inside 2.5 minutes
+          # (a dl.google.com hiccup), and the old step discarded sdkmanager's
+          # output, so nothing said why. A failed attempt now prints its tail.
           read -r -a packages <<< "$SDK_PACKAGES"
+          budget="${SDK_INSTALL_BUDGET_SECONDS:-420}"
+          backoff=(15 30 45 60 60)
+          log="$(mktemp)"
           for package in "${packages[@]}"; do
             dir="$ANDROID_HOME/${package//;//}"
-            for attempt in 1 2 3; do
+            for attempt in 1 2 3 4 5 6; do
+              remaining=$(( budget - SECONDS ))
+              if [ "$remaining" -lt 20 ]; then
+                echo "::error::Could not install $package: the ${budget} s install budget ran out after $(( attempt - 1 )) attempts."
+                exit 1
+              fi
               # An attempt that has not finished in 180 s has stalled (a whole install
               # takes under a minute); the next one starts clean. Not cached: the repo's
               # Actions cache is at its 10 GB limit, and a 1.5 GB SDK entry would evict
               # the Supabase image and AVD caches every job reads.
-              timeout --kill-after=10 180 sdkmanager --install "$package" --channel=0 > /dev/null || true
+              limit=$(( remaining < 180 ? remaining : 180 ))
+              timeout --kill-after=10 "$limit" sdkmanager --install "$package" --channel=0 > "$log" 2>&1 || true
               # A truncated archive never unpacks, so package.xml is the check.
               if [ -f "$dir/package.xml" ]; then
                 echo "Installed $package"
                 continue 2
               fi
-              echo "Install attempt ${attempt} of $package left nothing behind; retrying."
+              echo "Install attempt ${attempt} of $package left nothing behind; sdkmanager said:"
+              tail -n 20 "$log" | sed 's/^/  | /'
               rm -rf "$dir"
-              sleep $(( attempt * 15 ))
+              if [ "$attempt" -lt 6 ]; then sleep "${backoff[$(( attempt - 1 ))]}"; fi
             done
-            echo "::error::Could not install $package after 3 attempts."
+            echo "::error::Could not install $package after 6 attempts."
             exit 1
           done
 
