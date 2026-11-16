@@ -13,6 +13,8 @@ import {
   RAW_DIR,
   WEB_BASE_URL,
   assertIsolatedDatabaseUrl,
+  consentGrepInvert,
+  realSessionConsentPolicy,
 } from '../../scripts/e2e-real-session/harness.mjs'
 import localConfig from './local.config'
 
@@ -44,6 +46,8 @@ export default defineConfig({
   webServer: undefined,
   globalSetup: undefined,
   globalTeardown: undefined,
+  // GUARDIAN_CONSENT_POLICY picks the lane: the policy-off specs, or only the consent cases.
+  grepInvert: consentGrepInvert(realSessionConsentPolicy()),
   fullyParallel: false,
   workers: 1,
   retries: 0,

@@ -280,4 +280,27 @@ describe('sign-in failure reasons', () => {
       expect(sessionStorage.getItem(key)).toBeNull()
     }
   )
+  // TEA sign-off finding 2 (policy required_13_15): a teen the guardian lock refuses reads the
+  // profile check's 403 as awaiting_guardian only when the identity-keyed status says so.
+  it.each([
+    [{ status: 'awaiting_guardian', accountId: 'teen-1' }, 200, 'awaiting_guardian'],
+    [{ status: 'complete' }, 200, 'denied'],
+    [{ status: 'needs_birthdate' }, 200, 'denied'],
+    [{}, 503, 'denied'],
+  ] as const)(
+    'a verified code whose account check answers 403 and status %j (%i) is %s',
+    async (body, statusCode, expected) => {
+      useMswHandlers(
+        http.get('*/api/v1/user/profile', () => HttpResponse.json({}, { status: 403 })),
+        http.get('*/api/v1/auth/signup/federated', () =>
+          HttpResponse.json(body, { status: statusCode })
+        )
+      )
+      const auth = await import('./web-session')
+      expect(await reason(auth.verifyWebOtp('teen@example.test', '123456'))).toBe(
+        expected
+      )
+      expect(auth.webSessionIdentity()).toBeNull()
+    }
+  )
 })

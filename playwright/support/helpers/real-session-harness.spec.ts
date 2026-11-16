@@ -23,7 +23,12 @@ import {
   type DeleteUserResult,
 } from '../../../scripts/e2e-real-session/cleanup-users.mjs'
 import {
+  CONSENT_REQUIRED_TAG,
+  EXPECTED_CONSENT_REQUIRED_TESTS,
   EXPECTED_REAL_SESSION_TESTS,
+  consentGrepInvert,
+  expectedRealSessionTests,
+  realSessionConsentPolicy,
   assertIsolatedDatabaseUrl,
   envKeysToBlank,
   findIssuableAccount,
@@ -333,8 +338,8 @@ describe('the run fails unless the specs ran (R56)', () => {
   const junit = (attributes: string) =>
     `<?xml version="1.0" encoding="UTF-8"?>\n<testsuites id="" name="" ${attributes} time="12.5">\n<testsuite name="x" tests="9" skipped="0"/>\n</testsuites>`
 
-  it('R56-RS-01 passes the seventeen expected tests with no failure, error or skip', () => {
-    expect(EXPECTED_REAL_SESSION_TESTS).toBe(17)
+  it('R56-RS-01 passes the nineteen expected tests with no failure, error or skip', () => {
+    expect(EXPECTED_REAL_SESSION_TESTS).toBe(19)
     expect(
       junitOutcome(junit('tests="8" failures="0" skipped="0" errors="0"'), 8)
     ).toEqual({ ok: true, tests: 8 })
@@ -587,5 +592,32 @@ describe('Auth proxy', () => {
     await proxy!.close()
     proxy = undefined
     expect(fs.existsSync(otpDir)).toBe(false)
+  })
+})
+
+// Owner ruling 2026-11-16: guardian consent is off by default; the consent cases run only in a
+// lane started with GUARDIAN_CONSENT_POLICY=required_13_15.
+describe('the lane runs the tests of its guardian consent policy', () => {
+  it('reads off unless the lane asks for required_13_15', () => {
+    expect(realSessionConsentPolicy({})).toBe('off')
+    expect(realSessionConsentPolicy({ GUARDIAN_CONSENT_POLICY: 'off' })).toBe('off')
+    expect(
+      realSessionConsentPolicy({ GUARDIAN_CONSENT_POLICY: ' required_13_15 ' })
+    ).toBe('required_13_15')
+  })
+
+  it('expects nineteen tests under off and five under required_13_15', () => {
+    expect(expectedRealSessionTests('off')).toBe(19)
+    expect(expectedRealSessionTests('required_13_15')).toBe(5)
+    expect(EXPECTED_CONSENT_REQUIRED_TESTS).toBe(5)
+  })
+
+  it('keeps each lane to its own tests, tags included in the matched title', () => {
+    const tagged = `E-TEEN: a 14-year-old ${CONSENT_REQUIRED_TAG}`
+    const untagged = 'E-OFF-TEEN-GOOGLE: a new 14-year-old signs up with Google'
+    expect(consentGrepInvert('off').test(tagged)).toBe(true)
+    expect(consentGrepInvert('off').test(untagged)).toBe(false)
+    expect(consentGrepInvert('required_13_15').test(tagged)).toBe(false)
+    expect(consentGrepInvert('required_13_15').test(untagged)).toBe(true)
   })
 })

@@ -13,6 +13,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { calculateAge } from '@couture/utils'
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
+import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
 import { assertWardrobeParticipationAllowed } from '../guardian/guardian-participation.js'
 import { assertCommunitySubjectAvailable } from './community-privacy.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
@@ -177,7 +178,10 @@ export async function assertCommunityDatabaseReadAccess(
       !Array.isArray(compliance) &&
       typeof compliance.accountStatus === 'string' &&
       compliance.accountStatus !== 'active' &&
-      !(allowConsentPending && compliance.accountStatus === 'pending_guardian_consent')
+      !(
+        (allowConsentPending || resolveGuardianConsentPolicy() === 'off') &&
+        compliance.accountStatus === 'pending_guardian_consent'
+      )
     )
       throw new ForbiddenException('Community account unavailable')
   }

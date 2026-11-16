@@ -4,6 +4,8 @@ import {
   calculateAge,
   evaluateBirthdateInput,
   evaluateAgeGate,
+  GUARDIAN_CONSENT_POLICY,
+  guardianConsentRequiredFor,
   INVALID_BIRTHDATE_MESSAGE,
   parseBirthdateInput,
 } from './age'
@@ -54,11 +56,32 @@ describe('age utilities', () => {
     })
   })
 
-  it('requires guardian consent for users aged thirteen through fifteen', () => {
+  it('the shipped policy is off: guardian consent is not required (owner ruling 2026-11-16)', () => {
+    expect(GUARDIAN_CONSENT_POLICY).toBe('off')
+  })
+
+  it.each([13, 14, 15])('under policy off a %i-year-old is active at once', (age) => {
+    const today = new Date('2026-04-16T12:00:00.000Z')
+    const birthdate = new Date(`${2026 - age}-04-15T12:00:00.000Z`)
+    expect(evaluateAgeGate(birthdate, today)).toEqual({
+      age,
+      allowed: true,
+      requiresGuardian: false,
+      accountStatus: 'active',
+      message: null,
+    })
+    expect(evaluateBirthdateInput(`${2026 - age}-04-15`, today)).toMatchObject({
+      kind: 'valid',
+      message: null,
+    })
+  })
+
+  it('under policy required_13_15 a 13 to 15 year old needs guardian consent', () => {
     expect(
       evaluateAgeGate(
         new Date('2011-04-15T12:00:00.000Z'),
-        new Date('2026-04-16T12:00:00.000Z')
+        new Date('2026-04-16T12:00:00.000Z'),
+        'required_13_15'
       )
     ).toEqual({
       age: 15,
@@ -67,6 +90,37 @@ describe('age utilities', () => {
       accountStatus: 'pending_guardian_consent',
       message: AGE_GATE_MESSAGES.guardianRequired,
     })
+    expect(
+      evaluateBirthdateInput(
+        '2011-04-15',
+        new Date('2026-04-16T12:00:00.000Z'),
+        'required_13_15'
+      ).message
+    ).toBe(AGE_GATE_MESSAGES.guardianRequired)
+  })
+
+  it.each([
+    ['off', 12, false],
+    ['off', 13, false],
+    ['off', 15, false],
+    ['off', 16, false],
+    ['required_13_15', 12, false],
+    ['required_13_15', 13, true],
+    ['required_13_15', 15, true],
+    ['required_13_15', 16, false],
+  ] as const)('guardianConsentRequiredFor(%i) under %s', (policy, age, required) => {
+    expect(guardianConsentRequiredFor(age, policy)).toBe(required)
+  })
+
+  it('under either policy a child under 13 is refused', () => {
+    for (const policy of ['off', 'required_13_15'] as const)
+      expect(
+        evaluateAgeGate(
+          new Date('2014-04-17T12:00:00.000Z'),
+          new Date('2026-04-16T12:00:00.000Z'),
+          policy
+        )
+      ).toMatchObject({ age: 11, allowed: false, accountStatus: 'blocked_underage' })
   })
 
   it('allows users aged sixteen and older without guardian consent', () => {

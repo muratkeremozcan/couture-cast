@@ -103,8 +103,7 @@ export const ptPT: GuestPreviewStrings = {
     previewOnlyBody:
       'Artigos de exemplo, conjuntos, marcações Gosto, o filtro de coleção e as trocas.',
     stillRequired: 'Continua a ser necessário',
-    stillRequiredBody:
-      'Configuração da conta, início de sessão verificado e aprovação do encarregado de educação, quando aplicável.',
+    stillRequiredBody: 'Configuração da conta e início de sessão verificado.',
     backToPreview: 'Voltar à pré-visualização',
     signInToContinue: 'Iniciar sessão para continuar',
   },
@@ -118,7 +117,7 @@ export const ptPT: GuestPreviewStrings = {
     saved: 'As preferências de conforto foram guardadas.',
     kept: 'As preferências da conta não foram alteradas.',
     rejected:
-      'A conta ainda não pode guardar preferências. Primeiro é necessária a aprovação do encarregado de educação ou uma verificação de idade.',
+      'A conta ainda não pode guardar preferências. Primeiro é necessária uma verificação de idade.',
     failed:
       'Não foi possível guardar as preferências. A sua escolha mantém-se para poder tentar novamente.',
     loadFailed: 'Não foi possível carregar as preferências da conta.',

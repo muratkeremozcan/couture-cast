@@ -103,8 +103,7 @@ export const deDE: GuestPreviewStrings = {
     previewOnlyBody:
       'Beispielteile, Outfits, Likes, der Kollektionsfilter und getauschte Teile.',
     stillRequired: 'Weiterhin erforderlich',
-    stillRequiredBody:
-      'Kontoeinrichtung, bestätigte Anmeldung und, falls zutreffend, die Zustimmung der Eltern.',
+    stillRequiredBody: 'Kontoeinrichtung und bestätigte Anmeldung.',
     backToPreview: 'Zurück zur Vorschau',
     signInToContinue: 'Zum Fortfahren anmelden',
   },
@@ -118,7 +117,7 @@ export const deDE: GuestPreviewStrings = {
     saved: 'Ihre Komforteinstellungen sind gespeichert.',
     kept: 'Ihre Kontoeinstellungen sind unverändert.',
     rejected:
-      'Ihr Konto kann noch keine Einstellungen speichern. Zuerst ist die Zustimmung eines Erziehungsberechtigten oder eine Altersprüfung nötig.',
+      'Ihr Konto kann noch keine Einstellungen speichern. Zuerst ist eine Altersprüfung nötig.',
     failed:
       'Ihre Einstellungen konnten nicht gespeichert werden. Ihre Auswahl bleibt erhalten, Sie können es erneut versuchen.',
     loadFailed: 'Ihre Kontoeinstellungen konnten nicht geladen werden.',

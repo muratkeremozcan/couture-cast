@@ -103,8 +103,7 @@ export const ptBR: GuestPreviewStrings = {
     previewOnlyBody:
       'Itens de exemplo, looks, curtidas, o filtro de coleção e as trocas.',
     stillRequired: 'Ainda é necessário',
-    stillRequiredBody:
-      'Configuração da conta, login verificado e aprovação do responsável, quando se aplica.',
+    stillRequiredBody: 'Configuração da conta e login verificado.',
     backToPreview: 'Voltar à prévia',
     signInToContinue: 'Entre para continuar',
   },
@@ -118,7 +117,7 @@ export const ptBR: GuestPreviewStrings = {
     saved: 'Suas preferências de conforto foram salvas.',
     kept: 'As preferências da sua conta não mudaram.',
     rejected:
-      'Sua conta ainda não pode salvar preferências. Primeiro é preciso a aprovação do responsável ou uma verificação de idade.',
+      'Sua conta ainda não pode salvar preferências. Primeiro é preciso uma verificação de idade.',
     failed:
       'Não foi possível salvar suas preferências. Sua escolha foi mantida para você tentar de novo.',
     loadFailed: 'Não foi possível carregar as preferências da sua conta.',

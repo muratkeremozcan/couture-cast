@@ -11558,6 +11558,14 @@ Hard-won lessons from the implementation and code review of this story:
   for a teen the lock refuses (a revoked teen included); both clients keep the session, show the
   guardian invitation on the finish step, and Continue signs out. An email code takes the same
   path. The real-session lane reproduced the loop on `main` before the fix.
+- The teen-path review then found guardian consent did not hold: a teen could approve their own
+  account from the link the app showed them, no invite email was sent, and no guardian could sign
+  in to revoke. The owner turned consent off (2026-11-16). One value, `GUARDIAN_CONSENT_POLICY`
+  (`packages/utils/src/age.ts`, read by `apps/api/src/modules/auth/guardian-consent-policy.ts`),
+  decides it: under `off` every 13+ account is active at creation, the guardian endpoints answer
+  409 `guardian_consent_off`, and a migration activates teens left waiting. `required_13_15` still
+  runs in the test lanes, and fails boot anywhere else until the guardian endpoints check their
+  caller.
 
 Story/Task mapping:
 
@@ -11681,9 +11689,14 @@ E2E, Playwright:
 - [`playwright/tests/google-sign-in-real-session.spec.ts`](../../playwright/tests/google-sign-in-real-session.spec.ts):
   proves the web round trip on the real stack through the Keycloak stand-in: new adult, teen,
   under 13, linking, resume, cancel, preview conversion and a stored session without the token;
-  E-TEEN-RESIGN, E-TEEN-RESIGN-OTP, E-TEEN-APPROVED and E-TEEN-CONTINUE prove a waiting teen
-  returns to the guardian step by Google or email code, an approved teen lands home, and
-  Continue ends the session.
+  E-OFF-TEEN-GOOGLE, E-OFF-TEEN-EMAIL and E-OFF-RETURNING-PENDING prove a new or left-waiting
+  teen lands home under policy off; the `@consent-required` cases (E-TEEN, E-TEEN-RESIGN,
+  E-TEEN-RESIGN-OTP, E-TEEN-APPROVED, E-TEEN-CONTINUE) run in a second lane with
+  `GUARDIAN_CONSENT_POLICY=required_13_15`.
+- [`apps/api/integration/guardian-consent-off-migration.integration.spec.ts`](../../apps/api/integration/guardian-consent-off-migration.integration.spec.ts):
+  proves the consent-off migration activates waiting and revoked teens and nothing else.
+- [`apps/api/src/modules/auth/guardian-lock-route-sweep.spec.ts`](../../apps/api/src/modules/auth/guardian-lock-route-sweep.spec.ts):
+  proves every API route runs the guardian lock or is named with a reason.
 - [`playwright/tests/legal-pages.spec.ts`](../../playwright/tests/legal-pages.spec.ts):
   proves the legal pages render signed out without JavaScript, link from every entry point and
   keep each corrected sentence.
@@ -11694,10 +11707,11 @@ E2E, Playwright:
 
 Mobile E2E, Maestro:
 
-- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): nine Android flows (new account,
+- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): eleven Android flows (new account,
   existing member, under 13, cancelled chooser, Back on the finish step, relaunch resume, preview
-  conversion, Cancel back to the Create account door, and a teen waiting on a guardian who signs
-  in again, gets the guardian step and leaves signed out) and two capture flows for light and dark
+  conversion, Cancel back to the Create account door, a new teen and a teen left waiting landing
+  home under policy off, and, under required_13_15, a waiting teen who signs in again, gets the
+  guardian step and signs out) and two capture flows for light and dark
   screens, run by
   `scripts/run-google-native.mjs`.
 

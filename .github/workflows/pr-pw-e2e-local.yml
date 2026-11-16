@@ -299,6 +299,18 @@ jobs:
       - name: Run real-session specs
         run: npm run test:pw-real-session
 
+      # Guardian consent is off in production (owner ruling 2026-11-16), but the waiting-teen
+      # path stays proven for the day it returns: the @consent-required cases, against an API
+      # started with GUARDIAN_CONSENT_POLICY=required_13_15 (allowed only in test environments).
+      # Its own run directory, so the default run's published artifacts stay as they were; the
+      # web build does not depend on the policy, so it is reused.
+      - name: Run real-session guardian consent specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          GUARDIAN_CONSENT_POLICY: required_13_15
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
+        run: npm run test:pw-real-session -- --skip-web-build
+
       # A fake cannot prove storage refuses an expired token, and this is the job with real Storage.
       # Its own isolated database, so a real-session failure neither hides this nor shares state with it.
       - name: Prove Storage refuses a late community upload
@@ -312,6 +324,11 @@ jobs:
       # run.mjs deletes its users itself; this covers a run that was killed first.
       - name: Delete the Auth users the run created
         if: always()
+        run: node scripts/e2e-real-session/cleanup-users.mjs
+      - name: Delete the Auth users the guardian consent run created
+        if: always()
+        env:
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
         run: node scripts/e2e-real-session/cleanup-users.mjs
 
       # Fails closed: nothing is uploaded unless run.mjs finished publishing the

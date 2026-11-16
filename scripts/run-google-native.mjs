@@ -71,6 +71,7 @@ import {
   expectationProblems,
   failingStep,
   flowEnv,
+  googleNativeConsentPolicy,
   googleNativeReversePorts,
   harnessEmail,
   memberBirthdate,
@@ -144,7 +145,8 @@ async function main() {
   const apk = path.resolve(args.apk)
   if (!fs.existsSync(apk)) throw new Error(`No client at ${apk}`)
   const device = args.device
-  const flows = selectGoogleNativeFlows(args.flows)
+  const consentPolicy = googleNativeConsentPolicy()
+  const flows = selectGoogleNativeFlows(args.flows, consentPolicy)
   const directory = path.resolve(
     args.evidence ??
       process.env.GOOGLE_NATIVE_DIR ??
@@ -311,10 +313,30 @@ async function main() {
     return String((await response.json()).userId)
   }
 
-  /**
-   * The flow's expectation problems, polled briefly: the app's Cancel and the server's under-13
-   * refusal delete the Auth user before the screen changes, and GoTrue commits on its own time.
-   */
+  /** The stored state the 2026-11-15 production loop left two real teens in. */
+  const markWaitingOnGuardian = async (url, userId) => {
+    const client = new pg.Client({ connectionString: url })
+    await client.connect()
+    try {
+      const { rowCount } = await client.query(
+        'UPDATE "UserProfile" SET preferences = $2::jsonb WHERE user_id = $1',
+        [
+          userId,
+          JSON.stringify({
+            compliance: {
+              accountStatus: 'pending_guardian_consent',
+              guardianConsentRequired: true,
+            },
+          }),
+        ]
+      )
+      if (rowCount !== 1) throw new Error('The waiting teen profile was not found.')
+    } finally {
+      await client.end()
+    }
+  }
+
+  /** The profile's compliance block, for a flow that checks the teen's stored status. */
   const complianceOf = async (url, userId) => {
     const client = new pg.Client({ connectionString: url })
     await client.connect()
@@ -329,6 +351,10 @@ async function main() {
     }
   }
 
+  /**
+   * The flow's expectation problems, polled briefly: the app's Cancel and the server's under-13
+   * refusal delete the Auth user before the screen changes, and GoTrue commits on its own time.
+   */
   const checkFlow = async (flow, database, email, memberId) => {
     let problems = []
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -340,7 +366,7 @@ async function main() {
         comfort:
           flow.expect.comfort && ids[0] ? await comfortRow(database.url, ids[0]) : null,
         compliance:
-          flow.expect.pendingTeen && ids[0]
+          (flow.expect.pendingTeen || flow.expect.activeTeen) && ids[0]
             ? await complianceOf(database.url, ids[0])
             : null,
       })
@@ -357,6 +383,8 @@ async function main() {
     const otpEmail = flow.otpEmail ? harnessEmail() : undefined
     recordFlowAddresses(flow, { google: email, 'email-code': otpEmail })
     const memberId = flow.member ? await createMember(flow, email) : undefined
+    if (flow.member === 'pending_teen' && memberId)
+      await markWaitingOnGuardian(database.url, memberId)
     await queueIdentity(standInIdentity(flow, email))
 
     ensureReverses()
@@ -429,6 +457,8 @@ async function main() {
 
     const stackOverrides = {
       TEST_ENV: 'local',
+      // The lane's guardian consent policy, whatever .env.local says (google-native-flows.mjs).
+      GUARDIAN_CONSENT_POLICY: consentPolicy,
       DATABASE_URL: database.url,
       REDIS_URL: redisUrl,
       REDIS_TLS: 'false',

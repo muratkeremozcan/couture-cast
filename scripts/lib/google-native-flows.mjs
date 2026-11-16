@@ -39,13 +39,17 @@ export const GOOGLE_PREVIEW_PROPOSAL = Object.freeze({
  * Each flow and its plan:
  * - `deny`: the queued identity answers `error=access_denied`, a closed chooser.
  * - `member`: the runner creates the app account for the address first, through the product
- *   email signup: `adult` an eligible member, `teen` a 14-year-old still waiting on a guardian.
+ *   email signup: `adult` an eligible member, `teen` a 14-year-old (waiting on a guardian under
+ *   required_13_15, active under off), `pending_teen` a 14-year-old the runner then marks as
+ *   still waiting, the state the 2026-11-15 production loop left two real teens in.
+ * - `policy`: `required_13_15` for a flow that runs only in the lane started with
+ *   GUARDIAN_CONSENT_POLICY=required_13_15; every other flow runs only under off.
  * - `birthdate`: `adult` or `under13`, typed on the finish step.
  * - `otpEmail`: a second recorded address the flow requests an email code for.
  * - `expect`: what the run proves afterwards. `appUsers` is the address's app user count in
  *   the isolated database, `authUser` whether local Auth still holds a user for it, `keycloak`
  *   that user's stand-in identity, `comfort` the saved preview proposal, `pendingTeen` that the
- *   account still waits on guardian consent.
+ *   account still waits on guardian consent, `activeTeen` that it is an active account.
  */
 export const GOOGLE_NATIVE_FLOWS = Object.freeze([
   {
@@ -85,6 +89,7 @@ export const GOOGLE_NATIVE_FLOWS = Object.freeze([
     // The 2026-11-15 production loop: a teen waiting on a guardian signs in with Google again
     // and must get the guardian step, then Continue ends the session.
     name: 'google-teen-resign',
+    policy: 'required_13_15',
     member: 'teen',
     expect: {
       appUsers: 1,
@@ -93,6 +98,19 @@ export const GOOGLE_NATIVE_FLOWS = Object.freeze([
       keycloak: true,
       pendingTeen: true,
     },
+  },
+  {
+    // Policy off (owner ruling 2026-11-16): a new 14-year-old finishes from the Create account
+    // door and lands on Home as a member.
+    name: 'google-off-new-teen',
+    birthdate: 'teen',
+    expect: { appUsers: 1, authUser: true, keycloak: true, activeTeen: true },
+  },
+  {
+    // Policy off: a teen the production loop left waiting signs in and lands on Home.
+    name: 'google-off-pending-teen',
+    member: 'pending_teen',
+    expect: { appUsers: 1, sameAppUser: true, authUser: true, keycloak: true },
   },
   {
     name: 'google-preview-conversion',
@@ -112,9 +130,22 @@ export const GOOGLE_NATIVE_CAPTURES = Object.freeze([
   { name: 'screens/capture-teen', birthdate: 'teen' },
 ])
 
-/** The flows a `--flows a,b` argument names, in table order; every name must exist. */
-export function selectGoogleNativeFlows(argument) {
-  if (!argument) return [...GOOGLE_NATIVE_FLOWS]
+/** The lane's guardian consent policy, from GUARDIAN_CONSENT_POLICY; anything else is off. */
+export function googleNativeConsentPolicy(env = process.env) {
+  return env.GUARDIAN_CONSENT_POLICY?.trim() === 'required_13_15'
+    ? 'required_13_15'
+    : 'off'
+}
+
+const flowPolicy = (flow) => flow.policy ?? 'off'
+
+/**
+ * The flows a `--flows a,b` argument names, in table order, for the lane's policy; every name
+ * must exist and belong to that policy.
+ */
+export function selectGoogleNativeFlows(argument, policy = 'off') {
+  const lane = GOOGLE_NATIVE_FLOWS.filter((flow) => flowPolicy(flow) === policy)
+  if (!argument) return lane
   const wanted = argument
     .split(',')
     .map((name) => name.trim().replace(/\.ya?ml$/, ''))
@@ -123,7 +154,12 @@ export function selectGoogleNativeFlows(argument) {
     (name) => !GOOGLE_NATIVE_FLOWS.some((flow) => flow.name === name)
   )
   if (unknown.length) throw new Error(`Unknown Google device flow: ${unknown.join(', ')}`)
-  return GOOGLE_NATIVE_FLOWS.filter((flow) => wanted.includes(flow.name))
+  const elsewhere = wanted.filter((name) => !lane.some((flow) => flow.name === name))
+  if (elsewhere.length)
+    throw new Error(
+      `Not a ${policy} flow (set GUARDIAN_CONSENT_POLICY to run it): ${elsewhere.join(', ')}`
+    )
+  return lane.filter((flow) => wanted.includes(flow.name))
 }
 
 /**
@@ -141,7 +177,8 @@ export function birthdateYearsAgo(age, now = new Date()) {
 
 /** The birthdate the runner's product signup gives a `member` flow's account. */
 export function memberBirthdate(flow, now = new Date()) {
-  if (flow.member === 'teen') return birthdateYearsAgo(14, now)
+  if (flow.member === 'teen' || flow.member === 'pending_teen')
+    return birthdateYearsAgo(14, now)
   if (flow.member === 'adult') return '1990-06-15'
   return undefined
 }
@@ -238,6 +275,15 @@ export function flowEnv(flow, { email, otpEmail, strings, now = new Date() }) {
  */
 export function expectationProblems(flow, observed) {
   const { expect } = flow
+  return [
+    ...accountProblems(expect, observed),
+    ...complianceProblems(expect, observed.compliance),
+    ...comfortProblems(expect, observed.comfort),
+  ]
+}
+
+/** The address's app users and its Auth user. */
+function accountProblems(expect, observed) {
   const problems = []
   if (observed.appUserIds.length !== expect.appUsers)
     problems.push(
@@ -253,23 +299,36 @@ export function expectationProblems(flow, observed) {
     )
   if (expect.keycloak && !observed.authUser.providers.includes('keycloak'))
     problems.push('the Auth user carries no stand-in (keycloak) identity')
-  if (expect.pendingTeen) {
-    const compliance = observed.compliance
-    if (
-      compliance?.accountStatus !== 'pending_guardian_consent' ||
-      compliance?.guardianConsentRequired !== true
-    )
-      problems.push('the teen account no longer waits on guardian consent')
-  }
-  if (expect.comfort) {
-    const row = observed.comfort
-    if (!row) problems.push('no comfort preferences row exists for the converted account')
-    else
-      for (const [column, value] of Object.entries(GOOGLE_PREVIEW_PROPOSAL))
-        if (row[column] !== value)
-          problems.push(`comfort ${column} is ${String(row[column])}, expected ${value}`)
-  }
   return problems
+}
+
+/** The teen's stored compliance status, for the flows that expect one. */
+function complianceProblems(expect, compliance) {
+  if (
+    expect.pendingTeen &&
+    (compliance?.accountStatus !== 'pending_guardian_consent' ||
+      compliance?.guardianConsentRequired !== true)
+  )
+    return ['the teen account no longer waits on guardian consent']
+  if (
+    expect.activeTeen &&
+    (compliance?.accountStatus !== 'active' ||
+      compliance?.guardianConsentRequired !== false)
+  )
+    return ['the new teen account is not active']
+  return []
+}
+
+/** The saved preview proposal, for the conversion flow. */
+function comfortProblems(expect, row) {
+  if (!expect.comfort) return []
+  if (!row) return ['no comfort preferences row exists for the converted account']
+  return Object.entries(GOOGLE_PREVIEW_PROPOSAL)
+    .filter(([column, value]) => row[column] !== value)
+    .map(
+      ([column, value]) =>
+        `comfort ${column} is ${String(row[column])}, expected ${value}`
+    )
 }
 
 /**

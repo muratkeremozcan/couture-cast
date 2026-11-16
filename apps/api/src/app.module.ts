@@ -30,6 +30,7 @@ import { WardrobeModule } from './modules/wardrobe/wardrobe.module'
 import { CommerceModule } from './modules/commerce/commerce.module.js'
 import { CommunityModule } from './modules/community/community.module'
 import { AuthStateModule } from './modules/auth/auth-state.module'
+import { guardianConsentPolicyBootCheck } from './modules/auth/guardian-consent-policy'
 
 // `ScheduleModule` is deliberately absent. Every periodic sweep this app used
 // to declare with `@Cron` now runs as a BullMQ Job Scheduler in the worker
@@ -64,7 +65,13 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     ShareCardsModule,
   ],
   controllers: [AppController, ApiHealthController, HealthController, AdminController],
-  providers: [AppService, AdminService],
+  providers: [
+    AppService,
+    AdminService,
+    // Boot fails on an unknown GUARDIAN_CONSENT_POLICY, or on required_13_15 outside test
+    // environments (teen-path finding B-1).
+    guardianConsentPolicyBootCheck,
+  ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

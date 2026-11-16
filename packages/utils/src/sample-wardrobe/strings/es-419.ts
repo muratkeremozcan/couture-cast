@@ -105,8 +105,7 @@ export const es419: GuestPreviewStrings = {
     previewOnlyBody:
       'Prendas de muestra, atuendos, Me gusta, el filtro de colección y los cambios.',
     stillRequired: 'Aún se necesita',
-    stillRequiredBody:
-      'Configuración de la cuenta, inicio de sesión verificado y aprobación de un tutor cuando corresponda.',
+    stillRequiredBody: 'Configuración de la cuenta e inicio de sesión verificado.',
     backToPreview: 'Volver a la vista previa',
     signInToContinue: 'Inicia sesión para continuar',
   },
@@ -120,7 +119,7 @@ export const es419: GuestPreviewStrings = {
     saved: 'Tus preferencias de comodidad se guardaron.',
     kept: 'Las preferencias de tu cuenta no cambiaron.',
     rejected:
-      'Tu cuenta todavía no puede guardar preferencias. Primero se necesita la aprobación de un tutor o una verificación de edad.',
+      'Tu cuenta todavía no puede guardar preferencias. Primero se necesita una verificación de edad.',
     failed:
       'No pudimos guardar tus preferencias. Tu elección se conserva para que puedas intentarlo de nuevo.',
     loadFailed: 'No pudimos cargar las preferencias de tu cuenta.',

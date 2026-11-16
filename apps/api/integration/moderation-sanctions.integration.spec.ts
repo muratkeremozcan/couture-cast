@@ -123,6 +123,11 @@ import { WeatherQueryService } from '../src/modules/weather/weather-query.servic
 import { WeatherRepository } from '../src/modules/weather/weather.repository.js'
 import { createCommunityRealtimeServer } from '../src/realtime/community-realtime.server.js'
 import { listenHttpApp } from '../src/testing/loopback-http-app.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its consent-aware overturn cases need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 vi.setConfig({ testTimeout: 30_000 })
 

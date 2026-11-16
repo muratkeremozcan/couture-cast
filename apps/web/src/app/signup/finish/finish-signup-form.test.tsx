@@ -104,10 +104,7 @@ describe('W-A11Y-FOCUS: the finish step opens on its only question', () => {
 
 describe('D3: the email signup inline birthdate messages, announced', () => {
   // Review finding 3: red on the pre-fix range, which showed one fixed message only on submit.
-  it.each([
-    ['under 13', birthdate(10)],
-    ['13 to 15', birthdate(14)],
-  ])(
+  it.each([['under 13', birthdate(10)]])(
     "a birthdate %s announces evaluateBirthdateInput's message",
     async (_label, value) => {
       const field = await renderForm()
@@ -119,10 +116,14 @@ describe('D3: the email signup inline birthdate messages, announced', () => {
     }
   )
 
-  it('an adult birthdate shows no inline message', async () => {
+  // Guardian consent is off (owner ruling 2026-11-16): a teen sees no guardian message.
+  it.each([
+    ['13 to 15', birthdate(14)],
+    ['an adult', birthdate(30)],
+  ])('%s birthdate shows no inline message', async (_label, value) => {
     const field = await renderForm()
-    fireEvent.change(field, { target: { value: birthdate(30) } })
-    expect(evaluateBirthdateInput(birthdate(30)).message).toBeNull()
+    fireEvent.change(field, { target: { value } })
+    expect(evaluateBirthdateInput(value).message).toBeNull()
     expect(screen.queryByTestId('finish-signup-inline-message')).toBeNull()
   })
 
@@ -260,7 +261,7 @@ describe('W-TEEN-RESIGN: the finish step for a teen waiting on a guardian', () =
     )
   })
 
-  it('Continue ends the session before going home', async () => {
+  it('Sign out ends the session before going home', async () => {
     let settle!: () => void
     session.signOut.mockReturnValue(
       new Promise<void>((resolve) => {
@@ -270,7 +271,8 @@ describe('W-TEEN-RESIGN: the finish step for a teen waiting on a guardian', () =
     session.awaiting.mockResolvedValue('teen-pending-1')
     render(<FinishSignupForm fromPreview={false} door="signin" />)
     await screen.findByText(strings.awaitingGuardian)
-    fireEvent.click(screen.getByRole('button', { name: strings.continue }))
+    expect(screen.getByRole('heading', { name: strings.guardianStepTitle })).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: strings.guardianStepLeave }))
     await waitFor(() => expect(session.signOut).toHaveBeenCalledTimes(1))
     expect(replace).not.toHaveBeenCalled()
     settle()

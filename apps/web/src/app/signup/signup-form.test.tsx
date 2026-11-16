@@ -24,16 +24,16 @@ describe('SignupForm', () => {
     )
   })
 
-  it('shows the guardian consent message for ages thirteen through fifteen', () => {
+  // Guardian consent is off (owner ruling 2026-11-16): a teen birthdate shows no guardian message.
+  it('shows no guardian consent message for ages thirteen through fifteen', () => {
     render(<SignupForm submitSignup={vi.fn()} />)
 
     fireEvent.change(screen.getByLabelText('Birthdate'), {
       target: { value: '2011-04-15' },
     })
 
-    expect(screen.getByTestId('signup-inline-message')).toHaveTextContent(
-      'Guardian consent required'
-    )
+    expect(screen.queryByTestId('signup-inline-message')).toBeNull()
+    expect(screen.queryByText(/guardian/i)).toBeNull()
   })
 
   it('submits eligible signups and shows the success state', async () => {

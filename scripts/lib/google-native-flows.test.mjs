@@ -16,7 +16,9 @@ import {
   devClientUrl,
   expectationProblems,
   failingStep,
+  flowBirthdate,
   flowEnv,
+  googleNativeConsentPolicy,
   googleNativeReversePorts,
   harnessEmail,
   memberBirthdate,
@@ -97,7 +99,13 @@ describe('Google device flow table', () => {
   })
 
   test('runs the flows the --flows argument names, in table order', () => {
-    assert.equal(selectGoogleNativeFlows(undefined).length, GOOGLE_NATIVE_FLOWS.length)
+    const required = GOOGLE_NATIVE_FLOWS.filter(
+      (flow) => flow.policy === 'required_13_15'
+    )
+    assert.equal(
+      selectGoogleNativeFlows(undefined).length,
+      GOOGLE_NATIVE_FLOWS.length - required.length
+    )
     assert.deepEqual(
       selectGoogleNativeFlows('google-under13.yaml, google-new-account').map(
         (flow) => flow.name
@@ -105,6 +113,61 @@ describe('Google device flow table', () => {
       ['google-new-account', 'google-under13']
     )
     assert.throws(() => selectGoogleNativeFlows('google-unverified-refused'), /Unknown/)
+  })
+
+  // Guardian consent is off by default (owner ruling 2026-11-16); the waiting-teen flow runs only
+  // in a lane started with GUARDIAN_CONSENT_POLICY=required_13_15.
+  test('each lane runs only its own policy flows', () => {
+    assert.equal(googleNativeConsentPolicy({}), 'off')
+    assert.equal(
+      googleNativeConsentPolicy({ GUARDIAN_CONSENT_POLICY: 'required_13_15' }),
+      'required_13_15'
+    )
+    const off = selectGoogleNativeFlows(undefined, 'off').map((flow) => flow.name)
+    assert.ok(off.includes('google-off-new-teen'))
+    assert.ok(off.includes('google-off-pending-teen'))
+    assert.ok(!off.includes('google-teen-resign'))
+    assert.deepEqual(
+      selectGoogleNativeFlows(undefined, 'required_13_15').map((flow) => flow.name),
+      ['google-teen-resign']
+    )
+    assert.throws(
+      () => selectGoogleNativeFlows('google-teen-resign', 'off'),
+      /Not a off flow \(set GUARDIAN_CONSENT_POLICY to run it\): google-teen-resign/
+    )
+    assert.throws(
+      () => selectGoogleNativeFlows('google-off-new-teen', 'required_13_15'),
+      /Not a required_13_15 flow/
+    )
+  })
+
+  test('the consent-off flows seed and expect the right teen', () => {
+    const now = new Date('2026-11-15T12:00:00Z')
+    const flow = (name) => GOOGLE_NATIVE_FLOWS.find((row) => row.name === name)
+    assert.equal(flowBirthdate(flow('google-off-new-teen'), now), '2012-05-17')
+    assert.equal(memberBirthdate(flow('google-off-pending-teen'), now), '2012-05-17')
+    const base = {
+      appUserIds: ['u1'],
+      memberId: 'u1',
+      authUser: { exists: true, providers: ['keycloak'] },
+    }
+    assert.deepEqual(
+      expectationProblems(flow('google-off-new-teen'), {
+        ...base,
+        compliance: { accountStatus: 'active', guardianConsentRequired: false },
+      }),
+      []
+    )
+    assert.deepEqual(
+      expectationProblems(flow('google-off-new-teen'), {
+        ...base,
+        compliance: {
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      }),
+      ['the new teen account is not active']
+    )
   })
 })
 

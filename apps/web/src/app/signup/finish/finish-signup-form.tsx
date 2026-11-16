@@ -270,7 +270,6 @@ export function FinishSignupForm({
   )
 }
 
-/** The email signup's guardian invitation step, for a teen created through Google. */
 /**
  * The teen's guardian step: a new account (`created`) or a returning teen still waiting
  * (`awaiting_guardian`). Continue ends the session.
@@ -281,7 +280,7 @@ function GuardianStep({ phase }: { phase: GuardianPhase }) {
   const created = phase.kind === 'created'
   return (
     <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8">
-      <h1 className="text-3xl font-semibold">{strings.finishTitle}</h1>
+      <h1 className="text-3xl font-semibold">{strings.guardianStepTitle}</h1>
       <p data-testid="finish-signup-outcome" role="status" className="text-emerald-200">
         {created ? strings.createdGuardianPending : strings.awaitingGuardian}
       </p>
@@ -293,7 +292,7 @@ function GuardianStep({ phase }: { phase: GuardianPhase }) {
         }}
         className="min-h-12 w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold text-black"
       >
-        {strings.continue}
+        {strings.guardianStepLeave}
       </button>
     </section>
   )

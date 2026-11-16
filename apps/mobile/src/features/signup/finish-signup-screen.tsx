@@ -108,7 +108,12 @@ function useFinishStepChrome({
     if (inlineError) announce('error', inlineError)
   }, [announce, inlineError])
 
-  const headerTitle = phase === 'loading' || phase === 'form' ? strings.finishTitle : ''
+  const headerTitle =
+    phase === 'loading' || phase === 'form'
+      ? strings.finishTitle
+      : phase === 'created' || phase === 'awaiting_guardian'
+        ? strings.guardianStepTitle
+        : ''
   useEffect(() => {
     onTitleChange?.(headerTitle)
   }, [headerTitle, onTitleChange])
@@ -354,7 +359,6 @@ export function FinishSignupScreen({
   )
 }
 
-/** The email signup's guardian invitation step, for a teen created through Google. */
 type GuardianPhase = Extract<Phase, { kind: 'created' | 'awaiting_guardian' }>
 
 const onGuardianStep = (phase: Phase): phase is GuardianPhase =>
@@ -397,7 +401,7 @@ function GuardianStep({
         onPress={onLeave}
         style={styles.button}
       >
-        <Text style={styles.buttonText}>{strings.continue}</Text>
+        <Text style={styles.buttonText}>{strings.guardianStepLeave}</Text>
       </Pressable>
     </ScrollView>
   )

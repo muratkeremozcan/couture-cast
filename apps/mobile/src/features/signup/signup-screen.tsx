@@ -169,7 +169,7 @@ export function SignupScreen({
         Create your account with age verification first.
       </Text>
       <Text style={styles.description}>
-        Ages 13 to 15 require guardian consent before wardrobe access is enabled.
+        You must be 13 or older to create an account.
       </Text>
 
       <View style={styles.form}>

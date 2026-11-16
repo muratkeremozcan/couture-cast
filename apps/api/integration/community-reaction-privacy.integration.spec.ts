@@ -7,6 +7,11 @@ import { describe, expect, it, vi } from 'vitest'
 import { birthdateForAge } from '../src/testing/birthdate.js'
 import { reactionTestContext } from './helpers/community-reaction-context.js'
 import { deleteMembers, updatePost } from './helpers/privacy-guards.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its consent gates need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 const { prisma, repository, namespace, guardian, input, fixture, mutate } =
   reactionTestContext()

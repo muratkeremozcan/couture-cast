@@ -31,8 +31,8 @@ export default async function SignupPage({
             Start with age verification before wardrobe access unlocks.
           </h1>
           <p className="text-base text-neutral-300">
-            CoutureCast blocks accounts for children under 13 and routes users aged 13 to
-            15 into a guardian consent flow before they can continue.
+            CoutureCast asks for your birthdate and does not create accounts for children
+            under 13.
           </p>
           <Link
             href="/"

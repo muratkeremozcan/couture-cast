@@ -628,7 +628,7 @@
       "rateLimited": "Troppe reazioni. Riprova tra un minuto.",
       "total_one": "{{count}} reazione",
       "total_other": "{{count}} reazioni",
-      "ineligible": "Per reagire devi avere almeno 13 anni. Sotto i 16 anni serve il consenso attivo di un tutore."
+      "ineligible": "Per reagire devi avere almeno 13 anni."
     },
     "comments": {
       "title": "Commenti",

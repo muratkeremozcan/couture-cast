@@ -12,9 +12,19 @@ import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import { Test } from '@nestjs/testing'
 import type { INestApplication } from '@nestjs/common'
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+} from 'vitest'
 import { AGE_GATE_MESSAGES } from '@couture/utils'
 import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
 import { listenHttpApp } from '../src/testing/loopback-http-app.js'
 import { birthdateForAge } from '../src/testing/birthdate.js'
 import { bindRequestContext } from '../src/logger/request-context.js'
@@ -29,7 +39,11 @@ import {
 } from '../src/modules/auth/auth.service.js'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { GuardianConsentStateService } from '../src/modules/auth/guardian-consent-state.service.js'
+import { assertCommunityDatabaseAccess } from '../src/modules/community/community-access.service.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service.js'
+import { GuardianController } from '../src/modules/guardian/guardian.controller.js'
+import { UserController } from '../src/modules/user/user.controller.js'
+import { UserService } from '../src/modules/user/user.service.js'
 import { RequestAuthGuard, RolesGuard } from '../src/modules/auth/security.guards.js'
 import {
   SUPABASE_AUTH_ADMIN,
@@ -41,6 +55,11 @@ const IDENTITY_ORIGIN = 'https://story617.identity.invalid'
 const database = isolatedCommunityDatabase()
 const prisma = new PrismaClient({ datasources: { db: { url: database.url } } })
 const identity = new AccessTokenIdentityService(prisma)
+const guardianService = {
+  inviteGuardian: vi.fn(),
+  acceptInvitation: vi.fn(),
+  revokeConsent: vi.fn(),
+}
 
 type Deferred = { promise: Promise<void>; release: () => void }
 function deferred(): Deferred {
@@ -134,6 +153,22 @@ function federated(method: 'GET' | 'POST' | 'DELETE', bearer?: string, body?: un
   })
 }
 
+function signedIn(
+  method: 'GET' | 'PUT' | 'POST',
+  path: string,
+  bearer?: string,
+  body?: unknown
+) {
+  return nativeFetch(`${url}${path}`, {
+    method,
+    headers: {
+      ...(bearer ? { authorization: `Bearer ${bearer}` } : {}),
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+}
+
 function emailSignup(email: string, birth: string) {
   return nativeFetch(`${url}/api/v1/auth/signup`, {
     method: 'POST',
@@ -216,8 +251,11 @@ beforeAll(async () => {
   })
 
   const module = await Test.createTestingModule({
-    controllers: [AuthController],
+    controllers: [AuthController, UserController, GuardianController],
     providers: [
+      { provide: UserService, useFactory: () => new UserService(prisma) },
+      // Policy off refuses before the service; under required_13_15 nothing here reaches it.
+      { provide: GuardianService, useValue: guardianService },
       {
         // Vitest's transform emits no decorator metadata, so the constructor is called directly.
         provide: AuthService,
@@ -296,98 +334,120 @@ describe('A-FED-GET-STATUS: GET decides the route after a 401 profile check', ()
     expect(await response.json()).toEqual({ status: 'complete' })
   })
 
-  // The guardian lock refuses a pending teen's profile check (403), which a client read as
-  // "no account" and looped between sign-in and Google; the status names the state instead.
-  it('A-FED-AWAITING-GUARDIAN: a pending teen answers awaiting_guardian with its account id', async () => {
-    const email = address()
-    const { bearer } = googleUser(email)
-    const created = await federated('POST', bearer, { birthdate: birthdate(14) })
-    expect(created.status).toBe(201)
-    const { userId } = (await created.json()) as { userId: string }
-    const response = await federated('GET', bearer)
-    expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({
-      status: 'awaiting_guardian',
-      accountId: userId,
-    })
-    // The status names the state; the lock RequestAuthGuard applies is unchanged.
-    await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
-      userId,
-      role: 'teen',
-    })
-    await expect(
-      new GuardianConsentStateService(prisma).canTeenAccess(userId)
-    ).resolves.toBe(false)
-  })
+  describe('under policy required_13_15', () => {
+    useGuardianConsentPolicy('required_13_15')
 
-  it('answers awaiting_guardian for an email-signup teen too', async () => {
-    const email = address()
-    expect((await emailSignup(email, birthdate(14))).status).toBe(201)
-    const { bearer } = googleUser(email)
-    const response = await federated('GET', bearer)
-    const [account] = await accountsFor(email)
-    expect(await response.json()).toEqual({
-      status: 'awaiting_guardian',
-      accountId: account!.id,
+    // The guardian lock refuses a pending teen's profile check (403), which a client read as
+    // "no account" and looped between sign-in and Google; the status names the state instead.
+    it('A-FED-AWAITING-GUARDIAN: a pending teen answers awaiting_guardian with its account id', async () => {
+      const email = address()
+      const { bearer } = googleUser(email)
+      const created = await federated('POST', bearer, { birthdate: birthdate(14) })
+      expect(created.status).toBe(201)
+      const { userId } = (await created.json()) as { userId: string }
+      const response = await federated('GET', bearer)
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({
+        status: 'awaiting_guardian',
+        accountId: userId,
+      })
+      // The status names the state; the lock RequestAuthGuard applies is unchanged.
+      await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
+        userId,
+        role: 'teen',
+      })
+      await expect(
+        new GuardianConsentStateService(prisma).canTeenAccess(userId)
+      ).resolves.toBe(false)
     })
-  })
 
-  it('answers complete once a guardian has approved the teen', async () => {
-    const email = address()
-    const { bearer } = googleUser(email)
-    expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
-      201
-    )
-    const [account] = await accountsFor(email)
-    await prisma.userProfile.update({
-      where: { user_id: account!.id },
-      data: {
-        preferences: {
-          compliance: { accountStatus: 'active', guardianConsentRequired: false },
+    it('answers awaiting_guardian for an email-signup teen too', async () => {
+      const email = address()
+      expect((await emailSignup(email, birthdate(14))).status).toBe(201)
+      const { bearer } = googleUser(email)
+      const response = await federated('GET', bearer)
+      const [account] = await accountsFor(email)
+      expect(await response.json()).toEqual({
+        status: 'awaiting_guardian',
+        accountId: account!.id,
+      })
+    })
+
+    it('answers complete once a guardian has approved the teen', async () => {
+      const email = address()
+      const { bearer } = googleUser(email)
+      expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
+        201
+      )
+      const [account] = await accountsFor(email)
+      await prisma.userProfile.update({
+        where: { user_id: account!.id },
+        data: {
+          preferences: {
+            compliance: { accountStatus: 'active', guardianConsentRequired: false },
+          },
         },
-      },
+      })
+      const response = await federated('GET', bearer)
+      expect(await response.json()).toEqual({ status: 'complete' })
     })
-    const response = await federated('GET', bearer)
-    expect(await response.json()).toEqual({ status: 'complete' })
-  })
 
-  it('A-FED-REVOKED: a teen whose guardian revokes consent answers awaiting_guardian again', async () => {
-    const email = address()
-    const { bearer } = googleUser(email)
-    expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
-      201
-    )
-    const [teen] = await accountsFor(email)
-    await prisma.userProfile.update({
-      where: { user_id: teen!.id },
-      data: {
-        preferences: {
-          compliance: { accountStatus: 'active', guardianConsentRequired: false },
+    it('A-FED-REVOKED: a teen whose guardian revokes consent answers awaiting_guardian again', async () => {
+      const email = address()
+      const { bearer } = googleUser(email)
+      expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
+        201
+      )
+      const [teen] = await accountsFor(email)
+      await prisma.userProfile.update({
+        where: { user_id: teen!.id },
+        data: {
+          preferences: {
+            compliance: { accountStatus: 'active', guardianConsentRequired: false },
+          },
         },
-      },
-    })
-    const guardian = await prisma.user.create({ data: { email: address() } })
-    await prisma.guardianConsent.create({
-      data: {
-        guardian_id: guardian.id,
-        teen_id: teen!.id,
-        status: 'granted',
-        consent_level: 'full_access',
-        revoked_at: null,
-      },
-    })
-    expect(await (await federated('GET', bearer)).json()).toEqual({ status: 'complete' })
+      })
+      const guardian = await prisma.user.create({ data: { email: address() } })
+      await prisma.guardianConsent.create({
+        data: {
+          guardian_id: guardian.id,
+          teen_id: teen!.id,
+          status: 'granted',
+          consent_level: 'full_access',
+          revoked_at: null,
+        },
+      })
+      expect(await (await federated('GET', bearer)).json()).toEqual({
+        status: 'complete',
+      })
 
-    await new GuardianService(
-      { capture: vi.fn() } as never,
-      prisma,
-      new GuardianConsentStateService(prisma),
-      { invalidateUserSessions: vi.fn().mockResolvedValue(undefined) } as never
-    ).revokeConsent(guardian.id, teen!.id)
+      await new GuardianService(
+        { capture: vi.fn() } as never,
+        prisma,
+        new GuardianConsentStateService(prisma),
+        { invalidateUserSessions: vi.fn().mockResolvedValue(undefined) } as never
+      ).revokeConsent(guardian.id, teen!.id)
 
-    expect(await (await federated('GET', bearer)).json()).toEqual({
-      status: 'awaiting_guardian',
-      accountId: teen!.id,
+      expect(await (await federated('GET', bearer)).json()).toEqual({
+        status: 'awaiting_guardian',
+        accountId: teen!.id,
+      })
+    })
+
+    it('A-LOCK-HOLDS: the waiting teen gets 403 from every signed-in endpoint', async () => {
+      const email = address()
+      const { bearer } = googleUser(email)
+      expect((await federated('POST', bearer, { birthdate: birthdate(14) })).status).toBe(
+        201
+      )
+      const profile = await signedIn('GET', '/api/v1/user/profile', bearer)
+      expect(profile.status).toBe(403)
+      expect(await profile.json()).toMatchObject({
+        statusCode: 403,
+        message: 'Guardian consent required before continuing',
+      })
+      const preferences = await signedIn('PUT', '/api/v1/user/preferences', bearer, {})
+      expect(preferences.status).toBe(403)
     })
   })
 
@@ -464,28 +524,32 @@ describe('A-FED-CREATE: POST creates the account from the verified address', () 
     expect(admin.deleteUser).not.toHaveBeenCalled()
   })
 
-  it('A-FED-TEEN: a 14-year-old is pending guardian consent and resolves as teen', async () => {
-    const email = address()
-    const { bearer } = googleUser(email)
-    const response = await federated('POST', bearer, { birthdate: birthdate(14) })
-    expect(response.status).toBe(201)
-    const body = (await response.json()) as { userId: string }
-    expect(body).toEqual({
-      userId: body.userId,
-      age: 14,
-      accountStatus: 'pending_guardian_consent',
-      guardianConsentRequired: true,
-    })
-    const [account] = await accountsFor(email)
-    expect(account!.profile!.preferences).toEqual({
-      compliance: {
+  describe('under policy required_13_15', () => {
+    useGuardianConsentPolicy('required_13_15')
+
+    it('A-FED-TEEN: a 14-year-old is pending guardian consent and resolves as teen', async () => {
+      const email = address()
+      const { bearer } = googleUser(email)
+      const response = await federated('POST', bearer, { birthdate: birthdate(14) })
+      expect(response.status).toBe(201)
+      const body = (await response.json()) as { userId: string }
+      expect(body).toEqual({
+        userId: body.userId,
+        age: 14,
         accountStatus: 'pending_guardian_consent',
         guardianConsentRequired: true,
-      },
-    })
-    await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
-      userId: body.userId,
-      role: 'teen',
+      })
+      const [account] = await accountsFor(email)
+      expect(account!.profile!.preferences).toEqual({
+        compliance: {
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      })
+      await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
+        userId: body.userId,
+        role: 'teen',
+      })
     })
   })
 
@@ -558,30 +622,48 @@ describe('A-FED-CREATE: POST creates the account from the verified address', () 
 })
 
 describe('A-FED-BOUNDARY: the email signup age gate, unchanged', () => {
-  it('admits a person on their 13th birthday as pending guardian consent', async () => {
-    const { bearer } = googleUser(address())
-    const response = await federated('POST', bearer, { birthdate: birthdayToday(13) })
-    expect(response.status).toBe(201)
-    expect(await response.json()).toMatchObject({
-      age: 13,
-      accountStatus: 'pending_guardian_consent',
-      guardianConsentRequired: true,
+  describe('under policy required_13_15', () => {
+    useGuardianConsentPolicy('required_13_15')
+
+    it('admits a person on their 13th birthday as pending guardian consent', async () => {
+      const { bearer } = googleUser(address())
+      const response = await federated('POST', bearer, { birthdate: birthdayToday(13) })
+      expect(response.status).toBe(201)
+      expect(await response.json()).toMatchObject({
+        age: 13,
+        accountStatus: 'pending_guardian_consent',
+        guardianConsentRequired: true,
+      })
+    })
+
+    it.each([
+      [15, 'pending_guardian_consent', true],
+      [16, 'active', false],
+    ] as const)('age %i is %s', async (age, accountStatus, guardianConsentRequired) => {
+      const { bearer } = googleUser(address())
+      const response = await federated('POST', bearer, { birthdate: birthdayToday(age) })
+      expect(response.status).toBe(201)
+      expect(await response.json()).toMatchObject({
+        age,
+        accountStatus,
+        guardianConsentRequired,
+      })
     })
   })
 
-  it.each([
-    [15, 'pending_guardian_consent', true],
-    [16, 'active', false],
-  ] as const)('age %i is %s', async (age, accountStatus, guardianConsentRequired) => {
-    const { bearer } = googleUser(address())
-    const response = await federated('POST', bearer, { birthdate: birthdayToday(age) })
-    expect(response.status).toBe(201)
-    expect(await response.json()).toMatchObject({
-      age,
-      accountStatus,
-      guardianConsentRequired,
-    })
-  })
+  it.each([13, 14, 15, 16])(
+    'under policy off (the default) age %i is active with no guardian step',
+    async (age) => {
+      const { bearer } = googleUser(address())
+      const response = await federated('POST', bearer, { birthdate: birthdayToday(age) })
+      expect(response.status).toBe(201)
+      expect(await response.json()).toMatchObject({
+        age,
+        accountStatus: 'active',
+        guardianConsentRequired: false,
+      })
+    }
+  )
 
   // Invalid input answers exactly what email signup answers for the same value (one gate).
   it.each([
@@ -1124,5 +1206,244 @@ describe('A-FED-ROW-UNDER13 (TEA-2): a row without a profile is never an orphan,
     expect(accounts.map((account) => account.id)).toEqual([row.id])
     expect(accounts[0]!.profile).toBeNull()
     expect(profileCompletedCalls()).toEqual([])
+  })
+})
+
+// Owner ruling 2026-11-16: guardian consent is off by default (GUARDIAN_CONSENT_POLICY). Every
+// 13+ account is active at creation, a teen the old policy left waiting gets through, and every
+// guardian consent endpoint answers 409 before it reads or writes anything.
+describe('A-OFF: guardian consent off (the default)', () => {
+  useGuardianConsentPolicy('off')
+
+  const guardianRows = async (teenId?: string) => ({
+    invitations: await prisma.guardianInvitation.count(
+      teenId ? { where: { teen_id: teenId } } : undefined
+    ),
+    consents: await prisma.guardianConsent.count(
+      teenId ? { where: { teen_id: teenId } } : undefined
+    ),
+    outbox: await prisma.eventEnvelope.count({
+      where: { channel: { startsWith: 'email.guardian' } },
+    }),
+  })
+
+  const communityAccess = (userId: string) =>
+    prisma.$transaction((tx) => assertCommunityDatabaseAccess(tx, userId))
+
+  it.each([
+    ['Google', 13],
+    ['Google', 14],
+    ['Google', 15],
+    ['email', 13],
+    ['email', 14],
+    ['email', 15],
+  ] as const)(
+    'A-OFF-NEW-TEEN: a %s signup at %i is active, unlocked and writes no guardian row',
+    async (door, age) => {
+      const email = address()
+      const { bearer } = googleUser(email)
+      const before = await guardianRows()
+      const created =
+        door === 'Google'
+          ? await federated('POST', bearer, { birthdate: birthdate(age) })
+          : await emailSignup(email, birthdate(age))
+      expect(created.status).toBe(201)
+      expect(await created.json()).toMatchObject({
+        age,
+        accountStatus: 'active',
+        guardianConsentRequired: false,
+      })
+      const [account] = await accountsFor(email)
+      expect(account!.profile!.preferences).toEqual({
+        compliance: { accountStatus: 'active', guardianConsentRequired: false },
+      })
+      expect(await (await federated('GET', bearer)).json()).toEqual({
+        status: 'complete',
+      })
+      await expect(identity.resolveIdentity(bearer)).resolves.toEqual({
+        userId: account!.id,
+        role: 'teen',
+      })
+      await expect(
+        new GuardianConsentStateService(prisma).canTeenAccess(account!.id)
+      ).resolves.toBe(true)
+      expect((await signedIn('GET', '/api/v1/user/profile', bearer)).status).toBe(200)
+      await expect(communityAccess(account!.id)).resolves.toBeUndefined()
+      expect(await guardianRows(account!.id)).toEqual({
+        invitations: 0,
+        consents: 0,
+        outbox: before.outbox,
+      })
+    }
+  )
+
+  it('A-UNDER-13: the day before the 13th birthday is refused by email and Google, the birthday itself is active', async () => {
+    const tooYoung = address()
+    const viaEmail = await emailSignup(tooYoung, birthdayTomorrow(13))
+    expect(viaEmail.status).toBe(403)
+    expect(await viaEmail.json()).toMatchObject({ message: AGE_GATE_MESSAGES.underage })
+    expect(await accountsFor(tooYoung)).toEqual([])
+
+    const { bearer: childBearer, user } = googleUser(address())
+    const viaGoogle = await federated('POST', childBearer, {
+      birthdate: birthdayTomorrow(13),
+    })
+    expect(viaGoogle.status).toBe(403)
+    expect(await viaGoogle.json()).toMatchObject({
+      message: AGE_GATE_MESSAGES.underage,
+      code: 'underage',
+    })
+    expect(admin.deleteUser.mock.calls).toEqual([[user.id]])
+
+    const birthday = address()
+    const onTheDay = await emailSignup(birthday, birthdayToday(13))
+    expect(onTheDay.status).toBe(201)
+    expect(await onTheDay.json()).toMatchObject({
+      age: 13,
+      accountStatus: 'active',
+      guardianConsentRequired: false,
+    })
+  })
+
+  it.each(['pending', 'revoked'] as const)(
+    'A-OFF-EXISTING: a %s teen the old policy left waiting gets through every lock',
+    async (state) => {
+      const email = address()
+      expect((await emailSignup(email, birthdate(14))).status).toBe(201)
+      const [teen] = await accountsFor(email)
+      if (state === 'revoked') {
+        const guardian = await prisma.user.create({ data: { email: address() } })
+        await prisma.guardianConsent.create({
+          data: {
+            guardian_id: guardian.id,
+            teen_id: teen!.id,
+            consent_level: 'full_access',
+            status: 'revoked',
+            revoked_at: new Date(),
+          },
+        })
+      }
+      await prisma.userProfile.update({
+        where: { user_id: teen!.id },
+        data: {
+          preferences: {
+            compliance: {
+              accountStatus: 'pending_guardian_consent',
+              guardianConsentRequired: true,
+              ...(state === 'revoked'
+                ? { guardianConsentRevokedAt: new Date().toISOString() }
+                : {}),
+            },
+          },
+        },
+      })
+      const { bearer } = googleUser(email)
+
+      expect(await (await federated('GET', bearer)).json()).toEqual({
+        status: 'complete',
+      })
+      await expect(
+        new GuardianConsentStateService(prisma).canTeenAccess(teen!.id)
+      ).resolves.toBe(true)
+      expect((await signedIn('GET', '/api/v1/user/profile', bearer)).status).toBe(200)
+      await expect(communityAccess(teen!.id)).resolves.toBeUndefined()
+    }
+  )
+
+  it('a teen with any other non-active status is still refused, and is no guardian wait', async () => {
+    const email = address()
+    expect((await emailSignup(email, birthdate(14))).status).toBe(201)
+    const [teen] = await accountsFor(email)
+    await prisma.userProfile.update({
+      where: { user_id: teen!.id },
+      data: { preferences: { compliance: { accountStatus: 'suspended' } } },
+    })
+    const { bearer } = googleUser(email)
+    expect((await signedIn('GET', '/api/v1/user/profile', bearer)).status).toBe(403)
+    expect(await (await federated('GET', bearer)).json()).toEqual({ status: 'complete' })
+  })
+
+  const CONSENT_ENDPOINTS = [
+    [
+      '/api/v1/guardian/invitations',
+      { teenId: 'teen-x', guardianEmail: 'g@synthetic.test', consentLevel: 'read_only' },
+    ],
+    ['/api/v1/guardian/accept', { token: 'invitation-token' }],
+    ['/api/v1/guardian/revoke', { guardianId: 'guardian-x', teenId: 'teen-x' }],
+    [
+      '/api/v1/auth/guardian-consent',
+      { guardianId: 'guardian-x', teenId: 'teen-x', consentLevel: 'read_only' },
+    ],
+  ] as const
+
+  it.each(
+    CONSENT_ENDPOINTS.flatMap(([path, body]) =>
+      (['no bearer', 'a teen bearer'] as const).map((auth) => [path, auth, body] as const)
+    )
+  )(
+    'A-OFF-CONSENT-409: %s with %s answers 409 guardian_consent_off and writes nothing',
+    async (path, auth, body) => {
+      let bearer: string | undefined
+      if (auth === 'a teen bearer') {
+        const email = address()
+        expect((await emailSignup(email, birthdate(14))).status).toBe(201)
+        bearer = googleUser(email).bearer
+      }
+      const before = await guardianRows()
+      const response = await signedIn('POST', path, bearer, body)
+      expect(response.status).toBe(409)
+      expect(await response.json()).toEqual({
+        statusCode: 409,
+        code: 'guardian_consent_off',
+        message: 'Guardian consent is not used.',
+      })
+      expect(await guardianRows()).toEqual(before)
+      expect(guardianService.inviteGuardian).not.toHaveBeenCalled()
+      expect(guardianService.acceptInvitation).not.toHaveBeenCalled()
+      expect(guardianService.revokeConsent).not.toHaveBeenCalled()
+    }
+  )
+})
+
+// Ordered pairs across a policy change. The lock's 30 s cache lives in one process, and a policy
+// change is a redeploy, so each read after the flip uses a fresh service, as a restart does.
+describe('L-POLICY-FLIP: a policy change between creation and the next request', () => {
+  afterEach(() => {
+    delete process.env.GUARDIAN_CONSENT_POLICY
+  })
+
+  it('a teen created under off stays active once the policy turns to required_13_15', async () => {
+    process.env.GUARDIAN_CONSENT_POLICY = 'off'
+    const email = address()
+    expect((await emailSignup(email, birthdate(14))).status).toBe(201)
+    const [teen] = await accountsFor(email)
+
+    process.env.GUARDIAN_CONSENT_POLICY = 'required_13_15'
+    const { bearer } = googleUser(email)
+    expect(await (await federated('GET', bearer)).json()).toEqual({ status: 'complete' })
+    await expect(
+      new GuardianConsentStateService(prisma).canTeenAccess(teen!.id)
+    ).resolves.toBe(true)
+  })
+
+  it('a teen waiting under required_13_15 gets through once the policy turns off', async () => {
+    process.env.GUARDIAN_CONSENT_POLICY = 'required_13_15'
+    const email = address()
+    expect((await emailSignup(email, birthdate(14))).status).toBe(201)
+    const [teen] = await accountsFor(email)
+    const { bearer } = googleUser(email)
+    await expect(
+      new GuardianConsentStateService(prisma).canTeenAccess(teen!.id)
+    ).resolves.toBe(false)
+    expect(await (await federated('GET', bearer)).json()).toEqual({
+      status: 'awaiting_guardian',
+      accountId: teen!.id,
+    })
+
+    process.env.GUARDIAN_CONSENT_POLICY = 'off'
+    await expect(
+      new GuardianConsentStateService(prisma).canTeenAccess(teen!.id)
+    ).resolves.toBe(true)
+    expect(await (await federated('GET', bearer)).json()).toEqual({ status: 'complete' })
   })
 })

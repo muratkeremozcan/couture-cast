@@ -148,8 +148,8 @@ describe('finish step outcomes', () => {
       /guardian needs to approve/
     )
     expect(flow.read).toHaveBeenCalledTimes(1)
-    // The account exists: the header no longer says to finish creating it.
-    expect(headerTitle()).toBe('')
+    // The account exists: the header names the guardian wait instead of finishing it.
+    expect(headerTitle()).toBe('Waiting for your guardian')
   })
 })
 
@@ -164,7 +164,9 @@ describe('finish step form', () => {
     expect(headerTitle()).toBe('Finish creating your account')
   })
 
-  it('shows an under-13 birthdate as an error alert and guidance as a hint', async () => {
+  // Guardian consent is off (owner ruling 2026-11-16): a teen birthdate clears the alert and
+  // shows nothing, since the guardian message was the only guidance a valid date had.
+  it('shows an under-13 birthdate as an error alert and clears it for a teen', async () => {
     await render(
       <AccessibilityAnnouncerProvider>
         <SignupFinishRoute />
@@ -174,16 +176,10 @@ describe('finish step form', () => {
     await userEvent.fill(input, '2016-05-17')
     const underage = await screen.findByTestId('finish-signup-inline-message')
     expect(underage.getAttribute('role')).toBe('alert')
-    const errorColor = getComputedStyle(underage).color
     await userEvent.fill(input, '2012-05-17')
     await waitFor(() =>
-      expect(
-        screen.getByTestId('finish-signup-inline-message').getAttribute('role')
-      ).toBeNull()
+      expect(screen.queryByTestId('finish-signup-inline-message')).toBeNull()
     )
-    expect(
-      getComputedStyle(screen.getByTestId('finish-signup-inline-message')).color
-    ).not.toBe(errorColor)
   })
 })
 
@@ -237,7 +233,7 @@ describe('under-13 refusal and the stored guest preview', () => {
 // Owner's production loop (2026-11-15): a returning teen the guardian lock refuses gets the
 // guardian invitation, and leaving the step ends the session before going home.
 describe('a returning teen waiting on a guardian', () => {
-  it('shows the guardian invitation and Continue signs out, then goes home', async () => {
+  it('shows the guardian invitation and Sign out ends the session, then goes home', async () => {
     flow.awaiting.mockResolvedValue('teen-pending-1')
     let settle: () => void = () => undefined
     flow.signOut.mockReturnValue(
@@ -257,8 +253,8 @@ describe('a returning teen waiting on a guardian', () => {
     )
     expect(flow.awaiting).toHaveBeenCalledWith('signed-google')
     expect(screen.queryByTestId('finish-signup-birthdate')).toBeNull()
-    await waitFor(() => expect(headerTitle()).toBe(''))
-    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => expect(headerTitle()).toBe('Waiting for your guardian'))
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }))
     await waitFor(() => expect(flow.signOut).toHaveBeenCalledTimes(1))
     expect(flow.router.replace).not.toHaveBeenCalled()
     settle()

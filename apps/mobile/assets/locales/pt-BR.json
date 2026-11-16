@@ -790,7 +790,7 @@
       "rateLimited": "Muitas reações. Tente novamente em um minuto.",
       "total_one": "{{count}} reação",
       "total_other": "{{count}} reações",
-      "ineligible": "É preciso ter pelo menos 13 anos para reagir. Menores de 16 precisam de consentimento ativo de um responsável."
+      "ineligible": "É preciso ter pelo menos 13 anos para reagir."
     },
     "comments": {
       "title": "Comentários",

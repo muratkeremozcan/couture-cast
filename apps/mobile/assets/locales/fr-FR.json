@@ -790,7 +790,7 @@
       "rateLimited": "Trop de réactions. Réessayez dans une minute.",
       "total_one": "{{count}} réaction",
       "total_other": "{{count}} réactions",
-      "ineligible": "Les réactions sont réservées aux 13 ans et plus. Avant 16 ans, un consentement parental actif est nécessaire."
+      "ineligible": "Les réactions sont réservées aux 13 ans et plus."
     },
     "comments": {
       "title": "Commentaires",

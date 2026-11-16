@@ -1,5 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common'
 import { Prisma, PrismaClient } from '@prisma/client'
+import type { GuardianConsentPolicy } from '@couture/utils'
+import { resolveGuardianConsentPolicy } from './guardian-consent-policy'
 
 type CachedTeenAccessState = {
   allowed: boolean
@@ -30,14 +32,31 @@ function extractComplianceState(
 }
 
 /**
- * The teen lock RequestAuthGuard applies, as a pure rule: a teen whose account is not active
- * or still needs guardian consent is refused on every signed-in endpoint.
+ * The teen lock RequestAuthGuard applies, as a pure rule. Under `required_13_15` a teen whose
+ * account is not active or still needs guardian consent is refused on every signed-in endpoint.
+ * Under `off` a teen still waiting on a guardian (`pending_guardian_consent`, revoked included)
+ * gets through, and only another non-active status refuses.
  */
-export function teenAccessBlocked(preferences: Prisma.JsonValue | null | undefined) {
-  return (
-    extractComplianceState(preferences).accountStatus !== 'active' ||
-    requiresGuardianConsent(preferences)
-  )
+export function teenAccessBlocked(
+  preferences: Prisma.JsonValue | null | undefined,
+  policy: GuardianConsentPolicy = resolveGuardianConsentPolicy()
+) {
+  const status = extractComplianceState(preferences).accountStatus
+  if (policy === 'off')
+    return status !== 'active' && status !== 'pending_guardian_consent'
+  return status !== 'active' || requiresGuardianConsent(preferences)
+}
+
+/**
+ * Whether the account is waiting on a guardian and the policy still asks for one: the only case
+ * the federated status names `awaiting_guardian`. Any other refusal (a suspended account) is
+ * not a guardian wait, and under policy off nothing is.
+ */
+export function awaitingGuardianConsent(
+  preferences: Prisma.JsonValue | null | undefined,
+  policy: GuardianConsentPolicy = resolveGuardianConsentPolicy()
+) {
+  return policy === 'required_13_15' && requiresGuardianConsent(preferences)
 }
 
 export function requiresGuardianConsent(
@@ -122,21 +141,12 @@ export class GuardianConsentStateService {
       return false
     }
 
-    const compliance = extractComplianceState(user.profile.preferences)
-    if (compliance.accountStatus !== 'active') {
-      const accountStatus =
-        typeof compliance.accountStatus === 'string'
-          ? compliance.accountStatus
-          : 'unknown'
+    if (teenAccessBlocked(user.profile.preferences)) {
+      const { accountStatus } = extractComplianceState(user.profile.preferences)
       this.logger.warn(
-        `Blocking teen request for "${userId}" because account status is "${accountStatus}"`
-      )
-      return false
-    }
-
-    if (requiresGuardianConsent(user.profile.preferences)) {
-      this.logger.warn(
-        `Blocking teen request for "${userId}" because guardian consent is still required`
+        `Blocking teen request for "${userId}" because account status is "${
+          typeof accountStatus === 'string' ? accountStatus : 'unknown'
+        }"`
       )
       return false
     }
