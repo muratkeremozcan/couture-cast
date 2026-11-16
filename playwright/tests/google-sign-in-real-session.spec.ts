@@ -334,7 +334,13 @@ test(
     await expect(page).toHaveURL(`${WEB}/signup/finish?door=signup`)
     await page.getByLabel('Birthdate').fill(birthdate(14))
     await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
-    await page.getByRole('button', { name: 'Create account' }).click()
+    // TEA sign-off N-2: an empty message costs no gap; the button sits one form gap (24 px)
+    // under the birthdate hint, never the old 70 px band.
+    const hint = await page.locator('#finish-signup-birthdate-hint').boundingBox()
+    const create = page.getByRole('button', { name: 'Create account' })
+    const button = await create.boundingBox()
+    expect(button!.y - (hint!.y + hint!.height)).toBeLessThanOrEqual(32)
+    await create.click()
 
     await expect(page).toHaveURL(`${WEB}/`)
     await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
@@ -361,8 +367,10 @@ test(
     await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
     await page.getByRole('button', { name: 'Create account' }).click()
     await expect(
-      page.getByText('Account created. You can continue to onboarding.')
+      page.getByText('Account created. Sign in with your email to continue.')
     ).toBeVisible()
+    // TEA sign-off N-3: the page links to the next step, and the form is done.
+    await expect(page.getByRole('button', { name: 'Create account' })).toHaveCount(0)
     await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
 
     const [account, ...extra] = await accounts(email)
@@ -376,7 +384,8 @@ test(
       mapping: 'email',
       label: 'off-email-teen',
     })
-    await page.goto('/signin')
+    await page.getByTestId('signup-sign-in-to-continue').click()
+    await expect(page).toHaveURL(`${WEB}/signin`)
     await page.locator('input[name="email"]').fill(email)
     await page.locator('button[type="submit"]').click()
     await page.locator('input[name="code"]').waitFor({ state: 'visible' })

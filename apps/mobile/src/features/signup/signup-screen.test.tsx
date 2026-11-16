@@ -1,8 +1,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import i18n, { initI18n } from '@/src/lib/i18n'
 import { SignupScreen } from './signup-screen'
 
 describe('SignupScreen', () => {
+  beforeAll(async () => {
+    await initI18n()
+    await i18n.changeLanguage('en-US')
+  })
+
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(new Date('2026-04-16T12:00:00.000Z'))
@@ -70,8 +76,51 @@ describe('SignupScreen', () => {
       })
     })
     expect(screen.getByTestId('signup-success-message').textContent).toBe(
-      'Account created. You can continue to onboarding.'
+      'Account created. Sign in with your email to continue.'
     )
+    // TEA sign-off N-3: the next step is a button to sign-in, and Create account is gone.
+    expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe(
+      'Sign in to continue'
+    )
+    expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
+  })
+
+  it('N-3 leaves for sign-in from the created state', async () => {
+    const onPreviewNavigate = vi.fn()
+    render(
+      <SignupScreen
+        submitSignup={vi.fn().mockResolvedValue({
+          userId: 'user-9',
+          age: 14,
+          accountStatus: 'active',
+          guardianConsentRequired: false,
+        })}
+        onPreviewNavigate={onPreviewNavigate}
+      />
+    )
+    fireEvent.change(screen.getByLabelText('Email'), {
+      target: { value: 'teen@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('Birthdate'), {
+      target: { value: '2012-04-15' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    fireEvent.click(await screen.findByTestId('signup-sign-in-to-continue'))
+    expect(onPreviewNavigate).toHaveBeenCalledExactlyOnceWith('/signin')
+  })
+
+  // TEA sign-off N-1 (parity with web): the screen follows the app language.
+  it('renders in the active language (fr-FR)', async () => {
+    await i18n.changeLanguage('fr-FR')
+    try {
+      render(<SignupScreen submitSignup={vi.fn()} />)
+      expect(screen.getByText('Inscription conforme à la COPPA')).toBeTruthy()
+      expect(screen.getByLabelText('Adresse e-mail')).toBeTruthy()
+      expect(screen.getByLabelText('Date de naissance')).toBeTruthy()
+      expect(screen.getByRole('button', { name: 'Créer le compte' })).toBeTruthy()
+    } finally {
+      await i18n.changeLanguage('en-US')
+    }
   })
 
   it('shows the guardian invitation step after teen signup and sends the invite', async () => {
@@ -196,7 +245,9 @@ describe('SignupScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create account' }))
 
     await waitFor(() => {
-      expect(screen.getByTestId('signup-error-message').textContent).toBe('Signup failed')
+      expect(screen.getByTestId('signup-error-message').textContent).toBe(
+        'Your account could not be created right now. Try again in a moment.'
+      )
     })
   })
 
@@ -293,7 +344,7 @@ describe('SignupScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('signup-error-message').textContent).toBe(
-        'Guardian invitation failed'
+        'The guardian invitation could not be sent. Try again.'
       )
     })
   })

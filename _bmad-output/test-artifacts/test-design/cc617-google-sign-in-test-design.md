@@ -483,6 +483,17 @@ not run (F-1, F-4).
 Red on `ce02601b`: all 20 A-OFF and L-POLICY-FLIP cases and all three E-OFF cases fail for the
 expected reason (teen created pending, status `awaiting_guardian`, consent endpoints doing work).
 
+### Final sign-off follow-ups (TEA, 2026-11-16)
+
+| ID                   | Layer                                                            | Proves                                                                                                                                                                                |
+| -------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| N-1 doors in fr-FR   | Playwright (`sign-in-doors-locale.spec.ts`), web and mobile unit | `/signup` and `/signin` render the Google button, divider and page copy in the browser language; red with SessionBridge before the page                                               |
+| N-2 finish gap       | real-session E-OFF-TEEN-GOOGLE                                   | Create account sits at most 32 px under the birthdate hint when no message shows                                                                                                      |
+| N-3 signup next step | web and mobile unit, real-session E-OFF-TEEN-EMAIL               | After an email signup the page links to sign-in and Create account is gone                                                                                                            |
+| N-4 profile links    | API unit and HTTP parity                                         | Under off `/user/profile` names no linked teen or guardian and reads no consent row                                                                                                   |
+| N-5 fr copy          | utils unit                                                       | fr-FR and fr-CA say to sign in again once the account is approved                                                                                                                     |
+| L-1, L-2, L-3        | API unit and integration, web unit                               | The minimum of 150 000 reports on plain times; fault-injection cases give the claim 5 s while the marker case pins 500 ms; one axe pass per state; the MSW delay asserted by its call |
+
 ### Re-enable checklist (gated by the boot refusal)
 
 Turning consent back on needs each of these first, red-first, in the PR that removes the

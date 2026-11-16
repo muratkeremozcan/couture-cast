@@ -11,11 +11,9 @@ import {
   guardianInvitationInputSchema,
 } from '@couture/api-client/contracts/http'
 import {
-  AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
   getFederatedSignInStrings,
   getGuestPreviewStrings,
-  INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { webGuestPreviewStore } from '../../lib/guest-preview'
@@ -40,9 +38,8 @@ export function SignupForm({
 }: SignupFormProps) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
-  const googleMessage = googleOutcome
-    ? getFederatedSignInStrings(i18n.language)[googleOutcome]
-    : null
+  const strings = getFederatedSignInStrings(i18n.language)
+  const googleMessage = googleOutcome ? strings[googleOutcome] : null
   const [accountCreated, setAccountCreated] = useState(false)
   const [email, setEmail] = useState('')
   const [birthdate, setBirthdate] = useState('')
@@ -57,7 +54,10 @@ export function SignupForm({
   const [isInviting, setIsInviting] = useState(false)
 
   const birthdateEvaluation = evaluateBirthdateInput(birthdate)
-  const inlineMessage = birthdateEvaluation.message
+  const inlineMessage =
+    birthdateEvaluation.gate?.accountStatus === 'blocked_underage'
+      ? strings.underage
+      : birthdateEvaluation.message
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -66,14 +66,14 @@ export function SignupForm({
     setInviteLink(null)
 
     if (birthdateEvaluation.kind !== 'valid') {
-      setErrorMessage(INVALID_BIRTHDATE_MESSAGE)
+      setErrorMessage(strings.invalidBirthdate)
       return
     }
 
     const { gate } = birthdateEvaluation
 
     if (!gate.allowed) {
-      setErrorMessage(AGE_GATE_MESSAGES.underage)
+      setErrorMessage(strings.underage)
       // Story 6.16 D2: an age refusal outranks the preview's self-reported gate.
       if (fromPreview) webGuestPreviewStore().clear()
       return
@@ -86,17 +86,15 @@ export function SignupForm({
       if (response.guardianConsentRequired) {
         setAccountCreated(true)
         setPendingTeenId(response.userId)
-        setSuccessMessage(
-          'Account created. Guardian consent is required before wardrobe access is enabled.'
-        )
+        setSuccessMessage(strings.createdGuardianPending)
         return
       }
 
       setPendingTeenId(null)
-      setSuccessMessage('Account created. You can continue to onboarding.')
+      setSuccessMessage(strings.signupCreated)
       setAccountCreated(true)
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Signup failed')
+      setErrorMessage(failureText(error, strings.createUnavailable))
       // D2: the server's refusal outranks the preview gate, as the client's does.
       if (fromPreview && error instanceof SignupRefusedError)
         webGuestPreviewStore().clear()
@@ -107,14 +105,14 @@ export function SignupForm({
 
   async function handleGuardianInvite() {
     if (!pendingTeenId) {
-      setErrorMessage('Create the teen account first before inviting a guardian.')
+      setErrorMessage(strings.inviteFailed)
       return
     }
 
     const guardianEmailValidation =
       guardianInvitationInputSchema.shape.guardianEmail.safeParse(guardianEmail)
     if (!guardianEmailValidation.success) {
-      setErrorMessage('Enter a valid guardian email address.')
+      setErrorMessage(strings.invalidGuardianEmail)
       setSuccessMessage(null)
       setInviteLink(null)
       return
@@ -132,14 +130,10 @@ export function SignupForm({
         consentLevel,
       })
       setInviteLink(response.invitationLink)
-      setSuccessMessage(
-        `Guardian invitation sent to ${response.guardianEmail}. Share the link below if they do not see the email.`
-      )
+      setSuccessMessage(strings.inviteSent.replace('{email}', response.guardianEmail))
     } catch (error) {
       setInviteLink(null)
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Guardian invitation failed'
-      )
+      setErrorMessage(failureText(error, strings.inviteFailed))
     } finally {
       setIsInviting(false)
     }
@@ -173,7 +167,7 @@ export function SignupForm({
       <SignInDivider tone="dark" />
       <div className="space-y-2">
         <label htmlFor="signup-email" className="text-sm font-medium text-neutral-100">
-          Email
+          {strings.email}
         </label>
         <input
           id="signup-email"
@@ -192,7 +186,7 @@ export function SignupForm({
           htmlFor="signup-birthdate"
           className="text-sm font-medium text-neutral-100"
         >
-          Birthdate
+          {strings.birthdate}
         </label>
         <input
           id="signup-birthdate"
@@ -234,33 +228,21 @@ export function SignupForm({
         </p>
       ) : null}
 
-      {fromPreview && accountCreated ? (
-        <Link
-          href="/signin?from=preview"
-          data-testid="signup-sign-in-to-continue"
-          className="inline-flex min-h-11 items-center rounded-full border border-amber-300 px-5 text-sm font-semibold text-amber-200"
-        >
-          {previewStrings.signInToContinue}
-        </Link>
-      ) : null}
-
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        {isSubmitting ? 'Creating account…' : 'Create account'}
-      </button>
+      <SignupNextStep
+        accountCreated={accountCreated}
+        fromPreview={fromPreview}
+        isSubmitting={isSubmitting}
+        submitLabel={isSubmitting ? strings.creating : strings.create}
+        signInLabel={previewStrings.signInToContinue}
+      />
 
       {pendingTeenId ? (
         <div className="space-y-4 rounded-2xl border border-amber-300/20 bg-amber-300/5 p-5">
           <div className="space-y-1">
             <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-amber-200">
-              Guardian invitation
+              {strings.guardianTitle}
             </h2>
-            <p className="text-sm text-neutral-200">
-              Invite a guardian to approve access for this teen account.
-            </p>
+            <p className="text-sm text-neutral-200">{strings.guardianIntro}</p>
           </div>
 
           <div className="space-y-4">
@@ -269,7 +251,7 @@ export function SignupForm({
                 htmlFor="guardian-email"
                 className="text-sm font-medium text-neutral-100"
               >
-                Guardian email
+                {strings.guardianEmail}
               </label>
               <input
                 id="guardian-email"
@@ -288,7 +270,7 @@ export function SignupForm({
                 htmlFor="guardian-consent-level"
                 className="text-sm font-medium text-neutral-100"
               >
-                Consent level
+                {strings.consentLevel}
               </label>
               <select
                 id="guardian-consent-level"
@@ -301,8 +283,8 @@ export function SignupForm({
                 }
                 className="w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300"
               >
-                <option value="read_only">Read only</option>
-                <option value="full_access">Full access</option>
+                <option value="read_only">{strings.readOnly}</option>
+                <option value="full_access">{strings.fullAccess}</option>
               </select>
             </div>
 
@@ -314,7 +296,7 @@ export function SignupForm({
               }}
               className="w-full rounded-full border border-amber-300/60 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-amber-100 transition hover:bg-amber-300/10 disabled:cursor-not-allowed disabled:opacity-70"
             >
-              {isInviting ? 'Sending invite…' : 'Send guardian invite'}
+              {isInviting ? strings.sendingInvite : strings.sendInvite}
             </button>
           </div>
 
@@ -339,5 +321,48 @@ export function SignupForm({
         </Link>
       ) : null}
     </form>
+  )
+}
+
+/** A rejection's own message when it has one, else the localized fallback. */
+function failureText(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback
+}
+
+/**
+ * TEA sign-off N-3: Create account until the account exists, then the way to sign in, so a
+ * finished form never invites a second signup with the same address.
+ */
+function SignupNextStep({
+  accountCreated,
+  fromPreview,
+  isSubmitting,
+  submitLabel,
+  signInLabel,
+}: {
+  accountCreated: boolean
+  fromPreview: boolean
+  isSubmitting: boolean
+  submitLabel: string
+  signInLabel: string
+}) {
+  if (accountCreated)
+    return (
+      <Link
+        href={fromPreview ? '/signin?from=preview' : '/signin'}
+        data-testid="signup-sign-in-to-continue"
+        className="inline-flex min-h-11 items-center rounded-full border border-amber-300 px-5 text-sm font-semibold text-amber-200"
+      >
+        {signInLabel}
+      </Link>
+    )
+  return (
+    <button
+      type="submit"
+      disabled={isSubmitting}
+      className="w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold uppercase tracking-[0.24em] text-black transition hover:bg-amber-200 disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      {submitLabel}
+    </button>
   )
 }

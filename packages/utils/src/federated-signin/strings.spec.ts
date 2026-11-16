@@ -46,4 +46,17 @@ describe('federated sign-in strings', () => {
       'Continuar con Google'
     )
   })
+
+  // TEA sign-off N-5: "une fois qu'elle aura été approuvée" read as the invitation being
+  // approved; the guardian approves the account.
+  it.each(['fr-FR', 'fr-CA'] as const)(
+    '%s says to sign in again once the account is approved',
+    (locale) => {
+      const strings = getFederatedSignInStrings(locale)
+      for (const key of ['createdGuardianPending', 'awaitingGuardian'] as const)
+        expect(strings[key], key).toMatch(
+          /puis reconnectez-vous une fois votre compte approuvé\.$/
+        )
+    }
+  )
 })

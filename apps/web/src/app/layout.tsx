@@ -30,9 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SessionBridge />
         <SkipToContent />
         {children}
+        {/* Last, so its effect switches to the browser language after every component in the page
+            has subscribed to the change; placed first, the switch fired before they listened and
+            the sign-in doors stayed English (TEA sign-off N-1). */}
+        <SessionBridge />
       </body>
     </html>
   )

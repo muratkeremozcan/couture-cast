@@ -19,7 +19,7 @@ tags:
   - maestro
 env:
   ADULT_BIRTHDATE: '1990-05-05'
-  SIGNUP_CREATED: 'Account created. You can continue to onboarding.'
+  SIGNUP_CREATED: 'Account created. Sign in with your email to continue.'
   SEND_CODE: 'Send sign-in code'
   CODE_SENT: 'Check your email for the sign-in code.'
 ---

@@ -242,10 +242,11 @@ export function FinishSignupForm({
           </p>
         ) : null}
       </div>
+      {/* An empty alert stays in the tree for its announcement and costs no gap (TEA N-2). */}
       <p
         data-testid="finish-signup-message"
         role="alert"
-        className="min-h-6 text-sm text-amber-200"
+        className="text-sm text-amber-200 empty:!mt-0"
       >
         {message ?? ''}
       </p>

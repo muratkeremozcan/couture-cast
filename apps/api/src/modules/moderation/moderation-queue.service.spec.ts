@@ -11,6 +11,7 @@ import type {
   ModerationQueueRepository,
 } from './moderation-queue.repository.js'
 import {
+  earliestTimes,
   MODERATION_MEDIA_TTL_SECONDS,
   ModerationQueueService,
   projectSnapshot,
@@ -651,15 +652,29 @@ describe('round 2: an operator note is cut without splitting a surrogate pair', 
   })
 })
 
+// TEA sign-off L-1: the 150 000 report case went through getCase, whose per-report mapping and
+// schema parse took up to 7 s on a loaded host. The property is the minimum alone, so it is
+// tested on plain times, and getCase keeps a small case that proves the wiring.
 describe('round 3: a case with very many reports', () => {
-  it('reads the earliest due and accepted time without spreading the reports into Math.min', async () => {
-    const base = postCase().reports[0]!
+  it('earliestTimes reads the earliest due and accepted time of 150 000 reports without spreading them into Math.min', () => {
     const reports = Array.from({ length: 150_000 }, (_, index) => ({
+      dueAt: new Date(NOW.getTime() + (index + 3) * 60_000),
+      acceptedAt: new Date(NOW.getTime() - (index === 77_777 ? 9 : 1) * 3_600_000),
+    }))
+    expect(earliestTimes(reports)).toEqual({
+      dueAt: new Date(NOW.getTime() + 3 * 60_000),
+      acceptedAt: new Date(NOW.getTime() - 9 * 3_600_000),
+    })
+  })
+
+  it('getCase reports the earliest due and accepted time whichever report holds them', async () => {
+    const base = postCase().reports[0]!
+    const reports = [5, 2, 9].map((hours, index) => ({
       ...base,
       id: `rep-${index}`,
       reporterId: `reporter-${index}`,
-      dueAt: new Date(NOW.getTime() + (index + 3) * 60_000),
-      acceptedAt: new Date(NOW.getTime() - (index === 777 ? 9 : 1) * 3_600_000),
+      dueAt: new Date(NOW.getTime() + (index === 2 ? 3 : 10 + index) * 60_000),
+      acceptedAt: new Date(NOW.getTime() - hours * 3_600_000),
     }))
     const { service } = build(postCase({ reports }))
     const detail = (await service.getCase(AUTH, 'post.p1')).data
