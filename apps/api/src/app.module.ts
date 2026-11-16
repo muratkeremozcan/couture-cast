@@ -29,6 +29,7 @@ import { PersonalizationModule } from './modules/personalization/personalization
 import { WardrobeModule } from './modules/wardrobe/wardrobe.module'
 import { CommerceModule } from './modules/commerce/commerce.module.js'
 import { CommunityModule } from './modules/community/community.module'
+import { AuthStateModule } from './modules/auth/auth-state.module'
 
 // `ScheduleModule` is deliberately absent. Every periodic sweep this app used
 // to declare with `@Cron` now runs as a BullMQ Job Scheduler in the worker
@@ -47,6 +48,8 @@ const websocketModules = process.env.DISABLE_WEBSOCKETS === 'true' ? [] : [Gatew
     NotificationsModule,
     EventsModule,
     AuthModule,
+    // RequestAuthGuard on AdminController resolves its identity and consent services here.
+    AuthStateModule,
     GuardianModule,
     FeatureFlagsModule,
     ModerationModule,
