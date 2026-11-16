@@ -42,7 +42,7 @@ test('the emulator SDK step installs its list through the shared script', () => 
 })
 
 /** Runs the script against a stub sdkmanager; `sdkmanager` is its bash body. */
-function runStep(t, sdkmanager, env = {}, args = [], { node } = {}) {
+function runStep(t, sdkmanager, env = {}, args = [], { node, gradleProperties } = {}) {
   const work = mkdtempSync(path.join(os.tmpdir(), 'sdk-install-'))
   t.after(() => rmSync(work, { recursive: true, force: true }))
   const bin = path.join(work, 'bin')
@@ -65,6 +65,11 @@ function runStep(t, sdkmanager, env = {}, args = [], { node } = {}) {
     writeFileSync(path.join(bin, 'node'), `#!/bin/bash\n${node}\n`, { mode: 0o755 })
   const home = path.join(work, 'home')
   mkdirSync(home)
+  // A user gradle.properties the job wrote before the install, as given.
+  if (gradleProperties !== undefined) {
+    mkdirSync(path.join(home, '.gradle'))
+    writeFileSync(path.join(home, '.gradle/gradle.properties'), gradleProperties)
+  }
   const result = spawnSync('bash', ['--noprofile', '--norc', script, ...args], {
     encoding: 'utf8',
     timeout: 20_000,
@@ -235,6 +240,32 @@ test('--gradle installs every resolved package through a run of 429s', (t) => {
   }
   // Nothing missing from the list may be downloaded mid-build any more.
   assert.equal(result.gradleProperties, 'android.builder.sdkDownload=false\n')
+})
+
+// Java properties may end at EOF without a newline; a plain append would then glue the setting
+// onto the last value (org.gradle.parallel=trueandroid.builder.sdkDownload=false).
+test('--gradle starts the setting on its own line after a file with no final newline', (t) => {
+  const result = runStep(t, unpack, {}, ['--gradle'], {
+    node: `echo '${gradlePackages}'`,
+    gradleProperties: 'org.gradle.parallel=true',
+  })
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.equal(
+    result.gradleProperties,
+    'org.gradle.parallel=true\nandroid.builder.sdkDownload=false\n'
+  )
+})
+
+test('--gradle appends after a file that already ends its last line', (t) => {
+  const result = runStep(t, unpack, {}, ['--gradle'], {
+    node: `echo '${gradlePackages}'`,
+    gradleProperties: 'org.gradle.jvmargs=-Xmx4g\n',
+  })
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.equal(
+    result.gradleProperties,
+    'org.gradle.jvmargs=-Xmx4g\nandroid.builder.sdkDownload=false\n'
+  )
 })
 
 test('--gradle leaves Gradle downloads alone when a package never installs', (t) => {

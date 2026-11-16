@@ -86,7 +86,11 @@ done
 if [ "$gradle" -eq 1 ]; then
   properties="${GRADLE_USER_HOME:-$HOME/.gradle}/gradle.properties"
   mkdir -p "$(dirname "$properties")"
-  # The user-level file takes precedence over the generated project's gradle.properties.
+  # The user-level file takes precedence over the generated project's gradle.properties. Its last
+  # line may end at EOF with no newline; the setting must not run on from that line's value.
+  if [ -s "$properties" ] && [ -n "$(tail -c 1 "$properties")" ]; then
+    echo >> "$properties"
+  fi
   echo 'android.builder.sdkDownload=false' >> "$properties"
   echo "Gradle may not download SDK packages now ($properties)."
 fi
