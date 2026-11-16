@@ -14,15 +14,26 @@ export function chunk(type, data = Buffer.alloc(0)) {
   return Buffer.concat([length, body, crc])
 }
 
-/** A 1x1 RGB IHDR and one IDAT of its pixel row. */
+/** A 1x1 RGB (color type 2) IHDR and one IDAT of its pixel row. */
 export const IHDR = chunk('IHDR', Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 2, 0, 0, 0]))
 export const IDAT = chunk('IDAT', zlib.deflateSync(Buffer.from([0, 255, 255, 255])))
+/** The same 1x1 image as RGBA (color type 6), as adb screencap writes it. */
+export const RGBA_IHDR = chunk(
+  'IHDR',
+  Buffer.from([0, 0, 0, 1, 0, 0, 0, 1, 8, 6, 0, 0, 0])
+)
+export const RGBA_IDAT = chunk(
+  'IDAT',
+  zlib.deflateSync(Buffer.from([0, 255, 255, 255, 255]))
+)
 export const IEND = chunk('IEND')
 
 /**
  * The metadata real screenshots carry (run 43746880534 shard 3 audit-failure-preparing.png from
  * XCUITest, its native-ios-*.png from simctl, and run 43741547435's native-android-*.png from
- * adb): sRGB and a 68-byte eXIf on iOS, sRGB and sBIT on Android, no text chunk on either.
+ * adb): sRGB and a 68-byte eXIf on iOS, sRGB and a four-byte sBIT on Android, no text chunk on
+ * either. The Android screens are RGBA (color type 6), so their sBIT has four bytes: build them
+ * with pngFile(REAL_ANDROID_METADATA, { rgba: true }) (PR 237 review).
  */
 export const REAL_IOS_METADATA = [
   chunk('sRGB', Buffer.from([0])),
@@ -39,9 +50,15 @@ export const REAL_ANDROID_METADATA = [
   chunk('sBIT', Buffer.from([8, 8, 8, 8])),
 ]
 
-/** A whole PNG: the signature, IHDR, then `metadata`, one IDAT and IEND. */
-export function pngFile(metadata = []) {
-  return Buffer.concat([SIGNATURE, IHDR, ...metadata, IDAT, IEND])
+/** A whole PNG: the signature, IHDR, then `metadata`, one IDAT and IEND; RGB unless `rgba`. */
+export function pngFile(metadata = [], { rgba = false } = {}) {
+  return Buffer.concat([
+    SIGNATURE,
+    rgba ? RGBA_IHDR : IHDR,
+    ...metadata,
+    rgba ? RGBA_IDAT : IDAT,
+    IEND,
+  ])
 }
 
 export const tEXt = (keyword, text) =>
@@ -67,5 +84,14 @@ export const iTXt = (keyword, text, { compressed = false } = {}) =>
       compressed
         ? zlib.deflateSync(Buffer.from(text, 'utf8'))
         : Buffer.from(text, 'utf8'),
+    ])
+  )
+/** An iCCP chunk: profile name, deflate method and the compressed `profile` bytes. */
+export const iCCP = (name, profile) =>
+  chunk(
+    'iCCP',
+    Buffer.concat([
+      Buffer.from(`${name}\0\0`, 'latin1'),
+      zlib.deflateSync(Buffer.from(profile)),
     ])
   )

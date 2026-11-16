@@ -19,6 +19,7 @@ import {
   REAL_ANDROID_METADATA,
   REAL_IOS_METADATA,
   chunk,
+  iCCP,
   iTXt,
   pngFile,
   tEXt,
@@ -331,9 +332,23 @@ describe('share-card audit screens', () => {
 // chunk, compressed or not, is read for the private text the public diagnostics refuse.
 describe('assertPublicAuditScreen', () => {
   test('passes the chunks real XCUITest, simctl and adb screenshots carry', () => {
+    const android = pngFile(REAL_ANDROID_METADATA, { rgba: true })
     assert.doesNotThrow(() => assertPublicAuditScreen(pngFile(REAL_IOS_METADATA)))
-    assert.doesNotThrow(() => assertPublicAuditScreen(pngFile(REAL_ANDROID_METADATA)))
+    assert.doesNotThrow(() => assertPublicAuditScreen(android))
     assert.doesNotThrow(() => assertPublicAuditScreen(pngFile()))
+    // PR 237 review: the adb screens of run 43741547435 are RGBA (IHDR color type 6) with a
+    // four-byte sBIT, one byte per channel; the fixture keeps that pairing.
+    const sBIT = android.indexOf('sBIT')
+    assert.equal(android[16 + 9], 6, 'IHDR color type')
+    assert.equal(android.readUInt32BE(sBIT - 4), 4, 'sBIT bytes')
+    // A display profile whose texts are its name, description and copyright passes.
+    const profile = Buffer.concat([
+      Buffer.from('desc\0\0\0\0Display P3\0', 'latin1'),
+      Buffer.from('Copyright Apple Inc., 2017', 'utf16le').swap16(),
+    ])
+    assert.doesNotThrow(() =>
+      assertPublicAuditScreen(pngFile([iCCP('Display P3', profile)]))
+    )
   })
 
   test('pixels are never read as text', () => {
@@ -382,6 +397,17 @@ describe('assertPublicAuditScreen', () => {
         'a zTXt that does not inflate',
         pngFile([chunk('zTXt', Buffer.from('Comment\0\0garbage'))]),
       ],
+      [
+        'an iCCP that does not inflate',
+        pngFile([chunk('iCCP', Buffer.from('P3\0\0garbage'))]),
+      ],
+      [
+        'an iCCP that is not deflate',
+        pngFile([
+          chunk('iCCP', Buffer.concat([Buffer.from('P3\0\x01'), zlib.deflateSync('x')])),
+        ]),
+      ],
+      ['an iCCP with no profile name', pngFile([chunk('iCCP', Buffer.from('\0\0'))])],
     ])
       assert.throws(
         () => assertPublicAuditScreen(bytes),
@@ -415,6 +441,13 @@ describe('assertPublicAuditScreen', () => {
       ['a secret key in a tEXt', tEXt('Key', 'sb_secret_0123456789')],
       ['a private key in a zTXt', zTXt('Key', '-----BEGIN PRIVATE KEY-----')],
       ['a keyword alone', tEXt('service_role', 'x')],
+      // PR 237 review: an ICC profile is deflated inside iCCP; it is inflated and read.
+      ['an email in an iCCP profile', iCCP('P3', 'desc\0\0\0\0owner@personal.invalid')],
+      [
+        'a local path in a UTF-16BE iCCP profile tag',
+        iCCP('P3', Buffer.from('mluc/Users/runner/work/x.icc', 'utf16le').swap16()),
+      ],
+      ['a token as an iCCP profile name', iCCP('service_role', 'x')],
       [
         'an email in UTF-16 inside eXIf',
         chunk('eXIf', Buffer.from('MM\0*owner@personal.invalid', 'utf16le')),

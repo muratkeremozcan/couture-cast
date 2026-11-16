@@ -290,7 +290,7 @@ describe('native public evidence', () => {
   test('real screenshot shapes publish unchanged', (t) => {
     const { directory, run } = evidenceFixture(t)
     const ios = pngFile(REAL_IOS_METADATA)
-    const android = pngFile(REAL_ANDROID_METADATA)
+    const android = pngFile(REAL_ANDROID_METADATA, { rgba: true })
     const original = pngFile()
     fs.writeFileSync(path.join(directory, 'native-ios-audit-failure.png'), ios)
     fs.writeFileSync(path.join(directory, 'native-android-de-DE.png'), android)

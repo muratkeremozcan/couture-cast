@@ -48,7 +48,7 @@ export const PRIVATE_TEXT = Object.freeze([
   EMAIL,
   /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.|access_token|refresh_token|service_role|@example\.test|@cc68\.test/i,
 ])
-// The text chunks, and how much one may inflate to.
+// The text chunks, and how much a compressed chunk (zTXt, iTXt, iCCP) may inflate to.
 const TEXT_CHUNKS = new Set(['tEXt', 'zTXt', 'iTXt'])
 const MAX_INFLATED = 1 << 20
 
@@ -59,16 +59,37 @@ const inflate = (bytes) => {
   try {
     return zlib.inflateSync(bytes, { maxOutputLength: MAX_INFLATED })
   } catch {
-    return invalid('a text chunk does not inflate')
+    return invalid('a compressed chunk does not inflate')
   }
 }
+/**
+ * Runs of printable bytes, read as Latin-1 and as UTF-16 in both alignments, so UTF-16 text of
+ * either byte order shows (eXIf, ICC profile mluc tags).
+ */
+const printableRuns = (data) =>
+  [
+    data.toString('latin1'),
+    data.toString('utf16le'),
+    data.subarray(1).toString('utf16le'),
+  ].flatMap((view) => view.match(/[\x20-\x7e]{4,}/g) ?? [])
 
 /**
  * The texts one metadata chunk can show a reader: a text chunk's keyword and text, inflated when
- * compressed (zTXt, compressed iTXt), and any other chunk's runs of printable bytes, read as
- * Latin-1 and as UTF-16 in both alignments (eXIf, as real XCUITest and simctl screenshots carry).
+ * compressed (zTXt, compressed iTXt), an iCCP profile's name and the printable runs of its
+ * inflated profile (PR 237 review), and any other chunk's printable runs (eXIf, as real XCUITest
+ * and simctl screenshots carry).
  */
 function chunkTexts(type, data) {
+  if (type === 'iCCP') {
+    // Profile name, null, compression method (0, deflate), compressed profile.
+    const nameEnd = data.indexOf(0)
+    if (nameEnd < 1) invalid('iCCP has no profile name')
+    if (data[nameEnd + 1] !== 0) invalid('iCCP is not deflate')
+    return [
+      data.toString('latin1', 0, nameEnd),
+      ...printableRuns(inflate(data.subarray(nameEnd + 2))),
+    ]
+  }
   if (TEXT_CHUNKS.has(type)) {
     const keywordEnd = data.indexOf(0)
     if (keywordEnd < 1) invalid(`${type} has no keyword`)
@@ -92,12 +113,7 @@ function chunkTexts(type, data) {
       (flag ? inflate(text) : text).toString('utf8'),
     ]
   }
-  const views = [
-    data.toString('latin1'),
-    data.toString('utf16le'),
-    data.subarray(1).toString('utf16le'),
-  ]
-  return views.flatMap((view) => view.match(/[\x20-\x7e]{4,}/g) ?? [])
+  return printableRuns(data)
 }
 
 /**
