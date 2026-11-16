@@ -82,7 +82,7 @@ test('stopping signals only the runners of this device and never the harness', (
     calls.push([command, ...args])
     return { stdout: command === 'pgrep' ? `4242\n${process.pid}\n1\nnope\n77\n` : '' }
   }
-  assert.deepEqual(stopIosDriver(device, spawn), { stopped: 2 })
+  assert.deepEqual(stopIosDriver(device, spawn), { stopped: 2, failed: null })
   assert.deepEqual(calls[0], [
     'pgrep',
     '-f',
@@ -102,5 +102,50 @@ test('stopping signals only the runners of this device and never the harness', (
 
 test('a device name that is not a simulator id is refused before any process is listed', () => {
   const spawn = () => assert.fail('no process may be listed')
-  assert.deepEqual(stopIosDriver('booted; rm -rf /', spawn), { stopped: 0 })
+  assert.deepEqual(stopIosDriver('booted; rm -rf /', spawn), {
+    stopped: 0,
+    failed: null,
+  })
+})
+
+// PR 237 review: a terminate that could not start, timed out or was killed may leave the old
+// runner answering on the pinned port, so preparation refuses to hand out --no-reinstall-driver.
+test('a runner stop that did not finish aborts preparation', () => {
+  for (const [label, terminated, failed] of [
+    [
+      'xcrun could not start',
+      { error: Object.assign(new Error('x'), { code: 'ENOENT' }) },
+      'ENOENT',
+    ],
+    [
+      'the 30 s timeout fired',
+      { error: Object.assign(new Error('x'), { code: 'ETIMEDOUT' }), signal: 'SIGTERM' },
+      'ETIMEDOUT',
+    ],
+    ['terminate was killed', { status: null, signal: 'SIGKILL' }, 'SIGKILL'],
+  ]) {
+    const directory = tmp()
+    const spawn = (command) => (command === 'xcrun' ? terminated : { stdout: '' })
+    assert.equal(stopIosDriver(device, spawn).failed, failed, label)
+    assert.throws(
+      () => iosDriverTestArgs({ platform: 'ios', directory, device, spawn }),
+      new RegExp(`^Error: ios_driver_stop_failed:${failed}$`),
+      label
+    )
+    // After a failed flow the stop failure is only logged, so the flow keeps its own outcome.
+    recordIosDriverFlow({ platform: 'ios', directory, device, ok: true })
+    assert.deepEqual(
+      recordIosDriverFlow({ platform: 'ios', directory, device, ok: false, spawn }),
+      { reusable: false, stopped: 0, failed },
+      label
+    )
+    assert.deepEqual(fs.readdirSync(directory), [], 'the reuse mark is cleared')
+  }
+  // A runner that was not running makes terminate exit nonzero: that is the state wanted.
+  const spawn = (command) =>
+    command === 'xcrun' ? { status: 3, signal: null } : { stdout: '' }
+  assert.deepEqual(
+    iosDriverTestArgs({ platform: 'ios', directory: tmp(), device, spawn }),
+    ['--no-reinstall-driver']
+  )
 })

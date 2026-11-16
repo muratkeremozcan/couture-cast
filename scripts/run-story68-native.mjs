@@ -213,6 +213,13 @@ function iosDeadlineKill(platform, result) {
 function afterTimeoutHierarchy(platform, result, output) {
   if (!iosDeadlineKill(platform, result)) return null
   recordIosDriverFlow({ platform, directory, device, ok: false })
+  let driverArgs
+  try {
+    driverArgs = iosDriverTestArgs({ platform, directory, device })
+  } catch {
+    // A runner that could not be stopped is not read through; the flow keeps its failure.
+    return null
+  }
   return captureIosTimeoutHierarchy({
     maestroBinary,
     output,
@@ -221,7 +228,7 @@ function afterTimeoutHierarchy(platform, result, output) {
       device,
       ...iosDriverGlobalArgs(platform),
       'hierarchy',
-      ...iosDriverTestArgs({ platform, directory, device }),
+      ...driverArgs,
     ],
   })
 }
