@@ -8,6 +8,7 @@ import React, {
   useEffect,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react'
 import {
   Keyboard,
@@ -163,6 +164,49 @@ export function withModalMarker(children: React.ReactNode) {
   )
 }
 
+/**
+ * How many EdgeToEdgeModals are up. iOS presents a Modal over the screen that opened it and
+ * leaves that screen in the accessibility tree: shard 3 of run 43800364098 found Home's
+ * current-temperature under the share card composer, where the composer draws "Preparing card",
+ * so VoiceOver could leave the composer for text the composer hides. The app root reads this and
+ * hides the screen under an open modal (underModalAccessibility).
+ */
+let openModals = 0
+const modalListeners = new Set<() => void>()
+function subscribeModals(listener: () => void) {
+  modalListeners.add(listener)
+  return () => {
+    modalListeners.delete(listener)
+  }
+}
+function setOpenModals(change: number) {
+  openModals += change
+  modalListeners.forEach((listener) => listener())
+}
+
+/** Whether any EdgeToEdgeModal is visible. */
+export function useEdgeToEdgeModalOpen(): boolean {
+  return useSyncExternalStore(
+    subscribeModals,
+    () => openModals > 0,
+    () => false
+  )
+}
+
+/**
+ * The accessibility props of the screen under the modals: hidden from VoiceOver, the XCUITest
+ * tree and TalkBack while one is open. A native Modal draws in its own presented view controller
+ * or dialog window, outside the app root, so hiding the root never hides the modal. The web
+ * modal is a portal and keeps its own focus trap, so web gets nothing.
+ */
+export function underModalAccessibility(open: boolean, os: string = Platform.OS) {
+  if (os === 'web') return {}
+  return {
+    accessibilityElementsHidden: open,
+    importantForAccessibility: open ? 'no-hide-descendants' : 'auto',
+  } as const
+}
+
 export function EdgeToEdgeModal({
   scrim,
   scrimTestID,
@@ -170,6 +214,12 @@ export function EdgeToEdgeModal({
   ...props
 }: EdgeToEdgeModalProps) {
   const [keyboardOpen] = useKeyboardOpen()
+  const { visible = true } = props
+  useEffect(() => {
+    if (!visible) return
+    setOpenModals(1)
+    return () => setOpenModals(-1)
+  }, [visible])
   return (
     <Modal transparent {...props} statusBarTranslucent navigationBarTranslucent>
       <View testID={scrimTestID} style={[styles.fill, { backgroundColor: scrim }]}>

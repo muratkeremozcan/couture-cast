@@ -12,7 +12,13 @@ import {
   liveFontMarkerPlacement,
   modalRenders,
 } from '@/src/test-utils/edge-to-edge-modal'
-import { EdgeToEdgeModal, useModalInsets, withModalMarker } from './edge-to-edge-modal'
+import {
+  EdgeToEdgeModal,
+  underModalAccessibility,
+  useEdgeToEdgeModalOpen,
+  useModalInsets,
+  withModalMarker,
+} from './edge-to-edge-modal'
 
 /**
  * react-native-web never reports a software keyboard, so the R57 cases drive the
@@ -269,5 +275,68 @@ describe('R57 EdgeToEdgeModal over the software keyboard', () => {
     expect(screen.getByTestId('insets').textContent).toBe(
       `${TEST_SAFE_AREA_INSETS.top}/${TEST_SAFE_AREA_INSETS.bottom}`
     )
+  })
+})
+
+// Shard 3, run 43800364098: under the share card composer, Home's text stayed in the iOS
+// accessibility tree (the audit's Vision listing found current-temperature where the composer
+// draws "Preparing card"). While any EdgeToEdgeModal is up, the screen under it leaves the tree.
+describe('the screen under an open EdgeToEdgeModal', () => {
+  function Probe() {
+    const open = useEdgeToEdgeModalOpen()
+    return <Text testID="modal-open">{String(open)}</Text>
+  }
+
+  it('reports a modal open while one is visible, through two at once, and none after', () => {
+    const view = render(
+      <>
+        <Probe />
+        <EdgeToEdgeModal visible={false}>
+          <Text>first</Text>
+        </EdgeToEdgeModal>
+      </>
+    )
+    expect(screen.getByTestId('modal-open')).toHaveTextContent('false')
+    const both = (first: boolean, second: boolean) => (
+      <>
+        <Probe />
+        <EdgeToEdgeModal visible={first}>
+          <Text>first</Text>
+        </EdgeToEdgeModal>
+        <EdgeToEdgeModal visible={second}>
+          <Text>second</Text>
+        </EdgeToEdgeModal>
+      </>
+    )
+    view.rerender(both(true, false))
+    expect(screen.getByTestId('modal-open')).toHaveTextContent('true')
+    view.rerender(both(true, true))
+    view.rerender(both(false, true))
+    expect(screen.getByTestId('modal-open')).toHaveTextContent('true')
+    view.rerender(both(false, false))
+    expect(screen.getByTestId('modal-open')).toHaveTextContent('false')
+    view.rerender(both(true, false))
+    view.unmount()
+    const after = render(<Probe />)
+    expect(after.getByTestId('modal-open')).toHaveTextContent('false')
+  })
+
+  it('hides the screen from VoiceOver and TalkBack only while a modal is open, never on web', () => {
+    expect(underModalAccessibility(true, 'ios')).toEqual({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    })
+    expect(underModalAccessibility(true, 'android')).toEqual({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    })
+    for (const os of ['ios', 'android'] as const)
+      expect(underModalAccessibility(false, os)).toEqual({
+        accessibilityElementsHidden: false,
+        importantForAccessibility: 'auto',
+      })
+    // The web modal is a portal outside the app root; testing-library and the browser keep the
+    // root readable.
+    expect(underModalAccessibility(true, 'web')).toEqual({})
   })
 })

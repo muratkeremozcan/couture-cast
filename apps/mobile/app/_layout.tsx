@@ -33,6 +33,10 @@ import { initI18n } from '@/src/lib/i18n'
 import { registerRitualBackgroundTaskAsync } from '@/src/lib/background-task'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { AppThemeProvider } from '@/src/theme/theme-context'
+import {
+  underModalAccessibility,
+  useEdgeToEdgeModalOpen,
+} from '@/components/edge-to-edge-modal'
 import { LiveFontMountMarker } from '@/components/live-font-mount-marker'
 import { useTranslation } from 'react-i18next'
 import { getFederatedSignInStrings, getGuestPreviewStrings } from '@couture/utils'
@@ -115,6 +119,7 @@ function RootLayoutNav() {
   const colorScheme = useColorScheme()
   const theme = colorScheme === 'dark' ? DarkTheme : DefaultTheme
   const { t, i18n } = useTranslation()
+  const modalOpen = useEdgeToEdgeModalOpen()
 
   const router = useRouter()
   const navigation = useRootNavigationState()
@@ -246,72 +251,84 @@ function RootLayoutNav() {
             {/* iOS labels the back button with the previous route's title; the tab
                 group has none, so it read "(tabs)". */}
             <LiveFontMountMarker scope="root" />
-            <AndroidShareCardPresentation
-              pathname={pathname}
-              navigationReady={Boolean(navigation?.key)}
-              onRestoreRoute={(path) => router.replace(path)}
+            {/* While an EdgeToEdgeModal is up, the screens under it leave the accessibility
+                tree (shard 3, run 43800364098: Home's text sat under the share card composer).
+                Never flattened, so the flag toggles on one native view and the screens keep
+                theirs. */}
+            <View
+              collapsable={false}
+              style={styles.screens}
+              {...underModalAccessibility(modalOpen)}
             >
-              <Stack
-                screenOptions={{
-                  headerBackTitle: t('common.back'),
-                }}
+              <AndroidShareCardPresentation
+                pathname={pathname}
+                navigationReady={Boolean(navigation?.key)}
+                onRestoreRoute={(path) => router.replace(path)}
               >
-                <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-                {/* The modal names itself in its own heading; an untitled header would
+                <Stack
+                  screenOptions={{
+                    headerBackTitle: t('common.back'),
+                  }}
+                >
+                  <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+                  {/* The modal names itself in its own heading; an untitled header would
                     show the raw route name "modal". Android keeps the bar for its back
                     arrow; an iOS sheet dismisses by swipe or Cancel and needs no empty bar. */}
-                <Stack.Screen
-                  name="modal"
-                  options={{
-                    presentation: 'modal',
-                    title: '',
-                    headerShown: Platform.OS !== 'ios',
-                  }}
-                />
-                <Stack.Screen
-                  name="wardrobe-capsules"
-                  options={{ title: t('wardrobe.capsules.title') }}
-                />
-                {/* The native header carries each title; the screens render no second one. */}
-                <Stack.Screen
-                  name="signin"
-                  options={{ title: t('community.notifications.signin') }}
-                />
-                <Stack.Screen
-                  name="notification-settings"
-                  options={{ title: t('community.notifications.title') }}
-                />
-                <Stack.Screen
-                  name="locations"
-                  options={{ title: t('locations.title') }}
-                />
-                <Stack.Screen
-                  name="preview"
-                  options={{ title: getGuestPreviewStrings(i18n.language).chrome.entry }}
-                />
-                {/* Signup names itself in its own heading; an untitled header would show the
+                  <Stack.Screen
+                    name="modal"
+                    options={{
+                      presentation: 'modal',
+                      title: '',
+                      headerShown: Platform.OS !== 'ios',
+                    }}
+                  />
+                  <Stack.Screen
+                    name="wardrobe-capsules"
+                    options={{ title: t('wardrobe.capsules.title') }}
+                  />
+                  {/* The native header carries each title; the screens render no second one. */}
+                  <Stack.Screen
+                    name="signin"
+                    options={{ title: t('community.notifications.signin') }}
+                  />
+                  <Stack.Screen
+                    name="notification-settings"
+                    options={{ title: t('community.notifications.title') }}
+                  />
+                  <Stack.Screen
+                    name="locations"
+                    options={{ title: t('locations.title') }}
+                  />
+                  <Stack.Screen
+                    name="preview"
+                    options={{
+                      title: getGuestPreviewStrings(i18n.language).chrome.entry,
+                    }}
+                  />
+                  {/* Signup names itself in its own heading; an untitled header would show the
                     raw route name "signup". */}
-                <Stack.Screen name="signup" options={{ title: '' }} />
-                {/* Story 6.17 D3, D5: the Google finish step and its callback. The header
+                  <Stack.Screen name="signup" options={{ title: '' }} />
+                  {/* Story 6.17 D3, D5: the Google finish step and its callback. The header
                     carries the finish step's title; the screen renders no second one. */}
-                <Stack.Screen
-                  name="signup-finish"
-                  options={{
-                    title: getFederatedSignInStrings(i18n.language).finishTitle,
-                    headerBackVisible: false,
-                    gestureEnabled: false,
-                  }}
-                />
-                <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
-                <Stack.Screen
-                  name="preview-continue"
-                  options={{
-                    title: getGuestPreviewStrings(i18n.language).review.heading,
-                    headerBackVisible: false,
-                  }}
-                />
-              </Stack>
-            </AndroidShareCardPresentation>
+                  <Stack.Screen
+                    name="signup-finish"
+                    options={{
+                      title: getFederatedSignInStrings(i18n.language).finishTitle,
+                      headerBackVisible: false,
+                      gestureEnabled: false,
+                    }}
+                  />
+                  <Stack.Screen name="auth/callback" options={{ headerShown: false }} />
+                  <Stack.Screen
+                    name="preview-continue"
+                    options={{
+                      title: getGuestPreviewStrings(i18n.language).review.heading,
+                      headerBackVisible: false,
+                    }}
+                  />
+                </Stack>
+              </AndroidShareCardPresentation>
+            </View>
             {/* Android edge-to-edge leaves the status bar icons light whatever the theme, so
                 they vanished on the light headers. `auto` follows the OS scheme the navigation
                 theme follows; screens that need another style push their own entry on top. */}
@@ -334,6 +351,7 @@ function RootLayoutNav() {
 }
 
 const styles = StyleSheet.create({
+  screens: { flex: 1 },
   // Mid-screen: at the window's top-left it sat under the status bar, and the
   // Android accessibility tree dropped it there.
   mountedMarker: {
