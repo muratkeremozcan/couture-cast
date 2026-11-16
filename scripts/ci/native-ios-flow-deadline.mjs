@@ -73,12 +73,8 @@ export async function runDeadlineWorker(request, timingFile) {
   const began = performance.now()
   let timedOut = false
   let killAfterMs = null
-  const child = spawn(request.binary, request.args, {
-    cwd: request.cwd,
-    env: request.env,
-    detached: true,
-    stdio: ['ignore', 'inherit', 'inherit'],
-  })
+  /** @type {import('node:child_process').ChildProcess | undefined} */
+  let child
   const write = () =>
     fs.writeFileSync(
       timingFile,
@@ -95,14 +91,14 @@ export async function runDeadlineWorker(request, timingFile) {
   // from the parent (spawnSync past maxBuffer), the SIGINT a cancelled step sends first, a SIGHUP, or
   // an uncaught error still kills the group and writes, before anything is logged.
   const killOwned = () => {
-    if (!child.pid) return
+    if (!child?.pid) return
     try {
       process.kill(-child.pid, 'SIGKILL')
     } catch (error) {
       if (error.code === 'ESRCH') return
       report(`owned_flow_group_kill_failed:${error.code ?? 'unknown'}`)
       try {
-        child.kill('SIGKILL')
+        child?.kill('SIGKILL')
       } catch {
         // The record below still names the deadline.
       }
@@ -131,6 +127,16 @@ export async function runDeadlineWorker(request, timingFile) {
       process.exit(1)
     }
   })
+  // The handlers above are in place before the group starts: the child runs the moment spawn
+  // returns, and a signal arriving before them killed the worker with no record and left the
+  // group running (2026-11-16, on a loaded machine).
+  child = spawn(request.binary, request.args, {
+    cwd: request.cwd,
+    env: request.env,
+    detached: true,
+    stdio: ['ignore', 'inherit', 'inherit'],
+  })
+  const owned = child
   const timer = setTimeout(
     () => {
       timedOut = true
@@ -142,11 +148,11 @@ export async function runDeadlineWorker(request, timingFile) {
   )
   try {
     const code = await new Promise((resolve) => {
-      child.once('error', () => {
+      owned.once('error', () => {
         report('owned_flow_launch_failed')
         resolve(127)
       })
-      child.once('close', (exitCode, signal) =>
+      owned.once('close', (exitCode, signal) =>
         resolve(timedOut ? 124 : (exitCode ?? (signal ? 1 : 0)))
       )
     })

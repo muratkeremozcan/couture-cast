@@ -7,9 +7,10 @@
  * counts toward the 100 a day, and pushes no preview check needed used them up. CI calls this
  * only when the preview checks need the branch (scripts/vercel-preview-inputs.mjs).
  *
- * A preview deployment this script created on the branch for the same build inputs (a hash of
- * every tracked file the project builds from) and the same project configuration (its preview
- * environment variables and build settings) is adopted, ready or still building; otherwise it
+ * A preview deployment this script created for the same build inputs (a hash of every tracked
+ * file the project builds from, scripts/vercel-build-inputs.mjs) and the same project
+ * configuration (its preview environment variables and build settings) is adopted, ready or
+ * still building, whichever branch it was built for; otherwise it
  * creates one from the exact commit and waits for it, within one deadline for the job. It never
  * cancels a deployment. Either way it returns that deployment's own URL, id and commit, which the
  * health wait and the e2e run use as they are.
@@ -269,12 +270,16 @@ export async function previewDeployment(input) {
   }
   const { project, branch, sha, inputs, config, force, log } = settings
   if (!force) {
+    // Any branch's deployment qualifies: the configuration identity already holds every
+    // variable scoped to this branch, so equal inputs and configuration build the same output.
+    // Only Vercel's system variables differ (VERCEL_GIT_COMMIT_REF, the gitBranch /api/health
+    // reports), and no check compares the branch. Replayed against the 96 preview builds of
+    // 2026-11-13 to 16, this map's inputs repeated another branch's ready build 27 times.
     const ours = (await settings.list())
       .filter(
         (deployment) =>
           (deployment.target ?? 'preview') === 'preview' &&
           deployment.meta?.ccPreviewSource === PREVIEW_SOURCE &&
-          deployment.meta?.githubCommitRef === branch &&
           deployment.meta?.ccPreviewInputs === inputs &&
           deployment.meta?.ccPreviewConfig === config &&
           /^[a-f0-9]{40}$/.test(deployment.meta?.githubCommitSha ?? '')
@@ -405,8 +410,7 @@ export async function run(project, env, options = {}) {
         teamId: team.id,
         projectId: projectData.id,
         state: 'READY,BUILDING,QUEUED,INITIALIZING',
-        'meta-githubCommitRef': branch,
-        limit: '50',
+        limit: '100',
       })
       return (await api('GET', `/v6/deployments?${query}`)).deployments ?? []
     },
