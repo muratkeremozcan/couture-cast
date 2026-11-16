@@ -71,8 +71,10 @@ import {
   expectationProblems,
   failingStep,
   flowEnv,
+  googleNativeConsentPolicy,
   googleNativeReversePorts,
   harnessEmail,
+  memberBirthdate,
   selectGoogleNativeFlows,
   standInIdentity,
 } from './lib/google-native-flows.mjs'
@@ -129,6 +131,7 @@ async function flowStrings() {
     back: catalog.common.back,
     cancelled: federated.cancelled,
     underage: federated.underage,
+    awaitingGuardian: federated.awaitingGuardian,
     email: catalog.community.notifications.email,
     sendCode: catalog.community.notifications.sendCode,
     codeSent: catalog.community.notifications.codeSent,
@@ -142,7 +145,8 @@ async function main() {
   const apk = path.resolve(args.apk)
   if (!fs.existsSync(apk)) throw new Error(`No client at ${apk}`)
   const device = args.device
-  const flows = selectGoogleNativeFlows(args.flows)
+  const consentPolicy = googleNativeConsentPolicy()
+  const flows = selectGoogleNativeFlows(args.flows, consentPolicy)
   const directory = path.resolve(
     args.evidence ??
       process.env.GOOGLE_NATIVE_DIR ??
@@ -294,16 +298,57 @@ async function main() {
         })
   }
 
-  /** An eligible adult app account through the product signup endpoint, as E-LINK does. */
-  const createMember = async (email) => {
+  /**
+   * The flow's app account through the product signup endpoint, as E-LINK and E-TEEN-RESIGN-OTP
+   * do: an eligible adult, or a 14-year-old the guardian lock refuses.
+   */
+  const createMember = async (flow, email) => {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, birthdate: '1990-06-15' }),
+      body: JSON.stringify({ email, birthdate: memberBirthdate(flow) }),
     })
     if (response.status !== 201)
       throw new Error(`The member signup answered ${response.status}`)
     return String((await response.json()).userId)
+  }
+
+  /** The stored state the 2026-11-15 production loop left two real teens in. */
+  const markWaitingOnGuardian = async (url, userId) => {
+    const client = new pg.Client({ connectionString: url })
+    await client.connect()
+    try {
+      const { rowCount } = await client.query(
+        'UPDATE "UserProfile" SET preferences = $2::jsonb WHERE user_id = $1',
+        [
+          userId,
+          JSON.stringify({
+            compliance: {
+              accountStatus: 'pending_guardian_consent',
+              guardianConsentRequired: true,
+            },
+          }),
+        ]
+      )
+      if (rowCount !== 1) throw new Error('The waiting teen profile was not found.')
+    } finally {
+      await client.end()
+    }
+  }
+
+  /** The profile's compliance block, for a flow that checks the teen's stored status. */
+  const complianceOf = async (url, userId) => {
+    const client = new pg.Client({ connectionString: url })
+    await client.connect()
+    try {
+      const { rows } = await client.query(
+        'SELECT preferences FROM "UserProfile" WHERE user_id = $1',
+        [userId]
+      )
+      return rows[0]?.preferences?.compliance ?? null
+    } finally {
+      await client.end()
+    }
   }
 
   /**
@@ -320,6 +365,10 @@ async function main() {
         authUser: await authUserState(email),
         comfort:
           flow.expect.comfort && ids[0] ? await comfortRow(database.url, ids[0]) : null,
+        compliance:
+          (flow.expect.pendingTeen || flow.expect.activeTeen) && ids[0]
+            ? await complianceOf(database.url, ids[0])
+            : null,
       })
       if (problems.length === 0) return problems
       await new Promise((resolve) => setTimeout(resolve, 1_000))
@@ -333,7 +382,9 @@ async function main() {
     const email = harnessEmail()
     const otpEmail = flow.otpEmail ? harnessEmail() : undefined
     recordFlowAddresses(flow, { google: email, 'email-code': otpEmail })
-    const memberId = flow.member ? await createMember(email) : undefined
+    const memberId = flow.member ? await createMember(flow, email) : undefined
+    if (flow.member === 'pending_teen' && memberId)
+      await markWaitingOnGuardian(database.url, memberId)
     await queueIdentity(standInIdentity(flow, email))
 
     ensureReverses()
@@ -406,6 +457,8 @@ async function main() {
 
     const stackOverrides = {
       TEST_ENV: 'local',
+      // The lane's guardian consent policy, whatever .env.local says (google-native-flows.mjs).
+      GUARDIAN_CONSENT_POLICY: consentPolicy,
       DATABASE_URL: database.url,
       REDIS_URL: redisUrl,
       REDIS_TLS: 'false',

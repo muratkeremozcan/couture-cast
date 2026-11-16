@@ -51,6 +51,8 @@ vi.mock('@/src/lib/native-session', () => ({
   readNativeFederatedIdentity: flow.read,
   cancelNativeFederatedSignup: flow.cancel,
   finishNativeFederatedSignup: vi.fn(),
+  // No teen waits on a guardian here; the finish step asks the birthdate.
+  fetchNativeAwaitingGuardianAccount: () => Promise.resolve(null),
 }))
 vi.mock('expo-router', async () => ({
   router: flow.router,

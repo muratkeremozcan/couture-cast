@@ -613,3 +613,47 @@ describe('resume decided by the server status', () => {
     expect(sdk.secure.has(FINISH_MARKER)).toBe(false)
   })
 })
+
+// Owner's production loop (2026-11-15): the guardian lock answers a pending teen's profile
+// check 403; the status names awaiting_guardian so neither path refuses or signs out.
+describe('a teen waiting on a guardian', () => {
+  const pending = () =>
+    answers('/api/v1/user/profile', json({ message: 'Guardian consent required' }, 403))
+  const awaiting = () =>
+    answers(
+      '/api/v1/auth/signup/federated',
+      json({ status: 'awaiting_guardian', accountId: 'teen-pending-1' })
+    )
+
+  it('Google: keeps the session and answers awaiting_guardian', async () => {
+    pending()
+    const status = awaiting()
+    const { session } = await load()
+    await expect(
+      session.completeNativeOAuth(`${REDIRECT}?code=pending-teen`)
+    ).resolves.toEqual({ kind: 'awaiting_guardian' })
+    expect(status).toHaveLength(1)
+    expect(sdk.signOut).not.toHaveBeenCalled()
+    expect(sdk.secure.has(FINISH_MARKER)).toBe(false)
+    await expect(
+      session.fetchNativeAwaitingGuardianAccount('signed-native-google')
+    ).resolves.toBe('teen-pending-1')
+  })
+
+  it('email code: throws awaiting_guardian instead of denied', async () => {
+    sdk.verifyOtp.mockImplementation(() => {
+      sdk.current = {
+        access_token: 'signed-native-otp-teen',
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+        user: { id: 'supabase-native-otp-teen', email: 'teen@synthetic.test' },
+      }
+      return Promise.resolve({ data: { session: sdk.current }, error: null })
+    })
+    pending()
+    awaiting()
+    const { session } = await load()
+    await expect(
+      session.verifyNativeOtp('teen@synthetic.test', '123456')
+    ).rejects.toMatchObject({ reason: 'awaiting_guardian' })
+  })
+})

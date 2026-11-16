@@ -15,14 +15,12 @@ export default function PrivacyPage() {
       title="Privacy Policy"
       summary="CoutureCast plans outfits from the weather and your wardrobe. This page explains what we collect to do that, who processes it for us, and how to have it deleted."
     >
-      {/* Age gate: packages/utils/src/age.ts, apps/api auth.service signup paths. The guardian
-          lock: JwtAuthGuard refuses a pending teen on every signed-in endpoint. */}
+      {/* Age gate: packages/utils/src/age.ts (GUARDIAN_CONSENT_POLICY off since 2026-11-16),
+          apps/api auth.service signup paths. */}
       <LegalSection title="Who can use CoutureCast">
         <p>
           CoutureCast is for people aged 13 and older. Every signup, with email or with
-          Google, asks for a birthdate. Nobody under 13 can create an account. People aged
-          13 to 15 can create an account, but its features stay locked until a guardian
-          approves.
+          Google, asks for a birthdate. Nobody under 13 can create an account.
         </p>
       </LegalSection>
 
@@ -34,11 +32,6 @@ export default function PrivacyPage() {
           </li>
           <li>
             <strong>Your birthdate</strong>, to apply the age rules above.
-          </li>
-          <li>
-            <strong>For accounts aged 13 to 15</strong>: the guardian email address the
-            teen enters, and the guardian&apos;s consent record (consent level, time, and
-            the IP address the guardian approved from).
           </li>
           <li>
             <strong>What you add to the app</strong>: wardrobe items and their photos, an
@@ -80,20 +73,17 @@ export default function PrivacyPage() {
         </LegalList>
       </LegalSection>
 
-      {/* Guardian flow: apps/api guardian.service.ts and the guardian dashboard. */}
-      <LegalSection title="Guardian consent for ages 13 to 15">
+      {/* Guardian consent ended 2026-11-16: the API refuses every guardian endpoint
+          (guardian-consent-policy.ts) and migration 20261116120000_guardian_consent_off made
+          waiting accounts active. The GuardianConsent and invitation rows are kept. */}
+      <LegalSection title="Earlier guardian consent records">
         <p>
-          A teen aged 13 to 15 enters a guardian&apos;s email address. The guardian
-          follows the invitation link to approve the account with read-only or full
-          access. Until a guardian approves, the teen account can invite a guardian and
-          nothing more: wardrobe, community, saved places, and every other signed-in
-          feature stay locked.
-        </p>
-        <p>
-          A guardian can revoke consent at any time from the guardian dashboard. When the
-          last guardian revokes, the teen&apos;s access to those features stops again.
-          Guardians can ask to review or delete a teen&apos;s information by writing to
-          the address below.
+          Until 16 November 2026, accounts for ages 13 to 15 needed a guardian&apos;s
+          approval. CoutureCast no longer asks for it, and those accounts now work like
+          any other. We keep the guardian records made before then: the guardian email
+          address, the consent level, and the time and IP address of each approval or
+          revocation. A guardian or teen can ask us to delete them by writing to the
+          address below.
         </p>
       </LegalSection>
 

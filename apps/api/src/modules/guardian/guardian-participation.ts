@@ -2,6 +2,8 @@
 import { ForbiddenException } from '@nestjs/common'
 import type { Prisma } from '@prisma/client'
 import { calculateAge } from '@couture/utils'
+import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
+import { teenAccessBlocked } from '../auth/guardian-consent-state.service.js'
 
 export async function assertWardrobeParticipationAllowed(
   tx: Prisma.TransactionClient,
@@ -29,6 +31,14 @@ export async function assertWardrobeParticipationAllowed(
     typeof compliance === 'object' &&
     !Array.isArray(compliance) &&
     compliance.accountStatus === 'active'
-  if (age < 13 || !active || user.teen_roles.length === 0)
+  if (age < 13) throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+  // Policy off: no 13 to 15 year old waits on a guardian, so neither the consent row nor the
+  // waiting status refuses; the guard's own rule decides.
+  if (resolveGuardianConsentPolicy() === 'off') {
+    if (teenAccessBlocked(preferences, 'off'))
+      throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
+    return
+  }
+  if (!active || user.teen_roles.length === 0)
     throw new ForbiddenException('GUARDIAN_CONSENT_REQUIRED')
 }

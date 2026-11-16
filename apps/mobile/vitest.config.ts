@@ -223,8 +223,11 @@ export default defineConfig({
     browser: {
       enabled: true,
       instances: [{ browser: 'chromium' }],
+      // Each userEvent action gets its own 10 s bound. Without one, Vitest gives an action only
+      // what is left of the test timeout, so a starved host reports "Timeout 1ms exceeded" on
+      // whichever click comes last instead of naming a stuck action (TEA sign-off F-6).
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-      provider: playwright(),
+      provider: playwright({ actionTimeout: 10_000 }),
       headless: !isWatchMode,
     },
     setupFiles: ['./vitest.expo-env.setup.ts', './vitest.setup.ts'],

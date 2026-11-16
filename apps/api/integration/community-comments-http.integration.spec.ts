@@ -20,6 +20,11 @@ import {
   SECOND_MS,
 } from './helpers/community-comments-context.js'
 import { updatePost } from './helpers/privacy-guards.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its revoked-teen case need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 const { prisma, repository, flags, guardian, input, fixture, publish, bootApp } =
   commentsTestContext()

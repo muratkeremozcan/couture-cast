@@ -128,6 +128,23 @@ function splitCodes(reason: string | null): string[] {
     .filter((code) => code.length > 0)
 }
 
+/**
+ * The earliest due and accepted time across a case's reports. A loop takes any number of reports;
+ * spreading them into Math.min would hit the engine's argument limit.
+ */
+export function earliestTimes(reports: readonly { dueAt: Date; acceptedAt: Date }[]): {
+  dueAt: Date
+  acceptedAt: Date
+} {
+  let dueAt = Infinity
+  let acceptedAt = Infinity
+  for (const report of reports) {
+    dueAt = Math.min(dueAt, report.dueAt.getTime())
+    acceptedAt = Math.min(acceptedAt, report.acceptedAt.getTime())
+  }
+  return { dueAt: new Date(dueAt), acceptedAt: new Date(acceptedAt) }
+}
+
 @Injectable()
 export class ModerationQueueService {
   private readonly logger = new Logger(ModerationQueueService.name)
@@ -249,16 +266,7 @@ export class ModerationQueueService {
 
     const findings = this.findings(loaded)
     const hasFinding = this.hasFinding(loaded)
-    // A reduce takes any number of reports; spreading them into Math.min would hit the argument limit.
-    const dueAt = new Date(
-      relevant.reduce((min, report) => Math.min(min, report.dueAt.getTime()), Infinity)
-    )
-    const acceptedAt = new Date(
-      relevant.reduce(
-        (min, report) => Math.min(min, report.acceptedAt.getTime()),
-        Infinity
-      )
-    )
+    const { dueAt, acceptedAt } = earliestTimes(relevant)
     const first = relevant[0] as ReportRecord
     const live = loaded.post ?? loaded.comment
 

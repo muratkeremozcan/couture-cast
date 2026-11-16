@@ -256,6 +256,23 @@ describe('general worker bootstrap', () => {
     })
   })
 
+  // TEA sign-off F-4: the worker refuses a guardian consent policy its deployment may not run,
+  // as the API's AppModule does, before it opens a queue or starts telemetry.
+  it('U-W-POLICY: exits 1 before starting anything on required_13_15 outside a test environment', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('TEST_ENV', '')
+    harness.initializeOpenTelemetry.mockClear()
+    try {
+      await freshProcess().startWorkers()
+      expect(harness.exit).toHaveBeenCalledWith(1)
+      expect(harness.initializeOpenTelemetry).not.toHaveBeenCalled()
+      expect(harness.createCommunityWorkerRuntime).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('U-W-OTEL: starts OpenTelemetry and closes it on shutdown', async () => {
     harness.initializeOpenTelemetry.mockClear()
     harness.shutdownOpenTelemetry.mockClear()

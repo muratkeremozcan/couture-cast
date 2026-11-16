@@ -56,7 +56,8 @@ import {
   API_BASE_URL,
   API_PORT,
   AUTH_PROXY_PORT,
-  EXPECTED_REAL_SESSION_TESTS,
+  expectedRealSessionTests,
+  realSessionConsentPolicy,
   MAILPIT_URL,
   RUN_STATE_FILES,
   WEATHER_DOUBLE_PORT,
@@ -280,6 +281,7 @@ async function main() {
       // A skip reason now throws: skipped specs would exit 0.
       STORY65_REAL_SESSION_REQUIRED: 'true',
       PLAYWRIGHT_SKIP_DB_RESET: 'true',
+      GUARDIAN_CONSENT_POLICY: realSessionConsentPolicy(),
     }
     fs.writeFileSync(
       path.join(directory, 'owned-env.json'),
@@ -374,6 +376,8 @@ async function main() {
       E2E_WEATHER_DOUBLE_PORT: String(WEATHER_DOUBLE_PORT),
       COMMUNITY_SCREENING_EVIDENCE_MODE: 'fixture',
       PLAYWRIGHT_SKIP_DB_RESET: 'true',
+      // The API runs the lane's guardian consent policy, whatever .env.local says.
+      GUARDIAN_CONSENT_POLICY: realSessionConsentPolicy(),
     }
     const stackEnv = {
       ...process.env,
@@ -446,7 +450,9 @@ async function main() {
     const outcome = junitOutcome(
       fs.existsSync(junit) ? fs.readFileSync(junit, 'utf8') : '',
       // Playwright arguments may filter the specs; the full run must hold every expected test.
-      playwrightArgs.length === 0 ? EXPECTED_REAL_SESSION_TESTS : undefined
+      playwrightArgs.length === 0
+        ? expectedRealSessionTests(realSessionConsentPolicy())
+        : undefined
     )
     if (!outcome.ok) {
       log(`Playwright exited 0, but ${outcome.reason}; failing the run.`)

@@ -20,7 +20,7 @@ Added Steps 40 to 57:
 - Step 54: Story 6.14, complimentary full access, `1fa40089` (PR #198), merged on 2026-11-10.
 - Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
 - Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
-- Step 57: Story 6.17, Google sign-in, in review on `feat/story-6-17-google-sign-in`.
+- Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -28,6 +28,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Moved Step 57 to completed after PR #238 merged as `5bd54123`, and added the pending-teen sign-in loop to its takeaways and tests.
 Added Step 57 for Story 6.17 while its PR is in review, with Step 57 in `Current position` and `The whole project in plain English`.
 Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 Moved Step 56 to completed after PR #234 merged as `08ac8314`.
@@ -130,12 +131,12 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- In review: Step 57, Story 6.17, Google sign-in, `review` in `sprint-status.yaml`.
+- Latest completed step: Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
-- Latest completed step: Step 56, Story 6.16, guest wardrobe and outfit preview, status `done`, merged as `08ac8314` (PR #234) on 2026-11-15.
+  The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
+- Previous completed step: Step 56, Story 6.16, guest wardrobe and outfit preview, status `done`, merged as `08ac8314` (PR #234) on 2026-11-15.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-16-guest-wardrobe-outfit-preview.md`.
-  Step 56 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
 - Closing: Step 55, Story 6.15, SDK 54 readiness and the live font-scale proof, `done` in `sprint-status.yaml` with PR #230.
   PRs #226 (`814ce811`) and #229 (`f49027e4`) merged on SDK 54; Steps 1 to 4 (SDK 55 to 58) moved to Story 6.15b, `backlog`.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-15-expo-sdk58-live-font-scale-layout.md`.
@@ -11550,6 +11551,21 @@ Hard-won lessons from the implementation and code review of this story:
   started on signup returned to sign-in. It also found the web resume ran only when the root
   layout mounted, so a client-side link out of a legal page escaped the finish step. Both
   clients now share the door helpers and decide the resume from the server status.
+- Production found a loop after merge: a teen waiting on a guardian signed in with Google and
+  landed back on sign-in every time. The guardian lock answers the teen's profile check with a
+  403, the client read that as "no account", and the federated status said `complete`, so the
+  client refused and signed out. The status now answers `awaiting_guardian` with the account id
+  for a teen the lock refuses (a revoked teen included); both clients keep the session, show the
+  guardian invitation on the finish step, and Continue signs out. An email code takes the same
+  path. The real-session lane reproduced the loop on `main` before the fix.
+- The teen-path review then found guardian consent did not hold: a teen could approve their own
+  account from the link the app showed them, no invite email was sent, and no guardian could sign
+  in to revoke. The owner turned consent off (2026-11-16). One value, `GUARDIAN_CONSENT_POLICY`
+  (`packages/utils/src/age.ts`, read by `apps/api/src/modules/auth/guardian-consent-policy.ts`),
+  decides it: under `off` every 13+ account is active at creation, the guardian endpoints answer
+  409 `guardian_consent_off`, and a migration activates teens left waiting. `required_13_15` still
+  runs in the test lanes, and fails boot anywhere else until the guardian endpoints check their
+  caller.
 
 Story/Task mapping:
 
@@ -11672,7 +11688,15 @@ E2E, Playwright:
 
 - [`playwright/tests/google-sign-in-real-session.spec.ts`](../../playwright/tests/google-sign-in-real-session.spec.ts):
   proves the web round trip on the real stack through the Keycloak stand-in: new adult, teen,
-  under 13, linking, resume, cancel, preview conversion and a stored session without the token.
+  under 13, linking, resume, cancel, preview conversion and a stored session without the token;
+  E-OFF-TEEN-GOOGLE, E-OFF-TEEN-EMAIL and E-OFF-RETURNING-PENDING prove a new or left-waiting
+  teen lands home under policy off; the `@consent-required` cases (E-TEEN, E-TEEN-RESIGN,
+  E-TEEN-RESIGN-OTP, E-TEEN-APPROVED, E-TEEN-CONTINUE) run in a second lane with
+  `GUARDIAN_CONSENT_POLICY=required_13_15`.
+- [`apps/api/integration/guardian-consent-off-migration.integration.spec.ts`](../../apps/api/integration/guardian-consent-off-migration.integration.spec.ts):
+  proves the consent-off migration activates waiting and revoked teens and nothing else.
+- [`apps/api/src/modules/auth/guardian-lock-route-sweep.spec.ts`](../../apps/api/src/modules/auth/guardian-lock-route-sweep.spec.ts):
+  proves every API route runs the guardian lock or is named with a reason.
 - [`playwright/tests/legal-pages.spec.ts`](../../playwright/tests/legal-pages.spec.ts):
   proves the legal pages render signed out without JavaScript, link from every entry point and
   keep each corrected sentence.
@@ -11683,9 +11707,11 @@ E2E, Playwright:
 
 Mobile E2E, Maestro:
 
-- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): eight Android flows (new account,
+- [`maestro/google-sign-in/`](../../maestro/google-sign-in/): eleven Android flows (new account,
   existing member, under 13, cancelled chooser, Back on the finish step, relaunch resume, preview
-  conversion, Cancel back to the Create account door) and two capture flows for light and dark
+  conversion, Cancel back to the Create account door, a new teen and a teen left waiting landing
+  home under policy off, and, under required_13_15, a waiting teen who signs in again, gets the
+  guardian step and signs out) and two capture flows for light and dark
   screens, run by
   `scripts/run-google-native.mjs`.
 
@@ -11705,6 +11731,5 @@ Evidence boundaries:
 - The Google OAuth consent screen is published (In production) with the public `/privacy` and
   `/terms` pages; those URLs answer on production once this PR deploys.
 - Real Google is exercised by hand; CI signs in through the Keycloak stand-in only.
-- The orphan sweep runs on production only after `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` is set on
-  the hosted community worker at release.
+- `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` is set on the hosted community worker (2026-11-15).
 - The legal pages are engineering copy matched to the code, not counsel-reviewed text.

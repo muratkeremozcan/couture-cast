@@ -101,8 +101,7 @@ export const enCA: GuestPreviewStrings = {
     previewOnly: 'Preview only',
     previewOnlyBody: 'Sample items, outfits, likes, the collection filter and swaps.',
     stillRequired: 'Still required',
-    stillRequiredBody:
-      'Account setup, verified sign-in, and guardian approval where it applies.',
+    stillRequiredBody: 'Account setup and verified sign-in.',
     backToPreview: 'Back to preview',
     signInToContinue: 'Sign in to continue',
   },
@@ -115,8 +114,7 @@ export const enCA: GuestPreviewStrings = {
     saving: 'Saving…',
     saved: 'Your comfort preferences are saved.',
     kept: 'Your account preferences are unchanged.',
-    rejected:
-      "Your account can't save preferences yet. Guardian approval or an age check comes first.",
+    rejected: "Your account can't save preferences yet. An age check comes first.",
     failed:
       "We couldn't save your preferences. Your choice is kept, so you can try again.",
     loadFailed: "We couldn't load your account preferences.",

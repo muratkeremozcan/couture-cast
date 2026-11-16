@@ -103,8 +103,7 @@ export const frFR: GuestPreviewStrings = {
     previewOnlyBody:
       "Pièces d'exemple, tenues, « j'aime », filtre de collection et remplacements.",
     stillRequired: 'Toujours nécessaire',
-    stillRequiredBody:
-      "Création du compte, connexion vérifiée et accord d'un parent ou tuteur le cas échéant.",
+    stillRequiredBody: 'Création du compte et connexion vérifiée.',
     backToPreview: "Retour à l'aperçu",
     signInToContinue: 'Se connecter pour continuer',
   },
@@ -118,7 +117,7 @@ export const frFR: GuestPreviewStrings = {
     saved: 'Vos préférences de confort sont enregistrées.',
     kept: 'Les préférences de votre compte sont inchangées.',
     rejected:
-      "Votre compte ne peut pas encore enregistrer de préférences. L'accord d'un parent ou une vérification d'âge est d'abord nécessaire.",
+      "Votre compte ne peut pas encore enregistrer de préférences. Une vérification d'âge est d'abord nécessaire.",
     failed:
       "Nous n'avons pas pu enregistrer vos préférences. Votre choix est conservé, vous pouvez réessayer.",
     loadFailed: "Nous n'avons pas pu charger les préférences de votre compte.",

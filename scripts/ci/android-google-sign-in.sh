@@ -16,3 +16,8 @@ mkdir -p "$evidence"
 adb -s "$ANDROID_SERIAL" wait-for-device
 adb -s "$ANDROID_SERIAL" shell 'while [ -z "$(getprop sys.boot_completed)" ]; do sleep 1; done'
 node scripts/run-google-native.mjs --apk "$apk" --device "$ANDROID_SERIAL" --evidence "$evidence"
+# Guardian consent is off by default (owner ruling 2026-11-16); the waiting-teen flow runs in its
+# own lane against an API started with GUARDIAN_CONSENT_POLICY=required_13_15.
+mkdir -p "$evidence/consent-required"
+GUARDIAN_CONSENT_POLICY=required_13_15 node scripts/run-google-native.mjs --apk "$apk" \
+  --device "$ANDROID_SERIAL" --evidence "$evidence/consent-required"

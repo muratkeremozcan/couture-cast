@@ -21,6 +21,11 @@ import {
 import { checkA11y, contrastRatio } from '../support/helpers/accessibility'
 import { authHeaders } from '../support/helpers/api-test'
 import {
+  CONSENT_LANE_ONLY,
+  CONSENT_REQUIRED_TAG,
+  e2eConsentPolicy,
+} from '../support/helpers/guardian-consent-policy'
+import {
   completedCommunityFeed,
   communityApiTest,
   communityTest,
@@ -837,70 +842,76 @@ test.describe('Story 6.4 screened threaded comments', () => {
     await expect(thread.getByRole('alert')).toHaveCount(0)
   })
 
-  test('[P0] replaces a teen comment with a neutral placeholder once guardian consent is revoked', async ({
-    page,
-    communitySession,
-    communityApi,
-    apiRequest,
-    recurse,
-    interceptNetworkCall,
-  }, testInfo) => {
-    expect(communitySession.userId).toBeTruthy()
-    const body = `Wool coat over a knit ${runToken()}`
+  // Revoking needs the guardian consent endpoints, which answer 409 while consent is off.
+  test(
+    '[P0] replaces a teen comment with a neutral placeholder once guardian consent is revoked',
+    {
+      tag: CONSENT_REQUIRED_TAG,
+    },
+    async (
+      { page, communitySession, communityApi, apiRequest, recurse, interceptNetworkCall },
+      testInfo
+    ) => {
+      test.skip(e2eConsentPolicy() !== 'required_13_15', CONSENT_LANE_ONLY)
+      expect(communitySession.userId).toBeTruthy()
+      const body = `Wool coat over a knit ${runToken()}`
 
-    await log.step('A 15-year-old with accepted guardian consent publishes a comment')
-    const consent = await createAcceptedGuardianConsent(apiRequest, testInfo)
-    guardianTargets.push(consent)
-    // The fixture's owned teardown erases and deletes the teen's comment rows.
-    communityApi.trackUser(consent.teenId)
-    const teen: Account = {
-      apiBaseUrl: communitySession.apiBaseUrl,
-      headers: { ...authHeaders(consent.teenId, 'teen'), 'x-couture-platform': 'web' },
+      await log.step('A 15-year-old with accepted guardian consent publishes a comment')
+      const consent = await createAcceptedGuardianConsent(apiRequest, testInfo)
+      guardianTargets.push(consent)
+      // The fixture's owned teardown erases and deletes the teen's comment rows.
+      communityApi.trackUser(consent.teenId)
+      const teen: Account = {
+        apiBaseUrl: communitySession.apiBaseUrl,
+        headers: { ...authHeaders(consent.teenId, 'teen'), 'x-couture-platform': 'web' },
+      }
+      const authored = await createComment({ apiRequest }, teen, body)
+      expect(
+        (await settledSubmission({ apiRequest, recurse }, teen, authored.id)).status
+      ).toBe('published')
+
+      await log.step('The adult reader sees the body and the alias')
+      const { thread, initial } = await openThread(page, interceptNetworkCall)
+      const visible = rootOnFirstPage(initial.roots, authored.id)
+      expect(visible).toMatchObject({ body, isOwn: false, unavailable: false })
+      expect(visible.author).not.toBeNull()
+      const alias = visible.author!
+      const entry = thread.getByTestId(`comment-${authored.id}`)
+      await expect(entry).toContainText(body)
+      await expect(entry).toContainText(alias)
+
+      await log.step('The guardian revokes consent through the real route')
+      const revoked = await apiRequest<unknown>({
+        method: 'POST',
+        path: '/api/v1/guardian/revoke',
+        baseUrl: communitySession.apiBaseUrl,
+        headers: authHeaders(consent.guardianId, 'guardian'),
+        body: { guardianId: consent.guardianId, teenId: consent.teenId },
+      })
+      expect(revoked.status).toBe(200)
+      expect(guardianConsentRevokeResponseSchema.parse(revoked.body)).toMatchObject({
+        teenId: consent.teenId,
+        remainingActiveGuardians: 0,
+        sessionInvalidated: true,
+      })
+
+      await log.step('A refresh shows only the neutral placeholder')
+      const { roots } = await refreshThread(thread, interceptNetworkCall)
+      const suppressed = rootOnFirstPage(roots, authored.id)
+      expect(suppressed).toMatchObject({ body: null, author: null, unavailable: true })
+      // The strict contract carries no status field; the payload must not name a cause.
+      expect(JSON.stringify(suppressed)).not.toMatch(
+        /consent|suspend|guardian|teen|minor/i
+      )
+      await expect(entry.getByText('Unavailable.', { exact: true })).toBeVisible()
+      await expect(entry).not.toContainText(body)
+      await expect(entry).not.toContainText(/consent|suspend|guardian|teen|minor/i)
+      await expect(thread.getByText(body)).toHaveCount(0)
+      await expect(thread.getByText(alias, { exact: true })).toHaveCount(0)
+      await expect(entry.getByRole('button', { name: /^Reply:/ })).toHaveCount(0)
+      await expect(
+        entry.getByRole('button', { name: 'Report: Unavailable.', exact: true })
+      ).toBeVisible()
     }
-    const authored = await createComment({ apiRequest }, teen, body)
-    expect(
-      (await settledSubmission({ apiRequest, recurse }, teen, authored.id)).status
-    ).toBe('published')
-
-    await log.step('The adult reader sees the body and the alias')
-    const { thread, initial } = await openThread(page, interceptNetworkCall)
-    const visible = rootOnFirstPage(initial.roots, authored.id)
-    expect(visible).toMatchObject({ body, isOwn: false, unavailable: false })
-    expect(visible.author).not.toBeNull()
-    const alias = visible.author!
-    const entry = thread.getByTestId(`comment-${authored.id}`)
-    await expect(entry).toContainText(body)
-    await expect(entry).toContainText(alias)
-
-    await log.step('The guardian revokes consent through the real route')
-    const revoked = await apiRequest<unknown>({
-      method: 'POST',
-      path: '/api/v1/guardian/revoke',
-      baseUrl: communitySession.apiBaseUrl,
-      headers: authHeaders(consent.guardianId, 'guardian'),
-      body: { guardianId: consent.guardianId, teenId: consent.teenId },
-    })
-    expect(revoked.status).toBe(200)
-    expect(guardianConsentRevokeResponseSchema.parse(revoked.body)).toMatchObject({
-      teenId: consent.teenId,
-      remainingActiveGuardians: 0,
-      sessionInvalidated: true,
-    })
-
-    await log.step('A refresh shows only the neutral placeholder')
-    const { roots } = await refreshThread(thread, interceptNetworkCall)
-    const suppressed = rootOnFirstPage(roots, authored.id)
-    expect(suppressed).toMatchObject({ body: null, author: null, unavailable: true })
-    // The strict contract carries no status field; the payload must not name a cause.
-    expect(JSON.stringify(suppressed)).not.toMatch(/consent|suspend|guardian|teen|minor/i)
-    await expect(entry.getByText('Unavailable.', { exact: true })).toBeVisible()
-    await expect(entry).not.toContainText(body)
-    await expect(entry).not.toContainText(/consent|suspend|guardian|teen|minor/i)
-    await expect(thread.getByText(body)).toHaveCount(0)
-    await expect(thread.getByText(alias, { exact: true })).toHaveCount(0)
-    await expect(entry.getByRole('button', { name: /^Reply:/ })).toHaveCount(0)
-    await expect(
-      entry.getByRole('button', { name: 'Report: Unavailable.', exact: true })
-    ).toBeVisible()
-  })
+  )
 })

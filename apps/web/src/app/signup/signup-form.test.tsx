@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getI18n } from '../../i18n'
 import { SignupForm } from './signup-form'
 
 describe('SignupForm', () => {
@@ -24,16 +25,16 @@ describe('SignupForm', () => {
     )
   })
 
-  it('shows the guardian consent message for ages thirteen through fifteen', () => {
+  // Guardian consent is off (owner ruling 2026-11-16): a teen birthdate shows no guardian message.
+  it('shows no guardian consent message for ages thirteen through fifteen', () => {
     render(<SignupForm submitSignup={vi.fn()} />)
 
     fireEvent.change(screen.getByLabelText('Birthdate'), {
       target: { value: '2011-04-15' },
     })
 
-    expect(screen.getByTestId('signup-inline-message')).toHaveTextContent(
-      'Guardian consent required'
-    )
+    expect(screen.queryByTestId('signup-inline-message')).toBeNull()
+    expect(screen.queryByText(/guardian/i)).toBeNull()
   })
 
   it('submits eligible signups and shows the success state', async () => {
@@ -69,9 +70,48 @@ describe('SignupForm', () => {
         birthdate: '2010-04-15',
       })
       expect(screen.getByTestId('signup-success-message')).toHaveTextContent(
-        'Account created. You can continue to onboarding.'
+        'Account created. Sign in with your email to continue.'
       )
     })
+    // TEA sign-off N-3: the page names the next step and links to it; the form is done, so
+    // Create account is gone instead of inviting a second signup with the same address.
+    const next = screen.getByTestId('signup-sign-in-to-continue')
+    expect(next.textContent).toBe('Sign in to continue')
+    expect(next.getAttribute('href')).toBe('/signin')
+    expect(screen.queryByRole('button', { name: 'Create account' })).toBeNull()
+  })
+
+  // TEA sign-off N-1: the page follows the browser language like the finish step does.
+  it('renders the form in the active language (fr-FR)', async () => {
+    await getI18n().changeLanguage('fr-FR')
+    try {
+      const submitSignup = vi.fn().mockResolvedValue({
+        userId: 'user-fr',
+        age: 30,
+        accountStatus: 'active',
+        guardianConsentRequired: false,
+      })
+      render(<SignupForm submitSignup={submitSignup} />)
+      expect(screen.getByTestId('google-sign-in')).toHaveTextContent(
+        'Continuer avec Google'
+      )
+      expect(screen.getByRole('separator')).toHaveAttribute('aria-label', 'ou')
+      fireEvent.change(screen.getByLabelText('Adresse e-mail'), {
+        target: { value: 'adulte@example.com' },
+      })
+      fireEvent.change(screen.getByLabelText('Date de naissance'), {
+        target: { value: '1996-04-15' },
+      })
+      fireEvent.submit(screen.getByRole('button', { name: 'Créer le compte' }))
+      expect(await screen.findByTestId('signup-success-message')).toHaveTextContent(
+        'Compte créé. Connectez-vous avec votre adresse e-mail pour continuer.'
+      )
+      expect(screen.getByTestId('signup-sign-in-to-continue').textContent).toBe(
+        'Se connecter pour continuer'
+      )
+    } finally {
+      await getI18n().changeLanguage('en-US')
+    }
   })
 
   it('shows the guardian invitation step after teen signup and sends the invite', async () => {
@@ -185,7 +225,18 @@ describe('SignupForm validation and failure paths', () => {
 
   it.each([
     ['an Error', new Error('Email already registered'), 'Email already registered'],
-    ['a non-Error', 'socket hang up', 'Signup failed'],
+    // The fallback is the localized create-unavailable copy (TEA sign-off N-1).
+    [
+      'a non-Error',
+      'socket hang up',
+      'Your account could not be created right now. Try again in a moment.',
+    ],
+    // A network failure is a TypeError whose message is the browser's, never shown.
+    [
+      'a network failure',
+      new TypeError('Failed to fetch'),
+      'Your account could not be created right now. Try again in a moment.',
+    ],
   ])('surfaces a signup rejection that is %s', async (_label, reason, expected) => {
     const submitSignup = vi.fn().mockRejectedValue(reason)
     render(<SignupForm submitSignup={submitSignup} />)
@@ -258,7 +309,11 @@ describe('SignupForm guardian invitation failures', () => {
 
   it.each([
     ['an Error', new Error('Guardian already invited'), 'Guardian already invited'],
-    ['a non-Error', 'socket hang up', 'Guardian invitation failed'],
+    [
+      'a non-Error',
+      'socket hang up',
+      'The guardian invitation could not be sent. Try again.',
+    ],
   ])(
     'surfaces a guardian invitation rejection that is %s',
     async (_l, reason, expected) => {

@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-31-outfit-capsule-builder
 import { ForbiddenException, NotFoundException } from '@nestjs/common'
 import type { PrismaClient } from '@prisma/client'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi, type Mock } from 'vitest'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import type { GuardianService } from '../guardian/guardian.service.js'
 import { WardrobeAccessService } from './wardrobe-access.service.js'
@@ -17,6 +17,10 @@ type GuardianConsentRow = {
 }
 
 describe('WardrobeAccessService', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
   const createMockPrisma = (
     ownerExists = true,
     guardianConsent: GuardianConsentRow | null = null
@@ -69,7 +73,8 @@ describe('WardrobeAccessService', () => {
       expect(result).toEqual({ actorRole: 'admin' })
     })
 
-    it('4.3-UNIT-AUTHZ-04 allows guardian read access with valid consent', async () => {
+    it('4.3-UNIT-AUTHZ-04 allows guardian read access with valid consent under policy required_13_15', async () => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
       const prisma = createMockPrisma(true, {
         guardian_id: 'g-1',
         teen_id: 'owner-1',
@@ -107,7 +112,8 @@ describe('WardrobeAccessService', () => {
       expect(result).toEqual({ actorRole: 'owner' })
     })
 
-    it('4.3-UNIT-AUTHZ-07 rejects read-only guardian write access with GUARDIAN_READ_ONLY', async () => {
+    it('4.3-UNIT-AUTHZ-07 rejects read-only guardian write access with GUARDIAN_READ_ONLY under policy required_13_15', async () => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
       const prisma = createMockPrisma(true, {
         guardian_id: 'g-1',
         teen_id: 'owner-1',
@@ -123,7 +129,8 @@ describe('WardrobeAccessService', () => {
       )
     })
 
-    it('4.3-UNIT-AUTHZ-08 allows full consent guardian write access', async () => {
+    it('4.3-UNIT-AUTHZ-08 allows full consent guardian write access under policy required_13_15', async () => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
       const prisma = createMockPrisma(true, {
         guardian_id: 'g-1',
         teen_id: 'owner-1',
@@ -136,6 +143,55 @@ describe('WardrobeAccessService', () => {
 
       const result = await service.assertWriteAccess(actor, 'owner-1')
       expect(result).toEqual({ actorRole: 'guardian' })
+    })
+  })
+
+  // TEA sign-off F-3: while guardian consent is off, a granted row stays for audit and grants
+  // nothing, because nobody can revoke it.
+  describe('A-OFF-GUARDIAN-ACCESS under policy off', () => {
+    const grantedFull: GuardianConsentRow = {
+      guardian_id: 'g-1',
+      teen_id: 'owner-1',
+      consent_level: 'full',
+      status: 'granted',
+    }
+    const guardian: RequestAuthContext = { token: 't', userId: 'g-1', role: 'guardian' }
+
+    it.each(['assertReadAccess', 'assertWriteAccess'] as const)(
+      '%s masks the teen capsules from a granted guardian with 404 NOT_FOUND',
+      async (method) => {
+        vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'off')
+        const prisma = createMockPrisma(true, grantedFull)
+        const findConsent = (
+          prisma as unknown as { guardianConsent: { findFirst: Mock } }
+        ).guardianConsent.findFirst
+        const service = new WardrobeAccessService(prisma, createMockGuardianService(true))
+
+        const refusal = service[method](guardian, 'owner-1')
+        await expect(refusal).rejects.toThrow(NotFoundException)
+        await expect(refusal).rejects.toThrow('NOT_FOUND')
+        expect(findConsent).not.toHaveBeenCalled()
+      }
+    )
+
+    it('leaves the owner and an admin their access', async () => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'off')
+      const service = new WardrobeAccessService(
+        createMockPrisma(true, grantedFull),
+        createMockGuardianService(true)
+      )
+      await expect(
+        service.assertWriteAccess(
+          { token: 't', userId: 'owner-1', role: 'teen' },
+          'owner-1'
+        )
+      ).resolves.toEqual({ actorRole: 'owner' })
+      await expect(
+        service.assertWriteAccess(
+          { token: 't', userId: 'admin-1', role: 'admin' },
+          'owner-1'
+        )
+      ).resolves.toEqual({ actorRole: 'admin' })
     })
   })
 })

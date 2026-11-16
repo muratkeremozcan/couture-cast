@@ -20,8 +20,10 @@ import { RequestAuthGuard, RolesGuard } from '../auth/security.guards'
 import type { RequestAuthContext } from '../auth/security.types'
 import { getClientIp } from '../../controllers/client-ip'
 import { GuardianService } from './guardian.service'
+import { GuardianConsentPolicyGuard } from '../auth/guardian-consent-policy'
 
 @Controller('/api/v1/guardian')
+@UseGuards(GuardianConsentPolicyGuard)
 export class GuardianController {
   constructor(
     @Inject(GuardianService) private readonly guardianService: GuardianService

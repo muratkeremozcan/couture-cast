@@ -15,12 +15,14 @@ import { expect, test } from '../support/fixtures/merged-fixtures'
 import {
   createRealCommunityAuthAccount,
   localAuthUsersByEmail,
+  readGeneratedCommunityCode,
   realCommunityEmail,
   realSessionSkipReason,
   recordStandInIdentity,
   signupRealCommunityAppUser,
 } from '../support/helpers/community-real-session'
 import { armGoogleStandIn } from '../support/helpers/google-stand-in'
+import { CONSENT_REQUIRED_TAG } from '../../scripts/e2e-real-session/harness.mjs'
 
 const skipReason = realSessionSkipReason()
 test.skip(Boolean(skipReason), skipReason ?? '')
@@ -31,6 +33,10 @@ test.use({ authSessionEnabled: false, trace: 'off', video: 'off', screenshot: 'o
 // tests assert on, so the automatic network error monitor is off for them (the identity spec's
 // precedent). Every outcome is asserted on the page and in both databases instead.
 const EXPECTED_AUTH_ERRORS = { annotation: [{ type: 'skipNetworkMonitoring' }] }
+// The guardian-consent cases run only in the lane started with
+// GUARDIAN_CONSENT_POLICY=required_13_15 (harness.mjs, consentGrepInvert); the default lane runs
+// the policy-off cases (owner ruling 2026-11-16).
+const CONSENT_REQUIRED = { ...EXPECTED_AUTH_ERRORS, tag: CONSENT_REQUIRED_TAG }
 
 const WEB = 'http://127.0.0.1:3077'
 const prisma = new PrismaClient()
@@ -138,7 +144,7 @@ test(
 
 test(
   'E-TEEN: a 14-year-old is pending guardian consent and sees the invite step',
-  EXPECTED_AUTH_ERRORS,
+  CONSENT_REQUIRED,
   async ({ page }) => {
     const person = standInPerson('google-new-teen')
     await armGoogleStandIn(page, person)
@@ -158,6 +164,292 @@ test(
         guardianConsentRequired: true,
       },
     })
+  }
+)
+
+// Owner's production report (2026-11-15): a 14-year-old who finished signup signed in with
+// Google again and landed back on sign-in every time. The guardian lock answers the profile
+// check 403, which read as "no account"; the status now names awaiting_guardian.
+async function createPendingTeen(page: Page, label: string) {
+  const person = standInPerson(label)
+  await armGoogleStandIn(page, person)
+  await continueWithGoogle(page, '/signup')
+  await expect(page).toHaveURL(`${WEB}/signup/finish?door=signup`)
+  await page.getByLabel('Birthdate').fill(birthdate(14))
+  await page.getByRole('button', { name: 'Create account' }).click()
+  await expect(page.getByLabel('Guardian email')).toBeVisible()
+  return person
+}
+
+const AWAITING_GUARDIAN =
+  'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.'
+const CREATED_GUARDIAN_PENDING =
+  'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.'
+
+test(
+  'E-TEEN-RESIGN: a teen waiting on a guardian signs in with Google again and gets the guardian invitation',
+  CONSENT_REQUIRED,
+  async ({ page }) => {
+    const person = await createPendingTeen(page, 'google-resign-teen')
+    // Another device, or a cleared browser: no session, no marker.
+    await page.evaluate(() => {
+      window.localStorage.clear()
+      window.sessionStorage.clear()
+    })
+    const visited: string[] = []
+    const logouts: string[] = []
+    page.on('framenavigated', (frame) => {
+      if (frame === page.mainFrame()) {
+        const url = new URL(frame.url())
+        visited.push(`${url.pathname}${url.search}`)
+      }
+    })
+    page.on('request', (request) => {
+      if (request.url().includes('/auth/v1/logout')) logouts.push(request.url())
+    })
+
+    await continueWithGoogle(page, '/signin')
+    await expect(page).toHaveURL(`${WEB}/signup/finish`)
+    await expect(page.getByTestId('finish-signup-outcome')).toHaveText(AWAITING_GUARDIAN)
+    await expect(page.getByLabel('Guardian email')).toBeVisible()
+    await expect(page.getByLabel('Birthdate')).toHaveCount(0)
+    // The loop went /auth/callback, then back to /signin with google=refused and a sign-out.
+    const afterCallback = visited.slice(
+      visited.findIndex((path) => path.startsWith('/auth/callback'))
+    )
+    expect(afterCallback[0]).toMatch(/^\/auth\/callback/)
+    expect(afterCallback.filter((path) => path.startsWith('/signin'))).toEqual([])
+    expect(visited.filter((path) => path.includes('google='))).toEqual([])
+    expect(logouts).toEqual([])
+    expect(await sessionAuthUserId(page)).not.toBeNull()
+    const [account, ...extra] = await accounts(person.email)
+    expect(extra).toEqual([])
+    expect(account!.profile!.preferences).toEqual({
+      compliance: {
+        accountStatus: 'pending_guardian_consent',
+        guardianConsentRequired: true,
+      },
+    })
+
+    // Sign out on the returning step ends the session the same way.
+    await expect(
+      page.getByRole('heading', { name: 'Waiting for your guardian' })
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await expect(page).toHaveURL(`${WEB}/`)
+    await expect.poll(() => sessionAuthUserId(page)).toBeNull()
+  }
+)
+
+test(
+  'E-TEEN-RESIGN-OTP: a teen waiting on a guardian signs in with an email code and gets the guardian invitation',
+  CONSENT_REQUIRED,
+  async ({ page, apiRequest }) => {
+    const email = realCommunityEmail()
+    const signup = await apiRequest<{ userId: string }>({
+      method: 'POST',
+      baseUrl: 'http://127.0.0.1:4077',
+      path: '/api/v1/auth/signup',
+      body: { email, birthdate: birthdate(14) },
+    })
+    expect(signup.status).toBe(201)
+    const teen = await createRealCommunityAuthAccount({
+      email,
+      appUserId: signup.body.userId,
+      mapping: 'email',
+      label: 'otp-resign-teen',
+    })
+
+    await page.goto('/signin')
+    await page.locator('input[name="email"]').fill(email)
+    await page.locator('button[type="submit"]').click()
+    await page.locator('input[name="code"]').waitFor({ state: 'visible' })
+    await page.locator('input[name="code"]').fill(readGeneratedCommunityCode(teen))
+    await page.locator('button[type="submit"]').click()
+
+    await expect(page).toHaveURL(`${WEB}/signup/finish`)
+    await expect(page.getByTestId('finish-signup-outcome')).toHaveText(AWAITING_GUARDIAN)
+    await expect(page.getByLabel('Guardian email')).toBeVisible()
+    await expect(page.getByText('This account is unavailable')).toHaveCount(0)
+  }
+)
+
+test(
+  'E-TEEN-APPROVED: once the guardian approves, the teen signs in with Google and lands home',
+  CONSENT_REQUIRED,
+  async ({ page, apiRequest }) => {
+    await createPendingTeen(page, 'google-approved-teen')
+    await page.getByLabel('Guardian email').fill(realCommunityEmail())
+    await page.getByRole('button', { name: 'Send guardian invite' }).click()
+    const link = await page.getByText(/\/guardian\/accept\?token=/).textContent()
+    const token = new URL(link!.trim()).searchParams.get('token')
+    const accepted = await apiRequest({
+      method: 'POST',
+      baseUrl: 'http://127.0.0.1:4077',
+      path: '/api/v1/guardian/accept',
+      body: { token },
+    })
+    expect(accepted.status).toBe(200)
+
+    await page.evaluate(() => {
+      window.localStorage.clear()
+      window.sessionStorage.clear()
+    })
+    await continueWithGoogle(page, '/signin')
+    await expect(page).toHaveURL(`${WEB}/`)
+    expect(await sessionAuthUserId(page)).not.toBeNull()
+  }
+)
+
+test(
+  'E-TEEN-CONTINUE: Sign out on the guardian step ends the session and lands home',
+  CONSENT_REQUIRED,
+  async ({ page }) => {
+    await createPendingTeen(page, 'google-continue-teen')
+    // The step says the session ends before Continue ends it.
+    await expect(page.getByTestId('finish-signup-outcome')).toHaveText(
+      CREATED_GUARDIAN_PENDING
+    )
+    expect(await sessionAuthUserId(page)).not.toBeNull()
+    await expect(
+      page.getByRole('heading', { name: 'Waiting for your guardian' })
+    ).toBeVisible()
+    await page.getByRole('button', { name: 'Sign out' }).click()
+    await expect(page).toHaveURL(`${WEB}/`)
+    await expect.poll(() => sessionAuthUserId(page)).toBeNull()
+  }
+)
+
+// Policy off (owner ruling 2026-11-16): every 13+ account is active at creation, and a teen
+// the production loop left waiting signs in like anyone else.
+const GUARDIAN_COPY = /guardian/i
+
+test(
+  'E-OFF-TEEN-GOOGLE: a new 14-year-old signs up with Google and lands home with no guardian step',
+  EXPECTED_AUTH_ERRORS,
+  async ({ page }) => {
+    const person = standInPerson('google-off-teen')
+    await armGoogleStandIn(page, person)
+    await continueWithGoogle(page, '/signup')
+    await expect(page).toHaveURL(`${WEB}/signup/finish?door=signup`)
+    await page.getByLabel('Birthdate').fill(birthdate(14))
+    await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
+    // TEA sign-off N-2: an empty message costs no gap; the button sits one form gap (24 px)
+    // under the birthdate hint, never the old 70 px band.
+    const hint = await page.locator('#finish-signup-birthdate-hint').boundingBox()
+    const create = page.getByRole('button', { name: 'Create account' })
+    const button = await create.boundingBox()
+    expect(button!.y - (hint!.y + hint!.height)).toBeLessThanOrEqual(32)
+    await create.click()
+
+    await expect(page).toHaveURL(`${WEB}/`)
+    await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
+    expect(await sessionAuthUserId(page)).not.toBeNull()
+    const [account, ...extra] = await accounts(person.email)
+    expect(extra).toEqual([])
+    expect(account!.profile!.preferences).toEqual({
+      compliance: { accountStatus: 'active', guardianConsentRequired: false },
+    })
+    expect(
+      await prisma.guardianInvitation.count({ where: { teen_id: account!.id } })
+    ).toBe(0)
+  }
+)
+
+test(
+  'E-OFF-TEEN-EMAIL: a new 14-year-old signs up by email, signs in with a code and lands home',
+  EXPECTED_AUTH_ERRORS,
+  async ({ page }) => {
+    const email = realCommunityEmail()
+    await page.goto('/signup')
+    await page.locator('input[name="email"]').fill(email)
+    await page.locator('input[name="birthdate"]').fill(birthdate(14))
+    await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
+    await page.getByRole('button', { name: 'Create account' }).click()
+    await expect(
+      page.getByText('Account created. Sign in with your email to continue.')
+    ).toBeVisible()
+    // TEA sign-off N-3: the page links to the next step, and the form is done.
+    await expect(page.getByRole('button', { name: 'Create account' })).toHaveCount(0)
+    await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
+
+    const [account, ...extra] = await accounts(email)
+    expect(extra).toEqual([])
+    expect(account!.profile!.preferences).toEqual({
+      compliance: { accountStatus: 'active', guardianConsentRequired: false },
+    })
+    const teen = await createRealCommunityAuthAccount({
+      email,
+      appUserId: account!.id,
+      mapping: 'email',
+      label: 'off-email-teen',
+    })
+    await page.getByTestId('signup-sign-in-to-continue').click()
+    await expect(page).toHaveURL(`${WEB}/signin`)
+    await page.locator('input[name="email"]').fill(email)
+    await page.locator('button[type="submit"]').click()
+    await page.locator('input[name="code"]').waitFor({ state: 'visible' })
+    await page.locator('input[name="code"]').fill(readGeneratedCommunityCode(teen))
+    await page.locator('button[type="submit"]').click()
+
+    await expect(page).toHaveURL(`${WEB}/`)
+    expect(await sessionAuthUserId(page)).not.toBeNull()
+    await expect(page.getByText('This account is unavailable')).toHaveCount(0)
+  }
+)
+
+test(
+  'E-OFF-RETURNING-PENDING: a teen the production loop left waiting signs in by Google and by email code and lands home',
+  EXPECTED_AUTH_ERRORS,
+  async ({ page, apiRequest }) => {
+    const person = standInPerson('google-off-pending-teen')
+    const signup = await apiRequest<{ userId: string }>({
+      method: 'POST',
+      baseUrl: 'http://127.0.0.1:4077',
+      path: '/api/v1/auth/signup',
+      body: { email: person.email, birthdate: birthdate(14) },
+    })
+    expect(signup.status).toBe(201)
+    // The stored state Chloe and Mila had before the migration: still waiting on a guardian.
+    await prisma.userProfile.update({
+      where: { user_id: signup.body.userId },
+      data: {
+        preferences: {
+          compliance: {
+            accountStatus: 'pending_guardian_consent',
+            guardianConsentRequired: true,
+          },
+        },
+      },
+    })
+
+    // Email code first, then Google on the same address (E-LINK's order: the Google identity
+    // links to the existing Auth user).
+    const teen = await createRealCommunityAuthAccount({
+      email: person.email,
+      appUserId: signup.body.userId,
+      mapping: 'email',
+      label: 'off-pending-teen-otp',
+    })
+    await page.goto('/signin')
+    await page.locator('input[name="email"]').fill(person.email)
+    await page.locator('button[type="submit"]').click()
+    await page.locator('input[name="code"]').waitFor({ state: 'visible' })
+    await page.locator('input[name="code"]').fill(readGeneratedCommunityCode(teen))
+    await page.locator('button[type="submit"]').click()
+    await expect(page).toHaveURL(`${WEB}/`)
+    expect(await sessionAuthUserId(page)).not.toBeNull()
+    await expect(page.getByText('This account is unavailable')).toHaveCount(0)
+
+    await page.evaluate(() => {
+      window.localStorage.clear()
+      window.sessionStorage.clear()
+    })
+    await armGoogleStandIn(page, person)
+    await continueWithGoogle(page, '/signin')
+    await expect(page).toHaveURL(`${WEB}/`)
+    await expect(page.getByText(GUARDIAN_COPY)).toHaveCount(0)
+    expect(await sessionAuthUserId(page)).not.toBeNull()
   }
 )
 

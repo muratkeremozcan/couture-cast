@@ -37,6 +37,18 @@ describe('moderation-review consumer registration', () => {
   })
 })
 
+// TEA sign-off F-4: the wardrobe worker starts only inside `require.main === module`, so its
+// boot refusal is asserted structurally like the registration above.
+describe('U-W-POLICY: wardrobe worker guardian consent policy', () => {
+  it('resolves the policy before it opens a queue', () => {
+    const source = readFileSync(path.resolve(__dirname, 'wardrobe.bootstrap.ts'), 'utf8')
+    const start = source.slice(source.indexOf('async function startWardrobeWorker()'))
+    const resolved = start.indexOf('resolveGuardianConsentPolicy()')
+    expect(resolved).toBeGreaterThan(-1)
+    expect(resolved).toBeLessThan(start.indexOf('createQueues()'))
+  })
+})
+
 describe('classifySilhouetteProcessingFailure', () => {
   it.each([
     [new Error('Request timeout after 30s'), 'timeout'],

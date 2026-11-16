@@ -22,8 +22,13 @@ import {
   type GuardianConsentCleanupTarget,
 } from '../support/helpers/guardian-consent'
 import { log } from '@seontechnologies/playwright-utils/log'
+import {
+  CONSENT_LANE_ONLY,
+  CONSENT_REQUIRED_TAG,
+  e2eConsentPolicy,
+} from '../support/helpers/guardian-consent-policy'
 
-test.describe('Guardian consent browser smoke', () => {
+test.describe('Guardian consent browser smoke', { tag: CONSENT_REQUIRED_TAG }, () => {
   let cleanupTargets: GuardianConsentCleanupTarget[] = []
 
   test.beforeEach(({}, testInfo) => {
@@ -31,6 +36,7 @@ test.describe('Guardian consent browser smoke', () => {
       isNonLocalEnvironment(testInfo),
       'Skipping guardian consent write-path browser smoke tests outside local runs until cleanup isolation is available for remote environments.'
     )
+    test.skip(e2eConsentPolicy() !== 'required_13_15', CONSENT_LANE_ONLY)
   })
 
   test.afterEach(async () => {
@@ -56,9 +62,9 @@ test.describe('Guardian consent browser smoke', () => {
     await page.goto('/signup')
     await page.getByLabel('Email').fill(teenSignupPayload.email)
     await page.getByLabel('Birthdate').fill(teenSignupPayload.birthdate)
-    await expect(page.getByTestId('signup-inline-message')).toHaveText(
-      'Guardian consent required'
-    )
+    // The birthdate hint follows the client's shipped policy (off), so it says nothing for a
+    // teen; the API under test is what requires the guardian.
+    await expect(page.getByTestId('signup-inline-message')).toHaveCount(0)
 
     const signupCallPromise = proxyApiCall({
       interceptNetworkCall,
@@ -74,7 +80,7 @@ test.describe('Guardian consent browser smoke', () => {
     cleanupTargets.push({ teenId: signupUserId })
 
     await expect(page.getByTestId('signup-success-message')).toContainText(
-      'Guardian consent is required'
+      'A guardian needs to approve your account'
     )
     await expect(page.getByRole('heading', { name: 'Guardian invitation' })).toBeVisible()
 

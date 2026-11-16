@@ -210,10 +210,15 @@ describe('resolveWebNextStep (D8)', () => {
     expect(await resolveWebNextStep('token')).toBe('/wardrobe/onboarding')
   })
 
-  it('sends a teen awaiting guardian consent to the teen dashboard', async () => {
-    useProfileResponse('teen', [{ status: 'pending' }])
-    expect(await resolveWebNextStep('token')).toBe('/teen/dashboard')
-  })
+  // Guardian consent is off (2026-11-16): a teen with no granted guardian is a member like any
+  // other, never sent to the teen dashboard's consent status.
+  it.each([[[]], [[{ status: 'pending' as const }]]])(
+    'sends a teen with guardian links %j to onboarding',
+    async (links) => {
+      useProfileResponse('teen', links)
+      expect(await resolveWebNextStep('token')).toBe('/wardrobe/onboarding')
+    }
+  )
 
   it('sends a consented teen to onboarding and falls back on a failure', async () => {
     useProfileResponse('teen', [{ status: 'pending' }, { status: 'granted' }])

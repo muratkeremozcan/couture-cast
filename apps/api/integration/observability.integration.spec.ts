@@ -30,6 +30,11 @@ import { bindRequestContext } from '../src/logger/request-context'
 import { createRequestLoggerMiddleware } from '../src/logger/request-logger.middleware'
 import { AccessTokenIdentityService } from '../src/modules/auth/access-token-identity.service.js'
 import { AuthModule } from '../src/modules/auth/auth.module'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its sample request, POST /api/v1/auth/guardian-consent need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 vi.mock('posthog-node', () => ({
   PostHog: class PostHogMock {

@@ -84,6 +84,7 @@ import { createBaseLogger } from '../logger/pino.config.js'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
+import { resolveGuardianConsentPolicy } from '../modules/auth/guardian-consent-policy.js'
 
 const logger = createBaseLogger().child({ feature: 'workers' })
 
@@ -135,6 +136,9 @@ export function createStandaloneWeatherFanout(
 export async function startWorkers(state: WorkerProcessState) {
   const { workers, queues, closeables, redisClients } = state
   try {
+    // Refuse to start on a guardian consent policy this deployment may not run, as the API's
+    // AppModule does (TEA sign-off F-4).
+    resolveGuardianConsentPolicy()
     // Story 6.12: worker meters export nothing without this, and only `main.ts` started it.
     // The hosted community worker omits the SDK for its image budget, so PostHog is its signal.
     initializeOpenTelemetry()

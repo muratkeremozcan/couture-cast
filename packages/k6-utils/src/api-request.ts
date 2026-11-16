@@ -29,6 +29,8 @@ export type ApiRequestParams = {
   tags?: Record<string, string>
   /** Request timeout (string like '30s' or number in ms). */
   timeout?: string | number
+  /** Statuses this request expects, so an expected 4xx does not count in http_req_failed. */
+  expectedStatuses?: number[]
 }
 
 export type ApiResponse<T> = {
@@ -47,7 +49,7 @@ export type ApiResponse<T> = {
  * @returns `{ status, body, rawResponse }` where body is the parsed JSON typed as T
  */
 export function apiRequest<T = unknown>(params: ApiRequestParams): ApiResponse<T> {
-  const { method, url, body, headers = {}, tags, timeout } = params
+  const { method, url, body, headers = {}, tags, timeout, expectedStatuses } = params
 
   // Merge Content-Type with caller headers; caller can override if needed
   const mergedHeaders: Record<string, string> = {
@@ -58,6 +60,8 @@ export function apiRequest<T = unknown>(params: ApiRequestParams): ApiResponse<T
   const k6Params: Params = { headers: mergedHeaders }
   if (tags) k6Params.tags = tags
   if (timeout !== undefined) k6Params.timeout = timeout
+  if (expectedStatuses)
+    k6Params.responseCallback = http.expectedStatuses(...expectedStatuses)
 
   // Serialize body for methods that carry a payload
   const serializedBody = body !== undefined && body !== null ? JSON.stringify(body) : null

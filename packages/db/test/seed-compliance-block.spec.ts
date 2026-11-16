@@ -25,7 +25,7 @@
 // unseeded machine and cannot be silently skipped by a schema probe.
 import { describe, expect, it } from 'vitest'
 
-import { evaluateAgeGate } from '../../utils/src/age.ts'
+import { evaluateAgeGate, type GuardianConsentPolicy } from '../../utils/src/age.ts'
 import {
   CONSENT_PAIRS,
   createUserProfileInput,
@@ -40,9 +40,10 @@ type Compliance = {
 
 function complianceOf(
   fixture: ReturnType<typeof getTeenFixtures>[number],
-  hasGrantedGuardian: boolean
+  hasGrantedGuardian: boolean,
+  policy?: GuardianConsentPolicy
 ): Compliance {
-  const preferences = createUserProfileInput(fixture, hasGrantedGuardian)
+  const preferences = createUserProfileInput(fixture, hasGrantedGuardian, policy)
     .preferences as Record<string, unknown>
   return (preferences.compliance ?? {}) as Compliance
 }
@@ -93,7 +94,7 @@ describe('seeded account compliance block', () => {
     }
   })
 
-  it('6.1-DB-043 marks a consented minor active and an unconsented one pending', () => {
+  it('6.1-DB-043 under policy required_13_15 marks a consented minor active and an unconsented one pending', () => {
     // The half that is consent STATE rather than an age fact. A 13-to-15-year-old
     // whose guardian has accepted is `active`, exactly as acceptance would have
     // left them; one with no consent pair stays `pending_guardian_consent`
@@ -101,8 +102,23 @@ describe('seeded account compliance block', () => {
     const minor = teens.find((fixture) => evaluateAgeGate(fixture.birthdate).age < 16)
     expect(minor, 'the seed must keep at least one under-16 fixture').toBeDefined()
 
-    expect(complianceOf(minor!, true).accountStatus).toBe('active')
-    expect(complianceOf(minor!, false).accountStatus).toBe('pending_guardian_consent')
+    expect(complianceOf(minor!, true, 'required_13_15').accountStatus).toBe('active')
+    expect(complianceOf(minor!, false, 'required_13_15').accountStatus).toBe(
+      'pending_guardian_consent'
+    )
+  })
+
+  // Owner ruling 2026-11-16: with guardian consent off, signup makes every 13+ account
+  // active with no guardian, so the seed does too, consent pair or not.
+  it('6.1-DB-043b under policy off marks every minor active with no guardian required', () => {
+    const minor = teens.find((fixture) => evaluateAgeGate(fixture.birthdate).age < 16)
+    expect(minor, 'the seed must keep at least one under-16 fixture').toBeDefined()
+
+    for (const consented of [true, false])
+      expect(complianceOf(minor!, consented, 'off'), `consented ${consented}`).toEqual({
+        accountStatus: 'active',
+        guardianConsentRequired: false,
+      })
   })
 
   it('6.1-DB-044 keeps the existing preference keys alongside the new block', () => {

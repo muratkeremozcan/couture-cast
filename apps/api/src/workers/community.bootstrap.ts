@@ -33,6 +33,7 @@ import {
 import { SupabaseAuthAdmin } from '../modules/auth/supabase-auth-admin'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources } from './shutdown-resources'
+import { resolveGuardianConsentPolicy } from '../modules/auth/guardian-consent-policy.js'
 
 /**
  * The community moderation pipeline as its own process group.
@@ -215,6 +216,9 @@ function scheduleWithBackoff(
 
 export async function startCommunityWorkers(state: CommunityWorkerProcessState) {
   try {
+    // Refuse to start on a guardian consent policy this deployment may not run, as the API's
+    // AppModule does (TEA sign-off F-4).
+    resolveGuardianConsentPolicy()
     const prisma = getPrismaClient()
     const posthogService = new PostHogService()
     // Story 6.14 D2: one complimentary seam for every evaluator this worker builds.

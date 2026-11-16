@@ -130,6 +130,22 @@ describe('dedicated community worker bootstrap', () => {
     vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
   })
 
+  // TEA sign-off F-4: the worker refuses a guardian consent policy its deployment may not run,
+  // as the API's AppModule does, before it composes the runtime.
+  it('U-W-POLICY: exits 1 before composing anything on required_13_15 outside a test environment', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
+    vi.stubEnv('NODE_ENV', 'production')
+    vi.stubEnv('TEST_ENV', '')
+    const exit = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
+    try {
+      await freshProcess().startCommunityWorkers()
+      expect(exit).toHaveBeenCalledWith(1)
+      expect(harness.createCommunityWorkerRuntime).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   describe('U-W-INTERVAL: the hosted path of the SLA sweep', () => {
     const slaIntervalMs = 60_000
 

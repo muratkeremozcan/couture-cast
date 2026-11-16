@@ -4,7 +4,7 @@ import { ContactLink, LegalList, LegalPage, LegalSection } from '../components/l
 
 export const metadata: Metadata = {
   title: 'CoutureCast Terms of Service',
-  description: 'The rules for using CoutureCast, including age and guardian consent.',
+  description: 'The rules for using CoutureCast, including who can use it.',
 }
 
 const inlineLink = 'text-amber-200 underline underline-offset-4 hover:text-amber-100'
@@ -21,22 +21,14 @@ export default function TermsPage() {
           <li>
             You must be 13 or older. The service is not available to children under 13.
           </li>
-          <li>
-            If you are 13 to 15, your account stays limited until a guardian approves it,
-            and a guardian can revoke that approval at any time.
-          </li>
-          <li>
-            If you are 16 or older, you can use CoutureCast without guardian consent.
-          </li>
         </LegalList>
       </LegalSection>
 
       <LegalSection title="Your account">
         <p>
-          Give your real birthdate and, for a teen account, a real guardian email address.
-          We may restrict or close an account whose age or consent information is false,
-          missing, or revoked. You can sign in with an email code or with Google; keep
-          access to that email account secure.
+          Give your real birthdate. We may restrict or close an account whose age
+          information is false or missing. You can sign in with an email code or with
+          Google; keep access to that email account secure.
         </p>
       </LegalSection>
 

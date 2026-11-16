@@ -20,8 +20,10 @@ import { webGuestPreviewStore } from '../../../lib/guest-preview'
 import { destinationAfterSignIn } from '../../../lib/post-signin-destination'
 import {
   cancelWebFederatedSignup,
+  fetchWebAwaitingGuardianAccount,
   finishWebFederatedSignup,
   readWebFederatedIdentity,
+  signOutWebSession,
 } from '../../../lib/web-session'
 
 type Phase =
@@ -31,6 +33,20 @@ type Phase =
   | { kind: 'refused' }
   | { kind: 'underage' }
   | { kind: 'created'; account: SignupResponse }
+  // A returning teen whose guardian has not approved (or has revoked): the invitation again.
+  | { kind: 'awaiting_guardian'; accountId: string }
+
+type GuardianPhase = Extract<Phase, { kind: 'created' | 'awaiting_guardian' }>
+
+const onGuardianStep = (phase: Phase): phase is GuardianPhase =>
+  phase.kind === 'created' || phase.kind === 'awaiting_guardian'
+
+// Every signed-in request refuses a teen until a guardian approves, so the session would
+// only read as signed out on the next page; end it here and say so on the step.
+async function leaveUntilApproved() {
+  await signOutWebSession().catch(() => undefined)
+  window.location.replace('/')
+}
 
 const fieldClass =
   'w-full rounded-xl border border-white/15 bg-black/30 px-4 py-3 text-white outline-none transition focus:border-amber-300'
@@ -57,10 +73,17 @@ export function FinishSignupForm({
   useEffect(() => {
     let active = true
     void readWebFederatedIdentity()
-      .then((identity) => {
+      .then(async (identity) => {
+        if (!identity) {
+          if (active) setPhase({ kind: 'no_session' })
+          return
+        }
+        const accountId = await fetchWebAwaitingGuardianAccount(identity.accessToken)
         if (active)
           setPhase(
-            identity ? { kind: 'form', email: identity.email } : { kind: 'no_session' }
+            accountId
+              ? { kind: 'awaiting_guardian', accountId }
+              : { kind: 'form', email: identity.email }
           )
       })
       .catch(() => {
@@ -139,7 +162,7 @@ export function FinishSignupForm({
       </section>
     )
 
-  if (phase.kind !== 'form' && phase.kind !== 'created') {
+  if (phase.kind !== 'form' && !onGuardianStep(phase)) {
     const text =
       phase.kind === 'underage'
         ? strings.underage
@@ -166,25 +189,7 @@ export function FinishSignupForm({
     )
   }
 
-  if (phase.kind === 'created')
-    return (
-      <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8">
-        <h1 className="text-3xl font-semibold">{strings.finishTitle}</h1>
-        <p data-testid="finish-signup-outcome" role="status" className="text-emerald-200">
-          {strings.createdGuardianPending}
-        </p>
-        <GuardianInvitePanel teenId={phase.account.userId} />
-        <button
-          type="button"
-          onClick={() => {
-            void continueToApp()
-          }}
-          className="min-h-12 w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold text-black"
-        >
-          {strings.continue}
-        </button>
-      </section>
-    )
+  if (onGuardianStep(phase)) return <GuardianStep phase={phase} />
 
   return (
     <form
@@ -237,10 +242,11 @@ export function FinishSignupForm({
           </p>
         ) : null}
       </div>
+      {/* An empty alert stays in the tree for its announcement and costs no gap (TEA N-2). */}
       <p
         data-testid="finish-signup-message"
         role="alert"
-        className="min-h-6 text-sm text-amber-200"
+        className="text-sm text-amber-200 empty:!mt-0"
       >
         {message ?? ''}
       </p>
@@ -265,7 +271,34 @@ export function FinishSignupForm({
   )
 }
 
-/** The email signup's guardian invitation step, for a teen created through Google. */
+/**
+ * The teen's guardian step: a new account (`created`) or a returning teen still waiting
+ * (`awaiting_guardian`). Continue ends the session.
+ */
+function GuardianStep({ phase }: { phase: GuardianPhase }) {
+  const { i18n } = useTranslation('translation', { i18n: getI18n() })
+  const strings = getFederatedSignInStrings(i18n.language)
+  const created = phase.kind === 'created'
+  return (
+    <section className="space-y-6 rounded-3xl border border-white/10 bg-white/5 p-8">
+      <h1 className="text-3xl font-semibold">{strings.guardianStepTitle}</h1>
+      <p data-testid="finish-signup-outcome" role="status" className="text-emerald-200">
+        {created ? strings.createdGuardianPending : strings.awaitingGuardian}
+      </p>
+      <GuardianInvitePanel teenId={created ? phase.account.userId : phase.accountId} />
+      <button
+        type="button"
+        onClick={() => {
+          void leaveUntilApproved()
+        }}
+        className="min-h-12 w-full rounded-full bg-amber-300 px-5 py-3 text-sm font-semibold text-black"
+      >
+        {strings.guardianStepLeave}
+      </button>
+    </section>
+  )
+}
+
 function GuardianInvitePanel({ teenId }: { teenId: string }) {
   const { i18n } = useTranslation('translation', { i18n: getI18n() })
   const strings = getFederatedSignInStrings(i18n.language)

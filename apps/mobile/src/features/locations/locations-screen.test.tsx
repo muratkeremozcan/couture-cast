@@ -93,7 +93,11 @@ function alertsReading(text: string) {
   )
 }
 
-describe('LocationsScreen', () => {
+// TEA sign-off F-6: 1.2b-MOB-05 failed once at host load 500+ with "locator.click: Timeout 1ms
+// exceeded", which means the test had used its whole 15 s budget before that click; it was not
+// reproduced, and the case takes 0.56 to 0.73 s on a loaded host. The 30 s budget is headroom for
+// a starved host only; the per-action bound in vitest.config.ts names a click that is stuck.
+describe('LocationsScreen', { timeout: 30_000 }, () => {
   let saved: SavedLocation[]
   let restoreAccessTokenResolver: () => void
   const cleanups: (() => void)[] = []

@@ -44,7 +44,11 @@ export const hasStoredWebSession = () =>
  * CoutureCast account that can sign in (retrying will not help); `code_invalid` means the
  * code was wrong or expired; `unavailable` means a transient failure worth retrying.
  */
-export type WebSignInFailure = 'denied' | 'code_invalid' | 'unavailable'
+export type WebSignInFailure =
+  | 'denied'
+  | 'code_invalid'
+  | 'unavailable'
+  | 'awaiting_guardian'
 export class WebSignInError extends Error {
   constructor(
     readonly reason: WebSignInFailure,
@@ -257,13 +261,56 @@ export async function verifyWebOtp(email: string, token: string) {
   try {
     await accept(data.session)
   } catch (failure) {
-    // A 401/403/404 account check is the server saying this identity has no account.
+    // A 401/403/404 account check is the server saying this identity has no account, unless
+    // the account is a teen the guardian lock refuses until a guardian approves.
+    if (sessionDenied(failure) && (await awaitingGuardian(data.session.access_token)))
+      throw new WebSignInError(
+        'awaiting_guardian',
+        'A guardian has to approve this account.'
+      )
     throw new WebSignInError(
       sessionDenied(failure) ? 'denied' : 'unavailable',
       'Session verification is unavailable.'
     )
   }
-  if (!member) throw new WebSignInError('denied', 'This account is unavailable.')
+  if (!member) {
+    if (await awaitingGuardian(data.session.access_token))
+      throw new WebSignInError(
+        'awaiting_guardian',
+        'A guardian has to approve this account.'
+      )
+    throw new WebSignInError('denied', 'This account is unavailable.')
+  }
+}
+
+/**
+ * The account behind this token is a teen the guardian lock refuses on every
+ * signed-in endpoint (the profile check included), or false when the status is anything else
+ * or unknown. Only the identity-keyed status endpoint answers for such a teen.
+ */
+async function awaitingGuardian(accessToken: string) {
+  try {
+    return (
+      (await fetchWebFederatedSignupStatus(accessToken)).status === 'awaiting_guardian'
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * The teen account a stored identity is waiting on a guardian for, or null. The finish step
+ * shows the guardian invitation for it instead of the birthdate question.
+ */
+export async function fetchWebAwaitingGuardianAccount(
+  accessToken: string
+): Promise<string | null> {
+  try {
+    const status = await fetchWebFederatedSignupStatus(accessToken)
+    return status.status === 'awaiting_guardian' ? (status.accountId ?? null) : null
+  } catch {
+    return null
+  }
 }
 export async function signOutWebSession() {
   localSignedOut = true
@@ -287,6 +334,9 @@ export async function signOutWebSession() {
 export type WebOAuthOutcome =
   | { kind: 'member' }
   | { kind: 'no_account' }
+  // A teen whose guardian has not approved (or has revoked): the session stays, and the finish
+  // step shows the guardian invitation (the lock refuses every other signed-in request).
+  | { kind: 'awaiting_guardian' }
   | { kind: 'refused' }
   | { kind: 'cancelled' }
   | { kind: 'unavailable' }
@@ -379,13 +429,14 @@ async function settleFederatedSession(session: Session): Promise<WebOAuthOutcome
   }
   let status
   try {
-    status = await fetchWebFederatedSignupStatus(session.access_token)
+    status = (await fetchWebFederatedSignupStatus(session.access_token)).status
   } catch (error) {
     return sessionStatus(error) === 401
       ? refuseFederatedIdentity()
       : { kind: 'unavailable' }
   }
   if (status === 'needs_birthdate') return { kind: 'no_account' }
+  if (status === 'awaiting_guardian') return { kind: 'awaiting_guardian' }
   try {
     await accept(session)
   } catch (failure) {
@@ -469,7 +520,7 @@ export async function resolveFederatedFinishRoute(): Promise<string | null> {
   if (!identity) return null
   let status
   try {
-    status = await fetchWebFederatedSignupStatus(identity.accessToken)
+    status = (await fetchWebFederatedSignupStatus(identity.accessToken)).status
   } catch {
     return null
   }

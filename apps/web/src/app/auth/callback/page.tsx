@@ -26,6 +26,8 @@ async function destinationFor(
     case 'member':
       return destinationAfterSignIn(fromPreview)
     case 'no_account':
+    case 'awaiting_guardian':
+      // The finish step asks the status itself: the birthdate, or the guardian invitation.
       return finishStepHref(fromPreview ? 'preview' : null, door)
     default:
       return `/${door}?google=${outcome.kind}${fromPreview ? '&from=preview' : ''}`

@@ -1,7 +1,7 @@
 // Learning path Step 29: Garment capture flow.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 import { ForbiddenException } from '@nestjs/common'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createService,
   activeCompliancePreferences,
@@ -27,6 +27,10 @@ describe('GuardianService upload eligibility', () => {
     beforeEach(() => {
       vi.useFakeTimers()
       vi.setSystemTime(AGE_REFERENCE_DATE)
+    })
+
+    afterEach(() => {
+      vi.unstubAllEnvs()
     })
 
     // THESE THREE CASES USED TO ASSERT THE HOLE. The guard began with
@@ -148,8 +152,9 @@ describe('GuardianService upload eligibility', () => {
     })
 
     it.each(['pending_guardian_consent', 'suspended', undefined])(
-      'denies uploads while the account status is %s',
+      'under policy required_13_15 denies uploads while the account status is %s',
       async (accountStatus) => {
+        vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
         const { prisma, service } = createService()
         seedUser(prisma, {
           id: 'teen-inactive',
@@ -189,8 +194,9 @@ describe('GuardianService upload eligibility', () => {
     })
 
     it.each([13, 15])(
-      'denies uploads for a %s-year-old with no active guardian consent',
+      'under policy required_13_15 denies uploads for a %s-year-old with no active guardian consent',
       async (age) => {
+        vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
         const { prisma, service } = createService()
         seedUser(prisma, {
           id: 'teen-unconsented',
@@ -205,7 +211,8 @@ describe('GuardianService upload eligibility', () => {
       }
     )
 
-    it('denies uploads for a 13-15 year old whose only consent has been revoked', async () => {
+    it('under policy required_13_15 denies uploads for a 13-15 year old whose only consent has been revoked', async () => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
       const { prisma, service } = createService()
       seedUser(prisma, {
         id: 'teen-revoked',
@@ -251,6 +258,75 @@ describe('GuardianService upload eligibility', () => {
       await expect(
         service.assertWardrobeUploadAllowed('teen-consented', 'teen')
       ).resolves.toBeUndefined()
+    })
+
+    describe('under policy off (the default)', () => {
+      it.each([13, 14, 15])(
+        'allows uploads for a %s-year-old with no guardian consent at all',
+        async (age) => {
+          const { prisma, service } = createService()
+          seedUser(prisma, {
+            id: 'teen-no-guardian',
+            email: 'teen.noguardian@example.com',
+            birthdate: birthdateForAge(age),
+            preferences: activeCompliancePreferences(),
+          })
+
+          await expect(
+            service.assertWardrobeUploadAllowed('teen-no-guardian', 'teen')
+          ).resolves.toBeUndefined()
+        }
+      )
+
+      it('allows uploads for a teen still marked as waiting on a guardian', async () => {
+        const { prisma, service } = createService()
+        seedUser(prisma, {
+          id: 'teen-waiting',
+          email: 'teen.waiting@example.com',
+          birthdate: birthdateForAge(14),
+          preferences: {
+            compliance: {
+              accountStatus: 'pending_guardian_consent',
+              guardianConsentRequired: true,
+            },
+          },
+        })
+
+        await expect(
+          service.assertWardrobeUploadAllowed('teen-waiting', 'teen')
+        ).resolves.toBeUndefined()
+      })
+
+      it.each(['suspended', undefined])(
+        'still denies uploads while the account status is %s',
+        async (accountStatus) => {
+          const { prisma, service } = createService()
+          seedUser(prisma, {
+            id: 'teen-inactive',
+            email: 'teen.inactive@example.com',
+            birthdate: birthdateForAge(14),
+            preferences: { compliance: { accountStatus } },
+          })
+
+          await expect(
+            service.assertWardrobeUploadAllowed('teen-inactive', 'teen')
+          ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+        }
+      )
+
+      it('still denies uploads for an under-13 account', async () => {
+        const { prisma, service } = createService()
+        seedUser(prisma, {
+          id: 'child',
+          email: 'child@example.com',
+          birthdate: birthdateForAge(12),
+          preferences: activeCompliancePreferences(),
+        })
+
+        await expect(
+          service.assertWardrobeUploadAllowed('child', 'teen')
+        ).rejects.toThrow('GUARDIAN_CONSENT_REQUIRED')
+      })
     })
 
     it('allows uploads at 16 and over without any guardian consent', async () => {
