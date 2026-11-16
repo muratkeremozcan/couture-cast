@@ -74,6 +74,10 @@ import {
   captureHashes,
   createVolatileProofCheck,
 } from './lib/live-font-volatile-proof.mjs'
+import {
+  scopeCommunityFeed,
+  scopesCommunityFeed,
+} from './lib/live-font-community-feed.mjs'
 import { ageWeatherSnapshot } from './lib/live-font-weather.mjs'
 import { createSyncMaestro } from './lib/maestro-driver-sync.mjs'
 
@@ -689,6 +693,11 @@ const residualBaselines = residualBaselineFile.entries
 
 /** One statement against the harness database, bounded, resolving to its row count. */
 async function harnessQuery(url, sql, params) {
+  return (await harnessStatement(url, sql, params)).rowCount
+}
+
+/** One statement against the harness database, bounded, resolving to its rows and row count. */
+async function harnessStatement(url, sql, params) {
   const client = new pg.Client({
     connectionString: url,
     connectionTimeoutMillis: 15_000,
@@ -697,7 +706,8 @@ async function harnessQuery(url, sql, params) {
   })
   await client.connect()
   try {
-    return (await client.query(sql, params)).rowCount
+    const { rows, rowCount } = await client.query(sql, params)
+    return { rows, rowCount }
   } finally {
     await client.end()
   }
@@ -821,28 +831,49 @@ try {
       }
       continue
     }
-    const report = await runScreenJourney({
-      io: deviceIo(name),
-      platform,
-      androidApi,
-      name,
-      reactNativeVersion,
-      residualBaselines,
-      label: runLabel,
-      timezone: pinned.timezone,
-      weatherBanner: weather.weatherBanner,
-      androidDensity,
-      // The inputs at a proof run's manifest sha, recomputed from git, against HEAD's.
-      volatileProofCheck: createVolatileProofCheck({
+    // TEA ruling 3: the iOS Community leg runs on a feed of known length
+    // (live-font-community-feed.mjs), published again after the screen however it ends. A signal
+    // mid-screen leaves it scoped in the harness's own database, which the next prepare seeds
+    // afresh.
+    const feed = scopesCommunityFeed({ platform, screen: name })
+      ? await scopeCommunityFeed({
+          ownedEnv: JSON.parse(fs.readFileSync(ownedEnvFile, 'utf8')),
+          query: harnessStatement,
+        })
+      : null
+    let report
+    try {
+      report = await runScreenJourney({
+        io: deviceIo(name),
         platform,
-        repoRoot: root,
-        changed: (sha) =>
-          changedInputs(
-            writeManifest({ leg: 'live-font', rev: sha, cwd: root, requireClean: false }),
-            { cwd: root, requireClean: false }
-          ),
-      }),
-    })
+        androidApi,
+        name,
+        reactNativeVersion,
+        residualBaselines,
+        label: runLabel,
+        timezone: pinned.timezone,
+        weatherBanner: weather.weatherBanner,
+        androidDensity,
+        // The inputs at a proof run's manifest sha, recomputed from git, against HEAD's.
+        volatileProofCheck: createVolatileProofCheck({
+          platform,
+          repoRoot: root,
+          changed: (sha) =>
+            changedInputs(
+              writeManifest({
+                leg: 'live-font',
+                rev: sha,
+                cwd: root,
+                requireClean: false,
+              }),
+              { cwd: root, requireClean: false }
+            ),
+        }),
+      })
+    } finally {
+      await feed?.restore()
+    }
+    if (feed) report.communityFeed = { kept: feed.kept, withdrawn: feed.withdrawn.length }
     for (const leg of report.legs) {
       for (const [stage, capture] of Object.entries(leg.evidence))
         leg.evidence[stage] = capture.file
