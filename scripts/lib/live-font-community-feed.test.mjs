@@ -182,6 +182,43 @@ describe('the live font Community feed', () => {
     )
   })
 
+  // CodeRabbit on PR 242: when the check fails and so does the first restore, the scope tries
+  // again, and a restore that keeps failing leaves its handle on the error for the caller.
+  test('a failed check retries the restore and hands it over when it keeps failing', async () => {
+    const run = (refusals) => {
+      const db = fakeDatabase(SEEDED)
+      let left = refusals
+      const query = async (url, sql, params) => {
+        if (/^SELECT "id" FROM "LookbookPost"/.test(sql))
+          throw new Error('connection refused')
+        if (left > 0 && /SET "status" = 'published'/.test(sql)) {
+          left -= 1
+          throw new Error('connection reset')
+        }
+        return db.query(url, sql, params)
+      }
+      return { db, query }
+    }
+    const published = (db) =>
+      [...db.status].filter(([, state]) => state === 'published').map(([id]) => id)
+    const once = run(1)
+    await assert.rejects(scopeCommunityFeed({ ownedEnv: owned, query: once.query }), {
+      code: 'live_font_community_feed_failed',
+      message: /connection refused/,
+    })
+    assert.deepEqual(published(once.db), SEEDED)
+    const always = run(3)
+    const error = await scopeCommunityFeed({ ownedEnv: owned, query: always.query }).then(
+      () => assert.fail('the scope must fail'),
+      (caught) => caught
+    )
+    assert.equal(error.code, 'live_font_community_feed_failed')
+    assert.match(error.message, /connection refused; restore failed: .*connection reset/)
+    assert.notDeepEqual(published(always.db), SEEDED)
+    await error.restore()
+    assert.deepEqual(published(always.db), SEEDED)
+  })
+
   test('refuses a database that is not the harness database, and reports a failed write', async () => {
     const db = fakeDatabase(SEEDED)
     await assert.rejects(

@@ -45,6 +45,9 @@ WHERE "status" = 'published' AND NOT ("id" = ANY($1::text[])) AND EXISTS (SELECT
 RETURNING "id"`
 const PUBLISHED = `SELECT "id" FROM "LookbookPost"
 WHERE "status" = 'published' ORDER BY "id"`
+/** How many times a failed setup tries to put the withdrawn posts back before it hands over. */
+const RESTORE_ATTEMPTS = 3
+
 const RESTORE = `UPDATE "LookbookPost" SET "status" = 'published' WHERE "status" = 'withdrawn' AND "id" = ANY($1::text[])
 RETURNING "id"`
 
@@ -54,7 +57,9 @@ RETURNING "id"`
  * posts `kept`, the posts `withdrawn` and `restore()`, which publishes those again (a call after
  * one that succeeded does nothing; one after a failure tries again). Any post the feed names that
  * is not published, or any other post still published, fails as live_font_community_feed_unexpected
- * after the withdrawn posts are put back; a failed check puts them back too.
+ * after the withdrawn posts are put back; a failed check puts them back too. A failed setup tries
+ * the restore up to RESTORE_ATTEMPTS times, and when every attempt fails the error carries
+ * `restore` and says so.
  */
 export async function scopeCommunityFeed({ ownedEnv, query }) {
   const url = harnessDatabaseUrl(ownedEnv)
@@ -74,26 +79,44 @@ export async function scopeCommunityFeed({ ownedEnv, query }) {
     // Done only once the posts are back: a failed restore stays retryable.
     restored = true
   }
+  // The caller has no restore() until this resolves, so a failed setup puts the withdrawn posts
+  // back itself, up to RESTORE_ATTEMPTS times; a restore that keeps failing rides on the error.
+  const failSetup = async (error) => {
+    let restoreError
+    for (let attempt = 1; attempt <= RESTORE_ATTEMPTS; attempt += 1) {
+      try {
+        await restore()
+        restoreError = undefined
+        break
+      } catch (caught) {
+        restoreError = caught
+      }
+    }
+    if (restoreError) {
+      error.message += `; restore failed: ${restoreError.message}`
+      error.restore = restore
+    }
+    throw error
+  }
   let published
   try {
     published = (await run(PUBLISHED, [])).rows.map((row) => row.id)
   } catch (error) {
-    // The caller has no restore() until this resolves, so the withdrawn posts go back here.
-    await restore()
-    throw error
+    await failSetup(error)
   }
   const missing = feed.filter((id) => !published.includes(id))
   const extra = published.filter((id) => !feed.includes(id))
   if (missing.length || extra.length) {
-    await restore()
-    throw coded(
-      'live_font_community_feed_unexpected',
-      [
-        missing.length && `not published: ${missing.join(',')}`,
-        extra.length && `still published: ${extra.join(',')}`,
-      ]
-        .filter(Boolean)
-        .join('; ')
+    await failSetup(
+      coded(
+        'live_font_community_feed_unexpected',
+        [
+          missing.length && `not published: ${missing.join(',')}`,
+          extra.length && `still published: ${extra.join(',')}`,
+        ]
+          .filter(Boolean)
+          .join('; ')
+      )
     )
   }
   return { kept: feed, withdrawn, restore }
