@@ -304,14 +304,24 @@ describe('createImmutableAssetCache', () => {
     ).resolves.toBeUndefined()
   })
 
-  it('still fails on any other error reading the body or fulfilling', async () => {
+  // CodeRabbit review of #243: a body that cannot be read leaves the request to the browser,
+  // as a failed fetch does, so the page meets the network as it would without the cache.
+  it.each(['read ECONNRESET', 'apiResponse.body: Response has been disposed'])(
+    'lets the browser make a request whose body read failed (%s)',
+    async (message) => {
+      const cache = createImmutableAssetCache()
+      const broken = route(ASSET, immutable('a'), 'GET', {
+        bodyError: new Error(message),
+      })
+      await expect(cache.handle(broken.route)).resolves.toBeUndefined()
+      expect(broken.calls.continue).toBe(1)
+      expect(broken.calls.fulfill).toEqual([])
+      expect(cache.stats()).toEqual({ fetched: 1, served: 0, kept: 0 })
+    }
+  )
+
+  it('still fails on any other error fulfilling', async () => {
     const cache = createImmutableAssetCache()
-    await expect(
-      cache.handle(
-        route(ASSET, immutable('a'), 'GET', { bodyError: new Error('read ECONNRESET') })
-          .route
-      )
-    ).rejects.toThrow('read ECONNRESET')
     await expect(
       cache.handle(
         route(ASSET, immutable('b'), 'GET', {

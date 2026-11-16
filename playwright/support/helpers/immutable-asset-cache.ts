@@ -89,22 +89,17 @@ export function createImmutableAssetCache(): ImmutableAssetCache {
   /** The server's answer, or undefined when the browser was left to make the request. */
   async function fetchReply(route: Route): Promise<Fetched | undefined> {
     let response: Awaited<ReturnType<Route['fetch']>>
+    let body: Buffer
     try {
       // A redirect reaches the browser as one, as it would without the cache.
       response = await route.fetch({ maxRedirects: 0 })
+      fetched += 1
+      body = await response.body()
     } catch {
-      // Let the browser make the request itself, so a network failure reaches the page as it
-      // would without the cache. A route whose page already closed has nothing to answer.
+      // Let the browser make the request itself, so a failed fetch or body read reaches the page
+      // as it would without the cache. A route whose page already closed has nothing to answer.
       await route.continue().catch(() => undefined)
       return undefined
-    }
-    fetched += 1
-    let body: Buffer
-    try {
-      body = await response.body()
-    } catch (error) {
-      if (endedByTeardown(error)) return undefined
-      throw error
     }
     const reply = {
       status: response.status(),
