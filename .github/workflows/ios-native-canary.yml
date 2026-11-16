@@ -9,9 +9,10 @@ name: iOS native canary
 run-name: iOS 26.5 canary ${{ github.sha }}
 
 on:
-  # 06:37 UTC: after the 03:23 UTC nightly run of ios-native.yml has finished, its ios-live-font
-  # job included (about 140 minutes, 180 at its timeout), so the canary never shares macOS
-  # concurrency with it. The canary itself skips ios-live-font.
+  # 06:37 UTC: 194 minutes after the 03:23 UTC nightly run of ios-native.yml starts, past the 180
+  # minute timeout of each ios-live-font leg. The four legs and the shards queue for GitHub's five
+  # macOS runners, so a slow night can still hold one when the canary starts, and the canary's
+  # jobs then wait for it. The canary itself skips ios-live-font.
   schedule:
     - cron: '37 6 * * *'
 

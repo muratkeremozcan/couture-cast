@@ -68,7 +68,7 @@ import {
 } from './lib/live-font-pages.mjs'
 import { installRestoreGuard } from './lib/live-font-run-guard.mjs'
 import { requiredMounts, textProbeSummary } from './lib/live-font-scale-proof.mjs'
-import { createTextProbe } from './lib/live-font-text-probe.mjs'
+import { assertTextProbeLinked, createTextProbe } from './lib/live-font-text-probe.mjs'
 import {
   CAPTURE_HASHES,
   captureHashes,
@@ -774,6 +774,13 @@ try {
       previousTimezone = previous
     },
   })
+  // F-00i (nightly run 43707223465): a build without the probe would fail every capture after
+  // three asks each, screen after screen, so the run checks once, before its first screen, and
+  // stops with live_font_probe_not_linked. Before the loop (PR 237 review P1), so no screen's own
+  // catch, a failed read-version included, can skip it; the outer catch writes the report. The
+  // Android receiver registers only in a running app, so that check launches it first.
+  if (platform === 'android') launch()
+  assertTextProbeLinked({ platform, device, appId, adbBinary, androidApi })
   for (const name of screens) {
     activeVolatile = SCREENS[name]?.volatile ?? []
     mounts = mountTracker(requiredMounts(SCREENS[name]?.mount))

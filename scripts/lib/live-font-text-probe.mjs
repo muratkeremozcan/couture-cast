@@ -612,6 +612,167 @@ export function createTextProbe({
   }
 }
 
+// Linking (nightly run 43707223465) ---------------------------------------------------------------
+
+// The first four bytes of a Mach-O file or a universal binary, in either byte order.
+const MACH_O_MAGIC = new Set([
+  0xfeedface, 0xcefaedfe, 0xfeedfacf, 0xcffaedfe, 0xcafebabe, 0xbebafeca,
+])
+
+/**
+ * Every Mach-O file under `directory`. A framework can reach its binary through a symlink
+ * (Foo.framework/Foo -> Versions/Current/Foo), and Dirent reports a link as neither a file nor a
+ * folder, so links are followed (PR 237 review P1): each real path is read once, so a link back
+ * to a folder already read ends there, and a dangling link is skipped.
+ */
+function machOFiles(directory, fs, seen = new Set()) {
+  const found = []
+  const real = fs.realpathSync(directory)
+  if (seen.has(real)) return found
+  seen.add(real)
+  for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name)
+    let kind = entry
+    if (entry.isSymbolicLink()) {
+      let target
+      try {
+        target = fs.realpathSync(file)
+        kind = fs.statSync(file)
+      } catch {
+        continue
+      }
+      if (kind.isFile()) {
+        if (seen.has(target)) continue
+        seen.add(target)
+      }
+    }
+    if (kind.isDirectory()) found.push(...machOFiles(file, fs, seen))
+    else if (kind.isFile()) {
+      const head = Buffer.alloc(4)
+      const fd = fs.openSync(file, 'r')
+      try {
+        if (
+          fs.readSync(fd, head, 0, 4, 0) === 4 &&
+          MACH_O_MAGIC.has(head.readUInt32BE(0))
+        )
+          found.push(file)
+      } finally {
+        fs.closeSync(fd)
+      }
+    }
+  }
+  return found
+}
+
+/** The first Android API that registers the probe's receiver (TextLayoutProbeReceiver.register). */
+export const TEXT_PROBE_MIN_ANDROID_API = 29
+/** How long the driver waits for the launched app to register the receiver. */
+export const TEXT_PROBE_REGISTER_MS = 20_000
+const REGISTER_POLL_MS = 1_000
+
+/**
+ * Whether `dumpsys activity broadcasts` lists a filter for the probe's action registered by
+ * `appId`'s own process (PR 237 review P1): only the Registered Receivers section counts, and in
+ * it only a ReceiverList block whose process is `appId`, so another CoutureCast build resident on
+ * the device (story65 registers the same action) or a broadcast in the history never does.
+ *   Registered Receivers:
+ *   * ReceiverList{<hash> <pid> <process>/<uid>/u<user> remote:<hash>}
+ *     Filter #0: BroadcastFilter{...}
+ *       Action: "<action>"
+ */
+export function receiverRegistered(broadcasts, appId) {
+  const lines = String(broadcasts).split('\n')
+  const start = lines.findIndex((line) => line.trim() === 'Registered Receivers:')
+  if (start < 0) return false
+  const indent = (line) => line.length - line.trimStart().length
+  const sectionIndent = indent(lines[start])
+  const owner = new RegExp(
+    `^\\* ReceiverList\\{\\S+ \\S+ ${appId.replaceAll('.', '\\.')}/\\d+/u\\d+ `
+  )
+  let ours = false
+  for (const line of lines.slice(start + 1)) {
+    const text = line.trim()
+    if (!text) continue
+    // The next section (Receiver Resolver Table, Historical broadcasts, Sticky broadcasts...).
+    if (indent(line) <= sectionIndent && !text.startsWith('* ')) break
+    if (text.startsWith('* ')) ours = owner.test(text)
+    else if (ours && text === `Action: "${TEXT_PROBE_ACTION}"`) return true
+  }
+  return false
+}
+
+/**
+ * Throws live_font_probe_not_linked unless the installed build carries the text layout probe.
+ * A build prebuilt without COUTURE_TEXT_LAYOUT_PROBE=1 has none (plugins/with-text-layout-probe.js),
+ * and every capture then asks three times before it fails as live_font_text_probe_missing: the
+ * nightly iOS run 43707223465 spent its proof that way on all four screens. The driver checks once,
+ * before its first screen, and stops the run on a missing probe.
+ *   iOS      a Mach-O file in the installed app bundle (the executable for static pods, a
+ *            framework for dynamic ones, symlinks followed) holds the notification name the probe
+ *            listens for.
+ *   Android  the launched app registered the probe's receiver (Application.onCreate, API 29 and
+ *            later), so its own ReceiverList in `dumpsys activity broadcasts` lists a filter for the
+ *            action; it is read every second for up to `registerMs` while the app starts. Below API
+ *            29 the probe never registers, so the run fails as live_font_probe_api_unsupported.
+ */
+export function assertTextProbeLinked({
+  platform,
+  device,
+  appId,
+  androidApi,
+  adbBinary = 'adb',
+  exec = boundedCall,
+  fs = nodeFs,
+  sleep = sleepSync,
+  now = Date.now,
+  callMs = TEXT_PROBE_CALL_MS,
+  registerMs = TEXT_PROBE_REGISTER_MS,
+}) {
+  if (!TEXT_PROBE_KINDS[platform])
+    fail('live_font_text_probe_invalid', `platform ${platform}`)
+  const call = (binary, args) => exec(binary, args, { timeout: callMs })
+  if (platform === 'android') {
+    if (!Number.isInteger(androidApi))
+      fail('live_font_text_probe_invalid', `Android API ${androidApi}`)
+    if (androidApi < TEXT_PROBE_MIN_ANDROID_API)
+      fail(
+        'live_font_probe_api_unsupported',
+        `Android API ${androidApi} is below ${TEXT_PROBE_MIN_ANDROID_API}, where the text layout probe registers no receiver; run on API ${TEXT_PROBE_MIN_ANDROID_API} or later`
+      )
+    const deadline = now() + registerMs
+    for (;;) {
+      const broadcasts = call(adbBinary, [
+        '-s',
+        device,
+        'shell',
+        'dumpsys',
+        'activity',
+        'broadcasts',
+      ])
+      if (receiverRegistered(broadcasts, appId)) return
+      if (now() >= deadline) break
+      sleep(REGISTER_POLL_MS)
+    }
+    fail(
+      'live_font_probe_not_linked',
+      `${appId} registered no ${TEXT_PROBE_ACTION} receiver; prebuild with COUTURE_TEXT_LAYOUT_PROBE=1`
+    )
+  }
+  const bundle = call('xcrun', [
+    'simctl',
+    'get_app_container',
+    device,
+    appId,
+    'app',
+  ]).trim()
+  const marker = Buffer.from(TEXT_PROBE_NOTIFICATION, 'utf8')
+  if (!machOFiles(bundle, fs).some((file) => fs.readFileSync(file).includes(marker)))
+    fail(
+      'live_font_probe_not_linked',
+      `no binary in ${path.basename(bundle)} carries ${TEXT_PROBE_NOTIFICATION}; prebuild with COUTURE_TEXT_LAYOUT_PROBE=1`
+    )
+}
+
 // Matching (TEA change 5 and the rulings of 2026-11-14) -----------------------------------------
 
 const area = (rect) => (rect[2] - rect[0]) * (rect[3] - rect[1])

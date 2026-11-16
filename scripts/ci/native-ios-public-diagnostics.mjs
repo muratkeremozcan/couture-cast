@@ -48,12 +48,12 @@ const MAX_ENTRIES = 20000
 const KEY = /^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,79}$/
 const PRINTABLE = /^[\x20-\x7e]*$/
 const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
-const SECRET_TEXT =
+export const SECRET_TEXT =
   /eyJ[A-Za-z0-9_-]{8,}|bearer\s|access_token|refresh_token|service_role|api[_-]?key|secret|password|passwd|sb_[a-z]+_|sk_[a-z]+_|gh[pousr]_[A-Za-z0-9]|AKIA[0-9A-Z]{8}|-----BEGIN/i
-const LOCAL_PATH =
+export const LOCAL_PATH =
   /(^|[\s=:(])(\/|~\/)[^\s]|\/(Users|private|var|tmp|Library|Volumes|home|opt|runner)\/|file:\/\/|[A-Za-z]:\\/
 const LONG_TOKEN = /[A-Za-z0-9+/_=-]{40,}/
-const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/
+export const EMAIL = /[^\s@]+@[^\s@]+\.[^\s@]+/
 
 /**
  * One xcodebuild or harness log line made fit for the public job log (story 6.15, Antigravity

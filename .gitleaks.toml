@@ -14,6 +14,9 @@ paths = [
   '''packages/k6-utils/src/jwt\.ts''',
 ]
 regexes = [
+  # A fake Supabase secret key shape that share-card-audit-screens.test.mjs (PR 237) places in PNG
+  # metadata to prove the public evidence refuses it; it was never a key.
+  '''^sb_secret_0123456789$''',
   # SHA-256 of the committed test-only Android keystore (story 6.15 TEA-19), a file digest the
   # minifiedDebuggable prebuild spec pins; it is no credential.
   '''^bb0e9edef61334bbc98c133a85200ad218f1eebfd9828cceaf7d71dddcf87df3$''',

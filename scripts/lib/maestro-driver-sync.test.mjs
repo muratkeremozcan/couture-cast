@@ -142,9 +142,12 @@ const iosRead = (udid) => ['--device', udid, 'hierarchy']
 /**
  * A macOS host as the iOS lifecycle sees it through `spawn`: processes, their listening sockets
  * and what a connect to each gets, lsof, ps, pgrep and kill, and the Node port probe. Its Maestro
- * behaves as 2.8 does on iOS: unless told --no-reinstall-driver while a runner answers on
- * --driver-host-port, it restarts the runner with `xcodebuild test-without-building`, and a
- * runner that cannot bind its port never passes the status check.
+ * behaves as 2.8 does on iOS (LocalXCTestInstaller, read with javap from maestro-ios-driver.jar):
+ * without --no-reinstall-driver it uninstalls the runner of the simulator and starts a new one,
+ * and its exit (the shutdown hook's close()) uninstalls it again, killing the runner it started;
+ * with the flag it reuses a runner that answers on --driver-host-port, starts one with
+ * `xcodebuild test-without-building` when none does, and leaves it running at exit. A runner
+ * that cannot bind its port never passes the status check.
  */
 function fakeMac(t) {
   const reservations = fs.mkdtempSync(path.join(os.tmpdir(), 'ios-driver-ports-'))
@@ -245,11 +248,19 @@ function fakeMac(t) {
     host.calls.push(args)
     const device = args[args.indexOf('--device') + 1]
     const port = Number(args[args.indexOf('--driver-host-port') + 1])
+    const reinstall = !args.includes('--no-reinstall-driver')
+    // uninstall(): the runner app of this simulator and the xcodebuild that runs it.
+    const uninstall = () => {
+      for (const [pid, { command }] of [...host.processes])
+        if (command === runnerCommand(device) || command.includes(`id=${device}`))
+          host.processes.delete(pid)
+    }
+    if (reinstall) uninstall()
     const answering = socketsOn(port).some(
       (s) => s.answer === 'http' && s.command === runnerCommand(device)
     )
-    if (!(args.includes('--no-reinstall-driver') && answering)) {
-      // restartXCTestRunner: uninstall, install, start the runner with xcodebuild.
+    if (!answering) {
+      // startXCTestRunner: install and start the runner with xcodebuild.
       const xcodebuild = [
         'test-without-building',
         '-xctestrun',
@@ -274,8 +285,13 @@ function fakeMac(t) {
     }
     const during = host.during
     host.during = null
-    during?.()
-    return args.includes('hierarchy') ? '{"id":"root"}' : 'ok'
+    try {
+      during?.()
+      return args.includes('hierarchy') ? '{"id":"root"}' : 'ok'
+    } finally {
+      // close(): with reinstallDriver set, Maestro uninstalls the runner as it exits.
+      if (reinstall) uninstall()
+    }
   }
   host.run = (device, { pid = process.pid, alive = () => true } = {}) =>
     createSyncMaestro({
@@ -310,7 +326,8 @@ test('iOS: a second Maestro call on the same simulator starts no xcodebuild; hie
     `node -e <probe> ${port} status`,
     `node -e <probe> ${port} status`,
   ])
-  // The first call pins the port and lets Maestro install the runner; later ones reuse it.
+  // Every call pins the port and passes --no-reinstall-driver: the first starts the runner and
+  // leaves it running, later ones reuse it.
   assert.deepEqual(mac.calls, [
     [
       '--device',
@@ -318,6 +335,7 @@ test('iOS: a second Maestro call on the same simulator starts no xcodebuild; hie
       '--driver-host-port',
       String(port),
       'test',
+      '--no-reinstall-driver',
       '-e',
       'A=1',
       'swipe-up.yaml',
@@ -349,6 +367,34 @@ test('iOS: a second Maestro call on the same simulator starts no xcodebuild; hie
     `node -e <probe> ${port} bind`,
     `xcodebuild test-without-building -xctestrun /var/folders/T/${SIM}/maestro-driver-ios-config.xctestrun -destination id=${SIM}`,
   ])
+})
+
+// Nightly run 43707223465 and dispatches 43740466527, 43746880534: the first call of a run had
+// no --no-reinstall-driver, so Maestro's exit killed the runner it started and every later call
+// found it gone and started another, 374 restarts in one 120 min proof.
+test('iOS: Maestro 2.8 kills a runner started without --no-reinstall-driver; the run keeps one for every call', (t) => {
+  const bare = fakeMac(t)
+  const [port] = iosDriverPortCandidates(SIM)
+  bare.maestro(['--device', SIM, '--driver-host-port', String(port), 'test', 'a.yaml'])
+  assert.deepEqual(
+    [...bare.processes.values()],
+    [],
+    'no runner outlives a reinstall call'
+  )
+  const mac = fakeMac(t)
+  const run = mac.run(SIM)
+  for (let call = 0; call < 5; call += 1) run(call % 2 ? iosRead(SIM) : iosFlow(SIM))
+  // Red before the fix: five xcodebuilds and four maestro_ios_driver_gone lines.
+  assert.equal(mac.xcodebuilds().length, 1)
+  assert.deepEqual(
+    mac.logs.filter((line) => line.startsWith('maestro_ios_driver_')),
+    []
+  )
+  assert.ok(mac.calls.every((args) => args.includes('--no-reinstall-driver')))
+  assert.ok(
+    [...mac.processes.values()].some(({ command }) => command === runnerCommand(SIM)),
+    'the runner is still up after the last call'
+  )
 })
 
 test('iOS: the port is derived from the UDID, and two simulators get distinct ports even when theirs collide', (t) => {
@@ -408,7 +454,7 @@ test('iOS: a failed flow stops its runner and the next call starts a fresh one',
   assert.ok(mac.spawned.includes(`pgrep -f xcodebuild test-without-building.*${SIM}`))
   assert.ok(mac.spawned.some((line) => /^kill -TERM \d+$/.test(line)))
   run(iosFlow(SIM))
-  assert.ok(!mac.calls[2].includes('--no-reinstall-driver'))
+  assert.ok(mac.calls[2].includes('--no-reinstall-driver'))
   assert.equal(mac.xcodebuilds().length, 2)
   assert.equal(mac.calls[2][3], mac.calls[0][3], 'the same port, free again')
 })
@@ -477,7 +523,7 @@ test('iOS: a status check that is accepted and closed fails at once with maestro
   // The next call starts a fresh runner on the next free candidate.
   run(iosFlow(SIM))
   assert.equal(mac.calls[1][3], String(iosDriverPortCandidates(SIM)[1]))
-  assert.ok(!mac.calls[1].includes('--no-reinstall-driver'))
+  assert.ok(mac.calls[1].includes('--no-reinstall-driver'))
 })
 
 test('iOS: a failed call whose port another process holds says so, keeping the output', (t) => {
@@ -543,7 +589,7 @@ test('iOS: a runner that went away is restarted on its port; exit stops it and f
   assert.deepEqual({ device, pid }, { device: SIM, pid: process.pid })
   mac.spawn('kill', ['-TERM', ...[...mac.processes.keys()].map(String)])
   run(iosFlow(SIM))
-  assert.ok(!mac.calls[1].includes('--no-reinstall-driver'))
+  assert.ok(mac.calls[1].includes('--no-reinstall-driver'))
   assert.equal(mac.calls[1][3], String(port))
   assert.match(mac.logs.join('\n'), new RegExp(`maestro_ios_driver_gone: ${port}`))
   // This simulator's runner left by an earlier run is stopped and waited for, not skipped.
