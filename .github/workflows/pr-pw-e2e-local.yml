@@ -340,6 +340,10 @@ jobs:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
         run: npm run test:pw-consent
+      # Every @consent-required test passed and none skipped, against the expected count.
+      - name: Check the guardian consent run report
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        run: npx tsx playwright/support/helpers/consent-lane-report-cli.ts consent playwright/artifacts/consent-lane-report.json
       - name: Check guardian consent artifacts for secret values
         id: consent_secret_scan
         if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
@@ -515,6 +519,16 @@ jobs:
           shards: '2'
           e2e-result: ${{ needs.pw-e2e.result || 'unknown' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # The sharded run's API has guardian consent off: it must skip exactly the
+      # @consent-required tests, for the consent lane, and nothing else for that reason.
+      - name: Check the consent-lane skips of the sharded run
+        if: ${{ !cancelled() && needs.pw-e2e.result != 'skipped' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: merged-local-report.json
+        run: |
+          npx playwright merge-reports --reporter=json all-blob-reports
+          npx tsx playwright/support/helpers/consent-lane-report-cli.ts off merged-local-report.json
 
       # Proves every test ran in exactly one shard and writes the shard times to
       # the job summary. Reads the shards' psp-record-* artifacts and the jobs

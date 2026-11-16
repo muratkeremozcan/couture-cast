@@ -18,3 +18,16 @@ export const CONSENT_LANE_ONLY =
 
 export const CONSENT_OFF_ONLY =
   'The guardian consent lane runs the API with consent required.'
+
+/**
+ * How many @consent-required tests the default local suite holds (outside the real-session
+ * specs, which have their own count in scripts/e2e-real-session/harness.mjs). Both runs are
+ * checked against it (consent-lane-report.ts), so adding or losing one fails until this moves.
+ */
+export const EXPECTED_CONSENT_REQUIRED_E2E_TESTS = 9
+
+/**
+ * The file filter `npm run test:pw-consent` passes: every spec but the real-session ones,
+ * which skip outside their own harness.
+ */
+export const CONSENT_E2E_FILE_FILTER = String.raw`^(?!.*real-session).*\.spec\.ts$`
