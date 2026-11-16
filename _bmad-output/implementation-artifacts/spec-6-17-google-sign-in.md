@@ -602,3 +602,10 @@ real-Google run. iOS Maestro and VoiceOver run nightly and on dispatch.
     delete falling to the sweep, the whole 13 to 15 lock and the coordinates OpenWeather gets.
   - Out of scope, existing behavior: unauthenticated email signup lets anyone pre-register an
     address with a birthdate of their choosing; the address owner then signs in to that row.
+  - Post-merge fix (`fix/pending-teen-sign-in`): a teen waiting on a guardian looped back to
+    sign-in on every Google attempt in production, because the guardian lock 403s the profile
+    check and the federated status answered `complete`. The status now answers
+    `awaiting_guardian` with the account id when the lock refuses the teen (revoked consent
+    included); web and mobile keep the session and show the guardian invitation on the finish
+    step, Continue signs out, and an email code routes the same way. Reproduced red on `main`
+    in the real-session lane first.

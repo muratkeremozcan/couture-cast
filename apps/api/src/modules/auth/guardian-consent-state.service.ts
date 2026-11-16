@@ -29,6 +29,17 @@ function extractComplianceState(
   return compliance as Record<string, unknown>
 }
 
+/**
+ * The teen lock RequestAuthGuard applies, as a pure rule: a teen whose account is not active
+ * or still needs guardian consent is refused on every signed-in endpoint.
+ */
+export function teenAccessBlocked(preferences: Prisma.JsonValue | null | undefined) {
+  return (
+    extractComplianceState(preferences).accountStatus !== 'active' ||
+    requiresGuardianConsent(preferences)
+  )
+}
+
 export function requiresGuardianConsent(
   preferences: Prisma.JsonValue | null | undefined
 ) {

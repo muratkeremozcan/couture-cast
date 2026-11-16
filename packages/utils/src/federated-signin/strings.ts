@@ -20,6 +20,7 @@ export type FederatedSignInStrings = {
   cancel: string
   cancelling: string
   createdGuardianPending: string
+  awaitingGuardian: string
   continue: string
   underage: string
   invalidBirthdate: string
@@ -67,6 +68,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Cancelling…',
     createdGuardianPending:
       'Account created. A guardian needs to approve your account before wardrobe features turn on.',
+    awaitingGuardian:
+      'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
     continue: 'Continue',
     underage: 'You must be 13 or older to use CoutureCast.',
     invalidBirthdate: 'Enter your birthdate as a full date.',
@@ -113,6 +116,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Cancelling…',
     createdGuardianPending:
       'Account created. A guardian needs to approve your account before wardrobe features turn on.',
+    awaitingGuardian:
+      'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
     continue: 'Continue',
     underage: 'You must be 13 or older to use CoutureCast.',
     invalidBirthdate: 'Enter your birthdate as a full date.',
@@ -160,6 +165,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Cancelando…',
     createdGuardianPending:
       'Cuenta creada. Un tutor debe aprobar tu cuenta antes de que se activen las funciones del guardarropa.',
+    awaitingGuardian:
+      'Tu cuenta está esperando la aprobación de un tutor. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
     continue: 'Continuar',
     underage: 'Debes tener 13 años o más para usar CoutureCast.',
     invalidBirthdate: 'Escribe tu fecha de nacimiento completa.',
@@ -209,6 +216,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Annulation…',
     createdGuardianPending:
       "Compte créé. Un parent ou tuteur doit approuver votre compte avant que les fonctions de garde-robe s'activent.",
+    awaitingGuardian:
+      "Ton compte attend l'approbation d'un parent ou tuteur. Envoie l'invitation ci-dessous, puis reconnecte-toi une fois qu'il l'aura approuvé.",
     continue: 'Continuer',
     underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
     invalidBirthdate: 'Entrez votre date de naissance complète.',
@@ -258,6 +267,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Annulation…',
     createdGuardianPending:
       "Compte créé. Un parent ou tuteur doit approuver votre compte avant l'activation des fonctions de garde-robe.",
+    awaitingGuardian:
+      "Ton compte attend l'approbation d'un parent ou tuteur. Envoie l'invitation ci-dessous, puis reconnecte-toi une fois qu'il l'aura approuvé.",
     continue: 'Continuer',
     underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
     invalidBirthdate: 'Saisissez votre date de naissance complète.',
@@ -306,6 +317,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'İptal ediliyor…',
     createdGuardianPending:
       'Hesap oluşturuldu. Gardırop özellikleri açılmadan önce bir velinin hesabınızı onaylaması gerekir.',
+    awaitingGuardian:
+      'Hesabın bir velinin onayını bekliyor. Aşağıdaki daveti gönder, veli onayladığında tekrar giriş yap.',
     continue: 'Devam',
     underage: "CoutureCast'i kullanmak için en az 13 yaşında olmalısınız.",
     invalidBirthdate: 'Doğum tarihinizi tam tarih olarak girin.',
@@ -352,6 +365,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Wird abgebrochen…',
     createdGuardianPending:
       'Konto erstellt. Eine erziehungsberechtigte Person muss dein Konto genehmigen, bevor die Kleiderschrank-Funktionen aktiv werden.',
+    awaitingGuardian:
+      'Dein Konto wartet auf die Zustimmung eines Erziehungsberechtigten. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
     continue: 'Weiter',
     underage: 'Du musst mindestens 13 Jahre alt sein, um CoutureCast zu nutzen.',
     invalidBirthdate: 'Gib dein vollständiges Geburtsdatum ein.',
@@ -402,6 +417,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Annullamento…',
     createdGuardianPending:
       'Account creato. Un genitore o tutore deve approvare il tuo account prima che le funzioni del guardaroba si attivino.',
+    awaitingGuardian:
+      "Il tuo account è in attesa dell'approvazione di un genitore o tutore. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
     continue: 'Continua',
     underage: 'Devi avere almeno 13 anni per usare CoutureCast.',
     invalidBirthdate: 'Inserisci la tua data di nascita completa.',
@@ -450,6 +467,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'Cancelando…',
     createdGuardianPending:
       'Conta criada. Um responsável precisa aprovar sua conta antes que os recursos do guarda-roupa sejam ativados.',
+    awaitingGuardian:
+      'Sua conta está aguardando a aprovação de um responsável. Envie o convite abaixo e entre de novo quando ele aprovar.',
     continue: 'Continuar',
     underage: 'Você precisa ter 13 anos ou mais para usar o CoutureCast.',
     invalidBirthdate: 'Digite sua data de nascimento completa.',
@@ -498,6 +517,8 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancelling: 'A cancelar…',
     createdGuardianPending:
       'Conta criada. Um encarregado de educação tem de aprovar a sua conta antes de as funcionalidades do guarda-roupa ficarem ativas.',
+    awaitingGuardian:
+      'A tua conta está a aguardar a aprovação de um encarregado de educação. Envia o convite abaixo e volta a iniciar sessão quando ele aprovar.',
     continue: 'Continuar',
     underage: 'Tem de ter 13 anos ou mais para usar o CoutureCast.',
     invalidBirthdate: 'Introduza a sua data de nascimento completa.',

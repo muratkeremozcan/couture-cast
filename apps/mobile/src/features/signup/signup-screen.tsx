@@ -30,7 +30,7 @@ type SignupScreenProps = {
   /** Story 6.16 D8: the route performs navigation, so this screen stays router-free. */
   onPreviewNavigate?: (href: SignupPreviewHref) => void
   /** Story 6.17 D2: a Google round trip that signed someone in or needs the finish step. */
-  onGoogleSignedIn?: (outcome: 'member' | 'no_account') => void
+  onGoogleSignedIn?: (outcome: 'member' | 'no_account' | 'awaiting_guardian') => void
   /** Story 6.17 D5: a round trip that ended back on this door, named by the cold callback. */
   googleOutcome?: 'cancelled' | 'unavailable' | 'refused' | null
 }

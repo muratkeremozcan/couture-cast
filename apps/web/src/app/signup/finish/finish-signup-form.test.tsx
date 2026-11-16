@@ -15,12 +15,16 @@ const session = vi.hoisted(() => ({
   read: vi.fn(),
   cancel: vi.fn(),
   finish: vi.fn(),
+  awaiting: vi.fn(),
+  signOut: vi.fn(),
 }))
 vi.mock('../../../lib/web-session', async (importOriginal) => ({
   ...(await importOriginal<typeof WebSession>()),
   readWebFederatedIdentity: session.read,
   cancelWebFederatedSignup: session.cancel,
   finishWebFederatedSignup: session.finish,
+  fetchWebAwaitingGuardianAccount: session.awaiting,
+  signOutWebSession: session.signOut,
 }))
 const preview = vi.hoisted(() => ({ clear: vi.fn() }))
 const guardian = vi.hoisted(() => ({ invite: vi.fn() }))
@@ -78,6 +82,8 @@ beforeEach(async () => {
     email: 'waiting@synthetic.test',
   })
   session.cancel.mockResolvedValue(undefined)
+  session.awaiting.mockResolvedValue(null)
+  session.signOut.mockResolvedValue(undefined)
 })
 
 afterEach(() => {
@@ -224,5 +230,50 @@ describe('W-TEEN-GUARDIAN: the guardian step after a 13 to 15 account is created
     })
     fireEvent.click(screen.getByRole('button', { name: strings.sendInvite }))
     await screen.findByText(strings.inviteFailed)
+  })
+})
+
+// Owner's production loop (2026-11-15): a returning teen the guardian lock refuses gets the
+// guardian invitation, and leaving the step ends the session.
+describe('W-TEEN-RESIGN: the finish step for a teen waiting on a guardian', () => {
+  it('shows the guardian invitation, never the birthdate question', async () => {
+    session.awaiting.mockResolvedValue('teen-pending-1')
+    render(<FinishSignupForm fromPreview={false} door="signin" />)
+    await screen.findByText(strings.awaitingGuardian)
+    expect(session.awaiting).toHaveBeenCalledWith('signed-waiting-identity')
+    expect(screen.getByLabelText(strings.guardianEmail)).toBeTruthy()
+    expect(screen.queryByLabelText(strings.birthdate)).toBeNull()
+    guardian.invite.mockResolvedValue({
+      guardianEmail: 'guardian@synthetic.test',
+      invitationLink: 'https://couturecast.synthetic.test/guardian/accept?token=t',
+    })
+    fireEvent.change(screen.getByLabelText(strings.guardianEmail), {
+      target: { value: 'guardian@synthetic.test' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: strings.sendInvite }))
+    await waitFor(() =>
+      expect(guardian.invite).toHaveBeenCalledWith({
+        teenId: 'teen-pending-1',
+        guardianEmail: 'guardian@synthetic.test',
+        consentLevel: 'read_only',
+      })
+    )
+  })
+
+  it('Continue ends the session before going home', async () => {
+    let settle!: () => void
+    session.signOut.mockReturnValue(
+      new Promise<void>((resolve) => {
+        settle = resolve
+      })
+    )
+    session.awaiting.mockResolvedValue('teen-pending-1')
+    render(<FinishSignupForm fromPreview={false} door="signin" />)
+    await screen.findByText(strings.awaitingGuardian)
+    fireEvent.click(screen.getByRole('button', { name: strings.continue }))
+    await waitFor(() => expect(session.signOut).toHaveBeenCalledTimes(1))
+    expect(replace).not.toHaveBeenCalled()
+    settle()
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/'))
   })
 })

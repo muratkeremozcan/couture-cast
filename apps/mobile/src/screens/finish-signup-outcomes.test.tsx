@@ -51,11 +51,15 @@ const flow = vi.hoisted(() => ({
   params: {} as Record<string, string>,
   router: { back: vi.fn(), replace: vi.fn(), push: vi.fn() },
   setOptions: vi.fn(),
+  awaiting: vi.fn<(token: string) => Promise<string | null>>(),
+  signOut: vi.fn<() => Promise<void>>(),
 }))
 vi.mock('@/src/lib/native-session', () => ({
   readNativeFederatedIdentity: flow.read,
   cancelNativeFederatedSignup: flow.cancel,
   finishNativeFederatedSignup: flow.finish,
+  fetchNativeAwaitingGuardianAccount: flow.awaiting,
+  signOutNativeSession: flow.signOut,
 }))
 vi.mock('expo-router', async () => ({
   router: flow.router,
@@ -100,6 +104,9 @@ beforeEach(() => {
   flow.router.push.mockReset()
   flow.router.back.mockReset()
   flow.setOptions.mockReset()
+  // Most cases are a new identity: the finish step asks the birthdate.
+  flow.awaiting.mockReset().mockResolvedValue(null)
+  flow.signOut.mockReset().mockResolvedValue(undefined)
 })
 
 /** The header title the route last set. */
@@ -225,4 +232,36 @@ describe('under-13 refusal and the stored guest preview', () => {
       setMobileGuestPreviewStoreForTests(undefined)
     }
   )
+})
+
+// Owner's production loop (2026-11-15): a returning teen the guardian lock refuses gets the
+// guardian invitation, and leaving the step ends the session before going home.
+describe('a returning teen waiting on a guardian', () => {
+  it('shows the guardian invitation and Continue signs out, then goes home', async () => {
+    flow.awaiting.mockResolvedValue('teen-pending-1')
+    let settle: () => void = () => undefined
+    flow.signOut.mockReturnValue(
+      new Promise<void>((resolve) => {
+        settle = resolve
+      })
+    )
+    await render(
+      <AccessibilityAnnouncerProvider>
+        <SignupFinishRoute />
+      </AccessibilityAnnouncerProvider>
+    )
+    await waitFor(() =>
+      expect(screen.getByTestId('finish-signup-outcome').textContent).toBe(
+        'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.'
+      )
+    )
+    expect(flow.awaiting).toHaveBeenCalledWith('signed-google')
+    expect(screen.queryByTestId('finish-signup-birthdate')).toBeNull()
+    await waitFor(() => expect(headerTitle()).toBe(''))
+    await userEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    await waitFor(() => expect(flow.signOut).toHaveBeenCalledTimes(1))
+    expect(flow.router.replace).not.toHaveBeenCalled()
+    settle()
+    await waitFor(() => expect(flow.router.replace).toHaveBeenCalledWith('/'))
+  })
 })

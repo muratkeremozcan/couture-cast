@@ -412,3 +412,28 @@ must turn the named scenario red.
   real client registration are proved only by H-AUTHORIZE and X-OWNER-RUN.
 - iOS Maestro, VoiceOver and the ASWebAuthenticationSession consent alert run nightly and on
   dispatch; PRs carry unit, component, web, E lane and Android proofs.
+
+## Addendum: pending teen sign-in loop (escaped, 2026-11-15)
+
+Updated: 2026-11-15. A 14-year-old who finished the Google signup returned to sign-in on every
+later Google sign-in in production. The guardian lock answers `GET /api/v1/user/profile` with 403
+for a pending teen, both clients read that 403 as "no account", and the next round trip got
+status `complete` and then a refused sign-out. The plan covered the first teen finish (E-TEEN)
+but never the ordered pair "teen pending, then sign in again". Lifecycle pairs must include every
+return visit for every non-terminal account state, not only the first transition into it.
+
+| ID                     | Scenario                                                            | Exact assertion                                                             |
+| ---------------------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| A-FED-STATUS-PENDING   | Federated status for a guardian-locked teen                         | 200, `status` is `awaiting_guardian`, `accountId` is that teen's id         |
+| A-FED-STATUS-APPROVED  | Status after guardian approval                                      | `status` is `complete`                                                      |
+| A-FED-STATUS-UNCHANGED | Under-13 refusal and no row                                         | Same bodies as before the fix                                               |
+| A-LOCK-HOLDS           | Profile for the pending teen                                        | Still 403; the fix adds no lock bypass                                      |
+| E-TEEN-RESIGN          | Teen finishes, signs out, signs in with Google again                | Lands on the guardian invitation step; never `/signin`; no sign-out request |
+| E-TEEN-RESIGN-OTP      | Same pair through email OTP                                         | Same landing as E-TEEN-RESIGN                                               |
+| E-TEEN-CONTINUE        | Continue on the guardian step                                       | Signs out and shows the "sign in again once approved" text                  |
+| E-TEEN-APPROVED        | Guardian approves, then teen signs in with Google                   | Lands home signed in                                                        |
+| E-TEEN-REVOKED         | Guardian declines or revokes after approval, where the model has it | Route pinned to the state the builder names                                 |
+| U-W/M-AWAITING         | Web and mobile routing of `awaiting_guardian`                       | Both route to the guardian invitation step                                  |
+| M-TEEN-RESIGN          | Android Maestro re-sign-in for a seeded pending teen                | Guardian invitation screen, light and dark                                  |
+
+The repro runs against main first and must fail there before the fix lands.

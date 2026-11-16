@@ -6,7 +6,7 @@ import {
   signupResponseSchema,
   type FederatedSignupInput,
   type FederatedSignupRefusalCode,
-  type FederatedSignupStatus,
+  type FederatedSignupStatusResponse,
   type SignupInput,
   type SignupResponse,
 } from '@couture/api-client/contracts/http'
@@ -114,9 +114,9 @@ async function federatedRequest(
 export async function fetchWebFederatedSignupStatus(
   accessToken: string,
   fetchImpl: typeof fetch = fetch
-): Promise<FederatedSignupStatus> {
+): Promise<FederatedSignupStatusResponse> {
   const response = await federatedRequest('GET', accessToken, undefined, fetchImpl)
-  return federatedSignupStatusResponseSchema.parse(await response.json()).status
+  return federatedSignupStatusResponseSchema.parse(await response.json())
 }
 
 export async function submitWebFederatedSignup(
