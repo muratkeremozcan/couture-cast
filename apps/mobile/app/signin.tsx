@@ -25,7 +25,7 @@ import {
   NativeSignInError,
   type NativeSignInFailure,
 } from '@/src/lib/native-signin-error'
-const FAILURE_KEYS: Record<NativeSignInFailure, string> = {
+const FAILURE_KEYS: Record<Exclude<NativeSignInFailure, 'awaiting_guardian'>, string> = {
   denied: 'community.notifications.signinDenied',
   code_invalid: 'community.notifications.signinCodeInvalid',
   unavailable: 'community.notifications.signinUnavailable',
@@ -67,7 +67,8 @@ export default function SignInScreen() {
       await leaveSignedIn()
       return
     }
-    if (outcome.kind === 'no_account') {
+    // A teen waiting on a guardian gets the guardian invitation on the finish step.
+    if (outcome.kind === 'no_account' || outcome.kind === 'awaiting_guardian') {
       router.replace(
         finishStepHref(fromPreview ? 'preview' : null, 'signin', '/signup-finish') as Href
       )
@@ -91,8 +92,18 @@ export default function SignInScreen() {
     } catch (error) {
       // Anything unclassified is treated as temporary, so the person retries.
       const reason = error instanceof NativeSignInError ? error.reason : 'unavailable'
-      if (sent) traceShareCardOpener(`signin-verify-${reason}`)
-      setMessage(FAILURE_KEYS[reason])
+      if (sent && reason !== 'awaiting_guardian')
+        traceShareCardOpener(`signin-verify-${reason}`)
+      // A teen waiting on a guardian goes to the guardian invitation, not a refusal.
+      if (reason === 'awaiting_guardian')
+        router.replace(
+          finishStepHref(
+            fromPreview ? 'preview' : null,
+            'signin',
+            '/signup-finish'
+          ) as Href
+        )
+      else setMessage(FAILURE_KEYS[reason])
     } finally {
       setBusy(false)
     }

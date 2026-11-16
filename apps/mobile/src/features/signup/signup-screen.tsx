@@ -30,12 +30,12 @@ type SignupScreenProps = {
   /** Story 6.16 D8: the route performs navigation, so this screen stays router-free. */
   onPreviewNavigate?: (href: SignupPreviewHref) => void
   /** Story 6.17 D2: a Google round trip that signed someone in or needs the finish step. */
-  onGoogleSignedIn?: (outcome: 'member' | 'no_account') => void
+  onGoogleSignedIn?: (outcome: 'member' | 'no_account' | 'awaiting_guardian') => void
   /** Story 6.17 D5: a round trip that ended back on this door, named by the cold callback. */
   googleOutcome?: 'cancelled' | 'unavailable' | 'refused' | null
 }
 
-type SignupPreviewHref = '/preview' | '/signin?from=preview'
+type SignupPreviewHref = '/preview' | '/signin?from=preview' | '/signin'
 
 export function SignupScreen({
   submitSignup = submitMobileSignup,
@@ -49,6 +49,7 @@ export function SignupScreen({
   const { announce } = useAccessibilityAnnouncer()
   const { i18n } = useTranslation()
   const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
+  const strings = getFederatedSignInStrings(i18n.language)
   const [accountCreated, setAccountCreated] = useState(false)
   const [email, setEmail] = useState('')
   const [birthdate, setBirthdate] = useState('')
@@ -103,17 +104,15 @@ export function SignupScreen({
       if (response.guardianConsentRequired) {
         setAccountCreated(true)
         setPendingTeenId(response.userId)
-        setSuccessMessage(
-          'Account created. Guardian consent is required before wardrobe access is enabled.'
-        )
+        setSuccessMessage(strings.createdGuardianPending)
         return
       }
 
       setPendingTeenId(null)
-      setSuccessMessage('Account created. You can continue to onboarding.')
+      setSuccessMessage(strings.signupCreated)
       setAccountCreated(true)
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Signup failed')
+      setErrorMessage(failureText(error, strings.createUnavailable))
       // D2: the server's refusal outranks the preview gate, as the client's does.
       if (fromPreview && error instanceof SignupRefusedError)
         mobileGuestPreviewStore().clear()
@@ -124,14 +123,14 @@ export function SignupScreen({
 
   async function handleGuardianInvite() {
     if (!pendingTeenId) {
-      setErrorMessage('Create the teen account first before inviting a guardian.')
+      setErrorMessage(strings.inviteFailed)
       return
     }
 
     const guardianEmailValidation =
       guardianInvitationInputSchema.shape.guardianEmail.safeParse(guardianEmail)
     if (!guardianEmailValidation.success) {
-      setErrorMessage('Enter a valid guardian email address.')
+      setErrorMessage(strings.invalidGuardianEmail)
       setSuccessMessage(null)
       setInviteLink(null)
       return
@@ -149,14 +148,10 @@ export function SignupScreen({
         consentLevel,
       })
       setInviteLink(response.invitationLink)
-      setSuccessMessage(
-        `Guardian invitation sent to ${response.guardianEmail}. Share the link below if they do not see the email.`
-      )
+      setSuccessMessage(strings.inviteSent.replace('{email}', response.guardianEmail))
     } catch (error) {
       setInviteLink(null)
-      setErrorMessage(
-        error instanceof Error ? error.message : 'Guardian invitation failed'
-      )
+      setErrorMessage(failureText(error, strings.inviteFailed))
     } finally {
       setIsInviting(false)
     }
@@ -164,13 +159,11 @@ export function SignupScreen({
 
   return (
     <View testID="signup-screen" style={styles.container}>
-      <Text style={styles.eyebrow}>COPPA-ready signup</Text>
+      <Text style={styles.eyebrow}>{strings.signupEyebrow}</Text>
       <Text style={styles.title} accessibilityRole="header">
-        Create your account with age verification first.
+        {strings.signupHeading}
       </Text>
-      <Text style={styles.description}>
-        Ages 13 to 15 require guardian consent before wardrobe access is enabled.
-      </Text>
+      <Text style={styles.description}>{strings.signupIntro}</Text>
 
       <View style={styles.form}>
         <SignupGoogleEntry
@@ -178,9 +171,9 @@ export function SignupScreen({
           onSignedIn={onGoogleSignedIn}
           onFailure={setErrorMessage}
         />
-        <Text style={styles.label}>Email</Text>
+        <Text style={styles.label}>{strings.email}</Text>
         <TextInput
-          accessibilityLabel="Email"
+          accessibilityLabel={strings.email}
           autoCapitalize="none"
           autoComplete="email"
           keyboardType="email-address"
@@ -189,9 +182,9 @@ export function SignupScreen({
           style={styles.input}
         />
 
-        <Text style={styles.label}>Birthdate</Text>
+        <Text style={styles.label}>{strings.birthdate}</Text>
         <TextInput
-          accessibilityLabel="Birthdate"
+          accessibilityLabel={strings.birthdate}
           placeholder="YYYY-MM-DD"
           placeholderTextColor={styles.placeholder.color}
           value={birthdate}
@@ -230,37 +223,26 @@ export function SignupScreen({
           </Text>
         ) : null}
 
-        <SignupPreviewLink
-          kind="continue"
-          visible={fromPreview && accountCreated}
-          label={previewStrings.signInToContinue}
+        <SignupNextStep
+          accountCreated={accountCreated}
+          fromPreview={fromPreview}
+          isSubmitting={isSubmitting}
+          submitLabel={isSubmitting ? strings.creating : strings.create}
+          signInLabel={previewStrings.signInToContinue}
+          onSubmit={() => {
+            void handleSubmit()
+          }}
           onNavigate={onPreviewNavigate}
         />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={isSubmitting ? 'Creating account' : 'Create account'}
-          style={[styles.button, isSubmitting ? styles.buttonDisabled : null]}
-          onPress={() => {
-            void handleSubmit()
-          }}
-          disabled={isSubmitting}
-        >
-          <Text style={styles.buttonText}>
-            {isSubmitting ? 'Creating account…' : 'Create account'}
-          </Text>
-        </Pressable>
-
         {pendingTeenId ? (
           <View style={styles.invitationCard}>
-            <Text style={styles.invitationEyebrow}>Guardian invitation</Text>
-            <Text style={styles.description}>
-              Invite a guardian to approve access for this teen account.
-            </Text>
+            <Text style={styles.invitationEyebrow}>{strings.guardianTitle}</Text>
+            <Text style={styles.description}>{strings.guardianIntro}</Text>
 
-            <Text style={styles.label}>Guardian email</Text>
+            <Text style={styles.label}>{strings.guardianEmail}</Text>
             <TextInput
-              accessibilityLabel="Guardian email"
+              accessibilityLabel={strings.guardianEmail}
               autoCapitalize="none"
               autoComplete="email"
               keyboardType="email-address"
@@ -269,11 +251,11 @@ export function SignupScreen({
               style={styles.input}
             />
 
-            <Text style={styles.label}>Consent level</Text>
+            <Text style={styles.label}>{strings.consentLevel}</Text>
             <View style={styles.segmentRow} accessibilityRole="radiogroup">
               <Pressable
                 accessibilityRole="radio"
-                accessibilityLabel="Read only consent"
+                accessibilityLabel={strings.readOnlyConsent}
                 accessibilityState={{ selected: consentLevel === 'read_only' }}
                 onPress={() => setConsentLevel('read_only')}
                 style={[
@@ -281,11 +263,11 @@ export function SignupScreen({
                   consentLevel === 'read_only' ? styles.segmentButtonActive : null,
                 ]}
               >
-                <Text style={styles.segmentButtonText}>Read only</Text>
+                <Text style={styles.segmentButtonText}>{strings.readOnly}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="radio"
-                accessibilityLabel="Full access consent"
+                accessibilityLabel={strings.fullAccessConsent}
                 accessibilityState={{ selected: consentLevel === 'full_access' }}
                 onPress={() => setConsentLevel('full_access')}
                 style={[
@@ -293,15 +275,13 @@ export function SignupScreen({
                   consentLevel === 'full_access' ? styles.segmentButtonActive : null,
                 ]}
               >
-                <Text style={styles.segmentButtonText}>Full access</Text>
+                <Text style={styles.segmentButtonText}>{strings.fullAccess}</Text>
               </Pressable>
             </View>
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={
-                isInviting ? 'Sending guardian invite' : 'Send guardian invite'
-              }
+              accessibilityLabel={isInviting ? strings.sendingInvite : strings.sendInvite}
               style={[styles.secondaryButton, isInviting ? styles.buttonDisabled : null]}
               onPress={() => {
                 void handleGuardianInvite()
@@ -309,7 +289,7 @@ export function SignupScreen({
               disabled={isInviting}
             >
               <Text style={styles.secondaryButtonText}>
-                {isInviting ? 'Sending invite…' : 'Send guardian invite'}
+                {isInviting ? strings.sendingInvite : strings.sendInvite}
               </Text>
             </Pressable>
 
@@ -335,11 +315,14 @@ export function SignupScreen({
 function SignupPreviewLink({
   kind,
   visible,
+  href = '/signin?from=preview',
   label,
   onNavigate,
 }: {
   kind: 'continue' | 'back'
   visible: boolean
+  /** Where Continue goes; Back always goes to the preview. */
+  href?: '/signin?from=preview' | '/signin'
   label: string
   onNavigate: (href: SignupPreviewHref) => void
 }) {
@@ -350,7 +333,7 @@ function SignupPreviewLink({
       testID="signup-sign-in-to-continue"
       accessibilityRole="button"
       style={styles.button}
-      onPress={() => onNavigate('/signin?from=preview')}
+      onPress={() => onNavigate(href)}
     >
       <Text style={styles.buttonText}>{label}</Text>
     </Pressable>
@@ -512,3 +495,58 @@ const useStyles = createSchemeStyles((colors) => ({
     color: colors.text,
   },
 }))
+
+/**
+ * The server's own message for a refusal it explained; the localized fallback for anything
+ * else, a network failure ("Failed to fetch") included.
+ */
+function failureText(error: unknown, fallback: string) {
+  return error instanceof Error && !(error instanceof TypeError)
+    ? error.message
+    : fallback
+}
+
+/**
+ * TEA sign-off N-3: Create account until the account exists, then the way to sign in, so a
+ * finished form never invites a second signup with the same address.
+ */
+function SignupNextStep({
+  accountCreated,
+  fromPreview,
+  isSubmitting,
+  submitLabel,
+  signInLabel,
+  onSubmit,
+  onNavigate,
+}: {
+  accountCreated: boolean
+  fromPreview: boolean
+  isSubmitting: boolean
+  submitLabel: string
+  signInLabel: string
+  onSubmit: () => void
+  onNavigate: (href: SignupPreviewHref) => void
+}) {
+  const styles = useStyles()
+  if (accountCreated)
+    return (
+      <SignupPreviewLink
+        kind="continue"
+        visible
+        href={fromPreview ? '/signin?from=preview' : '/signin'}
+        label={signInLabel}
+        onNavigate={onNavigate}
+      />
+    )
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={submitLabel}
+      style={[styles.button, isSubmitting ? styles.buttonDisabled : null]}
+      onPress={onSubmit}
+      disabled={isSubmitting}
+    >
+      <Text style={styles.buttonText}>{submitLabel}</Text>
+    </Pressable>
+  )
+}

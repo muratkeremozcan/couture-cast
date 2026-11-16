@@ -790,7 +790,7 @@
       "rateLimited": "Demasiadas reacciones. Inténtalo en un minuto.",
       "total_one": "{{count}} reacción",
       "total_other": "{{count}} reacciones",
-      "ineligible": "Debes tener al menos 13 años para reaccionar. Los menores de 16 necesitan consentimiento vigente de su tutor."
+      "ineligible": "Debes tener al menos 13 años para reaccionar."
     },
     "comments": {
       "title": "Comentarios",

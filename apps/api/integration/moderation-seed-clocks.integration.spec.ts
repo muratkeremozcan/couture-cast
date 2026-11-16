@@ -22,6 +22,11 @@ import {
   decisionFixtures,
   moderationDecisionsTestContext,
 } from './helpers/moderation-decisions-seed.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its lapsed-consent fixtures need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 vi.setConfig({ testTimeout: 30_000 })
 

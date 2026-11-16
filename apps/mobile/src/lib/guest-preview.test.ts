@@ -178,12 +178,16 @@ describe('resolveMobileNextStep (D8)', () => {
     expect(await resolveMobileNextStep()).toBe('/signin')
   })
 
-  it('routes an active member to onboarding and a pending teen to the teen dashboard', async () => {
+  // Guardian consent is off (2026-11-16): a teen with no granted guardian is a member like any
+  // other, never sent to the teen dashboard's consent status.
+  it('routes a member and any teen whose profile loads to onboarding', async () => {
     token = 'token-a'
     answerProfile('guardian', [])
     expect(await resolveMobileNextStep()).toBe('/wardrobe-onboarding')
+    answerProfile('teen', [])
+    expect(await resolveMobileNextStep()).toBe('/wardrobe-onboarding')
     answerProfile('teen', ['pending'])
-    expect(await resolveMobileNextStep()).toBe('/teen-dashboard')
+    expect(await resolveMobileNextStep()).toBe('/wardrobe-onboarding')
     answerProfile('teen', ['pending', 'granted'])
     expect(await resolveMobileNextStep()).toBe('/wardrobe-onboarding')
   })

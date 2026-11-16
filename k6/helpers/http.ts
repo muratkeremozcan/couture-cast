@@ -27,6 +27,7 @@ export function postJson<T = JsonObject>(
     headers?: Record<string, string>
     tags?: Record<string, string>
     timeout?: string | number
+    expectedStatuses?: number[]
   } = {}
 ): ApiResponse<T> {
   return apiRequest<T>({
@@ -36,6 +37,7 @@ export function postJson<T = JsonObject>(
     headers: options.headers,
     tags: options.tags,
     timeout: options.timeout,
+    expectedStatuses: options.expectedStatuses,
   })
 }
 

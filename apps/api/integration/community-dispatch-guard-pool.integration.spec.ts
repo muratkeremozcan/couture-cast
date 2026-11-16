@@ -48,6 +48,11 @@ import { GuardDriverError } from '../src/prisma/guard-prisma-client.js'
 
 vi.setConfig({ testTimeout: 120_000 })
 
+/**
+ * TEA sign-off L-2: on a loaded host the 500 ms claim bound ended the claim (Postgres 25P04)
+ * before the fault a case armed, so the cases that are not about the bound give the claim 5 s.
+ */
+const RELAXED_CLAIM = { claimTimeoutMs: 5_000 }
 const SLOW_CONNECT_MS = 1500
 
 const db = isolatedCommunityDatabase()
@@ -276,7 +281,7 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
       deliveries.push(await seededDelivery({ granted: true }))
     const pool = createCommunityGuardPool(guardUrl, SLOTS)
     try {
-      const guard = new CommunitySendGuard(pool, flags, provider)
+      const guard = new CommunitySendGuard(pool, flags, provider, RELAXED_CLAIM)
       const opened = await openCommunityGuardPool(
         pool,
         guard,
@@ -353,7 +358,7 @@ describe('dispatch guard pool with 1.5 s connection opening', () => {
       const before = fastProxy.accepted()
       const opened = await openCommunityGuardPool(
         pool,
-        new CommunitySendGuard(pool, flags, provider),
+        new CommunitySendGuard(pool, flags, provider, RELAXED_CLAIM),
         communityGuardConnections(SLOTS)
       )
       expect(opened.connections).toBe(communityGuardConnections(SLOTS))
@@ -557,7 +562,7 @@ describe('guard connections that fail after they open', () => {
       expect(
         await openCommunityGuardPool(
           pool,
-          new CommunitySendGuard(pool, flags, provider),
+          new CommunitySendGuard(pool, flags, provider, RELAXED_CLAIM),
           connections
         )
       ).toEqual({ attempts: 2, connections })
@@ -567,6 +572,8 @@ describe('guard connections that fail after they open', () => {
     }
   })
 
+  // Keeps the production claim bound: the fault is armed on its exact SET text, so this case
+  // also proves the default guard sends transaction_timeout = '500ms'.
   it('names a connection closed under the claim as the guard being unreachable', async () => {
     const delivery = await seededDelivery({ granted: true })
     const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
@@ -591,7 +598,7 @@ describe('guard connections that fail after they open', () => {
     const delivery = await seededDelivery({ granted: true })
     const pool = createCommunityGuardPool(faultGuardUrl, SLOTS)
     try {
-      const guard = new CommunitySendGuard(pool, flags, provider)
+      const guard = new CommunitySendGuard(pool, flags, provider, RELAXED_CLAIM)
       sent.length = 0
       faultProxy.arm('"CommunityFlagEvaluation" e JOIN', 'close', 1)
       expect(await guard.dispatch(delivery.id)).toBe(true)
@@ -623,7 +630,7 @@ describe('guard connections that fail after they open', () => {
           })
         },
       } as unknown as CommunityPushProvider
-      const guard = new CommunitySendGuard(pool, flags, closingProvider)
+      const guard = new CommunitySendGuard(pool, flags, closingProvider, RELAXED_CLAIM)
       sent.length = 0
       expect(await guard.dispatch(delivery.id)).toBe(true)
       expect(faultProxy.armed()).toBe(0)

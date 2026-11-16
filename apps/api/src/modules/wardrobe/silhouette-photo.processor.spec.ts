@@ -2,7 +2,7 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-call */
 import type { PrismaClient } from '@prisma/client'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SilhouettePhotoProcessor } from './silhouette-photo.processor'
 import type { SilhouettePhotoModerationEngine } from './silhouette-photo-moderation.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
@@ -50,6 +50,10 @@ describe('SilhouettePhotoProcessor', () => {
   } as unknown as SilhouettePhotoModerationEngine
 
   const processor = new SilhouettePhotoProcessor(mockPrisma, mockStorage, mockEngine)
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -122,7 +126,8 @@ describe('SilhouettePhotoProcessor', () => {
     expect(mockGuardianConsentFindMany).not.toHaveBeenCalled()
   })
 
-  it('4.4-UNIT-06 writes a ModerationEvent and one EventEnvelope per active guardian on privacy_violation for a teen', async () => {
+  it('4.4-UNIT-06 writes a ModerationEvent and one EventEnvelope per active guardian on privacy_violation for a teen under policy required_13_15', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
     mockFindUnique.mockResolvedValueOnce({
       id: 'p1',
       user_id: 'teen-1',
@@ -175,6 +180,35 @@ describe('SilhouettePhotoProcessor', () => {
     // one `new Date()` call per iteration, which could otherwise disagree by
     // a few milliseconds across guardians for the same moderation event.
     expect(call.data[0]?.payload.flaggedAt).toBe(call.data[1]?.payload.flaggedAt)
+  })
+
+  // TEA sign-off F-3: while guardian consent is off a granted row reaches no guardian.
+  it('A-OFF-GUARDIAN-ACCESS under policy off marks the failure and mails no granted guardian', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'off')
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'p1',
+      user_id: 'teen-1',
+      my_form_object_path: 'wardrobe/teen-1/silhouette/s1.png',
+      my_form_status: 'processing',
+    })
+    mockModerate.mockResolvedValueOnce({ outcome: 'privacy_violation' })
+    mockGuardianConsentFindMany.mockResolvedValueOnce([
+      { guardian_id: 'g1', guardian: { email: 'guardian1@example.test' } },
+    ])
+
+    await processor.process('p1')
+
+    expect(mockUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          my_form_status: 'failed',
+          my_form_failure_reason: 'privacy_violation',
+        }),
+      })
+    )
+    expect(mockGuardianConsentFindMany).not.toHaveBeenCalled()
+    expect(mockModerationEventCreate).not.toHaveBeenCalled()
+    expect(mockEventEnvelopeCreateMany).not.toHaveBeenCalled()
   })
 
   it('4.4-UNIT-06 does not write a ModerationEvent for a privacy_violation with no active guardian', async () => {

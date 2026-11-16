@@ -15,6 +15,12 @@ import {
 } from '@couture/api-client/contracts/http'
 import { test, expect } from '../../support/fixtures/merged-fixtures'
 import {
+  CONSENT_LANE_ONLY,
+  CONSENT_OFF_ONLY,
+  CONSENT_REQUIRED_TAG,
+  e2eConsentPolicy,
+} from '../../support/helpers/guardian-consent-policy'
+import {
   authHeaders,
   buildUniqueId,
   extractErrorMessage,
@@ -57,6 +63,8 @@ type EndpointScenario = {
   getActorId: (payload: ContractPayload) => string
   withMismatchedActorId: (payload: ContractPayload, actorId: string) => ContractPayload
   mismatchMessage: string
+  /** Guarded by GuardianConsentPolicyGuard: answers 409 before any of this while consent is off. */
+  consentRequired?: boolean
 }
 
 function createScenarioPayload(
@@ -85,6 +93,7 @@ const scenarios: EndpointScenario[] = [
       guardianId: actorId,
     }),
     mismatchMessage: 'Authenticated guardian does not match guardianId',
+    consentRequired: true,
   },
   {
     path: '/api/v1/moderation/actions',
@@ -118,94 +127,142 @@ test.describe('Auth and moderation endpoint security contracts', () => {
   })
 
   for (const scenario of scenarios) {
-    test.describe(scenario.path, () => {
-      test('[P0] returns 401 when auth headers are missing', async ({
-        apiRequest,
-        validateSchema,
-      }, testInfo) => {
-        const payload = createScenarioPayload(scenario, testInfo)
-        const { status, body } = await apiRequest({
-          method: 'POST',
-          path: scenario.path,
-          baseUrl: resolveApiBaseUrl(testInfo),
-          body: payload,
+    test.describe(
+      scenario.path,
+      { tag: scenario.consentRequired ? [CONSENT_REQUIRED_TAG] : [] },
+      () => {
+        if (scenario.consentRequired)
+          test.skip(e2eConsentPolicy() !== 'required_13_15', CONSENT_LANE_ONLY)
+        test('[P0] returns 401 when auth headers are missing', async ({
+          apiRequest,
+          validateSchema,
+        }, testInfo) => {
+          const payload = createScenarioPayload(scenario, testInfo)
+          const { status, body } = await apiRequest({
+            method: 'POST',
+            path: scenario.path,
+            baseUrl: resolveApiBaseUrl(testInfo),
+            body: payload,
+          })
+
+          expect(status).toBe(401)
+          await validateSchema(unauthorizedHttpErrorSchema, body, {
+            shape: { statusCode: 401, error: 'Unauthorized' },
+          })
+          const errMsg = extractErrorMessage(body)
+          expect(
+            errMsg.includes('Missing or invalid') ||
+              errMsg.includes('Invalid access token')
+          ).toBe(true)
         })
 
-        expect(status).toBe(401)
-        await validateSchema(unauthorizedHttpErrorSchema, body, {
-          shape: { statusCode: 401, error: 'Unauthorized' },
+        test('[P0] returns 403 for wrong role', async ({
+          apiRequest,
+          validateSchema,
+        }, testInfo) => {
+          const payload = createScenarioPayload(scenario, testInfo)
+          const actorId = scenario.getActorId(payload)
+          const { status, body } = await apiRequest({
+            method: 'POST',
+            path: scenario.path,
+            baseUrl: resolveApiBaseUrl(testInfo),
+            body: payload,
+            headers: authHeaders(actorId, scenario.wrongRole),
+          })
+
+          expect(status).toBe(403)
+          await validateSchema(forbiddenHttpErrorSchema, body, {
+            shape: { statusCode: 403, error: 'Forbidden' },
+          })
+          expect(extractErrorMessage(body)).toContain('Insufficient role')
         })
-        const errMsg = extractErrorMessage(body)
-        expect(
-          errMsg.includes('Missing or invalid') || errMsg.includes('Invalid access token')
-        ).toBe(true)
+
+        test('[P0] returns 403 for mismatched actor identity', async ({
+          apiRequest,
+          validateSchema,
+        }, testInfo) => {
+          const payload = createScenarioPayload(scenario, testInfo)
+          const actorId = scenario.getActorId(payload)
+          const mismatchedPayload = scenario.withMismatchedActorId(
+            payload,
+            buildUniqueId(`${scenario.actorRole}-mismatch`, testInfo)
+          )
+
+          const { status, body } = await apiRequest({
+            method: 'POST',
+            path: scenario.path,
+            baseUrl: resolveApiBaseUrl(testInfo),
+            body: mismatchedPayload,
+            headers: authHeaders(actorId, scenario.actorRole),
+          })
+
+          expect(status).toBe(403)
+          await validateSchema(forbiddenHttpErrorSchema, body, {
+            shape: { statusCode: 403, error: 'Forbidden' },
+          })
+          expect(extractErrorMessage(body)).toContain(scenario.mismatchMessage)
+        })
+
+        test('[P0] returns 200 for authorized request', async ({
+          apiRequest,
+          validateSchema,
+        }, testInfo) => {
+          const payload = createScenarioPayload(scenario, testInfo)
+          const actorId = scenario.getActorId(payload)
+          const { status, body } = await apiRequest({
+            method: 'POST',
+            path: scenario.path,
+            baseUrl: resolveApiBaseUrl(testInfo),
+            body: payload,
+            headers: authHeaders(actorId, scenario.actorRole),
+          })
+
+          expect(status).toBe(200)
+          await validateSchema(trackedResponseSchema, body, {
+            shape: { tracked: true },
+          })
+        })
+      }
+    )
+  }
+})
+
+// Owner ruling 2026-11-16: while guardian consent is off, the guardian consent route answers
+// 409 guardian_consent_off before authentication, so no bearer and a valid guardian bearer get
+// the same refusal and nothing is recorded.
+test.describe('/api/v1/auth/guardian-consent while guardian consent is off', () => {
+  test.beforeEach(({}, testInfo) => {
+    test.skip(
+      isProdEnvironment(testInfo),
+      'Skipping write-path contract tests in production.'
+    )
+    test.skip(e2eConsentPolicy() === 'required_13_15', CONSENT_OFF_ONLY)
+  })
+
+  for (const [label, withBearer] of [
+    ['with no bearer', false],
+    ['with the guardian bearer', true],
+  ] as const) {
+    test(`[P0] answers 409 guardian_consent_off ${label}`, async ({
+      apiRequest,
+    }, testInfo) => {
+      const payload = createScenarioPayload(
+        scenarios[0]!,
+        testInfo
+      ) as GuardianConsentPayload
+      const { status, body } = await apiRequest({
+        method: 'POST',
+        path: '/api/v1/auth/guardian-consent',
+        baseUrl: resolveApiBaseUrl(testInfo),
+        body: payload,
+        headers: withBearer ? authHeaders(payload.guardianId, 'guardian') : undefined,
       })
 
-      test('[P0] returns 403 for wrong role', async ({
-        apiRequest,
-        validateSchema,
-      }, testInfo) => {
-        const payload = createScenarioPayload(scenario, testInfo)
-        const actorId = scenario.getActorId(payload)
-        const { status, body } = await apiRequest({
-          method: 'POST',
-          path: scenario.path,
-          baseUrl: resolveApiBaseUrl(testInfo),
-          body: payload,
-          headers: authHeaders(actorId, scenario.wrongRole),
-        })
-
-        expect(status).toBe(403)
-        await validateSchema(forbiddenHttpErrorSchema, body, {
-          shape: { statusCode: 403, error: 'Forbidden' },
-        })
-        expect(extractErrorMessage(body)).toContain('Insufficient role')
-      })
-
-      test('[P0] returns 403 for mismatched actor identity', async ({
-        apiRequest,
-        validateSchema,
-      }, testInfo) => {
-        const payload = createScenarioPayload(scenario, testInfo)
-        const actorId = scenario.getActorId(payload)
-        const mismatchedPayload = scenario.withMismatchedActorId(
-          payload,
-          buildUniqueId(`${scenario.actorRole}-mismatch`, testInfo)
-        )
-
-        const { status, body } = await apiRequest({
-          method: 'POST',
-          path: scenario.path,
-          baseUrl: resolveApiBaseUrl(testInfo),
-          body: mismatchedPayload,
-          headers: authHeaders(actorId, scenario.actorRole),
-        })
-
-        expect(status).toBe(403)
-        await validateSchema(forbiddenHttpErrorSchema, body, {
-          shape: { statusCode: 403, error: 'Forbidden' },
-        })
-        expect(extractErrorMessage(body)).toContain(scenario.mismatchMessage)
-      })
-
-      test('[P0] returns 200 for authorized request', async ({
-        apiRequest,
-        validateSchema,
-      }, testInfo) => {
-        const payload = createScenarioPayload(scenario, testInfo)
-        const actorId = scenario.getActorId(payload)
-        const { status, body } = await apiRequest({
-          method: 'POST',
-          path: scenario.path,
-          baseUrl: resolveApiBaseUrl(testInfo),
-          body: payload,
-          headers: authHeaders(actorId, scenario.actorRole),
-        })
-
-        expect(status).toBe(200)
-        await validateSchema(trackedResponseSchema, body, {
-          shape: { tracked: true },
-        })
+      expect(status).toBe(409)
+      expect(body).toEqual({
+        statusCode: 409,
+        code: 'guardian_consent_off',
+        message: 'Guardian consent is not used.',
       })
     })
   }

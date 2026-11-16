@@ -1,0 +1,25 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane, M-OFF-NEW-TEEN (guardian consent off, owner ruling 2026-11-16): a new
+# 14-year-old finishes from the Create account door and lands on Home as a member, with no
+# guardian step.
+# Runner: queues ${GOOGLE_EMAIL}, then checks one app user that is an active account.
+appId: ${MAESTRO_APP_ID}
+name: 'Google new teen, consent off'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-create-account'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+    label: 'The Create account door shows Continue with Google'
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/finish-step.yaml
+- runFlow: steps/enter-birthdate.yaml
+- runFlow: steps/assert-member-home.yaml
+- assertNotVisible:
+    id: 'guardian-invite-email'

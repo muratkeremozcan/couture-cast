@@ -3,11 +3,14 @@ export {
   calculateAge,
   evaluateBirthdateInput,
   evaluateAgeGate,
+  GUARDIAN_CONSENT_POLICY,
+  guardianConsentRequiredFor,
   INVALID_BIRTHDATE_MESSAGE,
   parseBirthdateInput,
 } from './age'
 export type {
   AgeGateAccountStatus,
+  GuardianConsentPolicy,
   AgeGateResult,
   BirthdateAgeGateEvaluation,
 } from './age'

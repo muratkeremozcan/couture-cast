@@ -56,6 +56,9 @@ function configuredDelay(): number {
  * Tests that pin a latency budget on purpose (the request-ownership specs) fail at large
  * values, so run the whole suite at 100 or below.
  */
+/** The wait the delay handler makes, an object so a test can spy on the call itself. */
+export const mswDelay = { wait: (ms: number) => delay(ms) }
+
 export function delayHandler(): RequestHandler[] {
   const max = configuredDelay()
   if (max === 0) return []
@@ -66,7 +69,7 @@ export function delayHandler(): RequestHandler[] {
       // see a request marks it and the ones behind it let it through.
       if (vi.isFakeTimers() || delayed.has(request)) return
       delayed.add(request)
-      await delay(random ? Math.random() * max : max)
+      await mswDelay.wait(random ? Math.random() * max : max)
     }),
   ]
 }

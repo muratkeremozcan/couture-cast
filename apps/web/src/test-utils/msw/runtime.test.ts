@@ -1,6 +1,17 @@
 import { http, HttpResponse } from 'msw'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { delayHandler, useMswHandlers } from './runtime'
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  vi,
+  type MockInstance,
+} from 'vitest'
+import { delayHandler, mswDelay, useMswHandlers } from './runtime'
+
+// TEA sign-off L-3b: wall-clock upper bounds failed under CPU contention (190 ms read 376 ms).
+// The delay call itself is the contract; elapsed time keeps only its lower bound.
 
 const PATH = 'http://localhost/msw-delay-probe'
 
@@ -15,7 +26,9 @@ const answer = () => http.get(PATH, () => HttpResponse.json({ ok: true }))
 describe('opt-in MSW response delay', () => {
   // The tests below set the switch themselves, so the shell's own value (the README runs the
   // whole suite with it set) must not leak into them.
+  let wait: MockInstance<typeof mswDelay.wait>
   beforeEach(() => {
+    wait = vi.spyOn(mswDelay, 'wait')
     vi.stubEnv('MSW_TEST_DELAY_MS', '')
     vi.stubEnv('MSW_TEST_DELAY_RANDOM', '')
   })
@@ -47,7 +60,8 @@ describe('opt-in MSW response delay', () => {
   it('answers immediately when the switch is off', async () => {
     vi.stubEnv('MSW_TEST_DELAY_MS', '')
     useMswHandlers(answer())
-    expect(await timedRead()).toBeLessThan(80)
+    await timedRead()
+    expect(wait).not.toHaveBeenCalled()
   })
 
   // Later sets sit in front of the one that answers, so the request falls through every
@@ -56,9 +70,8 @@ describe('opt-in MSW response delay', () => {
     http.get(`http://localhost/${name}`, () => HttpResponse.json({}))
 
   async function expectOneDelay() {
-    const elapsed = await timedRead()
-    expect(elapsed).toBeGreaterThanOrEqual(90)
-    expect(elapsed).toBeLessThan(190)
+    expect(await timedRead()).toBeGreaterThanOrEqual(90)
+    expect(wait).toHaveBeenCalledExactlyOnceWith(100)
   }
 
   it('delays a request by the fixed value exactly once with two handler sets registered', async () => {
@@ -81,9 +94,8 @@ describe('opt-in MSW response delay', () => {
     vi.stubEnv('MSW_TEST_DELAY_RANDOM', '1')
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
     useMswHandlers(answer())
-    const elapsed = await timedRead()
-    expect(elapsed).toBeGreaterThanOrEqual(90)
-    expect(elapsed).toBeLessThan(190)
+    expect(await timedRead()).toBeGreaterThanOrEqual(90)
+    expect(wait).toHaveBeenCalledExactlyOnceWith(100)
   })
 
   it.each(['0', 'false', ''])('counts MSW_TEST_DELAY_RANDOM=%j as off', async (value) => {
@@ -92,6 +104,7 @@ describe('opt-in MSW response delay', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0)
     useMswHandlers(answer())
     expect(await timedRead()).toBeGreaterThanOrEqual(190)
+    expect(wait).toHaveBeenCalledExactlyOnceWith(200)
   })
 
   it('does not wait on the clock while fake timers are installed', async () => {

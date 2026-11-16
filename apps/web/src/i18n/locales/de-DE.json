@@ -628,7 +628,7 @@
       "rateLimited": "Zu viele Reaktionen. Versuche es in einer Minute erneut.",
       "total_one": "{{count}} Reaktion",
       "total_other": "{{count}} Reaktionen",
-      "ineligible": "Reaktionen sind ab 13 Jahren möglich. Unter 16 ist eine gültige Zustimmung eines Erziehungsberechtigten erforderlich."
+      "ineligible": "Reaktionen sind ab 13 Jahren möglich."
     },
     "comments": {
       "title": "Kommentare",

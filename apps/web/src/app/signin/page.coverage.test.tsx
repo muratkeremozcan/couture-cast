@@ -107,3 +107,36 @@ describe('OTP sign-in recovery', () => {
     await screen.findByText(label('signinUnavailable'))
   })
 })
+
+// Owner's production loop (2026-11-15): a teen waiting on a guardian who signs in with an email
+// code goes to the guardian invitation, not to "This account is unavailable".
+describe('a teen waiting on a guardian', () => {
+  it('goes to the finish step guardian invitation after the code', async () => {
+    const realLocation = window.location
+    const assign = vi.fn()
+    Object.defineProperty(window, 'location', {
+      configurable: true,
+      value: { ...realLocation, assign, search: '' },
+    })
+    try {
+      auth.verify.mockRejectedValueOnce(
+        new WebSignInError('awaiting_guardian', 'A guardian has to approve this account.')
+      )
+      render(<SignInPage />)
+      fireEvent.change(screen.getByLabelText(label('email')), {
+        target: { value: 'teen@example.test' },
+      })
+      fireEvent.click(screen.getByRole('button', { name: label('sendCode') }))
+      const code = await screen.findByLabelText(label('code'))
+      fireEvent.change(code, { target: { value: '123456' } })
+      fireEvent.click(screen.getByRole('button', { name: label('verify') }))
+      await waitFor(() => expect(assign).toHaveBeenCalledWith('/signup/finish'))
+      expect(screen.queryByText(label('signinDenied'))).toBeNull()
+    } finally {
+      Object.defineProperty(window, 'location', {
+        configurable: true,
+        value: realLocation,
+      })
+    }
+  })
+})

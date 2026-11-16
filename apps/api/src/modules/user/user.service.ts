@@ -1,10 +1,11 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common'
 import { randomUUID } from 'node:crypto'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type GuardianConsent } from '@prisma/client'
 import {
   userProfileResponseSchema,
   type UserPreferencesInput,
 } from '../../contracts/http.js'
+import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
 import type { RequestAuthContext } from '../auth/security.types'
 
 // Story 0.9 Task 5 step 4 owner:
@@ -14,23 +15,30 @@ import type { RequestAuthContext } from '../auth/security.types'
 // Why this step matters:
 // the first `user` REST slice should prove that real DB-backed profile data can flow through the
 // canonical contract layer without controller-local DTOs or decorator-authored docs.
+/** The consent rows a profile names; none while guardian consent is off. */
+type GuardianLinks = { teen_roles: GuardianConsent[]; guardian_roles: GuardianConsent[] }
+
 @Injectable()
 export class UserService {
   constructor(@Inject(PrismaClient) private readonly prisma: PrismaClient) {}
 
   async getProfile(auth: RequestAuthContext) {
+    // While guardian consent is off a granted row stays for audit and grants nothing, so the
+    // profile names no linked teen or guardian (TEA sign-off N-4).
+    const links = resolveGuardianConsentPolicy() !== 'off'
     const user = await this.prisma.user.findUnique({
       where: { id: auth.userId },
-      include: {
-        profile: true,
-        guardian_roles: true,
-        teen_roles: true,
-      },
+      include: links
+        ? { profile: true, guardian_roles: true, teen_roles: true }
+        : { profile: true },
     })
 
     if (!user) {
       throw new NotFoundException('Authenticated user profile not found')
     }
+    const linked: GuardianLinks = links
+      ? (user as unknown as GuardianLinks)
+      : { teen_roles: [], guardian_roles: [] }
 
     return userProfileResponseSchema.parse({
       user: {
@@ -40,12 +48,12 @@ export class UserService {
         birthdate: user.profile?.birthdate?.toISOString() ?? null,
         role: auth.role,
       },
-      linkedGuardians: user.teen_roles.map((consent) => ({
+      linkedGuardians: linked.teen_roles.map((consent) => ({
         guardianId: consent.guardian_id,
         status: consent.status,
         consentGrantedAt: consent.consent_granted_at?.toISOString() ?? null,
       })),
-      linkedTeens: user.guardian_roles.map((consent) => ({
+      linkedTeens: linked.guardian_roles.map((consent) => ({
         teenId: consent.teen_id,
         status: consent.status,
         consentGrantedAt: consent.consent_granted_at?.toISOString() ?? null,

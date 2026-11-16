@@ -15,6 +15,7 @@ import {
   parseBirthdateInput,
   type AgeGateResult,
 } from '@couture/utils'
+import { resolveGuardianConsentPolicy } from './guardian-consent-policy'
 import { TelemetryService } from '../telemetry/telemetry.service'
 import {
   InjectAnalyticsClient,
@@ -42,6 +43,7 @@ import {
   type VerifiedSupabaseIdentity,
 } from './access-token-identity.service.js'
 import { SUPABASE_AUTH_ADMIN, type SupabaseAuthAdmin } from './supabase-auth-admin'
+import { awaitingGuardianConsent } from './guardian-consent-state.service'
 
 /** Story 6.17 TEA-2: a guardian-only account that holds a granted consent stays adult. */
 export const FEDERATED_GUARDIAN_MINOR_MESSAGE =
@@ -192,7 +194,11 @@ export class AuthService {
     }
 
     const birthdate = parseBirthdate(parsed.data.birthdate)
-    const gate = evaluateAgeGate(birthdate, options.today ?? new Date())
+    const gate = evaluateAgeGate(
+      birthdate,
+      options.today ?? new Date(),
+      resolveGuardianConsentPolicy()
+    )
 
     if (!gate.allowed) {
       throw new ForbiddenException(gate.message)
@@ -248,8 +254,21 @@ export class AuthService {
     const identity = await this.identityService.readVerifiedSupabaseIdentity(token)
     const rows = await this.addressRows(this.prisma, identity.email.toLowerCase())
     if (rows.length > 1) throw identityUnusable()
-    const status = rows[0]?.profile?.birthdate ? 'complete' : 'needs_birthdate'
-    return federatedSignupStatusResponseSchema.parse({ status })
+    const account = rows[0]
+    const birthdate = account?.profile?.birthdate
+    if (!account || !birthdate)
+      return federatedSignupStatusResponseSchema.parse({ status: 'needs_birthdate' })
+    // A teen the guardian lock refuses everywhere would read the profile check's 403 as "no
+    // account" and loop between sign-in and Google; name the state so clients show the
+    // guardian step instead.
+    // Only a real guardian wait, with no age test (the guard locks by role, and an active adult
+    // never waits). Under policy off nothing waits.
+    if (awaitingGuardianConsent(account.profile?.preferences))
+      return federatedSignupStatusResponseSchema.parse({
+        status: 'awaiting_guardian',
+        accountId: account.id,
+      })
+    return federatedSignupStatusResponseSchema.parse({ status: 'complete' })
   }
 
   /** Inside the lock: the identity must still exist and still own the same address. */
@@ -275,7 +294,11 @@ export class AuthService {
     const parsed = federatedSignupInputSchema.safeParse(input)
     if (!parsed.success) throw new BadRequestException('Invalid signup payload')
     const birthdate = parseBirthdate(parsed.data.birthdate)
-    const gate = evaluateAgeGate(birthdate, options.today ?? new Date())
+    const gate = evaluateAgeGate(
+      birthdate,
+      options.today ?? new Date(),
+      resolveGuardianConsentPolicy()
+    )
 
     const identity = await this.identityService.readVerifiedSupabaseIdentity(token)
     const normalized = identity.email.toLowerCase()

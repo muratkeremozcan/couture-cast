@@ -19,6 +19,7 @@ import { GuardianConsentStateService } from '../src/modules/auth/guardian-consen
 import { RequestAuthGuard } from '../src/modules/auth/security.guards'
 import { UserController } from '../src/modules/user/user.controller'
 import { UserService } from '../src/modules/user/user.service'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
 import { GuardianService } from '../src/modules/guardian/guardian.service'
 
 type RequestRole = 'guardian' | 'teen' | 'moderator' | 'admin'
@@ -241,6 +242,10 @@ class InMemoryGuardianIntegrationPrisma {
 }
 
 describe('Guardian emancipation sweep (integration)', () => {
+  // The sweep lifts a guardian lock, which exists only under required_13_15 (consent is off by
+  // default since 2026-11-16).
+  useGuardianConsentPolicy('required_13_15')
+
   let app: INestApplication | undefined
   let prisma: InMemoryGuardianIntegrationPrisma
   let guardianService: GuardianService

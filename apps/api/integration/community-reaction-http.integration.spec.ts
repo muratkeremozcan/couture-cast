@@ -16,6 +16,11 @@ import { CommunityService } from '../src/modules/community/community.service.js'
 import { CommunitySpotlightService } from '../src/modules/community/community-spotlight.service.js'
 
 import { reactionTestContext } from './helpers/community-reaction-context.js'
+import { useGuardianConsentPolicy } from './helpers/guardian-consent-policy.js'
+
+// Guardian consent is off by default (owner ruling 2026-11-16); its revoked-teen case need the
+// guardian lock, so this file runs under required_13_15.
+useGuardianConsentPolicy('required_13_15')
 
 const { prisma, repository, guardian, input, fixture, mutate } = reactionTestContext()
 

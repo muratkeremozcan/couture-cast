@@ -16,7 +16,8 @@ export default function SignupRoute() {
       fromPreview={fromPreview}
       googleOutcome={googleOutcome}
       onGoogleSignedIn={(outcome) => {
-        if (outcome === 'no_account') {
+        // A teen waiting on a guardian gets the guardian invitation on the finish step.
+        if (outcome === 'no_account' || outcome === 'awaiting_guardian') {
           router.replace(
             finishStepHref(
               fromPreview ? 'preview' : null,

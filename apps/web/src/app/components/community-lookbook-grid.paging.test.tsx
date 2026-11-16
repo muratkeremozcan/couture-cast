@@ -273,6 +273,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(screen.queryByTestId('community-action-notice')).not.toBeInTheDocument()
     })
 
+    // TEA sign-off L-3a: one full axe pass over the open grid ran past 5 s on a loaded host.
     it('6.1-WEB-069 has no axe violations with a look open', async () => {
       signIn()
       useMswHandlers(
@@ -293,6 +294,6 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
         results.violations.map((violation) => violation.id),
         JSON.stringify(results.violations, null, 2)
       ).toEqual([])
-    })
+    }, 15_000)
   })
 })

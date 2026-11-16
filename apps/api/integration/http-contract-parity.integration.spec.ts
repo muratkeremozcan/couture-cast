@@ -138,6 +138,7 @@ describe('HTTP contract parity (integration)', () => {
 
   afterEach(async () => {
     vi.restoreAllMocks()
+    vi.unstubAllEnvs()
 
     if (app) {
       await app.close()
@@ -218,7 +219,8 @@ describe('HTTP contract parity (integration)', () => {
     unauthorizedHttpErrorSchema.parse(response.body)
   })
 
-  it('validates the authenticated profile route against the shared user schema', async () => {
+  it('validates the authenticated profile route against the shared user schema under policy required_13_15', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
     const teen = createTeenProfileFixture()
     const guardian = createGuardianProfileFixture({
       id: 'guardian-2',
@@ -244,6 +246,25 @@ describe('HTTP contract parity (integration)', () => {
     expect(body.linkedGuardians[0]).toEqual(
       buildLinkedGuardianResponse(guardian, DEFAULT_CONSENT_GRANTED_AT)
     )
+  })
+
+  // TEA sign-off N-4: while guardian consent is off the profile lists no guardian links.
+  it('validates the authenticated profile route with no guardian links under policy off', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'off')
+    const teen = createTeenProfileFixture()
+    prismaUserFindUniqueMock.mockResolvedValue(
+      buildPrismaUserProfileFixture(teen, [], [])
+    )
+
+    const response = await request(baseUrl())
+      .get('/api/v1/user/profile')
+      .set(createHeaders(teen.id, 'teen'))
+
+    expect(response.status).toBe(200)
+    const body = userProfileResponseSchema.parse(response.body)
+    expect(body.user.id).toBe(teen.id)
+    expect(body.linkedGuardians).toEqual([])
+    expect(body.linkedTeens).toEqual([])
   })
 
   it('validates missing profiles against the shared not-found schema', async () => {

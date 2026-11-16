@@ -57,12 +57,33 @@ export class CommunityDispatchPreflightError extends Error {
   }
 }
 
+/** The claim transaction's bound in production; Postgres ends a claim that runs longer. */
+export const COMMUNITY_SEND_CLAIM_TIMEOUT_MS = 500
+
+export type CommunitySendGuardOptions = {
+  /**
+   * Overrides the claim bound. Only fault-injection tests pass it, so a loaded test host does not
+   * end the claim (Postgres 25P04) before the fault they arm fires (TEA sign-off L-2).
+   */
+  claimTimeoutMs?: number
+}
+
 export class CommunitySendGuard {
+  private readonly claimTimeoutMs: number
+
   constructor(
     private readonly prisma: PrismaClient,
     private readonly flags: Pick<CommunityFlagEvaluationService, 'evaluate'>,
-    private readonly provider = new CommunityPushProvider()
-  ) {}
+    private readonly provider = new CommunityPushProvider(),
+    options: CommunitySendGuardOptions = {}
+  ) {
+    const claimTimeoutMs = options.claimTimeoutMs ?? COMMUNITY_SEND_CLAIM_TIMEOUT_MS
+    if (!Number.isSafeInteger(claimTimeoutMs) || claimTimeoutMs <= 0)
+      throw new RangeError(
+        `claimTimeoutMs must be a positive integer; got ${claimTimeoutMs}`
+      )
+    this.claimTimeoutMs = claimTimeoutMs
+  }
 
   async verifyRuntime(): Promise<void> {
     const version = await this.prisma.$queryRaw<
@@ -118,7 +139,10 @@ export class CommunitySendGuard {
 
   private async claim(delivery: Delivery, contexts: Context[], owner: string) {
     return interactiveTransaction(this.prisma, async (tx) => {
-      await tx.$executeRawUnsafe("SET LOCAL transaction_timeout = '500ms'")
+      // A positive integer checked in the constructor: SET takes no bind parameter.
+      await tx.$executeRawUnsafe(
+        `SET LOCAL transaction_timeout = '${this.claimTimeoutMs}ms'`
+      )
       await tx.$executeRawUnsafe("SET LOCAL lock_timeout = '100ms'")
       await this.lockPrivacy(tx, delivery, contexts)
       if (

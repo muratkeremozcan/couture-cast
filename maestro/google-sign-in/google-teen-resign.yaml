@@ -1,0 +1,41 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane, M-TEEN-RESIGN: a 14-year-old whose guardian has not approved signs in with
+# Google from the Sign in door and gets the guardian step again. The 2026-11-15 production loop
+# sent them back to Sign in instead. Continue then ends the session and lands on a signed-out Home.
+# Runner: creates the teen account for ${GOOGLE_EMAIL} through the product signup endpoint first,
+# queues the identity, then checks the address keeps one app user that still waits on consent.
+appId: ${MAESTRO_APP_ID}
+name: 'Google teen waiting on a guardian'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-sign-in'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+    label: 'The Sign in door shows Continue with Google'
+- runFlow: steps/continue-with-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'finish-signup-outcome'
+      text: ${AWAITING_TEXT}
+    timeout: 45000
+    label: 'The finish step shows the guardian invitation'
+- assertVisible:
+    id: 'guardian-invite-email'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'
+- assertNotVisible:
+    id: 'signin-code-input'
+# No hideKeyboard: on Android it is a Back press, which would leave the guardian step.
+- tapOn:
+    id: 'guardian-step-continue'
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 30000
+    label: 'Continue ends the session and lands on a signed-out Home'

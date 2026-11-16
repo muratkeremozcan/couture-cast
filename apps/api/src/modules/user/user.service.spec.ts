@@ -28,9 +28,11 @@ const createService = (findUnique = vi.fn()) => {
 describe('UserService', () => {
   afterEach(() => {
     resetCleanupRegistry()
+    vi.unstubAllEnvs()
   })
 
-  it('maps the authenticated user and guardian links through the shared response schema', async () => {
+  it('under policy required_13_15 maps the authenticated user and guardian links through the shared response schema', async () => {
+    vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'required_13_15')
     const teen = createTeenProfileFixture()
     const guardian = createGuardianProfileFixture({
       id: 'guardian-2',
@@ -68,6 +70,40 @@ describe('UserService', () => {
       )
     )
   })
+
+  // TEA sign-off N-4: while guardian consent is off a granted row grants nothing, so the profile
+  // names no linked teen or guardian and does not read the rows.
+  it.each([
+    ['teen', 'teen'],
+    ['guardian', 'guardian'],
+  ] as const)(
+    'A-OFF-GUARDIAN-ACCESS under policy off lists no guardian links for a %s',
+    async (_label, role) => {
+      vi.stubEnv('GUARDIAN_CONSENT_POLICY', 'off')
+      const teen = createTeenProfileFixture()
+      const guardian = createGuardianProfileFixture({ id: 'guardian-2' })
+      const findUnique = vi
+        .fn()
+        .mockResolvedValue(
+          buildPrismaUserProfileFixture(
+            teen,
+            [buildLinkedGuardianRole(guardian, DEFAULT_CONSENT_GRANTED_AT)],
+            []
+          )
+        )
+      const { service } = createService(findUnique)
+
+      const result = await service.getProfile({ token: 't', userId: teen.id, role })
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: teen.id },
+        include: { profile: true },
+      })
+      expect(result.linkedGuardians).toEqual([])
+      expect(result.linkedTeens).toEqual([])
+      expect(result.user.id).toBe(teen.id)
+    }
+  )
 
   it('throws when the authenticated user cannot be found', async () => {
     const { service } = createService(vi.fn().mockResolvedValue(null))
