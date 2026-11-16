@@ -9,6 +9,7 @@
  */
 export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/',
+  '/auth/callback',
   '/community',
   '/guardian/accept',
   '/guardian/dashboard',
@@ -20,10 +21,13 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
   '/palette',
   '/preview',
   '/preview/continue',
+  '/privacy',
   '/settings',
   '/signin',
   '/signup',
+  '/signup/finish',
   '/teen/dashboard',
+  '/terms',
   '/wardrobe',
   '/wardrobe/capsules',
   '/wardrobe/onboarding',
@@ -32,6 +36,7 @@ export const WEB_ANALYTICS_ROUTES = Object.freeze([
 /** Expo Router paths: route groups such as `(tabs)` are not part of the path. */
 export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/',
+  '/auth/callback',
   '/community',
   '/guardian-accept',
   '/guardian-dashboard',
@@ -45,6 +50,7 @@ export const MOBILE_ANALYTICS_ROUTES = Object.freeze([
   '/settings',
   '/signin',
   '/signup',
+  '/signup-finish',
   '/teen-dashboard',
   // Story 6.15 F-00i: the text layout probe's fixture; it renders nothing outside probe builds.
   '/text-clip-fixture',

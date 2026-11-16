@@ -16,6 +16,10 @@
 //   `expo export` without `--dev` still builds a minified bundle with `__DEV__` false.
 // Each runs with `--clear`, because the transform cache keys do not follow every inlined value.
 //
+// Story 6.17 D10 rides on the same exports: the real-session lane's OAuth stand-in variable
+// (EXPO_PUBLIC_E2E_OAUTH_PROVIDER) is read only inside `__DEV__`, so each export runs with it set
+// to a sentinel and a release bundle that still contains the sentinel fails the scan.
+//
 // Usage: node scripts/ci/revenuecat-bundle-scan.mjs [--env-file <path with the Test Store key>]
 import { spawnSync } from 'node:child_process'
 import fs, { realpathSync } from 'node:fs'
@@ -32,6 +36,10 @@ import {
 } from './revenuecat-key-hygiene.mjs'
 
 export { TEST_STORE_KEY_VARIABLE }
+
+/** Story 6.17 D10: the development-only OAuth stand-in switch and the value the scan plants. */
+export const E2E_OAUTH_PROVIDER_VARIABLE = 'EXPO_PUBLIC_E2E_OAUTH_PROVIDER'
+export const E2E_OAUTH_PROVIDER_SENTINEL = 'couturecast-oauth-standin-sentinel'
 
 /** The release exports the scan proves, in the order it runs them. */
 export const EXPORT_SHAPES = [
@@ -57,15 +65,30 @@ function* files(root) {
   }
 }
 
-/** Every exported file that holds the given key or a `test_` RevenueCat key. */
-export function scanExport(root, key) {
+/**
+ * Every exported file that holds the given key, a `test_` RevenueCat key, or one of the planted
+ * development-only markers.
+ */
+export function scanExport(root, key, markers = []) {
   const hits = []
   for (const file of files(root)) {
     const text = fs.readFileSync(file).toString('latin1')
-    if ((key && text.includes(key)) || TEST_KEY_PATTERN.test(text))
+    if (
+      (key && text.includes(key)) ||
+      TEST_KEY_PATTERN.test(text) ||
+      markers.some((marker) => text.includes(marker))
+    )
       hits.push(path.relative(root, file))
   }
   return hits
+}
+
+/**
+ * The per-shape release check the CLI loop runs on each export: the Test Store key, any `test_`
+ * RevenueCat key, and the planted OAuth stand-in sentinel (Story 6.17 D10).
+ */
+export function scanReleaseExport(out, key) {
+  return scanExport(out, key, [E2E_OAUTH_PROVIDER_SENTINEL])
 }
 
 /** Reads one variable from a dotenv file without exposing the rest. */
@@ -95,6 +118,7 @@ export function exportCommand(shape, { eas, key, out, env = process.env }) {
       NODE_ENV: shape.nodeEnv,
       EAS_BUILD_PROFILE: shape.profile,
       [TEST_STORE_KEY_VARIABLE]: key,
+      [E2E_OAUTH_PROVIDER_VARIABLE]: E2E_OAUTH_PROVIDER_SENTINEL,
     },
   }
 }
@@ -133,11 +157,11 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
         )
         process.exit(1)
       }
-      const hits = scanExport(out, key)
+      const hits = scanReleaseExport(out, key)
       console.log(
         hits.length
-          ? `revenuecat-bundle-scan: ${shape.name}: Test Store key found in ${hits.join(', ')}`
-          : `revenuecat-bundle-scan: ${shape.name}: no Test Store key in ${[...files(out)].length} exported files`
+          ? `revenuecat-bundle-scan: ${shape.name}: Test Store key or OAuth stand-in found in ${hits.join(', ')}`
+          : `revenuecat-bundle-scan: ${shape.name}: no Test Store key or OAuth stand-in in ${[...files(out)].length} exported files`
       )
       if (hits.length) failed = true
     } finally {

@@ -1,8 +1,34 @@
 'use client'
-import { useEffect } from 'react'
-import { startWebSession } from '../../lib/web-session'
+import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
+import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-session'
+
+// The legal pages stay readable mid-signup: Google's consent screen and the finish step link there.
+const FINISH_EXEMPT_PATHS = ['/signup/finish', '/auth/callback', '/privacy', '/terms']
+
+/**
+ * Story 6.17 D3: a stored identity with no account (a reload, a closed tab, a new tab, or a
+ * client-side link out of a legal page) goes back to the finish step. The server's status
+ * decides; nothing branches on the provider.
+ */
+function resumeFederatedFinish() {
+  if (FINISH_EXEMPT_PATHS.includes(window.location.pathname)) return
+  void resolveFederatedFinishRoute()
+    .then((href) => {
+      if (href && !FINISH_EXEMPT_PATHS.includes(window.location.pathname))
+        window.location.replace(href)
+    })
+    .catch(() => undefined)
+}
 export function SessionBridge() {
+  // The bridge mounts once in the root layout, so a client-side navigation (a Link from
+  // /privacy to /) never remounts it; the resume runs again on every route change instead.
+  const pathname = usePathname()
+  const [sessionReady, setSessionReady] = useState(false)
+  useEffect(() => {
+    if (sessionReady) resumeFederatedFinish()
+  }, [pathname, sessionReady])
   useEffect(() => {
     const stopLanguageSync = syncDocumentLanguage()
     activateBrowserLocale()
@@ -11,7 +37,10 @@ export function SessionBridge() {
     void startWebSession()
       .then((stop) => {
         if (stopped) stop()
-        else cleanup = stop
+        else {
+          cleanup = stop
+          setSessionReady(true)
+        }
       })
       .catch(() => undefined)
     return () => {

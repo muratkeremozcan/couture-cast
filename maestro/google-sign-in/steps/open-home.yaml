@@ -1,0 +1,11 @@
+# Story 6.17 M lane: the isolated client opened by the runner (scripts/run-google-native.mjs) on
+# a cleared app, mounted at a signed-out Home. maestro/story65/open-app.yaml absorbs the dev
+# client's own sheets and waits for the tab bar.
+appId: ${MAESTRO_APP_ID}
+---
+- runFlow: ../../story65/open-app.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'home-signed-out-welcome'
+    timeout: 30000
+    label: 'Home is signed out'

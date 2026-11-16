@@ -1,0 +1,15 @@
+# Story 6.17 D3: the finish step for ${GOOGLE_EMAIL}, the Google address shown read-only.
+appId: ${MAESTRO_APP_ID}
+---
+- extendedWaitUntil:
+    visible:
+      id: 'finish-signup-birthdate'
+    timeout: 45000
+    label: 'The Google identity without an account reached the finish step'
+- assertVisible:
+    id: 'finish-signup-email'
+    text: ${GOOGLE_EMAIL}
+- assertVisible:
+    id: 'finish-signup-create'
+- assertVisible:
+    id: 'finish-signup-cancel'

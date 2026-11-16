@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { AnalyticsEventActions } from './components/analytics-event-actions'
 import { PostHogClickTracker } from './components/posthog-click-tracker'
 import { GuestPreviewEntry } from './components/guest-preview/guest-preview-entry'
+import { LegalLinks } from './components/legal-page'
 import { LookbookPrismLayout } from './components/lookbook-prism-layout'
 import { StickyBottomNav } from './components/sticky-bottom-nav'
 
@@ -107,6 +108,7 @@ export default function Home() {
             24/7 with automated fallbacks.
           </p>
         </section>
+        <LegalLinks className="text-neutral-300" />
       </main>
       <PostHogClickTracker />
     </div>

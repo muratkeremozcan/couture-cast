@@ -85,6 +85,52 @@ export const signupResponseSchema = z
     ].join(' '),
   })
 
+// Story 6.17 D3: the finish step after a federated (Google) sign-in. The address comes from the
+// verified bearer identity, so the body carries the birthdate and nothing else (strict: an email,
+// userId, role or accountStatus field is a 400).
+export const federatedSignupInputSchema = z
+  .object({
+    birthdate: birthdateSchema,
+  })
+  .strict()
+
+export const federatedSignupStatusSchema = z.enum(['needs_birthdate', 'complete'])
+
+export const federatedSignupStatusResponseSchema = z
+  .object({
+    status: federatedSignupStatusSchema,
+  })
+  .strict()
+  .openapi({
+    description: [
+      'needs_birthdate: the verified address matches no account, or one account without a',
+      'profile, so the finish step applies. complete: one account with a profile matches and',
+      'the client re-verifies the session.',
+    ].join(' '),
+  })
+
+/** Why the finish step refused the person, so clients branch on a code and never on copy. */
+export const federatedSignupRefusalCodeSchema = z.enum([
+  'underage',
+  'federated_guardian_minor',
+])
+
+export const federatedSignupForbiddenSchema = z
+  .object({
+    statusCode: z.literal(403),
+    error: z.literal('Forbidden'),
+    message: nonEmptyStringSchema,
+    code: federatedSignupRefusalCodeSchema,
+  })
+  .strict()
+
+export type FederatedSignupRefusalCode = z.infer<typeof federatedSignupRefusalCodeSchema>
+export type FederatedSignupInput = z.infer<typeof federatedSignupInputSchema>
+export type FederatedSignupStatus = z.infer<typeof federatedSignupStatusSchema>
+export type FederatedSignupStatusResponse = z.infer<
+  typeof federatedSignupStatusResponseSchema
+>
+
 export type SignupInput = z.infer<typeof signupInputSchema>
 export type SignupResponse = z.infer<typeof signupResponseSchema>
 
@@ -150,6 +196,113 @@ export function registerAuthContracts(
           },
         },
       },
+    },
+  })
+
+  const registeredFederatedSignupInputSchema = registry.register(
+    'FederatedSignupInput',
+    federatedSignupInputSchema
+  )
+  const registeredFederatedSignupStatusResponseSchema = registry.register(
+    'FederatedSignupStatusResponse',
+    federatedSignupStatusResponseSchema
+  )
+  const registeredFederatedSignupForbiddenSchema = registry.register(
+    'FederatedSignupForbidden',
+    federatedSignupForbiddenSchema
+  )
+  const federatedErrors = {
+    401: {
+      description:
+        'Missing bearer, an identity without a verified address, or an address that matches more than one account',
+      content: {
+        'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+      },
+    },
+    503: {
+      description: 'Auth could not be reached to verify the identity',
+      content: {
+        'application/json': { schema: commonSchemas.serviceUnavailableHttpErrorSchema },
+      },
+    },
+  } as const
+
+  registry.registerPath({
+    method: 'get',
+    path: '/api/v1/auth/signup/federated',
+    tags: ['auth'],
+    summary: 'Decide whether a federated identity needs the finish step',
+    description:
+      'Story 6.17 D3: called after a Google sign-in whose profile check answered 401.',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      200: {
+        description: 'Where the identity goes next',
+        content: {
+          'application/json': { schema: registeredFederatedSignupStatusResponseSchema },
+        },
+      },
+      ...federatedErrors,
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/auth/signup/federated',
+    tags: ['auth'],
+    summary: 'Create the account for a verified federated identity',
+    description:
+      'Story 6.17 D3: runs the signup age gate on the submitted birthdate and creates the account for the verified bearer address. Under 13 deletes the Auth identity.',
+    security: [{ bearerAuth: [] }],
+    request: {
+      body: {
+        required: true,
+        content: {
+          'application/json': { schema: registeredFederatedSignupInputSchema },
+        },
+      },
+    },
+    responses: {
+      201: {
+        description: 'Account created, or a profile attached to a profile-less account',
+        content: {
+          'application/json': { schema: registeredSignupResponseSchema },
+        },
+      },
+      400: {
+        description: 'Payload failed validation',
+        content: {
+          'application/json': { schema: commonSchemas.badRequestHttpErrorSchema },
+        },
+      },
+      403: {
+        description:
+          'Birthdate is under thirteen (code underage; the Auth identity is deleted when no account owns the address), or a guardian account is under eighteen (code federated_guardian_minor)',
+        content: {
+          'application/json': { schema: registeredFederatedSignupForbiddenSchema },
+        },
+      },
+      409: {
+        description: 'The address already has an account with a profile',
+        content: {
+          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
+        },
+      },
+      ...federatedErrors,
+    },
+  })
+
+  registry.registerPath({
+    method: 'delete',
+    path: '/api/v1/auth/signup/federated',
+    tags: ['auth'],
+    summary: 'Abandon the finish step',
+    description:
+      'Story 6.17 D3: deletes the Auth identity when its address has no account; does nothing otherwise.',
+    security: [{ bearerAuth: [] }],
+    responses: {
+      204: { description: 'Identity deleted, or kept because an account exists' },
+      ...federatedErrors,
     },
   })
 

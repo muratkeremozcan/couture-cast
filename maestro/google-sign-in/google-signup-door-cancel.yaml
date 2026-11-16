@@ -1,0 +1,19 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane (D3, D5): Google started from the Create account door, the finish step, then
+# Cancel. Cancel returns to the door that started, Create account, never to Sign in.
+# Runner: checks the Auth user for ${GOOGLE_EMAIL} is gone and no app user exists.
+appId: ${MAESTRO_APP_ID}
+name: 'Google signup door cancel'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-create-account'
+- runFlow: steps/assert-signup-door.yaml
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/finish-step.yaml
+- tapOn:
+    id: 'finish-signup-cancel'
+- runFlow: steps/assert-signup-door.yaml

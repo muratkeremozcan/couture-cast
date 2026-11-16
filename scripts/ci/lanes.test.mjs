@@ -104,7 +104,8 @@ test('a docs-only pull request runs no lane (#199 minus the runbook the API spec
 test('a doc a test reads wakes the lane that runs the test (#199)', () => {
   const files = pullRequest(199)
   assert.ok(files.includes('_bmad-output/project-knowledge/deployment-guide.md'))
-  assert.deepEqual(running(files), ['coverage-api'])
+  // Story 6.17: the api unit suite reads the guide too, and year-ahead reruns it.
+  assert.deepEqual(running(files), ['coverage-api', 'year-ahead'])
 })
 
 test('an API-only pull request runs Maestro, whose journeys call the API, and skips native and web-only lanes (#209, #180)', () => {
@@ -235,7 +236,8 @@ const EXPECTED_SKIPS = {
   'coverage-api': [204, 192],
   'coverage-mobile': [209, 208, 199, 180, 148],
   'coverage-other': [204, 199, 192, 148],
-  'year-ahead': [204, 199, 192, 148],
+  // #199 changed the deployment guide, which the api unit suite reads since Story 6.17.
+  'year-ahead': [204, 192, 148],
   community: [204, 199, 192, 148],
   contract: [204, 199, 192, 148],
   'web-e2e': [204, 199, 192],

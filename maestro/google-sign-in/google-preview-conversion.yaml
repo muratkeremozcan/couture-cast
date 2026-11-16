@@ -1,0 +1,81 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane (AC5, D6, L-G-*): a guest sets a comfort proposal in the preview, chooses
+# Create account, continues with Google as a new address, passes the finish step and reaches the
+# carryover review, where the proposal is saved.
+# Runner: checks the address has one app user whose comfort row is cold, low, high.
+appId: ${MAESTRO_APP_ID}
+name: 'Google preview conversion'
+tags:
+  - google-sign-in
+env:
+  ADULT_BIRTHDATE: '1990-05-05'
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-try-sample'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-gate'
+    timeout: 20000
+- tapOn:
+    id: 'guest-preview-birthdate'
+- inputText: ${ADULT_BIRTHDATE}
+- hideKeyboard:
+    optional: true
+- tapOn:
+    id: 'guest-preview-gate-submit'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-outfit'
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-thermal-cold'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-thermal-cold'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-wind-low'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-wind-low'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-rain-high'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-rain-high'
+- scrollUntilVisible:
+    element:
+      id: 'guest-preview-create-account'
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: 'guest-preview-create-account'
+- extendedWaitUntil:
+    visible:
+      id: 'signup-back-to-preview'
+    timeout: 15000
+    label: 'Signup opened from the preview'
+- runFlow: steps/continue-with-google.yaml
+- runFlow: steps/finish-step.yaml
+- runFlow: steps/enter-birthdate.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-review-proposed'
+    timeout: 45000
+    label: 'The new account reached the carryover review'
+- tapOn:
+    id: 'guest-preview-review-use'
+- extendedWaitUntil:
+    visible:
+      id: 'guest-preview-review-result'
+    timeout: 20000
+    label: 'The proposal was saved to the account'
+- assertVisible:
+    id: 'guest-preview-review-continue'

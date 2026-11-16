@@ -2,7 +2,7 @@
 # See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-55-expo-sdk-58-upgrade-for-live-font-scale-layout
 #
 # Story 6.15 (Antigravity r6 P3, TEA ruling): the Android checks that ran only by hand, nightly on
-# main and by manual dispatch, never on a pull request or a merge. Both jobs run on Linux in
+# main and by manual dispatch, never on a pull request or a merge. Every job runs on Linux in
 # parallel; scripts/ci/android-native-workflow.mjs holds the rules this file keeps.
 #
 #   android-release-builds    the app's release AAB with every shipped ABI and its
@@ -17,11 +17,18 @@
 #                             maestro/network-timeout/dev-client-timeout.yaml (S2-06): Home's
 #                             15 s abort must end a request the API never answers. About 30
 #                             minutes; limit 60.
+#   android-google-sign-in    Story 6.17 M lane: the isolated Story 6.5 debug client on an API 36
+#                             emulator runs maestro/google-sign-in/ through
+#                             scripts/ci/android-google-sign-in.sh and scripts/run-google-native.mjs
+#                             against local Supabase, the mock OIDC Google stand-in, an isolated
+#                             database and its own API and Metro. Nightly and dispatch only: the
+#                             debug client's Gradle build alone outruns the 20-minute PR job
+#                             ceiling. About 45 minutes; limit 75.
 #
 # The Android emulator lanes that run nightly today (pr-share-card-native.yml's android36 lanes,
 # pr-accessibility-focus.yml's TalkBack job) also run on a merge or a pull request, and drive the
 # Story 6.8 isolated client against its own runtime or a release app, so the flow gets its own
-# schedule-only job here. Neither job uses a secret; each uploads its evidence for 7 days.
+# schedule-only job here. No job uses a secret; each uploads its evidence for 7 days.
 #
 # Both builds go through the Worklets staging (scripts/lib/story68-worklets-staging.mjs, via
 # scripts/ci/worklets-staged-gradle.mjs): the 2026-11-13 device run hit Reanimated's legacy
@@ -194,5 +201,126 @@ jobs:
         with:
           name: android-network-timeout
           path: ${{ runner.temp }}/android-network-timeout/
+          retention-days: 7
+          if-no-files-found: error
+
+  android-google-sign-in:
+    name: Android Google sign-in
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      MAESTRO_CLI_NO_ANALYTICS: '1'
+      # The job owns this Redis service, so no other stack shares the run's queues.
+      REDIS_URL: redis://127.0.0.1:6379
+    steps:
+      - uses: actions/checkout@v4
+      # First step after checkout: every later step reads the CI Supabase ports
+      # (.github/supabase-ci-ports.env) and LOCAL_DATABASE_URL from here.
+      - name: Configure the CI Supabase host ports
+        uses: ./.github/actions/configure-ci-supabase-ports
+      - name: Free runner disk
+        uses: ./.github/actions/free-runner-disk
+      # Mailpit stays: the cancel flow requests an email code after the cancelled chooser.
+      - name: Preload the Supabase images
+        uses: ./.github/actions/preload-supabase-images
+        with:
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
+      - name: Record the build identity
+        run: |
+          mkdir -p "$RUNNER_TEMP/android-google-sign-in"
+          git rev-parse HEAD > "$RUNNER_TEMP/android-google-sign-in/commit.txt"
+      - name: Setup Node environment
+        uses: ./.github/actions/install
+        with:
+          install-command: npm ci
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+      - name: Start local Supabase services with Mailpit
+        id: supabase
+        uses: ./.github/actions/start-local-supabase
+        timeout-minutes: 10
+        with:
+          exclude: 'realtime,studio,postgres-meta,logflare,vector,edge-runtime,supavisor,imgproxy'
+      - name: Upload the Supabase start log
+        # The start's own log names the command that failed or hung.
+        if: ${{ !cancelled() && steps.supabase.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: supabase-start-log-${{ github.job }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/supabase-start/start.log
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop the Supabase containers a failed start left
+        if: ${{ always() && steps.supabase.outcome == 'failure' }}
+        timeout-minutes: 2
+        run: timeout --kill-after=10 90 npx supabase stop --no-backup
+      # The isolated Story 6.5 client (com.couturecast.story65, scheme couturecast-story65): the
+      # only build whose development bundle may use the OAuth stand-in (D10). app.config.ts
+      # requires local API and Auth origins for it; Metro serves the real ones at run time.
+      - name: Generate the Android project
+        working-directory: apps/mobile
+        env:
+          CI: '1'
+          EXPO_NO_GIT_STATUS: '1'
+          STORY65_NATIVE_TEST_BUILD: '1'
+          EXPO_PUBLIC_API_BASE_URL: http://127.0.0.1:4079
+          EXPO_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+        run: npx expo prebuild --platform android --no-install
+      - name: Fetch the Gradle wrapper
+        run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
+      - name: Build the isolated debug development client
+        id: google_client_build
+        timeout-minutes: 35
+        run: node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-google-sign-in/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain
+      - name: Install the pinned Maestro CLI
+        run: node scripts/maestro-install.mjs
+      - name: Enable and verify Android hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          sudo udevadm settle --timeout=30
+          ls -l /dev/kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Google sign-in flows against the stand-in
+        id: google_sign_in
+        timeout-minutes: 35
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          GOOGLE_NATIVE_EVIDENCE: ${{ runner.temp }}/android-google-sign-in
+        with:
+          api-level: 36
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          script: bash scripts/ci/android-google-sign-in.sh
+      - name: Collect the Google sign-in evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-google-sign-in
+          path: ${{ runner.temp }}/android-google-sign-in/
           retention-days: 7
           if-no-files-found: error

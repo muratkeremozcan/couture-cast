@@ -15,6 +15,12 @@
 //                             maestro/network-timeout/dev-client-timeout.yaml against
 //                             scripts/lib/network-tarpit.mjs through
 //                             scripts/ci/android-network-timeout.sh.
+//   android-google-sign-in    Story 6.17 M lane: the isolated Story 6.5 debug client on an
+//                             emulator runs maestro/google-sign-in/ through
+//                             scripts/ci/android-google-sign-in.sh and
+//                             scripts/run-google-native.mjs, against local Supabase (Mailpit
+//                             kept) and the job's own Redis. Not on pull requests: the client's
+//                             Gradle build alone outruns the 20-minute PR job ceiling.
 //
 // Each rule checks that a control is present, eligible to run and able to fail its job, and that
 // the evidence uploads for a short time without a secret in reach.
@@ -32,7 +38,9 @@ export const WORKFLOW = '.github/workflows/android-native.yml'
 export const NETWORK_SCRIPT = 'scripts/ci/android-network-timeout.sh'
 export const RELEASE_JOB = 'android-release-builds'
 export const NETWORK_JOB = 'android-network-timeout'
-export const LIMITS = { [RELEASE_JOB]: 120, [NETWORK_JOB]: 60 }
+export const GOOGLE_JOB = 'android-google-sign-in'
+export const GOOGLE_SCRIPT = 'scripts/ci/android-google-sign-in.sh'
+export const LIMITS = { [RELEASE_JOB]: 120, [NETWORK_JOB]: 60, [GOOGLE_JOB]: 75 }
 const NIGHTLY = /^([0-5]?\d) ([01]?\d|2[0-3]) \* \* \*$/
 const HOSTED_JOB_LIMIT = 360
 const BUILT = "${{ !cancelled() && steps.android_build.outcome == 'success' }}"
@@ -46,6 +54,8 @@ export const RELEASE_ABI_LIST = 'armeabi-v7a,arm64-v8a,x86,x86_64'
 export const RELEASE_BUILD = `node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Release --abis ${RELEASE_ABI_LIST} --evidence "$RUNNER_TEMP/android-release-builds/worklets" -- :app:bundleRelease :app:assembleMinifiedDebuggable -PreactNativeArchitectures=${RELEASE_ABI_LIST} --console=plain`
 export const CLIENT_BUILD =
   'node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-network-timeout/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain'
+export const GOOGLE_CLIENT_BUILD =
+  'node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-google-sign-in/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain'
 export const MINIFIED_EVIDENCE =
   'node scripts/lib/minified-debuggable-evidence.mjs --android apps/mobile/android | tee "$RUNNER_TEMP/android-release-builds/minified-debuggable.json"'
 export const RELEASE_ABIS =
@@ -53,6 +63,21 @@ export const RELEASE_ABIS =
 export const PREBUILD = 'npx expo prebuild --platform android --no-install'
 export const NETWORK_RUN = `bash ${NETWORK_SCRIPT}`
 export const NETWORK_EVIDENCE = '${{ runner.temp }}/android-network-timeout'
+export const GOOGLE_RUN = `bash ${GOOGLE_SCRIPT}`
+export const GOOGLE_EVIDENCE = '${{ runner.temp }}/android-google-sign-in'
+/** The isolated client and the local origins app.config.ts requires for it (D10). */
+export const GOOGLE_PREBUILD_ENV = {
+  CI: '1',
+  EXPO_NO_GIT_STATUS: '1',
+  STORY65_NATIVE_TEST_BUILD: '1',
+  EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4079',
+  EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321',
+}
+export const GOOGLE_LINES = [
+  'set -euo pipefail',
+  'apk=apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk',
+  'node scripts/run-google-native.mjs --apk "$apk" --device "$ANDROID_SERIAL" --evidence "$evidence"',
+]
 export const ARTIFACTS = {
   [RELEASE_JOB]: {
     name: RELEASE_JOB,
@@ -63,6 +88,12 @@ export const ARTIFACTS = {
   [NETWORK_JOB]: {
     name: NETWORK_JOB,
     path: `${NETWORK_EVIDENCE}/`,
+    'retention-days': 7,
+    'if-no-files-found': 'error',
+  },
+  [GOOGLE_JOB]: {
+    name: GOOGLE_JOB,
+    path: `${GOOGLE_EVIDENCE}/`,
     'retention-days': 7,
     'if-no-files-found': 'error',
   },
@@ -97,6 +128,15 @@ const steps = (job) => job?.steps ?? []
 const onOf = (workflow) => workflow?.on ?? workflow?.[true]
 const indexOf = (job, predicate) => steps(job).findIndex(predicate)
 const runs = (command) => (step) => String(step.run ?? '').includes(command)
+
+/** A failed Supabase start's log upload, and nothing else. */
+function startLogUpload(step) {
+  return (
+    step.uses === 'actions/upload-artifact@v4' &&
+    step.with?.path === '${{ runner.temp }}/supabase-start/start.log' &&
+    step.if === "${{ !cancelled() && steps.supabase.outcome == 'failure' }}"
+  )
+}
 
 /** Why a workflow step's shell body may not execute each required line or may hide a failure. */
 function stepProblems(label, step, condition, required, check) {
@@ -133,8 +173,12 @@ function workflowProblems(workflow, check) {
     'android-native.yml: contents: read only, on every job'
   )
   check(
-    same(Object.keys(workflow?.jobs ?? {}).sort(), [NETWORK_JOB, RELEASE_JOB]),
-    `android-native.yml holds exactly ${RELEASE_JOB} and ${NETWORK_JOB}`
+    same(Object.keys(workflow?.jobs ?? {}).sort(), [
+      GOOGLE_JOB,
+      NETWORK_JOB,
+      RELEASE_JOB,
+    ]),
+    `android-native.yml holds exactly ${RELEASE_JOB}, ${NETWORK_JOB} and ${GOOGLE_JOB}`
   )
   check(
     !/\bsecrets\./.test(JSON.stringify(workflow ?? {})),
@@ -171,8 +215,11 @@ function jobProblems(name, job, check) {
     ),
     `${name}: every step limit stays inside the job's`
   )
-  const uploads = steps(job).filter((step) =>
-    String(step.uses).startsWith('actions/upload-artifact')
+  // The one other upload allowed: a failed Supabase start's own log, the step
+  // supabase-start-bounds.test.mjs requires after every start.
+  const uploads = steps(job).filter(
+    (step) =>
+      String(step.uses).startsWith('actions/upload-artifact') && !startLogUpload(step)
   )
   check(
     uploads.length === 1 &&
@@ -302,30 +349,105 @@ function networkProblems(job, script, check) {
   )
 }
 
+/**
+ * The Google sign-in flows: local Supabase with Mailpit and the job's own Redis, the isolated
+ * client, Maestro, the emulator and the runner, in one strict shell.
+ */
+function googleProblems(job, script, check) {
+  const rows = steps(job)
+  check(
+    job?.env?.REDIS_URL === 'redis://127.0.0.1:6379' &&
+      job?.services?.redis?.image === 'redis:7-alpine',
+    `${GOOGLE_JOB}: the run's Redis is the job's own service`
+  )
+  const supabase = rows.find(
+    (step) => step.uses === './.github/actions/start-local-supabase'
+  )
+  check(
+    !!supabase &&
+      supabase.if === undefined &&
+      Number.isInteger(supabase['timeout-minutes']) &&
+      !String(supabase.with?.exclude ?? 'mailpit')
+        .split(',')
+        .includes('mailpit'),
+    `${GOOGLE_JOB}: start local Supabase with Mailpit (the cancel flow requests an email code), with its own limit`
+  )
+  const prebuild = rows.find((step) => step.run === PREBUILD)
+  check(
+    same(prebuild?.env, GOOGLE_PREBUILD_ENV),
+    `${GOOGLE_JOB}: generate the isolated Story 6.5 client (STORY65_NATIVE_TEST_BUILD=1 with local origins)`
+  )
+  const build = rows.find((step) => step.id === 'google_client_build')
+  stepProblems(
+    `${GOOGLE_JOB}: the client build`,
+    build,
+    undefined,
+    [GOOGLE_CLIENT_BUILD],
+    check
+  )
+  check(
+    build?.['working-directory'] === undefined &&
+      Number.isInteger(build?.['timeout-minutes']),
+    `${GOOGLE_JOB}: build the client from the repository root through the Worklets staging, with its own limit`
+  )
+  const flow = rows.find((step) => step.id === 'google_sign_in')
+  check(
+    flow?.uses === 'reactivecircus/android-emulator-runner@v2' &&
+      flow.if === undefined &&
+      flow.with?.script === GOOGLE_RUN &&
+      same(flow.env, { GOOGLE_NATIVE_EVIDENCE: GOOGLE_EVIDENCE }) &&
+      Number.isInteger(flow['timeout-minutes']),
+    `${GOOGLE_JOB}: run ${GOOGLE_RUN} on the emulator after every earlier success, with the evidence directory and its own limit`
+  )
+  const order = [
+    indexOf(job, (step) => step === supabase),
+    indexOf(job, (step) => step.run === PREBUILD),
+    indexOf(job, (step) => step.id === 'google_client_build'),
+    indexOf(job, runs('node scripts/maestro-install.mjs')),
+    indexOf(job, runs('test -r /dev/kvm && test -w /dev/kvm')),
+    indexOf(job, (step) => step.id === 'google_sign_in'),
+  ]
+  check(
+    order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])),
+    `${GOOGLE_JOB}: start Supabase, prebuild, build the client, install Maestro, enable KVM, then run the flows`
+  )
+  check(
+    executedLines(script)[0]?.line === 'set -euo pipefail' && !neutralizedRun(script),
+    `${GOOGLE_SCRIPT}: one strict shell that cannot hide a failure`
+  )
+  for (const problem of requiredLineProblems(script, GOOGLE_LINES))
+    check(false, `${GOOGLE_SCRIPT} ${problem}`)
+}
+
 /** Every rule android-native.yml keeps; an empty list means it keeps them all. */
-export function androidNativeProblems(workflow, script) {
+export function androidNativeProblems(workflow, script, googleScript) {
   const problems = []
   const check = (ok, message) => {
     if (!ok) problems.push(message)
   }
   workflowProblems(workflow, check)
-  for (const name of [RELEASE_JOB, NETWORK_JOB])
+  for (const name of [RELEASE_JOB, NETWORK_JOB, GOOGLE_JOB])
     jobProblems(name, workflow?.jobs?.[name], check)
   releaseProblems(workflow?.jobs?.[RELEASE_JOB], check)
   networkProblems(workflow?.jobs?.[NETWORK_JOB], String(script ?? ''), check)
+  googleProblems(workflow?.jobs?.[GOOGLE_JOB], String(googleScript ?? ''), check)
   return problems
 }
 
 export function readAndroidNative(read = (file) => fs.readFileSync(file, 'utf8')) {
-  return { workflow: parse(read(WORKFLOW)), script: read(NETWORK_SCRIPT) }
+  return {
+    workflow: parse(read(WORKFLOW)),
+    script: read(NETWORK_SCRIPT),
+    googleScript: read(GOOGLE_SCRIPT),
+  }
 }
 
 if (
   process.argv[1] &&
   import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href
 ) {
-  const { workflow, script } = readAndroidNative()
-  const problems = androidNativeProblems(workflow, script)
+  const { workflow, script, googleScript } = readAndroidNative()
+  const problems = androidNativeProblems(workflow, script, googleScript)
   if (problems.length) {
     console.error(problems.join('\n'))
     process.exitCode = 1

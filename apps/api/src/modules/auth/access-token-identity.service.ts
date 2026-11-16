@@ -42,6 +42,13 @@ export type AccessTokenIdentity = {
   role: ApiRole
 }
 
+/** Story 6.17 D3: a Supabase identity whose address Auth has verified. */
+export type VerifiedSupabaseIdentity = {
+  authUserId: string
+  email: string
+  appMetadata: Record<string, unknown>
+}
+
 const invalidAccessToken = () => new UnauthorizedException('Invalid access token')
 
 function normalizeString(value: unknown): string | undefined {
@@ -289,6 +296,35 @@ export class AccessTokenIdentityService {
     } catch (error) {
       if (error instanceof UnauthorizedException) throw error
       throw new CommunityUnavailableException()
+    }
+  }
+
+  /**
+   * Story 6.17 D3: reads the bearer's Supabase identity for the federated signup endpoints,
+   * which act on the Auth user itself before any app account exists. No test-token bypass
+   * applies: only a real Auth identity with a verified address passes.
+   */
+  async readVerifiedSupabaseIdentity(
+    rawToken: string
+  ): Promise<VerifiedSupabaseIdentity> {
+    const token = rawToken.trim()
+    if (!token) throw invalidAccessToken()
+    const supabaseUrl = process.env.SUPABASE_URL?.trim()
+    const anonKey = process.env.SUPABASE_ANON_KEY?.trim()
+    if (!supabaseUrl || !anonKey) throw new CommunityUnavailableException()
+
+    const body = await this.fetchSupabaseIdentity(token, supabaseUrl, anonKey)
+    const identity = supabaseIdentitySchema.safeParse(body)
+    if (!identity.success) throw new CommunityUnavailableException()
+
+    const authUserId = normalizeString(identity.data.id)
+    const email = z.string().trim().email().safeParse(identity.data.email)
+    if (!authUserId || !email.success || !hasVerifiedEmailEvidence(identity.data))
+      throw invalidAccessToken()
+    return {
+      authUserId,
+      email: email.data,
+      appMetadata: identity.data.app_metadata ?? {},
     }
   }
 

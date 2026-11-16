@@ -1,0 +1,44 @@
+# Learning path Step 57: Google sign-in.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-57-google-sign-in
+# Story 6.17 M lane (AC6, M-FAIL-CANCEL): the person closes the account chooser. The mock OIDC
+# provider answers the queued deny identity with access_denied, as Google does; GoTrue returns
+# the error to the app's callback. Sign in shows the cancelled message, never the provider's
+# text, and the email code path still works.
+# Runner: checks no Auth user exists for the denied address; ${OTP_EMAIL} is recorded for cleanup.
+appId: ${MAESTRO_APP_ID}
+name: 'Google cancel chooser'
+tags:
+  - google-sign-in
+---
+- runFlow: steps/open-home.yaml
+- tapOn:
+    id: 'home-sign-in'
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in'
+    timeout: 15000
+- runFlow: steps/continue-with-google.yaml
+- extendedWaitUntil:
+    visible:
+      id: 'google-sign-in-status'
+      text: ${CANCELLED_TEXT}
+    timeout: 45000
+    label: 'Sign in shows the cancelled message'
+- assertNotVisible:
+    text: '.*resource owner.*'
+- assertNotVisible:
+    id: 'finish-signup-birthdate'
+# The email label and its EditText share one accessible name; index 1 is the input
+# (maestro/story65/signin-request.yaml).
+- tapOn:
+    text: ${EMAIL_LABEL}
+    index: 1
+- waitForAnimationToEnd
+- inputText: ${OTP_EMAIL}
+- hideKeyboard:
+    optional: true
+- tapOn: ${SEND_CODE}
+- extendedWaitUntil:
+    visible: ${CODE_SENT}
+    timeout: 20000
+    label: 'Email sign-in still works after the cancel'

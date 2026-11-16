@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Pressable, StyleSheet, TextInput } from 'react-native'
+import { Pressable, TextInput } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import {
   type GuardianInvitationInput,
@@ -11,14 +11,16 @@ import {
 import {
   AGE_GATE_MESSAGES,
   evaluateBirthdateInput,
+  getFederatedSignInStrings,
   getGuestPreviewStrings,
   INVALID_BIRTHDATE_MESSAGE,
 } from '@couture/utils'
-import { Text, View } from '@/components/themed'
+import { Text, View, createSchemeStyles } from '@/components/themed'
 import { inviteGuardianFromMobile } from '@/src/lib/guardian'
 import { mobileGuestPreviewStore } from '@/src/lib/guest-preview-store'
 import { SignupRefusedError, submitMobileSignup } from '@/src/lib/signup'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
+import { SignupGoogleEntry } from './google-sign-in-button'
 
 type SignupScreenProps = {
   submitSignup?: (input: SignupInput) => Promise<SignupResponse>
@@ -27,6 +29,10 @@ type SignupScreenProps = {
   fromPreview?: boolean
   /** Story 6.16 D8: the route performs navigation, so this screen stays router-free. */
   onPreviewNavigate?: (href: SignupPreviewHref) => void
+  /** Story 6.17 D2: a Google round trip that signed someone in or needs the finish step. */
+  onGoogleSignedIn?: (outcome: 'member' | 'no_account') => void
+  /** Story 6.17 D5: a round trip that ended back on this door, named by the cold callback. */
+  googleOutcome?: 'cancelled' | 'unavailable' | 'refused' | null
 }
 
 type SignupPreviewHref = '/preview' | '/signin?from=preview'
@@ -36,7 +42,10 @@ export function SignupScreen({
   inviteGuardian = inviteGuardianFromMobile,
   fromPreview = false,
   onPreviewNavigate = () => undefined,
+  onGoogleSignedIn = () => undefined,
+  googleOutcome = null,
 }: SignupScreenProps) {
+  const styles = useStyles()
   const { announce } = useAccessibilityAnnouncer()
   const { i18n } = useTranslation()
   const previewStrings = getGuestPreviewStrings(i18n.language).conversionDetail
@@ -46,7 +55,9 @@ export function SignupScreen({
   const [guardianEmail, setGuardianEmail] = useState('')
   const [consentLevel, setConsentLevel] =
     useState<GuardianInvitationInput['consentLevel']>('read_only')
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [errorMessage, setErrorMessage] = useState<string | null>(() =>
+    googleOutcome ? getFederatedSignInStrings(i18n.language)[googleOutcome] : null
+  )
   const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const [inviteLink, setInviteLink] = useState<string | null>(null)
   const [pendingTeenId, setPendingTeenId] = useState<string | null>(null)
@@ -152,7 +163,7 @@ export function SignupScreen({
   }
 
   return (
-    <View style={styles.container}>
+    <View testID="signup-screen" style={styles.container}>
       <Text style={styles.eyebrow}>COPPA-ready signup</Text>
       <Text style={styles.title} accessibilityRole="header">
         Create your account with age verification first.
@@ -162,6 +173,11 @@ export function SignupScreen({
       </Text>
 
       <View style={styles.form}>
+        <SignupGoogleEntry
+          fromPreview={fromPreview}
+          onSignedIn={onGoogleSignedIn}
+          onFailure={setErrorMessage}
+        />
         <Text style={styles.label}>Email</Text>
         <TextInput
           accessibilityLabel="Email"
@@ -177,7 +193,7 @@ export function SignupScreen({
         <TextInput
           accessibilityLabel="Birthdate"
           placeholder="YYYY-MM-DD"
-          placeholderTextColor="#737373"
+          placeholderTextColor={styles.placeholder.color}
           value={birthdate}
           onChangeText={setBirthdate}
           style={styles.input}
@@ -327,6 +343,7 @@ function SignupPreviewLink({
   label: string
   onNavigate: (href: SignupPreviewHref) => void
 }) {
+  const styles = useStyles()
   if (!visible) return null
   return kind === 'continue' ? (
     <Pressable
@@ -349,69 +366,78 @@ function SignupPreviewLink({
   )
 }
 
-const styles = StyleSheet.create({
+/**
+ * Layout plus the OS light/dark chrome tokens (`constants/colors.ts`). The earlier fixed
+ * colors were drawn for a dark page and left white field text and pale messages on the
+ * light one.
+ */
+const useStyles = createSchemeStyles((colors) => ({
   previewLink: { minHeight: 44, justifyContent: 'center' },
-  previewLinkText: { textDecorationLine: 'underline' },
+  previewLinkText: { textDecorationLine: 'underline', color: colors.text },
+  placeholder: { color: colors.mutedText },
   container: {
     flex: 1,
     paddingHorizontal: 24,
     paddingVertical: 32,
     gap: 12,
+    backgroundColor: colors.background,
   },
   eyebrow: {
     fontSize: 12,
     letterSpacing: 3,
     textTransform: 'uppercase',
-    color: '#fcd34d',
+    color: colors.accentText,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
     lineHeight: 34,
+    color: colors.text,
   },
   description: {
     fontSize: 15,
     lineHeight: 22,
-    color: '#a3a3a3',
+    color: colors.mutedText,
   },
   form: {
     marginTop: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: colors.border,
     borderRadius: 24,
     padding: 20,
   },
   label: {
     fontSize: 13,
     fontWeight: '600',
+    color: colors.text,
   },
   input: {
     minHeight: 44,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: colors.strongBorder,
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    color: '#ffffff',
+    color: colors.text,
   },
   inlineMessage: {
     fontSize: 13,
-    color: '#fde68a',
+    color: colors.noticeText,
   },
   errorMessage: {
     fontSize: 13,
-    color: '#fecaca',
+    color: colors.dangerText,
   },
   successMessage: {
     fontSize: 13,
-    color: '#bbf7d0',
+    color: colors.successText,
   },
   button: {
     minHeight: 44,
     marginTop: 8,
     borderRadius: 999,
-    backgroundColor: '#fcd34d',
+    backgroundColor: colors.accent,
     paddingVertical: 14,
     alignItems: 'center',
   },
@@ -419,7 +445,7 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   buttonText: {
-    color: '#111827',
+    color: colors.onAccent,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -429,37 +455,39 @@ const styles = StyleSheet.create({
     marginTop: 12,
     gap: 10,
     borderWidth: 1,
-    borderColor: 'rgba(252, 211, 77, 0.22)',
+    borderColor: colors.noticeBorder,
     borderRadius: 20,
     padding: 16,
-    backgroundColor: 'rgba(252, 211, 77, 0.08)',
+    backgroundColor: colors.noticeSurface,
   },
   invitationEyebrow: {
     fontSize: 12,
     letterSpacing: 2,
     textTransform: 'uppercase',
-    color: '#fde68a',
+    color: colors.noticeText,
     fontWeight: '700',
   },
   segmentRow: {
     flexDirection: 'row',
     gap: 10,
+    backgroundColor: 'transparent',
   },
   segmentButton: {
     minHeight: 44,
     flex: 1,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
+    borderColor: colors.strongBorder,
     borderRadius: 14,
     paddingVertical: 12,
     alignItems: 'center',
   },
   segmentButtonActive: {
-    borderColor: '#fcd34d',
-    backgroundColor: 'rgba(252, 211, 77, 0.14)',
+    borderColor: colors.accent,
+    backgroundColor: colors.surface,
+    borderWidth: 2,
   },
   segmentButtonText: {
-    color: '#ffffff',
+    color: colors.text,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -467,12 +495,12 @@ const styles = StyleSheet.create({
     marginTop: 6,
     borderRadius: 999,
     borderWidth: 1,
-    borderColor: 'rgba(252, 211, 77, 0.6)',
+    borderColor: colors.noticeBorder,
     paddingVertical: 14,
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: '#fde68a',
+    color: colors.noticeText,
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 1.5,
@@ -481,6 +509,6 @@ const styles = StyleSheet.create({
   inviteLink: {
     fontSize: 13,
     lineHeight: 19,
-    color: '#e5e5e5',
+    color: colors.text,
   },
-})
+}))
