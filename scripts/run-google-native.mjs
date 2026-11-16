@@ -73,6 +73,7 @@ import {
   flowEnv,
   googleNativeReversePorts,
   harnessEmail,
+  memberBirthdate,
   selectGoogleNativeFlows,
   standInIdentity,
 } from './lib/google-native-flows.mjs'
@@ -129,6 +130,7 @@ async function flowStrings() {
     back: catalog.common.back,
     cancelled: federated.cancelled,
     underage: federated.underage,
+    awaitingGuardian: federated.awaitingGuardian,
     email: catalog.community.notifications.email,
     sendCode: catalog.community.notifications.sendCode,
     codeSent: catalog.community.notifications.codeSent,
@@ -294,12 +296,15 @@ async function main() {
         })
   }
 
-  /** An eligible adult app account through the product signup endpoint, as E-LINK does. */
-  const createMember = async (email) => {
+  /**
+   * The flow's app account through the product signup endpoint, as E-LINK and E-TEEN-RESIGN-OTP
+   * do: an eligible adult, or a 14-year-old the guardian lock refuses.
+   */
+  const createMember = async (flow, email) => {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email, birthdate: '1990-06-15' }),
+      body: JSON.stringify({ email, birthdate: memberBirthdate(flow) }),
     })
     if (response.status !== 201)
       throw new Error(`The member signup answered ${response.status}`)
@@ -310,6 +315,20 @@ async function main() {
    * The flow's expectation problems, polled briefly: the app's Cancel and the server's under-13
    * refusal delete the Auth user before the screen changes, and GoTrue commits on its own time.
    */
+  const complianceOf = async (url, userId) => {
+    const client = new pg.Client({ connectionString: url })
+    await client.connect()
+    try {
+      const { rows } = await client.query(
+        'SELECT preferences FROM "UserProfile" WHERE user_id = $1',
+        [userId]
+      )
+      return rows[0]?.preferences?.compliance ?? null
+    } finally {
+      await client.end()
+    }
+  }
+
   const checkFlow = async (flow, database, email, memberId) => {
     let problems = []
     for (let attempt = 0; attempt < 10; attempt++) {
@@ -320,6 +339,10 @@ async function main() {
         authUser: await authUserState(email),
         comfort:
           flow.expect.comfort && ids[0] ? await comfortRow(database.url, ids[0]) : null,
+        compliance:
+          flow.expect.pendingTeen && ids[0]
+            ? await complianceOf(database.url, ids[0])
+            : null,
       })
       if (problems.length === 0) return problems
       await new Promise((resolve) => setTimeout(resolve, 1_000))
@@ -333,7 +356,7 @@ async function main() {
     const email = harnessEmail()
     const otpEmail = flow.otpEmail ? harnessEmail() : undefined
     recordFlowAddresses(flow, { google: email, 'email-code': otpEmail })
-    const memberId = flow.member ? await createMember(email) : undefined
+    const memberId = flow.member ? await createMember(flow, email) : undefined
     await queueIdentity(standInIdentity(flow, email))
 
     ensureReverses()

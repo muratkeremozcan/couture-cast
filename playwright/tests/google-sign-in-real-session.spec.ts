@@ -178,6 +178,8 @@ async function createPendingTeen(page: Page, label: string) {
 
 const AWAITING_GUARDIAN =
   'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.'
+const CREATED_GUARDIAN_PENDING =
+  'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.'
 
 test(
   'E-TEEN-RESIGN: a teen waiting on a guardian signs in with Google again and gets the guardian invitation',
@@ -223,6 +225,11 @@ test(
         guardianConsentRequired: true,
       },
     })
+
+    // Continue on the returning step ends the session the same way.
+    await page.getByRole('button', { name: 'Continue' }).click()
+    await expect(page).toHaveURL(`${WEB}/`)
+    await expect.poll(() => sessionAuthUserId(page)).toBeNull()
   }
 )
 
@@ -291,6 +298,11 @@ test(
   EXPECTED_AUTH_ERRORS,
   async ({ page }) => {
     await createPendingTeen(page, 'google-continue-teen')
+    // The step says the session ends before Continue ends it.
+    await expect(page.getByTestId('finish-signup-outcome')).toHaveText(
+      CREATED_GUARDIAN_PENDING
+    )
+    expect(await sessionAuthUserId(page)).not.toBeNull()
     await page.getByRole('button', { name: 'Continue' }).click()
     await expect(page).toHaveURL(`${WEB}/`)
     await expect.poll(() => sessionAuthUserId(page)).toBeNull()

@@ -67,7 +67,7 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancel',
     cancelling: 'Cancelling…',
     createdGuardianPending:
-      'Account created. A guardian needs to approve your account before wardrobe features turn on.',
+      'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.',
     awaitingGuardian:
       'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
     continue: 'Continue',
@@ -115,7 +115,7 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancel',
     cancelling: 'Cancelling…',
     createdGuardianPending:
-      'Account created. A guardian needs to approve your account before wardrobe features turn on.',
+      'Account created. A guardian needs to approve your account before wardrobe features turn on. Send the invite below, then sign in again once they approve.',
     awaitingGuardian:
       'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
     continue: 'Continue',
@@ -164,7 +164,7 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancelar',
     cancelling: 'Cancelando…',
     createdGuardianPending:
-      'Cuenta creada. Un tutor debe aprobar tu cuenta antes de que se activen las funciones del guardarropa.',
+      'Cuenta creada. Un tutor debe aprobar tu cuenta antes de que se activen las funciones del guardarropa. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
     awaitingGuardian:
       'Tu cuenta está esperando la aprobación de un tutor. Envía la invitación de abajo y vuelve a iniciar sesión cuando la apruebe.',
     continue: 'Continuar',
@@ -215,9 +215,9 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Annuler',
     cancelling: 'Annulation…',
     createdGuardianPending:
-      "Compte créé. Un parent ou tuteur doit approuver votre compte avant que les fonctions de garde-robe s'activent.",
+      "Compte créé. Un parent ou tuteur doit approuver votre compte avant que les fonctions de garde-robe s'activent. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois qu'elle aura été approuvée.",
     awaitingGuardian:
-      "Ton compte attend l'approbation d'un parent ou tuteur. Envoie l'invitation ci-dessous, puis reconnecte-toi une fois qu'il l'aura approuvé.",
+      "Votre compte attend l'approbation d'un parent ou tuteur. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois qu'elle aura été approuvée.",
     continue: 'Continuer',
     underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
     invalidBirthdate: 'Entrez votre date de naissance complète.',
@@ -266,9 +266,9 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Annuler',
     cancelling: 'Annulation…',
     createdGuardianPending:
-      "Compte créé. Un parent ou tuteur doit approuver votre compte avant l'activation des fonctions de garde-robe.",
+      "Compte créé. Un parent ou tuteur doit approuver votre compte avant l'activation des fonctions de garde-robe. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois qu'elle aura été approuvée.",
     awaitingGuardian:
-      "Ton compte attend l'approbation d'un parent ou tuteur. Envoie l'invitation ci-dessous, puis reconnecte-toi une fois qu'il l'aura approuvé.",
+      "Votre compte attend l'approbation d'un parent ou tuteur. Envoyez l'invitation ci-dessous, puis reconnectez-vous une fois qu'elle aura été approuvée.",
     continue: 'Continuer',
     underage: 'Vous devez avoir 13 ans ou plus pour utiliser CoutureCast.',
     invalidBirthdate: 'Saisissez votre date de naissance complète.',
@@ -316,9 +316,9 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'İptal',
     cancelling: 'İptal ediliyor…',
     createdGuardianPending:
-      'Hesap oluşturuldu. Gardırop özellikleri açılmadan önce bir velinin hesabınızı onaylaması gerekir.',
+      'Hesap oluşturuldu. Gardırop özellikleri açılmadan önce bir velinin hesabınızı onaylaması gerekir. Aşağıdaki daveti gönderin, veliniz onayladığında tekrar giriş yapın.',
     awaitingGuardian:
-      'Hesabın bir velinin onayını bekliyor. Aşağıdaki daveti gönder, veli onayladığında tekrar giriş yap.',
+      'Hesabınız bir velinin onayını bekliyor. Aşağıdaki daveti gönderin, veliniz onayladığında tekrar giriş yapın.',
     continue: 'Devam',
     underage: "CoutureCast'i kullanmak için en az 13 yaşında olmalısınız.",
     invalidBirthdate: 'Doğum tarihinizi tam tarih olarak girin.',
@@ -364,7 +364,7 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Abbrechen',
     cancelling: 'Wird abgebrochen…',
     createdGuardianPending:
-      'Konto erstellt. Eine erziehungsberechtigte Person muss dein Konto genehmigen, bevor die Kleiderschrank-Funktionen aktiv werden.',
+      'Konto erstellt. Eine erziehungsberechtigte Person muss dein Konto genehmigen, bevor die Kleiderschrank-Funktionen aktiv werden. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
     awaitingGuardian:
       'Dein Konto wartet auf die Zustimmung eines Erziehungsberechtigten. Sende unten die Einladung und melde dich wieder an, sobald zugestimmt wurde.',
     continue: 'Weiter',
@@ -416,7 +416,7 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Annulla',
     cancelling: 'Annullamento…',
     createdGuardianPending:
-      'Account creato. Un genitore o tutore deve approvare il tuo account prima che le funzioni del guardaroba si attivino.',
+      "Account creato. Un genitore o tutore deve approvare il tuo account prima che le funzioni del guardaroba si attivino. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
     awaitingGuardian:
       "Il tuo account è in attesa dell'approvazione di un genitore o tutore. Invia l'invito qui sotto, poi accedi di nuovo quando avrà approvato.",
     continue: 'Continua',
@@ -466,7 +466,7 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancelar',
     cancelling: 'Cancelando…',
     createdGuardianPending:
-      'Conta criada. Um responsável precisa aprovar sua conta antes que os recursos do guarda-roupa sejam ativados.',
+      'Conta criada. Um responsável precisa aprovar sua conta antes que os recursos do guarda-roupa sejam ativados. Envie o convite abaixo e entre de novo quando ele aprovar.',
     awaitingGuardian:
       'Sua conta está aguardando a aprovação de um responsável. Envie o convite abaixo e entre de novo quando ele aprovar.',
     continue: 'Continuar',
@@ -516,9 +516,9 @@ export const FEDERATED_SIGNIN_STRINGS: Readonly<
     cancel: 'Cancelar',
     cancelling: 'A cancelar…',
     createdGuardianPending:
-      'Conta criada. Um encarregado de educação tem de aprovar a sua conta antes de as funcionalidades do guarda-roupa ficarem ativas.',
+      'Conta criada. Um encarregado de educação tem de aprovar a sua conta antes de as funcionalidades do guarda-roupa ficarem ativas. Envie o convite abaixo e volte a iniciar sessão quando ele aprovar.',
     awaitingGuardian:
-      'A tua conta está a aguardar a aprovação de um encarregado de educação. Envia o convite abaixo e volta a iniciar sessão quando ele aprovar.',
+      'A sua conta está a aguardar a aprovação de um encarregado de educação. Envie o convite abaixo e volte a iniciar sessão quando ele aprovar.',
     continue: 'Continuar',
     underage: 'Tem de ter 13 anos ou mais para usar o CoutureCast.',
     invalidBirthdate: 'Introduza a sua data de nascimento completa.',

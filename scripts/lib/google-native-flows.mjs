@@ -38,12 +38,14 @@ export const GOOGLE_PREVIEW_PROPOSAL = Object.freeze({
 /**
  * Each flow and its plan:
  * - `deny`: the queued identity answers `error=access_denied`, a closed chooser.
- * - `member`: the runner creates the app account for the address first.
+ * - `member`: the runner creates the app account for the address first, through the product
+ *   email signup: `adult` an eligible member, `teen` a 14-year-old still waiting on a guardian.
  * - `birthdate`: `adult` or `under13`, typed on the finish step.
  * - `otpEmail`: a second recorded address the flow requests an email code for.
  * - `expect`: what the run proves afterwards. `appUsers` is the address's app user count in
  *   the isolated database, `authUser` whether local Auth still holds a user for it, `keycloak`
- *   that user's stand-in identity, `comfort` the saved preview proposal.
+ *   that user's stand-in identity, `comfort` the saved preview proposal, `pendingTeen` that the
+ *   account still waits on guardian consent.
  */
 export const GOOGLE_NATIVE_FLOWS = Object.freeze([
   {
@@ -53,7 +55,7 @@ export const GOOGLE_NATIVE_FLOWS = Object.freeze([
   },
   {
     name: 'google-existing-member',
-    member: true,
+    member: 'adult',
     expect: { appUsers: 1, sameAppUser: true, authUser: true, keycloak: true },
   },
   {
@@ -78,6 +80,19 @@ export const GOOGLE_NATIVE_FLOWS = Object.freeze([
     name: 'google-under13',
     birthdate: 'under13',
     expect: { appUsers: 0, authUser: false },
+  },
+  {
+    // The 2026-11-15 production loop: a teen waiting on a guardian signs in with Google again
+    // and must get the guardian step, then Continue ends the session.
+    name: 'google-teen-resign',
+    member: 'teen',
+    expect: {
+      appUsers: 1,
+      sameAppUser: true,
+      authUser: true,
+      keycloak: true,
+      pendingTeen: true,
+    },
   },
   {
     name: 'google-preview-conversion',
@@ -122,6 +137,13 @@ export function birthdateYearsAgo(age, now = new Date()) {
     now.getUTCDate()
   )
   return new Date(birthday - 182 * 86_400_000).toISOString().slice(0, 10)
+}
+
+/** The birthdate the runner's product signup gives a `member` flow's account. */
+export function memberBirthdate(flow, now = new Date()) {
+  if (flow.member === 'teen') return birthdateYearsAgo(14, now)
+  if (flow.member === 'adult') return '1990-06-15'
+  return undefined
 }
 
 export function flowBirthdate(flow, now = new Date()) {
@@ -189,6 +211,7 @@ export function flowEnv(flow, { email, otpEmail, strings, now = new Date() }) {
   if (birthdate) env.BIRTHDATE = birthdate
   if (flow.birthdate === 'under13') env.UNDERAGE_TEXT = strings.underage
   if (flow.deny) env.CANCELLED_TEXT = strings.cancelled
+  if (flow.member === 'teen') env.AWAITING_TEXT = strings.awaitingGuardian
   if (flow.otpEmail) {
     if (!otpEmail) throw new Error(`${flow.name} needs an email code address`)
     Object.assign(env, {
@@ -210,6 +233,7 @@ export function flowEnv(flow, { email, otpEmail, strings, now = new Date() }) {
  *   memberId?: string
  *   authUser: { exists: boolean; providers: string[] }
  *   comfort?: Record<string, unknown> | null
+ *   compliance?: Record<string, unknown> | null
  * }} observed
  */
 export function expectationProblems(flow, observed) {
@@ -229,6 +253,14 @@ export function expectationProblems(flow, observed) {
     )
   if (expect.keycloak && !observed.authUser.providers.includes('keycloak'))
     problems.push('the Auth user carries no stand-in (keycloak) identity')
+  if (expect.pendingTeen) {
+    const compliance = observed.compliance
+    if (
+      compliance?.accountStatus !== 'pending_guardian_consent' ||
+      compliance?.guardianConsentRequired !== true
+    )
+      problems.push('the teen account no longer waits on guardian consent')
+  }
   if (expect.comfort) {
     const row = observed.comfort
     if (!row) problems.push('no comfort preferences row exists for the converted account')

@@ -19,6 +19,7 @@ import {
   flowEnv,
   googleNativeReversePorts,
   harnessEmail,
+  memberBirthdate,
   selectGoogleNativeFlows,
   standInIdentity,
 } from './google-native-flows.mjs'
@@ -29,6 +30,8 @@ const strings = {
   back: 'Back',
   cancelled: 'Google sign-in was cancelled.',
   underage: 'You must be 13 or older to use CoutureCast.',
+  awaitingGuardian:
+    'Your account is waiting for a guardian to approve it. Send the invite below, then sign in again once they approve.',
   email: 'Email',
   sendCode: 'Send sign-in code',
   codeSent: 'Check your email for the sign-in code.',
@@ -178,6 +181,44 @@ describe('Google device flow checks', () => {
       }).length,
       2
     )
+  })
+
+  test('the teen flow seeds a 14-year-old and passes the guardian copy', () => {
+    const teen = flow('google-teen-resign')
+    const now = new Date('2026-11-15T12:00:00Z')
+    assert.equal(memberBirthdate(teen, now), '2012-05-17')
+    assert.equal(memberBirthdate(flow('google-existing-member'), now), '1990-06-15')
+    assert.equal(memberBirthdate(flow('google-new-account'), now), undefined)
+    const env = flowEnv(teen, { email: 'a@example.test', strings })
+    assert.equal(env.AWAITING_TEXT, strings.awaitingGuardian)
+    assert.equal(env.BIRTHDATE, undefined)
+  })
+
+  test('the teen flow fails once the account stops waiting on consent', () => {
+    const observed = {
+      appUserIds: ['u1'],
+      memberId: 'u1',
+      authUser: keycloakUser,
+    }
+    assert.deepEqual(
+      expectationProblems(flow('google-teen-resign'), {
+        ...observed,
+        compliance: {
+          accountStatus: 'pending_guardian_consent',
+          guardianConsentRequired: true,
+        },
+      }),
+      []
+    )
+    for (const compliance of [
+      null,
+      { accountStatus: 'active', guardianConsentRequired: false },
+      { accountStatus: 'pending_guardian_consent', guardianConsentRequired: false },
+    ])
+      assert.deepEqual(
+        expectationProblems(flow('google-teen-resign'), { ...observed, compliance }),
+        ['the teen account no longer waits on guardian consent']
+      )
   })
 
   test('an existing member must stay the account made before the flow', () => {

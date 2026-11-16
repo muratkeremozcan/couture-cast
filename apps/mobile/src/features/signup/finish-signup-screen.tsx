@@ -391,7 +391,12 @@ function GuardianStep({
         teenId={created ? phase.account.userId : phase.accountId}
         inviteGuardian={inviteGuardian}
       />
-      <Pressable accessibilityRole="button" onPress={onLeave} style={styles.button}>
+      <Pressable
+        accessibilityRole="button"
+        testID="guardian-step-continue"
+        onPress={onLeave}
+        style={styles.button}
+      >
         <Text style={styles.buttonText}>{strings.continue}</Text>
       </Pressable>
     </ScrollView>
@@ -442,6 +447,7 @@ function GuardianInvitePanel({
       <Text style={styles.body}>{strings.guardianIntro}</Text>
       <Text style={styles.label}>{strings.guardianEmail}</Text>
       <TextInput
+        testID="guardian-invite-email"
         accessibilityLabel={strings.guardianEmail}
         autoCapitalize="none"
         autoComplete="email"
