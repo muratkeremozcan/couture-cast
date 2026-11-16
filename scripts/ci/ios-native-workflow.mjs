@@ -76,13 +76,8 @@ export const IOS_CLIENT =
 // bundle embeds the anon key of that job's stack, and runs the live font-scale driver on it, one
 // matrix leg per screen (scripts/ci/ios-live-font-legs.mjs: the four screens took 4 to 5 hours on
 // one runner). The canary skips the job: it already runs on the canary's iOS 26 simulator.
-// The legs wait for the shards and Expo Go and run whatever those concluded: started with the
-// run, they held four of the account's five macOS runners for about 110 minutes, and shards and
-// Expo Go queued until GitHub cancelled them without a step (dispatches 43885384025 and
-// 43924119388).
 export const LIVE_FONT_JOB = 'ios-live-font'
-export const LIVE_FONT_NEEDS = ['ios-shard', 'ios-expo-go']
-export const LIVE_FONT_IF = '${{ !cancelled() && !inputs.ios26-canary }}'
+export const LIVE_FONT_IF = '${{ !inputs.ios26-canary }}'
 export const IOS_RELEASE_APP =
   '/tmp/cc68-ios-build/Build/Products/Release-iphonesimulator/CoutureCastStory68.app'
 export { LIVE_FONT_SCREENS }
@@ -924,13 +919,13 @@ function runtimeProblems(jobs, check) {
 /**
  * Story 6.15 AC3: ios-live-font builds the Release test build, installs it on a fresh simulator,
  * signs in through the product UI and runs the driver on every screen; a nonzero exit fails the
- * job, and the proof uploads after its secret scan, kept for a week. It starts once the shards
- * and Expo Go are done, and the canary skips it.
+ * job, and the proof uploads after its secret scan, kept for a week. It starts with the run, and
+ * the canary skips it.
  */
 function liveFontProblems(job, check) {
   check(
-    same(needsList(job), LIVE_FONT_NEEDS) && job?.if === LIVE_FONT_IF,
-    `${LIVE_FONT_JOB}: wait for the shards and Expo Go (${LIVE_FONT_NEEDS.join(', ')}), run whatever they concluded, and skip only under the canary (${LIVE_FONT_IF})`
+    job?.needs === undefined && job?.if === LIVE_FONT_IF,
+    `${LIVE_FONT_JOB}: start with the run, beside the builds, and skip only under the canary (${LIVE_FONT_IF})`
   )
   check(
     same(job?.strategy, LIVE_FONT_STRATEGY) && job?.name === LIVE_FONT_NAME,

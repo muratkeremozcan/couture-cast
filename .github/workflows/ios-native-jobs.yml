@@ -1041,11 +1041,7 @@ jobs:
   # the Release build up to 31, simulator and sign-in 10, the proof 45 to 70 for its screen.
   ios-live-font:
     name: iOS live font scale (${{ matrix.screen }})
-    # After the shards and Expo Go, whatever they concluded: started with the run, the four legs
-    # held four of the account's five macOS runners for about 110 minutes, and shards and Expo Go
-    # queued until GitHub cancelled them without a step (dispatches 43885384025, 43924119388).
-    needs: [ios-shard, ios-expo-go]
-    if: ${{ !cancelled() && !inputs.ios26-canary }}
+    if: ${{ !inputs.ios26-canary }}
     runs-on: macos-26
     timeout-minutes: 180
     strategy:

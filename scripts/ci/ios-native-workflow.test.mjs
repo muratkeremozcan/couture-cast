@@ -925,12 +925,11 @@ describe('the iOS live font-scale proof', () => {
     assert.deepEqual(Object.keys(onOf(source[J])), ['workflow_call'])
     assert.ok(MACOS_JOBS.includes(LIVE_FONT_JOB))
     assert.equal(job['runs-on'], 'macos-26')
-    // The canary passes ios26-canary and skips the job; ios-native.yml never passes it. The legs
-    // run after the shards and Expo Go, whatever those concluded.
-    assert.equal(job.if, '${{ !cancelled() && !inputs.ios26-canary }}')
+    // The canary passes ios26-canary and skips the job; ios-native.yml never passes it.
+    assert.equal(job.if, '${{ !inputs.ios26-canary }}')
     assert.equal(source[P].jobs['ios-native'].with['ios26-canary'], undefined)
     assert.equal(source[C].jobs['ios-native-canary'].with['ios26-canary'], true)
-    assert.deepEqual(job.needs, ['ios-shard', 'ios-expo-go'])
+    assert.equal(job.needs, undefined)
   })
 
   test('has fixed limits: 180 minutes for the job, 45 for the build, 120 for the proof', () => {
@@ -1057,28 +1056,11 @@ describe('the iOS live font-scale proof', () => {
         delete live.if
       },
     ],
-    // Dispatches 43885384025 and 43924119388: the four legs started with the run and held four
-    // of the account's five macOS runners for about 110 minutes, so shards and Expo Go queued
-    // past GitHub's limit and were cancelled without a step. The legs now wait for both.
     [
-      'a live font proof that starts beside the shards',
-      /wait for the shards and Expo Go/,
-      (live) => {
-        delete live.needs
-      },
-    ],
-    [
-      'a live font proof that waits for ios-build only',
-      /wait for the shards and Expo Go/,
+      'a live font proof that waits for ios-build',
+      /start with the run, beside the builds/,
       (live) => {
         live.needs = 'ios-build'
-      },
-    ],
-    [
-      'a live font proof that a failed shard skips',
-      /wait for the shards and Expo Go/,
-      (live) => {
-        live.if = '${{ !inputs.ios26-canary }}'
       },
     ],
     [
