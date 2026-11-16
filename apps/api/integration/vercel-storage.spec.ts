@@ -7,11 +7,8 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { parse as parseYaml } from 'yaml'
 import { z } from 'zod'
-import {
-  inputsHash,
-  previewRequired,
-  projectBuildPaths,
-} from '../../../scripts/vercel-preview-inputs.mjs'
+import { inputsHash, previewRequired } from '../../../scripts/vercel-preview-inputs.mjs'
+import { OUTSIDE_BUILDS } from '../../../scripts/vercel-build-inputs.mjs'
 import {
   BUILD_SETTINGS,
   configIdentity,
@@ -150,7 +147,11 @@ describe('Vercel preview storage', () => {
   // asks, beside the workspace manifests every fixture holds.
   it('an explicit request requires previews that the branch alone would skip', () => {
     const cli = path.join(fixture, 'scripts/vercel-preview-inputs.mjs')
-    const copies = ['scripts/vercel-preview-inputs.mjs', 'scripts/ci/lanes.mjs']
+    const copies = [
+      'scripts/vercel-preview-inputs.mjs',
+      'scripts/vercel-build-inputs.mjs',
+      'scripts/ci/lanes.mjs',
+    ]
     for (const file of copies) {
       fs.mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true })
       fs.copyFileSync(path.join(repoRoot, file), path.join(fixture, file))
@@ -208,14 +209,17 @@ describe('Vercel preview storage', () => {
     expect(previewRequired(fixture, 'main')).toBe(true)
   })
 
-  it('every project input set excludes the other app and keeps shared inputs', () => {
-    expect(projectBuildPaths.web).toContain(':(exclude)apps/api')
-    expect(projectBuildPaths.web).not.toContain(':(exclude)apps/web')
-    expect(projectBuildPaths.api).toContain(':(exclude)apps/web')
-    expect(projectBuildPaths.api).not.toContain(':(exclude)apps/api')
-    for (const project of projects)
-      for (const shared of ['packages', 'scripts', 'package-lock.json', 'supabase'])
-        expect(projectBuildPaths[project]).not.toContain(`:(exclude)${shared}`)
+  it('no path outside every build is shared code or either app', () => {
+    // scripts/vercel-build-inputs.test.mjs holds the full map, scripts/ included.
+    for (const shared of [
+      'apps/web',
+      'apps/api',
+      'packages',
+      'scripts',
+      'package-lock.json',
+      'supabase',
+    ])
+      expect(OUTSIDE_BUILDS).not.toContain(shared)
   })
 
   // A preview deployment is reused only for identical inputs: every tracked path, mode and blob
@@ -229,7 +233,9 @@ describe('Vercel preview storage', () => {
     ['packages/db/prisma/schema.prisma', { web: true, api: true }],
     ['package-lock.json', { web: true, api: true }],
     ['package.json', { web: true, api: true }],
-    ['scripts/build.mjs', { web: true, api: true }],
+    ['scripts/build-workspace-package.mjs', { web: true, api: true }],
+    ['scripts/prisma-migrate-deploy.mjs', { web: false, api: true }],
+    ['scripts/ci/lanes.mjs', { web: false, api: false }],
     ['new-runtime/input.json', { web: true, api: true }],
     ['playwright/tests/flow.spec.ts', { web: false, api: false }],
     ['.github/workflows/pr-checks.yml', { web: false, api: false }],
@@ -266,7 +272,10 @@ describe('Vercel preview storage', () => {
       const config = readVercelConfig(app)
       // Branch pushes create no deployment; main still deploys production.
       expect(config.git.deploymentEnabled).toEqual({ main: true, '**': false })
-      expect(config.ignoreCommand).toBeUndefined()
+      // Only a production build of main with unchanged inputs is skipped; previews always build.
+      expect(config.ignoreCommand).toBe(
+        `node ../../scripts/vercel-build-inputs.mjs ignore ${app}`
+      )
     }
     const read = (file: string) =>
       fs.readFileSync(path.join(repoRoot, '.github/workflows', file), 'utf8')
@@ -559,6 +568,22 @@ describe('Vercel preview deployment', () => {
     expect(run.created).toEqual([])
   })
 
+  // The configuration identity holds every variable scoped to this branch, so another
+  // branch's deployment with equal inputs and configuration built the same output.
+  it('reuses a ready deployment another branch built from the same inputs and configuration', async () => {
+    const run = deploy(
+      [listed('dpl_other_branch', 'READY', 1, { githubCommitRef: 'other' })],
+      [{ id: 'dpl_other_branch', readyState: 'READY', url: 'dpl_other_branch.example' }]
+    )
+    await expect(run.result).resolves.toEqual({
+      id: 'dpl_other_branch',
+      url: 'https://dpl_other_branch.example',
+      sha: older,
+      reused: true,
+    })
+    expect(run.created).toEqual([])
+  })
+
   it('adopts a build already running for the same inputs instead of creating another', async () => {
     const run = deploy(
       [listed('dpl_running', 'BUILDING', 3)],
@@ -575,7 +600,6 @@ describe('Vercel preview deployment', () => {
   it.each([
     ['other inputs', listed('dpl_x', 'READY', 1, { ccPreviewInputs: 'inputs-0' })],
     ['other configuration', listed('dpl_x', 'READY', 1, { ccPreviewConfig: 'config-0' })],
-    ['another branch', listed('dpl_x', 'READY', 1, { githubCommitRef: 'other' })],
     [
       'a production deployment',
       { ...listed('dpl_x', 'BUILDING', 1), target: 'production' },
@@ -841,6 +865,13 @@ describe('Vercel preview deploy step', () => {
       expect(api.calls.some((call) => call.path.startsWith('/v6/deployments'))).toBe(
         !force
       )
+      // The lookup spans every branch; the inputs and configuration decide the match.
+      if (!force)
+        expect(
+          api.calls.find((call) => call.path.startsWith('/v6/deployments'))?.path
+        ).toBe(
+          '/v6/deployments?teamId=team_1&projectId=prj_web&state=READY%2CBUILDING%2CQUEUED%2CINITIALIZING&limit=100'
+        )
     }
   )
 

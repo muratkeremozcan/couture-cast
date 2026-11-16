@@ -1,6 +1,7 @@
 {
   "version": 2,
   "outputDirectory": "public",
+  "ignoreCommand": "node ../../scripts/vercel-build-inputs.mjs ignore api",
   "git": {
     "deploymentEnabled": {
       "main": true,
