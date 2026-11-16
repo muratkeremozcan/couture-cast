@@ -32,6 +32,34 @@ function running(pid) {
   return ps.status === 0 && state !== '' && !state.startsWith('Z')
 }
 
+/**
+ * The owned command's pid once its file holds one. The file exists before its contents are
+ * written (writeFileSync opens, then writes), so existence alone can read an empty pid.
+ */
+async function waitForPid(pidFile, attempts = 200) {
+  for (let i = 0; i < attempts; i++) {
+    const pid = readPid(pidFile)
+    if (pid) return pid
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+  throw new Error(`no pid in ${pidFile}`)
+}
+
+/** The positive integer pid in `pidFile`, or undefined while it is missing or incomplete. */
+function readPid(pidFile) {
+  const text = fs.existsSync(pidFile) ? fs.readFileSync(pidFile, 'utf8').trim() : ''
+  return /^[1-9]\d*$/.test(text) ? Number(text) : undefined
+}
+
+test('waitForPid waits past a pid file that exists but is still empty', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-flow-pid-'))
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }))
+  const pidFile = path.join(dir, 'child.pid')
+  fs.writeFileSync(pidFile, '')
+  setTimeout(() => fs.writeFileSync(pidFile, '4242'), 150)
+  assert.equal(await waitForPid(pidFile), 4242)
+})
+
 const delayedTermination =
   "process.on('SIGTERM',()=>setTimeout(()=>process.exit(143),300));setInterval(()=>{},1000)"
 
@@ -137,7 +165,8 @@ test('a worker stopped by its parent still kills the owned group and writes its 
   assert.equal(result.error?.code, 'ENOBUFS')
   assert.equal(result.status, 143)
   assert.equal(result.deadline.timedOut, false)
-  const pid = Number(fs.readFileSync(pidFile, 'utf8'))
+  const pid = readPid(pidFile)
+  assert.ok(pid, 'the owned command wrote its pid')
   let alive = running(pid)
   for (let i = 0; i < 50 && alive; i++) {
     spawnSync('sleep', ['0.1'])
@@ -206,9 +235,7 @@ async function signalledWorker(t, signal) {
       timeoutMs: 10000,
     })
   )
-  for (let i = 0; i < 100 && !fs.existsSync(pidFile); i++)
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  const pid = Number(fs.readFileSync(pidFile, 'utf8'))
+  const pid = await waitForPid(pidFile)
   const exited = new Promise((resolve) => worker.once('exit', (code) => resolve(code)))
   worker.kill(signal)
   const code = await exited
@@ -246,7 +273,9 @@ test('an uncaught error kills the owned group and writes the record even when lo
       // The error waits for the owned command to start: a fixed 300 ms ran out first on a loaded
       // machine, so the group died before it wrote its pid (2026-11-16).
       `const pidFile = ${JSON.stringify(pidFile)}`,
-      "const inject = () => { if (!fs.existsSync(pidFile)) return setTimeout(inject, 20); throw new Error('injected') }",
+      // The file exists before its pid is written, so the injection waits for the pid itself.
+      "const started = () => /^[1-9]\\d*$/.test(fs.existsSync(pidFile) ? fs.readFileSync(pidFile, 'utf8').trim() : '')",
+      "const inject = () => { if (!started()) return setTimeout(inject, 20); throw new Error('injected') }",
       'setTimeout(inject, 20)',
       '',
     ].join('\n')
@@ -273,7 +302,8 @@ test('an uncaught error kills the owned group and writes the record even when lo
   assert.equal(result.signal, null)
   assert.equal(result.status, 1)
   assert.equal(JSON.parse(fs.readFileSync(timingFile, 'utf8')).timedOut, false)
-  const pid = Number(fs.readFileSync(pidFile, 'utf8'))
+  const pid = readPid(pidFile)
+  assert.ok(pid, 'the owned command wrote its pid')
   let alive = running(pid)
   for (let i = 0; i < 50 && alive; i++) {
     spawnSync('sleep', ['0.1'])
