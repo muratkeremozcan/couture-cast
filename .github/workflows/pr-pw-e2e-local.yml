@@ -217,8 +217,9 @@ jobs:
     name: Real-session community E2E
     needs: [lanes]
     if: fromJSON(needs.lanes.outputs.plan)['web-e2e']
-    # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12).
-    timeout-minutes: 15
+    # 7.0 minutes at p50, 7.8 at p95 (last 20 runs, 2026-11-12), before the guardian consent
+    # Playwright step below (a database reset, a web build and nine specs, about 5 minutes).
+    timeout-minutes: 20
     runs-on: ubuntu-latest
     services:
       redis:
@@ -320,6 +321,41 @@ jobs:
         env:
           INTEGRATION_TEST_DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
         run: npm run test:community-storage -w apps/api
+
+      # The @consent-required specs of the default local suite (guardian invite, accept,
+      # dashboard, revoke, and the comment hidden after a revoke), against the local stack with
+      # GUARDIAN_CONSENT_POLICY=required_13_15; the sharded suite skips them while consent is
+      # off. Last, because it resets the Supabase database the Storage proof above uses.
+      - name: Reset the database for the guardian consent specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+        run: npm run db:reset
+      - name: Build the web app for the guardian consent specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        run: npm run build --workspace web
+      - name: Run the guardian consent Playwright specs
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+        run: npm run test:pw-consent
+      - name: Check guardian consent artifacts for secret values
+        id: consent_secret_scan
+        if: ${{ !cancelled() && steps.supabase.outcome == 'success' }}
+        env:
+          GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/check-artifact-secrets.mjs --names GUARDIAN_INVITE_JWT_SECRET,GH_TOKEN playwright/artifacts
+      - name: Upload guardian consent artifacts
+        # Only artifacts that passed the secret scan leave the runner.
+        if: ${{ !cancelled() && steps.consent_secret_scan.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: guardian-consent-e2e
+          path: playwright/artifacts
+          if-no-files-found: ignore
+          retention-days: 5
 
       # run.mjs deletes its users itself; this covers a run that was killed first.
       - name: Delete the Auth users the run created
