@@ -19,6 +19,7 @@ const require = createRequire(path.join(mobile, 'package.json'))
 const {
   FONT_SCALE_SHIM,
   fontScaleTextTarget,
+  withAnimatedText,
   withFontScaleText,
 } = require('./metro-font-scale-text.js')
 
@@ -68,15 +69,55 @@ describe('withFontScaleText', () => {
         },
       })
     let loaded = 0
-    const shim = withFontScaleText(real, () => {
-      loaded += 1
-      return 'FontScaleText'
+    const shim = withFontScaleText(real, {
+      Text: () => {
+        loaded += 1
+        return 'FontScaleText'
+      },
     })
     assert.deepEqual(Object.keys(shim).sort(), ['Platform', 'Text', 'View'])
     assert.deepEqual([read, loaded], [[], 0], 'nothing is read before it is used')
     assert.equal(shim.View, 'real View')
     assert.equal(shim.Text, 'FontScaleText')
     assert.deepEqual([read, loaded], [['View'], 1], 'the real Text is never read')
+  })
+})
+
+// iOS dispatch 43852018196: with Text replaced, Settings' header title still kept its launch
+// height (20 pt where a cold launch measures 28), since React Navigation draws it with
+// Animated.Text, which React Native builds from its own Text, not from 'react-native'.
+describe('withAnimatedText', () => {
+  test('gives Animated a Text animated from the font-scale Text and keeps the rest', () => {
+    const read = []
+    const real = {}
+    for (const name of ['View', 'Text', 'timing'])
+      Object.defineProperty(real, name, {
+        enumerable: true,
+        get: () => {
+          read.push(name)
+          return `real ${name}`
+        },
+      })
+    real.createAnimatedComponent = (component) => `animated ${component}`
+    const animated = withAnimatedText(real, () => 'FontScaleText')
+    assert.deepEqual(read, [], 'nothing is read before it is used')
+    assert.deepEqual(Object.keys(animated).sort(), [
+      'Text',
+      'View',
+      'createAnimatedComponent',
+      'timing',
+    ])
+    assert.equal(animated.Text, 'animated FontScaleText')
+    assert.equal(animated.Text, animated.Text, 'one component, so React keeps its state')
+    assert.equal(animated.View, 'real View')
+    assert.equal(animated.timing, 'real timing')
+    assert.deepEqual(read, ['View', 'timing'], 'the real Animated.Text is never read')
+  })
+
+  test('the shim hands react-native exports Animated through withAnimatedText', () => {
+    const shim = fs.readFileSync(FONT_SCALE_SHIM, 'utf8')
+    assert.match(shim, /Animated: \(\) =>/)
+    assert.match(shim, /withAnimatedText\(reactNative\.Animated, loadText\)/)
   })
 })
 
