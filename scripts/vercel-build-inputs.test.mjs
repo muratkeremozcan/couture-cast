@@ -13,6 +13,7 @@ import { parse } from 'yaml'
 import {
   BUILD_SCRIPTS,
   buildDecision,
+  IGNORE_STEP,
   equivalentCommits,
   inputsHashAt,
   isBuildInput,
@@ -23,6 +24,97 @@ import { inputsHash } from './vercel-preview-inputs.mjs'
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const MODULE = 'scripts/vercel-build-inputs.mjs'
+
+/**
+ * Each Vercel project's install and build commands, run from its root directory. They live in
+ * the project settings (scripts/vercel-preview-deploy.mjs hashes them into the preview identity);
+ * the API's build command is mirrored as `vercel:build` in apps/api/package.json.
+ */
+const VERCEL_COMMANDS = {
+  web: {
+    root: 'apps/web',
+    install: 'npm ci --ignore-scripts',
+    build: 'NEXT_DISABLE_ESLINT=1 NEXT_DISABLE_TYPECHECK=1 npm run build',
+  },
+  api: {
+    root: 'apps/api',
+    install: 'HUSKY=0 npm ci',
+    build:
+      'cd ../.. && npx prisma@6.19.0 generate --schema packages/db/prisma/schema.prisma && node scripts/prisma-migrate-deploy.mjs && npm run build --workspace api',
+  },
+}
+
+/** The lifecycle scripts `npm ci` runs in the root package and in every workspace. */
+const INSTALL_HOOKS = [
+  'preinstall',
+  'install',
+  'postinstall',
+  'preprepare',
+  'prepare',
+  'postprepare',
+]
+
+function readManifest(dir) {
+  const file = path.join(repoRoot, dir, 'package.json')
+  return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : undefined
+}
+
+function workspaceDirs() {
+  return ['apps', 'packages'].flatMap((parent) =>
+    fs
+      .readdirSync(path.join(repoRoot, parent))
+      .map((name) => `${parent}/${name}`)
+      .filter((dir) => readManifest(dir))
+  )
+}
+
+/**
+ * Every file a project's install and build commands run with `node`, as repository paths:
+ * through `cd`, `npm run` (with its pre and post hooks, in its own or a named workspace) and
+ * the install hooks of the root and every workspace unless `--ignore-scripts` turns them off.
+ */
+function scriptsRunBy(commands, read = readManifest, dirs = workspaceDirs()) {
+  const found = new Set()
+  const byName = new Map(dirs.map((dir) => [read(dir)?.name, dir]))
+  const ran = new Set()
+  const runScript = (dir, name) => {
+    if (ran.has(`${dir}:${name}`)) return
+    ran.add(`${dir}:${name}`)
+    const scripts = read(dir)?.scripts ?? {}
+    for (const step of [`pre${name}`, name, `post${name}`])
+      if (scripts[step]) runCommand(scripts[step], dir)
+  }
+  const runCommand = (command, start) => {
+    let cwd = start
+    for (const part of command.split('&&')) {
+      const words = part
+        .trim()
+        .split(/\s+/)
+        .filter((word) => !/^[A-Z_]+=/.test(word))
+      const [program, verb] = words
+      if (program === 'cd') cwd = path.posix.normalize(path.posix.join(cwd, verb))
+      else if (program === 'node') {
+        const file = path.posix.normalize(path.posix.join(cwd, verb))
+        if (!file.startsWith('node_modules/')) found.add(file)
+      } else if (program === 'npm' && verb === 'run') {
+        const flag = words.indexOf('--workspace')
+        runScript(flag === -1 ? cwd : byName.get(words[flag + 1]), words[2])
+      } else if (
+        program === 'npm' &&
+        verb === 'ci' &&
+        !words.includes('--ignore-scripts')
+      )
+        for (const dir of ['', ...dirs])
+          for (const hook of INSTALL_HOOKS) {
+            const hookCommand = read(dir)?.scripts?.[hook]
+            if (hookCommand) runCommand(hookCommand, dir)
+          }
+    }
+  }
+  runCommand(commands.install, commands.root)
+  runCommand(commands.build, commands.root)
+  return [...found].sort()
+}
 
 /** The files a fixture repository starts with: two apps, shared code and scripts. */
 const BASE_FILES = {
@@ -135,8 +227,9 @@ describe('the input map', () => {
       'k6',
       'pact',
     ])
+    assert.equal(IGNORE_STEP, MODULE)
     assert.deepEqual(BUILD_SCRIPTS, {
-      web: ['scripts/check-node-version.mjs', 'scripts/build-workspace-package.mjs'],
+      web: ['scripts/build-workspace-package.mjs'],
       api: [
         'scripts/check-node-version.mjs',
         'scripts/build-workspace-package.mjs',
@@ -157,8 +250,9 @@ describe('the input map', () => {
     // A sibling whose name only starts like an excluded directory stays an input.
     ['apps/web-next/page.tsx', { web: true, api: true }],
     ['scriptsx/tool.mjs', { web: true, api: true }],
-    ['scripts/check-node-version.mjs', { web: true, api: true }],
+    ['scripts/check-node-version.mjs', { web: false, api: true }],
     ['scripts/build-workspace-package.mjs', { web: true, api: true }],
+    ['scripts/vercel-build-inputs.mjs', { web: true, api: true }],
     ['scripts/prisma-migrate-deploy.mjs', { web: false, api: true }],
     ['scripts/lib/connection.mjs', { web: false, api: true }],
     ['scripts/lib/ports.cjs', { web: false, api: true }],
@@ -198,8 +292,12 @@ describe('the input map', () => {
         "const f = require('./f.cjs')",
         "import './side-effect.mjs'",
         "spawn('node', ['./spawned.mjs'])",
+        "spawn('node', ['scripts/from-root.mjs'], { cwd: repoRoot })",
         "import outside from '../packages/utils/index.mjs'",
         "import fs from 'node:fs'",
+        '// a comment naming `scripts/ci/commented.mjs` and ./commented.mjs',
+        '/* `scripts/ci/block.mjs` */',
+        ' * `scripts/ci/jsdoc.mjs`',
         "import dotenv from 'dotenv'",
       ].join('\n'),
       'scripts/lib/b.mjs':
@@ -212,6 +310,7 @@ describe('the input map', () => {
       'scripts/e.mjs',
       'scripts/entry.mjs',
       'scripts/f.cjs',
+      'scripts/from-root.mjs',
       'scripts/lib/b.mjs',
       'scripts/side-effect.mjs',
       'scripts/spawned.mjs',
@@ -229,10 +328,7 @@ describe('the input map', () => {
       [...scriptInputs(BUILD_SCRIPTS[project], read)]
         .filter((file) => read(file) !== null)
         .sort()
-    assert.deepEqual(existing('web'), [
-      'scripts/build-workspace-package.mjs',
-      'scripts/check-node-version.mjs',
-    ])
+    assert.deepEqual(existing('web'), ['scripts/build-workspace-package.mjs'])
     assert.deepEqual(existing('api'), [
       'scripts/build-workspace-package.mjs',
       'scripts/check-node-version.mjs',
@@ -246,28 +342,81 @@ describe('the input map', () => {
     ])
   })
 
-  test('the API build command runs the migration script BUILD_SCRIPTS names', () => {
+  test('BUILD_SCRIPTS names every script the Vercel install and build commands run', () => {
+    const run = {
+      web: scriptsRunBy(VERCEL_COMMANDS.web),
+      api: scriptsRunBy(VERCEL_COMMANDS.api),
+    }
+    assert.deepEqual(run, {
+      web: ['scripts/build-workspace-package.mjs'],
+      api: [
+        '.husky/install.mjs',
+        'scripts/build-workspace-package.mjs',
+        'scripts/check-node-version.mjs',
+        'scripts/prisma-migrate-deploy.mjs',
+      ],
+    })
+    for (const project of /** @type {const} */ (['web', 'api'])) {
+      const scripts = run[project].filter((file) => file.startsWith('scripts/'))
+      assert.deepEqual([...BUILD_SCRIPTS[project]].sort(), scripts)
+      // Anything else a build runs must be an input already.
+      for (const file of run[project].filter((entry) => !scripts.includes(entry)))
+        assert.equal(isBuildInput(project, file, new Set()), true, file)
+    }
+  })
+
+  test('the API build command mirrored in its manifest is the one VERCEL_COMMANDS names', () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(repoRoot, 'apps/api/package.json'), 'utf8')
     )
-    assert.equal(
-      manifest.scripts['vercel:build'],
-      'cd ../.. && npx prisma@6.19.0 generate --schema packages/db/prisma/schema.prisma && node scripts/prisma-migrate-deploy.mjs && npm run build --workspace api'
-    )
-    const root = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'))
-    assert.equal(root.scripts.preinstall, 'node scripts/check-node-version.mjs')
-    for (const workspace of ['api-client', 'config', 'testing', 'utils']) {
-      const pkg = JSON.parse(
-        fs.readFileSync(
-          path.join(repoRoot, 'packages', workspace, 'package.json'),
-          'utf8'
-        )
-      )
-      assert.match(
-        pkg.scripts.build,
-        /^node \.\.\/\.\.\/scripts\/build-workspace-package\.mjs/
-      )
+    assert.equal(manifest.scripts['vercel:build'], VERCEL_COMMANDS.api.build)
+  })
+
+  test('the resolver follows npm lifecycle hooks, workspaces and cd into nested scripts', () => {
+    const manifests = {
+      '': {
+        workspaces: ['apps/*', 'packages/*'],
+        scripts: { preinstall: 'node scripts/a.mjs' },
+      },
+      'apps/one': {
+        name: 'one',
+        scripts: {
+          prebuild: 'npm run deps',
+          deps: 'npm run build --workspace @x/lib',
+          build: 'next build',
+          postinstall: 'node ../../scripts/b.mjs',
+        },
+      },
+      'packages/lib': {
+        name: '@x/lib',
+        scripts: {
+          build: 'node ../../scripts/c.mjs --tsc tsc',
+          prepare: 'node ./local.mjs',
+        },
+      },
     }
+    const read = (dir) => manifests[dir]
+    const dirs = ['apps/one', 'packages/lib']
+    assert.deepEqual(
+      scriptsRunBy(
+        { root: 'apps/one', install: 'npm ci --ignore-scripts', build: 'npm run build' },
+        read,
+        dirs
+      ),
+      ['scripts/c.mjs']
+    )
+    assert.deepEqual(
+      scriptsRunBy(
+        {
+          root: 'apps/one',
+          install: 'HUSKY=0 npm ci',
+          build: 'cd ../.. && node scripts/d.mjs',
+        },
+        read,
+        dirs
+      ),
+      ['packages/lib/local.mjs', 'scripts/a.mjs', 'scripts/b.mjs', 'scripts/d.mjs']
+    )
   })
 })
 
@@ -420,6 +569,57 @@ describe('the ignored build step', () => {
     })
   })
 
+  test('builds a redeploy of the deployed commit, so changed variables or settings take effect', () => {
+    commit(fixture, { 'docs/guide.md': 'docs only' })
+    const head = git(fixture, 'rev-parse', 'HEAD')
+    const reason = `${head} is the last successful production deployment, so this is a redeploy, which always builds`
+    assert.deepEqual(
+      buildDecision('web', production(head, { VERCEL_GIT_COMMIT_SHA: head }), fixture),
+      { build: true, reason }
+    )
+    // Without VERCEL_GIT_COMMIT_SHA the checked-out commit decides.
+    assert.deepEqual(buildDecision('api', production(head), fixture), {
+      build: true,
+      reason,
+    })
+  })
+
+  test('refuses a commit under test that is neither HEAD nor a SHA, before git sees it', () => {
+    const previous = git(fixture, 'rev-parse', 'HEAD')
+    for (const head of ['--upload-pack=touch /tmp/pwned', 'main', 'abc123'])
+      assert.deepEqual(
+        buildDecision(
+          'web',
+          production(previous, { VERCEL_GIT_COMMIT_SHA: head }),
+          fixture
+        ),
+        {
+          build: true,
+          reason: `VERCEL_GIT_COMMIT_SHA ${JSON.stringify(head)} is not a commit SHA`,
+        }
+      )
+  })
+
+  // Antigravity review of #243 (P1) proposed keeping only the commits contiguous with the head.
+  // Here C1's build failed, so production still serves C0, and C2 reverts C1: the step skips C2
+  // because its inputs equal C0's, and production keeps serving C0, which builds C2's source. A
+  // contiguous list ([C2]) would never see C0 and the production wait would time out.
+  test('a revert after a failed build is skipped, and the wait accepts the commit still serving', () => {
+    const c0 = git(fixture, 'rev-parse', 'HEAD')
+    commit(fixture, { 'apps/web/src/page.tsx': 'built, then its deployment failed' })
+    const c2 = commit(fixture, {
+      'apps/web/src/page.tsx': BASE_FILES['apps/web/src/page.tsx'],
+    })
+    assert.deepEqual(
+      buildDecision('web', production(c0, { VERCEL_GIT_COMMIT_SHA: c2 }), fixture),
+      {
+        build: false,
+        reason: `web inputs at ${c2} equal those of ${c0}, the last successful production deployment`,
+      }
+    )
+    assert.deepEqual(equivalentCommits(fixture, 'web', c2), [c2, c0])
+  })
+
   test('builds when the commit under test cannot be read', () => {
     const previous = git(fixture, 'rev-parse', 'HEAD')
     const decision = buildDecision(
@@ -490,6 +690,28 @@ describe('the ignored build step', () => {
         build: true,
         reason: `could not fetch ${previous} (exit 1: fatal: VERCEL_GIT_REPO_OWNER or VERCEL_GIT_REPO_SLUG is empty)`,
       })
+    })
+
+    test('builds when the repository named is not a GitHub owner and name', () => {
+      for (const [owner, slug] of [
+        ['owner', 'repo.git --upload-pack=x'],
+        ['../owner', 'repo'],
+        ['owner', 'repo/../../x'],
+      ])
+        assert.deepEqual(
+          buildDecision(
+            'web',
+            production(previous, {
+              VERCEL_GIT_REPO_OWNER: owner,
+              VERCEL_GIT_REPO_SLUG: slug,
+            }),
+            clone
+          ),
+          {
+            build: true,
+            reason: `could not fetch ${previous} (exit 1: fatal: VERCEL_GIT_REPO_OWNER or VERCEL_GIT_REPO_SLUG is not a GitHub owner or repository name)`,
+          }
+        )
     })
 
     test('builds when the fetch fails', () => {
@@ -604,11 +826,18 @@ describe('equivalentCommits', () => {
     assert.ok(!equivalentCommits(fixture, 'web', revert).includes(change))
   })
 
+  test('refuses a head that is not a full commit SHA, before git sees it', () => {
+    for (const head of ['--all', 'HEAD', 'main'])
+      assert.throws(() => equivalentCommits(fixture, 'web', head), {
+        message: `${JSON.stringify(head)} is not a commit SHA`,
+      })
+  })
+
   test('the CLI writes the list for its project to GITHUB_OUTPUT', () => {
-    write(fixture, MODULE, fs.readFileSync(path.join(repoRoot, MODULE), 'utf8'))
-    const head = commit(fixture, {
+    const added = commit(fixture, {
       [MODULE]: fs.readFileSync(path.join(repoRoot, MODULE), 'utf8'),
     })
+    const head = commit(fixture, { 'docs/guide.md': 'docs only' })
     const output = path.join(scratch, 'output')
     const result = spawnSync(process.execPath, [MODULE, 'equivalent', 'web', head], {
       cwd: fixture,
@@ -616,8 +845,9 @@ describe('equivalentCommits', () => {
       env: { PATH: process.env.PATH, GITHUB_OUTPUT: output },
     })
     assert.equal(result.status, 0, result.stderr)
+    // The map is an input itself, so the commit that added it starts the list.
     const commits = equivalentCommits(fixture, 'web', head)
-    assert.equal(commits.length, 2)
+    assert.deepEqual(commits, [head, added])
     assert.equal(result.stdout, `${commits.join(' ')}\n`)
     assert.equal(fs.readFileSync(output, 'utf8'), `web=${commits.join(' ')}\n`)
   })
@@ -690,6 +920,37 @@ describe('production E2E accepts what each project serves', () => {
     assert.equal(
       workflow('rwf-wait-for-deployment.yml').on.workflow_call.outputs.observed_sha.value,
       '${{ jobs.wait.outputs.observed_sha }}'
+    )
+  })
+
+  test('a manual production run waits the same way and tests the commit web serves', () => {
+    const { jobs } = workflow('pw-e2e-trigger.yml')
+    const served = jobs['prod-served-commits']
+    assert.equal(served.if, "inputs.test_env == 'prod' && inputs.custom_base_url == ''")
+    assert.equal(served.steps[0].with['fetch-depth'], 100)
+    assert.deepEqual(served.steps.map((step) => step.run).filter(Boolean), [
+      'node scripts/vercel-build-inputs.mjs equivalent web "$GITHUB_SHA"',
+    ])
+    assert.deepEqual(served.outputs, { web: '${{ steps.commits.outputs.web }}' })
+    assert.deepEqual(jobs['prod-wait-web'], {
+      needs: 'prod-served-commits',
+      uses: './.github/workflows/rwf-wait-for-deployment.yml',
+      with: {
+        health_url: 'https://couture-cast-web.vercel.app/api/health',
+        expected_sha: '${{ needs.prod-served-commits.outputs.web }}',
+        retries: 20,
+        sleep_seconds: 30,
+      },
+    })
+    const tests = jobs['run-prod-tests']
+    assert.equal(tests.needs, 'prod-wait-web')
+    assert.equal(
+      tests.if,
+      '!cancelled() && inputs.test_env == \'prod\' && contains(fromJSON(\'["success","skipped"]\'), needs.prod-wait-web.result)'
+    )
+    assert.equal(
+      tests.with.expected_web_sha,
+      '${{ needs.prod-wait-web.outputs.observed_sha }}'
     )
   })
 

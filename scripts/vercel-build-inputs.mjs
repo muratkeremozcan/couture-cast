@@ -46,17 +46,19 @@ export const OUTSIDE_BUILDS = [
 ]
 
 /**
- * The scripts a build runs. Both installs and the package builds run check-node-version.mjs
- * (the root preinstall) and build-workspace-package.mjs (each package's build); the API's
- * build command (its Vercel project settings, mirrored by `vercel:build` in apps/api's
- * package.json) also runs prisma-migrate-deploy.mjs. What they import or name by relative
- * path is an input too (scriptInputs). Every other file under scripts/ is CI and test
+ * The scripts each project's build runs: each package's build-workspace-package.mjs (web's
+ * prebuild and the API build), and for the API the root preinstall check-node-version.mjs (its
+ * install runs lifecycle scripts; web's passes --ignore-scripts) and the build command's
+ * prisma-migrate-deploy.mjs (Vercel project settings, mirrored by `vercel:build` in apps/api's
+ * package.json). scripts/vercel-build-inputs.test.mjs resolves both commands through every npm
+ * hook to keep this list exact. What these import or name by path is an input too
+ * (scriptInputs). Every other file under scripts/ is CI and test
  * tooling no build reads, and changes to it used to rebuild both projects: from 2026-11-13 to
  * 2026-11-16, 27 of 40 API and 15 of 28 web preview rebuilds on a branch that already had one
  * changed no build input outside scripts/.
  */
 export const BUILD_SCRIPTS = {
-  web: ['scripts/check-node-version.mjs', 'scripts/build-workspace-package.mjs'],
+  web: ['scripts/build-workspace-package.mjs'],
   api: [
     'scripts/check-node-version.mjs',
     'scripts/build-workspace-package.mjs',
@@ -65,19 +67,38 @@ export const BUILD_SCRIPTS = {
 }
 
 /**
+ * This file, which the ignored build step runs before every build: an input of both projects,
+ * so a change to the map rebuilds them. It is not scanned, since it names every project's
+ * scripts and runs none of them.
+ */
+export const IGNORE_STEP = 'scripts/vercel-build-inputs.mjs'
+
+/**
  * Relative references in a script: import, export from, import(), require(), and any other
  * quoted path that starts with ./ or ../ (a file a script reads or spawns by path).
  */
 const RELATIVE_REFERENCE = /['"`](\.{1,2}\/[^'"`\s]+)['"`]/g
 
+/** A quoted path from the repository root, as a script run with `cwd: repoRoot` names one. */
+const ROOT_REFERENCE = /['"`](scripts\/[^'"`\s]+)['"`]/g
+
 /**
- * The scripts `entries` load, closed over their relative references into scripts/. A
- * reference to a file that does not exist stays in the set, so adding that file later changes
- * the inputs; a path in a comment counts too, which can only add an input.
+ * The scripts `entries` load, closed over the references their code makes into scripts/, by a
+ * path relative to the script or to the repository root. Comment lines are skipped: they name
+ * scripts the build never runs. A reference to a file that does not exist stays in the set, so
+ * adding that file later changes the inputs.
  * @param {readonly string[]} entries repository paths
  * @param {(file: string) => string | null} read a file's text, or null when it is absent
  * @returns {Set<string>}
  */
+/** A script's text without its comment lines (`//`, `/*` and the ` * ` of a block). */
+function codeLines(text) {
+  return text
+    .split('\n')
+    .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+    .join('\n')
+}
+
 export function scriptInputs(entries, read) {
   const found = new Set()
   const queue = [...entries]
@@ -85,8 +106,11 @@ export function scriptInputs(entries, read) {
     const file = /** @type {string} */ (queue.pop())
     if (found.has(file)) continue
     found.add(file)
-    const text = read(file)
-    if (text === null) continue
+    const source = read(file)
+    if (source === null) continue
+    const text = codeLines(source)
+    for (const [, reference] of text.matchAll(ROOT_REFERENCE))
+      queue.push(path.posix.normalize(reference))
     for (const [, reference] of text.matchAll(RELATIVE_REFERENCE)) {
       const target = path.posix.normalize(
         path.posix.join(path.posix.dirname(file), reference)
@@ -107,7 +131,7 @@ export function isBuildInput(project, file, scripts) {
   const other = project === 'web' ? PROJECT_APPS.api : PROJECT_APPS.web
   const under = (dir) => file === dir || file.startsWith(`${dir}/`)
   if (OUTSIDE_BUILDS.some(under) || under(other)) return false
-  if (under('scripts')) return scripts.has(file)
+  if (under('scripts')) return file === IGNORE_STEP || scripts.has(file)
   return true
 }
 
@@ -214,14 +238,20 @@ export function workingTree(cwd) {
   }
 }
 
+/** A full commit SHA, the only revision these accept from outside. */
+const SHA = /^[a-f0-9]{40}$/
+
 /**
  * The commits on `head`'s first-parent history, `head` first and at most `limit` of them, whose
  * `project` inputs equal `head`'s: any of them is a deployment of the source `head` builds.
  * Production E2E accepts each, since the ignored build step leaves the last built one serving.
+ * The list skips over commits with other inputs: when a build failed, the deployment before it
+ * keeps serving, and a later commit that reverts to its source is skipped against it.
  * @param {string} cwd @param {Project} project @param {string} head @param {number} [limit]
  * @returns {string[]}
  */
 export function equivalentCommits(cwd, project, head, limit = 100) {
+  if (!SHA.test(head)) throw new Error(`${JSON.stringify(head)} is not a commit SHA`)
   const listed = git(['rev-list', '--first-parent', `--max-count=${limit}`, head], cwd)
   if (listed.status !== 0)
     throw new Error(`git rev-list ${head} failed (${failure(listed)})`)
@@ -230,7 +260,8 @@ export function equivalentCommits(cwd, project, head, limit = 100) {
   return commits.filter((commit) => inputsHashAt(cwd, project, commit) === target)
 }
 
-const SHA = /^[a-f0-9]{40}$/
+/** A GitHub owner or repository name: letters, digits, `-`, `_` and `.`, never `..`. */
+const GITHUB_NAME = /^(?!\.\.?$)[A-Za-z0-9_.-]+$/
 
 /**
  * Fetches one commit, with its whole tree, from the repository Vercel names. The build clone
@@ -245,6 +276,12 @@ function fetchFromPublicRepository(sha, env, cwd) {
       status: 1,
       stderr: 'fatal: VERCEL_GIT_REPO_OWNER or VERCEL_GIT_REPO_SLUG is empty',
     }
+  if (![owner, slug].every((name) => GITHUB_NAME.test(name)))
+    return {
+      status: 1,
+      stderr:
+        'fatal: VERCEL_GIT_REPO_OWNER or VERCEL_GIT_REPO_SLUG is not a GitHub owner or repository name',
+    }
   const url = `https://github.com/${owner}/${slug}.git`
   // No prompt can be answered here; a repository that asks for credentials fails at once.
   return git(['fetch', '--no-tags', '--depth=1', url, sha], cwd, {
@@ -256,8 +293,9 @@ function fetchFromPublicRepository(sha, env, cwd) {
  * Whether Vercel should build this deployment of `project`. Only a production build of main
  * is ever skipped, and only when its inputs equal those of the last successful production
  * deployment (VERCEL_GIT_PREVIOUS_SHA). A preview always builds: CI creates one only when the
- * preview checks need it (scripts/vercel-preview-deploy.mjs). A missing or malformed commit,
- * an unreachable one, or any git failure builds.
+ * preview checks need it (scripts/vercel-preview-deploy.mjs). A redeploy of the deployed commit
+ * always builds, so a changed environment variable or build setting takes effect through
+ * Redeploy. A missing or malformed commit, an unreachable one, or any git failure builds.
  * @param {string} project @param {NodeJS.ProcessEnv} env @param {string} [cwd]
  * @returns {{ build: boolean, reason: string }}
  */
@@ -269,32 +307,57 @@ export function buildDecision(project, env, cwd = repoRoot) {
       build: true,
       reason: `VERCEL_ENV is ${JSON.stringify(env.VERCEL_ENV ?? '')}; only a production build is ever skipped`,
     }
+  const commits = productionCommits(env, cwd)
+  if ('reason' in commits) return { build: true, reason: commits.reason }
+  const { previous, head } = commits
+  return compareInputs(/** @type {Project} */ (project), previous, head, cwd)
+}
+
+/**
+ * The deployed commit and the one under test, or why the build cannot be skipped: a missing or
+ * malformed commit, a redeploy of the deployed commit, or a previous commit the clone cannot
+ * fetch.
+ * @param {NodeJS.ProcessEnv} env @param {string} cwd
+ * @returns {{ previous: string, head: string } | { reason: string }}
+ */
+function productionCommits(env, cwd) {
   const previous = env.VERCEL_GIT_PREVIOUS_SHA?.trim() ?? ''
   if (!SHA.test(previous))
     return {
-      build: true,
       reason: previous
         ? `VERCEL_GIT_PREVIOUS_SHA ${JSON.stringify(previous)} is not a commit SHA`
         : 'no previous successful production deployment (VERCEL_GIT_PREVIOUS_SHA is empty)',
     }
   const head = env.VERCEL_GIT_COMMIT_SHA?.trim() || 'HEAD'
+  if (head !== 'HEAD' && !SHA.test(head))
+    return { reason: `VERCEL_GIT_COMMIT_SHA ${JSON.stringify(head)} is not a commit SHA` }
+  // A redeploy of the deployed commit is how a changed environment variable or build setting
+  // reaches production: the source is the same, so only this rule lets it build.
+  const resolved = git(['rev-parse', '--verify', `${head}^{commit}`], cwd).stdout?.trim()
+  if (resolved === previous)
+    return {
+      reason: `${previous} is the last successful production deployment, so this is a redeploy, which always builds`,
+    }
   if (git(['cat-file', '-e', `${previous}^{commit}`], cwd).status !== 0) {
     const fetched = fetchFromPublicRepository(previous, env, cwd)
     if (fetched.status !== 0)
-      return { build: true, reason: `could not fetch ${previous} (${failure(fetched)})` }
+      return { reason: `could not fetch ${previous} (${failure(fetched)})` }
   }
+  return { previous, head }
+}
+
+/**
+ * @param {Project} project @param {string} previous @param {string} head @param {string} cwd
+ * @returns {{ build: boolean, reason: string }}
+ */
+function compareInputs(project, previous, head, cwd) {
   try {
-    const before = inputsHashAt(cwd, /** @type {Project} */ (project), previous)
-    const after = inputsHashAt(cwd, /** @type {Project} */ (project), head)
-    if (before === after)
+    if (inputsHashAt(cwd, project, previous) === inputsHashAt(cwd, project, head))
       return {
         build: false,
         reason: `${project} inputs at ${head} equal those of ${previous}, the last successful production deployment`,
       }
-    return {
-      build: true,
-      reason: describeChange(cwd, /** @type {Project} */ (project), previous, head),
-    }
+    return { build: true, reason: describeChange(cwd, project, previous, head) }
   } catch (error) {
     return {
       build: true,

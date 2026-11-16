@@ -79,8 +79,44 @@ jobs:
       expected_web_sha: ${{ inputs.custom_base_url == '' && needs.preview-ready.outputs.web_sha || '' }}
     secrets: inherit
 
+  # The ignored build step can leave production web serving an earlier commit with this
+  # commit's inputs (scripts/vercel-build-inputs.mjs), so the web health test checks the commit
+  # the wait observes, as pw-e2e-prod.yml does. A custom web URL serves whatever it serves.
+  prod-served-commits:
+    if: inputs.test_env == 'prod' && inputs.custom_base_url == ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      web: ${{ steps.commits.outputs.web }}
+    steps:
+      - name: Checkout recent history
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          # equivalentCommits walks at most 100 first-parent commits.
+          fetch-depth: 100
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+      - name: Commits production web may serve
+        id: commits
+        run: node scripts/vercel-build-inputs.mjs equivalent web "$GITHUB_SHA"
+
+  prod-wait-web:
+    needs: prod-served-commits
+    uses: ./.github/workflows/rwf-wait-for-deployment.yml
+    with:
+      health_url: https://couture-cast-web.vercel.app/api/health
+      expected_sha: ${{ needs.prod-served-commits.outputs.web }}
+      retries: 20
+      sleep_seconds: 30
+
   run-prod-tests:
-    if: inputs.test_env == 'prod'
+    needs: prod-wait-web
+    if: >-
+      !cancelled() && inputs.test_env == 'prod' &&
+      contains(fromJSON('["success","skipped"]'), needs.prod-wait-web.result)
     uses: ./.github/workflows/rwf-e2e.yml
     with:
       test_env: ${{ inputs.test_env }}
@@ -88,4 +124,6 @@ jobs:
       gh_ref: ${{ github.sha }}
       custom_base_url: ${{ inputs.custom_base_url }}
       custom_api_base_url: ${{ inputs.custom_api_base_url }}
+      # Empty with a custom web URL, so the test keeps comparing the dispatched commit.
+      expected_web_sha: ${{ needs.prod-wait-web.outputs.observed_sha }}
     secrets: inherit

@@ -2,6 +2,7 @@ export type Project = 'web' | 'api'
 export declare const PROJECT_APPS: Record<Project, string>
 export declare const OUTSIDE_BUILDS: readonly string[]
 export declare const BUILD_SCRIPTS: Record<Project, readonly string[]>
+export declare const IGNORE_STEP: 'scripts/vercel-build-inputs.mjs'
 export declare function scriptInputs(
   entries: readonly string[],
   read: (file: string) => string | null
