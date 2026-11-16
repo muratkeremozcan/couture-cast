@@ -339,6 +339,8 @@ jobs:
         env:
           DATABASE_URL: ${{ env.LOCAL_DATABASE_URL }}
           GUARDIAN_INVITE_JWT_SECRET: ${{ secrets.GUARDIAN_INVITE_JWT_SECRET }}
+          # The job sets it for the real-session specs, which this run leaves out.
+          STORY65_REAL_SESSION_REQUIRED: ''
         run: npm run test:pw-consent
       # Every @consent-required test passed and none skipped, against the expected count.
       - name: Check the guardian consent run report
