@@ -46,13 +46,42 @@ tags:
 # worth keeping in mind before treating a name assertion as too strict: here the
 # strictness is the only reason a corrupted name was ever noticed.
 #
-# `eraseText` first, because the field may already hold a partial value from a
-# previous attempt, and the retry proves what was actually typed rather than
-# trusting that `inputText` delivered it.
+# Each attempt clears what the previous attempt left, and the retry proves what
+# was actually typed rather than trusting that `inputText` delivered it.
+#
+# The clearing is bounded, because every DEL is slow under load. A sharded
+# Android run (job 132977352556) died on a bare `eraseText` here with
+# `DeviceServerDiedException ... DEADLINE_EXCEEDED after 120s`. A bare
+# `eraseText` erases 50 characters, one key press each, and UiAutomator waits up
+# to 10 s for the app to go idle before every press. The loaded emulator never
+# went idle, so each press took about 10 s and only 13 of the 50 fit inside the
+# 120 s gRPC deadline of the one command. The field was empty the whole time:
+# the builder had just opened.
+#
+# So the erase runs only while the field holds typed text, and in chunks of 8:
+# 8 presses at 10 s stay inside the 120 s deadline with 40 s to spare, and the
+# deadline applies per command. The first attempt finds the field empty and
+# erases nothing. A failed attempt leaves at most 31 characters: the 16 of
+# `MMaestro capsule` (the doubled first character above) plus one repeated
+# delivery of the 15-character name. Four chunks cover 32.
+#
+# The condition must not match an empty field. Android reports an empty
+# TextInput's placeholder as its text, and Maestro also matches `text:` against
+# the hint, so `.+` alone would erase on every attempt. The lookahead rejects
+# `wardrobe.capsules.namePlaceholder` from en-US.json; `clearState` above leaves
+# the app in the device locale, which is en-US on CI.
+# scripts/lib/maestro-erase-text.test.mjs keeps this string and that key equal.
 - retry:
     maxRetries: 3
     commands:
-      - eraseText
+      - repeat:
+          times: 4
+          while:
+            visible:
+              id: 'capsule-name-input'
+              text: '(?!Work casual$).+'
+          commands:
+            - eraseText: 8
       - inputText: 'Maestro capsule'
       - assertVisible:
           text: 'Maestro capsule'

@@ -33,6 +33,28 @@ const NONE = {
   purchasesEnabled: true,
 }
 
+/**
+ * The git stand-in a run needs, or undefined for the real git. A hung git proves rev-parse is
+ * bounded, and a git printing a non-sha proves the answer is checked. Any other hang shortens
+ * every side call's bound (HANG_BOUND_MS), and the real git rev-parse, loading the repository,
+ * missed a 300 ms bound on a loaded machine (test_store_rev_failed in place of the hung call's
+ * code, 2026-11-16), so an instant stub answers instead and the bound stays on the call that
+ * hangs.
+ */
+/**
+ * The side-call bound a hang test runs with. A hung stub sleeps 300 s, so any bound this far
+ * below proves the call is bounded; 300 ms also cut off stubs that answer at once when the
+ * machine was busy (2026-11-16, two of five hang tests in one gate run).
+ */
+const HANG_BOUND_MS = 3000
+
+function gitStubFor(hang, git) {
+  if (hang === 'git') return 'exec sleep 300'
+  if (git === 'not-a-sha') return 'echo not-a-sha; exit 0'
+  if (hang) return `echo ${'a'.repeat(40)}`
+  return undefined
+}
+
 function writeStub(dir, name, body) {
   const file = path.join(dir, name)
   fs.writeFileSync(file, `#!/bin/sh\n${body}\n`, { mode: 0o755 })
@@ -109,9 +131,8 @@ async function runDriver(
       'exit 0',
     ].join('\n')
   )
-  if (hang === 'git') writeStub(bin, 'git', 'exec sleep 300')
-  // git that answers rev-parse with something that is not a sha, and exits 0.
-  if (git === 'not-a-sha') writeStub(bin, 'git', 'echo not-a-sha; exit 0')
+  const gitStub = gitStubFor(hang, git)
+  if (gitStub) writeStub(bin, 'git', gitStub)
   // adb records every reverse and reverse --remove it is asked for, one line each.
   writeStub(
     path.join(androidHome, 'platform-tools'),
@@ -158,7 +179,7 @@ async function runDriver(
       ...['--server', 'local', '--api-url', `http://127.0.0.1:${port}`],
       ...['--metro-port', String(port), '--proxy-port', '0'],
       ...['--artifact', artifact, '--secrets-env', secrets, '--out', out],
-      ...(hang ? ['--spawn-timeout-ms', '300'] : []),
+      ...(hang ? ['--spawn-timeout-ms', String(HANG_BOUND_MS)] : []),
       ...extraArgs,
     ],
     {
@@ -265,13 +286,12 @@ test('the driver crashing mid-run quarantines the planted leak and keeps the fai
   assert.match(result.stdout, /test_store_command_failed/)
   assert.match(result.stderr, /test_store_evidence_leak/)
   assert.ok(!result.stdout.includes(result.member))
-  // TEA (Story 6.15): on iOS the first call pins this simulator's runner port and lets Maestro
-  // install the runner (scripts/lib/maestro-driver-sync.mjs).
+  // TEA (Story 6.15): on iOS the first call pins this simulator's runner port and starts the
+  // runner with --no-reinstall-driver, so it outlives the call (scripts/lib/maestro-driver-sync.mjs).
   assert.match(
     result.maestroArgs[0],
-    /^--device stub-device --driver-host-port 17[2-4]\d\d (?:test|hierarchy) /
+    /^--device stub-device --driver-host-port 17[2-4]\d\d (?:test|hierarchy) --no-reinstall-driver /
   )
-  assert.doesNotMatch(result.maestroArgs[0], /--no-reinstall-driver/)
   await assertCleaned(result)
 })
 

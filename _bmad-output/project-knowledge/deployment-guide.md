@@ -13,6 +13,7 @@ Updated: 2026-11-11 (append): community append runs in one database statement; t
 Updated: 2026-11-13 (Story 6.15 Step 0): release hold, Test Store isolation, debug signing and the macOS nightly shape.
 Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
+Updated: 2026-11-16 (Vercel Hobby limits): one build input map, production builds skipped when unchanged, previews reused across branches, E2E asset cache.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -164,16 +165,46 @@ each project's `vercel.json` sets `git.deploymentEnabled` to `{"main": true, "**
 branch matching several rules deploys when any is true, so `main` keeps its production
 deployments). On the Hobby plan every deployment counts toward 100 a day, a build canceled by an
 ignored build step included, and on 2026-11-11 pushes no preview check needed used them up and
-blocked two merges for hours. An ignored build step cannot help: Vercel's build clone has no git
-remote and ten commits of history (probe, 2026-11-12), and its canceled builds still count.
+blocked two merges for hours. An ignored build step cannot help there, since its canceled builds
+still count; it serves `main` instead (below).
+
+**Build inputs.** [One module](../../scripts/vercel-build-inputs.mjs) says which tracked files each
+project builds from, and every build decision asks it: the repository less the other app, tests,
+workflows and load scripts (`apps/mobile`, `docs`, `_bmad-output`, `.github`, `playwright`,
+`maestro`, `k6`, `pact`), and of `scripts/` only the map itself and what a build runs: each
+package's build (`build-workspace-package.mjs`), and for the API the root preinstall
+(`check-node-version.mjs`, since web installs with `--ignore-scripts`) and its build command's
+`prisma-migrate-deploy.mjs`, plus every script their code reaches by a path relative to the script
+or to the repository root (comment lines do not count). Its spec resolves both projects' install
+and build commands through every npm hook and fails when that list drifts. Other scripts are CI
+and test tooling; from 2026-11-13 to 16 they alone caused 27 of 40 API and 15 of 28 web preview
+rebuilds on a branch that already had a preview. A new top-level path builds by default, and a new
+script builds once a build script references it.
+
+**Production builds of `main`.** Each `vercel.json` sets `ignoreCommand` to
+`node ../../scripts/vercel-build-inputs.mjs ignore <project>`. On a production deployment it
+compares the commit's inputs with those of `VERCEL_GIT_PREVIOUS_SHA` (the last successful
+production deployment) and skips the build when they are equal, so a mobile, docs, test or CI
+merge builds neither project and a web-only merge builds only web. Vercel's build clone has no git
+remote and ten commits of history (probe, 2026-11-12), so the step fetches the previous commit at
+depth 1 from the public repository Vercel names. It builds whenever the previous commit is missing
+or malformed, the commit under test or the repository Vercel names is malformed, the fetch fails
+or the comparison fails, and it always builds a preview, since CI creates previews only when the
+checks need them. Replayed over the last 60 merges to `main`, it leaves 51 of 120 production
+builds.
+
+The step compares source only. A Redeploy of the deployed commit (the previous commit is the one
+under test) always builds, so **after changing a production environment variable or build
+setting, redeploy each project it affects**: the next merge may skip the build and leave the old
+values live, since `NEXT_PUBLIC_*`, `POSTHOG_*` and `PROD_API_BASE_URL` are read at build time.
 
 When [the preview scope](../../scripts/vercel-preview-inputs.mjs) says the preview checks read the
 branch's changes against main, one job per project (`deploy-web`, `deploy-api`, 20 minutes each,
 since Hobby builds one deployment at a time) runs
 [the deploy script](../../scripts/vercel-preview-deploy.mjs). It adopts a preview deployment it
-created itself (marked `ccPreviewSource`, preview target only) on this branch with the same build
-inputs (a hash of every tracked file the project builds from: the repository less the other app,
-tests, workflows and load scripts) and the same configuration (the ids and update times of the
+created itself (marked `ccPreviewSource`, preview target only) on any branch with the same build
+inputs (a hash of every tracked file the project builds from, above) and the same configuration
+(the ids and update times of the
 preview variables that apply to the branch, and the build settings: framework, install, build and
 output commands, root directory, files outside it, system variable exposure, Node version, Git LFS,
 region and resources), the newest ready one first, else one still building. Otherwise it creates
@@ -222,16 +253,38 @@ artifacts. The PR path and the manual trigger both resolve and wait through
 metadata and the expected SHA. The [API smoke test](../../playwright/tests/api/api-health.spec.ts)
 checks the API root response but does not assert API health metadata.
 
+**Edge requests.** The Hobby team allows 1,000,000 edge requests in 30 days, and on 2026-11-16 it
+had used 769,717: 94% on the web project and almost none from visitors (hours with no CI run
+served none). Each E2E test opens a fresh browser context, and the routes the fixtures register
+turn Chromium's HTTP cache off, so every page load fetched its ~23 hashed chunks, fonts and
+stylesheets again. [The fixtures](../../playwright/support/fixtures/merged-fixtures.ts) now keep
+each `_next/static` response the server marks `immutable` for the rest of the worker
+([asset cache](../../playwright/support/helpers/immutable-asset-cache.ts)); pages, RSC payloads
+and API calls still reach the server every time. Against production, 12 smoke and legal-page
+tests made 21 asset requests in place of 98. Concurrent requests for one asset share a single
+fetch, and each page's teardown drains the requests still in flight before the context closes,
+so no disposed fetch (whose call log would carry the preview's `_vercel_jwt` cookie) reaches the
+report.
+
 ## Production deployment verification
 
 [Production E2E](../../.github/workflows/pw-e2e-prod.yml) runs on pushes to `main` and manually. It
 uses fixed Vercel production domains and the
 [generic deployment waiter](../../.github/workflows/rwf-wait-for-deployment.yml).
 
-Both projects are held to the pushed commit before tests start:
+Both projects are held to the pushed commit's source before tests start. A project whose build
+the ignored build step skipped keeps serving the last commit it built, so the `served-commits` job
+lists, per project, the commits on `main`'s whole first-parent history whose build inputs
+equal the pushed commit's, and each wait accepts any of them:
 
-- The web `/api/health` must report `status: ok` and match the pushed SHA.
-- The API `/api/health` must report `status: ok` and match the pushed SHA.
+- The web `/api/health` must report `status: ok` and one of the web project's commits.
+- The API `/api/health` must report `status: ok` and one of the API project's commits.
+- The web health test checks the commit the web wait observed (`EXPECTED_WEB_SHA`).
+- The list skips commits with other inputs: when a build failed, the deployment before it keeps
+  serving, and a later commit that reverts to its source is skipped against it, so that earlier
+  commit is the one serving.
+- [Manual E2E](../../.github/workflows/pw-e2e-trigger.yml) against production with no custom web
+  URL waits the same way for web and tests the commit it observed.
 - Playwright uses `DATABASE_URL_PROD` and fixed production web/API defaults unless overridden.
 
 The production workflow is a post-push verifier, not a deployment job or promotion gate. It does
@@ -1137,8 +1190,8 @@ Deployment-adjacent controls supported by the repository include:
   optional changed-test burn-in, and artifacts.
 - [Preview Playwright](../../.github/workflows/pr-pw-e2e-vercel-preview.yml): independent web/API
   SHA waits before hosted E2E.
-- [Production Playwright](../../.github/workflows/pw-e2e-prod.yml): production web SHA wait, API
-  secondary-route check, and hosted E2E.
+- [Production Playwright](../../.github/workflows/pw-e2e-prod.yml): production web and API waits
+  for a commit with the pushed commit's build inputs, and hosted E2E.
 - [k6 PR smoke](../../.github/workflows/k6-smoke-prs.yml): local Supabase/API smoke for relevant
   changes.
 - [Manual k6 load](../../.github/workflows/k6-load.yml): selectable Preview or production load

@@ -30,11 +30,20 @@
 // runner serves the whole run on one pinned port, on a port of this simulator's own
 // (scripts/lib/maestro-ios-driver-port.mjs) because two simulators run at once: the first call,
 // and the first after a failure, start a runner on a port proven free on every address; every
-// call after a completed one passes --no-reinstall-driver, after a status check of that port. A
-// runner that answers is reused (no xcodebuild starts); a port that accepts and closes, or answers
-// with something that is not HTTP, is another process's, and the call fails at once with
-// maestro_driver_port_in_use. Any failed call stops the runner, so the next starts a fresh one.
-// Hierarchy reads go through the same runner.
+// later call checks that port first. A runner that answers is reused (no xcodebuild starts); a
+// port that accepts and closes, or answers with something that is not HTTP, is another
+// process's, and the call fails at once with maestro_driver_port_in_use. Any failed call stops
+// the runner, so the next starts a fresh one. Hierarchy reads go through the same runner.
+//
+// Every iOS call passes --no-reinstall-driver, the one that starts a runner too (nightly run
+// 43707223465 and dispatches 43740466527, 43746880534: maestro_ios_driver_gone before every
+// call, 374 restarts in 120 min). Maestro 2.8 ends each call through a shutdown hook whose
+// LocalXCTestInstaller.close() uninstalls the driver when reinstallDriver is set, which kills
+// the runner it started; without the flag no runner outlives its call. With the flag, a call that
+// finds no runner answering still starts one (startXCTestRunner checks only the channel), and
+// close() leaves it running. The runner is fresh anyway: a call that starts one does so only
+// after stopRunner and selectPort stopped this simulator's runner and proved the port free, and
+// `xcodebuild test-without-building` installs this Maestro version's runner.
 import {
   PORT_IN_USE,
   createIosDriverPortIo,
@@ -223,15 +232,15 @@ export function createIosDriver({
     throw portInUse(busy.join('; '))
   }
 
-  /** The command line with the pinned port (a global option) and, on reuse, no reinstall. */
-  const withDriverArgs = (args, reuse) => {
+  /** The command line with the pinned port (a global option) and no reinstall, so it survives. */
+  const withDriverArgs = (args) => {
     const at = subcommandAt(args)
     return [
       ...args.slice(0, at),
       DRIVER_HOST_PORT_ARG,
       String(port),
       args[at],
-      ...(reuse ? [NO_REINSTALL_DRIVER_ARG] : []),
+      NO_REINSTALL_DRIVER_ARG,
       ...args.slice(at + 1),
     ]
   }
@@ -254,7 +263,7 @@ export function createIosDriver({
     if (reusable) {
       // Maestro's own status check, made first: a runner that answers is reused as it is.
       const status = io.probe(port).connect['127.0.0.1']
-      if (status === 'http') return withDriverArgs(args, true)
+      if (status === 'http') return withDriverArgs(args)
       if (status !== 'refused' && status !== 'silent') {
         const held = heldBy(status) ?? `${port} connect 127.0.0.1 ${status}`
         stopRunner()
@@ -265,7 +274,7 @@ export function createIosDriver({
       stopRunner()
     }
     selectPort()
-    return withDriverArgs(args, false)
+    return withDriverArgs(args)
   }
 
   return function run(args, options) {

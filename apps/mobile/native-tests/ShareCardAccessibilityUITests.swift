@@ -140,6 +140,26 @@ final class ShareCardAccessibilityUITests: XCTestCase {
     }
   }
 
+  /// The composer slides up as a transparent modal over the wardrobe, and until it lands the audit
+  /// can read wardrobe text through its scrim. Runs 43740466527 and 43746880534 (shard 3, iOS 18.5)
+  /// and canary 43723427595 (iOS 26.5) failed preparing, the one state audited right after the
+  /// composer opens, on nil-element "Potentially inaccessible text", while the screen after the
+  /// audit showed only text with elements. Settled: the opener under the sheet is no longer
+  /// hittable and the title's frame reads the same twice, 0.5 s apart, within 10 s.
+  func settleComposer(_ state: String) {
+    let opener = element("outfit-share-card-open")
+    let title = element("share-card-title")
+    let deadline = Date().addingTimeInterval(10)
+    var previous: CGRect?
+    repeat {
+      let frame: CGRect? = title.exists ? title.frame : nil
+      if let frame, frame == previous, !(opener.exists && opener.isHittable) { return }
+      previous = frame
+      RunLoop.current.run(until: Date().addingTimeInterval(0.5))
+    } while Date() < deadline
+    XCTFail("Composer still moving 10 s before the audit: \(state)")
+  }
+
   func audit(_ state: String) throws {
     // Every state except preparing shows the approved preview; the test input decides, never the app.
     let expectsPreview = state != "preparing"
@@ -175,6 +195,13 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       XCTAssertEqual(status.elementType, .staticText)
     }
     if expectsPreview { print("CC68_PREVIEW_LABEL \(state): \(loaded().label)") }
+    settleComposer(state)
+    // PR 237 review P2: the audit judges the composer, so it must be on screen first, and only a
+    // screen of it is ever kept beside an issue the audit refuses.
+    let composerShown = element("share-card-title").exists
+    XCTAssertTrue(composerShown, "Composer on screen before the audit: \(state)")
+    // The screen the audit judges, kept only beside an issue it refuses.
+    let judged = app.screenshot().pngRepresentation
     try app.performAccessibilityAudit(for: .all) { issue in
       print("CC68_AUDIT_CLOSED \(state)|\(issue.auditType.rawValue)|\(issue.element != nil)|\(issue.compactDescription)")
       let description = "\(issue.compactDescription): \(issue.detailedDescription) ELEMENT \(issue.element?.debugDescription ?? "none")"
@@ -186,7 +213,26 @@ final class ShareCardAccessibilityUITests: XCTestCase {
       // Apple's raster OCR heuristic has no AX element for this fixed artwork.
       // Coordinator-approved exception requires its exact issue signature/state.
       let allowed = Self.allowsRasterOCRIssue(type: issue.auditType, description: issue.compactDescription, detail: issue.detailedDescription, state: state, hasElement: issue.element != nil, previewVerified: previewVerified)
-      if !allowed { print(shareCardAuditIssueLine(state, issue)) }
+      if !allowed {
+        print(shareCardAuditIssueLine(state, issue))
+        // iOS 26.5 canary shard 3 failed preparing on "Potentially inaccessible text" with no
+        // picture of the screen, so the screen the audit judged, taken just before it, is kept
+        // beside its issue, as a PNG that a failed run exports to audit-failure-<state>.png
+        // (share-card-audit-screens.mjs exports the earliest). The screen after the audit follows
+        // as audit-after-<state>, in the xcresult only.
+        let composerKept = composerShown && self.element("share-card-title").exists
+        XCTAssertTrue(composerKept, "Composer on screen beside the refused issue: \(state)")
+        if composerKept {
+          let screen = XCTAttachment(data: judged, uniformTypeIdentifier: "public.png")
+          screen.name = "audit-failure-\(state)"
+          screen.lifetime = .keepAlways
+          self.add(screen)
+        }
+        let after = XCTAttachment(data: self.app.screenshot().pngRepresentation, uniformTypeIdentifier: "public.png")
+        after.name = "audit-after-\(state)"
+        after.lifetime = .keepAlways
+        self.add(after)
+      }
       return allowed
     }
     let title = element("share-card-title")
