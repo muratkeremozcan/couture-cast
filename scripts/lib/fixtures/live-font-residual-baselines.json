@@ -482,6 +482,75 @@
         "settled": "settings-011-settled-1",
         "updated": "settings-012-updated-1"
       }
+    },
+    {
+      "platform": "ios",
+      "build": "release",
+      "screen": "home",
+      "from": "accessibility-medium",
+      "to": "large",
+      "timezone": "UTC",
+      "weatherBanner": "out-of-date",
+      "staleKeys": [],
+      "clippedKeys": [
+        "staleContent:cold:[\"\",\"Hourly Forecast\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Clear Sky, 68 degrees Fahrenheit, and 2 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Clear Sky, 68 degrees Fahrenheit, and 2 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Clear Sky, 68 degrees Fahrenheit, and 2 AM, Precipitation: 0%\"]#0>[\"\",\"☀️\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Cloudy, 68 degrees Fahrenheit, and 12 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Cloudy, 68 degrees Fahrenheit, and 12 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Cloudy, 68 degrees Fahrenheit, and 12 AM, Precipitation: 0%\"]#0>[\"\",\"☁️\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 1 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 1 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 1 AM, Precipitation: 0%\"]#0>[\"\",\"🌧️\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 4 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 4 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 4 AM, Precipitation: 0%\"]#0>[\"\",\"🌧️\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Snowy, 68 degrees Fahrenheit, and 3 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Snowy, 68 degrees Fahrenheit, and 3 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:cold:[\"hourly-item\",\"Snowy, 68 degrees Fahrenheit, and 3 AM, Precipitation: 0%\"]#0>[\"\",\"❄️\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Clear Sky, 68 degrees Fahrenheit, and 2 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Clear Sky, 68 degrees Fahrenheit, and 2 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Clear Sky, 68 degrees Fahrenheit, and 2 AM, Precipitation: 0%\"]#0>[\"\",\"☀️\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Cloudy, 68 degrees Fahrenheit, and 12 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Cloudy, 68 degrees Fahrenheit, and 12 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Cloudy, 68 degrees Fahrenheit, and 12 AM, Precipitation: 0%\"]#0>[\"\",\"☁️\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 1 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 1 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 1 AM, Precipitation: 0%\"]#0>[\"\",\"🌧️\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 4 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 4 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Rainy, 68 degrees Fahrenheit, and 4 AM, Precipitation: 0%\"]#0>[\"\",\"🌧️\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Snowy, 68 degrees Fahrenheit, and 3 AM, Precipitation: 0%\"]#0>[\"\",\"68°F\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Snowy, 68 degrees Fahrenheit, and 3 AM, Precipitation: 0%\"]#0>[\"\",\"<hour>\"]#0",
+        "staleContent:updated:[\"hourly-item\",\"Snowy, 68 degrees Fahrenheit, and 3 AM, Precipitation: 0%\"]#0>[\"\",\"❄️\"]#0"
+      ],
+      "review": {
+        "verdict": "known-residual",
+        "structuralPass": true,
+        "everyMissStale": true,
+        "growthFailing": [],
+        "clipsStale": true,
+        "controlPass": true
+      },
+      "evidence": {
+        "run": "https://github.com/muratkeremozcan/couture-cast/actions/runs/43773613293",
+        "artifact": "ios-live-font-proof-home",
+        "before": "home-015-before-accessibility-medium",
+        "immediate": "home-016-immediate-large",
+        "settled": "home-017-settled-large",
+        "updated": "home-018-updated-large",
+        "coldBefore": "home-005-cold-accessibility-medium",
+        "cold": "home-001-cold-large",
+        "coldBeforeUpdated": "home-006-cold-accessibility-medium",
+        "coldUpdated": "home-002-cold-large",
+        "reviewedImages": [
+          "home-017-settled-large.png",
+          "home-017-settled-large-page1.png",
+          "home-018-updated-large.png",
+          "home-018-updated-large-page1.png"
+        ]
+      }
     }
   ]
 }
