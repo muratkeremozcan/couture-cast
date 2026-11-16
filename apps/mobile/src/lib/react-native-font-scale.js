@@ -15,7 +15,8 @@ let animated
 const loadText = () =>
   (fontScaleText ??= createFontScaleText(
     reactNative.Text,
-    reactNative.useWindowDimensions
+    reactNative.useWindowDimensions,
+    reactNative.unstable_TextAncestorContext
   ))
 module.exports = withFontScaleText(reactNative, {
   Text: loadText,

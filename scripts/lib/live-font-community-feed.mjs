@@ -51,9 +51,10 @@ RETURNING "id"`
 /**
  * Scopes the harness feed to LIVE_FONT_COMMUNITY_FEED. `query(url, sql, params)` runs one
  * statement against the harness database and resolves to `{ rowCount, rows }`. Resolves to the
- * posts `kept`, the posts `withdrawn` and `restore()`, which publishes those again once (a second
- * call does nothing). Any post the feed names that is not published, or any other post still
- * published, fails as live_font_community_feed_unexpected after the withdrawn posts are put back.
+ * posts `kept`, the posts `withdrawn` and `restore()`, which publishes those again (a call after
+ * one that succeeded does nothing; one after a failure tries again). Any post the feed names that
+ * is not published, or any other post still published, fails as live_font_community_feed_unexpected
+ * after the withdrawn posts are put back; a failed check puts them back too.
  */
 export async function scopeCommunityFeed({ ownedEnv, query }) {
   const url = harnessDatabaseUrl(ownedEnv)
@@ -69,10 +70,18 @@ export async function scopeCommunityFeed({ ownedEnv, query }) {
   let restored = false
   const restore = async () => {
     if (restored) return
-    restored = true
     if (withdrawn.length) await run(RESTORE, [withdrawn])
+    // Done only once the posts are back: a failed restore stays retryable.
+    restored = true
   }
-  const published = (await run(PUBLISHED, [])).rows.map((row) => row.id)
+  let published
+  try {
+    published = (await run(PUBLISHED, [])).rows.map((row) => row.id)
+  } catch (error) {
+    // The caller has no restore() until this resolves, so the withdrawn posts go back here.
+    await restore()
+    throw error
+  }
   const missing = feed.filter((id) => !published.includes(id))
   const extra = published.filter((id) => !feed.includes(id))
   if (missing.length || extra.length) {

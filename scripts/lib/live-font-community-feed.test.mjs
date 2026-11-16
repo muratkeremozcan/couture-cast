@@ -139,6 +139,49 @@ describe('the live font Community feed', () => {
     })
   })
 
+  // CodeRabbit on PR 242: a failed restoration must not count as done, so the runner's next
+  // restore() still publishes the withdrawn posts.
+  test('a failed restore can be retried', async () => {
+    const db = fakeDatabase(SEEDED)
+    let refuseRestore = true
+    const flaky = async (url, sql, params) => {
+      if (refuseRestore && /SET "status" = 'published'/.test(sql)) {
+        refuseRestore = false
+        throw new Error('connection reset')
+      }
+      return db.query(url, sql, params)
+    }
+    const scoped = await scopeCommunityFeed({ ownedEnv: owned, query: flaky })
+    await assert.rejects(scoped.restore(), {
+      code: 'live_font_community_feed_failed',
+      message: /connection reset/,
+    })
+    await scoped.restore()
+    assert.deepEqual(
+      [...db.status].filter(([, state]) => state === 'published').map(([id]) => id),
+      SEEDED
+    )
+  })
+
+  // CodeRabbit on PR 242: the runner has no handle until the scope resolves, so a failed check
+  // after the withdrawal puts the posts back itself.
+  test('a failed check after the withdrawal restores the withdrawn posts', async () => {
+    const db = fakeDatabase(SEEDED)
+    const checkFails = async (url, sql, params) => {
+      if (/^SELECT "id" FROM "LookbookPost"/.test(sql))
+        throw new Error('connection refused')
+      return db.query(url, sql, params)
+    }
+    await assert.rejects(scopeCommunityFeed({ ownedEnv: owned, query: checkFails }), {
+      code: 'live_font_community_feed_failed',
+      message: /connection refused/,
+    })
+    assert.deepEqual(
+      [...db.status].filter(([, state]) => state === 'published').map(([id]) => id),
+      SEEDED
+    )
+  })
+
   test('refuses a database that is not the harness database, and reports a failed write', async () => {
     const db = fakeDatabase(SEEDED)
     await assert.rejects(

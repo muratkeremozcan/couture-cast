@@ -6,6 +6,7 @@
 // new size measures 42). A paragraph lays out again when its props change, so every outermost
 // Text carries a font-scale dependent maxFontSizeMultiplier no text ever reaches.
 import {
+  createContext,
   createElement,
   createRef,
   forwardRef,
@@ -25,7 +26,13 @@ const seen = {
   listeners: new Set<() => void>(),
 }
 
-/** react-native's Text as the shim hands it over: records the props each render receives. */
+/** react-native's TextAncestorContext: true inside a Text, reset to false by a View. */
+const TextAncestor = createContext(false)
+
+/**
+ * react-native's Text as the shim hands it over: records the props each render receives, and
+ * marks its children as inside a paragraph, as react-native's Text does.
+ */
 const Text = forwardRef(function Text(
   props: { children?: ReactNode; maxFontSizeMultiplier?: number },
   ref: Ref<HTMLSpanElement>
@@ -34,8 +41,20 @@ const Text = forwardRef(function Text(
     children: typeof props.children === 'string' ? props.children : 'nested',
     maxFontSizeMultiplier: props.maxFontSizeMultiplier,
   })
-  return createElement('span', { ref }, props.children)
+  return createElement(
+    TextAncestor.Provider,
+    { value: true },
+    createElement('span', { ref }, props.children)
+  )
 }) as unknown as typeof NativeText
+
+/** react-native's View: a Text inside it starts a paragraph of its own. */
+const View = ({ children }: { children?: ReactNode }) =>
+  createElement(
+    TextAncestor.Provider,
+    { value: false },
+    createElement('div', null, children)
+  )
 
 /** useWindowDimensions with a font scale the test changes, as a live text size change does. */
 const useDimensions = (() => {
@@ -50,7 +69,7 @@ const useDimensions = (() => {
   return { width: 402, height: 874, scale: 3, fontScale: seen.fontScale }
 }) as typeof useWindowDimensions
 
-const FontScaleText = createFontScaleText(Text, useDimensions)
+const FontScaleText = createFontScaleText(Text, useDimensions, TextAncestor)
 
 function setFontScale(fontScale: number) {
   seen.fontScale = fontScale
@@ -105,6 +124,27 @@ describe('FontScaleText', () => {
         .filter((text) => text.children === 'Inner')
         .map((text) => text.maxFontSizeMultiplier)
     ).toEqual(seen.texts.filter((text) => text.children === 'Inner').map(() => undefined))
+  })
+
+  // CodeRabbit on PR 242: react-native resets its paragraph context at a View, so a Text inside a
+  // View inside a Text is a paragraph of its own and needs its own changing cap.
+  it('gives a Text behind a View inside a Text a cap of its own', () => {
+    render(
+      <FontScaleText>
+        Outer
+        <View>
+          <FontScaleText>Boxed</FontScaleText>
+        </View>
+      </FontScaleText>
+    )
+    expect(
+      seen.texts.find((text) => text.children === 'Boxed')?.maxFontSizeMultiplier
+    ).toBe(remeasureCap(undefined, 1))
+    seen.texts.length = 0
+    setFontScale(1.353)
+    expect(
+      seen.texts.filter((text) => text.children === 'Boxed').at(-1)?.maxFontSizeMultiplier
+    ).toBe(remeasureCap(undefined, 1.353))
   })
 
   it("keeps the caller's cap and forwards the ref", () => {

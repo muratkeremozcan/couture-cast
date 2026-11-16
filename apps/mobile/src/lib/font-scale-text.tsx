@@ -15,7 +15,7 @@
 //
 // The Expo SDK 58 upgrade (React Native 0.87, where text relayouts on a font scale change by
 // itself) removes this file, its Metro alias and their tests.
-import React, { createContext, forwardRef, useContext } from 'react'
+import React, { forwardRef, useContext, type Context } from 'react'
 import type { Text, TextProps, useWindowDimensions } from 'react-native'
 
 /**
@@ -34,29 +34,30 @@ export function remeasureCap(cap: number | null | undefined, fontScale: number):
   return UNCAPPED + fontScale * 1e-3
 }
 
-/** Whether a Text sits inside another: it is laid out with that paragraph. */
-const InParagraph = createContext(false)
-
-/** The font-scale Text over react-native's own `Text` and `useWindowDimensions`. */
+/**
+ * The font-scale Text over react-native's own `Text`, `useWindowDimensions` and
+ * `unstable_TextAncestorContext`. That context is true inside a Text and a View resets it, so a
+ * Text in a View in a Text starts a paragraph of its own (CodeRabbit on PR 242), exactly as
+ * react-native lays it out.
+ */
 export function createFontScaleText(
   NativeText: typeof Text,
-  useDimensions: typeof useWindowDimensions
+  useDimensions: typeof useWindowDimensions,
+  TextAncestor: Context<boolean>
 ) {
   const FontScaleText = forwardRef<React.ComponentRef<typeof Text>, TextProps>(
     function FontScaleText(props, ref) {
-      const nested = useContext(InParagraph)
+      const nested = useContext(TextAncestor)
       const { fontScale } = useDimensions()
       // A nested Text inherits its paragraph's cap; one of its own would override a cap the
       // paragraph sets.
       if (nested) return <NativeText ref={ref} {...props} />
       return (
-        <InParagraph.Provider value>
-          <NativeText
-            ref={ref}
-            {...props}
-            maxFontSizeMultiplier={remeasureCap(props.maxFontSizeMultiplier, fontScale)}
-          />
-        </InParagraph.Provider>
+        <NativeText
+          ref={ref}
+          {...props}
+          maxFontSizeMultiplier={remeasureCap(props.maxFontSizeMultiplier, fontScale)}
+        />
       )
     }
   )
