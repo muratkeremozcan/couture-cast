@@ -290,7 +290,25 @@ describe('share-card audit screens', () => {
 
   test('the harness clears before the audit runs and exports only on its failure', () => {
     const harness = fs.readFileSync('scripts/run-story68-native.mjs', 'utf8')
+    const branch = harness.indexOf(
+      "} else if (command === 'a11y' && platform === 'ios') {"
+    )
     const clear = harness.indexOf('clearAuditScreens(directory)')
+    // PR 237 review: cleared before the project copy and xcodegen, so a run that fails there
+    // cannot publish an earlier run's screens.
+    const copy = harness.indexOf(
+      "const generated = path.join(directory, 'accessibility-project')"
+    )
+    const generate = harness.indexOf("run('xcodegen', [", branch)
+    assert.equal(
+      harness.indexOf('clearAuditScreens(directory)', clear + 1),
+      -1,
+      'one clear'
+    )
+    assert.ok(
+      branch > 0 && clear > branch && clear < copy && copy < generate,
+      'cleared first'
+    )
     const audit = harness.indexOf("const audit = child(\n    'xcodebuild'")
     const failed = harness.indexOf('if (code !== 0 || !closed.passed) {')
     const exported = harness.indexOf('exportAuditScreens({ result, directory, run })')

@@ -1019,6 +1019,10 @@ if (command === 'prebuild') {
   }
 } else if (command === 'a11y' && platform === 'ios') {
   requireDevice()
+  // Only this run's refused issues may be published (share-card-audit-screens.mjs). Cleared
+  // before the project copy and xcodegen, so a run that fails there cannot publish an earlier
+  // run's screens (PR 237 review).
+  clearAuditScreens(directory)
   const generated = path.join(directory, 'accessibility-project')
   fs.mkdirSync(generated, { recursive: true })
   for (const name of [
@@ -1093,8 +1097,6 @@ if (command === 'prebuild') {
   // Resolve the container before the first focus read; a failure is retried by the next request.
   await readContainer().catch(() => undefined)
   const result = path.join(directory, `accessibility-ios-${Date.now()}.xcresult`)
-  // Only this run's refused issues may be published (share-card-audit-screens.mjs).
-  clearAuditScreens(directory)
   const auditLog = path.join(directory, 'accessibility-ios.log')
   const offset = fs.existsSync(auditLog) ? fs.statSync(auditLog).size : 0
   const audit = child(
