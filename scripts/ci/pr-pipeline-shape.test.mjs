@@ -249,15 +249,15 @@ test('burn-in leaves out real-session specs, which only their own lane can run',
     }
   }
   assert.equal(
-    changedAfter(['playwright/tests/signed-in-landing-real-session.spec.ts']),
+    changedAfter(['playwright/tests/example-real-session.spec.ts']),
     'changed=false'
   )
   assert.equal(
     changedAfter([
-      'playwright/tests/signed-in-landing-real-session.spec.ts',
-      'playwright/tests/mobile-viewport-overflow.spec.ts',
+      'playwright/tests/example-real-session.spec.ts',
+      'playwright/tests/example.spec.ts',
     ]),
     'changed=true'
   )
-  assert.equal(changedAfter(['apps/web/src/app/page.tsx']), 'changed=false')
+  assert.equal(changedAfter(['apps/web/src/example.ts']), 'changed=false')
 })
