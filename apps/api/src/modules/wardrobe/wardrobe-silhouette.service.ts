@@ -39,6 +39,7 @@ import {
   verifyUploadToken,
 } from './wardrobe-upload-token.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { publicApiUrl } from '../../config/runtime-environment'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -350,7 +351,7 @@ export class WardrobeSilhouetteService {
     return {
       data: {
         uploadSessionId: profile.my_form_upload_session_id,
-        uploadUrl: `${this.publicApiUrl()}/api/v1/wardrobe/silhouette/my-form/uploads/${profile.my_form_upload_session_id}`,
+        uploadUrl: `${publicApiUrl()}/api/v1/wardrobe/silhouette/my-form/uploads/${profile.my_form_upload_session_id}`,
         uploadToken: generateUploadToken(
           profile.my_form_upload_session_id,
           profile.user_id,
@@ -361,10 +362,6 @@ export class WardrobeSilhouetteService {
         expiresAt: profile.my_form_upload_expires_at.toISOString(),
       },
     }
-  }
-
-  private publicApiUrl(): string {
-    return (process.env.PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '')
   }
 
   /** Not-found/ownership/status/expiry/token checks, split out of

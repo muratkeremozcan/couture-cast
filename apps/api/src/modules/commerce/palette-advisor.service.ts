@@ -54,6 +54,7 @@ import { AffiliateOfferService } from './affiliate-offer.service.js'
 import { PaletteAnalysisProcessingQueue } from './palette-analysis-processing.queue.js'
 import { PremiumEntitlementService } from './premium-entitlement.service.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { publicApiUrl } from '../../config/runtime-environment'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 
@@ -446,7 +447,7 @@ export class PaletteAdvisorService {
     return {
       data: {
         uploadSessionId: profile.selfie_upload_session_id,
-        uploadUrl: `${this.publicApiUrl()}/api/v1/commerce/premium/palette/selfie/uploads/${profile.selfie_upload_session_id}`,
+        uploadUrl: `${publicApiUrl()}/api/v1/commerce/premium/palette/selfie/uploads/${profile.selfie_upload_session_id}`,
         uploadToken: generateUploadToken(
           profile.selfie_upload_session_id,
           profile.user_id,
@@ -457,10 +458,6 @@ export class PaletteAdvisorService {
         expiresAt: profile.selfie_upload_expires_at.toISOString(),
       },
     }
-  }
-
-  private publicApiUrl(): string {
-    return (process.env.PUBLIC_API_URL ?? 'http://localhost:3001').replace(/\/+$/, '')
   }
 
   private assertUploadableSession(

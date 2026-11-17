@@ -34,7 +34,7 @@ import {
   type UpdateAdvisorRecommendationInput,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
-import { createWebApiClient } from './api-client'
+import { createWebApiClient, resolveWebApiBaseUrl } from './api-client'
 import {
   generateIdempotencyKey,
   prepareGarmentImage,
@@ -381,6 +381,7 @@ export async function uploadPaletteSelfieFromWeb({
   try {
     await uploadGarmentBytes({
       uploadUrl: allocation.uploadUrl,
+      apiBaseUrl: resolveWebApiBaseUrl(),
       uploadToken: allocation.uploadToken,
       bearerToken: accessToken,
       mimeType: image.mimeType,

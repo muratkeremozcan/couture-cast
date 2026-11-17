@@ -49,6 +49,7 @@ import {
   verifyUploadToken,
 } from './wardrobe-upload-token'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { publicApiUrl } from '../../config/runtime-environment'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -341,10 +342,7 @@ export class WardrobeService {
     if (!garment.upload_session_id || !garment.upload_expires_at || !garment.mime_type) {
       throw new ConflictException('UPLOAD_SESSION_EXPIRED')
     }
-    const baseUrl = (process.env.PUBLIC_API_URL ?? 'http://localhost:3001').replace(
-      /\/+$/,
-      ''
-    )
+    const baseUrl = publicApiUrl()
     return {
       data: {
         garmentId: garment.id,

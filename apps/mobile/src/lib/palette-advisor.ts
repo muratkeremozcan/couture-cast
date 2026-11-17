@@ -24,7 +24,7 @@ import {
   type UpdateAdvisorRecommendationInput,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
-import { createMobileApiClient } from './api-client'
+import { createMobileApiClient, resolveMobileApiBaseUrl } from './api-client'
 import { withRequestTimeout } from './commerce'
 import { resolveMobileAccessToken } from './mobile-auth'
 
@@ -327,6 +327,7 @@ export async function uploadPaletteSelfieFromMobile({
   try {
     await uploadGarmentBytes({
       uploadUrl: allocation.uploadUrl,
+      apiBaseUrl: resolveMobileApiBaseUrl(),
       uploadToken: allocation.uploadToken,
       bearerToken: accessToken,
       mimeType,

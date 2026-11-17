@@ -14,6 +14,7 @@ import {
   generateHttpOpenApiDocument,
   suggestGarmentTagsResponseSchema,
   uploadGarmentBytes,
+  resolveApiUploadUrl,
 } from '../src/contracts/http'
 
 const VALID_SHA256 = 'b6d81b360a5672d80c27430f39153e2c3f359dd3a214b61213cfa1447d2d73e5'
@@ -331,6 +332,37 @@ describe('Wardrobe HTTP Contracts', () => {
   })
 
   describe('uploadGarmentBytes Transport Helper', () => {
+    // Tester report 2026-11-17: production named http://localhost:3001 in the upload URL and
+    // the phone's upload failed with "Failed to fetch".
+    it('sends an /api/v1 upload to the client API base whatever host the API named', async () => {
+      const fetchFn = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(new Response(null, { status: 204 }))
+      await uploadGarmentBytes({
+        uploadUrl: 'http://localhost:3001/api/v1/wardrobe/uploads/session-1?part=1',
+        apiBaseUrl: '',
+        uploadToken: 'upload-token',
+        bearerToken: 'access-token',
+        mimeType: 'image/png',
+        body: new Blob(['x'], { type: 'image/png' }),
+        fetchFn,
+      })
+      expect(fetchFn.mock.calls[0]?.[0]).toBe('/api/v1/wardrobe/uploads/session-1?part=1')
+    })
+
+    it('resolves upload URLs against the client API base only for the API path', () => {
+      const named = 'http://localhost:3001/api/v1/wardrobe/uploads/session-1'
+      expect(resolveApiUploadUrl(named)).toBe(named)
+      expect(resolveApiUploadUrl(named, '')).toBe('/api/v1/wardrobe/uploads/session-1')
+      expect(resolveApiUploadUrl(named, 'https://api.example.test/')).toBe(
+        'https://api.example.test/api/v1/wardrobe/uploads/session-1'
+      )
+      const signed =
+        'https://storage.example.test/object/upload/sign/community/a.jpg?token=t'
+      expect(resolveApiUploadUrl(signed, '')).toBe(signed)
+      expect(resolveApiUploadUrl('not a url', '')).toBe('not a url')
+    })
+
     it('reports completion once for Blob upload bodies', async () => {
       const blobProgress = vi.fn()
       const successfulFetch = vi

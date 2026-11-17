@@ -193,21 +193,20 @@ describe('web palette advisor client (Story 5.4)', () => {
         return HttpResponse.json({
           data: {
             uploadSessionId: 'session-1',
+            // The host production once named (tester report 2026-11-17); the bytes still go
+            // to this app's own API base.
             uploadUrl:
-              'http://localhost/api/v1/commerce/premium/palette/selfie/uploads/session-1',
+              'http://localhost:3001/api/v1/commerce/premium/palette/selfie/uploads/session-1',
             uploadToken: 'upload-token',
             requiredHeaders: { 'content-type': 'image/jpeg' },
             expiresAt: '2026-08-25T10:15:00.000Z',
           },
         })
       }),
-      http.put(
-        'http://localhost/api/v1/commerce/premium/palette/selfie/uploads/session-1',
-        ({ request }) => {
-          bytesHeaders = Object.fromEntries(request.headers.entries())
-          return new HttpResponse(null, { status: 204 })
-        }
-      ),
+      http.put(`${PALETTE_PATH}/selfie/uploads/session-1`, ({ request }) => {
+        bytesHeaders = Object.fromEntries(request.headers.entries())
+        return new HttpResponse(null, { status: 204 })
+      }),
       http.post(`${PALETTE_PATH}/selfie/commit`, async ({ request }) => {
         seen.commit = request.headers.get('idempotency-key')
         seen.body = JSON.stringify(await request.json())
