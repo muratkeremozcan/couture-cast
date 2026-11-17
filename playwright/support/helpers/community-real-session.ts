@@ -187,6 +187,25 @@ export async function verifyRealCommunityOtp(
   return data.session.access_token
 }
 
+/**
+ * Revokes every refresh token of the session `accessToken` belongs to, server side, through the
+ * owned Auth proxy (GoTrue logout, scope global). The browser keeps its stored copy, which is
+ * the stale session a closed laptop or a password change leaves behind.
+ */
+export async function revokeRealSessions(accessToken: string): Promise<void> {
+  const config = JSON.parse(
+    fs.readFileSync(path.join(harnessDirectory(), 'auth-harness.json'), 'utf8')
+  ) as { proxyUrl: string }
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!anonKey) throw new Error('The public Auth configuration is unavailable.')
+  const response = await fetch(`${config.proxyUrl}/auth/v1/logout?scope=global`, {
+    method: 'POST',
+    headers: { apikey: anonKey, authorization: `Bearer ${accessToken}` },
+  })
+  if (response.status !== 204)
+    throw new Error(`Session revocation failed: ${response.status}`)
+}
+
 export function readGeneratedCommunityCode(account: RealCommunityAccount): string {
   const config = JSON.parse(
     fs.readFileSync(path.join(harnessDirectory(), 'auth-harness.json'), 'utf8')

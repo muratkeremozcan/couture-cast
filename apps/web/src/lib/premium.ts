@@ -20,6 +20,7 @@ import {
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 
 // One sessionStorage truth for "is there a web session": the commerce helper
 // reads the same key, and duplicating the check would let the two drift.
@@ -89,7 +90,7 @@ function readAccessToken(): string {
   const token =
     typeof window === 'undefined'
       ? null
-      : (window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
+      : (readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
   if (!token) {
     throw new PremiumRequestError('signed_out', PREMIUM_SIGNED_OUT_MESSAGE)
   }

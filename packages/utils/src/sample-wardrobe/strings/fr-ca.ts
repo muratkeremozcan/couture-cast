@@ -16,6 +16,8 @@ export const frCA: GuestPreviewStrings = {
       "Créez un compte pour ajouter vos vêtements. Après la connexion, vous pourrez choisir d'enregistrer vos préférences de confort. Les articles d'exemple et les J'aime de l'aperçu restent dans cet aperçu.",
     createAccount: 'Créer un compte',
     signIn: 'Se connecter',
+    openWardrobe: 'Ouvrir votre garde-robe',
+    signOut: 'Se déconnecter',
     resetPreview: "Réinitialiser l'aperçu",
     exitPreview: "Quitter l'aperçu",
     storageUnavailable: 'Cet aperçu pourrait être réinitialisé à sa fermeture.',

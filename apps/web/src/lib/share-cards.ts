@@ -20,6 +20,7 @@ import { browserAnalytics } from '../analytics/browser-analytics'
 import { createWebApiClient } from './api-client'
 import { BLOB_DOWNLOAD_URL_LIFETIME_MS } from './blob-download'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 export async function validateWebShareCard(card: PreparedShareCard) {
   const bytes = decodeShareCardBase64(card.pngBase64)
   const digest = await crypto.subtle.digest('SHA-256', bytes)
@@ -31,7 +32,7 @@ export async function validateWebShareCard(card: PreparedShareCard) {
 }
 const memberApi = () =>
   createWebApiClient({
-    accessToken: () => window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY) ?? '',
+    accessToken: () => readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY) ?? '',
   })
 export async function prepareShareCardFromWeb(
   input: PrepareShareCardInput,

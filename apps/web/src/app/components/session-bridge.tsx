@@ -2,6 +2,7 @@
 import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { activateBrowserLocale, syncDocumentLanguage } from '../../i18n'
+import { applyLandingSession, readLandingSession } from '../../lib/landing-session'
 import { resolveFederatedFinishRoute, startWebSession } from '../../lib/web-session'
 
 // The legal pages stay readable mid-signup: Google's consent screen and the finish step link there.
@@ -21,6 +22,11 @@ function resumeFederatedFinish() {
     })
     .catch(() => undefined)
 }
+/** Keeps <html data-session> current (lib/landing-session.ts). */
+function syncLandingSession(settled: boolean) {
+  applyLandingSession(readLandingSession(settled))
+}
+
 export function SessionBridge() {
   // The bridge mounts once in the root layout, so a client-side navigation (a Link from
   // /privacy to /) never remounts it; the resume runs again on every route change instead.
@@ -28,7 +34,26 @@ export function SessionBridge() {
   const [sessionReady, setSessionReady] = useState(false)
   useEffect(() => {
     if (sessionReady) resumeFederatedFinish()
+    syncLandingSession(sessionReady)
   }, [pathname, sessionReady])
+  useEffect(() => {
+    // A sign-in or sign-out in this tab, a session change in another tab (storage), a return
+    // to the tab, and a page restored from Safari's back-forward cache all re-read the session.
+    const sync = () => syncLandingSession(sessionReady)
+    const onPageShow = (event: PageTransitionEvent) => {
+      if (event.persisted) sync()
+    }
+    window.addEventListener('couture:session', sync)
+    window.addEventListener('storage', sync)
+    window.addEventListener('focus', sync)
+    window.addEventListener('pageshow', onPageShow)
+    return () => {
+      window.removeEventListener('couture:session', sync)
+      window.removeEventListener('storage', sync)
+      window.removeEventListener('focus', sync)
+      window.removeEventListener('pageshow', onPageShow)
+    }
+  }, [sessionReady])
   useEffect(() => {
     const stopLanguageSync = syncDocumentLanguage()
     activateBrowserLocale()

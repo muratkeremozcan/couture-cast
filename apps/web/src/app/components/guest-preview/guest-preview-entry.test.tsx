@@ -16,6 +16,27 @@ describe('guest preview entry', () => {
     expect(screen.getByTestId('landing-sign-in').getAttribute('href')).toBe('/signin')
     await getI18n().changeLanguage('en-US')
   })
+
+  // Owner report 2026-11-16: the member set exists beside the signed-out set; globals.css shows
+  // the one that matches <html data-session> (lib/landing-session.ts).
+  it('marks each action with the session it belongs to, in the active locale', async () => {
+    await getI18n().changeLanguage('de-DE')
+    render(<GuestPreviewEntry />)
+    const chrome = GUEST_PREVIEW_STRINGS['de-DE'].chrome
+    const landing = (id: string) => screen.getByTestId(id).getAttribute('data-landing')
+    expect(landing('guest-preview-entry')).toBe('guest')
+    expect(landing('landing-sign-in')).toBe('guest')
+    expect(landing('landing-open-wardrobe')).toBe('member')
+    expect(landing('landing-sign-out')).toBe('member')
+    expect(screen.getByTestId('landing-open-wardrobe').getAttribute('href')).toBe(
+      '/wardrobe'
+    )
+    expect(screen.getByTestId('landing-open-wardrobe').textContent).toBe(
+      chrome.openWardrobe
+    )
+    expect(screen.getByTestId('landing-sign-out').textContent).toBe(chrome.signOut)
+    await getI18n().changeLanguage('en-US')
+  })
 })
 
 describe('sample garment art', () => {

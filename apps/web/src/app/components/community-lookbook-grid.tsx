@@ -2050,7 +2050,13 @@ function CommunitySettingsLink({
 }) {
   if (banned) return null
   return (
-    <Link href={href} className="min-h-12 self-start py-3 underline">
+    <Link
+      href={href}
+      // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a stored
+      // session not verified yet, never sees it (globals.css, lib/landing-session.ts).
+      data-landing={href === '/signin' ? 'guest-inline' : undefined}
+      className="min-h-12 self-start py-3 underline"
+    >
       {label}
     </Link>
   )

@@ -15,6 +15,8 @@ export const ptBR: GuestPreviewStrings = {
       'Crie uma conta para adicionar suas roupas. Depois de entrar, você pode escolher salvar suas preferências de conforto. Os itens de exemplo e as curtidas da prévia ficam nesta prévia.',
     createAccount: 'Criar conta',
     signIn: 'Entrar',
+    openWardrobe: 'Abrir seu guarda-roupa',
+    signOut: 'Sair',
     resetPreview: 'Redefinir prévia',
     exitPreview: 'Sair da prévia',
     storageUnavailable: 'Esta prévia pode ser redefinida quando você fechá-la.',

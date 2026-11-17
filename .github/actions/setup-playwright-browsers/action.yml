@@ -18,6 +18,11 @@ runs:
         restore-keys: |
           playwright-${{ runner.os }}-
 
-    - name: Install Playwright browsers (chromium)
+    # WebKit runs the iPhone guards (the webkit-iphone projects in playwright/config): the owner's
+    # 2026-11-16 sign-in loop and header overflow were seen in iPhone Safari. Its Ubuntu packages
+    # are not on the hosted image, so they install through apt-install.sh, bounded.
+    - name: Install Playwright browsers (chromium, webkit)
       shell: bash
-      run: npx playwright install chromium
+      run: |
+        timeout --kill-after=10 600 bash scripts/ci/apt-install.sh --playwright webkit
+        npx playwright install chromium webkit

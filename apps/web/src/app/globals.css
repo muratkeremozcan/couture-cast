@@ -154,3 +154,27 @@ body {
     animation: none;
   }
 }
+
+/*
+ * Owner report 2026-11-16: a signed-in member saw the landing's Start signup and Sign in and ran
+ * Google sign-in again. lib/landing-session.ts names the session on <html data-session> before
+ * first paint; these rules show the matching landing actions from that first paint. With no
+ * attribute at all (the script could not run) the page stays the signed-out landing.
+ * A pending session is almost always a member's, so it holds the member actions' space without
+ * showing them, and the page does not move when they appear (TEA R3). `guest-inline` marks a
+ * signed-out link inside another section (the Community feed's), which keeps its own space.
+ */
+html:not([data-session='member']):not([data-session='pending']) [data-landing='member'] {
+  display: none !important;
+}
+html[data-session='pending'] [data-landing='member'] {
+  visibility: hidden;
+}
+html[data-session='member'] [data-landing='guest'],
+html[data-session='pending'] [data-landing='guest'],
+html[data-session='member'] [data-landing='guest-inline'] {
+  display: none !important;
+}
+html[data-session='pending'] [data-landing='guest-inline'] {
+  visibility: hidden;
+}
