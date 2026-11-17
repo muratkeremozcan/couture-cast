@@ -476,10 +476,17 @@ test('L-10: the landing hydrates cleanly for a member, a pending session and a v
   await expectPendingLanding(tab)
   // TEA R3: pending holds the member layout, so nothing below the actions moves when the
   // member actions appear. Measured from the hero's own top: the community feed above it loads
-  // on its own schedule.
-  const rowTop = async () =>
-    (await tab.getByTestId('hero-cta-group').boundingBox())!.y -
-    (await tab.getByTestId('hero-section').boundingBox())!.y
+  // on its own schedule. Both boxes are read in one script run, so the feed cannot grow between
+  // the two reads (two boundingBox calls once read -5374 when it landed in between).
+  const rowTop = () =>
+    tab.evaluate(() => {
+      const box = (testId: string) => {
+        const node = document.querySelector(`[data-testid="${testId}"]`)
+        if (!node) throw new Error(`missing ${testId}`)
+        return node.getBoundingClientRect().top
+      }
+      return box('hero-cta-group') - box('hero-section')
+    })
   const pendingTop = await rowTop()
   release()
   await expectMemberLanding(tab)
