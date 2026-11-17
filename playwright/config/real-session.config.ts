@@ -11,6 +11,7 @@ import { defineConfig, devices } from '@playwright/test'
 import {
   API_BASE_URL,
   RAW_DIR,
+  REAL_SESSION_SPEC_PATTERN,
   WEB_BASE_URL,
   assertIsolatedDatabaseUrl,
   consentGrepInvert,
@@ -41,8 +42,7 @@ const metadata = { environment: 'local', apiBaseUrl: API_BASE_URL, baseUrl: WEB_
 export default defineConfig({
   ...localConfig,
   testDir: path.resolve(__dirname, '../tests'),
-  testMatch:
-    /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/,
+  testMatch: REAL_SESSION_SPEC_PATTERN,
   webServer: undefined,
   globalSetup: undefined,
   globalTeardown: undefined,

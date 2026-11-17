@@ -3,7 +3,17 @@
 // and the gate near 30 (last clean pushes of PR 210). Burn-in still runs on every pull
 // request and still fails the gate; it no longer delays the lanes.
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { parse } from 'yaml'
@@ -194,4 +204,113 @@ test('burn-in reads the SKIP_BURN_IN label as it is now, so a rerun after adding
     plan.steps.indexOf(current) < plan.steps.indexOf(detect),
     'the label is read before the changed specs'
   )
+})
+
+// PR 250: burn-in reran a changed real-session spec under the local config, where every case
+// skips without the real-session stack, and the shard guard failed the run as proving nothing.
+// The real-session lane runs those specs on every web pull request, so burn-in leaves them out.
+// The environment for git in a scratch repository: no GIT_* variable from the caller (GIT_DIR,
+// GIT_INDEX_FILE and the like would aim git at the caller's repository) and no user or system
+// config (hooks, signing, templates).
+const scratchGitEnv = (base) => ({
+  ...Object.fromEntries(Object.entries(base).filter(([key]) => !key.startsWith('GIT_'))),
+  GIT_CONFIG_GLOBAL: '/dev/null',
+  GIT_CONFIG_NOSYSTEM: '1',
+})
+const SCRATCH_GIT_CONFIG = [
+  '-c',
+  'user.name=t',
+  '-c',
+  'user.email=t@t',
+  '-c',
+  'commit.gpgsign=false',
+]
+
+// Runs the burn-in detect step's own script in a fresh repository: one base commit, then the
+// files. The child processes get the environment `env` returns, scrubbed by scratchGitEnv.
+const detectChangedAfter = (files, env = () => process.env) => {
+  const detect = workflow('rwf-burn-in.yml').jobs.plan.steps.find(
+    (s) => s.id === 'detect-changed'
+  )
+  const repo = mkdtempSync(path.join(tmpdir(), 'burn-in-detect-'))
+  const git = (...args) =>
+    execFileSync('git', [...SCRATCH_GIT_CONFIG, ...args], {
+      cwd: repo,
+      encoding: 'utf8',
+      env: scratchGitEnv(env()),
+    })
+  try {
+    git('init', '-q', '-b', 'main')
+    writeFileSync(path.join(repo, 'README'), 'base\n')
+    git('add', '.')
+    git('commit', '-q', '-m', 'base')
+    const base = git('rev-parse', 'HEAD').trim()
+    for (const file of files) {
+      mkdirSync(path.dirname(path.join(repo, file)), { recursive: true })
+      writeFileSync(path.join(repo, file), 'test\n')
+    }
+    git('add', '.')
+    git('commit', '-q', '-m', 'change')
+    const output = path.join(repo, '.github-output')
+    writeFileSync(output, '')
+    const script = detect.run
+      .replaceAll('${{ steps.base-ref.outputs.value }}', base)
+      .replaceAll('${{ inputs.test-directory }}', 'playwright/')
+    execFileSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
+      cwd: repo,
+      env: { ...scratchGitEnv(env()), GITHUB_OUTPUT: output },
+      stdio: 'ignore',
+    })
+    return readFileSync(output, 'utf8').trim()
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+}
+
+test('burn-in leaves out real-session specs, which only their own lane can run', () => {
+  assert.equal(
+    detectChangedAfter(['playwright/tests/example-real-session.spec.ts']),
+    'changed=false'
+  )
+  assert.equal(
+    detectChangedAfter([
+      'playwright/tests/example-real-session.spec.ts',
+      'playwright/tests/example.spec.ts',
+    ]),
+    'changed=true'
+  )
+  assert.equal(detectChangedAfter(['apps/web/src/example.ts']), 'changed=false')
+})
+
+// PR 250 review L1: a git hook or a caller that exports GIT_DIR (or GIT_INDEX_FILE) points every
+// git in the scratch repository at the caller's own repository, and its git add rewrote that
+// index. The scratch run must leave any repository the environment names untouched.
+test('the burn-in detect case writes only to its own scratch repository', () => {
+  const sentinel = mkdtempSync(path.join(tmpdir(), 'burn-in-sentinel-'))
+  try {
+    const run = (...args) =>
+      execFileSync('git', [...SCRATCH_GIT_CONFIG, ...args], {
+        cwd: sentinel,
+        encoding: 'utf8',
+        env: scratchGitEnv(process.env),
+      })
+    run('init', '-q', '-b', 'main')
+    writeFileSync(path.join(sentinel, 'kept'), 'kept\n')
+    run('add', '.')
+    run('commit', '-q', '-m', 'sentinel')
+    const before = run('ls-files', '--stage') + run('rev-parse', 'HEAD')
+    const leaking = () => ({
+      ...process.env,
+      GIT_DIR: path.join(sentinel, '.git'),
+      GIT_WORK_TREE: sentinel,
+      GIT_INDEX_FILE: path.join(sentinel, '.git', 'index'),
+    })
+    assert.equal(
+      detectChangedAfter(['playwright/tests/example.spec.ts'], leaking),
+      'changed=true'
+    )
+    assert.equal(run('ls-files', '--stage') + run('rev-parse', 'HEAD'), before)
+  } finally {
+    rmSync(sentinel, { recursive: true, force: true })
+  }
 })
