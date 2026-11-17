@@ -11,11 +11,13 @@ export function readStorage(area: 'local' | 'session', key: string): string | nu
 }
 
 /**
- * The first head script. Where the browser refuses localStorage or sessionStorage, it puts an
- * in-memory store of the same shape in its place before any other script runs, so the auth and
- * analytics SDKs, which read storage while they load, start instead of crashing the app. A
- * person in that browser stays signed in for as long as the tab is open.
+ * The first head script. Where the browser refuses to read localStorage or sessionStorage, it
+ * puts an in-memory store of the same shape in its place before any other script runs, so the
+ * auth and analytics SDKs, which read storage while they load, start instead of crashing the app.
+ * A person in that browser stays signed in for as long as the tab is open. Where reads work but
+ * writes fail (a full store, TEA F4), the real store stays readable, so a stored session still
+ * counts, and new writes go to memory on top of it.
  */
 export function blockedStorageFallbackScript(): string {
-  return "(function(){function fallback(name){try{var s=window[name];var k='__couturecast_probe__';s.setItem(k,k);s.getItem(k);s.removeItem(k)}catch(e){var m=Object.create(null);var store={getItem:function(k){k=String(k);return k in m?m[k]:null},setItem:function(k,v){m[String(k)]=String(v)},removeItem:function(k){delete m[String(k)]},clear:function(){m=Object.create(null)},key:function(i){var keys=Object.keys(m);return i<keys.length?keys[i]:null},get length(){return Object.keys(m).length}};try{Object.defineProperty(window,name,{value:store,configurable:true})}catch(e2){}}}fallback('localStorage');fallback('sessionStorage')})()"
+  return "(function(){function memory(base){var m=Object.create(null);var gone=Object.create(null);function read(k){k=String(k);if(k in m)return m[k];if(k in gone||!base)return null;try{return base.getItem(k)}catch(e){return null}}return{getItem:read,setItem:function(k,v){k=String(k);try{if(base){base.setItem(k,String(v));delete m[k];delete gone[k];return}}catch(e){}m[k]=String(v);delete gone[k]},removeItem:function(k){k=String(k);delete m[k];gone[k]=1;try{if(base)base.removeItem(k)}catch(e){}},clear:function(){m=Object.create(null);gone=Object.create(null);try{if(base)base.clear()}catch(e){}},key:function(i){var keys=Object.keys(m);return i<keys.length?keys[i]:null},get length(){return Object.keys(m).length}}}function fallback(name){var s;try{s=window[name];s.getItem('__couturecast_probe__')}catch(e){try{Object.defineProperty(window,name,{value:memory(null),configurable:true})}catch(e2){}return}try{var k='__couturecast_probe__';s.setItem(k,k);s.removeItem(k)}catch(e){try{Object.defineProperty(window,name,{value:memory(s),configurable:true})}catch(e2){}}}fallback('localStorage');fallback('sessionStorage')})()"
 }

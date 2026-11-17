@@ -4,9 +4,11 @@
 // scrolls sideways, every header and hero action lies inside the viewport and inside every
 // clipping ancestor, and every action label stays on one line. Runs in Chromium and in WebKit
 // with the iPhone 15 descriptor (base.config.ts), in light and dark, in English and German
-// (the longest labels), at 393 px (iPhone 15 and 16) and 320 px (the narrowest supported).
+// (the longest labels), at 393 px (iPhone 15 and 16) and 320 px (the narrowest supported). The
+// bottom navigation is checked too, and no label may be cut inside its own box.
 import type { Page } from '@playwright/test'
 import { expect, test } from '../support/fixtures/merged-fixtures'
+import { seedWebSession } from '../support/helpers/commerce-session'
 
 const WIDTHS = [393, 320] as const
 const SCHEMES = ['light', 'dark'] as const
@@ -38,14 +40,25 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       }
       return null
     }
+    /**
+     * The most lines any one text run of the control takes. Per text run, because a control may
+     * stack an icon above its label on purpose (the bottom navigation).
+     */
     const lineCount = (control: HTMLElement) => {
-      const range = document.createRange()
-      range.selectNodeContents(control)
-      return new Set(
-        Array.from(range.getClientRects())
-          .filter((rect) => rect.width > 0 && rect.height > 0)
-          .map((rect) => Math.round(rect.bottom))
-      ).size
+      const walker = document.createTreeWalker(control, NodeFilter.SHOW_TEXT)
+      let most = 0
+      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+        if (!node.textContent?.trim()) continue
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        const lines = new Set(
+          Array.from(range.getClientRects())
+            .filter((rect) => rect.width > 0 && rect.height > 0)
+            .map((rect) => Math.round(rect.bottom))
+        ).size
+        most = Math.max(most, lines)
+      }
+      return most
     }
     const controlProblems = (control: HTMLElement): string[] => {
       const box = control.getBoundingClientRect()
@@ -64,6 +77,18 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       if (clip) problems.push(`"${name}" is clipped by a <${clip}>`)
       const lines = lineCount(control)
       if (lines > 1) problems.push(`"${name}" wraps onto ${lines} lines`)
+      // TEA P5: a label cut by its own box (an ellipsis or a clipped bottom-nav label).
+      for (const part of [
+        control,
+        ...Array.from(control.querySelectorAll<HTMLElement>('*')),
+      ])
+        if (
+          // A screen-reader-only part is a 1 px clipped box on purpose.
+          part.clientWidth > 1 &&
+          part.scrollWidth > part.clientWidth + 0.5 &&
+          getComputedStyle(part).overflow !== 'visible'
+        )
+          problems.push(`"${name}" is cut inside its own box`)
       return problems
     }
 
@@ -73,9 +98,60 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
         ? []
         : [`page scrolls sideways: scrollWidth ${scrollWidth} > ${width}`]
     const controls = document.querySelectorAll<HTMLElement>(
-      'header a, header button, [data-testid="hero-section"] a, [data-testid="hero-section"] button, [data-testid="hero-section"] label'
+      'header a, header button, [data-testid="hero-section"] a, [data-testid="hero-section"] button, [data-testid="hero-section"] label, [data-testid="sticky-bottom-nav"] a'
     )
     for (const control of Array.from(controls)) problems.push(...controlProblems(control))
+    return problems
+  })
+}
+
+/**
+ * Layout settles in the frame after a resize or a scheme change, and colours once their
+ * transitions end (TEA F5: a screenshot mid-transition showed + Add Garment as if disabled).
+ */
+async function settle(page: Page) {
+  await page.evaluate(
+    () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
+  )
+  // Colour transitions only: a looping animation (a loading pulse) never finishes, and one that
+  // is cancelled rejects.
+  await page.evaluate(() =>
+    Promise.all(
+      document
+        .getAnimations()
+        .filter((animation) => animation instanceof CSSTransition)
+        .map((animation) => animation.finished.catch(() => null))
+    ).then(() => null)
+  )
+}
+
+/**
+ * TEA P4: below the sm breakpoint the Wardrobe Hub's two secondary actions share the first row
+ * in equal halves and + Add Garment takes the whole second row.
+ */
+async function wardrobeHeaderProblems(page: Page): Promise<Problem[]> {
+  return page.evaluate(() => {
+    const box = (element: Element | null) => element?.getBoundingClientRect()
+    const capsules = box(document.querySelector('[data-testid="wardrobe-capsules-link"]'))
+    const header = document.querySelector('header')
+    const buttons = Array.from(header?.querySelectorAll('button') ?? [])
+    const silhouette = box(
+      buttons.find((button) => !button.textContent?.includes('Add')) ?? null
+    )
+    const add = box(
+      buttons.find((button) => button.textContent?.includes('Add Garment')) ?? null
+    )
+    if (!capsules || !silhouette || !add) return ['a Wardrobe Hub action is missing']
+    const near = (a: number, b: number) => Math.abs(a - b) <= 1
+    const problems: string[] = []
+    if (!near(capsules.top, silhouette.top))
+      problems.push('the secondaries are not on one row')
+    if (!near(capsules.width, silhouette.width))
+      problems.push('the secondaries are not equal halves')
+    if (!(add.top >= capsules.bottom))
+      problems.push('+ Add Garment is not below the secondaries')
+    if (!near(add.left, capsules.left) || !near(add.right, silhouette.right))
+      problems.push('+ Add Garment does not span the row')
     return problems
   })
 }
@@ -87,12 +163,12 @@ async function expectNoOverflow(page: Page, route: string) {
     await page.setViewportSize({ width, height: 852 })
     for (const colorScheme of SCHEMES) {
       await page.emulateMedia({ colorScheme })
-      // Layout settles in the frame after a resize or a scheme change.
-      await page.evaluate(
-        () => new Promise((resolve) => requestAnimationFrame(() => resolve(null)))
-      )
+      await settle(page)
       for (const problem of await layoutProblems(page))
         problems.push(`${route} at ${width} px, ${colorScheme}: ${problem}`)
+      if (route === '/wardrobe')
+        for (const problem of await wardrobeHeaderProblems(page))
+          problems.push(`${route} at ${width} px, ${colorScheme}: ${problem}`)
     }
   }
   expect(problems).toEqual([])
@@ -114,14 +190,21 @@ for (const locale of ['en-US', 'de-DE']) {
         'The signed-in fixture session exists only on the local stack.'
       )
       for (const route of MEMBER_ROUTES)
-        test(`O-1 ${route} fits a phone, signed in`, async ({ page }, testInfo) => {
+        test(`O-1 ${route} fits a phone, signed in`, async ({
+          page,
+          authToken,
+        }, testInfo) => {
+          // TEA F3: the app's own bearer, so the landing really is the member landing.
+          await seedWebSession(page, authToken)
           await open(page, route)
+          await expect(page.locator('html')).toHaveAttribute('data-session', 'member')
           await expectNoOverflow(page, route)
           // TEA opens these before sign-off: the header the owner reported, at 393 px.
           if (route === '/wardrobe')
             for (const colorScheme of SCHEMES) {
               await page.setViewportSize({ width: 393, height: 852 })
               await page.emulateMedia({ colorScheme })
+              await settle(page)
               await testInfo.attach(`wardrobe-header-393-${colorScheme}-${locale}`, {
                 body: await page.locator('header').first().screenshot(),
                 contentType: 'image/png',

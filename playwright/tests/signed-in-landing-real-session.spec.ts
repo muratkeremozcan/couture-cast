@@ -4,7 +4,7 @@
 // ran Google again: a sign-in loop from the person's side. The landing now reads the session
 // before first paint. Runs in the owned real-session lane, in Chromium and in WebKit with the
 // iPhone 15 descriptor (real-session.config.ts), against real GoTrue, the Google stand-in and
-// the isolated database. TEA test design for fix/web-signed-in-landing, cases L-1 to L-10 and H-1 to H-7.
+// the isolated database. TEA test design for fix/web-signed-in-landing, cases L-1 to L-11, H-1 to H-7 and the sign-off findings F1, F2 and F6.
 import { randomUUID } from 'node:crypto'
 import type { Page, Request } from '@playwright/test'
 import { expect, test } from '../support/fixtures/merged-fixtures'
@@ -79,6 +79,14 @@ async function expectMemberLanding(page: Page) {
   await expect(page.getByRole('link', { name: 'Start signup', exact: true })).toHaveCount(
     0
   )
+  // TEA F2: the signed-out set is removed from layout, not only hidden, so the member actions
+  // start where the hero text starts, with no empty space before Open your wardrobe.
+  for (const selector of GUEST_LANDING_ACTIONS)
+    await expect(page.locator(selector)).toHaveCSS('display', 'none')
+  const left = async (testId: string) => (await page.getByTestId(testId).boundingBox())!.x
+  expect(
+    Math.abs((await left('landing-open-wardrobe')) - (await left('hero-headline')))
+  ).toBeLessThanOrEqual(1)
 }
 
 /**
@@ -90,6 +98,7 @@ async function expectPendingLanding(page: Page) {
   await expect(page.getByTestId('hero-headline')).toBeVisible()
   await expect(page.getByTestId('cta-primary')).toBeVisible()
   await expect(page.getByTestId('cta-secondary')).toBeVisible()
+  await expect(page.getByTestId('track-wardrobe-upload-started')).toBeVisible()
   for (const name of ['Sign in', 'Start signup', 'Try a sample wardrobe', 'Sign out'])
     await expect(page.getByRole('link', { name, exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Sign out', exact: true })).toHaveCount(0)
@@ -156,6 +165,12 @@ function collectPageErrors(page: Page, options: { strict: boolean }) {
       /hydrat|Minified React error|Content Security Policy|Refused to execute/i.test(text)
     )
       errors.push(text)
+    // Next.js reports a route prefetch that a navigation cancelled and then serves the page
+    // itself; nothing failed.
+    else if (
+      /^Failed to fetch RSC payload .* Falling back to browser navigation/.test(text)
+    )
+      return
     else if (options.strict && message.type() === 'error') errors.push(text)
   })
   page.on('pageerror', (error) => {
@@ -429,7 +444,10 @@ test('L-10: the landing hydrates cleanly for a member, a pending session and a v
   const errors = collectPageErrors(page, { strict: false })
   const landing = await page.request.get('/')
   const policy = landing.headers()['content-security-policy'] ?? ''
-  // Should a policy ever arrive, it must allow this inline script; the attribute below proves it ran.
+  // Should a policy ever arrive, it must allow the inline head scripts (TEA H-6). The states the
+  // page reaches below come from the head script and SessionBridge alike, so this case proves the
+  // hydration and policy errors are absent, not that the head script ran; L-1, L-3 and L-8 cover
+  // the head script (they fail without it).
   expect(
     policy === '' || /script-src[^;]*('sha256-|'nonce-|'unsafe-inline')/.test(policy)
   ).toBe(true)
@@ -459,4 +477,49 @@ test('L-10: the landing hydrates cleanly for a member, a pending session and a v
   await expectMemberLanding(tab)
 
   expect([...errors, ...tabErrors]).toEqual([])
+})
+
+// TEA F1: a member who returns to an open tab after the access token expired must not see
+// Sign in while the SDK refreshes. The expiry is written in place, the refresh is held, and the
+// tab is focused again, as a person switching back to it does.
+test('L-11: a member returning to a tab after the token expired never sees Sign in', async ({
+  page,
+  apiRequest,
+}) => {
+  const account = await member(apiRequest)
+  await recordLandingActions(page)
+  await signInWithCode(page, account)
+  await expectMemberLanding(page)
+
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route(isRefreshUrl, async (route) => {
+    await held
+    await route.continue()
+  })
+  // From here on: emptied in place, because the recorder keeps writing to the same lists.
+  await page.evaluate(() => {
+    const seen = window.__landingActionsSeen!
+    seen.guest.length = 0
+    seen.member.length = 0
+    seen.states.length = 0
+  })
+  await page.evaluate((key) => {
+    const session = JSON.parse(window.localStorage.getItem(key)!) as {
+      expires_at: number
+    }
+    session.expires_at = Math.floor(Date.now() / 1000) - 60
+    window.localStorage.setItem(key, JSON.stringify(session))
+    window.dispatchEvent(new Event('focus'))
+    // Bubbles to window, where the auth SDK listens for a tab becoming visible again.
+    document.dispatchEvent(new Event('visibilitychange', { bubbles: true }))
+  }, SESSION_KEY)
+  await expect(page.locator('html')).toHaveAttribute('data-session', 'pending')
+  await expect(page.getByRole('link', { name: 'Sign in', exact: true })).toHaveCount(0)
+
+  release()
+  await expectMemberLanding(page)
+  const seen = await landingActionsSeen(page)
+  expect(seen.guest).toEqual([])
+  expect(seen.states).not.toContain('none')
 })

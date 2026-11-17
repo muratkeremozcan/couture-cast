@@ -256,11 +256,13 @@ function WardrobeHubView() {
             <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-50">
               Wardrobe Hub
             </h1>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            {/* TEA P4: on phones the two secondary actions share the first row in equal halves and
+                + Add Garment, the primary, takes the full second row. */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center sm:gap-3">
               {/* The capsules route had no entry point anywhere in the app. */}
               <Link
                 href="/wardrobe/capsules"
-                className="flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
                 data-testid="wardrobe-capsules-link"
               >
                 Outfit capsules
@@ -275,14 +277,14 @@ function WardrobeHubView() {
                     ? 'Unable to load your account. Reload the page to try again.'
                     : undefined
                 }
-                className="flex min-h-[44px] items-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                className="flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 focus:ring-2 focus:ring-black focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-800"
               >
                 {t('wardrobe.silhouette.title')}
               </button>
               <button
                 ref={addGarmentButtonRef}
                 onClick={(event) => openCapture(event.currentTarget)}
-                className="min-h-[44px] whitespace-nowrap rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+                className="col-span-2 min-h-[44px] whitespace-nowrap rounded-lg bg-zinc-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
               >
                 + Add Garment
               </button>

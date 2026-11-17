@@ -87,7 +87,8 @@ const CASES: Case[] = [
     local: EXPIRED,
     session: BEARER,
     before: 'pending',
-    after: 'none',
+    // TEA F1: a tab back from sleep waits for the refresh instead of showing Sign in.
+    after: 'pending',
   },
   // TEA H-2: corrupt storage is signed out, never pending and never member.
   {

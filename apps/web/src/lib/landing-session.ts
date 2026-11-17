@@ -33,7 +33,8 @@ type StorageReader = Pick<Storage, 'getItem'>
  * (TEA H-2: corrupt storage is signed out). A member needs this tab's verified bearer and a
  * stored session that has not expired (TEA H-1: an expired session may be revoked, so it waits
  * for the refresh instead of painting the member landing). `settled` is true once this page's
- * session start finished: a stored session it did not turn into a member is then signed out.
+ * session start finished: a stored session it did not turn into a member is then signed out,
+ * unless this tab holds a bearer for it, which means a refresh is due (TEA F1).
  * `e2eAuth` accepts the local end-to-end fixture bearer, which has no stored Supabase session.
  */
 export function decideLandingSession(
@@ -43,24 +44,32 @@ export function decideLandingSession(
   e2eAuth: boolean,
   now: number
 ): LandingSession {
-  let session: { expires_at?: unknown; refresh_token?: unknown } | null = null
-  if (stored !== null) {
+  // Inner helpers keep it self-contained: they travel with its source into the head script.
+  const expiryOf = (raw: string | null): number | null => {
+    if (raw === null) return null
     try {
-      session = JSON.parse(stored) as { expires_at?: unknown; refresh_token?: unknown }
+      const parsed = JSON.parse(raw) as {
+        expires_at?: unknown
+        refresh_token?: unknown
+      } | null
+      if (parsed === null || typeof parsed !== 'object') return null
+      if (typeof parsed.refresh_token !== 'string' || parsed.refresh_token === '')
+        return null
+      return typeof parsed.expires_at === 'number' ? parsed.expires_at : null
     } catch {
-      session = null
+      return null
     }
   }
-  const valid =
-    session !== null &&
-    typeof session === 'object' &&
-    typeof session.expires_at === 'number' &&
-    typeof session.refresh_token === 'string' &&
-    session.refresh_token !== ''
-  const live = valid && (session!.expires_at as number) * 1000 > now
+  const expiresAt = expiryOf(stored)
+  const valid = expiresAt !== null
+  const live = valid && expiresAt * 1000 > now
   const token = (bearer || '').trim()
   const fixture = e2eAuth && token.indexOf('test-token') === 0
   if (token !== '' && (live || fixture)) return 'member'
+  // TEA F1: a tab that verified a member and then sat past the access token's expiry waits for
+  // the SDK's refresh, which either renews it (member) or clears it (signed out). Calling it
+  // signed out meanwhile showed a returning member Sign in again.
+  if (token !== '' && valid) return 'pending'
   if (valid && !settled) return 'pending'
   return 'none'
 }

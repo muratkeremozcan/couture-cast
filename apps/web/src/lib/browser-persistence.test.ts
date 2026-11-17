@@ -48,6 +48,30 @@ describe('the blocked-storage head script', () => {
     expect(local.getItem('__couturecast_probe__')).toBeNull()
   })
 
+  // TEA F4: a full store refuses writes but still holds a valid stored session.
+  it('keeps a store that refuses only writes readable, and writes on top of it in memory', () => {
+    const saved: Record<string, string> = {
+      'couturecast.auth-session': '{"stored":true}',
+    }
+    const full = {
+      getItem: (key: string) => saved[key] ?? null,
+      setItem: () => {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+      },
+      removeItem: (key: string) => void delete saved[key],
+    }
+    const fake: FakeWindow = { localStorage: full, sessionStorage: window.sessionStorage }
+    fallback(fake)
+    const store = fake.localStorage as Storage
+    expect(store).not.toBe(full)
+    expect(fake.sessionStorage).toBe(window.sessionStorage)
+    expect(store.getItem('couturecast.auth-session')).toBe('{"stored":true}')
+    store.setItem('new', 'value')
+    expect(store.getItem('new')).toBe('value')
+    store.removeItem('couturecast.auth-session')
+    expect(store.getItem('couturecast.auth-session')).toBeNull()
+  })
+
   for (const refusal of ['reads', 'access'] as const)
     it(`puts a working in-memory store in place when the browser refuses ${refusal}`, () => {
       const fake: FakeWindow = {}

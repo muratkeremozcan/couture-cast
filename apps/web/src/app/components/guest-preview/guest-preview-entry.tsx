@@ -2,7 +2,8 @@
 // Story 6.16 D1: the landing's way into the labeled guest preview, beside signup.
 // Owner report 2026-11-16: a signed-in member saw these signed-out actions and ran Google
 // sign-in again. Each set carries data-landing, and globals.css shows only the set that matches
-// <html data-session> (lib/landing-session.ts), from first paint.
+// <html data-session> (lib/landing-session.ts), from first paint. On phones the text links sit
+// flush with the buttons above and below them (TEA P2).
 import Link from 'next/link'
 import { useTranslation } from 'react-i18next'
 import { getGuestPreviewStrings } from '@couture/utils'
@@ -26,7 +27,7 @@ export function GuestPreviewEntry() {
         href="/signin"
         data-testid="landing-sign-in"
         data-landing="guest"
-        className="inline-flex min-h-11 items-center rounded-full px-3 py-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-neutral-200 underline underline-offset-4 hover:text-amber-200"
+        className="inline-flex min-h-11 items-center rounded-full px-0 py-3 sm:px-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-neutral-200 underline underline-offset-4 hover:text-amber-200"
       >
         {strings.chrome.signIn}
       </Link>
@@ -43,7 +44,7 @@ export function GuestPreviewEntry() {
         data-testid="landing-sign-out"
         data-landing="member"
         onClick={() => void signOutWebSession().catch(() => undefined)}
-        className="inline-flex min-h-11 items-center rounded-full px-3 py-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-neutral-200 underline underline-offset-4 hover:text-amber-200"
+        className="inline-flex min-h-11 items-center rounded-full px-0 py-3 sm:px-3 whitespace-nowrap text-sm font-semibold sm:uppercase sm:tracking-[0.24em] text-neutral-200 underline underline-offset-4 hover:text-amber-200"
       >
         {strings.chrome.signOut}
       </button>
