@@ -20,6 +20,14 @@
 // (EXPO_PUBLIC_E2E_OAUTH_PROVIDER) is read only inside `__DEV__`, so each export runs with it set
 // to a sentinel and a release bundle that still contains the sentinel fails the scan.
 //
+// The E2E member token rides on them too. Development harnesses bake a member token into the
+// Metro bundle (EXPO_PUBLIC_E2E_ACCESS_TOKEN from scripts/run-maestro.mjs,
+// scripts/run-test-store-journey.mjs and scripts/ci/android-network-timeout.sh, or
+// EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE for a sharded run) with EXPO_PUBLIC_E2E_AUTH_MODE other
+// than 'real'. apps/mobile/src/lib/mobile-auth.ts and native-session.ts read them only inside
+// `__DEV__`, so each export runs in member mode with both token keys set to sentinels, and a
+// release bundle holding either sentinel, or the network-timeout placeholder, fails the scan.
+//
 // Usage: node scripts/ci/revenuecat-bundle-scan.mjs [--env-file <path with the Test Store key>]
 import { spawnSync } from 'node:child_process'
 import fs, { realpathSync } from 'node:fs'
@@ -40,6 +48,24 @@ export { TEST_STORE_KEY_VARIABLE }
 /** Story 6.17 D10: the development-only OAuth stand-in switch and the value the scan plants. */
 export const E2E_OAUTH_PROVIDER_VARIABLE = 'EXPO_PUBLIC_E2E_OAUTH_PROVIDER'
 export const E2E_OAUTH_PROVIDER_SENTINEL = 'couturecast-oauth-standin-sentinel'
+
+/** The development-only member mode switch and token keys, with the values the scan plants. */
+export const E2E_AUTH_MODE_VARIABLE = 'EXPO_PUBLIC_E2E_AUTH_MODE'
+export const E2E_ACCESS_TOKEN_VARIABLE = 'EXPO_PUBLIC_E2E_ACCESS_TOKEN'
+export const E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE =
+  'EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE'
+export const E2E_ACCESS_TOKEN_SENTINEL = 'couturecast-e2e-member-token-sentinel'
+export const E2E_DEVICE_TOKEN_SENTINEL = 'couturecast-e2e-device-token-sentinel'
+/** The member token scripts/ci/android-network-timeout.sh bakes into its development bundle. */
+export const NETWORK_TIMEOUT_MEMBER_TOKEN = 'network-timeout-member-placeholder'
+
+/** Every marker a release export must not contain. */
+export const RELEASE_MARKERS = [
+  E2E_OAUTH_PROVIDER_SENTINEL,
+  E2E_ACCESS_TOKEN_SENTINEL,
+  E2E_DEVICE_TOKEN_SENTINEL,
+  NETWORK_TIMEOUT_MEMBER_TOKEN,
+]
 
 /** The release exports the scan proves, in the order it runs them. */
 export const EXPORT_SHAPES = [
@@ -85,10 +111,11 @@ export function scanExport(root, key, markers = []) {
 
 /**
  * The per-shape release check the CLI loop runs on each export: the Test Store key, any `test_`
- * RevenueCat key, and the planted OAuth stand-in sentinel (Story 6.17 D10).
+ * RevenueCat key, the planted OAuth stand-in sentinel (Story 6.17 D10) and the planted member
+ * token sentinels.
  */
 export function scanReleaseExport(out, key) {
-  return scanExport(out, key, [E2E_OAUTH_PROVIDER_SENTINEL])
+  return scanExport(out, key, RELEASE_MARKERS)
 }
 
 /** Reads one variable from a dotenv file without exposing the rest. */
@@ -119,6 +146,11 @@ export function exportCommand(shape, { eas, key, out, env = process.env }) {
       EAS_BUILD_PROFILE: shape.profile,
       [TEST_STORE_KEY_VARIABLE]: key,
       [E2E_OAUTH_PROVIDER_VARIABLE]: E2E_OAUTH_PROVIDER_SENTINEL,
+      [E2E_AUTH_MODE_VARIABLE]: 'member',
+      [E2E_ACCESS_TOKEN_VARIABLE]: E2E_ACCESS_TOKEN_SENTINEL,
+      [E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE]: JSON.stringify({
+        'couture-e2e-1': E2E_DEVICE_TOKEN_SENTINEL,
+      }),
     },
   }
 }
@@ -160,8 +192,8 @@ if (process.argv[1] && realpathSync(process.argv[1]) === fileURLToPath(import.me
       const hits = scanReleaseExport(out, key)
       console.log(
         hits.length
-          ? `revenuecat-bundle-scan: ${shape.name}: Test Store key or OAuth stand-in found in ${hits.join(', ')}`
-          : `revenuecat-bundle-scan: ${shape.name}: no Test Store key or OAuth stand-in in ${[...files(out)].length} exported files`
+          ? `revenuecat-bundle-scan: ${shape.name}: Test Store key, OAuth stand-in or E2E member token found in ${hits.join(', ')}`
+          : `revenuecat-bundle-scan: ${shape.name}: no Test Store key, OAuth stand-in or E2E member token in ${[...files(out)].length} exported files`
       )
       if (hits.length) failed = true
     } finally {

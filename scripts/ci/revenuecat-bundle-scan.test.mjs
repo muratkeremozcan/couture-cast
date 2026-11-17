@@ -4,12 +4,21 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 
+import { profileEnvBlocks } from './revenuecat-key-hygiene.mjs'
+
 import {
+  E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE,
+  E2E_ACCESS_TOKEN_SENTINEL,
+  E2E_ACCESS_TOKEN_VARIABLE,
+  E2E_AUTH_MODE_VARIABLE,
+  E2E_DEVICE_TOKEN_SENTINEL,
   E2E_OAUTH_PROVIDER_SENTINEL,
   E2E_OAUTH_PROVIDER_VARIABLE,
+  NETWORK_TIMEOUT_MEMBER_TOKEN,
   EXPORT_SHAPES,
   TEST_STORE_KEY_VARIABLE,
   exportCommand,
@@ -91,6 +100,130 @@ test('the per-shape release check reports the planted sentinel and the Test Stor
   assert.deepEqual(bundleScan.scanReleaseExport(clean, 'secretvalue123'), [])
 })
 
+// PR 249: the network-timeout harness bakes a placeholder member token into its development
+// bundle. Each release export runs in member mode with both token keys planted, so a release
+// bundle that inlined either one, or the harness placeholder, fails the scan.
+test('the per-shape release check reports a seeded E2E member token leak', async (t) => {
+  const { scanReleaseExport } = await import('./revenuecat-bundle-scan.mjs')
+  for (const leak of [
+    E2E_ACCESS_TOKEN_SENTINEL,
+    E2E_DEVICE_TOKEN_SENTINEL,
+    NETWORK_TIMEOUT_MEMBER_TOKEN,
+  ]) {
+    const root = exportTree(t, {
+      '_expo/static/js/android/entry.hbc': `bearer${leak}authorization`,
+      '_expo/static/js/ios/entry.hbc': 'bearer authorization',
+    })
+    assert.deepEqual(
+      scanReleaseExport(root, 'secretvalue123'),
+      ['_expo/static/js/android/entry.hbc'],
+      leak
+    )
+  }
+})
+
+// Member mode reaches a bundle only through the env Metro starts with, so no EAS build profile
+// may set it, and only the development harnesses write the member token.
+test('no EAS build profile sets member mode or a member token', () => {
+  const eas = JSON.parse(fs.readFileSync('apps/mobile/eas.json', 'utf8'))
+  const variables = [
+    E2E_AUTH_MODE_VARIABLE,
+    E2E_ACCESS_TOKEN_VARIABLE,
+    E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE,
+  ]
+  const leaks = (config) =>
+    Object.entries(config.build).flatMap(([name, profile]) =>
+      profileEnvBlocks(profile).flatMap(([where, block]) =>
+        variables
+          .filter((variable) => variable in block)
+          .map((v) => `${name}.${where}: ${v}`)
+      )
+    )
+  assert.deepEqual(leaks(eas), [])
+  // The check finds a seeded leak.
+  assert.deepEqual(
+    leaks({
+      build: {
+        production: { android: { env: { [E2E_ACCESS_TOKEN_VARIABLE]: 'leak' } } },
+      },
+    }).length,
+    1
+  )
+})
+
+// A source line that writes the E2E member token (or its per-device map): a shell or dotenv
+// assignment, an env property or bracket write, or an object, JSON or YAML key.
+const writesMemberToken = (source) => {
+  const name = `${E2E_ACCESS_TOKEN_VARIABLE}(?:_BY_DEVICE)?`
+  const quoted = `['"\`]${name}['"\`]`
+  return new RegExp(
+    [
+      // NAME=value, env.NAME = value
+      `${name}\\s*=(?!=)`,
+      // env['NAME'] = value
+      `\\[\\s*${quoted}\\s*\\]\\s*=(?!=)`,
+      // { "NAME": value }
+      `${quoted}\\s*:`,
+      // { NAME: value }, YAML NAME: value
+      `(?:^|[{,])\\s*${name}\\s*:`,
+    ].join('|'),
+    'm'
+  ).test(source)
+}
+
+test('the writer check sees every way to write the E2E member token', () => {
+  const token = E2E_ACCESS_TOKEN_VARIABLE
+  for (const write of [
+    `${token}=abc npx expo start`,
+    `export ${token}_BY_DEVICE='{}'`,
+    `process.env.${token} = token`,
+    `env['${token}'] = token`,
+    `env[\`${token}_BY_DEVICE\`]=map`,
+    `{ "${token}": token }`,
+    `Object.assign(process.env, {${token}:token})`,
+    `spawn(cmd, { env: { ...process.env, ${token}: token } })`,
+    `env:\n  ${token}: abc`,
+  ]) {
+    assert.equal(writesMemberToken(write), true, write)
+  }
+  for (const read of [
+    `const value = process.env.${token} ?? ''`,
+    `if (process.env.${token} === undefined) return`,
+    `const token = flag ? process.env.${token} : undefined`,
+    `const key = env['${token}']`,
+  ]) {
+    assert.equal(writesMemberToken(read), false, read)
+  }
+})
+
+test('only the development harnesses write the E2E member token', () => {
+  const tracked = spawnSync(
+    'git',
+    ['ls-files', '-z', '--', 'apps', 'scripts', '.github', 'packages'],
+    {
+      encoding: 'utf8',
+    }
+  )
+    .stdout.split('\0')
+    .filter(Boolean)
+  const writers = tracked.filter(
+    (file) =>
+      // Tests and their fixtures write nothing a build reads.
+      !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+      !/(^|\/)test\/fixtures\//.test(file) &&
+      fs.existsSync(file) &&
+      fs.statSync(file).isFile() &&
+      writesMemberToken(fs.readFileSync(file, 'utf8'))
+  )
+  assert.deepEqual(writers.sort(), [
+    // The rule that pins the harness's Metro line.
+    'scripts/ci/android-native-workflow.mjs',
+    'scripts/ci/android-network-timeout.sh',
+    'scripts/run-maestro.mjs',
+    'scripts/run-test-store-journey.mjs',
+  ])
+})
+
 test('reads one variable from a dotenv file, quoted or not', (t) => {
   const root = exportTree(t, {
     '.env.local':
@@ -170,6 +303,11 @@ test('the scan exports production and preview, each with its env files and EAS p
     EAS_BUILD_PROFILE: 'production',
     [TEST_STORE_KEY_VARIABLE]: key,
     [E2E_OAUTH_PROVIDER_VARIABLE]: E2E_OAUTH_PROVIDER_SENTINEL,
+    [E2E_AUTH_MODE_VARIABLE]: 'member',
+    [E2E_ACCESS_TOKEN_VARIABLE]: E2E_ACCESS_TOKEN_SENTINEL,
+    [E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE]: JSON.stringify({
+      'couture-e2e-1': E2E_DEVICE_TOKEN_SENTINEL,
+    }),
   })
   assert.deepEqual(preview.args, [
     'expo',

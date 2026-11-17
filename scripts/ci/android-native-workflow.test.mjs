@@ -313,6 +313,12 @@ describe('android-native.yml', () => {
       flow(w).with.script = 'bash scripts/ci/share-card-android.sh'
     }
   )
+  // Diag run 44008046979: the build's daemons held about 5.5 GB through the emulator step.
+  rejected('the emulator beside the build daemons', /stop its daemons/, (w) => {
+    network(w).steps = network(w).steps.filter(
+      (row) => !String(row.run).includes('stop-gradle-daemons.sh')
+    )
+  })
   rejected('the flow without Maestro', /install Maestro/, (w) => {
     network(w).steps = network(w).steps.filter(
       (row) => !String(row.run).includes('maestro-install.mjs')
@@ -333,6 +339,18 @@ describe('android-native.yml', () => {
       'Metro pointed at a live API',
       'http://10.0.2.2:4010',
       'http://10.0.2.2:4000',
+      /does not start: \(cd apps\/mobile/,
+    ],
+    [
+      'Metro with no member token',
+      'EXPO_PUBLIC_E2E_ACCESS_TOKEN=network-timeout-member-placeholder ',
+      '',
+      /does not start: \(cd apps\/mobile/,
+    ],
+    [
+      'a signed-out Metro',
+      'EXPO_PUBLIC_E2E_AUTH_MODE=member',
+      'EXPO_PUBLIC_E2E_AUTH_MODE=real',
       /does not start: \(cd apps\/mobile/,
     ],
     [
@@ -413,7 +431,7 @@ describe('android-network-timeout.sh', () => {
       // publishes the grandchild's pid in one rename, so a reader never sees half a pid.
       stub(
         path.join(bin, 'npx'),
-        `echo "metro-env $EXPO_PUBLIC_API_BASE_URL $EXPO_PUBLIC_SUPABASE_URL $EXPO_PUBLIC_SUPABASE_ANON_KEY" >> "${dir}/calls"\necho $$ >> "${dir}/stub-pids"\n/bin/sleep 30 &\necho $! > "${dir}/metro-child.tmp"\n/bin/mv "${dir}/metro-child.tmp" "${dir}/metro-child"\nexec /bin/sleep 30`
+        `echo "metro-env $EXPO_PUBLIC_API_BASE_URL $EXPO_PUBLIC_SUPABASE_URL $EXPO_PUBLIC_SUPABASE_ANON_KEY" >> "${dir}/calls"\necho "metro-auth mode=\${EXPO_PUBLIC_E2E_AUTH_MODE-} token=\${EXPO_PUBLIC_E2E_ACCESS_TOKEN-} by-device=\${EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE-}" >> "${dir}/calls"\necho $$ >> "${dir}/stub-pids"\n/bin/sleep 30 &\necho $! > "${dir}/metro-child.tmp"\n/bin/mv "${dir}/metro-child.tmp" "${dir}/metro-child"\nexec /bin/sleep 30`
       )
       // Real Metro answers its status route only once it runs, so the stub does too: it answers
       // after Metro's grandchild exists. Without this the script could finish, and stop Metro,
@@ -530,6 +548,21 @@ describe('android-network-timeout.sh', () => {
     )
   })
 
+  // Android native runs 43862298410 and 43964196075: Story 6.16 sends Home's ritual request only
+  // for a member, and the bundle signed nobody in, so Home showed the signed-out welcome card and
+  // the tarpit never saw a request. In __DEV__, apps/mobile/src/lib/mobile-auth.ts returns a baked
+  // token unless the auth mode is 'real', and Home's session state is then 'member'.
+  test('Metro serves a member bundle, so Home sends the ritual request the tarpit holds', () => {
+    const { status, calls } = run()
+    assert.equal(status, 0)
+    const auth = calls.match(/^metro-auth mode=(\S*) token=(\S*) by-device=(\S*)$/m)
+    assert.ok(auth, 'Metro started with its auth env recorded')
+    const [, mode, token, byDevice] = auth
+    assert.notEqual(mode, 'real', 'a real-auth bundle resolves only a native session')
+    assert.ok(token.length > 0, 'the bundle carries a member token')
+    assert.equal(byDevice, '', 'one device, one token')
+  })
+
   test('fails before the flow when the manifest names no bundle', () => {
     const { status, calls } = run({ MANIFEST: '{}' })
     assert.notEqual(status, 0)
@@ -631,6 +664,27 @@ describe('android-native.yml android-google-sign-in', () => {
       0,
       build
     )
+  })
+  rejectedGoogle('the emulator beside the build daemons', /stop its daemons/, (w) => {
+    google(w).steps = google(w).steps.filter(
+      (row) => !String(row.run).includes('stop-gradle-daemons.sh')
+    )
+  })
+  rejectedGoogle('the daemons stopped before the build', /stop its daemons/, (w) => {
+    const rows = google(w).steps
+    const [stop] = rows.splice(
+      rows.findIndex((row) => String(row.run).includes('stop-gradle-daemons.sh')),
+      1
+    )
+    rows.splice(
+      rows.findIndex((row) => row.id === 'google_client_build'),
+      0,
+      stop
+    )
+  })
+  rejectedGoogle('the daemon stop skipped after a failure', /stop its daemons/, (w) => {
+    step(google(w), (row) => String(row.run).includes('stop-gradle-daemons.sh')).if =
+      'always()'
   })
   rejectedGoogle('flows after a skipped step', /after every earlier success/, (w) => {
     step(google(w), (row) => row.id === 'google_sign_in').if = 'always()'

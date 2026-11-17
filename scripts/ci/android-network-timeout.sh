@@ -20,11 +20,18 @@ set -m
 node scripts/lib/network-tarpit.mjs --port 4010 > "$evidence/tarpit.log" 2>&1 &
 tarpit=$!
 # The app builds its Supabase client before it reads a session; without a URL and key that client
-# throws and Home's request never leaves the app. These are placeholders: the flow signs nobody
-# in, and the tarpit is the only server the run reaches.
+# throws and Home's request never leaves the app. These are placeholders, and the tarpit is the
+# only server the run reaches.
+# Story 6.16 made the ritual a member request: a signed-out Home shows the welcome card and sends
+# nothing, so the flow never met the timeout (android-native runs 43862298410, 43964196075). The
+# bundle carries a placeholder member token, the member mode of scripts/lib/maestro-auth-mode.mjs:
+# in __DEV__, apps/mobile/src/lib/mobile-auth.ts returns it before any session read, and Home sends
+# its ritual request with it to the tarpit.
 (cd apps/mobile && CI=1 EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 \
   EXPO_PUBLIC_SUPABASE_URL=http://10.0.2.2:4011 \
   EXPO_PUBLIC_SUPABASE_ANON_KEY=network-timeout-placeholder \
+  EXPO_PUBLIC_E2E_AUTH_MODE=member \
+  EXPO_PUBLIC_E2E_ACCESS_TOKEN=network-timeout-member-placeholder \
   npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &
 metro=$!
 # Every descendant of a pid, deepest first, so a service that left its own process group (or a
