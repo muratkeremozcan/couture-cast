@@ -200,6 +200,9 @@ test('quiet services are stopped by exact listed label: running ones only when o
   const calls = []
   const execute = (operation, binary, args, options) => {
     calls.push({ operation, binary, args, options })
+    if (operation === 'recheck-processes-healthd') return { exitCode: 0, stdout: quietPs }
+    if (operation === 'recheck-services-healthd')
+      return { exitCode: 0, stdout: '111 0 com.apple.healthd' }
     return { exitCode: operation === 'bootout-quiet-healthd' ? 1 : 0 }
   }
   const listed = '110 0 com.apple.chronod\n- 0 com.apple.triald\n111 0 com.apple.healthd'
@@ -237,15 +240,19 @@ test('quiet services are stopped by exact listed label: running ones only when o
     [
       'bootout-quiet-chronod',
       'bootout-quiet-healthd',
+      'recheck-processes-healthd',
+      'recheck-services-healthd',
       'freeze-quiet-healthd',
       'bootout-quiet-triald',
       'bootout-quiet-mediaanalysisd',
     ]
   )
-  assert.deepEqual(calls[2].args, ['-STOP', '111'])
-  assert.equal(calls[3].args.at(-1), 'system/com.apple.triald')
-  assert.equal(calls[3].options.fatal, false)
-  assert.equal(calls[4].args.at(-1), 'system/com.apple.mediaanalysisd')
+  assert.deepEqual(calls[2].args, ['-A', '-o', 'pid=,ppid=,%cpu=,comm='])
+  assert.deepEqual(calls[3].args, ['simctl', 'spawn', 'owned-uuid', 'launchctl', 'list'])
+  assert.deepEqual(calls[4].args, ['-STOP', '111'])
+  assert.equal(calls[5].args.at(-1), 'system/com.apple.triald')
+  assert.equal(calls[5].options.fatal, false)
+  assert.equal(calls[6].args.at(-1), 'system/com.apple.mediaanalysisd')
   assert.deepEqual(calls[0].args, [
     'simctl',
     'spawn',
@@ -285,6 +292,10 @@ test('a running quiet service whose boot-out fails is frozen by its pid', () => 
     calls.push({ operation, binary, args, options })
     if (operation === 'bootout-quiet-mediaanalysisd') return { exitCode: null }
     if (operation === 'bootout-quiet-triald') return { exitCode: 5 }
+    if (operation === 'recheck-processes-mediaanalysisd')
+      return { exitCode: 0, stdout: ps + '\n114 100 215 /s/mediaanalysisd' }
+    if (operation === 'recheck-services-mediaanalysisd')
+      return { exitCode: 0, stdout: jobsText + '\n114 0 com.apple.mediaanalysisd' }
     return { exitCode: 0 }
   }
   const log = console.log
@@ -324,6 +335,68 @@ test('a running quiet service whose boot-out fails is frozen by its pid', () => 
     calls.some((call) => call.operation === 'freeze-quiet-triald'),
     false
   )
+})
+
+// CodeRabbit on PR 247: the ps and launchctl snapshots are read once, before every boot-out, so
+// the pid a failed boot-out names may have exited and been reused by then. The freeze rereads both
+// and suspends only a pid that still is that service under the simulator manager.
+test('a quiet service is frozen only while its pid is still that service', () => {
+  const freeze = (recheckPs, recheckList) => {
+    const calls = []
+    const execute = (operation, binary, args, options) => {
+      calls.push({ operation, binary, args, options })
+      if (operation === 'bootout-quiet-mediaanalysisd') return { exitCode: null }
+      if (operation === 'recheck-processes-mediaanalysisd')
+        return { exitCode: 0, stdout: recheckPs }
+      if (operation === 'recheck-services-mediaanalysisd')
+        return { exitCode: 0, stdout: recheckList }
+      return { exitCode: 0 }
+    }
+    const log = console.log
+    console.log = (line) => calls.push({ line })
+    try {
+      const record = bootoutQuietServices(
+        'owned-uuid',
+        ps + '\n114 100 215 /s/mediaanalysisd',
+        simulatorJobs(jobsText + '\n114 0 com.apple.mediaanalysisd'),
+        100,
+        execute,
+        '114 0 com.apple.mediaanalysisd'
+      )
+      return {
+        record,
+        froze: calls.some((call) => call.operation === 'freeze-quiet-mediaanalysisd'),
+      }
+    } finally {
+      console.log = log
+    }
+  }
+  const same = freeze(
+    ps + '\n114 100 215 /s/mediaanalysisd',
+    jobsText + '\n114 0 com.apple.mediaanalysisd'
+  )
+  assert.equal(same.froze, true)
+  assert.deepEqual(same.record.census.mediaanalysisd, {
+    state: 'running',
+    bootoutExit: null,
+    freezeExit: 0,
+  })
+  // The service restarted under a new pid, and pid 114 now belongs to something else.
+  const moved = freeze(
+    ps + '\n114 1 0 /usr/bin/other\n140 100 3 /s/mediaanalysisd',
+    jobsText + '\n140 0 com.apple.mediaanalysisd'
+  )
+  assert.equal(moved.froze, false)
+  assert.deepEqual(moved.record.census.mediaanalysisd, {
+    state: 'running',
+    bootoutExit: null,
+    freezeSkipped: 'pid_changed',
+  })
+  assert.deepEqual(moved.record.stopped, [])
+  // The service is gone, or the reread failed: nothing is frozen.
+  const gone = freeze(ps, jobsText)
+  assert.equal(gone.froze, false)
+  assert.equal(gone.record.census.mediaanalysisd.freezeSkipped, 'not_owned')
 })
 
 // Dispatch 43393247650 shard 3: mediaanalysisd was listed idle at quiesce time, was left alone,
