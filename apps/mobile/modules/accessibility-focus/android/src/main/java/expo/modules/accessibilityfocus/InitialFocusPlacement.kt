@@ -10,7 +10,8 @@ package expo.modules.accessibilityfocus
  * reopened share-card composer's Cancel). This waits, in order, for the view to exist, for its
  * window to have focus and for TalkBack's first focus in that window (an event the caller
  * reports through [initialFocusObserved], or a focused view the target reads), then moves focus
- * and resolves [Outcome.FOCUSED] only once a later read finds the view still holding it.
+ * and resolves [Outcome.FOCUSED] only once a later read finds the view still holding it; a hold
+ * first gained at the bound has no later read and resolves [Outcome.NOT_HELD].
  *
  * Pure timing with no Android types, so JVM tests drive it on a virtual clock; the module
  * supplies the main-looper scheduler and the view reads. Every call runs on one thread.
@@ -114,7 +115,10 @@ class InitialFocusPlacement(
     }
     val now = scheduler.now()
     if (now >= deadline) {
-      return finish(waiting ?: if (target.focused()) Outcome.FOCUSED else Outcome.NOT_HELD)
+      // A hold confirmed by a later read already resolved above, so a hold reaching this line
+      // was first gained in this check. TalkBack can still take it a moment later and no read
+      // is left to see that, so it is not reported held.
+      return finish(waiting ?: Outcome.NOT_HELD)
     }
     schedule(minOf(pollMs, deadline - now))
   }

@@ -159,6 +159,30 @@ class InitialFocusPlacementTest {
   }
 
   @Test
+  fun aMoveFirstHeldAtTheBoundHasNoLaterReadAndIsNotReportedHeld() {
+    // CodeRabbit on PR 253: TalkBack places its focus at the bound, the move lands in that same
+    // check, and TalkBack moves again 1 ms later. No later read can confirm the hold.
+    val bound = InitialFocusPlacement.BOUND_MS
+    val window = FakeWindow(talkBackLandsAt = bound, talkBackMovesAgainAt = bound + 1)
+    window.start()
+    window.runUntil(10_000)
+    assertEquals(listOf(bound), window.moves)
+    assertEquals(listOf(Outcome.NOT_HELD to bound), window.outcomes)
+    assertEquals(THIRD, window.focusedView())
+  }
+
+  @Test
+  fun aMoveJustBeforeTheBoundIsConfirmedByTheCheckAtTheBound() {
+    val bound = InitialFocusPlacement.BOUND_MS
+    val window = FakeWindow(talkBackLandsAt = bound - 1)
+    window.start()
+    window.runUntil(10_000)
+    assertEquals(listOf(bound - 1), window.moves)
+    assertEquals(listOf(Outcome.FOCUSED to bound), window.outcomes)
+    assertEquals(SECOND, window.focusedView())
+  }
+
+  @Test
   fun aWindowTalkBackNeverFocusesFailsWithinTheBoundWithoutMoving() {
     val window = FakeWindow(talkBackLandsAt = null)
     window.start()
