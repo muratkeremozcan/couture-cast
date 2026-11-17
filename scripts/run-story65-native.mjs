@@ -33,6 +33,7 @@ import { config as loadEnv } from 'dotenv'
 import pg from 'pg'
 import { MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import { androidReversePorts } from './lib/story68-native-safety.mjs'
+import { AUTH_PROXY_PORT } from './e2e-real-session/harness.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const flows = path.join(root, 'maestro', 'story65')
@@ -399,7 +400,7 @@ function ensureAndroidReverses() {
   // reverses, so wait for the device and re-assert the owned ones before each use.
   run(adbPath, ['-s', device, 'wait-for-device'])
   // Signed community image URLs point at the local Supabase API port.
-  for (const port of androidReversePorts([4077, 8088, 53051]))
+  for (const port of androidReversePorts([4077, 8088, AUTH_PROXY_PORT]))
     adb('reverse', `tcp:${port}`, `tcp:${port}`)
 }
 

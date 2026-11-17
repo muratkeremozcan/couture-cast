@@ -56,7 +56,7 @@ function prebuild(root, override = {}, clean = true) {
         EAS_BUILD_PROFILE: 'production',
         FIREBASE_GOOGLE_SERVICES_FILE: '',
         EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4088',
-        EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:53068',
+        EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:23068',
         ...override,
       },
     }

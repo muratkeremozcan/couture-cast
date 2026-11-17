@@ -131,7 +131,7 @@ describe('the scan fails closed from the command line', () => {
 
   describe('published values are not secrets', () => {
     const origin = 'http://127.0.0.1:4088'
-    const supabase = 'http://127.0.0.1:53068'
+    const supabase = 'http://127.0.0.1:23068'
     const env = (extra = {}) =>
       harness({
         'owned-env.json': JSON.stringify({

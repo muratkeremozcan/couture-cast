@@ -4,6 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import test from 'node:test'
 import { shareCardWebCommand, waitForAuthHarness } from './web.mjs'
+import { authStartupFailure, recordAuthStartupFailure } from './auth-startup-failure.mjs'
 
 function owned(envFiles = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-web-command-'))
@@ -18,7 +19,7 @@ function owned(envFiles = {}) {
   )
   fs.writeFileSync(
     path.join(directory, 'auth-harness.json'),
-    JSON.stringify({ proxyUrl: 'http://127.0.0.1:53068' })
+    JSON.stringify({ proxyUrl: 'http://127.0.0.1:23068' })
   )
   for (const [name, text] of Object.entries(envFiles))
     fs.writeFileSync(path.join(root, name), text)
@@ -32,7 +33,7 @@ const ownedValues = {
   NODE_ENV: 'production',
   WEB_NEXT_DIST_DIR: '.next-share-card',
   NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4088',
-  NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:53068',
+  NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:23068',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'owned-anon',
   NEXT_PUBLIC_E2E_AUTH: 'false',
   NEXT_TELEMETRY_DISABLED: '1',
@@ -122,7 +123,7 @@ test('the web build waits for the owned auth harness, bounded, and names a dead 
         if (polls === 4)
           fs.writeFileSync(
             harness,
-            JSON.stringify({ proxyUrl: 'http://127.0.0.1:53068' })
+            JSON.stringify({ proxyUrl: 'http://127.0.0.1:23068' })
           )
       },
     }
@@ -133,7 +134,7 @@ test('the web build waits for the owned auth harness, bounded, and names a dead 
         timeoutMs: 60_000,
         ...appearing,
       }),
-      { proxyUrl: 'http://127.0.0.1:53068' }
+      { proxyUrl: 'http://127.0.0.1:23068' }
     )
     assert.equal(polls, 4)
 
@@ -141,7 +142,18 @@ test('the web build waits for the owned auth harness, bounded, and names a dead 
     clock = 0
     await assert.rejects(
       waitForAuthHarness({ directory: root, exitFile, timeoutMs: 60_000, ...timing }),
-      { message: 'owned_auth_harness_timeout: no auth-harness.json after 60000 ms' }
+      {
+        message:
+          'owned_auth_harness_timeout: no auth-harness.json after 60000 ms, and the owned auth service recorded no exit',
+      }
+    )
+    // A local run has no exit record to read, so it names none.
+    clock = 0
+    await assert.rejects(
+      waitForAuthHarness({ directory: root, timeoutMs: 60_000, ...timing }),
+      {
+        message: 'owned_auth_harness_timeout: no auth-harness.json after 60000 ms',
+      }
     )
 
     fs.writeFileSync(exitFile, '1\n')
@@ -153,6 +165,66 @@ test('the web build waits for the owned auth harness, bounded, and names a dead 
       }
     )
     assert.equal(clock, 0)
+
+    // The service's own startup failure record names why, without its private log.
+    recordAuthStartupFailure(
+      root,
+      Object.assign(
+        new Error('listen EADDRINUSE: address already in use 127.0.0.1:23068'),
+        {
+          code: 'EADDRINUSE',
+          syscall: 'listen',
+          address: '127.0.0.1',
+          port: 23068,
+        }
+      )
+    )
+    await assert.rejects(
+      waitForAuthHarness({ directory: root, exitFile, timeoutMs: 60_000, ...timing }),
+      {
+        message:
+          'owned_auth_harness_exited: the owned auth service exited with status 1; its startup failed with EADDRINUSE on listen 127.0.0.1:23068',
+      }
+    )
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+// The record keeps only the error's code, call and address: a message can quote what it failed
+// on (a JSON parse error quotes the owned env file, which holds the service-role key).
+test('the auth startup failure record keeps the code, call and address only', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-auth-failure-'))
+  try {
+    assert.deepEqual(
+      authStartupFailure(
+        Object.assign(
+          new SyntaxError('Unexpected token in {"SUPABASE_SERVICE_ROLE_KEY":"x'),
+          {
+            extra: 'x',
+          }
+        )
+      ),
+      { name: 'SyntaxError', code: null, syscall: null, address: null, port: null }
+    )
+    recordAuthStartupFailure(
+      root,
+      Object.assign(new Error('listen EACCES'), {
+        code: 'EACCES',
+        syscall: 'listen',
+        address: '127.0.0.1',
+        port: 23068,
+      })
+    )
+    const file = path.join(root, 'auth-startup-failure.json')
+    assert.deepEqual(JSON.parse(fs.readFileSync(file, 'utf8')), {
+      name: 'Error',
+      code: 'EACCES',
+      syscall: 'listen',
+      address: '127.0.0.1',
+      port: 23068,
+    })
+    assert.equal(fs.statSync(file).mode & 0o777, 0o600)
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

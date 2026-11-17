@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { androidReversePorts, restoreAndroidReverse } from './story68-native-safety.mjs'
 import { proveReleaseLiveFont } from './story68-release-live-font.mjs'
+import { STORY68_AUTH_PROXY_PORT } from './story68-public-build-env.mjs'
 
 const failures = new Set([
   'owned_uuid_loopback_database_required',
@@ -134,7 +135,7 @@ export async function runReleaseLiveFontCommand(ctx) {
           restoreAndroidReverse({
             adb: ctx.adb,
             device: ctx.device,
-            ports: androidReversePorts([4088, 53068]),
+            ports: androidReversePorts([4088, STORY68_AUTH_PROXY_PORT]),
           }),
         maestro: ctx.maestro,
         hierarchy: (timeout) => {

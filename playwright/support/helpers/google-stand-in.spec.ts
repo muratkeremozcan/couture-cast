@@ -17,7 +17,7 @@ import {
   ticketedMockUrl,
 } from './google-stand-in'
 
-const AUTH = 'http://127.0.0.1:53051/auth/v1/authorize'
+const AUTH = 'http://127.0.0.1:23051/auth/v1/authorize'
 
 describe('rewriteAuthorizeUrl', () => {
   it('changes only the provider of a google authorize request', () => {
@@ -31,8 +31,8 @@ describe('rewriteAuthorizeUrl', () => {
 
   it.each([
     `${AUTH}?provider=github`,
-    'http://127.0.0.1:53051/auth/v1/otp?provider=google',
-    'http://127.0.0.1:53051/auth/v1/authorize/extra?provider=google',
+    'http://127.0.0.1:23051/auth/v1/otp?provider=google',
+    'http://127.0.0.1:23051/auth/v1/authorize/extra?provider=google',
   ])('leaves %s alone', (url) => {
     expect(rewriteAuthorizeUrl(url)).toBeNull()
   })
