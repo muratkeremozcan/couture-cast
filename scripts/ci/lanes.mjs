@@ -464,7 +464,7 @@ export function selectLanes({ event, files, labels = [], dependencies }) {
  * now, can. Renames count both paths, so a list at COMPARE_FILES_CAP may be cut short; the plan
  * runs every lane then.
  */
-async function changedFiles({ repository, base, head, token, fetchImpl = fetch }) {
+export async function changedFiles({ repository, base, head, token, fetchImpl = fetch }) {
   const commit = /^[0-9a-f]{40}$/
   if (!commit.test(base ?? '') || !commit.test(head ?? ''))
     throw new Error('the event names no base and head commit')

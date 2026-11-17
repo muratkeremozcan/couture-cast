@@ -309,6 +309,19 @@ jobs:
           STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
         run: npm run test:pw-real-session -- --skip-web-build
 
+      # Burn-in for the real-session specs the pull request changes: rwf-burn-in.yml leaves
+      # them out, since under its config they have no owned stack and every case skips. Each
+      # changed spec runs three times with no retries on a fresh isolated database, reusing the
+      # web build above; with none changed the step ends in seconds.
+      - name: Burn in changed real-session specs
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.supabase.outcome == 'success' }}
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
+        run: node scripts/ci/real-session-burn-in.mjs
+
       # A fake cannot prove storage refuses an expired token, and this is the job with real Storage.
       # Its own isolated database, so a real-session failure neither hides this nor shares state with it.
       - name: Prove Storage refuses a late community upload
@@ -368,6 +381,11 @@ jobs:
         if: always()
         env:
           STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-consent
+        run: node scripts/e2e-real-session/cleanup-users.mjs
+      - name: Delete the Auth users the real-session burn-in created
+        if: always()
+        env:
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
         run: node scripts/e2e-real-session/cleanup-users.mjs
 
       # Fails closed: nothing is uploaded unless run.mjs finished publishing the

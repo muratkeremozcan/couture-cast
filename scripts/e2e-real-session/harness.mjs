@@ -45,6 +45,10 @@ export const WEB_DIST_DIR = '.next-real-session'
  */
 export const RAW_DIR = 'raw'
 
+/** The specs the real-session lane runs: playwright/config/real-session.config.ts and its burn-in. */
+export const REAL_SESSION_SPEC_MATCH =
+  /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/
+
 /** Where a run keeps its state when STORY65_REAL_SESSION_DIR is not set. */
 export const DEFAULT_HARNESS_DIR = '.real-session-e2e'
 

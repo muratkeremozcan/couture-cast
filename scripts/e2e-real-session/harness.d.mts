@@ -12,6 +12,7 @@ export declare const WEATHER_DOUBLE_PORT: number
 export declare const MAILPIT_URL: string
 export declare const WEB_DIST_DIR: string
 export declare const RAW_DIR: string
+export declare const REAL_SESSION_SPEC_MATCH: RegExp
 export declare const DEFAULT_HARNESS_DIR: string
 export declare const ISOLATED_DATABASE_NAME: RegExp
 export declare const REAL_SESSION_EMAIL: RegExp
