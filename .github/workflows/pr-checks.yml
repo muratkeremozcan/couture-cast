@@ -176,6 +176,15 @@ jobs:
         timeout-minutes: 6
         run: npm run test:analytics-privacy --workspace apps/web
 
+      # next dev's output and what the page saw (requests, console, errors), each line
+      # redacted of the invitation token and email by the test itself.
+      - name: Upload analytics privacy evidence
+        if: ${{ !cancelled() && steps.analytics-privacy.outcome == 'failure' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-privacy-evidence-${{ github.event.pull_request.number || github.sha }}
+          path: playwright/artifacts/analytics-privacy/
+
       - name: Upload Lighthouse accessibility reports
         if: always()
         uses: actions/upload-artifact@v4

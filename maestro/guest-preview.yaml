@@ -196,11 +196,14 @@ env:
     label: 'The resumed preview kept the cold-weather look'
 
 # Exit clears guest state and returns to the welcome card.
+# No `centerElement`: Exit is the last child of the preview screen, pinned to the
+# bottom of the scroll view, so it can never reach the middle. Maestro then
+# swipes five more times at the same bounds before it accepts the button, about
+# 8 s of the 20 s timeout, and CI run 44068684535 failed on that step.
 - scrollUntilVisible:
     element:
       id: 'guest-preview-exit'
     direction: DOWN
-    centerElement: true
 - tapOn:
     id: 'guest-preview-exit'
 - extendedWaitUntil:

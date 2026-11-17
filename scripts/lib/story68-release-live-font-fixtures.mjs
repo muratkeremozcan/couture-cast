@@ -30,14 +30,14 @@ export function configuration() {
       build: {
         STORY68_NATIVE_TEST_BUILD: '1',
         EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4088',
-        EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:53068',
+        EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:23068',
       },
       resources: {
         owner: 'cc68-impl',
         database,
         createdDatabase: true,
         apiPort: 4088,
-        authProxyPort: 53068,
+        authProxyPort: 23068,
       },
       apiLog: JSON.stringify({ code: 'owned_database_verified', database }),
     },

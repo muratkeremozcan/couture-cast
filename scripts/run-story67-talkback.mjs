@@ -5,7 +5,7 @@
 /**
  * Drives the Home spotlight teaser on an Android development build that carries the local
  * accessibility-focus module, with TalkBack running, against an owned Story 6.5-style
- * harness (isolated API on 4077, Metro on 8088, local Auth proxy on 53051).
+ * harness (isolated API on 4077, Metro on 8088, local Auth proxy on 23051).
  *
  * Every command takes --harness <dir> and --label <name>; evidence lands in
  * <harness>/native/android-talkback/<label>.
@@ -31,6 +31,7 @@ import { fileURLToPath } from 'node:url'
 import { MAESTRO_PINNED_VERSION } from './maestro-version.mjs'
 import { talkbackFlowStrings } from './lib/story67-talkback-env.mjs'
 import { androidReversePorts } from './lib/story68-native-safety.mjs'
+import { AUTH_PROXY_PORT } from './e2e-real-session/harness.mjs'
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const flows = path.join(root, 'maestro', 'story67')
@@ -103,7 +104,7 @@ async function waitFor(description, probe, { timeout = 30_000, interval = 500 } 
 
 function ensureReverses() {
   run(adbPath, ['-s', device, 'wait-for-device'])
-  for (const port of androidReversePorts([4077, 8088, 53051]))
+  for (const port of androidReversePorts([4077, 8088, AUTH_PROXY_PORT]))
     adb('reverse', `tcp:${port}`, `tcp:${port}`)
 }
 

@@ -51,12 +51,13 @@ tags:
 
 # The disclosure and the CTA sit below the teaser link, the last items on Home.
 # Scroll to the CTA, then one extra swipe settles the whole block clear of the
-# tab bar before anything is read or tapped.
+# tab bar before anything is read or tapped. No `centerElement`: the CTA is
+# pinned to the end of Home and can never reach the middle, so centring only
+# adds swipes that leave it in place (four in CI run 44068684535).
 - scrollUntilVisible:
     element:
       id: 'home-spotlight-teaser-shop'
     direction: DOWN
-    centerElement: true
     timeout: 30000
     label: 'The sponsored teaser CTA follows the teaser link on Home'
 - swipe:

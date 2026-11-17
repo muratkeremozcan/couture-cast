@@ -46,21 +46,20 @@ env:
 # Language, Shopping and Premium, so it is off-screen on a phone until scrolled
 # to. Asserting it directly failed even with diagnostics correctly enabled.
 #
-# `centerElement` and the longer timeout are both about the parallel run. Four
-# simulators share this machine's CPU, so a scroll that finished comfortably
-# inside 15s serially does not always finish in time, and this step failed on
-# two consecutive parallel runs -- once here, once on the button below.
+# The longer timeout is about the parallel run. Four simulators share this
+# machine's CPU, so a scroll that finished comfortably inside 15s serially does
+# not always finish in time, and this step failed on two consecutive parallel
+# runs -- once here, once on the button below.
 #
-# `centerElement` is the more important half. Without it the scroll stops as
-# soon as the heading is *partially* on screen, which satisfies this step and
-# leaves the button underneath it still below the fold, so the failure surfaces
-# one step later as a button that "does not exist" on a screen that is rendering
-# perfectly.
+# No `centerElement`. `scrollUntilVisible` already waits for the element to be
+# 100% visible (Maestro's default visibility percentage), so a heading only
+# partly on screen never satisfies it. The panel is pinned to the end of the
+# settings list and can never reach the middle: in CI run 44068684535 the
+# heading stayed at y=1707 through four more swipes before Maestro accepted it.
 - scrollUntilVisible:
     element:
       text: 'Mobile analytics diagnostics'
     direction: DOWN
-    centerElement: true
     timeout: 45000
 - assertVisible: 'Mobile analytics diagnostics'
 
@@ -68,8 +67,11 @@ env:
     element:
       text: 'Record weather alert analytics'
     direction: DOWN
-    centerElement: true
     timeout: 45000
+# Pin the list end, as palette-advisor.yaml does. iOS judges visibility from
+# unclipped XCUI frames, so the step above can stop with the button behind the
+# tab bar; one more scroll settles it clear of the tab bar on both platforms.
+- scroll
 - tapOn:
     text: 'Record weather alert analytics'
     retryTapIfNoChange: true

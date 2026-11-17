@@ -5,6 +5,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { parse as parseEnvFile } from 'dotenv'
 import { envKeysToBlank } from '../e2e-real-session/harness.mjs'
 import { ROOT_ENV_FILES } from '../local-e2e-database.mjs'
+import { describeAuthStartupFailure } from './auth-startup-failure.mjs'
 
 // The browser lane serves a production build. `build` compiles apps/web with the owned
 // runtime's public values (its prebuild also builds the shared packages); `start` then
@@ -66,7 +67,8 @@ export function shareCardWebCommand(command, { root, directory, env }) {
  * The owned auth harness, once the auth proxy (started in the background, scripts/e2e-share-card/
  * auth.mjs) has written all of it: a build that read it first failed ENOENT (dispatch
  * 43687651012 browser-acceptance). Fails as owned_auth_harness_exited when the service already
- * recorded its exit, and as owned_auth_harness_timeout after `timeoutMs`.
+ * recorded its exit, naming its startup failure record when it left one, and as
+ * owned_auth_harness_timeout after `timeoutMs`, saying whether the service recorded an exit.
  */
 export async function waitForAuthHarness({
   directory,
@@ -77,10 +79,12 @@ export async function waitForAuthHarness({
 }) {
   const started = now()
   for (;;) {
-    if (exitFile && fs.existsSync(exitFile))
+    if (exitFile && fs.existsSync(exitFile)) {
+      const why = describeAuthStartupFailure(directory)
       throw new Error(
-        `owned_auth_harness_exited: the owned auth service exited with status ${fs.readFileSync(exitFile, 'utf8').trim()}`
+        `owned_auth_harness_exited: the owned auth service exited with status ${fs.readFileSync(exitFile, 'utf8').trim()}${why ? `; ${why}` : ''}`
       )
+    }
     try {
       const harness = JSON.parse(
         fs.readFileSync(path.join(directory, 'auth-harness.json'), 'utf8')
@@ -91,7 +95,7 @@ export async function waitForAuthHarness({
     }
     if (now() - started >= timeoutMs)
       throw new Error(
-        `owned_auth_harness_timeout: no auth-harness.json after ${timeoutMs} ms`
+        `owned_auth_harness_timeout: no auth-harness.json after ${timeoutMs} ms${exitFile ? ', and the owned auth service recorded no exit' : ''}`
       )
     await delay(500)
   }

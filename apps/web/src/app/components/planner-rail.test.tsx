@@ -556,6 +556,37 @@ describe('PlannerRail', () => {
     expect(screen.getByTestId('planner-days')).toBeInTheDocument()
   })
 
+  it('refreshes on a window focus that arrives the moment the week renders', async () => {
+    // PR checks run 44131052026: on a busy runner the focus came after the week rendered
+    // but before React re-registered the focus listener, so the listener that answered
+    // still saw the checking state and refreshed nothing. A MutationObserver runs right
+    // after the commit, ahead of React's passive effects, which pins that order.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    let requestCount = 0
+    useMswHandlers(
+      http.get(PLANNER_PATH, () => {
+        requestCount += 1
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      })
+    )
+    let focusedOnRender = false
+    const observer = new MutationObserver(() => {
+      if (focusedOnRender || !screen.queryByTestId('planner-days')) return
+      focusedOnRender = true
+      window.dispatchEvent(new Event('focus'))
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    try {
+      renderRail()
+      await waitFor(() => expect(focusedOnRender).toBe(true))
+      await waitFor(() => expect(requestCount).toBe(2))
+    } finally {
+      observer.disconnect()
+    }
+    expect(screen.queryByTestId('planner-skeleton')).not.toBeInTheDocument()
+    expect(screen.getByTestId('planner-days')).toBeInTheDocument()
+  })
+
   it('does not refresh on window focus once closed', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
     let requestCount = 0
