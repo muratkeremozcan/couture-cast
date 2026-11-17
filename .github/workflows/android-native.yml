@@ -84,6 +84,13 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
       # Gradle's dependencies and transforms; main writes the cache, every other ref reads it.
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -152,6 +159,13 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}
@@ -252,6 +266,13 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
       - uses: gradle/actions/setup-gradle@v4
         with:
           cache-read-only: ${{ github.ref != 'refs/heads/main' }}

@@ -12,6 +12,8 @@ on:
       - 'apps/mobile/modules/modal-system-bars/**'
       - 'package-lock.json'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - 'scripts/ci/android-sdk-install.sh'
+      - 'scripts/ci/android-gradle-sdk-packages.mjs'
       - 'scripts/ci/junit-report-check.mjs'
       - 'scripts/ci/gradle-resolution-retry.mjs'
       - 'scripts/lib/transient-resolution-retry.cjs'
@@ -29,6 +31,8 @@ on:
       - 'apps/mobile/modules/modal-system-bars/**'
       - 'package-lock.json'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - 'scripts/ci/android-sdk-install.sh'
+      - 'scripts/ci/android-gradle-sdk-packages.mjs'
       - 'scripts/ci/junit-report-check.mjs'
       - 'scripts/ci/gradle-resolution-retry.mjs'
       - 'scripts/lib/transient-resolution-retry.cjs'
@@ -100,6 +104,14 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
 
       - name: Generate the Android project
         working-directory: apps/mobile
