@@ -26,6 +26,7 @@ import {
   CONSENT_REQUIRED_TAG,
   EXPECTED_CONSENT_REQUIRED_TESTS,
   EXPECTED_REAL_SESSION_TESTS,
+  REAL_SESSION_SPEC_PATTERN,
   consentGrepInvert,
   expectedRealSessionTests,
   realSessionConsentPolicy,
@@ -619,5 +620,18 @@ describe('the lane runs the tests of its guardian consent policy', () => {
     expect(consentGrepInvert('off').test(untagged)).toBe(false)
     expect(consentGrepInvert('required_13_15').test(tagged)).toBe(false)
     expect(consentGrepInvert('required_13_15').test(untagged)).toBe(true)
+  })
+})
+
+// PR 250 review M1: burn-in leaves every *-real-session.spec.ts to the real-session lane, which
+// runs only REAL_SESSION_SPEC_PATTERN. A spec named that way and left out of it would run nowhere.
+describe('real-session spec list', () => {
+  it('R250-RS-01 runs every *-real-session spec in playwright/tests', () => {
+    const testsDir = path.resolve(__dirname, '../../tests')
+    const specs = fs
+      .readdirSync(testsDir)
+      .filter((file) => file.endsWith('-real-session.spec.ts'))
+    expect(specs.length).toBeGreaterThan(0)
+    expect(specs.filter((file) => !REAL_SESSION_SPEC_PATTERN.test(file))).toEqual([])
   })
 })

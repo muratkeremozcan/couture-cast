@@ -12,7 +12,6 @@ export declare const WEATHER_DOUBLE_PORT: number
 export declare const MAILPIT_URL: string
 export declare const WEB_DIST_DIR: string
 export declare const RAW_DIR: string
-export declare const REAL_SESSION_SPEC_MATCH: RegExp
 export declare const DEFAULT_HARNESS_DIR: string
 export declare const ISOLATED_DATABASE_NAME: RegExp
 export declare const REAL_SESSION_EMAIL: RegExp
@@ -62,6 +61,7 @@ export type RealSessionConsentPolicy = 'off' | 'required_13_15'
 export declare function realSessionConsentPolicy(
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>
 ): RealSessionConsentPolicy
+export declare const REAL_SESSION_SPEC_PATTERN: RegExp
 export declare const EXPECTED_REAL_SESSION_TESTS: number
 export declare const EXPECTED_CONSENT_REQUIRED_TESTS: number
 export declare function expectedRealSessionTests(policy: RealSessionConsentPolicy): number

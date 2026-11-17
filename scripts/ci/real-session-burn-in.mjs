@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 import { COMPARE_FILES_CAP, changedFiles } from './lanes.mjs'
 import {
   CONSENT_REQUIRED_TAG,
-  REAL_SESSION_SPEC_MATCH,
+  REAL_SESSION_SPEC_PATTERN,
   realSessionConsentPolicy,
 } from '../e2e-real-session/harness.mjs'
 
@@ -49,7 +49,7 @@ export function burnInSpecs(files, policy, io = {}) {
   const candidates = files.length >= COMPARE_FILES_CAP ? (io.all ?? allSpecs)() : files
   const selected = candidates.filter(
     (file) =>
-      file.startsWith(TESTS_DIR) && REAL_SESSION_SPEC_MATCH.test(file) && exists(file)
+      file.startsWith(TESTS_DIR) && REAL_SESSION_SPEC_PATTERN.test(file) && exists(file)
   )
   const forPolicy =
     policy === 'required_13_15'

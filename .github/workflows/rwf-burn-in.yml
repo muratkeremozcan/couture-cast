@@ -110,7 +110,10 @@ jobs:
             git branch -f "$LOCAL_REF" "origin/$REMOTE_REF" || true
           fi
 
-          CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' || true)
+          # A real-session spec skips every case outside its own stack, so a burn-in of it alone
+          # runs nothing and fails the shard guard (PR 250). The real-session lane runs those
+          # specs on every web pull request.
+          CHANGED=$(git diff "$BASE_REF"...HEAD --name-only | grep -E '^${{ inputs.test-directory }}.*\.(spec|test)\.(ts|tsx)$' | grep -vE -- '-real-session\.spec\.ts$' || true)
 
           if [[ -z "$CHANGED" ]]; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

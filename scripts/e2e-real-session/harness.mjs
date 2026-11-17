@@ -45,10 +45,6 @@ export const WEB_DIST_DIR = '.next-real-session'
  */
 export const RAW_DIR = 'raw'
 
-/** The specs the real-session lane runs: playwright/config/real-session.config.ts and its burn-in. */
-export const REAL_SESSION_SPEC_MATCH =
-  /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/
-
 /** Where a run keeps its state when STORY65_REAL_SESSION_DIR is not set. */
 export const DEFAULT_HARNESS_DIR = '.real-session-e2e'
 
@@ -343,6 +339,14 @@ export function realSessionConsentPolicy(env = process.env) {
  * run in Chromium and again in WebKit with the iPhone 15 descriptor. A full run must report
  * exactly this many, none skipped.
  */
+/**
+ * The real-session specs by file name: real-session.config.ts runs exactly these. Burn-in
+ * (.github/workflows/rwf-burn-in.yml) leaves every *-real-session.spec.ts to this lane, so a spec
+ * named that way and missing here would run nowhere; real-session-harness.spec.ts checks.
+ */
+export const REAL_SESSION_SPEC_PATTERN =
+  /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/
+
 export const EXPECTED_REAL_SESSION_TESTS = 45
 
 /** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
