@@ -312,14 +312,27 @@ jobs:
       # Burn-in for the real-session specs the pull request changes: rwf-burn-in.yml leaves
       # them out, since under its config they have no owned stack and every case skips. Each
       # changed spec runs three times with no retries on a fresh isolated database, reusing the
-      # web build above; with none changed the step ends in seconds.
+      # web build above, once per consent policy like the runs above; with none changed a step
+      # ends in seconds. The SKIP_BURN_IN label skips them, as it skips the burn-in job. Each has
+      # its own timeout, so a hung stack cannot take the steps after it.
       - name: Burn in changed real-session specs
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && steps.supabase.outcome == 'success' }}
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') && steps.supabase.outcome == 'success' }}
+        timeout-minutes: 7
         env:
           GITHUB_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
+        run: node scripts/ci/real-session-burn-in.mjs
+      - name: Burn in changed real-session guardian consent cases
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'SKIP_BURN_IN') && steps.supabase.outcome == 'success' }}
+        timeout-minutes: 7
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          GUARDIAN_CONSENT_POLICY: required_13_15
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in-consent
         run: node scripts/ci/real-session-burn-in.mjs
 
       # A fake cannot prove storage refuses an expired token, and this is the job with real Storage.
@@ -387,6 +400,11 @@ jobs:
         env:
           STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in
         run: node scripts/e2e-real-session/cleanup-users.mjs
+      - name: Delete the Auth users the guardian consent burn-in created
+        if: always()
+        env:
+          STORY65_REAL_SESSION_DIR: ${{ github.workspace }}/.real-session-e2e-burn-in-consent
+        run: node scripts/e2e-real-session/cleanup-users.mjs
 
       # Fails closed: nothing is uploaded unless run.mjs finished publishing the
       # redacted set (its completion record matches the upload directory byte for
@@ -412,6 +430,40 @@ jobs:
           name: real-session-e2e
           path: ${{ env.STORY65_REAL_SESSION_DIR }}/artifacts
           include-hidden-files: true
+          retention-days: 5
+
+      # The burn-in runs' redacted output, under the same fail-closed checks: a burn-in that
+      # never started left no directory and is passed over; one killed mid-teardown left no
+      # completion record, so verify fails and nothing of it ships.
+      - name: Check real-session burn-in artifacts for secret values
+        id: burn_in_secret_scan
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          found=0
+          for dir in "${{ github.workspace }}/.real-session-e2e-burn-in" "${{ github.workspace }}/.real-session-e2e-burn-in-consent"; do
+            [ -d "$dir" ] || continue
+            found=1
+            STORY65_REAL_SESSION_DIR="$dir" node scripts/e2e-real-session/artifacts.mjs verify
+            node scripts/check-artifact-secrets.mjs \
+              --names SUPABASE_SERVICE_ROLE_KEY,SUPABASE_ANON_KEY,GH_TOKEN \
+              --otp-file "$dir/issued-otps.json" \
+              --reject-jwt \
+              "$dir/artifacts"
+          done
+          echo "found=$found" >> "$GITHUB_OUTPUT"
+
+      - name: Upload redacted real-session burn-in artifacts
+        if: always() && steps.burn_in_secret_scan.outcome == 'success' && steps.burn_in_secret_scan.outputs.found == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: real-session-e2e-burn-in
+          path: |
+            ${{ github.workspace }}/.real-session-e2e-burn-in/artifacts
+            ${{ github.workspace }}/.real-session-e2e-burn-in-consent/artifacts
+          include-hidden-files: true
+          if-no-files-found: ignore
           retention-days: 5
 
   # Story 6.14 TEA-15: the complimentary access spec turns every member flag off

@@ -266,6 +266,8 @@ export const LANES = {
       'playwright/share-card.config.ts',
       'playwright/tests/share-card-*.spec.ts',
       'playwright/support/**',
+      // real-session-burn-in.test.mjs holds its repeat count to this config's.
+      'playwright/config/.burn-in.config.ts',
       '_bmad-output/test-artifacts/story-6-9/**',
     ],
   },
