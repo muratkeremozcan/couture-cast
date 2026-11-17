@@ -476,14 +476,27 @@ test('L-10: the landing hydrates cleanly for a member, a pending session and a v
   await expectPendingLanding(tab)
   // TEA R3: pending holds the member layout, so nothing below the actions moves when the
   // member actions appear. Measured from the hero's own top: the community feed above it loads
-  // on its own schedule.
-  const rowTop = async () =>
-    (await tab.getByTestId('hero-cta-group').boundingBox())!.y -
-    (await tab.getByTestId('hero-section').boundingBox())!.y
-  const pendingTop = await rowTop()
+  // on its own schedule. Both boxes are read in one script run, so the feed cannot grow between
+  // the two reads (two boundingBox calls once read -5374 when it landed in between).
+  // The row's height is compared too, so the content below it cannot move either (PR 250
+  // review L2).
+  const rowBox = () =>
+    tab.evaluate(() => {
+      const box = (testId: string) => {
+        const nodes = document.querySelectorAll(`[data-testid="${testId}"]`)
+        if (nodes.length !== 1)
+          throw new Error(`${testId}: ${nodes.length} matches, expected 1`)
+        return nodes[0]!.getBoundingClientRect()
+      }
+      const row = box('hero-cta-group')
+      return { top: row.top - box('hero-section').top, height: row.height }
+    })
+  // A late font swap would re-wrap the hero copy between the two reads.
+  await tab.evaluate(() => document.fonts.ready.then(() => undefined))
+  const pendingBox = await rowBox()
   release()
   await expectMemberLanding(tab)
-  expect(await rowTop()).toBe(pendingTop)
+  expect(await rowBox()).toEqual(pendingBox)
 
   expect([...errors, ...tabErrors]).toEqual([])
 })
