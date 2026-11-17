@@ -33,7 +33,10 @@ import { resolveSupportedLocale } from '@couture/api-client/contracts/http'
 import { EdgeToEdgeModal, useModalInsets } from './edge-to-edge-modal'
 import { isRectInViewport, revealOffset } from './community/compose-field-reveal'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
-import { focusShareCardElement } from '@/src/lib/share-card-focus'
+import {
+  focusShareCardElement,
+  focusShareCardElementAfterPlacement,
+} from '@/src/lib/share-card-focus'
 import { traceShareCardOpener } from '@/src/lib/share-card-presentation-trace'
 import {
   mobileApplicationUserId,
@@ -502,6 +505,8 @@ export function ShareCardComposer({
   } | null>(null)
   const [loaded, setLoaded] = useState<string | null>(null)
   const [presentationEpoch, setPresentationEpoch] = useState(0)
+  /** Counts dialog shows, so feedback focus asked for before the dialog's nodes existed retries. */
+  const [shows, setShows] = useState(0)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
@@ -869,6 +874,12 @@ export function ShareCardComposer({
         const node = safeFindNodeHandle(title.current)
         if (Platform.OS === 'android' && node)
           void setModalDarkStatusBar(node)?.catch(() => undefined)
+        setShows((count) => count + 1)
+        // Android: Finishing up's feedback owns the Cancel focus. TalkBack places its own first
+        // focus in this new window later and would overwrite a move made now (main run
+        // 44076358778), so the feedback asks for Cancel through the move that waits for that
+        // placement, and the show above retries a request made before the nodes existed.
+        if (Platform.OS === 'android' && pendingOtherSave) return
         focusShareCardElement(
           pendingOtherSave ? safeFindNodeHandle(cancelTarget.current) : node
         )
@@ -949,21 +960,29 @@ export function ShareCardComposer({
                     : status === 'finishingSave'
                       ? cancelTarget.current
                       : recoveryTarget.current
+                const tag = safeFindNodeHandle(target)
+                // A rendered target without a node yet is not done: the dialog's show asks
+                // again. A result with no such action rendered still announces, as before.
+                if (target && !tag) return false
                 const captured = generation.current
                 const isCurrent = () =>
                   latest.current.open &&
                   latest.current.member === member &&
                   latest.current.key === key &&
                   generation.current === captured
-                focusShareCardElement(safeFindNodeHandle(target), isCurrent)
+                if (Platform.OS === 'android' && status === 'finishingSave')
+                  focusShareCardElementAfterPlacement(tag, isCurrent)
+                else focusShareCardElement(tag, isCurrent)
                 void revealInScroll(scroll.current, scrollOffset.current, target).then(
                   (offset) => {
                     if (offset !== null && isCurrent())
                       scroll.current?.scrollTo({ y: offset, animated: false })
                   }
                 )
+                return true
               }}
               visible={open}
+              shows={shows}
               scope={`${member}:${key}:${presentationEpoch}`}
               pending={pendingOtherSave}
               message={ownsFeedback ? message : null}
@@ -1084,6 +1103,7 @@ function CardPreview({
 function ComposerFeedback({
   onFocusResult,
   visible,
+  shows,
   scope,
   pending,
   message,
@@ -1091,8 +1111,11 @@ function ComposerFeedback({
   available,
   t,
 }: {
-  onFocusResult: (status: string) => void
+  /** Moves focus for a result; false when its rendered target has no node yet (not done). */
+  onFocusResult: (status: string) => boolean
   visible: boolean
+  /** The dialog's show count: a result not yet focused is tried again on each show. */
+  shows: number
   scope: string
   pending: boolean
   message: string | null
@@ -1112,14 +1135,17 @@ function ComposerFeedback({
     if (!key) return
     const announcement = t(`shareCard.${key}`)
     if (announced.current === announcement) return
+    const focuses = !['preparing', 'saving', 'sharing', 'nativeSaveUnavailable'].includes(
+      key
+    )
+    // A result whose focus target has no node yet stays unannounced, so the next show retries it.
+    if (focuses && !onFocusResult(key)) return
     announced.current = announcement
-    if (!['preparing', 'saving', 'sharing', 'nativeSaveUnavailable'].includes(key))
-      onFocusResult(key)
     if (Platform.OS !== 'ios') return
     AccessibilityInfo.announceForAccessibilityWithOptions(announcement, {
       queue: available && !error,
     })
-  }, [visible, scope, available, error, pending, message, t, onFocusResult])
+  }, [visible, shows, scope, available, error, pending, message, t, onFocusResult])
   const status = Boolean(pending || message)
   const failure = !available || Boolean(error)
   const { width, fontScale } = useWindowDimensions()

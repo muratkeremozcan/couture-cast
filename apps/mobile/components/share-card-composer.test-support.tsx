@@ -85,6 +85,9 @@ export function installComposerHooks() {
       .mockResolvedValue({ granted: true, canAskAgain: true })
     boundary.save.mockReset().mockResolvedValue(undefined)
     boundary.focus.mockClear()
+    boundary.placement.mockClear()
+    boundary.nodesBeforeShow = true
+    boundary.dialogShown = false
     boundary.announce.mockClear()
     boundary.settings.mockClear()
     boundary.imageLoads.length = 0

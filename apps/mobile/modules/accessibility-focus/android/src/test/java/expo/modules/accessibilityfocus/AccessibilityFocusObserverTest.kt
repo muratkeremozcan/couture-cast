@@ -281,6 +281,54 @@ class AccessibilityFocusObserverTest {
   }
 
   @Test
+  fun aFocusTapOnADialogRootSeesOnlyFocusEventsForwardsAndRemovesCleanly() {
+    val dialogRoot = decor()
+    val existing = RecordingDelegate()
+    dialogRoot.accessibilityDelegate = existing
+    val child = View(context)
+    var taps = 0
+    val focus = observer()
+    val untap = focus.tapFocusEvents(dialogRoot) { taps++ }!!
+
+    val tap = dialogRoot.accessibilityDelegate!!
+    tap.onRequestSendAccessibilityEvent(dialogRoot, child, focusEvent())
+    tap.onRequestSendAccessibilityEvent(
+      dialogRoot,
+      child,
+      focusEvent(AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED),
+    )
+    tap.onRequestSendAccessibilityEvent(dialogRoot, child, focusEvent(AccessibilityEvent.TYPE_VIEW_CLICKED))
+    assertEquals(1, taps)
+    assertEquals("a tap never reports to the module", emptyList<List<Int>>(), reports)
+    assertEquals(List(3) { "onRequestSendAccessibilityEvent" }, existing.calls)
+
+    untap()
+    assertSame(existing, dialogRoot.accessibilityDelegate)
+  }
+
+  @Test
+  fun aFocusTapLeavesALaterDelegateTheObservedDecorAndOldApisAlone() {
+    val dialogRoot = decor()
+    val focus = observer()
+    val untap = focus.tapFocusEvents(dialogRoot) {}!!
+    val later = RecordingDelegate()
+    dialogRoot.accessibilityDelegate = later
+    untap()
+    assertSame(later, dialogRoot.accessibilityDelegate)
+
+    val window = decor()
+    focus.start { window }
+    idle()
+    val observing = window.accessibilityDelegate
+    assertNull(focus.tapFocusEvents(window) {})
+    assertSame(observing, window.accessibilityDelegate)
+
+    val old = decor()
+    assertNull(observer(sdkInt = 28).tapFocusEvents(old) {})
+    assertNull(old.accessibilityDelegate)
+  }
+
+  @Test
   fun attachesOnlyOnTheMainLooper() {
     val window = decor()
     val focus = observer()

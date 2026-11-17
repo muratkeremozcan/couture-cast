@@ -4,6 +4,7 @@
 import { talkbackFailureSummary } from './lib/story68-talkback-failure.mjs'
 import {
   bundleBuilds,
+  focusHolders,
   focusLatencies,
   talkBackVersion,
   talkbackEvidence,
@@ -967,6 +968,7 @@ if (command === 'prebuild') {
           bundlesBefore,
           bundlesAfter: readMetro(),
           focusWaits: focusLatencies(output),
+          focusHolders: focusHolders(output),
         }),
       })
     )

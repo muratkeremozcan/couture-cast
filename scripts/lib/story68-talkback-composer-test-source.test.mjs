@@ -74,7 +74,8 @@ test('focus returns and jumps use the 5 s focus bound, network-backed states kee
 })
 
 test('focus latency is recorded per wait and reported to the harness after every test', () => {
-  assert.match(composer, /record = \{ focusLatencies \+= it \}/)
+  // Every wait's latency is recorded first; a timeout adds its holder (the test below).
+  assert.match(composer, /record = \{\s*focusLatencies \+= it\s/)
   assert.match(composer, /@After\s+fun reportFocusLatencies\(\)/)
   assert.match(composer, /REPORT_KEY_STREAMRESULT/)
   const helper = read(
@@ -138,4 +139,31 @@ test('every label the composer test compares against is en-US catalog copy', () 
     labels.filter((label) => !copy.has(label)),
     []
   )
+})
+
+test('a timed-out focus wait records who held TalkBack focus and the harness gets it after the test', () => {
+  // Main run 44076358778 timed out on Cancel with no word on where TalkBack focus was.
+  assert.match(
+    composer,
+    /record = \{\s*focusLatencies \+= it\s*if \(it\.timedOut\) focusHolders \+= focusHolder\(it\.wait\)\s*\}/
+  )
+  assert.match(composer, /findFocus\(AccessibilityNodeInfo\.FOCUS_ACCESSIBILITY\)/)
+  assert.match(composer, /TreeSettling\.FocusHolder\(/)
+  const report = composer.slice(composer.indexOf('fun reportFocusLatencies()'))
+  assert.match(report.slice(0, 900), /focusHolders\.map \{ it\.line\(\) \}/)
+})
+
+test('cleanup lets the released old save settle before the next test, which waits for an enabled Save', () => {
+  // Main run 44076358778: release then real at once left the old save running into the next
+  // test, whose Save was still disabled but clickable, so "Saved status" never came.
+  const restore = composer.slice(composer.indexOf('private fun restoreRealFixture()'))
+  const release = restore.indexOf('fixture("release")')
+  const settle = restore.indexOf('waitFor("Released old save settles")')
+  const real = restore.indexOf('fixture("real")')
+  assert.ok(release > 0 && release < settle && settle < real)
+  assert.match(
+    composer,
+    /waitFor\("Save is enabled and clickable"\) \{\s*find\("share-card-save"\)\?\.let \{ it\.isEnabled && it\.isClickable \} == true\s*\}\s*click\("share-card-save"\)/
+  )
+  assert.doesNotMatch(composer, /waitFor\("Save is clickable"\)/)
 })

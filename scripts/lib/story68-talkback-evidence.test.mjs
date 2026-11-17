@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import {
   bundleBuilds,
+  focusHolders,
   focusLatencies,
   talkBackVersion,
   talkbackEvidence,
@@ -31,6 +32,7 @@ test('bundle builds are counted from the Metro log and only the stage window is 
     bundleBuildsDuringStage: 2,
     bundleMsDuringStage: [13800, 90],
     focusWaits: [],
+    focusHolders: [],
   })
 })
 
@@ -52,6 +54,7 @@ test('missing inputs give null fields instead of invented numbers', () => {
     bundleBuildsDuringStage: 0,
     bundleMsDuringStage: [],
     focusWaits: [],
+    focusHolders: [],
   })
   assert.deepEqual(bundleBuilds(undefined), [])
 })
@@ -94,4 +97,50 @@ test('the harness feeds the parsed focus latencies into the evidence it prints',
     'utf8'
   )
   assert.match(source, /focusWaits: focusLatencies\(output\)/)
+})
+
+test('a timed-out focus wait names who held TalkBack focus, from closed lines only', () => {
+  // Main run 44076358778: Cancel never took focus and nothing said where TalkBack focus was.
+  const output = [
+    'INSTRUMENTATION_STATUS: stream=',
+    'CC68_FOCUS_LATENCY|Old save focuses its Cancel recovery control|5085|timeout',
+    'CC68_FOCUS_HOLDER|Old save focuses its Cancel recovery control|share-card-title|application',
+    'CC68_FOCUS_HOLDER|TalkBack restored to opener|none|unknown',
+    'CC68_FOCUS_HOLDER|Focused Save is in the active modal window|unnamed|system',
+    'CC68_FOCUS_HOLDER|bad<wait>|share-card-title|application',
+    'CC68_FOCUS_HOLDER|Save initially focused|Saved to photos|application',
+    'CC68_FOCUS_HOLDER|Save initially focused|share-card-save|Application',
+    'CC68_FOCUS_HOLDER|Save initially focused|share-card-save',
+    'text before CC68_FOCUS_HOLDER|Injected|share-card-save|application',
+  ].join('\n')
+  const holders = focusHolders(output)
+  assert.deepEqual(holders, [
+    {
+      wait: 'Old save focuses its Cancel recovery control',
+      holder: 'share-card-title',
+      window: 'application',
+    },
+    { wait: 'TalkBack restored to opener', holder: 'none', window: 'unknown' },
+    {
+      wait: 'Focused Save is in the active modal window',
+      holder: 'unnamed',
+      window: 'system',
+    },
+  ])
+  assert.deepEqual(talkbackEvidence({ focusHolders: holders }).focusHolders, holders)
+  assert.deepEqual(focusHolders(undefined), [])
+  assert.equal(
+    focusHolders(
+      Array.from({ length: 50 }, () => 'CC68_FOCUS_HOLDER|w|none|unknown').join('\n')
+    ).length,
+    40
+  )
+})
+
+test('the harness feeds the parsed focus holders into the evidence it prints', () => {
+  const source = fs.readFileSync(
+    fileURLToPath(new URL('../run-story68-native.mjs', import.meta.url)),
+    'utf8'
+  )
+  assert.match(source, /focusHolders: focusHolders\(output\)/)
 })

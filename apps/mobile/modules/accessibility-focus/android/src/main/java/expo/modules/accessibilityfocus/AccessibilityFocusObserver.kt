@@ -96,17 +96,45 @@ class AccessibilityFocusObserver(
     emit(tagsOf(focusedView(host)))
   }
 
-  /** Forwards every call to the delegate it wraps, or to the platform default. */
-  inner class ForwardingDelegate(private val wrapped: View.AccessibilityDelegate?) :
-    View.AccessibilityDelegate() {
+  /**
+   * Calls [onFocused] for each TalkBack focus event in [root]'s window, through a
+   * [ForwardingDelegate] on [root], and returns the call that removes it. Null where no delegate
+   * can go on without risk: below API 29, or on the decor this observer already watches (its
+   * delegate stays the only one there; the caller reads focus from the views instead).
+   */
+  // `View.getAccessibilityDelegate` is API 29; `canObserve` gates it.
+  @SuppressLint("NewApi")
+  fun tapFocusEvents(root: View, onFocused: () -> Unit): (() -> Unit)? {
+    if (!canObserve || root === attachedDecor) return null
+    val existing = root.accessibilityDelegate
+    val delegate = ForwardingDelegate(existing, onFocused)
+    root.accessibilityDelegate = delegate
+    return {
+      // Someone who replaced this delegate since keeps theirs.
+      if (root.accessibilityDelegate === delegate) root.accessibilityDelegate = existing
+    }
+  }
+
+  /**
+   * Forwards every call to the delegate it wraps, or to the platform default. Without [tap] it
+   * reports focus changes to the module; with one it only calls [tap] on each focus event.
+   */
+  inner class ForwardingDelegate(
+    private val wrapped: View.AccessibilityDelegate?,
+    private val tap: (() -> Unit)? = null,
+  ) : View.AccessibilityDelegate() {
     override fun onRequestSendAccessibilityEvent(
       host: ViewGroup,
       child: View,
       event: AccessibilityEvent,
     ): Boolean {
-      when (event.eventType) {
-        AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED,
-        AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED -> report(host)
+      if (tap != null) {
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED) tap.invoke()
+      } else {
+        when (event.eventType) {
+          AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED,
+          AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUS_CLEARED -> report(host)
+        }
       }
       return wrapped?.onRequestSendAccessibilityEvent(host, child, event)
         ?: super.onRequestSendAccessibilityEvent(host, child, event)

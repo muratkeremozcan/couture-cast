@@ -38,17 +38,42 @@ class ShareCardComposerTalkBackTest {
     TreeSettling.waitFor(message, clock, diagnostic = ::dump, condition = condition)
   /** Focus returns and jumps are felt by a TalkBack user: 5 s, and the failure names the bound. */
   private val focusLatencies = mutableListOf<TreeSettling.FocusLatency>()
+  private val focusHolders = mutableListOf<TreeSettling.FocusHolder>()
   private fun waitForFocus(message: String, condition: () -> Boolean) =
-    TreeSettling.waitForFocus(message, clock, diagnostic = ::dump, record = { focusLatencies += it }, condition = condition)
+    TreeSettling.waitForFocus(message, clock, diagnostic = ::dump, record = {
+      focusLatencies += it
+      if (it.timedOut) focusHolders += focusHolder(it.wait)
+    }, condition = condition)
 
-  /** Pass or fail, the harness gets every focus wait's latency as closed lines. */
+  /**
+   * Where TalkBack focus is when a focus wait runs out: the focused node's testID in the active
+   * window and that window's type (main run 44076358778 timed out on Cancel without saying).
+   */
+  private fun focusHolder(wait: String): TreeSettling.FocusHolder {
+    val focused = runCatching { automation.rootInActiveWindow?.findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY) }.getOrNull()
+    return TreeSettling.FocusHolder(wait, focused?.let { it.viewIdResourceName ?: "" }, activeWindowType())
+  }
+
+  /** Window types need interactive-window retrieval, which this failure path turns on itself. */
+  private fun activeWindowType(): String = runCatching {
+    val info = automation.serviceInfo
+    if (info.flags and AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS == 0) {
+      info.flags = info.flags or AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+      automation.serviceInfo = info
+    }
+    TreeSettling.FocusHolder.windowTypeName(automation.windows.firstOrNull { it.isActive }?.type)
+  }.getOrDefault(TreeSettling.FocusHolder.windowTypeName(null))
+
+  /** Pass or fail, the harness gets every focus wait's latency, and each timeout's holder, as closed lines. */
   @After
   fun reportFocusLatencies() {
-    if (focusLatencies.isEmpty()) return
+    if (focusLatencies.isEmpty() && focusHolders.isEmpty()) return
+    val lines = focusLatencies.map { it.line() } + focusHolders.map { it.line() }
     instrumentation.sendStatus(0, Bundle().apply {
-      putString(Instrumentation.REPORT_KEY_STREAMRESULT, focusLatencies.joinToString("\n", "\n", "\n") { it.line() })
+      putString(Instrumentation.REPORT_KEY_STREAMRESULT, lines.joinToString("\n", "\n", "\n"))
     })
     focusLatencies.clear()
+    focusHolders.clear()
   }
   /** Id plus bounds of every node: it stops changing once the composer tree is complete. */
   private fun signature(): String = all().joinToString("|") {
@@ -144,7 +169,10 @@ class ShareCardComposerTalkBackTest {
     }
     for (id in listOf("share-card-title", "share-card-save", "share-card-cancel"))
       waitFor("Label of $id") { find(id)?.let { label(it).isNotBlank() } == true }
-    waitFor("Save is clickable") { find("share-card-save")?.isClickable == true }
+    // A Save the previous test's old save still holds is disabled yet clickable: wait for both.
+    waitFor("Save is enabled and clickable") {
+      find("share-card-save")?.let { it.isEnabled && it.isClickable } == true
+    }
     click("share-card-save")
     waitFor("Saved status") { all().any { label(it) == "Saved to photos" } }
     // Saved feedback returns TalkBack focus to Save, the same target iOS asserts.
@@ -210,6 +238,12 @@ class ShareCardComposerTalkBackTest {
 
   private fun restoreRealFixture() {
     fixture("release")
+    // The released old save settles before anything else opens the composer. An open composer
+    // shows it: the watermark re-enables and Finishing up leaves, as the passing path waits for.
+    waitFor("Released old save settles") {
+      find("share-card-title") == null ||
+        (find("share-card-watermark")?.isEnabled == true && find("share-card-feedback") == null)
+    }
     fixture("real")
     closeComposerIfOpen()
   }

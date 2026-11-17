@@ -23,6 +23,7 @@ vi.mock('@/src/lib/accessibility-focus', () => ({
 }))
 vi.mock('../modules/accessibility-focus', () => ({
   focusAccessibilityElement: () => null,
+  focusAccessibilityElementAfterPlacement: () => null,
 }))
 import { ShareCardTabHeading } from './share-card-tab-heading'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'

@@ -62,6 +62,38 @@ object TreeSettling {
   }
 
   /**
+   * Who held TalkBack focus when a focus wait timed out: the testID of the focused node in the
+   * active window ([viewId] is its resource name), and that window's type. Only a testID-shaped
+   * id passes; a node without one is `unnamed` and no focus at all is `none`, so no label or
+   * text a person entered can reach the log.
+   */
+  class FocusHolder(private val wait: String, viewId: String?, windowType: String?) {
+    private val holder = when {
+      viewId == null -> "none"
+      else -> viewId.substringAfterLast('/').takeIf { TEST_ID.matches(it) } ?: "unnamed"
+    }
+    private val window = windowType ?: "unknown"
+
+    /** One closed line the host harness parses out of the instrumentation output. */
+    fun line() = "CC68_FOCUS_HOLDER|$wait|$holder|$window"
+
+    companion object {
+      private val TEST_ID = Regex("[A-Za-z0-9_.-]{1,80}")
+
+      /** AccessibilityWindowInfo.TYPE_* as a fixed name; anything else is `unknown`. */
+      fun windowTypeName(type: Int?): String = when (type) {
+        1 -> "application"
+        2 -> "input_method"
+        3 -> "system"
+        4 -> "accessibility_overlay"
+        5 -> "split_screen_divider"
+        6 -> "magnification_overlay"
+        else -> "unknown"
+      }
+    }
+  }
+
+  /**
    * A focus wait: [FOCUS_BOUND_MS] long, and the failure names that bound. Its elapsed time is
    * handed to [record] whether it passes or times out, so CI shows the real focus latency.
    */

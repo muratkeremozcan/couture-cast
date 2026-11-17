@@ -197,4 +197,34 @@ class TreeSettlingTest {
     assertFalse(TreeSettling.clickIfPresent(stuck.clock, stuck::present, stuck::click))
     assertEquals(5_000L, stuck.time)
   }
+
+  @Test
+  fun aTimedOutFocusWaitNamesTheFocusHolderByTestIdOnly() {
+    // Main run 44076358778: the Cancel wait timed out and nothing said where TalkBack focus was.
+    assertEquals(
+      "CC68_FOCUS_HOLDER|Old save focuses its Cancel recovery control|share-card-title|application",
+      TreeSettling.FocusHolder(
+        "Old save focuses its Cancel recovery control",
+        "com.couturecast.story68:id/share-card-title",
+        TreeSettling.FocusHolder.windowTypeName(1),
+      ).line(),
+    )
+    assertEquals(
+      "CC68_FOCUS_HOLDER|TalkBack restored to opener|none|unknown",
+      TreeSettling.FocusHolder("TalkBack restored to opener", null, null).line(),
+    )
+    // A node without an id holds focus: it is named as such, never by its text.
+    assertEquals(
+      "CC68_FOCUS_HOLDER|Save initially focused|unnamed|system",
+      TreeSettling.FocusHolder("Save initially focused", "", TreeSettling.FocusHolder.windowTypeName(3)).line(),
+    )
+    assertEquals(
+      "CC68_FOCUS_HOLDER|Save initially focused|unnamed|unknown",
+      TreeSettling.FocusHolder("Save initially focused", "pkg:id/Saved to photos", TreeSettling.FocusHolder.windowTypeName(99)).line(),
+    )
+    assertEquals(
+      listOf("application", "input_method", "system", "accessibility_overlay", "split_screen_divider", "magnification_overlay", "unknown"),
+      listOf(1, 2, 3, 4, 5, 6, 0).map { TreeSettling.FocusHolder.windowTypeName(it) },
+    )
+  }
 }

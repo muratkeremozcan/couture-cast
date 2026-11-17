@@ -70,6 +70,8 @@ vi.mock('../modules/accessibility-focus', () => ({
     boundary.focus(tag)
     return Promise.resolve(true)
   },
+  // No placement-aware move here: the composer's single-shot move records every focus.
+  focusAccessibilityElementAfterPlacement: () => null,
 }))
 vi.mock('./edge-to-edge-modal', () => ({
   useModalInsets: () => ({ top: 10, bottom: 10, left: 0, right: 0 }),

@@ -57,6 +57,8 @@ vi.mock('@/modules/accessibility-focus', () => ({
     if (osFocus.reportsBeforeResolving) osFocus.report([tag])
     return Promise.resolve(true)
   },
+  // The share-card composer's Android-only move; the teaser never uses it.
+  focusAccessibilityElementAfterPlacement: () => null,
   observeAccessibilityFocus: (listener: AccessibilityFocusListener) => {
     if (!osFocus.available) return null
     osFocus.listeners.add(listener)

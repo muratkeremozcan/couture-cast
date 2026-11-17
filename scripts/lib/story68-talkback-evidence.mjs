@@ -26,6 +26,21 @@ export function focusLatencies(output) {
     .map((match) => ({ wait: match[1], ms: Number(match[2]), outcome: match[3] }))
 }
 
+/**
+ * Who held TalkBack focus when a focus wait timed out, from closed lines the instrumented test
+ * prints (CC68_FOCUS_HOLDER|<wait>|<testID suffix, unnamed or none>|<active window type>).
+ * Only testIDs and fixed window type names pass, so nothing a person typed can reach the log.
+ */
+export function focusHolders(output) {
+  return [
+    ...String(output ?? '').matchAll(
+      /^CC68_FOCUS_HOLDER\|([A-Za-z0-9 _.\-/]{1,80})\|([A-Za-z0-9_.-]{1,80})\|([a-z_]{1,32})$/gm
+    ),
+  ]
+    .slice(0, 40)
+    .map((match) => ({ wait: match[1], holder: match[2], window: match[3] }))
+}
+
 const seconds = (ms) =>
   Number.isFinite(ms) && ms >= 0 ? Math.round(ms / 100) / 10 : null
 
@@ -36,6 +51,7 @@ export function talkbackEvidence({
   bundlesBefore = [],
   bundlesAfter = [],
   focusWaits = [],
+  focusHolders = [],
 }) {
   const during = bundlesAfter.slice(bundlesBefore.length)
   return {
@@ -46,5 +62,6 @@ export function talkbackEvidence({
     bundleBuildsDuringStage: during.length,
     bundleMsDuringStage: during.slice(0, 20),
     focusWaits,
+    focusHolders,
   }
 }
