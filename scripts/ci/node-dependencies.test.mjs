@@ -82,3 +82,11 @@ test('both setup actions take their tree from it', () => {
     )
   }
 })
+
+// 2026-11-17: onnxruntime-node (through @huggingface/transformers) downloads its CUDA binaries
+// from a GitHub release on every Linux x64 install, and that release asset now returns 404, so a
+// cache miss would fail the install. No CI runner has a GPU.
+test('the install skips the onnxruntime CUDA download', () => {
+  const install = step('Install dependencies')
+  assert.equal(install.env.ONNXRUNTIME_NODE_INSTALL_CUDA, 'skip')
+})

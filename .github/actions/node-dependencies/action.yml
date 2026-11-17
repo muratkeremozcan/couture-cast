@@ -71,6 +71,9 @@ runs:
       shell: bash
       env:
         INSTALL_COMMAND: ${{ inputs.install-command }}
+        # onnxruntime-node fetches CUDA binaries from a GitHub release on Linux x64, and that
+        # asset now returns 404. No runner has a GPU, so the CPU binaries in the package suffice.
+        ONNXRUNTIME_NODE_INSTALL_CUDA: skip
       run: bash "${{ github.action_path }}/../../../scripts/ci/install-dependencies.sh"
 
     - name: Save the dependency tree for this lockfile
