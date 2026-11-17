@@ -3,7 +3,17 @@
 // and the gate near 30 (last clean pushes of PR 210). Burn-in still runs on every pull
 // request and still fails the gate; it no longer delays the lanes.
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { parse } from 'yaml'
@@ -194,4 +204,60 @@ test('burn-in reads the SKIP_BURN_IN label as it is now, so a rerun after adding
     plan.steps.indexOf(current) < plan.steps.indexOf(detect),
     'the label is read before the changed specs'
   )
+})
+
+// PR 250: burn-in reran a changed real-session spec under the local config, where every case
+// skips without the real-session stack, and the shard guard failed the run as proving nothing.
+// The real-session lane runs those specs on every web pull request, so burn-in leaves them out.
+test('burn-in leaves out real-session specs, which only their own lane can run', () => {
+  const detect = workflow('rwf-burn-in.yml').jobs.plan.steps.find(
+    (s) => s.id === 'detect-changed'
+  )
+  // Each case runs the step's own script in a fresh repository: one base commit, then the files.
+  const changedAfter = (files) => {
+    const repo = mkdtempSync(path.join(tmpdir(), 'burn-in-detect-'))
+    const git = (...args) =>
+      execFileSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], {
+        cwd: repo,
+        encoding: 'utf8',
+      })
+    try {
+      git('init', '-q', '-b', 'main')
+      writeFileSync(path.join(repo, 'README'), 'base\n')
+      git('add', '.')
+      git('commit', '-q', '-m', 'base')
+      const base = git('rev-parse', 'HEAD').trim()
+      for (const file of files) {
+        mkdirSync(path.dirname(path.join(repo, file)), { recursive: true })
+        writeFileSync(path.join(repo, file), 'test\n')
+      }
+      git('add', '.')
+      git('commit', '-q', '-m', 'change')
+      const output = path.join(repo, '.github-output')
+      writeFileSync(output, '')
+      const script = detect.run
+        .replaceAll('${{ steps.base-ref.outputs.value }}', base)
+        .replaceAll('${{ inputs.test-directory }}', 'playwright/')
+      execFileSync('bash', ['-e', '-o', 'pipefail', '-c', script], {
+        cwd: repo,
+        env: { ...process.env, GITHUB_OUTPUT: output },
+        stdio: 'ignore',
+      })
+      return readFileSync(output, 'utf8').trim()
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  }
+  assert.equal(
+    changedAfter(['playwright/tests/signed-in-landing-real-session.spec.ts']),
+    'changed=false'
+  )
+  assert.equal(
+    changedAfter([
+      'playwright/tests/signed-in-landing-real-session.spec.ts',
+      'playwright/tests/mobile-viewport-overflow.spec.ts',
+    ]),
+    'changed=true'
+  )
+  assert.equal(changedAfter(['apps/web/src/app/page.tsx']), 'changed=false')
 })
