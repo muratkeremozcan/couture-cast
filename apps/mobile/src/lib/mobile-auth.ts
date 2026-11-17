@@ -32,10 +32,17 @@ export type MobileAccessTokenResolver = () =>
  * failure is an import-time `Cannot read properties of undefined (reading
  * 'EventEmitter')` rather than anything that points here.
  *
+ * The caller reads the map inside its `__DEV__` block, never this function: Expo inlines the
+ * value at export, and a read here survived into the release Hermes bytecode of a production
+ * export (scripts/ci/revenuecat-bundle-scan.mjs, PR 249).
+ *
+ * @param map the bundle's `EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE`
  * @returns the token for this device, or undefined when no map applies
  */
-const resolveDeviceScopedE2EToken = async (): Promise<string | undefined> => {
-  const raw = process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE?.trim()
+const resolveDeviceScopedE2EToken = async (
+  map: string | undefined
+): Promise<string | undefined> => {
+  const raw = map?.trim()
   if (!raw) {
     return undefined
   }
@@ -64,7 +71,9 @@ const resolveDeviceScopedE2EToken = async (): Promise<string | undefined> => {
 const defaultAccessTokenResolver: MobileAccessTokenResolver = async () => {
   if (__DEV__ && process.env.EXPO_PUBLIC_E2E_AUTH_MODE !== 'real') {
     const fixture =
-      (await resolveDeviceScopedE2EToken()) ??
+      (await resolveDeviceScopedE2EToken(
+        process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN_BY_DEVICE
+      )) ??
       (process.env.EXPO_PUBLIC_E2E_ACCESS_TOKEN?.trim() || undefined)
     if (fixture) return fixture
   }

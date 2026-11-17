@@ -4,12 +4,21 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { test } from 'node:test'
 import { parse } from 'yaml'
 
+import { profileEnvBlocks } from './revenuecat-key-hygiene.mjs'
+
 import {
+  E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE,
+  E2E_ACCESS_TOKEN_SENTINEL,
+  E2E_ACCESS_TOKEN_VARIABLE,
+  E2E_AUTH_MODE_VARIABLE,
+  E2E_DEVICE_TOKEN_SENTINEL,
   E2E_OAUTH_PROVIDER_SENTINEL,
   E2E_OAUTH_PROVIDER_VARIABLE,
+  NETWORK_TIMEOUT_MEMBER_TOKEN,
   EXPORT_SHAPES,
   TEST_STORE_KEY_VARIABLE,
   exportCommand,
@@ -91,6 +100,88 @@ test('the per-shape release check reports the planted sentinel and the Test Stor
   assert.deepEqual(bundleScan.scanReleaseExport(clean, 'secretvalue123'), [])
 })
 
+// PR 249: the network-timeout harness bakes a placeholder member token into its development
+// bundle. Each release export runs in member mode with both token keys planted, so a release
+// bundle that inlined either one, or the harness placeholder, fails the scan.
+test('the per-shape release check reports a seeded E2E member token leak', async (t) => {
+  const { scanReleaseExport } = await import('./revenuecat-bundle-scan.mjs')
+  for (const leak of [
+    E2E_ACCESS_TOKEN_SENTINEL,
+    E2E_DEVICE_TOKEN_SENTINEL,
+    NETWORK_TIMEOUT_MEMBER_TOKEN,
+  ]) {
+    const root = exportTree(t, {
+      '_expo/static/js/android/entry.hbc': `bearer${leak}authorization`,
+      '_expo/static/js/ios/entry.hbc': 'bearer authorization',
+    })
+    assert.deepEqual(
+      scanReleaseExport(root, 'secretvalue123'),
+      ['_expo/static/js/android/entry.hbc'],
+      leak
+    )
+  }
+})
+
+// Member mode reaches a bundle only through the env Metro starts with, so no EAS build profile
+// may set it, and only the development harnesses write the member token.
+test('no EAS build profile sets member mode or a member token', () => {
+  const eas = JSON.parse(fs.readFileSync('apps/mobile/eas.json', 'utf8'))
+  const variables = [
+    E2E_AUTH_MODE_VARIABLE,
+    E2E_ACCESS_TOKEN_VARIABLE,
+    E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE,
+  ]
+  const leaks = (config) =>
+    Object.entries(config.build).flatMap(([name, profile]) =>
+      profileEnvBlocks(profile).flatMap(([where, block]) =>
+        variables
+          .filter((variable) => variable in block)
+          .map((v) => `${name}.${where}: ${v}`)
+      )
+    )
+  assert.deepEqual(leaks(eas), [])
+  // The check finds a seeded leak.
+  assert.deepEqual(
+    leaks({
+      build: {
+        production: { android: { env: { [E2E_ACCESS_TOKEN_VARIABLE]: 'leak' } } },
+      },
+    }).length,
+    1
+  )
+})
+
+test('only the development harnesses write the E2E member token', () => {
+  const tracked = spawnSync(
+    'git',
+    ['ls-files', '-z', '--', 'apps', 'scripts', '.github', 'packages'],
+    {
+      encoding: 'utf8',
+    }
+  )
+    .stdout.split('\0')
+    .filter(Boolean)
+  const writes = new RegExp(
+    `(${E2E_ACCESS_TOKEN_VARIABLE}(_BY_DEVICE)?(=|:\\s)|env\\.${E2E_ACCESS_TOKEN_VARIABLE}(_BY_DEVICE)?\\s*=[^=])`
+  )
+  const writers = tracked.filter(
+    (file) =>
+      // Tests and their fixtures write nothing a build reads.
+      !/\.(test|spec)\.[cm]?[jt]sx?$/.test(file) &&
+      !/(^|\/)test\/fixtures\//.test(file) &&
+      fs.existsSync(file) &&
+      fs.statSync(file).isFile() &&
+      writes.test(fs.readFileSync(file, 'utf8'))
+  )
+  assert.deepEqual(writers.sort(), [
+    // The rule that pins the harness's Metro line.
+    'scripts/ci/android-native-workflow.mjs',
+    'scripts/ci/android-network-timeout.sh',
+    'scripts/run-maestro.mjs',
+    'scripts/run-test-store-journey.mjs',
+  ])
+})
+
 test('reads one variable from a dotenv file, quoted or not', (t) => {
   const root = exportTree(t, {
     '.env.local':
@@ -170,6 +261,11 @@ test('the scan exports production and preview, each with its env files and EAS p
     EAS_BUILD_PROFILE: 'production',
     [TEST_STORE_KEY_VARIABLE]: key,
     [E2E_OAUTH_PROVIDER_VARIABLE]: E2E_OAUTH_PROVIDER_SENTINEL,
+    [E2E_AUTH_MODE_VARIABLE]: 'member',
+    [E2E_ACCESS_TOKEN_VARIABLE]: E2E_ACCESS_TOKEN_SENTINEL,
+    [E2E_ACCESS_TOKEN_BY_DEVICE_VARIABLE]: JSON.stringify({
+      'couture-e2e-1': E2E_DEVICE_TOKEN_SENTINEL,
+    }),
   })
   assert.deepEqual(preview.args, [
     'expo',
