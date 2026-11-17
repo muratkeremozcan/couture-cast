@@ -61,6 +61,7 @@ export type RealSessionConsentPolicy = 'off' | 'required_13_15'
 export declare function realSessionConsentPolicy(
   env?: NodeJS.ProcessEnv | Record<string, string | undefined>
 ): RealSessionConsentPolicy
+export declare const REAL_SESSION_SPEC_PATTERN: RegExp
 export declare const EXPECTED_REAL_SESSION_TESTS: number
 export declare const EXPECTED_CONSENT_REQUIRED_TESTS: number
 export declare function expectedRealSessionTests(policy: RealSessionConsentPolicy): number
