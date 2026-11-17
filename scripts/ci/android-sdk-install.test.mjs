@@ -1,8 +1,17 @@
-// Story 6.14 follow-up: the mobile e2e SDK install cannot stall the job. In run
-// 43083368586 one sdkmanager call ran 33.5 minutes and the shard hit its job timeout.
+// Story 6.14 follow-up: the Android SDK install cannot stall a job. In run 43083368586 one
+// sdkmanager call ran 33.5 minutes and the shard hit its job timeout. The emulator jobs
+// (pr-mobile-e2e.yml) and every Gradle build of the app (android-gradle-sdk-workflows.test.mjs)
+// install through scripts/ci/android-sdk-install.sh, so these cases drive that script.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -10,6 +19,7 @@ import { test } from 'node:test'
 import { parse } from 'yaml'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
+const script = path.join(root, 'scripts/ci/android-sdk-install.sh')
 const workflow = parse(
   readFileSync(path.join(root, '.github/workflows/pr-mobile-e2e.yml'), 'utf8')
 )
@@ -17,12 +27,22 @@ const step = workflow.jobs['mobile-e2e-android'].steps.find(
   (candidate) => candidate.name === 'Install Android SDK packages for the emulator'
 )
 
-test('the SDK install step has its own timeout', () => {
+test('the emulator SDK step has its own timeout', () => {
   assert.ok(step['timeout-minutes'] > 0 && step['timeout-minutes'] <= 8)
 })
 
-/** Runs the step against a stub sdkmanager; `sdkmanager` is its bash body. */
-function runStep(t, sdkmanager, env = {}) {
+test('the emulator SDK step installs its list through the shared script', () => {
+  assert.equal(step.run.trim(), 'bash scripts/ci/android-sdk-install.sh')
+  assert.match(step.env.SDK_PACKAGES, /^build-tools;\S+ platform-tools /)
+  assert.match(
+    step.env.SDK_PACKAGES,
+    / system-images;android-\$\{\{ env\.ANDROID_API_LEVEL \}\};/
+  )
+  assert.match(step.env.SDK_PACKAGES, / emulator$/)
+})
+
+/** Runs the script against a stub sdkmanager; `sdkmanager` is its bash body. */
+function runStep(t, sdkmanager, env = {}, args = [], { node, gradleProperties } = {}) {
   const work = mkdtempSync(path.join(os.tmpdir(), 'sdk-install-'))
   t.after(() => rmSync(work, { recursive: true, force: true }))
   const bin = path.join(work, 'bin')
@@ -40,16 +60,28 @@ function runStep(t, sdkmanager, env = {}) {
     { mode: 0o755 }
   )
   writeFileSync(path.join(bin, 'sleep'), '#!/bin/bash\nexit 0\n', { mode: 0o755 })
-  return spawnSync(
-    'bash',
-    ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run],
-    {
-      encoding: 'utf8',
-      timeout: 20_000,
-      killSignal: 'SIGKILL',
-      env: { PATH: `${bin}:/usr/bin:/bin`, ANDROID_HOME: sdk, ...env },
-    }
-  )
+  // The package resolver of --gradle, standing in for node.
+  if (node !== undefined)
+    writeFileSync(path.join(bin, 'node'), `#!/bin/bash\n${node}\n`, { mode: 0o755 })
+  const home = path.join(work, 'home')
+  mkdirSync(home)
+  // A user gradle.properties the job wrote before the install, as given.
+  if (gradleProperties !== undefined) {
+    mkdirSync(path.join(home, '.gradle'))
+    writeFileSync(path.join(home, '.gradle/gradle.properties'), gradleProperties)
+  }
+  const result = spawnSync('bash', ['--noprofile', '--norc', script, ...args], {
+    encoding: 'utf8',
+    timeout: 20_000,
+    killSignal: 'SIGKILL',
+    env: { PATH: `${bin}:/usr/bin:/bin`, ANDROID_HOME: sdk, HOME: home, ...env },
+  })
+  const properties = path.join(home, '.gradle/gradle.properties')
+  return {
+    ...result,
+    sdk,
+    gradleProperties: existsSync(properties) ? readFileSync(properties, 'utf8') : null,
+  }
 }
 
 const unpack =
@@ -152,20 +184,16 @@ mkdir -p "$ANDROID_HOME/\${package//;//}" && touch "$ANDROID_HOME/\${package//;/
   )
   writeFileSync(path.join(bin, 'sleep'), '#!/bin/bash\nexit 0\n', { mode: 0o755 })
   const started = Date.now()
-  const result = spawnSync(
-    'bash',
-    ['--noprofile', '--norc', '-e', '-o', 'pipefail', '-c', step.run],
-    {
-      encoding: 'utf8',
-      timeout: 20_000,
-      killSignal: 'SIGKILL',
-      env: {
-        PATH: `${bin}:/usr/bin:/bin`,
-        ANDROID_HOME: sdk,
-        SDK_PACKAGES: 'platform-tools emulator',
-      },
-    }
-  )
+  const result = spawnSync('bash', ['--noprofile', '--norc', script], {
+    encoding: 'utf8',
+    timeout: 20_000,
+    killSignal: 'SIGKILL',
+    env: {
+      PATH: `${bin}:/usr/bin:/bin`,
+      ANDROID_HOME: sdk,
+      SDK_PACKAGES: 'platform-tools emulator',
+    },
+  })
   assert.equal(
     result.signal,
     null,
@@ -179,4 +207,90 @@ mkdir -p "$ANDROID_HOME/\${package//;//}" && touch "$ANDROID_HOME/\${package//;/
   )
   assert.match(result.stdout, /Installed platform-tools/)
   assert.match(result.stdout, /Installed emulator/)
+})
+
+// Main run 43927343722: Gradle fetched NDK 27.1.12297006 itself, dl.google.com answered 429 and
+// android36-controls failed. --gradle installs what the build needs first, with the same retries.
+const gradlePackages =
+  'ndk;27.1.12297006 cmake;3.22.1 build-tools;36.0.0 platforms;android-36'
+
+test('--gradle installs every resolved package through a run of 429s', (t) => {
+  const result = runStep(
+    t,
+    `if [ "$package" = "ndk;27.1.12297006" ] && [ "$n" -le 3 ]; then echo "Warning: Failed to download package: HTTP 429 Too Many Requests"; exit 1; fi\n${unpack}`,
+    {},
+    ['--gradle'],
+    { node: `echo '${gradlePackages}'` }
+  )
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.equal(
+    result.stdout.match(/Install attempt \d of ndk;27\.1\.12297006 left nothing behind/g)
+      .length,
+    3
+  )
+  for (const installed of gradlePackages.split(' ')) {
+    assert.match(
+      result.stdout,
+      new RegExp(`Installed ${installed.replace(/[.;]/g, '\\$&')}\n`)
+    )
+    assert.ok(
+      existsSync(path.join(result.sdk, installed.replaceAll(';', '/'), 'package.xml')),
+      installed
+    )
+  }
+  // Nothing missing from the list may be downloaded mid-build any more.
+  assert.equal(result.gradleProperties, 'android.builder.sdkDownload=false\n')
+})
+
+// Java properties may end at EOF without a newline; a plain append would then glue the setting
+// onto the last value (org.gradle.parallel=trueandroid.builder.sdkDownload=false).
+test('--gradle starts the setting on its own line after a file with no final newline', (t) => {
+  const result = runStep(t, unpack, {}, ['--gradle'], {
+    node: `echo '${gradlePackages}'`,
+    gradleProperties: 'org.gradle.parallel=true',
+  })
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.equal(
+    result.gradleProperties,
+    'org.gradle.parallel=true\nandroid.builder.sdkDownload=false\n'
+  )
+})
+
+test('--gradle appends after a file that already ends its last line', (t) => {
+  const result = runStep(t, unpack, {}, ['--gradle'], {
+    node: `echo '${gradlePackages}'`,
+    gradleProperties: 'org.gradle.jvmargs=-Xmx4g\n',
+  })
+  assert.equal(result.status, 0, result.stdout + result.stderr)
+  assert.equal(
+    result.gradleProperties,
+    'org.gradle.jvmargs=-Xmx4g\nandroid.builder.sdkDownload=false\n'
+  )
+})
+
+test('--gradle leaves Gradle downloads alone when a package never installs', (t) => {
+  const result = runStep(t, 'echo "Warning: HTTP 429"; exit 1', {}, ['--gradle'], {
+    node: `echo '${gradlePackages}'`,
+  })
+  assert.equal(result.status, 1)
+  assert.match(
+    result.stdout,
+    /::error::Could not install ndk;27\.1\.12297006 after 6 attempts\.\n$/
+  )
+  assert.equal(result.gradleProperties, null)
+})
+
+test('--gradle fails when the packages cannot be resolved', (t) => {
+  const result = runStep(t, unpack, {}, ['--gradle'], {
+    node: 'echo "android_sdk_packages_missing_version: ndkVersion" >&2; exit 1',
+  })
+  assert.equal(result.status, 1)
+  assert.doesNotMatch(result.stdout, /Installed/)
+  assert.equal(result.gradleProperties, null)
+})
+
+test('a run with no packages to install fails instead of passing empty', (t) => {
+  const result = runStep(t, unpack, { SDK_PACKAGES: '' })
+  assert.equal(result.status, 2)
+  assert.match(result.stdout, /::error::No Android SDK packages to install\./)
 })

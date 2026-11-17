@@ -31,7 +31,8 @@ runs:
 
         # Nothing here is used by any job in this repository. The Android NDKs go
         # because React Native 0.81 pins NDK 27.1.12297006, which no runner image
-        # ships, so Gradle installs that version itself and never reads the
+        # ships, so the Gradle jobs install that version before building
+        # (scripts/ci/android-sdk-install.sh --gradle) and never read the
         # preinstalled ones. The rest of the Android SDK stays: the emulator jobs
         # install their own system images, and the builds use its platforms and
         # build tools. Java, Node, Python, the browsers and Docker stay as well.
