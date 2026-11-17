@@ -7,6 +7,7 @@
 // (the longest labels), at 393 px (iPhone 15 and 16) and 320 px (the narrowest supported). The
 // bottom navigation is checked too, and no label may be cut inside its own box.
 import type { Page } from '@playwright/test'
+import { communityFeedResponseSchema } from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
 import { seedWebSession } from '../support/helpers/commerce-session'
 
@@ -40,25 +41,32 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       }
       return null
     }
+    /** Line boxes of a range's rects: a rect starting below the current line opens a new one. */
+    const linesOf = (range: Range) => {
+      const rects = Array.from(range.getClientRects())
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .sort((a, b) => a.top - b.top)
+      let lines = 0
+      let bottom = -Infinity
+      for (const rect of rects)
+        if (rect.top >= bottom - 1) {
+          lines++
+          bottom = rect.bottom
+        } else bottom = Math.max(bottom, rect.bottom)
+      return lines
+    }
     /**
-     * The most lines any one text run of the control takes. Per text run, because a control may
-     * stack an icon above its label on purpose (the bottom navigation).
+     * The lines the control's whole content takes (TEA R2). A control that stacks its parts in
+     * a column on purpose (an icon above a label in the bottom navigation) is measured part by
+     * part, each part as a whole.
      */
-    const lineCount = (control: HTMLElement) => {
-      const walker = document.createTreeWalker(control, NodeFilter.SHOW_TEXT)
-      let most = 0
-      for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-        if (!node.textContent?.trim()) continue
-        const range = document.createRange()
-        range.selectNodeContents(node)
-        const lines = new Set(
-          Array.from(range.getClientRects())
-            .filter((rect) => rect.width > 0 && rect.height > 0)
-            .map((rect) => Math.round(rect.bottom))
-        ).size
-        most = Math.max(most, lines)
-      }
-      return most
+    const lineCount = (element: Element): number => {
+      const style = getComputedStyle(element)
+      if (style.display.includes('flex') && style.flexDirection.startsWith('column'))
+        return Math.max(0, ...Array.from(element.children).map(lineCount))
+      const range = document.createRange()
+      range.selectNodeContents(element)
+      return linesOf(range)
     }
     const controlProblems = (control: HTMLElement): string[] => {
       const box = control.getBoundingClientRect()
@@ -77,18 +85,23 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       if (clip) problems.push(`"${name}" is clipped by a <${clip}>`)
       const lines = lineCount(control)
       if (lines > 1) problems.push(`"${name}" wraps onto ${lines} lines`)
-      // TEA P5: a label cut by its own box (an ellipsis or a clipped bottom-nav label).
+      // TEA P5, R2: a label cut by its own box, whatever its overflow: content wider than a box,
+      // or text that reaches past the control's edges.
+      // A screen-reader-only part is a 1 px clipped box on purpose.
       for (const part of [
         control,
         ...Array.from(control.querySelectorAll<HTMLElement>('*')),
       ])
-        if (
-          // A screen-reader-only part is a 1 px clipped box on purpose.
-          part.clientWidth > 1 &&
-          part.scrollWidth > part.clientWidth + 0.5 &&
-          getComputedStyle(part).overflow !== 'visible'
-        )
+        if (part.clientWidth > 1 && part.scrollWidth > part.clientWidth + 0.5)
           problems.push(`"${name}" is cut inside its own box`)
+      const text = document.createRange()
+      text.selectNodeContents(control)
+      const textBox = text.getBoundingClientRect()
+      if (
+        textBox.width > 0 &&
+        (textBox.left < box.left - 0.5 || textBox.right > box.right + 0.5)
+      )
+        problems.push(`"${name}" has text outside its box`)
       return problems
     }
 
@@ -174,7 +187,29 @@ async function expectNoOverflow(page: Page, route: string) {
   expect(problems).toEqual([])
 }
 
+/**
+ * TEA R4: the landing's community feed reads storage objects that live only in the default
+ * database, so on an isolated stack it answers 503. The layout test needs the page chrome, not
+ * the feed, so the feed answers a fixed empty page, checked against the contract.
+ */
+const EMPTY_FEED = communityFeedResponseSchema.parse({
+  data: {
+    items: [],
+    authorStates: [],
+    nextCursor: null,
+    mode: 'auto',
+    viewerBand: null,
+    bandResolved: false,
+    bandUnresolvedReason: null,
+    experimentVariant: 'auto',
+    activeChallenge: null,
+  },
+})
+
 async function open(page: Page, route: string) {
+  await page.route('**/api/v1/community/feed**', (request) =>
+    request.fulfill({ json: EMPTY_FEED })
+  )
   await page.goto(route)
   await expect(page.locator('#main-content')).toBeVisible()
   await page.evaluate(() => document.fonts.ready.then(() => null))

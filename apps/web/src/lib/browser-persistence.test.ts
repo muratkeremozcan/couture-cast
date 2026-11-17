@@ -72,6 +72,36 @@ describe('the blocked-storage head script', () => {
     expect(store.getItem('couturecast.auth-session')).toBeNull()
   })
 
+  // TEA R1: an SDK that clears its keys walks key() and length (posthog-js on sign-out).
+  it('lists the real keys and the memory keys once each when only writes fail', () => {
+    const saved: Record<string, string> = { a: '1', b: '2' }
+    const full = {
+      getItem: (key: string) => saved[key] ?? null,
+      setItem: () => {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+      },
+      removeItem: (key: string) => void delete saved[key],
+      key: (index: number) => Object.keys(saved)[index] ?? null,
+      get length() {
+        return Object.keys(saved).length
+      },
+    }
+    const fake: FakeWindow = { localStorage: full, sessionStorage: window.sessionStorage }
+    fallback(fake)
+    const store = fake.localStorage as Storage
+    store.setItem('b', 'memory')
+    store.setItem('c', '3')
+    const keys = Array.from({ length: store.length }, (_, index) => store.key(index))
+    expect(keys).toEqual(['a', 'b', 'c'])
+    expect(store.getItem('b')).toBe('memory')
+    store.removeItem('a')
+    expect(Array.from({ length: store.length }, (_, index) => store.key(index))).toEqual([
+      'b',
+      'c',
+    ])
+    expect(store.key(5)).toBeNull()
+  })
+
   for (const refusal of ['reads', 'access'] as const)
     it(`puts a working in-memory store in place when the browser refuses ${refusal}`, () => {
       const fake: FakeWindow = {}
