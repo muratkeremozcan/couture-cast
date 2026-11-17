@@ -1,5 +1,8 @@
 const { getDefaultConfig } = require('expo/metro-config')
-const { fontScaleTextTarget } = require('./metro-font-scale-text')
+const {
+  fontScaleTextTarget,
+  reactNativeEntryRequest,
+} = require('./metro-font-scale-text')
 
 const config = getDefaultConfig(__dirname)
 
@@ -15,6 +18,9 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
     context.originModulePath
   )
   if (fontScaleShim) return { type: 'sourceFile', filePath: fontScaleShim }
+  // The shim's own react-native, by a name no deep-import warning covers.
+  const reactNativeEntry = reactNativeEntryRequest(moduleName)
+  if (reactNativeEntry) return context.resolveRequest(context, reactNativeEntry, platform)
   try {
     return context.resolveRequest(context, moduleName, platform)
   } catch (error) {
