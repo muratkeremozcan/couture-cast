@@ -51,11 +51,13 @@ function runExpoPrebuild(fixtureRoot, { platform = 'ios', timeout = 50_000 } = {
   )
 }
 
+/** A spawnSync result that exited 0; otherwise its output, and its spawn error (a timeout). */
 function assertCommand(result, label) {
+  const spawnError = result.error ? ` (${result.error.message})` : ''
   assert.equal(
     result.status,
     0,
-    `${label}\n${result.stdout ?? ''}\n${result.stderr ?? ''}`
+    `${label}${spawnError}\n${result.stdout ?? ''}\n${result.stderr ?? ''}`
   )
 }
 
