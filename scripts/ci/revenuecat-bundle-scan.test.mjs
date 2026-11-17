@@ -151,6 +151,51 @@ test('no EAS build profile sets member mode or a member token', () => {
   )
 })
 
+// A source line that writes the E2E member token (or its per-device map): a shell or dotenv
+// assignment, an env property or bracket write, or an object, JSON or YAML key.
+const writesMemberToken = (source) => {
+  const name = `${E2E_ACCESS_TOKEN_VARIABLE}(?:_BY_DEVICE)?`
+  const quoted = `['"\`]${name}['"\`]`
+  return new RegExp(
+    [
+      // NAME=value, env.NAME = value
+      `${name}\\s*=(?!=)`,
+      // env['NAME'] = value
+      `\\[\\s*${quoted}\\s*\\]\\s*=(?!=)`,
+      // { "NAME": value }
+      `${quoted}\\s*:`,
+      // { NAME: value }, YAML NAME: value
+      `(?:^|[{,])\\s*${name}\\s*:`,
+    ].join('|'),
+    'm'
+  ).test(source)
+}
+
+test('the writer check sees every way to write the E2E member token', () => {
+  const token = E2E_ACCESS_TOKEN_VARIABLE
+  for (const write of [
+    `${token}=abc npx expo start`,
+    `export ${token}_BY_DEVICE='{}'`,
+    `process.env.${token} = token`,
+    `env['${token}'] = token`,
+    `env[\`${token}_BY_DEVICE\`]=map`,
+    `{ "${token}": token }`,
+    `Object.assign(process.env, {${token}:token})`,
+    `spawn(cmd, { env: { ...process.env, ${token}: token } })`,
+    `env:\n  ${token}: abc`,
+  ]) {
+    assert.equal(writesMemberToken(write), true, write)
+  }
+  for (const read of [
+    `const value = process.env.${token} ?? ''`,
+    `if (process.env.${token} === undefined) return`,
+    `const token = flag ? process.env.${token} : undefined`,
+    `const key = env['${token}']`,
+  ]) {
+    assert.equal(writesMemberToken(read), false, read)
+  }
+})
+
 test('only the development harnesses write the E2E member token', () => {
   const tracked = spawnSync(
     'git',
@@ -161,9 +206,6 @@ test('only the development harnesses write the E2E member token', () => {
   )
     .stdout.split('\0')
     .filter(Boolean)
-  const writes = new RegExp(
-    `(${E2E_ACCESS_TOKEN_VARIABLE}(_BY_DEVICE)?(=|:\\s)|env\\.${E2E_ACCESS_TOKEN_VARIABLE}(_BY_DEVICE)?\\s*=[^=])`
-  )
   const writers = tracked.filter(
     (file) =>
       // Tests and their fixtures write nothing a build reads.
@@ -171,7 +213,7 @@ test('only the development harnesses write the E2E member token', () => {
       !/(^|\/)test\/fixtures\//.test(file) &&
       fs.existsSync(file) &&
       fs.statSync(file).isFile() &&
-      writes.test(fs.readFileSync(file, 'utf8'))
+      writesMemberToken(fs.readFileSync(file, 'utf8'))
   )
   assert.deepEqual(writers.sort(), [
     // The rule that pins the harness's Metro line.
