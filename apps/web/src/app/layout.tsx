@@ -4,6 +4,8 @@ import type { Metadata } from 'next'
 import localFont from 'next/font/local'
 import './globals.css'
 import { SkipToContent } from './components/skip-to-content'
+import { blockedStorageFallbackScript } from '../lib/browser-persistence'
+import { landingSessionScript } from '../lib/landing-session'
 
 const geistSans = localFont({
   src: './fonts/GeistVF.woff',
@@ -28,7 +30,22 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    // The head script sets data-session before React hydrates, so <html> differs from the server
+    // render by that one attribute on purpose.
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        {/* First: a browser that refuses storage gets an in-memory store before any SDK loads. */}
+        <script dangerouslySetInnerHTML={{ __html: blockedStorageFallbackScript() }} />
+        <script
+          // Static source with no user input (lib/landing-session.ts): it must run before first
+          // paint, so it cannot wait for a bundle.
+          dangerouslySetInnerHTML={{
+            __html: landingSessionScript({
+              e2eAuth: process.env.NEXT_PUBLIC_E2E_AUTH === 'true',
+            }),
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <SkipToContent />
         {children}

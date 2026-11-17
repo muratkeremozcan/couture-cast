@@ -16,6 +16,8 @@ export const es419: GuestPreviewStrings = {
       'Crea una cuenta para agregar tu ropa. Después de iniciar sesión, puedes elegir guardar tus preferencias de comodidad. Las prendas de muestra y los Me gusta de la vista previa se quedan en esta vista previa.',
     createAccount: 'Crear cuenta',
     signIn: 'Iniciar sesión',
+    openWardrobe: 'Abrir tu guardarropa',
+    signOut: 'Cerrar sesión',
     resetPreview: 'Restablecer vista previa',
     exitPreview: 'Salir de la vista previa',
     storageUnavailable: 'Esta vista previa puede reiniciarse al cerrarla.',

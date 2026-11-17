@@ -5,6 +5,7 @@ import type {
 } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 
 // Story 0.9 Task 7 step 3 owner:
 // route web polling through the generated client instead of rebuilding request details in components.
@@ -19,7 +20,7 @@ export function readWebEventsAccessToken(): string | null {
   if (typeof window === 'undefined') {
     return null
   }
-  return window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() || null
+  return readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() || null
 }
 
 /**

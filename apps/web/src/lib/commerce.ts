@@ -18,6 +18,7 @@ import {
 import { ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 
 /**
  * Thrown for every failure these wrappers surface, so a caller can tell an API
@@ -54,7 +55,7 @@ function readStoredToken(): string | null {
   if (typeof window === 'undefined') {
     return null
   }
-  return window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null
+  return readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null
 }
 
 function readAccessToken(): string {

@@ -16,6 +16,8 @@ export const enUS = {
       'Create an account to add your clothes. You can choose to save your comfort preferences after signing in. Sample items and preview likes stay in this preview.',
     createAccount: 'Create account',
     signIn: 'Sign in',
+    openWardrobe: 'Open your wardrobe',
+    signOut: 'Sign out',
     resetPreview: 'Reset preview',
     exitPreview: 'Exit preview',
     storageUnavailable: 'This preview may reset when you close it.',

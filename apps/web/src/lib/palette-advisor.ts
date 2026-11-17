@@ -40,6 +40,7 @@ import {
   prepareGarmentImage,
   WEB_ACCESS_TOKEN_STORAGE_KEY,
 } from './wardrobe'
+import { readStorage } from './browser-persistence'
 
 // One sessionStorage truth for "is there a web session": the commerce, premium
 // and premium-theme helpers all read the same key, and a fourth copy of the
@@ -98,7 +99,7 @@ function readAccessToken(): string {
   const token =
     typeof window === 'undefined'
       ? null
-      : (window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
+      : (readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
   if (!token) {
     throw new PaletteAdvisorRequestError('signed_out', PALETTE_ADVISOR_SIGNED_OUT_MESSAGE)
   }

@@ -15,6 +15,8 @@ export const deDE: GuestPreviewStrings = {
       'Erstellen Sie ein Konto, um Ihre Kleidung hinzuzufügen. Nach der Anmeldung können Sie Ihre Komforteinstellungen speichern. Beispielteile und Likes aus der Vorschau bleiben in dieser Vorschau.',
     createAccount: 'Konto erstellen',
     signIn: 'Anmelden',
+    openWardrobe: 'Ihren Kleiderschrank öffnen',
+    signOut: 'Abmelden',
     resetPreview: 'Vorschau zurücksetzen',
     exitPreview: 'Vorschau beenden',
     storageUnavailable: 'Diese Vorschau wird beim Schließen eventuell zurückgesetzt.',

@@ -39,6 +39,7 @@ import { createWebApiClient } from './api-client'
 import { BLOB_DOWNLOAD_URL_LIFETIME_MS } from './blob-download'
 import { getI18n } from '../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 
 /** `useTranslation` bound to this app's instance, so the console renders before the locale bridge mounts. */
 export function useModerationTranslation() {
@@ -130,7 +131,7 @@ export function parseTolerant<T>(schema: z.ZodType<T>, data: unknown): T {
 }
 
 function readAccessToken(): string {
-  const token = window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
+  const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
   if (!token) throw new ModerationRequestError('signed_out', 'Your session expired.')
   return token
 }
@@ -398,7 +399,7 @@ async function decisionFailure(error: unknown): Promise<ModerationDecisionReques
 }
 
 function readDecisionToken(): string {
-  const token = window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
+  const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim()
   if (!token) throw new ModerationDecisionRequestError('signed_out')
   return token
 }

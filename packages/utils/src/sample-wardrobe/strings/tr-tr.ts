@@ -15,6 +15,8 @@ export const trTR: GuestPreviewStrings = {
       'Kıyafetlerinizi eklemek için hesap oluşturun. Giriş yaptıktan sonra konfor tercihlerinizi kaydetmeyi seçebilirsiniz. Örnek parçalar ve önizlemedeki beğeniler bu önizlemede kalır.',
     createAccount: 'Hesap oluşturun',
     signIn: 'Giriş yapın',
+    openWardrobe: 'Gardırobunuzu açın',
+    signOut: 'Oturumu kapat',
     resetPreview: 'Önizlemeyi sıfırlayın',
     exitPreview: 'Önizlemeden çıkın',
     storageUnavailable: 'Bu önizleme, kapattığınızda sıfırlanabilir.',

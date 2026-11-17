@@ -35,6 +35,8 @@ const REQUIRED = [
   'scripts/ci/android-talkback.sh',
   'scripts/ci/accessibility-focus-device-tests.sh',
   'scripts/ci/fetch-gradle-wrapper.sh',
+  'scripts/ci/android-sdk-install.sh',
+  'scripts/ci/android-gradle-sdk-packages.mjs',
   'scripts/ci/check-accessibility-focus-results.mjs',
   'scripts/ci/check-accessibility-focus-builds.sh',
   'scripts/run-story67-talkback.mjs',

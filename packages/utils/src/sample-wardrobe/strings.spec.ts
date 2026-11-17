@@ -119,6 +119,35 @@ describe('guest preview strings (U-CATALOG-STRINGS)', () => {
     ).toBe('3 of 9 reviewed')
   })
 
+  // Owner report 2026-11-16: a signed-in member saw only Start signup and Sign in on the web
+  // landing. Its member actions read these two strings, translated in every locale.
+  it('names the member landing actions exactly, and no locale falls back to English', () => {
+    const expected = {
+      'en-US': ['Open your wardrobe', 'Sign out'],
+      'en-CA': ['Open your wardrobe', 'Sign out'],
+      'de-DE': ['Ihren Kleiderschrank öffnen', 'Abmelden'],
+      'es-419': ['Abrir tu guardarropa', 'Cerrar sesión'],
+      'fr-CA': ['Ouvrir votre garde-robe', 'Se déconnecter'],
+      'fr-FR': ['Ouvrir votre garde-robe', 'Se déconnecter'],
+      'it-IT': ['Apri il tuo guardaroba', 'Esci'],
+      'pt-BR': ['Abrir seu guarda-roupa', 'Sair'],
+      'pt-PT': ['Abrir o seu roupeiro', 'Terminar sessão'],
+      'tr-TR': ['Gardırobunuzu açın', 'Oturumu kapat'],
+    } as const
+    expect(Object.keys(expected).sort()).toEqual([...GUEST_PREVIEW_LOCALES].sort())
+    for (const [locale, [openWardrobe, signOut]] of Object.entries(expected)) {
+      const chrome = GUEST_PREVIEW_STRINGS[locale as keyof typeof expected].chrome
+      expect([chrome.openWardrobe, chrome.signOut], locale).toEqual([
+        openWardrobe,
+        signOut,
+      ])
+      if (!locale.startsWith('en-')) {
+        expect(chrome.openWardrobe, locale).not.toBe(enUS.chrome.openWardrobe)
+        expect(chrome.signOut, locale).not.toBe(enUS.chrome.signOut)
+      }
+    }
+  })
+
   it('makes no score, popularity, sponsorship or live-weather claim in any locale (U-HONEST)', () => {
     for (const locale of GUEST_PREVIEW_LOCALES) {
       for (const [key, text] of leaves(GUEST_PREVIEW_STRINGS[locale])) {

@@ -27,6 +27,8 @@ on:
       - 'scripts/ci/android-talkback.sh'
       - 'scripts/ci/accessibility-focus-device-tests.sh'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - 'scripts/ci/android-sdk-install.sh'
+      - 'scripts/ci/android-gradle-sdk-packages.mjs'
       - 'scripts/ci/check-accessibility-focus-results.mjs'
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
@@ -46,6 +48,8 @@ on:
       - 'scripts/ci/android-talkback.sh'
       - 'scripts/ci/accessibility-focus-device-tests.sh'
       - 'scripts/ci/fetch-gradle-wrapper.sh'
+      - 'scripts/ci/android-sdk-install.sh'
+      - 'scripts/ci/android-gradle-sdk-packages.mjs'
       - 'scripts/ci/check-accessibility-focus-results.mjs'
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
@@ -110,6 +114,14 @@ jobs:
         with:
           packages: platform-tools
 
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
+
       - name: Generate the Android project
         id: android_project
         working-directory: apps/mobile
@@ -163,6 +175,14 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
 
       - name: Generate the Android project
         working-directory: apps/mobile
@@ -223,6 +243,14 @@ jobs:
         uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
+
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle build needs, with
+      # retries, before Gradle runs: Gradle's own one-shot download of the NDK hit a 429 and
+      # failed android36-controls in main run 43927343722 (scripts/ci/android-sdk-install.sh).
+      - name: Install the Android SDK packages Gradle builds with
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
 
       - name: Generate the Android project
         working-directory: apps/mobile

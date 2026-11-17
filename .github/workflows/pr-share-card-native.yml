@@ -155,6 +155,16 @@ jobs:
         if: ${{ !cancelled() && matrix.platform == 'android' }}
         with:
           packages: platform-tools
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle builds need, with retries,
+      # before any Gradle run: Gradle's own one-shot download of the NDK hit a 429 and failed
+      # android36-controls in main run 43927343722. The journey runs Gradle even when the client
+      # comes from its cache, so every Android lane installs them.
+      - name: Install the Android SDK packages Gradle builds with
+        id: android_sdk_packages
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
       # A restored client skips the Debug build, so the Gradle work left in the journey (the
       # share-sheet androidTest, the Release font build, the TalkBack androidTest) starts cold:
       # 13 minutes more in android36-interaction on run 41332254336. This restores Gradle's
@@ -237,11 +247,11 @@ jobs:
         if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Fetch the Gradle wrapper
-        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk_packages.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
       - name: Build native development client
         id: native_build
-        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk_packages.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Verify modal status-bar styling on both Android SDK branches
         id: modal_system_bars
@@ -281,7 +291,7 @@ jobs:
           test -r /dev/kvm && test -w /dev/kvm
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && matrix.platform == 'android' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.android_sdk_packages.outcome == 'success' && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}
@@ -394,6 +404,16 @@ jobs:
         if: ${{ !cancelled() }}
         with:
           packages: platform-tools
+      # NDK 27.1.12297006, CMake, build tools and the platform the Gradle builds need, with retries,
+      # before any Gradle run: Gradle's own one-shot download of the NDK hit a 429 and failed
+      # android36-controls in main run 43927343722. The journey runs Gradle even when the client
+      # comes from its cache, so every Android lane installs them.
+      - name: Install the Android SDK packages Gradle builds with
+        id: android_sdk_packages
+        if: ${{ !cancelled() && steps.install.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        # Normally about a minute; the script holds every attempt to a 420 s budget.
+        timeout-minutes: 8
+        run: bash scripts/ci/android-sdk-install.sh --gradle
       # A restored client skips the Debug build, so the Gradle work left (the share-receive APKs,
       # the Release font build, the TalkBack androidTest) starts cold: 13 minutes more in
       # android36-interaction on run 41332254336. This restores Gradle's dependencies and
@@ -476,11 +496,11 @@ jobs:
         if: ${{ !cancelled() && steps.prebuild.outcome == 'success' }}
         run: node scripts/ci/node-test-gate.mjs worklets-staging
       - name: Fetch the Gradle wrapper
-        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && matrix.platform == 'android' && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk_packages.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
       - name: Build native development client
         id: native_build
-        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
+        if: ${{ !cancelled() && steps.prebuild.outcome == 'success' && steps.java.outcome == 'success' && steps.android_sdk_packages.outcome == 'success' && steps.native_cache.outcome == 'success' && steps.native_cache.outputs.cache-hit != 'true' }}
         run: node scripts/run-story68-native.mjs build --platform ${{ matrix.platform }}
       - name: Verify modal status-bar styling on both Android SDK branches
         id: modal_system_bars
@@ -538,7 +558,7 @@ jobs:
       # Built only for a journey that can run: a client restored or built on this runner.
       - name: Build the share-receive APKs
         id: share_receive_build
-        if: ${{ !cancelled() && steps.share_receive_cache.outcome == 'success' && steps.share_receive_cache.outputs.cache-hit != 'true' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.java.outcome == 'success' && steps.android_sdk.outcome == 'success' }}
+        if: ${{ !cancelled() && steps.share_receive_cache.outcome == 'success' && steps.share_receive_cache.outputs.cache-hit != 'true' && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.java.outcome == 'success' && steps.android_sdk_packages.outcome == 'success' }}
         run: node scripts/run-story68-native.mjs share-receive-build --platform ${{ matrix.platform }}
       # A fork's pull request can restore these like the client, so they are scanned the same way.
       - name: Refuse to cache share-receive APKs that embed a secret
@@ -575,7 +595,7 @@ jobs:
       # CC68_SHARE_RECEIVE_PREBUILT tells share-sheet to install them without building.
       - name: Android isolated native journey
         timeout-minutes: ${{ matrix.journey_timeout }}
-        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.share_receive_key.outcome == 'success' && (steps.share_receive_key.outputs.key == '' || steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && steps.kvm.outcome == 'success' }}
+        if: ${{ !cancelled() && (steps.native_build.outcome == 'success' || steps.native_cache.outputs.cache-hit == 'true') && steps.share_receive_key.outcome == 'success' && (steps.share_receive_key.outputs.key == '' || steps.share_receive_cache.outputs.cache-hit == 'true' || steps.share_receive_save.outcome == 'success') && steps.android_sdk_packages.outcome == 'success' && steps.kvm.outcome == 'success' }}
         uses: reactivecircus/android-emulator-runner@v2
         env:
           CC68_ANDROID_API: ${{ matrix.api }}

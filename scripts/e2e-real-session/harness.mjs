@@ -335,9 +335,11 @@ export function realSessionConsentPolicy(env = process.env) {
  * five in `community-real-session-identity.spec.ts`, two in
  * `guest-preview-real-session.spec.ts` (Story 6.16) and eleven untagged ones in
  * `google-sign-in-real-session.spec.ts` (Story 6.17, three of them the policy-off teen
- * cases). A full run must report exactly this many, none skipped.
+ * cases), and thirteen in `signed-in-landing-real-session.spec.ts` (owner report 2026-11-16) that
+ * run in Chromium and again in WebKit with the iPhone 15 descriptor. A full run must report
+ * exactly this many, none skipped.
  */
-export const EXPECTED_REAL_SESSION_TESTS = 19
+export const EXPECTED_REAL_SESSION_TESTS = 45
 
 /** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
 export const EXPECTED_CONSENT_REQUIRED_TESTS = 5

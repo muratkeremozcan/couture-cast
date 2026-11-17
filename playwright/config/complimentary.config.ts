@@ -8,7 +8,7 @@
 // config ignores the spec (base.config.ts testIgnore), because it turns the six member
 // flags off globally, which would break the shared parallel run.
 import merge from 'lodash.merge'
-import { defineConfig } from '@playwright/test'
+import { defineConfig, devices } from '@playwright/test'
 import localConfig from './local.config'
 
 const ownedJson = process.env.COMPLIMENTARY_E2E_OWNED_ENV
@@ -46,6 +46,9 @@ export default defineConfig({
   // Set outside the merge: lodash.merge walks arrays index by index.
   testIgnore: [],
   testMatch: /complimentary-access\.spec\.ts$/,
+  // Chromium only: the base config's webkit-iphone project carries its own testMatch, which
+  // would run the phone-width guard here on the complimentary database.
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   fullyParallel: false,
   workers: 1,
 })
