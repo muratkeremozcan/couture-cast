@@ -112,4 +112,30 @@ describe('Home after a native cold start', () => {
     expect(screen.queryByTestId('home-signed-out-welcome')).toBeNull()
     expect(ritualRequests).toEqual(['Bearer restored-token'])
   })
+
+  // PR 249: the Android network-timeout flow now runs as a member, so the signed-out side of
+  // Story 6.16 D1 is held here. On an API that never answers, a signed-out Home still shows the
+  // welcome card and sends nothing, so no timeout and no error state can follow.
+  it('a signed-out Home on a hung network shows the welcome card and sends no ritual request', async () => {
+    let ritualRequests = 0
+    server.use(
+      http.get('*/api/v1/ritual', async () => {
+        ritualRequests += 1
+        await new Promise(() => undefined)
+        return HttpResponse.json(mockRitualResponse)
+      })
+    )
+    await render(
+      <AccessibilityAnnouncerProvider>
+        <TabOneScreen />
+      </AccessibilityAnnouncerProvider>
+    )
+    await screen.findByTestId('home-signed-out-welcome')
+    // Long enough for a ritual request sent on mount to reach the handler.
+    await new Promise((resolve) => setTimeout(resolve, 500))
+    expect(ritualRequests).toBe(0)
+    expect(screen.getByTestId('home-signed-out-welcome')).toBeTruthy()
+    expect(screen.queryByTestId('weather-header-skeleton')).toBeNull()
+    expect(screen.queryByTestId('hero-error-state')).toBeNull()
+  })
 })
