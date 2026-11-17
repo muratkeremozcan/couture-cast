@@ -481,12 +481,15 @@ test('L-10: the landing hydrates cleanly for a member, a pending session and a v
   const rowTop = () =>
     tab.evaluate(() => {
       const box = (testId: string) => {
-        const node = document.querySelector(`[data-testid="${testId}"]`)
-        if (!node) throw new Error(`missing ${testId}`)
-        return node.getBoundingClientRect().top
+        const nodes = document.querySelectorAll(`[data-testid="${testId}"]`)
+        if (nodes.length !== 1)
+          throw new Error(`${testId}: ${nodes.length} matches, expected 1`)
+        return nodes[0]!.getBoundingClientRect().top
       }
       return box('hero-cta-group') - box('hero-section')
     })
+  // A late font swap would re-wrap the hero copy between the two reads.
+  await tab.evaluate(() => document.fonts.ready.then(() => undefined))
   const pendingTop = await rowTop()
   release()
   await expectMemberLanding(tab)
