@@ -61,6 +61,9 @@ export const MINIFIED_EVIDENCE =
 export const RELEASE_ABIS =
   'node scripts/ci/android-release-abis.mjs apps/mobile/android/app/build/outputs/bundle/release/app-release.aab | tee "$RUNNER_TEMP/android-release-builds/release-abis.txt"'
 export const PREBUILD = 'npx expo prebuild --platform android --no-install'
+// The build's daemons idle through the emulator step otherwise: about 5.5 GB of 16 GB in diag
+// run 44008046979, beside the runner the Google sign-in job lost in run 43964196075.
+export const STOP_DAEMONS = 'bash scripts/ci/stop-gradle-daemons.sh apps/mobile/android'
 export const NETWORK_RUN = `bash ${NETWORK_SCRIPT}`
 export const NETWORK_EVIDENCE = '${{ runner.temp }}/android-network-timeout'
 export const GOOGLE_RUN = `bash ${GOOGLE_SCRIPT}`
@@ -313,13 +316,14 @@ function networkProblems(job, script, check) {
   const order = [
     indexOf(job, (step) => step.run === PREBUILD),
     indexOf(job, (step) => step.id === 'client_build'),
+    indexOf(job, (step) => step.run === STOP_DAEMONS && step.if === undefined),
     indexOf(job, runs('node scripts/maestro-install.mjs')),
     indexOf(job, runs('test -r /dev/kvm && test -w /dev/kvm')),
     indexOf(job, (step) => step.id === 'network_timeout'),
   ]
   check(
     order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])),
-    `${NETWORK_JOB}: prebuild, build the client, install Maestro, enable KVM, then run the flow`
+    `${NETWORK_JOB}: prebuild, build the client, stop its daemons, install Maestro, enable KVM, then run the flow`
   )
   const lines = executedLines(script)
   check(
@@ -405,13 +409,14 @@ function googleProblems(job, script, check) {
     indexOf(job, (step) => step === supabase),
     indexOf(job, (step) => step.run === PREBUILD),
     indexOf(job, (step) => step.id === 'google_client_build'),
+    indexOf(job, (step) => step.run === STOP_DAEMONS && step.if === undefined),
     indexOf(job, runs('node scripts/maestro-install.mjs')),
     indexOf(job, runs('test -r /dev/kvm && test -w /dev/kvm')),
     indexOf(job, (step) => step.id === 'google_sign_in'),
   ]
   check(
     order.every((at, i) => at >= 0 && (i === 0 || at > order[i - 1])),
-    `${GOOGLE_JOB}: start Supabase, prebuild, build the client, install Maestro, enable KVM, then run the flows`
+    `${GOOGLE_JOB}: start Supabase, prebuild, build the client, stop its daemons, install Maestro, enable KVM, then run the flows`
   )
   check(
     executedLines(script)[0]?.line === 'set -euo pipefail' && !neutralizedRun(script),

@@ -25,6 +25,10 @@
 #                             debug client's Gradle build alone outruns the 20-minute PR job
 #                             ceiling. About 45 minutes; limit 75.
 #
+# Both emulator jobs stop the build's Gradle and Kotlin daemons before the emulator boots
+# (scripts/ci/stop-gradle-daemons.sh): they held about 5.5 GB of the runner's 16 GB through the
+# Google sign-in flows (diag run 44008046979), and that job lost its runner in run 43964196075.
+#
 # The Android emulator lanes that run nightly today (pr-share-card-native.yml's android36 lanes,
 # pr-accessibility-focus.yml's TalkBack job) also run on a merge or a pull request, and drive the
 # Story 6.8 isolated client against its own runtime or a release app, so the flow gets its own
@@ -184,6 +188,11 @@ jobs:
         id: client_build
         timeout-minutes: 35
         run: node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-network-timeout/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain
+      # The build's Gradle daemon, Kotlin compile daemons and javac workers would idle through the
+      # emulator step: about 5.5 GB of the runner's 16 GB (diag run 44008046979), beside a job that
+      # lost its runner in run 43964196075 (scripts/ci/stop-gradle-daemons.sh).
+      - name: Stop the build's Gradle and Kotlin daemons
+        run: bash scripts/ci/stop-gradle-daemons.sh apps/mobile/android
       - name: Install the pinned Maestro CLI
         run: node scripts/maestro-install.mjs
       - name: Enable and verify Android hardware acceleration
@@ -313,6 +322,11 @@ jobs:
         id: google_client_build
         timeout-minutes: 35
         run: node scripts/ci/worklets-staged-gradle.mjs --project apps/mobile/android --configuration Debug --abis x86_64 --evidence "$RUNNER_TEMP/android-google-sign-in/worklets" -- :app:assembleDebug -PreactNativeArchitectures=x86_64 --console=plain
+      # The build's Gradle daemon, Kotlin compile daemons and javac workers would idle through the
+      # emulator step: about 5.5 GB of the runner's 16 GB (diag run 44008046979), beside a job that
+      # lost its runner in run 43964196075 (scripts/ci/stop-gradle-daemons.sh).
+      - name: Stop the build's Gradle and Kotlin daemons
+        run: bash scripts/ci/stop-gradle-daemons.sh apps/mobile/android
       - name: Install the pinned Maestro CLI
         run: node scripts/maestro-install.mjs
       - name: Enable and verify Android hardware acceleration

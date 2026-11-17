@@ -313,6 +313,12 @@ describe('android-native.yml', () => {
       flow(w).with.script = 'bash scripts/ci/share-card-android.sh'
     }
   )
+  // Diag run 44008046979: the build's daemons held about 5.5 GB through the emulator step.
+  rejected('the emulator beside the build daemons', /stop its daemons/, (w) => {
+    network(w).steps = network(w).steps.filter(
+      (row) => !String(row.run).includes('stop-gradle-daemons.sh')
+    )
+  })
   rejected('the flow without Maestro', /install Maestro/, (w) => {
     network(w).steps = network(w).steps.filter(
       (row) => !String(row.run).includes('maestro-install.mjs')
@@ -658,6 +664,27 @@ describe('android-native.yml android-google-sign-in', () => {
       0,
       build
     )
+  })
+  rejectedGoogle('the emulator beside the build daemons', /stop its daemons/, (w) => {
+    google(w).steps = google(w).steps.filter(
+      (row) => !String(row.run).includes('stop-gradle-daemons.sh')
+    )
+  })
+  rejectedGoogle('the daemons stopped before the build', /stop its daemons/, (w) => {
+    const rows = google(w).steps
+    const [stop] = rows.splice(
+      rows.findIndex((row) => String(row.run).includes('stop-gradle-daemons.sh')),
+      1
+    )
+    rows.splice(
+      rows.findIndex((row) => row.id === 'google_client_build'),
+      0,
+      stop
+    )
+  })
+  rejectedGoogle('the daemon stop skipped after a failure', /stop its daemons/, (w) => {
+    step(google(w), (row) => String(row.run).includes('stop-gradle-daemons.sh')).if =
+      'always()'
   })
   rejectedGoogle('flows after a skipped step', /after every earlier success/, (w) => {
     step(google(w), (row) => row.id === 'google_sign_in').if = 'always()'
