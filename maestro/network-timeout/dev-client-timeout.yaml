@@ -3,7 +3,9 @@
 # meets a check that already passed on SDK 54.
 #
 # Home aborts its ritual request after 15 s (`ritualRequestTimeoutMs` in app/(tabs)/index.tsx)
-# and, with no cached ritual, shows `hero-error-state`. The API stand-in is
+# and, with no cached ritual, shows `hero-error-state`. Story 6.16 sends that request only for a
+# member, so the bundle carries a placeholder member token (EXPO_PUBLIC_E2E_ACCESS_TOKEN, which
+# src/lib/mobile-auth.ts returns in __DEV__); a signed-out Home shows its welcome card instead. The API stand-in is
 # scripts/lib/network-tarpit.mjs: it accepts every connection and never answers, so only the
 # app's AbortController can end the request. A refused port or airplane mode fails at once and
 # would never reach that path, so the flow first proves the request is still pending well after
@@ -13,7 +15,8 @@
 # discovers it: that suite runs against a live API. Run it on an Android emulator:
 #
 #   node scripts/lib/network-tarpit.mjs --port 4010 &
-#   cd apps/mobile && EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 npx expo start --dev-client
+#   cd apps/mobile && EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 \
+#     EXPO_PUBLIC_E2E_ACCESS_TOKEN=network-timeout-member-placeholder npx expo start --dev-client
 #   adb install -r android/app/build/outputs/apk/debug/app-debug.apk
 #   MAESTRO_APP_ID=com.couturecast.app \
 #     APP_URL='mobile://expo-development-client/?url=http%3A%2F%2F10.0.2.2%3A8081' \
@@ -34,6 +37,12 @@ tags:
     stopApp: false
 
 - runFlow: ../subflows/open-app.yaml
+
+# Android native runs 43862298410 and 43964196075: a signed-out bundle showed the welcome card and
+# sent no request, so the wait below timed out with nothing to say why.
+- assertNotVisible:
+    id: 'home-signed-out-welcome'
+    label: 'Home runs as a member, so it sends the ritual request'
 
 # The first load: it may already have timed out while the app was opening, so only its end state
 # is asserted here.
