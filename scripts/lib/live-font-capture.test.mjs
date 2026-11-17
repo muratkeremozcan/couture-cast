@@ -1080,6 +1080,23 @@ describe('hierarchy source (two booted simulators)', () => {
     assert.deepEqual(deviceFingerprint(udidA), a)
   })
 
+  // Dispatch 43962043900, home leg: the simulator was set to 57% and its status bar read
+  // "56% battery power"; 43924119388's community leg was set to 58% and failed the same way.
+  // Simulator status bars keep the level as a fraction, and 0.57 * 100 is 56.99999999999999,
+  // shown as 56. Every fingerprint takes a level that survives the round trip, in double and
+  // single precision.
+  test('every fingerprint takes a battery level the status bar shows as set', () => {
+    const shown = (level) => [
+      Math.floor((level / 100) * 100),
+      Math.floor(Math.fround(Math.fround(level / 100) * 100)),
+    ]
+    for (let index = 0; index < 5000; index += 1) {
+      const { battery } = deviceFingerprint(`${udidA}-${index}`)
+      assert.deepEqual(shown(battery), [battery, battery], `battery ${battery}`)
+    }
+    assert.deepEqual(shown(57), [56, 57], 'the level dispatch 43962043900 set')
+  })
+
   test('a dump from the requested simulator and build passes', () => {
     assert.doesNotThrow(() =>
       assertHierarchySource(dump('0.81.5', deviceFingerprint(udidA)), {
@@ -1161,48 +1178,43 @@ describe('hierarchy source (two booted simulators)', () => {
     )
   })
 
-  test('a status bar between updates is read again, another device never passes', () => {
+  test('a missing marker is read again, a wrong device or build fails at once', () => {
     const print = deviceFingerprint(udidA)
     const good = dump('0.81.5', print)
-    const partial = dump('0.81.5', print)
-    partial.children[1].children[0].children.pop()
+    const bare = dump('0.81.5', print)
+    bare.children[0].children = []
     const check = (tree) =>
-      assertHierarchySource(tree, { platform: 'ios', fingerprint: print })
+      assertHierarchySource(tree, {
+        platform: 'ios',
+        fingerprint: print,
+        reactNativeVersion: '0.81.5',
+      })
     const reads = (trees) => {
       const queue = [...trees]
       const seen = []
       return {
         read: () => queue.shift(),
-        onRetry: (error) => seen.push(error.message.split(' ')[0]),
+        onRetry: (error) => seen.push(error.message),
         seen,
       }
     }
-    const transient = reads([partial, good])
-    assert.equal(readCheckedHierarchy({ ...transient, check }), good)
-    assert.equal(transient.seen.length, 1)
-    // Another simulator on every read fails after the third.
-    const other = dump('0.81.5', deviceFingerprint(udidB))
-    const wrong = reads([other, other, other, good])
-    assert.throws(() => readCheckedHierarchy({ ...wrong, check }), {
+    const marker = reads([bare, good])
+    assert.equal(readCheckedHierarchy({ ...marker, check }), good)
+    assert.deepEqual(marker.seen, ['live_font_hierarchy_wrong_build:missing'])
+    const stillBare = reads([bare, bare, bare, good])
+    assert.throws(() => readCheckedHierarchy({ ...stillBare, check }), {
+      message: 'live_font_hierarchy_wrong_build:missing',
+    })
+    assert.equal(stillBare.seen.length, 2)
+    const other = reads([dump('0.81.5', deviceFingerprint(udidB)), good])
+    assert.throws(() => readCheckedHierarchy({ ...other, check }), {
       message: /^live_font_hierarchy_wrong_device/,
     })
-    assert.equal(wrong.seen.length, 2)
-    // Another build fails at once.
     const build = reads([dump('0.88.1', print), good])
-    assert.throws(
-      () =>
-        readCheckedHierarchy({
-          ...build,
-          check: (tree) =>
-            assertHierarchySource(tree, {
-              platform: 'ios',
-              fingerprint: print,
-              reactNativeVersion: '0.81.5',
-            }),
-        }),
-      { message: 'live_font_hierarchy_wrong_build:0.88.1' }
-    )
-    assert.equal(build.seen.length, 0)
+    assert.throws(() => readCheckedHierarchy({ ...build, check }), {
+      message: 'live_font_hierarchy_wrong_build:0.88.1',
+    })
+    assert.deepEqual([other.seen, build.seen], [[], []])
   })
 
   test("a dump carrying another build's markers fails", () => {
