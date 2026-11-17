@@ -339,6 +339,14 @@ export function realSessionConsentPolicy(env = process.env) {
  * run in Chromium and again in WebKit with the iPhone 15 descriptor. A full run must report
  * exactly this many, none skipped.
  */
+/**
+ * The real-session specs by file name: real-session.config.ts runs exactly these. Burn-in
+ * (.github/workflows/rwf-burn-in.yml) leaves every *-real-session.spec.ts to this lane, so a spec
+ * named that way and missing here would run nowhere; real-session-harness.spec.ts checks.
+ */
+export const REAL_SESSION_SPEC_PATTERN =
+  /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/
+
 export const EXPECTED_REAL_SESSION_TESTS = 45
 
 /** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
