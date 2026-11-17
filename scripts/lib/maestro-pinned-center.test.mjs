@@ -191,14 +191,15 @@ describe('pinnedCenterScrollCauses', () => {
   test('reads the Google runner layout, one flattened folder per flow', () => {
     // run-google-native.mjs: --debug-output <maestroDir>/<label> --flatten-debug-output.
     writeLog('google-preview-conversion', 'Google preview conversion')
-    assert.equal(
+    // The whole cause: a missing log also yields exactly one cause, so a count would pass it.
+    assert.deepEqual(
       pinnedCenterScrollCauses({
         debugRoot,
         flowTitle: 'Google preview conversion',
         startedAtMs: 0,
         finished: true,
-      }).length,
-      1
+      }),
+      [describePinnedCenterScroll(pinned)]
     )
   })
 
