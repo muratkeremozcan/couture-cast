@@ -113,6 +113,13 @@ const CASES: Case[] = [
     after: 'none',
   },
   {
+    name: 'a stored session without an access token',
+    local: stored({ refresh_token: 'refresh-1', expires_at: nowSeconds() + 3600 }),
+    session: BEARER,
+    before: 'none',
+    after: 'none',
+  },
+  {
     name: 'a stored JSON value that is not an object',
     local: stored('"just a string"'),
     session: BEARER,

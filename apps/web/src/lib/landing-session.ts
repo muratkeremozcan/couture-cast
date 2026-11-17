@@ -29,7 +29,7 @@ type StorageReader = Pick<Storage, 'getItem'>
  * syntax that compiles to a helper) because its own source is inlined into the head script, so
  * the head script and the page can never decide differently.
  *
- * A stored session counts only when it parses and carries a refresh token and a numeric expiry
+ * A stored session counts only when it parses and carries an access token, a refresh token and a numeric expiry
  * (TEA H-2: corrupt storage is signed out). A member needs this tab's verified bearer and a
  * stored session that has not expired (TEA H-1: an expired session may be revoked, so it waits
  * for the refresh instead of painting the member landing). `settled` is true once this page's
@@ -49,10 +49,13 @@ export function decideLandingSession(
     if (raw === null) return null
     try {
       const parsed = JSON.parse(raw) as {
+        access_token?: unknown
         expires_at?: unknown
         refresh_token?: unknown
       } | null
       if (parsed === null || typeof parsed !== 'object') return null
+      if (typeof parsed.access_token !== 'string' || parsed.access_token === '')
+        return null
       if (typeof parsed.refresh_token !== 'string' || parsed.refresh_token === '')
         return null
       return typeof parsed.expires_at === 'number' ? parsed.expires_at : null

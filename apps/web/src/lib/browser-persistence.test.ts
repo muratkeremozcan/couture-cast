@@ -102,6 +102,38 @@ describe('the blocked-storage head script', () => {
     expect(store.key(5)).toBeNull()
   })
 
+  // CodeRabbit on PR 248: a store that refuses every change, clear() included.
+  it('keeps removed and cleared keys gone when the store refuses changes', () => {
+    const saved: Record<string, string> = { a: '1', 'couturecast.auth-session': '{}' }
+    const refuse = () => {
+      throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+    }
+    const locked = {
+      getItem: (key: string) => saved[key] ?? null,
+      setItem: refuse,
+      removeItem: refuse,
+      clear: refuse,
+      key: (index: number) => Object.keys(saved)[index] ?? null,
+      get length() {
+        return Object.keys(saved).length
+      },
+    }
+    const fake: FakeWindow = {
+      localStorage: locked,
+      sessionStorage: window.sessionStorage,
+    }
+    fallback(fake)
+    const store = fake.localStorage as Storage
+    store.removeItem('couturecast.auth-session')
+    store.clear()
+    expect(store.getItem('couturecast.auth-session')).toBeNull()
+    expect(store.getItem('a')).toBeNull()
+    expect(store.length).toBe(0)
+    store.setItem('b', '2')
+    expect(store.getItem('b')).toBe('2')
+    expect(store.length).toBe(1)
+  })
+
   for (const refusal of ['reads', 'access'] as const)
     it(`puts a working in-memory store in place when the browser refuses ${refusal}`, () => {
       const fake: FakeWindow = {}

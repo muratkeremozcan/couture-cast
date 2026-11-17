@@ -26,7 +26,7 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
       (control.innerText || control.getAttribute('aria-label') || '')
         .replace(/\s+/g, ' ')
         .trim()
-    /** The nearest ancestor that clips its content, if the control pokes out of it. */
+    /** The first ancestor, nearest out, that clips its content and that the control pokes out of. */
     const clippedBy = (control: HTMLElement, box: DOMRect) => {
       for (
         let ancestor = control.parentElement;
@@ -36,8 +36,9 @@ async function layoutProblems(page: Page): Promise<Problem[]> {
         const style = getComputedStyle(ancestor)
         if (style.overflowX === 'visible' && style.overflowY === 'visible') continue
         const clip = ancestor.getBoundingClientRect()
-        const outside = box.left < clip.left - 0.5 || box.right > clip.right + 0.5
-        return outside ? ancestor.tagName.toLowerCase() : null
+        // Every clipping ancestor counts, not only the nearest (CodeRabbit on PR 248).
+        if (box.left < clip.left - 0.5 || box.right > clip.right + 0.5)
+          return ancestor.tagName.toLowerCase()
       }
       return null
     }

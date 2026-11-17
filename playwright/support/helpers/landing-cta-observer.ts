@@ -83,7 +83,9 @@ export async function recordLandingActions(page: Page) {
 /** What the page recorded since its last load. */
 export async function landingActionsSeen(page: Page): Promise<LandingActionsSeen> {
   return page.evaluate(() => {
-    const seen = window.__landingActionsSeen ?? { guest: [], member: [], states: [] }
+    // A page without the recorder would read as having seen nothing (CodeRabbit on PR 248).
+    const seen = window.__landingActionsSeen
+    if (!seen) throw new Error('recordLandingActions was not installed on this page')
     return { guest: [...seen.guest], member: [...seen.member], states: [...seen.states] }
   })
 }

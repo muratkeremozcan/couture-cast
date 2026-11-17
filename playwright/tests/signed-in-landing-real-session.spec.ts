@@ -215,6 +215,7 @@ test('L-1: a member who signs in with Google lands on the member landing, never 
   await expectMemberLanding(page)
   expect((await landingActionsSeen(page)).guest).toEqual([])
   const tab = await page.context().newPage()
+  await recordLandingActions(tab)
   await tab.goto('/')
   await expectMemberLanding(tab)
   expect((await landingActionsSeen(tab)).guest).toEqual([])
