@@ -556,6 +556,37 @@ describe('PlannerRail', () => {
     expect(screen.getByTestId('planner-days')).toBeInTheDocument()
   })
 
+  it('refreshes on a window focus that lands as soon as the week renders', async () => {
+    // The week's first commit and the focus listener's re-subscription are separate steps: a
+    // focus between them once read the pre-load state and skipped the refresh (year-ahead lane,
+    // PR 253 run 44106984611). Fire focus from the DOM mutation that shows the week, before
+    // React flushes its effects.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    let requestCount = 0
+    useMswHandlers(
+      http.get(PLANNER_PATH, () => {
+        requestCount += 1
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      })
+    )
+    let focused = false
+    const observer = new MutationObserver(() => {
+      if (focused || !document.querySelector('[data-testid="planner-days"]')) return
+      focused = true
+      window.dispatchEvent(new Event('focus'))
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+    try {
+      renderRail()
+      await waitFor(() => expect(focused).toBe(true))
+      await waitFor(() => expect(requestCount).toBe(2))
+    } finally {
+      observer.disconnect()
+    }
+    expect(screen.queryByTestId('planner-skeleton')).not.toBeInTheDocument()
+    expect(screen.getByTestId('planner-days')).toBeInTheDocument()
+  })
+
   it('does not refresh on window focus once closed', async () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
     let requestCount = 0

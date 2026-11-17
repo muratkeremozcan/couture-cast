@@ -490,18 +490,26 @@ export function PlannerRail({
     return () => controller.abort()
   }, [isOpen, load])
 
+  // The committed entitlement state for the focus listener. A layout effect runs in the same
+  // commit that renders the state, so a focus that arrives as soon as the week shows reads it;
+  // re-subscribing the listener from a passive effect left a gap where it read the old state.
+  const entitlementStateRef = useRef<EntitlementState>(entitlementState)
+  useLayoutEffect(() => {
+    entitlementStateRef.current = entitlementState
+  }, [entitlementState])
+
   // AC 6: also refresh on screen focus while open, still no interval polling.
   useEffect(() => {
     if (!isOpen) return
     function handleFocus() {
-      if (entitlementState !== 'entitled') return
+      if (entitlementStateRef.current !== 'entitled') return
       const controller = new AbortController()
       fetchControllerRef.current = controller
       void load(controller.signal, { silent: true })
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [isOpen, entitlementState, load])
+  }, [isOpen, load])
 
   // Focus trap and restore, overlay only -- the rail variant is ordinary
   // in-page content and must stay in the normal tab order.
