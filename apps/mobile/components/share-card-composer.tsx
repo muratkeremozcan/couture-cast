@@ -961,17 +961,19 @@ export function ShareCardComposer({
                       ? cancelTarget.current
                       : recoveryTarget.current
                 const tag = safeFindNodeHandle(target)
-                // A rendered target without a node yet is not done: the dialog's show asks
-                // again. A result with no such action rendered still announces, as before.
-                if (target && !tag) return false
+                const afterPlacement =
+                  Platform.OS === 'android' && status === 'finishingSave'
+                // Android Finishing up: a rendered Cancel without a node yet is not done, and the
+                // dialog's show asks again. Every other result focuses what it can and announces,
+                // as before: iOS under the New Architecture can return no tag for a mounted view.
+                if (afterPlacement && target && !tag) return false
                 const captured = generation.current
                 const isCurrent = () =>
                   latest.current.open &&
                   latest.current.member === member &&
                   latest.current.key === key &&
                   generation.current === captured
-                if (Platform.OS === 'android' && status === 'finishingSave')
-                  focusShareCardElementAfterPlacement(tag, isCurrent)
+                if (afterPlacement) focusShareCardElementAfterPlacement(tag, isCurrent)
                 else focusShareCardElement(tag, isCurrent)
                 void revealInScroll(scroll.current, scrollOffset.current, target).then(
                   (offset) => {
@@ -1111,7 +1113,7 @@ function ComposerFeedback({
   available,
   t,
 }: {
-  /** Moves focus for a result; false when its rendered target has no node yet (not done). */
+  /** Moves focus for a result; false when Android's Cancel has no node yet (not done). */
   onFocusResult: (status: string) => boolean
   visible: boolean
   /** The dialog's show count: a result not yet focused is tried again on each show. */
@@ -1138,7 +1140,7 @@ function ComposerFeedback({
     const focuses = !['preparing', 'saving', 'sharing', 'nativeSaveUnavailable'].includes(
       key
     )
-    // A result whose focus target has no node yet stays unannounced, so the next show retries it.
+    // A result whose focus is not done yet stays unannounced, so the next show retries it.
     if (focuses && !onFocusResult(key)) return
     announced.current = announcement
     if (Platform.OS !== 'ios') return

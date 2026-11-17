@@ -26,6 +26,11 @@ export const boundary = {
    */
   nodesBeforeShow: true,
   dialogShown: false,
+  /**
+   * False models iOS under the New Architecture, where `findNodeHandle` hands back no numeric
+   * tag for a mounted view, so `safeFindNodeHandle` yields null for every rendered target.
+   */
+  handles: true,
   announce: vi.fn(),
   settings: vi.fn(),
   imageLoads: [] as (() => void)[],
@@ -119,7 +124,7 @@ export const composerMocks = {
   }),
   accessibilityFocusHandles: () => ({
     safeFindNodeHandle: (node: HTMLElement | null) =>
-      !boundary.nodesBeforeShow && !boundary.dialogShown
+      !boundary.handles || (!boundary.nodesBeforeShow && !boundary.dialogShown)
         ? null
         : (focusTags[node?.getAttribute('data-testid') ?? ''] ?? 41),
   }),

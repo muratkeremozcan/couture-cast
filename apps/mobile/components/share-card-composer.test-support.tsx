@@ -88,6 +88,7 @@ export function installComposerHooks() {
     boundary.placement.mockClear()
     boundary.nodesBeforeShow = true
     boundary.dialogShown = false
+    boundary.handles = true
     boundary.announce.mockClear()
     boundary.settings.mockClear()
     boundary.imageLoads.length = 0

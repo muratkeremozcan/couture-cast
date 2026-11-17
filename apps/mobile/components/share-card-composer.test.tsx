@@ -492,6 +492,29 @@ describe('share-card composer lifecycle', () => {
       boundary.announce.mock.calls.filter(([message]) => message === text)
     ).toHaveLength(1)
   })
+  // CodeRabbit on PR 253: under the New Architecture iOS can hand back no numeric tag for a
+  // mounted view. The missing-node retry belongs to Android's Finishing up; an iOS result with
+  // a rendered target and no tag still announces once, as it did before that retry existed.
+  it('U-A11Y: iOS announces a result once when its rendered focus target has no node handle', async () => {
+    boundary.handles = false
+    boundary.permission.mockResolvedValue({ granted: false, canAskAgain: false })
+    render(<Harness />)
+    await ready()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    const text = i18n.t('shareCard.permissionPermanent')
+    expect(await screen.findByText(text)).toBeInTheDocument()
+    expect(screen.getByText(i18n.t('shareCard.openSettings'))).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        boundary.announce.mock.calls.filter(([message]) => message === text)
+      ).toEqual([[text, { queue: false }]])
+    )
+    await act(drainMacrotask)
+    expect(boundary.announce.mock.calls.filter(([message]) => message === text)).toEqual([
+      [text, { queue: false }],
+    ])
+    expect(boundary.focus).not.toHaveBeenCalled()
+  })
   it('M1: pending preparation keeps exact feedback through watermark OFF and ON without a response', async () => {
     boundary.prepare.mockReturnValue(new Promise(() => undefined))
     render(<Harness />)
