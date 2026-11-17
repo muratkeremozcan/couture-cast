@@ -62,6 +62,18 @@ describe('6.7 accessibility-focus native wrapper', () => {
   })
 })
 
+it('the move after TalkBack placement forwards to the Android call and is absent where the module has none', async () => {
+  const { focusAccessibilityElementAfterPlacement } = await wrapper()
+  expect(focusAccessibilityElementAfterPlacement(44)).toBeNull()
+  // iOS and older Android builds carry the module without the call.
+  native.module = fakeModule().module
+  expect(focusAccessibilityElementAfterPlacement(44)).toBeNull()
+  const place = vi.fn().mockResolvedValue('focused')
+  native.module = fakeModule({ focusAfterInitialPlacement: place }).module
+  await expect(focusAccessibilityElementAfterPlacement(44)).resolves.toBe('focused')
+  expect(place.mock.calls).toEqual([[44]])
+})
+
 it('guarded read-only diagnostics tolerate absent native support and forward enable/disarm exactly', async () => {
   const { enableStory68FocusObservation } = await wrapper()
   expect(enableStory68FocusObservation()).toBeNull()

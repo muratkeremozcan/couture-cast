@@ -3,10 +3,12 @@
 //
 // What 'react-native' resolves to on iOS and Android (metro-font-scale-text.js): react-native,
 // with the font-scale Text in place of Text, Animated.Text included. CommonJS, so each export stays a lazy getter as
-// react-native's own are. It reads react-native as 'react-native/index': Metro caches the bare
-// 'react-native' of app code once for every importer, so that name would hand the shim itself
-// back. The Expo SDK 58 upgrade (React Native 0.87) removes it.
-const reactNative = require('react-native/index')
+// react-native's own are. It reads react-native by the name metro-font-scale-text.js's
+// REACT_NATIVE_ENTRY gives it: Metro caches the bare 'react-native' of app code once for every
+// importer, so that name would hand the shim itself back, and 'react-native/index' is a deep
+// import whose dev warning LogBox shows as a toast over the screen. The Expo SDK 58 upgrade
+// (React Native 0.87) removes it.
+const reactNative = require('react-native-font-scale-entry')
 const { createFontScaleText } = require('./font-scale-text')
 const { withAnimatedText, withFontScaleText } = require('./with-font-scale-text')
 

@@ -43,6 +43,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import {
   clearRitualMemoryCache,
+  readLatestRitualCache,
   ritualCacheOwner,
   saveRitualCache,
 } from '@/src/lib/ritual-cache'
@@ -56,6 +57,19 @@ function countingRitualHandler() {
   return http.get('*/api/v1/ritual', () => {
     ritualRequestCount += 1
     return HttpResponse.json(mockRitualResponse)
+  })
+}
+
+/**
+ * Waits until the screen's refresh saved a ritual newer than `after`. The screen saves a fetched
+ * ritual even after it unmounts, so a test that ends with its refresh in flight leaves an entry
+ * the next test reads after afterEach has cleared the cache: 3.3-MOB-HERO-13 then served the
+ * ritual and never showed its error state (PR 253 coverage run 44174458659).
+ */
+async function waitForRitualSavedAfter(after: number) {
+  await waitFor(async () => {
+    const saved = await readLatestRitualCache(ritualCacheOwner('test-member'), 'en-US')
+    expect(saved?.timestamp).toBeGreaterThan(after)
   })
 }
 
@@ -138,9 +152,10 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
   })
 
   it('3.3-MOB-HERO-12 refetches after the cache passes 15 minutes', async () => {
+    const staleTimestamp = Date.now() - 16 * 60 * 1000
     await saveRitualCache(ritualCacheOwner('test-member'), 'en-US', {
       data: mockRitualResponse,
-      timestamp: Date.now() - 16 * 60 * 1000,
+      timestamp: staleTimestamp,
     })
 
     await renderScreen()
@@ -148,8 +163,10 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     await waitFor(() => {
       expect(ritualRequestCount).toBe(1)
     })
+    await waitForRitualSavedAfter(staleTimestamp)
     // A successful refresh is not a degraded read, so the offline notice must
     // stay hidden even though a stale entry existed.
+    expect(screen.getByTestId('weather-header')).toBeTruthy()
     expect(screen.queryByTestId('stale-cache-banner')).toBeNull()
   })
 
@@ -162,6 +179,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
     })
 
     server.use(countingRitualHandler())
+    const retriedAt = Date.now() - 1
     fireEvent.click(screen.getByText('Retry'))
 
     await waitFor(() => {
@@ -175,6 +193,7 @@ describe('TabOneScreen cache, recovery, and deep-link routing', () => {
         'Daily guidance updated: Clear Sky'
       )
     })
+    await waitForRitualSavedAfter(retriedAt)
   })
 
   it('3.3-MOB-HERO-14 hands a community notification to the community route without clearing its params', async () => {

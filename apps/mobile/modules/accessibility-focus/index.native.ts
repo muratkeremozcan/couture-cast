@@ -8,15 +8,25 @@
 // passing the window's decor view). Expo Go carries no local module, so there it
 // is absent and callers fall back to React Native and to what they can see.
 import { requireOptionalNativeModule, type EventSubscription } from 'expo-modules-core'
-import type { AccessibilityFocusChange, AccessibilityFocusListener } from './types'
+import type {
+  AccessibilityFocusChange,
+  AccessibilityFocusListener,
+  InitialFocusPlacementOutcome,
+} from './types'
 
-export type { AccessibilityFocusChange, AccessibilityFocusListener } from './types'
+export type {
+  AccessibilityFocusChange,
+  AccessibilityFocusListener,
+  InitialFocusPlacementOutcome,
+} from './types'
 
 interface AccessibilityFocusModule {
   /** False on Android before API 29, where observing could discard another delegate. */
   canObserveFocus?: boolean
   enableStory68Observation?(fixtureEnabled: boolean): Promise<boolean>
   focus(tag: number): Promise<boolean>
+  /** Android only: a move that waits for TalkBack's own first focus in the view's window. */
+  focusAfterInitialPlacement?(tag: number): Promise<InitialFocusPlacementOutcome>
   addListener(
     event: 'onAccessibilityFocusChange',
     listener: (change: AccessibilityFocusChange) => void
@@ -48,6 +58,17 @@ export function observeAccessibilityFocus(
 export function focusAccessibilityElement(tag: number): Promise<boolean> | null {
   const module = nativeModule()
   return module ? module.focus(tag) : null
+}
+
+/**
+ * Android: moves TalkBack to the view with this native tag once its window has focus and
+ * TalkBack has placed its own first focus there, which would otherwise overwrite an earlier
+ * move. Null when this build has no such call (iOS, Expo Go, web).
+ */
+export function focusAccessibilityElementAfterPlacement(
+  tag: number
+): Promise<InitialFocusPlacementOutcome> | null {
+  return nativeModule()?.focusAfterInitialPlacement?.(tag) ?? null
 }
 
 /** Read-only diagnostics, activated only by the isolated Debug fixture boundary. */

@@ -54,6 +54,7 @@ import {
   nativeShareCardSavePending,
   liveShareCardFiles,
 } from '@/src/lib/share-card-save-operations'
+import { drainMacrotask } from '@/src/test-utils/drain-macrotask'
 import {
   boundary,
   changeIdentity,
@@ -61,6 +62,7 @@ import {
   Harness,
   installComposerHooks,
   ready,
+  setOS,
 } from './share-card-composer.test-support'
 
 installComposerHooks()
@@ -174,6 +176,53 @@ describe('share-card composer lifecycle', () => {
       })
     }
   })
+  // Main run 44076358778 (android36-controls): the reopened composer moved TalkBack to Cancel
+  // once, TalkBack's own first focus in the new dialog window then took the title, and "Old save
+  // focuses its Cancel recovery control" timed out. Android asks for Cancel through the move that
+  // waits for that placement, once, and a request made before the dialog's nodes exist is retried
+  // when the dialog shows instead of being marked done.
+  it.each([
+    ['exist before the dialog shows', true],
+    ['exist only once the dialog shows', false],
+  ] as const)(
+    'U-A11Y: Android reopen with an older committed save asks for Cancel after TalkBack placement when its nodes %s',
+    async (_when, nodesBeforeShow) => {
+      setOS('android')
+      const native = deferred<void>()
+      boundary.save.mockImplementation((_card, _signal, _isCurrent, owner) =>
+        commitShareCardSave({
+          fileUri: `cc68-reopen-android-focus-${nodesBeforeShow}.png`,
+          owner,
+          save: () => native.promise,
+          cleanup: () => Promise.resolve(),
+        })
+      )
+      render(<Harness />)
+      await ready()
+      await userEvent.click(screen.getByTestId('share-card-save'))
+      await waitFor(() => expect(nativeShareCardSavePending()).toBe(true))
+      try {
+        await userEvent.click(screen.getByTestId('share-card-cancel'))
+        boundary.nodesBeforeShow = nodesBeforeShow
+        boundary.focus.mockClear()
+        boundary.placement.mockClear()
+        await userEvent.click(screen.getByText('Reopen'))
+        expect(
+          await screen.findByText(i18n.t('shareCard.finishingSave'))
+        ).toBeInTheDocument()
+        await waitFor(() => expect(boundary.placement.mock.calls).toEqual([[44]]))
+        await act(drainMacrotask)
+        expect(boundary.placement.mock.calls).toEqual([[44]])
+        // No single-shot move to Cancel or the title races TalkBack's own placement.
+        expect(boundary.focus.mock.calls).toEqual([])
+      } finally {
+        await act(async () => {
+          native.resolve()
+          await native.promise
+        })
+      }
+    }
+  )
   it('L5: reopening an older committed save re-enables the watermark after settlement', async () => {
     const native = deferred<void>()
     boundary.save.mockImplementation((_card, _signal, _isCurrent, owner) =>
@@ -442,6 +491,29 @@ describe('share-card composer lifecycle', () => {
     expect(
       boundary.announce.mock.calls.filter(([message]) => message === text)
     ).toHaveLength(1)
+  })
+  // CodeRabbit on PR 253: under the New Architecture iOS can hand back no numeric tag for a
+  // mounted view. The missing-node retry belongs to Android's Finishing up; an iOS result with
+  // a rendered target and no tag still announces once, as it did before that retry existed.
+  it('U-A11Y: iOS announces a result once when its rendered focus target has no node handle', async () => {
+    boundary.handles = false
+    boundary.permission.mockResolvedValue({ granted: false, canAskAgain: false })
+    render(<Harness />)
+    await ready()
+    await userEvent.click(screen.getByTestId('share-card-save'))
+    const text = i18n.t('shareCard.permissionPermanent')
+    expect(await screen.findByText(text)).toBeInTheDocument()
+    expect(screen.getByText(i18n.t('shareCard.openSettings'))).toBeInTheDocument()
+    await waitFor(() =>
+      expect(
+        boundary.announce.mock.calls.filter(([message]) => message === text)
+      ).toEqual([[text, { queue: false }]])
+    )
+    await act(drainMacrotask)
+    expect(boundary.announce.mock.calls.filter(([message]) => message === text)).toEqual([
+      [text, { queue: false }],
+    ])
+    expect(boundary.focus).not.toHaveBeenCalled()
   })
   it('M1: pending preparation keeps exact feedback through watermark OFF and ON without a response', async () => {
     boundary.prepare.mockReturnValue(new Promise(() => undefined))

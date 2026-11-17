@@ -40,6 +40,27 @@ const {
   runExpoPrebuild,
 } = require('./prebuild-test-helpers')
 
+/** How long one merge may run before it is killed. */
+const MERGE_TIMEOUT_MS = 120000
+/**
+ * Gradle's HTTP connect and read timeouts in the merger project. Gradle's own are 30 s, and Gradle
+ * 8.14.3 sends a stalled GET three times, so one stalled download sat silent for 96 s before
+ * Gradle printed "Read timed out" (local repro against a repository that never answers). With
+ * the wrapper download and startup that outlasted MERGE_TIMEOUT_MS: PR 253 run 44169550859 and
+ * main run 44160668534 killed the merge at 120 s with nothing after `> Task :processMainManifest`,
+ * so the retry never saw an error. At 10 s a stall fails as "Read timed out" within the cap, and
+ * the retry runs the merge again. A healthy download never waits 10 s for a byte.
+ */
+const GRADLE_HTTP_TIMEOUT_MS = 10000
+
+/** The merger project's gradle.properties: Gradle's HTTP timeouts, bounded. */
+function mergerGradleProperties() {
+  return (
+    `systemProp.org.gradle.internal.http.connectionTimeout=${GRADLE_HTTP_TIMEOUT_MS}\n` +
+    `systemProp.org.gradle.internal.http.socketTimeout=${GRADLE_HTTP_TIMEOUT_MS}\n`
+  )
+}
+
 function footprint(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).reduce((total, entry) => {
     const filename = path.join(directory, entry.name)
@@ -114,6 +135,7 @@ async function generateAndroidPermissionProof(t) {
     path.join(proof, 'settings.gradle'),
     "rootProject.name = 'cc68-permission-proof'\n"
   )
+  fs.writeFileSync(path.join(proof, 'gradle.properties'), mergerGradleProperties())
   fs.writeFileSync(
     path.join(proof, 'build.gradle'),
     `
@@ -153,7 +175,7 @@ tasks.register('processMainManifest', JavaExec) {
       {
         cwd: proof,
         encoding: 'utf8',
-        timeout: 120000,
+        timeout: MERGE_TIMEOUT_MS,
         env: {
           ...process.env,
           ...(javaHome ? { JAVA_HOME: javaHome } : {}),
@@ -179,10 +201,14 @@ tasks.register('processMainManifest', JavaExec) {
       permissions: manifest.manifest['uses-permission'].map((item) => item.$),
     })
   )
-  return { generated, manifest }
+  const gradleProperties = fs.readFileSync(path.join(proof, 'gradle.properties'), 'utf8')
+  return { generated, gradleProperties, manifest }
 }
 module.exports = {
+  GRADLE_HTTP_TIMEOUT_MS,
+  MERGE_TIMEOUT_MS,
   generateAndroidPermissionProof,
+  mergerGradleProperties,
   isTransientResolutionFailure,
   runWithResolutionRetry,
 }

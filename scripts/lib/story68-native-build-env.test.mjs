@@ -24,6 +24,7 @@ import { talkbackFailureSummary } from './story68-talkback-failure.mjs'
 import { summarizeNativeBuildFailure } from './native-build-failure.mjs'
 import {
   bundleBuilds,
+  focusHolders,
   focusLatencies,
   talkBackVersion,
   talkbackEvidence,
@@ -47,6 +48,7 @@ describe('TalkBack driver handoff', () => {
         performance,
         console: { log: (line) => logs.push(line) },
         bundleBuilds,
+        focusHolders,
         focusLatencies,
         talkBackVersion,
         talkbackEvidence,

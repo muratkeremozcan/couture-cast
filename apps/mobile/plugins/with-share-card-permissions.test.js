@@ -79,6 +79,26 @@ test(
   }
 )
 
+test('a failed command names its spawn error, so a command killed at its timeout says so', () => {
+  const timedOut = Object.assign(new Error('spawnSync android/gradlew ETIMEDOUT'), {
+    code: 'ETIMEDOUT',
+  })
+  assert.throws(
+    () =>
+      assertCommand(
+        { status: 143, signal: null, error: timedOut, stdout: '> Task :x', stderr: '' },
+        'Official Android manifest merger failed'
+      ),
+    (error) => {
+      assert.equal(
+        error.message.split('\n')[0],
+        'Official Android manifest merger failed (spawnSync android/gradlew ETIMEDOUT)'
+      )
+      return true
+    }
+  )
+})
+
 test('the Android merger proof retries a rate-limited or dropped download and nothing else', () => {
   const {
     isTransientResolutionFailure,
@@ -174,6 +194,36 @@ test('the Android merger proof retries a rate-limited or dropped download and no
   assert.equal(limitedRuns, 3)
 })
 
+// PR 253 run 44169550859 and main run 44160668534: the merge printed `> Task :processMainManifest`
+// and then nothing until its 120 s cap killed Gradle (status 143), so the retry above never saw an
+// error. A stalled repository reproduces it: Gradle 8.14.3 sends the stalled GET three times and
+// waits out its 30 s socket timeout each time, 96 s before it prints "Read timed out".
+test('the Android merger proof ends a stalled download inside its merge cap, as a retried error', () => {
+  const {
+    GRADLE_HTTP_TIMEOUT_MS,
+    MERGE_TIMEOUT_MS,
+    isTransientResolutionFailure,
+    mergerGradleProperties,
+  } = require('./share-card-android-permissions-proof')
+  assert.equal(
+    mergerGradleProperties(),
+    'systemProp.org.gradle.internal.http.connectionTimeout=10000\n' +
+      'systemProp.org.gradle.internal.http.socketTimeout=10000\n'
+  )
+  assert.equal(MERGE_TIMEOUT_MS, 120000)
+  // Two stalled resources, three GETs each, still leave half the cap for the wrapper and startup.
+  assert.equal(2 * 3 * GRADLE_HTTP_TIMEOUT_MS <= MERGE_TIMEOUT_MS / 2, true)
+  assert.equal(
+    isTransientResolutionFailure({
+      status: 1,
+      stdout:
+        "> Could not GET 'https://dl.google.com/dl/android/maven2/com/android/tools/build/manifest-merger/31.11.0/manifest-merger-31.11.0.pom'.\n   > Read timed out",
+      stderr: '',
+    }),
+    true
+  )
+})
+
 test(
   'generated and officially merged Android permissions keep add-only export and image-picker needs',
   // Prebuild (50 s cap) plus up to three merges (120 s cap each) and 60 s of waits: 470 s.
@@ -182,7 +232,13 @@ test(
     const {
       generateAndroidPermissionProof,
     } = require('./share-card-android-permissions-proof')
-    const { generated, manifest } = await generateAndroidPermissionProof(t)
+    const { generated, gradleProperties, manifest } =
+      await generateAndroidPermissionProof(t)
+    assert.equal(
+      gradleProperties,
+      'systemProp.org.gradle.internal.http.connectionTimeout=10000\n' +
+        'systemProp.org.gradle.internal.http.socketTimeout=10000\n'
+    )
     const declarations = new Map(
       generated.manifest['uses-permission'].map((item) => [
         item.$['android:name'],

@@ -18,6 +18,19 @@ export const boundary = {
   subscribers: new Set<() => void>(),
   appState: new Set<(state: string) => void>(),
   focus: vi.fn(),
+  /** Android focus moves that wait for TalkBack's own first focus in the dialog window. */
+  placement: vi.fn(),
+  /**
+   * Whether native view handles resolve before the dialog has shown. False models a dialog whose
+   * nodes do not exist yet when the composer's effects run; `dialogShown` then gates them.
+   */
+  nodesBeforeShow: true,
+  dialogShown: false,
+  /**
+   * False models iOS under the New Architecture, where `findNodeHandle` hands back no numeric
+   * tag for a mounted view, so `safeFindNodeHandle` yields null for every rendered target.
+   */
+  handles: true,
   announce: vi.fn(),
   settings: vi.fn(),
   imageLoads: [] as (() => void)[],
@@ -111,12 +124,18 @@ export const composerMocks = {
   }),
   accessibilityFocusHandles: () => ({
     safeFindNodeHandle: (node: HTMLElement | null) =>
-      focusTags[node?.getAttribute('data-testid') ?? ''] ?? 41,
+      !boundary.handles || (!boundary.nodesBeforeShow && !boundary.dialogShown)
+        ? null
+        : (focusTags[node?.getAttribute('data-testid') ?? ''] ?? 41),
   }),
   accessibilityFocusModule: () => ({
     focusAccessibilityElement: (tag: number) => {
       boundary.focus(tag)
       return Promise.resolve(true)
+    },
+    focusAccessibilityElementAfterPlacement: (tag: number) => {
+      boundary.placement(tag)
+      return Promise.resolve('focused')
     },
   }),
   modal: () => ({
@@ -136,9 +155,16 @@ export const composerMocks = {
     }) => {
       boundary.requestClose = visible ? onRequestClose : undefined
       useEffect(() => {
-        if (visible) onShow?.()
+        // The dialog's native nodes exist from the show on, as on a device.
+        if (visible) {
+          boundary.dialogShown = true
+          onShow?.()
+        }
         return () => {
-          if (visible) onDismiss?.()
+          if (visible) {
+            boundary.dialogShown = false
+            onDismiss?.()
+          }
         }
       }, [visible])
       return visible ? createElement('div', { role: 'dialog' }, children) : null

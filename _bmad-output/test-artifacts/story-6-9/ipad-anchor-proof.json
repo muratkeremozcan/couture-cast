@@ -3,16 +3,16 @@
   "deviceClass": "iPad",
   "environment": "simulator",
   "osVersion": "26.1",
-  "commit": "57f5d9661f18dd26da16603d1be368cb91cd51b8",
+  "commit": "641a2582a2c55fda83d02f6f1bda26ec1bad06c9",
   "sources": {
-    "apps/mobile/components/share-card-composer.tsx": "3ec65705374dd7dfffcf43183e93b009e8a73761",
+    "apps/mobile/components/share-card-composer.tsx": "a6b91072b86b04f969ec491184a71df68b9e40b0",
     "apps/mobile/modules/share-card-native-share/ios/ShareCardAnchorConfiguration.swift": "d27ceb30edd710ada5513edeb17b91790286db8b",
     "apps/mobile/modules/share-card-native-share/ios/ShareCardNativeShareModule.swift": "637a94aaebae0df89f07aede56d0c7f47ce1c199"
   },
   "result": "anchored_to_share",
   "screenshot": {
     "file": "ipad-anchor-proof.png",
-    "sha256": "41e0fe4eacc46f11181353ab1fba313c410016ab35aaad6c473881b51f6114cf"
+    "sha256": "de3eddf20a3812505820d8008eb06fc0b2bfaf2493a88cd62aca573a3fe0a8f8"
   },
-  "recordedAt": "2026-11-16T12:34:21.094Z"
+  "recordedAt": "2026-11-17T16:45:30.984Z"
 }

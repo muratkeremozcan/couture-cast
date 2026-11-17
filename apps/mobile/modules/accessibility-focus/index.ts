@@ -1,8 +1,12 @@
 // Story 6.7 owner: web and test build of the accessibility-focus module. The
 // DOM moves and reports focus itself, so nothing here does either.
-import type { AccessibilityFocusListener } from './types'
+import type { AccessibilityFocusListener, InitialFocusPlacementOutcome } from './types'
 
-export type { AccessibilityFocusChange, AccessibilityFocusListener } from './types'
+export type {
+  AccessibilityFocusChange,
+  AccessibilityFocusListener,
+  InitialFocusPlacementOutcome,
+} from './types'
 
 /**
  * Subscribes to OS accessibility-focus changes. Returns the unsubscribe, or null
@@ -19,6 +23,13 @@ export function observeAccessibilityFocus(
  * Resolves whether the view accepted it; null when this build has no module.
  */
 export function focusAccessibilityElement(_tag: number): Promise<boolean> | null {
+  return null
+}
+
+/** Android only: a move that waits for TalkBack's own first focus. Null on web and in tests. */
+export function focusAccessibilityElementAfterPlacement(
+  _tag: number
+): Promise<InitialFocusPlacementOutcome> | null {
   return null
 }
 
