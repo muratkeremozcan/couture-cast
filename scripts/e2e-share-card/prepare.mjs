@@ -11,7 +11,10 @@ import sharp from 'sharp'
 import { planRedis, resolveSupabase } from './runtime-sources.mjs'
 import { localDatabaseUrl } from '../lib/local-supabase-ports.mjs'
 import { pinNativeJourneyWeather } from '../lib/native-journey-weather.mjs'
-import { story68PublicBuildEnv } from '../lib/story68-public-build-env.mjs'
+import {
+  STORY68_AUTH_PROXY_PORT,
+  story68PublicBuildEnv,
+} from '../lib/story68-public-build-env.mjs'
 import { CC68_SEEDED_POST_ID } from '../lib/story68-fallback-post.mjs'
 
 const root = process.cwd()
@@ -73,7 +76,7 @@ const resources = {
   storageObjects: [],
   apiPort: 4088,
   metroPort: 8089,
-  authProxyPort: 53068,
+  authProxyPort: STORY68_AUTH_PROXY_PORT,
 }
 fs.writeFileSync(resourcesFile, JSON.stringify(resources, null, 2) + '\n', {
   mode: 0o600,
@@ -284,6 +287,6 @@ console.log(
     status: 'ready',
     apiPort: 4088,
     metroPort: 8089,
-    authProxyPort: 53068,
+    authProxyPort: STORY68_AUTH_PROXY_PORT,
   })
 )

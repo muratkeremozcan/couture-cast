@@ -38,7 +38,7 @@ const previewEnv = { NODE_ENV: 'development', EAS_BUILD_PROFILE: 'development' }
 const probeEnv = {
   STORY68_NATIVE_TEST_BUILD: '1',
   EXPO_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4088',
-  EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:53068',
+  EXPO_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:23068',
   COUTURE_TEXT_LAYOUT_PROBE: '1',
 }
 

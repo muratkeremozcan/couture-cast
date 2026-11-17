@@ -15,3 +15,12 @@ export declare function describeMissingReport(
   lastCommand: string | undefined
 ): string
 export declare function flowTitleOf(yamlText: string): string | undefined
+export declare function maestroFlowTitle(flowPath: string, yamlText: string): string
+export declare function decodeXmlText(text: string): string
+export declare function addFlowFailureCause(
+  flowFailures: string[],
+  flowPasses: Set<string>,
+  flowPath: string,
+  cause: string,
+  options?: { reportedAs?: string }
+): void

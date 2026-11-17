@@ -556,11 +556,11 @@ describe('PlannerRail', () => {
     expect(screen.getByTestId('planner-days')).toBeInTheDocument()
   })
 
-  it('refreshes on a window focus that lands as soon as the week renders', async () => {
-    // The week's first commit and the focus listener's re-subscription are separate steps: a
-    // focus between them once read the pre-load state and skipped the refresh (year-ahead lane,
-    // PR 253 run 44106984611). Fire focus from the DOM mutation that shows the week, before
-    // React flushes its effects.
+  it('refreshes on a window focus that arrives the moment the week renders', async () => {
+    // PR checks run 44131052026: on a busy runner the focus came after the week rendered
+    // but before React re-registered the focus listener, so the listener that answered
+    // still saw the checking state and refreshed nothing. A MutationObserver runs right
+    // after the commit, ahead of React's passive effects, which pins that order.
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
     let requestCount = 0
     useMswHandlers(
@@ -569,16 +569,16 @@ describe('PlannerRail', () => {
         return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
       })
     )
-    let focused = false
+    let focusedOnRender = false
     const observer = new MutationObserver(() => {
-      if (focused || !document.querySelector('[data-testid="planner-days"]')) return
-      focused = true
+      if (focusedOnRender || !screen.queryByTestId('planner-days')) return
+      focusedOnRender = true
       window.dispatchEvent(new Event('focus'))
     })
     observer.observe(document.body, { childList: true, subtree: true })
     try {
       renderRail()
-      await waitFor(() => expect(focused).toBe(true))
+      await waitFor(() => expect(focusedOnRender).toBe(true))
       await waitFor(() => expect(requestCount).toBe(2))
     } finally {
       observer.disconnect()

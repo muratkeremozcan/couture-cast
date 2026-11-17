@@ -65,13 +65,16 @@ import {
   metroOutputSince,
 } from './lib/android-flow-diagnostics.mjs'
 import {
+  addFlowFailureCause,
+  decodeXmlText,
   describeMissingReport,
-  flowTitleOf,
   lastStartedMaestroCommand,
+  maestroFlowTitle,
   newestFlowDebugLog,
   removeReportEverywhere,
 } from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
+import { pinnedCenterScrollCauses } from './lib/maestro-pinned-center.mjs'
 import {
   createMaestroDriverReuse,
   launchShardedSuite,
@@ -1900,25 +1903,27 @@ const watchWeatherDouble = async (flowPath) => {
 /**
  * Fails a flow with a named cause on top of whatever Maestro reported: a pass
  * becomes a failure, and an existing failure entry gains the cause, so the
- * flow is still counted once.
+ * flow is still counted once (scripts/lib/maestro-flow-outcome.mjs).
  *
  * @param {string} flowPath
  * @param {string} cause
  * @param {string[]} flowFailures collected in place
+ * @param {{ reportedAs?: string }} [options] the title the iOS sharded report used
  * @returns {void}
  */
-const failFlowWithCause = (flowPath, cause, flowFailures) => {
+const failFlowWithCause = (flowPath, cause, flowFailures, options) => {
   log(`FAIL ${flowPath} (${cause})`)
-  flowPasses.delete(flowPath)
-  const index = flowFailures.findLastIndex(
-    (entry) => entry === flowPath || entry.startsWith(`${flowPath} (`)
-  )
-  if (index === -1) {
-    flowFailures.push(`${flowPath} (${cause})`)
-  } else {
-    flowFailures[index] = `${flowFailures[index]} (${cause})`
-  }
+  addFlowFailureCause(flowFailures, flowPasses, flowPath, cause, options)
 }
+
+/**
+ * The title Maestro files a flow's debug output and report entry under.
+ *
+ * @param {string} flowPath
+ * @returns {string}
+ */
+const flowTitleFor = (flowPath) =>
+  maestroFlowTitle(flowPath, fs.readFileSync(flowPath, 'utf8'))
 
 /** The device a serial run drives when no serial is pinned: adb's own default. */
 const DEFAULT_ADB_DEVICE = 'the default adb device'
@@ -3131,8 +3136,10 @@ const readSuiteReport = (reportPath) => {
   // `<skipped>` can be attributed to the case that owns it. Self-closing cases
   // (`<testcase ... />`) carry neither and are passes.
   for (const segment of xml.split('<testcase').slice(1)) {
-    const name = /name="([^"]+)"/.exec(segment)?.[1]
-    if (!name) continue
+    const rawName = /name="([^"]+)"/.exec(segment)?.[1]
+    if (!rawName) continue
+    // The flow's title as it spells it, so the iOS path can match a flow to its entry.
+    const name = decodeXmlText(rawName)
     const body = segment.split('</testcase>')[0]
     if (/<failure[\s>]/.test(body) || /<error[\s>]/.test(body)) {
       failed.push(name)
@@ -3645,6 +3652,7 @@ const runGuestVerifyFlow = async (target, maestroEnv, code) => {
       driverArgs
     )
     log(`Running Maestro flow ${GUEST_CONVERSION_VERIFY_FLOW} (output kept private)`)
+    const startedAtMs = Date.now()
     try {
       await runPrivateMaestro({
         commands: [['maestro'], [MAESTRO_BIN]],
@@ -3656,6 +3664,15 @@ const runGuestVerifyFlow = async (target, maestroEnv, code) => {
           ? getFlowLogPath(GUEST_CONVERSION_VERIFY_FLOW)
           : undefined,
       })
+      // The same pinned-element guard as every other flow, on this flow's private debug
+      // output; runGuestConversionLeg redacts the code from whatever this throws.
+      const causes = pinnedCenterScrollCauses({
+        debugRoot: privateDir,
+        flowTitle: flowTitleFor(GUEST_CONVERSION_VERIFY_FLOW),
+        startedAtMs,
+        finished: fs.existsSync(report),
+      })
+      if (causes.length > 0) throw new Error(causes.join('; '))
     } finally {
       maestroDriverReuse.recordInvocation(target.platform, device)
       if (WRITE_ARTIFACTS) {
@@ -4153,7 +4170,7 @@ const runAndroidShardedFlows = async (shardedFlows, target, maestroEnv, flowFail
       maestroDriverReuse.recordInvocation(target.platform, device),
     onRefused: (flowPath, device, cause) =>
       failFlowWithCause(flowPath, `${device}: ${cause}`, flowFailures),
-    onFinished: (flowPath, device, error, startedAtMs) =>
+    onFinished: (flowPath, device, error, startedAtMs) => {
       recordSingleFlowOutcome(
         flowPath,
         error,
@@ -4161,7 +4178,9 @@ const runAndroidShardedFlows = async (shardedFlows, target, maestroEnv, flowFail
         startedAtMs,
         target.platform,
         device
-      ),
+      )
+      failPinnedCenterScrolls(flowPath, startedAtMs, flowFailures)
+    },
     log,
   })
 }
@@ -4215,6 +4234,7 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
   )
 
   log(`Running ${shardedFlows.length} flows across ${SHARD_DEVICE_IDS.length} devices`)
+  const suiteStartedAt = Date.now()
   // The exit code is not trusted on its own here. A sharded invocation
   // has been observed exiting 0 while its own summary printed
   // `Passed: 16/17` and the JUnit report recorded `failures="1"`, so
@@ -4256,6 +4276,10 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
     maestroExitError,
     flowFailures
   )
+  for (const flowPath of shardedFlows)
+    failPinnedCenterScrolls(flowPath, suiteStartedAt, flowFailures, {
+      suiteReport: report,
+    })
 }
 
 /**
@@ -4310,8 +4334,7 @@ const launchStallCheckFor = (flowPath, platform, device) => {
     process.env.MAESTRO_CLOUD_API_KEY && process.env.MAESTRO_CLOUD_WORKSPACE
   )
   if (platform !== 'android' || !WRITE_ARTIFACTS || cloud) return undefined
-  const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
-  if (!title) return undefined
+  const title = flowTitleFor(flowPath)
   return (attemptStartedAtMs) =>
     createLaunchStallCheck({
       device,
@@ -4415,6 +4438,7 @@ const runUserScopedFlows = async (
     serialArgs.push(maestroFlowPath(flowPath, target.platform))
 
     log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
+    const flowStartedAt = Date.now()
     try {
       await runMaestroCommandWithWatchdogRetry(
         withTestOptions(serialArgs, driverArgs),
@@ -4441,6 +4465,7 @@ const runUserScopedFlows = async (
     for (const cause of [doubleCause, restoreCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
+    failPinnedCenterScrolls(flowPath, flowStartedAt, flowFailures)
   }
 }
 
@@ -4603,16 +4628,85 @@ const captureAndroidWindowStack = (flowPath, serial = androidSerial, startedAtMs
  */
 const lastMaestroCommandFor = (flowPath, startedAtMs) => {
   try {
-    const title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
     // Only this flow's own run: an older log would name another run's step (R29).
-    const logFile =
-      title && newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title, { sinceMs: startedAtMs })
+    const logFile = newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, flowTitleFor(flowPath), {
+      sinceMs: startedAtMs,
+    })
     return logFile
       ? lastStartedMaestroCommand(fs.readFileSync(logFile, 'utf8'))
       : undefined
   } catch {
     return undefined
   }
+}
+
+/**
+ * Whether the flow's own JUnit report was written: Maestro finished the flow. Every
+ * attempt deletes the report first (R28), so a report here is this run's.
+ *
+ * @param {string} flowPath
+ * @returns {boolean}
+ */
+const flowReportWritten = (flowPath) =>
+  readSuiteReport(
+    resolveReportPath(getFlowReportPath(flowPath)) ?? getFlowReportPath(flowPath)
+  ).unreadable === null
+
+/**
+ * Every flow title a suite report described.
+ *
+ * @param {{ passed: string[], failed: string[], skipped: string[] }} report
+ * @returns {Set<string>}
+ */
+const reportedNames = (report) =>
+  new Set([...report.passed, ...report.failed, ...report.skipped])
+
+/**
+ * Fails a flow whose debug log shows a `scrollUntilVisible` step that kept swiping an
+ * element fully visible at the same bounds: `centerElement` set on an element pinned to a
+ * scroll edge. Those swipes passed unnoticed until one slow emulator pushed the step past
+ * its timeout (CI run 44068684535, guest-preview.yaml); see
+ * scripts/lib/maestro-pinned-center.mjs. Needs the debug output `--artifacts` writes. A
+ * flow Maestro finished without a debug log the guard can find fails too, so the guard
+ * never passes a flow it did not read.
+ *
+ * The iOS sharded path passes its suite report: that report names flows by title, so the
+ * flow finished when its title is in the report, and a cause joins the title's entry.
+ *
+ * @param {string} flowPath
+ * @param {number} startedAtMs when the flow's first attempt began
+ * @param {string[]} flowFailures collected in place
+ * @param {{ suiteReport?: { passed: string[], failed: string[], skipped: string[] } }} [options]
+ * @returns {void}
+ */
+const failPinnedCenterScrolls = (
+  flowPath,
+  startedAtMs,
+  flowFailures,
+  { suiteReport } = {}
+) => {
+  if (!WRITE_ARTIFACTS) return
+  let reportedAs
+  let causes
+  try {
+    const flowTitle = flowTitleFor(flowPath)
+    reportedAs = suiteReport ? flowTitle : undefined
+    // Only this flow's own run, as in lastMaestroCommandFor (R29).
+    causes = pinnedCenterScrollCauses({
+      debugRoot: MAESTRO_ARTIFACT_DIR,
+      flowTitle,
+      startedAtMs,
+      finished: suiteReport
+        ? reportedNames(suiteReport).has(flowTitle)
+        : flowReportWritten(flowPath),
+    })
+  } catch (error) {
+    causes = [
+      `pinned-center check could not read the Maestro debug log (${error.message})`,
+    ]
+  }
+  for (const cause of causes)
+    failFlowWithCause(flowPath, cause, flowFailures, { reportedAs })
 }
 
 /**
@@ -4751,6 +4845,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     for (const cause of [doubleCause, restoreCause, conversionCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
+    failPinnedCenterScrolls(flowPath, flowStartedAt, flowFailures)
   }
 }
 

@@ -12,7 +12,7 @@
  *    mode.
  * 2. Creates `tea_community_<32 hex>` on the local Supabase Postgres with the same
  *    auth bootstrap as `apps/api/integration/helpers/isolated-community-database.ts`.
- * 3. Starts the OTP Auth proxy (`auth-proxy.mjs`) on 53051.
+ * 3. Starts the OTP Auth proxy (`auth-proxy.mjs`) on 23051.
  * 4. Builds the web with NEXT_PUBLIC_E2E_AUTH=false and the proxy as its Supabase
  *    URL into `apps/web/.next-real-session`.
  * 5. Starts `scripts/start-api-e2e-with-workers.mjs` against that database with the

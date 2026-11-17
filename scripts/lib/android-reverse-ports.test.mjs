@@ -14,8 +14,8 @@ const root = fileURLToPath(new URL('../../', import.meta.url))
 
 test('the reversed Supabase port is the configured API port', () => {
   assert.deepEqual(
-    androidReversePorts([4088, 53068], { SUPABASE_API_PORT: '24321' }),
-    [4088, 53068, 24321]
+    androidReversePorts([4088, 23068], { SUPABASE_API_PORT: '24321' }),
+    [4088, 23068, 24321]
   )
   assert.deepEqual(androidReversePorts([4077], {}), [4077, 54321])
 })

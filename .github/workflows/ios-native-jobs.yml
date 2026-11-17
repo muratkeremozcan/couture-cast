@@ -274,9 +274,11 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status, so an early crash is
           # reported by the name of the service that stopped.
-          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
-          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
-          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          # set +e: the step shell runs bash -e, which ended a failed service's subshell before
+          # its echo, so only a clean exit was recorded (run 44145335277).
+          (set +e; node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (set +e; node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (set +e; node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       - name: Generate native development client
         id: prebuild
@@ -560,9 +562,11 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status, so an early crash is
           # reported by the name of the service that stopped.
-          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
-          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
-          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          # set +e: the step shell runs bash -e, which ended a failed service's subshell before
+          # its echo, so only a clean exit was recorded (run 44145335277).
+          (set +e; node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (set +e; node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (set +e; node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
       - name: Restore the development client of this fingerprint
@@ -827,9 +831,11 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status, so an early crash is
           # reported by the name of the service that stopped.
-          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
-          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
-          (node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          # set +e: the step shell runs bash -e, which ended a failed service's subshell before
+          # its echo, so only a clean exit was recorded (run 44145335277).
+          (set +e; node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (set +e; node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (set +e; node scripts/run-story68-native.mjs metro --platform ios > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       # ios-build resolved the key and, on a miss, saved the scanned client before this job started.
       - name: Restore the development client of this fingerprint

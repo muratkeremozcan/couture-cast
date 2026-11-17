@@ -1,5 +1,6 @@
 import { assertRapidWatermarkRuntime } from './story68-rapid-watermark.mjs'
 import { assertOwnedStory68EmulatorPort } from './story68-native-safety.mjs'
+import { STORY68_AUTH_PROXY_PORT } from './story68-public-build-env.mjs'
 
 const app = 'com.couturecast.story68'
 const timeoutMs = 20_000
@@ -98,8 +99,8 @@ function assertTarget(config) {
   if (
     !['http:', 'https:'].includes(auth.protocol) ||
     !['localhost', '127.0.0.1'].includes(auth.hostname) ||
-    Number(auth.port) !== 53068 ||
-    config.runtime.resources.authProxyPort !== 53068
+    Number(auth.port) !== STORY68_AUTH_PROXY_PORT ||
+    config.runtime.resources.authProxyPort !== STORY68_AUTH_PROXY_PORT
   )
     fail('owned_release_font_auth_required')
 }

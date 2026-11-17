@@ -5,7 +5,13 @@
  * two cannot drift apart.
  */
 export const STORY68_API_ORIGIN = 'http://127.0.0.1:4088'
-export const STORY68_AUTH_ORIGIN = 'http://127.0.0.1:53068'
+/**
+ * The owned auth proxy's port (scripts/e2e-share-card/auth.mjs). Below 32768, outside every
+ * runner's ephemeral range: on 53068 an outgoing connection could hold it as its local port, and
+ * the proxy's listen then failed (run 44145335277; scripts/lib/owned-listener-ports.test.mjs).
+ */
+export const STORY68_AUTH_PROXY_PORT = 23068
+export const STORY68_AUTH_ORIGIN = `http://127.0.0.1:${STORY68_AUTH_PROXY_PORT}`
 
 /** @param {string} anonKey the anon key of the runtime's own Supabase stack */
 export const story68PublicBuildEnv = (anonKey) => ({

@@ -147,11 +147,13 @@ tags:
 # Cancel leaves the reply unsent; the root below starts from a top-level draft.
 - tapOn: '^Cancel$'
 - assertNotVisible: ${output.longReplyContext}
+# No `centerElement`: the composer sits in the sheet's footer, below the
+# thread's scroll view, so no swipe moves it and centring only adds five swipes
+# at the same bounds (CI run 44068684535).
 - scrollUntilVisible:
     element:
       id: 'comment-body'
     direction: DOWN
-    centerElement: true
     timeout: 15000
 - tapOn:
     id: 'comment-body'

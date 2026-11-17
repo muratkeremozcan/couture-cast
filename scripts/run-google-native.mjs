@@ -43,6 +43,8 @@ import { fileURLToPath } from 'node:url'
 import pg from 'pg'
 import { localE2eDatabaseUrl } from './local-e2e-database.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
+import { maestroFlowTitle } from './lib/maestro-flow-outcome.mjs'
+import { pinnedCenterScrollCauses } from './lib/maestro-pinned-center.mjs'
 import { deleteRecordedUsers, localAuthUsers } from './e2e-real-session/cleanup-users.mjs'
 import { redactSecrets } from './e2e-real-session/harness.mjs'
 import { IDENTITIES_FILE, recordPendingIdentity } from './e2e-real-session/identities.mjs'
@@ -397,6 +399,7 @@ async function main() {
     const output = path.join(maestroDir, label)
     fs.mkdirSync(output, { recursive: true })
     const env = { ...flowEnv(flow, { email, otpEmail, strings }), ...extraEnv }
+    const flowFile = path.join(repoRoot, GOOGLE_NATIVE_FLOW_DIR, `${flow.name}.yaml`)
     const maestro = run(
       maestroBinary(),
       [
@@ -409,7 +412,7 @@ async function main() {
         output,
         '--flatten-debug-output',
         ...Object.entries(env).flatMap(([key, value]) => ['-e', `${key}=${value}`]),
-        path.join(repoRoot, GOOGLE_NATIVE_FLOW_DIR, `${flow.name}.yaml`),
+        flowFile,
       ],
       {
         allowFail: true,
@@ -423,10 +426,29 @@ async function main() {
     )
     const text = redactSecrets(`${maestro.stdout}\n${maestro.stderr}`, secrets)
     fs.writeFileSync(path.join(logDir, `maestro-${label}.log`), text)
-    const problems =
+    const expectation =
       maestro.status === 0 && flow.expect
         ? await checkFlow(flow, database, email, memberId)
         : []
+    // The pinned-element guard every run-maestro.mjs flow gets
+    // (scripts/lib/maestro-pinned-center.mjs), on this flow's flattened debug output.
+    let guardCauses
+    try {
+      guardCauses = pinnedCenterScrollCauses({
+        debugRoot: maestroDir,
+        flowTitle: maestroFlowTitle(flowFile, fs.readFileSync(flowFile, 'utf8')),
+        startedAtMs: started,
+        finished: maestro.status === 0,
+      })
+    } catch (error) {
+      guardCauses = [
+        `pinned-center check could not read the Maestro debug log (${error.message})`,
+      ]
+    }
+    const problems = [
+      ...expectation,
+      ...guardCauses.map((cause) => redactSecrets(cause, secrets)),
+    ]
     const result = {
       flow: flow.name,
       passed: maestro.status === 0 && problems.length === 0,

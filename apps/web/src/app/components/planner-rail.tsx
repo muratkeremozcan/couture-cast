@@ -490,10 +490,12 @@ export function PlannerRail({
     return () => controller.abort()
   }, [isOpen, load])
 
-  // The committed entitlement state for the focus listener. A layout effect runs in the same
-  // commit that renders the state, so a focus that arrives as soon as the week shows reads it;
-  // re-subscribing the listener from a passive effect left a gap where it read the old state.
-  const entitlementStateRef = useRef<EntitlementState>(entitlementState)
+  // The focus listener reads the state of the latest commit. A layout effect updates it
+  // inside the commit that renders the week; re-registering the listener in a passive
+  // effect left a window after the week rendered in which a focus met the previous
+  // listener, still holding 'checking', and refreshed nothing (PR checks run
+  // 44131052026).
+  const entitlementStateRef = useRef(entitlementState)
   useLayoutEffect(() => {
     entitlementStateRef.current = entitlementState
   }, [entitlementState])

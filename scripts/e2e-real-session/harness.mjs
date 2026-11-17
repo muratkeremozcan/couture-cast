@@ -22,8 +22,12 @@ export const WEB_PORT = 3077
 export const API_BASE_URL = `http://127.0.0.1:${API_PORT}`
 export const WEB_BASE_URL = `http://127.0.0.1:${WEB_PORT}`
 
-/** The OTP-minting Auth proxy the web build talks to in place of Supabase Auth. */
-export const AUTH_PROXY_PORT = 53051
+/**
+ * The OTP-minting Auth proxy the web build talks to in place of Supabase Auth. Below 32768,
+ * outside every runner's ephemeral range, where an outgoing connection can hold a port and fail
+ * the proxy's listen (scripts/lib/owned-listener-ports.test.mjs).
+ */
+export const AUTH_PROXY_PORT = 23051
 
 /** Kept off the default 4010 so a normal local stack can run beside this one. */
 export const WEATHER_DOUBLE_PORT = 4087

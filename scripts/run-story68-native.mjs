@@ -78,6 +78,7 @@ import {
 } from './lib/story68-native-build.mjs'
 import { assertNativeProbeMode } from './lib/text-layout-probe-mode.mjs'
 import { MAESTRO_BIN } from './maestro-version.mjs'
+import { STORY68_AUTH_PROXY_PORT } from './lib/story68-public-build-env.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
   breadcrumbIn,
@@ -243,7 +244,7 @@ function reverse() {
     restoreAndroidReverse({
       adb,
       device,
-      ports: androidReversePorts([4088, 8089, 53068]),
+      ports: androidReversePorts([4088, 8089, STORY68_AUTH_PROXY_PORT]),
     })
 }
 function nativeOriginalPaths() {

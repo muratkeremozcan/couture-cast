@@ -206,9 +206,11 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status so an early crash is
           # reported by name instead of surfacing as an unrelated later failure.
-          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
-          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
-          (node scripts/run-story68-native.mjs metro --platform ${{ matrix.platform }} > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          # set +e: the step shell runs bash -e, which ended a failed service's subshell before
+          # its echo, so only a clean exit was recorded (run 44145335277).
+          (set +e; node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (set +e; node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (set +e; node scripts/run-story68-native.mjs metro --platform ${{ matrix.platform }} > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       - name: Verify the owned API database entry guard
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
@@ -455,9 +457,11 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status so an early crash is
           # reported by name instead of surfacing as an unrelated later failure.
-          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
-          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
-          (node scripts/run-story68-native.mjs metro --platform android > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
+          # set +e: the step shell runs bash -e, which ended a failed service's subshell before
+          # its echo, so only a clean exit was recorded (run 44145335277).
+          (set +e; node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (set +e; node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          (set +e; node scripts/run-story68-native.mjs metro --platform android > /tmp/cc68-metro.log 2>&1; echo $? > /tmp/cc68-metro.exit) &
           node scripts/maestro-install.mjs
       - name: Verify the owned API database entry guard
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
@@ -824,8 +828,10 @@ jobs:
           node scripts/lib/story68-built-render.mjs
           # Each long-running service records its exit status so an early crash is
           # reported by name instead of surfacing as an unrelated later failure.
-          (node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
-          (node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
+          # set +e: the step shell runs bash -e, which ended a failed service's subshell before
+          # its echo, so only a clean exit was recorded (run 44145335277).
+          (set +e; node scripts/e2e-share-card/auth.mjs > /tmp/cc68-auth.log 2>&1; echo $? > /tmp/cc68-auth.exit) &
+          (set +e; node scripts/run-story68-native.mjs serve > /tmp/cc68-api.log 2>&1; echo $? > /tmp/cc68-api.exit) &
       - name: Verify the owned API database entry guard
         if: ${{ !cancelled() && steps.runtime.outcome == 'success' }}
         run: |

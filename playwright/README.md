@@ -101,7 +101,7 @@ every normal run, because they need a stack nothing else starts.
    bucket the migrations define exists and fails naming each missing one. The
    check lives in `scripts/local-storage-buckets.mjs`, and its `provision`
    command creates the buckets.
-2. The OTP Auth proxy (`auth-proxy.mjs`, port 53051). It forwards every Auth call
+2. The OTP Auth proxy (`auth-proxy.mjs`, port 23051). It forwards every Auth call
    to local Supabase Auth and issues an OTP only for an address the specs recorded
    in `created-identities.json`. In `generated` mode it mints the code with the
    Auth Admin API into a 0700 temp directory; in `real-email` mode local Auth
@@ -162,7 +162,7 @@ REDIS_URL=redis://127.0.0.1:6390 npm run test:pw-real-session
 docker stop real-session-redis
 ```
 
-Ports 4077, 3077, 4087 and 53051 must be free. Pass `-- --skip-web-build` to
+Ports 4077, 3077, 4087 and 23051 must be free. Pass `-- --skip-web-build` to
 reuse the last real-auth web build, and any Playwright arguments after `--`.
 State lives in `.real-session-e2e/` (or `STORY65_REAL_SESSION_DIR`); only its
 `artifacts/` folder holds redacted output, and only while `artifacts-complete.json`
