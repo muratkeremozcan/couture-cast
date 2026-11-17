@@ -180,9 +180,9 @@ const fingerprint = platform === 'ios' ? deviceFingerprint(device) : undefined
 // Read from the installed app on the first launch; every later hierarchy must agree with it.
 let reactNativeVersion
 function hierarchy() {
-  // An Activity relaunch or a window change can leave one read between mounts with no marker,
-  // and a status bar can be read mid-update; either still failing after three reads fails, and
-  // another build fails at once (readCheckedHierarchy).
+  // An Activity relaunch or a window change can leave one read between mounts with no marker; a
+  // marker still missing after three reads, a wrong build or a wrong device fails at once
+  // (readCheckedHierarchy).
   return readCheckedHierarchy({
     read: () => {
       const raw = maestroRun(['--device', device, 'hierarchy'])
