@@ -73,6 +73,10 @@ import {
 } from './lib/maestro-flow-outcome.mjs'
 import { runMobileE2EFlow } from './lib/mobile-e2e-flow-retry.mjs'
 import {
+  describePinnedCenterScroll,
+  findPinnedCenterScrolls,
+} from './lib/maestro-pinned-center.mjs'
+import {
   createMaestroDriverReuse,
   launchShardedSuite,
   withTestOptions,
@@ -4153,7 +4157,7 @@ const runAndroidShardedFlows = async (shardedFlows, target, maestroEnv, flowFail
       maestroDriverReuse.recordInvocation(target.platform, device),
     onRefused: (flowPath, device, cause) =>
       failFlowWithCause(flowPath, `${device}: ${cause}`, flowFailures),
-    onFinished: (flowPath, device, error, startedAtMs) =>
+    onFinished: (flowPath, device, error, startedAtMs) => {
       recordSingleFlowOutcome(
         flowPath,
         error,
@@ -4161,7 +4165,9 @@ const runAndroidShardedFlows = async (shardedFlows, target, maestroEnv, flowFail
         startedAtMs,
         target.platform,
         device
-      ),
+      )
+      failPinnedCenterScrolls(flowPath, startedAtMs, flowFailures)
+    },
     log,
   })
 }
@@ -4215,6 +4221,7 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
   )
 
   log(`Running ${shardedFlows.length} flows across ${SHARD_DEVICE_IDS.length} devices`)
+  const suiteStartedAt = Date.now()
   // The exit code is not trusted on its own here. A sharded invocation
   // has been observed exiting 0 while its own summary printed
   // `Passed: 16/17` and the JUnit report recorded `failures="1"`, so
@@ -4256,6 +4263,8 @@ const runShardedFlows = async (shardedFlows, target, maestroEnv, flowFailures) =
     maestroExitError,
     flowFailures
   )
+  for (const flowPath of shardedFlows)
+    failPinnedCenterScrolls(flowPath, suiteStartedAt, flowFailures)
 }
 
 /**
@@ -4415,6 +4424,7 @@ const runUserScopedFlows = async (
     serialArgs.push(maestroFlowPath(flowPath, target.platform))
 
     log(`Running user-scoped flow on ${SHARD_DEVICE_IDS[0]}: ${flowPath}`)
+    const flowStartedAt = Date.now()
     try {
       await runMaestroCommandWithWatchdogRetry(
         withTestOptions(serialArgs, driverArgs),
@@ -4441,6 +4451,7 @@ const runUserScopedFlows = async (
     for (const cause of [doubleCause, restoreCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
+    failPinnedCenterScrolls(flowPath, flowStartedAt, flowFailures)
   }
 }
 
@@ -4616,6 +4627,38 @@ const lastMaestroCommandFor = (flowPath, startedAtMs) => {
 }
 
 /**
+ * Fails a flow whose debug log shows a `scrollUntilVisible` step that kept swiping an
+ * element fully visible at the same bounds: `centerElement` set on an element pinned to a
+ * scroll edge. Those swipes passed unnoticed until one slow emulator pushed the step past
+ * its timeout (CI run 44068684535, guest-preview.yaml); see
+ * scripts/lib/maestro-pinned-center.mjs. Needs the debug output `--artifacts` writes.
+ *
+ * @param {string} flowPath
+ * @param {number} startedAtMs when the flow's first attempt began
+ * @param {string[]} flowFailures collected in place
+ * @returns {void}
+ */
+const failPinnedCenterScrolls = (flowPath, startedAtMs, flowFailures) => {
+  if (!WRITE_ARTIFACTS) return
+  let title
+  let findings = []
+  try {
+    title = flowTitleOf(fs.readFileSync(flowPath, 'utf8'))
+    // Only this flow's own run, as in lastMaestroCommandFor (R29).
+    const logFile =
+      title && newestFlowDebugLog(MAESTRO_ARTIFACT_DIR, title, { sinceMs: startedAtMs })
+    if (logFile) findings = findPinnedCenterScrolls(fs.readFileSync(logFile, 'utf8'))
+  } catch (error) {
+    log(`Could not read the Maestro debug log of ${flowPath} (${error.message})`)
+    return
+  }
+  for (const finding of findings)
+    failFlowWithCause(flowPath, describePinnedCenterScroll(finding), flowFailures)
+  // The iOS sharded report counts a pass under the flow's title, not its path.
+  if (findings.length > 0 && title) flowPasses.delete(title)
+}
+
+/**
  * @param {string} flowPath
  * @param {Error | undefined} maestroExitError
  * @param {string[]} flowFailures collected in place
@@ -4751,6 +4794,7 @@ const runFlowsSerially = async (target, maestroEnv, mobileIdentity, flowFailures
     for (const cause of [doubleCause, restoreCause, conversionCause]) {
       if (cause) failFlowWithCause(flowPath, cause, flowFailures)
     }
+    failPinnedCenterScrolls(flowPath, flowStartedAt, flowFailures)
   }
 }
 
