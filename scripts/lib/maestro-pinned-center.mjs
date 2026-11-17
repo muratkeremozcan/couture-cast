@@ -21,6 +21,9 @@
  * A step whose element was fully visible at the same bounds on two or more tries swiped
  * without moving it, which is the pinned-element signature reported here.
  */
+import fs from 'node:fs'
+
+import { newestFlowDebugLog } from './maestro-flow-outcome.mjs'
 
 // Maestro names a step's start and end through CliConsoleListener (with a JUnit report) or
 // MaestroCommandRunner.runCommands lambdas (without one).
@@ -137,4 +140,44 @@ export function findPinnedCenterScrolls(logText) {
 export function describePinnedCenterScroll({ step, selector, bounds, tries }) {
   const element = selector ? ` (${selector})` : ''
   return `scrollUntilVisible step "${step}"${element} stayed at ${bounds} with 100% visibility for ${tries} tries: centerElement was set on an element pinned to a scroll edge, so it can never be centered and every swipe is wasted; remove centerElement from this step`
+}
+
+/**
+ * The failure cause for a flow Maestro finished without a debug log the guard could find.
+ *
+ * @param {string} debugRoot
+ * @param {string} flowTitle
+ * @returns {string}
+ */
+export function describeMissingDebugLog(debugRoot, flowTitle) {
+  return `pinned-center check: Maestro finished the flow but left no debug log for "${flowTitle}" under ${debugRoot}, so its scrollUntilVisible steps went unchecked`
+}
+
+/**
+ * Every failure cause the pinned-element guard finds for one flow run: one per pinned
+ * step in the flow's newest debug log written since `startedAtMs`, or, when Maestro
+ * `finished` the flow (it wrote a report or exited cleanly) and left no such log, the
+ * missing log itself, since a guard that cannot read the log would otherwise pass every
+ * flow unread. A flow Maestro never finished already failed with its own cause.
+ *
+ * @param {{
+ *   debugRoot: string
+ *   flowTitle: string
+ *   startedAtMs: number
+ *   finished: boolean
+ * }} options `debugRoot` holds one folder per Maestro run (`--debug-output`), or one per
+ *   flow with `--flatten-debug-output`; `flowTitle` is maestroFlowTitle's
+ * @returns {string[]}
+ */
+export function pinnedCenterScrollCauses({
+  debugRoot,
+  flowTitle,
+  startedAtMs,
+  finished,
+}) {
+  const logFile = newestFlowDebugLog(debugRoot, flowTitle, { sinceMs: startedAtMs })
+  if (!logFile) return finished ? [describeMissingDebugLog(debugRoot, flowTitle)] : []
+  return findPinnedCenterScrolls(fs.readFileSync(logFile, 'utf8')).map(
+    describePinnedCenterScroll
+  )
 }
