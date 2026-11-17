@@ -261,7 +261,7 @@ function changeIdentity(member: string | null) {
   })
 }
 async function ready() {
-  fireEvent.load(await screen.findByTestId('share-card-preview'))
+  fireEvent.load(await screen.findByTestId('share-card-preview-image'))
   await waitFor(() =>
     expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
       'aria-disabled',
@@ -640,7 +640,7 @@ describe('Android Activity root replacement', () => {
     try {
       old.unmount()
       render(<Host />)
-      fireEvent.load(await screen.findByTestId('share-card-preview'))
+      fireEvent.load(await screen.findByTestId('share-card-preview-image'))
       expect(liveShareCardFiles().has('cc68-root-replacement.png')).toBe(true)
       expect(screen.getByTestId('share-card-save')).toHaveAttribute(
         'aria-disabled',

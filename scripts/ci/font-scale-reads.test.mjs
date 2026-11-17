@@ -19,6 +19,14 @@
 //   `TabBarLabel` (tab-bar-label.tsx): the tab bar grows by what its labels grew, and a label fits
 //   its tab; on iOS the label keeps React Navigation's allowFontScaling false, since the tab's
 //   Large Content Viewer shows it at the user's size.
+// The owner's live font fix (PR 242) adds one read that rescales no text: React Native 0.81 keeps
+// a paragraph's layout through a live text size change, so `FontScaleText` (src/lib/
+// font-scale-text.tsx) gives every paragraph's outermost Text a maxFontSizeMultiplier that follows
+// the font scale and that no text reaches (`remeasureCap`). The changed prop lays the paragraph out
+// again; font size, style and allowFontScaling stay the caller's. Its fontScale passes only in
+// the two forms FONT_SCALE_FORMS accepts and its maxFontSizeMultiplier only as that one attribute,
+// so the Story 6.8 AppText repair (a font size times the scale) still fails there. The Expo SDK 58
+// upgrade (React Native 0.87) removes the file and these allowances.
 // A banned name (allowFontScaling, maxFontSizeMultiplier, getFontScale) passes only in the one
 // function BANNED_ALLOWED gives it, and only in the form its test there accepts. Names are scoped
 // by the TypeScript AST's function bodies, so code after a function never inherits its
@@ -78,13 +86,54 @@ const ALLOWED = {
     // A type with a fontScale field: the scale the stored label heights were measured at.
     'TabLabelHeights',
   ],
+  'src/lib/font-scale-text.tsx': ['remeasureCap', 'createFontScaleText.FontScaleText'],
 }
 /**
  * file -> scope path -> banned name -> a test of the use: the name passes only in that one scope
  * and only in that form, each occurrence checked on its own.
  */
+/**
+ * The one attribute through which FontScaleText passes the font scale on: a maxFontSizeMultiplier
+ * that remeasureCap computes from the caller's cap and the scale, and nothing else.
+ */
+const REMEASURE_ATTRIBUTE = '{remeasureCap(props.maxFontSizeMultiplier, fontScale)}'
+
+/** Whether a node sits in FontScaleText's re-measure attribute (REMEASURE_ATTRIBUTE). */
+function inRemeasureAttribute(node, source) {
+  for (
+    let current = node.parent;
+    current && !ts.isFunctionLike(current);
+    current = current.parent
+  )
+    if (ts.isJsxAttribute(current))
+      return (
+        current.name.getText(source) === 'maxFontSizeMultiplier' &&
+        current.initializer?.getText(source) === REMEASURE_ATTRIBUTE
+      )
+  return false
+}
+
+/**
+ * file -> scope path -> a test of each fontScale occurrence, for an allowed scope that may use the
+ * scale in set forms only: FontScaleText reads it from useDimensions() and hands it to
+ * remeasureCap, and never sizes text by it.
+ */
+const FONT_SCALE_FORMS = {
+  'src/lib/font-scale-text.tsx': {
+    'createFontScaleText.FontScaleText': (node, source) =>
+      (ts.isBindingElement(node.parent) &&
+        node.parent.name === node &&
+        !node.parent.propertyName &&
+        patternSource(node.parent)?.getText(source) === 'useDimensions()') ||
+      inRemeasureAttribute(node, source),
+  },
+}
+
 const BANNED_ALLOWED = {
   'components/glyph-box.ts': { glyphScale: { maxFontSizeMultiplier: () => true } },
+  'src/lib/font-scale-text.tsx': {
+    'createFontScaleText.FontScaleText': { maxFontSizeMultiplier: inRemeasureAttribute },
+  },
   'components/tab-bar-label.tsx': {
     TabBarLabel: {
       // React Navigation's iOS label, which the tab's Large Content Viewer shows at full size.
@@ -354,7 +403,8 @@ export function fontScaleReads(files) {
             : BANNED_NAMES.has(name)
               ? (BANNED_ALLOWED[file]?.[scope]?.[name]?.(node, source) ?? false)
               : name === FONT_SCALE
-                ? (ALLOWED[file] ?? []).includes(scope)
+                ? (ALLOWED[file] ?? []).includes(scope) &&
+                  (FONT_SCALE_FORMS[file]?.[scope]?.(node, source) ?? true)
                 : true
         if (!allowed)
           flagged.add(source.getLineAndCharacterOfPosition(node.getStart(source)).line)
@@ -614,6 +664,43 @@ describe('font-scale reads in app code', () => {
       'constants are scanned'
     )
     assert.ok(!files.some((file) => /(^|\/)(node_modules|ios|android)\//.test(file)))
+  })
+
+  // PR 242: FontScaleText may pass the scale to remeasureCap and nothing else; the Story 6.8
+  // AppText repair written inside it still fails.
+  test('FontScaleText passes the scale only to its re-measure cap', () => {
+    const text = (body) =>
+      [
+        'export function createFontScaleText(NativeText, useDimensions) {',
+        '  return forwardRef(function FontScaleText(props, ref) {',
+        '    const { fontScale } = useDimensions()',
+        ...body,
+        '  })',
+        '}',
+      ].join('\n')
+    const fixed = text([
+      '    return <NativeText {...props} maxFontSizeMultiplier={remeasureCap(props.maxFontSizeMultiplier, fontScale)} />',
+    ])
+    assert.deepEqual(fontScaleReads({ 'src/lib/font-scale-text.tsx': fixed }), [])
+    const appText = text([
+      '    return <NativeText {...props} style={[props.style, { fontSize: 16 * fontScale }]} />',
+    ])
+    assert.deepEqual(fontScaleReads({ 'src/lib/font-scale-text.tsx': appText }), [
+      'src/lib/font-scale-text.tsx:4 return <NativeText {...props} style={[props.style, { fontSize: 16 * fontScale }]} />',
+    ])
+    const otherCap = text([
+      '    return <NativeText {...props} allowFontScaling={false} maxFontSizeMultiplier={fontScale} />',
+    ])
+    assert.deepEqual(fontScaleReads({ 'src/lib/font-scale-text.tsx': otherCap }), [
+      'src/lib/font-scale-text.tsx:4 return <NativeText {...props} allowFontScaling={false} maxFontSizeMultiplier={fontScale} />',
+    ])
+    const renamed = fixed.replace(
+      'const { fontScale } = useDimensions()',
+      'const { fontScale } = useWindowDimensions()'
+    )
+    assert.equal(fontScaleReads({ 'src/lib/font-scale-text.tsx': renamed }).length, 1)
+    // The allowance is the file's: the same component anywhere else fails.
+    assert.equal(fontScaleReads({ 'components/app-text.tsx': fixed }).length, 2)
   })
 
   test('a composer read outside its layout rules is caught', () => {

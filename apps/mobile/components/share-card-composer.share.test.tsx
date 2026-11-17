@@ -411,7 +411,7 @@ describe('Story 6.9 composer Share', () => {
     ).toBeInTheDocument()
     // Refresh (46), never Retry (43): the stale path offers a fresh preview.
     await waitFor(() => expect(boundary.focus).toHaveBeenLastCalledWith(46))
-    expect(screen.getByAltText(card.accessibilityLabel)).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: card.accessibilityLabel })).toBeInTheDocument()
     expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
     expect(screen.getByTestId('share-card-share')).toHaveAttribute(
       'aria-disabled',

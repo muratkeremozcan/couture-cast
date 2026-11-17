@@ -1077,6 +1077,9 @@ function resolveLeftovers({
  * only, by frame (every edge within the tolerance; two such elements ambiguous). An element with a text view inside stands in only
  * when a text record lies inside it, so a probe that drops a text record cannot hide it behind
  * its own element. Each element pairs once; it is never judged and never counts as text.
+ * The label a node shows the element is its accessibility `label` when the hierarchy reads one
+ * apart from its text (iOS: a switch's text is its value, "1" or "0", and its label its name),
+ * else its text.
  * Returns the pairs `{ node, element, label }`, with `ambiguous` beside them.
  */
 function pairElements({ nodes, open, elements, records, tolerance, nodeRank }) {
@@ -1098,7 +1101,7 @@ function pairElements({ nodes, open, elements, records, tolerance, nodeRank }) {
       .filter(
         ({ element, index }) =>
           !used.has(index) &&
-          element.label === node.text &&
+          element.label === (node.label ?? node.text) &&
           (!element.hasText || holdsText(element))
       )
     const named = eligible.filter(
@@ -1125,7 +1128,11 @@ function pairElements({ nodes, open, elements, records, tolerance, nodeRank }) {
       continue
     }
     used.add(chosen[0].index)
-    pairs.push({ node: node.index, element: chosen[0].index, label: node.text })
+    pairs.push({
+      node: node.index,
+      element: chosen[0].index,
+      label: node.label ?? node.text,
+    })
   }
   return pairs
 }
@@ -1178,12 +1185,14 @@ function holdsWords(label, text) {
  * P2-2): one of its own lines, or the tolerance when that is more. The iOS 6c85bbb4 Home
  * teaser's pill sits 3 px below the link it belongs to (a line of 13 px) and its in-app browser
  * caption 6 px below the shop button (a line of 16 px); a "cast" 460 px from "Forecast
- * details" is no part of it.
+ * details" is no part of it. A line is the laid-out text's (viewRect), whatever part of it a
+ * scroll viewport leaves showing: in iOS run 43773613293 the caption showed its top 1.3 px,
+ * still 6 px below the button, and a line read off that sliver left it unmatched.
  */
-function bordersReach(record, rect, tolerance) {
+function bordersReach(record, tolerance) {
   const lines =
     Number.isInteger(record.lineCount) && record.lineCount > 0 ? record.lineCount : 1
-  return Math.max(tolerance, (rect[3] - rect[1]) / lines)
+  return Math.max(tolerance, (record.viewRect[3] - record.viewRect[1]) / lines)
 }
 
 /**
@@ -1223,7 +1232,7 @@ function hiddenOwner(record, { nodes, elements, tolerance }) {
       .filter((node) => normalized(node.text ?? '') !== text)
       .map((node) => node.box),
   ].filter((box) => contains(box, rect, tolerance))
-  const reach = bordersReach(record, rect, tolerance)
+  const reach = bordersReach(record, tolerance)
   const nearest = best(
     identified.filter(
       ({ element }) =>

@@ -70,6 +70,21 @@ describe('share-card composer lifecycle', () => {
     expect(process.env.EXPO_OS).toBe('ios')
     expect(Platform.OS).toBe('ios')
   })
+  // iOS run 43773613293: an Image given only a label stayed out of the accessibility tree, so
+  // VoiceOver never read the card. The preview is one image element named by its drawn text; the
+  // picture inside carries no name of its own.
+  it('U-A11Y: the preview is one image element named by the card text', async () => {
+    render(<Harness />)
+    const preview = await ready()
+    expect(screen.getByRole('img', { name: card.accessibilityLabel })).toBe(preview)
+    expect(preview).toHaveAttribute('data-testid', 'share-card-preview-loaded')
+    const picture = screen.getByTestId('share-card-preview-image')
+    expect(preview.contains(picture)).toBe(true)
+    expect(picture).not.toHaveAttribute('aria-label')
+    expect(
+      screen.getAllByRole('img').filter((each) => each.getAttribute('aria-label'))
+    ).toEqual([preview])
+  })
   it('U-SAVE U-A11Y: loaded image and explicit permission precede final save authorization; native resolution owns success', async () => {
     const native = deferred<void>()
     boundary.save.mockReturnValue(native.promise)
@@ -396,7 +411,7 @@ describe('share-card composer lifecycle', () => {
   it('U-NATIVE-UNAVAILABLE: keeps loaded preview and disables Save before permission activation', async () => {
     boundary.available = false
     render(<Harness />)
-    fireEvent.load(await screen.findByTestId('share-card-preview'))
+    fireEvent.load(await screen.findByTestId('share-card-preview-image'))
     expect(
       screen.getByText(i18n.t('shareCard.nativeSaveUnavailable'))
     ).toBeInTheDocument()
@@ -490,7 +505,7 @@ describe('share-card composer lifecycle', () => {
       await i18n.changeLanguage(locale)
       if (state === 'nativeSaveUnavailable') boundary.available = false
       render(<Harness />)
-      fireEvent.load(await screen.findByTestId('share-card-preview'))
+      fireEvent.load(await screen.findByTestId('share-card-preview-image'))
       let pending: ReturnType<typeof deferred<void>> | undefined
       let committed: Promise<void> | undefined
       if (state === 'finishingSave') {
@@ -552,7 +567,7 @@ describe('share-card composer lifecycle', () => {
     )
     act(() => oldLoad())
     expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
-    fireEvent.load(screen.getByTestId('share-card-preview'))
+    fireEvent.load(screen.getByTestId('share-card-preview-image'))
     await waitFor(() =>
       expect(screen.getByTestId('share-card-save')).not.toHaveAttribute(
         'aria-disabled',
@@ -566,7 +581,7 @@ describe('share-card composer lifecycle', () => {
     await userEvent.click(screen.getByRole('switch'))
     await userEvent.click(screen.getByRole('switch'))
     expect(screen.getByTestId('share-card-preview')).not.toBe(image)
-    fireEvent.load(screen.getByTestId('share-card-preview'))
+    fireEvent.load(screen.getByTestId('share-card-preview-image'))
     await userEvent.click(screen.getByTestId('share-card-cancel'))
     await userEvent.click(screen.getByText('Reopen'))
     expect(screen.getByTestId('share-card-save')).toHaveAttribute('aria-disabled', 'true')
@@ -684,14 +699,20 @@ describe('share-card composer lifecycle', () => {
       off.resolve(offCard)
       await off.promise
     })
-    expect(await screen.findByAltText(offCard.accessibilityLabel)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('img', { name: offCard.accessibilityLabel })
+    ).toBeInTheDocument()
     // The mock ignores the abort signal, so the superseded ON response really arrives.
     await act(async () => {
       on.resolve(card)
       await on.promise
     })
-    expect(screen.getByAltText(offCard.accessibilityLabel)).toBeInTheDocument()
-    expect(screen.queryByAltText(card.accessibilityLabel)).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('img', { name: offCard.accessibilityLabel })
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('img', { name: card.accessibilityLabel })
+    ).not.toBeInTheDocument()
     await ready()
     await userEvent.click(screen.getByTestId('share-card-save'))
     expect(await screen.findByText(i18n.t('shareCard.saved'))).toBeInTheDocument()

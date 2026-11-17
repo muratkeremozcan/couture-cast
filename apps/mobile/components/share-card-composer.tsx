@@ -1056,17 +1056,29 @@ function CardPreview({
   onError: () => void
 }) {
   if (!current) return null
+  // The preview is one accessibility element: an image named by the card's drawn text. An Image
+  // given only a label stays out of the accessibility tree on iOS (React Native leaves its view
+  // isAccessibilityElement NO), so VoiceOver skipped the card (iOS run 43773613293: the text
+  // layout probe listed no element for it). The wrapper carries the name, the role and the
+  // testID; the picture inside is drawn only.
   return (
-    <Image
+    <View
       key={current.key}
-      source={{ uri: `data:image/png;base64,${current.card.pngBase64}` }}
+      accessible
+      accessibilityRole="image"
       accessibilityLabel={current.card.accessibilityLabel}
       style={[styles.preview, width !== null && { width, alignSelf: 'center' }]}
-      resizeMode="contain"
       testID={shareCardPreviewTestId(loaded, current.card.sha256)}
-      onLoad={onLoad}
-      onError={onError}
-    />
+    >
+      <Image
+        source={{ uri: `data:image/png;base64,${current.card.pngBase64}` }}
+        style={styles.previewImage}
+        testID="share-card-preview-image"
+        resizeMode="contain"
+        onLoad={onLoad}
+        onError={onError}
+      />
+    </View>
   )
 }
 function ComposerFeedback({
@@ -1291,6 +1303,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   preview: { width: '100%', aspectRatio: PREVIEW_ASPECT },
+  previewImage: { width: '100%', height: '100%' },
   error: { color: '#7A1F2D', fontSize: 16 },
   feedbackSlot: { gap: 16 },
   feedbackLine: { lineHeight: FEEDBACK_LINE_HEIGHT },

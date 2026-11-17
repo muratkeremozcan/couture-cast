@@ -1244,6 +1244,40 @@ describe('matchTextProbe, accessibility elements (TEA ruling r46)', () => {
     'community-card-image-seed-spotlight-1'
   )
 
+  // iOS run 43773613293, composer: XCUITest reads a switch's value ("1" on, "0" off) as the
+  // node's text and its accessibility label as the node's `label`, while the probe lists the
+  // element by its label. The element pairs the node by the label, the one name both sides
+  // give it; the value never stands in for it, and another label never pairs.
+  test("an element pairs a switch node by the node's accessibility label, never its value", () => {
+    const WATERMARK = 'Show watermark'
+    const toggle = {
+      ...node('1', [313, 125, 378, 173], 'share-card-watermark'),
+      label: WATERMARK,
+    }
+    const switchElement = element(WATERMARK, [313, 125.333, 378, 173.333], {
+      identifier: 'share-card-watermark',
+    })
+    const paired = iosMatch([toggle], [], [switchElement])
+    assert.deepEqual(
+      [paired.pass, paired.elements],
+      [true, [{ node: 0, element: 0, label: WATERMARK }]]
+    )
+    assert.deepEqual(paired.pairs, [], 'an element pairs no record and is never judged')
+    // Off, the value changes and the label holds.
+    assert.equal(iosMatch([{ ...toggle, text: '0' }], [], [switchElement]).pass, true)
+    // Another label on the element: no pair, whatever the value.
+    const renamed = iosMatch([toggle], [], [{ ...switchElement, label: 'Show logo' }])
+    assert.deepEqual(
+      [renamed.code, renamed.unmatchedNodes],
+      ['live_font_text_probe_unmatched', [0]]
+    )
+    // An element named by the value only never pairs a node whose label differs.
+    const byValue = iosMatch([toggle], [], [{ ...switchElement, label: '1' }])
+    assert.equal(byValue.code, 'live_font_text_probe_unmatched')
+    // Without an element the node stays unmatched, as before.
+    assert.equal(iosMatch([toggle], [], []).code, 'live_font_text_probe_unmatched')
+  })
+
   test('an element-only node pairs by identity, else by frame; neither fails unmatched', () => {
     const byId = iosMatch(
       [imageNode],
@@ -1486,6 +1520,36 @@ describe('matchTextProbe, accessibility-hidden records (TEA ruling r49)', () => 
       tolerance: 1,
     })
   const viaOf = (result, index) => result.pairs.find((pair) => pair.record === index)
+
+  // iOS run 43773613293, Home page 2: the scroll viewport cut the caption to its top 1.3 pt, 6 pt
+  // under the shop button. Its reach is one of its own laid-out lines (viewRect), never the
+  // sliver that shows; a caption whose line sits farther than that stays unmatched.
+  test('a caption cut to a sliver keeps the reach of its own line', () => {
+    const sliver = (top) =>
+      records().map((each, index) =>
+        index === CAPTION
+          ? {
+              ...each,
+              viewRect: [29, top, 373, top + 16],
+              visibleRect: [29, top, 373, top + 1.333],
+              clipRect: [29, top, 373, top + 16],
+              contentRect: [29, top, 185.152, top + 16],
+            }
+          : each
+      )
+    const cut = teaser(sliver(715))
+    assert.equal(cut.pass, true, cut.code)
+    assert.deepEqual(
+      cut.hiddenAttached.find((each) => each.record === CAPTION),
+      { record: CAPTION, element: 1, node: 4 }
+    )
+    // 20 pt under the button, more than its 16 pt line: no part of the button.
+    const far = teaser(sliver(729))
+    assert.deepEqual(
+      [far.code, far.unmatchedRecords],
+      ['live_font_text_probe_unmatched', [CAPTION]]
+    )
+  })
 
   test('the teaser pill and caption join the nearest identified element whose label holds them', () => {
     const result = teaser()
