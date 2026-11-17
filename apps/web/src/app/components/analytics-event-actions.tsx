@@ -213,6 +213,8 @@ export function AnalyticsEventActions() {
     event.target.value = ''
   }
 
+  // On phones these match the landing's sign-in actions in the same stack: 44 px, text-sm (TEA
+  // P1, P3). Wider screens keep their original size.
   return (
     <div className="flex flex-wrap gap-4" data-testid="hero-cta-group">
       <a
@@ -222,7 +224,7 @@ export function AnalyticsEventActions() {
         data-ph-cta-label="Preview outfits"
         data-ph-cta-type="primary"
         onClick={handleRitualCreated}
-        className="bg-amber-300 text-black px-6 py-3 rounded-full font-semibold hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+        className="inline-flex min-h-11 items-center whitespace-nowrap bg-amber-300 text-black px-5 py-3 text-sm sm:px-6 sm:text-base rounded-full font-semibold hover:bg-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
       >
         Preview outfits
       </a>
@@ -232,14 +234,14 @@ export function AnalyticsEventActions() {
         data-ph-event="cta_clicked"
         data-ph-cta-label="See the planner"
         data-ph-cta-type="secondary"
-        className="border border-white/30 px-6 py-3 rounded-full font-semibold hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+        className="inline-flex min-h-11 items-center whitespace-nowrap border border-white/30 px-5 py-[11px] text-sm sm:px-6 sm:py-3 sm:text-base rounded-full font-semibold hover:border-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
       >
         See the planner
       </a>
       <label
         htmlFor="wardrobe-upload-input"
         data-testid="track-wardrobe-upload-started"
-        className="border border-amber-300/70 px-6 py-3 rounded-full font-semibold text-amber-200 hover:bg-amber-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
+        className="inline-flex min-h-11 items-center whitespace-nowrap border border-amber-300/70 px-5 py-[11px] text-sm sm:px-6 sm:py-3 sm:text-base rounded-full font-semibold text-amber-200 hover:bg-amber-300/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-200"
       >
         Start wardrobe upload
       </label>

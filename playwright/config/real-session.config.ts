@@ -42,7 +42,7 @@ export default defineConfig({
   ...localConfig,
   testDir: path.resolve(__dirname, '../tests'),
   testMatch:
-    /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session)\.spec\.ts$/,
+    /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/,
   webServer: undefined,
   globalSetup: undefined,
   globalTeardown: undefined,
@@ -55,7 +55,17 @@ export default defineConfig({
   // No HTML report: its step titles carry filled values, OTP codes included.
   reporter: [['list'], ['junit', { outputFile: path.join(raw, 'junit.xml') }]],
   metadata,
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] }, metadata }],
+  projects: [
+    { name: 'chromium', use: { ...devices['Desktop Chrome'] }, metadata },
+    // Owner report 2026-11-16: the signed-in landing loop was seen on iPhone Safari, so its spec
+    // also runs in WebKit with the iPhone 15 descriptor (393 wide, touch, device scale 3).
+    {
+      name: 'webkit-iphone',
+      use: { ...devices['iPhone 15'] },
+      testMatch: /signed-in-landing-real-session\.spec\.ts$/,
+      metadata,
+    },
+  ],
   use: {
     ...localConfig.use,
     baseURL: WEB_BASE_URL,

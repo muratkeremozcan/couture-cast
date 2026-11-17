@@ -105,7 +105,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
               data-testid={`bottom-nav-${tab.id}`}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => handleTabClick(tab)}
-              className="relative flex min-h-[44px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+              className="relative flex min-h-[44px] min-w-[64px] flex-col items-center justify-center gap-1 rounded-md px-1 py-1.5 sm:px-3 text-xs font-medium text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
             >
               <span aria-hidden="true" className="text-base">
                 {tab.icon}

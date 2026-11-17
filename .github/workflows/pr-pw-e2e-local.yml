@@ -294,9 +294,6 @@ jobs:
         timeout-minutes: 2
         run: timeout --kill-after=10 90 npx supabase stop --no-backup
 
-      - name: Install Playwright Chromium only
-        run: npx playwright install chromium
-
       - name: Run real-session specs
         run: npm run test:pw-real-session
 

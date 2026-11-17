@@ -15,6 +15,8 @@ export const ptPT: GuestPreviewStrings = {
       'Crie uma conta para adicionar a sua roupa. Depois de iniciar sessão, pode optar por guardar as preferências de conforto. Os artigos de exemplo e as marcações Gosto ficam nesta pré-visualização.',
     createAccount: 'Criar conta',
     signIn: 'Iniciar sessão',
+    openWardrobe: 'Abrir o seu roupeiro',
+    signOut: 'Terminar sessão',
     resetPreview: 'Repor pré-visualização',
     exitPreview: 'Sair da pré-visualização',
     storageUnavailable: 'Esta pré-visualização pode ser reposta ao fechá-la.',
