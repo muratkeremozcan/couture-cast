@@ -1,11 +1,12 @@
 import { spawn, type ChildProcess } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { createRequire } from 'node:module'
+import { createInterface } from 'node:readline'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
 import { gunzipSync } from 'node:zlib'
-import { chromium, type Browser } from 'playwright'
+import { chromium, type Browser, type Page } from 'playwright'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 /**
@@ -17,6 +18,10 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
  */
 
 const webRoot = path.resolve(__dirname, '..')
+// Uploaded by the PR checks job when this check fails: next dev's output and what the
+// page saw, so a failure explains itself.
+const evidenceDir = path.resolve(webRoot, '../../playwright/artifacts/analytics-privacy')
+const nextDevLog = path.join(evidenceDir, 'next-dev.log')
 const requireFromWeb = createRequire(path.join(webRoot, 'package.json'))
 // A guardian invitation token as the API issues it: a JWT whose payload names the teen
 // and the guardian's email.
@@ -44,6 +49,71 @@ let upstream: Server
 let web: ChildProcess
 let webOrigin = ''
 let browser: Browser
+const startedAt = Date.now()
+/** What the page did, in order: requests, responses, console lines, errors. */
+const pageEvents: string[] = []
+
+/** The evidence with every leak masked, so a failure message never carries the token. */
+function redact(text: string): string {
+  return leaks.reduce((masked, leak) => masked.split(leak).join('[redacted]'), text)
+}
+
+function nextDevTail(lines = 80): string {
+  try {
+    return readFileSync(nextDevLog, 'utf8').split('\n').slice(-lines).join('\n')
+  } catch (error) {
+    return `(next dev log unreadable: ${(error as Error).message})`
+  }
+}
+
+/** Everything known when a wait times out, also written to the evidence directory. */
+function evidence(): string {
+  const text = redact(
+    [
+      `receiver got: ${received.map(({ method, url }) => `${method} ${url}`).join(', ') || '(nothing)'}`,
+      `page events (${pageEvents.length}):`,
+      ...pageEvents.map((line) => `  ${line}`),
+      'next dev output, last lines:',
+      nextDevTail(),
+    ].join('\n')
+  )
+  try {
+    writeFileSync(path.join(evidenceDir, 'evidence.txt'), `${text}\n`)
+  } catch {
+    // The message below still carries it.
+  }
+  return text
+}
+
+async function recordPage(page: Page) {
+  const at = () => `+${((Date.now() - startedAt) / 1000).toFixed(1)}s`
+  page.on('request', (request) =>
+    pageEvents.push(`${at()} request ${request.method()} ${request.url()}`)
+  )
+  page.on('response', (response) =>
+    pageEvents.push(`${at()} response ${response.status()} ${response.url()}`)
+  )
+  page.on('requestfailed', (request) =>
+    pageEvents.push(
+      `${at()} requestfailed ${request.method()} ${request.url()}: ${request.failure()?.errorText ?? ''}`
+    )
+  )
+  page.on('console', (message) =>
+    pageEvents.push(`${at()} console.${message.type()} ${message.text()}`)
+  )
+  page.on('pageerror', (error) =>
+    pageEvents.push(`${at()} pageerror ${error.message} ${error.stack ?? ''}`.trimEnd())
+  )
+  // A script that fails to parse raises a pageerror with no message or stack; the
+  // debugger names it.
+  const session = await page.context().newCDPSession(page)
+  session.on('Debugger.scriptFailedToParse', ({ url, startLine, length, hash }) =>
+    pageEvents.push(
+      `${at()} scriptFailedToParse ${url || '(inline)'} line ${startLine} length ${length} hash ${hash}`
+    )
+  )
+  await session.send('Debugger.enable')
+}
 
 function decodeBody(url: string, raw: Buffer): string {
   if (raw.length === 0) return ''
@@ -74,9 +144,7 @@ async function waitFor<T>(probe: () => Promise<T | undefined>, timeoutMs: number
     const value = await probe().catch(() => undefined)
     if (value !== undefined) return value
     if (Date.now() > deadline)
-      throw new Error(
-        `timed out; the receiver got ${received.map(({ method, url }) => `${method} ${url}`).join(', ')}`
-      )
+      throw new Error(`timed out after ${timeoutMs} ms\n${evidence()}`)
     await new Promise((resolve) => setTimeout(resolve, 250))
   }
 }
@@ -114,13 +182,15 @@ beforeAll(async () => {
 
   const port = await freePort()
   webOrigin = `http://127.0.0.1:${port}`
+  mkdirSync(evidenceDir, { recursive: true })
+  writeFileSync(nextDevLog, '')
   web = spawn(
     process.execPath,
     [requireFromWeb.resolve('next/dist/bin/next'), 'dev', '-p', String(port)],
     {
       cwd: webRoot,
       detached: true,
-      stdio: 'ignore',
+      stdio: ['ignore', 'pipe', 'pipe'],
       env: {
         ...process.env,
         NODE_ENV: 'development',
@@ -131,12 +201,45 @@ beforeAll(async () => {
       },
     }
   )
+  // next dev logs each request line, the invitation URL included, so the file gets
+  // every line redacted.
+  for (const stream of [web.stdout, web.stderr])
+    if (stream)
+      createInterface({ input: stream }).on('line', (line) =>
+        appendFileSync(nextDevLog, `${redact(line)}\n`)
+      )
   await waitFor(async () => {
     const response = await fetch(`${webOrigin}/api/health`)
     return response.ok ? true : undefined
   }, 120_000)
   browser = await chromium.launch({ headless: true })
+  await warmNextDev()
 }, 180_000)
+
+/**
+ * The first visit to a page under next dev compiles it, and the server compile then sends
+ * the client compiler around again ("Compiled in ... (486 modules)"), re-emitting the
+ * page's chunks while the browser is still fetching them. About half of all cold visits
+ * got app/layout.js cut off at a 64 KiB write boundary (Invalid or unexpected token), and
+ * PR checks run 44131052026 saw a visit in which PostHog sent nothing for 60 s. One
+ * throwaway visit to the same page, with no token and /ingest blocked so nothing reaches
+ * the receiver, lets every compile finish first; the /ingest route compiles on a path it
+ * answers 404 without calling PostHog.
+ */
+async function warmNextDev() {
+  const context = await browser.newContext()
+  try {
+    await context.route('**/ingest/**', (route) => route.abort())
+    const page = await context.newPage()
+    await page.goto(`${webOrigin}/guardian/accept`)
+    await page.waitForLoadState('networkidle')
+  } finally {
+    await context.close()
+  }
+  const ingest = await fetch(`${webOrigin}/ingest/warm-up`)
+  expect(ingest.status).toBe(404)
+  expect(received).toEqual([])
+}
 
 afterAll(async () => {
   await browser?.close()
@@ -172,9 +275,26 @@ describe('U-ANALYTICS-PRIVACY-WEB-TRANSPORT: what PostHog receives', () => {
       Object.defineProperty(navigator, 'userAgentData', { get: () => undefined })
     })
     const page = await context.newPage()
+    await recordPage(page)
     try {
       const document = await page.goto(`${webOrigin}${invitationPath}`)
-      // The uncaught error goes through exception autocapture, which loads its script.
+      // next dev must hand the page whole chunks: one cut off mid-write leaves the app
+      // half booted, and PostHog may never start.
+      await page.waitForLoadState('networkidle')
+      if (pageEvents.some((line) => line.includes('scriptFailedToParse')))
+        throw new Error(`next dev served a script that does not parse\n${evidence()}`)
+      // The uncaught error goes through exception autocapture, which loads its script and
+      // only then wraps window.onerror; an error thrown before that is never captured.
+      await waitFor(
+        () =>
+          page.evaluate(() =>
+            (window.onerror as { __POSTHOG_INSTRUMENTED__?: boolean } | null)
+              ?.__POSTHOG_INSTRUMENTED__
+              ? true
+              : undefined
+          ),
+        30_000
+      )
       await page.evaluate(() => {
         setTimeout(() => {
           throw new Error('autocaptured')
