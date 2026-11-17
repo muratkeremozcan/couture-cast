@@ -103,8 +103,10 @@ export const ARTIFACTS = {
 export const NETWORK_SERVICES = [
   'node scripts/lib/network-tarpit.mjs --port 4010 > "$evidence/tarpit.log" 2>&1 &',
   // Placeholder Supabase public env: without it the app's Supabase client throws before Home's
-  // request leaves the app (device run, 2026-11-13).
-  '(cd apps/mobile && CI=1 EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 EXPO_PUBLIC_SUPABASE_URL=http://10.0.2.2:4011 EXPO_PUBLIC_SUPABASE_ANON_KEY=network-timeout-placeholder npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &',
+  // request leaves the app (device run, 2026-11-13). A placeholder member token in member mode:
+  // Story 6.16 sends Home's ritual request only for a member, and a signed-out bundle never met
+  // the timeout (runs 43862298410 and 43964196075).
+  '(cd apps/mobile && CI=1 EXPO_PUBLIC_API_BASE_URL=http://10.0.2.2:4010 EXPO_PUBLIC_SUPABASE_URL=http://10.0.2.2:4011 EXPO_PUBLIC_SUPABASE_ANON_KEY=network-timeout-placeholder EXPO_PUBLIC_E2E_AUTH_MODE=member EXPO_PUBLIC_E2E_ACCESS_TOKEN=network-timeout-member-placeholder npx expo start --dev-client --port 8081 > "$evidence/metro.log" 2>&1) &',
 ]
 export const NETWORK_LINES = [
   'set -euo pipefail',
