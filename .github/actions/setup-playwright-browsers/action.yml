@@ -19,7 +19,7 @@ runs:
           playwright-${{ runner.os }}-
 
     # WebKit's Ubuntu package files (about 139 MB), restored only by the exact key of the package
-    # list Playwright pins, so a hit downloads none of them. On 2026-11-18 the runner's Ubuntu
+    # list Playwright pins and the ISO week, so a hit downloads none of them. On 2026-11-18 the runner's Ubuntu
     # mirror served them at about 10 MB a minute and the install hit its 10 minute bound before any
     # test ran (PR 254, run 44207275357). A miss saves them once the install succeeds; a failed
     # install drops them before its retry (apt-install.sh).
