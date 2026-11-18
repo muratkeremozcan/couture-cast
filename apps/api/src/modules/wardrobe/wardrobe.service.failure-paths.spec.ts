@@ -267,6 +267,17 @@ describe('WardrobeService failure and degraded-dependency paths', () => {
     )
 
     /** A replay of a key whose session already lapsed must not hand back a dead URL. */
+    it('writes no upload session when the API public base is not configured', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('PUBLIC_API_URL', '')
+      vi.stubEnv('VERCEL_ENV', '')
+
+      await expect(
+        h.service.createUploadUrl(USER_ID, 'guardian', declaration, IDEMPOTENCY_KEY)
+      ).rejects.toThrow('PUBLIC_API_URL must be set')
+      expect(h.prisma.garmentItem.create).not.toHaveBeenCalled()
+    })
+
     it('rejects a replay against a lapsed upload session', async () => {
       h.prisma.garmentItem.findUnique.mockResolvedValue(
         matchingExisting({ upload_expires_at: new Date(FIXTURE_NOW.getTime() - 1) })

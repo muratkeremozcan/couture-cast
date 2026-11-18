@@ -49,6 +49,7 @@ import {
   verifyUploadToken,
 } from './wardrobe-upload-token'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { publicApiUrl } from '../../config/runtime-environment'
 
 const UPLOAD_EXPIRY_SECONDS = 900
 const READ_URL_EXPIRY_SECONDS = 900
@@ -337,19 +338,18 @@ export class WardrobeService {
     this.uploadTokenSecret = requireUploadTokenSecret()
   }
 
-  private uploadResponse(garment: GarmentItem): UploadUrlResult['response'] {
+  private uploadResponse(
+    garment: GarmentItem,
+    apiBase: string
+  ): UploadUrlResult['response'] {
     if (!garment.upload_session_id || !garment.upload_expires_at || !garment.mime_type) {
       throw new ConflictException('UPLOAD_SESSION_EXPIRED')
     }
-    const baseUrl = (process.env.PUBLIC_API_URL ?? 'http://localhost:3001').replace(
-      /\/+$/,
-      ''
-    )
     return {
       data: {
         garmentId: garment.id,
         uploadSessionId: garment.upload_session_id,
-        uploadUrl: `${baseUrl}/api/v1/wardrobe/uploads/${garment.upload_session_id}`,
+        uploadUrl: `${apiBase}/api/v1/wardrobe/uploads/${garment.upload_session_id}`,
         uploadToken: generateUploadToken(
           garment.upload_session_id,
           garment.user_id,
@@ -371,6 +371,8 @@ export class WardrobeService {
     idempotencyKey: string
   ): Promise<UploadUrlResult> {
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    // Resolved before allocation: a missing base must fail before a session row is written.
+    const apiBase = publicApiUrl()
 
     const existing = await this.prisma.garmentItem.findUnique({
       where: {
@@ -392,7 +394,7 @@ export class WardrobeService {
       ) {
         throw new ConflictException('UPLOAD_SESSION_EXPIRED')
       }
-      return { replayed: true, response: this.uploadResponse(existing) }
+      return { replayed: true, response: this.uploadResponse(existing, apiBase) }
     }
 
     const garmentId = randomUUID()
@@ -423,7 +425,7 @@ export class WardrobeService {
           consent_checked_at: new Date(),
         },
       })
-      return { replayed: false, response: this.uploadResponse(created) }
+      return { replayed: false, response: this.uploadResponse(created, apiBase) }
     } catch (error) {
       if (!isUniqueConstraintError(error)) {
         throw error
@@ -447,7 +449,7 @@ export class WardrobeService {
       ) {
         throw new ConflictException('UPLOAD_SESSION_EXPIRED')
       }
-      return { replayed: true, response: this.uploadResponse(raced) }
+      return { replayed: true, response: this.uploadResponse(raced, apiBase) }
     }
   }
 

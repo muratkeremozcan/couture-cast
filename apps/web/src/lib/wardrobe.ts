@@ -26,7 +26,7 @@ import {
   type UpdateSilhouetteSlidersInput,
 } from '@couture/api-client/contracts/http'
 import { ResponseError } from '@couture/api-client'
-import { createWebApiClient } from './api-client'
+import { createWebApiClient, resolveWebApiBaseUrl } from './api-client'
 import { readStorage } from './browser-persistence'
 
 export const WEB_ACCESS_TOKEN_STORAGE_KEY = 'couturecast.access-token'
@@ -343,6 +343,7 @@ export async function uploadGarmentImageFromWeb({
   onProgress?.(35)
   await uploadGarmentBytes({
     uploadUrl: allocation.uploadUrl,
+    apiBaseUrl: resolveWebApiBaseUrl(),
     uploadToken: allocation.uploadToken,
     bearerToken: accessToken,
     mimeType: image.mimeType,
@@ -787,6 +788,7 @@ export async function uploadMyFormPhotoFromWeb({
   try {
     await uploadGarmentBytes({
       uploadUrl: allocation.uploadUrl,
+      apiBaseUrl: resolveWebApiBaseUrl(),
       uploadToken: allocation.uploadToken,
       bearerToken: accessToken,
       mimeType: image.mimeType,

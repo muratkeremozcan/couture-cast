@@ -79,13 +79,16 @@ function CameraStep({
 }) {
   return (
     <div className="mt-4 flex flex-col items-center gap-4">
-      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black">
+      {/* Tester report 2026-11-17: a phone camera streams a portrait frame, and a 16:9 box with
+          object-cover showed a third of it while Snap Photo kept all of it. The preview takes the
+          frame's own shape, capped to the screen, so it shows exactly what the photo holds. */}
+      <div className="flex w-full justify-center">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="h-full w-full object-cover"
+          className="block max-h-[55dvh] w-auto max-w-full rounded-lg object-contain"
         />
       </div>
       <div className="flex gap-4">
@@ -183,22 +186,31 @@ function CropStep({
           aria-label="Auto Background Cleanup"
           aria-checked={useBgCleanup}
           onClick={() => setUseBgCleanup(!useBgCleanup)}
-          className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
-            useBgCleanup ? 'bg-emerald-600' : 'bg-zinc-300 dark:bg-zinc-600'
-          }`}
+          // The global 44 px touch target sized the 24 px track itself into a disc; the button
+          // keeps the touch target and draws the track inside it.
+          className="inline-flex shrink-0 items-center justify-center"
         >
           <span
-            className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-              useBgCleanup ? 'translate-x-6' : 'translate-x-1'
+            aria-hidden="true"
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${
+              useBgCleanup ? 'bg-emerald-600' : 'bg-zinc-300 dark:bg-zinc-600'
             }`}
-          />
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                useBgCleanup ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </span>
         </button>
       </div>
 
-      <div className="flex justify-between gap-3 pt-2">
+      {/* Phones stack the two actions full width in DOM order, so keyboard focus moves top to
+          bottom; side by side they wrapped to two lines each on a 412 px screen. */}
+      <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-between">
         <button
           onClick={onReset}
-          className="rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
+          className="whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"
         >
           Retake / Choose Another
         </button>
@@ -206,7 +218,7 @@ function CropStep({
           onClick={() => {
             onConfirm()
           }}
-          className="rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
+          className="whitespace-nowrap rounded-lg bg-zinc-900 px-5 py-2 text-sm font-semibold text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900"
         >
           Use This Image
         </button>

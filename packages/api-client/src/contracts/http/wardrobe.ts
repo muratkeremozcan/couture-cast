@@ -2502,10 +2502,34 @@ export interface UploadGarmentBytesOptions {
   signal?: AbortSignal
   timeoutMs?: number
   fetchFn?: typeof fetch
+  /**
+   * The base this client sends every other API request to ('' for the web app's own origin).
+   * When set, an upload URL on the API's own path (/api/v1/...) goes there whatever host the
+   * API named in it: the browser reaches the API only through the web app's /api/v1 rewrite,
+   * and production once named http://localhost:3001 (tester report 2026-11-17). Upload URLs on
+   * other paths, such as storage signed URLs, are used as given.
+   */
+  apiBaseUrl?: string
+}
+
+const API_UPLOAD_PATH = /^\/api\/v1\//
+
+/** The URL a client sends upload bytes to; see UploadGarmentBytesOptions.apiBaseUrl. */
+export function resolveApiUploadUrl(uploadUrl: string, apiBaseUrl?: string): string {
+  if (apiBaseUrl === undefined) return uploadUrl
+  let named: URL
+  try {
+    named = new URL(uploadUrl)
+  } catch {
+    return uploadUrl
+  }
+  if (!API_UPLOAD_PATH.test(named.pathname)) return uploadUrl
+  return `${apiBaseUrl.replace(/\/+$/, '')}${named.pathname}${named.search}`
 }
 
 export async function uploadGarmentBytes({
   uploadUrl,
+  apiBaseUrl,
   uploadToken,
   bearerToken,
   mimeType,
@@ -2524,7 +2548,7 @@ export async function uploadGarmentBytes({
   const totalBytes = 'byteLength' in body ? body.byteLength : body.size
 
   const perform = async (requestSignal?: AbortSignal) => {
-    const response = await fetchFn(uploadUrl, {
+    const response = await fetchFn(resolveApiUploadUrl(uploadUrl, apiBaseUrl), {
       method: 'PUT',
       headers,
       body,
