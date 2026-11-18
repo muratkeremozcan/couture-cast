@@ -1,4 +1,5 @@
-// browser-acceptance caches the Ubuntu package files its browser step downloads. The key names
+// browser-acceptance and setup-playwright-browsers cache the Ubuntu package files their browser
+// steps download. The key names
 // everything that decides that package list, so a change to any of them starts a fresh cache.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
@@ -33,6 +34,7 @@ describe('Ubuntu package cache key', () => {
       { osRelease: 'ID=debian\nVERSION_ID="12"\n' },
       { playwrightVersion: '1.65.0' },
       { browsers: ['chromium'] },
+      { browsers: ['webkit'] },
     ])
       assert.notEqual(
         packageCacheKey({ ...host, ...change }),
@@ -52,6 +54,7 @@ describe('Ubuntu package cache key', () => {
       { playwrightVersion: '' },
       { playwrightVersion: 'latest' },
       { browsers: ['firefox'] },
+      { browsers: ['webkit', 'chromium'] },
       { browsers: [] },
     ])
       assert.throws(
@@ -89,6 +92,26 @@ describe('Ubuntu package cache key', () => {
       () => cacheOutputs(['--webkit'], env, read),
       /browser_dependency_engine_selection_required/
     )
+  })
+
+  test('the --playwright form keys the engines apt-install.sh installs', async () => {
+    const { cacheOutputs } = await helper()
+    const env = { RUNNER_OS: 'Linux', RUNNER_ARCH: 'X64', RUNNER_TEMP: '/runner/temp' }
+    const read = { osRelease: host.osRelease, playwrightVersion: '1.64.1' }
+    assert.equal(
+      cacheOutputs(['--playwright', 'webkit'], env, read),
+      'key=ubuntu-packages-v1-Linux-X64-ubuntu24.04-playwright1.64.1-webkit\npath=/runner/temp/ubuntu-packages\n'
+    )
+    for (const args of [
+      ['--playwright'],
+      ['--playwright', 'firefox'],
+      ['--playwright', 'webkit', 'webkit'],
+    ])
+      assert.throws(
+        () => cacheOutputs(args, env, read),
+        /ubuntu_package_cache_key_input_required/,
+        JSON.stringify(args)
+      )
   })
 
   test('outside a runner the command fails and prints no key', () => {

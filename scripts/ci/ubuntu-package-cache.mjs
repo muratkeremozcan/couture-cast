@@ -1,16 +1,19 @@
-// The cache key and directory for the Ubuntu package files that browser-acceptance's browser step
-// downloads. Playwright pins the package list for each of its versions, Ubuntu release and engine,
-// so the key names those and the runner. The workflow restores only this exact key: a key that
-// matched by prefix could hand over the files of another package list.
+// The cache key and directory for the Ubuntu package files that a browser step downloads:
+// browser-acceptance's (share-card-browser-deps.mjs) and the WebKit packages of
+// .github/actions/setup-playwright-browsers. Playwright pins the package list for each of its
+// versions, Ubuntu release and engine, so the key names those and the runner. A workflow restores
+// only this exact key: a key that matched by prefix could hand over the files of another package
+// list.
 //
 //   node scripts/ci/ubuntu-package-cache.mjs [--chromium-only] >> "$GITHUB_OUTPUT"
+//   node scripts/ci/ubuntu-package-cache.mjs --playwright webkit >> "$GITHUB_OUTPUT"
 import fs from 'node:fs'
 import { createRequire } from 'node:module'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { shareCardBrowserEngines } from './share-card-browser-deps.mjs'
 
-const ENGINE_SETS = ['chromium', 'chromium,firefox,webkit']
+const ENGINE_SETS = ['chromium', 'webkit', 'chromium,firefox,webkit']
 const required = () => new Error('ubuntu_package_cache_key_input_required')
 
 function releaseField(osRelease, name) {
@@ -52,6 +55,14 @@ export function packageCacheDirectory(env) {
   return path.join(env.RUNNER_TEMP, 'ubuntu-packages')
 }
 
+/**
+ * The engines whose packages the step installs: `--playwright <engine>...` names them as
+ * apt-install.sh takes them; otherwise share-card-browser-deps.mjs's arguments pick them.
+ */
+export function cacheEngines(args) {
+  return args[0] === '--playwright' ? args.slice(1) : shareCardBrowserEngines(args)
+}
+
 /** The step outputs: the exact key and the directory apt-install.sh keeps the files in. */
 export function cacheOutputs(args, env, { osRelease, playwrightVersion }) {
   const key = packageCacheKey({
@@ -59,7 +70,7 @@ export function cacheOutputs(args, env, { osRelease, playwrightVersion }) {
     runnerArch: env.RUNNER_ARCH,
     osRelease,
     playwrightVersion,
-    browsers: shareCardBrowserEngines(args),
+    browsers: cacheEngines(args),
   })
   return `key=${key}\npath=${packageCacheDirectory(env)}\n`
 }
