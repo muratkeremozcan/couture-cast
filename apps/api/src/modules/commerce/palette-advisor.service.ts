@@ -362,6 +362,9 @@ export class PaletteAdvisorService {
     await this.assertConsent(userId)
     await this.assertAnalysisEnabled(userId)
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    // Resolved before the transaction: a missing base must fail before the current selfie is
+    // replaced and removed.
+    const apiBase = publicApiUrl()
 
     const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('palette_profile:' || ${userId}))`
@@ -430,12 +433,13 @@ export class PaletteAdvisorService {
 
     return {
       replayed: outcome.replayed,
-      response: this.uploadUrlResponse(outcome.profile),
+      response: this.uploadUrlResponse(outcome.profile, apiBase),
     }
   }
 
   private uploadUrlResponse(
-    profile: PaletteProfile
+    profile: PaletteProfile,
+    apiBase: string
   ): CreatePaletteSelfieUploadUrlResponse {
     if (
       !profile.selfie_upload_session_id ||
@@ -447,7 +451,7 @@ export class PaletteAdvisorService {
     return {
       data: {
         uploadSessionId: profile.selfie_upload_session_id,
-        uploadUrl: `${publicApiUrl()}/api/v1/commerce/premium/palette/selfie/uploads/${profile.selfie_upload_session_id}`,
+        uploadUrl: `${apiBase}/api/v1/commerce/premium/palette/selfie/uploads/${profile.selfie_upload_session_id}`,
         uploadToken: generateUploadToken(
           profile.selfie_upload_session_id,
           profile.user_id,

@@ -11,7 +11,8 @@
 // the photo will hold. The stand-in camera streams a portrait frame, as a phone does.
 //
 // G-3: on the same screen the two crop actions wrapped to two lines each, and the background
-// cleanup switch drew its track at the 44 px touch size, a disc instead of a switch.
+// cleanup switch drew its track at the 44 px touch size, a disc instead of a switch. Stacked on
+// a phone, the actions keep DOM order on screen so keyboard focus moves top to bottom.
 import path from 'node:path'
 import { signupResponseSchema } from '@couture/api-client/contracts/http'
 import { expect, test } from '../support/fixtures/merged-fixtures'
@@ -108,7 +109,9 @@ phoneTest.describe('Garment capture on a phone', () => {
 
       await expect(page.getByText('Garment Upload Complete!')).toBeVisible()
       await expect(page.getByText('Failed to fetch')).toHaveCount(0)
-      const origin = new URL(page.url()).origin
+      // The web app's own /api/v1 path, or the API base the web build was given.
+      const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL?.trim()
+      const origin = apiBase ? new URL(apiBase).origin : new URL(page.url()).origin
       expect(uploads).toHaveLength(1)
       expect(new URL(uploads[0]!).origin).toBe(origin)
       expect(new URL(uploads[0]!).pathname).toMatch(/^\/api\/v1\/wardrobe\/uploads\//)
@@ -189,11 +192,15 @@ phoneTest.describe('Garment capture on a phone', () => {
       await page.getByRole('button', { name: 'Snap Photo' }).click()
       const snapped = page.getByRole('dialog').getByRole('img').first()
       await expect(snapped).toBeVisible()
-      const photo = await snapped.evaluate((element: HTMLImageElement) => ({
-        width: element.naturalWidth,
-        height: element.naturalHeight,
-      }))
-      expect(photo).toEqual(CAMERA_FRAME)
+      // The box is sized by CSS, so it shows before the data URL decodes.
+      await expect
+        .poll(() =>
+          snapped.evaluate((element: HTMLImageElement) => ({
+            width: element.naturalWidth,
+            height: element.naturalHeight,
+          }))
+        )
+        .toEqual(CAMERA_FRAME)
     }
   )
 
@@ -204,6 +211,16 @@ phoneTest.describe('Garment capture on a phone', () => {
       await waitForAccessibilityReady(page)
       await page.getByRole('button', { name: '+ Add Garment' }).click()
       await page.getByLabel('Garment image file').setInputFiles(garmentFixturePath)
+
+      // Keyboard focus follows the DOM, so the actions must sit on screen in DOM order.
+      const actionTops = await page
+        .getByRole('dialog')
+        .getByRole('button', { name: /^(Retake \/ Choose Another|Use This Image)$/ })
+        .evaluateAll((elements) =>
+          elements.map((element) => element.getBoundingClientRect().top)
+        )
+      expect(actionTops).toHaveLength(2)
+      expect(actionTops[0]!).toBeLessThan(actionTops[1]!)
 
       for (const name of ['Retake / Choose Another', 'Use This Image']) {
         const button = page.getByRole('button', { name })

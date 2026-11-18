@@ -205,9 +205,9 @@ function CropStep({
         </button>
       </div>
 
-      {/* Phones stack the two actions full width, the primary on top; side by side they wrapped
-          to two lines each on a 412 px screen. */}
-      <div className="flex flex-col-reverse gap-3 pt-2 sm:flex-row sm:justify-between">
+      {/* Phones stack the two actions full width in DOM order, so keyboard focus moves top to
+          bottom; side by side they wrapped to two lines each on a 412 px screen. */}
+      <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-between">
         <button
           onClick={onReset}
           className="whitespace-nowrap rounded-lg border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-300"

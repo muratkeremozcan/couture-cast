@@ -465,6 +465,42 @@ describe('WardrobeSilhouetteService', () => {
       expect(remove).toHaveBeenCalledWith(['wardrobe/user-1/silhouette/old.png'])
     })
 
+    it('4.4-UNIT-10 keeps the current photo when the API public base is not configured', async () => {
+      // Restores only these keys: unstubAllEnvs would also drop env the setup file stubs.
+      const saved = ['NODE_ENV', 'PUBLIC_API_URL', 'VERCEL_ENV'].map(
+        (key) => [key, process.env[key]] as const
+      )
+      process.env.NODE_ENV = 'production'
+      process.env.PUBLIC_API_URL = ''
+      process.env.VERCEL_ENV = ''
+      try {
+        findUnique.mockResolvedValueOnce(
+          profileRow({
+            my_form_status: 'ready',
+            my_form_object_path: 'wardrobe/user-1/silhouette/old.png',
+            my_form_upload_idempotency_key: 'key-0',
+          })
+        )
+        update.mockImplementationOnce(({ data }: { data: Record<string, unknown> }) =>
+          Promise.resolve(profileRow(data))
+        )
+
+        await expect(
+          service.createMyFormUploadUrl(USER_ID, 'guardian', declaration, 'key-1')
+        ).rejects.toThrow('PUBLIC_API_URL must be set')
+        expect(update).not.toHaveBeenCalled()
+        expect(remove).not.toHaveBeenCalled()
+      } finally {
+        // The fixed code never reaches these queued rows; drop them so later tests start clean.
+        findUnique.mockReset()
+        update.mockReset()
+        for (const [key, value] of saved) {
+          if (value === undefined) delete process.env[key]
+          else process.env[key] = value
+        }
+      }
+    })
+
     it('4.4-UNIT-10 survives a failure to remove the superseded object', async () => {
       findUnique.mockResolvedValueOnce(
         profileRow({

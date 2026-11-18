@@ -266,6 +266,9 @@ export class WardrobeSilhouetteService {
     idempotencyKey: string
   ): Promise<UploadUrlResult> {
     await this.guardianService.assertWardrobeUploadAllowed(userId, role)
+    // Resolved before the transaction: a missing base must fail before the current photo is
+    // replaced and removed.
+    const apiBase = publicApiUrl()
 
     const outcome = await interactiveTransaction(this.prisma, async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('silhouette_profile:' || ${userId}))`
@@ -334,12 +337,13 @@ export class WardrobeSilhouetteService {
 
     return {
       replayed: outcome.replayed,
-      response: this.uploadUrlResponse(outcome.profile),
+      response: this.uploadUrlResponse(outcome.profile, apiBase),
     }
   }
 
   private uploadUrlResponse(
-    profile: SilhouetteProfile
+    profile: SilhouetteProfile,
+    apiBase: string
   ): CreateSilhouetteUploadUrlResponse {
     if (
       !profile.my_form_upload_session_id ||
@@ -351,7 +355,7 @@ export class WardrobeSilhouetteService {
     return {
       data: {
         uploadSessionId: profile.my_form_upload_session_id,
-        uploadUrl: `${publicApiUrl()}/api/v1/wardrobe/silhouette/my-form/uploads/${profile.my_form_upload_session_id}`,
+        uploadUrl: `${apiBase}/api/v1/wardrobe/silhouette/my-form/uploads/${profile.my_form_upload_session_id}`,
         uploadToken: generateUploadToken(
           profile.my_form_upload_session_id,
           profile.user_id,
