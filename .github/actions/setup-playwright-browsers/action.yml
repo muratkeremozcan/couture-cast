@@ -18,11 +18,37 @@ runs:
         restore-keys: |
           playwright-${{ runner.os }}-
 
+    # WebKit's Ubuntu package files (about 139 MB), restored only by the exact key of the package
+    # list Playwright pins and the ISO week, so a hit downloads none of them. On 2026-11-18 the runner's Ubuntu
+    # mirror served them at about 10 MB a minute and the install hit its 10 minute bound before any
+    # test ran (PR 254, run 44207275357). A miss saves them once the install succeeds; a failed
+    # install drops them before its retry (apt-install.sh).
+    - name: Key the Ubuntu package cache
+      id: ubuntu_packages_key
+      shell: bash
+      run: node scripts/ci/ubuntu-package-cache.mjs --playwright webkit >> "$GITHUB_OUTPUT"
+
+    - name: Restore the Ubuntu package files
+      id: ubuntu_packages_cache
+      uses: actions/cache/restore@v4
+      with:
+        key: ${{ steps.ubuntu_packages_key.outputs.key }}
+        path: ${{ steps.ubuntu_packages_key.outputs.path }}/*.deb
+
     # WebKit runs the iPhone guards (the webkit-iphone projects in playwright/config): the owner's
     # 2026-11-16 sign-in loop and header overflow were seen in iPhone Safari. Its Ubuntu packages
     # are not on the hosted image, so they install through apt-install.sh, bounded.
     - name: Install Playwright browsers (chromium, webkit)
       shell: bash
+      env:
+        APT_INSTALL_ARCHIVES: ${{ steps.ubuntu_packages_key.outputs.path }}
       run: |
         timeout --kill-after=10 600 bash scripts/ci/apt-install.sh --playwright webkit
         npx playwright install chromium webkit
+
+    - name: Save the Ubuntu package files
+      if: ${{ steps.ubuntu_packages_cache.outputs.cache-hit != 'true' }}
+      uses: actions/cache/save@v4
+      with:
+        key: ${{ steps.ubuntu_packages_key.outputs.key }}
+        path: ${{ steps.ubuntu_packages_key.outputs.path }}/*.deb
