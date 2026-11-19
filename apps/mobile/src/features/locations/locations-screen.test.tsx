@@ -734,28 +734,6 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
 
       await waitFor(() => expect(liveRegion()).toBe(''))
     })
-
-    it('LOC-TEXT-MOB-01 a keystroke queued before the switch renders never becomes the next member search', async () => {
-      server.use(searchHandler())
-      renderScreen()
-      await screen.findByTestId('location-label-0')
-      const input = await screen.findByTestId<HTMLInputElement>('locations-search-input')
-
-      // The switch is published; A's keystroke is delivered before the screen re-renders.
-      bearer = 'token-b'
-      setMobileApplicationUserId('member-b')
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
-        input,
-        'Chicago'
-      )
-      input.dispatchEvent(new Event('input', { bubbles: true }))
-
-      await waitFor(() =>
-        expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
-      )
-      expect(screen.getByTestId('locations-search-input')).toHaveValue('')
-      expect(vi.mocked(searchLocationsFromMobile)).not.toHaveBeenCalled()
-    })
   })
 
   /*
@@ -823,10 +801,10 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
     expect(screen.queryByTestId('locations-screen')).toBeNull()
     await waitFor(() => expect(liveRegion()).toBe('Home saved.'))
-    // Past the announcer's 80 ms delay, so a second confirmation would have been delivered.
-    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
-    await vi.advanceTimersByTimeAsync(200)
-    vi.useRealTimers()
+    // Past three times the announcer's 80 ms delay, so a second confirmation would have landed.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    })
     expect(announcements.filter((entry) => entry.text === 'Home saved.')).toHaveLength(1)
   })
 

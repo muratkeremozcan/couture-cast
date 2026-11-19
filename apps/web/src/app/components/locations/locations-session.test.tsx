@@ -21,6 +21,8 @@ import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/wardrobe'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
 import type * as WebSession from '../../../lib/web-session'
+import { readApproximatePosition } from '../../../lib/device-position'
+import { locationsFromCoordinatesFromWeb } from '../../../lib/locations'
 import { LocationsSection } from './locations-section'
 
 /** The session bridge's state, driven by hand: who verification named, and its pending answer. */
@@ -44,6 +46,11 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
     })
   },
 }))
+
+// Passthrough spies: every position reading and lookup still runs, and a test can settle the
+// reading the section started and see whether a lookup followed it.
+vi.mock('../../../lib/device-position', { spy: true })
+vi.mock('../../../lib/locations', { spy: true })
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -527,16 +534,18 @@ describe('LocationsSection follows the web session', () => {
       await waitFor(() => expect(held.answer).toBeDefined())
 
       publish({ identity: 'member-2', bearer: 'second-token' })
+      const reading = vi.mocked(readApproximatePosition).mock.results.at(-1)!
+        .value as Promise<unknown>
+      // The reading settles; the continuation the section registered on it runs before this
+      // test's, so a lookup it started would already be recorded.
       await act(async () => {
         held.answer!({
           coords: { latitude: 41.88, longitude: -87.63 },
         } as GeolocationPosition)
-        await Promise.resolve()
+        await reading
       })
-      // The next member's own list is the tracked point after which a stale lookup would show.
-      await waitFor(() => expect(listBearers).toContain('Bearer second-token'))
-      await screen.findByTestId('location-item')
 
+      expect(vi.mocked(locationsFromCoordinatesFromWeb)).not.toHaveBeenCalled()
       expect(lookups).toEqual([])
     } finally {
       Reflect.deleteProperty(window.navigator, 'geolocation')

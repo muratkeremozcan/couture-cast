@@ -112,15 +112,16 @@ async function locationError(error: unknown): Promise<LocationRequestError> {
 }
 
 /**
- * The bearer a member-owned operation captured when the member acted. Every request in that
- * operation sends this one, never a later read of session storage, so one member's data can only
- * travel under that member's token.
+ * The bearer for one request, read immediately before it is sent and only while the member who
+ * started the operation still holds the session. A long prompt (browser location consent) can
+ * outlast a token, so an operation never reuses a bearer across requests; it reads a fresh one
+ * for each, and the owner check keeps one member's data off another member's token.
  */
 export interface LocationCredentials {
   readonly accessToken: string
 }
 
-/** The bearer this tab holds right now, captured for one operation, or null when signed out. */
+/** The bearer this tab holds right now, for one request, or null when signed out. */
 export function captureLocationCredentials(): LocationCredentials | null {
   const token =
     typeof window === 'undefined'
