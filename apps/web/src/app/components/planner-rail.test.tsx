@@ -10,6 +10,7 @@ import {
   PLANNER_DAY_CHANGED_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import { signInFixtureMember } from '../../test-utils/member-session'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
@@ -787,11 +788,15 @@ describe('PlannerRail keeps focus and the newest week with the member', () => {
       releaseStale = resolve
     })
     const expectedVersions: number[] = []
+    let staleAnswered = false
     useMswHandlers(
       http.get(PLANNER_PATH, async () => {
         weekReads += 1
         // The focus refresh is held until after the reshuffle answers.
-        if (weekReads === 2) await stale
+        if (weekReads === 2) {
+          await stale
+          staleAnswered = true
+        }
         return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
       }),
       http.post(RESHUFFLE_PATH, async ({ request }) => {
@@ -818,10 +823,11 @@ describe('PlannerRail keeps focus and the newest week with the member', () => {
     await waitFor(() => expect(button).not.toBeDisabled())
 
     // The older week (version 1) answers now.
-    await act(async () => {
-      releaseStale()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
+    // The click follows the stale answer's delivery, not a timer: the handler has answered it
+    // and the rail has had every round of the request barrier to apply or drop it.
+    act(() => releaseStale())
+    await waitFor(() => expect(staleAnswered).toBe(true))
+    await settle()
 
     fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
     await waitFor(() => expect(expectedVersions).toEqual([1, 2]))

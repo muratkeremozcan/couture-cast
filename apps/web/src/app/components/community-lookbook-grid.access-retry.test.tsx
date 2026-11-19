@@ -4,7 +4,7 @@
 // show the community again once access is back (the denial stopped the sync, and only a
 // catch-up reporting 'connected' restores the grid); the one-row probe the denial sends speaks
 // only while no newer feed read has started; and the weekly challenge stays readable while the
-// session is unverified, but only a verified member can start a post from it.
+// reader has no verified member, but only a verified member can start a post from it.
 import { CommunitySyncState } from '@couture/api-client'
 import { COMMUNITY_FEED_DISABLED_MESSAGE } from '@couture/api-client/contracts/http'
 import { act, screen, waitFor } from '@testing-library/react'
@@ -13,6 +13,7 @@ import { http, HttpResponse } from 'msw'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import {
   CHALLENGE,
   FEED_PATH,
@@ -61,6 +62,8 @@ function useRefusedThenOpenCommunity(options: { holdProbe?: boolean } = {}) {
     releaseProbe = resolve
   })
   const probes: string[] = []
+  /** The probe's refusal has left the handler: its answer is on its way to the grid. */
+  let probeAnswered = false
   const post = (id: string) => ({ ...item({ id }), reactions })
   useMswHandlers(
     http.get(FEED_PATH, async ({ request }) => {
@@ -68,6 +71,7 @@ function useRefusedThenOpenCommunity(options: { holdProbe?: boolean } = {}) {
       if (limit === '1') {
         probes.push(limit)
         if (options.holdProbe) await probeHeld
+        probeAnswered = true
         return denied()
       }
       if (!open) return denied()
@@ -115,6 +119,7 @@ function useRefusedThenOpenCommunity(options: { holdProbe?: boolean } = {}) {
       open = true
     },
     releaseProbe: () => releaseProbe(),
+    probeAnswered: () => probeAnswered,
   }
 }
 
@@ -161,18 +166,19 @@ describe('Retry after a realtime denial', () => {
     await waitFor(() => expect(screen.queryByTestId('community-feed-error')).toBeNull())
 
     // The denial's probe answers last, with the old refusal.
-    await act(async () => {
-      community.releaseProbe()
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
+    // The assertion follows the answer's delivery: the handler has answered, and the grid has
+    // had every round of the request barrier to apply it, so a guard that lets it through fails.
+    act(() => community.releaseProbe())
+    await waitFor(() => expect(community.probeAnswered()).toBe(true))
+    await settle()
 
     expect(screen.queryByTestId('community-feed-error')).toBeNull()
   })
 })
 
-describe('the weekly challenge while the session is unverified', () => {
-  it('COMMUNITY-CHALLENGE-GATE-01 stays readable and offers no way to post without a verified member', async () => {
-    // A bearer no verification named (a stale one from an earlier session).
+describe('the weekly challenge without a verified member', () => {
+  it('COMMUNITY-CHALLENGE-GATE-01 stays readable and offers no way to post when no member is verified', async () => {
+    // A bearer no verification named (a stale one from an earlier session): no verified member.
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'stale-bearer')
     useMswHandlers(feedHandler({ activeChallenge: CHALLENGE }))
     renderGrid()

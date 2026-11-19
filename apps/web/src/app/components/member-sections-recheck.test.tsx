@@ -15,6 +15,7 @@ import { PALETTE_ANALYSIS_IN_PROGRESS_MESSAGE } from '@couture/api-client/contra
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
 import { PALETTE_PATH, errorBody, profile } from '../../test-utils/palette-advisor-panel'
 import { CommercePreferencesSection } from './commerce-preferences-section'
@@ -139,6 +140,7 @@ describe('Shopping and partners reads again after a same-member rotation', () =>
     await waitFor(() => expect(toggle).toBeEnabled())
     expect(toggle).not.toBeChecked()
     expect(screen.queryByTestId('commerce-error-message')).toBeNull()
+    await settle()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 })
@@ -163,10 +165,10 @@ describe('the advisor keeps a failed recheck retryable', () => {
     await waitFor(() => expect(session.pending).toHaveLength(1))
 
     await failRecheck(0)
-    expect(screen.getByTestId('palette-advisor-error')).toHaveTextContent(
+    expect(await screen.findByTestId('palette-advisor-error')).toHaveTextContent(
       'We could not load your palette. Try again.'
     )
-    expect(screen.getByTestId('palette-advisor-session-retry')).toHaveTextContent(
+    expect(await screen.findByTestId('palette-advisor-session-retry')).toHaveTextContent(
       'Try again'
     )
     expect(screen.queryByTestId('palette-advisor-locked')).toBeNull()
@@ -175,6 +177,7 @@ describe('the advisor keeps a failed recheck retryable', () => {
     publish('token-1b')
     expect(await screen.findByTestId('palette-advisor-consent')).toBeInTheDocument()
     expect(screen.queryByTestId('palette-advisor-session-retry')).toBeNull()
+    await settle()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 
@@ -184,12 +187,15 @@ describe('the advisor keeps a failed recheck retryable', () => {
     await waitFor(() => expect(session.pending).toHaveLength(1))
     await failRecheck(0)
 
-    await userEvent.setup().click(screen.getByTestId('palette-advisor-session-retry'))
+    await userEvent
+      .setup()
+      .click(await screen.findByTestId('palette-advisor-session-retry'))
     await waitFor(() => expect(session.pending).toHaveLength(2))
     await failRecheck(1)
 
-    expect(screen.getByTestId('palette-advisor-session-retry')).toBeInTheDocument()
+    expect(await screen.findByTestId('palette-advisor-session-retry')).toBeInTheDocument()
     expect(screen.queryByTestId('palette-advisor-locked')).toBeNull()
+    await settle()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1a'])
   })
 
@@ -241,6 +247,7 @@ describe('the advisor keeps a failed recheck retryable', () => {
         'Analyzing your palette…'
       )
     )
+    await settle()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1a', 'Bearer token-1b'])
   })
 })
@@ -260,12 +267,13 @@ describe('the planner keeps a failed recheck retryable and closes every read', (
     await waitFor(() => expect(session.pending).toHaveLength(1))
 
     await failRecheck(0)
-    expect(screen.getByTestId('planner-rail-error')).toBeInTheDocument()
-    expect(screen.getByTestId('planner-rail-retry')).toBeInTheDocument()
+    expect(await screen.findByTestId('planner-rail-error')).toBeInTheDocument()
+    expect(await screen.findByTestId('planner-rail-retry')).toBeInTheDocument()
     expect(screen.queryByTestId('planner-rail-locked')).toBeNull()
 
     publish('token-1b')
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
+    await settle()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 
@@ -313,8 +321,9 @@ describe('the planner keeps a failed recheck retryable and closes every read', (
     })
     await act(async () => {
       third.release()
-      await new Promise((resolve) => setTimeout(resolve, 0))
+      await Promise.resolve()
     })
+    await settle()
 
     expect(bearers).not.toContain('Bearer token-1b')
     expect(reads).toBe(3)
