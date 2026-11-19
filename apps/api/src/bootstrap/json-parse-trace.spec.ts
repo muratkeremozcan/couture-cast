@@ -87,6 +87,12 @@ beforeAll(async () => {
   // Loaded after enable, so the instrumentations patch these copies as the deployed API's are
   // (Nest loads express itself when it creates the app below).
   const load = createRequire(__filename)
+  // A worker that already loaded express (another spec) would hand back an unpatched copy, and
+  // the instrumentation patches only on load: drop those copies so the next require is patched.
+  for (const key of Object.keys(load.cache)) {
+    if (/node_modules[\\/](express|router|@nestjs[\\/]platform-express)[\\/]/.test(key))
+      delete load.cache[key]
+  }
   load('http')
   load('express')
   load('@nestjs/platform-express')
