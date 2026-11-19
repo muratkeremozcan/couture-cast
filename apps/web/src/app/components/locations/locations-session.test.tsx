@@ -517,10 +517,18 @@ describe('LocationsSection follows the web session', () => {
   it('LOC-ROTATE-WEB-02 a position that arrives after another member signed in is never sent', async () => {
     const user = userEvent.setup()
     const lookups: (string | null)[] = []
+    const office: SavedLocation = { ...HOME, id: 'loc-2', label: 'Office' }
     useMswHandlers(
       http.post('/api/v1/locations/from-coordinates', ({ request }) => {
         lookups.push(request.headers.get('authorization'))
         return HttpResponse.json({ data: [] })
+      }),
+      http.get('/api/v1/locations', ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        listBearers.push(bearer)
+        return HttpResponse.json({
+          data: [bearer === 'Bearer second-token' ? office : HOME],
+        })
       })
     )
     const held = holdPosition()
@@ -546,6 +554,12 @@ describe('LocationsSection follows the web session', () => {
       })
 
       expect(vi.mocked(locationsFromCoordinatesFromWeb)).not.toHaveBeenCalled()
+      expect(lookups).toEqual([])
+
+      // The second member's own list still loads, and the lookup stays unsent after it.
+      expect(await screen.findByText('Office')).toBeInTheDocument()
+      expect(screen.queryByText('Home')).not.toBeInTheDocument()
+      expect(listBearers).toEqual(['Bearer first-token', 'Bearer second-token'])
       expect(lookups).toEqual([])
     } finally {
       Reflect.deleteProperty(window.navigator, 'geolocation')
