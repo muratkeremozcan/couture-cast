@@ -11819,9 +11819,9 @@ Hard-won lessons from the implementation and code review of this story:
   `gson` 2.9.1 during plugin resolution, reached through both the Gradle plugin portal and Maven
   Central lookups. Every Gradle call in that workflow, the TalkBack connected runs included, now
   goes through `scripts/ci/gradle-resolution-retry.mjs`. It retries a run whose output shows a
-  failed download with a transient cause, on the same line or nested under it. A run with failing
-  test cases and no such download runs once; one that also shows a failed download retries, which
-  is the Robolectric case. The Codex review found the connected runs still resolved their UTP
+  failed download, printed by Gradle or Robolectric, with a transient cause on the same line or
+  nested under it. A run with failing tests and no such download runs once; one that also shows a
+  failed download retries, which is the Robolectric case. The Codex review found the connected runs still resolved their UTP
   dependencies outside the retry.
 - The Release font share-card lane lost its emulator during a 12-minute Release build on a runner
   that also hosts Supabase and the app's services. Memory exhaustion is a working hypothesis: the
@@ -11847,10 +11847,15 @@ Hard-won lessons from the implementation and code review of this story:
 - The first API record read the launcher's log, which holds no HTTP lines, so a failed leg would
   have published an empty record; and it kept any lowercase path segment, which would have
   published a lowercase private value once the right log was wired. It now reads the API child's
-  log and maps every path onto the OpenAPI contract's route templates.
+  log and maps every path onto the OpenAPI contract's route templates. The next review found the
+  public selector's token filter dropped the whole record for long template names such as
+  `api/v1/community/notification-preferences`, which every iOS sign-in requests; the selector now
+  checks each route against the contract and runs the token filter on every other string.
 - The Gradle retry missed a resolution failure printed over several lines under a test task's own
-  `FAILED` line. The classifier now reads a cause nested under a failed download, and a test
-  task's own `FAILED` line alone no longer counts as failing tests.
+  `FAILED` line. The classifier now reads a cause nested under a failed download, and counts a
+  download only on a line Gradle or Robolectric prints, so an assertion that quotes
+  `Could not GET ... 429` does not retry. A test task that failed, a crashed JVM included,
+  retries only when the run also printed a real failed download.
 - The tap retry first shipped with structural YAML tests only, which a retry that never retries
   passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
   with the subset of Maestro 2.8.0's rules and timing the subflow uses. The review found the first
@@ -11915,8 +11920,9 @@ Tests that cover this step:
 Workflow contracts, Vitest:
 
 - [`apps/api/integration/deployment-workflows.spec.ts`](../../apps/api/integration/deployment-workflows.spec.ts):
-  proves the daily schedule, the separate concurrency group, that no Prod E2E job is conditional
-  on the event, and the README badge.
+  parses `pw-e2e-prod.yml` and proves the daily schedule, the separate concurrency group, that no
+  job or step here or in the reusable workflows it calls is conditional on the event, and the
+  README badge.
 - [`playwright/support/helpers/accessibility-focus-workflow.spec.ts`](../../playwright/support/helpers/accessibility-focus-workflow.spec.ts):
   proves the accessibility-focus path filters list the retry files.
 - [`playwright/support/helpers/accessibility-focus-results.spec.ts`](../../playwright/support/helpers/accessibility-focus-results.spec.ts):
@@ -11926,7 +11932,8 @@ CI scripts, node:test:
 
 - [`scripts/ci/gradle-resolution-retry.test.mjs`](../../scripts/ci/gradle-resolution-retry.test.mjs):
   proves every Gradle call in the accessibility workflow goes through the retry, every Android job
-  sets up the Gradle cache, and a 429 in a connected run retries while a failing test runs once.
+  sets up the Gradle cache, and the classifier's outcomes: a same-line or nested transient download
+  failure retries, a quoted download line or a crashed test task with no real download runs once.
 - [`scripts/ci/share-card-android-release-font.test.mjs`](../../scripts/ci/share-card-android-release-font.test.mjs):
   proves swap sized against the disk guard, the emulator check after the build, and that kernel
   OOM lines reach the log.
@@ -11948,14 +11955,16 @@ CI scripts, node:test:
 - [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
   proves every opener flow positions the opener for its platform and scrolls with the guard.
 - [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
-  proves the iOS Settings proof reads the return link and the Android title check stays.
+  proves the harness's Settings re-read accepts only the Settings breadcrumb on iOS and the
+  resumed package on Android, and walks the parsed `settings.yaml` so no iOS title check returns.
 - [`scripts/lib/native-build-failure.test.mjs`](../../scripts/lib/native-build-failure.test.mjs):
   proves xcodebuild's failed commands are named, escaped names included, through the list footer,
   and that Swift errors, also in paths with spaces, and failed build scripts are classified.
 - [`scripts/ci/native-api-requests.test.mjs`](../../scripts/ci/native-api-requests.test.mjs):
-  proves the API record reads the API child's log, names each request by its OpenAPI route
-  template (an unknown path reads `unknown`, so a lowercase private value never reaches the public
-  record), counts slow and unanswered requests, and runs after the service-exit check.
+  proves the API record reads the log name the harness writes, names each request by its OpenAPI
+  route template (an unknown path reads `unknown`, so a lowercase private value never reaches the
+  public record), publishes whole through the real selector with a preferences and a feed request
+  in one record, counts slow and unanswered requests, and runs after the service-exit check.
 
 Mobile, Vitest:
 
