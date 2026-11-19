@@ -11782,8 +11782,8 @@ User/business impact:
 
 With the stories done, the open question becomes "is production still working today?".
 Production can break with no merge: an expired secret, a provider outage, a plan quota or drifted
-data. Before this step the production suite ran after a push to `main` or by hand, and nothing ran
-it between pushes. The production Playwright suite now also runs once a day, and the README's
+data. Before this step the production suite ran after a push to `main` or when someone dispatched
+it, so between pushes nothing ran it on its own. The production Playwright suite now also runs once a day, and the README's
 `production status` badge shows the latest result. Three nightly native workflows were red (iOS
 native, accessibility focus and the share-card native lanes); iOS runs only nightly or by
 dispatch, since macOS jobs never run on pull requests. This step fixes the causes the evidence
@@ -11793,9 +11793,9 @@ record their cause next time.
 Key takeaways:
 
 1. **A status check is the push suite on a clock.**
-   The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves the commit
-   `main` pointed at when the run started (or one with the same build inputs), then runs the same
-   suite a push runs. No second suite drifts from the first.
+   The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves the
+   scheduled event's commit, `main` as of the event (or one with the same build inputs), then runs
+   the same suite a push runs. No second suite drifts from the first.
 2. **A scheduled run must not cost a push its verdict.**
    By default GitHub keeps one pending run per concurrency group and replaces it on every
    arrival, and this workflow uses that default. In the
@@ -11836,12 +11836,12 @@ Hard-won lessons from the implementation and code review of this story:
   a Release build that exited 65, left no failed command in its record; its cause is unknown, and
   the build summary now lists xcodebuild's failed commands so the next one is named.
 - The community live font leg ended on "We could not load the community feed." with the feed
-  text pushed down by the error panel. The working hypothesis: the proof harness drags past the
-  top of the feed after each capture, which fires pull-to-refresh, and one refresh failed. The
-  artifact holds no request timeline, so the failed request is not identified. The app defect
-  behind it is proven by test: after a failed refresh, the error panel stayed through every later
-  load that answered, so a member who pulls again after a network blip saw the error above a feed
-  that loaded. A load that answers now clears a stale load error, on the pull path and the
+  text pushed down by the error panel. The working hypothesis: the extra downward drags the proof
+  harness makes after its scrolled captures can fire pull-to-refresh, and one such read failed.
+  The artifact holds no request timeline, so neither the failed request nor any later refresh is
+  identified. Investigating it found an app defect, reproduced independently by test: after a
+  failed read, the error panel stayed through every later load that answered, so a member who
+  pulls again after a network blip saw the error above a feed that loaded. A load that answers now clears a stale load error, on the pull path and the
   realtime rebuild alike (the review found the first fix covered only the pull), and a failed
   withdraw stays on screen.
 - The first API record read the launcher's log, which holds no HTTP lines, so a failed leg would
@@ -11849,8 +11849,8 @@ Hard-won lessons from the implementation and code review of this story:
   published a lowercase private value once the right log was wired. It now reads the API child's
   log and maps every path onto the OpenAPI contract's route templates.
 - The Gradle retry missed a resolution failure printed over several lines under a test task's own
-  `FAILED` line. The classifier now reads a cause nested under a failed download, and counts only
-  per-case failures as failing tests.
+  `FAILED` line. The classifier now reads a cause nested under a failed download, and a test
+  task's own `FAILED` line alone no longer counts as failing tests.
 - The tap retry first shipped with structural YAML tests only, which a retry that never retries
   passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
   with the subset of Maestro 2.8.0's rules the subflow uses. The model proves the retry logic,
@@ -11890,9 +11890,9 @@ Sequence to follow:
 4. `maestro/story68/tap-outfit-open.yaml`, `maestro/story68/settings.yaml` and
    `scripts/lib/story68-flow-timeouts.mjs`.
 5. `scripts/lib/native-build-failure.mjs` and `scripts/lib/maestro-flow-model.mjs`.
-6. `apps/mobile/src/features/community/community-screen.tsx` (the load-error reset).
-7. `scripts/ci/native-api-requests.mjs`, `.github/workflows/ios-native-jobs.yml` and
+6. `scripts/ci/native-api-requests.mjs`, `.github/workflows/ios-native-jobs.yml` and
    `scripts/ci/native-ios-public-diagnostics.mjs`.
+7. `apps/mobile/src/features/community/community-screen.tsx` (the load-error reset).
 
 Task owner map:
 
@@ -11955,8 +11955,10 @@ Mobile, Vitest:
 
 Evidence boundaries:
 
-- The daily production run, the swap step, the Gradle cache and the iOS fixes run only on GitHub's
-  runners. Their native proof is pending until the first scheduled runs after merge and the manual
-  dispatches named in the pull request; the device scripts and their fixtures also run locally.
-- The Release font emulator loss and the failed community refresh have no recorded cause beyond
-  what this step names; the new evidence records exist so the next failure names one.
+- The daily production run, the swap step, the Gradle cache and the iOS fixes have no hosted CI
+  result yet; their fixtures and scripts ran locally. The hosted proof is the manual dispatches of
+  the native workflows from this branch and the first scheduled runs after merge.
+- The Release font emulator loss and the community leg's failed read have no recorded cause beyond
+  the hypotheses this step names. The new evidence records make the next failure more likely to
+  name one; a build log with no xcodebuild command list or a run with no kernel OOM record still
+  leaves it open.
