@@ -72,10 +72,12 @@ async function main() {
   if (!process.env.MODERATION_OPS_WEBHOOK_URL?.trim() && pushUserIds.length > 0) {
     // The verified operator client: node-postgres against the committed Supabase root CA, host
     // name checked, the same trust the worker image uses. A bare PrismaClient would not verify it.
-    const { default: operatorModule } = await import(
+    // Named export: `npm run moderation:sla:drill` runs tsx from the repository root, where this
+    // dynamic import resolves as ESM with no default export.
+    const { createOperatorPrismaClient } = await import(
       '../apps/api/src/prisma/operator-prisma-client.ts'
     )
-    prisma = operatorModule.createOperatorPrismaClient(process.env.DATABASE_URL ?? '')
+    prisma = createOperatorPrismaClient(process.env.DATABASE_URL ?? '')
   }
   const channel = createModerationOpsChannel({
     url: process.env.MODERATION_OPS_WEBHOOK_URL,

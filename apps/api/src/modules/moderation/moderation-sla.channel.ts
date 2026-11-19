@@ -260,7 +260,10 @@ function createModerationOpsPushChannel(options: {
       }))
       const { accepted, errors, transport } = await sendBatches(messages)
       if (accepted.length > 0) {
-        await options.onAccepted?.(payload.id, accepted)
+        // Expo accepted the push, so the alert is delivered even if recording the tickets fails:
+        // `deliver` never rejects, and a rejection here would make the next claim push again.
+        // The caller logs a failed record; only that alert's receipts are lost.
+        await options.onAccepted?.(payload.id, accepted).catch(() => undefined)
         return 'delivered'
       }
       return failureOutcome(errors, transport)

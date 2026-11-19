@@ -509,13 +509,18 @@ export function createModerationSlaSweep(
         // Recorded before the alert counts as delivered, so receipts survive a worker restart.
         onAccepted: async (alertId, ticketIds) => {
           const now = new Date()
-          await repository.recordPushTickets(
-            alertId,
-            ticketIds,
-            now,
-            new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_RETRY_MS),
-            new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_EXPIRY_MS)
-          )
+          try {
+            await repository.recordPushTickets(
+              alertId,
+              ticketIds,
+              now,
+              new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_RETRY_MS),
+              new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_EXPIRY_MS)
+            )
+          } catch (error) {
+            const event = MODERATION_SLA_LOG_EVENTS.pushTicketRecordFailed
+            logger.warn({ event, alertId, prismaCode: prismaErrorCode(error) }, event)
+          }
         },
       },
     }),
