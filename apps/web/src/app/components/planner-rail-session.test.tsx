@@ -237,6 +237,9 @@ describe('PlannerRail follows the web session', () => {
     await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
 
     publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    // The rotation alone starts no second read; only the denial of the old token does.
+    expect(bearers).toEqual(['Bearer token-1a'])
     await act(async () => {
       releaseOld()
       await Promise.resolve()
@@ -245,5 +248,42 @@ describe('PlannerRail follows the web session', () => {
     expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
     expect(locked()).toBeNull()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('PLANNER-SESSION-WEB-05b control: an old read that succeeds after a same-member rotation is kept, with no second read', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get(PLANNER_PATH, async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          // Answers as member-1's fresh read would.
+        }
+        return HttpResponse.json(WEEK)
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    // The rotation alone starts no second read; only the denial of the old token does.
+    expect(bearers).toEqual(['Bearer token-1a'])
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
+    expect(locked()).toBeNull()
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a'])
   })
 })

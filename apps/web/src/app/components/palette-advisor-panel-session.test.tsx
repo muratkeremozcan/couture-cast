@@ -15,6 +15,7 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import type * as WebSession from '../../lib/web-session'
+import type * as Commerce from '../../lib/commerce'
 import { ADVISOR_RULES } from '@couture/api-client/contracts/http'
 import {
   PALETTE_PATH,
@@ -41,6 +42,22 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
       session.verify = resolve
     }),
 }))
+
+/** Every sponsored click the panel minted, kept until it settles. */
+const mints = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+vi.mock('../../lib/commerce', async (importOriginal) => {
+  const actual = await importOriginal<typeof Commerce>()
+  return {
+    ...actual,
+    mintAffiliateClickFromWeb: (
+      ...args: Parameters<typeof actual.mintAffiliateClickFromWeb>
+    ) => {
+      const pending = actual.mintAffiliateClickFromWeb(...args)
+      mints.promises.push(pending)
+      return pending
+    },
+  }
+})
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -220,6 +237,7 @@ describe('PaletteAdvisorPanel follows the web session', () => {
 
     beforeEach(() => {
       clickBearers = []
+      mints.promises = []
       let release!: () => void
       const held = new Promise<void>((resolve) => {
         release = resolve
@@ -279,9 +297,11 @@ describe('PaletteAdvisorPanel follows the web session', () => {
       await waitFor(() => expect(clickBearers).toEqual(['Bearer token-1']))
 
       view.unmount()
+      releaseClick()
+      // The panel's own mint has settled, so a navigation it would make has been made.
+      expect(mints.promises).toHaveLength(1)
       await act(async () => {
-        releaseClick()
-        await Promise.resolve()
+        await Promise.allSettled(mints.promises)
       })
       await settle()
 
@@ -317,6 +337,9 @@ describe('PaletteAdvisorPanel follows the web session', () => {
     await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
 
     publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    // The rotation alone starts no second read; only the denial of the old token does.
+    expect(bearers).toEqual(['Bearer token-1a'])
     await act(async () => {
       releaseOld()
       await Promise.resolve()
@@ -325,5 +348,42 @@ describe('PaletteAdvisorPanel follows the web session', () => {
     expect(await screen.findByTestId('palette-advisor-consent')).toBeInTheDocument()
     expect(locked()).toBeNull()
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('PALETTE-SESSION-WEB-07b control: an old read that succeeds after a same-member rotation is kept, with no second read', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get(PALETTE_PATH, async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          // Answers as member-1's fresh read would.
+        }
+        return HttpResponse.json({ data: profile({ isEntitled: true }) })
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    // The rotation alone starts no second read; only the denial of the old token does.
+    expect(bearers).toEqual(['Bearer token-1a'])
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('palette-advisor-consent')).toBeInTheDocument()
+    expect(locked()).toBeNull()
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a'])
   })
 })

@@ -38,10 +38,29 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
 }))
 
 // jsdom's location cannot be assigned, so the external redirect is recorded instead.
-vi.mock('../../lib/premium', async (importOriginal) => ({
-  ...(await importOriginal<typeof Premium>()),
-  redirectToExternalUrl: vi.fn(),
-}))
+/** Every checkout and portal session the section asked for, kept until it settles. */
+const billing = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+vi.mock('../../lib/premium', async (importOriginal) => {
+  const actual = await importOriginal<typeof Premium>()
+  return {
+    ...actual,
+    redirectToExternalUrl: vi.fn(),
+    createCheckoutSessionFromWeb: (
+      ...args: Parameters<typeof actual.createCheckoutSessionFromWeb>
+    ) => {
+      const pending = actual.createCheckoutSessionFromWeb(...args)
+      billing.promises.push(pending)
+      return pending
+    },
+    createPortalSessionFromWeb: (
+      ...args: Parameters<typeof actual.createPortalSessionFromWeb>
+    ) => {
+      const pending = actual.createPortalSessionFromWeb(...args)
+      billing.promises.push(pending)
+      return pending
+    },
+  }
+})
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
@@ -321,6 +340,10 @@ describe('SubscriptionSection follows the web session', () => {
             'You have complimentary Premium access from CoutureCast.'
           )
         )
+        await settle()
+        expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+          'You have complimentary Premium access from CoutureCast.'
+        )
       } finally {
         stop()
       }
@@ -350,6 +373,10 @@ describe('SubscriptionSection follows the web session', () => {
         await waitFor(() =>
           expect(seen.some((text) => /Premium is active/.test(text))).toBe(true)
         )
+        await settle()
+        expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+          /Premium is active/
+        )
       } finally {
         stop()
       }
@@ -361,12 +388,30 @@ describe('SubscriptionSection follows the web session', () => {
   describe('billing work belongs to the member and the page that started it', () => {
     const REFRESH_PATH = '/api/v1/commerce/subscription/refresh'
     const PORTAL_PATH = '/api/v1/commerce/subscription/portal-session'
+    const CHECKOUT_PATH = '/api/v1/commerce/subscription/checkout-session'
     const ACTIVATING = 'Payment received. Activating your Premium subscription…'
     const PORTAL_LAG = /billing portal, especially cancellations/
     let refreshBearers: (string | null)[]
 
+    function hold() {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return { gate, release }
+    }
+
+    /** Every billing session request the section started has settled (or been cancelled). */
+    async function settleBilling() {
+      await act(async () => {
+        await Promise.allSettled(billing.promises)
+      })
+      await settle()
+    }
+
     beforeEach(() => {
       refreshBearers = []
+      billing.promises = []
       vi.mocked(redirectToExternalUrl).mockClear()
       useMswHandlers(
         http.post(REFRESH_PATH, ({ request }) => {
@@ -388,6 +433,15 @@ describe('SubscriptionSection follows the web session', () => {
     ])(
       'SUBSCRIPTION-SESSION-WEB-08 a %s return is not replayed for the next member on the same page',
       async (_kind, url) => {
+        const memberTwoRead = hold()
+        useMswHandlers(
+          http.get('/api/v1/commerce/subscription', async ({ request }) => {
+            const bearer = request.headers.get('authorization')
+            bearers.push(bearer)
+            if (bearer === 'Bearer token-2') await memberTwoRead.gate
+            return HttpResponse.json({ data: SUBSCRIPTION[bearer ?? ''] ?? NONE })
+          })
+        )
         window.history.replaceState({}, '', url)
         session.stored = true
         session.identity = 'member-1'
@@ -397,6 +451,18 @@ describe('SubscriptionSection follows the web session', () => {
 
         publish({ identity: null, bearer: null })
         publish({ identity: 'member-2', bearer: 'token-2' })
+        await waitFor(() =>
+          expect(bearers.filter((bearer) => bearer === 'Bearer token-2')).toEqual([
+            'Bearer token-2',
+          ])
+        )
+        await settle()
+        // While member-2's own read is still out, nothing of member-1's return shows.
+        expect(screen.queryByText(ACTIVATING)).toBeNull()
+        expect(screen.queryByTestId('premium-portal-lag-hint')).toBeNull()
+        expect(document.body.textContent).not.toMatch(PORTAL_LAG)
+
+        act(() => memberTwoRead.release())
         expect(await screen.findByTestId('premium-subscribe-monthly')).toBeEnabled()
         await settle()
 
@@ -411,83 +477,120 @@ describe('SubscriptionSection follows the web session', () => {
       }
     )
 
-    // Finding 4: a denial of member-1's superseded token is not a sign-out.
-    it('SUBSCRIPTION-SESSION-WEB-09 a late 401 for the old token after a same-member rotation reads again with the fresh one', async () => {
-      let releaseOld!: () => void
-      const old = new Promise<void>((resolve) => {
-        releaseOld = resolve
-      })
-      useMswHandlers(
-        http.get('/api/v1/commerce/subscription', async ({ request }) => {
-          const bearer = request.headers.get('authorization')
-          bearers.push(bearer)
-          if (bearer === 'Bearer token-1a') {
-            await old
-            return HttpResponse.json(
-              { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
-              { status: 401 }
-            )
-          }
-          return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
+    // Finding 4: a denial of member-1's superseded token is not a sign-out. The old read stays
+    // held through the rotation, so a section that simply refetches on every token change is
+    // told apart from one that retries the denied read.
+    describe('a same-member token rotation', () => {
+      function useOldRead(old: { gate: Promise<void> }, status: 200 | 401) {
+        useMswHandlers(
+          http.get('/api/v1/commerce/subscription', async ({ request }) => {
+            const bearer = request.headers.get('authorization')
+            bearers.push(bearer)
+            if (bearer === 'Bearer token-1a') {
+              await old.gate
+              if (status === 401)
+                return HttpResponse.json(
+                  { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+                  { status: 401 }
+                )
+            }
+            return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
+          })
+        )
+      }
+
+      async function rotateWhileOldReadIsOut() {
+        session.stored = true
+        session.identity = 'member-1'
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+        renderSection()
+        await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+        publish({ identity: 'member-1', bearer: 'token-1b' })
+        await settle()
+        // The rotation alone starts no second read.
+        expect(bearers).toEqual(['Bearer token-1a'])
+      }
+
+      it('SUBSCRIPTION-SESSION-WEB-09 a late 401 for the old token reads again, once, with the fresh one', async () => {
+        const old = hold()
+        useOldRead(old, 401)
+        await rotateWhileOldReadIsOut()
+
+        await act(async () => {
+          old.release()
+          await Promise.resolve()
         })
-      )
-      session.stored = true
-      session.identity = 'member-1'
-      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
-      renderSection()
-      await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
 
-      // The bridge refreshes member-1's token; the old read is still out.
-      publish({ identity: 'member-1', bearer: 'token-1b' })
-      await act(async () => {
-        releaseOld()
-        await Promise.resolve()
+        expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+        await settle()
+        expect(hint()).toBeNull()
+        expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
       })
 
-      expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
-      expect(hint()).toBeNull()
-      expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+      it('SUBSCRIPTION-SESSION-WEB-09b control: an old read that succeeds is kept, with no second read', async () => {
+        const old = hold()
+        useOldRead(old, 200)
+        await rotateWhileOldReadIsOut()
+
+        act(() => old.release())
+
+        expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+        await settle()
+        expect(bearers).toEqual(['Bearer token-1a'])
+      })
     })
 
-    // Finding 5: a portal session that answers after Settings closed sends nobody anywhere.
+    // Finding 5: a checkout or portal session that answers after its page or member is gone
+    // sends nobody anywhere. The section's own request promise is settled before asserting.
     it.each([
-      ['Settings closes', 'unmount'],
-      ['member-1 leaves and comes back', 'a-b-a'],
+      ['portal', 'Settings closes', 'unmount'],
+      ['portal', 'member-1 leaves and comes back', 'a-b-a'],
+      ['checkout', 'Settings closes', 'unmount'],
+      ['checkout', 'member-2 leaves and comes back', 'a-b-a'],
     ])(
-      'SUBSCRIPTION-SESSION-WEB-10 a portal session answering after %s does not redirect',
-      async (_case, how) => {
-        let releasePortal!: () => void
-        const portal = new Promise<void>((resolve) => {
-          releasePortal = resolve
-        })
-        let portalPosts = 0
+      'SUBSCRIPTION-SESSION-WEB-10 a %s session answering after %s does not redirect',
+      async (kind, _case, how) => {
+        const answer = hold()
+        let posts = 0
         useMswHandlers(
-          http.post(PORTAL_PATH, async () => {
-            portalPosts += 1
-            await portal
+          http.post(kind === 'portal' ? PORTAL_PATH : CHECKOUT_PATH, async () => {
+            posts += 1
+            await answer.gate
             return HttpResponse.json({
-              data: { url: 'https://portal.stripe.test/session' },
+              data: {
+                url:
+                  kind === 'portal'
+                    ? 'https://portal.stripe.test/session'
+                    : 'https://checkout.stripe.test/session',
+              },
             })
           })
         )
+        // The portal belongs to an active subscriber, checkout to a member without Premium.
+        const [member, token, other, otherToken] =
+          kind === 'portal'
+            ? ['member-1', 'token-1', 'member-2', 'token-2']
+            : ['member-2', 'token-2', 'member-1', 'token-1']
         session.stored = true
-        session.identity = 'member-1'
-        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+        session.identity = member
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, token)
         const view = renderSection()
-        ;(await screen.findByTestId('premium-manage-button')).click()
-        await waitFor(() => expect(portalPosts).toBe(1))
+        const control = await screen.findByTestId(
+          kind === 'portal' ? 'premium-manage-button' : 'premium-subscribe-monthly'
+        )
+        await waitFor(() => expect(control).toBeEnabled())
+        control.click()
+        await waitFor(() => expect(posts).toBe(1))
+        expect(billing.promises).toHaveLength(1)
 
         if (how === 'unmount') view.unmount()
         else {
-          publish({ identity: 'member-2', bearer: 'token-2' })
-          publish({ identity: 'member-1', bearer: 'token-1' })
+          publish({ identity: other, bearer: otherToken })
+          publish({ identity: member, bearer: token })
           await settle()
         }
-        await act(async () => {
-          releasePortal()
-          await Promise.resolve()
-        })
-        await settle()
+        act(() => answer.release())
+        await settleBilling()
 
         expect(vi.mocked(redirectToExternalUrl)).not.toHaveBeenCalled()
       }

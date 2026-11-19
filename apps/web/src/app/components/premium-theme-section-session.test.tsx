@@ -36,10 +36,13 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
     }),
 }))
 
+/** The pathname the app is on; a client-side link changes it. */
+const route = vi.hoisted(() => ({ pathname: '/settings' }))
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useSearchParams: () => new URLSearchParams(),
-  usePathname: () => '/settings',
+  usePathname: () => route.pathname,
 }))
 
 /** What the session bridge does when verification names (or clears) the member. */
@@ -103,6 +106,7 @@ const appliedTheme = () => document.documentElement.dataset.theme ?? ''
 describe('PremiumThemeSection follows the web session', () => {
   beforeEach(async () => {
     resetSession()
+    route.pathname = '/settings'
     document.documentElement.dataset.theme = ''
     useMswHandlers(
       http.get('/api/v1/commerce/premium/theme', ({ request }) => {
@@ -220,6 +224,9 @@ describe('PremiumThemeSection follows the web session', () => {
     await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
 
     publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    // The rotation alone starts no second read; only the denial of the old token does.
+    expect(bearers).toEqual(['Bearer token-1a'])
     await act(async () => {
       releaseOld()
       await Promise.resolve()
@@ -228,6 +235,43 @@ describe('PremiumThemeSection follows the web session', () => {
     expect(await screen.findByTestId('premium-theme-gallery')).toBeInTheDocument()
     expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
     expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('THEME-SESSION-WEB-05b control: an old read that succeeds after a same-member rotation is kept, with no second read', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get('/api/v1/commerce/premium/theme', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          // Answers as member-1's fresh read would.
+        }
+        return HttpResponse.json({ data: THEME['Bearer token-1'] })
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    // The rotation alone starts no second read; only the denial of the old token does.
+    expect(bearers).toEqual(['Bearer token-1a'])
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-theme-gallery')).toBeInTheDocument()
+    expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a'])
   })
 
   // Settings Codex review 1, finding 7: the palette is applied to the whole document, which
@@ -248,6 +292,7 @@ describe('PremiumThemeSection follows the web session', () => {
     expect(memberOnePalette).not.toBe('')
 
     // A client-side link away from Settings: the root shell stays, the section goes.
+    route.pathname = '/wardrobe'
     view.rerender(shell(false))
     expect(screen.queryByTestId('premium-theme-section')).toBeNull()
     expect(appliedTheme()).toBe(memberOnePalette)
