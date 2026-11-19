@@ -134,42 +134,52 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
       const uniform = pairs.length === 0 || onBackground.length >= 0.95 * pairs.length
       const contrast = (x: number, y: number) =>
         (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
-      // Each background region is rated on its own: glyph pixels are grouped by the luminance
-      // under them (2% contrast steps), each group by its strongest stem (the pixel whose ink
-      // differs most from its own background, where a translucent text color is painted over
-      // that region), held against the weakest background in the group, and the text takes its
-      // weakest group. A group needs 3% of the glyph pixels (and at least 8) to count, so a few
-      // antialiased pixels cannot decide the result.
-      const groups = new Map<
-        number,
-        { count: number; strongest: number; ink: number; unders: number[] }
-      >()
-      for (const [under, inked] of onBackground) {
-        const key = Math.round(Math.log(under + 0.05) / Math.log(1.02))
-        const group = groups.get(key) ?? {
-          count: 0,
-          strongest: 1,
-          ink: inked,
-          unders: [],
+      // Each background region is rated on its own. Glyph pixels are grouped by the exact
+      // luminance under them, and each group by its strongest stem (the pixel whose ink differs
+      // most from its own background, which is where a translucent text color is painted over
+      // that region); the text takes its weakest group. A group needs 3% of the glyph pixels
+      // (and at least 8) to count, so a few antialiased pixels cannot decide the result. Only a
+      // smooth gradient, where no exact background holds that share, falls back to 2% steps,
+      // each step's stem held against every background in it.
+      type Group = { count: number; strongest: number; ink: number; unders: number[] }
+      const groupBy = (keyOf: (under: number) => number) => {
+        const groups = new Map<number, Group>()
+        for (const [under, inked] of onBackground) {
+          const key = keyOf(under)
+          let group = groups.get(key)
+          if (!group) {
+            group = { count: 0, strongest: 1, ink: inked, unders: [] }
+            groups.set(key, group)
+          }
+          group.count += 1
+          group.unders.push(under)
+          const local = contrast(under, inked)
+          if (local > group.strongest) {
+            group.strongest = local
+            group.ink = inked
+          }
         }
-        group.count += 1
-        group.unders.push(under)
-        const local = contrast(under, inked)
-        if (local > group.strongest) {
-          group.strongest = local
-          group.ink = inked
-        }
-        groups.set(key, group)
+        return [...groups.values()]
       }
       const floor = Math.max(8, 0.03 * onBackground.length)
-      const counted = [...groups.values()].filter((group) => group.count >= floor)
-      const rated = counted.length > 0 ? counted : [...groups.values()]
-      // Within a group the stem's ink is held against every background in it, so two near
-      // backgrounds sharing a step cannot lend the stronger one's figure to the weaker.
-      const worst = (group: { ink: number; unders: number[] }) =>
-        Math.min(...group.unders.map((under) => contrast(group.ink, under)))
-      let ratio = 1
-      if (rated.length > 0) ratio = Math.min(...rated.map(worst))
+      const worstOf = (group: Group) => {
+        let worst = Infinity
+        for (const under of group.unders)
+          worst = Math.min(worst, contrast(group.ink, under))
+        return worst
+      }
+      const exact = groupBy((under) => under).filter((group) => group.count >= floor)
+      let rated: number[]
+      if (exact.length > 0) rated = exact.map((group) => group.strongest)
+      else {
+        const steps = groupBy((under) =>
+          Math.round(Math.log(under + 0.05) / Math.log(1.02))
+        )
+        const counted = steps.filter((group) => group.count >= floor)
+        rated = (counted.length > 0 ? counted : steps).map(worstOf)
+      }
+      let ratio = rated.length > 0 ? Infinity : 1
+      for (const value of rated) ratio = Math.min(ratio, value)
       return { painted, ratio, uniform }
     },
     { a: inked, b: bare, m: mask ?? null }
