@@ -216,13 +216,15 @@ test.describe('Story 5.1 web settings affiliate opt-out', () => {
     await log.step('Tab from the top of the document to the control')
     // The skip link is the first focusable element in the layout. Story 1.2b put
     // the Locations section first inside `main`, and for this member, who has no
-    // saved location, its only control is the city search, so three presses is
-    // the whole path. The exact count is the point: a control reachable only
-    // after ten tabs is unusable.
+    // saved location, its controls are the city search and Use my location (the
+    // Jade follow-up, Step 58), so four presses is the whole path. The exact count
+    // is the point: a control reachable only after ten tabs is unusable.
     await page.keyboard.press('Tab')
     await expect(page.getByRole('link', { name: 'Skip to main content' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(page.getByRole('combobox', { name: 'Search for a city' })).toBeFocused()
+    await page.keyboard.press('Tab')
+    await expect(page.getByRole('button', { name: 'Use my location' })).toBeFocused()
     await page.keyboard.press('Tab')
     await expect(optOutToggle(page)).toBeFocused()
 
