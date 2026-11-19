@@ -292,3 +292,17 @@ lists exactly the locale files in its directory and its `corpusSha256` aggregate
 files only. The run product records `gates.cleanGatedOn` and `gates.cleanSeals` as maps from
 locale to version and to seal. Import a holdout for chosen locales with
 `--import-holdout <dir> --holdout-version holdout-vN --locales pt[,xx]`.
+
+## V6 and v8 retirement after production tuning (2026-11-19)
+
+The owner decided on 2026-11-19 to cut the false holds of caption screening as far as the measured
+data allowed, with no drop in unsafe catch. The builder read the 30 withheld clean entries of the
+active holdouts (holdout-v6 for de, en, es, fr, it and tr; holdout-v8 for pt) and added allow rules
+in `apps/api/policies/community-screening/allow-list-v1.json` that clear only under their own
+declared locale. After review closed the bypasses a first draft opened, clean withheld fell from
+30 to 4 of 13,999 entries on the same holdouts, and the per-language disallowed fixtures stayed
+withheld at 1520 of 1520 with no bypass. Those are development measurements, not release evidence:
+having been tuned against, holdout-v6 and holdout-v8 are retired for every locale in
+`holdout-retirements.json`, and no holdout is eligible until a fresh one is authored, sealed and
+released under the v6 rules. The four remaining holds stay withheld because no rule separates
+their safe reading from an abusive one (`_bmad-output/test-artifacts/community-screening-retune-2026-11-19.md`).

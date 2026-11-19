@@ -28,6 +28,12 @@ const RISK_CLASS = {
 
 type Phase = 'loading' | 'ready' | 'failed'
 const REFRESH_ID = 'moderation-refresh'
+/**
+ * Screening holds are due 30 minutes after they are flagged (SCREENING_HOLD_SLA_MS), and SLA
+ * alerts are console-only, so an open console re-reads the first page every minute while the
+ * tab is visible. A list read writes no audit row; only opening a case does.
+ */
+export const MODERATION_QUEUE_AUTO_REFRESH_MS = 60_000
 
 /** Where focus goes after Load more: the first new case, else Refresh once the list has ended. */
 function focusTarget(
@@ -54,6 +60,9 @@ function useModerationQueue(filters: ModerationQueueFilters) {
   const itemsRef = useRef<ModerationCaseSummary[]>([])
   const countRef = useRef(0)
   countRef.current = items.length
+  // A moderator who paged with Load more keeps those pages: the automatic re-read would drop them.
+  const pagedRef = useRef(false)
+  const busyRef = useRef(false)
 
   const load = useCallback(
     async (next: ModerationQueueFilters, after: string | null, manual = false) => {
@@ -61,6 +70,7 @@ function useModerationQueue(filters: ModerationQueueFilters) {
       const controller = new AbortController()
       abortRef.current = controller
       const more = after !== null
+      busyRef.current = true
       if (more) setBusy('more')
       else if (manual) setBusy('refresh')
       try {
@@ -75,6 +85,8 @@ function useModerationQueue(filters: ModerationQueueFilters) {
         const added = page.items.filter((item) => !seen.has(item.caseId))
         itemsRef.current = [...base, ...added]
         setItems(itemsRef.current)
+        // Only a page that was appended holds the automatic re-read off; a failed Load more does not.
+        pagedRef.current = more
         // The first new row takes focus, so a Load more that vanished or disabled never strands it.
         // A page of only known cases that ends the list sends focus to Refresh, the next stable control.
         const target = more ? focusTarget(added, page.nextCursor) : null
@@ -106,7 +118,10 @@ function useModerationQueue(filters: ModerationQueueFilters) {
           setPhase('failed')
         }
       } finally {
-        if (!controller.signal.aborted) setBusy(null)
+        if (!controller.signal.aborted) {
+          busyRef.current = false
+          setBusy(null)
+        }
       }
     },
     []
@@ -123,6 +138,15 @@ function useModerationQueue(filters: ModerationQueueFilters) {
     setPhase('loading')
     void load(filters, null)
     return () => abortRef.current?.abort()
+  }, [filters, load])
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== 'visible' || busyRef.current || pagedRef.current)
+        return
+      void load(filters, null)
+    }, MODERATION_QUEUE_AUTO_REFRESH_MS)
+    return () => window.clearInterval(timer)
   }, [filters, load])
 
   return {

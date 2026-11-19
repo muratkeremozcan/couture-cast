@@ -414,9 +414,8 @@
   },
   "community": {
     "title": "Comunidade",
-    "heading": "Lookbook vivo da comunidade",
+    "heading": "Looks mais recentes",
     "sectionLabel": "Lookbook da comunidade",
-    "inspirations": "Inspirações da comunidade",
     "share": "Compartilhe seu look",
     "newPost": "Nova publicação",
     "deepLink": {
@@ -424,6 +423,7 @@
     },
     "filters": {
       "label": "Filtros da comunidade",
+      "explainer": "Os filtros de clima agrupam os looks pela previsão da semana no local salvo de quem os compartilha, de frio e úmido a quente e seco.",
       "announce": "Mostrando looks de {{filter}}.",
       "mode": {
         "auto": "Seu clima",
@@ -888,6 +888,7 @@
       "monitorStaleShort": "O monitor parou. Nenhum alerta está sendo enviado.",
       "monitorNever": "O monitor ainda não foi executado. Nenhum alerta está sendo enviado.",
       "channelWebhook": "Os alertas vão para o webhook de operações e aparecem nesta página.",
+      "channelPush": "Os alertas chegam aos dispositivos da moderação como notificação push e aparecem nesta página.",
       "channelConsole": "Nenhum webhook configurado: os alertas aparecem só nesta página e ninguém é avisado.",
       "queueTitle": "Casos abertos",
       "escalated": "Escalados",

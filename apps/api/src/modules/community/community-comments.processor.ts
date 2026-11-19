@@ -12,6 +12,7 @@ import { assertCommunityDatabaseAccess } from './community-access.service.js'
 import { PUBLICLY_VISIBLE_POST_WHERE } from './community.repository.js'
 import { commentAnalytics } from './community-comments.repository.js'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
+import { SCREENING_HOLD_SLA_MS } from '@couture/api-client/contracts/http'
 
 export interface StaleScreeningSelection {
   generation: number
@@ -241,7 +242,7 @@ export class CommunityCommentsProcessor {
         origin: 'screening',
         accepted_at: now,
         routed_at: now,
-        sla_due_at: new Date(now.getTime() + 86_400_000),
+        sla_due_at: new Date(now.getTime() + SCREENING_HOLD_SLA_MS),
         audit: { create: { action, reason, occurred_at: now } },
       },
     })

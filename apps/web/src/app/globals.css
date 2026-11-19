@@ -86,6 +86,71 @@
   --theme-card-border: rgba(47, 51, 61, 0.15);
 }
 
+/*
+ * Production feedback 2026-11-19: the lookbook (Home and /community) stayed white under a dark
+ * system setting while Wardrobe and Moderation follow it. The lookbook surface reads these tokens,
+ * and the Default system gets dark values below. A premium palette is a light design the member
+ * chose, so the lookbook keeps it, light surface included, whatever the system setting says.
+ * Every ink sits at 4.5:1 or more on both surfaces of its mode.
+ */
+:root {
+  --lookbook-surface: #ffffff;
+  --lookbook-surface-muted: #f5f5f7;
+  --lookbook-ink: #111111;
+  --lookbook-ink-soft: #36363d;
+  --lookbook-ink-muted: #5c5c66;
+  --lookbook-line: #e6e6ed;
+  --lookbook-gold-ink: #8a691f;
+  --lookbook-danger: #b91c1c;
+  /* Merlot as a foreground (an error, a flag, Withdraw); a Merlot fill under white text keeps
+     #7a1f2d in both modes. */
+  --lookbook-merlot-ink: #7a1f2d;
+  /* The ritual card's warm paper (Create my outfit card) and the share-card control's ink. */
+  --lookbook-cream: #f7f3e8;
+  --lookbook-cream-line: #d7c8a7;
+  --lookbook-cream-ink: #292724;
+}
+
+/*
+ * The `~=` match keeps these selectors out of the palette table that
+ * premium-theme-section.test.tsx parses from every `[data-theme=` rule. A new palette adds its
+ * own block above and its name here.
+ */
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme~='jewel_radiance']):not([data-theme~='autumn_umber']):not(
+      [data-theme~='winter_metallic']
+    ) {
+    --theme-primary: #f5f5f7;
+    --theme-card-bg: #1c1c21;
+    --theme-card-text: #f5f5f7;
+    --theme-card-border: rgba(245, 245, 247, 0.2);
+    --lookbook-surface: #121214;
+    --lookbook-surface-muted: #1c1c21;
+    --lookbook-ink: #f5f5f7;
+    --lookbook-ink-soft: #d4d4d8;
+    --lookbook-ink-muted: #a1a1aa;
+    --lookbook-line: #2e2e36;
+    --lookbook-gold-ink: #d9b75e;
+    --lookbook-danger: #f87171;
+    --lookbook-merlot-ink: #f0a3ae;
+    --lookbook-cream: #24211b;
+    --lookbook-cream-line: #4a4232;
+    --lookbook-cream-ink: #f5f0e3;
+  }
+
+  /*
+   * A light focus surface sits on a theme card, and the Default card is dark here. Native
+   * controls on it (a checkbox, the file picker, a scrollbar) follow the dark surface too.
+   */
+  html:not([data-theme~='jewel_radiance']):not([data-theme~='autumn_umber']):not(
+      [data-theme~='winter_metallic']
+    )
+    :is([data-focus-surface='light'], .lookbook-body) {
+    --focus-essential: #ffffff;
+    color-scheme: dark;
+  }
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
@@ -163,6 +228,9 @@ body {
  * A pending session is almost always a member's, so it holds the member actions' space without
  * showing them, and the page does not move when they appear (TEA R3). `guest-inline` marks a
  * signed-out link inside another section (the Community feed's), which keeps its own space.
+ * `refused-inline` marks the Sign in link of a stored session the API refused: the landing may
+ * still read that session as a member, so the link stays visible then, and hides only while the
+ * landing is pending.
  */
 html:not([data-session='member']):not([data-session='pending']) [data-landing='member'] {
   display: none !important;
@@ -175,6 +243,7 @@ html[data-session='pending'] [data-landing='guest'],
 html[data-session='member'] [data-landing='guest-inline'] {
   display: none !important;
 }
-html[data-session='pending'] [data-landing='guest-inline'] {
+html[data-session='pending'] [data-landing='guest-inline'],
+html[data-session='pending'] [data-landing='refused-inline'] {
   visibility: hidden;
 }

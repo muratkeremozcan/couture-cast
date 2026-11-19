@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 40: Community screening release gate and hosted worker.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
 // Story 6.2b, AC 5: the text screening measurement against the committed corpus.
@@ -15,20 +17,30 @@
 //   - disguised terms: at least 100 cases spanning every obfuscation family
 //     Story 6.2 AC 4 names, and none of them may reach `pass`.
 //
+// With no eligible holdout (production follow-up 2026-11-19: v6 and v8 were retired after the
+// allow list was tuned against them), the PR run is a development run: every gate that needs no
+// eligible holdout still runs and the retired holdout figures are measured and labelled
+// development, while a release run (COMMUNITY_SCREENING_RUN_PRODUCT_DIR set) refuses to start.
+//
 // It runs in the ordinary unit suite, so a term list or allow-list change that
 // starts flagging ordinary copy, or opens a bypass, fails the pull request that
 // made it. Failure messages carry case ids and reason codes and never the text
 // or a matched term, which keeps raw terms out of logs and evidence.
 import fs from 'node:fs'
+import os from 'node:os'
 import { createHash } from 'node:crypto'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   CLEAN_HOLDOUT_UPPER_BOUND_MAXIMUM,
   passesCleanHoldoutGate,
   wilsonInterval,
 } from './community-text-corpus-gate.js'
 import { assertLocaleFileSealed } from './community-text-holdout-eligibility.js'
+import {
+  parseActiveHoldout,
+  requireEligibleHoldout,
+} from './community-text-holdout-eligibility-core.mjs'
 import {
   assertVersionDirectorySealed,
   describeCleanGates,
@@ -51,9 +63,96 @@ async function currentInputSetHash(): Promise<string> {
 }
 
 const corpusDir = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
-// Each locale names its own active holdout version; every one must be eligible for that
-// locale with a registered seal before any corpus file is read.
-const { holdouts, manifests } = loadActiveHoldouts(corpusDir)
+
+/** Set by the release command that writes the run product. */
+const RELEASE_RUN = Boolean(process.env.COMMUNITY_SCREENING_RUN_PRODUCT_DIR?.trim())
+
+type ActiveHoldouts = ReturnType<typeof loadActiveHoldouts>
+
+const readJson = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'))
+
+/**
+ * Classifies every selected locale/version pair from the selector and the ledger alone, before
+ * any version-specific file (freeze manifest or caption rows) is read. `retired` means every pair
+ * carries an explicit retirement for its locale; `none-retired` hands the selection to the strict
+ * loader, which still refuses an unclassified pair. A retired pair beside an eligible or
+ * unclassified one is refused here, so a fresh cohort cannot be opened as development data.
+ */
+function classifySelection(
+  active: Record<string, string>,
+  ledger: unknown
+): 'retired' | 'none-retired' {
+  const retired: string[] = []
+  const notRetired: string[] = []
+  for (const [locale, version] of Object.entries(active)) {
+    try {
+      requireEligibleHoldout(version, ledger, locale)
+      notRetired.push(`${locale} ${version} is eligible`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (message.includes(`${version} is retired for ${locale}`)) retired.push(locale)
+      else notRetired.push(`${locale}: ${message}`)
+    }
+  }
+  if (retired.length === 0) return 'none-retired'
+  if (notRetired.length > 0)
+    throw new Error(
+      `a development corpus run needs every selected holdout retired; ${notRetired.join('; ')}`
+    )
+  return 'retired'
+}
+
+/** The seal a retired version's own freeze manifest records, checked against the selector. */
+function developmentSeal(version: string, manifest: unknown) {
+  const { corpusVersion, sealedAt, corpusSha256 } = (manifest ?? {}) as Record<
+    string,
+    unknown
+  >
+  if (corpusVersion !== version)
+    throw new Error(`freeze manifest of ${version} names ${String(corpusVersion)}`)
+  if (typeof sealedAt !== 'string' || Number.isNaN(Date.parse(sealedAt)))
+    throw new Error(`freeze manifest of ${version} has no valid sealedAt`)
+  if (typeof corpusSha256 !== 'string' || !/^[0-9a-f]{64}$/.test(corpusSha256))
+    throw new Error(`freeze manifest of ${version} has no valid corpusSha256`)
+  return { corpusVersion: version, sealedAt, corpusSha256 }
+}
+
+/**
+ * Each locale names its own active holdout version. The whole selection is classified first.
+ * When none is retired, the strict loader gates every locale on an eligible, sealed version, as a
+ * release run requires. When every pair is retired, a release run refuses and a PR run reads the
+ * retired holdouts as development data: each version's own manifest identity is checked, and the
+ * existing hash checks cover the contents. A mixed selection refuses before reading any manifest.
+ */
+function loadHoldoutsForRun(
+  release: boolean,
+  dir = corpusDir
+): ActiveHoldouts & { development: boolean } {
+  const active = parseActiveHoldout(readJson(path.join(dir, 'active-holdout.json')))
+  const ledger = readJson(path.join(dir, 'holdout-retirements.json'))
+  if (classifySelection(active, ledger) === 'none-retired' || release)
+    return { ...loadActiveHoldouts(dir), development: false }
+  const manifests: ActiveHoldouts['manifests'] = new Map()
+  const holdouts: ActiveHoldouts['holdouts'] = {}
+  for (const [locale, version] of Object.entries(active)) {
+    if (!manifests.has(version)) {
+      manifests.set(
+        version,
+        readJson(path.join(dir, version, 'freeze-manifest.json')) as Parameters<
+          typeof assertVersionDirectorySealed
+        >[2]
+      )
+    }
+    holdouts[locale] = { version, seal: developmentSeal(version, manifests.get(version)) }
+  }
+  return { holdouts, manifests, development: true }
+}
+
+const {
+  holdouts,
+  manifests,
+  development: DEVELOPMENT_RUN,
+} = loadHoldoutsForRun(RELEASE_RUN)
 const holdoutVersion = (language: string): string => holdouts[language]?.version ?? ''
 const holdoutPath = (language: string): string =>
   path.join(corpusDir, holdoutVersion(language), `${language}.json`)
@@ -217,9 +316,6 @@ function evaluateLanguage(language: string): LanguageResult {
   }
 }
 
-/** Set by the release command that writes the run product. */
-const RELEASE_RUN = Boolean(process.env.COMMUNITY_SCREENING_RUN_PRODUCT_DIR?.trim())
-
 const languages = Object.keys(LANGUAGE_LOCALE)
 const results = new Map(
   languages.map((language) => [language, evaluateLanguage(language)])
@@ -324,6 +420,182 @@ describe.each(languages)('text corpus: %s', (language) => {
 
   it('withholds every disguised term, whatever the obfuscation family', () => {
     expect(result.disallowed.bypassIds).toEqual([])
+  })
+})
+
+describe('development run while no holdout is eligible', () => {
+  it.runIf(DEVELOPMENT_RUN)('refuses a release run on the same selector', () => {
+    expect(() => loadHoldoutsForRun(true)).toThrow(/is retired for [a-z]{2}/)
+  })
+
+  // The rules were tuned against these entries, so a Wilson bound on them would not estimate
+  // new captions. The figures are the observed held count over the denominator, per locale; the
+  // Wilson release gate is reserved for a fresh, eligible holdout. They go to the job log and,
+  // when the PR step names a directory, to a development artifact the completeness check reads.
+  it.runIf(DEVELOPMENT_RUN)(
+    'reports the held count and denominator of each retired holdout as development data',
+    () => {
+      const figures = Object.fromEntries(
+        languages.map((language) => {
+          const { clean } = results.get(language) as LanguageResult
+          expect(clean.total, language).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
+          return [
+            language,
+            {
+              version: holdoutVersion(language),
+              held: clean.withheld,
+              total: clean.total,
+            },
+          ]
+        })
+      )
+      process.stdout.write(
+        `community text corpus, development data, not release evidence: ${Object.entries(
+          figures
+        )
+          .map(([language, f]) => `${language} ${f.version} held ${f.held} of ${f.total}`)
+          .join('; ')}\n`
+      )
+      const dir = process.env.COMMUNITY_SCREENING_DEVELOPMENT_DIR?.trim()
+      if (!dir) return
+      fs.mkdirSync(dir, { recursive: true })
+      const file = path.join(dir, 'text-corpus-development.json')
+      fs.writeFileSync(
+        file,
+        `${JSON.stringify({ kind: 'development', measuredAt: new Date().toISOString(), languages: figures }, null, 2)}\n`
+      )
+      expect(Object.keys((readJson(file) as { languages: object }).languages)).toEqual(
+        languages
+      )
+    }
+  )
+})
+
+describe('development selection classification', () => {
+  const seal = (version: string, locales: string[]) => ({
+    corpusVersion: version,
+    sealedAt: '2026-11-19T00:00:00.000Z',
+    corpusSha256: 'c'.repeat(64),
+    locales,
+  })
+  const retiredFor = (locales: string[]) => ({ locales, reason: 'tuned against' })
+  const ledger = (
+    eligible: Record<string, unknown>,
+    retired: Record<string, unknown>
+  ) => ({
+    schemaVersion: 3,
+    eligible,
+    retired,
+  })
+
+  it('classifies a selection whose every pair is retired for its locale as retired', () => {
+    expect(
+      classifySelection(
+        { de: 'holdout-v90', pt: 'holdout-v91' },
+        ledger(
+          {},
+          { 'holdout-v90': retiredFor(['de']), 'holdout-v91': retiredFor(['pt']) }
+        )
+      )
+    ).toBe('retired')
+  })
+
+  it('hands a selection with no retired pair to the strict loader', () => {
+    expect(
+      classifySelection(
+        { de: 'holdout-v90' },
+        ledger({ 'holdout-v90': seal('holdout-v90', ['de']) }, {})
+      )
+    ).toBe('none-retired')
+  })
+
+  it('refuses a retired pair beside an unclassified one', () => {
+    expect(() =>
+      classifySelection(
+        { de: 'holdout-v90', pt: 'holdout-v91' },
+        ledger({}, { 'holdout-v90': retiredFor(['de']) })
+      )
+    ).toThrow(/every selected holdout retired; pt: /)
+  })
+
+  it('refuses a retired pair beside an eligible fresh cohort', () => {
+    expect(() =>
+      classifySelection(
+        { de: 'holdout-v90', pt: 'holdout-v91' },
+        ledger(
+          { 'holdout-v91': seal('holdout-v91', ['pt']) },
+          { 'holdout-v90': retiredFor(['de']) }
+        )
+      )
+    ).toThrow(/pt holdout-v91 is eligible/)
+  })
+
+  it('refuses a version retired only for another locale', () => {
+    expect(() =>
+      classifySelection(
+        { de: 'holdout-v90', pt: 'holdout-v90' },
+        ledger({}, { 'holdout-v90': retiredFor(['de']) })
+      )
+    ).toThrow(/every selected holdout retired; pt: /)
+  })
+
+  it('refuses a mixed selection before reading any freeze manifest', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'holdout-mixed-'))
+    try {
+      const others = ['en', 'es', 'fr', 'it', 'pt', 'tr']
+      fs.writeFileSync(
+        path.join(dir, 'active-holdout.json'),
+        JSON.stringify({
+          schemaVersion: 2,
+          locales: {
+            de: 'holdout-v91',
+            ...Object.fromEntries(others.map((locale) => [locale, 'holdout-v90'])),
+          },
+        })
+      )
+      fs.writeFileSync(
+        path.join(dir, 'holdout-retirements.json'),
+        JSON.stringify(
+          ledger(
+            { 'holdout-v91': seal('holdout-v91', ['de']) },
+            { 'holdout-v90': retiredFor(others) }
+          )
+        )
+      )
+      const reads = vi.spyOn(fs, 'readFileSync')
+      expect(() => loadHoldoutsForRun(false, dir)).toThrow(/de holdout-v91 is eligible/)
+      expect(reads.mock.calls.map(([file]) => String(file))).toEqual([
+        path.join(dir, 'active-holdout.json'),
+        path.join(dir, 'holdout-retirements.json'),
+      ])
+      reads.mockRestore()
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it.each([
+    [
+      'another version',
+      {
+        corpusVersion: 'holdout-v999',
+        sealedAt: '2026-10-28T00:00:00Z',
+        corpusSha256: 'a'.repeat(64),
+      },
+      /names holdout-v999/,
+    ],
+    [
+      'no seal time',
+      { corpusVersion: 'holdout-v90', corpusSha256: 'a'.repeat(64) },
+      /no valid sealedAt/,
+    ],
+    [
+      'no aggregate hash',
+      { corpusVersion: 'holdout-v90', sealedAt: '2026-10-28T00:00:00Z' },
+      /no valid corpusSha256/,
+    ],
+  ])('refuses a retired manifest with %s', (_case, manifest, error) => {
+    expect(() => developmentSeal('holdout-v90', manifest)).toThrow(error)
   })
 })
 

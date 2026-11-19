@@ -14,6 +14,7 @@ Updated: 2026-11-13 (Story 6.15 Step 0): release hold, Test Store isolation, deb
 Updated: 2026-11-12 (preview deployments): branch pushes create no Vercel deployment; CI creates or reuses a preview only when the preview checks need it.
 Updated: 2026-11-11 (production analytics): PostHog project map, privacy policy, post-merge key step.
 Updated: 2026-11-16 (Vercel Hobby limits): one build input map, production builds skipped when unchanged, previews reused across branches, E2E asset cache.
+Updated: 2026-11-19: Community Beta opened in production; community and moderation flags pinned at 100 percent.
 Updated: 2026-10-16 - preview readiness wait shared by PR and manual e2e, resolvers poll for the
 expected commit, prod waits on both health SHAs, preview runs have no database secret, CI Supabase
 pulls from ghcr.io.
@@ -1301,8 +1302,11 @@ Follow the rollout and rollback steps in the [moderation SLA runbook](./moderati
     Current custom queue/cache/realtime/database dashboards are placeholders rather than live
     operational signals. The moderation SLA dashboard has real metrics locally, and its hosted
     panels stay empty because neither hosted runtime starts the OpenTelemetry SDK.
-11. **No moderation alert reaches a person in production yet.** `MODERATION_OPS_WEBHOOK_URL` has no
-    production destination, so alerts stop at `/moderation/sla` (Story 6.12 D8). The owner signed off
+11. **Moderation alerts can reach moderators by push.** `MODERATION_OPS_WEBHOOK_URL` has no
+    production destination. Since 2026-11-19 the sweep can push alerts to the devices of the
+    accounts in `MODERATION_OPS_PUSH_USER_IDS` on the community worker (see the moderation SLA
+    runbook). With neither set, alerts stay console only; with no granted device they fail as
+    `invalid_config`. No hosted drill or device delivery is recorded here yet. The owner signed off
     staffing on 2026-11-05, and no roster or schedule exists
     ([gate record](../test-artifacts/community-beta-gate-signatures.md)).
 

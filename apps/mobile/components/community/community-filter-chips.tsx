@@ -51,6 +51,14 @@ export function CommunityFilterChips({
         { backgroundColor: palette.background, borderBottomColor: palette.divider },
       ]}
     >
+      {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
+          climate band and nothing said what a band is, so one line above them does. */}
+      <Text
+        testID="community-filters-explainer"
+        style={[styles.explainer, { color: palette.mutedText }]}
+      >
+        {t('community.filters.explainer')}
+      </Text>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -124,6 +132,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     paddingVertical: 10,
     zIndex: 10,
+  },
+  explainer: {
+    fontSize: 13,
+    lineHeight: 18,
+    paddingHorizontal: 16,
+    paddingBottom: 8,
   },
   scrollContent: {
     paddingHorizontal: 16,

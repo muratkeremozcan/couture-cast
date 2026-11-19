@@ -74,12 +74,12 @@ export function RitualShareCardLauncher() {
   const selected = outfits.find((outfit) => outfit.scenario === scenario)
   return (
     <div
-      className="rounded-lg border border-[#D7C8A7] bg-[#F7F3E8] p-4"
+      className="rounded-lg border border-[color:var(--lookbook-cream-line)] bg-[var(--lookbook-cream)] p-4 text-[color:var(--lookbook-cream-ink)]"
       data-testid="ritual-share-card-launcher"
     >
       <button
         type="button"
-        className="min-h-[44px] text-sm font-semibold text-[#292724]"
+        className="min-h-[44px] text-sm font-semibold text-[color:var(--lookbook-cream-ink)]"
         disabled={busy}
         onClick={() => void activate()}
       >
@@ -91,7 +91,7 @@ export function RitualShareCardLauncher() {
           <label className="text-sm">
             {t('shareCard.sourceOutfit')}
             <select
-              className="ml-2 min-h-[44px] rounded bg-white px-3"
+              className="ml-2 min-h-[44px] rounded bg-[var(--lookbook-surface)] px-3"
               value={scenario}
               onChange={(event) => setScenario(event.target.value)}
             >

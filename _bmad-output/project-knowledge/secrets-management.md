@@ -79,6 +79,7 @@ rerunning pre-fix workflow runs.
 It belongs on the worker that runs the SLA sweep, and in `.env.prod` when set.
 A webhook URL is its own credential, so treat it like a key: it appears in no log, row or error.
 Rotate it by creating a new webhook at the destination, replacing the value, restarting the worker and running `npm run moderation:sla:drill`.
+`MODERATION_OPS_PUSH_USER_IDS` names the moderator accounts whose devices receive SLA alerts by Expo push when no webhook is set. Account ids are not secrets; set the value on the community worker.
 See the [moderation SLA runbook](./moderation-sla-runbook.md).
 
 ## Affiliate partner secrets (story 5.1)

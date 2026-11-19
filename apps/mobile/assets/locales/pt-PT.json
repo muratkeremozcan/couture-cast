@@ -605,9 +605,8 @@
   },
   "community": {
     "title": "Comunidade",
-    "heading": "Álbum vivo de visuais da comunidade",
+    "heading": "Visuais mais recentes",
     "sectionLabel": "Álbum de visuais da comunidade",
-    "inspirations": "Inspirações da comunidade",
     "share": "Partilhe o seu visual",
     "newPost": "Nova publicação",
     "deepLink": {
@@ -615,6 +614,7 @@
     },
     "filters": {
       "label": "Filtros da comunidade",
+      "explainer": "Os filtros de clima agrupam os visuais pela previsão da semana no local guardado de quem os partilha, de frio e húmido a quente e seco.",
       "announce": "A mostrar visuais de {{filter}}.",
       "mode": {
         "auto": "O seu clima",

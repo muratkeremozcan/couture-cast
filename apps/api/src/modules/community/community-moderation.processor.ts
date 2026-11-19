@@ -14,7 +14,7 @@ import {
 import {
   COMMUNITY_BAN_MARKER_PREFIX,
   communityImageValidationCodeSchema,
-  SLA_DURATION_MS,
+  SCREENING_HOLD_SLA_MS,
 } from '@couture/api-client/contracts/http'
 import {
   PrismaClient,
@@ -73,7 +73,7 @@ export const MODERATION_SCREENING_TIMEOUT_MS = 30_000
 
 /** Minutes an operator has to see a flagged post, per the moderation SLA. */
 const FLAGGED_ALERT_SLA_MINUTES = 5
-const FLAGGED_REVIEW_SLA_HOURS = 24
+const FLAGGED_REVIEW_SLA_MINUTES = SCREENING_HOLD_SLA_MS / 60_000
 
 /**
  * Which BullMQ attempt is executing, so a metric and an evidence line can tell a
@@ -737,7 +737,7 @@ export class CommunityModerationProcessor {
             content_snapshot: buildCommunityContentSnapshot(post, flaggedAt),
             subject_alias: alias?.alias ?? null,
             image_object_path: post.image_object_path,
-            sla_due_at: new Date(flaggedAt.getTime() + SLA_DURATION_MS),
+            sla_due_at: new Date(flaggedAt.getTime() + SCREENING_HOLD_SLA_MS),
             created_at: flaggedAt,
           },
         })
@@ -775,7 +775,7 @@ export class CommunityModerationProcessor {
         },
         flaggedAt: flaggedAt.toISOString(),
         slaTargetMinutes: FLAGGED_ALERT_SLA_MINUTES,
-        slaReviewDeadlineHours: FLAGGED_REVIEW_SLA_HOURS,
+        slaReviewDeadlineMinutes: FLAGGED_REVIEW_SLA_MINUTES,
       },
       'Post flagged by automated content screening; moderation queue 5-minute SLA alert recorded'
     )

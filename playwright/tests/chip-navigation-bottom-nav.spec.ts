@@ -1,9 +1,17 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.6 Task 6 step 1 owner: E2E test sticky bottom nav viewport visibility, chip keyboard navigation, and reduced motion in `playwright/tests/chip-navigation-bottom-nav.spec.ts`
-import { communityTest as test, expect } from '../support/helpers/community-session'
+import enUS from '../../apps/web/src/i18n/locales/en-US.json'
+import {
+  communityTest as test,
+  completedCommunityFeed,
+  expect,
+  expectCommunityFeedLoaded,
+} from '../support/helpers/community-session'
 
 /**
  * This file asserts the chip's effect on `data-chip-category`, which lives on
@@ -88,9 +96,13 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
       const top = element.getBoundingClientRect().top + window.scrollY
       window.scrollTo(0, top + 200)
     })
+    // Values wrapped in objects: recurse rejects a falsy final value, and a bar
+    // stuck flush to the top reports exactly `y === 0`.
+    // Stuck means flush with the top. `y <= 1` also accepted a bar scrolled
+    // 200 px off screen (Codex review 8).
     await recurse(
-      async () => (await chipBar.boundingBox())?.y,
-      (y) => y !== undefined && y <= 1
+      async () => ({ y: (await chipBar.boundingBox())?.y }),
+      ({ y }) => y !== undefined && Math.abs(y) <= 1
     )
 
     // Story 6.1 renamed this landmark: its `aria-label` is
@@ -99,16 +111,27 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     const lookbookFilters = page.getByRole('navigation', {
       name: 'Community filters',
     })
+    // The filter nav lives in the Community Section, well below the hero. Scroll
+    // it just past the point where it meets the chip bar, so it is inside its
+    // sticking interval, then it must sit flush under the bar: `delta >= 0` alone
+    // accepted a 674 px gap (Codex review 8). Only 20 px past, not more: this
+    // spec reads as a guest, whose short feed ends about 210 px below the nav,
+    // and a sticky nav releases once its section's end scrolls past it.
+    const chipHeight = (await chipBar.boundingBox())?.height ?? 0
+    await lookbookFilters.evaluate((element, stickTop) => {
+      const top = element.getBoundingClientRect().top + window.scrollY
+      window.scrollTo(0, top - stickTop + 20)
+    }, chipHeight)
     await recurse(
       async () => {
         const chipBox = await chipBar.boundingBox()
         const filterBox = await lookbookFilters.boundingBox()
         if (!chipBox || !filterBox) {
-          return -1
+          return { chipTop: Number.NaN, delta: Number.NaN }
         }
-        return filterBox.y - (chipBox.y + chipBox.height)
+        return { chipTop: chipBox.y, delta: filterBox.y - (chipBox.y + chipBox.height) }
       },
-      (delta) => delta >= 0
+      ({ chipTop, delta }) => Math.abs(chipTop) <= 1 && Math.abs(delta) <= 1
     )
 
     await communityChip.click()
@@ -218,6 +241,90 @@ test.describe('Chip Navigation & Sticky Bottom Nav (Story 3.6)', () => {
     // way.
     await page.keyboard.press('Tab')
     await expect(page.locator(':focus')).not.toHaveAttribute('data-testid', /chip-/)
+  })
+
+  /*
+   * Production follow-up after the project close (2026-11-19). A tester on Android
+   * Chrome (448 px) tapped the Community tab four times and reported "community is
+   * empty": `/community` was still the Story 3.6 placeholder, a dark page holding
+   * only the word "Community", while the lookbook lived on Home alone. This walks
+   * her path: Home, tap the bottom-nav Community tab, and expect the lookbook
+   * itself, with the renamed heading, the climate explainer and a loaded feed.
+   */
+  test('3.6-E2E-007: the bottom-nav Community tab opens the community lookbook on a phone', async ({
+    page,
+    communitySession,
+  }) => {
+    expect(communitySession.userId).toBeTruthy()
+    await page.setViewportSize({ width: 448, height: 900 })
+    await page.goto('/')
+
+    // No response listener here: Home can start a second feed read that lands
+    // after the tap, and its body is gone once the page navigates, so a listener
+    // could bind to Home's read and fail. The looks rendered inside the
+    // Community page are the proof, and the network monitor fails any 4xx/5xx.
+    await page.getByTestId('bottom-nav-community').click()
+    await expect(page).toHaveURL('/community')
+    await expect(page.getByTestId('bottom-nav-community')).toHaveAttribute(
+      'aria-current',
+      'page'
+    )
+
+    const communityPage = page.getByTestId('community-page')
+    await expect(communityPage.getByRole('heading', { level: 1 })).toHaveText('Community')
+
+    const filters = communityPage.getByRole('navigation', { name: 'Community filters' })
+    await expect(filters.getByRole('heading', { level: 2 })).toHaveText('Latest looks')
+    const explainer = filters.getByTestId('community-filters-explainer')
+    await expect(explainer).toHaveText(enUS.community.filters.explainer)
+    await expect(filters).toHaveAccessibleDescription(enUS.community.filters.explainer)
+    await expect(filters.getByTestId('community-filter-cold_wet')).toHaveText(
+      'Cold and wet'
+    )
+
+    // A real card inside the card grid; the loading skeletons sit outside it.
+    await expectCommunityFeedLoaded(page, communityPage)
+    await expect(communityPage.getByTestId('community-feed-empty')).toHaveCount(0)
+  })
+
+  /*
+   * Two layout guarantees of the new `/community` page that only a real browser
+   * shows. The bottom nav hides from 768 px, so a desktop reader needs the brand
+   * link back to Home. And `/community` has no chip bar above the filters, so the
+   * sticky filter nav must pin flush to the top of the viewport: offset by the
+   * chip bar height it would float with a gap, and inside an `overflow-x-hidden`
+   * wrapper it would stick to that wrapper and scroll away with the feed.
+   */
+  test('3.6-E2E-008: /community pins its filters to the top and links back to Home on desktop', async ({
+    page,
+    communitySession,
+    recurse,
+  }) => {
+    expect(communitySession.userId).toBeTruthy()
+    await page.setViewportSize({ width: 448, height: 900 })
+    const feedOnCommunity = completedCommunityFeed(page)
+    await page.goto('/community')
+    expect((await feedOnCommunity).status).toBe(200)
+    await expectCommunityFeedLoaded(page)
+
+    const filters = page
+      .getByTestId('community-page')
+      .getByRole('navigation', { name: 'Community filters' })
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+    // Wrapped in an object: recurse rejects a falsy final value, and a nav pinned
+    // flush to the top reports exactly `y === 0`.
+    await recurse(
+      async () => ({ y: (await filters.boundingBox())?.y }),
+      ({ y }) => y !== undefined && Math.abs(y) <= 1
+    )
+    await expect(filters).toBeInViewport()
+
+    await page.setViewportSize({ width: 1280, height: 800 })
+    await expect(page.getByTestId('sticky-bottom-nav')).toBeHidden()
+    const home = page.getByTestId('community-page-home-link')
+    await expect(home).toBeVisible()
+    await home.click()
+    await expect(page).toHaveURL('/')
   })
 
   test('3.6-E2E-004: respects prefers-reduced-motion media feature', async ({ page }) => {

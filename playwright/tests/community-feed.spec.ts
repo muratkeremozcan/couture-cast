@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-38-community-feed-by-climate-band
 //
@@ -60,10 +62,12 @@ const test = communityTest.extend<{ ownLook: { postId: string; caption: string }
 })
 
 /*
- * The community grid lives on the Lookbook Prism home page, inside its "Community
- * Section" region. `/community` is the mobile-destination stub
- * (`apps/web/src/app/components/mobile-destination-page.tsx`) and renders only an
- * `h1`, so a spec pointed there finds nothing and looks broken.
+ * The community grid renders in two places: the Lookbook Prism home page, inside
+ * its "Community Section" region, and the bottom-nav `/community` page (since the
+ * 2026-11-19 production follow-up; it was an `h1`-only placeholder before). These
+ * specs stay on Home, the denser page, where the grid shares the screen with the
+ * hero chips and the planner rail. `chip-navigation-bottom-nav.spec.ts` 3.6-E2E-007
+ * covers `/community` itself.
  */
 const COMMUNITY_ROUTE = '/'
 

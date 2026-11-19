@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 // Learning path Step 40: Community screening release gate and hosted worker.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-40-community-screening-release-gate-and-hosted-worker
@@ -622,7 +624,7 @@ describe('CommunityModerationProcessor & Worker', () => {
         (mockPostReportCreate.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
           .data
 
-      it('writes one screening report with a null reporter, the snapshot, the path and a 24-hour due time', async () => {
+      it('writes one screening report with a null reporter, the snapshot, the path and a 30-minute due time', async () => {
         mockFindUnique.mockResolvedValue(flaggedPost())
         await flagging().process({ postId: 'post-intake', uploadSessionId: 'session-i' })
 
@@ -643,7 +645,9 @@ describe('CommunityModerationProcessor & Worker', () => {
         })
         const createdAt = data.created_at as Date
         const dueAt = data.sla_due_at as Date
-        expect(dueAt.getTime() - createdAt.getTime()).toBe(24 * 3_600_000)
+        // Owner ruling 2026-11-19: a screening hold is due 30 minutes after it is flagged (it was
+        // 24 hours). A literal, not SCREENING_HOLD_SLA_MS, so the contract cannot drift unseen.
+        expect(dueAt.getTime() - createdAt.getTime()).toBe(30 * 60_000)
       })
 
       it('copies an existing alias and creates none', async () => {

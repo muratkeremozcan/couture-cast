@@ -6,18 +6,13 @@ import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
-import type { ClimateBand } from '@couture/api-client/contracts/http'
 import posthog from 'posthog-js'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getGuestPreviewStrings } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
-import {
-  CommunityLookbookGrid,
-  LookbookFilterNav,
-  type FilterCategory,
-} from './community-lookbook-grid'
+import { CommunityLookbookGrid, type FilterCategory } from './community-lookbook-grid'
 import { PlannerRail } from './planner-rail'
 import { ChipNavigation, type ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
@@ -203,16 +198,6 @@ export function LookbookPrismLayout() {
   const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('auto')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
-  // The grid is the only thing on this page that sees the feed response, and
-  // this slot renders a second `LookbookFilterNav` from the same filter state.
-  // Without lifting the resolved band, the two navs answer "which climate am I
-  // seeing" differently: the grid's names the band, this one says "Your climate".
-  const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
-  // Same reason as `viewerBand`, for `mode`: the experiment can serve `all` to a
-  // viewer who requested `auto`, and without this the two navs would disagree
-  // about which chip is pressed. `null` until the grid's first response lands,
-  // so this nav starts by mirroring the click like the grid itself does.
-  const [servedMode, setServedMode] = useState<FilterCategory | null>(null)
   const [communityBanned, setCommunityBanned] = useState(false)
 
   // Deep Link & Notification States
@@ -348,19 +333,19 @@ export function LookbookPrismLayout() {
       ref={containerRef}
       data-focus-surface="light"
       data-testid="lookbook-prism-container"
-      className={`lookbook-body relative w-full bg-[#FFFFFF] text-[#111111] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
+      className={`lookbook-body relative w-full bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)] motion-safe:transition-[max-width,box-shadow] motion-safe:duration-300 motion-reduce:transition-none ${
         isMobilePreview
-          ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-[32px] border-4 border-[#111111] bg-[#FFFFFF] p-4 shadow-2xl'
+          ? 'my-6 mx-auto max-h-[812px] max-w-[375px] overflow-x-hidden overflow-y-auto rounded-[32px] border-4 border-[#111111] bg-[var(--lookbook-surface)] p-4 shadow-2xl'
           : 'mx-auto max-w-[1440px] px-4 py-8 sm:px-6'
       }`}
     >
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <span className="lookbook-metrics text-xs uppercase tracking-[0.3em] text-[#8A691F]">
+          <span className="lookbook-metrics text-xs uppercase tracking-[0.3em] text-[color:var(--lookbook-gold-ink)]">
             Lookbook Prism
           </span>
           <h2
-            className={`lookbook-display font-semibold tracking-tight text-[#111111] ${
+            className={`lookbook-display font-semibold tracking-tight text-[color:var(--lookbook-ink)] ${
               isMobilePreview ? 'text-3xl' : 'text-3xl sm:text-4xl'
             }`}
           >
@@ -379,7 +364,7 @@ export function LookbookPrismLayout() {
             plannerOpenerRef.current = event.currentTarget
             setIsPlannerRailOpen(true)
           }}
-          className="min-h-[44px] rounded-lg border border-[#C9A14A] bg-[#FFFFFF] px-4 py-2 text-sm font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
+          className="min-h-[44px] rounded-lg border border-[#C9A14A] bg-[var(--lookbook-surface)] px-4 py-2 text-sm font-semibold text-[color:var(--lookbook-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A]"
         >
           {i18n.t('commerce.premium.planner.openControl')}
         </button>
@@ -472,7 +457,7 @@ export function LookbookPrismLayout() {
           aria-label="Hero Ritual Canvas"
           // Focusable from code, so focus has somewhere to land when the teaser leaves.
           tabIndex={-1}
-          className={`flex min-w-0 self-start flex-col gap-6 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
+          className={`flex min-w-0 self-start flex-col gap-6 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] p-6 shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
             isMobilePreview ? '' : 'sm:p-8'
           }`}
         >
@@ -480,11 +465,11 @@ export function LookbookPrismLayout() {
             <h2
               tabIndex={-1}
               data-share-card-focus-fallback="hero"
-              className="lookbook-metrics text-xs uppercase tracking-widest text-[#8A691F]"
+              className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--lookbook-gold-ink)]"
             >
               Daily Hero Ritual
             </h2>
-            <span className="lookbook-metrics rounded-full border border-[#E6E6ED] bg-[#FFFFFF] px-3 py-1 text-xs text-[#111111]">
+            <span className="lookbook-metrics rounded-full border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] px-3 py-1 text-xs text-[color:var(--lookbook-ink)]">
               08:30 AM • NYC
             </span>
           </div>
@@ -493,33 +478,27 @@ export function LookbookPrismLayout() {
 
           {/* Weather Numerical Banner */}
           <div className="flex items-baseline gap-4">
-            <span className="lookbook-metrics text-5xl font-bold text-[#111111]">
+            <span className="lookbook-metrics text-5xl font-bold text-[color:var(--lookbook-ink)]">
               18°C
             </span>
             <div className="space-y-1">
-              <p className="text-sm font-semibold text-[#111111]">Mild Humidity • 65%</p>
-              <p className="lookbook-metrics text-xs text-[#5C5C66]">
+              <p className="text-sm font-semibold text-[color:var(--lookbook-ink)]">
+                Mild Humidity • 65%
+              </p>
+              <p className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
                 +3°C from yesterday commute
               </p>
             </div>
           </div>
 
-          <LookbookFilterNav
-            activeTab={servedMode ?? activeTab}
-            isMobilePreview={isMobilePreview}
-            onTabChange={setActiveTab}
-            viewerBand={viewerBand}
-            closed={communityBanned}
-          />
-
           {/* Outfit Tiles */}
           <div className="space-y-4">
-            <h3 className="lookbook-display text-xl font-semibold text-[#111111]">
+            <h3 className="lookbook-display text-xl font-semibold text-[color:var(--lookbook-ink)]">
               Primary Recommended Look
               {/* Story 6.16 D9: this hero is a demonstration, never a visitor's result. */}
               <span
                 data-testid="hero-example-label"
-                className="lookbook-metrics ml-3 rounded-full border border-[#C9A14A] px-2 py-0.5 align-middle text-[11px] uppercase text-[#8A691F]"
+                className="lookbook-metrics ml-3 rounded-full border border-[#C9A14A] px-2 py-0.5 align-middle text-[11px] uppercase text-[color:var(--lookbook-gold-ink)]"
               >
                 {getGuestPreviewStrings(i18n.language).chrome.exampleLabel}
               </span>
@@ -535,32 +514,32 @@ export function LookbookPrismLayout() {
             >
               {!isComparisonMode ? (
                 // Single Primary Card
-                <div className="group rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
+                <div className="group rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-6 motion-safe:transition-colors motion-safe:duration-300 motion-safe:hover:border-[#C9A14A] motion-reduce:transition-none">
                   <div className="mb-4 flex items-center justify-between">
-                    <span className="lookbook-metrics text-xs uppercase text-[#8A691F]">
+                    <span className="lookbook-metrics text-xs uppercase text-[color:var(--lookbook-gold-ink)]">
                       {heroRecommendation.eyebrow}
                     </span>
-                    <span className="lookbook-metrics text-xs text-[#5C5C66]">
+                    <span className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]">
                       Match Score: {heroRecommendation.score}
                     </span>
                   </div>
                   <h4
                     data-testid="hero-recommendation-title"
-                    className="lookbook-display mb-2 text-lg font-semibold text-[#111111]"
+                    className="lookbook-display mb-2 text-lg font-semibold text-[color:var(--lookbook-ink)]"
                   >
                     {heroRecommendation.title}
                   </h4>
-                  <p className="mb-4 text-xs leading-relaxed text-[#36363D]">
+                  <p className="mb-4 text-xs leading-relaxed text-[color:var(--lookbook-ink-soft)]">
                     {heroRecommendation.description}
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <span className="lookbook-metrics rounded-md border border-[#E6E6ED] bg-[#F5F5F7] px-2.5 py-1 text-[11px] text-[#36363D]">
+                    <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
                       Onyx Blazer
                     </span>
-                    <span className="lookbook-metrics rounded-md border border-[#E6E6ED] bg-[#F5F5F7] px-2.5 py-1 text-[11px] text-[#36363D]">
+                    <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
                       Merlot Silk Scarf
                     </span>
-                    <span className="lookbook-metrics rounded-md border border-[#E6E6ED] bg-[#F5F5F7] px-2.5 py-1 text-[11px] text-[#36363D]">
+                    <span className="lookbook-metrics rounded-md border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] px-2.5 py-1 text-[11px] text-[color:var(--lookbook-ink-soft)]">
                       Leather Loafers
                     </span>
                   </div>
@@ -576,29 +555,29 @@ export function LookbookPrismLayout() {
                   }`}
                 >
                   {/* Look A */}
-                  <div className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[#FFFFFF] p-5">
-                    <div className="lookbook-metrics flex items-center justify-between text-xs text-[#8A691F]">
+                  <div className="space-y-3 rounded-[8px] border border-[#C9A14A] bg-[var(--lookbook-surface)] p-5">
+                    <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-gold-ink)]">
                       <span>LOOK A (Primary)</span>
                       <span>96%</span>
                     </div>
-                    <h4 className="lookbook-display text-base font-semibold text-[#111111]">
+                    <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
                       Blazer & Silk Knit
                     </h4>
-                    <p className="text-xs text-[#36363D]">
+                    <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
                       Warmth level tuned for brisk morning wind.
                     </p>
                   </div>
 
                   {/* Look B */}
-                  <div className="space-y-3 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-5">
-                    <div className="lookbook-metrics flex items-center justify-between text-xs text-[#5C5C66]">
+                  <div className="space-y-3 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-5">
+                    <div className="lookbook-metrics flex items-center justify-between text-xs text-[color:var(--lookbook-ink-muted)]">
                       <span>LOOK B (Alternative)</span>
                       <span>91%</span>
                     </div>
-                    <h4 className="lookbook-display text-base font-semibold text-[#111111]">
+                    <h4 className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]">
                       Trench & Merino Cardigan
                     </h4>
-                    <p className="text-xs text-[#36363D]">
+                    <p className="text-xs text-[color:var(--lookbook-ink-soft)]">
                       Higher wind protection with water-resistant shell.
                     </p>
                   </div>
@@ -625,8 +604,11 @@ export function LookbookPrismLayout() {
             isMobilePreview={isMobilePreview}
             chipCategory={chipCategory}
             highlightedCardId={highlightedCardId}
-            onViewerBandChange={setViewerBand}
-            onServedModeChange={setServedMode}
+            // The heading, explainer and climate chips sit with the feed they filter. They used
+            // to render in the hero column, which on a phone put the outfit cards between the
+            // chips and the looks.
+            showFilterNav
+            onTabChange={setActiveTab}
             onBannedChange={setCommunityBanned}
             spotlightFocusIntent={teaser.focusIntent}
           />

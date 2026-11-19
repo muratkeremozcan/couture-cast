@@ -1023,7 +1023,7 @@ function contextClears(
     (before !== undefined &&
       context.adjacentBefore.includes(before) &&
       connectedLiteralTokens(literal, spans, position - 1, position)) ||
-    holdsFrame(tokens, position, context.clearFrames) ||
+    holdsConnectedFrame(literal, spans, tokens, position, context.clearFrames) ||
     (context.textEvidence.length > 0 &&
       tokens.some((token) => context.textEvidence.includes(token)))
   )
@@ -1051,6 +1051,32 @@ function holdsFrame(
     const words = frame.split(' ')
     const at = words.indexOf(tokens[position] as string)
     return at >= 0 && words.every((word, index) => tokens[position - at + index] === word)
+  })
+}
+
+/**
+ * A clearing frame must also be one run of words: every neighbor in it joined by plain spaces, so a
+ * frame cannot span a sentence, a quotation or a line break ("... in die." then the epithet). Veto
+ * frames keep `holdsFrame`, which ignores punctuation, so a veto stays conservative.
+ */
+function holdsConnectedFrame(
+  literal: string,
+  spans: readonly RegExpMatchArray[],
+  tokens: readonly string[],
+  position: number,
+  frames: readonly string[]
+): boolean {
+  return frames.some((frame) => {
+    const words = frame.split(' ')
+    const at = words.indexOf(tokens[position] as string)
+    if (at < 0) return false
+    const start = position - at
+    return words.every(
+      (word, index) =>
+        tokens[start + index] === word &&
+        (index === 0 ||
+          connectedLiteralTokens(literal, spans, start + index - 1, start + index))
+    )
   })
 }
 

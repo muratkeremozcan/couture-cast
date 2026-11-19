@@ -15,9 +15,12 @@ const navLinks = [
 
 export default function Home() {
   return (
+    // overflow-x-clip keeps the bleed layout from scrolling sideways without making this wrapper a
+    // scroll container: overflow-x-hidden did, so the sticky chip bar and filter nav stuck to it
+    // and scrolled off the screen with the page.
     <div
       data-focus-surface="dark"
-      className="min-h-screen overflow-x-hidden bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]"
+      className="min-h-screen overflow-x-clip bg-gradient-to-b from-neutral-950 via-black to-neutral-900 text-white font-[family-name:var(--font-geist-sans)]"
     >
       <header className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-4 px-6 py-6 sm:flex-row sm:items-center">
         <div className="flex flex-col gap-2">

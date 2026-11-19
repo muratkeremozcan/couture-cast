@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 6.12 test owner: what the database itself guarantees about the SLA alert tables.
 // D-SCHEMA: the unique key that makes a retry harmless, closed values, the deliverable index, and
 // no column that could hold member content. D-RLS: enabled with zero policies.
@@ -160,6 +162,32 @@ describe('D-SCHEMA: ModerationSlaAlert', () => {
 })
 
 describe('D-SCHEMA: ModerationSlaMonitor', () => {
+  // 20261119120000_moderation_sla_push_channel widened the check for the Expo push channel.
+  it.each(['webhook', 'push', 'console'])('accepts the channel %s', async (channel) => {
+    const id = randomUUID()
+    await db.query(
+      'INSERT INTO "ModerationSlaMonitor" (id, last_sweep_at, channel) VALUES ($1, now(), $2)',
+      [id, channel]
+    )
+    const { rows } = await db.query<{ channel: string }>(
+      'SELECT channel FROM "ModerationSlaMonitor" WHERE id = $1',
+      [id]
+    )
+    expect(rows).toEqual([{ channel }])
+  })
+
+  it.each(['pager', 'Push', 'push '])('refuses the channel %j', async (channel) => {
+    await expect(
+      db.query(
+        'INSERT INTO "ModerationSlaMonitor" (id, last_sweep_at, channel) VALUES ($1, now(), $2)',
+        [randomUUID(), channel]
+      )
+    ).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'ModerationSlaMonitor_channel_check',
+    })
+  })
+
   it('holds one closed channel value', async () => {
     await expect(
       db.query(
@@ -169,8 +197,159 @@ describe('D-SCHEMA: ModerationSlaMonitor', () => {
   })
 })
 
-describe('D-RLS: both tables are API-only', () => {
-  it.each(['ModerationSlaAlert', 'ModerationSlaMonitor'])(
+describe('D-SCHEMA: ModerationSlaPushReceipt (20261119120000_moderation_sla_push_channel)', () => {
+  const RECEIPT_ALERT = `receipt-alert-${randomUUID()}`
+  beforeAll(async () => {
+    await insertAlert({ id: RECEIPT_ALERT })
+  })
+
+  async function insertReceipt(overrides: Record<string, unknown> = {}) {
+    const row = {
+      ticket_id: randomUUID(),
+      alert_id: RECEIPT_ALERT,
+      accepted_at: '2026-11-19T12:00:00Z',
+      check_after: '2026-11-19T12:05:00Z',
+      expires_at: '2026-11-20T12:00:00Z',
+      ...overrides,
+    }
+    const columns = Object.keys(row)
+    await db.query(
+      `INSERT INTO "ModerationSlaPushReceipt" (${columns.map((column) => `"${column}"`).join(', ')})
+       VALUES (${columns.map((_column, index) => `$${index + 1}`).join(', ')})`,
+      Object.values(row)
+    )
+    return row.ticket_id
+  }
+
+  it.each([[null], ['ok'], ['failed'], ['unknown']])(
+    'accepts the outcome %j',
+    async (outcome) => {
+      const ticketId = await insertReceipt({
+        outcome,
+        error: outcome === 'failed' ? 'DeviceNotRegistered' : null,
+      })
+      const { rows } = await db.query<{ outcome: string | null }>(
+        'SELECT outcome FROM "ModerationSlaPushReceipt" WHERE ticket_id = $1',
+        [ticketId]
+      )
+      expect(rows).toEqual([{ outcome }])
+    }
+  )
+
+  it.each(['pending', 'OK', 'error', ''])('refuses the outcome %j', async (outcome) => {
+    await expect(insertReceipt({ outcome })).rejects.toMatchObject({
+      code: '23514',
+      constraint: 'ModerationSlaPushReceipt_outcome_check',
+    })
+  })
+
+  it('refuses a second row for one ticket id', async () => {
+    const ticketId = await insertReceipt()
+    await expect(insertReceipt({ ticket_id: ticketId })).rejects.toMatchObject({
+      code: '23505',
+      constraint: 'ModerationSlaPushReceipt_pkey',
+    })
+  })
+
+  it.each(['alert_id', 'accepted_at', 'check_after', 'expires_at'])(
+    'refuses a row with no %s',
+    async (column) => {
+      await expect(insertReceipt({ [column]: null })).rejects.toMatchObject({
+        code: '23502',
+        column,
+      })
+    }
+  )
+
+  it('has exactly the receipt columns, with nothing that could hold a token or member content', async () => {
+    const { rows } = await db.query<{ column_name: string; is_nullable: string }>(
+      `SELECT column_name, is_nullable FROM information_schema.columns
+       WHERE table_schema = 'public' AND table_name = 'ModerationSlaPushReceipt'
+       ORDER BY column_name`
+    )
+    expect(rows).toEqual([
+      { column_name: 'accepted_at', is_nullable: 'NO' },
+      { column_name: 'alert_id', is_nullable: 'NO' },
+      { column_name: 'check_after', is_nullable: 'NO' },
+      { column_name: 'checked_at', is_nullable: 'YES' },
+      { column_name: 'error', is_nullable: 'YES' },
+      { column_name: 'expires_at', is_nullable: 'NO' },
+      { column_name: 'outcome', is_nullable: 'YES' },
+      { column_name: 'ticket_id', is_nullable: 'NO' },
+    ])
+  })
+
+  it('refuses a receipt for an alert that does not exist', async () => {
+    await expect(
+      insertReceipt({ alert_id: `missing-${randomUUID()}` })
+    ).rejects.toMatchObject({
+      code: '23503',
+      constraint: 'ModerationSlaPushReceipt_alert_id_fkey',
+    })
+  })
+
+  it('deletes the receipts with their alert, so alert retention prunes them', async () => {
+    const alertId = `cascade-${randomUUID()}`
+    await insertAlert({ id: alertId })
+    const kept = await insertReceipt()
+    const gone = [
+      await insertReceipt({ alert_id: alertId }),
+      await insertReceipt({ alert_id: alertId }),
+    ]
+    await db.query('DELETE FROM "ModerationSlaAlert" WHERE id = $1', [alertId])
+    const { rows } = await db.query<{ ticket_id: string }>(
+      'SELECT ticket_id FROM "ModerationSlaPushReceipt" WHERE ticket_id = ANY($1)',
+      [[kept, ...gone]]
+    )
+    expect(rows).toEqual([{ ticket_id: kept }])
+  })
+
+  it('follows an alert id change, so a re-keyed alert keeps its receipts', async () => {
+    const alertId = `rekey-${randomUUID()}`
+    await insertAlert({ id: alertId })
+    const ticketId = await insertReceipt({ alert_id: alertId })
+    await db.query('UPDATE "ModerationSlaAlert" SET id = $2 WHERE id = $1', [
+      alertId,
+      `${alertId}-new`,
+    ])
+    const { rows } = await db.query<{ alert_id: string }>(
+      'SELECT alert_id FROM "ModerationSlaPushReceipt" WHERE ticket_id = $1',
+      [ticketId]
+    )
+    expect(rows).toEqual([{ alert_id: `${alertId}-new` }])
+  })
+
+  it('indexes alert_id for the cascade', async () => {
+    const { rows } = await db.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes WHERE tablename = 'ModerationSlaPushReceipt'
+       AND indexname = 'ModerationSlaPushReceipt_alert_id_idx'`
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.indexdef).toContain('(alert_id)')
+  })
+
+  it('holds the (outcome, check_after) index the due-receipt read uses', async () => {
+    const { rows } = await db.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes WHERE tablename = 'ModerationSlaPushReceipt'
+       AND indexname = 'ModerationSlaPushReceipt_outcome_check_after_idx'`
+    )
+    expect(rows).toHaveLength(1)
+    expect(rows[0]!.indexdef).toContain('(outcome, check_after)')
+  })
+
+  it.each(['anon', 'authenticated'])('grants %s no privilege on it', async (role) => {
+    for (const privilege of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE']) {
+      const { rows } = await db.query<{ granted: boolean }>(
+        'SELECT has_table_privilege($1, $2, $3) AS granted',
+        [role, 'public."ModerationSlaPushReceipt"', privilege]
+      )
+      expect(rows[0]!.granted, `${role} ${privilege}`).toBe(false)
+    }
+  })
+})
+
+describe('D-RLS: every SLA table is API-only', () => {
+  it.each(['ModerationSlaAlert', 'ModerationSlaMonitor', 'ModerationSlaPushReceipt'])(
     '%s has RLS on and zero policies',
     async (table) => {
       const { rows } = await db.query<{ enabled: boolean; policies: string }>(

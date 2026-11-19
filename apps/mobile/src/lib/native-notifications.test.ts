@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 43: Realtime engagement and push notifications.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-43-realtime-engagement-and-push-notifications
 // Story 6.5 native boundaries are controlled; registration/preferences use actual HTTP wrappers.
@@ -116,6 +118,7 @@ vi.mock('./mobile-auth', () => ({
 }))
 import {
   enableNativeCommunityNotifications,
+  isModerationSlaPush,
   reconcileNativeRegistration,
   startNativeNotifications,
 } from './native-notifications'
@@ -540,4 +543,98 @@ it('keeps response navigation available during OS registration failures and reco
   } finally {
     close()
   }
+})
+
+// Production follow-up 2026-11-19: moderation SLA alerts from the API's Expo push channel
+// (apps/api/src/modules/moderation/moderation-sla.channel.ts). Its data block is exactly this.
+const moderationSlaData = () => ({ version: 1, source: 'moderation_sla' })
+
+describe('moderation SLA push on the device', () => {
+  it.each([
+    ['the data block the API sends', moderationSlaData(), true],
+    ['that source with extra fields', { source: 'moderation_sla', alertId: 'a1' }, true],
+    ['a community push', notificationData(), false],
+    ['another source', { version: 1, source: 'notification' }, false],
+    ['the source in another case', { source: 'Moderation_SLA' }, false],
+    ['the source nested one level down', { data: { source: 'moderation_sla' } }, false],
+    ['no source', { version: 1 }, false],
+    ['the bare string', 'moderation_sla', false],
+    ['null', null, false],
+    ['undefined', undefined, false],
+    ['an array', ['moderation_sla'], false],
+  ])('isModerationSlaPush: %s is %s', (_name, data, expected) => {
+    expect(isModerationSlaPush(data)).toBe(expected)
+  })
+
+  // Starting the listeners also starts a registration in the background. Each handler test
+  // settles it (a later reconcile joins the one in flight) and stops the listeners, so no
+  // registration carries into the next test after its mocks reset.
+  async function settle(close: () => void) {
+    close()
+    await reconcileNativeRegistration().catch(() => undefined)
+  }
+
+  it('shows a foreground banner with sound for a moderation SLA push, and nothing for an unknown one', async () => {
+    const close = await startNativeNotifications({ ready: () => true, open: vi.fn() })
+    try {
+      const handle = (data: unknown) =>
+        device.handler!.handleNotification(responseFor(data).notification)
+      expect(await handle(moderationSlaData())).toEqual({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+      })
+      expect(await handle(notificationData())).toEqual({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: false,
+        shouldSetBadge: false,
+      })
+      for (const other of [
+        { version: 1, source: 'billing' },
+        { arbitrary: true },
+        null,
+      ]) {
+        expect(await handle(other)).toEqual({
+          shouldShowBanner: false,
+          shouldShowList: false,
+          shouldPlaySound: false,
+          shouldSetBadge: false,
+        })
+      }
+    } finally {
+      await settle(close)
+    }
+  })
+
+  it('opens nothing in the app when a moderation SLA push is tapped', async () => {
+    const open = vi.fn()
+    const close = await startNativeNotifications({ ready: () => true, open })
+    try {
+      device.response!(responseFor(moderationSlaData()))
+      expect(open).not.toHaveBeenCalled()
+    } finally {
+      await settle(close)
+    }
+  })
+
+  it('registers on Android only the community channel, which the API push targets', async () => {
+    device.platform = 'android'
+    device.channel.mockClear()
+    await reconcileNativeRegistration()
+    // The API sends moderation alerts with channelId 'community' (MODERATION_SLA_ANDROID_CHANNEL_ID),
+    // so this channel must exist before the token is registered.
+    expect(device.channel.mock.calls).toEqual([
+      ['community', { name: 'CoutureCast', importance: 3 }],
+    ])
+    expect(registrations).toBe(1)
+  })
+
+  it('creates no Android channel on iOS', async () => {
+    device.channel.mockClear()
+    await reconcileNativeRegistration()
+    expect(device.channel).not.toHaveBeenCalled()
+    expect(registrations).toBe(1)
+  })
 })

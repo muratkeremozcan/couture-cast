@@ -28,7 +28,8 @@ import {
   resolveAffiliateLocaleRegion,
 } from '../../lib/commerce'
 
-const MERLOT = '#7A1F2D'
+/** Merlot as text: globals.css gives it a dark-mode value that reads on the dark surface. */
+const MERLOT_INK = 'var(--lookbook-merlot-ink)'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -188,7 +189,7 @@ export function CommunitySponsoredCta({
       <span
         id={opensId}
         data-testid={`${ctaId}-opens`}
-        className="text-[10px] text-neutral-600"
+        className="text-[10px] text-[color:var(--lookbook-ink-muted)]"
       >
         {t('community.card.shopOpensInBrowser')}
       </span>
@@ -198,7 +199,7 @@ export function CommunitySponsoredCta({
           data-testid={`${ctaId}-status`}
           data-state={state}
           className="text-xs"
-          style={state === 'error' ? { color: MERLOT } : undefined}
+          style={state === 'error' ? { color: MERLOT_INK } : undefined}
         >
           {t(STATUS_KEYS[state])}
         </span>

@@ -9706,6 +9706,7 @@ export interface GetModerationSla200ResponseDataMonitor {
  */
 export const GetModerationSla200ResponseDataMonitorChannelEnum = {
   webhook: 'webhook',
+  push: 'push',
   console: 'console',
 } as const
 export type GetModerationSla200ResponseDataMonitorChannelEnum =
@@ -13281,6 +13282,7 @@ export interface ModerationSlaResponseDataMonitor {
  */
 export const ModerationSlaResponseDataMonitorChannelEnum = {
   webhook: 'webhook',
+  push: 'push',
   console: 'console',
 } as const
 export type ModerationSlaResponseDataMonitorChannelEnum =
