@@ -214,6 +214,19 @@ function UnlessBanned({ banned, children }: { banned: boolean; children: ReactNo
   return banned ? null : <>{children}</>
 }
 
+type CommunityActionError = { error: unknown; fallbackKey: string }
+
+/**
+ * A feed read that failed after the first page spoke up beside the feed
+ * (`community.error.load`). A later read that answers, a pull or a realtime rebuild, makes that
+ * message stale, so it goes; an unrelated action's failure (a withdraw, a report) stays.
+ */
+function withoutStaleLoadError(
+  current: CommunityActionError | null
+): CommunityActionError | null {
+  return current?.fallbackKey === 'community.error.load' ? null : current
+}
+
 export function CommunityScreen() {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
@@ -504,10 +517,7 @@ export function CommunityScreen() {
    * action failure borrowed the withdraw string, so a next page that 500'd told the
    * reader "We could not withdraw this look. It is still in the feed."
    */
-  const [actionError, setActionError] = useState<{
-    error: unknown
-    fallbackKey: string
-  } | null>(null)
+  const [actionError, setActionError] = useState<CommunityActionError | null>(null)
 
   useEffect(() => {
     highlightedTargetRef.current = null
@@ -946,11 +956,7 @@ export function CommunityScreen() {
             setBandUnresolvedReason(feed.bandUnresolvedReason)
             setActiveChallenge(feed.activeChallenge)
             setFeedError(null)
-            // A read that failed before spoke up beside the feed; this one answered, so
-            // the stale "could not load" goes. An unrelated action's failure stays.
-            setActionError((current) =>
-              current?.fallbackKey === 'community.error.load' ? null : current
-            )
+            setActionError(withoutStaleLoadError)
             setBannedSanction(null)
             if (syncDeniedRef.current) {
               syncDeniedRef.current = false
@@ -1155,6 +1161,8 @@ export function CommunityScreen() {
       setActiveChallenge(page.activeChallenge)
       setIsLoadingMore(false)
       setIsRefreshing(false)
+      // A realtime rebuild that answered is the same recovery as a pull that answered.
+      setActionError(withoutStaleLoadError)
       setFeedState('ready')
 
       const ids = new Set(realtimeItems.current.map((item) => item.id))

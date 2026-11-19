@@ -5,11 +5,17 @@
  * keeps only closed values.
  *
  * API: the request logger's JSON lines (apps/api/src/logger/request-logger.middleware.ts) as
- * routes with their dynamic segments masked, method, phase, status and duration, plus a count per
- * route of answers by status, failures, requests that never got an answer and answers slower than
- * the app's 15 s request deadline (COMMERCE_REQUEST_TIMEOUT_MS in apps/mobile/src/lib/commerce.ts,
- * which the community reads use). Each service (auth proxy, API, Metro): its log's line count and
- * whether it exited.
+ * route templates, method, phase, status and duration, plus a count per route of answers by
+ * status, failures, requests that never got an answer and answers slower than the app's 15 s
+ * request deadline (COMMERCE_REQUEST_TIMEOUT_MS in apps/mobile/src/lib/commerce.ts, which the
+ * community reads use). The request lines come from the API child's own log, `api.log` in the
+ * harness directory (`child(..., 'api.log')` in scripts/run-story68-native.mjs); the workflow's
+ * `/tmp/cc68-api.log` holds only the `serve` launcher's output. Each service (auth proxy, API
+ * launcher, Metro): its wrapper log's line count and whether it exited.
+ *
+ * A route is published only as a template of the canonical HTTP contract
+ * (packages/api-client/docs/http.openapi.json), so no request value, in a parameter position or
+ * on a path the contract does not name, ever reaches the record: an unknown path is `unknown`.
  *
  * Nightly run 44298434117, iOS live font scale (community): the restore read showed "We could not
  * load the community feed." and nothing public said whether the API answered, failed or was slow.
@@ -28,35 +34,57 @@ const PHASES = {
   request_completed: 'completed',
   request_failed: 'failed',
 }
-// A segment kept as is: a lowercase route word (community, feed, notification-preferences).
-const ROUTE_WORD = /^[a-z][a-z0-9-]{0,39}$/
-const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i
+export const UNKNOWN_ROUTE = 'unknown'
+export const API_CHILD_LOG = 'api.log'
+const CONTRACT = new URL(
+  '../../packages/api-client/docs/http.openapi.json',
+  import.meta.url
+)
+const MAX_SEGMENTS = 12
+
+/** The canonical contract's path templates (`/api/v1/community/posts/{postId}`). */
+export function contractRouteTemplates(file = CONTRACT) {
+  return Object.keys(JSON.parse(fs.readFileSync(file, 'utf8')).paths ?? {})
+}
+
+let contractTemplates = null
+const defaultTemplates = () => (contractTemplates ??= contractRouteTemplates())
 
 /**
- * A request path as a route (`api/v1/community/feed`): no query and no leading slash, every
- * segment that is not a route word read as `:id`.
+ * A request path as its contract template with no leading slash
+ * (`api/v1/community/posts/{postId}`): the public selector reads a string that starts with a
+ * slash as a local path. Every parameter position takes the template's name, never the request's
+ * value. A path no template matches is `unknown`; a value that is not a path is null.
  */
-export function routeOf(requestPath) {
+export function routeOf(requestPath, templates = defaultTemplates()) {
   if (typeof requestPath !== 'string' || !requestPath.startsWith('/')) return null
-  const pathname = requestPath.split('?')[0]
-  const segments = pathname.split('/').slice(1)
-  if (segments.length > 12) return null
-  // No leading slash: the public selector reads a string that starts with one as a local path.
-  return segments
-    .map((segment) =>
-      segment === '' ||
-      (ROUTE_WORD.test(segment) && !UUID.test(segment) && !/\d{3,}/.test(segment))
-        ? segment
-        : ':id'
-    )
-    .join('/')
+  const segments = requestPath.split('?')[0].split('/').slice(1)
+  if (segments.length > MAX_SEGMENTS) return UNKNOWN_ROUTE
+  let best = null
+  let bestStatic = -1
+  for (const template of templates) {
+    const parts = template.split('/').slice(1)
+    if (parts.length !== segments.length) continue
+    let statics = 0
+    const matches = parts.every((part, at) => {
+      if (/^\{[A-Za-z][A-Za-z0-9_]*\}$/.test(part)) return segments[at] !== ''
+      statics += 1
+      return part === segments[at]
+    })
+    // A static segment outranks a parameter: posts/allocate is not posts/{postId}.
+    if (matches && statics > bestStatic) {
+      best = template
+      bestStatic = statics
+    }
+  }
+  return best === null ? UNKNOWN_ROUTE : best.slice(1)
 }
 
 const integerOrNull = (value) =>
   Number.isFinite(value) ? Math.max(0, Math.round(value)) : null
 
 /** One request-logger line as a row, or null for any other line. */
-function requestRow(line) {
+function requestRow(line, templates) {
   let entry
   try {
     entry = JSON.parse(line)
@@ -64,7 +92,7 @@ function requestRow(line) {
     return null
   }
   const phase = PHASES[entry?.msg ?? entry?.message]
-  const route = routeOf(entry?.path)
+  const route = routeOf(entry?.path, templates)
   if (!phase || !route) return null
   // The API's logger writes an ISO `timestamp` (apps/api/src/logger/pino.config.ts).
   const stamp = Date.parse(entry.timestamp)
@@ -116,11 +144,14 @@ function routeSummaries(rows) {
 }
 
 /** The closed request record of one API log. Unparsed lines are counted, never kept. */
-export function apiRequestRecord(apiLog, { limit = RECENT_ROWS } = {}) {
+export function apiRequestRecord(
+  apiLog,
+  { limit = RECENT_ROWS, templates = defaultTemplates() } = {}
+) {
   const lines = String(apiLog ?? '')
     .split('\n')
     .filter((line) => line.trim() !== '')
-  const rows = lines.map(requestRow).filter(Boolean)
+  const rows = lines.map((line) => requestRow(line, templates)).filter(Boolean)
   const firstAt = rows.find((row) => row.stamp !== null)?.stamp ?? null
   return {
     version: 1,
@@ -166,20 +197,25 @@ export function serviceRecord(directory = '/tmp') {
   )
 }
 
-/** Writes the closed record for the job's public evidence selector to pick up. */
+/**
+ * Writes the closed record for the job's public evidence selector to pick up. The request lines
+ * are read from the API child's log in the harness directory; `apiLog` says whether that log was
+ * read, so a missing log reads as not measured, never as an API that served nothing.
+ */
 export function writeApiRequestEvidence({
   harnessDirectory,
   serviceDirectory = '/tmp',
+  templates,
 } = {}) {
-  const apiLog = path.join(serviceDirectory, 'cc68-api.log')
-  let text = ''
+  let text = null
   try {
-    text = fs.readFileSync(apiLog, 'utf8')
+    text = fs.readFileSync(path.join(harnessDirectory, API_CHILD_LOG), 'utf8')
   } catch {
-    text = ''
+    text = null
   }
   const record = {
-    ...apiRequestRecord(text),
+    apiLog: text === null ? 'missing' : 'read',
+    ...apiRequestRecord(text ?? '', templates ? { templates } : {}),
     services: serviceRecord(serviceDirectory),
   }
   fs.mkdirSync(harnessDirectory, { recursive: true })
@@ -202,6 +238,7 @@ if (
   console.log(
     JSON.stringify({
       apiRequests: {
+        apiLog: record.apiLog,
         lines: record.lines,
         routes: record.routes.length,
         services: record.services,

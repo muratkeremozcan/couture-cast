@@ -19,11 +19,14 @@ const TRANSIENT_RESOLUTION_FAILURE =
   /Too Many Requests|status code 429|status code 5\d\d|HTTP response code: (?:429|5\d\d)|Connection reset|Connection timed out|Read timed out|Connect timed out|SocketTimeoutException|ConnectTimeoutException|Remote host terminated the handshake/i
 
 /**
- * Gradle's marks of a failing test: the test task's FAILED line, a failed case
- * (`ModalSystemBarsTest > appliesLightBarsOnApi33 FAILED`), or the closing summary.
+ * Gradle's marks of test cases that ran and failed: a failed case
+ * (`ModalSystemBarsTest > appliesLightBarsOnApi33 FAILED`), the closing summary, or a connected
+ * run's per-device summary. A test task's own `> Task ... FAILED` line is not one: the task also
+ * fails that way when it cannot resolve its inputs before any test runs (the connected task's
+ * UTP dependencies, for one).
  */
 const GRADLE_TEST_FAILURE =
-  /^> Task \S*[Tt]est\S* FAILED\s*$|^\S+ > .+ FAILED\s*$|There were failing tests/m
+  /^\S+ > .+ FAILED\s*$|There were failing tests|^Tests on .+ failed: \d+/m
 
 /**
  * An artifact download that failed: Gradle's `Could not GET` (or HEAD, resolve, download) and the
@@ -32,27 +35,61 @@ const GRADLE_TEST_FAILURE =
 const ARTIFACT_DOWNLOAD_FAILURE =
   /Could not (?:GET|HEAD|resolve|download)\b|Server returned HTTP response code: \d{3} for URL:/
 
+/**
+ * Gradle nests a failure's causes as indented `>` lines under the line they explain:
+ *
+ *   > Could not resolve com.android.tools.utp:android-device-provider-ddmlib:31.11.0.
+ *      > Could not GET 'https://dl.google.com/...'.
+ *         > Read timed out
+ *
+ * so a download failure's transient cause can sit on a later line than the download.
+ */
+const NESTED_CAUSE = /^(\s*)> /
+
+/**
+ * The transient error inside the first failed artifact download that has one: the download's own
+ * line, or a cause nested under it. Undefined when no failed download names a transient error.
+ */
+function transientDownloadFailure(output) {
+  const lines = output.split('\n')
+  for (const [at, line] of lines.entries()) {
+    if (!ARTIFACT_DOWNLOAD_FAILURE.test(line)) continue
+    const depth = (NESTED_CAUSE.exec(line)?.[1] ?? '').length
+    for (let next = at; next < lines.length; next += 1) {
+      const cause = lines[next]
+      if (next > at) {
+        const nested = NESTED_CAUSE.exec(cause)
+        if (!nested || nested[1].length <= depth) break
+      }
+      const match = TRANSIENT_RESOLUTION_FAILURE.exec(cause)
+      if (match) return match[0]
+    }
+  }
+  return undefined
+}
+
 /** Waits before the second and third attempts. */
 const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
 
 /**
- * The transient download error a failed run printed, or undefined when it printed none. A run
- * killed by a signal (a timeout) is not retried. Neither is a run with a failing test, since a
- * test's own output can mention a timeout or a 429, unless a line it printed is an artifact
- * download that failed transiently (Robolectric fetching its Android runtime, for one).
+ * The transient download error a failed run printed, or undefined when it printed none.
+ *
+ * - A run killed by a signal (a timeout) is never retried.
+ * - A run whose test cases failed (GRADLE_TEST_FAILURE) is retried only when it also printed a
+ *   failed artifact download whose own line or nested cause is transient: Robolectric fetching
+ *   its Android runtime fails the cases that way. A timeout or a 429 that a test's own output
+ *   merely mentions, with no failed download, never retries it. So an assertion failure runs
+ *   once unless the same run also failed a transient artifact download.
+ * - Any other failed run, a test task that failed before its tests ran included, is retried on a
+ *   transient failed download (multiline causes included) or any other transient error it
+ *   printed (the wrapper's distribution download, a reset connection).
  */
 function transientResolutionFailure(result) {
   if (result.status === 0 || result.signal) return undefined
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
-  if (GRADLE_TEST_FAILURE.test(output)) {
-    const download = output
-      .split('\n')
-      .find(
-        (line) =>
-          ARTIFACT_DOWNLOAD_FAILURE.test(line) && TRANSIENT_RESOLUTION_FAILURE.test(line)
-      )
-    return download ? TRANSIENT_RESOLUTION_FAILURE.exec(download)[0] : undefined
-  }
+  const download = transientDownloadFailure(output)
+  if (GRADLE_TEST_FAILURE.test(output)) return download
+  if (download !== undefined) return download
   const match = TRANSIENT_RESOLUTION_FAILURE.exec(output)
   return match ? match[0] : undefined
 }

@@ -200,6 +200,40 @@ test('a failing test whose failure is a rate-limited artifact download still ret
     )
 })
 
+test('a test task that failed resolving before its tests ran retries on a nested transient cause', () => {
+  // The old classifier read the task's FAILED line as a failing test and needed the transient
+  // word on the download's own line, so this failed on the first attempt.
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: UTP_READ_TIMED_OUT }),
+    'Read timed out'
+  )
+})
+
+test('a failing test is not retried by a transient word beside, not under, a failed download', () => {
+  // A case's own output: the timeout is not a nested cause of the download line above it.
+  const assertion = [
+    'AccessibilityFocusTalkBackTest > reportsFocus[emulator-5554] FAILED',
+    "    java.lang.AssertionError: Could not GET 'https://example.test/fixture.json' in the stub",
+    '    Read timed out',
+    '> There were failing tests. See the report.',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: assertion }),
+    undefined
+  )
+  // A failed download whose nested cause is not transient (a 404) retries nothing either.
+  const missing = [
+    '> Could not resolve com.example:absent:1.0.0.',
+    "   > Could not GET 'https://repo.maven.apache.org/maven2/com/example/absent/1.0.0/absent-1.0.0.pom'.",
+    '      > Received status code 404 from server: Not Found',
+    'BUILD FAILED in 4s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: missing }),
+    undefined
+  )
+})
+
 test('the modal system bars workflow runs its Gradle build through the retry', () => {
   const workflow = fs.readFileSync(
     fileURLToPath(
@@ -311,7 +345,22 @@ test('the accessibility focus workflow runs every Gradle build through the retry
 // starts, after the APK build, so a 429 there failed the lane past the build's retry. This runs
 // the real device script with a stand-in Gradle and adb: the build passes, the TalkBack run's
 // first start is rate-limited, and the suppressed-focus control fails on its assertion.
-test('the TalkBack device script retries a rate-limited connected run and never the control', (t) => {
+// Codex review 4: a connected run whose UTP resolution fails before any test runs marks its task
+// FAILED and prints the transient cause on a nested line, not beside the download.
+const UTP_READ_TIMED_OUT = [
+  '> Task :accessibility-focus:connectedDebugAndroidTest FAILED',
+  'FAILURE: Build failed with an exception.',
+  '* What went wrong:',
+  "Execution failed for task ':accessibility-focus:connectedDebugAndroidTest'.",
+  "> Could not resolve all files for configuration ':accessibility-focus:_internal-unified-test-platform-android-device-provider-ddmlib'.",
+  '   > Could not resolve com.android.tools.utp:android-device-provider-ddmlib:31.11.0.',
+  "      > Could not get resource 'https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib/31.11.0/android-device-provider-ddmlib-31.11.0.pom'.",
+  "         > Could not GET 'https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib/31.11.0/android-device-provider-ddmlib-31.11.0.pom'.",
+  '            > Read timed out',
+  'BUILD FAILED in 31s',
+].join('\n')
+
+function runDeviceScript(t, firstConnectedFailure) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-focus-device-'))
   t.after(() => fs.rmSync(root, { recursive: true, force: true }))
   const android = path.join(root, 'apps/mobile/android')
@@ -326,11 +375,6 @@ test('the TalkBack device script retries a rate-limited connected run and never 
     `<?xml version="1.0"?><testsuite name="AccessibilityFocusTalkBackTest">${EXPECTED_TESTS.map(
       (name) => testcase(name, failing.includes(name))
     ).join('')}</testsuite>`
-  const rateLimited = [
-    '> Could not resolve com.android.tools.utp:android-test-plugin-host-retention:31.11.0.',
-    `   > ${RATE_LIMITED}`,
-    'BUILD FAILED in 9s',
-  ].join('\n')
   fs.writeFileSync(
     path.join(android, 'gradlew'),
     `#!${process.execPath}
@@ -350,7 +394,7 @@ if (task === ':accessibility-focus:assembleDebugAndroidTest') {
 }
 const earlier = prior.filter((call) => call.task === task && call.suppressed === suppressed)
 if (!suppressed && earlier.length === 0) {
-  console.error(${JSON.stringify(rateLimited)})
+  console.error(${JSON.stringify(firstConnectedFailure)})
   process.exit(1)
 }
 const raw = '../modules/accessibility-focus/android/build/outputs/androidTest-results/connected'
@@ -412,30 +456,56 @@ Atomics.wait = (array, index, value, ms) => {
       ACCESSIBILITY_FOCUS_WINDOW_WAIT: '1',
     },
   })
-  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
-  // The build once; the TalkBack run twice, its first start rate-limited; the control once.
-  assert.deepEqual(
-    fs
+  return {
+    result,
+    calls: fs
       .readFileSync(calls, 'utf8')
       .trim()
       .split('\n')
       .map((line) => JSON.parse(line)),
+    waits: fs.existsSync(waits)
+      ? fs.readFileSync(waits, 'utf8').trim().split('\n').map(Number)
+      : [],
+  }
+}
+
+for (const [cause, failure, error] of [
+  [
+    'a 429 beside the download',
     [
+      '> Could not resolve com.android.tools.utp:android-test-plugin-host-retention:31.11.0.',
+      `   > ${RATE_LIMITED}`,
+      'BUILD FAILED in 9s',
+    ].join('\n'),
+    'status code 429',
+  ],
+  [
+    'a read timeout nested under the download, with the task FAILED',
+    UTP_READ_TIMED_OUT,
+    'Read timed out',
+  ],
+])
+  test(`the TalkBack device script retries a connected run that failed resolving (${cause}) and never the control`, (t) => {
+    const { result, calls, waits } = runDeviceScript(t, failure)
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+    // The build once; the TalkBack run twice, its first start failed resolving; the control once.
+    assert.deepEqual(calls, [
       { task: ':accessibility-focus:assembleDebugAndroidTest', suppressed: false },
       { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: false },
       { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: false },
       { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: true },
-    ]
-  )
-  assert.deepEqual(fs.readFileSync(waits, 'utf8').trim().split('\n').map(Number), [
-    RESOLUTION_RETRY_DELAYS_MS[0],
-  ])
-  assert.match(
-    result.stdout,
-    /^::warning::Attempt 1\/3 hit a transient download error \(status code 429\); retrying in 20 s\.$/m
-  )
-  assert.match(
-    result.stdout,
-    /^TalkBack run: 5 passed\. Suppressed-focus control: the 4 tests that need the OS focus report failed on it, the rest passed\.$/m
-  )
-})
+    ])
+    assert.deepEqual(waits, [RESOLUTION_RETRY_DELAYS_MS[0]])
+    assert.ok(
+      result.stdout
+        .split('\n')
+        .includes(
+          `::warning::Attempt 1/3 hit a transient download error (${error}); retrying in 20 s.`
+        ),
+      result.stdout
+    )
+    assert.match(
+      result.stdout,
+      /^TalkBack run: 5 passed\. Suppressed-focus control: the 4 tests that need the OS focus report failed on it, the rest passed\.$/m
+    )
+  })
