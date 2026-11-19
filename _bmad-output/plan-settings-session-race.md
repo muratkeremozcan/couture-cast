@@ -85,9 +85,11 @@ Working rules: never git stash, git checkout -- or git reset; never touch /Users
 - Outage retry: one shared `SessionRetryButton` (`session.retry`, new `session` namespace in all
   ten locales, `session-locales.spec.ts`); the planner reuses its own error panel and retry.
 - The theme section clears `<html data-theme>` in a layout effect on every live-owner change.
-- Premium hides its status line while `checking` (it read "You don't have a Premium subscription
-  yet" during verification); `loading` keeps today's line because
-  `subscription-section.complimentary.test.tsx` W-DISCLOSURE-HIDDEN pins it.
+- Premium renders its status line only once the reads decide it (`ready`, after both the
+  subscription and the access read settle) or when signed out, so an active subscriber or a
+  complimentary member never sees "You don't have a Premium subscription yet" flash
+  (SUBSCRIPTION-SESSION-WEB-06/07). W-DISCLOSURE-HIDDEN now waits for the subscription request
+  in place of the status line, with every assertion kept.
 - Test migration: `src/test-utils/member-session.ts` (`signInFixtureMember`: env stub plus a
   `test-token-access` bearer, unstubbed by `onTestFinished`).
 

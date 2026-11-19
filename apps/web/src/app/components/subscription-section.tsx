@@ -264,9 +264,10 @@ function resolveSectionView(
 
   return {
     showDisclosure: showsDisclosure(sectionState, entitled, complimentary),
-    // Nothing is known while the session is verified, so "no subscription yet" waits too.
-    showStatusLine:
-      isIdle && sectionState !== 'load_failed' && sectionState !== 'checking',
+    // The status line waits for the reads, like the disclosure: until both the subscription and
+    // the access read have settled, "no subscription yet" would be a guess, and an active
+    // subscriber or a complimentary member would see it flash. Signed out it is today's line.
+    showStatusLine: isIdle && (sectionState === 'ready' || sectionState === 'signed_out'),
     showComplimentaryNote: readyBody !== null && entitled && complimentary,
     // The grace banner still warns a paying grantee about their payment method; only the
     // ended note ("subscribe again") is withheld from a member whose grant keeps Premium on.

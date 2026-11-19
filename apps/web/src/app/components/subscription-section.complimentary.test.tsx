@@ -7,7 +7,7 @@
 // (`cc614-complimentary-access-test-design.md`).
 import { I18nextProvider } from 'react-i18next'
 import { http, HttpResponse } from 'msw'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
@@ -131,8 +131,12 @@ describe('SubscriptionSection complimentary access', () => {
     const pending = new Promise<void>((resolve) => {
       release = resolve
     })
+    let subscriptionRequests = 0
     useMswHandlers(
-      http.get(SUBSCRIPTION_PATH, () => HttpResponse.json({ data: NONE_SUBSCRIPTION })),
+      http.get(SUBSCRIPTION_PATH, () => {
+        subscriptionRequests += 1
+        return HttpResponse.json({ data: NONE_SUBSCRIPTION })
+      }),
       http.get(ACCESS_PATH, async () => {
         await pending
         return HttpResponse.json({ data: { premium: true, source: 'complimentary' } })
@@ -146,10 +150,13 @@ describe('SubscriptionSection complimentary access', () => {
     observer.observe(document.body, { childList: true, subtree: true })
     try {
       renderSection()
-      // The subscription read lands while the access read is still held.
-      await waitFor(() =>
-        expect(screen.getByTestId('premium-status-line')).toBeInTheDocument()
-      )
+      // The subscription read lands while the access read is still held. The status line now
+      // waits for both reads, so the wait is on the subscription request, then one task for
+      // its answer to reach the section.
+      await waitFor(() => expect(subscriptionRequests).toBe(1))
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
       expect(screen.queryByTestId('premium-disclosure')).not.toBeInTheDocument()
       release()
       await waitFor(() =>
