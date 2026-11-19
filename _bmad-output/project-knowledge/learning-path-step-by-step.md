@@ -11835,6 +11835,10 @@ Hard-won lessons from the implementation and code review of this step:
   failed, and the app kept its error panel through every later refresh that succeeded. That was a
   real defect: a member who pulls again after a network blip saw the error above a feed that loaded.
   A load that answers now clears a stale load error, and a failed withdraw stays on screen.
+- The tap retry first shipped with structural YAML tests only, which a retry that never retries
+  passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
+  with Maestro 2.8.0's rules; Maestro's web beta, the other option, crashed on the scripted page.
+  The model proves the retry logic, not device touch delivery or real hierarchy timing.
 - A first change to the accessibility device script broke two Playwright helper specs that read
   the script and its workflow; nobody ran them until the review round. Run every spec that reads a
   changed file before committing.
@@ -11868,7 +11872,7 @@ Sequence to follow:
 3. `scripts/ci/share-card-android-release-font.sh`.
 4. `maestro/story68/tap-outfit-open.yaml`, `maestro/story68/settings.yaml` and
    `scripts/lib/story68-flow-timeouts.mjs`.
-5. `scripts/lib/native-build-failure.mjs`.
+5. `scripts/lib/native-build-failure.mjs` and `scripts/lib/maestro-flow-model.mjs`.
 6. `apps/mobile/src/features/community/community-screen.tsx` (the load-error reset).
 7. `scripts/ci/native-api-requests.mjs`, `.github/workflows/ios-native-jobs.yml` and
    `scripts/ci/native-ios-public-diagnostics.mjs`.
@@ -11901,13 +11905,19 @@ CI scripts, node:test:
   proves swap sized against the disk guard, the emulator check after the build, and that kernel
   OOM lines reach the log.
 - [`scripts/lib/story68-outfit-open-tap.test.mjs`](../../scripts/lib/story68-outfit-open-tap.test.mjs):
-  proves the opener flows tap through the retry subflow and the subflow never taps an open sheet.
+  runs the real `tap-outfit-open.yaml` against a scripted opener: a cancelled first press opens on
+  the second, a title drawn late gets no second press, and a broken opener fails by name inside
+  the budget.
+- [`scripts/lib/maestro-flow-model.test.mjs`](../../scripts/lib/maestro-flow-model.test.mjs):
+  proves the executable model of Maestro 2.8.0's retry, condition and `optional` rules, and that it
+  throws on any command it does not know.
 - [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
   proves the flow budgets derive from the positioning and tap subflows.
 - [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
   proves the iOS Settings proof reads the return link and the Android title check stays.
 - [`scripts/lib/native-build-failure.test.mjs`](../../scripts/lib/native-build-failure.test.mjs):
-  proves xcodebuild's failed commands, Swift errors and failed build scripts are named.
+  proves xcodebuild's failed commands are named, escaped names included, through the list footer,
+  and that Swift errors, also in paths with spaces, and failed build scripts are classified.
 - [`scripts/ci/native-api-requests.test.mjs`](../../scripts/ci/native-api-requests.test.mjs):
   proves the API record masks dynamic route segments, counts slow and unanswered requests, and is
   wired into the failed-run evidence.
