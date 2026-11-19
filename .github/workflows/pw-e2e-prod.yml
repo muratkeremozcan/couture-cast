@@ -22,11 +22,13 @@ permissions:
 
 # One run per ref. Web and API serve only the newest main commit, so a run left
 # going after the next push tests a deployment that moves under it (web-health-sha
-# then reads the newer SHA). The newer push supersedes the older run. A scheduled run
-# never cancels a push run: it waits for it, and a push still supersedes it.
+# then reads the newer SHA). The newer push supersedes the older run.
+# The daily scheduled run has its own group: in the push group it would cancel a running
+# push verification or replace a pending one. A push that deploys while the scheduled run
+# is testing can fail that scheduled run's SHA check; the push run then gives the verdict.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'push' }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'schedule' && '-status' || '' }}
+  cancel-in-progress: true
 
 jobs:
   # The ignored build step (ignoreCommand in apps/web/vercel.json and apps/api/vercel.json)

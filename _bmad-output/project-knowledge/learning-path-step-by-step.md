@@ -11754,8 +11754,10 @@ each merged on green CI. Most were CI reliability; three were product defects re
 3. **A flaky oracle is a test defect, not an app defect.**
    The advisory-lock test compared clocks from three processes (#241). A landing check read two
    boxes in two frames while the feed above them loaded (#250). Maestro flows centered elements
-   pinned to a scroll edge (#252) and erased text past the device deadline (#240). Each fix kept
-   the exact assertion and seeded the real defect to prove it still goes red.
+   pinned to a scroll edge (#252) and erased text past the device deadline (#240). The fixes kept
+   each invariant at the same strictness, and seeded the real defect to prove it still goes red.
+   #241 replaced its oracle: it checks enter and leave order in one shared log and per-worker
+   counts, and no longer compares clocks across processes.
 4. **A nightly lane that never passed proves nothing.**
    The iOS live font job shipped its Release build without the text layout probe (#237), then
    needed its legs to reach a verdict at all (#242, #247). The Android network-timeout flow sat

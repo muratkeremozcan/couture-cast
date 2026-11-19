@@ -275,9 +275,18 @@ day on a schedule (`41 11 * * *`, 11:41 UTC), and manually. It uses fixed Vercel
 The scheduled run is the production status check. Production can break with no merge: an expired
 secret, a provider outage, a plan quota or drifted data. The scheduled run waits for production to
 serve `main`'s latest commit (or one with the same build inputs), then runs the same suite a push
-runs. The `production status` badge at the top of the README shows the latest run on `main`.
-GitHub emails a failed scheduled run to the person who last changed its cron line. Only a push
-cancels a run in progress; a scheduled run waits behind a push run.
+runs. The `production status` badge at the top of the README shows the latest run on `main` and
+carries no age; the run list shows when it finished. GitHub can delay or drop a scheduled run, and
+disables a public repository's schedules after 60 days with no repository activity; re-enable
+them from the Actions tab.
+
+Failed scheduled runs notify the user who last changed the cron line, or who last re-enabled the
+workflow, through that user's Actions notification settings; with Actions notifications off, no
+email arrives.
+
+The scheduled run has its own concurrency group, so it never cancels a running push verification
+or replaces a pending one. A push that deploys while the scheduled run is testing can fail that
+scheduled run's SHA check; the push run then gives the verdict.
 
 Both projects are held to the pushed commit's source before tests start. A project whose build
 the ignored build step skipped keeps serving the last commit it built, so the `served-commits` job

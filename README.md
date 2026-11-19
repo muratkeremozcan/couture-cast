@@ -258,12 +258,15 @@ on iOS simulator.
 
 ### Production status
 
-The `production status` badge above reads [Production E2E](.github/workflows/pw-e2e-prod.yml) on
-`main`. It runs the production Playwright suite after every push to `main` and once a day at
-11:41 UTC, so a green badge means production served the latest `main` and passed within the last
-day.
-The nightly badges cover the native lanes (iOS, Android, watchOS, share card, accessibility focus)
-that only run on a schedule or by dispatch. See
+The `production status` badge above shows the latest run of
+[Production E2E](.github/workflows/pw-e2e-prod.yml) on `main`. That workflow runs the production
+Playwright suite after every push to `main` and once a day at 11:41 UTC. The badge carries no age:
+open its run list to see when the latest run finished. GitHub can delay or drop a scheduled run,
+and it disables the schedules of a public repository after 60 days with no repository activity, so
+a green badge with no run in the last day is stale.
+The other badges show the scheduled (nightly) runs of the native workflows: iOS, Android and
+watchOS run on a schedule or by dispatch only; the share-card and accessibility-focus workflows
+also run on pull requests and pushes to `main`. See
 [the deployment guide](_bmad-output/project-knowledge/deployment-guide.md#production-deployment-verification).
 
 ### API contract tooling
