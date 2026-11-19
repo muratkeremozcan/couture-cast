@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import { modalRenders } from '@/src/test-utils/edge-to-edge-modal'
 import { press } from '@/src/test-utils/press'
 /* eslint-disable @typescript-eslint/await-thenable */

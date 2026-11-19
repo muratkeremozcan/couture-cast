@@ -11834,7 +11834,16 @@ Hard-won lessons from the implementation and code review of this step:
   drags past the top of the feed after each capture, which fires pull-to-refresh. One refresh
   failed, and the app kept its error panel through every later refresh that succeeded. That was a
   real defect: a member who pulls again after a network blip saw the error above a feed that loaded.
-  A load that answers now clears a stale load error, and a failed withdraw stays on screen.
+  A load that answers now clears a stale load error, on the pull path and the realtime rebuild
+  alike (the review found the first fix covered only the pull), and a failed withdraw stays on
+  screen.
+- The first API record read the launcher's log, which holds no HTTP lines, so a failed leg would
+  have published an empty record; and it kept any lowercase path segment, which would have
+  published a lowercase private value once the right log was wired. It now reads the API child's
+  log and maps every path onto the OpenAPI contract's route templates.
+- The Gradle retry missed a resolution failure printed over several lines under a test task's own
+  `FAILED` line. The classifier now reads a cause nested under a failed download, and counts only
+  per-case failures as failing tests.
 - The tap retry first shipped with structural YAML tests only, which a retry that never retries
   passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
   with Maestro 2.8.0's rules; Maestro's web beta, the other option, crashed on the scripted page.
@@ -11919,15 +11928,17 @@ CI scripts, node:test:
   proves xcodebuild's failed commands are named, escaped names included, through the list footer,
   and that Swift errors, also in paths with spaces, and failed build scripts are classified.
 - [`scripts/ci/native-api-requests.test.mjs`](../../scripts/ci/native-api-requests.test.mjs):
-  proves the API record masks dynamic route segments, counts slow and unanswered requests, and is
-  wired into the failed-run evidence.
+  proves the API record reads the API child's log, names each request by its OpenAPI route
+  template (an unknown path reads `unknown`, so a lowercase private value never reaches the public
+  record), counts slow and unanswered requests, and runs after the service-exit check.
 
 Mobile, Vitest:
 
 - [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx)
-  (cases in `apps/mobile/src/test-utils/community-screen/feed.cases.tsx`): 6.1-MOB-096 proves a
-  refresh that answers clears an earlier load error; 6.1-MOB-097 proves it keeps a failed
-  withdraw.
+  (cases in `apps/mobile/src/test-utils/community-screen/feed.cases.tsx` and
+  `realtime.cases.tsx`): 6.1-MOB-096 proves a refresh that answers clears an earlier load error,
+  6.1-MOB-097 proves it keeps a failed withdraw, and 6.1-MOB-098 proves a realtime rebuild that
+  answers clears it too.
 
 Evidence boundaries:
 
