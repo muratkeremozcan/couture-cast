@@ -1,15 +1,23 @@
 // Learning path Step 58: Production status and nightly health.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
+//
+// These pin the model's implemented subset of the pinned Maestro 2.8.0 rules against the model's
+// own virtual clock. They prove the model applies the rules its header cites (taken from Maestro
+// commit b63727604c3f28fd97504d4f2d04371bad63e509); they cannot prove a real Maestro run times
+// out where the model does.
 import assert from 'node:assert/strict'
-import test from 'node:test'
+import test, { describe } from 'node:test'
+import { MAESTRO_PINNED_VERSION } from '../maestro-version.mjs'
 import {
-  MODEL_READ_MS,
-  MODEL_TAP_MS,
+  MAESTRO_LOOKUP_MS,
+  MAESTRO_MODEL_VERSION,
+  MAESTRO_NOT_VISIBLE_SEARCH_MS,
+  MAESTRO_OPTIONAL_LOOKUP_MS,
   MaestroModelStepFailed,
   runMaestroModel,
 } from './maestro-flow-model.mjs'
 
-const lookupMs = 3 * MODEL_READ_MS
+const timing = { readMs: 100, settleMs: 300, pressMs: 50 }
 
 /** A screen whose elements show from a fixed time, recording every press. */
 function screen(shownFrom = {}) {
@@ -22,127 +30,187 @@ function screen(shownFrom = {}) {
 }
 const failing = { extendedWaitUntil: { visible: { id: 'never' }, timeout: 2_000 } }
 
-test('a retry block runs maxRetries + 1 times, restarting at its first command', () => {
-  const s = screen({ button: 0 })
-  assert.throws(
-    () =>
+describe('runMaestroModel', () => {
+  describe('pinned release and constants', () => {
+    test('model: its rules were read from the Maestro release the repository pins', () => {
+      // A bump of MAESTRO_PINNED_VERSION fails here until the rules above are read again from the new
+      // release and MAESTRO_MODEL_VERSION moves with them.
+      assert.equal(MAESTRO_MODEL_VERSION, MAESTRO_PINNED_VERSION)
+    })
+    test('model: the pinned constants are the 17 s lookup, the 7 s optional lookup and the 500 ms notVisible search', () => {
+      assert.deepEqual(
+        [MAESTRO_LOOKUP_MS, MAESTRO_OPTIONAL_LOOKUP_MS, MAESTRO_NOT_VISIBLE_SEARCH_MS],
+        [17_000, 7_000, 500]
+      )
+    })
+  })
+  describe('retry', () => {
+    test('model: a retry block runs maxRetries + 1 times, restarting at its first command', () => {
+      const s = screen({ button: 0 })
+      assert.throws(
+        () =>
+          runMaestroModel(
+            [
+              {
+                retry: {
+                  maxRetries: 2,
+                  commands: [{ tapOn: { id: 'button' } }, failing],
+                },
+              },
+            ],
+            s,
+            timing
+          ),
+        (error) => error instanceof MaestroModelStepFailed && /never/.test(error.message)
+      )
+      assert.equal(s.presses.length, 3)
+    })
+    test('model: maxRetries reads as an integer (a non-integer reads as 1), caps at 3, and a negative runs nothing', () => {
+      for (const [maxRetries, presses] of [
+        [undefined, 2],
+        [0, 1],
+        [3, 4],
+        [5, 4],
+        ['2', 3],
+        ['two', 2],
+      ]) {
+        const s = screen({ button: 0 })
+        const retry = { commands: [{ tapOn: { id: 'button' } }, failing] }
+        if (maxRetries !== undefined) retry.maxRetries = maxRetries
+        assert.throws(
+          () => runMaestroModel([{ retry }], s, timing),
+          MaestroModelStepFailed
+        )
+        assert.equal(s.presses.length, presses, `maxRetries ${maxRetries}`)
+      }
+      const s = screen({ button: 0 })
       runMaestroModel(
-        [{ retry: { maxRetries: 2, commands: [{ tapOn: { id: 'button' } }, failing] } }],
+        [{ retry: { maxRetries: -1, commands: [{ tapOn: { id: 'button' } }, failing] } }],
         s,
-        { lookupMs }
-      ),
-    (error) => error instanceof MaestroModelStepFailed && /never/.test(error.message)
-  )
-  assert.equal(s.presses.length, 3)
-})
-
-test('retry defaults to one retry and caps maxRetries at 3, as the pinned Maestro does', () => {
-  for (const [maxRetries, presses] of [
-    [undefined, 2],
-    [0, 1],
-    [3, 4],
-    [5, 4],
-    ['2', 3],
-  ]) {
-    const s = screen({ button: 0 })
-    const retry = { commands: [{ tapOn: { id: 'button' } }, failing] }
-    if (maxRetries !== undefined) retry.maxRetries = maxRetries
-    assert.throws(
-      () => runMaestroModel([{ retry }], s, { lookupMs }),
-      MaestroModelStepFailed
-    )
-    assert.equal(s.presses.length, presses, `maxRetries ${maxRetries}`)
-  }
-})
-
-test('a retry block that passes on a later attempt passes the flow', () => {
-  const s = screen({ button: 0, done: 5_000 })
-  const elapsed = runMaestroModel(
-    [
-      {
-        retry: {
-          maxRetries: 3,
-          commands: [
-            { tapOn: { id: 'button' } },
-            { extendedWaitUntil: { visible: { id: 'done' }, timeout: 2_000 } },
-          ],
-        },
-      },
-    ],
-    s,
-    { lookupMs }
-  )
-  assert.equal(s.presses.length, 2)
-  assert.ok(elapsed >= 5_000)
-})
-
-test('when: notVisible passes at once for an absent element and fails after the window for a shown one', () => {
-  const run = (shownFrom) => {
-    const s = screen(shownFrom)
-    const elapsed = runMaestroModel(
-      [
+        timing
+      )
+      assert.equal(s.presses.length, 0)
+    })
+  })
+  describe('tapOn', () => {
+    test('model: a tap reads once, settles, presses once and settles again', () => {
+      const s = screen({ button: 0 })
+      const elapsed = runMaestroModel([{ tapOn: { id: 'button' } }], s, timing)
+      const pressedAt = timing.readMs + timing.settleMs + timing.pressMs
+      assert.deepEqual(s.presses, [{ id: 'button', at: pressedAt }])
+      assert.equal(elapsed, pressedAt + timing.settleMs)
+    })
+    test('model: tapOn looks up for 17 s, 7 s when optional, and optional turns only that failure into a pass', () => {
+      assert.throws(
+        () => runMaestroModel([{ tapOn: { id: 'missing' } }], screen(), timing),
+        (error) =>
+          error instanceof MaestroModelStepFailed &&
+          error.message === 'tapOn missing: not visible' &&
+          error.elapsedMs === MAESTRO_LOOKUP_MS
+      )
+      const s = screen({ next: 0 })
+      const elapsed = runMaestroModel(
+        [{ tapOn: { id: 'missing', optional: true } }, { tapOn: { id: 'next' } }],
+        s,
+        timing
+      )
+      assert.deepEqual(
+        s.presses.map(({ id }) => id),
+        ['next']
+      )
+      // The optional lookup gave up at 7 s; the later tap's window shrank by those 7 s and still read.
+      assert.equal(
+        s.presses[0].at,
+        MAESTRO_OPTIONAL_LOOKUP_MS + timing.readMs + timing.settleMs + timing.pressMs
+      )
+      assert.equal(elapsed, s.presses[0].at + timing.settleMs)
+    })
+  })
+  describe('lookup windows', () => {
+    test('model: a window shrinks by the time since the last tap, and a zero window still reads once', () => {
+      // After the tap, an optional 2 s wait that misses leaves a second 2 s wait no time: it reads
+      // exactly once.
+      const tapped = timing.readMs + 2 * timing.settleMs + timing.pressMs
+      const commands = [
+        { tapOn: { id: 'button' } },
+        { extendedWaitUntil: { visible: { id: 'gap' }, timeout: 2_000, optional: true } },
+        { extendedWaitUntil: { visible: { id: 'late' }, timeout: 2_000 } },
+      ]
+      // The one read lands at tapped + 2 s + one read: shown by then, the wait passes.
+      const passes = screen({ button: 0, late: tapped + 2_000 + timing.readMs })
+      assert.equal(
+        runMaestroModel(commands, passes, timing),
+        tapped + 2_000 + timing.readMs
+      )
+      // Shown one millisecond later, the single read misses it and the wait fails at once.
+      const misses = screen({ button: 0, late: tapped + 2_000 + timing.readMs + 1 })
+      assert.throws(
+        () => runMaestroModel(commands, misses, timing),
+        (error) =>
+          error instanceof MaestroModelStepFailed &&
+          error.elapsedMs === tapped + 2_000 + timing.readMs
+      )
+    })
+  })
+  describe('when', () => {
+    test('model: when-notVisible runs nested 500 ms lookups and passes only on one that misses the element', () => {
+      const guarded = [
         {
           runFlow: {
             when: { visible: { id: 'button' }, notVisible: { id: 'sheet' } },
             commands: [{ tapOn: { id: 'button' } }],
           },
         },
-      ],
-      s,
-      { lookupMs }
-    )
-    return { presses: s.presses.length, elapsed }
-  }
-  // Two reads (button shown, sheet absent), then the tap's lookup read and the press.
-  assert.deepEqual(run({ button: 0 }), {
-    presses: 1,
-    elapsed: 3 * MODEL_READ_MS + MODEL_TAP_MS,
+      ]
+      // Sheet absent: one visible read, then one nested search of 500 ms of reads, then the tap.
+      const absent = screen({ button: 0 })
+      runMaestroModel(guarded, absent, timing)
+      const searched = timing.readMs + MAESTRO_NOT_VISIBLE_SEARCH_MS
+      assert.deepEqual(absent.presses, [
+        { id: 'button', at: searched + timing.readMs + timing.settleMs + timing.pressMs },
+      ])
+      // Sheet shown throughout: nested searches find it until the 7 s window (less the visible read)
+      // is spent, and nothing is pressed.
+      const shown = screen({ button: 0, sheet: 0 })
+      const elapsed = runMaestroModel(guarded, shown, timing)
+      assert.equal(shown.presses.length, 0)
+      assert.equal(elapsed, MAESTRO_OPTIONAL_LOOKUP_MS)
+      // No button within 7 s: the condition fails before notVisible is read.
+      const none = screen({})
+      assert.equal(runMaestroModel(guarded, none, timing), MAESTRO_OPTIONAL_LOOKUP_MS)
+      assert.equal(none.presses.length, 0)
+    })
   })
-  // The sheet stays shown: notVisible reads for its whole window, and nothing is pressed.
-  assert.deepEqual(run({ button: 0, sheet: 0 }), {
-    presses: 0,
-    elapsed: MODEL_READ_MS + lookupMs,
+  describe('unsupported input', () => {
+    test('model: an unknown command, key, selector or condition throws instead of being skipped', () => {
+      for (const commands of [
+        [{ scrollUntilVisible: { element: { id: 'a' } } }],
+        [{ tapOn: { id: 'a', index: 2 } }],
+        [{ tapOn: { text: 'Open' } }],
+        [{ runFlow: { when: { platform: 'iOS' }, commands: [] } }],
+        [{ runFlow: { file: 'other.yaml' } }],
+        [{ extendedWaitUntil: { notVisible: { id: 'a' }, timeout: 1_000 } }],
+        [{ tapOn: { id: 'a' }, assertVisible: { id: 'a' } }],
+        ['waitForAnimationToEnd'],
+      ])
+        assert.throws(
+          () => runMaestroModel(commands, screen({ a: 0 }), timing),
+          /maestro_model_unsupported/,
+          JSON.stringify(commands)
+        )
+      assert.throws(
+        () =>
+          runMaestroModel(
+            [{ extendedWaitUntil: { visible: { id: 'a' } } }],
+            screen({ a: 0 }),
+            timing
+          ),
+        /maestro_model_extended_wait_timeout/
+      )
+      assert.throws(
+        () => runMaestroModel([], screen(), { ...timing, readMs: 0 }),
+        /maestro_model_read_ms/
+      )
+    })
   })
-  // No button within the window: the condition fails before notVisible is read.
-  assert.deepEqual(run({}), { presses: 0, elapsed: lookupMs })
-})
-
-test('tapOn fails when its element never shows; optional turns only that failure into a pass', () => {
-  assert.throws(
-    () => runMaestroModel([{ tapOn: { id: 'missing' } }], screen(), { lookupMs }),
-    (error) =>
-      error instanceof MaestroModelStepFailed &&
-      error.message === 'tapOn missing: not visible' &&
-      error.elapsedMs === lookupMs
-  )
-  const s = screen({ next: 0 })
-  runMaestroModel(
-    [{ tapOn: { id: 'missing', optional: true } }, { tapOn: { id: 'next' } }],
-    s,
-    { lookupMs }
-  )
-  assert.deepEqual(
-    s.presses.map(({ id }) => id),
-    ['next']
-  )
-})
-
-test('an unknown command, key, selector or condition throws instead of being skipped', () => {
-  for (const commands of [
-    [{ scrollUntilVisible: { element: { id: 'a' } } }],
-    [{ tapOn: { id: 'a', index: 2 } }],
-    [{ tapOn: { text: 'Open' } }],
-    [{ runFlow: { when: { platform: 'iOS' }, commands: [] } }],
-    [{ runFlow: { file: 'other.yaml' } }],
-    [{ extendedWaitUntil: { notVisible: { id: 'a' }, timeout: 1_000 } }],
-    [{ extendedWaitUntil: { visible: { id: 'a' } } }],
-    [{ retry: { maxRetries: -1, commands: [] } }],
-    [{ tapOn: { id: 'a' }, assertVisible: { id: 'a' } }],
-    ['waitForAnimationToEnd'],
-  ])
-    assert.throws(
-      () => runMaestroModel(commands, screen({ a: 0 }), { lookupMs }),
-      /maestro_model_unsupported/,
-      JSON.stringify(commands)
-    )
 })

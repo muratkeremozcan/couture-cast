@@ -31,6 +31,7 @@ import {
   systemSurfaceSummary,
   logSize,
   maestroLogCommands,
+  outfitOpenerTaps,
   slowMaestroCommands,
 } from './native-ios-maestro-trace.mjs'
 
@@ -1321,4 +1322,59 @@ test("after a deadline kill the after-timeout screen wins over an earlier retry'
   assert.equal(unread.hierarchySource, 'unavailable-after-timeout')
   assert.equal(unread.systemSurface, null)
   assert.equal(unread.earlierRetryHierarchy, true)
+})
+
+// tap-outfit-open.yaml retries a cancelled opener press up to four times and passes, so a rise in
+// lost first presses would stay hidden without a count of the presses each flow issued.
+const openerRetryLog = [
+  stamped('10:00:00.000', 'Run flow tap-outfit-open.yaml RUNNING'),
+  stamped('10:00:01.000', 'Tap on id: outfit-share-card-open, Index: 0 RUNNING'),
+  stamped('10:00:02.000', 'Tap on id: outfit-share-card-open, Index: 0 COMPLETED'),
+  stamped('10:00:10.000', 'Assert that id: share-card-title is visible FAILED'),
+  stamped('10:00:11.000', 'Tap on id: outfit-share-card-open RUNNING'),
+  stamped('10:00:12.000', 'Tap on id: outfit-share-card-open COMPLETED'),
+  stamped('10:00:12.500', 'Tap on id: outfit-share-card-open-later RUNNING'),
+  stamped('10:00:13.000', 'Tap on id: share-card-save RUNNING'),
+  // A press the deadline killed before it completed still counts.
+  stamped('10:00:14.000', 'Tap on id: outfit-share-card-open RUNNING'),
+].join('\n')
+
+test('outfitOpenerTaps counts each outfit opener press the progressive log started, and nothing else', () => {
+  assert.equal(outfitOpenerTaps(openerRetryLog), 3)
+  assert.equal(outfitOpenerTaps(heldKilledLog), 1)
+  assert.equal(outfitOpenerTaps(killedLog), 0)
+  assert.equal(outfitOpenerTaps(undefined), 0)
+})
+
+test('a passing flow records how many opener presses it took, and warns when it took more than one', (t) => {
+  const output = outputWith(t, [row('tapOnElement', 2000)])
+  const directory = outputWith(t, [])
+  const lines = []
+  const record = (flow, progressLog) =>
+    recordIosCommandTimings({
+      platform: 'ios',
+      flow,
+      output,
+      directory,
+      progressLog,
+      log: (line) => lines.push(line),
+    })
+  record('open-outfit.yaml', openerRetryLog)
+  record('preparing-cancel.yaml', openerRetryLog.split('\n').slice(0, 3).join('\n'))
+  record('settings.yaml', killedLog)
+  const receipt = JSON.parse(
+    fs.readFileSync(path.join(directory, 'native-ios-flow-command-timings.json'))
+  )
+  assert.deepEqual(
+    receipt.flows.map((f) => [f.flow, f.outfitOpenerTaps, f.source]),
+    [
+      ['open-outfit.yaml', 3, undefined],
+      ['preparing-cancel.yaml', 1, undefined],
+      ['settings.yaml', undefined, undefined],
+    ]
+  )
+  assert.deepEqual(lines, [
+    JSON.stringify({ outfitOpenerRetried: { flow: 'open-outfit.yaml', taps: 3 } }),
+  ])
+  assert.doesNotMatch(JSON.stringify(receipt), /share-card-title|outfit-share-card-open/)
 })

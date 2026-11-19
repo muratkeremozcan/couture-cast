@@ -5,7 +5,10 @@ appId: ${MAESTRO_APP_ID}
 # tapped the opener clear of the chip bar and the tab bar, and the app logged opener-press-in and
 # then opener-touch-cancel 0.2 s later, so the Home ScrollView took the touch and the sheet never
 # opened. The title is the first thing an opened sheet shows, in every state (preparing, loaded,
-# unavailable), so a press that only landed late already shows it and is never repeated.
+# unavailable). The guard skips the tap when the title is on screen by its own read: under the
+# pinned Maestro that is up to one hierarchy read plus a 500 ms search after the 8 s wait gives up,
+# since the wait used up the guard's 7 s window. A title that draws later than that gets a second
+# press; scripts/lib/story68-outfit-open-tap.test.mjs runs both sides of that boundary.
 - retry:
     maxRetries: 3
     commands:

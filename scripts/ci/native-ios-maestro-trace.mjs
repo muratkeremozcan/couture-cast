@@ -64,6 +64,7 @@ export function recordIosCommandTimings({
   directory,
   minMs = 1000,
   maestroLog = '',
+  progressLog = '',
   log = console.log,
 }) {
   if (platform !== 'ios') return null
@@ -71,6 +72,12 @@ export function recordIosCommandTimings({
     commandFiles(output).length || !maestroLog
       ? { flow, commands: slowMaestroCommands(output, minMs) }
       : { flow, source: 'maestro-log', commands: maestroLogCommands(maestroLog, minMs) }
+  // tap-outfit-open.yaml retries a cancelled opener press up to four times and still passes, so
+  // the count of presses it issued is the only record of how often the first one is lost.
+  const openerTaps = outfitOpenerTaps(progressLog || maestroLog)
+  if (openerTaps > 0) entry.outfitOpenerTaps = openerTaps
+  if (openerTaps > 1)
+    log(JSON.stringify({ outfitOpenerRetried: { flow, taps: openerTaps } }))
   const file = path.join(directory, 'native-ios-flow-command-timings.json')
   try {
     const record = fs.existsSync(file)
@@ -90,6 +97,19 @@ const PROGRESS_LINE =
   /^(\d{2}):(\d{2}):(\d{2})\.(\d{3}) \[ *\w+\] maestro\.cli\.runner\.MaestroCommandRunner\.runCommands\$lambda\$\d+: (.*) (RUNNING|COMPLETED|FAILED|SKIPPED)$/
 // Only the leading words of a command label are kept: never its quoted text or coordinates.
 const verbOf = (label) => /^[A-Za-z]+(?: [A-Za-z]+){0,2}/.exec(label)?.[0] ?? 'unknown'
+
+// The outfit opener tap as the progressive log labels it, with or without its `, Index: 0`.
+const OUTFIT_OPENER_TAP = /^Tap on id: outfit-share-card-open(?:,|$)/
+
+/** How many outfit opener presses a flow issued: one RUNNING line per press, counted only. */
+export function outfitOpenerTaps(log) {
+  let taps = 0
+  for (const line of String(log ?? '').split('\n')) {
+    const match = PROGRESS_LINE.exec(line)
+    if (match?.[6] === 'RUNNING' && OUTFIT_OPENER_TAP.test(match[5])) taps++
+  }
+  return taps
+}
 
 const progressSeconds = (h, m, sec, ms) =>
   Number(h) * 3600 + Number(m) * 60 + Number(sec) + Number(ms) / 1000

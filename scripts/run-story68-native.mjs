@@ -591,7 +591,13 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   )
   if (recoverSnapshot) return maestro(flow, env, secret, attempt + 1)
   if (result.status !== 0) throw new Error(`native_flow_failed:${flow}`)
-  recordIosCommandTimings({ platform, flow, output: successOutput, directory })
+  recordIosCommandTimings({
+    platform,
+    flow,
+    output: successOutput,
+    directory,
+    progressLog: snapshotLog,
+  })
   recordIosStackPop({
     platform,
     flow,
