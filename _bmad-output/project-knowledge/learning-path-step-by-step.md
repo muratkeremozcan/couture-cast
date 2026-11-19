@@ -11875,6 +11875,14 @@ Hard-won lessons from the implementation and code review of this story:
   Maestro started, so a rise in retries shows in the evidence; a started command is not proof of
   a delivered touch. The model proves
   scripted control flow, not device touch delivery or real hierarchy timing.
+- This pull request's own dispatch of the accessibility workflow then failed on
+  `Could not find junit-4.13.2.jar`, a file Maven Central serves; the pull request run of the same
+  workflow had passed on the same cache 22 minutes earlier. Gradle 8.14.3 caches a missing-artifact
+  result for a day, so a plain rerun in the same Gradle home fails again. The classifier now counts
+  a missing file for a resolved module, inside Gradle's cause tree, as transient, and the retry
+  adds `--refresh-dependencies`; a missing module or version still fails at once. The story68
+  Android build, whose share-card lane failed in 15 s with no task named, now runs through the same
+  retry, and the build summary names plugin and dependency failures.
 - This pull request's own Playwright shard failed before any test: the WebKit package cache hit,
   then a refused `security.ubuntu.com` fetch made the install script drop every cached package,
   and the re-download from a slow mirror ran into the 600 s bound. A partial index refresh now

@@ -50,6 +50,7 @@ function fixtureRepo(t) {
   write('scripts/lib/helper.mjs', 'export const a = 1\n')
   write('scripts/run-live-font-proof.mjs', "import './lib/live-font-journey.mjs'\n")
   write('scripts/run-story68-native.mjs', '')
+  write('scripts/ci/gradle-resolution-retry.mjs', '')
   const commit = (message) => {
     git('add', '-A')
     git('commit', '-q', '-m', message)

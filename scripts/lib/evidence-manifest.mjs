@@ -49,6 +49,13 @@ const HARNESS_DATA = [
  * named by repository path, which a harness spawns). Data a harness reads by repository path is
  * listed here; evidence-manifest.test.mjs fails when a harness names one its leg does not cover.
  */
+// The story68 harness and the Gradle retry its Android build runs through (PR 256), a script
+// story68-native-build.mjs spawns by repository path.
+const STORY68_HARNESS = [
+  'scripts/run-story68-native.mjs',
+  'scripts/ci/gradle-resolution-retry.mjs',
+]
+
 export const LEGS = {
   'live-font': {
     // The runner loads the manifest module by URL for the volatile-key proof.
@@ -59,12 +66,12 @@ export const LEGS = {
       'scripts/lib/evidence-manifest.mjs',
     ],
     globs: ['scripts/lib/live-font-*'],
-    entries: ['scripts/run-live-font-proof.mjs', 'scripts/run-story68-native.mjs'],
+    entries: ['scripts/run-live-font-proof.mjs', ...STORY68_HARNESS],
   },
   'ios-build': {
     paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: ['scripts/lib/story68-*'],
-    entries: ['scripts/run-story68-native.mjs'],
+    entries: [...STORY68_HARNESS],
   },
   'network-timeout': {
     paths: [...SHARED_INPUTS],
@@ -90,7 +97,7 @@ export const LEGS = {
     ],
     globs: [],
     entries: [
-      'scripts/run-story68-native.mjs',
+      ...STORY68_HARNESS,
       'scripts/lib/minified-debuggable-evidence.mjs',
       'scripts/run-test-store-journey.mjs',
       'scripts/test-store-preview-webhook.mjs',
@@ -99,7 +106,7 @@ export const LEGS = {
   upgrade: {
     paths: [...SHARED_INPUTS, ...SERVER_INPUTS, ...HARNESS_DATA],
     globs: [],
-    entries: ['scripts/run-story68-native.mjs'],
+    entries: [...STORY68_HARNESS],
   },
 }
 
