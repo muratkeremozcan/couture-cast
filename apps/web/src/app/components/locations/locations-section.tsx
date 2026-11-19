@@ -20,11 +20,13 @@ import {
   type SavedLocation,
 } from '@couture/api-client/contracts/http'
 import {
+  captureLocationCredentials,
   deleteLocationFromWeb,
   listLocationsFromWeb,
   LocationRequestError,
   renameLocationFromWeb,
   setPrimaryLocationFromWeb,
+  type LocationCredentials,
   type LocationFailureReason,
 } from '../../../lib/locations'
 import {
@@ -34,7 +36,7 @@ import {
   safeReturnPath,
 } from './location-format'
 import { currentWebSessionOwner, useWebSession } from '../../../lib/use-web-session'
-import { LocationSearchForm } from './location-search-form'
+import { LocationSearchForm, type LocationClaim } from './location-search-form'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -62,7 +64,8 @@ export function LocationsSection() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const itemRefs = useRef(new Map<string, HTMLElement>())
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const pendingFocusRef = useRef<string | null>(null)
+  /** Where focus goes once the change renders, with the ownership check of the work that set it. */
+  const pendingFocusRef = useRef<{ target: string; current: () => boolean } | null>(null)
   const session = useWebSession()
   const owner = session.status === 'signed_in' ? session.owner : null
   const [loadAttempt, setLoadAttempt] = useState(0)
@@ -87,6 +90,25 @@ export function LocationsSection() {
       currentWebSessionOwner() === startedFor
   }, [])
 
+  /**
+   * Fixes the credentials of one member-owned operation at the moment the
+   * member acts: the owner this section rendered for, which must still be the
+   * one the session bridge names, and the bearer this tab holds now. Every
+   * request in the operation sends that bearer, and every step after an await
+   * (and every deferred announcement, focus or navigation) checks `current`.
+   * Null refuses the action: the member already changed.
+   */
+  const claim = useCallback((): LocationClaim | null => {
+    if (owner === null || currentWebSessionOwner() !== owner) return null
+    const credentials = captureLocationCredentials()
+    if (!credentials) return null
+    return { current: ownedBy(owner), credentials }
+  }, [owner, ownedBy])
+
+  const focusLater = useCallback((target: string, current: () => boolean) => {
+    pendingFocusRef.current = { target, current }
+  }, [])
+
   const loadErrorMessage = t('locations.loadError')
 
   /*
@@ -107,9 +129,10 @@ export function LocationsSection() {
    * left while it was in flight.
    */
   const reload = useCallback(
-    async (current: () => boolean, signal?: AbortSignal): Promise<boolean> => {
+    async (claimed: LocationClaim, signal?: AbortSignal): Promise<boolean> => {
+      const { current, credentials } = claimed
       if (!current()) return false
-      const next = await listLocationsFromWeb(signal)
+      const next = await listLocationsFromWeb(signal, credentials)
       if (signal?.aborted || !current()) return false
       setLocations(next)
       setSectionState('ready')
@@ -154,15 +177,17 @@ export function LocationsSection() {
       setSectionState('signed_out')
       return
     }
+    // The bridge publishes again once it names a member; until then nothing is asked.
+    const claimed = claim()
+    if (!claimed) return
     const controller = new AbortController()
-    const current = ownedBy(owner)
     setSectionState('loading')
-    reload(current, controller.signal).catch(() => {
-      if (controller.signal.aborted || !current()) return
+    reload(claimed, controller.signal).catch(() => {
+      if (controller.signal.aborted || !claimed.current()) return
       setSectionState('load_failed')
     })
     return () => controller.abort()
-  }, [reload, ownedBy, session.status, owner, loadAttempt])
+  }, [reload, claim, session.status, owner, loadAttempt])
 
   function retryLoad() {
     if (session.status === 'unavailable') session.retry()
@@ -171,10 +196,14 @@ export function LocationsSection() {
 
   // Focus moves to the item an action changed, once it has rendered.
   useEffect(() => {
-    const id = pendingFocusRef.current
-    if (!id) return
+    const pending = pendingFocusRef.current
+    if (!pending) return
     pendingFocusRef.current = null
-    const target = id === 'heading' ? headingRef.current : itemRefs.current.get(id)
+    if (!pending.current()) return
+    const target =
+      pending.target === 'heading'
+        ? headingRef.current
+        : itemRefs.current.get(pending.target)
     target?.focus()
   }, [locations, renamingId, confirmingId])
 
@@ -185,20 +214,22 @@ export function LocationsSection() {
    */
   async function run(
     locationId: string,
-    mutate: () => Promise<unknown>,
+    mutate: (credentials: LocationCredentials) => Promise<unknown>,
     settled: () => string,
     focusAfter: string
   ): Promise<void> {
     if (busyId) return
-    const current = ownedBy(owner)
+    const claimed = claim()
+    if (!claimed) return
+    const { current } = claimed
     setBusyId(locationId)
     setError(null)
     try {
-      await mutate()
+      await mutate(claimed.credentials)
       if (!current()) return
       const message = settled()
-      if (!(await reload(current)) || !current()) return
-      pendingFocusRef.current = focusAfter
+      if (!(await reload(claimed)) || !current()) return
+      focusLater(focusAfter, current)
       announce(message, current)
     } catch (caught) {
       if (current()) setError(reasonOf(caught))
@@ -210,7 +241,7 @@ export function LocationsSection() {
   function makePrimary(location: SavedLocation) {
     void run(
       location.id,
-      () => setPrimaryLocationFromWeb(location.id),
+      (credentials) => setPrimaryLocationFromWeb(location.id, credentials),
       () => t('locations.primaryChanged', { label: location.label }),
       location.id
     )
@@ -221,7 +252,7 @@ export function LocationsSection() {
     if (!label) return
     void run(
       location.id,
-      () => renameLocationFromWeb(location.id, label),
+      (credentials) => renameLocationFromWeb(location.id, label, credentials),
       () => {
         setRenamingId(null)
         return t('locations.renamed', { label })
@@ -233,7 +264,7 @@ export function LocationsSection() {
   function confirmDelete(location: SavedLocation) {
     void run(
       location.id,
-      () => deleteLocationFromWeb(location.id),
+      (credentials) => deleteLocationFromWeb(location.id, credentials),
       () => {
         setConfirmingId(null)
         return t('locations.deleted', { label: location.label })
@@ -242,16 +273,17 @@ export function LocationsSection() {
     )
   }
 
-  async function handleSaved(location: SavedLocation) {
-    const current = ownedBy(owner)
+  /** The form's save, continued with the claim the member made when they saved. */
+  async function handleSaved(location: SavedLocation, claimed: LocationClaim) {
+    const { current } = claimed
     if (!current()) return
-    const loaded = await reload(current).catch(() => {
+    const loaded = await reload(claimed).catch(() => {
       if (current()) setSectionState('load_failed')
       return false
     })
     if (!loaded || !current()) return
     announce(t('locations.saved', { label: location.label }), current)
-    pendingFocusRef.current = location.id
+    focusLater(location.id, current)
     const target = safeReturnPath(returnTo, window.location.origin)
     if (target && current()) router.push(target)
   }
@@ -369,7 +401,7 @@ export function LocationsSection() {
                           onKeyDown={(event) => {
                             if (event.key === 'Escape') {
                               setRenamingId(null)
-                              pendingFocusRef.current = location.id
+                              focusLater(location.id, ownedBy(owner))
                             }
                           }}
                           className="rounded-md border border-neutral-600 bg-neutral-900 px-3 text-white"
@@ -388,7 +420,7 @@ export function LocationsSection() {
                         type="button"
                         onClick={() => {
                           setRenamingId(null)
-                          pendingFocusRef.current = location.id
+                          focusLater(location.id, ownedBy(owner))
                         }}
                         className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
                       >
@@ -417,7 +449,7 @@ export function LocationsSection() {
                         type="button"
                         onClick={() => {
                           setConfirmingId(null)
-                          pendingFocusRef.current = location.id
+                          focusLater(location.id, ownedBy(owner))
                         }}
                         className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
                       >
@@ -480,9 +512,10 @@ export function LocationsSection() {
               key={owner ?? 'signed-out'}
               locale={locale}
               autoFocus={guided}
-              announce={(message) => announce(message, ownedBy(owner))}
-              onSaved={(location) => {
-                void handleSaved(location)
+              claim={claim}
+              announce={announce}
+              onSaved={(location, claimed) => {
+                void handleSaved(location, claimed)
               }}
             />
           )}

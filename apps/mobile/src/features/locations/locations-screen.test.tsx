@@ -3,7 +3,7 @@
 // Story 1.2b: the mobile Locations screen through MSW, so the request shapes,
 // the platform header and the contract parsing run with the UI. Input goes
 // through the browser runner's real user events.
-import React from 'react'
+import React, { useState } from 'react'
 import { userEvent } from 'vitest/browser'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -188,7 +188,9 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
       'en-US',
       expect.anything(),
       // The ownership check the request runs after its bearer resolves.
-      expect.any(Function)
+      expect.any(Function),
+      // The bearer captured when the quiet wait started.
+      expect.any(Promise)
     )
     vi.useRealTimers()
 
@@ -720,6 +722,20 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
       expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
       expect(screen.queryByText('Alpha Home')).toBeNull()
     })
+
+    it('LOC-ANNOUNCE-MOB-01 a confirmation already read out leaves the live region at sign-out', async () => {
+      server.use(searchHandler(), saveHandler())
+      renderScreen()
+      await screen.findByTestId('location-label-0')
+      await searchAndChoose()
+      await userEvent.fill(await screen.findByTestId('location-label-input'), 'Home')
+      await userEvent.click(screen.getByTestId('location-save-button'))
+      await waitFor(() => expect(liveRegion()).toBe('Home saved.'))
+
+      switchTo({ member: null, bearer: null })
+
+      await waitFor(() => expect(liveRegion()).toBe(''))
+    })
   })
 
   /*
@@ -761,5 +777,32 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     await renameLocationFromMobile('loc-1', 'Studio', undefined, () => answered.owned)
     expect(mutations).toEqual(['rename'])
     expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('LOC-SAVE-MOB-01 a guided save that returns to the last screen is still confirmed, once', async () => {
+    server.use(searchHandler(), saveHandler())
+    const { announcements, stop } = recordAnnouncements()
+    cleanups.push(stop)
+    let leave = () => undefined as void
+    function Host() {
+      const [shown, setShown] = useState(true)
+      leave = () => setShown(false)
+      return shown ? <LocationsScreen guided /> : null
+    }
+    render(
+      <AccessibilityAnnouncerProvider>
+        <Host />
+      </AccessibilityAnnouncerProvider>
+    )
+    routerMock.back.mockImplementationOnce(() => leave())
+
+    await searchAndChoose()
+    await userEvent.fill(await screen.findByTestId('location-label-input'), 'Home')
+    await userEvent.click(screen.getByTestId('location-save-button'))
+
+    await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId('locations-screen')).toBeNull()
+    await waitFor(() => expect(liveRegion()).toBe('Home saved.'))
+    expect(announcements.filter((entry) => entry.text === 'Home saved.')).toHaveLength(1)
   })
 })

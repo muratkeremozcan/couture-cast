@@ -15,6 +15,7 @@ import {
   getAnnouncementUrgency,
   type AccessibilityAnnouncementEvent,
 } from '@couture/utils'
+import { subscribeMobileApplicationUser } from '@/src/lib/mobile-auth'
 
 export interface AnnounceOptions {
   /**
@@ -41,6 +42,8 @@ interface RenderedAnnouncement {
   message: string
   urgency: 'polite' | 'assertive'
   id: number
+  /** Belongs to the signed-in member (it was announced with `stillCurrent`). */
+  memberOwned: boolean
 }
 
 const AccessibilityAnnouncerContext = createContext<Announce | null>(null)
@@ -59,6 +62,24 @@ export function AccessibilityAnnouncerProvider({ children }: PropsWithChildren) 
         clearTimeout(timerRef.current)
       }
     },
+    []
+  )
+
+  // A change of member (sign-out included) takes the last member's announcements with it: the
+  // queued one, the one still in the live region, and the memory used to skip repeats.
+  useEffect(
+    () =>
+      subscribeMobileApplicationUser(() => {
+        if (pendingRef.current?.stillCurrent) {
+          pendingRef.current = null
+          if (timerRef.current) {
+            clearTimeout(timerRef.current)
+            timerRef.current = null
+          }
+        }
+        lastMessageRef.current = ''
+        setRendered((current) => (current?.memberOwned ? null : current))
+      }),
     []
   )
 
@@ -124,6 +145,7 @@ export function AccessibilityAnnouncerProvider({ children }: PropsWithChildren) 
           message: pending.message,
           urgency: pending.urgency,
           id: announcementIdRef.current,
+          memberOwned: Boolean(pending.stillCurrent),
         })
 
         if (Platform.OS === 'web') {

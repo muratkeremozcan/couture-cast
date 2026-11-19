@@ -111,15 +111,36 @@ async function locationError(error: unknown): Promise<LocationRequestError> {
   )
 }
 
-function client() {
-  return createWebApiClient({ accessToken: readAccessToken() })
+/**
+ * The bearer a member-owned operation captured when the member acted. Every request in that
+ * operation sends this one, never a later read of session storage, so one member's data can only
+ * travel under that member's token.
+ */
+export interface LocationCredentials {
+  readonly accessToken: string
+}
+
+/** The bearer this tab holds right now, captured for one operation, or null when signed out. */
+export function captureLocationCredentials(): LocationCredentials | null {
+  const token =
+    typeof window === 'undefined'
+      ? null
+      : (readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
+  return token ? { accessToken: token } : null
+}
+
+function client(credentials?: LocationCredentials) {
+  return createWebApiClient({
+    accessToken: credentials?.accessToken ?? readAccessToken(),
+  })
 }
 
 export async function listLocationsFromWeb(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation[]> {
   try {
-    const response = await client().apiV1LocationsGet({ signal })
+    const response = await client(credentials).apiV1LocationsGet({ signal })
     return listSavedLocationsResponseSchema.parse(response).data
   } catch (error) {
     throw await locationError(error)
@@ -129,10 +150,11 @@ export async function listLocationsFromWeb(
 export async function searchLocationsFromWeb(
   query: string,
   locale: SupportedLocale,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  credentials?: LocationCredentials
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const response = await client().apiV1LocationsSearchGet(
+    const response = await client(credentials).apiV1LocationsSearchGet(
       { q: query, locale, xCouturePlatform: 'web' },
       { signal }
     )
@@ -150,10 +172,11 @@ export async function searchLocationsFromWeb(
 export async function locationsFromCoordinatesFromWeb(
   position: { latitude: number; longitude: number },
   locale: SupportedLocale,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  credentials?: LocationCredentials
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const response = await client().apiV1LocationsFromCoordinatesPost(
+    const response = await client(credentials).apiV1LocationsFromCoordinatesPost(
       {
         xCouturePlatform: 'web',
         locationsFromCoordinatesInput: {
@@ -172,10 +195,11 @@ export async function locationsFromCoordinatesFromWeb(
 
 export async function saveLocationFromSearchFromWeb(
   candidateToken: string,
-  label: string
+  label: string,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation> {
   try {
-    const response = await client().apiV1LocationsFromSearchPost({
+    const response = await client(credentials).apiV1LocationsFromSearchPost({
       xCouturePlatform: 'web',
       createSavedLocationFromSearchInput: { candidateToken, label },
     })
@@ -187,10 +211,13 @@ export async function saveLocationFromSearchFromWeb(
 }
 
 export async function setPrimaryLocationFromWeb(
-  locationId: string
+  locationId: string,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation> {
   try {
-    const response = await client().apiV1LocationsLocationIdPrimaryPost({ locationId })
+    const response = await client(credentials).apiV1LocationsLocationIdPrimaryPost({
+      locationId,
+    })
     const saved = setPrimarySavedLocationResponseSchema.parse(response).data
     return saved
   } catch (error) {
@@ -200,10 +227,11 @@ export async function setPrimaryLocationFromWeb(
 
 export async function renameLocationFromWeb(
   locationId: string,
-  label: string
+  label: string,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation> {
   try {
-    const response = await client().apiV1LocationsLocationIdPatch({
+    const response = await client(credentials).apiV1LocationsLocationIdPatch({
       locationId,
       updateSavedLocationInput: { label },
     })
@@ -214,9 +242,14 @@ export async function renameLocationFromWeb(
   }
 }
 
-export async function deleteLocationFromWeb(locationId: string): Promise<void> {
+export async function deleteLocationFromWeb(
+  locationId: string,
+  credentials?: LocationCredentials
+): Promise<void> {
   try {
-    const response = await client().apiV1LocationsLocationIdDelete({ locationId })
+    const response = await client(credentials).apiV1LocationsLocationIdDelete({
+      locationId,
+    })
     deleteSavedLocationResponseSchema.parse(response)
   } catch (error) {
     throw await locationError(error)

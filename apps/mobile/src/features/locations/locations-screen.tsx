@@ -47,6 +47,8 @@ import {
   locationsNearFromMobile,
   searchLocationsFromMobile,
   setPrimaryLocationFromMobile,
+  captureMobileBearer,
+  type CapturedBearer,
   type LocationFailureReason,
 } from '@/src/lib/locations'
 import {
@@ -127,6 +129,16 @@ export function formatPlace(
     .join(', ')
 }
 
+/** One member-owned operation, claimed when the member acted. */
+interface MemberClaim {
+  /** This member, this screen, this operation. */
+  current: () => boolean
+  /** This member only: for a confirmation that outlives an intended navigation. */
+  memberCurrent: () => boolean
+  /** The bearer captured at the action; every request in the operation sends it. */
+  bearer: CapturedBearer
+}
+
 export interface LocationsScreenProps {
   /** Opened from a no-location state: save returns there. */
   guided?: boolean
@@ -182,28 +194,49 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   }, [])
 
   /**
-   * One ownership token for member-owned work: the member signed in now, this
-   * screen still mounted, and the work's own controller not aborted. Every
-   * request checks it after its bearer resolves and before it is sent; every
-   * completion checks it before it writes, announces or navigates.
+   * The member this screen rendered for, still signed in and the screen still
+   * mounted; null when the member already changed (a press queued before the
+   * switch re-rendered the screen is refused).
    */
-  const ownership = useCallback((controller: AbortController) => {
-    const epoch = mobileIdentityEpoch()
-    return () =>
-      mountedRef.current && epoch === mobileIdentityEpoch() && !controller.signal.aborted
-  }, [])
+  const memberPredicate = useCallback((): (() => boolean) | null => {
+    const epoch = memberEpoch
+    if (!mountedRef.current || epoch !== mobileIdentityEpoch()) return null
+    return () => mountedRef.current && epoch === mobileIdentityEpoch()
+  }, [memberEpoch])
+
+  /**
+   * Claims one member-owned operation at the moment the member acts. The owner
+   * is the member this screen rendered for (refused if that is no longer who
+   * is signed in), and the bearer is captured now: every request in the
+   * operation sends it, never a later read. `current` (this member, this
+   * screen, this operation) is checked after every await and by every deferred
+   * announcement, focus or navigation; `memberCurrent` drops the screen, for a
+   * confirmation that outlives an intended navigation.
+   */
+  const claim = useCallback(
+    (controller: AbortController): MemberClaim | null => {
+      const onScreen = memberPredicate()
+      if (!onScreen) return null
+      const epoch = memberEpoch
+      return {
+        current: () => onScreen() && !controller.signal.aborted,
+        memberCurrent: () => epoch === mobileIdentityEpoch(),
+        bearer: captureMobileBearer(),
+      }
+    },
+    [memberPredicate, memberEpoch]
+  )
 
   /** True when the list landed for the member who asked for it. */
   const reload = useCallback(
-    async (controller: AbortController): Promise<boolean> => {
-      const current = ownership(controller)
-      const next = await listLocationsFromMobile(controller.signal, current)
-      if (!current()) return false
+    async (claimed: MemberClaim, signal: AbortSignal): Promise<boolean> => {
+      const next = await listLocationsFromMobile(signal, claimed.current, claimed.bearer)
+      if (!claimed.current()) return false
       setLocations(next)
       setScreenState('ready')
       return true
     },
-    [ownership]
+    []
   )
 
   /** Drops a pending Use my location: its position, request and answer go nowhere. */
@@ -255,15 +288,17 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
 
   useEffect(() => {
     const controller = new AbortController()
-    const current = ownership(controller)
-    reload(controller).catch((error: unknown) => {
-      if (!current()) return
+    // A member change re-renders with the next epoch and runs this again.
+    const claimed = claim(controller)
+    if (!claimed) return
+    reload(claimed, controller.signal).catch((error: unknown) => {
+      if (!claimed.current()) return
       setScreenState(
         locationFailureReason(error) === 'signed_out' ? 'signed_out' : 'load_failed'
       )
     })
     return () => controller.abort()
-  }, [reload, ownership, memberEpoch])
+  }, [reload, claim])
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -273,10 +308,20 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       return
     }
     const controller = new AbortController()
-    const current = ownership(controller)
+    // Claimed at the keystroke that starts the quiet wait, with its bearer.
+    const claimed = claim(controller)
+    if (!claimed) return
+    const { current } = claimed
     const timer = setTimeout(() => {
+      if (!current()) return
       setIsSearching(true)
-      searchLocationsFromMobile(trimmed, locale, controller.signal, current)
+      searchLocationsFromMobile(
+        trimmed,
+        locale,
+        controller.signal,
+        current,
+        claimed.bearer
+      )
         .then((results) => {
           if (!current()) return
           setCandidates(results)
@@ -307,7 +352,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query, locale, selected, searchAttempt, ownership])
+  }, [query, locale, selected, searchAttempt, claim])
 
   /**
    * One list action for the member who started it. The request is checked after
@@ -317,28 +362,35 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
    */
   async function runListAction(
     locationId: string,
-    mutate: (signal: AbortSignal, stillCurrent: () => boolean) => Promise<unknown>,
+    mutate: (
+      signal: AbortSignal,
+      stillCurrent: () => boolean,
+      bearer: CapturedBearer
+    ) => Promise<unknown>,
     settled: () => string
-  ): Promise<boolean> {
-    if (busyId) return false
+  ): Promise<(() => boolean) | null> {
+    if (busyId) return null
     const controller = new AbortController()
+    const claimed = claim(controller)
+    if (!claimed) return null
     listActionControllerRef.current = controller
-    const current = ownership(controller)
+    const { current } = claimed
     setBusyId(locationId)
     setListError(null)
     try {
-      await mutate(controller.signal, current)
-      if (!current()) return false
+      await mutate(controller.signal, current, claimed.bearer)
+      if (!current()) return null
       const message = settled()
-      if (!(await reload(controller)) || !current()) return false
+      if (!(await reload(claimed, controller.signal)) || !current()) return null
       announce('feedback', message, { stillCurrent: current })
-      return true
+      // The caller's deferred focus checks this when it runs.
+      return current
     } catch (error) {
-      if (!current()) return false
+      if (!current()) return null
       const reason = locationFailureReason(error)
       setListError(reason)
       announce('error', t(errorKey(reason)), { stillCurrent: current })
-      return false
+      return null
     } finally {
       if (current()) {
         listActionControllerRef.current = null
@@ -348,11 +400,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   }
 
   function choose(candidate: LocationSearchCandidate) {
+    const current = memberPredicate()
+    if (!current) return
     setSelected(candidate)
     setLabel(candidate.city)
     setCandidates([])
     setFormError(null)
-    announce('feedback', t('locations.selected', { place: candidate.displayLabel }))
+    announce('feedback', t('locations.selected', { place: candidate.displayLabel }), {
+      stillCurrent: current,
+    })
   }
 
   /**
@@ -362,13 +418,14 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
    */
   async function locate() {
     if (isLocating || isSaving) return
+    const controller = new AbortController()
+    // Claimed at the tap: the position is sent only under this member's bearer.
+    const claimed = claim(controller)
+    if (!claimed) return
     locateControllerRef.current?.abort()
     const attempt = ++locateAttemptRef.current
-    const controller = new AbortController()
     locateControllerRef.current = controller
-    // Still this tap, for the member who tapped, on this screen.
-    const owned = ownership(controller)
-    const current = () => attempt === locateAttemptRef.current && owned()
+    const current = () => attempt === locateAttemptRef.current && claimed.current()
     setIsLocating(true)
     setFormError(null)
     setSelected(null)
@@ -387,7 +444,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         position.longitude,
         locale,
         controller.signal,
-        current
+        current,
+        claimed.bearer
       )
       if (!current()) return
       if (results.length === 0) {
@@ -414,9 +472,12 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   async function save() {
     if (isSaving || !selected) return
     const controller = new AbortController()
+    // Claimed at the press: the place this screen shows is saved only under the
+    // bearer of the member it was shown to.
+    const claimed = claim(controller)
+    if (!claimed) return
     saveControllerRef.current = controller
-    // Still the member who picked this place, on this screen.
-    const current = ownership(controller)
+    const { current } = claimed
     setIsSaving(true)
     setFormError(null)
     try {
@@ -424,20 +485,24 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         selected.candidateToken,
         label.trim() || selected.city,
         controller.signal,
-        current
+        current,
+        claimed.bearer
       )
       if (!current()) return
       setSelected(null)
       setQuery('')
       setLabel('')
+      const navigatesBack = guided && router.canGoBack()
+      // A guided save leaves this screen on purpose; its confirmation belongs to
+      // the member, not the screen, so it is still heard on the next one.
       announce('feedback', t('locations.saved', { label: saved.label }), {
-        stillCurrent: current,
+        stillCurrent: navigatesBack ? claimed.memberCurrent : current,
       })
-      if (guided && router.canGoBack()) {
+      if (navigatesBack) {
         router.back()
         return
       }
-      await reload(controller)
+      await reload(claimed, controller.signal)
     } catch (error) {
       if (!current()) return
       const reason = locationFailureReason(error)
@@ -544,8 +609,14 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       if (!next) return
                       void runListAction(
                         location.id,
-                        (signal, current) =>
-                          renameLocationFromMobile(location.id, next, signal, current),
+                        (signal, current, bearer) =>
+                          renameLocationFromMobile(
+                            location.id,
+                            next,
+                            signal,
+                            current,
+                            bearer
+                          ),
                         () => {
                           setRenamingId(null)
                           return t('locations.renamed', { label: next })
@@ -579,14 +650,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     onPress={() => {
                       void runListAction(
                         location.id,
-                        (signal, current) =>
-                          deleteLocationFromMobile(location.id, signal, current),
+                        (signal, current, bearer) =>
+                          deleteLocationFromMobile(location.id, signal, current, bearer),
                         () => {
                           setConfirmingId(null)
                           return t('locations.deleted', { label: location.label })
                         }
-                      ).then((done) => {
-                        if (done) focus(headingRef.current)
+                      ).then((current) => {
+                        // Checked when the focus moves, not when the delete settled.
+                        if (current?.()) focus(headingRef.current)
                       })
                     }}
                     style={[styles.secondaryButton, { borderColor: palette.danger }]}
@@ -615,8 +687,13 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       onPress={() => {
                         void runListAction(
                           location.id,
-                          (signal, current) =>
-                            setPrimaryLocationFromMobile(location.id, signal, current),
+                          (signal, current, bearer) =>
+                            setPrimaryLocationFromMobile(
+                              location.id,
+                              signal,
+                              current,
+                              bearer
+                            ),
                           () => t('locations.primaryChanged', { label: location.label })
                         )
                       }}

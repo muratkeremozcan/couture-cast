@@ -12,7 +12,14 @@
 // failure explains itself and moves focus to the city search.
 'use client'
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from 'react'
 import { useTranslation } from 'react-i18next'
 import type {
   LocationSearchCandidate,
@@ -25,6 +32,7 @@ import {
 } from '../../../lib/device-position'
 import {
   LocationRequestError,
+  type LocationCredentials,
   locationsFromCoordinatesFromWeb,
   saveLocationFromSearchFromWeb,
   searchLocationsFromWeb,
@@ -44,11 +52,23 @@ const MAX_QUERY_LENGTH = 80
 
 type SearchState = 'idle' | 'searching' | 'done'
 
+/**
+ * One member-owned operation's credentials, fixed when the member acted: `credentials` is the
+ * bearer every request in it sends, and `current` is false once the member (or this section) is
+ * gone. Every step after an await, and every deferred announcement or focus, checks `current`.
+ */
+export interface LocationClaim {
+  current: () => boolean
+  credentials: LocationCredentials
+}
+
 interface LocationSearchFormProps {
   locale: SupportedLocale
   autoFocus: boolean
-  announce: (message: string) => void
-  onSaved: (location: SavedLocation) => void
+  /** The section's claim for an action starting now, or null when the member already changed. */
+  claim: () => LocationClaim | null
+  announce: (message: string, current: () => boolean) => void
+  onSaved: (location: SavedLocation, claimed: LocationClaim) => void
 }
 
 function failureReason(error: unknown): LocationFailureReason {
@@ -78,6 +98,7 @@ function formErrorKey(error: FormError): string {
 export function LocationSearchForm({
   locale,
   autoFocus,
+  claim,
   announce,
   onSaved,
 }: LocationSearchFormProps) {
@@ -101,11 +122,15 @@ export function LocationSearchForm({
   const [searchAttempt, setSearchAttempt] = useState(0)
   const [isLocating, setIsLocating] = useState(false)
   const locateRef = useRef<AbortController | null>(null)
+  // The claim of the search whose results are on screen: their announcement checks it.
+  const searchClaimRef = useRef<LocationClaim | null>(null)
 
   const resultCountMessage = t('locations.resultCount', { count: candidates.length })
   const noResultsMessage = t('locations.noResults')
   const announceRef = useRef(announce)
   announceRef.current = announce
+  const claimRef = useRef(claim)
+  claimRef.current = claim
 
   useEffect(() => {
     if (autoFocus) searchInputRef.current?.focus()
@@ -129,6 +154,16 @@ export function LocationSearchForm({
     setIsLocating(false)
   }
 
+  /** The section's claim, also ended when this form unmounts. */
+  const claimHere = useCallback((): LocationClaim | null => {
+    const claimed = claimRef.current()
+    if (!claimed) return null
+    return {
+      credentials: claimed.credentials,
+      current: () => mountedRef.current && claimed.current(),
+    }
+  }, [])
+
   useEffect(() => {
     const trimmed = query.trim()
     if (trimmed.length < MIN_QUERY_LENGTH) {
@@ -137,12 +172,18 @@ export function LocationSearchForm({
       setIsOpen(false)
       return
     }
+    // Claimed at the keystroke that starts the quiet wait, not when the wait ends.
+    const claimed = claimHere()
+    if (!claimed) return
     const controller = new AbortController()
+    const current = () => !controller.signal.aborted && claimed.current()
     const timer = setTimeout(() => {
+      if (!current()) return
       setSearchState('searching')
-      void searchLocationsFromWeb(trimmed, locale, controller.signal)
+      void searchLocationsFromWeb(trimmed, locale, controller.signal, claimed.credentials)
         .then((results) => {
-          if (controller.signal.aborted) return
+          if (!current()) return
+          searchClaimRef.current = claimed
           setCandidates(results)
           setActiveIndex(results.length > 0 ? 0 : -1)
           setIsOpen(results.length > 0)
@@ -150,7 +191,7 @@ export function LocationSearchForm({
           setError(null)
         })
         .catch((caught: unknown) => {
-          if (controller.signal.aborted) return
+          if (!current()) return
           setCandidates([])
           setIsOpen(false)
           setSearchState('done')
@@ -161,25 +202,35 @@ export function LocationSearchForm({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query, locale, searchAttempt])
+  }, [query, locale, searchAttempt, claimHere])
 
   // One announcement per finished search, never per keystroke.
   useEffect(() => {
     if (searchState !== 'done' || error) return
-    announceRef.current(candidates.length > 0 ? resultCountMessage : noResultsMessage)
+    const claimed = searchClaimRef.current
+    if (!claimed) return
+    announceRef.current(
+      candidates.length > 0 ? resultCountMessage : noResultsMessage,
+      claimed.current
+    )
   }, [searchState, candidates, error, resultCountMessage, noResultsMessage])
 
   function choose(candidate: LocationSearchCandidate) {
+    const claimed = claimHere()
+    if (!claimed) return
     setSelected(candidate)
     setLabel(candidate.city)
     setIsOpen(false)
     setError(null)
-    announce(t('locations.selected', { place: candidate.displayLabel }))
-    requestAnimationFrame(() => labelInputRef.current?.focus())
+    announce(t('locations.selected', { place: candidate.displayLabel }), claimed.current)
+    requestAnimationFrame(() => {
+      if (claimed.current()) labelInputRef.current?.focus()
+    })
   }
 
   /** A failed Use my location says why and hands the member the city search. */
-  function locateFailed(next: FormError) {
+  function locateFailed(next: FormError, current: () => boolean) {
+    if (!current()) return
     setCandidates([])
     setIsOpen(false)
     setSearchState('idle')
@@ -190,9 +241,13 @@ export function LocationSearchForm({
   async function locateMe() {
     // A save in flight owns the form, as on mobile.
     if (isLocating || isSaving) return
+    // Claimed at the tap: the position is sent only under this member's bearer.
+    const claimed = claimHere()
+    if (!claimed) return
     locateRef.current?.abort()
     const controller = new AbortController()
     locateRef.current = controller
+    const current = () => !controller.signal.aborted && claimed.current()
     setIsLocating(true)
     setError(null)
     setSelected(null)
@@ -202,32 +257,38 @@ export function LocationSearchForm({
     setSearchState('idle')
     try {
       const position = await readApproximatePosition()
-      if (controller.signal.aborted) return
+      if (!current()) return
       const results = await locationsFromCoordinatesFromWeb(
         position,
         locale,
-        controller.signal
+        controller.signal,
+        claimed.credentials
       )
-      if (controller.signal.aborted) return
+      if (!current()) return
       if (results.length === 0) {
-        locateFailed({ reason: 'no_city_nearby', step: 'locate' })
+        locateFailed({ reason: 'no_city_nearby', step: 'locate' }, current)
         return
       }
+      searchClaimRef.current = claimed
       setCandidates(results)
       setActiveIndex(0)
       setIsOpen(true)
       setSearchState('done')
       searchInputRef.current?.focus()
     } catch (caught) {
-      if (controller.signal.aborted) return
+      if (!current()) return
       if (caught instanceof DevicePositionError) {
-        locateFailed({
-          reason: caught.reason === 'denied' ? 'location_denied' : 'location_unavailable',
-          step: 'locate',
-        })
+        locateFailed(
+          {
+            reason:
+              caught.reason === 'denied' ? 'location_denied' : 'location_unavailable',
+            step: 'locate',
+          },
+          current
+        )
         return
       }
-      locateFailed({ reason: failureReason(caught), step: 'locate' })
+      locateFailed({ reason: failureReason(caught), step: 'locate' }, current)
     } finally {
       if (locateRef.current === controller) {
         locateRef.current = null
@@ -258,29 +319,34 @@ export function LocationSearchForm({
   async function save() {
     // Re-entrancy is refused here; disabling the button would drop focus.
     if (isSaving || !selected) return
+    // Claimed at the press: the place is saved only under this member's bearer.
+    const claimed = claimHere()
+    if (!claimed) return
     const trimmedLabel = label.trim() || selected.city
     setIsSaving(true)
     setError(null)
     try {
       const saved = await saveLocationFromSearchFromWeb(
         selected.candidateToken,
-        trimmedLabel
+        trimmedLabel,
+        claimed.credentials
       )
-      if (!mountedRef.current) return
+      if (!claimed.current()) return
       setSelected(null)
       setQuery('')
       setLabel('')
       setCandidates([])
       setSearchState('idle')
-      onSaved(saved)
+      onSaved(saved, claimed)
     } catch (caught) {
+      if (!claimed.current()) return
       const reason = failureReason(caught)
       // An expired candidate cannot be retried; every other failure keeps the
       // chosen city so a retry is one press.
       if (reason === 'invalid_candidate') setSelected(null)
       setError({ reason, step: 'save' })
     } finally {
-      setIsSaving(false)
+      if (claimed.current()) setIsSaving(false)
     }
   }
 
