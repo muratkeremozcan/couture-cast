@@ -225,11 +225,34 @@ describe('deployment workflows', () => {
   it('prod e2e lets the newer main push supersede a run still testing the older one', () => {
     // A group keyed by run_id never matches another run, so two pushes minutes
     // apart overlapped and the older run's web-health-sha read the newer SHA.
+    // Only a push cancels: a scheduled status run queues behind a push run instead
+    // of cancelling the push's verdict.
     const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
     expect(content).toMatch(
-      /^concurrency:\n {2}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: true$/m
+      /^concurrency:\n {2}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\n {2}cancel-in-progress: \$\{\{ github\.event_name == 'push' \}\}$/m
     )
     expect(content).not.toMatch(/github\.run_id/)
+  })
+
+  it('prod e2e runs on a schedule as the production status check', () => {
+    // Step 58: production can break with no merge (an expired secret, a provider
+    // outage, a quota), so the prod suite also runs once a day on main.
+    const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
+    const on = content.slice(content.indexOf('\non:'), content.indexOf('\npermissions:'))
+    expect(on).toMatch(/^ {2}push:\n {4}branches:\n {6}- main$/m)
+    expect(on).toMatch(/^ {2}schedule:\n(?: {4}#.*\n)* {4}- cron: '41 11 \* \* \*'$/m)
+    expect(on).toMatch(/^ {2}workflow_dispatch:$/m)
+    // Every trigger waits for the commits production serves; none skips the wait.
+    const servedCommits = content.slice(
+      content.indexOf('\n  served-commits:'),
+      content.indexOf('\n  wait-web:')
+    )
+    expect(servedCommits).not.toMatch(/^ {4}if:/m)
+    // The README status badge reads this workflow on main.
+    const readme = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8')
+    expect(readme).toContain(
+      'https://github.com/muratkeremozcan/couture-cast/actions/workflows/pw-e2e-prod.yml/badge.svg?branch=main'
+    )
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

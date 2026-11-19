@@ -268,9 +268,16 @@ report.
 
 ## Production deployment verification
 
-[Production E2E](../../.github/workflows/pw-e2e-prod.yml) runs on pushes to `main` and manually. It
-uses fixed Vercel production domains and the
+[Production E2E](../../.github/workflows/pw-e2e-prod.yml) runs on pushes to `main`, once a
+day on a schedule (`41 11 * * *`, 11:41 UTC), and manually. It uses fixed Vercel production domains and the
 [generic deployment waiter](../../.github/workflows/rwf-wait-for-deployment.yml).
+
+The scheduled run is the production status check. Production can break with no merge: an expired
+secret, a provider outage, a plan quota or drifted data. The scheduled run waits for production to
+serve `main`'s latest commit (or one with the same build inputs), then runs the same suite a push
+runs. The `production status` badge at the top of the README shows the latest run on `main`.
+GitHub emails a failed scheduled run to the person who last changed its cron line. Only a push
+cancels a run in progress; a scheduled run waits behind a push run.
 
 Both projects are held to the pushed commit's source before tests start. A project whose build
 the ignored build step skipped keeps serving the last commit it built, so the `served-commits` job

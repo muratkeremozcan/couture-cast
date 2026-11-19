@@ -11733,3 +11733,35 @@ Evidence boundaries:
 - Real Google is exercised by hand; CI signs in through the Keycloak stand-in only.
 - `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` is set on the hosted community worker (2026-11-15).
 - The legal pages are engineering copy matched to the code, not counsel-reviewed text.
+
+### Production follow-ups (PRs #237 to #255)
+
+Between the Story 6.17 merge and the project close, every fix landed as its own PR, one at a time,
+each merged on green CI. Most were CI reliability; three were product defects real users found.
+
+1. **Real users find what lanes do not.**
+   A teen waiting on a guardian looped on sign-in (#244, recorded in the lessons above). Signed-in
+   teens on iPhone Safari saw the landing's Start signup and Sign in, because the landing never
+   read the session; a head script now names the session before first paint (#248). A tester on
+   Android Chrome got "Failed to fetch" on garment upload, because production had no
+   `PUBLIC_API_URL` and the API handed the browser a localhost upload URL; uploads now go through
+   the web app's `/api/v1` rewrite, and the camera preview shows the whole frame the photo keeps
+   (#254).
+2. **A third-party download is a flake waiting for a busy day.**
+   Maven Central, the Gradle plugin portal, dl.google.com and an Ubuntu mirror each failed a run
+   with 429s or timeouts. Each now has a cache, an explicit install step before Gradle can fetch
+   on its own, or a bounded retry that prints why it failed (#239, #245, #246, #255).
+3. **A flaky oracle is a test defect, not an app defect.**
+   The advisory-lock test compared clocks from three processes (#241). A landing check read two
+   boxes in two frames while the feed above them loaded (#250). Maestro flows centered elements
+   pinned to a scroll edge (#252) and erased text past the device deadline (#240). Each fix kept
+   the exact assertion and seeded the real defect to prove it still goes red.
+4. **A nightly lane that never passed proves nothing.**
+   The iOS live font job shipped its Release build without the text layout probe (#237), then
+   needed its legs to reach a verdict at all (#242, #247). The Android network-timeout flow sat
+   on a signed-out welcome card after Story 6.16 made the request member-only (#249). TalkBack
+   placed its own focus after the app's request in the reopened composer (#253).
+5. **Stay inside the plan's limits.**
+   The Vercel Hobby team reached 98 of 100 build hours and 77% of its edge requests, almost all
+   from CI. #243 cut both at the source and kept every test. Changed real-session specs now get
+   burn-in inside the lane that owns their stack (#251).

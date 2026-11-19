@@ -4,6 +4,9 @@
 ![branches](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-branches.json)
 ![functions](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-functions.json)
 ![lines](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/muratkeremozcan/64348ebdc6e662b93ade9f40bdc03442/raw/couture-cast-lines.json)
+[![production status](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pw-e2e-prod.yml/badge.svg?branch=main)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pw-e2e-prod.yml?query=branch%3Amain)
+[![nightly Android native journeys](https://github.com/muratkeremozcan/couture-cast/actions/workflows/android-native.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/android-native.yml?query=event%3Aschedule)
+[![nightly watchOS native](https://github.com/muratkeremozcan/couture-cast/actions/workflows/watchos-native.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/watchos-native.yml?query=event%3Aschedule)
 [![nightly native share-card lanes](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-share-card-native.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-share-card-native.yml?query=event%3Aschedule)
 [![nightly accessibility focus Android lanes](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-accessibility-focus.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/pr-accessibility-focus.yml?query=event%3Aschedule)
 [![nightly iOS native builds and journeys](https://github.com/muratkeremozcan/couture-cast/actions/workflows/ios-native.yml/badge.svg?event=schedule)](https://github.com/muratkeremozcan/couture-cast/actions/workflows/ios-native.yml?query=event%3Aschedule)
@@ -252,6 +255,16 @@ on iOS simulator.
 - ESLint, Prettier, and `lint-staged` configs match the reference repo’s rules (no-only-tests, consistent type imports, formatting).
 - `_bmad-output/planning-artifacts/epics.md` Epic 0 stories describe these guardrails explicitly so all Sprint 0 tasks stay tied to product strategy.
 - CI currently executes: install → schema validation for the canonical HTTP OpenAPI spec → typecheck → lint (workspace + root) → build → tests. Burn-in/Selective runners plug into the same workflow after CC-0.6.
+
+### Production status
+
+The `production status` badge above reads [Production E2E](.github/workflows/pw-e2e-prod.yml) on
+`main`. It runs the production Playwright suite after every push to `main` and once a day at
+11:41 UTC, so a green badge means production served the latest `main` and passed within the last
+day.
+The nightly badges cover the native lanes (iOS, Android, watchOS, share card, accessibility focus)
+that only run on a schedule or by dispatch. See
+[the deployment guide](_bmad-output/project-knowledge/deployment-guide.md#production-deployment-verification).
 
 ### API contract tooling
 
