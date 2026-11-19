@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
 import { PALETTE_PATH, profile } from '../../test-utils/palette-advisor-panel'
 import { CommercePreferencesSection } from './commerce-preferences-section'
@@ -304,13 +305,6 @@ describe('Premium checks a billing follow-up read before sending it', () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-2')
   }
 
-  async function settle() {
-    for (let round = 0; round < 3; round += 1)
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      })
-  }
-
   it('SESSION-BILLING-WEB-01 the activation poll sends no next read once its member left', async () => {
     window.history.replaceState(null, '', '/settings?checkout=success')
     const realSetTimeout = window.setTimeout.bind(window)
@@ -446,13 +440,6 @@ describe('Premium keeps reads with the member through a token rotation and a mem
       else window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, bearer)
       window.dispatchEvent(new Event('couture:session'))
     })
-  }
-
-  async function settle() {
-    for (let round = 0; round < 3; round += 1)
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0))
-      })
   }
 
   /** member-1's reads: token-1a is denied, token-1b answers, member-2 has no subscription. */

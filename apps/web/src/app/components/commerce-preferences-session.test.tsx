@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
 import { CommercePreferencesSection } from './commerce-preferences-section'
 
@@ -57,14 +58,6 @@ async function finishVerification(token: string | undefined) {
     session.verify?.(token)
     await Promise.resolve()
   })
-}
-
-/** Lets every pending read answer and React apply it, without a timer. */
-async function settle() {
-  for (let round = 0; round < 3; round += 1)
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
 }
 
 /** Every member-owned read's bearer, in order. */
@@ -178,8 +171,11 @@ describe('CommercePreferencesSection follows the web session', () => {
 
     publish({ identity: null, bearer: null })
     publish({ identity: 'member-2', bearer: 'token-2' })
-    await waitFor(() => expect(toggle()).toBeChecked())
-    expect(toggle()).toBeEnabled()
+    // The control starts checked and disabled; member-2's own answer is what enables it.
+    await waitFor(() => {
+      expect(toggle()).toBeChecked()
+      expect(toggle()).toBeEnabled()
+    })
     await settle()
     expect(bearers).toEqual(['Bearer token-1', 'Bearer token-2'])
 

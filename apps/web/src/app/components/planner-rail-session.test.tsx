@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import { settle } from '../../test-utils/request-barrier'
 import type * as WebSession from '../../lib/web-session'
 import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
 import { PlannerRail } from './planner-rail'
@@ -58,14 +59,6 @@ async function finishVerification(token: string | undefined) {
     for (const verify of session.verifiers.splice(0)) verify(token)
     await Promise.resolve()
   })
-}
-
-/** Lets every pending read answer and React apply it, without a timer. */
-async function settle() {
-  for (let round = 0; round < 3; round += 1)
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-    })
 }
 
 /** Every member-owned read's bearer, in order. */
