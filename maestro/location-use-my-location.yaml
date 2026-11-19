@@ -94,6 +94,32 @@ tags:
 - tapOn:
     id: 'locations-use-my-location'
     label: 'Use the allowed location'
+# Expo Go asks its own per-experience question on Android, on top of the OS grant above:
+# "Couture Cast needs permissions for coarse location. You've already granted permission to
+# another Expo experience. Allow Couture Cast to also use it?" (PR 257 run 44597617717: the
+# dialog covered the screen for the whole wait and the app never read the position). It is
+# asked once per permission type, so the pair runs twice; both are optional because a
+# development or store build, and iOS Expo Go, never raise it.
+- extendedWaitUntil:
+    visible:
+      text: '.*needs permissions for .*location.*'
+    timeout: 5000
+    optional: true
+    label: "Expo Go's per-experience location prompt, when it appears"
+- tapOn:
+    id: 'android:id/button1'
+    optional: true
+    label: 'Grant this experience the location permission'
+- extendedWaitUntil:
+    visible:
+      text: '.*needs permissions for .*location.*'
+    timeout: 3000
+    optional: true
+    label: "Expo Go's second per-experience location prompt, when it appears"
+- tapOn:
+    id: 'android:id/button1'
+    optional: true
+    label: 'Grant this experience the second location permission'
 - extendedWaitUntil:
     visible:
       id: 'location-search-option-0'
