@@ -57,10 +57,10 @@ drop_archives() {
 # The name apt gives a package file it downloads (QuoteString in apt's acquire-item.cc): package,
 # version and architecture joined by '_', with '%', '_' and ':' percent-encoded, and '.' too in
 # the architecture. apt finds a cached file by this name and checks only its size. The
-# architecture in the name is the build's: on Ubuntu 26.04 an x86-64-v3 runner installs the
-# amd64v3 variant builds, whose control field still says amd64 while apt names the file
-# libsndfile1_1.2.2-4_amd64v3.deb, so the name is built from the label the index's Filename ends
-# with, never from the control field.
+# architecture in the name is the index stanza's Architecture-Variant, or its Architecture when it
+# has none (apt 3.2's acquire-item.cc and deblistparser.cc): on Ubuntu 26.04 an x86-64-v3 runner
+# installs the amd64v3 builds, Architecture amd64 and Architecture-Variant amd64v3, which apt saves
+# as libsndfile1_1.2.2-4_amd64v3.deb. The pool path plays no part, so neither does it here.
 apt_cache_name() {
   local package=$1 version=$2 arch=$3
   quote() {
@@ -84,16 +84,25 @@ verify_archives() {
   # Plain indexed arrays and a lookup file, so the script runs on macOS's Bash 3.2, where the
   # harness that tests it also runs.
   local debs=() ids=() specs=() deb fields package version arch
+  # Every restored file is accounted for in one summary line, so a restore reconciles with what
+  # stays: kept plus each reason it was dropped.
+  local kept=0 links=0 unreadable=0 misnamed=0 unvouched=0
+  report() {
+    (( kept + links + unreadable + misnamed + unvouched > 0 )) || return 0
+    echo "Checked the restored package files against the package index: kept $kept, dropped $((links + unreadable + misnamed + unvouched)) ($links symlinks, $unreadable unreadable, $misnamed under a name apt would not give them, $unvouched the index does not vouch for)."
+  }
   # A symlink is not a file this script downloaded, and apt would follow it past the hash check
   # below, which reads regular files only.
+  links=$(find "$archives" -maxdepth 1 -type l -name '*.deb' | wc -l | tr -d ' ')
   find "$archives" -maxdepth 1 -type l -name '*.deb' -delete
   while IFS= read -r -d '' deb; do debs+=("$deb"); done \
     < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
-  (( ${#debs[@]} > 0 )) || return 0
+  (( ${#debs[@]} > 0 )) || { report; return 0; }
   local kept_debs=() packages=() versions=()
   for deb in "${debs[@]}"; do
     if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
       rm -f "$deb"
+      unreadable=$((unreadable + 1))
       continue
     fi
     package=$(sed -n 's/^Package: //p' <<<"$fields")
@@ -101,6 +110,7 @@ verify_archives() {
     arch=$(sed -n 's/^Architecture: //p' <<<"$fields")
     if [[ -z "$package" || -z "$version" || -z "$arch" ]]; then
       rm -f "$deb"
+      unreadable=$((unreadable + 1))
       continue
     fi
     kept_debs+=("$deb")
@@ -109,7 +119,7 @@ verify_archives() {
     ids+=("$package|$arch|$version")
     specs+=("$package=$version")
   done
-  (( ${#specs[@]} > 0 )) || return 0
+  (( ${#specs[@]} > 0 )) || { report; return 0; }
   # Error-Mode any makes a partial refresh visible. A failed refresh still leaves apt the signed
   # indexes it held before, and the install that follows (Playwright's install-deps runs its own
   # update and tolerates the same failure) installs from those or from fresher ones. So each
@@ -123,20 +133,19 @@ verify_archives() {
   fi
   local index
   index=$(mktemp) || { drop_archives; return 0; }
-  # One line per package, architecture and version the index knows: its SHA256 and the build
-  # label its Filename ends with (amd64, amd64v3, all). Versions it no longer lists print nothing
-  # and are dropped below.
+  # One line per package, architecture and version the index knows, from one signed stanza: its
+  # SHA256 and the architecture apt names the file by (Architecture-Variant, else Architecture).
+  # Versions it no longer lists print nothing and are dropped below.
   apt-cache show "${specs[@]}" 2>/dev/null | awk '
     function emit() {
-      if (p && v && a && h && l) print p "|" a "|" v " " h " " l
-      p = v = a = h = l = ""
+      if (p && v && a && h) print p "|" a "|" v " " h " " (w ? w : a)
+      p = v = a = w = h = ""
     }
     /^Package: / { p = $2 } /^Version: / { v = $2 } /^Architecture: / { a = $2 }
-    /^SHA256: / { h = $2 }
-    /^Filename: / { l = $2; sub(/^.*_/, "", l); sub(/\.deb$/, "", l) }
+    /^Architecture-Variant: / { w = $2 } /^SHA256: / { h = $2 }
     /^$/ { emit() }
     END { emit() }' > "$index"
-  local i record hash label kept=0 misnamed=0 unvouched=0
+  local i record hash label
   for (( i = 0; i < ${#kept_debs[@]}; i++ )); do
     deb=${kept_debs[i]}
     record=$(awk -v id="${ids[i]}" '$1 == id { print $2 " " $3; exit }' "$index")
@@ -158,7 +167,7 @@ verify_archives() {
     fi
   done
   rm -f "$index"
-  echo "Checked the restored package files against the package index: kept $kept, dropped $((misnamed + unvouched)) ($misnamed under a name apt would not give them, $unvouched the index does not vouch for)."
+  report
 }
 
 [[ -z "$archives" ]] || verify_archives

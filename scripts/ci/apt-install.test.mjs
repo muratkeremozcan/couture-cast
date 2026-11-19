@@ -408,7 +408,7 @@ describe('apt-install.sh', () => {
       )
       assert.match(
         stdout,
-        /kept 2, dropped 2 \(0 under a name apt would not give them, 2 the index does not vouch for\)\./
+        /kept 2, dropped 3 \(0 symlinks, 1 unreadable, 0 under a name apt would not give them, 2 the index does not vouch for\)\./
       )
     } finally {
       rmSync(directory, { recursive: true, force: true })
@@ -448,7 +448,7 @@ describe('apt-install.sh', () => {
       assert.match(stdout, /::warning::The package index refresh was partial;/)
       assert.match(
         stdout,
-        /kept 1, dropped 1 \(0 under a name apt would not give them, 1 the index does not vouch for\)\./
+        /kept 1, dropped 1 \(0 symlinks, 0 unreadable, 0 under a name apt would not give them, 1 the index does not vouch for\)\./
       )
     } finally {
       rmSync(directory, { recursive: true, force: true })
@@ -504,7 +504,7 @@ describe('apt-install.sh', () => {
       )
       assert.match(
         stdout,
-        /kept 1, dropped 1 \(1 under a name apt would not give them, 0 the index does not vouch for\)\./
+        /kept 1, dropped 2 \(1 symlinks, 0 unreadable, 1 under a name apt would not give them, 0 the index does not vouch for\)\./
       )
     } finally {
       rmSync(directory, { recursive: true, force: true })
@@ -530,7 +530,7 @@ describe('apt-install.sh', () => {
       ])
       assert.match(
         stdout,
-        /kept 0, dropped 1 \(0 under a name apt would not give them, 1 the index does not vouch for\)\./
+        /kept 0, dropped 1 \(0 symlinks, 0 unreadable, 0 under a name apt would not give them, 1 the index does not vouch for\)\./
       )
     } finally {
       rmSync(directory, { recursive: true, force: true })
@@ -538,54 +538,63 @@ describe('apt-install.sh', () => {
   })
 
   // PR 257 run 44602208565 (burn-in 3): on Ubuntu 26.04 an x86-64-v3 runner installs the
-  // amd64v3 builds. Their control field says amd64, but apt names the file after the build
-  // (libsndfile1_1.2.2-4_amd64v3.deb, measured in an ubuntu:26.04 container), and the old check
-  // built the name from the control field: every restored WebKit package but the 16
-  // architecture-independent ones was dropped, and 111 MB came down a slow mirror into the
-  // step's 600 s bound. The name now comes from the build label of the index record.
-  test('keeps a variant build under the name apt gives it, and drops it under the control field name', () => {
+  // amd64v3 builds: Architecture amd64, Architecture-Variant amd64v3, and apt saves them as
+  // libsndfile1_1.2.2-4_amd64v3.deb (measured in an ubuntu:26.04 container). The old check built
+  // the name from the control field's amd64: every restored WebKit package but the 16
+  // architecture-independent ones was dropped, so 111 MB of the 140 MB had to be downloaded
+  // again, and the shard timed out at the step's 600 s bound in the middle of that download.
+  // apt names the file by the index stanza's Architecture-Variant, else its Architecture
+  // (apt 3.2's acquire-item.cc and deblistparser.cc), never by the pool path; so does the check.
+  test('names a restored file as apt does: by Architecture-Variant, else Architecture, never the pool path', () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
     try {
       const archives = path.join(directory, 'ubuntu-packages')
       mkdirSync(archives)
-      const control = (name) =>
-        'Package: ' + name + '\nVersion: 2.0\nArchitecture: amd64\n'
-      writeFileSync(path.join(archives, 'libvar_2.0_amd64v3.deb'), 'var')
-      writeFileSync(
-        path.join(archives, 'libvar_2.0_amd64v3.deb.control'),
-        control('libvar')
-      )
-      // The same kind of build stored under the control field's architecture: apt would never
-      // look for it there.
-      writeFileSync(path.join(archives, 'libbas_2.0_amd64.deb'), 'bas')
-      writeFileSync(
-        path.join(archives, 'libbas_2.0_amd64.deb.control'),
-        control('libbas')
-      )
-      const record = (name, bytes) =>
-        'Package: ' +
-        name +
-        '\nArchitecture: amd64\nVersion: 2.0\nFilename: pool/main/' +
-        name +
-        '_2.0_amd64v3.deb\nSHA256: ' +
-        createHash('sha256').update(bytes).digest('hex') +
-        '\n'
+      const restore = (file, name, bytes) => {
+        writeFileSync(path.join(archives, file), bytes)
+        writeFileSync(
+          path.join(archives, `${file}.control`),
+          `Package: ${name}\nVersion: 2.0\nArchitecture: amd64\n`
+        )
+      }
+      restore('libvar_2.0_amd64v3.deb', 'libvar', 'var')
+      // A variant build stored under the control field's architecture: apt never looks there.
+      restore('libbas_2.0_amd64.deb', 'libbas', 'bas')
+      // A stanza with no variant whose pool path happens to end in amd64v3: apt names the file
+      // from the stanza's Architecture, amd64.
+      restore('libodd_2.0_amd64.deb', 'libodd', 'odd')
+      const record = (name, bytes, { variant, pool }) =>
+        [
+          `Package: ${name}`,
+          'Architecture: amd64',
+          ...(variant ? [`Architecture-Variant: ${variant}`] : []),
+          'Version: 2.0',
+          `Filename: pool/main/${name}_2.0_${pool}.deb`,
+          `SHA256: ${createHash('sha256').update(bytes).digest('hex')}`,
+          '',
+        ].join('\n')
       const { status, calls, stdout } = runScript(['--playwright', 'webkit'], {
         env: { APT_INSTALL_ARCHIVES: archives },
-        index: [record('libvar', 'var'), record('libbas', 'bas')].join('\n'),
+        index: [
+          record('libvar', 'var', { variant: 'amd64v3', pool: 'amd64v3' }),
+          record('libbas', 'bas', { variant: 'amd64v3', pool: 'amd64v3' }),
+          record('libodd', 'odd', { pool: 'amd64v3' }),
+        ].join('\n'),
       })
       assert.equal(status, 0)
       assert.deepEqual(
-        readdirSync(archives).filter((name) => name.endsWith('.deb')),
-        ['libvar_2.0_amd64v3.deb']
+        readdirSync(archives)
+          .filter((name) => name.endsWith('.deb'))
+          .sort(),
+        ['libodd_2.0_amd64.deb', 'libvar_2.0_amd64v3.deb']
       )
       assert.equal(
         calls.at(-1),
-        'npx --no-install playwright install-deps webkit holding 1'
+        'npx --no-install playwright install-deps webkit holding 2'
       )
       assert.match(
         stdout,
-        /kept 1, dropped 1 \(1 under a name apt would not give them, 0 the index does not vouch for\)\./
+        /kept 2, dropped 1 \(0 symlinks, 0 unreadable, 1 under a name apt would not give them, 0 the index does not vouch for\)\./
       )
     } finally {
       rmSync(directory, { recursive: true, force: true })
