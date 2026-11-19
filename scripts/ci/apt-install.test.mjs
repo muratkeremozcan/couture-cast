@@ -1,5 +1,7 @@
 // Learning path Step 54: Complimentary full access (CI apt retries).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 //
 // CI installs Ubuntu packages in one place, scripts/ci/apt-install.sh. Its calls (apt-get, apt with
 // a verb, dpkg -i, Playwright's dependency installer) may appear nowhere else under .github or

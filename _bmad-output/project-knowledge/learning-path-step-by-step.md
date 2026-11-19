@@ -11795,7 +11795,8 @@ Key takeaways:
 1. **A status check is the push suite on a clock.**
    The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves the
    scheduled event's commit, `main` as of the event (or one with the same build inputs), then runs
-   the same suite a push runs. No second suite drifts from the first.
+   the same suite a push runs, with the same lane setting, so the Playwright helper unit tests stay
+   in the PR checks and a red badge means production. No second suite drifts from the first.
 2. **A scheduled run must not cost a push its verdict.**
    By default GitHub keeps one pending run per concurrency group and replaces it on every
    arrival, and this workflow uses that default. In the
@@ -11826,7 +11827,9 @@ Hard-won lessons from the implementation and code review of this story:
 - The Release font share-card lane lost its emulator during a 12-minute Release build on a runner
   that also hosts Supabase and the app's services. Memory exhaustion is a working hypothesis: the
   run kept no kernel log. The lane now adds swap sized inside the native build's 15 GiB disk guard;
-  the Codex review caught that a fixed 8 GiB swap could push free disk under that guard.
+  the Codex review caught that a fixed 8 GiB swap could push free disk under that guard. The
+  emulator, memory and kernel diagnostics now run after a failed Release build too, and the lane
+  keeps the build's own exit status.
 - The 11-17 and 11-18 iOS nightlies failed five ways, no two alike, in separate jobs. The
   share-card opener's touch was cancelled after its press-in, a flow passed its last step and was
   then killed at the 120 s default deadline, and a negative check read the backgrounded app after
@@ -11865,6 +11868,11 @@ Hard-won lessons from the implementation and code review of this story:
   late; the tests run both sides of the boundary, and each run now records how many opener
   presses a flow made, so a rise in cancelled presses shows in the evidence. The model proves
   scripted control flow, not device touch delivery or real hierarchy timing.
+- This pull request's own Playwright shard failed before any test: the WebKit package cache hit,
+  then a refused `security.ubuntu.com` fetch made the install script drop every cached package,
+  and the re-download from a slow mirror ran into the 600 s bound. A partial index refresh now
+  keeps each cached package whose SHA256 a signed index apt holds still vouches for, and drops the
+  rest; a failed install still drops all of them before its retry.
 - A first change to the accessibility device script broke two Playwright helper specs that read
   the script and its workflow, and the review round found them. Run every spec that reads a
   changed file before committing.
@@ -11934,6 +11942,9 @@ CI scripts, node:test:
   proves every Gradle call in the accessibility workflow goes through the retry, every Android job
   sets up the Gradle cache, and the classifier's outcomes: a same-line or nested transient download
   failure retries, a quoted download line or a crashed test task with no real download runs once.
+- [`scripts/ci/apt-install.test.mjs`](../../scripts/ci/apt-install.test.mjs):
+  proves a partial index refresh keeps the cached package a signed index vouches for and drops an
+  altered one, and drops everything when no index vouches for it.
 - [`scripts/ci/share-card-android-release-font.test.mjs`](../../scripts/ci/share-card-android-release-font.test.mjs):
   proves swap sized against the disk guard, the emulator check after the build, and that kernel
   OOM lines reach the log.
