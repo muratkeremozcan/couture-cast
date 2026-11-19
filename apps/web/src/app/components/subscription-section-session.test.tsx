@@ -252,4 +252,101 @@ describe('SubscriptionSection follows the web session', () => {
     expect(subscribe()).toBeDisabled()
     expect(bearers).toEqual(['Bearer token-1'])
   })
+
+  // The owner saw "You do not have a Premium subscription yet" on /settings although Premium is
+  // theirs (complimentary). Beyond the sign-in race, the line spoke while the reads were still out:
+  // a status line is a claim about this member, so it waits for the answer that decides it.
+  describe('the status line never claims "no subscription" before the reads answer', () => {
+    const NO_SUBSCRIPTION = "You don't have a Premium subscription yet."
+
+    /** Every text the status line shows, from first paint on, in order. */
+    function recordStatusLine() {
+      const seen: string[] = []
+      const note = () => {
+        const text = screen.queryByTestId('premium-status-line')?.textContent ?? ''
+        if (text && seen.at(-1) !== text) seen.push(text)
+      }
+      const observer = new MutationObserver(note)
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      })
+      return { seen, stop: () => observer.disconnect() }
+    }
+
+    function hold() {
+      let release!: () => void
+      const gate = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return { gate, release }
+    }
+
+    it('SUBSCRIPTION-SESSION-WEB-06 a complimentary member never reads "no subscription" while access is pending', async () => {
+      const access = hold()
+      useMswHandlers(
+        http.get('/api/v1/commerce/subscription', ({ request }) => {
+          bearers.push(request.headers.get('authorization'))
+          return HttpResponse.json({ data: NONE })
+        }),
+        http.get('/api/v1/commerce/premium/access', async () => {
+          await access.gate
+          return HttpResponse.json({ data: { premium: true, source: 'complimentary' } })
+        })
+      )
+      session.stored = true
+      session.identity = 'member-1'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+      const { seen, stop } = recordStatusLine()
+      try {
+        renderSection()
+        // The subscription read has answered "none"; only the access read is still out.
+        await waitFor(() => expect(bearers).toEqual(['Bearer token-1']))
+        await settle()
+        expect(seen).not.toContain(NO_SUBSCRIPTION)
+
+        act(() => access.release())
+        await waitFor(() =>
+          expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+            'You have complimentary Premium access from CoutureCast.'
+          )
+        )
+      } finally {
+        stop()
+      }
+      expect(seen).not.toContain(NO_SUBSCRIPTION)
+    })
+
+    it('SUBSCRIPTION-SESSION-WEB-07 an active subscriber never reads "no subscription" while the read is pending', async () => {
+      const subscription = hold()
+      useMswHandlers(
+        http.get('/api/v1/commerce/subscription', async ({ request }) => {
+          bearers.push(request.headers.get('authorization'))
+          await subscription.gate
+          return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
+        })
+      )
+      session.stored = true
+      session.identity = 'member-1'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+      const { seen, stop } = recordStatusLine()
+      try {
+        renderSection()
+        await waitFor(() => expect(bearers).toEqual(['Bearer token-1']))
+        await settle()
+        expect(seen).not.toContain(NO_SUBSCRIPTION)
+
+        act(() => subscription.release())
+        await waitFor(() =>
+          expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+            /Premium is active/
+          )
+        )
+      } finally {
+        stop()
+      }
+      expect(seen).not.toContain(NO_SUBSCRIPTION)
+    })
+  })
 })
