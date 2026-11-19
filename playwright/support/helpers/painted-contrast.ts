@@ -30,6 +30,11 @@ const FILL_OFF =
 // Descendants' glyphs stay hidden in both shots, so only the marked element's own text differs.
 const DESCENDANT_TEXT_OFF = `[${MARK}] * { ${FILL_OFF} }`
 const OWN_TEXT_OFF = `[${MARK}] { ${FILL_OFF} }`
+// The glyph mask: the same glyphs in an opaque magenta, to find where every letter sits.
+const MASK_FILL =
+  '-webkit-text-fill-color: #ff00ff !important; text-shadow: none !important;'
+const OWN_TEXT_MASK = `[${MARK}] { ${MASK_FILL} }`
+const PLACEHOLDER_MASK = `[${MARK}]::placeholder { color: #ff00ff !important; opacity: 1 !important; ${MASK_FILL} }`
 const PLACEHOLDER_OFF = `[${MARK}]::placeholder { color: transparent !important; ${FILL_OFF} }`
 
 async function setInkStyle(page: Page, css: string) {
@@ -67,10 +72,14 @@ async function shot(page: Page, clip: Clip) {
   ).toString('base64')
 }
 
-/** Compares a shot without the ink (`bare`) with one with it (`inked`), pixel by pixel. */
-function compare(page: Page, bare: string, inked: string): Promise<Ink> {
+/**
+ * Compares a shot without the ink (`bare`) with one with it (`inked`), pixel by pixel. `mask`,
+ * when given, is the same glyphs painted magenta: every glyph position, including letters whose
+ * real ink equals the background and so changes nothing, is then sampled.
+ */
+function compare(page: Page, bare: string, inked: string, mask?: string): Promise<Ink> {
   return page.evaluate(
-    async ({ a, b }) => {
+    async ({ a, b, m }) => {
       const pixels = async (base64: string) => {
         const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
         const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }))
@@ -81,7 +90,11 @@ function compare(page: Page, bare: string, inked: string): Promise<Ink> {
         ctx.drawImage(bitmap, 0, 0)
         return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data
       }
-      const [inkedPx, barePx] = await Promise.all([pixels(a), pixels(b)])
+      const [inkedPx, barePx, maskPx] = await Promise.all([
+        pixels(a),
+        pixels(b),
+        m ? pixels(m) : Promise.resolve(null),
+      ])
       const channel = (v: number) => {
         const s = v / 255
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
@@ -90,16 +103,25 @@ function compare(page: Page, bare: string, inked: string): Promise<Ink> {
         0.2126 * channel(d[i]!) +
         0.7152 * channel(d[i + 1]!) +
         0.0722 * channel(d[i + 2]!)
-      // Each changed pixel: the luminance under it without the ink, and with it.
-      const pairs: [number, number][] = []
+      const differs = (x: Uint8ClampedArray, y: Uint8ClampedArray, i: number) =>
+        Math.abs(x[i]! - y[i]!) +
+          Math.abs(x[i + 1]! - y[i + 1]!) +
+          Math.abs(x[i + 2]! - y[i + 2]!) >
+        0
+      // Each glyph position (the mask's, or else every pixel the ink changed): the luminance
+      // under it without the ink, and with it.
+      let painted = 0
+      const changedPairs: [number, number][] = []
+      const maskPairs: [number, number][] = []
       for (let i = 0; i < inkedPx.length; i += 4) {
-        const changed =
-          Math.abs(inkedPx[i]! - barePx[i]!) +
-          Math.abs(inkedPx[i + 1]! - barePx[i + 1]!) +
-          Math.abs(inkedPx[i + 2]! - barePx[i + 2]!)
-        if (changed > 0) pairs.push([luminance(barePx, i), luminance(inkedPx, i)])
+        const pair: [number, number] = [luminance(barePx, i), luminance(inkedPx, i)]
+        if (differs(inkedPx, barePx, i)) {
+          painted += 1
+          changedPairs.push(pair)
+        }
+        if (maskPx && differs(maskPx, barePx, i)) maskPairs.push(pair)
       }
-      const painted = pairs.length
+      const pairs = maskPairs.length > 0 ? maskPairs : changedPairs
       // The background is the median under the ink; uniform when 95% of the ink sits within
       // 15% of it (an antialiased edge over a 1 px border is allowed, a background that changes
       // under the text is not). The ratio is read over that background only.
@@ -109,7 +131,7 @@ function compare(page: Page, bare: string, inked: string): Promise<Ink> {
         Math.max(value + 0.05, median + 0.05) / Math.min(value + 0.05, median + 0.05) <=
         1.15
       const onBackground = pairs.filter(([bare]) => near(bare))
-      const uniform = painted === 0 || onBackground.length >= 0.95 * painted
+      const uniform = pairs.length === 0 || onBackground.length >= 0.95 * pairs.length
       let ratio = 1
       for (const [bare, ink] of onBackground)
         ratio = Math.max(
@@ -118,8 +140,71 @@ function compare(page: Page, bare: string, inked: string): Promise<Ink> {
         )
       return { painted, ratio, uniform }
     },
-    { a: inked, b: bare }
+    { a: inked, b: bare, m: mask ?? null }
   )
+}
+
+type States = {
+  bare: () => Promise<void>
+  inked: () => Promise<void>
+  mask?: () => Promise<void>
+}
+
+/**
+ * The region to shoot: the element's box plus `margin`, in the viewport. 'detached' when the
+ * node was replaced between the lookup and the scroll; null when it has no box on screen. A sticky
+ * bar or overlay over the box would be measured in its place, so a covered element is refused.
+ */
+async function clipFor(
+  target: Locator,
+  margin: number
+): Promise<Clip | null | 'detached'> {
+  try {
+    await target.scrollIntoViewIfNeeded({ timeout: 2_000 })
+  } catch (error) {
+    if (/not attached|detached/i.test(String(error))) return 'detached'
+    throw error
+  }
+  const cover = await target.evaluate((el) => {
+    const r = el.getBoundingClientRect()
+    for (const fx of [0.5, 0.15, 0.85]) {
+      const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)
+      if (hit && !el.contains(hit) && !hit.contains(el)) {
+        const id = hit.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
+        return `${hit.tagName.toLowerCase()} in ${id}`
+      }
+    }
+    return null
+  })
+  if (cover)
+    throw new Error(`painted-contrast: the measured element is covered by ${cover}`)
+  const box = await target.boundingBox()
+  if (!box || box.width === 0 || box.height === 0) return null
+  const viewport = target.page().viewportSize()!
+  const x = Math.max(0, box.x - margin)
+  const y = Math.max(0, box.y - margin)
+  const clip = {
+    x,
+    y,
+    width: Math.min(viewport.width, box.x + box.width + margin) - x,
+    height: Math.min(viewport.height, box.y + box.height + margin) - y,
+  }
+  return clip.width > 0 && clip.height > 0 ? clip : null
+}
+
+/** The bare, inked and (when given) mask shots of `clip`, compared. */
+async function takeShots(page: Page, clip: Clip, states: States): Promise<Ink> {
+  await states.bare()
+  const bare = await shot(page, clip)
+  await states.inked()
+  const inked = await shot(page, clip)
+  let mask: string | undefined
+  if (states.mask) {
+    await states.mask()
+    mask = await shot(page, clip)
+  }
+  await setInkStyle(page, '')
+  return compare(page, bare, inked, mask)
 }
 
 /**
@@ -130,7 +215,7 @@ function compare(page: Page, bare: string, inked: string): Promise<Ink> {
  */
 async function measure(
   target: Locator,
-  states: { bare: () => Promise<void>; inked: () => Promise<void> },
+  states: States,
   options: { margin?: number; prepare?: () => Promise<void> } = {}
 ): Promise<Ink | null> {
   const margin = options.margin ?? 0
@@ -138,48 +223,13 @@ async function measure(
   for (let attempt = 0; attempt < 5; attempt += 1) {
     await options.prepare?.()
     if ((await target.count()) === 0) continue
-    try {
-      await target.scrollIntoViewIfNeeded({ timeout: 2_000 })
-    } catch (error) {
-      // Replaced between the lookup and the scroll: look it up again.
-      if (/not attached|detached/i.test(String(error))) continue
-      throw error
-    }
-    // A sticky bar or overlay over the box would be measured in its place: refuse that.
-    const cover = await target.evaluate((el) => {
-      const r = el.getBoundingClientRect()
-      for (const fx of [0.5, 0.15, 0.85]) {
-        const hit = document.elementFromPoint(r.left + r.width * fx, r.top + r.height / 2)
-        if (hit && !el.contains(hit) && !hit.contains(el)) {
-          const id = hit.closest('[data-testid]')?.getAttribute('data-testid') ?? ''
-          return `${hit.tagName.toLowerCase()} in ${id}`
-        }
-      }
-      return null
-    })
-    if (cover)
-      throw new Error(`painted-contrast: the measured element is covered by ${cover}`)
-    const box = await target.boundingBox()
-    if (!box || box.width === 0 || box.height === 0) return null
-    const viewport = page.viewportSize()!
-    const x = Math.max(0, box.x - margin)
-    const y = Math.max(0, box.y - margin)
-    const clip = {
-      x,
-      y,
-      width: Math.min(viewport.width, box.x + box.width + margin) - x,
-      height: Math.min(viewport.height, box.y + box.height + margin) - y,
-    }
-    if (clip.width <= 0 || clip.height <= 0) return null
+    const clip = await clipFor(target, margin)
+    if (clip === 'detached') continue
+    if (!clip) return null
     const handle = await target.elementHandle()
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
-      await states.bare()
-      const bare = await shot(page, clip)
-      await states.inked()
-      const inked = await shot(page, clip)
-      await setInkStyle(page, '')
-      const ink = await compare(page, bare, inked)
+      const ink = await takeShots(page, clip, states)
       const stable = await handle.evaluate(
         (el, mark) => el.isConnected && el.hasAttribute(mark),
         MARK
@@ -200,6 +250,7 @@ async function measure(
 const textStates = (page: Page) => ({
   bare: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_OFF}`),
   inked: () => setInkStyle(page, DESCENDANT_TEXT_OFF),
+  mask: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_MASK}`),
 })
 
 /** The painted contrast of an element's own text (or a field's value, or a closed select's choice). */
@@ -216,6 +267,7 @@ export function inkOfPlaceholder(field: Locator): Promise<Ink | null> {
   return measure(field, {
     bare: () => setInkStyle(page, PLACEHOLDER_OFF),
     inked: () => setInkStyle(page, ''),
+    mask: () => setInkStyle(page, PLACEHOLDER_MASK),
   })
 }
 
@@ -364,6 +416,68 @@ function enumerate(root: Locator): Promise<Target[]> {
   }, TARGET)
 }
 
+/** Whether `root` shows at all, and the text it holds. */
+function rootState(root: Locator) {
+  return root.evaluate((el) => {
+    const box = el.getBoundingClientRect()
+    const style = getComputedStyle(el)
+    return {
+      visible:
+        box.width > 1 &&
+        box.height > 1 &&
+        style.visibility !== 'hidden' &&
+        style.display !== 'none',
+      text: (el.textContent ?? '').trim().slice(0, 60),
+    }
+  })
+}
+
+const signature = (list: Target[]) => JSON.stringify(list.map((t) => [t.index, t.text]))
+
+class TargetsChanged extends Error {}
+
+function failureFor(target: Target, ink: Ink | null): ContrastFailure | null {
+  const required = requiredFor(target)
+  if (ink && ink.painted > 0 && ink.uniform && ink.ratio >= required) return null
+  const text =
+    ink && !ink.uniform ? `${target.text} (background not uniform)` : target.text
+  return {
+    text: text.slice(0, 60),
+    ratio: ink ? Math.floor(ink.ratio * 1000) / 1000 : 0,
+    required,
+    painted: ink?.painted ?? 0,
+  }
+}
+
+/** One scan over a settled target list; throws TargetsChanged when the list moves under it. */
+async function scanOnce(root: Locator, rootText: string): Promise<ContrastFailure[]> {
+  const page = root.page()
+  const targets = await enumerate(root)
+  const expected = signature(targets)
+  const settled = async () => {
+    if (signature(await enumerate(root)) !== expected) throw new TargetsChanged()
+  }
+  const failures: ContrastFailure[] = []
+  for (const target of targets) {
+    if (target.index < 0) {
+      failures.push({ text: target.text, ratio: 0, required: 4.5, painted: 0 })
+      continue
+    }
+    const ink = await inkOfText(page.locator(`[${TARGET}="${target.index}"]`), settled)
+    const failure = failureFor(target, ink)
+    if (failure) failures.push(failure)
+  }
+  await settled()
+  if (targets.length === 0 && rootText)
+    failures.push({
+      text: `${rootText} (no text rendered)`,
+      ratio: 0,
+      required: 4.5,
+      painted: 0,
+    })
+  return failures
+}
+
 /**
  * Every visible text run, filled field and closed select inside `root` whose painted text is
  * below its WCAG minimum, not painted at all, or painted over a background that is not uniform
@@ -371,35 +485,30 @@ function enumerate(root: Locator): Promise<Target[]> {
  * exempts an inactive control), and so is visually hidden text that keeps only a 1 px box
  * (`sr-only`). An empty field is refused: the caller fills it, and measures its placeholder with
  * `placeholderContrastFailures` first. A target re-rendered mid-measurement is found again by
- * enumerating `root` once more.
+ * enumerating `root` once more; a changed list of targets restarts the scan. A root that is not
+ * shown, or that holds text none of which renders, fails.
  */
 export async function textContrastFailures(root: Locator): Promise<ContrastFailure[]> {
-  const targets = await enumerate(root)
-  const page = root.page()
-  const failures: ContrastFailure[] = []
+  // A root that shows nothing while it holds text fails outright: nothing in it is readable.
+  const state = await rootState(root)
+  if (!state.visible)
+    return state.text
+      ? [{ text: `${state.text} (not shown)`, ratio: 0, required: 4.5, painted: 0 }]
+      : []
   try {
-    for (const target of targets) {
-      if (target.index < 0) {
-        failures.push({ text: target.text, ratio: 0, required: 4.5, painted: 0 })
-        continue
+    // The scan runs over one settled list of targets. If the list changes while a target is
+    // measured (a sibling inserted, a run re-rendered with other text), it starts over, so no
+    // index can point at a different element; persistent churn ends in an explicit error.
+    for (let scan = 0; scan < 5; scan += 1) {
+      try {
+        return await scanOnce(root, state.text)
+      } catch (error) {
+        if (!(error instanceof TargetsChanged)) throw error
       }
-      const ink = await inkOfText(
-        page.locator(`[${TARGET}="${target.index}"]`),
-        async () => {
-          await enumerate(root)
-        }
-      )
-      const required = requiredFor(target)
-      const text =
-        ink && !ink.uniform ? `${target.text} (background not uniform)` : target.text
-      if (!ink || ink.painted === 0 || !ink.uniform || ink.ratio < required)
-        failures.push({
-          text: text.slice(0, 60),
-          ratio: ink ? Math.floor(ink.ratio * 1000) / 1000 : 0,
-          required,
-          painted: ink?.painted ?? 0,
-        })
     }
+    throw new Error(
+      'painted-contrast: the text under the root kept changing during the scan'
+    )
   } finally {
     await root
       .evaluate(
@@ -411,7 +520,6 @@ export async function textContrastFailures(root: Locator): Promise<ContrastFailu
       )
       .catch(() => undefined)
   }
-  return failures
 }
 
 /** Each visible empty field's placeholder inside `root` below 4.5:1, or not painted. */

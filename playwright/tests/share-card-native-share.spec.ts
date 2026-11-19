@@ -95,6 +95,9 @@ test('P-SHARE-BYTES: the shared File is the previewed PNG and one handed_off eve
       if (value) document.documentElement.setAttribute('data-theme', value)
       else document.documentElement.removeAttribute('data-theme')
     }, palette)
+    // Shown and painted in every palette: a hidden control fails the contrast scan as well.
+    await expect(share).toBeVisible()
+    await expect(feedback).toBeVisible()
     expect(await textContrastFailures(share), `Share, ${palette ?? 'Default'}`).toEqual(
       []
     )
