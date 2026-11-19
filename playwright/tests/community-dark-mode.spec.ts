@@ -13,6 +13,7 @@ import frFR from '../../apps/web/src/i18n/locales/fr-FR.json'
 import { checkA11y, contrastRatio } from '../support/helpers/accessibility'
 import {
   focusRing,
+  inkCoverage,
   inkOfText,
   paletteCardSurface,
   placeholderContrastFailures,
@@ -391,10 +392,8 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       )
       const panel = share.locator(':scope > div').first()
       expect(await surfacePixel(panel)).toBe(cardSurface)
-      // The stubbed native share shows Share; sending fills the visible feedback line, which is
-      // aria-hidden (its status region announces it) but painted, so both are measured.
       // Share and its feedback line need a member web session, which the share-card lane's owned
-      // runtime provides; share-card-native-share.spec.ts measures them.
+      // runtime provides; share-card-native-share.spec.ts measures them per palette.
       expect(await textContrastFailures(share.getByTestId('share-card-save'))).toEqual([])
       expect(await textContrastFailures(panel)).toEqual([])
     })
@@ -475,10 +474,11 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       await expect(signIn).toHaveText(enUS.community.notifications.signin)
       await expect(signIn.locator('svg')).toHaveCount(0)
       await expectInHeadingRow(page, signIn)
-      // Painted, not only present: its own text changes pixels, legibly.
+      // Painted, not only present: legibly, and all of it, against an unclipped clone in its font.
       const label = await inkOfText(signIn)
       expect(label!.painted).toBeGreaterThan(20)
       expect(label!.ratio).toBeGreaterThanOrEqual(4.5)
+      expect(await inkCoverage(signIn)).toBeGreaterThanOrEqual(0.85)
       expect(await textContrastFailures(signIn)).toEqual([])
 
       // Negative controls beside the link: the same words visually hidden (sr-only), and full-size
@@ -487,6 +487,10 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
         const controls: [string, string][] = [
           ['tea-sr-only-control', ''],
           ['tea-clipped-control', 'display:inline-block;clip-path:inset(50%)'],
+          [
+            'tea-partly-clipped-control',
+            'display:inline-block;clip-path:inset(0 78% 0 0)',
+          ],
         ]
         for (const [id, css] of controls) {
           const control = document.createElement('span')
@@ -505,6 +509,10 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
       ).toHaveLength(1)
       const hidden = await inkOfText(page.getByTestId('tea-sr-only-control'))
       expect(hidden?.painted ?? 0).toBeLessThanOrEqual(1)
+      // Most of the words clipped away: legible where painted, but far from all of it.
+      expect(
+        await inkCoverage(page.getByTestId('tea-partly-clipped-control'))
+      ).toBeLessThan(0.5)
     }
   )
 
@@ -542,13 +550,14 @@ test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
 
         const nav = page.getByTestId('sticky-bottom-nav')
         const home = nav.getByRole('link', { name: /home/i })
-        await home.focus()
-        // Keyboard focus, so :focus-visible draws the ring.
-        await page.keyboard.press('Shift+Tab')
-        await page.keyboard.press('Tab')
-        await expect(home).toBeFocused()
-        const ring = await focusRing(home)
-        // Drawn: the outline changes pixels around the tab, and they reach 3:1 on the nav.
+        // The tab as it looks before focus, then after keyboard focus (so :focus-visible applies).
+        const ring = await focusRing(home, async () => {
+          await home.focus()
+          await page.keyboard.press('Shift+Tab')
+          await page.keyboard.press('Tab')
+          await expect(home).toBeFocused()
+        })
+        // Focus changes pixels around the tab, and they reach 3:1 against what was there.
         expect(ring!.painted).toBeGreaterThan(20)
         expect(ring!.ratio).toBeGreaterThanOrEqual(3)
       })

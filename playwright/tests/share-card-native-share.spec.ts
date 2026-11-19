@@ -10,6 +10,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import AxeBuilder from '@axe-core/playwright'
 import { test, expect } from '../support/fixtures/share-card-fixtures'
+import { textContrastFailures } from '../support/helpers/painted-contrast'
 import {
   activateFocused,
   downloadedDigest,
@@ -81,6 +82,27 @@ test('P-SHARE-BYTES: the shared File is the previewed PNG and one handed_off eve
     },
   ])
   await expect(dialog.getByText(shareCopy().shared, { exact: true })).toHaveCount(0)
+  // Production follow-up 2026-11-19 (community-dark-mode.spec.ts 3.6-E2E-018 covers the dialog
+  // surface): under a dark system setting, Share and its visible feedback line keep readable
+  // ink on the Default dialog and on each premium palette's light dialog. The feedback line is
+  // aria-hidden (the status region announces it) but painted, so it is measured. This rides on
+  // P-SHARE-BYTES because the lane allows five share titles.
+  await page.emulateMedia({ colorScheme: 'dark' })
+  const feedback = dialog.getByTestId('share-card-feedback')
+  await expect(feedback).toHaveText(shareCopy().sentToApp)
+  for (const palette of [null, 'jewel_radiance', 'autumn_umber', 'winter_metallic']) {
+    await page.evaluate((value) => {
+      if (value) document.documentElement.setAttribute('data-theme', value)
+      else document.documentElement.removeAttribute('data-theme')
+    }, palette)
+    expect(await textContrastFailures(share), `Share, ${palette ?? 'Default'}`).toEqual(
+      []
+    )
+    expect(
+      await textContrastFailures(feedback),
+      `feedback, ${palette ?? 'Default'}`
+    ).toEqual([])
+  }
 })
 test('P-SHARE-DISMISS: a closed share sheet keeps the preview, watermark and Download', async ({
   context,

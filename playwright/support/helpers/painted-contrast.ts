@@ -1,12 +1,14 @@
 // Rendered-pixel contrast for Playwright specs: what Chromium paints, not what CSS declares.
 //
-// Each measurement takes two screenshots of the same region: one as rendered, and one with only
-// the ink under test made transparent by an injected rule (an element's own text, a field's
-// placeholder, or a focus outline). The region's pixels that change are that ink; each is compared
-// with the pixel at the same place without it, so group opacity, translucent colors, gradients,
-// clip-paths and antialiasing all come out as painted. The highest per-pixel WCAG ratio stands
-// for the ink (a glyph's stem reaches its full color), compared unrounded; no changed pixel means
-// nothing was painted. Used by playwright/tests/community-dark-mode.spec.ts.
+// Each measurement takes two screenshots of the same region: one without the ink under test and
+// one with it. Text is hidden by -webkit-text-fill-color alone, so borders, underlines and other
+// currentColor decoration stay in both shots; a placeholder by its own fill; a focus indicator by
+// taking the first shot before keyboard focus. The pixels that change are that ink, each compared
+// with the same pixel without it, so group opacity, translucent colors, clip-paths and
+// antialiasing count as painted. The highest per-pixel WCAG ratio stands for the ink (a glyph's
+// stem reaches its full color), which holds only on a uniform background, so the background under
+// the changed pixels must be uniform or the measurement is refused. Ratios compare unrounded; no
+// changed pixel means nothing was painted. Used by playwright/tests/community-dark-mode.spec.ts.
 import { type Locator, type Page } from '@playwright/test'
 
 export type ContrastFailure = {
@@ -16,16 +18,19 @@ export type ContrastFailure = {
   painted: number
 }
 
-type Ink = { painted: number; ratio: number }
+/** `uniform`: the background under the changed pixels varies by under 15% in contrast terms. */
+export type Ink = { painted: number; ratio: number; uniform: boolean }
 
 const MARK = 'data-tea-ink'
 const TARGET = 'data-tea-target'
 const STYLE_ID = 'tea-ink-style'
-// Descendants' own text stays hidden in both shots, so only the marked element's text differs.
-const DESCENDANT_TEXT_OFF = `[${MARK}] * { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; }`
-const OWN_TEXT_OFF = `[${MARK}] { color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; }`
-const PLACEHOLDER_OFF = `[${MARK}]::placeholder { color: transparent !important; -webkit-text-fill-color: transparent !important; }`
-const RING_OFF = `[${MARK}], [${MARK}]:focus-visible { outline: none !important; box-shadow: none !important; }`
+// Glyph fill only: color, and every currentColor border or decoration with it, is left alone.
+const FILL_OFF =
+  '-webkit-text-fill-color: transparent !important; text-shadow: none !important;'
+// Descendants' glyphs stay hidden in both shots, so only the marked element's own text differs.
+const DESCENDANT_TEXT_OFF = `[${MARK}] * { ${FILL_OFF} }`
+const OWN_TEXT_OFF = `[${MARK}] { ${FILL_OFF} }`
+const PLACEHOLDER_OFF = `[${MARK}]::placeholder { color: transparent !important; ${FILL_OFF} }`
 
 async function setInkStyle(page: Page, css: string) {
   await page.evaluate(
@@ -46,22 +51,24 @@ async function setInkStyle(page: Page, css: string) {
   )
 }
 
-/** Screenshots `clip` with `shown` and then `hidden` applied, and compares them pixel by pixel. */
-async function compareShots(
-  page: Page,
-  clip: { x: number; y: number; width: number; height: number },
-  shown: string,
-  hidden: string
-): Promise<Ink> {
-  const shot = async (css: string) => {
-    await setInkStyle(page, css)
-    return (
-      await page.screenshot({ clip, animations: 'disabled', caret: 'hide', scale: 'css' })
-    ).toString('base64')
-  }
-  const withInk = await shot(shown)
-  const withoutInk = await shot(hidden)
-  await setInkStyle(page, '')
+const nextFrames = (page: Page) =>
+  page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+      })
+  )
+
+type Clip = { x: number; y: number; width: number; height: number }
+
+async function shot(page: Page, clip: Clip) {
+  return (
+    await page.screenshot({ clip, animations: 'disabled', caret: 'hide', scale: 'css' })
+  ).toString('base64')
+}
+
+/** Compares a shot without the ink (`bare`) with one with it (`inked`), pixel by pixel. */
+function compare(page: Page, bare: string, inked: string): Promise<Ink> {
   return page.evaluate(
     async ({ a, b }) => {
       const pixels = async (base64: string) => {
@@ -74,7 +81,7 @@ async function compareShots(
         ctx.drawImage(bitmap, 0, 0)
         return ctx.getImageData(0, 0, bitmap.width, bitmap.height).data
       }
-      const [inked, bare] = await Promise.all([pixels(a), pixels(b)])
+      const [inkedPx, barePx] = await Promise.all([pixels(a), pixels(b)])
       const channel = (v: number) => {
         const s = v / 255
         return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
@@ -83,38 +90,61 @@ async function compareShots(
         0.2126 * channel(d[i]!) +
         0.7152 * channel(d[i + 1]!) +
         0.0722 * channel(d[i + 2]!)
-      let painted = 0
-      let ratio = 1
-      for (let i = 0; i < inked.length; i += 4) {
+      // Each changed pixel: the luminance under it without the ink, and with it.
+      const pairs: [number, number][] = []
+      for (let i = 0; i < inkedPx.length; i += 4) {
         const changed =
-          Math.abs(inked[i]! - bare[i]!) +
-          Math.abs(inked[i + 1]! - bare[i + 1]!) +
-          Math.abs(inked[i + 2]! - bare[i + 2]!)
-        if (changed === 0) continue
-        painted += 1
-        const [hi, lo] = [luminance(inked, i), luminance(bare, i)].sort((x, y) => y - x)
-        ratio = Math.max(ratio, (hi! + 0.05) / (lo! + 0.05))
+          Math.abs(inkedPx[i]! - barePx[i]!) +
+          Math.abs(inkedPx[i + 1]! - barePx[i + 1]!) +
+          Math.abs(inkedPx[i + 2]! - barePx[i + 2]!)
+        if (changed > 0) pairs.push([luminance(barePx, i), luminance(inkedPx, i)])
       }
-      return { painted, ratio }
+      const painted = pairs.length
+      // The background is the median under the ink; uniform when 95% of the ink sits within
+      // 15% of it (an antialiased edge over a 1 px border is allowed, a background that changes
+      // under the text is not). The ratio is read over that background only.
+      const under = pairs.map(([bare]) => bare).sort((x, y) => x - y)
+      const median = under[Math.floor(under.length / 2)] ?? 0
+      const near = (value: number) =>
+        Math.max(value + 0.05, median + 0.05) / Math.min(value + 0.05, median + 0.05) <=
+        1.15
+      const onBackground = pairs.filter(([bare]) => near(bare))
+      const uniform = painted === 0 || onBackground.length >= 0.95 * painted
+      let ratio = 1
+      for (const [bare, ink] of onBackground)
+        ratio = Math.max(
+          ratio,
+          (Math.max(bare, ink) + 0.05) / (Math.min(bare, ink) + 0.05)
+        )
+      return { painted, ratio, uniform }
     },
-    { a: withInk, b: withoutInk }
+    { a: inked, b: bare }
   )
 }
 
 /**
- * Marks the element, measures one ink of it inside its own box (plus `margin`), unmarks it. A
- * re-render that replaces the element between the two shots drops the mark and makes them equal,
- * so the measurement counts only when the same marked node is still attached afterwards; it is
- * taken again otherwise.
+ * Measures one ink of `target` inside its own box (plus `margin`). `prepare` runs first on every
+ * attempt (it re-marks enumerated targets after a re-render); `bare` and `inked` put the page in
+ * the two states, in that order. A re-render that replaces the node between the shots is detected
+ * through the mark and measured again.
  */
 async function measure(
   target: Locator,
-  shown: string,
-  hidden: string,
-  margin = 0
+  states: { bare: () => Promise<void>; inked: () => Promise<void> },
+  options: { margin?: number; prepare?: () => Promise<void> } = {}
 ): Promise<Ink | null> {
+  const margin = options.margin ?? 0
+  const page = target.page()
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    await target.scrollIntoViewIfNeeded()
+    await options.prepare?.()
+    if ((await target.count()) === 0) continue
+    try {
+      await target.scrollIntoViewIfNeeded({ timeout: 2_000 })
+    } catch (error) {
+      // Replaced between the lookup and the scroll: look it up again.
+      if (/not attached|detached/i.test(String(error))) continue
+      throw error
+    }
     // A sticky bar or overlay over the box would be measured in its place: refuse that.
     const cover = await target.evaluate((el) => {
       const r = el.getBoundingClientRect()
@@ -131,7 +161,6 @@ async function measure(
       throw new Error(`painted-contrast: the measured element is covered by ${cover}`)
     const box = await target.boundingBox()
     if (!box || box.width === 0 || box.height === 0) return null
-    const page = target.page()
     const viewport = page.viewportSize()!
     const x = Math.max(0, box.x - margin)
     const y = Math.max(0, box.y - margin)
@@ -145,7 +174,12 @@ async function measure(
     const handle = await target.elementHandle()
     await handle.evaluate((el, mark) => el.setAttribute(mark, ''), MARK)
     try {
-      const ink = await compareShots(page, clip, shown, hidden)
+      await states.bare()
+      const bare = await shot(page, clip)
+      await states.inked()
+      const inked = await shot(page, clip)
+      await setInkStyle(page, '')
+      const ink = await compare(page, bare, inked)
       const stable = await handle.evaluate(
         (el, mark) => el.isConnected && el.hasAttribute(mark),
         MARK
@@ -163,22 +197,112 @@ async function measure(
   throw new Error('painted-contrast: the element kept re-rendering during measurement')
 }
 
+const textStates = (page: Page) => ({
+  bare: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_OFF}`),
+  inked: () => setInkStyle(page, DESCENDANT_TEXT_OFF),
+})
+
 /** The painted contrast of an element's own text (or a field's value, or a closed select's choice). */
-export function inkOfText(target: Locator): Promise<Ink | null> {
-  return measure(target, DESCENDANT_TEXT_OFF, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_OFF}`)
+export function inkOfText(
+  target: Locator,
+  prepare?: () => Promise<void>
+): Promise<Ink | null> {
+  return measure(target, textStates(target.page()), { prepare })
 }
 
 /** The painted contrast of an empty field's placeholder over the field. */
 export function inkOfPlaceholder(field: Locator): Promise<Ink | null> {
-  return measure(field, '', PLACEHOLDER_OFF)
+  const page = field.page()
+  return measure(field, {
+    bare: () => setInkStyle(page, PLACEHOLDER_OFF),
+    inked: () => setInkStyle(page, ''),
+  })
 }
 
 /**
- * A focused element's ring as painted: the pixels its outline and halo change around it, against
- * the same pixels without them. `painted` counts those pixels; none means no visible ring.
+ * A keyboard focus indicator as a reader sees it appear: the element's area before focus and
+ * after `focusWithKeyboard`, with every normal decoration in both shots, so a permanent shadow or
+ * border is no indicator. `painted` counts the pixels focus changes.
  */
-export function focusRing(target: Locator): Promise<Ink | null> {
-  return measure(target, '', RING_OFF, 10)
+export function focusRing(
+  target: Locator,
+  focusWithKeyboard: () => Promise<void>
+): Promise<Ink | null> {
+  const page = target.page()
+  return measure(
+    target,
+    {
+      bare: async () => {
+        await target.evaluate((el) => (el as HTMLElement).blur())
+        await nextFrames(page)
+      },
+      inked: async () => {
+        await focusWithKeyboard()
+        await nextFrames(page)
+      },
+    },
+    { margin: 10 }
+  )
+}
+
+/**
+ * How much of `target`'s text paints, against a clone of it with the same font, black on white,
+ * outside every clipping ancestor: 1 means all of it, a partly clipped label reads far lower.
+ */
+export async function inkCoverage(target: Locator): Promise<number> {
+  const page = target.page()
+  const actual = await inkOfText(target)
+  const reference = await target.evaluate((el) => {
+    const style = getComputedStyle(el)
+    const clone = el.cloneNode(true) as HTMLElement
+    clone.removeAttribute('data-testid')
+    // Each property that can clip, fade or move the text is reset; nothing that sets the glyph
+    // fill inline, so the measurement's own fill rule still applies to the clone.
+    for (const [property, value] of [
+      ['clip-path', 'none'],
+      ['clip', 'auto'],
+      ['mask', 'none'],
+      ['opacity', '1'],
+      ['filter', 'none'],
+      ['transform', 'none'],
+      ['overflow', 'visible'],
+      ['visibility', 'visible'],
+      ['position', 'static'],
+      ['margin', '0'],
+      ['padding', '0'],
+      ['border', '0'],
+      ['background', 'none'],
+      ['width', 'auto'],
+      ['height', 'auto'],
+      ['font', style.font],
+      ['letter-spacing', style.letterSpacing],
+      ['word-spacing', style.wordSpacing],
+      ['text-transform', style.textTransform],
+      ['white-space', 'pre'],
+      ['color', '#000'],
+      ['display', 'inline-block'],
+    ] as const)
+      clone.style.setProperty(property, value, 'important')
+    const holder = document.createElement('div')
+    holder.dataset.testid = 'tea-ink-reference'
+    holder.setAttribute(
+      'style',
+      'all: initial; position: fixed; left: 8px; top: 8px; z-index: 2147483647; background: #fff; padding: 4px;'
+    )
+    holder.append(clone)
+    document.body.append(holder)
+    return true
+  })
+  try {
+    const clone = page.getByTestId('tea-ink-reference').locator(':scope > *')
+    const ref = reference ? await inkOfText(clone) : null
+    if (!actual || !ref || ref.painted === 0) return 0
+    return actual.painted / ref.painted
+  } finally {
+    await page.evaluate(() =>
+      document.querySelector('[data-testid="tea-ink-reference"]')?.remove()
+    )
+  }
 }
 
 const requiredFor = (style: { fontSize: string; fontWeight: string }) => {
@@ -186,18 +310,12 @@ const requiredFor = (style: { fontSize: string; fontWeight: string }) => {
   return size >= 24 || (size >= 18.66 && Number(style.fontWeight) >= 700) ? 3 : 4.5
 }
 
-/**
- * Every visible text run, filled field and closed select inside `root` whose painted text is
- * below its WCAG minimum, or not painted at all. Disabled controls are skipped (WCAG 1.4.3 exempts
- * an inactive control), and so is visually hidden text that keeps only a 1 px box (`sr-only`):
- * a label clipped any other way is measured, and fails when nothing of it is painted. An empty
- * field is refused: the caller fills it, and measures its placeholder with
- * `placeholderContrastFailures` first.
- */
-export async function textContrastFailures(root: Locator): Promise<ContrastFailure[]> {
-  const targets = await root.evaluate((scope, tag) => {
-    const found: { index: number; text: string; fontSize: string; fontWeight: string }[] =
-      []
+type Target = { index: number; text: string; fontSize: string; fontWeight: string }
+
+/** Marks every measurable text run under `root` with its enumeration index; returns them. */
+function enumerate(root: Locator): Promise<Target[]> {
+  return root.evaluate((scope, tag) => {
+    const found: Target[] = []
     const measurable = (el: Element) => {
       const box = el.getBoundingClientRect()
       const style = getComputedStyle(el)
@@ -225,54 +343,74 @@ export async function textContrastFailures(root: Locator): Promise<ContrastFailu
     }
     const all = [scope, ...Array.from(scope.querySelectorAll('*'))]
     all.forEach((el, index) => {
+      el.removeAttribute(tag)
       if (!measurable(el)) return
       const style = getComputedStyle(el)
       const own = textOf(el)
+      const entry = { fontSize: style.fontSize, fontWeight: style.fontWeight }
       if (own === null) {
         found.push({
           index: -1 - index,
           text: `empty ${el.tagName.toLowerCase()} ${el.id}`,
-          fontSize: style.fontSize,
-          fontWeight: style.fontWeight,
+          ...entry,
         })
         return
       }
-      const text = own
-      if (text) {
-        el.setAttribute(tag, String(index))
-        found.push({
-          index,
-          text,
-          fontSize: style.fontSize,
-          fontWeight: style.fontWeight,
-        })
-      }
+      if (!own) return
+      el.setAttribute(tag, String(index))
+      found.push({ index, text: own, ...entry })
     })
     return found
   }, TARGET)
+}
+
+/**
+ * Every visible text run, filled field and closed select inside `root` whose painted text is
+ * below its WCAG minimum, not painted at all, or painted over a background that is not uniform
+ * (refused: the best pixel would not stand for the run). Disabled controls are skipped (WCAG 1.4.3
+ * exempts an inactive control), and so is visually hidden text that keeps only a 1 px box
+ * (`sr-only`). An empty field is refused: the caller fills it, and measures its placeholder with
+ * `placeholderContrastFailures` first. A target re-rendered mid-measurement is found again by
+ * enumerating `root` once more.
+ */
+export async function textContrastFailures(root: Locator): Promise<ContrastFailure[]> {
+  const targets = await enumerate(root)
+  const page = root.page()
   const failures: ContrastFailure[] = []
-  for (const target of targets) {
-    if (target.index < 0) {
-      failures.push({ text: target.text, ratio: 0, required: 4.5, painted: 0 })
-      continue
+  try {
+    for (const target of targets) {
+      if (target.index < 0) {
+        failures.push({ text: target.text, ratio: 0, required: 4.5, painted: 0 })
+        continue
+      }
+      const ink = await inkOfText(
+        page.locator(`[${TARGET}="${target.index}"]`),
+        async () => {
+          await enumerate(root)
+        }
+      )
+      const required = requiredFor(target)
+      const text =
+        ink && !ink.uniform ? `${target.text} (background not uniform)` : target.text
+      if (!ink || ink.painted === 0 || !ink.uniform || ink.ratio < required)
+        failures.push({
+          text: text.slice(0, 60),
+          ratio: ink ? Math.floor(ink.ratio * 1000) / 1000 : 0,
+          required,
+          painted: ink?.painted ?? 0,
+        })
     }
-    const ink = await inkOfText(root.page().locator(`[${TARGET}="${target.index}"]`))
-    const required = requiredFor(target)
-    if (!ink || ink.painted === 0 || ink.ratio < required)
-      failures.push({
-        text: target.text.slice(0, 40),
-        ratio: ink ? Math.floor(ink.ratio * 1000) / 1000 : 0,
-        required,
-        painted: ink?.painted ?? 0,
-      })
+  } finally {
+    await root
+      .evaluate(
+        (scope, tag) =>
+          [scope, ...Array.from(scope.querySelectorAll(`[${tag}]`))].forEach((el) =>
+            el.removeAttribute(tag)
+          ),
+        TARGET
+      )
+      .catch(() => undefined)
   }
-  await root.evaluate(
-    (scope, tag) =>
-      [scope, ...Array.from(scope.querySelectorAll(`[${tag}]`))].forEach((el) =>
-        el.removeAttribute(tag)
-      ),
-    TARGET
-  )
   return failures
 }
 
@@ -292,9 +430,9 @@ export async function placeholderContrastFailures(
     })
     if (!state.shown) continue
     const ink = await inkOfPlaceholder(field)
-    if (!ink || ink.painted === 0 || ink.ratio < 4.5)
+    if (!ink || ink.painted === 0 || !ink.uniform || ink.ratio < 4.5)
       failures.push({
-        text: state.text,
+        text: ink && !ink.uniform ? `${state.text} (background not uniform)` : state.text,
         ratio: ink ? Math.floor(ink.ratio * 1000) / 1000 : 0,
         required: 4.5,
         painted: ink?.painted ?? 0,
