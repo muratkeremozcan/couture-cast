@@ -16,14 +16,30 @@ import {
   type AccessibilityAnnouncementEvent,
 } from '@couture/utils'
 
-type Announce = (event: AccessibilityAnnouncementEvent, details: string) => void
+export interface AnnounceOptions {
+  /**
+   * False once the announcement no longer belongs to whoever is signed in (or its screen is
+   * gone). Checked again when the queued announcement is delivered, so a member's place is never
+   * read out after another member took over.
+   */
+  stillCurrent?: () => boolean
+}
+
+type Announce = (
+  event: AccessibilityAnnouncementEvent,
+  details: string,
+  options?: AnnounceOptions
+) => void
 
 interface PendingAnnouncement {
   message: string
   urgency: 'polite' | 'assertive'
+  stillCurrent?: () => boolean
 }
 
-interface RenderedAnnouncement extends PendingAnnouncement {
+interface RenderedAnnouncement {
+  message: string
+  urgency: 'polite' | 'assertive'
   id: number
 }
 
@@ -47,7 +63,7 @@ export function AccessibilityAnnouncerProvider({ children }: PropsWithChildren) 
   )
 
   const announce = useCallback<Announce>(
-    (event, details) => {
+    (event, details, options) => {
       const cleanDetails = details.trim()
       const localized = (() => {
         switch (event) {
@@ -74,7 +90,12 @@ export function AccessibilityAnnouncerProvider({ children }: PropsWithChildren) 
           }
         }
       })()
-      const next = { message: localized.trim(), urgency: getAnnouncementUrgency(event) }
+      const next: PendingAnnouncement = {
+        message: localized.trim(),
+        urgency: getAnnouncementUrgency(event),
+        stillCurrent: options?.stillCurrent,
+      }
+      if (next.stillCurrent && !next.stillCurrent()) return
 
       if (!next.message || next.message === lastMessageRef.current) {
         return
@@ -95,10 +116,15 @@ export function AccessibilityAnnouncerProvider({ children }: PropsWithChildren) 
         if (!pending || pending.message === lastMessageRef.current) {
           return
         }
+        if (pending.stillCurrent && !pending.stillCurrent()) return
 
         lastMessageRef.current = pending.message
         announcementIdRef.current += 1
-        setRendered({ ...pending, id: announcementIdRef.current })
+        setRendered({
+          message: pending.message,
+          urgency: pending.urgency,
+          id: announcementIdRef.current,
+        })
 
         if (Platform.OS === 'web') {
           return

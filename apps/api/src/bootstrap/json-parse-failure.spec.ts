@@ -45,7 +45,8 @@ describe('JSON parse failures', () => {
       .useValue(new RequestAuthGuard(consent, identity))
       .compile()
 
-    app = moduleRef.createNestApplication({ rawBody: true })
+    // configureApp owns the body parsers.
+    app = moduleRef.createNestApplication({ rawBody: true, bodyParser: false })
     configureApp(app, {
       adapterHost: app.get(HttpAdapterHost),
       telemetry: {

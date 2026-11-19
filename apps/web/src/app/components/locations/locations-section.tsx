@@ -73,18 +73,19 @@ export function LocationsSection() {
    */
   const ownerGenerationRef = useRef(0)
   /**
-   * Work started for `startedFor` may still touch this section: the section is
-   * mounted for the same member, and the session bridge still names them. The
-   * bridge is read synchronously, so a member change counts even before this
-   * section's effects have run.
+   * One ownership token for work started now for `startedFor`: it may still
+   * touch this section while the section is mounted for the same member and
+   * the session bridge still names them. The bridge is read synchronously, so
+   * a member change counts even before this section's effects have run. Every
+   * completion (list, status, focus, navigation) checks it first.
    */
-  const stillOwnedBy = useCallback(
-    (generation: number, startedFor: string | null) =>
+  const ownedBy = useCallback((startedFor: string | null) => {
+    const generation = ownerGenerationRef.current
+    return () =>
       generation === ownerGenerationRef.current &&
       startedFor !== null &&
-      currentWebSessionOwner() === startedFor,
-    []
-  )
+      currentWebSessionOwner() === startedFor
+  }, [])
 
   const loadErrorMessage = t('locations.loadError')
 
@@ -92,23 +93,30 @@ export function LocationsSection() {
    * Fresh text each time, so an identical outcome twice in a row (two deletes)
    * still reaches assistive technology: the region is cleared, then filled.
    */
-  const announce = useCallback((message: string) => {
-    const generation = ownerGenerationRef.current
+  const announce = useCallback((message: string, current: () => boolean) => {
+    if (!current()) return
     setStatus('')
     requestAnimationFrame(() => {
-      if (generation === ownerGenerationRef.current) setStatus(message)
+      if (current()) setStatus(message)
     })
   }, [])
 
-  /** True when the list landed for the member who asked for it. */
-  const reload = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
-    const generation = ownerGenerationRef.current
-    const next = await listLocationsFromWeb(signal)
-    if (signal?.aborted || generation !== ownerGenerationRef.current) return false
-    setLocations(next)
-    setSectionState('ready')
-    return true
-  }, [])
+  /**
+   * True when the list landed for the member who asked for it. The request is
+   * not sent once its owner is gone, and its answer is dropped if the owner
+   * left while it was in flight.
+   */
+  const reload = useCallback(
+    async (current: () => boolean, signal?: AbortSignal): Promise<boolean> => {
+      if (!current()) return false
+      const next = await listLocationsFromWeb(signal)
+      if (signal?.aborted || !current()) return false
+      setLocations(next)
+      setSectionState('ready')
+      return true
+    },
+    []
+  )
 
   // Unmounted, nothing pending may write here or start a request.
   useEffect(
@@ -147,13 +155,14 @@ export function LocationsSection() {
       return
     }
     const controller = new AbortController()
+    const current = ownedBy(owner)
     setSectionState('loading')
-    reload(controller.signal).catch(() => {
-      if (controller.signal.aborted) return
+    reload(current, controller.signal).catch(() => {
+      if (controller.signal.aborted || !current()) return
       setSectionState('load_failed')
     })
     return () => controller.abort()
-  }, [reload, session.status, owner, loadAttempt])
+  }, [reload, ownedBy, session.status, owner, loadAttempt])
 
   function retryLoad() {
     if (session.status === 'unavailable') session.retry()
@@ -181,18 +190,16 @@ export function LocationsSection() {
     focusAfter: string
   ): Promise<void> {
     if (busyId) return
-    const generation = ownerGenerationRef.current
-    const startedFor = owner
-    const current = () => stillOwnedBy(generation, startedFor)
+    const current = ownedBy(owner)
     setBusyId(locationId)
     setError(null)
     try {
       await mutate()
       if (!current()) return
       const message = settled()
-      if (!(await reload()) || !current()) return
+      if (!(await reload(current)) || !current()) return
       pendingFocusRef.current = focusAfter
-      announce(message)
+      announce(message, current)
     } catch (caught) {
       if (current()) setError(reasonOf(caught))
     } finally {
@@ -236,17 +243,17 @@ export function LocationsSection() {
   }
 
   async function handleSaved(location: SavedLocation) {
-    const generation = ownerGenerationRef.current
-    if (!stillOwnedBy(generation, owner)) return
-    const loaded = await reload().catch(() => {
-      if (generation === ownerGenerationRef.current) setSectionState('load_failed')
+    const current = ownedBy(owner)
+    if (!current()) return
+    const loaded = await reload(current).catch(() => {
+      if (current()) setSectionState('load_failed')
       return false
     })
-    if (!loaded || generation !== ownerGenerationRef.current) return
-    announce(t('locations.saved', { label: location.label }))
+    if (!loaded || !current()) return
+    announce(t('locations.saved', { label: location.label }), current)
     pendingFocusRef.current = location.id
     const target = safeReturnPath(returnTo, window.location.origin)
-    if (target) router.push(target)
+    if (target && current()) router.push(target)
   }
 
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
@@ -473,7 +480,7 @@ export function LocationsSection() {
               key={owner ?? 'signed-out'}
               locale={locale}
               autoFocus={guided}
-              announce={announce}
+              announce={(message) => announce(message, ownedBy(owner))}
               onSaved={(location) => {
                 void handleSaved(location)
               }}

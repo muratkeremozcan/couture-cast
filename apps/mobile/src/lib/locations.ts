@@ -109,6 +109,42 @@ export function locationFailureReason(error: unknown): LocationFailureReason {
   return error instanceof LocationRequestError ? error.reason : 'unknown'
 }
 
+/** Work started for a member who is no longer signed in on this device. */
+function supersededError(): Error {
+  const error = new Error('The member who started this request is no longer signed in.')
+  error.name = 'AbortError'
+  return error
+}
+
+/**
+ * Every member-owned request takes one ownership token: the caller's `signal`, aborted when its
+ * screen or tap is gone, and `stillCurrent`, false once the member who started it is no longer
+ * signed in. Both are checked before the bearer is resolved, again after (the bearer may already
+ * be the next member's), and before a completion notifies anyone.
+ */
+type StillCurrent = () => boolean
+const always: StillCurrent = () => true
+
+function owned(signal: AbortSignal | undefined, stillCurrent: StillCurrent): boolean {
+  return !signal?.aborted && stillCurrent()
+}
+
+/** The API client for this member's request, or a superseded error before anything is sent. */
+async function ownedClient(signal: AbortSignal | undefined, stillCurrent: StillCurrent) {
+  if (!owned(signal, stillCurrent)) throw supersededError()
+  const api = await client()
+  if (!owned(signal, stillCurrent)) throw supersededError()
+  return api
+}
+
+/** Global listeners hear about a change only while its member is still the one signed in. */
+function notifyIfOwned(
+  signal: AbortSignal | undefined,
+  stillCurrent: StillCurrent
+): void {
+  if (owned(signal, stillCurrent)) notifyLocationsChanged()
+}
+
 async function client() {
   const accessToken = (await resolveMobileAccessToken())?.trim()
   if (!accessToken) {
@@ -118,10 +154,11 @@ async function client() {
 }
 
 export async function listLocationsFromMobile(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation[]> {
   try {
-    const api = await client()
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsGet({ signal: requestSignal })
     )
@@ -134,10 +171,11 @@ export async function listLocationsFromMobile(
 export async function searchLocationsFromMobile(
   query: string,
   locale: SupportedLocale,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const api = await client()
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsSearchGet(
         { q: query, locale, xCouturePlatform: 'mobile' },
@@ -148,13 +186,6 @@ export async function searchLocationsFromMobile(
   } catch (error) {
     throw await locationError(error)
   }
-}
-
-/** Work started for a member who is no longer signed in on this device. */
-function supersededError(): Error {
-  const error = new Error('The member who started this request is no longer signed in.')
-  error.name = 'AbortError'
-  return error
 }
 
 /** Two decimals, about a kilometre: all of the device position that leaves the phone. */
@@ -174,13 +205,10 @@ export async function locationsNearFromMobile(
   locale: SupportedLocale,
   signal?: AbortSignal,
   /** False once the tap is superseded or the member changed: nothing more is sent. */
-  stillCurrent: () => boolean = () => true
+  stillCurrent: StillCurrent = always
 ): Promise<LocationSearchCandidate[]> {
   try {
-    if (!stillCurrent() || signal?.aborted) throw supersededError()
-    const api = await client()
-    // The bearer just resolved may belong to another member by now.
-    if (!stillCurrent() || signal?.aborted) throw supersededError()
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromCoordinatesPost(
         {
@@ -205,13 +233,10 @@ export async function saveLocationFromSearchFromMobile(
   label: string,
   signal?: AbortSignal,
   /** False once the member who picked the place is gone: nothing is sent. */
-  stillCurrent: () => boolean = () => true
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    if (!stillCurrent() || signal?.aborted) throw supersededError()
-    const api = await client()
-    // The bearer just resolved may belong to another member by now.
-    if (!stillCurrent() || signal?.aborted) throw supersededError()
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromSearchPost(
         {
@@ -222,7 +247,7 @@ export async function saveLocationFromSearchFromMobile(
       )
     )
     const saved = createSavedLocationFromSearchResponseSchema.parse(response).data
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -230,15 +255,17 @@ export async function saveLocationFromSearchFromMobile(
 }
 
 export async function setPrimaryLocationFromMobile(
-  locationId: string
+  locationId: string,
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdPrimaryPost({ locationId }, { signal: requestSignal })
     )
     const saved = setPrimarySavedLocationResponseSchema.parse(response).data
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -247,32 +274,38 @@ export async function setPrimaryLocationFromMobile(
 
 export async function renameLocationFromMobile(
   locationId: string,
-  label: string
+  label: string,
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdPatch(
         { locationId, updateSavedLocationInput: { label } },
         { signal: requestSignal }
       )
     )
     const saved = updateSavedLocationResponseSchema.parse(response).data
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
     return saved
   } catch (error) {
     throw await locationError(error)
   }
 }
 
-export async function deleteLocationFromMobile(locationId: string): Promise<void> {
+export async function deleteLocationFromMobile(
+  locationId: string,
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
+): Promise<void> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdDelete({ locationId }, { signal: requestSignal })
     )
     deleteSavedLocationResponseSchema.parse(response)
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
   } catch (error) {
     throw await locationError(error)
   }

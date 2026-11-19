@@ -163,6 +163,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   const locateAttemptRef = useRef(0)
   const locateControllerRef = useRef<AbortController | null>(null)
   const saveControllerRef = useRef<AbortController | null>(null)
+  const listActionControllerRef = useRef<AbortController | null>(null)
+  // False once the screen is gone: nothing it started may write, announce or navigate.
+  const mountedRef = useRef(true)
   // Every list, mutation and save belongs to the member signed in when it
   // started; this epoch moves with each change of member, sign-out included.
   const [memberEpoch, setMemberEpoch] = useState(mobileIdentityEpoch)
@@ -178,15 +181,30 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     }
   }, [])
 
-  /** True when the list landed for the member who asked for it. */
-  const reload = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+  /**
+   * One ownership token for member-owned work: the member signed in now, this
+   * screen still mounted, and the work's own controller not aborted. Every
+   * request checks it after its bearer resolves and before it is sent; every
+   * completion checks it before it writes, announces or navigates.
+   */
+  const ownership = useCallback((controller: AbortController) => {
     const epoch = mobileIdentityEpoch()
-    const next = await listLocationsFromMobile(signal)
-    if (signal?.aborted || epoch !== mobileIdentityEpoch()) return false
-    setLocations(next)
-    setScreenState('ready')
-    return true
+    return () =>
+      mountedRef.current && epoch === mobileIdentityEpoch() && !controller.signal.aborted
   }, [])
+
+  /** True when the list landed for the member who asked for it. */
+  const reload = useCallback(
+    async (controller: AbortController): Promise<boolean> => {
+      const current = ownership(controller)
+      const next = await listLocationsFromMobile(controller.signal, current)
+      if (!current()) return false
+      setLocations(next)
+      setScreenState('ready')
+      return true
+    },
+    [ownership]
+  )
 
   /** Drops a pending Use my location: its position, request and answer go nowhere. */
   const cancelLocate = useCallback(() => {
@@ -196,7 +214,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     setIsLocating(false)
   }, [])
 
-  useEffect(() => cancelLocate, [cancelLocate])
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      cancelLocate()
+      saveControllerRef.current?.abort()
+      listActionControllerRef.current?.abort()
+    }
+  }, [cancelLocate])
 
   // Everything on this screen belongs to the member who is signed in. Another
   // member (or none) cancels what is pending, starts from an empty screen and
@@ -207,6 +233,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         cancelLocate()
         saveControllerRef.current?.abort()
         saveControllerRef.current = null
+        listActionControllerRef.current?.abort()
+        listActionControllerRef.current = null
         setIsSaving(false)
         setLocations([])
         setBusyId(null)
@@ -227,14 +255,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
 
   useEffect(() => {
     const controller = new AbortController()
-    reload(controller.signal).catch((error: unknown) => {
-      if (controller.signal.aborted) return
+    const current = ownership(controller)
+    reload(controller).catch((error: unknown) => {
+      if (!current()) return
       setScreenState(
         locationFailureReason(error) === 'signed_out' ? 'signed_out' : 'load_failed'
       )
     })
     return () => controller.abort()
-  }, [reload, memberEpoch])
+  }, [reload, ownership, memberEpoch])
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -244,68 +273,77 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       return
     }
     const controller = new AbortController()
+    const current = ownership(controller)
     const timer = setTimeout(() => {
       setIsSearching(true)
-      searchLocationsFromMobile(trimmed, locale, controller.signal)
+      searchLocationsFromMobile(trimmed, locale, controller.signal, current)
         .then((results) => {
-          if (controller.signal.aborted) return
+          if (!current()) return
           setCandidates(results)
           // A refused save stays explained while the query searches again.
-          setFormError((current) => (current?.step === 'save' ? current : null))
+          setFormError((error) => (error?.step === 'save' ? error : null))
           announceRef.current(
             'feedback',
             results.length > 0
               ? tRef.current('locations.resultCount', { count: results.length })
-              : tRef.current('locations.noResults')
+              : tRef.current('locations.noResults'),
+            { stillCurrent: current }
           )
         })
         .catch((error: unknown) => {
-          if (controller.signal.aborted) return
+          if (!current()) return
           setCandidates([])
           const reason = locationFailureReason(error)
           setFormError({ reason, step: 'search' })
-          announceRef.current('error', tRef.current(errorKey(reason, 'search')))
+          announceRef.current('error', tRef.current(errorKey(reason, 'search')), {
+            stillCurrent: current,
+          })
         })
         .finally(() => {
-          if (!controller.signal.aborted) setIsSearching(false)
+          if (current()) setIsSearching(false)
         })
     }, LOCATION_SEARCH_DEBOUNCE_MS)
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query, locale, selected, searchAttempt])
+  }, [query, locale, selected, searchAttempt, ownership])
 
   /**
-   * One list action for the member who started it. Ownership is checked the
-   * moment the request settles, before any editor closes or a reload starts,
-   * and again after the reload.
+   * One list action for the member who started it. The request is checked after
+   * its bearer resolves and before it is sent; ownership is checked again the
+   * moment it settles, before any editor closes or a reload starts, after the
+   * reload, and when the announcement is delivered.
    */
   async function runListAction(
     locationId: string,
-    mutate: () => Promise<unknown>,
+    mutate: (signal: AbortSignal, stillCurrent: () => boolean) => Promise<unknown>,
     settled: () => string
   ): Promise<boolean> {
     if (busyId) return false
-    const epoch = mobileIdentityEpoch()
-    const current = () => epoch === mobileIdentityEpoch()
+    const controller = new AbortController()
+    listActionControllerRef.current = controller
+    const current = ownership(controller)
     setBusyId(locationId)
     setListError(null)
     try {
-      await mutate()
+      await mutate(controller.signal, current)
       if (!current()) return false
       const message = settled()
-      if (!(await reload()) || !current()) return false
-      announce('feedback', message)
+      if (!(await reload(controller)) || !current()) return false
+      announce('feedback', message, { stillCurrent: current })
       return true
     } catch (error) {
       if (!current()) return false
       const reason = locationFailureReason(error)
       setListError(reason)
-      announce('error', t(errorKey(reason)))
+      announce('error', t(errorKey(reason)), { stillCurrent: current })
       return false
     } finally {
-      if (current()) setBusyId(null)
+      if (current()) {
+        listActionControllerRef.current = null
+        setBusyId(null)
+      }
     }
   }
 
@@ -326,14 +364,11 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     if (isLocating || isSaving) return
     locateControllerRef.current?.abort()
     const attempt = ++locateAttemptRef.current
-    const epoch = mobileIdentityEpoch()
     const controller = new AbortController()
     locateControllerRef.current = controller
-    // Still this tap, for the member who tapped.
-    const current = () =>
-      attempt === locateAttemptRef.current &&
-      epoch === mobileIdentityEpoch() &&
-      !controller.signal.aborted
+    // Still this tap, for the member who tapped, on this screen.
+    const owned = ownership(controller)
+    const current = () => attempt === locateAttemptRef.current && owned()
     setIsLocating(true)
     setFormError(null)
     setSelected(null)
@@ -341,7 +376,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     setCandidates([])
     const fail = (reason: FormFailureReason) => {
       setFormError({ reason, step: 'locate' })
-      announce('error', t(errorKey(reason, 'locate')))
+      announce('error', t(errorKey(reason, 'locate')), { stillCurrent: current })
       searchInputRef.current?.focus()
     }
     try {
@@ -360,7 +395,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         return
       }
       setCandidates(results)
-      announce('feedback', t('locations.resultCount', { count: results.length }))
+      announce('feedback', t('locations.resultCount', { count: results.length }), {
+        stillCurrent: current,
+      })
     } catch (error) {
       if (!current()) return
       fail(
@@ -376,11 +413,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
 
   async function save() {
     if (isSaving || !selected) return
-    const epoch = mobileIdentityEpoch()
     const controller = new AbortController()
     saveControllerRef.current = controller
-    // Still the member who picked this place.
-    const current = () => epoch === mobileIdentityEpoch() && !controller.signal.aborted
+    // Still the member who picked this place, on this screen.
+    const current = ownership(controller)
     setIsSaving(true)
     setFormError(null)
     try {
@@ -394,18 +430,20 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       setSelected(null)
       setQuery('')
       setLabel('')
-      announce('feedback', t('locations.saved', { label: saved.label }))
+      announce('feedback', t('locations.saved', { label: saved.label }), {
+        stillCurrent: current,
+      })
       if (guided && router.canGoBack()) {
         router.back()
         return
       }
-      await reload()
+      await reload(controller)
     } catch (error) {
       if (!current()) return
       const reason = locationFailureReason(error)
       if (reason === 'invalid_candidate') setSelected(null)
       setFormError({ reason, step: 'save' })
-      announce('error', t(errorKey(reason, 'save')))
+      announce('error', t(errorKey(reason, 'save')), { stillCurrent: current })
     } finally {
       if (current()) {
         saveControllerRef.current = null
@@ -506,7 +544,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       if (!next) return
                       void runListAction(
                         location.id,
-                        () => renameLocationFromMobile(location.id, next),
+                        (signal, current) =>
+                          renameLocationFromMobile(location.id, next, signal, current),
                         () => {
                           setRenamingId(null)
                           return t('locations.renamed', { label: next })
@@ -540,7 +579,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     onPress={() => {
                       void runListAction(
                         location.id,
-                        () => deleteLocationFromMobile(location.id),
+                        (signal, current) =>
+                          deleteLocationFromMobile(location.id, signal, current),
                         () => {
                           setConfirmingId(null)
                           return t('locations.deleted', { label: location.label })
@@ -575,7 +615,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       onPress={() => {
                         void runListAction(
                           location.id,
-                          () => setPrimaryLocationFromMobile(location.id),
+                          (signal, current) =>
+                            setPrimaryLocationFromMobile(location.id, signal, current),
                           () => t('locations.primaryChanged', { label: location.label })
                         )
                       }}

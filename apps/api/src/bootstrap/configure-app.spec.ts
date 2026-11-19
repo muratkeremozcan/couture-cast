@@ -1,4 +1,6 @@
 import { HttpAdapterHost } from '@nestjs/core'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { BadRequestException, type INestApplication } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiExceptionFilter } from '../filters/api-exception.filter'
@@ -9,6 +11,7 @@ import request from 'supertest'
 import {
   configureApp,
   createJsonBodyParser,
+  createUrlencodedBodyParser,
   JSON_BODY_LIMIT_BYTES,
   resolveHttpCorsOrigins,
   UNPARSABLE_BODY_RESPONSE,
@@ -100,17 +103,19 @@ describe('configureApp', () => {
   it('binds the request context before the request logger', () => {
     configure()
 
-    expect(app.use).toHaveBeenCalledTimes(3)
+    expect(app.use).toHaveBeenCalledTimes(4)
     expect(app.use.mock.calls[0]?.[0]).toBe(bindRequestContext)
     expect(typeof app.use.mock.calls[1]?.[0]).toBe('function')
   })
 
   // 2026-11-19 review: a JSON parse failure must not quote the body anywhere.
-  it('installs the JSON parser after the request logger, named so Nest adds no second one', () => {
+  it('installs the JSON parser and then the URL-encoded parser after the request logger', () => {
     configure()
 
-    const parser = app.use.mock.calls[2]?.[0] as { name: string } | undefined
-    expect(parser?.name).toBe('jsonParser')
+    const names = app.use.mock.calls
+      .slice(2)
+      .map((call) => (call[0] as { name: string }).name)
+    expect(names).toEqual(['jsonParser', 'urlencodedParser'])
   })
 
   it('installs ApiExceptionFilter as a global filter', () => {
@@ -138,7 +143,7 @@ describe('configureApp', () => {
     configure()
 
     expect(app.enableCors).toHaveBeenCalledTimes(1)
-    expect(app.use).toHaveBeenCalledTimes(3)
+    expect(app.use).toHaveBeenCalledTimes(4)
     expect(app.useGlobalFilters).toHaveBeenCalledTimes(1)
   })
 })
@@ -152,6 +157,10 @@ describe('createJsonBodyParser', () => {
     const handed: unknown[] = []
     const server = express()
     server.use(createJsonBodyParser())
+    server.use(createUrlencodedBodyParser())
+    server.post('/form', (req: Request & { rawBody?: Buffer }, res: Response) => {
+      res.json({ raw: req.rawBody?.toString('utf8') ?? null, body: req.body as unknown })
+    })
     server.post('/', (req: Request & { rawBody?: Buffer }, res: Response) => {
       res.json({
         rawBytes: req.rawBody?.length ?? null,
@@ -216,4 +225,85 @@ describe('createJsonBodyParser', () => {
     expect(overLimit.status).toBe(413)
     expect((handed[0] as { type?: string }).type).toBe('entity.too.large')
   })
+
+  it('parses URL-encoded bodies as Nest did (extended), keeping the raw bytes', async () => {
+    const { server } = harness()
+
+    const response = await request(server)
+      .post('/form')
+      .set('content-type', 'application/x-www-form-urlencoded')
+      .send('a=1&b%5Bc%5D=2')
+
+    expect(response.status).toBe(200)
+    expect(response.body).toEqual({
+      raw: 'a=1&b%5Bc%5D=2',
+      body: { a: '1', b: { c: '2' } },
+    })
+  })
+})
+
+/**
+ * configureApp owns the body parsers, so an app created with Nest's default parsers and then
+ * configured here would parse every body twice (Nest recognizes an existing parser only by
+ * function name, and tracing renames it). Every file that calls configureApp must create its
+ * app with `bodyParser: false`.
+ */
+describe('every configureApp caller', () => {
+  const apiRoot = resolve(__dirname, '../..')
+  const SOURCE = /\.(ts|mts|cts)$/
+
+  function sources(dir: string): string[] {
+    if (!existsSync(dir)) return []
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name)
+      if (entry.isDirectory()) return entry.name === 'node_modules' ? [] : sources(path)
+      return SOURCE.test(entry.name) ? [path] : []
+    })
+  }
+
+  /** The argument list of each call to `callee`, by balanced parentheses. */
+  function callArguments(text: string, callee: RegExp): string[] {
+    const found: string[] = []
+    for (const match of text.matchAll(callee)) {
+      let depth = 0
+      const start = match.index + match[0].length
+      for (let index = start - 1; index < text.length; index += 1) {
+        if (text[index] === '(') depth += 1
+        else if (text[index] === ')') depth -= 1
+        if (depth === 0) {
+          found.push(text.slice(start, index))
+          break
+        }
+      }
+    }
+    return found
+  }
+
+  const callers = ['src', 'api', 'integration', 'test']
+    .flatMap((dir) => sources(join(apiRoot, dir)))
+    .filter((path) => !path.endsWith(join('bootstrap', 'configure-app.ts')))
+    .filter((path) => /\bconfigureApp\(/.test(readFileSync(path, 'utf8')))
+    // This spec calls configureApp on an app double, never on a Nest app.
+    .filter((path) => path !== __filename)
+
+  it('finds the entries (main.ts and api/index.ts at least)', () => {
+    const names = callers.map((path) => relative(apiRoot, path))
+    expect(names).toEqual(expect.arrayContaining(['src/main.ts', 'api/index.ts']))
+  })
+
+  it.each(callers.map((path) => [relative(apiRoot, path), path]))(
+    '%s creates its app with bodyParser: false',
+    (_name, path) => {
+      // Comments name these calls too ("NestFactory.create(AppModule) builds..."); code only.
+      const text = readFileSync(path, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/^\s*\/\/.*$/gm, '')
+      const creations = callArguments(
+        text,
+        /\b(?:NestFactory\.create|\.createNestApplication)(?:<[^>]*>)?\(/g
+      )
+      expect(creations.length).toBeGreaterThan(0)
+      for (const options of creations) expect(options).toMatch(/\bbodyParser:\s*false\b/)
+    }
+  )
 })

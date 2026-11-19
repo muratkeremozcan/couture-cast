@@ -35,9 +35,12 @@ import {
 } from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import {
+  deleteLocationFromMobile,
   onLocationsChanged,
+  renameLocationFromMobile,
   saveLocationFromSearchFromMobile,
   searchLocationsFromMobile,
+  setPrimaryLocationFromMobile,
 } from '@/src/lib/locations'
 import {
   locationCandidate,
@@ -183,7 +186,9 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     expect(vi.mocked(searchLocationsFromMobile)).toHaveBeenCalledWith(
       'Chicago',
       'en-US',
-      expect.anything()
+      expect.anything(),
+      // The ownership check the request runs after its bearer resolves.
+      expect.any(Function)
     )
     vi.useRealTimers()
 
@@ -715,5 +720,46 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
       expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
       expect(screen.queryByText('Alpha Home')).toBeNull()
     })
+  })
+
+  /*
+   * Review round 6 (2026-11-19): every member-owned mutation takes one
+   * ownership token. A token already superseded sends nothing; a completion
+   * whose member left notifies no global listener.
+   */
+  it('LOC-OWNER-LIB-MOB-01 the mutation helpers honor the ownership token on both sides of dispatch', async () => {
+    const mutations: string[] = []
+    const answered = { owned: true }
+    server.use(
+      http.patch('*/api/v1/locations/:id', () => {
+        mutations.push('rename')
+        answered.owned = false
+        return HttpResponse.json({ data: savedLocation({ label: 'Studio' }) })
+      }),
+      http.post('*/api/v1/locations/:id/primary', () => {
+        mutations.push('primary')
+        return HttpResponse.json({ data: savedLocation() })
+      }),
+      http.delete('*/api/v1/locations/:id', () => {
+        mutations.push('delete')
+        return HttpResponse.json({ data: { deleted: true } })
+      })
+    )
+    const heard = vi.fn()
+    cleanups.push(onLocationsChanged(heard))
+    const superseded = () => false
+
+    for (const attempt of [
+      renameLocationFromMobile('loc-1', 'Studio', undefined, superseded),
+      setPrimaryLocationFromMobile('loc-1', undefined, superseded),
+      deleteLocationFromMobile('loc-1', undefined, superseded),
+    ])
+      await expect(attempt).rejects.toBeDefined()
+    expect(mutations).toEqual([])
+
+    // Sent while owned; the member leaves before the answer is handled.
+    await renameLocationFromMobile('loc-1', 'Studio', undefined, () => answered.owned)
+    expect(mutations).toEqual(['rename'])
+    expect(heard).not.toHaveBeenCalled()
   })
 })
