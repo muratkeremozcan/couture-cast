@@ -34,7 +34,8 @@ for pause in "${pauses[@]}"; do
   [[ "$pause" =~ ^[0-9]{1,3}$ ]] || { echo "APT_INSTALL_PAUSES must be whole seconds." >&2; exit 2; }
 done
 
-config=$'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n'
+retries=$'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n'
+config=$retries
 archives=${APT_INSTALL_ARCHIVES:-}
 if [[ -n "$archives" ]]; then
   # apt's configuration quotes the path, so it holds only plain path characters.
@@ -52,6 +53,22 @@ printf '%s' "$config" |
 
 drop_archives() {
   find "$archives" -maxdepth 1 \( -type f -o -type l \) -name '*.deb' -delete
+}
+
+# Removes one restored file and succeeds only when it is gone.
+discard() {
+  rm -f -- "$1" 2>/dev/null
+  [[ ! -e "$1" && ! -L "$1" ]]
+}
+
+# The restored files could not all be checked, or a rejected one could not be removed: apt goes
+# back to its own archive directory, so nothing restored is read, and the install downloads.
+abandon_archives() {
+  echo "::warning::$1 The install uses apt's own archive directory and downloads every package."
+  printf '%s' "$retries" |
+    sudo -n tee /etc/apt/apt.conf.d/80-couture-ci-retries >/dev/null ||
+    { echo "::error::Could not write apt's retry settings." >&2; exit 1; }
+  archives=
 }
 
 # The name apt gives a package file it downloads (QuoteString in apt's acquire-item.cc): package,
@@ -86,31 +103,38 @@ verify_archives() {
   local debs=() ids=() specs=() deb fields package version arch
   # Every restored file is accounted for in one summary line, so a restore reconciles with what
   # stays: kept plus each reason it was dropped.
-  local kept=0 links=0 unreadable=0 misnamed=0 unvouched=0
+  # A file counts as dropped only once it is gone; one that stays is counted apart, and the
+  # caller then keeps apt away from the whole directory.
+  local kept=0 links=0 unreadable=0 misnamed=0 unvouched=0 stuck=0
   report() {
-    (( kept + links + unreadable + misnamed + unvouched > 0 )) || return 0
-    echo "Checked the restored package files against the package index: kept $kept, dropped $((links + unreadable + misnamed + unvouched)) ($links symlinks, $unreadable unreadable, $misnamed under a name apt would not give them, $unvouched the index does not vouch for)."
+    (( kept + links + unreadable + misnamed + unvouched + stuck > 0 )) || return 0
+    local unremoved=''
+    (( stuck == 0 )) || unremoved=" $stuck rejected files could not be removed."
+    echo "Checked the restored package files against the package index: kept $kept, dropped $((links + unreadable + misnamed + unvouched)) ($links symlinks, $unreadable unreadable, $misnamed under a name apt would not give them, $unvouched the index does not vouch for).$unremoved"
+    (( stuck == 0 ))
+  }
+  # drop <counter> <file>: removes a rejected file and counts it under its reason.
+  drop() {
+    if discard "$2"; then eval "$1=\$(( $1 + 1 ))"; else stuck=$((stuck + 1)); fi
   }
   # A symlink is not a file this script downloaded, and apt would follow it past the hash check
-  # below, which reads regular files only.
-  links=$(find "$archives" -maxdepth 1 -type l -name '*.deb' | wc -l | tr -d ' ')
-  find "$archives" -maxdepth 1 -type l -name '*.deb' -delete
+  # below, which reads regular files only. Listed NUL-delimited, so any name counts once.
+  while IFS= read -r -d '' deb; do drop links "$deb"; done \
+    < <(find "$archives" -maxdepth 1 -type l -name '*.deb' -print0)
   while IFS= read -r -d '' deb; do debs+=("$deb"); done \
     < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
-  (( ${#debs[@]} > 0 )) || { report; return 0; }
+  (( ${#debs[@]} > 0 )) || { report; return; }
   local kept_debs=() packages=() versions=()
   for deb in "${debs[@]}"; do
     if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
-      rm -f "$deb"
-      unreadable=$((unreadable + 1))
+      drop unreadable "$deb"
       continue
     fi
     package=$(sed -n 's/^Package: //p' <<<"$fields")
     version=$(sed -n 's/^Version: //p' <<<"$fields")
     arch=$(sed -n 's/^Architecture: //p' <<<"$fields")
     if [[ -z "$package" || -z "$version" || -z "$arch" ]]; then
-      rm -f "$deb"
-      unreadable=$((unreadable + 1))
+      drop unreadable "$deb"
       continue
     fi
     kept_debs+=("$deb")
@@ -119,7 +143,7 @@ verify_archives() {
     ids+=("$package|$arch|$version")
     specs+=("$package=$version")
   done
-  (( ${#specs[@]} > 0 )) || { report; return 0; }
+  (( ${#specs[@]} > 0 )) || { report; return; }
   # Error-Mode any makes a partial refresh visible. A failed refresh still leaves apt the signed
   # indexes it held before, and the install that follows (Playwright's install-deps runs its own
   # update and tolerates the same failure) installs from those or from fresher ones. So each
@@ -132,7 +156,10 @@ verify_archives() {
     echo "::warning::The package index refresh was partial; checking the restored package files against the indexes apt holds."
   fi
   local index
-  index=$(mktemp) || { drop_archives; return 0; }
+  if ! index=$(mktemp); then
+    echo "::warning::Could not create a file for the package index; the restored package files are not checked."
+    return 1
+  fi
   # One line per package, architecture and version the index knows, from one signed stanza: its
   # SHA256 and the architecture apt names the file by (Architecture-Variant, else Architecture).
   # Versions it no longer lists print nothing and are dropped below.
@@ -152,25 +179,24 @@ verify_archives() {
     hash=${record%% *}
     label=${record#* }
     if [[ -z "$record" ]]; then
-      rm -f "$deb"
-      unvouched=$((unvouched + 1))
+      drop unvouched "$deb"
     # apt would hand this file to dpkg as whatever version its name says, so an authentic older
     # archive stored under a newer version's name must not pass the hash check for its own version.
     elif [[ "$(basename "$deb")" != "$(apt_cache_name "${packages[i]}" "${versions[i]}" "$label")" ]]; then
-      rm -f "$deb"
-      misnamed=$((misnamed + 1))
+      drop misnamed "$deb"
     elif [[ "$(sha256sum "$deb" | cut -d ' ' -f 1)" == "$hash" ]]; then
       kept=$((kept + 1))
     else
-      rm -f "$deb"
-      unvouched=$((unvouched + 1))
+      drop unvouched "$deb"
     fi
   done
   rm -f "$index"
   report
 }
 
-[[ -z "$archives" ]] || verify_archives
+if [[ -n "$archives" ]] && ! verify_archives; then
+  abandon_archives "The restored package files in $archives could not all be checked and cleaned up."
+fi
 
 if [[ "$1" == "--playwright" ]]; then
   shift

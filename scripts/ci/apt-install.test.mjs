@@ -199,7 +199,14 @@ describe('CI installs Ubuntu packages only through apt-install.sh', () => {
  */
 function runScript(
   args,
-  { statuses = [], teeStatus = 0, pauses = '1 2', env = {}, index = '' } = {}
+  {
+    statuses = [],
+    teeStatus = 0,
+    pauses = '1 2',
+    env = {},
+    index = '',
+    extraStubs = {},
+  } = {}
 ) {
   const stubs = mkdtempSync(path.join(os.tmpdir(), 'apt-install-'))
   const stub = (name, body) => {
@@ -230,6 +237,7 @@ f=$(basename "$2" .deb); IFS=_ read -r p v a <<< "$f"
 [ "$p" = broken ] && exit 2
 printf 'Package: %s\\nVersion: %s\\nArchitecture: %s\\n' "$p" "$v" "$a"`
   )
+  for (const [name, body] of Object.entries(extraStubs)) stub(name, body)
   writeFileSync(path.join(stubs, 'index'), index)
   stub('apt-cache', `echo "apt-cache $*" >> "${stubs}/calls"\ncat "${stubs}/index"`)
   // Hashed in Node, so the tests do not depend on the host having sha256sum (older macOS).
@@ -599,6 +607,98 @@ describe('apt-install.sh', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }
+  })
+
+  // Codex review 17: a rejected file that cannot be removed must not be counted as dropped, and
+  // apt must not read the directory it stayed in.
+  describe('when cleanup or checking cannot finish', () => {
+    const withArchives = (setup, options) => {
+      const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+      try {
+        const archives = path.join(directory, 'ubuntu-packages')
+        mkdirSync(archives)
+        setup(archives)
+        const result = runScript(['--playwright', 'webkit'], {
+          env: { APT_INSTALL_ARCHIVES: archives },
+          ...options,
+        })
+        return {
+          ...result,
+          left: readdirSync(archives)
+            .filter((name) => name.endsWith('.deb'))
+            .sort(),
+        }
+      } finally {
+        rmSync(directory, { recursive: true, force: true })
+      }
+    }
+    // rm refuses any path naming "stuck", as a read-only restore would.
+    const stuckRm = {
+      rm: 'for a in "$@"; do case "$a" in *stuck*) exit 1;; esac; done\nexec /bin/rm "$@"',
+    }
+
+    test('a rejected file that stays is counted apart, and apt falls back to its own directory', () => {
+      const { status, stdout, config, left } = withArchives(
+        (archives) => {
+          writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
+          writeFileSync(path.join(archives, 'stuck_1.0_amd64.deb'), 'old')
+          writeFileSync(path.join(archives, 'libtwo_1.0_amd64.deb'), 'bad')
+        },
+        {
+          index: indexOf([
+            ['libone', '1.0', 'amd64', 'one'],
+            ['libtwo', '1.0', 'amd64', 'two'],
+          ]),
+          extraStubs: stuckRm,
+        }
+      )
+      assert.equal(status, 0)
+      assert.deepEqual(left, ['libone_1.0_amd64.deb', 'stuck_1.0_amd64.deb'])
+      assert.match(
+        stdout,
+        /kept 1, dropped 1 \(0 symlinks, 0 unreadable, 0 under a name apt would not give them, 1 the index does not vouch for\)\. 1 rejected files could not be removed\./
+      )
+      assert.match(
+        stdout,
+        /::warning::The restored package files in .* could not all be checked and cleaned up\./
+      )
+      // The last settings apt reads name no archive directory: the restored files are never used.
+      assert.doesNotMatch(config, /Dir::Cache::Archives/)
+      assert.match(config, /Acquire::Retries "5";/)
+    })
+
+    test('a symlink whose name holds a newline counts once', () => {
+      const { stdout, left } = withArchives(
+        (archives) => {
+          writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
+          symlinkSync(
+            path.join(archives, 'libone_1.0_amd64.deb'),
+            path.join(archives, 'two\nlines.deb')
+          )
+        },
+        { index: indexOf([['libone', '1.0', 'amd64', 'one']]) }
+      )
+      assert.deepEqual(left, ['libone_1.0_amd64.deb'])
+      assert.match(
+        stdout,
+        /kept 1, dropped 1 \(1 symlinks, 0 unreadable, 0 under a name apt would not give them, 0 the index does not vouch for\)\./
+      )
+    })
+
+    test('a package index file that cannot be created leaves the restore unchecked and unused', () => {
+      const { status, stdout, config, left } = withArchives(
+        (archives) => writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one'),
+        {
+          index: indexOf([['libone', '1.0', 'amd64', 'one']]),
+          extraStubs: { mktemp: 'exit 1' },
+        }
+      )
+      assert.equal(status, 0)
+      assert.deepEqual(left, ['libone_1.0_amd64.deb'])
+      assert.match(stdout, /::warning::Could not create a file for the package index/)
+      assert.match(stdout, /could not all be checked and cleaned up\./)
+      assert.doesNotMatch(config, /Dir::Cache::Archives/)
+    })
   })
 
   test('refuses an archive directory that is relative or has characters apt would misread', () => {
