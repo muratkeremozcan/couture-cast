@@ -56,7 +56,11 @@ drop_archives() {
 
 # The name apt gives a package file it downloads (QuoteString in apt's acquire-item.cc): package,
 # version and architecture joined by '_', with '%', '_' and ':' percent-encoded, and '.' too in
-# the architecture. apt finds a cached file by this name and checks only its size.
+# the architecture. apt finds a cached file by this name and checks only its size. The
+# architecture in the name is the build's: on Ubuntu 26.04 an x86-64-v3 runner installs the
+# amd64v3 variant builds, whose control field still says amd64 while apt names the file
+# libsndfile1_1.2.2-4_amd64v3.deb, so the name is built from the label the index's Filename ends
+# with, never from the control field.
 apt_cache_name() {
   local package=$1 version=$2 arch=$3
   quote() {
@@ -86,7 +90,7 @@ verify_archives() {
   while IFS= read -r -d '' deb; do debs+=("$deb"); done \
     < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
   (( ${#debs[@]} > 0 )) || return 0
-  local kept_debs=() misnamed=0
+  local kept_debs=() packages=() versions=()
   for deb in "${debs[@]}"; do
     if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
       rm -f "$deb"
@@ -99,14 +103,9 @@ verify_archives() {
       rm -f "$deb"
       continue
     fi
-    # apt would hand this file to dpkg as whatever version its name says, so an authentic older
-    # archive stored under a newer version's name must not pass the hash check for its own version.
-    if [[ "$(basename "$deb")" != "$(apt_cache_name "$package" "$version" "$arch")" ]]; then
-      rm -f "$deb"
-      misnamed=$((misnamed + 1))
-      continue
-    fi
     kept_debs+=("$deb")
+    packages+=("$package")
+    versions+=("$version")
     ids+=("$package|$arch|$version")
     specs+=("$package=$version")
   done
@@ -124,26 +123,42 @@ verify_archives() {
   fi
   local index
   index=$(mktemp) || { drop_archives; return 0; }
-  # One line per package, architecture and version the index knows, with its SHA256; versions
-  # it no longer lists print nothing and are dropped below.
+  # One line per package, architecture and version the index knows: its SHA256 and the build
+  # label its Filename ends with (amd64, amd64v3, all). Versions it no longer lists print nothing
+  # and are dropped below.
   apt-cache show "${specs[@]}" 2>/dev/null | awk '
+    function emit() {
+      if (p && v && a && h && l) print p "|" a "|" v " " h " " l
+      p = v = a = h = l = ""
+    }
     /^Package: / { p = $2 } /^Version: / { v = $2 } /^Architecture: / { a = $2 }
     /^SHA256: / { h = $2 }
-    /^$/ { if (p && v && a && h) print p "|" a "|" v " " h; p = v = a = h = "" }
-    END { if (p && v && a && h) print p "|" a "|" v " " h }' > "$index"
-  local i hash kept=0 dropped=$misnamed
+    /^Filename: / { l = $2; sub(/^.*_/, "", l); sub(/\.deb$/, "", l) }
+    /^$/ { emit() }
+    END { emit() }' > "$index"
+  local i record hash label kept=0 misnamed=0 unvouched=0
   for (( i = 0; i < ${#kept_debs[@]}; i++ )); do
     deb=${kept_debs[i]}
-    hash=$(awk -v id="${ids[i]}" '$1 == id { print $2; exit }' "$index")
-    if [[ -n "$hash" && "$(sha256sum "$deb" | cut -d ' ' -f 1)" == "$hash" ]]; then
+    record=$(awk -v id="${ids[i]}" '$1 == id { print $2 " " $3; exit }' "$index")
+    hash=${record%% *}
+    label=${record#* }
+    if [[ -z "$record" ]]; then
+      rm -f "$deb"
+      unvouched=$((unvouched + 1))
+    # apt would hand this file to dpkg as whatever version its name says, so an authentic older
+    # archive stored under a newer version's name must not pass the hash check for its own version.
+    elif [[ "$(basename "$deb")" != "$(apt_cache_name "${packages[i]}" "${versions[i]}" "$label")" ]]; then
+      rm -f "$deb"
+      misnamed=$((misnamed + 1))
+    elif [[ "$(sha256sum "$deb" | cut -d ' ' -f 1)" == "$hash" ]]; then
       kept=$((kept + 1))
     else
       rm -f "$deb"
-      dropped=$((dropped + 1))
+      unvouched=$((unvouched + 1))
     fi
   done
   rm -f "$index"
-  echo "Checked the restored package files against the package index: kept $kept, dropped $dropped."
+  echo "Checked the restored package files against the package index: kept $kept, dropped $((misnamed + unvouched)) ($misnamed under a name apt would not give them, $unvouched the index does not vouch for)."
 }
 
 [[ -z "$archives" ]] || verify_archives
