@@ -414,7 +414,7 @@
   },
   "community": {
     "title": "Community",
-    "heading": "Lookbook vivo della community",
+    "heading": "Ultimi look",
     "sectionLabel": "Lookbook della community",
     "inspirations": "Ispirazioni della community",
     "share": "Condividi il tuo look",
@@ -424,6 +424,7 @@
     },
     "filters": {
       "label": "Filtri della community",
+      "explainer": "I filtri clima raggruppano i look in base alle previsioni della settimana nel luogo salvato da chi li condivide, da freddo e umido a caldo e secco.",
       "announce": "Sono mostrati i look {{filter}}.",
       "mode": {
         "auto": "Il tuo clima",

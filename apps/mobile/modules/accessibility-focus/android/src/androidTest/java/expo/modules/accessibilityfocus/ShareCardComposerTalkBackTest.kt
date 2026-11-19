@@ -197,7 +197,7 @@ class ShareCardComposerTalkBackTest {
       click("tab-home")
       assertHeader("Home", "Outfit")
       click("tab-community")
-      assertHeader("Community", "Living community lookbook")
+      assertHeader("Community", "Latest looks")
       click("tab-home")
       waitFor("Outfit action") { find("outfit-share-card-open") != null }
       waitFor("Action label Create my outfit card") { find("outfit-share-card-open")?.let { label(it) } == "Create my outfit card" }

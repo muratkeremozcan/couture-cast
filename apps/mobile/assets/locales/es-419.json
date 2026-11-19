@@ -605,7 +605,7 @@
   },
   "community": {
     "title": "Comunidad",
-    "heading": "Lookbook vivo de la comunidad",
+    "heading": "Looks más recientes",
     "sectionLabel": "Lookbook de la comunidad",
     "inspirations": "Inspiraciones de la comunidad",
     "share": "Comparte tu look",
@@ -615,6 +615,7 @@
     },
     "filters": {
       "label": "Filtros de la comunidad",
+      "explainer": "Los filtros de clima agrupan los looks según el pronóstico semanal de la ubicación guardada de quien los comparte, de frío y húmedo a cálido y seco.",
       "announce": "Se muestran looks de {{filter}}.",
       "mode": {
         "auto": "Tu clima",

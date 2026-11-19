@@ -6,7 +6,7 @@ import path from 'node:path'
 import { PrismaClient, Prisma } from '@prisma/client'
 import { cleanupCommunityCommentFixtures } from '@couture/testing'
 import { createClient } from '@supabase/supabase-js'
-import type { APIRequestContext, Page } from '@playwright/test'
+import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import type {
   ApiRequestParams,
   ApiRequestResponse,
@@ -216,8 +216,19 @@ export function assertSeededFeed(items: FeedItem[]): void {
  * is not fixed: the seeded City Spotlight cohort and the looks other tests publish
  * come before the seeded lookbook posts, so no particular card is the signal.
  */
-export async function expectCommunityFeedLoaded(page: Page) {
-  await expect(page.locator('[data-testid^="lookbook-card-"]').first()).toBeVisible()
+export async function expectCommunityFeedLoaded(
+  page: Page,
+  scope: Page | Locator = page
+) {
+  // Inside `community-card-grid` only: the loading skeletons sit outside it and
+  // carry `lookbook-card-skeleton`, which a page-wide prefix match accepted as a
+  // loaded look while the feed read was still open (Codex review 8).
+  await expect(
+    scope
+      .getByTestId('community-card-grid')
+      .locator('[data-testid^="lookbook-card-"]')
+      .first()
+  ).toBeVisible()
 }
 
 /** Statuses no moderation run will move a post away from. */

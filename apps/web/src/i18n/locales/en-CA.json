@@ -414,7 +414,7 @@
   },
   "community": {
     "title": "Community",
-    "heading": "Living community lookbook",
+    "heading": "Latest looks",
     "sectionLabel": "Community lookbook",
     "inspirations": "Community inspirations",
     "share": "Share your look",
@@ -424,6 +424,7 @@
     },
     "filters": {
       "label": "Community filters",
+      "explainer": "Climate filters group looks by the week's forecast at each sharer's saved location, from cold and wet to warm and dry.",
       "announce": "Showing {{filter}} looks.",
       "mode": {
         "auto": "Your climate",

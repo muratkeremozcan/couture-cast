@@ -414,7 +414,7 @@
   },
   "community": {
     "title": "Topluluk",
-    "heading": "Yaşayan topluluk lookbook’u",
+    "heading": "En yeni kombinler",
     "sectionLabel": "Topluluk lookbook’u",
     "inspirations": "Topluluk ilhamları",
     "share": "Kombinini paylaş",
@@ -424,6 +424,7 @@
     },
     "filters": {
       "label": "Topluluk filtreleri",
+      "explainer": "İklim filtreleri kombinleri, paylaşan kişinin kayıtlı konumundaki haftalık hava tahminine göre gruplar: soğuk ve nemliden sıcak ve kuruya.",
       "announce": "{{filter}} kombinleri gösteriliyor.",
       "mode": {
         "auto": "Senin iklimin",

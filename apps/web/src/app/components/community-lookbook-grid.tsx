@@ -95,6 +95,7 @@ import React, {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -436,6 +437,11 @@ export interface LookbookFilterNavProps {
   viewerBand?: ClimateBand | null
   /** Story 6.11: a banned member has no feed to filter, so the nav and its heading leave the page. */
   closed?: boolean
+  /**
+   * Where the nav sticks. Home stacks it under the sticky chip navigation; `/community` has no
+   * chip bar above it, so it sticks to the top edge there instead of floating under a gap.
+   */
+  stickyTop?: number
 }
 
 // A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
@@ -450,8 +456,11 @@ export function LookbookFilterNav({
   onTabChange,
   viewerBand = null,
   closed = false,
+  stickyTop = CHIP_NAVIGATION_HEIGHT_PX,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
+  // Per instance, so a nav only ever points at its own explainer.
+  const explainerId = useId()
   if (closed) return null
 
   const handleTabClick = (tab: FilterCategory) => {
@@ -471,7 +480,8 @@ export function LookbookFilterNav({
   return (
     <nav
       aria-label={t('community.filters.label')}
-      style={{ top: CHIP_NAVIGATION_HEIGHT_PX }}
+      aria-describedby={explainerId}
+      style={{ top: stickyTop }}
       className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-white/95 py-3 backdrop-blur"
     >
       <h2
@@ -481,6 +491,15 @@ export function LookbookFilterNav({
       >
         {t('community.heading')}
       </h2>
+      {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
+          climate band and nothing said what a band is, so one visible line does. */}
+      <p
+        id={explainerId}
+        data-testid="community-filters-explainer"
+        className="-mt-1 text-xs leading-snug text-neutral-600"
+      >
+        {t('community.filters.explainer')}
+      </p>
       <div className={isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}>
         {COMMUNITY_FEED_MODES.map((mode) => {
           const isActive = activeTab === mode
@@ -521,6 +540,8 @@ interface WeeklyChallengeBannerProps {
   challenge: EmbeddedCommunityChallenge
   language: string
   t: Translate
+  /** False for a reader who cannot post: the challenge still shows, without its entry button. */
+  canParticipate: boolean
   onParticipate: (challenge: EmbeddedCommunityChallenge) => void
 }
 
@@ -528,6 +549,7 @@ function WeeklyChallengeBanner({
   challenge,
   language,
   t,
+  canParticipate,
   onParticipate,
 }: WeeklyChallengeBannerProps) {
   const formattedDates = (() => {
@@ -580,21 +602,23 @@ function WeeklyChallengeBanner({
         <p className="text-xs leading-relaxed text-neutral-600">{challenge.body}</p>
       </div>
 
-      <div className="flex justify-end pt-1">
-        <button
-          type="button"
-          data-testid="challenge-participate-button"
-          aria-label={t('community.challenge.participateLabel', {
-            title: challenge.title,
-          })}
-          onClick={() => {
-            onParticipate(challenge)
-          }}
-          className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
-        >
-          {t('community.challenge.participate')}
-        </button>
-      </div>
+      {canParticipate && (
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            data-testid="challenge-participate-button"
+            aria-label={t('community.challenge.participateLabel', {
+              title: challenge.title,
+            })}
+            onClick={() => {
+              onParticipate(challenge)
+            }}
+            className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
+          >
+            {t('community.challenge.participate')}
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
@@ -1693,13 +1717,18 @@ const NOTICE_CLASSES: Record<NoticeTone, string> = {
   error: '',
 }
 
-/** Story 1.2b: the guided add-location path, which returns here after the save. */
-export const COMMUNITY_ADD_LOCATION_HREF =
-  '/settings?addLocation=1&returnTo=%2F#locations'
+/**
+ * Story 1.2b: the guided add-location path, which returns to the page that showed the notice
+ * after the save: Home, or `/community` since that route renders the lookbook too.
+ */
+export function communityAddLocationHref(returnPath: string): string {
+  return `/settings?addLocation=1&returnTo=${encodeURIComponent(returnPath)}#locations`
+}
 
 interface CommunityNoticesProps {
   bandUnresolvedReason: CommunityBandUnresolvedReason | null
   canAddLocation: boolean
+  returnPath: string
   notice: Notice | null
   noticeText: string | null
   t: Translate
@@ -1715,6 +1744,7 @@ interface CommunityNoticesProps {
 function CommunityNotices({
   bandUnresolvedReason,
   canAddLocation,
+  returnPath,
   notice,
   noticeText,
   t,
@@ -1729,7 +1759,7 @@ function CommunityNotices({
           <p>{t(`community.band.unresolved.${bandUnresolvedReason}`)}</p>
           {bandUnresolvedReason === 'no_location' && canAddLocation && (
             <Link
-              href={COMMUNITY_ADD_LOCATION_HREF}
+              href={communityAddLocationHref(returnPath)}
               className="inline-flex min-h-[44px] items-center self-start font-semibold underline"
               data-testid="community-add-location"
             >
@@ -1757,6 +1787,11 @@ function CommunityNotices({
 interface CommunityFeedStatesProps {
   isLoading: boolean
   errorText: string | null
+  /**
+   * False for a signed-out reader. Retrying cannot sign anyone in, and the Sign in link
+   * already sits above the feed, so that reason reads as a note with no Try again button.
+   */
+  retryable: boolean
   itemCount: number
   gridColumns: string
   canShare: boolean
@@ -1768,6 +1803,7 @@ interface CommunityFeedStatesProps {
 function CommunityFeedStates({
   isLoading,
   errorText,
+  retryable,
   itemCount,
   gridColumns,
   canShare,
@@ -1777,7 +1813,16 @@ function CommunityFeedStates({
 }: CommunityFeedStatesProps) {
   return (
     <>
-      {errorText !== null && (
+      {errorText !== null && !retryable && (
+        <p
+          data-testid="community-feed-signed-out"
+          className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-xs text-[color:var(--theme-card-text)]"
+        >
+          {errorText}
+        </p>
+      )}
+
+      {errorText !== null && retryable && (
         <div
           role="alert"
           data-testid="community-feed-error"
@@ -1932,28 +1977,11 @@ export interface CommunityLookbookGridProps {
   chipCategory?: ChipCategory
   highlightedCardId?: string
   showFilterNav?: boolean
-  /**
-   * Reports the band the server resolved for the viewer.
-   *
-   * `lookbook-prism-layout.tsx` renders a SECOND `LookbookFilterNav` outside
-   * this component, and only this component ever sees the feed response. Without
-   * this the two navs on the same page answer "which climate am I seeing"
-   * differently -- one naming the band, the other saying "Your climate" -- which
-   * is a contradiction the reader has to resolve rather than a cosmetic gap.
-   */
-  onViewerBandChange?: (band: ClimateBand | null) => void
-  /**
-   * Reports the mode the server actually SERVED, which is not always the one
-   * that was requested: the beta experiment resolves a `auto` request to the
-   * viewer's arm, so half the cohort asks for `auto` and is served `all`.
-   *
-   * Exists for the same reason as {@link onViewerBandChange}. Only this
-   * component sees the feed response, and `lookbook-prism-layout.tsx` renders a
-   * second `LookbookFilterNav` outside it, so without this that nav shows the
-   * `auto` chip pressed over a feed carrying every region.
-   */
-  onServedModeChange?: (mode: CommunityFeedMode) => void
-  /** Story 6.11: the same lift for the ban, so the page's other filter nav closes with the feed. */
+  /** Passed to {@link LookbookFilterNav}'s `stickyTop`. */
+  filterNavStickyTop?: number
+  /** The route hosting this grid, where the add-location flow returns after the save. */
+  returnPath?: string
+  /** Story 6.11: lifts the ban, so Home's spotlight teaser closes with the feed. */
   onBannedChange?: (banned: boolean) => void
   /**
    * Story 6.7: a Home teaser activation. A new token asks this section to focus
@@ -2008,6 +2036,19 @@ function SpotlightFocusNotice({
   )
 }
 
+/**
+ * True for a stored session the API has not refused. `refusedScope` names the session scope the
+ * API answered 401 for; a later loading state or a 503 does not lift it, while a successful read
+ * or a different session does.
+ */
+function isMemberSession(
+  hasSession: boolean,
+  refusedScope: string | null | undefined,
+  sessionScope: string | null
+): boolean {
+  return hasSession && (refusedScope === undefined || refusedScope !== sessionScope)
+}
+
 /** A ban hides the feed, its author states and every action, like lost access does. */
 const feedVisible = (available: boolean, banned: unknown) => available && !banned
 
@@ -2043,10 +2084,13 @@ function CommunitySettingsLink({
   banned,
   href,
   label,
+  guestOnly,
 }: {
   banned: boolean
   href: string
   label: string
+  /** Hidden by globals.css once the page knows a member is signed in. */
+  guestOnly: boolean
 }) {
   if (banned) return null
   return (
@@ -2054,7 +2098,7 @@ function CommunitySettingsLink({
       href={href}
       // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a stored
       // session not verified yet, never sees it (globals.css, lib/landing-session.ts).
-      data-landing={href === '/signin' ? 'guest-inline' : undefined}
+      data-landing={guestOnly ? 'guest-inline' : undefined}
       className="min-h-12 self-start py-3 underline"
     >
       {label}
@@ -2069,8 +2113,8 @@ export function CommunityLookbookGrid({
   chipCategory = 'Personal',
   highlightedCardId,
   showFilterNav = false,
-  onViewerBandChange,
-  onServedModeChange,
+  filterNavStickyTop,
+  returnPath = '/',
   onBannedChange,
   spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
@@ -2330,6 +2374,11 @@ export function CommunityLookbookGrid({
   const [hasSession, setHasSession] = useState(false)
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
+  // A stored session the API answered 401 is signed out for this surface: it gets the Sign in
+  // link and none of the member actions (New post, challenge entry, the composer, share, report),
+  // whatever storage still holds. `undefined` means no refusal.
+  const [refusedScope, setRefusedScope] = useState<string | null | undefined>(undefined)
+  const memberSession = isMemberSession(hasSession, refusedScope, sessionScope)
 
   // Story 6.6: the City Spotlight heads this section. Its pages run through the
   // same reaction state as the feed, and its one View more announcement goes
@@ -2445,17 +2494,6 @@ export function CommunityLookbookGrid({
    */
   const displayedMode: CommunityFeedMode = servedMode ?? currentMode
 
-  // Reported from an effect rather than from inside `loadFeed`, so the caller's
-  // callback stays out of that callback's dependency list: a caller that passes
-  // an inline arrow would otherwise re-fire the whole feed read on every render.
-  useEffect(() => {
-    onViewerBandChange?.(viewerBand)
-  }, [onViewerBandChange, viewerBand])
-
-  useEffect(() => {
-    onServedModeChange?.(displayedMode)
-  }, [onServedModeChange, displayedMode])
-
   /**
    * One read of the feed.
    *
@@ -2505,6 +2543,40 @@ export function CommunityLookbookGrid({
     [applyLiveSponsorship, comments, liveSponsorships, reactionState]
   )
 
+  /**
+   * The API answered 401 for the stored session. Records the refusal against that session and
+   * retires every member action already in flight: the pending action (a photo allocation, a
+   * publish or a report) is aborted so its late answer cannot refill the next draft, and the
+   * composer and the report dialog close.
+   */
+  const refuseSession = useCallback(() => {
+    setRefusedScope(sessionScopeRef.current ?? null)
+    actionControllerRef.current?.abort()
+    setIsCreateModalOpen(false)
+    setComposeError(null)
+    setAllocated(null)
+    setIsPreparingPhoto(false)
+    setIsPublishing(false)
+    setPhotoPreview((current) => {
+      if (current) URL.revokeObjectURL(current)
+      return null
+    })
+    setReportingPostId(null)
+    setReportError(null)
+    setIsSubmittingReport(false)
+  }, [])
+
+  /** A failed feed read's note and announcement; a 401 also refuses the session. */
+  const reportFeedFailure = useCallback(
+    (error: unknown) => {
+      const message = messageForError(error, 'community.error.load', languageRef.current)
+      if (communityFailureReason(error) === 'signed_out') refuseSession()
+      setFeedError(message)
+      setAnnouncement(message)
+    },
+    [refuseSession, setAnnouncement]
+  )
+
   const loadFeed = useCallback(
     async (mode: CommunityFeedMode, cursor?: string) => {
       const readTicket = reactionState.beginRead()
@@ -2542,6 +2614,7 @@ export function CommunityLookbookGrid({
         setActiveChallenge(feed.activeChallenge)
         setNextCursor(feed.nextCursor)
         setFeedError(null)
+        setRefusedScope(undefined)
         setBannedSanction(null)
         // A refetch that hands back a freshly signed URL clears the failure: not
         // clearing it is what left a recovered card reading "Image unavailable"
@@ -2606,13 +2679,7 @@ export function CommunityLookbookGrid({
           closeForBan(sanction)
           return
         }
-        const message = messageForError(
-          error,
-          'community.error.load',
-          languageRef.current
-        )
-        setFeedError(message)
-        setAnnouncement(message)
+        reportFeedFailure(error)
       } finally {
         if (!controller.signal.aborted && generation === feedGenerationRef.current) {
           setIsLoading(false)
@@ -2626,8 +2693,8 @@ export function CommunityLookbookGrid({
       closeForBan,
       liveSponsorships,
       reactionState,
+      reportFeedFailure,
       revalidateHighlighted,
-      setAnnouncement,
     ]
   )
 
@@ -2772,6 +2839,10 @@ export function CommunityLookbookGrid({
       if (!active) return
       if (signal?.aborted) throw new CommunityRequestSuperseded()
       if (generation !== feedGenerationRef.current) throw new CommunityRequestSuperseded()
+      // A current, authenticated rebuild answers for this session like a successful filter read:
+      // an earlier 401 note and its refusal go, so the member's actions come back.
+      setFeedError(null)
+      setRefusedScope(undefined)
       // Rows already shown stay where they are, but their blocks follow this read.
       applyLiveSponsorship(page.items, stamp)
       const live = <T extends CommunityFeedItem>(post: T): T =>
@@ -2924,9 +2995,16 @@ export function CommunityLookbookGrid({
             const scope = feedScopeRef.current
             void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
               (error: unknown) => {
+                if (!active || scope !== feedScopeRef.current) return
                 const sanction = communitySanctionOf(error)
-                if (!active || scope !== feedScopeRef.current || !sanction) return
-                closeForBan(sanction)
+                if (sanction) {
+                  closeForBan(sanction)
+                  return
+                }
+                // A refused session gets the same answer a feed read gives it: the signed-out
+                // note, the Sign in link, and its member actions retired.
+                if (communityFailureReason(error) === 'signed_out')
+                  reportFeedFailure(error)
               }
             )
           }
@@ -2959,6 +3037,7 @@ export function CommunityLookbookGrid({
   }, [
     applyLiveSponsorship,
     closeForBan,
+    reportFeedFailure,
     liveSponsorships,
     comments,
     currentMode,
@@ -3424,7 +3503,7 @@ export function CommunityLookbookGrid({
   }
 
   const openCreateModal = () => {
-    if (!communityAvailable) return
+    if (!communityAvailable || !memberSession) return
     setComposeError(null)
     setNotice(null)
     setIsCreateModalOpen(true)
@@ -3584,7 +3663,7 @@ export function CommunityLookbookGrid({
 
   const presentation = communityPresentation(
     feedVisible(communityAvailable, bannedSanction),
-    hasSession,
+    memberSession,
     displayedItems,
     authorStates,
     nextCursor,
@@ -3660,6 +3739,7 @@ export function CommunityLookbookGrid({
             onTabChange={handleModeChange}
             viewerBand={viewerBand}
             closed={banned}
+            stickyTop={filterNavStickyTop}
           />
         )}
 
@@ -3667,12 +3747,16 @@ export function CommunityLookbookGrid({
           banned={banned}
           href={presentation.settingsHref}
           label={t(presentation.settingsLabel)}
+          // A refused stored session still reads as a member to the landing script, so its
+          // Sign in link must not carry the guest-only marker, or nothing offers sign-in.
+          guestOnly={!hasSession}
         />
         <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
 
         <CommunityNotices
           bandUnresolvedReason={bandNoticeReason}
           canAddLocation={hasSession}
+          returnPath={returnPath}
           notice={notice}
           noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
           t={t}
@@ -3683,6 +3767,7 @@ export function CommunityLookbookGrid({
             challenge={activeChallenge}
             language={i18n.language}
             t={t}
+            canParticipate={presentation.canAct}
             onParticipate={openCreateModal}
           />
         )}
@@ -3697,6 +3782,7 @@ export function CommunityLookbookGrid({
           <CommunityFeedStates
             isLoading={isLoading}
             errorText={renderMessage(feedError, t, viewerBand)}
+            retryable={feedError?.key !== FAILURE_KEYS.signed_out}
             itemCount={displayedItems.length}
             gridColumns={gridColumns}
             canShare={presentation.canAct}

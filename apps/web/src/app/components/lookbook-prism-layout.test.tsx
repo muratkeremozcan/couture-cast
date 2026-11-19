@@ -6,7 +6,7 @@ import { CommunitySyncState } from '@couture/api-client'
 // Learning path Step 28: Accessibility hardening.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-28-accessibility-hardening
 // Story 3.5 Task 6 step 3 owner: Lookbook Prism responsive layout, comparison mode, and focus rings.
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { PREMIUM_REQUIRED_MESSAGE } from '@couture/api-client/contracts/http'
@@ -188,21 +188,33 @@ describe('LookbookPrismLayout (Integration 3.5-INT-001 - 3.5-INT-005)', () => {
 
     const community = await screen.findByTestId(`lookbook-card-${COMMUNITY_POST_ID}`)
     const hero = screen.getByRole('region', { name: /hero ritual canvas/i })
-    const filter = screen.getByTestId('community-filter-auto')
+    const communitySection = screen.getByRole('region', { name: 'Community Section' })
     const garment = screen.getByText(/double-breasted blazer/i).closest('div.group')
 
     if (!garment) {
       throw new Error('Expected focus targets')
     }
 
+    // Production follow-up 2026-11-19: the climate filters moved out of the hero
+    // column and into the Community Section, beside the feed they filter. On a
+    // phone the old order put the outfit cards between the chips and the looks.
+    // Home renders exactly one filter nav now, so no second nav can disagree
+    // with the grid about the served mode or the resolved band.
+    const filterNavs = screen.getAllByRole('navigation', { name: 'Community filters' })
+    expect(filterNavs).toHaveLength(1)
+    const filterNav = filterNavs[0]!
+    expect(communitySection).toContainElement(filterNav)
+    expect(hero).not.toContainElement(filterNav)
+    const filter = within(filterNav).getByTestId('community-filter-auto')
+
     expect(
-      hero.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING
+      hero.compareDocumentPosition(garment) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(
-      filter.compareDocumentPosition(garment) & Node.DOCUMENT_POSITION_FOLLOWING
+      garment.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(
-      garment.compareDocumentPosition(community) & Node.DOCUMENT_POSITION_FOLLOWING
+      filter.compareDocumentPosition(community) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy()
     expect(garment).not.toHaveAttribute('tabindex')
     expect(community).toHaveAttribute('tabindex', '-1')

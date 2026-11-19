@@ -6,18 +6,13 @@ import { RitualShareCardLauncher } from './ritual-share-card-launcher'
 
 import React, { useEffect, useRef, useState } from 'react'
 import type { WeatherAlertDeepLinkTarget } from '@couture/api-client'
-import type { ClimateBand } from '@couture/api-client/contracts/http'
 import posthog from 'posthog-js'
 import { I18nextProvider, useTranslation } from 'react-i18next'
 import { getGuestPreviewStrings } from '@couture/utils'
 import { getI18n } from '../../i18n'
 import { processWebDeepLink } from '../lib/deep-link-handler'
 import { LayoutControls } from './layout-controls'
-import {
-  CommunityLookbookGrid,
-  LookbookFilterNav,
-  type FilterCategory,
-} from './community-lookbook-grid'
+import { CommunityLookbookGrid, type FilterCategory } from './community-lookbook-grid'
 import { PlannerRail } from './planner-rail'
 import { ChipNavigation, type ChipCategory } from './chip-navigation'
 import { StickyBottomNav } from './sticky-bottom-nav'
@@ -203,16 +198,6 @@ export function LookbookPrismLayout() {
   const plannerOpenerRef = useRef<HTMLElement | null>(null)
   const [activeTab, setActiveTab] = useState<FilterCategory>('auto')
   const [chipCategory, setChipCategory] = useState<ChipCategory>('Personal')
-  // The grid is the only thing on this page that sees the feed response, and
-  // this slot renders a second `LookbookFilterNav` from the same filter state.
-  // Without lifting the resolved band, the two navs answer "which climate am I
-  // seeing" differently: the grid's names the band, this one says "Your climate".
-  const [viewerBand, setViewerBand] = useState<ClimateBand | null>(null)
-  // Same reason as `viewerBand`, for `mode`: the experiment can serve `all` to a
-  // viewer who requested `auto`, and without this the two navs would disagree
-  // about which chip is pressed. `null` until the grid's first response lands,
-  // so this nav starts by mirroring the click like the grid itself does.
-  const [servedMode, setServedMode] = useState<FilterCategory | null>(null)
   const [communityBanned, setCommunityBanned] = useState(false)
 
   // Deep Link & Notification States
@@ -504,14 +489,6 @@ export function LookbookPrismLayout() {
             </div>
           </div>
 
-          <LookbookFilterNav
-            activeTab={servedMode ?? activeTab}
-            isMobilePreview={isMobilePreview}
-            onTabChange={setActiveTab}
-            viewerBand={viewerBand}
-            closed={communityBanned}
-          />
-
           {/* Outfit Tiles */}
           <div className="space-y-4">
             <h3 className="lookbook-display text-xl font-semibold text-[#111111]">
@@ -625,8 +602,11 @@ export function LookbookPrismLayout() {
             isMobilePreview={isMobilePreview}
             chipCategory={chipCategory}
             highlightedCardId={highlightedCardId}
-            onViewerBandChange={setViewerBand}
-            onServedModeChange={setServedMode}
+            // The heading, explainer and climate chips sit with the feed they filter. They used
+            // to render in the hero column, which on a phone put the outfit cards between the
+            // chips and the looks.
+            showFilterNav
+            onTabChange={setActiveTab}
             onBannedChange={setCommunityBanned}
             spotlightFocusIntent={teaser.focusIntent}
           />

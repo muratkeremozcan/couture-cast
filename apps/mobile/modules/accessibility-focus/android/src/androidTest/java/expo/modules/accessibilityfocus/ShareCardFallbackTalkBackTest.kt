@@ -64,7 +64,7 @@ class ShareCardFallbackTalkBackTest {
     val bounds = Rect()
     headers.single().getBoundsInScreen(bounds)
     assertFalse("Focused header is visible", bounds.isEmpty)
-    assertFalse("Duplicate content heading absent", all().any { label(it) == "Living community lookbook" && it.isHeading })
+    assertFalse("Duplicate content heading absent", all().any { label(it) == "Latest looks" && it.isHeading })
     instrumentation.sendStatus(0, Bundle().apply {
       putString(Instrumentation.REPORT_KEY_STREAMRESULT, "\nCC68_FALLBACK_PASS android actual-talkback-community-header\n")
     })

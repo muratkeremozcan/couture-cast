@@ -65,16 +65,20 @@ function heroEndsWithOutfits(): boolean {
 }
 
 /**
- * Waits for the feed response to reach the hero: its `auto` chip names the
- * band the grid lifts from that response. The feed read is independent of the
- * teaser read, so a hero snapshot taken before it lands races the band label.
+ * Waits for the feed response to land: the `auto` chip names the band the grid
+ * read from that response. The feed read is independent of the teaser read, so
+ * a hero snapshot taken before it lands races the re-render it causes. The
+ * filter nav sits in the Community Section since the 2026-11-19 production
+ * follow-up (it used to be a second copy inside the hero), so the chip is read
+ * there; the hero assertions themselves are unchanged.
  */
 async function heroFeedSettled() {
   const prefix = enUS.community.filters.mode.autoWithBand.split('{{band}}')[0]!
+  const communitySection = screen.getByRole('region', { name: 'Community Section' })
   await waitFor(() =>
-    expect(within(heroCanvas()).getByTestId('community-filter-auto').textContent).toMatch(
-      new RegExp(`^${prefix}\\S`)
-    )
+    expect(
+      within(communitySection).getByTestId('community-filter-auto').textContent
+    ).toMatch(new RegExp(`^${prefix}\\S`))
   )
 }
 
