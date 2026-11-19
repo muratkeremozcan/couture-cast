@@ -15,7 +15,7 @@
     "upstreamCommit": "5faf2ba42d7b1c0977169ec3611df25a3c08eb13",
     "upstreamFileSha256": "05ef524b0bb7f83f87257f6ec4dabf70e16b8bb6930f769fb93deaf608ff196d",
     "overlaySha256": "91921724657d16f3ef9731c3a5fd3cd880e9984a3d944659e912a23670d2b73f",
-    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "allowListSha256": "bb1084b7dcd43632272ee68f117baba0cfe1316f3234d90a3005ffc39105634f",
     "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf",
     "counts": {
       "upstreamLines": 76,

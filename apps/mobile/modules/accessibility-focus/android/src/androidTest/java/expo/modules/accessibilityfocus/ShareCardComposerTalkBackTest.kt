@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 package expo.modules.accessibilityfocus
@@ -197,7 +199,7 @@ class ShareCardComposerTalkBackTest {
       click("tab-home")
       assertHeader("Home", "Outfit")
       click("tab-community")
-      assertHeader("Community", "Living community lookbook")
+      assertHeader("Community", "Latest looks")
       click("tab-home")
       waitFor("Outfit action") { find("outfit-share-card-open") != null }
       waitFor("Action label Create my outfit card") { find("outfit-share-card-open")?.let { label(it) } == "Create my outfit card" }

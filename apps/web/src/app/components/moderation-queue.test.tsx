@@ -1,9 +1,11 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.10 test owner: C-WEB-Q-QUEUE, -STATES, -FORBIDDEN-NO-DATA, -DEDUPE, -FILTERS, -HOSTILE-TEXT, -NO-ACTIONS.
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useMswHandlers as mockApi } from '../../test-utils/msw/runtime'
 import {
   errorBody,
@@ -650,5 +652,179 @@ describe('CodeRabbit review: empty state, retry and link names', () => {
       'The moderation queue is unavailable. Try again.'
     )
     expect(screen.queryByText(/Showing the last result/)).not.toBeInTheDocument()
+  })
+})
+
+/*
+ * Production follow-up 2026-11-19: screening holds are due 30 minutes after they are flagged and
+ * SLA alerts are console-only, so an open queue re-reads its first page every minute. Only the
+ * interval timers are faked: the reads themselves, MSW and React stay on real time.
+ */
+describe('auto-refresh of the open queue', () => {
+  const visibility = (state: DocumentVisibilityState) =>
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => state,
+    })
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+    visibility('visible')
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+    visibility('visible')
+  })
+
+  // The contract is one minute. A literal, so a changed interval constant cannot move the test
+  // with it (Codex review 17: a ten-minute interval passed when this read the constant).
+  const MINUTE_MS = 60_000
+  const tick = () => act(() => vi.advanceTimersByTimeAsync(MINUTE_MS))
+  /**
+   * Waits for the queue to have been read `count` times. Testing Library's waitFor polls on
+   * setInterval, which these tests fake, so it only rechecks on a DOM change; a read held in
+   * flight changes nothing on screen. This polls on the real setTimeout instead.
+   */
+  const reads = async (seen: RecordedQuery[], count: number) => {
+    const deadline = Date.now() + 2_000
+    while (seen.length < count && Date.now() < deadline)
+      await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+    expect(seen).toHaveLength(count)
+  }
+
+  it('re-reads the first page every minute, so a new screening hold appears without Refresh', async () => {
+    const hold = summary({ caseId: 'post.held', excerpt: 'New screening hold' })
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(
+        (_query, call) => json(page(call === 1 ? three : [hold, ...three])),
+        seen
+      )
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    expect(screen.queryByText('New screening hold')).not.toBeInTheDocument()
+
+    await act(() => vi.advanceTimersByTimeAsync(MINUTE_MS - 1))
+    expect(seen).toHaveLength(1)
+
+    await act(() => vi.advanceTimersByTimeAsync(1))
+    expect(await screen.findByText('New screening hold')).toBeInTheDocument()
+    expect(seen).toHaveLength(2)
+    expect(seen[1]).not.toHaveProperty('cursor')
+    // A background read is not the moderator's Refresh: nothing announces a restarted list.
+    expect(screen.getByRole('status')).not.toHaveTextContent(/restart/i)
+  })
+
+  it('does not read while the tab is hidden, and resumes once it is visible', async () => {
+    const seen = await openQueue()
+    visibility('hidden')
+    await tick()
+    await tick()
+    expect(seen).toHaveLength(1)
+
+    visibility('visible')
+    await tick()
+    await reads(seen, 2)
+  })
+
+  it('does not start a second read while one is still in flight', async () => {
+    let release = () => undefined as void
+    const held = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(
+        (_query, call) =>
+          call === 2
+            ? held.then(() =>
+                json(
+                  page([summary({ caseId: 'post.late', excerpt: 'Held read' }), ...three])
+                )
+              )
+            : json(page(three)),
+        seen
+      )
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+
+    await tick()
+    await reads(seen, 2)
+    await tick()
+    await tick()
+    expect(seen).toHaveLength(2)
+
+    release()
+    // The held read has landed once its row is on screen; only then is the queue idle again.
+    await screen.findByText('Held read')
+    await tick()
+    await reads(seen, 3)
+  })
+
+  it('keeps the pages a moderator loaded, until they choose Refresh', async () => {
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler(
+        (query) =>
+          query.cursor
+            ? json(page([summary({ caseId: 'post.p9', excerpt: 'Second page' })], null))
+            : json(page(three, 'sig.cursor-1_x')),
+        seen
+      )
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await screen.findByText('Second page')
+    expect(seen).toHaveLength(2)
+
+    await tick()
+    await tick()
+    expect(seen).toHaveLength(2)
+    expect(screen.getAllByRole('listitem')).toHaveLength(4)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+    await reads(seen, 3)
+    // The Refresh has answered once the second page is gone; then polling resumes.
+    await waitFor(() => expect(screen.queryByText('Second page')).not.toBeInTheDocument())
+    await tick()
+    await reads(seen, 4)
+  })
+
+  it('keeps re-reading when the first Load more fails, so a new hold still appears', async () => {
+    const hold = summary({ caseId: 'post.held', excerpt: 'New screening hold' })
+    const seen: RecordedQuery[] = []
+    mockApi(
+      queueHandler((query, call) => {
+        if (query.cursor) return json(errorBody(503, 'unavailable'), 503)
+        return json(page(call === 1 ? three : [hold, ...three], 'sig.cursor-1_x'))
+      }, seen)
+    )
+    render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    await userEvent.click(screen.getByRole('button', { name: 'Load more' }))
+    await reads(seen, 2)
+    expect(seen[1]).toMatchObject({ cursor: 'sig.cursor-1_x' })
+    // The 503 has been handled once the stale notice shows; a tick before that finds the queue busy.
+    await screen.findByRole('alert')
+    expect(screen.getAllByRole('listitem')).toHaveLength(3)
+
+    // Nothing was appended, so the moderator is still on page one and the queue keeps polling.
+    await tick()
+    expect(await screen.findByText('New screening hold')).toBeInTheDocument()
+    await reads(seen, 3)
+    expect(seen[2]).not.toHaveProperty('cursor')
+  })
+
+  it('stops reading once the console is closed', async () => {
+    const seen: RecordedQuery[] = []
+    mockApi(queueHandler(() => json(page(three)), seen))
+    const { unmount } = render(<ModerationQueueView />)
+    await screen.findByRole('list', { name: 'Cases' })
+    unmount()
+    await tick()
+    expect(seen).toHaveLength(1)
   })
 })

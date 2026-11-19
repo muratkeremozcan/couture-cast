@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 3.5 Task 6 step 2 owner: unit-test community lookbook filter chip interactions and ARIA status in `apps/web/src/app/components/community-lookbook-grid.test.tsx`
@@ -14,7 +16,7 @@ import {
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import {
   FEED_PATH,
-  MERLOT,
+  MERLOT_INK,
   cursorFor,
   item,
   feedBody,
@@ -112,7 +114,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       const banner = await screen.findByTestId('community-feed-error')
       expect(banner).toHaveTextContent('We could not load the community feed.')
       expect(banner).not.toHaveTextContent('ECONNRESET')
-      expect(banner).toHaveStyle({ color: MERLOT })
+      expect(banner).toHaveStyle({ color: MERLOT_INK })
 
       await userEvent.click(screen.getByTestId('community-feed-retry-button'))
 
@@ -130,9 +132,30 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       )
       renderGrid()
 
-      const banner = await screen.findByTestId('community-feed-error')
-      expect(banner).toHaveTextContent('Sign in to take part in the community.')
-      expect(banner).not.toHaveTextContent('We could not load the community feed.')
+      // Production follow-up 2026-11-19: signed out is a state to act on, not a
+      // load failure, so it reads as a note. No alert role and no Try again
+      // button: retrying with the same stale token cannot sign anyone in.
+      const note = await screen.findByTestId('community-feed-signed-out')
+      expect(note).toHaveTextContent('Sign in to take part in the community.')
+      expect(note).not.toHaveTextContent('We could not load the community feed.')
+      expect(note).not.toHaveAttribute('role', 'alert')
+      expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-feed-retry-button')).not.toBeInTheDocument()
+      // The stored session is what the server just refused, so the reader still
+      // needs a way to sign in again. Without one the note is a dead end.
+      const signInLink = screen.getByRole('link', { name: 'Sign in' })
+      expect(signInLink).toHaveAttribute('href', '/signin')
+      // jsdom applies no stylesheet, so visibility is pinned through the marker.
+      // `globals.css` hides `[data-landing='guest-inline']` whenever the page is
+      // marked `data-session='member'`, which a stored session keeps it, so the
+      // guest-only marker here would hide the one way out in a real browser.
+      // `refused-inline` is hidden only while the landing is still pending (so it
+      // never flashes before first paint, real-session L-8) and shows under both
+      // `member` and `none`.
+      expect(signInLink).toHaveAttribute('data-landing', 'refused-inline')
+      // Same guarantee as 6.1-WEB-006: a reader the server just refused cannot
+      // post, so no compose affordance may promise otherwise.
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
     })
 
     it('6.1-WEB-005 reads a 503 kill switch as temporarily unavailable', async () => {
@@ -171,9 +194,16 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       // MSW never sees one.
       renderGrid()
 
-      expect(await screen.findByTestId('community-feed-error')).toHaveTextContent(
-        'Sign in to take part in the community.'
-      )
+      const note = await screen.findByTestId('community-feed-signed-out')
+      expect(note).toHaveTextContent('Sign in to take part in the community.')
+      expect(note).not.toHaveAttribute('role', 'alert')
+      expect(screen.queryByTestId('community-feed-error')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('community-feed-retry-button')).not.toBeInTheDocument()
+      const signInLink = screen.getByRole('link', { name: 'Sign in' })
+      expect(signInLink).toHaveAttribute('href', '/signin')
+      // A true guest keeps the guest-only marker, so the link stays out of sight
+      // for a member whose session is verified (globals.css `guest-inline`).
+      expect(signInLink).toHaveAttribute('data-landing', 'guest-inline')
       expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
     })
 
@@ -460,7 +490,6 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
 
     it('6.1-WEB-065 presses the chip the server served, not the one it asked for', async () => {
       signIn()
-      const servedModes: string[] = []
       // The `all` arm answering an `auto` request, which is exactly what half the
       // beta cohort receives: `resolveEffectiveMode` swaps `auto` for the
       // viewer's assignment and leaves every other mode alone.
@@ -472,11 +501,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
           viewerBand: 'temperate_dry',
         })
       )
-      renderGrid({
-        onServedModeChange: (mode) => {
-          servedModes.push(mode)
-        },
-      })
+      renderGrid()
 
       await screen.findByTestId('lookbook-card-post-1')
 
@@ -507,12 +532,11 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(screen.getByTestId('community-live-region')).toHaveTextContent(
         'Showing Every climate looks. 1 loaded.'
       )
-      // `lookbook-prism-layout.tsx` renders a second filter nav outside this
-      // component, and only this component sees the response, so the served mode
-      // has to travel out the same way the resolved band does.
-      await waitFor(() => {
-        expect(servedModes).toContain('all')
-      })
+      // Home used to render a second filter nav outside this component, fed by
+      // an `onServedModeChange` lift. Since the 2026-11-19 production follow-up
+      // the grid's own nav is the only one on Home, so the pressed chip above is
+      // the whole contract; `lookbook-prism-layout.test.tsx` 3.5-INT-005 pins
+      // that Home renders exactly one filter nav.
     })
 
     it('6.1-WEB-014 reports the chosen filter to its caller', async () => {

@@ -25,7 +25,7 @@ export function CommunityBannedNotice({
     <section
       aria-labelledby="community-banned-title"
       data-testid="community-banned-notice"
-      className="flex flex-col gap-3 rounded-lg border border-neutral-400 bg-white p-6 text-neutral-900"
+      className="flex flex-col gap-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-6 text-[color:var(--lookbook-ink)]"
     >
       <h2 id="community-banned-title" className="text-xl font-semibold">
         {t('community.banned.title')}

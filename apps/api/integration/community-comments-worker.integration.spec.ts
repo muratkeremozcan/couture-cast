@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 42: Screened threaded comments.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-42-screened-threaded-comments
 import { randomUUID } from 'node:crypto'
@@ -212,9 +214,14 @@ describe('comment worker Redis retry and generation ownership', () => {
       })
       expect(reports).toHaveLength(1)
       expect(reports[0]).toMatchObject({
+        origin: 'screening',
         content_snapshot: null,
         audit: [{ action: 'screening_failed', reason: 'screening_unavailable' }],
       })
+      // Owner ruling 2026-11-19: a screening hold on a comment is due 30 minutes after intake.
+      expect(reports[0]!.sla_due_at.getTime() - reports[0]!.accepted_at.getTime()).toBe(
+        30 * 60_000
+      )
       expect(screen).toHaveBeenCalledTimes(3)
     })
   }, 20_000)

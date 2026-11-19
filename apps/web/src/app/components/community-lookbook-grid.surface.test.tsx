@@ -1,11 +1,24 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Community grid journeys through the real web transport and MSW.
 import axe from 'axe-core'
-import { http } from 'msw'
+import { http, HttpResponse } from 'msw'
 import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { COMMUNITY_POST_NOT_FOUND_MESSAGE } from '@couture/api-client/contracts/http'
+import {
+  COMMUNITY_FEED_DISABLED_MESSAGE,
+  COMMUNITY_POST_NOT_FOUND_MESSAGE,
+} from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
+import {
+  captureSync,
+  eventsBody,
+  resolveBody,
+  resolvedTarget,
+  ZERO,
+} from '../../test-utils/community-spotlight'
+import { CommunityLookbookGrid } from './community-lookbook-grid'
 import {
   FEED_PATH,
   ALLOCATE_PATH,
@@ -41,6 +54,9 @@ vi.mock('posthog-js', () => ({
 }))
 
 setupCommunityGridClock()
+
+const EVENTS_PATH = '/api/v1/community/events'
+const TARGETS_PATH = '/api/v1/community/targets/resolve'
 
 describe('CommunityLookbookGrid (Story 6.1)', () => {
   setupCommunityGridSurface()
@@ -128,6 +144,268 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(await screen.findByTestId('challenge-climate-band')).toHaveTextContent(
         'Every climate'
       )
+    })
+
+    /*
+     * Production follow-up 2026-11-19: a stored session the API later answers 401
+     * is a signed-out reader. The surface had shown such a reader Participate and
+     * New post, and kept a composer open that could only fail on publish. Both
+     * cases start from a good read, so they cover the transition, not a reader
+     * who was refused from the first request.
+     */
+    it('6.1-WEB-077 drops Participate and New post when a filter read refuses the session', async () => {
+      signIn()
+      useMswHandlers(
+        http.get(FEED_PATH, ({ request }) =>
+          new URL(request.url).searchParams.get('mode') === 'cold_dry'
+            ? errorBody(401, 'Missing or invalid authentication headers.', 'Unauthorized')
+            : feedBody({ items: [item()], activeChallenge: CHALLENGE, mode: 'auto' })
+        )
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await screen.findByTestId('challenge-participate-button')
+      expect(screen.getByTestId('create-post-button')).toBeInTheDocument()
+
+      await user.click(screen.getByTestId('community-filter-cold_dry'))
+
+      expect(await screen.findByTestId('community-feed-signed-out')).toHaveTextContent(
+        'Sign in to take part in the community.'
+      )
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+        'href',
+        '/signin'
+      )
+    })
+
+    it('6.1-WEB-078 closes an open composer when a later feed read refuses the session', async () => {
+      signIn()
+      useMswHandlers(
+        http.get(FEED_PATH, ({ request }) =>
+          new URL(request.url).searchParams.get('mode') === 'cold_dry'
+            ? errorBody(401, 'Missing or invalid authentication headers.', 'Unauthorized')
+            : feedBody({ items: [item()], activeChallenge: CHALLENGE, mode: 'auto' })
+        )
+      )
+      const user = userEvent.setup()
+      const { rerender } = renderGrid({ activeTab: 'auto' })
+
+      await user.click(await screen.findByTestId('challenge-participate-button'))
+      expect(screen.getByTestId('post-image-file-input')).toBeInTheDocument()
+
+      // The open dialog covers the chips, so the filter changes from the page
+      // around the grid (Home's chip state feeds `activeTab`), and that read is
+      // the one the API refuses.
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="cold_dry" />)
+
+      await screen.findByTestId('community-feed-signed-out')
+      expect(screen.queryByTestId('post-image-file-input')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+    })
+
+    it('6.1-WEB-079 closes an open composer when the realtime catch-up is refused with a 401', async () => {
+      signIn()
+      const sync = captureSync()
+      const state = { refused: false }
+      const refusal = () =>
+        errorBody(401, 'Missing or invalid authentication headers.', 'Unauthorized')
+      useMswHandlers(
+        http.get(FEED_PATH, () =>
+          state.refused
+            ? refusal()
+            : feedBody({ items: [item()], activeChallenge: CHALLENGE, mode: 'auto' })
+        ),
+        http.get(EVENTS_PATH, () =>
+          state.refused
+            ? refusal()
+            : HttpResponse.json({
+                data: {
+                  events: [],
+                  nextCursor: 'cursor',
+                  hasMore: false,
+                  resyncRequired: false,
+                },
+              })
+        )
+      )
+      const user = userEvent.setup()
+      renderGrid()
+
+      await user.click(await screen.findByTestId('challenge-participate-button'))
+      expect(screen.getByTestId('post-image-file-input')).toBeInTheDocument()
+
+      // The session goes bad while the composer is open and no filter changes:
+      // the realtime catch-up is the read that learns it, and the access probe
+      // it sends answers 401 too.
+      state.refused = true
+      await sync()
+
+      await screen.findByTestId('community-feed-signed-out')
+      expect(screen.queryByTestId('post-image-file-input')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+    })
+
+    /*
+     * Refusal is a state of the session it was learned under (Codex review 6),
+     * not of the last read. Each case below drives the filter from the page
+     * around the grid, as Home's chips do, so the 401 lands on a chosen read.
+     */
+    const refusingFeed = (modes: Record<string, () => Response | Promise<Response>>) =>
+      http.get(FEED_PATH, ({ request }) => {
+        const mode = new URL(request.url).searchParams.get('mode') ?? 'auto'
+        const answer = modes[mode]
+        return answer
+          ? answer()
+          : feedBody({ items: [item()], activeChallenge: CHALLENGE, mode: 'auto' })
+      })
+    const unauthorized = () =>
+      errorBody(401, 'Missing or invalid authentication headers.', 'Unauthorized')
+
+    it('6.1-WEB-080 keeps compose hidden through a later 503 and restores it only after a good read', async () => {
+      signIn()
+      let recoveryReached = false
+      let releaseRecovery = () => undefined as void
+      const recoveryHeld = new Promise<void>((resolve) => {
+        releaseRecovery = resolve
+      })
+      useMswHandlers(
+        refusingFeed({
+          cold_dry: unauthorized,
+          warm_dry: () =>
+            errorBody(503, COMMUNITY_FEED_DISABLED_MESSAGE, 'Service Unavailable'),
+          all: async () => {
+            recoveryReached = true
+            await recoveryHeld
+            return feedBody({ items: [item()], activeChallenge: CHALLENGE, mode: 'all' })
+          },
+        })
+      )
+      const { rerender } = renderGrid({ activeTab: 'auto' })
+      await screen.findByTestId('challenge-participate-button')
+
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="cold_dry" />)
+      await screen.findByTestId('community-feed-signed-out')
+
+      // A 503 says nothing about the session. It must not hand New post back
+      // to a reader the API has just refused.
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="warm_dry" />)
+      expect(await screen.findByTestId('community-feed-error')).toHaveTextContent(
+        'The community feed is temporarily unavailable.'
+      )
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+
+      // A read the API answers is the evidence that the session works again, so
+      // a read still in flight is not: compose stays hidden until it answers
+      // (Codex review 8 showed member actions during a pending read passing).
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="all" />)
+      await waitFor(() => expect(recoveryReached).toBe(true))
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('challenge-participate-button')).not.toBeInTheDocument()
+
+      releaseRecovery()
+      expect(await screen.findByTestId('create-post-button')).toBeInTheDocument()
+      expect(screen.getByTestId('challenge-participate-button')).toBeInTheDocument()
+    })
+
+    it('6.1-WEB-081 drops a photo allocation that answers after the refusal', async () => {
+      signIn()
+      restoreObjectUrl = installImagePrepMocks()
+      let allocateStarted = false
+      let releaseAllocate = () => undefined as void
+      const allocateHeld = new Promise<void>((resolve) => {
+        releaseAllocate = resolve
+      })
+      useMswHandlers(
+        refusingFeed({ cold_dry: unauthorized }),
+        imageFixtureHandler(),
+        http.post(ALLOCATE_PATH, async () => {
+          allocateStarted = true
+          await allocateHeld
+          return allocateBody()
+        })
+      )
+      const user = userEvent.setup()
+      const { rerender } = renderGrid({ activeTab: 'auto' })
+
+      await user.click(await screen.findByTestId('create-post-button'))
+      await choosePhoto(user)
+      await waitFor(() => expect(allocateStarted).toBe(true))
+
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="cold_dry" />)
+      await screen.findByTestId('community-feed-signed-out')
+      expect(screen.queryByTestId('post-image-file-input')).not.toBeInTheDocument()
+
+      // The allocation answers late, after the refusal. It must not land in the
+      // next draft the reader opens once a good read restores compose.
+      releaseAllocate()
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="all" />)
+      await user.click(await screen.findByTestId('create-post-button'))
+      await screen.findByTestId('post-image-file-input')
+      expect(screen.queryByTestId('post-image-preview')).not.toBeInTheDocument()
+      expect(screen.queryByDisplayValue(SUGGESTED_ALT_TEXT)).not.toBeInTheDocument()
+      expect(screen.getByTestId('post-alt-text-input')).toHaveValue('')
+    })
+
+    it('6.1-WEB-082 closes an open report dialog when a later read refuses the session', async () => {
+      signIn()
+      useMswHandlers(refusingFeed({ cold_dry: unauthorized }))
+      const user = userEvent.setup()
+      const { rerender } = renderGrid({ activeTab: 'auto' })
+
+      await user.click(await screen.findByTestId('report-button-post-1'))
+      await screen.findByTestId('report-reason-select')
+
+      rerender(<CommunityLookbookGrid showFilterNav activeTab="cold_dry" />)
+      await screen.findByTestId('community-feed-signed-out')
+      expect(screen.queryByTestId('report-reason-select')).not.toBeInTheDocument()
+      expect(screen.queryByTestId('report-submit-button')).not.toBeInTheDocument()
+    })
+
+    it('6.1-WEB-083 restores compose when a realtime rebuild reads the feed after a refusal', async () => {
+      signIn()
+      const sync = captureSync()
+      const state = { refused: true, feedReads: 0 }
+      useMswHandlers(
+        http.get(FEED_PATH, () => {
+          state.feedReads += 1
+          return state.refused
+            ? unauthorized()
+            : feedBody({ items: [item()], activeChallenge: CHALLENGE, mode: 'auto' })
+        }),
+        http.get(EVENTS_PATH, () => eventsBody([], 'cursor')),
+        http.post(TARGETS_PATH, async ({ request }) => {
+          const { targets } = (await request.json()) as { targets: { key: string }[] }
+          return resolveBody(
+            targets.map((target) =>
+              resolvedTarget({ ...item({ id: target.key }), reactions: ZERO })
+            )
+          )
+        })
+      )
+      renderGrid()
+
+      await screen.findByTestId('community-feed-signed-out')
+      expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
+
+      // No filter click: the session works again and the realtime catch-up
+      // rebuilds the feed. That read answering is the same evidence a filter
+      // read is, so it lifts the refusal and brings the challenge back.
+      state.refused = false
+      const readsBefore = state.feedReads
+      await sync()
+      await waitFor(() => expect(state.feedReads).toBeGreaterThan(readsBefore))
+
+      expect(await screen.findByTestId('create-post-button')).toBeInTheDocument()
+      expect(
+        await screen.findByTestId('challenge-participate-button')
+      ).toBeInTheDocument()
+      expect(screen.queryByTestId('community-feed-signed-out')).not.toBeInTheDocument()
     })
   })
 
@@ -454,28 +732,43 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(image).toHaveAttribute('alt', 'Look by Style Explorer 4F2A')
     })
 
-    it('6.1-WEB-050 reports the resolved band without re-firing the feed read', async () => {
+    it('6.1-WEB-050 names the resolved band on its own auto chip without re-firing the feed read', async () => {
       signIn()
-      let feedCalls = 0
-      const reported: (string | null)[] = []
+      const requestedModes: (string | null)[] = []
       useMswHandlers(
-        http.get(FEED_PATH, () => {
-          feedCalls += 1
-          return feedBody({ items: [item()], viewerBand: 'cold_wet' })
+        http.get(FEED_PATH, ({ request }) => {
+          requestedModes.push(new URL(request.url).searchParams.get('mode'))
+          return feedBody({
+            items: [item()],
+            mode: 'auto',
+            viewerBand: 'cold_wet',
+            bandResolved: true,
+            bandUnresolvedReason: null,
+          })
         })
       )
-      // An inline arrow changes identity on every render, which is exactly the
-      // caller shape that would re-fire the read if the callback sat inside
-      // `loadFeed`'s dependency list.
-      renderGrid({
-        onViewerBandChange: (band) => {
-          reported.push(band)
-        },
-      })
+      // Home used to lift the band out through `onViewerBandChange` for a second
+      // filter nav; since the 2026-11-19 production follow-up the grid's own nav
+      // is the only one, so the band shows on its auto chip.
+      const { rerender } = renderGrid({ onTabChange: vi.fn() })
 
       await screen.findByTestId('lookbook-card-post-1')
-      await waitFor(() => expect(reported).toContain('cold_wet'))
-      expect(feedCalls).toBe(1)
+      expect(screen.getByTestId('community-filter-auto').textContent).toBe(
+        'Your climate: Cold and wet'
+      )
+      // A caller that passes an inline arrow hands the grid a new function on
+      // every render. Rerendering with a fresh one is that caller shape: if the
+      // callback sat inside `loadFeed`'s dependency list, this would re-fire the
+      // read. `loadFeed` marks the grid busy synchronously, inside the act that
+      // `rerender` runs, so a re-fire shows as `aria-busy="true"` right here.
+      // Waiting for the grid to go idle then lets any re-fired request land in
+      // `requestedModes`. A chip click is no fence: it aborts the re-fired read
+      // before MSW records it (mutation-tested; that version let the regression pass).
+      rerender(<CommunityLookbookGrid showFilterNav onTabChange={vi.fn()} />)
+      const grid = screen.getByTestId('community-card-grid')
+      expect(grid).toHaveAttribute('aria-busy', 'false')
+      await waitFor(() => expect(grid).toHaveAttribute('aria-busy', 'false'))
+      expect(requestedModes).toEqual(['auto'])
     })
 
     it('6.1-WEB-051 labels every card as its own region with the author in the name', async () => {

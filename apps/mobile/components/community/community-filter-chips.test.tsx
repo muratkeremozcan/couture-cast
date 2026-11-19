@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 8 owner: the community feed's sticky filter strip.
 //
@@ -8,8 +10,8 @@
 import React, { createElement } from 'react'
 import { run as runAxe } from 'axe-core'
 import type * as ReactNativeModule from 'react-native'
-import { render, screen } from '@testing-library/react'
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, within } from '@testing-library/react'
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CLIMATE_BANDS } from '@couture/utils'
 import type { CommunityFeedMode } from '@couture/api-client/contracts/http'
 
@@ -46,7 +48,7 @@ vi.mock('react-native', async (importOriginal) => {
 touchableSpy.createElement = createElement
 
 import enUS from '@/assets/locales/en-US.json'
-import i18n, { initI18n } from '@/src/lib/i18n'
+import i18n, { initI18n, supportedLocales } from '@/src/lib/i18n'
 import { press } from '@/src/test-utils/press'
 import { COMMUNITY_FILTER_MODES, CommunityFilterChips } from './community-filter-chips'
 
@@ -163,5 +165,64 @@ describe('CommunityFilterChips (Story 6.1)', () => {
       results.violations.map((violation) => violation.id),
       JSON.stringify(results.violations, null, 2)
     ).toEqual([])
+  })
+
+  /*
+   * Production follow-up after the project close (2026-11-19): a tester asked what
+   * the "Cold and wet" chip meant. Nothing on the surface said the chips filter
+   * looks by the weather they were shared in, so one visible line now sits above
+   * the strip. Above, not beside: it is read before the first chip, which is the
+   * order a screen reader walks the strip in, and it stays put while the chips
+   * scroll horizontally.
+   */
+  describe('climate filter explainer', () => {
+    afterEach(async () => {
+      await i18n.changeLanguage('en-US')
+    })
+
+    it.each(supportedLocales)(
+      '%s shows the explainer above the chip strip',
+      async (locale) => {
+        expect(
+          i18n.exists('community.filters.explainer', { lng: locale }),
+          `${locale} community.filters.explainer`
+        ).toBe(true)
+        await i18n.changeLanguage(locale)
+        const explainer = i18n.t('community.filters.explainer')
+
+        renderChips()
+
+        const strip = screen.getByTestId('community-sticky-filter-chips')
+        const line = within(strip).getByText(explainer)
+        expect(line).toBeVisible()
+
+        const firstChip = within(strip).getByTestId(
+          `community-filter-chip-${COMMUNITY_FILTER_MODES[0]}`
+        )
+        // DOCUMENT_POSITION_FOLLOWING: the first chip comes after the explainer.
+        expect(
+          line.compareDocumentPosition(firstChip) & Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy()
+      }
+    )
+
+    it('keeps the explainer outside the horizontally scrolling chip row', () => {
+      const explainer = i18n.t('community.filters.explainer')
+      renderChips()
+
+      const firstChip = screen.getByTestId(
+        `community-filter-chip-${COMMUNITY_FILTER_MODES[0]}`
+      )
+      const line = screen.getByText(explainer)
+      // The row's scroll container is the chips' nearest common ancestor; the
+      // explainer must not be inside it or it scrolls out of view with the chips.
+      const lastChip = screen.getByTestId(
+        `community-filter-chip-${COMMUNITY_FILTER_MODES[COMMUNITY_FILTER_MODES.length - 1]}`
+      )
+      let row: HTMLElement | null = firstChip.parentElement
+      while (row && !row.contains(lastChip)) row = row.parentElement
+      expect(row).not.toBeNull()
+      expect(row).not.toContainElement(line)
+    })
   })
 })

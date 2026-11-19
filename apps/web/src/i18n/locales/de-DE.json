@@ -414,9 +414,8 @@
   },
   "community": {
     "title": "Community",
-    "heading": "Lebendiges Community-Lookbook",
+    "heading": "Neueste Looks",
     "sectionLabel": "Community-Lookbook",
-    "inspirations": "Community-Inspirationen",
     "share": "Teile deinen Look",
     "newPost": "Neuer Beitrag",
     "deepLink": {
@@ -424,6 +423,7 @@
     },
     "filters": {
       "label": "Community-Filter",
+      "explainer": "Klimafilter ordnen Looks nach der Wochenvorhersage am gespeicherten Ort der teilenden Person, von kalt und feucht bis warm und trocken.",
       "announce": "Looks für {{filter}} werden angezeigt.",
       "mode": {
         "auto": "Dein Klima",
@@ -888,6 +888,7 @@
       "monitorStaleShort": "Die Überwachung läuft nicht mehr. Es werden keine Warnungen gesendet.",
       "monitorNever": "Die Überwachung lief noch nicht. Es werden keine Warnungen gesendet.",
       "channelWebhook": "Warnungen gehen an den Betriebs-Webhook und erscheinen auf dieser Seite.",
+      "channelPush": "Warnungen gehen als Push-Benachrichtigung an die Geräte der Moderation und erscheinen auf dieser Seite.",
       "channelConsole": "Es ist kein Webhook eingerichtet. Warnungen erscheinen nur auf dieser Seite und niemand wird benachrichtigt.",
       "queueTitle": "Offene Fälle",
       "escalated": "Eskaliert",

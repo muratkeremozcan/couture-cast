@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 //
 // Story 6.1: the moderation pipeline from the transactional outbox through to a
@@ -358,6 +360,14 @@ describe('6.1 community moderation pipeline', () => {
       })
       expect(event.flagged_by_id).toBeNull()
       expect(post.user_id).toBe(userId)
+
+      // Owner ruling 2026-11-19: a screening hold waits minutes, not hours. The queue row the
+      // flag writes is due 30 minutes after it was flagged; member reports keep 24 hours.
+      const hold = await prisma.communityPostReport.findFirstOrThrow({
+        where: { post_id: postId, origin: 'screening' },
+      })
+      expect(hold.reporter_id).toBeNull()
+      expect(hold.sla_due_at.getTime() - hold.created_at.getTime()).toBe(30 * 60_000)
 
       const outbox = await prisma.communityModerationOutbox.findUniqueOrThrow({
         where: { post_id: postId },

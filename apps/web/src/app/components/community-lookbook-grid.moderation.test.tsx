@@ -18,6 +18,7 @@ import {
   REPORT_PATH,
   WITHDRAW_PATH,
   MERLOT,
+  MERLOT_INK,
   GOLD,
   item,
   authorState,
@@ -226,12 +227,20 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       renderGrid()
 
       const badge = await screen.findByTestId('status-badge-as-flagged')
-      expect(badge).toHaveStyle({ color: MERLOT, borderColor: MERLOT })
+      // jsdom keeps the token as declared but cannot resolve a var() border for toHaveStyle, so
+      // the inline declaration is read directly.
+      expect({ color: badge.style.color, borderColor: badge.style.borderColor }).toEqual({
+        color: MERLOT_INK,
+        borderColor: MERLOT_INK,
+      })
       expect(badge).not.toHaveStyle({ color: GOLD })
       expect(screen.getByTestId('author-state-explanation-as-flagged')).toHaveStyle({
-        color: MERLOT,
+        color: MERLOT_INK,
       })
       // Merlot is reserved for the destructive state, so a withdrawal is neutral.
+      expect(screen.getByTestId('status-badge-as-withdrawn')).not.toHaveStyle({
+        color: MERLOT_INK,
+      })
       expect(screen.getByTestId('status-badge-as-withdrawn')).not.toHaveStyle({
         color: MERLOT,
       })
@@ -532,7 +541,7 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       expect(notice).toHaveTextContent(
         'We could not withdraw this look. It is still in the feed.'
       )
-      expect(notice).toHaveStyle({ color: MERLOT })
+      expect(notice).toHaveStyle({ color: MERLOT_INK })
       expect(notice).not.toHaveTextContent('withdraw transaction rolled back')
       expect(screen.getByTestId('lookbook-card-self-post')).toBeInTheDocument()
       expect(feedCalls).toBe(1)

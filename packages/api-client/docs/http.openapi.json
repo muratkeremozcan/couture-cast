@@ -19450,6 +19450,7 @@
                     ],
                     "enum": [
                       "webhook",
+                      "push",
                       "console",
                       null
                     ]
@@ -33570,6 +33571,7 @@
                               ],
                               "enum": [
                                 "webhook",
+                                "push",
                                 "console",
                                 null
                               ]

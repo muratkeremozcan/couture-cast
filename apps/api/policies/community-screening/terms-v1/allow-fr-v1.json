@@ -12,7 +12,7 @@
   },
   "generated": {
     "generator": "scripts/verify-community-screening-lists.mjs",
-    "allowListSha256": "b25c9043213ba09b2ca3f415ae05f79cd9222910c715eeda2100d748d5444613",
+    "allowListSha256": "bb1084b7dcd43632272ee68f117baba0cfe1316f3234d90a3005ffc39105634f",
     "reviewedOccurrenceSha256": "e5c93949c90d428f783d1e273c1abf0f97004dbde479663590011f4d2e5c23bf"
   },
   "entries": [
@@ -60,9 +60,66 @@
     "copulas": [],
     "nameFollowers": []
   },
-  "scopedWords": [],
+  "scopedWords": ["rayées", "lapins"],
   "scopedPhrases": [],
-  "literalContexts": [],
+  "literalContexts": [
+    {
+      "terms": ["bourré", "bourrée"],
+      "objects": [
+        "vêtements",
+        "affaires",
+        "plumes",
+        "coton",
+        "laine",
+        "duvet",
+        "papier",
+        "pulls",
+        "chaussettes",
+        "jouets",
+        "livres",
+        "foulards",
+        "tissus",
+        "coussins",
+        "ouate",
+        "mousse",
+        "poches"
+      ],
+      "connectors": ["de", "d", "à", "craquer"],
+      "maxDistance": 4,
+      "vetoes": [
+        "complètement",
+        "completement",
+        "totalement",
+        "trop",
+        "bien",
+        "suis",
+        "es",
+        "est",
+        "était",
+        "étais",
+        "etait",
+        "etais",
+        "soirée",
+        "soiree"
+      ],
+      "vetoRadius": 3,
+      "textVetoes": [
+        "alcool",
+        "bière",
+        "biere",
+        "vodka",
+        "whisky",
+        "vin",
+        "shots",
+        "cuite",
+        "ivre",
+        "picole",
+        "picoler",
+        "bourrés",
+        "bourrées"
+      ]
+    }
+  ],
   "occurrenceConstructions": [
     {
       "target": "retard",

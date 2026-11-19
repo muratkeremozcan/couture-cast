@@ -1176,8 +1176,30 @@ model ModerationSlaAlert {
   /// delivery leaves it, so the repair pass owes the record whatever the alert does next.
   failure_owed_code    String?
   failure_escalated_at DateTime?
+  push_receipts        ModerationSlaPushReceipt[]
 
   @@index([detected_at(sort: Desc), id(sort: Desc)])
+}
+
+/// Production follow-up 2026-11-19: one row per Expo ticket an SLA alert push was accepted with.
+/// The sweep reads each ticket's receipt until it reports, or marks it `unknown` at `expires_at`,
+/// so a failure Expo reports after accepting a message survives worker restarts.
+/// RLS: API-only, enabled with zero policies and zero grants.
+model ModerationSlaPushReceipt {
+  ticket_id   String             @id
+  /// Deleted with its alert, so the 400-day alert retention prunes these too.
+  alert       ModerationSlaAlert @relation(fields: [alert_id], references: [id], onDelete: Cascade)
+  alert_id    String
+  accepted_at DateTime
+  check_after DateTime
+  expires_at  DateTime
+  /// `ok`, `failed` or `unknown`; null while the receipt is still owed.
+  outcome     String?
+  error       String?
+  checked_at  DateTime?
+
+  @@index([outcome, check_after])
+  @@index([alert_id])
 }
 
 /// Story 6.12: the monitor's own record, one row with id `default`, stamped at the end of each
@@ -1186,7 +1208,7 @@ model ModerationSlaAlert {
 model ModerationSlaMonitor {
   id            String   @id @default("default")
   last_sweep_at DateTime
-  /// `webhook` or `console`, as the sweep that stamped this row resolved its channel.
+  /// `webhook`, `push` or `console`, as the sweep that stamped this row resolved its channel.
   channel       String
 }
 

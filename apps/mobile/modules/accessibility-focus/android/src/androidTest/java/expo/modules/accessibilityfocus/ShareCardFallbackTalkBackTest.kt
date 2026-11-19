@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
 package expo.modules.accessibilityfocus
@@ -64,7 +66,7 @@ class ShareCardFallbackTalkBackTest {
     val bounds = Rect()
     headers.single().getBoundsInScreen(bounds)
     assertFalse("Focused header is visible", bounds.isEmpty)
-    assertFalse("Duplicate content heading absent", all().any { label(it) == "Living community lookbook" && it.isHeading })
+    assertFalse("Duplicate content heading absent", all().any { label(it) == "Latest looks" && it.isHeading })
     instrumentation.sendStatus(0, Bundle().apply {
       putString(Instrumentation.REPORT_KEY_STREAMRESULT, "\nCC68_FALLBACK_PASS android actual-talkback-community-header\n")
     })

@@ -72,7 +72,7 @@ import {
   type CommunityFailureReason,
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
-import { useMemberSession, type MemberSession } from '../../lib/use-web-session'
+import { useMemberSession } from '../../lib/use-web-session'
 import {
   LiveSponsorshipLedger,
   type LiveReadStamp,
@@ -95,6 +95,7 @@ import React, {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -179,6 +180,8 @@ const MINIMUM_TARGET_ATTEMPT_MS = 250
  * custom properties in `globals.css`.
  */
 const MERLOT = '#7A1F2D'
+/** Merlot as text or a border: globals.css gives it a dark-mode value that reads on the dark surface. */
+const MERLOT_INK = 'var(--lookbook-merlot-ink)'
 
 /**
  * Every reason the community wrappers can throw, mapped onto catalog copy.
@@ -436,6 +439,16 @@ export interface LookbookFilterNavProps {
   viewerBand?: ClimateBand | null
   /** Story 6.11: a banned member has no feed to filter, so the nav and its heading leave the page. */
   closed?: boolean
+  /**
+   * Where the nav sticks. Home stacks it under the sticky chip navigation; `/community` has no
+   * chip bar above it, so it sticks to the top edge there instead of floating under a gap.
+   */
+  stickyTop?: number
+  /**
+   * Production feedback 2026-11-19: the feed's own actions (New post, the notifications link) sit in
+   * the heading row, so nothing floats between the chips and the feed.
+   */
+  actions?: React.ReactNode
 }
 
 // A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
@@ -450,8 +463,12 @@ export function LookbookFilterNav({
   onTabChange,
   viewerBand = null,
   closed = false,
+  stickyTop = CHIP_NAVIGATION_HEIGHT_PX,
+  actions,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
+  // Per instance, so a nav only ever points at its own explainer.
+  const explainerId = useId()
   if (closed) return null
 
   const handleTabClick = (tab: FilterCategory) => {
@@ -471,16 +488,30 @@ export function LookbookFilterNav({
   return (
     <nav
       aria-label={t('community.filters.label')}
-      style={{ top: CHIP_NAVIGATION_HEIGHT_PX }}
-      className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-white/95 py-3 backdrop-blur"
+      aria-describedby={explainerId}
+      style={{ top: stickyTop }}
+      className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur"
     >
-      <h2
-        tabIndex={-1}
-        data-share-card-focus-fallback="community"
-        className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
+      {/* Translated actions can outgrow a 320 px row, so they wrap below the heading as a group. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <h2
+          tabIndex={-1}
+          data-share-card-focus-fallback="community"
+          className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
+        >
+          {t('community.heading')}
+        </h2>
+        {actions}
+      </div>
+      {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
+          climate band and nothing said what a band is, so one visible line does. */}
+      <p
+        id={explainerId}
+        data-testid="community-filters-explainer"
+        className="-mt-1 text-xs leading-snug text-[color:var(--lookbook-ink-muted)]"
       >
-        {t('community.heading')}
-      </h2>
+        {t('community.filters.explainer')}
+      </p>
       <div className={isMobilePreview ? CHIP_ROW_SCROLL : CHIP_ROW}>
         {COMMUNITY_FEED_MODES.map((mode) => {
           const isActive = activeTab === mode
@@ -491,7 +522,7 @@ export function LookbookFilterNav({
           // colour, so it survives a monochrome or high-contrast rendering.
           const activeStyles = isActive
             ? 'border-[color:var(--theme-secondary)] font-bold text-[color:var(--theme-card-text)] underline underline-offset-4'
-            : 'border-transparent font-medium text-neutral-600 min-[768px]:border-[color:var(--theme-card-border)] min-[768px]:bg-[var(--theme-card-bg)]'
+            : 'border-transparent font-medium text-[color:var(--lookbook-ink-muted)] min-[768px]:border-[color:var(--theme-card-border)] min-[768px]:bg-[var(--theme-card-bg)]'
 
           return (
             <button
@@ -521,7 +552,7 @@ interface WeeklyChallengeBannerProps {
   challenge: EmbeddedCommunityChallenge
   language: string
   t: Translate
-  /** False while the session is verified or the member cannot act: the challenge stays readable. */
+  /** False for a reader who cannot post: the challenge still shows, without its entry button. */
   canParticipate: boolean
   onParticipate: (challenge: EmbeddedCommunityChallenge) => void
 }
@@ -567,7 +598,7 @@ function WeeklyChallengeBanner({
               ? bandLabel(challenge.climateBand, t)
               : t('community.challenge.allClimates')}
           </span>
-          <span className="lookbook-metrics text-[11px] text-neutral-600">
+          <span className="lookbook-metrics text-[11px] text-[color:var(--lookbook-ink-muted)]">
             {formattedDates}
           </span>
         </div>
@@ -580,7 +611,9 @@ function WeeklyChallengeBanner({
         >
           {challenge.title}
         </h3>
-        <p className="text-xs leading-relaxed text-neutral-600">{challenge.body}</p>
+        <p className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)]">
+          {challenge.body}
+        </p>
       </div>
 
       {canParticipate && (
@@ -646,7 +679,7 @@ function LookbookCardImageSurface({
           data-testid={`${scope}image-unavailable-${item.id}`}
           className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--theme-card-bg)] p-4 text-center"
         >
-          <span className="text-xs font-medium text-neutral-600">
+          <span className="text-xs font-medium text-[color:var(--lookbook-ink-muted)]">
             {t('community.card.imageUnavailable')}
           </span>
           <button
@@ -694,7 +727,7 @@ function LookbookCardImageSurface({
         >
           <span
             aria-hidden="true"
-            className="lookbook-metrics rounded-full bg-white/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-colors"
+            className="lookbook-metrics rounded-full bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-colors"
           >
             {t('community.card.open')}
           </span>
@@ -726,7 +759,7 @@ function LookbookCardImageSurface({
         {item.status !== 'published' && (
           <span
             data-testid={`${scope}status-badge-${item.id}`}
-            className="lookbook-metrics rounded-md border border-[color:var(--theme-card-border)] bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase text-[color:var(--theme-card-text)]"
+            className="lookbook-metrics rounded-md border border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-2 py-0.5 text-[9px] font-medium uppercase text-[color:var(--theme-card-text)]"
           >
             {t(`community.status.${item.status}`)}
           </span>
@@ -739,7 +772,7 @@ function LookbookCardImageSurface({
         {item.sponsorship && (
           <span
             data-testid={`${scope}sponsored-badge-${item.id}`}
-            className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-white/95 px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
+            className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
           >
             <span aria-hidden="true">{t('community.card.sponsored')}</span>
             <span id={sponsoredDisclosureId(scope, item.id)} className="sr-only">
@@ -799,7 +832,7 @@ function LookbookCardContent({
         {item.caption && (
           <p
             data-testid={`${scope}caption-${item.id}`}
-            className="text-xs leading-relaxed text-neutral-600 line-clamp-3"
+            className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)] line-clamp-3"
           >
             {item.caption}
           </p>
@@ -824,7 +857,7 @@ function LookbookCardContent({
               onClick={() => {
                 onWithdraw(item.id)
               }}
-              style={{ color: MERLOT }}
+              style={{ color: MERLOT_INK }}
               className="min-h-[44px] font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
             >
               {t('community.card.withdraw')}
@@ -840,7 +873,7 @@ function LookbookCardContent({
               className={`min-h-[44px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
                 isReported
                   ? 'cursor-default text-[color:var(--theme-card-text)]'
-                  : 'text-neutral-600 hover:underline'
+                  : 'text-[color:var(--lookbook-ink-muted)] hover:underline'
               }`}
             >
               {isReported ? t('community.card.reported') : t('community.card.report')}
@@ -1121,7 +1154,7 @@ function LookbookDetailDialog({
         {item.caption && (
           <p
             data-testid="community-detail-caption"
-            className="text-xs leading-relaxed text-neutral-600"
+            className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)]"
           >
             {item.caption}
           </p>
@@ -1201,7 +1234,9 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
         >
           {t('community.feed.yourPostsTitle')}
         </h3>
-        <p className="text-xs text-neutral-600">{t('community.feed.yourPostsBody')}</p>
+        <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
+          {t('community.feed.yourPostsBody')}
+        </p>
       </div>
 
       <ul className="flex flex-col gap-3">
@@ -1215,7 +1250,9 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
             >
               <span
                 data-testid={`status-badge-${state.id}`}
-                style={isFlagged ? { color: MERLOT, borderColor: MERLOT } : undefined}
+                style={
+                  isFlagged ? { color: MERLOT_INK, borderColor: MERLOT_INK } : undefined
+                }
                 className={`lookbook-metrics inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${
                   isFlagged
                     ? ''
@@ -1227,8 +1264,8 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {REMOVED_STATUSES.has(state.status) && (
                 <p
                   data-testid={`author-state-explanation-${state.id}`}
-                  style={isFlagged ? { color: MERLOT } : undefined}
-                  className={`text-xs leading-relaxed ${isFlagged ? '' : 'text-neutral-600'}`}
+                  style={isFlagged ? { color: MERLOT_INK } : undefined}
+                  className={`text-xs leading-relaxed ${isFlagged ? '' : 'text-[color:var(--lookbook-ink-muted)]'}`}
                 >
                   {t(`community.removed.${state.status}`)}
                 </p>
@@ -1236,7 +1273,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {state.moderationReason && (
                 <p
                   data-testid={`author-state-reason-${state.id}`}
-                  className="text-xs text-neutral-600"
+                  className="text-xs text-[color:var(--lookbook-ink-muted)]"
                 >
                   {moderationReasonText(state.moderationReason, t)}
                 </p>
@@ -1244,7 +1281,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {state.caption && (
                 <p
                   data-testid={`author-state-caption-${state.id}`}
-                  className="text-xs leading-relaxed text-neutral-600 line-clamp-2"
+                  className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)] line-clamp-2"
                 >
                   {state.caption}
                 </p>
@@ -1286,6 +1323,9 @@ function CommunityReportModal({
       suspended={suspended}
       isOpen
       onClose={onClose}
+      // The panel follows the lookbook theme, so a premium palette under a dark system setting
+      // keeps its light panel and the controls inside it match.
+      surface="theme"
       title={t('community.report.title')}
       titleId="report-modal-title"
       description={t('community.report.description')}
@@ -1303,7 +1343,7 @@ function CommunityReportModal({
           <div
             role="alert"
             data-testid="report-error-message"
-            style={{ color: MERLOT, borderColor: MERLOT }}
+            style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
             className="rounded-md border p-3 text-xs"
           >
             {errorMessage}
@@ -1313,7 +1353,7 @@ function CommunityReportModal({
         <div className="space-y-2">
           <label
             htmlFor="report-reason-select"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.report.reasonLabel')}
           </label>
@@ -1324,7 +1364,7 @@ function CommunityReportModal({
             onChange={(event) => {
               setReason(event.target.value as CommunityReportReason)
             }}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-white px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {communityReportReasonSchema.options.map((option) => (
               <option key={option} value={option}>
@@ -1337,7 +1377,7 @@ function CommunityReportModal({
         <div className="space-y-2">
           <label
             htmlFor="report-details-input"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.report.detailsLabel')}
           </label>
@@ -1351,9 +1391,9 @@ function CommunityReportModal({
             maxLength={500}
             rows={3}
             placeholder={t('community.report.detailsPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <span className="text-[10px] text-neutral-500">
+          <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.report.detailsCount', { count: details.length })}
           </span>
         </div>
@@ -1363,7 +1403,7 @@ function CommunityReportModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-neutral-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {t('community.report.cancel')}
           </button>
@@ -1476,6 +1516,9 @@ function PostCreationModal({
       suspended={suspended}
       isOpen
       onClose={onClose}
+      // The panel follows the lookbook theme, so a premium palette under a dark system setting
+      // keeps its light panel and the controls inside it match.
+      surface="theme"
       title={t('community.compose.title')}
       titleId="create-post-modal-title"
       description={t('community.compose.description')}
@@ -1487,7 +1530,7 @@ function PostCreationModal({
           <div
             role="alert"
             data-testid="create-post-error"
-            style={{ color: MERLOT, borderColor: MERLOT }}
+            style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
             className="rounded-md border p-3 text-xs"
           >
             {errorMessage ?? (validationKey ? t(validationKey) : '')}
@@ -1497,7 +1540,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-image-file"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.compose.photoLabel')}
           </label>
@@ -1513,9 +1556,9 @@ function PostCreationModal({
                 onSelectPhoto(file)
               }
             }}
-            className="w-full text-xs text-neutral-600 file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[#C9A14A] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full text-xs text-[color:var(--lookbook-ink-muted)] file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[#C9A14A] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <p className="text-[10px] text-neutral-500">
+          <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.photoHint')}
           </p>
           {photoPreview && (
@@ -1530,7 +1573,7 @@ function PostCreationModal({
           {isPreparing && (
             <p
               data-testid="create-post-progress"
-              className="text-[10px] text-neutral-500"
+              className="text-[10px] text-[color:var(--lookbook-ink-muted)]"
             >
               {t('community.compose.uploading')}
             </p>
@@ -1540,7 +1583,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-alt-text"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.compose.altLabel')}
           </label>
@@ -1555,9 +1598,9 @@ function PostCreationModal({
             maxLength={200}
             rows={2}
             placeholder={t('community.compose.altPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <p className="text-[10px] text-neutral-500">
+          <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {altTextSuggestion
               ? t('community.compose.altSuggested')
               : t('community.compose.altHint')}
@@ -1575,7 +1618,7 @@ function PostCreationModal({
             />
             <label
               htmlFor="confirm-alt-text"
-              className="text-xs font-medium text-[color:var(--theme-primary)]"
+              className="text-xs font-medium text-[color:var(--theme-card-text)]"
             >
               {t('community.compose.altConfirm')}
             </label>
@@ -1585,7 +1628,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-caption-input"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.compose.captionLabel')}
           </label>
@@ -1600,9 +1643,9 @@ function PostCreationModal({
             maxLength={280}
             rows={3}
             placeholder={t('community.compose.captionPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <span className="text-[10px] text-neutral-500">
+          <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.captionCount', { count: caption.length })}
           </span>
         </div>
@@ -1611,7 +1654,7 @@ function PostCreationModal({
           <div className="space-y-2">
             <label
               htmlFor="post-challenge-select"
-              className="text-xs font-semibold text-[color:var(--theme-primary)]"
+              className="text-xs font-semibold text-[color:var(--theme-card-text)]"
             >
               {t('community.compose.challengeLabel')}
             </label>
@@ -1622,7 +1665,7 @@ function PostCreationModal({
               onChange={(event) => {
                 setSelectedChallengeId(event.target.value || null)
               }}
-              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-white px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
             >
               <option value="">{t('community.compose.challengeNone')}</option>
               <option value={activeChallenge.id}>{activeChallenge.title}</option>
@@ -1635,7 +1678,7 @@ function PostCreationModal({
             type="button"
             onClick={onClose}
             disabled={isPublishing}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-neutral-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {t('community.compose.cancel')}
           </button>
@@ -1664,18 +1707,26 @@ function PostCreationModal({
 // lifecycle.
 // ---------------------------------------------------------------------------
 
-interface CommunityHeaderProps {
+interface CommunityHeaderActionsProps {
   canShare: boolean
   onShare: () => void
+  settingsLink: React.ReactNode
   t: Translate
 }
 
-function CommunityHeader({ canShare, onShare, t }: CommunityHeaderProps) {
+/**
+ * Production feedback 2026-11-19: the "Community inspirations" label repeated the "Latest looks"
+ * heading, and the notifications link floated alone above it, so both actions share one row.
+ */
+function CommunityHeaderActions({
+  canShare,
+  onShare,
+  settingsLink,
+  t,
+}: CommunityHeaderActionsProps) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--theme-card-text)]">
-        {t('community.inspirations')}
-      </span>
+    <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
+      {settingsLink}
       {canShare && (
         <button
           type="button"
@@ -1698,13 +1749,18 @@ const NOTICE_CLASSES: Record<NoticeTone, string> = {
   error: '',
 }
 
-/** Story 1.2b: the guided add-location path, which returns here after the save. */
-export const COMMUNITY_ADD_LOCATION_HREF =
-  '/settings?addLocation=1&returnTo=%2F#locations'
+/**
+ * Story 1.2b: the guided add-location path, which returns to the page that showed the notice
+ * after the save: Home, or `/community` since that route renders the lookbook too.
+ */
+export function communityAddLocationHref(returnPath: string): string {
+  return `/settings?addLocation=1&returnTo=${encodeURIComponent(returnPath)}#locations`
+}
 
 interface CommunityNoticesProps {
   bandUnresolvedReason: CommunityBandUnresolvedReason | null
   canAddLocation: boolean
+  returnPath: string
   notice: Notice | null
   noticeText: string | null
   t: Translate
@@ -1720,6 +1776,7 @@ interface CommunityNoticesProps {
 function CommunityNotices({
   bandUnresolvedReason,
   canAddLocation,
+  returnPath,
   notice,
   noticeText,
   t,
@@ -1734,7 +1791,7 @@ function CommunityNotices({
           <p>{t(`community.band.unresolved.${bandUnresolvedReason}`)}</p>
           {bandUnresolvedReason === 'no_location' && canAddLocation && (
             <Link
-              href={COMMUNITY_ADD_LOCATION_HREF}
+              href={communityAddLocationHref(returnPath)}
               className="inline-flex min-h-[44px] items-center self-start font-semibold underline"
               data-testid="community-add-location"
             >
@@ -1748,7 +1805,9 @@ function CommunityNotices({
           data-testid="community-action-notice"
           data-tone={notice.tone}
           style={
-            notice.tone === 'error' ? { color: MERLOT, borderColor: MERLOT } : undefined
+            notice.tone === 'error'
+              ? { color: MERLOT_INK, borderColor: MERLOT_INK }
+              : undefined
           }
           className={`rounded-[8px] border p-3 text-xs ${NOTICE_CLASSES[notice.tone]}`}
         >
@@ -1762,6 +1821,11 @@ function CommunityNotices({
 interface CommunityFeedStatesProps {
   isLoading: boolean
   errorText: string | null
+  /**
+   * False for a signed-out reader. Retrying cannot sign anyone in, and the Sign in link
+   * already sits above the feed, so that reason reads as a note with no Try again button.
+   */
+  retryable: boolean
   itemCount: number
   gridColumns: string
   canShare: boolean
@@ -1773,6 +1837,7 @@ interface CommunityFeedStatesProps {
 function CommunityFeedStates({
   isLoading,
   errorText,
+  retryable,
   itemCount,
   gridColumns,
   canShare,
@@ -1782,11 +1847,20 @@ function CommunityFeedStates({
 }: CommunityFeedStatesProps) {
   return (
     <>
-      {errorText !== null && (
+      {errorText !== null && !retryable && (
+        <p
+          data-testid="community-feed-signed-out"
+          className="rounded-[8px] border border-[color:var(--theme-card-border)] bg-[var(--theme-card-bg)] p-4 text-xs text-[color:var(--theme-card-text)]"
+        >
+          {errorText}
+        </p>
+      )}
+
+      {errorText !== null && retryable && (
         <div
           role="alert"
           data-testid="community-feed-error"
-          style={{ color: MERLOT, borderColor: MERLOT }}
+          style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
           className="flex items-center justify-between gap-3 rounded-[8px] border p-4 text-xs"
         >
           <span>{errorText}</span>
@@ -1829,7 +1903,9 @@ function CommunityFeedStates({
           <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
             {t('community.feed.emptyTitle')}
           </p>
-          <p className="mt-1 text-xs text-neutral-600">{t('community.feed.emptyBody')}</p>
+          <p className="mt-1 text-xs text-[color:var(--lookbook-ink-muted)]">
+            {t('community.feed.emptyBody')}
+          </p>
           {canShare && (
             <button
               type="button"
@@ -1937,28 +2013,11 @@ export interface CommunityLookbookGridProps {
   chipCategory?: ChipCategory
   highlightedCardId?: string
   showFilterNav?: boolean
-  /**
-   * Reports the band the server resolved for the viewer.
-   *
-   * `lookbook-prism-layout.tsx` renders a SECOND `LookbookFilterNav` outside
-   * this component, and only this component ever sees the feed response. Without
-   * this the two navs on the same page answer "which climate am I seeing"
-   * differently -- one naming the band, the other saying "Your climate" -- which
-   * is a contradiction the reader has to resolve rather than a cosmetic gap.
-   */
-  onViewerBandChange?: (band: ClimateBand | null) => void
-  /**
-   * Reports the mode the server actually SERVED, which is not always the one
-   * that was requested: the beta experiment resolves a `auto` request to the
-   * viewer's arm, so half the cohort asks for `auto` and is served `all`.
-   *
-   * Exists for the same reason as {@link onViewerBandChange}. Only this
-   * component sees the feed response, and `lookbook-prism-layout.tsx` renders a
-   * second `LookbookFilterNav` outside it, so without this that nav shows the
-   * `auto` chip pressed over a feed carrying every region.
-   */
-  onServedModeChange?: (mode: CommunityFeedMode) => void
-  /** Story 6.11: the same lift for the ban, so the page's other filter nav closes with the feed. */
+  /** Passed to {@link LookbookFilterNav}'s `stickyTop`. */
+  filterNavStickyTop?: number
+  /** The route hosting this grid, where the add-location flow returns after the save. */
+  returnPath?: string
+  /** Story 6.11: lifts the ban, so Home's spotlight teaser closes with the feed. */
   onBannedChange?: (banned: boolean) => void
   /**
    * Story 6.7: a Home teaser activation. A new token asks this section to focus
@@ -2013,46 +2072,72 @@ function SpotlightFocusNotice({
   )
 }
 
+/**
+ * True for a stored session the API has not refused. `refusedScope` names the session scope the
+ * API answered 401 for; a later loading state or a 503 does not lift it, while a successful read
+ * or a different session does.
+ */
+function isMemberSession(
+  hasSession: boolean,
+  refusedScope: string | null | undefined,
+  sessionScope: string | null
+): boolean {
+  return hasSession && (refusedScope === undefined || refusedScope !== sessionScope)
+}
+
 /** A ban hides the feed, its author states and every action, like lost access does. */
 const feedVisible = (available: boolean, banned: unknown) => available && !banned
 
-/**
- * What the grid offers for where the session stands. A stored session still under verification
- * (or one whose check failed) offers neither the member's actions nor the guest's sign-in link:
- * the reader may well be signed in, and is not known to be yet (2026-11-19 follow-up).
- */
-function sessionAffordances(status: MemberSession['status']) {
-  const hasSession = status === 'signed_in'
-  const settled = hasSession || status === 'signed_out'
-  return {
-    hasSession,
-    settingsHref: settled ? (hasSession ? '/notification-settings' : '/signin') : null,
-    settingsLabel: hasSession
-      ? 'community.notifications.title'
-      : 'community.notifications.signin',
-  }
+/** A stored session still being verified, or whose verification failed. */
+function isSessionPending(status: string): boolean {
+  return status === 'checking' || status === 'unavailable'
 }
 
 function communityPresentation(
   available: boolean,
-  sessionStatus: MemberSession['status'],
+  hasSession: boolean,
+  /**
+   * A stored session still under verification (or one whose check failed) offers neither the
+   * member's link nor the guest's sign-in link: the reader may well be signed in, and is not
+   * known to be yet (2026-11-19 follow-up).
+   */
+  sessionPending: boolean,
   items: CommunityFeedItem[],
   authorStates: CommunityAuthorPostState[],
   nextCursor: string | null,
   newLooks: CommunityFeedItem[],
   openedItem: CommunityFeedItem | null
 ) {
-  const affordances = sessionAffordances(sessionStatus)
   return {
     items: available ? items : [],
     authorStates: available ? authorStates : [],
     nextCursor: available ? nextCursor : null,
     showNewLooks: available && newLooks.length > 0,
     detail: openedItem,
-    canAct: available && affordances.hasSession,
-    settingsHref: affordances.settingsHref,
-    settingsLabel: affordances.settingsLabel,
+    canAct: available && hasSession,
+    settingsSignIn: !hasSession,
+    settingsHref: sessionPending
+      ? null
+      : hasSession
+        ? '/notification-settings'
+        : '/signin',
+    settingsLabel: hasSession
+      ? 'community.notifications.title'
+      : 'community.notifications.signin',
   }
+}
+
+/** Without the filter nav (a ban closes it) the feed actions keep a row of their own. */
+function StandaloneHeaderActions({
+  filterNavShown,
+  banned,
+  children,
+}: {
+  filterNavShown: boolean
+  banned: boolean
+  children: React.ReactNode
+}) {
+  return filterNavShown && !banned ? null : children
 }
 
 /** Story 6.11: the notifications link holds the section off the divider, and a ban removes it. */
@@ -2064,22 +2149,57 @@ function CommunitySettingsLink({
   banned,
   href,
   label,
+  signIn,
+  guestOnly,
 }: {
   banned: boolean
   /** Null while the session is still being verified: neither the member's link nor the guest's. */
   href: string | null
   label: string
+  /** The link asks the reader to sign in: no session, or one the API refused. */
+  signIn: boolean
+  /** Hidden by globals.css once the page knows a member is signed in. */
+  guestOnly: boolean
 }) {
   if (banned || href === null) return null
+  if (signIn) {
+    return (
+      <Link
+        href={href}
+        // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a
+        // stored session not verified yet, never sees it (globals.css, lib/landing-session.ts).
+        // A refused stored session keeps the link while the landing reads it as a member, and
+        // hides it with the guest link while the landing is still pending (globals.css).
+        data-landing={guestOnly ? 'guest-inline' : 'refused-inline'}
+        className="flex min-h-[44px] items-center px-2 text-sm font-medium text-[color:var(--theme-card-text)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+      >
+        {label}
+      </Link>
+    )
+  }
+  // A member's link is a bell in the heading row; its name stays the full label for assistive
+  // technology, and the tooltip shows it to a pointer.
   return (
     <Link
       href={href}
-      // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a stored
-      // session not verified yet, never sees it (globals.css, lib/landing-session.ts).
-      data-landing={href === '/signin' ? 'guest-inline' : undefined}
-      className="min-h-12 self-start py-3 underline"
+      aria-label={label}
+      title={label}
+      className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--theme-card-border)] text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors hover:border-[color:var(--theme-secondary)]"
     >
-      {label}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      </svg>
     </Link>
   )
 }
@@ -2091,8 +2211,8 @@ export function CommunityLookbookGrid({
   chipCategory = 'Personal',
   highlightedCardId,
   showFilterNav = false,
-  onViewerBandChange,
-  onServedModeChange,
+  filterNavStickyTop,
+  returnPath = '/',
   onBannedChange,
   spotlightFocusIntent,
 }: CommunityLookbookGridProps) {
@@ -2350,13 +2470,18 @@ export function CommunityLookbookGrid({
   const [notice, setNotice] = useState<Notice | null>(null)
   const [failedImages, setFailedImages] = useState<FailedImages>(NO_FAILED_IMAGES)
   // Follows the verified session: `checking` while a stored session is verified, never signed out.
-  const memberSession = useMemberSession()
-  const hasSession = memberSession.status === 'signed_in'
+  const sessionState = useMemberSession()
+  const hasSession = sessionState.status === 'signed_in'
   /** The realtime sync was denied and stopped; Retry restarts it (`realtimeEpoch`). */
   const realtimeDeniedRef = useRef(false)
   const [realtimeEpoch, setRealtimeEpoch] = useState(0)
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
+  // A stored session the API answered 401 is signed out for this surface: it gets the Sign in
+  // link and none of the member actions (New post, challenge entry, the composer, share, report),
+  // whatever storage still holds. `undefined` means no refusal.
+  const [refusedScope, setRefusedScope] = useState<string | null | undefined>(undefined)
+  const memberSession = isMemberSession(hasSession, refusedScope, sessionScope)
 
   // Story 6.6: the City Spotlight heads this section. Its pages run through the
   // same reaction state as the feed, and its one View more announcement goes
@@ -2468,17 +2593,6 @@ export function CommunityLookbookGrid({
    */
   const displayedMode: CommunityFeedMode = servedMode ?? currentMode
 
-  // Reported from an effect rather than from inside `loadFeed`, so the caller's
-  // callback stays out of that callback's dependency list: a caller that passes
-  // an inline arrow would otherwise re-fire the whole feed read on every render.
-  useEffect(() => {
-    onViewerBandChange?.(viewerBand)
-  }, [onViewerBandChange, viewerBand])
-
-  useEffect(() => {
-    onServedModeChange?.(displayedMode)
-  }, [onServedModeChange, displayedMode])
-
   /**
    * One read of the feed.
    *
@@ -2528,6 +2642,40 @@ export function CommunityLookbookGrid({
     [applyLiveSponsorship, comments, liveSponsorships, reactionState]
   )
 
+  /**
+   * The API answered 401 for the stored session. Records the refusal against that session and
+   * retires every member action already in flight: the pending action (a photo allocation, a
+   * publish or a report) is aborted so its late answer cannot refill the next draft, and the
+   * composer and the report dialog close.
+   */
+  const refuseSession = useCallback(() => {
+    setRefusedScope(sessionScopeRef.current ?? null)
+    actionControllerRef.current?.abort()
+    setIsCreateModalOpen(false)
+    setComposeError(null)
+    setAllocated(null)
+    setIsPreparingPhoto(false)
+    setIsPublishing(false)
+    setPhotoPreview((current) => {
+      if (current) URL.revokeObjectURL(current)
+      return null
+    })
+    setReportingPostId(null)
+    setReportError(null)
+    setIsSubmittingReport(false)
+  }, [])
+
+  /** A failed feed read's note and announcement; a 401 also refuses the session. */
+  const reportFeedFailure = useCallback(
+    (error: unknown) => {
+      const message = messageForError(error, 'community.error.load', languageRef.current)
+      if (communityFailureReason(error) === 'signed_out') refuseSession()
+      setFeedError(message)
+      setAnnouncement(message)
+    },
+    [refuseSession, setAnnouncement]
+  )
+
   const loadFeed = useCallback(
     async (mode: CommunityFeedMode, cursor?: string) => {
       const readTicket = reactionState.beginRead()
@@ -2565,6 +2713,7 @@ export function CommunityLookbookGrid({
         setActiveChallenge(feed.activeChallenge)
         setNextCursor(feed.nextCursor)
         setFeedError(null)
+        setRefusedScope(undefined)
         setBannedSanction(null)
         // A refetch that hands back a freshly signed URL clears the failure: not
         // clearing it is what left a recovered card reading "Image unavailable"
@@ -2629,13 +2778,7 @@ export function CommunityLookbookGrid({
           closeForBan(sanction)
           return
         }
-        const message = messageForError(
-          error,
-          'community.error.load',
-          languageRef.current
-        )
-        setFeedError(message)
-        setAnnouncement(message)
+        reportFeedFailure(error)
       } finally {
         if (!controller.signal.aborted && generation === feedGenerationRef.current) {
           setIsLoading(false)
@@ -2649,8 +2792,8 @@ export function CommunityLookbookGrid({
       closeForBan,
       liveSponsorships,
       reactionState,
+      reportFeedFailure,
       revalidateHighlighted,
-      setAnnouncement,
     ]
   )
 
@@ -2794,6 +2937,10 @@ export function CommunityLookbookGrid({
       if (!active) return
       if (signal?.aborted) throw new CommunityRequestSuperseded()
       if (generation !== feedGenerationRef.current) throw new CommunityRequestSuperseded()
+      // A current, authenticated rebuild answers for this session like a successful filter read:
+      // an earlier 401 note and its refusal go, so the member's actions come back.
+      setFeedError(null)
+      setRefusedScope(undefined)
       // Rows already shown stay where they are, but their blocks follow this read.
       applyLiveSponsorship(page.items, stamp)
       const live = <T extends CommunityFeedItem>(post: T): T =>
@@ -2960,6 +3107,12 @@ export function CommunityLookbookGrid({
                   closeForBan(sanction)
                   return
                 }
+                // A refused session gets the same answer a feed read gives it: the signed-out
+                // note, the Sign in link, and its member actions retired.
+                if (communityFailureReason(error) === 'signed_out') {
+                  reportFeedFailure(error)
+                  return
+                }
                 // The denial can abort the feed read still in flight, whose own catch then
                 // returns silently. The probe answers the same refusal, so the member ends on
                 // the same copy whichever answer lands first.
@@ -3002,6 +3155,7 @@ export function CommunityLookbookGrid({
   }, [
     applyLiveSponsorship,
     closeForBan,
+    reportFeedFailure,
     liveSponsorships,
     comments,
     currentMode,
@@ -3475,15 +3629,14 @@ export function CommunityLookbookGrid({
   }
 
   const openCreateModal = () => {
-    // Only a verified member may compose: never while the session is still being checked.
-    if (!communityAvailable || !hasSession) return
+    if (!communityAvailable || !memberSession) return
     setComposeError(null)
     setNotice(null)
     setIsCreateModalOpen(true)
   }
 
   const handleSelectPhoto = async (file: File): Promise<void> => {
-    if (!communityAvailable || !hasSession) return
+    if (!communityAvailable || !memberSession) return
     const preview = URL.createObjectURL(file)
     setPhotoPreview((current) => {
       if (current) URL.revokeObjectURL(current)
@@ -3636,7 +3789,8 @@ export function CommunityLookbookGrid({
 
   const presentation = communityPresentation(
     feedVisible(communityAvailable, bannedSanction),
-    memberSession.status,
+    memberSession,
+    isSessionPending(sessionState.status),
     displayedItems,
     authorStates,
     nextCursor,
@@ -3654,6 +3808,25 @@ export function CommunityLookbookGrid({
     presentation.detail,
     spotlight.state.items,
     presentation.canAct
+  )
+
+  const headerActions = (
+    <CommunityHeaderActions
+      canShare={presentation.canAct}
+      onShare={openCreateModal}
+      settingsLink={
+        <CommunitySettingsLink
+          banned={banned}
+          href={presentation.settingsHref}
+          label={t(presentation.settingsLabel)}
+          signIn={presentation.settingsSignIn}
+          // A refused stored session still reads as a member to the landing script, so its
+          // Sign in link must not carry the guest-only marker, or nothing offers sign-in.
+          guestOnly={!hasSession}
+        />
+      }
+      t={t}
+    />
   )
 
   return (
@@ -3712,19 +3885,19 @@ export function CommunityLookbookGrid({
             onTabChange={handleModeChange}
             viewerBand={viewerBand}
             closed={banned}
+            stickyTop={filterNavStickyTop}
+            actions={headerActions}
           />
         )}
 
-        <CommunitySettingsLink
-          banned={banned}
-          href={presentation.settingsHref}
-          label={t(presentation.settingsLabel)}
-        />
-        <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
+        <StandaloneHeaderActions filterNavShown={showFilterNav} banned={banned}>
+          {headerActions}
+        </StandaloneHeaderActions>
 
         <CommunityNotices
           bandUnresolvedReason={bandNoticeReason}
           canAddLocation={hasSession}
+          returnPath={returnPath}
           notice={notice}
           noticeText={renderMessage(notice?.message ?? null, t, viewerBand)}
           t={t}
@@ -3750,6 +3923,7 @@ export function CommunityLookbookGrid({
           <CommunityFeedStates
             isLoading={isLoading}
             errorText={renderMessage(feedError, t, viewerBand)}
+            retryable={feedError?.key !== FAILURE_KEYS.signed_out}
             itemCount={displayedItems.length}
             gridColumns={gridColumns}
             canShare={presentation.canAct}

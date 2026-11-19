@@ -26,6 +26,10 @@ export const MODERATION_SLA_LOG_EVENTS = {
   detectionFailed: 'moderation_sla_detection_failed',
   claimFailed: 'moderation_sla_claim_failed',
   signalsFailed: 'moderation_sla_signals_failed',
+  pushReceiptFailed: 'moderation_sla_push_receipt_failed',
+  pushReceiptUnknown: 'moderation_sla_push_receipt_unknown',
+  pushReceiptReadFailed: 'moderation_sla_push_receipt_read_failed',
+  pushTicketRecordFailed: 'moderation_sla_push_ticket_record_failed',
 } as const
 
 export const MODERATION_SLA_ANALYTICS_EVENTS = {

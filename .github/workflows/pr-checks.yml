@@ -871,9 +871,23 @@ jobs:
         run: |
           node scripts/verify-community-screening-model.mjs
           npm run build --workspace api
-      - name: Mandatory seven-locale release corpus evaluation
+      # A release evaluation needs an eligible holdout. While the ledger registers none (every
+      # selected holdout was retired after tuning, 2026-11-19), the PR runs the evaluator in
+      # development mode: the run-product variable is cleared for this step, every gate that needs
+      # no eligible holdout still runs, and the retired figures are reported as held counts. The
+      # strict release command stays `npm run community:screening:text`.
+      - name: Mandatory seven-locale corpus evaluation
         working-directory: apps/api
-        run: npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+        run: |
+          mkdir -p .cache/community-screening
+          eligible=$(node -e "const l=require('./test/fixtures/community-text-corpus/holdout-retirements.json');console.log(Object.keys(l.eligible??{}).length)")
+          if [ "$eligible" = "0" ]; then
+            echo "development" > .cache/community-screening/corpus-ci-mode
+            COMMUNITY_SCREENING_RUN_PRODUCT_DIR= COMMUNITY_SCREENING_DEVELOPMENT_DIR=.cache/community-screening npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+          else
+            echo "release" > .cache/community-screening/corpus-ci-mode
+            npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+          fi
       # Pure data checks over the development corpora, run without coverage
       # instrumentation and one file at a time. Measured 2026-10-27 with coverage in
       # the shared quality-gate run on this runner size, the slowest cases took 9.5 s
@@ -900,14 +914,68 @@ jobs:
           node --input-type=module <<'JS'
           import fs from 'node:fs'
           const problems = []
-          for (const [file, minimum, exact] of [['corpus-ci-tests.json',52],['mixed-ci-tests.json',1],['development-ci-tests.json',224,224]]) {
-            const name = `apps/api/.cache/community-screening/${file}`
+          const dir = 'apps/api/.cache/community-screening'
+          for (const [file, minimum, exact] of [['mixed-ci-tests.json',1],['development-ci-tests.json',224,224]]) {
+            const name = `${dir}/${file}`
             if (!fs.existsSync(name)) { problems.push(`${file}: no report`); continue }
             const report = JSON.parse(fs.readFileSync(name,'utf8'))
             if (report.numTotalTests < minimum || (exact !== undefined && report.numTotalTests !== exact) ||
                 report.numPassedTests !== report.numTotalTests || report.numPendingTests !== 0 ||
                 report.numFailedTests !== 0 || report.numTodoTests !== 0)
               problems.push(`${file}: ${report.numPassedTests}/${report.numTotalTests} passed`)
+          }
+          // The corpus evaluator skips by mode, so its report is checked case by case, by the full
+          // locale-qualified name: the seven per-locale Wilson gates run only in a release
+          // evaluation and the two development cases only while no holdout is eligible. Each of
+          // those nine must appear exactly once with the status its mode requires, and every other
+          // case must pass, at least 63 in all. A development run must also leave its seven held
+          // counts, each within 0 and its denominator, in text-corpus-development.json and write no
+          // release product.
+          const corpus = `${dir}/corpus-ci-tests.json`
+          const modeFile = `${dir}/corpus-ci-mode`
+          if (!fs.existsSync(corpus) || !fs.existsSync(modeFile)) problems.push('corpus-ci-tests.json: no report or mode')
+          else {
+            const mode = fs.readFileSync(modeFile,'utf8').trim()
+            const locales = ['de','en','es','fr','it','pt','tr']
+            const wilson = locales.map((l) => `text corpus: ${l} keeps the Wilson 95% upper bound on withheld holdout copy at or below 1%`)
+            const development = ['refuses a release run on the same selector','reports the held count and denominator of each retired holdout as development data']
+              .map((t) => `development run while no holdout is eligible ${t}`)
+            // The selector and manifest checks guard the development path itself, so each must run
+            // in either mode.
+            const classification = [
+              'classifies a selection whose every pair is retired for its locale as retired',
+              'hands a selection with no retired pair to the strict loader',
+              'refuses a retired pair beside an unclassified one',
+              'refuses a retired pair beside an eligible fresh cohort',
+              'refuses a version retired only for another locale',
+              'refuses a mixed selection before reading any freeze manifest',
+              'refuses a retired manifest with another version',
+              'refuses a retired manifest with no seal time',
+              'refuses a retired manifest with no aggregate hash',
+            ].map((t) => `development selection classification ${t}`)
+            const cases = JSON.parse(fs.readFileSync(corpus,'utf8')).testResults.flatMap((result) => result.assertionResults)
+            const status = new Map()
+            for (const c of cases) status.set(c.fullName, [...(status.get(c.fullName) ?? []), c.status])
+            const expected = { development: [wilson, development], release: [development, wilson] }[mode]
+            if (!expected) problems.push(`corpus-ci-mode: unknown mode ${mode}`)
+            else {
+              const [skippedNames, modePassedNames] = expected
+              const passedNames = [...modePassedNames, ...classification]
+              for (const name of skippedNames) if (String(status.get(name)) !== 'skipped') problems.push(`${name}: ${status.get(name) ?? 'missing'} (want skipped once)`)
+              for (const name of passedNames) if (String(status.get(name)) !== 'passed') problems.push(`${name}: ${status.get(name) ?? 'missing'} (want passed once)`)
+              const others = cases.filter((c) => !skippedNames.includes(c.fullName) && !passedNames.includes(c.fullName))
+              const notPassed = others.filter((c) => c.status !== 'passed')
+              if (cases.length < 63 || notPassed.length > 0)
+                problems.push(`corpus-ci-tests.json (${mode}): ${cases.length} cases; not passed: ${notPassed.map((c) => `${c.fullName}=${c.status}`).join(', ')}`)
+              if (mode === 'development') {
+                const artifact = `${dir}/text-corpus-development.json`
+                const figures = fs.existsSync(artifact) ? JSON.parse(fs.readFileSync(artifact,'utf8')).languages ?? {} : {}
+                const complete = locales.every((l) => Number.isInteger(figures[l]?.held) && Number.isInteger(figures[l]?.total) &&
+                  figures[l].total > 0 && figures[l].held >= 0 && figures[l].held <= figures[l].total)
+                if (!complete) problems.push('text-corpus-development.json: missing or incomplete held counts')
+                if (fs.existsSync(`${dir}/text-corpus-evaluation.json`)) problems.push('text-corpus-evaluation.json: a development run wrote a release product')
+              }
+            }
           }
           if (problems.length) throw new Error(`Incomplete mandatory screening execution: ${problems.join('; ')}`)
           JS

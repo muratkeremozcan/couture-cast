@@ -10,7 +10,7 @@ import { config as loadEnv } from 'dotenv'
 import channelModule from '../apps/api/src/modules/moderation/moderation-sla.channel.ts'
 import contractModule from '../packages/api-client/src/contracts/http/moderation-sla.ts'
 
-const { createModerationOpsChannel } = channelModule
+const { createModerationOpsChannel, parseModerationOpsPushUserIds } = channelModule
 const { moderationSlaDrillPayloadSchema } = contractModule
 
 function drillPayload() {
@@ -64,18 +64,50 @@ async function main() {
     return ok ? 0 : 1
   }
 
+  // The push channel reads moderator device tokens, so it needs the database; the webhook does not.
+  const pushUserIds = parseModerationOpsPushUserIds(
+    process.env.MODERATION_OPS_PUSH_USER_IDS
+  )
+  let prisma = null
+  if (!process.env.MODERATION_OPS_WEBHOOK_URL?.trim() && pushUserIds.length > 0) {
+    // The verified operator client: node-postgres against the committed Supabase root CA, host
+    // name checked, the same trust the worker image uses. A bare PrismaClient would not verify it.
+    // Named export: `npm run moderation:sla:drill` runs tsx from the repository root, where this
+    // dynamic import resolves as ESM with no default export.
+    const { createOperatorPrismaClient } = await import(
+      '../apps/api/src/prisma/operator-prisma-client.ts'
+    )
+    prisma = createOperatorPrismaClient(process.env.DATABASE_URL ?? '')
+  }
   const channel = createModerationOpsChannel({
     url: process.env.MODERATION_OPS_WEBHOOK_URL,
+    push: prisma
+      ? {
+          userIds: pushUserIds,
+          accessToken: process.env.EXPO_PUSH_ACCESS_TOKEN,
+          tokens: async (userIds) =>
+            (
+              await prisma.pushToken.findMany({
+                where: { user_id: { in: [...userIds] }, permission: 'granted' },
+                select: { token: true },
+              })
+            ).map((row) => row.token),
+        }
+      : undefined,
   })
-  if (channel.kind === 'console') {
-    console.error(
-      'moderation_sla_drill result=unconfigured: MODERATION_OPS_WEBHOOK_URL is not set'
-    )
-    return 2
+  try {
+    if (channel.kind === 'console') {
+      console.error(
+        'moderation_sla_drill result=unconfigured: neither MODERATION_OPS_WEBHOOK_URL nor MODERATION_OPS_PUSH_USER_IDS is set'
+      )
+      return 2
+    }
+    const result = await channel.deliver(drillPayload())
+    console.log(`moderation_sla_drill target=${channel.kind} result=${result}`)
+    return result === 'delivered' ? 0 : 1
+  } finally {
+    await prisma?.$disconnect()
   }
-  const result = await channel.deliver(drillPayload())
-  console.log(`moderation_sla_drill target=webhook result=${result}`)
-  return result === 'delivered' ? 0 : 1
 }
 
 process.exitCode = await main()

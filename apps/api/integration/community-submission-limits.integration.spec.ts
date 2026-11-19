@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 //
 // Story 6.1: the two community write paths whose correctness is a CONCURRENCY
@@ -421,6 +423,11 @@ describe('6.1 community submission and report limits', () => {
       expect(report.subject_alias).toBe('Style Explorer ABCD1234')
       expect(report.sla_due_at.getTime()).toBeGreaterThanOrEqual(
         before + REPORT_SLA_HOURS * 60 * 60 * 1000 - 5_000
+      )
+      // A member report keeps the 24-hour SLA; only screening holds moved to 30 minutes
+      // (2026-11-19). The upper bound stops a member report inheriting a longer clock.
+      expect(report.sla_due_at.getTime()).toBeLessThanOrEqual(
+        Date.now() + REPORT_SLA_HOURS * 60 * 60 * 1000
       )
       expect(report.resolved_at).toBeNull()
 
