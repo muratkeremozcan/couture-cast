@@ -308,10 +308,10 @@ async function measure(
   throw new Error('painted-contrast: the element kept re-rendering during measurement')
 }
 
-const textStates = (page: Page) => ({
-  bare: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_OFF}`),
-  inked: () => setInkStyle(page, DESCENDANT_TEXT_OFF),
-  mask: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_MASK}`),
+const textStates = (page: Page, extra = '') => ({
+  bare: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_OFF}\n${extra}`),
+  inked: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${extra}`),
+  mask: () => setInkStyle(page, `${DESCENDANT_TEXT_OFF}\n${OWN_TEXT_MASK}\n${extra}`),
 })
 
 /** The painted contrast of an element's own text (or a field's value, or a closed select's choice). */
@@ -358,63 +358,33 @@ export function focusRing(
   )
 }
 
+const UNCLIP = 'data-tea-unclip'
+// The clipping a label can hide behind: its own and its ancestors' clip-path, clip, mask and
+// overflow, switched off together with their descendants'.
+const UNCLIP_CSS = `[${UNCLIP}], [${UNCLIP}] * { clip-path: none !important; clip: auto !important; mask: none !important; overflow: visible !important; }`
+
 /**
- * How much of `target`'s text paints, against a clone of it with the same font, black on white,
- * outside every clipping ancestor: 1 means all of it, a partly clipped label reads far lower.
+ * How much of `target`'s text paints, against the same element with its clipping (its own and its
+ * ancestors' clip-path, clip, mask and overflow) switched off: 1 means all of it, a partly clipped
+ * label reads far lower. Both counts come from the same node at the same position, font, color and
+ * rasterization, so the ratio does not move with the machine's fonts or antialiasing. The reference
+ * reads inside the element's own box, so text spilling out of a clipped box is not counted.
  */
 export async function inkCoverage(target: Locator): Promise<number> {
   const page = target.page()
   const actual = await inkOfText(target)
-  const reference = await target.evaluate((el) => {
-    const style = getComputedStyle(el)
-    const clone = el.cloneNode(true) as HTMLElement
-    clone.removeAttribute('data-testid')
-    // Each property that can clip, fade or move the text is reset; nothing that sets the glyph
-    // fill inline, so the measurement's own fill rule still applies to the clone.
-    for (const [property, value] of [
-      ['clip-path', 'none'],
-      ['clip', 'auto'],
-      ['mask', 'none'],
-      ['opacity', '1'],
-      ['filter', 'none'],
-      ['transform', 'none'],
-      ['overflow', 'visible'],
-      ['visibility', 'visible'],
-      ['position', 'static'],
-      ['margin', '0'],
-      ['padding', '0'],
-      ['border', '0'],
-      ['background', 'none'],
-      ['width', 'auto'],
-      ['height', 'auto'],
-      ['font', style.font],
-      ['letter-spacing', style.letterSpacing],
-      ['word-spacing', style.wordSpacing],
-      ['text-transform', style.textTransform],
-      ['white-space', 'pre'],
-      ['color', '#000'],
-      ['display', 'inline-block'],
-    ] as const)
-      clone.style.setProperty(property, value, 'important')
-    const holder = document.createElement('div')
-    holder.dataset.testid = 'tea-ink-reference'
-    holder.setAttribute(
-      'style',
-      'all: initial; position: fixed; left: 8px; top: 8px; z-index: 2147483647; background: #fff; padding: 4px;'
-    )
-    holder.append(clone)
-    document.body.append(holder)
-    return true
-  })
+  await target.evaluate((el, attr) => {
+    for (let node: Element | null = el; node; node = node.parentElement)
+      node.setAttribute(attr, '')
+  }, UNCLIP)
   try {
-    const clone = page.getByTestId('tea-ink-reference').locator(':scope > *')
-    const ref = reference ? await inkOfText(clone) : null
-    if (!actual || !ref || ref.painted === 0) return 0
-    return actual.painted / ref.painted
+    const reference = await measure(target, textStates(page, UNCLIP_CSS))
+    if (!actual || !reference || reference.painted === 0) return 0
+    return actual.painted / reference.painted
   } finally {
-    await page.evaluate(() =>
-      document.querySelector('[data-testid="tea-ink-reference"]')?.remove()
-    )
+    await page.evaluate((attr) => {
+      document.querySelectorAll(`[${attr}]`).forEach((el) => el.removeAttribute(attr))
+    }, UNCLIP)
   }
 }
 
