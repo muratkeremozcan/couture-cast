@@ -1,3 +1,4 @@
+# Step 58 step 4 owner: searchable owner anchor
 appId: ${MAESTRO_APP_ID}
 ---
 # Taps the outfit card opener until the share card sheet shows its title. Maestro reports a tap

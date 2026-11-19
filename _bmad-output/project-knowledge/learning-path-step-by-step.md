@@ -11853,8 +11853,13 @@ Hard-won lessons from the implementation and code review of this story:
   task's own `FAILED` line alone no longer counts as failing tests.
 - The tap retry first shipped with structural YAML tests only, which a retry that never retries
   passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
-  with the subset of Maestro 2.8.0's rules the subflow uses. The model proves the retry logic,
-  not device touch delivery.
+  with the subset of Maestro 2.8.0's rules and timing the subflow uses. The review found the first
+  model invented its timing: under the pinned Maestro the guard reads the screen at most once
+  plus a 500 ms search after the 8 s title wait gives up, so a title that draws later than that
+  still gets a second press. No subflow change removes that, since a title can draw arbitrarily
+  late; the tests run both sides of the boundary, and each run now records how many opener
+  presses a flow made, so a rise in cancelled presses shows in the evidence. The model proves
+  scripted control flow, not device touch delivery or real hierarchy timing.
 - A first change to the accessibility device script broke two Playwright helper specs that read
   the script and its workflow, and the review round found them. Run every spec that reads a
   changed file before committing.
@@ -11889,7 +11894,8 @@ Sequence to follow:
 3. `scripts/ci/share-card-android-release-font.sh`.
 4. `maestro/story68/tap-outfit-open.yaml`, `maestro/story68/settings.yaml` and
    `scripts/lib/story68-flow-timeouts.mjs`.
-5. `scripts/lib/native-build-failure.mjs` and `scripts/lib/maestro-flow-model.mjs`.
+5. `scripts/lib/native-build-failure.mjs`, `scripts/lib/maestro-flow-model.mjs` and
+   `scripts/ci/native-ios-maestro-trace.mjs`.
 6. `scripts/ci/native-api-requests.mjs`, `.github/workflows/ios-native-jobs.yml` and
    `scripts/ci/native-ios-public-diagnostics.mjs`.
 7. `apps/mobile/src/features/community/community-screen.tsx` (the load-error reset).
@@ -11925,16 +11931,22 @@ CI scripts, node:test:
   proves swap sized against the disk guard, the emulator check after the build, and that kernel
   OOM lines reach the log.
 - [`scripts/lib/story68-outfit-open-tap.test.mjs`](../../scripts/lib/story68-outfit-open-tap.test.mjs):
-  runs the real `tap-outfit-open.yaml` against a scripted opener: a cancelled first press opens on
-  the second and a broken opener fails by name inside the budget; it also checks the opener
-  budgets in `scripts/lib/story68-flow-timeouts.mjs` against the subflows.
+  runs the real `tap-outfit-open.yaml` against a scripted opener under fast and slow timing: a
+  cancelled first press opens on the second, a title drawn at the guard boundary gets one press
+  and one drawn 1 ms later gets two, and a broken opener fails by name inside the budget. It also
+  checks each opener flow calls the subflow once and never taps bare, the opener budgets in
+  `scripts/lib/story68-flow-timeouts.mjs` against the subflows, and the press count in the run
+  evidence.
 - [`scripts/lib/maestro-flow-model.test.mjs`](../../scripts/lib/maestro-flow-model.test.mjs):
-  proves the model's implemented subset of Maestro 2.8.0's retry, condition and `optional` rules
-  against its own virtual clock, and that it throws on any command it does not know. It does not
-  prove the model matches Maestro; the pinned Maestro source it cites is that evidence.
+  proves the model's implemented subset of Maestro 2.8.0's retry, condition, lookup-window, tap
+  and `optional` rules against its own virtual clock, that it throws on any command it does not
+  know, and that its version equals the repository's pinned Maestro version. Its fidelity rests on
+  the pinned Maestro source it cites, read by hand; no test runs real Maestro against it.
+- [`scripts/ci/native-ios-maestro-trace.test.mjs`](../../scripts/ci/native-ios-maestro-trace.test.mjs):
+  proves the opener press count read from the Maestro log, a press cut off by the deadline
+  included.
 - [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
-  proves every opener flow positions the opener, scrolls with the guard and taps through the
-  subflow, never bare.
+  proves every opener flow positions the opener for its platform and scrolls with the guard.
 - [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
   proves the iOS Settings proof reads the return link and the Android title check stays.
 - [`scripts/lib/native-build-failure.test.mjs`](../../scripts/lib/native-build-failure.test.mjs):

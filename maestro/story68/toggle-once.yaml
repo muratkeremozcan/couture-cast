@@ -8,8 +8,10 @@ appId: ${MAESTRO_APP_ID}
 # (it-IT): Maestro reported the tap COMPLETED, the app logged no prepare for it and the old
 # digest stayed on screen for the whole 20 s wait, so the press never registered. Maestro's iOS
 # hierarchy never reports `checked`, so the previous digest is the postcondition. A tap is only
-# repeated while that digest is still on screen, which keeps a press that merely landed late
-# from toggling the watermark back.
+# repeated while that digest is still on screen, which keeps a press whose effect shows by the
+# guard's read from toggling the watermark back. Under the pinned Maestro the guard reads the screen at most once
+# plus a 500 ms search after the wait gives up (tap-outfit-open.yaml states the boundary), so an
+# effect that draws later than that still gets a second press.
 - retry:
     maxRetries: 3
     commands:

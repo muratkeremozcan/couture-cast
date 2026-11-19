@@ -10,7 +10,10 @@ appId: ${MAESTRO_APP_ID}
 # reported the OFF tap COMPLETED, the app logged no prepare for it and the switch stayed checked,
 # so the press never registered. Each tap therefore sits in a bounded retry whose postcondition
 # is the switch's own state, and it runs only while the switch is still in the state it
-# started from, so a press that merely landed late is never undone by a second tap.
+# started from, so a press whose effect shows by the guard's read is not undone by a second tap.
+# Under the pinned Maestro the guard reads the screen at most once
+# plus a 500 ms search after the wait gives up (tap-outfit-open.yaml states the boundary), so an
+# effect that draws later than that still gets a second press.
 - retry:
     maxRetries: 3
     commands:
