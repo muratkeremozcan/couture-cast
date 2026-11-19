@@ -13,6 +13,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type * as Locations from '@/src/lib/locations'
+import type * as AccessibilityFocus from '@/src/lib/accessibility-focus'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -42,6 +43,19 @@ const tracked = vi.hoisted(() => ({
   /** How many times the screen called save while saveAnswer was set. */
   saveCalls: 0,
 }))
+
+/** Every node the screen asked to focus for assistive technology (a no-op on web, recorded here). */
+const focusCalls = vi.hoisted(() => [] as unknown[])
+vi.mock('@/src/lib/accessibility-focus', async (importOriginal) => {
+  const actual = await importOriginal<typeof AccessibilityFocus>()
+  return {
+    ...actual,
+    safeFindNodeHandle: (node: unknown) => {
+      focusCalls.push(node)
+      return actual.safeFindNodeHandle(node)
+    },
+  }
+})
 
 vi.mock('@/src/lib/locations', async (importOriginal) => {
   const actual = await importOriginal<typeof Locations>()
@@ -244,7 +258,8 @@ describe(
       aRows = [A_HOME]
       mutations = []
       tracked.promises = []
-      router.back.mockClear()
+      focusCalls.length = 0
+      router.back.mockReset()
       process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
       setMobileApplicationUserId('member-a')
       restoreAccessTokenResolver = setMobileAccessTokenResolver(() => {
@@ -631,6 +646,218 @@ describe(
       await userEvent.click(await screen.findByTestId('location-search-option-0'))
       expect(await screen.findByTestId('location-save-button')).toBeTruthy()
       expect(screen.queryByTestId('location-error')).toBeNull()
+    })
+
+    // Codex product review 7. Each case below is one window where the phone's member has already
+    // changed (or is about to) while A's screen, press or deferred effect is still in play.
+
+    /** A from-search handler that records each save's bearer and answers with A's place. */
+    function answerSaves() {
+      server.use(
+        http.post('*/api/v1/locations/from-search', ({ request }) => {
+          saveBearers.push(request.headers.get('authorization'))
+          return HttpResponse.json(
+            { data: savedLocation({ id: 'a-9', label: 'Alpha Studio' }) },
+            { status: 201 }
+          )
+        })
+      )
+    }
+
+    /** A picks Springfield and names it, ready to save. */
+    async function pickAndName() {
+      await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Spring')
+      await userEvent.click(await screen.findByTestId('location-search-option-0'))
+      await userEvent.fill(
+        await screen.findByTestId('location-label-input'),
+        'Alpha Studio'
+      )
+      await settle()
+    }
+
+    /**
+     * The phone's session moves to B, and B's render is only queued: the identity listener ran
+     * outside any act scope, so React has not committed it when the next line runs.
+     */
+    function switchWithoutRender() {
+      bearer = 'token-b'
+      setMobileApplicationUserId('member-b')
+    }
+
+    /** A press that was already queued on A's screen: the DOM click reaches A's handler now. */
+    function pressNow(testId: string) {
+      const target = screen.getByTestId(testId)
+      act(() => {
+        target.click()
+      })
+    }
+
+    // Finding 2: an A-era press handled after the switch must not bind A's data to B.
+    it('LOC-MEMBER-MOB-13 a Save press queued on A screen when the phone switched sends nothing', async () => {
+      answerSaves()
+      renderScreen()
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      await pickAndName()
+
+      switchWithoutRender()
+      // A's screen is still the one on screen when the queued press is handled.
+      expect(screen.getByTestId('location-save-button')).toBeTruthy()
+      pressNow('location-save-button')
+      await settle()
+      await waitPastAnnouncements()
+
+      expect(saveBearers).toEqual([])
+      expect(await screen.findByText('Bravo Office')).toBeTruthy()
+      noAlpha()
+    })
+
+    it('LOC-MEMBER-MOB-14 a Make primary press queued on A screen when the phone switched sends nothing', async () => {
+      aRows = [A_HOME, A_CABIN]
+      renderScreen()
+      expect(await screen.findByText('Alpha Cabin')).toBeTruthy()
+      await settle()
+
+      switchWithoutRender()
+      expect(screen.getByTestId('location-make-primary-1')).toBeTruthy()
+      pressNow('location-make-primary-1')
+      await settle()
+
+      expect(mutations).toEqual([])
+      expect(await screen.findByText('Bravo Office')).toBeTruthy()
+      noAlpha()
+    })
+
+    // Finding 3: the city A picked is A's; its announcement dies with A's turn.
+    it('LOC-MEMBER-MOB-15 a city A picked is not announced after A signs out inside the debounce', async () => {
+      renderScreen()
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Spring')
+      expect(await screen.findByTestId('location-search-option-0')).toBeTruthy()
+      // The result-count announcement is delivered before the announcer's timer is held.
+      await waitPastAnnouncements()
+      const timers = holdAnnouncerTimers()
+      const { announcements, stop } = recordAnnouncements()
+      try {
+        await userEvent.click(screen.getByTestId('location-search-option-0'))
+        await waitFor(() => expect(timers.held()).toBeGreaterThan(0))
+        expect(announcements).toEqual([])
+
+        switchTo(null)
+        timers.release()
+        await settle()
+        await waitPastAnnouncements()
+
+        expect(announcements.filter((text) => /Springfield/.test(text))).toEqual([])
+        expect(screen.queryByText(/Springfield/)).toBeNull()
+      } finally {
+        timers.restore()
+        stop()
+      }
+    })
+
+    // Finding 4: the root announcer outlives the screen; what it already said for A goes with A.
+    it('LOC-MEMBER-MOB-16 an announcement already delivered for A leaves the live region when A signs out', async () => {
+      answerSaves()
+      const { back } = renderScreen()
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      await pickAndName()
+      await userEvent.click(screen.getByTestId('location-save-button'))
+      await settle()
+      const liveRegion = () => document.getElementById('a11y-live-announcer')
+      await waitFor(() => expect(liveRegion()?.textContent).toBe('Alpha Studio saved.'))
+
+      // A leaves Locations; the app and its announcer stay; then A signs out.
+      act(() => back())
+      switchTo(null)
+      await settle()
+      await waitPastAnnouncements()
+
+      expect(liveRegion()?.textContent ?? '').not.toMatch(/Alpha/)
+      expect(document.body.textContent).not.toMatch(/Alpha/)
+    })
+
+    // Finding 5: a guided save that succeeds goes Back and still confirms, exactly once.
+    it('LOC-MEMBER-MOB-17 a guided save confirms once on the screen Back returns to', async () => {
+      answerSaves()
+      const { back } = renderScreen(true)
+      // The router really leaves Locations when the screen calls Back.
+      router.back.mockImplementationOnce(() => back())
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      await pickAndName()
+      await waitPastAnnouncements()
+      const { announcements, stop } = recordAnnouncements()
+      try {
+        await userEvent.click(screen.getByTestId('location-save-button'))
+        await settle()
+        await waitPastAnnouncements()
+
+        expect(saveBearers).toEqual(['Bearer token-a'])
+        expect(router.back).toHaveBeenCalledTimes(1)
+        expect(screen.queryByTestId('locations-search-input')).toBeNull()
+        expect(
+          announcements.filter((text) => text === 'Alpha Studio saved.')
+        ).toHaveLength(1)
+      } finally {
+        stop()
+      }
+    })
+
+    // Finding 6: the focus a delete decided for A is not carried out after the phone switched.
+    describe('focus after a delete', () => {
+      /** A deletes Alpha Home; optionally the phone switches the moment the outcome is announced. */
+      async function deleteAlphaHome(switchOnAnnouncement: boolean) {
+        aRows = [A_HOME, A_CABIN]
+        server.use(
+          http.delete('*/api/v1/locations/:id', ({ request }) => {
+            mutations.push(`DELETE ${new URL(request.url).pathname}`)
+            aRows = [A_CABIN]
+            return HttpResponse.json({ data: { deleted: true } })
+          })
+        )
+        renderScreen()
+        expect(await screen.findByText('Alpha Home')).toBeTruthy()
+        await settle()
+        await userEvent.click(screen.getByTestId('location-delete-0'))
+        const realSetTimeout = globalThis.setTimeout
+        const spy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+          callback: () => void,
+          delay?: number,
+          ...args: unknown[]
+        ) => {
+          // The delete's announcement is queued in the same step that decides the focus.
+          if (
+            switchOnAnnouncement &&
+            delay === ANNOUNCER_DEBOUNCE_MS &&
+            mutations.length > 0
+          ) {
+            switchOnAnnouncement = false
+            switchWithoutRender()
+          }
+          return realSetTimeout(callback, delay, ...args)
+        }) as unknown as typeof setTimeout)
+        focusCalls.length = 0
+        try {
+          await userEvent.click(screen.getByTestId('location-delete-confirm'))
+          await settle()
+          await waitPastAnnouncements()
+        } finally {
+          spy.mockRestore()
+        }
+        expect(mutations).toEqual(['DELETE /api/v1/locations/a-1'])
+      }
+
+      it('LOC-MEMBER-MOB-18 control: with no switch, focus goes to the Locations heading', async () => {
+        await deleteAlphaHome(false)
+        expect(focusCalls).toHaveLength(1)
+        expect(focusCalls[0]).toBeInstanceOf(HTMLElement)
+      })
+
+      it('LOC-MEMBER-MOB-19 a focus decided for A is not carried out after the phone switched', async () => {
+        await deleteAlphaHome(true)
+        expect(focusCalls).toEqual([])
+        expect(await screen.findByText('Bravo Office')).toBeTruthy()
+        noAlpha()
+      })
     })
   }
 )

@@ -81,9 +81,13 @@ describe('the verifier connection against a real TLS server', () => {
     port = (server.address() as AddressInfo).port
   }, CASE_TIMEOUT_MS)
 
+  // A setup that failed part way (an OpenSSL timeout) leaves no server: still remove the directory.
   afterAll(async () => {
-    await new Promise((resolve) => server.close(resolve))
-    rmSync(dir, { recursive: true, force: true })
+    try {
+      if (server) await new Promise((resolve) => server.close(resolve))
+    } finally {
+      if (dir) rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   // The connection string names a remote host so the options are the remote ones, and the socket goes here.
