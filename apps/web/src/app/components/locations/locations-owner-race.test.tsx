@@ -14,7 +14,33 @@ import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/wardrobe'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
 import type * as WebSession from '../../../lib/web-session'
+import type * as Locations from '../../../lib/locations'
 import { LocationsSection } from './locations-section'
+
+/** Every list the section starts, kept until it settles, so a test waits for the late answer. */
+const lists = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+
+vi.mock('../../../lib/locations', async (importOriginal) => {
+  const actual = await importOriginal<typeof Locations>()
+  return {
+    ...actual,
+    listLocationsFromWeb: (...args: Parameters<typeof actual.listLocationsFromWeb>) => {
+      const listing = actual.listLocationsFromWeb(...args)
+      lists.promises.push(listing)
+      return listing
+    },
+  }
+})
+
+/** Every list has settled and React has applied whatever its handlers set. */
+async function settleLists() {
+  await act(async () => {
+    await Promise.allSettled(lists.promises)
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
 
 /** The session bridge's state, driven by hand. */
 const session = vi.hoisted(() => ({
@@ -106,6 +132,7 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
   beforeEach(async () => {
     heldList = null
     holdNextAList = false
+    lists.promises = []
     renamed = false
     session.identity = 'member-a'
     session.stored = true
@@ -134,16 +161,55 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     window.sessionStorage.clear()
   })
 
+  /** Member A renames their place and the confirmation is on screen. */
+  async function renameAndConfirm() {
+    const user = userEvent.setup()
+    renderSection()
+    expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Rename/ }))
+    const field = screen.getByRole('textbox', { name: 'New name' })
+    await user.clear(field)
+    await user.type(field, 'Alpha Studio')
+    await user.click(screen.getByRole('button', { name: /Save name/ }))
+    await waitFor(() =>
+      expect(screen.getByTestId('locations-status-region')).toHaveTextContent(
+        'Renamed to Alpha Studio.'
+      )
+    )
+    await settleLists()
+  }
+
+  it('LOC-OWNER-WEB-03 a confirmation already on screen leaves with the member who signs out', async () => {
+    await renameAndConfirm()
+
+    publish(null, null, false)
+    await settleLists()
+
+    expect(section()).toHaveAttribute('data-state', 'signed_out')
+    expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
+    expect(screen.queryByText(/Alpha/)).toBeNull()
+  })
+
+  it('LOC-OWNER-WEB-04 a confirmation already on screen is gone when the next member loads', async () => {
+    await renameAndConfirm()
+
+    publish(null, null, true)
+    publish('member-b', 'token-b', true)
+    expect(await screen.findByText('Bravo Office')).toBeInTheDocument()
+    await settleLists()
+
+    expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
+    expect(screen.queryByText(/Alpha/)).toBeNull()
+  })
+
   it('LOC-OWNER-WEB-01 a list that lands after sign-out shows none of the signed-out member', async () => {
     await renameAndHoldTheReload()
 
     publish(null, null, false)
     expect(section()).toHaveAttribute('data-state', 'signed_out')
 
-    await act(async () => {
-      heldList!.release()
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    })
+    act(() => heldList!.release())
+    await settleLists()
 
     expect(section()).toHaveAttribute('data-state', 'signed_out')
     expect(screen.queryByText(/Alpha/)).toBeNull()
@@ -157,10 +223,8 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     publish('member-b', 'token-b', true)
     expect(await screen.findByText('Bravo Office')).toBeInTheDocument()
 
-    await act(async () => {
-      heldList!.release()
-      await new Promise((resolve) => setTimeout(resolve, 50))
-    })
+    act(() => heldList!.release())
+    await settleLists()
 
     expect(section()).toHaveAttribute('data-state', 'ready')
     expect(screen.getByText('Bravo Office')).toBeInTheDocument()

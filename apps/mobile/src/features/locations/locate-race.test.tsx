@@ -9,6 +9,8 @@ import { userEvent } from 'vitest/browser'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
+import type * as DevicePosition from './device-position'
+import type * as Locations from '@/src/lib/locations'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -31,6 +33,54 @@ vi.mock('expo-location', () => ({
   },
   Accuracy: { Lowest: 1, Low: 2, Balanced: 3, High: 4, Highest: 5, BestForNavigation: 6 },
 }))
+
+/**
+ * The client calls the race is about, counted when they start and kept until they settle, so a
+ * test waits for the late answer to reach the screen instead of sleeping.
+ */
+const tracked = vi.hoisted(() => ({
+  positionReads: 0,
+  nearbyLookups: 0,
+  promises: [] as Promise<unknown>[],
+}))
+
+vi.mock('./device-position', async (importOriginal) => {
+  const actual = await importOriginal<typeof DevicePosition>()
+  return {
+    ...actual,
+    readDevicePosition: (...args: Parameters<typeof actual.readDevicePosition>) => {
+      tracked.positionReads += 1
+      const reading = actual.readDevicePosition(...args)
+      tracked.promises.push(reading)
+      return reading
+    },
+  }
+})
+
+vi.mock('@/src/lib/locations', async (importOriginal) => {
+  const actual = await importOriginal<typeof Locations>()
+  return {
+    ...actual,
+    locationsNearFromMobile: (
+      ...args: Parameters<typeof actual.locationsNearFromMobile>
+    ) => {
+      tracked.nearbyLookups += 1
+      const lookup = actual.locationsNearFromMobile(...args)
+      tracked.promises.push(lookup)
+      return lookup
+    },
+  }
+})
+
+/** Every tracked call has settled and React has applied what its handlers set. */
+async function settleClient() {
+  await act(async () => {
+    await Promise.allSettled(tracked.promises)
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
@@ -80,9 +130,7 @@ async function typeSpringfield() {
 
 /** After the late answer: the typed search still owns the picks, the message and the focus. */
 async function expectTypedSearchWins(input: HTMLElement, savedTokens: string[]) {
-  await act(async () => {
-    await new Promise((resolve) => setTimeout(resolve, 50))
-  })
+  await settleClient()
   expect(screen.getByTestId('location-search-option-0').textContent).toContain(
     'Springfield'
   )
@@ -114,6 +162,9 @@ describe(
     beforeEach(() => {
       posted = 0
       savedTokens = []
+      tracked.positionReads = 0
+      tracked.nearbyLookups = 0
+      tracked.promises = []
       location.requestForegroundPermissionsAsync.mockReset()
       location.getCurrentPositionAsync.mockReset()
       location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' })
@@ -179,6 +230,10 @@ describe(
         await position.promise
       })
 
+      await settleClient()
+      expect(tracked.positionReads).toBe(1)
+      // Counted when the screen would start the lookup, so a late one cannot slip past.
+      expect(tracked.nearbyLookups).toBe(0)
       expect(posted).toBe(0)
       await expectTypedSearchWins(input, savedTokens)
     })
@@ -224,7 +279,9 @@ describe(
         await permission.promise
       })
 
+      await settleClient()
       expect(location.getCurrentPositionAsync).not.toHaveBeenCalled()
+      expect(tracked.nearbyLookups).toBe(0)
       await expectTypedSearchWins(input, savedTokens)
     })
   }

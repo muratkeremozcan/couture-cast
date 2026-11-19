@@ -170,6 +170,55 @@ describe('LocationsSection treats a failed session check as an outage, never as 
     expect(listRequests).toBe(1)
   })
 
+  it('LOC-OUTAGE-WEB-05 member A check failing late while member B is still checking leaves B checking, then B lists once', async () => {
+    const bearers: (string | null)[] = []
+    useMswHandlers(
+      http.get('/api/v1/locations', ({ request }) => {
+        listRequests += 1
+        bearers.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: [HOME] })
+      })
+    )
+    renderSection()
+    expect(session.pending).toHaveLength(1)
+
+    // The bridge names member A on its own; A's check from this section stays outstanding.
+    await act(async () => {
+      session.identity = 'member-a'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-a')
+      window.dispatchEvent(new Event('couture:session'))
+      await Promise.resolve()
+    })
+    await screen.findByTestId('location-item')
+
+    // An account switch: A is cleared, the stored session now belongs to B, a new check starts.
+    await act(async () => {
+      session.identity = null
+      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      window.dispatchEvent(new Event('couture:session'))
+      await Promise.resolve()
+    })
+    expect(section()).toHaveAttribute('data-state', 'checking')
+    expect(session.pending).toHaveLength(2)
+
+    // A's original check fails late. Nothing in it is about B.
+    await failVerification(0)
+    expect(section()).toHaveAttribute('data-state', 'checking')
+    expect(screen.queryByTestId('locations-load-error')).toBeNull()
+    expect(screen.queryByTestId('locations-signed-out')).toBeNull()
+
+    await act(async () => {
+      session.identity = 'member-b'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
+      window.dispatchEvent(new Event('couture:session'))
+      session.pending[1]!.resolve('token-b')
+      await Promise.resolve()
+    })
+    await screen.findByTestId('location-item')
+    expect(section()).toHaveAttribute('data-state', 'ready')
+    expect(bearers).toEqual(['Bearer token-a', 'Bearer token-b'])
+  })
+
   it('LOC-OUTAGE-WEB-04 a check that verifies no member is signed out, as before', async () => {
     session.stored = true
     renderSection()

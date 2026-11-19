@@ -1,7 +1,9 @@
-// Production follow-up after the project close (2026-11-19). Jade signed in on the production web
-// app, opened /settings and saw "Sign in to manage your locations" under Locations while the same
-// page showed her Premium access, so she could neither find nor set a location ("Profile is
-// missing", "City search unavailable"). PostHog showed her searches failing from /settings.
+// Production follow-up after the project close (2026-11-19). Jade reported "Profile is missing"
+// and "City search unavailable"; PostHog shows three failed web city searches from /settings in
+// that window (outcome provider_unconfigured). Reproducing on production with a signed-in member,
+// a reload of /settings (or opening it in a new tab) showed "Sign in to manage your locations"
+// under Locations while the same page showed Premium access: a second way to lose Locations, found
+// by the reproduction, not reported by Jade.
 //
 // The Locations section asked once, on mount, whether this tab holds the verified bearer. A real
 // session writes that bearer only after the profile check, and a fresh tab or a reload starts
@@ -85,6 +87,21 @@ const sectionStates = (page: Page) =>
   )
 
 /**
+ * A completion boundary for a `couture:session` event: two animation frames and a task let React
+ * commit what the event changed and run its effects (where a list request would start), then
+ * every list request started so far has answered.
+ */
+async function settledAfterSessionEvent(page: Page, listRequests: Request[]) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolve, 0)))
+      )
+  )
+  await Promise.all(listRequests.map((request) => request.response()))
+}
+
+/**
  * Opens /settings while holding the session's profile check, and expects the member's Locations:
  *
  * - while verification is pending the section is `checking`: no Sign in hint, no list request;
@@ -102,15 +119,15 @@ async function expectMemberLocations(page: Page, open: () => Promise<unknown>) {
     )
       listRequests.push(request)
   }
-  const profileChecks: Promise<unknown>[] = []
+  const profileChecks: Request[] = []
   let release!: () => void
   const verificationHeld = new Promise<void>((resolve) => {
     release = resolve
   })
   await page.route(PROFILE_CHECK, async (route) => {
-    const answered = verificationHeld.then(() => route.continue())
-    profileChecks.push(answered)
-    await answered
+    profileChecks.push(route.request())
+    await verificationHeld
+    await route.continue()
   })
   page.on('request', recordList)
   try {
@@ -127,11 +144,12 @@ async function expectMemberLocations(page: Page, open: () => Promise<unknown>) {
     await expect(
       section.getByRole('combobox', { name: 'Search for a city' })
     ).toBeVisible()
-    await Promise.all(profileChecks)
+    // Every profile check has answered, not only been let through.
+    await Promise.all(profileChecks.map((request) => request.response()))
 
     // The bridge announces the same member again (a token refresh does): no second list.
     await page.evaluate(() => window.dispatchEvent(new Event('couture:session')))
-    await page.waitForLoadState('networkidle')
+    await settledAfterSessionEvent(page, listRequests)
     expect(listRequests).toHaveLength(1)
     expect((await listRequests[0]!.response())?.status()).toBe(200)
     const states = await sectionStates(page)
@@ -245,7 +263,7 @@ test(
     await expect(
       section.getByRole('combobox', { name: 'Search for a city' })
     ).toBeVisible()
-    await tab.waitForLoadState('networkidle')
+    await settledAfterSessionEvent(tab, listRequests)
     expect(listRequests).toHaveLength(1)
     expect((await listRequests[0]!.response())?.status()).toBe(200)
     const states = await sectionStates(tab)
