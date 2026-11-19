@@ -149,7 +149,10 @@ describe('CommunityLookbookGrid (Story 6.1)', () => {
       // `globals.css` hides `[data-landing='guest-inline']` whenever the page is
       // marked `data-session='member'`, which a stored session keeps it, so the
       // guest-only marker here would hide the one way out in a real browser.
-      expect(signInLink).not.toHaveAttribute('data-landing')
+      // `refused-inline` is hidden only while the landing is still pending (so it
+      // never flashes before first paint, real-session L-8) and shows under both
+      // `member` and `none`.
+      expect(signInLink).toHaveAttribute('data-landing', 'refused-inline')
       // Same guarantee as 6.1-WEB-006: a reader the server just refused cannot
       // post, so no compose affordance may promise otherwise.
       expect(screen.queryByTestId('create-post-button')).not.toBeInTheDocument()
