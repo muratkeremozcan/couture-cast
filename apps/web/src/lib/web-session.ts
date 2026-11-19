@@ -110,6 +110,11 @@ export function webSupabase() {
   })
   return client
 }
+/**
+ * The API refused this identity (401, 403 or 404 on the profile check): a definitive answer,
+ * where a timeout or a 5xx is a temporary failure worth retrying.
+ */
+export const isWebSessionDenial = (error: unknown) => sessionDenied(error)
 function sessionDenied(error: unknown) {
   if (!error || typeof error !== 'object' || !('response' in error)) return false
   const response: unknown = error.response
@@ -193,10 +198,19 @@ async function verifySession(session: Session | null) {
     throw error
   }
 }
+/**
+ * The e2e fixture bearer: only under NEXT_PUBLIC_E2E_AUTH, and only a `test-token` prefix. It
+ * skips verification; any other bearer counts only once verification names its member.
+ */
+export function isE2EFixtureBearer(token: string | null | undefined): boolean {
+  return (
+    process.env.NEXT_PUBLIC_E2E_AUTH === 'true' &&
+    Boolean(token?.startsWith('test-token'))
+  )
+}
 export async function startWebSession() {
   const fixture = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)
-  if (process.env.NEXT_PUBLIC_E2E_AUTH === 'true' && fixture?.startsWith('test-token'))
-    return () => undefined
+  if (isE2EFixtureBearer(fixture)) return () => undefined
   const auth = webSupabase().auth
   let stopped = false
   const { data } = auth.onAuthStateChange((_event, session) => {

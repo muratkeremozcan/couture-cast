@@ -12,6 +12,17 @@ import pg from 'pg'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { verifiedPgConnection } from '../../../../scripts/lib/database-tls.mjs'
 
+/**
+ * Generous real-time limits: the full API run shares the machine with other suites, and at load
+ * average 175 one run failed this file while every case passed alone. The connect limit stays under
+ * the case limit, so a slow handshake reports its own outcome instead of a bare case timeout.
+ */
+const CONNECT_TIMEOUT_MS = 15_000
+const CASE_TIMEOUT_MS = 30_000
+
+/** Handshakes the fake server finished; the CA-signed case must add exactly one. */
+let handshakes = 0
+
 /** Answers Postgres's SSLRequest with yes, finishes TLS, then closes before any protocol. */
 function tlsPostgres(key: string, cert: string): net.Server {
   return net.createServer((socket) => {
@@ -22,7 +33,10 @@ function tlsPostgres(key: string, cert: string): net.Server {
           key,
           cert,
         })
-        secure.on('secure', () => secure.destroy())
+        secure.on('secure', () => {
+          handshakes += 1
+          secure.destroy()
+        })
         secure.on('error', () => socket.destroy())
       })
     })
@@ -59,17 +73,21 @@ describe('the verifier connection against a real TLS server', () => {
         '-out',
         certPath,
       ],
-      { stdio: 'ignore' }
+      { stdio: 'ignore', timeout: CASE_TIMEOUT_MS }
     )
     cert = readFileSync(certPath, 'utf8')
     server = tlsPostgres(readFileSync(keyPath, 'utf8'), cert)
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
     port = (server.address() as AddressInfo).port
-  })
+  }, CASE_TIMEOUT_MS)
 
+  // A setup that failed part way (an OpenSSL timeout) leaves no server: still remove the directory.
   afterAll(async () => {
-    await new Promise((resolve) => server.close(resolve))
-    rmSync(dir, { recursive: true, force: true })
+    try {
+      if (server) await new Promise((resolve) => server.close(resolve))
+    } finally {
+      if (dir) rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   // The connection string names a remote host so the options are the remote ones, and the socket goes here.
@@ -81,7 +99,7 @@ describe('the verifier connection against a real TLS server', () => {
       user: 'probe',
       database: 'probe',
       password: 'probe',
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
       ...(ssl ? { ssl } : {}),
     })
     client.on('error', () => undefined)
@@ -94,21 +112,36 @@ describe('the verifier connection against a real TLS server', () => {
 
   const REMOTE = 'postgresql://u:p@db.example.supabase.co:5432/postgres'
 
-  it('refuses a server certificate the committed CA did not sign', async () => {
-    expect(await connect(REMOTE)).toBe('DEPTH_ZERO_SELF_SIGNED_CERT')
-  })
+  it(
+    'refuses a server certificate the committed CA did not sign',
+    async () => {
+      expect(await connect(REMOTE)).toBe('DEPTH_ZERO_SELF_SIGNED_CERT')
+    },
+    CASE_TIMEOUT_MS
+  )
 
-  it('refuses it even when the URL asks for no verification', async () => {
-    expect(await connect(`${REMOTE}?sslmode=no-verify`)).toBe(
-      'DEPTH_ZERO_SELF_SIGNED_CERT'
-    )
-  })
+  it(
+    'refuses it even when the URL asks for no verification',
+    async () => {
+      expect(await connect(`${REMOTE}?sslmode=no-verify`)).toBe(
+        'DEPTH_ZERO_SELF_SIGNED_CERT'
+      )
+    },
+    CASE_TIMEOUT_MS
+  )
 
-  it('finishes the handshake when the CA did sign it', async () => {
-    const outcome = await connect(REMOTE, {
-      caPath: path.join(dir, 'cert.pem'),
-    })
-    // The fake server hangs up once TLS is done, so the driver's complaint is about the closed stream.
-    expect(outcome).toMatch(/Connection terminated/)
-  })
+  it(
+    'finishes the handshake when the CA did sign it',
+    async () => {
+      const before = handshakes
+      const outcome = await connect(REMOTE, {
+        caPath: path.join(dir, 'cert.pem'),
+      })
+      // The fake server hangs up once TLS is done, so the driver's complaint is about the closed
+      // stream. The server's count proves TLS finished on its side too.
+      expect(outcome).toBe('Connection terminated unexpectedly')
+      expect(handshakes - before).toBe(1)
+    },
+    CASE_TIMEOUT_MS
+  )
 })

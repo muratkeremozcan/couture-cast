@@ -1,0 +1,168 @@
+# Learning path Step 58: Production follow-ups after the project close.
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
+# Production follow-up (2026-11-19): Use my location on mobile.
+#
+# Jade asked for the app to use her location with her approval, or let her type the city. The
+# Profile tab's Locations screen now offers "Use my location": the OS permission is asked only on
+# the tap, the position is rounded to two decimals on the phone, and the API resolves it to a city
+# through the weather provider double (scripts/weather-provider-double.mjs, reverse lookup).
+#
+# The runner removes the member's saved locations before the flow and restores the baseline
+# Chicago after it (`FLOW_STATE_HOOKS` in scripts/run-maestro.mjs), refuses the flow unless the
+# API reaches the double, and after the flow reads the double's request log: it fails the flow
+# unless every reverse lookup carried at most two decimals, one resolved to Chicago, and the
+# precise injected position (`USE_MY_LOCATION_LATITUDE`, `USE_MY_LOCATION_LONGITUDE`) never
+# reached the provider (`useMyLocationWeatherDoubleCause` in scripts/lib/mobile-e2e-flow-state.mjs).
+# The OS answers at reduced accuracy (iOS reduced, Android coarse), so the fix it hands the app can
+# differ from the injected pair; the exact rounding is pinned by the mocked-device unit tests.
+appId: ${MAESTRO_APP_ID}
+name: 'Use my location'
+tags:
+  - e2e
+  - locations
+  - maestro
+---
+# --- Denied: the reason, and manual search still works --------------------------------
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: false
+    permissions:
+      location: deny
+- runFlow: subflows/open-app.yaml
+- runFlow: subflows/open-settings.yaml
+- scrollUntilVisible:
+    element:
+      id: 'locations-link'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'locations-link'
+- extendedWaitUntil:
+    visible:
+      id: 'locations-use-my-location'
+    timeout: 15000
+    label: 'Locations offers Use my location'
+- assertNotVisible:
+    id: 'location-error'
+- tapOn:
+    id: 'locations-use-my-location'
+    label: 'Ask for the location'
+# Android asks again after a revoke (iOS answers denied without a prompt): refuse in the system
+# dialog. Optional, so it is a no-op wherever no dialog rises.
+- tapOn:
+    id: 'com.android.permissioncontroller:id/permission_deny_button'
+    optional: true
+    label: 'Refuse the Android permission dialog if it rises'
+- extendedWaitUntil:
+    visible:
+      id: 'location-error'
+      text: 'Location access is off. Search for your city instead.'
+    timeout: 15000
+    label: 'The denial is explained'
+- assertVisible:
+    id: 'locations-search-input'
+    label: 'Manual city search stays available'
+- assertNotVisible:
+    id: 'location-search-option-0'
+
+# --- Allowed: the city near the phone is offered, picked and saved ------------------------
+- setLocation:
+    latitude: ${USE_MY_LOCATION_LATITUDE}
+    longitude: ${USE_MY_LOCATION_LONGITUDE}
+- launchApp:
+    appId: ${MAESTRO_APP_ID}
+    clearState: true
+    stopApp: true
+    permissions:
+      location: allow
+- runFlow: subflows/open-app.yaml
+- runFlow: subflows/open-settings.yaml
+- scrollUntilVisible:
+    element:
+      id: 'locations-link'
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: 'locations-link'
+- extendedWaitUntil:
+    visible:
+      id: 'locations-use-my-location'
+    timeout: 15000
+- tapOn:
+    id: 'locations-use-my-location'
+    label: 'Use the allowed location'
+# Expo Go asks its own per-experience question on Android, on top of the OS grant above:
+# "Couture Cast needs permissions for coarse location. You've already granted permission to
+# another Expo experience. Allow Couture Cast to also use it?" (PR 257 run 44597617717: the
+# dialog covered the screen for the whole wait and the app never read the position). It is
+# asked once per permission type, so the pair runs twice; both are optional because a
+# development or store build, and iOS Expo Go, never raise it.
+- extendedWaitUntil:
+    visible:
+      text: '.*needs permissions for .*location.*'
+    timeout: 5000
+    optional: true
+    label: "Expo Go's per-experience location prompt, when it appears"
+- tapOn:
+    id: 'android:id/button1'
+    optional: true
+    label: 'Grant this experience the location permission'
+- extendedWaitUntil:
+    visible:
+      text: '.*needs permissions for .*location.*'
+    timeout: 3000
+    optional: true
+    label: "Expo Go's second per-experience location prompt, when it appears"
+- tapOn:
+    id: 'android:id/button1'
+    optional: true
+    label: 'Grant this experience the second location permission'
+- extendedWaitUntil:
+    visible:
+      id: 'location-search-option-0'
+    timeout: 20000
+    label: 'The city near the phone is offered'
+- assertVisible:
+    id: 'location-search-option-0'
+    text: 'Chicago, Illinois.*'
+    label: 'The offered city is the one near the phone'
+- assertNotVisible:
+    id: 'location-error'
+- tapOn:
+    id: 'location-search-option-0'
+    label: 'Pick the city'
+- extendedWaitUntil:
+    visible:
+      id: 'location-label-input'
+    timeout: 10000
+- tapOn:
+    id: 'location-label-input'
+# Picking prefills the label with the city, `Chicago` (7 characters).
+- eraseText: 7
+- inputText: 'Home'
+- runFlow:
+    when:
+      platform: iOS
+    commands:
+      - hideKeyboard
+- tapOn:
+    id: 'location-save-button'
+    label: 'Save the location'
+- extendedWaitUntil:
+    visible:
+      id: 'location-primary-badge-0'
+    timeout: 20000
+    label: 'The saved location is primary'
+- assertVisible:
+    id: 'location-label-0'
+    text: 'Home'
+- assertVisible:
+    text: 'Chicago, .*'
+    below:
+      id: 'location-label-0'
+    label: 'The saved row names the city near the phone'
+- takeScreenshot:
+    path: maestro/artifacts/location-use-my-location-saved

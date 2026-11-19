@@ -5,7 +5,7 @@
     "home": "Accueil",
     "wardrobe": "Garde-robe",
     "community": "Communauté",
-    "settings": "Paramètres"
+    "profile": "Profil"
   },
   "hero": {
     "scenarios": {
@@ -59,6 +59,9 @@
   },
   "settings": {
     "title": "Paramètres",
+    "account": {
+      "label": "Compte"
+    },
     "language": "Langue",
     "locale_sync_error": "La langue a changé sur cet appareil. La synchronisation du profil sera réessayée plus tard.",
     "locale_change_error": "Impossible de changer la langue. Veuillez réessayer.",
@@ -518,7 +521,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Sponsorisé. CoutureCast touche une commission si vous achetez via ce lien. Cela ne change pas les teintes recommandées, et vous pouvez désactiver les liens sponsorisés dans les Réglages.",
+          "disclosure": "Sponsorisé. CoutureCast touche une commission si vous achetez via ce lien. Cela ne change pas les teintes recommandées, et vous pouvez désactiver les liens sponsorisés dans le Profil.",
           "partnerLabel": "Par {{partner}}",
           "cta": "Acheter cette teinte"
         },
@@ -531,7 +534,7 @@
         },
         "locked": {
           "title": "Le conseil couleur est une fonctionnalité Premium",
-          "body": "Abonnez-vous à Premium depuis les Réglages pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons.",
+          "body": "Abonnez-vous à Premium depuis le Profil pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons.",
           "signedOutBody": "Connectez-vous et abonnez-vous à Premium pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons."
         },
         "staleVersion": "Cette palette provient d'une version antérieure de nos recommandations. Relancez l'analyse pour obtenir un résultat à jour.",
@@ -924,6 +927,9 @@
     "searchLabel": "Chercher une ville",
     "searchHint": "Entrez au moins deux lettres.",
     "searching": "Recherche en cours...",
+    "useMyLocation": "Utiliser ma position",
+    "useMyLocationHint": "Demande votre position approximative une fois pour trouver votre ville.",
+    "locating": "Recherche de votre ville...",
     "resultCount": "Résultats : {{count}}",
     "noResults": "Aucune ville ne correspond à cette recherche.",
     "selected": "Sélectionné : {{place}}",
@@ -947,7 +953,10 @@
       "duplicate": "Ce lieu est déjà enregistré.",
       "rate_limited": "Trop de recherches. Attendez un instant puis réessayez.",
       "invalid_query": "Entrez entre 2 et 80 caractères.",
-      "unknown": "Un problème est survenu. Réessayez."
+      "unknown": "Un problème est survenu. Réessayez.",
+      "location_denied": "L'accès à la position est désactivé. Recherchez plutôt votre ville.",
+      "location_unavailable": "Votre position n'est pas disponible pour le moment. Recherchez plutôt votre ville.",
+      "no_city_nearby": "Aucune ville trouvée près de vous. Recherchez plutôt votre ville."
     }
   },
   "home": {

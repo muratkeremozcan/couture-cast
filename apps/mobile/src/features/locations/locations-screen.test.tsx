@@ -3,9 +3,9 @@
 // Story 1.2b: the mobile Locations screen through MSW, so the request shapes,
 // the platform header and the contract parsing run with the UI. Input goes
 // through the browser runner's real user events.
-import React from 'react'
+import React, { useLayoutEffect, useState } from 'react'
 import { userEvent } from 'vitest/browser'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type {
@@ -29,12 +29,18 @@ vi.mock('@/src/lib/locations', { spy: true })
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import {
+  deleteLocationFromMobile,
   onLocationsChanged,
+  renameLocationFromMobile,
   saveLocationFromSearchFromMobile,
   searchLocationsFromMobile,
+  setPrimaryLocationFromMobile,
 } from '@/src/lib/locations'
 import {
   locationCandidate,
@@ -180,7 +186,9 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     expect(vi.mocked(searchLocationsFromMobile)).toHaveBeenCalledWith(
       'Chicago',
       'en-US',
-      expect.anything()
+      expect.anything(),
+      // The ownership check the request runs after its bearer resolves.
+      expect.any(Function)
     )
     vi.useRealTimers()
 
@@ -624,5 +632,199 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     )
     expect(screen.queryByTestId('locations-signed-out')).toBeNull()
     expect(screen.queryByTestId('location-add-form')).toBeNull()
+  })
+
+  /*
+   * Production follow-up (2026-11-19), review finding: the screen belongs to the
+   * member signed in on the device. A switch (or sign-out) shows none of the
+   * previous member's places, editors or late list, and loads the next list.
+   */
+  describe('across a change of member', () => {
+    const A_HOME = savedLocation({ id: 'a-1', label: 'Alpha Home' })
+    const B_OFFICE = officeLocation({ id: 'b-1', label: 'Bravo Office', isPrimary: true })
+    let bearer: string | null
+    let holdA: { release: () => void } | null
+    let holdNextA: boolean
+    let listBearers: (string | null)[]
+
+    beforeEach(() => {
+      bearer = 'token-a'
+      holdA = null
+      holdNextA = false
+      listBearers = []
+      setMobileApplicationUserId('member-a')
+      cleanups.push(setMobileAccessTokenResolver(() => bearer ?? undefined))
+      cleanups.push(() => setMobileApplicationUserId(null))
+      server.use(
+        http.get('*/api/v1/locations', async ({ request }) => {
+          const authorization = request.headers.get('authorization')
+          listBearers.push(authorization)
+          if (authorization === 'Bearer token-b')
+            return HttpResponse.json({ data: [B_OFFICE] })
+          if (holdNextA) {
+            holdNextA = false
+            await new Promise<void>((resolve) => {
+              holdA = { release: resolve }
+            })
+          }
+          return HttpResponse.json({ data: [A_HOME] })
+        })
+      )
+    })
+
+    function switchTo(next: { member: string | null; bearer: string | null }) {
+      act(() => {
+        bearer = next.bearer
+        setMobileApplicationUserId(next.member)
+      })
+    }
+
+    it('LOC-MEMBER-MOB-01 shows the next member only their own places, with A editing at the switch', async () => {
+      renderScreen()
+      expect((await screen.findByTestId('location-label-0')).textContent).toBe(
+        'Alpha Home'
+      )
+      await userEvent.click(screen.getByTestId('location-rename-0'))
+      expect(screen.getByTestId('location-rename-input-0')).toBeInTheDocument()
+
+      switchTo({ member: 'member-b', bearer: 'token-b' })
+
+      await waitFor(() =>
+        expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      )
+      expect(screen.queryByText('Alpha Home')).toBeNull()
+      expect(screen.queryByTestId('location-rename-input-0')).toBeNull()
+      expect(listBearers).toEqual(['Bearer token-a', 'Bearer token-b'])
+
+      switchTo({ member: null, bearer: null })
+
+      expect(await screen.findByTestId('locations-signed-out')).toBeInTheDocument()
+      expect(screen.queryByTestId('location-item-0')).toBeNull()
+    })
+
+    it('LOC-MEMBER-MOB-02 drops a list for A that lands after B loaded', async () => {
+      holdNextA = true
+      renderScreen()
+      await waitFor(() => expect(holdA).not.toBeNull())
+
+      switchTo({ member: 'member-b', bearer: 'token-b' })
+      await waitFor(() =>
+        expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      )
+
+      await act(async () => {
+        holdA!.release()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+
+      expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      expect(screen.queryByText('Alpha Home')).toBeNull()
+    })
+
+    it('LOC-ANNOUNCE-MOB-01 a confirmation already read out leaves the live region at sign-out', async () => {
+      server.use(searchHandler(), saveHandler())
+      renderScreen()
+      await screen.findByTestId('location-label-0')
+      await searchAndChoose()
+      await userEvent.fill(await screen.findByTestId('location-label-input'), 'Home')
+      await userEvent.click(screen.getByTestId('location-save-button'))
+      await waitFor(() => expect(liveRegion()).toBe('Home saved.'))
+
+      switchTo({ member: null, bearer: null })
+
+      await waitFor(() => expect(liveRegion()).toBe(''))
+    })
+  })
+
+  /*
+   * Review round 6 (2026-11-19): every member-owned mutation takes one
+   * ownership token. A token already superseded sends nothing; a completion
+   * whose member left notifies no global listener.
+   */
+  it('LOC-OWNER-LIB-MOB-01 the mutation helpers honor the ownership token on both sides of dispatch', async () => {
+    const mutations: string[] = []
+    const answered = { owned: true }
+    server.use(
+      http.patch('*/api/v1/locations/:id', () => {
+        mutations.push('rename')
+        answered.owned = false
+        return HttpResponse.json({ data: savedLocation({ label: 'Studio' }) })
+      }),
+      http.post('*/api/v1/locations/:id/primary', () => {
+        mutations.push('primary')
+        return HttpResponse.json({ data: savedLocation() })
+      }),
+      http.delete('*/api/v1/locations/:id', () => {
+        mutations.push('delete')
+        return HttpResponse.json({ data: { deleted: true } })
+      })
+    )
+    const heard = vi.fn()
+    cleanups.push(onLocationsChanged(heard))
+    const superseded = () => false
+
+    for (const attempt of [
+      renameLocationFromMobile('loc-1', 'Studio', undefined, superseded),
+      setPrimaryLocationFromMobile('loc-1', undefined, superseded),
+      deleteLocationFromMobile('loc-1', undefined, superseded),
+    ])
+      await expect(attempt).rejects.toBeDefined()
+    expect(mutations).toEqual([])
+
+    // Sent while owned; the member leaves before the answer is handled.
+    await renameLocationFromMobile('loc-1', 'Studio', undefined, () => answered.owned)
+    expect(mutations).toEqual(['rename'])
+    expect(heard).not.toHaveBeenCalled()
+  })
+
+  it('LOC-SAVE-MOB-01 a guided save that returns to the last screen is still confirmed, once', async () => {
+    server.use(searchHandler(), saveHandler())
+    const { announcements, stop } = recordAnnouncements()
+    cleanups.push(stop)
+    let leave = () => undefined as void
+    function Host() {
+      const [shown, setShown] = useState(true)
+      leave = () => setShown(false)
+      return shown ? <LocationsScreen guided /> : null
+    }
+    render(
+      <AccessibilityAnnouncerProvider>
+        <Host />
+      </AccessibilityAnnouncerProvider>
+    )
+    routerMock.back.mockImplementationOnce(() => leave())
+
+    await searchAndChoose()
+    await userEvent.fill(await screen.findByTestId('location-label-input'), 'Home')
+    await userEvent.click(screen.getByTestId('location-save-button'))
+
+    await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
+    expect(screen.queryByTestId('locations-screen')).toBeNull()
+    await waitFor(() => expect(liveRegion()).toBe('Home saved.'))
+    // Past three times the announcer's 80 ms delay, so a second confirmation would have landed.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 300))
+    })
+    expect(announcements.filter((entry) => entry.text === 'Home saved.')).toHaveLength(1)
+  })
+
+  it('LOC-MOUNT-MOB-01 a member named between the first render and the subscription still gets their list', async () => {
+    saved = [savedLocation()]
+    cleanups.push(() => setMobileApplicationUserId(null))
+    /** Publishes the member after the screen rendered, before its passive effects subscribe. */
+    function VerificationLands() {
+      useLayoutEffect(() => {
+        setMobileApplicationUserId('member-a')
+      }, [])
+      return null
+    }
+    render(
+      <AccessibilityAnnouncerProvider>
+        <LocationsScreen />
+        <VerificationLands />
+      </AccessibilityAnnouncerProvider>
+    )
+
+    expect((await screen.findByTestId('location-label-0')).textContent).toBe('Home')
   })
 })

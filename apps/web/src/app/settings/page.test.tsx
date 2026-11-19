@@ -4,6 +4,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-35-premium-theme-switcher
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
@@ -78,8 +80,33 @@ function locationsHandler() {
   return http.get('/api/v1/locations', () => HttpResponse.json({ data: [] }))
 }
 
+const PROFILE_PATH = '/api/v1/user/profile'
+
+/**
+ * Since 2026-11-19 the page is the Profile and names the signed-in account
+ * above its sections, so every signed-in render also reads the profile.
+ */
+function profileHandler(
+  user: { displayName: string | null; email: string } = {
+    displayName: 'Jade Rivers',
+    email: 'jade@example.test',
+  },
+  onRequest?: (request: Request) => void
+) {
+  return http.get(PROFILE_PATH, ({ request }) => {
+    onRequest?.(request)
+    return HttpResponse.json({
+      user: { id: 'member-1', birthdate: null, role: 'guardian', ...user },
+      linkedGuardians: [],
+      linkedTeens: [],
+    })
+  })
+}
+
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  // Only the e2e fixture bearer counts without a verified member.
+  vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-member')
 }
 
 /** A promise the test resolves by hand, so a pending request needs no timer. */
@@ -103,6 +130,7 @@ function preferenceHandlers(options: {
     subscriptionHandler(),
     themeHandler(),
     locationsHandler(),
+    profileHandler(),
     http.get(PREFERENCES_PATH, () => {
       if (options.getStatus) {
         return HttpResponse.json(
@@ -173,6 +201,7 @@ describe('Web settings page', () => {
   })
 
   afterEach(async () => {
+    vi.unstubAllEnvs()
     window.sessionStorage.clear()
     await getI18n().changeLanguage('en-US')
   })
@@ -239,7 +268,7 @@ describe('Web settings page', () => {
 
     await waitFor(() => expect(toggle()).toBeEnabled())
     expect(toggle()).toBeChecked()
-    expect(authorization).toHaveBeenCalledWith('Bearer test-access-token')
+    expect(authorization).toHaveBeenCalledWith('Bearer test-token-member')
     expect(screen.queryByTestId('commerce-signed-out-hint')).not.toBeInTheDocument()
   })
 
@@ -518,5 +547,72 @@ describe('Web settings page', () => {
       screen.getByRole('heading', { level: 1, name: deDE.settings.title })
     ).toBeInTheDocument()
     expect(deDE.settings.title).not.toBe('Settings')
+  })
+
+  /*
+   * Production follow-up (2026-11-19): Jade looked for her profile and found a
+   * page called Settings with no sign of her account. It is the Profile now, and
+   * it names the account above everything Settings held.
+   */
+  it('PROFILE-WEB-01 titles the page Profile and names the account above every section', async () => {
+    signIn()
+    const bearers: (string | null)[] = []
+    // The first matching handler answers, so this one goes ahead of the default.
+    useMswHandlers(
+      profileHandler(undefined, (request) =>
+        bearers.push(request.headers.get('authorization'))
+      ),
+      ...preferenceHandlers({})
+    )
+
+    render(<SettingsPage />)
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Profile')
+    const account = await screen.findByTestId('profile-account')
+    expect(account).toHaveAccessibleName('Your account')
+    expect(screen.getByTestId('profile-account-name')).toHaveTextContent('Jade Rivers')
+    expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
+      'jade@example.test'
+    )
+    expect(bearers).toEqual(['Bearer test-token-member'])
+    for (const section of [
+      'locations-section',
+      'commerce-preferences-section',
+      'premium-subscription-section',
+      'premium-theme-section',
+    ]) {
+      expect(
+        account.compareDocumentPosition(screen.getByTestId(section)) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+        section
+      ).toBeTruthy()
+    }
+  })
+
+  it('PROFILE-WEB-02 shows the email alone when the account has no display name', async () => {
+    signIn()
+    useMswHandlers(
+      profileHandler({ displayName: null, email: 'jade@example.test' }),
+      ...preferenceHandlers({})
+    )
+
+    render(<SettingsPage />)
+
+    expect(await screen.findByTestId('profile-account')).toHaveTextContent(
+      'jade@example.test'
+    )
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+  })
+
+  it('PROFILE-WEB-03 names no account and asks for none when signed out', async () => {
+    const asked = vi.fn()
+    useMswHandlers(profileHandler(undefined, asked))
+
+    render(<SettingsPage />)
+
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Profile')
+    await screen.findByTestId('locations-signed-out')
+    expect(screen.queryByTestId('profile-account')).toBeNull()
+    expect(asked).not.toHaveBeenCalled()
   })
 })

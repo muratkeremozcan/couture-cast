@@ -52,6 +52,27 @@ export declare const LOCATION_CAPTURE_FLOW: 'maestro/location-capture.yaml'
 
 export declare const COMMUNITY_COMMENTS_FLOW: 'maestro/community-comments.yaml'
 
+export declare const USE_MY_LOCATION_FLOW: 'maestro/location-use-my-location.yaml'
+
+export declare const USE_MY_LOCATION_DEVICE: Readonly<{
+  latitude: number
+  longitude: number
+}>
+
+export declare const USE_MY_LOCATION_ROUNDED: Readonly<{
+  latitude: number
+  longitude: number
+}>
+
+export declare function useMyLocationWeatherDoubleCause(observed: {
+  before: { geocoding: number }
+  requests: {
+    geocoding: { seq: number; query: string; latitude?: number; longitude?: number }[]
+  }
+  device?: { latitude: number; longitude: number }
+  city?: string
+}): string | undefined
+
 export declare const COMMUNITY_COMMENTS_LONG_ROOT: string
 
 export type CommunityCommentsLongRootTarget = { postId: string; authorId: string }

@@ -271,7 +271,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Sponsored. CoutureCast earns a commission if you buy through this link. It does not change which shades are recommended, and you can turn sponsored links off in Settings.",
+          "disclosure": "Sponsored. CoutureCast earns a commission if you buy through this link. It does not change which shades are recommended, and you can turn sponsored links off in Profile.",
           "partnerLabel": "From {{partner}}",
           "cta": "Shop this shade"
         },
@@ -284,7 +284,7 @@
         },
         "locked": {
           "title": "Color advice is a Premium feature",
-          "body": "Subscribe to Premium from Settings to get makeup shades and accessory pairings matched to your tones.",
+          "body": "Subscribe to Premium from Profile to get makeup shades and accessory pairings matched to your tones.",
           "signedOutBody": "Sign in and subscribe to Premium to get makeup shades and accessory pairings matched to your tones."
         },
         "staleVersion": "This palette came from an earlier version of our advice. Run the analysis again for an up-to-date result.",
@@ -728,6 +728,7 @@
     "empty": "No saved locations yet. Search for a city to add one.",
     "signedOutHint": "Sign in to manage your locations.",
     "loadError": "Unable to load your locations.",
+    "loadRetry": "Try again",
     "primary": "Primary",
     "makePrimary": "Make primary",
     "rename": "Rename",
@@ -752,6 +753,8 @@
     "deleted": "{{label}} deleted.",
     "limit": "You have saved three locations. Delete one to add another.",
     "retry": "Try again",
+    "useMyLocation": "Use my location",
+    "locating": "Finding your location...",
     "guided": {
       "add": "Add a location"
     },
@@ -763,11 +766,15 @@
       "duplicate": "That location is already saved.",
       "rate_limited": "Too many searches. Wait a moment and try again.",
       "invalid_query": "Type between 2 and 80 characters.",
-      "unknown": "Something went wrong. Try again."
+      "unknown": "Something went wrong. Try again.",
+      "location_denied": "Location access is off. Search for your city instead.",
+      "location_unavailable": "Your location is not available right now. Search for your city instead.",
+      "no_city_nearby": "No city found near you. Search for your city instead."
     }
   },
   "settings": {
-    "title": "Settings"
+    "title": "Profile",
+    "account": "Your account"
   },
   "home": {
     "spotlightTeaser": {
@@ -1208,5 +1215,13 @@
         "unavailable": "The export is unavailable. Try again."
       }
     }
+  },
+  "nav": {
+    "label": "Bottom navigation",
+    "home": "Home",
+    "wardrobe": "Wardrobe",
+    "community": "Community",
+    "profile": "Profile",
+    "navigatedTo": "Navigated to {{label}} tab"
   }
 }

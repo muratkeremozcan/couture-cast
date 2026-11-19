@@ -271,7 +271,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Sponsorisé. CoutureCast touche une commission si vous achetez via ce lien. Cela ne change pas les teintes recommandées, et vous pouvez désactiver les liens sponsorisés dans les Réglages.",
+          "disclosure": "Sponsorisé. CoutureCast touche une commission si vous achetez via ce lien. Cela ne change pas les teintes recommandées, et vous pouvez désactiver les liens sponsorisés dans le Profil.",
           "partnerLabel": "Par {{partner}}",
           "cta": "Acheter cette teinte"
         },
@@ -284,7 +284,7 @@
         },
         "locked": {
           "title": "Le conseil couleur est une fonctionnalité Premium",
-          "body": "Abonnez-vous à Premium depuis les Réglages pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons.",
+          "body": "Abonnez-vous à Premium depuis le Profil pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons.",
           "signedOutBody": "Connectez-vous et abonnez-vous à Premium pour recevoir des teintes de maquillage et des accords d'accessoires adaptés à vos tons."
         },
         "staleVersion": "Cette palette provient d'une version antérieure de nos recommandations. Relancez l'analyse pour obtenir un résultat à jour.",
@@ -728,6 +728,7 @@
     "empty": "Aucun lieu enregistré pour l'instant. Recherchez une ville pour en ajouter un.",
     "signedOutHint": "Connectez-vous pour gérer vos lieux.",
     "loadError": "Impossible de charger vos lieux.",
+    "loadRetry": "Réessayer",
     "primary": "Principal",
     "makePrimary": "Définir comme principal",
     "rename": "Renommer",
@@ -752,6 +753,8 @@
     "deleted": "{{label}} supprimé.",
     "limit": "Vous avez enregistré trois lieux. Supprimez-en un pour en ajouter un autre.",
     "retry": "Réessayer",
+    "useMyLocation": "Utiliser ma position",
+    "locating": "Recherche de votre position...",
     "guided": {
       "add": "Ajouter un lieu"
     },
@@ -763,11 +766,15 @@
       "duplicate": "Ce lieu est déjà enregistré.",
       "rate_limited": "Trop de recherches. Patientez un instant puis réessayez.",
       "invalid_query": "Saisissez entre 2 et 80 caractères.",
-      "unknown": "Un problème est survenu. Réessayez."
+      "unknown": "Un problème est survenu. Réessayez.",
+      "location_denied": "L'accès à la position est désactivé. Recherchez plutôt votre ville.",
+      "location_unavailable": "Votre position n'est pas disponible pour l'instant. Recherchez plutôt votre ville.",
+      "no_city_nearby": "Aucune ville trouvée près de vous. Recherchez plutôt votre ville."
     }
   },
   "settings": {
-    "title": "Paramètres"
+    "title": "Profil",
+    "account": "Votre compte"
   },
   "home": {
     "spotlightTeaser": {
@@ -1208,5 +1215,13 @@
         "unavailable": "L'export est indisponible. Réessayez."
       }
     }
+  },
+  "nav": {
+    "label": "Navigation inférieure",
+    "home": "Accueil",
+    "wardrobe": "Garde-robe",
+    "community": "Communauté",
+    "profile": "Profil",
+    "navigatedTo": "Onglet {{label}} ouvert"
   }
 }

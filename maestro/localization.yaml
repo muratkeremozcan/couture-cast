@@ -23,7 +23,7 @@ tags:
     env:
       LOCALE: tr-TR
 
-- assertVisible: 'Ayarlar'
+- assertVisible: 'Profil'
 - assertVisible: 'Dil'
 - assertVisible: 'Türkçe'
 

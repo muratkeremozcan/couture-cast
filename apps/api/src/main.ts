@@ -67,8 +67,9 @@ async function bootstrap() {
   //
   // This option must be set on EVERY bootstrap, not just this one. `api/index.ts`
   // is the deployed entry and the test suites create their own applications; a
-  // bootstrap without it 401s every signed webhook it serves.
-  const app = await NestFactory.create(AppModule, { rawBody: true })
+  // bootstrap without it 401s every signed webhook it serves. `bodyParser: false`:
+  // configureApp registers the JSON and URL-encoded parsers itself.
+  const app = await NestFactory.create(AppModule, { rawBody: true, bodyParser: false })
 
   // CORS, request context, request logging, and ApiExceptionFilter all live in
   // `configureApp` so this entry and the deployed `api/index.ts` cannot drift.

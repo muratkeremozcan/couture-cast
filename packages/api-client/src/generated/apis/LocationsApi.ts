@@ -20,10 +20,16 @@ import type {
   DeleteSavedLocationResponse,
   ListSavedLocationsResponse,
   LocationSearchResponse,
+  LocationsFromCoordinatesInput,
   SetPrimarySavedLocationResponse,
   UpdateSavedLocationInput,
   UpdateSavedLocationResponse,
 } from '../models/index'
+
+export interface ApiV1LocationsFromCoordinatesPostRequest {
+  xCouturePlatform: ApiV1LocationsFromCoordinatesPostXCouturePlatformEnum
+  locationsFromCoordinatesInput: LocationsFromCoordinatesInput
+}
 
 export interface ApiV1LocationsFromSearchPostRequest {
   xCouturePlatform: ApiV1LocationsFromSearchPostXCouturePlatformEnum
@@ -57,6 +63,88 @@ export interface ApiV1LocationsSearchGetRequest {
  *
  */
 export class LocationsApi extends runtime.BaseAPI {
+  /**
+   * Creates request options for apiV1LocationsFromCoordinatesPost without sending the request
+   */
+  async apiV1LocationsFromCoordinatesPostRequestOpts(
+    requestParameters: ApiV1LocationsFromCoordinatesPostRequest
+  ): Promise<runtime.RequestOpts> {
+    if (requestParameters['xCouturePlatform'] == null) {
+      throw new runtime.RequiredError(
+        'xCouturePlatform',
+        'Required parameter "xCouturePlatform" was null or undefined when calling apiV1LocationsFromCoordinatesPost().'
+      )
+    }
+
+    if (requestParameters['locationsFromCoordinatesInput'] == null) {
+      throw new runtime.RequiredError(
+        'locationsFromCoordinatesInput',
+        'Required parameter "locationsFromCoordinatesInput" was null or undefined when calling apiV1LocationsFromCoordinatesPost().'
+      )
+    }
+
+    const queryParameters: any = {}
+
+    const headerParameters: runtime.HTTPHeaders = {}
+
+    headerParameters['Content-Type'] = 'application/json'
+
+    if (requestParameters['xCouturePlatform'] != null) {
+      headerParameters['x-couture-platform'] = String(
+        requestParameters['xCouturePlatform']
+      )
+    }
+
+    if (this.configuration && this.configuration.accessToken) {
+      const token = this.configuration.accessToken
+      const tokenString = await token('bearerAuth', [])
+
+      if (tokenString) {
+        headerParameters['Authorization'] = `Bearer ${tokenString}`
+      }
+    }
+
+    let urlPath = `/api/v1/locations/from-coordinates`
+
+    return {
+      path: urlPath,
+      method: 'POST',
+      headers: headerParameters,
+      query: queryParameters,
+      body: requestParameters['locationsFromCoordinatesInput'],
+    }
+  }
+
+  /**
+   * Use my location. Resolves the posted coordinates to at most five city candidates through the configured provider reverse geocoding, in the same shape and with the same signed candidateToken as search, so the city saves through POST /api/v1/locations/from-search. The coordinates are rounded to two decimals, never logged, stored or sent to analytics; only the provider place coordinates of a saved candidate are stored. Counts against the search rate limit.
+   * Find the city at an approximate device position
+   */
+  async apiV1LocationsFromCoordinatesPostRaw(
+    requestParameters: ApiV1LocationsFromCoordinatesPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<runtime.ApiResponse<LocationSearchResponse>> {
+    const requestOptions =
+      await this.apiV1LocationsFromCoordinatesPostRequestOpts(requestParameters)
+    const response = await this.request(requestOptions, initOverrides)
+
+    return new runtime.JSONApiResponse(response)
+  }
+
+  /**
+   * Use my location. Resolves the posted coordinates to at most five city candidates through the configured provider reverse geocoding, in the same shape and with the same signed candidateToken as search, so the city saves through POST /api/v1/locations/from-search. The coordinates are rounded to two decimals, never logged, stored or sent to analytics; only the provider place coordinates of a saved candidate are stored. Counts against the search rate limit.
+   * Find the city at an approximate device position
+   */
+  async apiV1LocationsFromCoordinatesPost(
+    requestParameters: ApiV1LocationsFromCoordinatesPostRequest,
+    initOverrides?: RequestInit | runtime.InitOverrideFunction
+  ): Promise<LocationSearchResponse> {
+    const response = await this.apiV1LocationsFromCoordinatesPostRaw(
+      requestParameters,
+      initOverrides
+    )
+    return await response.value()
+  }
+
   /**
    * Creates request options for apiV1LocationsFromSearchPost without sending the request
    */
@@ -553,6 +641,15 @@ export class LocationsApi extends runtime.BaseAPI {
   }
 }
 
+/**
+ * @export
+ */
+export const ApiV1LocationsFromCoordinatesPostXCouturePlatformEnum = {
+  web: 'web',
+  mobile: 'mobile',
+} as const
+export type ApiV1LocationsFromCoordinatesPostXCouturePlatformEnum =
+  (typeof ApiV1LocationsFromCoordinatesPostXCouturePlatformEnum)[keyof typeof ApiV1LocationsFromCoordinatesPostXCouturePlatformEnum]
 /**
  * @export
  */

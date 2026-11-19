@@ -114,9 +114,20 @@ export default function PrivacyPage() {
           <li>Northflank and Upstash: background jobs and their queues.</li>
           <li>PostHog: the analytics described above.</li>
           <li>Grafana Cloud: performance traces and metrics from our servers.</li>
+          {/* WEATHER_PROVIDER_MODE picks OpenWeather or WeatherAPI for forecasts and place search.
+              Use my location: the client and the API round the position to two decimals
+              (apps/web/src/lib/device-position.ts, location-capture.service.ts) and the save
+              stores only the provider's place. */}
           <li>
             OpenWeather: forecasts and place search. It receives the place or city you
-            enter and the coordinates of the places you get forecasts for.
+            enter and the coordinates of the places you get forecasts for. When you tap
+            Use my location, the weather provider in use (OpenWeather, or WeatherAPI when
+            that provider is in use) receives your approximate position, rounded to about
+            1 km, to find the city near you. CoutureCast stores only the place you pick.
+          </li>
+          <li>
+            WeatherAPI: the same forecasts and place search, with the same information,
+            when CoutureCast uses it in place of OpenWeather.
           </li>
           <li>
             Expo, with Apple and Google delivery: push notifications you turn on in the

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 // The Expo packages app code imports lazily (ritual-cache, settings-storage, mobile-auth,
-// commerce, community, native-notifications and their fixtures). Before
+// commerce, community, native-notifications, Use my location and their fixtures). Before
 // vitest.expo-env.setup.ts installed Expo's web global, every one of them threw reading
 // globalThis.expo.EventEmitter while loading, and app code swallowed it. expo-notifications
 // is left out: on load it starts server auto-registration, which logs on web, and the
@@ -15,6 +15,7 @@ const lazyExpoLoads = {
   'expo-secure-store': () => import('expo-secure-store'),
   'expo-crypto': () => import('expo-crypto'),
   'expo-image-picker': () => import('expo-image-picker'),
+  'expo-location': () => import('expo-location'),
 }
 
 describe('Expo web global in browser suites', () => {

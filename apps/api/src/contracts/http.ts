@@ -82,6 +82,7 @@ export {
   locationSearchCandidateSchema,
   locationSearchQueryParamsSchema,
   locationSearchResponseSchema,
+  locationsFromCoordinatesInputSchema,
   locationUnavailableResponseSchema,
   type CreateSavedLocationFromSearchResponse,
   type LocationPlatform,

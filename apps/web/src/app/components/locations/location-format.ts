@@ -33,8 +33,22 @@ export function distinctPlaceParts(
   })
 }
 
-/** Which request failed: the same provider outage reads differently on save. */
-export type LocationFailureStep = 'search' | 'save'
+/**
+ * Which step failed: the same provider outage reads differently on save. Use my
+ * location (`locate`) answers an outage like search, because it is one.
+ */
+export type LocationFailureStep = 'search' | 'save' | 'locate'
+
+/**
+ * Use my location failures that happen before or instead of a request: the
+ * member or browser refused the position, the browser could not tell, or no
+ * city is near it. Each one points back at the city search.
+ */
+export type LocateFailure = 'location_denied' | 'location_unavailable' | 'no_city_nearby'
+
+export function locateErrorKey(failure: LocateFailure): string {
+  return `locations.errors.${failure}`
+}
 
 export function errorKey(
   reason: LocationFailureReason,

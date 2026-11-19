@@ -109,6 +109,43 @@ export function locationFailureReason(error: unknown): LocationFailureReason {
   return error instanceof LocationRequestError ? error.reason : 'unknown'
 }
 
+/** Work started for a member who is no longer signed in on this device. */
+function supersededError(): Error {
+  const error = new Error('The member who started this request is no longer signed in.')
+  error.name = 'AbortError'
+  return error
+}
+
+/**
+ * Every member-owned request takes one ownership token: the caller's `signal`, aborted when its
+ * screen or tap is gone, and `stillCurrent`, false once the member who started it is no longer
+ * signed in. Both are checked before the bearer is resolved, again after (the bearer may already
+ * be the next member's), and before a completion notifies anyone.
+ */
+type StillCurrent = () => boolean
+const always: StillCurrent = () => true
+
+function owned(signal: AbortSignal | undefined, stillCurrent: StillCurrent): boolean {
+  return !signal?.aborted && stillCurrent()
+}
+
+/** The API client for this member's request, or a superseded error before anything is sent. */
+async function ownedClient(signal: AbortSignal | undefined, stillCurrent: StillCurrent) {
+  if (!owned(signal, stillCurrent)) throw supersededError()
+  // The bearer is resolved here, when the request is sent, and the claim is checked after.
+  const api = await client()
+  if (!owned(signal, stillCurrent)) throw supersededError()
+  return api
+}
+
+/** Global listeners hear about a change only while its member is still the one signed in. */
+function notifyIfOwned(
+  signal: AbortSignal | undefined,
+  stillCurrent: StillCurrent
+): void {
+  if (owned(signal, stillCurrent)) notifyLocationsChanged()
+}
+
 async function client() {
   const accessToken = (await resolveMobileAccessToken())?.trim()
   if (!accessToken) {
@@ -118,10 +155,11 @@ async function client() {
 }
 
 export async function listLocationsFromMobile(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation[]> {
   try {
-    const api = await client()
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsGet({ signal: requestSignal })
     )
@@ -134,10 +172,11 @@ export async function listLocationsFromMobile(
 export async function searchLocationsFromMobile(
   query: string,
   locale: SupportedLocale,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const api = await client()
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsSearchGet(
         { q: query, locale, xCouturePlatform: 'mobile' },
@@ -150,13 +189,56 @@ export async function searchLocationsFromMobile(
   }
 }
 
+/** Two decimals, about a kilometre: all of the device position that leaves the phone. */
+export function approximateCoordinate(value: number): number {
+  const rounded = Math.round(value * 100) / 100
+  return Object.is(rounded, -0) ? 0 : rounded
+}
+
+/**
+ * Use my location: the cities nearest the device position, as search
+ * candidates. The position is rounded to two decimals here and travels only in
+ * the POST body; this module never logs it or sends it to analytics.
+ */
+export async function locationsNearFromMobile(
+  latitude: number,
+  longitude: number,
+  locale: SupportedLocale,
+  signal?: AbortSignal,
+  /** False once the tap is superseded or the member changed: nothing more is sent. */
+  stillCurrent: StillCurrent = always
+): Promise<LocationSearchCandidate[]> {
+  try {
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      api.apiV1LocationsFromCoordinatesPost(
+        {
+          xCouturePlatform: 'mobile',
+          locationsFromCoordinatesInput: {
+            latitude: approximateCoordinate(latitude),
+            longitude: approximateCoordinate(longitude),
+            locale,
+          },
+        },
+        { signal: requestSignal }
+      )
+    )
+    return locationSearchResponseSchema.parse(response).data
+  } catch (error) {
+    throw await locationError(error)
+  }
+}
+
 export async function saveLocationFromSearchFromMobile(
   candidateToken: string,
-  label: string
+  label: string,
+  signal?: AbortSignal,
+  /** False once the member who picked the place is gone: nothing is sent. */
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromSearchPost(
         {
           xCouturePlatform: 'mobile',
@@ -166,7 +248,7 @@ export async function saveLocationFromSearchFromMobile(
       )
     )
     const saved = createSavedLocationFromSearchResponseSchema.parse(response).data
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -174,15 +256,17 @@ export async function saveLocationFromSearchFromMobile(
 }
 
 export async function setPrimaryLocationFromMobile(
-  locationId: string
+  locationId: string,
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdPrimaryPost({ locationId }, { signal: requestSignal })
     )
     const saved = setPrimarySavedLocationResponseSchema.parse(response).data
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
     return saved
   } catch (error) {
     throw await locationError(error)
@@ -191,32 +275,38 @@ export async function setPrimaryLocationFromMobile(
 
 export async function renameLocationFromMobile(
   locationId: string,
-  label: string
+  label: string,
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdPatch(
         { locationId, updateSavedLocationInput: { label } },
         { signal: requestSignal }
       )
     )
     const saved = updateSavedLocationResponseSchema.parse(response).data
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
     return saved
   } catch (error) {
     throw await locationError(error)
   }
 }
 
-export async function deleteLocationFromMobile(locationId: string): Promise<void> {
+export async function deleteLocationFromMobile(
+  locationId: string,
+  signal?: AbortSignal,
+  stillCurrent: StillCurrent = always
+): Promise<void> {
   try {
-    const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    const api = await ownedClient(signal, stillCurrent)
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdDelete({ locationId }, { signal: requestSignal })
     )
     deleteSavedLocationResponseSchema.parse(response)
-    notifyLocationsChanged()
+    notifyIfOwned(signal, stillCurrent)
   } catch (error) {
     throw await locationError(error)
   }

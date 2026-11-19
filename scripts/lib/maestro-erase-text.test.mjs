@@ -10,7 +10,7 @@ import {
   eraseTextViolations,
   maestroFlowFiles,
 } from './maestro-erase-text.mjs'
-import { sentinelPlace } from './weather-provider-double-data.mjs'
+import { DOUBLE_PLACES, sentinelPlace } from './weather-provider-double-data.mjs'
 
 const root = fileURLToPath(new URL('../../', import.meta.url))
 const read = (file) => fs.readFileSync(path.join(root, file), 'utf8')
@@ -97,6 +97,12 @@ describe('the flows that erase', () => {
     const city = sentinelPlace('any nonce').name
     assert.equal(city.length, 13)
     assert.equal(erasedTotal(read('maestro/location-capture.yaml')), city.length)
+  })
+
+  test('Use my location erases exactly the prefilled city the double resolves', () => {
+    const chicago = DOUBLE_PLACES.find((place) => place.name === 'Chicago')
+    assert.equal(chicago?.name.length, 7)
+    assert.equal(erasedTotal(read('maestro/location-use-my-location.yaml')), 7)
   })
 
   test('the erased total counts every form the deadline rule accepts', () => {

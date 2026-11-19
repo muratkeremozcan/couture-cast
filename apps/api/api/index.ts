@@ -19,6 +19,8 @@ async function bootstrap(): Promise<Express> {
   const app = await NestFactory.create(AppModule, adapter, {
     bufferLogs: true,
     rawBody: true,
+    // configureApp registers the body parsers itself.
+    bodyParser: false,
   })
 
   // Before `init()`, not after: Express middleware registered post-initialization

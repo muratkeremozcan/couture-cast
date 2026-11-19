@@ -32,6 +32,14 @@ test(
       info.NSPhotoLibraryAddUsageDescription,
       'Allow CoutureCast to save the card you approve to your photos.'
     )
+    // Use my location (2026-11-19): when in use only, never always or in the background.
+    assert.equal(
+      info.NSLocationWhenInUseUsageDescription,
+      'Allow CoutureCast to find the city you are in when you tap Use my location.'
+    )
+    assert.equal(info.UIBackgroundModes?.includes('location') ?? false, false)
+    // The first iOS prompt offers approximate location, with Precise switched off.
+    assert.equal(info.NSLocationDefaultAccuracyReduced, true)
     // U-PLUGIN-MANIFEST: native sharing hands a file to the share sheet and asks for nothing.
     assert.deepEqual(
       Object.keys(info)
@@ -40,6 +48,7 @@ test(
       [
         'NSCameraUsageDescription',
         'NSFaceIDUsageDescription',
+        'NSLocationWhenInUseUsageDescription',
         'NSPhotoLibraryAddUsageDescription',
         'NSPhotoLibraryUsageDescription',
       ]
@@ -68,6 +77,7 @@ test(
       for (const key of [
         'NSPhotoLibraryUsageDescription',
         'NSPhotoLibraryAddUsageDescription',
+        'NSLocationWhenInUseUsageDescription',
       ]) {
         assert.ok(expected[key].trim())
         assert.ok(
@@ -286,6 +296,25 @@ test(
         `${permission} must remain available through API32 for existing picker/save paths`
       )
     }
+    // Use my location (2026-11-19): approximate and foreground only. expo-location's library
+    // manifest declares fine location; the generated policy removes it with background location.
+    for (const permission of [
+      'ACCESS_FINE_LOCATION',
+      'ACCESS_BACKGROUND_LOCATION',
+      'FOREGROUND_SERVICE_LOCATION',
+    ]) {
+      const name = `android.permission.${permission}`
+      assert.equal(permissions.has(name), false, `${name} must be absent after merge`)
+      assert.equal(
+        declarations.get(name)?.['tools:node'],
+        'remove',
+        `${name} must be removed by generated application policy`
+      )
+    }
+    assert.ok(
+      permissions.has('android.permission.ACCESS_COARSE_LOCATION'),
+      'ACCESS_COARSE_LOCATION remains for Use my location'
+    )
     assert.equal(permissions.has('android.permission.READ_MEDIA_IMAGES'), false)
     assert.equal(permissions.has('android.permission.QUERY_ALL_PACKAGES'), false)
   }

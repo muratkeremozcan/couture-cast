@@ -21,6 +21,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { FetchError, ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
+import { approximateCoordinate } from './device-position'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import { readStorage } from './browser-persistence'
 
@@ -110,15 +111,37 @@ async function locationError(error: unknown): Promise<LocationRequestError> {
   )
 }
 
-function client() {
-  return createWebApiClient({ accessToken: readAccessToken() })
+/**
+ * The bearer for one request, read immediately before it is sent and only while the member who
+ * started the operation still holds the session. A long prompt (browser location consent) can
+ * outlast a token, so an operation never reuses a bearer across requests; it reads a fresh one
+ * for each, and the owner check keeps one member's data off another member's token.
+ */
+export interface LocationCredentials {
+  readonly accessToken: string
+}
+
+/** The bearer this tab holds right now, for one request, or null when signed out. */
+export function captureLocationCredentials(): LocationCredentials | null {
+  const token =
+    typeof window === 'undefined'
+      ? null
+      : (readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null)
+  return token ? { accessToken: token } : null
+}
+
+function client(credentials?: LocationCredentials) {
+  return createWebApiClient({
+    accessToken: credentials?.accessToken ?? readAccessToken(),
+  })
 }
 
 export async function listLocationsFromWeb(
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation[]> {
   try {
-    const response = await client().apiV1LocationsGet({ signal })
+    const response = await client(credentials).apiV1LocationsGet({ signal })
     return listSavedLocationsResponseSchema.parse(response).data
   } catch (error) {
     throw await locationError(error)
@@ -128,11 +151,41 @@ export async function listLocationsFromWeb(
 export async function searchLocationsFromWeb(
   query: string,
   locale: SupportedLocale,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  credentials?: LocationCredentials
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const response = await client().apiV1LocationsSearchGet(
+    const response = await client(credentials).apiV1LocationsSearchGet(
       { q: query, locale, xCouturePlatform: 'web' },
+      { signal }
+    )
+    return locationSearchResponseSchema.parse(response).data
+  } catch (error) {
+    throw await locationError(error)
+  }
+}
+
+/**
+ * Use my location: the cities nearest an approximate position, as search
+ * candidates that save through `saveLocationFromSearchFromWeb`. The position is
+ * rounded to two decimals here as well and travels only in the POST body.
+ */
+export async function locationsFromCoordinatesFromWeb(
+  position: { latitude: number; longitude: number },
+  locale: SupportedLocale,
+  signal?: AbortSignal,
+  credentials?: LocationCredentials
+): Promise<LocationSearchCandidate[]> {
+  try {
+    const response = await client(credentials).apiV1LocationsFromCoordinatesPost(
+      {
+        xCouturePlatform: 'web',
+        locationsFromCoordinatesInput: {
+          latitude: approximateCoordinate(position.latitude),
+          longitude: approximateCoordinate(position.longitude),
+          locale,
+        },
+      },
       { signal }
     )
     return locationSearchResponseSchema.parse(response).data
@@ -143,10 +196,11 @@ export async function searchLocationsFromWeb(
 
 export async function saveLocationFromSearchFromWeb(
   candidateToken: string,
-  label: string
+  label: string,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation> {
   try {
-    const response = await client().apiV1LocationsFromSearchPost({
+    const response = await client(credentials).apiV1LocationsFromSearchPost({
       xCouturePlatform: 'web',
       createSavedLocationFromSearchInput: { candidateToken, label },
     })
@@ -158,10 +212,13 @@ export async function saveLocationFromSearchFromWeb(
 }
 
 export async function setPrimaryLocationFromWeb(
-  locationId: string
+  locationId: string,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation> {
   try {
-    const response = await client().apiV1LocationsLocationIdPrimaryPost({ locationId })
+    const response = await client(credentials).apiV1LocationsLocationIdPrimaryPost({
+      locationId,
+    })
     const saved = setPrimarySavedLocationResponseSchema.parse(response).data
     return saved
   } catch (error) {
@@ -171,10 +228,11 @@ export async function setPrimaryLocationFromWeb(
 
 export async function renameLocationFromWeb(
   locationId: string,
-  label: string
+  label: string,
+  credentials?: LocationCredentials
 ): Promise<SavedLocation> {
   try {
-    const response = await client().apiV1LocationsLocationIdPatch({
+    const response = await client(credentials).apiV1LocationsLocationIdPatch({
       locationId,
       updateSavedLocationInput: { label },
     })
@@ -185,9 +243,14 @@ export async function renameLocationFromWeb(
   }
 }
 
-export async function deleteLocationFromWeb(locationId: string): Promise<void> {
+export async function deleteLocationFromWeb(
+  locationId: string,
+  credentials?: LocationCredentials
+): Promise<void> {
   try {
-    const response = await client().apiV1LocationsLocationIdDelete({ locationId })
+    const response = await client(credentials).apiV1LocationsLocationIdDelete({
+      locationId,
+    })
     deleteSavedLocationResponseSchema.parse(response)
   } catch (error) {
     throw await locationError(error)

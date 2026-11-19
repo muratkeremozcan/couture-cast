@@ -54,7 +54,8 @@ export default function TabLayout() {
     home: t('tabs.home', { defaultValue: 'Home' }),
     wardrobe: t('tabs.wardrobe', { defaultValue: 'Wardrobe' }),
     community: t('tabs.community', { defaultValue: 'Community' }),
-    settings: t('tabs.settings', { defaultValue: 'Settings' }),
+    // The settings route reads Profile: the member's account and everything they set.
+    settings: t('tabs.profile', { defaultValue: 'Profile' }),
   }
 
   const trackTabPress = (tabId: string, label: string, targetPath: string) => {
@@ -194,7 +195,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }: { color: string; focused: boolean }) => (
             <TabBarIcon
               growth={indicatorDrop}
-              name="cog"
+              name="user-circle"
               color={color}
               focused={focused}
               tabId="settings"

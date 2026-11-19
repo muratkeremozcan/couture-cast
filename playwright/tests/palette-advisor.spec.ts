@@ -209,9 +209,7 @@ premiumFreshTest.describe(
           'Assert the locked panel shows the signed-in copy, and no consent control'
         )
         await expect(lockedPanel(page)).toBeVisible()
-        await expect(lockedPanel(page)).toContainText(
-          'Subscribe to Premium from Settings'
-        )
+        await expect(lockedPanel(page)).toContainText('Subscribe to Premium from Profile')
         // The consent gate must never be reachable for a non-entitled reader: it
         // would invite a grant the guard rejects pre-handler.
         await expect(consentBlock(page)).toHaveCount(0)

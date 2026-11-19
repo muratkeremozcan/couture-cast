@@ -1,5 +1,6 @@
 {
   "ios": {
+    "NSLocationWhenInUseUsageDescription": "Permita que o CoutureCast encontre sua cidade quando você tocar em Usar minha localização.",
     "NSPhotoLibraryAddUsageDescription": "Permita que o CoutureCast salve o cartão aprovado nas suas fotos.",
     "NSPhotoLibraryUsageDescription": "Permita que o CoutureCast escolha fotos do seu guarda-roupa."
   }

@@ -178,6 +178,10 @@ const geocoder = {
     if (world().geocoderDown) return Promise.reject(outage())
     return Promise.resolve([PACT_CHICAGO_PLACE])
   },
+  reverse() {
+    if (world().geocoderDown) return Promise.reject(outage())
+    return Promise.resolve([PACT_CHICAGO_PLACE])
+  },
 } satisfies ILocationGeocoder
 
 /** Five usable days: above the climate band's minimum, so the save is weather-ready. */

@@ -30,3 +30,9 @@ export declare function isFlakySaveCoordinate(
   longitude: number
 ): boolean
 export declare function coordinateKeySuffix(latitude: number, longitude: number): string
+export declare const REVERSE_MATCH_DEGREES: number
+export declare const REVERSE_DOWN_COORDINATE: Readonly<{ lat: number; lon: number }>
+export declare function reversePlaces(
+  lat: number,
+  lon: number
+): WeatherProviderDoublePlace[]

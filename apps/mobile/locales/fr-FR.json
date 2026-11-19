@@ -1,5 +1,6 @@
 {
   "ios": {
+    "NSLocationWhenInUseUsageDescription": "Autorisez CoutureCast à trouver votre ville lorsque vous touchez Utiliser ma position.",
     "NSPhotoLibraryAddUsageDescription": "Autorisez CoutureCast à enregistrer la carte approuvée dans vos photos.",
     "NSPhotoLibraryUsageDescription": "Autorisez CoutureCast à choisir des photos de votre garde-robe."
   }

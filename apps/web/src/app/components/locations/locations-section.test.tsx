@@ -145,7 +145,9 @@ function renderSection() {
 }
 
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  // Only the e2e fixture bearer counts without a verified member.
+  vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-member')
 }
 
 function status() {
@@ -211,6 +213,7 @@ describe('LocationsSection', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     for (const observer of observers.splice(0)) observer.disconnect()
     vi.useRealTimers()
     vi.unstubAllGlobals()

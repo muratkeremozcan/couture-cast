@@ -1,10 +1,14 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 1.2b: every locations key ships in all ten web locales.
 import { describe, expect, it } from 'vitest'
 import type { LocationFailureReason } from '../lib/locations'
 import {
   errorKey,
+  locateErrorKey,
+  type LocateFailure,
   type LocationFailureStep,
 } from '../app/components/locations/location-format'
 import { SUPPORTED_LOCALES, type SupportedLocale } from './index'
@@ -91,7 +95,16 @@ const FAILURE_REASONS: Record<LocationFailureReason, true> = {
   not_found: true,
   unknown: true,
 }
-const FAILURE_STEPS: Record<LocationFailureStep, true> = { search: true, save: true }
+const FAILURE_STEPS: Record<LocationFailureStep, true> = {
+  search: true,
+  save: true,
+  locate: true,
+}
+const LOCATE_FAILURES: Record<LocateFailure, true> = {
+  location_denied: true,
+  location_unavailable: true,
+  no_city_nearby: true,
+}
 
 describe('1.2b locations locale parity (web)', () => {
   it('1.2b-I18N-WEB-01 ships a locations tree for every supported locale', () => {
@@ -151,14 +164,38 @@ describe('1.2b locations locale parity (web)', () => {
   })
 
   // The settings page hosts the Locations section; its heading was English on
-  // every locale before Story 1.2b.
+  // every locale before Story 1.2b. Since 2026-11-19 the page is the Profile.
   it('1.2b-I18N-WEB-07 ships a translated settings page title in every locale', () => {
-    expect(lookup(CATALOGS['en-US'], 'settings.title')).toBe('Settings')
+    expect(lookup(CATALOGS['en-US'], 'settings.title')).toBe('Profile')
     for (const locale of SUPPORTED_LOCALES) {
       const title = lookup(CATALOGS[locale], 'settings.title')
       expect(typeof title, locale).toBe('string')
       expect(String(title).trim().length, locale).toBeGreaterThan(0)
-      if (!locale.startsWith('en-')) expect(title, locale).not.toBe('Settings')
+      if (!locale.startsWith('en-')) expect(title, locale).not.toBe('Profile')
+    }
+  })
+
+  // Production follow-up (2026-11-19), Use my location: the copy TEA's browser
+  // spec (playwright/tests/location-use-my-location.spec.ts) reads.
+  it('LOC-I18N-WEB-01 matches the canonical en-US Use my location strings', () => {
+    expect(reference.get('useMyLocation')).toBe('Use my location')
+    expect(reference.get('errors.location_denied')).toBe(
+      'Location access is off. Search for your city instead.'
+    )
+    expect(reference.get('errors.location_unavailable')).toBe(
+      'Your location is not available right now. Search for your city instead.'
+    )
+    expect(reference.get('errors.no_city_nearby')).toBe(
+      'No city found near you. Search for your city instead.'
+    )
+  })
+
+  it('LOC-I18N-WEB-02 ships every Use my location failure key in every locale', () => {
+    for (const failure of Object.keys(LOCATE_FAILURES) as LocateFailure[]) {
+      for (const locale of SUPPORTED_LOCALES) {
+        const value = lookup(CATALOGS[locale], locateErrorKey(failure))
+        expect(typeof value, `${locale} ${failure}`).toBe('string')
+      }
     }
   })
 

@@ -1,5 +1,6 @@
 {
   "ios": {
+    "NSLocationWhenInUseUsageDescription": "Konumumu kullan’a dokunduğunuzda CoutureCast’in bulunduğunuz şehri bulmasına izin verin.",
     "NSPhotoLibraryAddUsageDescription": "CoutureCast’in onayladığın kartı fotoğraflarına kaydetmesine izin ver.",
     "NSPhotoLibraryUsageDescription": "CoutureCast’in gardırobunuz için fotoğraf seçmesine izin verin."
   }

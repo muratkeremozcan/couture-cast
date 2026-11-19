@@ -271,7 +271,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Sponsorlu. Bu bağlantıdan alışveriş yaparsan CoutureCast komisyon kazanır. Bu, önerilen tonları değiştirmez ve sponsorlu bağlantıları Ayarlar'dan kapatabilirsin.",
+          "disclosure": "Sponsorlu. Bu bağlantıdan alışveriş yaparsan CoutureCast komisyon kazanır. Bu, önerilen tonları değiştirmez ve sponsorlu bağlantıları Profil'den kapatabilirsin.",
           "partnerLabel": "{{partner}} tarafından",
           "cta": "Bu tonu satın al"
         },
@@ -284,7 +284,7 @@
         },
         "locked": {
           "title": "Renk danışmanlığı bir Premium özelliğidir",
-          "body": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için Ayarlar'dan Premium'a abone ol.",
+          "body": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için Profil'den Premium'a abone ol.",
           "signedOutBody": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için giriş yap ve Premium'a abone ol."
         },
         "staleVersion": "Bu palet, önerilerimizin daha eski bir sürümünden geliyor. Güncel bir sonuç için analizi yeniden çalıştır.",
@@ -728,6 +728,7 @@
     "empty": "Henüz kayıtlı konum yok. Eklemek için bir şehir arayın.",
     "signedOutHint": "Konumlarınızı yönetmek için giriş yapın.",
     "loadError": "Konumlarınız yüklenemedi.",
+    "loadRetry": "Tekrar dene",
     "primary": "Ana konum",
     "makePrimary": "Ana konum yap",
     "rename": "Yeniden adlandır",
@@ -752,6 +753,8 @@
     "deleted": "{{label}} silindi.",
     "limit": "Üç konum kaydettiniz. Yeni bir tane eklemek için birini silin.",
     "retry": "Tekrar dene",
+    "useMyLocation": "Konumumu kullan",
+    "locating": "Konumunuz bulunuyor...",
     "guided": {
       "add": "Konum ekle"
     },
@@ -763,11 +766,15 @@
       "duplicate": "Bu konum zaten kayıtlı.",
       "rate_limited": "Çok fazla arama yapıldı. Biraz bekleyip tekrar deneyin.",
       "invalid_query": "2 ile 80 karakter arasında yazın.",
-      "unknown": "Bir sorun oluştu. Tekrar deneyin."
+      "unknown": "Bir sorun oluştu. Tekrar deneyin.",
+      "location_denied": "Konum erişimi kapalı. Bunun yerine şehrinizi arayın.",
+      "location_unavailable": "Konumunuz şu anda kullanılamıyor. Bunun yerine şehrinizi arayın.",
+      "no_city_nearby": "Yakınınızda şehir bulunamadı. Bunun yerine şehrinizi arayın."
     }
   },
   "settings": {
-    "title": "Ayarlar"
+    "title": "Profil",
+    "account": "Hesabınız"
   },
   "home": {
     "spotlightTeaser": {
@@ -1208,5 +1215,13 @@
         "unavailable": "Dışa aktarma kullanılamıyor. Yeniden deneyin."
       }
     }
+  },
+  "nav": {
+    "label": "Alt gezinme",
+    "home": "Ana Sayfa",
+    "wardrobe": "Gardırop",
+    "community": "Topluluk",
+    "profile": "Profil",
+    "navigatedTo": "{{label}} sekmesine geçildi"
   }
 }

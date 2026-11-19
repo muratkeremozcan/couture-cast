@@ -9,8 +9,10 @@
 // error uses the alert role. Busy actions set `aria-busy` beside
 // `accessibilityState.busy`, which react-native-web 0.21 no longer renders.
 // Opened from a guided entry, a save returns to the originating screen, which
-// reloads on `onLocationsChanged`.
-import { useCallback, useEffect, useRef, useState } from 'react'
+// reloads on `onLocationsChanged`. Use my location asks for permission only
+// when tapped, rounds the position to two decimals and offers the cities the
+// API finds near it as ordinary picks; any failure leaves search ready.
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import {
@@ -33,15 +35,25 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
+  mobileIdentityEpoch,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
+import {
   deleteLocationFromMobile,
   listLocationsFromMobile,
   locationFailureReason,
   renameLocationFromMobile,
   saveLocationFromSearchFromMobile,
+  locationsNearFromMobile,
   searchLocationsFromMobile,
   setPrimaryLocationFromMobile,
   type LocationFailureReason,
 } from '@/src/lib/locations'
+import {
+  DevicePositionError,
+  readDevicePosition,
+  type DevicePositionFailure,
+} from './device-position'
 
 /** Story 1.2b: search waits for 300 ms of quiet typing. */
 export const LOCATION_SEARCH_DEBOUNCE_MS = 300
@@ -50,14 +62,26 @@ const MIN_QUERY_LENGTH = 2
 
 type ScreenState = 'loading' | 'ready' | 'signed_out' | 'load_failed'
 
-/** Which request failed: the same provider outage reads differently on save. */
-export type LocationFailureStep = 'search' | 'save'
+/**
+ * Which request failed: the same provider outage reads differently on save.
+ * `locate` is Use my location, whose provider outage reads as search's.
+ */
+export type LocationFailureStep = 'search' | 'save' | 'locate'
+
+/** Use my location's own outcomes: no permission, no position, no city near it. */
+export type LocateFailureReason = DevicePositionFailure | 'no_city_nearby'
+
+type FormFailureReason = LocationFailureReason | LocateFailureReason
 
 export function errorKey(
-  reason: LocationFailureReason,
+  reason: FormFailureReason,
   step: LocationFailureStep = 'search'
 ): string {
   switch (reason) {
+    case 'location_denied':
+    case 'location_unavailable':
+    case 'no_city_nearby':
+      return `locations.errors.${reason}`
     case 'provider_unavailable':
       // The save-time forecast is a different request from city search, and
       // telling the member search is down when their pick could not be saved
@@ -103,12 +127,43 @@ export function formatPlace(
     .join(', ')
 }
 
+/** One member-owned operation, claimed when the member acted. */
+interface MemberClaim {
+  /** This member, this screen, this operation. */
+  current: () => boolean
+  /** This member only: for a confirmation that outlives an intended navigation. */
+  memberCurrent: () => boolean
+}
+
 export interface LocationsScreenProps {
   /** Opened from a no-location state: save returns there. */
   guided?: boolean
 }
 
+/**
+ * Everything on the screen belongs to the member signed in on the device: it is keyed by the
+ * identity epoch, read as an external store, so a change of member (or sign-out) discards the
+ * last member's rows, editors, inputs, form and every handler they hold in the same render,
+ * before any effect runs, and the next member's screen loads its own list. Reading the epoch as
+ * a store also catches a change that lands between the first render and the subscription.
+ */
 export function LocationsScreen({ guided = false }: LocationsScreenProps) {
+  const memberEpoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch
+  )
+  return (
+    <MemberLocationsScreen key={memberEpoch} guided={guided} memberEpoch={memberEpoch} />
+  )
+}
+
+function MemberLocationsScreen({
+  guided,
+  memberEpoch,
+}: {
+  guided: boolean
+  memberEpoch: number
+}) {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
   const { announce } = useAccessibilityAnnouncer()
@@ -128,10 +183,20 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<{
-    reason: LocationFailureReason
+    reason: FormFailureReason
     step: LocationFailureStep
   } | null>(null)
+  const [isLocating, setIsLocating] = useState(false)
   const headingRef = useRef<Text>(null)
+  const searchInputRef = useRef<TextInput>(null)
+  // Each tap supersedes the last; a result that lands after unmount or a newer
+  // tap is dropped.
+  const locateAttemptRef = useRef(0)
+  const locateControllerRef = useRef<AbortController | null>(null)
+  const saveControllerRef = useRef<AbortController | null>(null)
+  const listActionControllerRef = useRef<AbortController | null>(null)
+  // False once the screen is gone: nothing it started may write, announce or navigate.
+  const mountedRef = useRef(true)
   const announceRef = useRef(announce)
   announceRef.current = announce
   const tRef = useRef(t)
@@ -144,23 +209,82 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     }
   }, [])
 
-  const reload = useCallback(async (signal?: AbortSignal) => {
-    const next = await listLocationsFromMobile(signal)
-    if (signal?.aborted) return
-    setLocations(next)
-    setScreenState('ready')
+  /**
+   * The member this screen rendered for, still signed in and the screen still
+   * mounted; null when the member already changed (a press queued before the
+   * switch re-rendered the screen is refused).
+   */
+  const memberPredicate = useCallback((): (() => boolean) | null => {
+    const epoch = memberEpoch
+    if (!mountedRef.current || epoch !== mobileIdentityEpoch()) return null
+    return () => mountedRef.current && epoch === mobileIdentityEpoch()
+  }, [memberEpoch])
+
+  /**
+   * Pins one member-owned operation to its owner at the moment the member acts:
+   * the member this screen rendered for, refused if that is no longer who is
+   * signed in. Each request resolves the bearer only when it is sent, checking
+   * this claim before and after, so a token the same member refreshed in the
+   * meantime is used and another member's never is. `current` (this member,
+   * this screen, this operation) is checked after every await and by every
+   * deferred announcement, focus or navigation; `memberCurrent` drops the
+   * screen, for a confirmation that outlives an intended navigation.
+   */
+  const claim = useCallback(
+    (controller: AbortController): MemberClaim | null => {
+      const onScreen = memberPredicate()
+      if (!onScreen) return null
+      return {
+        current: () => onScreen() && !controller.signal.aborted,
+        memberCurrent: () => memberEpoch === mobileIdentityEpoch(),
+      }
+    },
+    [memberPredicate, memberEpoch]
+  )
+
+  /** True when the list landed for the member who asked for it. */
+  const reload = useCallback(
+    async (claimed: MemberClaim, signal: AbortSignal): Promise<boolean> => {
+      const next = await listLocationsFromMobile(signal, claimed.current)
+      if (!claimed.current()) return false
+      setLocations(next)
+      setScreenState('ready')
+      return true
+    },
+    []
+  )
+
+  /** Drops a pending Use my location: its position, request and answer go nowhere. */
+  const cancelLocate = useCallback(() => {
+    locateAttemptRef.current += 1
+    locateControllerRef.current?.abort()
+    locateControllerRef.current = null
+    setIsLocating(false)
   }, [])
 
   useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      cancelLocate()
+      saveControllerRef.current?.abort()
+      listActionControllerRef.current?.abort()
+    }
+  }, [cancelLocate])
+
+  useEffect(() => {
     const controller = new AbortController()
-    reload(controller.signal).catch((error: unknown) => {
-      if (controller.signal.aborted) return
+    // A member change mounts a new screen for the next member, which loads its own list.
+    const claimed = claim(controller)
+    if (!claimed) return
+    reload(claimed, controller.signal).catch((error: unknown) => {
+      if (!claimed.current()) return
       setScreenState(
         locationFailureReason(error) === 'signed_out' ? 'signed_out' : 'load_failed'
       )
     })
     return () => controller.abort()
-  }, [reload])
+  }, [reload, claim])
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -170,91 +294,202 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       return
     }
     const controller = new AbortController()
+    // Claimed at the keystroke that starts the quiet wait.
+    const claimed = claim(controller)
+    if (!claimed) return
+    const { current } = claimed
     const timer = setTimeout(() => {
+      if (!current()) return
       setIsSearching(true)
-      searchLocationsFromMobile(trimmed, locale, controller.signal)
+      searchLocationsFromMobile(trimmed, locale, controller.signal, current)
         .then((results) => {
-          if (controller.signal.aborted) return
+          if (!current()) return
           setCandidates(results)
           // A refused save stays explained while the query searches again.
-          setFormError((current) => (current?.step === 'save' ? current : null))
+          setFormError((error) => (error?.step === 'save' ? error : null))
           announceRef.current(
             'feedback',
             results.length > 0
               ? tRef.current('locations.resultCount', { count: results.length })
-              : tRef.current('locations.noResults')
+              : tRef.current('locations.noResults'),
+            { stillCurrent: current }
           )
         })
         .catch((error: unknown) => {
-          if (controller.signal.aborted) return
+          if (!current()) return
           setCandidates([])
           const reason = locationFailureReason(error)
           setFormError({ reason, step: 'search' })
-          announceRef.current('error', tRef.current(errorKey(reason, 'search')))
+          announceRef.current('error', tRef.current(errorKey(reason, 'search')), {
+            stillCurrent: current,
+          })
         })
         .finally(() => {
-          if (!controller.signal.aborted) setIsSearching(false)
+          if (current()) setIsSearching(false)
         })
     }, LOCATION_SEARCH_DEBOUNCE_MS)
     return () => {
       clearTimeout(timer)
       controller.abort()
     }
-  }, [query, locale, selected, searchAttempt])
+  }, [query, locale, selected, searchAttempt, claim])
 
+  /**
+   * One list action for the member who started it. The request is checked after
+   * its bearer resolves and before it is sent; ownership is checked again the
+   * moment it settles, before any editor closes or a reload starts, after the
+   * reload, and when the announcement is delivered.
+   */
   async function runListAction(
     locationId: string,
-    work: () => Promise<string>
-  ): Promise<void> {
-    if (busyId) return
+    mutate: (signal: AbortSignal, stillCurrent: () => boolean) => Promise<unknown>,
+    settled: () => string
+  ): Promise<(() => boolean) | null> {
+    if (busyId) return null
+    const controller = new AbortController()
+    const claimed = claim(controller)
+    if (!claimed) return null
+    listActionControllerRef.current = controller
+    const { current } = claimed
     setBusyId(locationId)
     setListError(null)
     try {
-      const message = await work()
-      await reload()
-      announce('feedback', message)
+      await mutate(controller.signal, current)
+      if (!current()) return null
+      const message = settled()
+      if (!(await reload(claimed, controller.signal)) || !current()) return null
+      announce('feedback', message, { stillCurrent: current })
+      // The caller's deferred focus checks this when it runs.
+      return current
     } catch (error) {
+      if (!current()) return null
       const reason = locationFailureReason(error)
       setListError(reason)
-      announce('error', t(errorKey(reason)))
+      announce('error', t(errorKey(reason)), { stillCurrent: current })
+      return null
     } finally {
-      setBusyId(null)
+      if (current()) {
+        listActionControllerRef.current = null
+        setBusyId(null)
+      }
     }
   }
 
   function choose(candidate: LocationSearchCandidate) {
+    const current = memberPredicate()
+    if (!current) return
     setSelected(candidate)
     setLabel(candidate.city)
     setCandidates([])
     setFormError(null)
-    announce('feedback', t('locations.selected', { place: candidate.displayLabel }))
+    announce('feedback', t('locations.selected', { place: candidate.displayLabel }), {
+      stillCurrent: current,
+    })
+  }
+
+  /**
+   * Use my location. Permission is asked here, on the tap, never before. A
+   * failure is explained and focus returns to the search field, which works
+   * exactly as before.
+   */
+  async function locate() {
+    if (isLocating || isSaving) return
+    const controller = new AbortController()
+    // Claimed at the tap: the position is sent only under this member's bearer.
+    const claimed = claim(controller)
+    if (!claimed) return
+    locateControllerRef.current?.abort()
+    const attempt = ++locateAttemptRef.current
+    locateControllerRef.current = controller
+    const current = () => attempt === locateAttemptRef.current && claimed.current()
+    setIsLocating(true)
+    setFormError(null)
+    setSelected(null)
+    setQuery('')
+    setCandidates([])
+    const fail = (reason: FormFailureReason) => {
+      setFormError({ reason, step: 'locate' })
+      announce('error', t(errorKey(reason, 'locate')), { stillCurrent: current })
+      searchInputRef.current?.focus()
+    }
+    try {
+      // The permission prompt and the reading start only while this tap is still current.
+      const position = await readDevicePosition(undefined, current)
+      if (!current()) return
+      // The bearer is resolved now, after the OS consent, for the same member.
+      const results = await locationsNearFromMobile(
+        position.latitude,
+        position.longitude,
+        locale,
+        controller.signal,
+        current
+      )
+      if (!current()) return
+      if (results.length === 0) {
+        fail('no_city_nearby')
+        return
+      }
+      setCandidates(results)
+      announce('feedback', t('locations.resultCount', { count: results.length }), {
+        stillCurrent: current,
+      })
+    } catch (error) {
+      if (!current()) return
+      fail(
+        error instanceof DevicePositionError ? error.reason : locationFailureReason(error)
+      )
+    } finally {
+      if (current()) {
+        locateControllerRef.current = null
+        setIsLocating(false)
+      }
+    }
   }
 
   async function save() {
     if (isSaving || !selected) return
+    const controller = new AbortController()
+    // Claimed at the press: the place this screen shows is saved only under the
+    // bearer of the member it was shown to.
+    const claimed = claim(controller)
+    if (!claimed) return
+    saveControllerRef.current = controller
+    const { current } = claimed
     setIsSaving(true)
     setFormError(null)
     try {
       const saved = await saveLocationFromSearchFromMobile(
         selected.candidateToken,
-        label.trim() || selected.city
+        label.trim() || selected.city,
+        controller.signal,
+        current
       )
+      if (!current()) return
       setSelected(null)
       setQuery('')
       setLabel('')
-      announce('feedback', t('locations.saved', { label: saved.label }))
-      if (guided && router.canGoBack()) {
+      const navigatesBack = guided && router.canGoBack()
+      // A guided save leaves this screen on purpose; its confirmation belongs to
+      // the member, not the screen, so it is still heard on the next one.
+      announce('feedback', t('locations.saved', { label: saved.label }), {
+        stillCurrent: navigatesBack ? claimed.memberCurrent : current,
+      })
+      if (navigatesBack) {
         router.back()
         return
       }
-      await reload()
+      await reload(claimed, controller.signal)
     } catch (error) {
+      if (!current()) return
       const reason = locationFailureReason(error)
       if (reason === 'invalid_candidate') setSelected(null)
       setFormError({ reason, step: 'save' })
-      announce('error', t(errorKey(reason, 'save')))
+      announce('error', t(errorKey(reason, 'save')), { stillCurrent: current })
     } finally {
-      setIsSaving(false)
+      if (current()) {
+        saveControllerRef.current = null
+        setIsSaving(false)
+      }
     }
   }
 
@@ -337,7 +572,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     accessibilityLabel={t('locations.renameField')}
                     value={renameValue}
                     maxLength={80}
-                    onChangeText={setRenameValue}
+                    onChangeText={(value) => {
+                      if (memberPredicate()) setRenameValue(value)
+                    }}
                     style={[inputStyle, styles.flex]}
                     testID={`location-rename-input-${index}`}
                   />
@@ -348,11 +585,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     onPress={() => {
                       const next = renameValue.trim()
                       if (!next) return
-                      void runListAction(location.id, async () => {
-                        await renameLocationFromMobile(location.id, next)
-                        setRenamingId(null)
-                        return t('locations.renamed', { label: next })
-                      })
+                      void runListAction(
+                        location.id,
+                        (signal, current) =>
+                          renameLocationFromMobile(location.id, next, signal, current),
+                        () => {
+                          setRenamingId(null)
+                          return t('locations.renamed', { label: next })
+                        }
+                      )
                     }}
                     style={styles.primaryButton}
                     testID={`location-rename-save-${index}`}
@@ -379,11 +620,18 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     accessibilityState={{ busy: busyId === location.id }}
                     aria-busy={busyId === location.id}
                     onPress={() => {
-                      void runListAction(location.id, async () => {
-                        await deleteLocationFromMobile(location.id)
-                        setConfirmingId(null)
-                        return t('locations.deleted', { label: location.label })
-                      }).then(() => focus(headingRef.current))
+                      void runListAction(
+                        location.id,
+                        (signal, current) =>
+                          deleteLocationFromMobile(location.id, signal, current),
+                        () => {
+                          setConfirmingId(null)
+                          return t('locations.deleted', { label: location.label })
+                        }
+                      ).then((current) => {
+                        // Checked when the focus moves, not when the delete settled.
+                        if (current?.()) focus(headingRef.current)
+                      })
                     }}
                     style={[styles.secondaryButton, { borderColor: palette.danger }]}
                     testID="location-delete-confirm"
@@ -409,10 +657,12 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       accessibilityState={{ busy: busyId === location.id }}
                       aria-busy={busyId === location.id}
                       onPress={() => {
-                        void runListAction(location.id, async () => {
-                          await setPrimaryLocationFromMobile(location.id)
-                          return t('locations.primaryChanged', { label: location.label })
-                        })
+                        void runListAction(
+                          location.id,
+                          (signal, current) =>
+                            setPrimaryLocationFromMobile(location.id, signal, current),
+                          () => t('locations.primaryChanged', { label: location.label })
+                        )
                       }}
                       style={[styles.secondaryButton, { borderColor: '#C9A14A' }]}
                       testID={`location-make-primary-${index}`}
@@ -463,8 +713,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
             </Text>
           ) : (
             <View style={styles.form} testID="location-add-form">
+              <UseMyLocationButton
+                isLocating={isLocating}
+                onPress={() => {
+                  void locate()
+                }}
+              />
               <Text style={[styles.label, textStyle]}>{t('locations.searchLabel')}</Text>
               <TextInput
+                ref={searchInputRef}
                 autoFocus={guided}
                 accessibilityLabel={t('locations.searchLabel')}
                 accessibilityHint={t('locations.searchHint')}
@@ -473,6 +730,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                 value={query}
                 maxLength={80}
                 onChangeText={(value) => {
+                  // A keystroke queued before the member changed is not the next member's.
+                  if (!memberPredicate()) return
+                  // Typing takes over from a pending Use my location: its late answer is dropped.
+                  cancelLocate()
                   setQuery(value)
                   setSelected(null)
                 }}
@@ -511,7 +772,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     accessibilityLabel={t('locations.labelField')}
                     value={label}
                     maxLength={80}
-                    onChangeText={setLabel}
+                    onChangeText={(value) => {
+                      if (memberPredicate()) setLabel(value)
+                    }}
                     style={inputStyle}
                     testID="location-label-input"
                   />
@@ -554,6 +817,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                           void save()
                           return
                         }
+                        if (formError.step === 'locate') {
+                          void locate()
+                          return
+                        }
                         setFormError(null)
                         setSearchAttempt((attempt) => attempt + 1)
                       }}
@@ -570,6 +837,40 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         </>
       )}
     </ScrollView>
+  )
+}
+
+/** Use my location, busy while the device and the API answer. */
+function UseMyLocationButton({
+  isLocating,
+  onPress,
+}: {
+  isLocating: boolean
+  onPress: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  const textStyle = { color: palette.text }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('locations.useMyLocation')}
+      accessibilityHint={t('locations.useMyLocationHint')}
+      accessibilityState={{ busy: isLocating }}
+      aria-busy={isLocating}
+      onPress={onPress}
+      style={[styles.secondaryButton, styles.locateButton, { borderColor: '#C9A14A' }]}
+      testID="locations-use-my-location"
+    >
+      {isLocating ? (
+        <View style={styles.row}>
+          <ActivityIndicator color={palette.text} />
+          <Text style={textStyle}>{t('locations.locating')}</Text>
+        </View>
+      ) : (
+        <Text style={textStyle}>{t('locations.useMyLocation')}</Text>
+      )}
+    </Pressable>
   )
 }
 
@@ -616,6 +917,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   primaryButtonText: { color: '#111111', fontWeight: '700' },
+  locateButton: { alignSelf: 'flex-start' },
   secondaryButton: {
     minHeight: 44,
     minWidth: 44,

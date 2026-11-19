@@ -5,6 +5,11 @@
 // is one press. Outcomes are announced once through the status region below;
 // failures render as alerts. Signed out, it renders the same calm shell the
 // unauthenticated accessibility audit of `/settings` scans.
+//
+// The section follows the session (`useWebSession`): while a stored session is
+// still being verified it stays `checking`, and it lists once per member. A
+// one-shot check on mount once told a signed-in member to sign in (Jade,
+// 2026-11-19).
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -15,12 +20,13 @@ import {
   type SavedLocation,
 } from '@couture/api-client/contracts/http'
 import {
+  captureLocationCredentials,
   deleteLocationFromWeb,
-  hasWebSession,
   listLocationsFromWeb,
   LocationRequestError,
   renameLocationFromWeb,
   setPrimaryLocationFromWeb,
+  type LocationCredentials,
   type LocationFailureReason,
 } from '../../../lib/locations'
 import {
@@ -29,7 +35,13 @@ import {
   MAX_SAVED_LOCATIONS,
   safeReturnPath,
 } from './location-format'
-import { LocationSearchForm } from './location-search-form'
+import {
+  currentWebSessionOwner,
+  useWebSession,
+  useWebSessionOwner,
+  type WebSessionState,
+} from '../../../lib/use-web-session'
+import { LocationSearchForm, type LocationClaim } from './location-search-form'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -40,7 +52,19 @@ function reasonOf(error: unknown): LocationFailureReason {
   return error instanceof LocationRequestError ? error.reason : 'unknown'
 }
 
+/**
+ * Everything in the section belongs to the member the session bridge names right now: it is
+ * keyed by that owner, so a change of member (or sign-out) discards the last member's rows,
+ * editors, status, form and every handler they hold in the same render, before any effect runs.
+ */
 export function LocationsSection() {
+  const liveOwner = useWebSessionOwner()
+  // Above the key: one session follower, so a member change starts no second verification.
+  const session = useWebSession()
+  return <MemberLocationsSection key={liveOwner ?? 'no-member'} session={session} />
+}
+
+function MemberLocationsSection({ session }: { session: WebSessionState }) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -57,7 +81,52 @@ export function LocationsSection() {
   const [confirmingId, setConfirmingId] = useState<string | null>(null)
   const itemRefs = useRef(new Map<string, HTMLElement>())
   const headingRef = useRef<HTMLHeadingElement>(null)
-  const pendingFocusRef = useRef<string | null>(null)
+  /** Where focus goes once the change renders, with the ownership check of the work that set it. */
+  const pendingFocusRef = useRef<{ target: string; current: () => boolean } | null>(null)
+  const owner = session.status === 'signed_in' ? session.owner : null
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  /*
+   * Bumped whenever the member changes (or leaves). Every async completion
+   * checks it, so a late answer for one member never shows on another's
+   * section, or after sign out.
+   */
+  const ownerGenerationRef = useRef(0)
+  /**
+   * One ownership token for work started now for `startedFor`: it may still
+   * touch this section while the section is mounted for the same member and
+   * the session bridge still names them. The bridge is read synchronously, so
+   * a member change counts even before this section's effects have run. Every
+   * completion (list, status, focus, navigation) checks it first.
+   */
+  const ownedBy = useCallback((startedFor: string | null) => {
+    const generation = ownerGenerationRef.current
+    return () =>
+      generation === ownerGenerationRef.current &&
+      startedFor !== null &&
+      currentWebSessionOwner() === startedFor
+  }, [])
+
+  /**
+   * Pins one member-owned operation to its owner at the moment the member acts:
+   * the owner this section rendered for, which must still be the one the
+   * session bridge names (null refuses the action). Each request reads the
+   * bearer only when it is sent, after checking the owner is unchanged, so the
+   * same member's refreshed token is used and another member's never is. Every
+   * step after an await, and every deferred announcement, focus or navigation,
+   * checks `current`.
+   */
+  const claim = useCallback((): LocationClaim | null => {
+    if (owner === null || currentWebSessionOwner() !== owner) return null
+    const current = ownedBy(owner)
+    return {
+      current,
+      credentials: () => (current() ? captureLocationCredentials() : null),
+    }
+  }, [owner, ownedBy])
+
+  const focusLater = useCallback((target: string, current: () => boolean) => {
+    pendingFocusRef.current = { target, current }
+  }, [])
 
   const loadErrorMessage = t('locations.loadError')
 
@@ -65,68 +134,137 @@ export function LocationsSection() {
    * Fresh text each time, so an identical outcome twice in a row (two deletes)
    * still reaches assistive technology: the region is cleared, then filled.
    */
-  const announce = useCallback((message: string) => {
+  const announce = useCallback((message: string, current: () => boolean) => {
+    if (!current()) return
     setStatus('')
-    requestAnimationFrame(() => setStatus(message))
+    requestAnimationFrame(() => {
+      if (current()) setStatus(message)
+    })
   }, [])
 
-  const reload = useCallback(async (signal?: AbortSignal) => {
-    const next = await listLocationsFromWeb(signal)
-    if (signal?.aborted) return
-    setLocations(next)
-    setSectionState('ready')
-  }, [])
+  /**
+   * True when the list landed for the member who asked for it. The request is
+   * not sent once its owner is gone, and its answer is dropped if the owner
+   * left while it was in flight.
+   */
+  const reload = useCallback(
+    async (claimed: LocationClaim, signal?: AbortSignal): Promise<boolean> => {
+      const { current } = claimed
+      const credentials = claimed.credentials()
+      if (!credentials) return false
+      const next = await listLocationsFromWeb(signal, credentials)
+      if (signal?.aborted || !current()) return false
+      setLocations(next)
+      setSectionState('ready')
+      return true
+    },
+    []
+  )
 
+  // Unmounted, nothing pending may write here or start a request.
+  useEffect(
+    () => () => {
+      ownerGenerationRef.current += 1
+    },
+    []
+  )
+
+  // A new member (or none) starts from an empty section.
   useEffect(() => {
-    if (!hasWebSession()) {
+    ownerGenerationRef.current += 1
+    setLocations([])
+    setStatus('')
+    setError(null)
+    setBusyId(null)
+    setRenamingId(null)
+    setConfirmingId(null)
+    pendingFocusRef.current = null
+  }, [owner])
+
+  // One list request per member: a session event that names the same member
+  // again (a token refresh, the end of a verification already answered) asks
+  // nothing. A retry after a failed load asks once more.
+  useEffect(() => {
+    if (session.status === 'checking') {
+      setSectionState('checking')
+      return
+    }
+    if (session.status === 'unavailable') {
+      setSectionState('load_failed')
+      return
+    }
+    if (!owner) {
       setSectionState('signed_out')
       return
     }
+    // The bridge publishes again once it names a member; until then nothing is asked.
+    const claimed = claim()
+    if (!claimed) return
     const controller = new AbortController()
     setSectionState('loading')
-    reload(controller.signal).catch(() => {
-      if (controller.signal.aborted) return
+    reload(claimed, controller.signal).catch(() => {
+      if (controller.signal.aborted || !claimed.current()) return
       setSectionState('load_failed')
     })
     return () => controller.abort()
-  }, [reload, loadErrorMessage])
+  }, [reload, claim, session.status, owner, loadAttempt])
+
+  function retryLoad() {
+    if (session.status === 'unavailable') session.retry()
+    else setLoadAttempt((attempt) => attempt + 1)
+  }
 
   // Focus moves to the item an action changed, once it has rendered.
   useEffect(() => {
-    const id = pendingFocusRef.current
-    if (!id) return
+    const pending = pendingFocusRef.current
+    if (!pending) return
     pendingFocusRef.current = null
-    const target = id === 'heading' ? headingRef.current : itemRefs.current.get(id)
+    if (!pending.current()) return
+    const target =
+      pending.target === 'heading'
+        ? headingRef.current
+        : itemRefs.current.get(pending.target)
     target?.focus()
   }, [locations, renamingId, confirmingId])
 
+  /**
+   * One mutation for the member who started it. Ownership is checked the moment
+   * the request settles, before any editor closes or a reload starts, and again
+   * after the reload lands.
+   */
   async function run(
     locationId: string,
-    work: () => Promise<string>,
+    mutate: (credentials: LocationCredentials) => Promise<unknown>,
+    settled: () => string,
     focusAfter: string
   ): Promise<void> {
     if (busyId) return
+    const claimed = claim()
+    if (!claimed) return
+    const { current } = claimed
     setBusyId(locationId)
     setError(null)
     try {
-      const message = await work()
-      await reload()
-      pendingFocusRef.current = focusAfter
-      announce(message)
+      const credentials = claimed.credentials()
+      if (!credentials) return
+      await mutate(credentials)
+      if (!current()) return
+      const message = settled()
+      if (!(await reload(claimed)) || !current()) return
+      focusLater(focusAfter, current)
+      announce(message, current)
     } catch (caught) {
-      setError(reasonOf(caught))
+      if (current()) setError(reasonOf(caught))
     } finally {
-      setBusyId(null)
+      if (current()) setBusyId(null)
     }
   }
 
   function makePrimary(location: SavedLocation) {
     void run(
       location.id,
-      async () => {
-        await setPrimaryLocationFromWeb(location.id)
-        return t('locations.primaryChanged', { label: location.label })
-      },
+      (credentials) => setPrimaryLocationFromWeb(location.id, credentials),
+      () => t('locations.primaryChanged', { label: location.label }),
       location.id
     )
   }
@@ -136,8 +274,8 @@ export function LocationsSection() {
     if (!label) return
     void run(
       location.id,
-      async () => {
-        await renameLocationFromWeb(location.id, label)
+      (credentials) => renameLocationFromWeb(location.id, label, credentials),
+      () => {
         setRenamingId(null)
         return t('locations.renamed', { label })
       },
@@ -148,8 +286,8 @@ export function LocationsSection() {
   function confirmDelete(location: SavedLocation) {
     void run(
       location.id,
-      async () => {
-        await deleteLocationFromWeb(location.id)
+      (credentials) => deleteLocationFromWeb(location.id, credentials),
+      () => {
         setConfirmingId(null)
         return t('locations.deleted', { label: location.label })
       },
@@ -157,12 +295,19 @@ export function LocationsSection() {
     )
   }
 
-  async function handleSaved(location: SavedLocation) {
-    await reload().catch(() => setSectionState('load_failed'))
-    announce(t('locations.saved', { label: location.label }))
-    pendingFocusRef.current = location.id
+  /** The form's save, continued with the claim the member made when they saved. */
+  async function handleSaved(location: SavedLocation, claimed: LocationClaim) {
+    const { current } = claimed
+    if (!current()) return
+    const loaded = await reload(claimed).catch(() => {
+      if (current()) setSectionState('load_failed')
+      return false
+    })
+    if (!loaded || !current()) return
+    announce(t('locations.saved', { label: location.label }), current)
+    focusLater(location.id, current)
     const target = safeReturnPath(returnTo, window.location.origin)
-    if (target) router.push(target)
+    if (target && current()) router.push(target)
   }
 
   const isFull = locations.length >= MAX_SAVED_LOCATIONS
@@ -194,13 +339,23 @@ export function LocationsSection() {
       )}
 
       {sectionState === 'load_failed' && (
-        <p
-          role="alert"
-          className="mt-4 text-sm text-red-300"
-          data-testid="locations-load-error"
-        >
-          {loadErrorMessage}
-        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <p
+            role="alert"
+            className="text-sm text-red-300"
+            data-testid="locations-load-error"
+          >
+            {loadErrorMessage}
+          </p>
+          <button
+            type="button"
+            onClick={retryLoad}
+            className="min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-white"
+            data-testid="locations-load-retry"
+          >
+            {t('locations.loadRetry')}
+          </button>
+        </div>
       )}
 
       {sectionState === 'ready' && (
@@ -268,7 +423,7 @@ export function LocationsSection() {
                           onKeyDown={(event) => {
                             if (event.key === 'Escape') {
                               setRenamingId(null)
-                              pendingFocusRef.current = location.id
+                              focusLater(location.id, ownedBy(owner))
                             }
                           }}
                           className="rounded-md border border-neutral-600 bg-neutral-900 px-3 text-white"
@@ -287,7 +442,7 @@ export function LocationsSection() {
                         type="button"
                         onClick={() => {
                           setRenamingId(null)
-                          pendingFocusRef.current = location.id
+                          focusLater(location.id, ownedBy(owner))
                         }}
                         className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
                       >
@@ -316,7 +471,7 @@ export function LocationsSection() {
                         type="button"
                         onClick={() => {
                           setConfirmingId(null)
-                          pendingFocusRef.current = location.id
+                          focusLater(location.id, ownedBy(owner))
                         }}
                         className="min-h-[44px] rounded-md border border-neutral-500 px-3 text-white"
                       >
@@ -375,11 +530,14 @@ export function LocationsSection() {
             </p>
           ) : (
             <LocationSearchForm
+              // A new member gets a fresh form: no query, pick or late save of the last one.
+              key={owner ?? 'signed-out'}
               locale={locale}
               autoFocus={guided}
+              claim={claim}
               announce={announce}
-              onSaved={(location) => {
-                void handleSaved(location)
+              onSaved={(location, claimed) => {
+                void handleSaved(location, claimed)
               }}
             />
           )}

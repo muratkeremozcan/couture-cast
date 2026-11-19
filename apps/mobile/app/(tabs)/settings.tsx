@@ -57,7 +57,7 @@ import {
   subscribeMobileApplicationUser,
 } from '@/src/lib/mobile-auth'
 import { getSavedSettings, saveSettings } from '@/src/lib/settings-storage'
-import { updatePreferredLocaleFromMobile } from '@/src/lib/user'
+import { getUserProfileFromMobile, updatePreferredLocaleFromMobile } from '@/src/lib/user'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { useAppTheme } from '@/src/theme/theme-context'
 import { resolveThemePalette } from '@/src/theme/theme-palettes'
@@ -404,6 +404,7 @@ export default function SettingsScreen() {
         keyboardShouldPersistTaps="handled"
       >
         <View style={styles.container} testID="settings-screen">
+          <ProfileAccountHeader signedIn={signedIn} />
           <View style={styles.settingsSection}>
             <Text style={styles.sectionTitle} testID="settings-language-title">
               {t('settings.language', { defaultValue: 'Language' })}
@@ -1505,6 +1506,67 @@ function PaletteAdvisorLinkRow() {
 }
 
 /**
+ * Production follow-up (2026-11-19): this tab reads Profile, so it opens on whose
+ * profile it is. The display name leads when the member set one, with the email
+ * under it; otherwise the email alone. Signed out, or until the profile answers,
+ * it renders nothing, and a failed read leaves the rest of the screen as it was.
+ */
+function ProfileAccountHeader({ signedIn }: { signedIn: boolean | null }) {
+  const { t } = useTranslation()
+  const tone = useSettingsTone()
+  const [account, setAccount] = useState<{
+    displayName: string | null
+    email: string
+  } | null>(null)
+  // An account switch keeps `signedIn` true, so the application user is followed too.
+  const [userGeneration, setUserGeneration] = useState(0)
+
+  useEffect(
+    () => subscribeMobileApplicationUser(() => setUserGeneration((value) => value + 1)),
+    []
+  )
+
+  useEffect(() => {
+    setAccount(null)
+    if (signedIn !== true) return
+    let active = true
+    void Promise.resolve()
+      .then(() => getUserProfileFromMobile())
+      .then((profile) => {
+        if (!active || !profile) return
+        const displayName = profile.user.displayName?.trim() || null
+        setAccount({ displayName, email: profile.user.email })
+      })
+      .catch(() => undefined)
+    return () => {
+      active = false
+    }
+  }, [signedIn, userGeneration])
+
+  if (!account) return null
+  return (
+    <View style={[styles.settingsSection, styles.accountHeader]} testID="profile-account">
+      <Text style={[styles.accountCaption, tone.helpText]}>
+        {t('settings.account.label', { defaultValue: 'Account' })}
+      </Text>
+      {account.displayName ? (
+        <Text style={styles.accountName} testID="profile-account-name">
+          {account.displayName}
+        </Text>
+      ) : null}
+      <Text
+        style={
+          account.displayName ? [styles.accountEmail, tone.helpText] : styles.accountName
+        }
+        testID="profile-account-email"
+      >
+        {account.email}
+      </Text>
+    </View>
+  )
+}
+
+/**
  * Story 1.2b: the entry point to saved locations. From Settings, switching the
  * primary location takes two taps: this row, then the location's Make primary.
  */
@@ -1571,6 +1633,20 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     alignItems: 'stretch',
     backgroundColor: 'transparent',
+  },
+  accountHeader: {
+    gap: 2,
+  },
+  accountCaption: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  accountName: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  accountEmail: {
+    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 16,

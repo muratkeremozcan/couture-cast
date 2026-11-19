@@ -1,5 +1,7 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 1.2b: the web location transport. Every failure reaches the UI as one
 // `LocationFailureReason`, so this pins the mapping from each HTTP answer.
 import { http, HttpResponse } from 'msw'
@@ -14,6 +16,7 @@ import {
   deleteLocationFromWeb,
   listLocationsFromWeb,
   LocationRequestError,
+  locationsFromCoordinatesFromWeb,
   renameLocationFromWeb,
   saveLocationFromSearchFromWeb,
   searchLocationsFromWeb,
@@ -285,5 +288,60 @@ describe('web location transport', () => {
     answer.resolve()
     expect(caught).not.toBeInstanceOf(LocationRequestError)
     expect((caught as Error).name).toBe('AbortError')
+  })
+
+  it('LOC-COORD-WEB-LIB-01 posts the position rounded to two decimals in the body only', async () => {
+    signIn()
+    const requests: Request[] = []
+    useMswHandlers(
+      http.post('/api/v1/locations/from-coordinates', ({ request }) => {
+        requests.push(request.clone())
+        return HttpResponse.json({ data: [candidate] })
+      })
+    )
+
+    const candidates = await locationsFromCoordinatesFromWeb(
+      { latitude: 41.878113, longitude: -87.629799 },
+      'fr-FR'
+    )
+
+    expect(candidates).toEqual([candidate])
+    expect(requests).toHaveLength(1)
+    expect(new URL(requests[0]!.url).search).toBe('')
+    expect(await requests[0]!.json()).toEqual({
+      latitude: 41.88,
+      longitude: -87.63,
+      locale: 'fr-FR',
+    })
+  })
+
+  it('LOC-COORD-WEB-LIB-02 maps a refused position and an outage like search', async () => {
+    signIn()
+    useMswHandlers(
+      http.post('/api/v1/locations/from-coordinates', () =>
+        HttpResponse.json(
+          {
+            statusCode: 503,
+            code: 'provider_unavailable',
+            retryable: true,
+            message: 'down',
+            error: 'Service Unavailable',
+          },
+          { status: 503 }
+        )
+      )
+    )
+    expect(
+      await reasonOf(
+        locationsFromCoordinatesFromWeb({ latitude: 1, longitude: 1 }, 'en-US')
+      )
+    ).toBe('provider_unavailable')
+
+    window.sessionStorage.clear()
+    expect(
+      await reasonOf(
+        locationsFromCoordinatesFromWeb({ latitude: 1, longitude: 1 }, 'en-US')
+      )
+    ).toBe('signed_out')
   })
 })

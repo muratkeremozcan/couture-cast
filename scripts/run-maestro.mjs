@@ -50,6 +50,9 @@ import {
   mobileE2EBaselineLocationRequestBody,
   mobileE2EFlowStateHooks,
   resetMobileE2EFlowState,
+  USE_MY_LOCATION_DEVICE,
+  USE_MY_LOCATION_FLOW,
+  useMyLocationWeatherDoubleCause,
 } from './lib/mobile-e2e-flow-state.mjs'
 import {
   coordinateKeySuffix,
@@ -1849,19 +1852,25 @@ const proveApiReachesWeatherDouble = async (apiBaseUrl, accessToken) => {
 }
 
 /**
- * Refuses `location-capture.yaml` up front when the API cannot be shown to use
+ * Refuses the flows that need the double (`location-capture.yaml` and
+ * `location-use-my-location.yaml`) up front when the API cannot be shown to use
  * the double. Every other flow is unaffected.
  *
  * @param {string} apiBaseUrl
  * @param {string | undefined} accessToken
  * @returns {Promise<void>}
  */
+const WEATHER_DOUBLE_FLOWS = [LOCATION_CAPTURE_FLOW, USE_MY_LOCATION_FLOW]
+
 const guardWeatherDoubleFlows = async (apiBaseUrl, accessToken) => {
-  if (!flowsToRun.includes(LOCATION_CAPTURE_FLOW)) return
+  const guarded = WEATHER_DOUBLE_FLOWS.filter((flow) => flowsToRun.includes(flow))
+  if (guarded.length === 0) return
   const cause = await proveApiReachesWeatherDouble(apiBaseUrl, accessToken)
   if (cause) {
-    flowRefusals.set(LOCATION_CAPTURE_FLOW, cause)
-    log(`REFUSE ${LOCATION_CAPTURE_FLOW} (${cause})`)
+    for (const flow of guarded) {
+      flowRefusals.set(flow, cause)
+      log(`REFUSE ${flow} (${cause})`)
+    }
   } else {
     log(
       `The API at ${apiBaseUrl} reaches the weather provider double at ${WEATHER_DOUBLE_ORIGIN}`
@@ -1877,7 +1886,7 @@ const guardWeatherDoubleFlows = async (apiBaseUrl, accessToken) => {
  * @returns {Promise<{ cause?: string, verify?: () => Promise<string | undefined> } | undefined>}
  */
 const watchWeatherDouble = async (flowPath) => {
-  if (flowPath !== LOCATION_CAPTURE_FLOW) return undefined
+  if (!WEATHER_DOUBLE_FLOWS.includes(flowPath)) return undefined
   let before
   try {
     before = await readWeatherDouble('stats')
@@ -1887,6 +1896,11 @@ const watchWeatherDouble = async (flowPath) => {
   return {
     verify: async () => {
       try {
+        if (flowPath === USE_MY_LOCATION_FLOW)
+          return useMyLocationWeatherDoubleCause({
+            before,
+            requests: await readWeatherDouble('requests'),
+          })
         return locationCaptureWeatherDoubleCause({
           before,
           requests: await readWeatherDouble('requests'),
@@ -4035,6 +4049,11 @@ const buildMaestroFlowEnvArgs = () => [
   `LOCATION_SENTINEL_PLACE=${LOCATION_SENTINEL_PLACE_TEXT}`,
   '-e',
   `LOCATION_SENTINEL_TEMP_F=${LOCATION_SENTINEL_TEMP_F}`,
+  // location-use-my-location.yaml sets the device here; the app must round it before sending.
+  '-e',
+  `USE_MY_LOCATION_LATITUDE=${USE_MY_LOCATION_DEVICE.latitude}`,
+  '-e',
+  `USE_MY_LOCATION_LONGITUDE=${USE_MY_LOCATION_DEVICE.longitude}`,
   // Seeded only while community-comments.yaml runs; the text is fixed.
   '-e',
   `COMMUNITY_COMMENTS_LONG_ROOT=${COMMUNITY_COMMENTS_LONG_ROOT}`,
@@ -4876,6 +4895,8 @@ const USER_SCOPED_FLOWS = [
   // Story 1.2b: removes and restores the member's saved locations around
   // itself, which only the per-flow hooks of a serial run can do safely.
   LOCATION_CAPTURE_FLOW,
+  // Production follow-up (2026-11-19): same saved-location hooks as location capture.
+  USE_MY_LOCATION_FLOW,
   // Story 6.4: replies to a long root seeded and removed by its per-flow
   // hooks, which only a serial run calls.
   COMMUNITY_COMMENTS_FLOW,

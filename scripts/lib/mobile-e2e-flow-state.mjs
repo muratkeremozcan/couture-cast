@@ -1,5 +1,5 @@
 // Story 6.3 device-reset owner: reset a member's reaction state between flow attempts in `scripts/lib/mobile-e2e-flow-state.mjs` and `scripts/lib/mobile-e2e-flow-retry.mjs`
-import { fold } from './weather-provider-double-data.mjs'
+import { fold, reversePlaces } from './weather-provider-double-data.mjs'
 
 // The native harness owns an isolated UUID database, genuine identities and source fixtures.
 // Its flow never uses the shared Expo Go member or reset hooks.
@@ -104,6 +104,21 @@ export const restoreMobileE2EBaselineLocation = async (prisma, userId) => {
 
 export const LOCATION_CAPTURE_FLOW = 'maestro/location-capture.yaml'
 export const COMMUNITY_COMMENTS_FLOW = 'maestro/community-comments.yaml'
+
+/**
+ * Production follow-up (2026-11-19): Use my location on mobile. The flow sets the device to
+ * USE_MY_LOCATION_DEVICE. Read at full accuracy it rounds to USE_MY_LOCATION_ROUNDED; the OS may
+ * answer a reduced-accuracy fix near it instead, which still resolves to the double's Chicago.
+ */
+export const USE_MY_LOCATION_FLOW = 'maestro/location-use-my-location.yaml'
+export const USE_MY_LOCATION_DEVICE = Object.freeze({
+  latitude: 41.871234,
+  longitude: -87.641234,
+})
+export const USE_MY_LOCATION_ROUNDED = Object.freeze({
+  latitude: 41.87,
+  longitude: -87.64,
+})
 
 /**
  * Story 6.4: the published root `community-comments.yaml` replies to with the
@@ -245,6 +260,12 @@ export const mobileE2EFlowStateHooks = ({
       clearMobileE2ELocations(prisma, userId, locationSentinelKeySuffix),
     after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
   },
+  // Starts with no saved location, so the Chicago it saves is not a duplicate of the baseline.
+  [USE_MY_LOCATION_FLOW]: {
+    before: (prisma, userId) =>
+      clearMobileE2ELocations(prisma, userId, locationSentinelKeySuffix),
+    after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
+  },
   [COMMUNITY_COMMENTS_FLOW]: {
     before: (prisma) =>
       seedCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
@@ -300,6 +321,63 @@ export const locationCaptureWeatherDoubleCause = ({ before, requests, query, pla
   )
   if (!atPlace) {
     return `no save-time forecast was fetched at the saved candidate's coordinates ${place.lat},${place.lon} (forecast calls during the flow: ${describeForecasts(forecasts)})`
+  }
+  return undefined
+}
+
+/** True when a coordinate carries at most two decimals, the precision the app may send. */
+const twoDecimals = (value) =>
+  Number.isFinite(value) && Math.round(value * 100) / 100 === value
+
+/**
+ * Production follow-up (2026-11-19): judges what the weather provider double saw while the Use
+ * my location flow ran. On a device the OS answers the injected position at reduced accuracy, so
+ * the fix the app reads (and rounds) can differ from the injected pair: the verdict checks what a
+ * correct client guarantees instead. Every reverse lookup carried at most two decimals, the
+ * precise injected position never reached the provider, and a lookup resolved to the city the
+ * flow saves (Chicago). The exact rounding arithmetic is pinned by the mocked-device unit tests.
+ * Returns the named cause that fails the flow, or `undefined`.
+ *
+ * @param {{
+ *   before: { geocoding: number },
+ *   requests: { geocoding: { seq: number, query: string, latitude?: number, longitude?: number }[] },
+ *   device?: { latitude: number, longitude: number },
+ *   city?: string,
+ * }} observed
+ * @returns {string | undefined}
+ */
+export const useMyLocationWeatherDoubleCause = ({
+  before,
+  requests,
+  device = USE_MY_LOCATION_DEVICE,
+  city = 'Chicago',
+}) => {
+  const lookups = requests.geocoding.filter((entry) => entry.seq > before.geocoding)
+  const reverse = lookups.filter((entry) => typeof entry.latitude === 'number')
+  if (reverse.length === 0) {
+    return 'weather provider double saw no reverse lookup during the flow'
+  }
+  const precise = [String(device.latitude), String(device.longitude)]
+  if (
+    lookups.some((entry) =>
+      precise.some((value) => JSON.stringify(entry).includes(value))
+    )
+  ) {
+    return 'the precise device position reached the weather provider; the app must round it first'
+  }
+  const unrounded = reverse.filter(
+    (entry) => !twoDecimals(entry.latitude) || !twoDecimals(entry.longitude)
+  )
+  if (unrounded.length > 0) {
+    // Counts only: a failure reason is logged in CI and must not carry a position.
+    return `${unrounded.length} of ${reverse.length} reverse lookups carried more than two decimals`
+  }
+  if (
+    !reverse.some(
+      (entry) => reversePlaces(entry.latitude, entry.longitude)[0]?.name === city
+    )
+  ) {
+    return `none of ${reverse.length} reverse lookups resolved to ${city}`
   }
   return undefined
 }

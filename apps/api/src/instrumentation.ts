@@ -1,5 +1,11 @@
 // Step 10 step 1 owner: searchable owner anchor
-import { DiagConsoleLogger, DiagLogLevel, diag } from '@opentelemetry/api'
+import type { IncomingMessage, RequestOptions } from 'node:http'
+import {
+  DiagConsoleLogger,
+  DiagLogLevel,
+  diag,
+  type Attributes,
+} from '@opentelemetry/api'
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node'
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-http'
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http'
@@ -177,6 +183,59 @@ export function resolveOtlpExporterConfig(
   }
 }
 
+/**
+ * Span URL attributes carry no query string. Outgoing provider calls put the API key
+ * (`appid`, `key`), the city search text (`q`) and the approximate device position
+ * (`lat`, `lon`) in the query; incoming search requests carry the city text. Each hook
+ * overrides every attribute the instrumentation fills from the full URL with origin plus
+ * path, and empties the query. A URL that cannot be parsed is replaced, never kept.
+ */
+const REDACTED_URL = 'REDACTED'
+
+function withoutQuery(raw: string, base?: string): { full: string; path: string } {
+  try {
+    const url = new URL(raw, base)
+    return { full: `${url.origin}${url.pathname}`, path: url.pathname }
+  } catch {
+    return { full: REDACTED_URL, path: REDACTED_URL }
+  }
+}
+
+/** `@opentelemetry/instrumentation-undici`: every `fetch` the API makes. */
+export function redactUndiciSpanUrl(request: {
+  origin: string
+  path: string
+}): Attributes {
+  const { full, path } = withoutQuery(request.path, request.origin)
+  return { 'url.full': full, 'url.path': path, 'url.query': '' }
+}
+
+/** `@opentelemetry/instrumentation-http`, outgoing: old and stable attribute names alike. */
+export function redactOutgoingHttpSpanUrl(options: RequestOptions): Attributes {
+  const protocol = options.protocol ?? 'http:'
+  const host = options.hostname ?? options.host ?? 'localhost'
+  const port = options.port ? `:${options.port}` : ''
+  const { full, path } = withoutQuery(options.path ?? '/', `${protocol}//${host}${port}`)
+  return { 'url.full': full, 'http.url': full, 'http.target': path }
+}
+
+/** `@opentelemetry/instrumentation-http`, incoming: the search query never reaches a span. */
+export function redactIncomingHttpSpanUrl(request: IncomingMessage): Attributes {
+  const host = request.headers.host ?? 'localhost'
+  const { full, path } = withoutQuery(request.url ?? '/', `http://${host}`)
+  return { 'url.query': '', 'http.url': full, 'http.target': path }
+}
+
+export function createNodeAutoInstrumentations() {
+  return getNodeAutoInstrumentations({
+    '@opentelemetry/instrumentation-undici': { startSpanHook: redactUndiciSpanUrl },
+    '@opentelemetry/instrumentation-http': {
+      startOutgoingSpanHook: redactOutgoingHttpSpanUrl,
+      startIncomingSpanHook: redactIncomingHttpSpanUrl,
+    },
+  })
+}
+
 // Flow ref S0.7/T4/2: create OTLP exporters for traces/metrics from the shared
 // Grafana config so both signals use the same auth contract.
 export function createOpenTelemetrySdkOptions(
@@ -207,7 +266,7 @@ export function createOpenTelemetrySdkOptions(
     // Flow ref S0.7/T4/3: enable instrumentation + W3C propagation via
     // textMapPropagator + auto-instrumentations.
     textMapPropagator: new core.W3CTraceContextPropagator(),
-    instrumentations: [getNodeAutoInstrumentations()],
+    instrumentations: [createNodeAutoInstrumentations()],
   }
 }
 

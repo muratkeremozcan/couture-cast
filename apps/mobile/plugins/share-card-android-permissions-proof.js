@@ -71,7 +71,10 @@ function footprint(directory) {
   }, 0)
 }
 
-/** Merge generated application policy with the two installed photo-library manifests. */
+/**
+ * Merge generated application policy with the two installed photo-library manifests and
+ * expo-location's, which declares fine location the app must not ship (Use my location).
+ */
 async function generateAndroidPermissionProof(t) {
   const { assertStory68DiskSpace } = await import(
     '../../../scripts/lib/test-disk-space.mjs'
@@ -104,7 +107,7 @@ async function generateAndroidPermissionProof(t) {
   const proof = path.join(owned.root, 'permission-proof')
   fs.mkdirSync(proof)
   const libraries = []
-  for (const name of ['expo-image-picker', 'expo-media-library']) {
+  for (const name of ['expo-image-picker', 'expo-media-library', 'expo-location']) {
     const moduleRoot = path.dirname(
       require.resolve(`${name}/package.json`, { paths: [repositoryRoot] })
     )

@@ -2,9 +2,13 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-36-colour-palette-beauty-and-accessory-advisor
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 3.6 Task 5 step 2 owner: sticky bottom navigation mobile visibility and telemetry.
-import { render, screen, fireEvent } from '@testing-library/react'
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { act, render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { getI18n } from '../../i18n'
+import { ProfileNavLink } from './profile-nav-link'
 import { resolveActiveNavTab, StickyBottomNav } from './sticky-bottom-nav'
 
 const posthogMocks = vi.hoisted(() => ({
@@ -142,5 +146,82 @@ describe('StickyBottomNav Component (Story 3.6)', () => {
     expect(previewNavElement.className).toContain('sticky')
     expect(previewNavElement.className).toContain('flex')
     expect(previewNavElement.className).not.toContain('min-[768px]:hidden')
+  })
+
+  /*
+   * Production follow-up (2026-11-19): Jade looked for her profile and found a
+   * tab called Settings. The tab reads Profile in the reader's language; its id,
+   * test id and route stay `settings`, and analytics keeps one English name.
+   */
+  describe('the Profile tab', () => {
+    afterEach(async () => {
+      await act(async () => {
+        await getI18n().changeLanguage('en-US')
+      })
+    })
+
+    it('PROFILE-NAV-WEB-01 names the settings tab Profile and records it as Profile', () => {
+      navigationMocks.pathname = '/settings'
+      render(<BottomNavHarness />)
+
+      const nav = screen.getByRole('navigation', { name: 'Bottom navigation' })
+      const profile = within(nav).getByRole('link', { name: 'Profile' })
+      expect(profile).toBe(screen.getByTestId('bottom-nav-settings'))
+      expect(profile).toHaveAttribute('href', '/settings')
+      expect(profile).toHaveAttribute('aria-current', 'page')
+      expect(within(nav).queryByRole('link', { name: /settings/i })).toBeNull()
+      expect(screen.getByTestId('bottom-nav-status')).toHaveTextContent(
+        'Navigated to Profile tab'
+      )
+
+      fireEvent.click(profile)
+      expect(posthogMocks.capture).toHaveBeenCalledWith('bottom_nav_clicked', {
+        tabId: 'settings',
+        label: 'Profile',
+        targetPath: '/settings',
+      })
+    })
+
+    it('PROFILE-NAV-WEB-02 shows every tab in the reader language, analytics stays English', async () => {
+      await act(async () => {
+        await getI18n().changeLanguage('de-DE')
+      })
+      render(<BottomNavHarness />)
+
+      const names = Object.entries({
+        home: 'Startseite',
+        wardrobe: 'Garderobe',
+        community: 'Community',
+        settings: 'Profil',
+      })
+      for (const [id, name] of names) {
+        expect(screen.getByTestId(`bottom-nav-${id}`)).toHaveAccessibleName(name)
+      }
+      expect(screen.getByRole('navigation')).toHaveAccessibleName('Untere Navigation')
+
+      fireEvent.click(screen.getByTestId('bottom-nav-settings'))
+      expect(screen.getByTestId('bottom-nav-status')).toHaveTextContent(
+        'Zum Tab Profil gewechselt'
+      )
+      expect(posthogMocks.capture).toHaveBeenCalledWith('bottom_nav_clicked', {
+        tabId: 'settings',
+        label: 'Profile',
+        targetPath: '/settings',
+      })
+    })
+
+    it('PROFILE-NAV-WEB-03 the home header Profile link reads the reader language and records English', async () => {
+      render(<ProfileNavLink />)
+      const link = screen.getByTestId('nav-profile')
+      expect(link).toHaveAccessibleName('Profile')
+      expect(link).toHaveAttribute('href', '/settings')
+
+      await act(async () => {
+        await getI18n().changeLanguage('tr-TR')
+      })
+
+      expect(link).toHaveAccessibleName('Profil')
+      expect(link).toHaveAttribute('data-ph-label', 'Profile')
+    })
   })
 })

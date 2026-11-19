@@ -271,7 +271,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Patrocinado. O CoutureCast recebe comissão se você comprar por este link. Isso não muda quais tons são recomendados, e você pode desativar links patrocinados em Configurações.",
+          "disclosure": "Patrocinado. O CoutureCast recebe comissão se você comprar por este link. Isso não muda quais tons são recomendados, e você pode desativar links patrocinados em Perfil.",
           "partnerLabel": "De {{partner}}",
           "cta": "Comprar este tom"
         },
@@ -284,7 +284,7 @@
         },
         "locked": {
           "title": "A consultoria de cores é um recurso Premium",
-          "body": "Assine o Premium em Configurações para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons.",
+          "body": "Assine o Premium em Perfil para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons.",
           "signedOutBody": "Entre na sua conta e assine o Premium para receber tons de maquiagem e combinações de acessórios de acordo com os seus tons."
         },
         "staleVersion": "Esta paleta veio de uma versão anterior das nossas recomendações. Refaça a análise para ter um resultado atualizado.",
@@ -728,6 +728,7 @@
     "empty": "Nenhum local salvo ainda. Busque uma cidade para adicionar.",
     "signedOutHint": "Entre para gerenciar seus locais.",
     "loadError": "Não foi possível carregar seus locais.",
+    "loadRetry": "Tentar novamente",
     "primary": "Principal",
     "makePrimary": "Tornar principal",
     "rename": "Renomear",
@@ -752,6 +753,8 @@
     "deleted": "{{label}} excluído.",
     "limit": "Você salvou três locais. Exclua um para adicionar outro.",
     "retry": "Tentar novamente",
+    "useMyLocation": "Usar minha localização",
+    "locating": "Buscando sua localização...",
     "guided": {
       "add": "Adicionar um local"
     },
@@ -763,11 +766,15 @@
       "duplicate": "Esse local já está salvo.",
       "rate_limited": "Muitas buscas. Aguarde um momento e tente novamente.",
       "invalid_query": "Digite entre 2 e 80 caracteres.",
-      "unknown": "Algo deu errado. Tente novamente."
+      "unknown": "Algo deu errado. Tente novamente.",
+      "location_denied": "O acesso à localização está desativado. Busque sua cidade.",
+      "location_unavailable": "Sua localização não está disponível agora. Busque sua cidade.",
+      "no_city_nearby": "Nenhuma cidade encontrada perto de você. Busque sua cidade."
     }
   },
   "settings": {
-    "title": "Configurações"
+    "title": "Perfil",
+    "account": "Sua conta"
   },
   "home": {
     "spotlightTeaser": {
@@ -1208,5 +1215,13 @@
         "unavailable": "A exportação está indisponível. Tente novamente."
       }
     }
+  },
+  "nav": {
+    "label": "Navegação inferior",
+    "home": "Início",
+    "wardrobe": "Guarda-roupa",
+    "community": "Comunidade",
+    "profile": "Perfil",
+    "navigatedTo": "Aba {{label}} aberta"
   }
 }

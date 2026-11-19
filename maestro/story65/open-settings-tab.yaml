@@ -1,4 +1,5 @@
-# Story 6.5 owner: open the Settings tab. Like maestro/subflows/open-settings.yaml, a tab tap
+# Story 6.5 owner: open the Settings tab, labelled Profile since 2026-11-19 (its id and route
+# stay `tab-settings` and settings). Like maestro/subflows/open-settings.yaml, a tab tap
 # landing during a transition is retried until the settings screen renders.
 appId: ${MAESTRO_APP_ID}
 ---

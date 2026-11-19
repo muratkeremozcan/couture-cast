@@ -195,7 +195,7 @@ describe('PaletteAdvisorScreen (Story 5.4)', () => {
     await render(<PaletteAdvisorScreen />)
 
     const locked = await screen.findByTestId('palette-advisor-locked')
-    expect(locked.textContent).toContain('Subscribe to Premium from Settings')
+    expect(locked.textContent).toContain('Subscribe to Premium from Profile')
     expect(screen.queryByTestId('palette-advisor-consent')).toBeNull()
   })
 

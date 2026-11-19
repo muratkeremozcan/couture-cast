@@ -6,21 +6,48 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import posthog from 'posthog-js'
+import { useTranslation } from 'react-i18next'
+import { getI18n } from '../../i18n'
 
 export type NavTabId = 'home' | 'wardrobe' | 'community' | 'settings'
 
 export interface NavTabItem {
   id: NavTabId
+  /** The English name analytics records, whatever the reader's language. */
   label: string
+  /** The catalog key the tab shows. */
+  labelKey: string
   href: string
   icon: string
 }
 
+/**
+ * The settings tab reads Profile (2026-11-19: Jade looked for a profile and
+ * never found it under Settings). Its id and route stay `settings`.
+ */
 const NAV_TABS: NavTabItem[] = [
-  { id: 'home', label: 'Home', href: '/', icon: '🏠' },
-  { id: 'wardrobe', label: 'Wardrobe', href: '/wardrobe', icon: '👔' },
-  { id: 'community', label: 'Community', href: '/community', icon: '✨' },
-  { id: 'settings', label: 'Settings', href: '/settings', icon: '⚙️' },
+  { id: 'home', label: 'Home', labelKey: 'nav.home', href: '/', icon: '🏠' },
+  {
+    id: 'wardrobe',
+    label: 'Wardrobe',
+    labelKey: 'nav.wardrobe',
+    href: '/wardrobe',
+    icon: '👔',
+  },
+  {
+    id: 'community',
+    label: 'Community',
+    labelKey: 'nav.community',
+    href: '/community',
+    icon: '✨',
+  },
+  {
+    id: 'settings',
+    label: 'Profile',
+    labelKey: 'nav.profile',
+    href: '/settings',
+    icon: '👤',
+  },
 ]
 
 export interface StickyBottomNavProps {
@@ -63,15 +90,18 @@ export function resolveActiveNavTab(pathname: string | null): NavTabId | null {
 }
 
 export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProps) {
+  const { t } = useTranslation('translation', { i18n: getI18n() })
   const pathname = usePathname()
   const activeTab = resolveActiveNavTab(pathname)
-  const activeLabel = NAV_TABS.find((tab) => tab.id === activeTab)?.label ?? null
-  const [announcement, setAnnouncement] = useState(
-    activeLabel === null ? '' : `Navigated to ${activeLabel} tab`
+  // The tab whose arrival the status region announces; null announces nothing.
+  const [announced, setAnnounced] = useState<NavTabItem | null>(
+    () => NAV_TABS.find((tab) => tab.id === activeTab) ?? null
   )
+  const announcement =
+    announced === null ? '' : t('nav.navigatedTo', { label: t(announced.labelKey) })
 
   const handleTabClick = (tab: NavTabItem) => {
-    setAnnouncement(`Navigated to ${tab.label} tab`)
+    setAnnounced(tab)
 
     try {
       if (typeof window !== 'undefined' && typeof posthog.capture === 'function') {
@@ -88,7 +118,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
 
   return (
     <nav
-      aria-label="Bottom Navigation"
+      aria-label={t('nav.label')}
       data-testid="sticky-bottom-nav"
       className={`bottom-0 left-0 right-0 z-30 border-t border-[#E6E6ED] bg-[#FFFFFF]/95 pt-2 backdrop-blur pb-[env(safe-area-inset-bottom,0.75rem)] ${
         isMobilePreview ? 'sticky flex' : 'fixed flex min-[768px]:hidden'
@@ -115,7 +145,7 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
                   isActive ? 'font-semibold text-[#111111]' : 'text-[#5C5C66]'
                 }`}
               >
-                {tab.label}
+                {t(tab.labelKey)}
               </span>
               {isActive && (
                 <span
