@@ -15,9 +15,15 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   getCommercePreferenceFromWeb,
+  isCommerceDenial,
   updateCommercePreferenceFromWeb,
 } from '../../lib/commerce'
-import { isLiveOwner, MemberScope, type MemberSession } from '../../lib/use-web-session'
+import {
+  isLiveOwner,
+  MemberScope,
+  readAsMember,
+  type MemberSession,
+} from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
 
 const TOGGLE_ID = 'commerce-affiliate-ctas'
@@ -102,7 +108,12 @@ function MemberCommercePreferences({ session }: { session: MemberSession }) {
 
     void (async () => {
       try {
-        const preference = await getCommercePreferenceFromWeb(controller.signal)
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const preference = await readAsMember(
+          owner,
+          () => getCommercePreferenceFromWeb(controller.signal),
+          isCommerceDenial
+        )
         if (!current()) {
           return
         }

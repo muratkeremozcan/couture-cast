@@ -1,5 +1,5 @@
 // Story 5.5 Task 7 owner: component tests for the live seven-day planner rail.
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { act, render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import axe from 'axe-core'
@@ -726,5 +726,104 @@ describe('PlannerRail', () => {
       })
       expect(results.violations).toEqual([])
     })
+  })
+})
+
+// PR #259 review (CodeRabbit): the rail's member-owned week remounts when the member changes,
+// and its reads must never undo a reshuffle the member just made.
+describe('PlannerRail keeps focus and the newest week with the member', () => {
+  beforeEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  it('PLANNER-MEMBER-01 a member change while focus is in the overlay week moves focus to Close', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      )
+    )
+    renderRail({ variant: 'overlay' })
+    const reshuffle = await screen.findByTestId(`planner-reshuffle-${SEVEN_DATES[0]!}`)
+    reshuffle.focus()
+    expect(reshuffle).toHaveFocus()
+
+    // The member signs out in this tab: the week is replaced by the locked panel.
+    act(() => {
+      window.sessionStorage.clear()
+      window.dispatchEvent(new Event('couture:session'))
+    })
+
+    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close planner' })).toHaveFocus()
+  })
+
+  it('PLANNER-MEMBER-02 the inline rail leaves focus where the page puts it', async () => {
+    signInFixtureMember()
+    useMswHandlers(
+      http.get(PLANNER_PATH, () =>
+        HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      )
+    )
+    renderRail({ variant: 'rail' })
+    const reshuffle = await screen.findByTestId(`planner-reshuffle-${SEVEN_DATES[0]!}`)
+    reshuffle.focus()
+
+    act(() => {
+      window.sessionStorage.clear()
+      window.dispatchEvent(new Event('couture:session'))
+    })
+
+    expect(await screen.findByTestId('planner-rail-locked')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Close planner' })).not.toHaveFocus()
+  })
+
+  it('PLANNER-MEMBER-03 a week read that started before a reshuffle landed does not undo it', async () => {
+    signInFixtureMember()
+    const target = SEVEN_DATES[0]!
+    let weekReads = 0
+    let releaseStale!: () => void
+    const stale = new Promise<void>((resolve) => {
+      releaseStale = resolve
+    })
+    const expectedVersions: number[] = []
+    useMswHandlers(
+      http.get(PLANNER_PATH, async () => {
+        weekReads += 1
+        // The focus refresh is held until after the reshuffle answers.
+        if (weekReads === 2) await stale
+        return HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
+      }),
+      http.post(RESHUFFLE_PATH, async ({ request }) => {
+        const body = (await request.json()) as { expectedVersion: number }
+        expectedVersions.push(body.expectedVersion)
+        return HttpResponse.json({
+          data: {
+            day: buildReadyDay(target, { version: body.expectedVersion + 1 }),
+            unchanged: false,
+          },
+        })
+      })
+    )
+    renderRail()
+    const button = await screen.findByTestId(`planner-reshuffle-${target}`)
+
+    act(() => {
+      window.dispatchEvent(new Event('focus'))
+    })
+    await waitFor(() => expect(weekReads).toBe(2))
+
+    fireEvent.click(button)
+    await waitFor(() => expect(expectedVersions).toEqual([1]))
+    await waitFor(() => expect(button).not.toBeDisabled())
+
+    // The older week (version 1) answers now.
+    await act(async () => {
+      releaseStale()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    fireEvent.click(screen.getByTestId(`planner-reshuffle-${target}`))
+    await waitFor(() => expect(expectedVersions).toEqual([1, 2]))
   })
 })

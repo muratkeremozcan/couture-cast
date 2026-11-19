@@ -48,8 +48,11 @@ import {
 } from '../../lib/planner'
 import {
   isLiveOwner,
+  isSessionRecheckError,
   MemberScope,
   readAsMember,
+  useReloadOnSessionRecheck,
+  useWebSessionOwner,
   type MemberSession,
 } from '../../lib/use-web-session'
 import { acquireScrollLock } from './modal-stack'
@@ -455,6 +458,20 @@ export function PlannerRail({
     }
   }, [isOpen, variant, invokingElementRef])
 
+  // A member change remounts the week (MemberScope). In the overlay, focus inside the week
+  // would fall to the page, out of the trap and out of Escape's reach: it goes to the stable
+  // Close button instead. The inline rail is ordinary page content and is left alone.
+  const liveOwner = useWebSessionOwner()
+  const shownOwnerRef = useRef(liveOwner)
+  useLayoutEffect(() => {
+    if (shownOwnerRef.current === liveOwner) return
+    shownOwnerRef.current = liveOwner
+    if (!isOpen || variant !== 'overlay') return
+    const active = document.activeElement
+    if (!active || active === document.body || !dialogRef.current?.contains(active))
+      closeButtonRef.current?.focus()
+  }, [liveOwner, isOpen, variant])
+
   // Traps focus and closes on Escape, overlay only -- the rail variant is
   // ordinary in-page content and must never intercept Tab or Escape.
   // Mirrors `accessible-modal.tsx`'s `handleKeyDown` exactly.
@@ -559,8 +576,16 @@ function PlannerWeek({
   const [dayErrors, setDayErrors] = useState<Record<string, string>>({})
   const [announcement, setAnnouncement] = useState<string | null>(null)
 
-  const fetchControllerRef = useRef<AbortController | null>(null)
+  /** Every week read in flight, so closing the rail aborts all of them, overlapping ones too. */
+  const readControllersRef = useRef<Set<AbortController>>(new Set())
   const reshuffleControllersRef = useRef<Map<string, AbortController>>(new Map())
+  /**
+   * Advances each time a reshuffle result lands. A week read that started before it carries
+   * older versions of the day, so its answer is dropped rather than undoing the reshuffle.
+   */
+  const weekGenerationRef = useRef(0)
+  /** The last read was denied and the bridge could not verify the member again. */
+  const [recheckFailed, setRecheckFailed] = useState(false)
 
   useLayoutEffect(() => {
     onCheckingChange(entitlementState === 'checking')
@@ -568,9 +593,11 @@ function PlannerWeek({
 
   // Closed or handed to another member: nothing this body started may still land.
   useEffect(() => {
+    const reads = readControllersRef.current
     const reshuffles = reshuffleControllersRef.current
     return () => {
-      fetchControllerRef.current?.abort()
+      for (const controller of reads) controller.abort()
+      reads.clear()
       for (const controller of reshuffles.values()) {
         controller.abort()
       }
@@ -585,21 +612,35 @@ function PlannerWeek({
       if (!isLiveOwner(owner)) return
       if (!options.silent) {
         setEntitlementState('checking')
+        setRecheckFailed(false)
       }
+      const generation = weekGenerationRef.current
       const current = () => !signal.aborted && isLiveOwner(owner)
       try {
         // A denial of a token the bridge has since rotated for this member is read again once.
         const data = await readAsMember(
           owner,
           () => getPlannerFromWeb(signal),
-          (error) => plannerFailureReason(error) === 'signed_out'
+          (error) => plannerFailureReason(error) === 'signed_out',
+          signal
         )
         if (!current()) return
+        // A reshuffle landed while this read was out: its week is older than the one shown.
+        if (generation !== weekGenerationRef.current) return
         setPlannerData(data)
         setEntitlementState('entitled')
         setAnnouncement(t('commerce.premium.planner.announce.ready'))
       } catch (loadError: unknown) {
         if (!current()) return
+        if (isSessionRecheckError(loadError)) {
+          // The member is not known to be signed out: the error panel with its retry, and a
+          // new read once the bridge verifies them again. A silent refresh keeps the week.
+          if (options.silent) return
+          setEntitlementState('error')
+          setPlannerData(null)
+          setRecheckFailed(true)
+          return
+        }
         const reason = plannerFailureReason(loadError)
         if (reason === 'signed_out' || reason === 'not_entitled') {
           setEntitlementState('locked')
@@ -622,6 +663,22 @@ function PlannerWeek({
     [owner, t]
   )
 
+  /** Starts one week read, tracked until it settles so closing the rail can abort it. */
+  const startRead = useCallback(
+    (options: { silent?: boolean } = {}) => {
+      const controller = new AbortController()
+      const reads = readControllersRef.current
+      reads.add(controller)
+      void load(controller.signal, options).finally(() => reads.delete(controller))
+      return controller
+    },
+    [load]
+  )
+  const readAgain = useCallback(() => {
+    startRead()
+  }, [startRead])
+  useReloadOnSessionRecheck(owner, recheckFailed, readAgain)
+
   // One fetch per open per member: a session event that names the same member again (a token
   // refresh, the end of a verification already answered) asks nothing, and a stored session
   // still under verification is `checking`, never the signed-out lock.
@@ -642,11 +699,9 @@ function PlannerWeek({
       setPlannerData(null)
       return
     }
-    const controller = new AbortController()
-    fetchControllerRef.current = controller
-    void load(controller.signal)
+    const controller = startRead()
     return () => controller.abort()
-  }, [status, owner, load])
+  }, [status, owner, startRead])
 
   // The focus listener reads the state of the latest commit. A layout effect updates it
   // inside the commit that renders the week; re-registering the listener in a passive
@@ -662,13 +717,11 @@ function PlannerWeek({
   useEffect(() => {
     function handleFocus() {
       if (entitlementStateRef.current !== 'entitled') return
-      const controller = new AbortController()
-      fetchControllerRef.current = controller
-      void load(controller.signal, { silent: true })
+      startRead({ silent: true })
     }
     window.addEventListener('focus', handleFocus)
     return () => window.removeEventListener('focus', handleFocus)
-  }, [load])
+  }, [startRead])
 
   const handleReshuffle = useCallback(
     async (day: PlannerReadyDay, index: number) => {
@@ -696,6 +749,7 @@ function PlannerWeek({
           controller.signal
         )
         if (!current()) return
+        weekGenerationRef.current += 1
         setPlannerData((existingData) =>
           existingData
             ? {
@@ -719,9 +773,7 @@ function PlannerWeek({
             ...errors,
             [day.planDate]: t('commerce.premium.planner.reshuffle.conflict'),
           }))
-          const refreshController = new AbortController()
-          fetchControllerRef.current = refreshController
-          void load(refreshController.signal, { silent: true })
+          startRead({ silent: true })
         } else if (
           reason === 'signed_out' ||
           reason === 'not_entitled' ||
@@ -743,7 +795,7 @@ function PlannerWeek({
         reshuffleControllersRef.current.delete(day.planDate)
       }
     },
-    [busyPlanDate, load, locale, owner, t]
+    [busyPlanDate, startRead, locale, owner, t]
   )
 
   const handleRetry = useCallback(() => {
@@ -752,10 +804,8 @@ function PlannerWeek({
       retry()
       return
     }
-    const controller = new AbortController()
-    fetchControllerRef.current = controller
-    void load(controller.signal)
-  }, [load, retry, status])
+    startRead()
+  }, [startRead, retry, status])
 
   const days = useMemo(() => plannerData?.days ?? [], [plannerData])
 

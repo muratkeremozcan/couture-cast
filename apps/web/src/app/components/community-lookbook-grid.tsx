@@ -521,6 +521,8 @@ interface WeeklyChallengeBannerProps {
   challenge: EmbeddedCommunityChallenge
   language: string
   t: Translate
+  /** False while the session is verified or the member cannot act: the challenge stays readable. */
+  canParticipate: boolean
   onParticipate: (challenge: EmbeddedCommunityChallenge) => void
 }
 
@@ -528,6 +530,7 @@ function WeeklyChallengeBanner({
   challenge,
   language,
   t,
+  canParticipate,
   onParticipate,
 }: WeeklyChallengeBannerProps) {
   const formattedDates = (() => {
@@ -580,21 +583,23 @@ function WeeklyChallengeBanner({
         <p className="text-xs leading-relaxed text-neutral-600">{challenge.body}</p>
       </div>
 
-      <div className="flex justify-end pt-1">
-        <button
-          type="button"
-          data-testid="challenge-participate-button"
-          aria-label={t('community.challenge.participateLabel', {
-            title: challenge.title,
-          })}
-          onClick={() => {
-            onParticipate(challenge)
-          }}
-          className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
-        >
-          {t('community.challenge.participate')}
-        </button>
-      </div>
+      {canParticipate && (
+        <div className="flex justify-end pt-1">
+          <button
+            type="button"
+            data-testid="challenge-participate-button"
+            aria-label={t('community.challenge.participateLabel', {
+              title: challenge.title,
+            })}
+            onClick={() => {
+              onParticipate(challenge)
+            }}
+            className="min-h-[44px] rounded-full bg-[#C9A14A] px-5 py-2 text-xs font-semibold text-[#111111] shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors"
+          >
+            {t('community.challenge.participate')}
+          </button>
+        </div>
+      )}
     </aside>
   )
 }
@@ -2347,6 +2352,9 @@ export function CommunityLookbookGrid({
   // Follows the verified session: `checking` while a stored session is verified, never signed out.
   const memberSession = useMemberSession()
   const hasSession = memberSession.status === 'signed_in'
+  /** The realtime sync was denied and stopped; Retry restarts it (`realtimeEpoch`). */
+  const realtimeDeniedRef = useRef(false)
+  const [realtimeEpoch, setRealtimeEpoch] = useState(0)
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
 
@@ -2919,6 +2927,7 @@ export function CommunityLookbookGrid({
           setIsLoadingMore(false)
           feedControllerRef.current?.abort()
         }
+        realtimeDeniedRef.current = state === 'denied'
         if (state === 'denied') {
           actionControllerRef.current?.abort()
           setIsSubmittingReport(false)
@@ -2934,11 +2943,18 @@ export function CommunityLookbookGrid({
           // A denied socket says nothing about why. One read asks, so a member banned while
           // the page was open sees the notice. A member already told needs no second answer.
           if (!bannedRef.current) {
-            // The answer belongs to the session scope it was asked in.
+            // The answer belongs to the session scope it was asked in, and only while no newer
+            // feed read (a Retry) has started since: a newer read speaks for the grid.
             const scope = feedScopeRef.current
+            const generation = feedGenerationRef.current
             void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
               (error: unknown) => {
-                if (!active || scope !== feedScopeRef.current) return
+                if (
+                  !active ||
+                  scope !== feedScopeRef.current ||
+                  generation !== feedGenerationRef.current
+                )
+                  return
                 const sanction = communitySanctionOf(error)
                 if (sanction) {
                   closeForBan(sanction)
@@ -2995,6 +3011,7 @@ export function CommunityLookbookGrid({
     resetSpotlight,
     captureScroll,
     setAnnouncement,
+    realtimeEpoch,
   ])
 
   useEffect(
@@ -3259,6 +3276,13 @@ export function CommunityLookbookGrid({
   }
 
   const handleRetry = () => {
+    // A realtime denial stopped the sync and hid the grid; only a catch-up that reports
+    // 'connected' shows it again. Retry starts a new sync, so a member whose access is back
+    // sees the items the retried read loads.
+    if (realtimeDeniedRef.current) {
+      realtimeDeniedRef.current = false
+      setRealtimeEpoch((epoch) => epoch + 1)
+    }
     void loadFeed(currentMode)
   }
 
@@ -3451,14 +3475,15 @@ export function CommunityLookbookGrid({
   }
 
   const openCreateModal = () => {
-    if (!communityAvailable) return
+    // Only a verified member may compose: never while the session is still being checked.
+    if (!communityAvailable || !hasSession) return
     setComposeError(null)
     setNotice(null)
     setIsCreateModalOpen(true)
   }
 
   const handleSelectPhoto = async (file: File): Promise<void> => {
-    if (!communityAvailable) return
+    if (!communityAvailable || !hasSession) return
     const preview = URL.createObjectURL(file)
     setPhotoPreview((current) => {
       if (current) URL.revokeObjectURL(current)
@@ -3710,6 +3735,7 @@ export function CommunityLookbookGrid({
             challenge={activeChallenge}
             language={i18n.language}
             t={t}
+            canParticipate={presentation.canAct}
             onParticipate={openCreateModal}
           />
         )}

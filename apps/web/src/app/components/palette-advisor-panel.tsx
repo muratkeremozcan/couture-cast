@@ -53,9 +53,11 @@ import {
 } from '../../lib/palette-advisor'
 import {
   isLiveOwner,
+  isSessionRecheckError,
   MemberScope,
   readAsMember,
   useMountSignal,
+  useSessionRecheck,
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
@@ -674,6 +676,13 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
   const { t, i18n } = useTranslation()
   const { status, owner } = session
   const [panelState, setPanelState] = useState<PanelState>('checking')
+  /** A read denied while the bridge could not verify the member again: retryable. */
+  const recheck = useSessionRecheck(owner)
+  const {
+    attempt: loadAttempt,
+    markFailed: markRecheckFailed,
+    clear: clearRecheck,
+  } = recheck
   const [profile, setProfile] = useState<PaletteAdvisorProfile | null>(null)
   const [busy, setBusy] = useState<BusyKind>(null)
   const [uploadState, setUploadState] = useState<PaletteSelfieUploadState | null>(null)
@@ -699,6 +708,8 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
   // One read per member: a session event that names the same member again (a token refresh,
   // the end of a verification already answered) asks nothing.
   useEffect(() => {
+    // Every run decides afresh whether a failed recheck is still waiting.
+    clearRecheck()
     if (status === 'checking') {
       setError(null)
       setPanelState('checking')
@@ -736,6 +747,14 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
         setPanelState('ready')
       } catch (loadError: unknown) {
         if (!current()) return
+        if (isSessionRecheckError(loadError)) {
+          // The member is not known to be signed out: a load error with a retry, and a new
+          // read once the bridge verifies them again.
+          setError(loadErrorMessage)
+          setPanelState('load_failed')
+          markRecheckFailed()
+          return
+        }
         if (paletteAdvisorFailureReason(loadError) === 'signed_out') {
           // An expired or cleared token is not a broken read. Show the locked
           // panel rather than an error the reader cannot act on, and never
@@ -749,7 +768,7 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage])
+  }, [status, owner, loadErrorMessage, loadAttempt, clearRecheck, markRecheckFailed])
 
   /**
    * Re-reads the server's view without touching the busy state.
@@ -762,7 +781,12 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
     // Checked before the read is sent, and again when it answers.
     if (!isLiveOwner(owner)) return
     try {
-      const next = await getPaletteAdvisorFromWeb()
+      // The same bounded retry as the first read: a denial of a rotated token reads again once.
+      const next = await readAsMember(
+        owner,
+        () => getPaletteAdvisorFromWeb(),
+        (error) => paletteAdvisorFailureReason(error) === 'signed_out'
+      )
       if (!isLiveOwner(owner)) return
       setProfile(next)
       setPanelState('ready')
@@ -1163,7 +1187,11 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
         </p>
       )}
 
-      <SessionRetryButton session={session} testId="palette-advisor-session-retry" />
+      <SessionRetryButton
+        session={session}
+        testId="palette-advisor-session-retry"
+        recheck={recheck.retry}
+      />
     </section>
   )
 }

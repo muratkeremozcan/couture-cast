@@ -248,6 +248,65 @@ export function currentWebSessionBearer(): string | null {
 }
 
 /**
+ * A read was denied and the bridge could not verify the member's session again (a timeout or a
+ * 5xx from the profile check). Says nothing about the member: the section shows its load error
+ * with a retry, and reads again when the bridge next verifies this member
+ * (`useReloadOnSessionRecheck`).
+ */
+export class SessionRecheckError extends Error {
+  constructor(readonly denial: unknown) {
+    super('Session verification is unavailable.')
+    this.name = 'SessionRecheckError'
+  }
+}
+
+export function isSessionRecheckError(error: unknown): error is SessionRecheckError {
+  return error instanceof SessionRecheckError
+}
+
+/**
+ * While `waiting` (a read failed with `SessionRecheckError`), runs `reload` once the bridge
+ * publishes again with `owner` still the member: the verification that failed has now
+ * succeeded. A section that read successfully never waits, so a token rotation reloads nothing.
+ */
+export function useReloadOnSessionRecheck(
+  owner: string | null,
+  waiting: boolean,
+  reload: () => void
+): void {
+  const reloadRef = useRef(reload)
+  useLayoutEffect(() => {
+    reloadRef.current = reload
+  })
+  useEffect(() => {
+    if (!waiting) return
+    const onSession = () => {
+      if (isLiveOwner(owner)) reloadRef.current()
+    }
+    window.addEventListener('couture:session', onSession)
+    return () => window.removeEventListener('couture:session', onSession)
+  }, [owner, waiting])
+}
+
+/**
+ * A section's failed-recheck state in one place: `markFailed` after a `SessionRecheckError`,
+ * `retry` (non-null only then) for the section's retry control, and `attempt`, bumped by the
+ * retry or by the bridge verifying the member again, for the section's read effect to follow.
+ */
+export function useSessionRecheck(owner: string | null) {
+  const [attempt, setAttempt] = useState(0)
+  const [failed, setFailed] = useState(false)
+  const readAgain = useCallback(() => {
+    setFailed(false)
+    setAttempt((current) => current + 1)
+  }, [])
+  useReloadOnSessionRecheck(owner, failed, readAgain)
+  const markFailed = useCallback(() => setFailed(true), [])
+  const clear = useCallback(() => setFailed(false), [])
+  return { attempt, retry: failed ? readAgain : null, markFailed, clear }
+}
+
+/**
  * One member read, with the bearer read at the moment it is sent. A denial (`isDenial`) of a
  * bearer the bridge has since replaced for the same member says nothing about that member: the
  * read is retried once with the current bearer.
@@ -261,22 +320,32 @@ export function currentWebSessionBearer(): string | null {
 export async function readAsMember<T>(
   owner: string,
   read: () => Promise<T>,
-  isDenial: (error: unknown) => boolean
+  isDenial: (error: unknown) => boolean,
+  /** The read's own cancellation: a cancelled read neither joins verification nor retries. */
+  signal?: AbortSignal
 ): Promise<T> {
   const sentWith = currentWebSessionBearer()
   try {
     return await read()
   } catch (error: unknown) {
-    if (!isDenial(error) || !isLiveOwner(owner)) throw error
+    if (!isDenial(error) || signal?.aborted || !isLiveOwner(owner)) throw error
     if (currentWebSessionBearer() === sentWith) {
       // The e2e fixture bearer has no stored session behind it and nothing to verify.
       if (!hasStoredWebSession()) throw error
       try {
         await resolveWebSessionToken()
-      } catch {
-        throw error
+      } catch (recheck: unknown) {
+        // A refused profile check confirms the denial. Any other failure (a timeout, a 5xx)
+        // leaves the member unknown: an outage the section can retry, never a sign-out.
+        if (isWebSessionDenial(recheck)) throw error
+        throw new SessionRecheckError(error)
       }
-      if (!isLiveOwner(owner) || currentWebSessionBearer() === sentWith) throw error
+      if (
+        signal?.aborted ||
+        !isLiveOwner(owner) ||
+        currentWebSessionBearer() === sentWith
+      )
+        throw error
     }
     return read()
   }
