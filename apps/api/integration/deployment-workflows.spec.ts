@@ -1,5 +1,7 @@
 // Learning path Step 7: CI and CD automated quality gates.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-7-ci-and-cd-automated-quality-gates
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import { describe, expect, it } from 'vitest'
 import fs from 'node:fs'
 import os from 'node:os'

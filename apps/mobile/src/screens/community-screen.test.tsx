@@ -14,6 +14,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
 // Learning path Step 47: Sponsored community highlights.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-47-sponsored-community-highlights
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import { CommunitySyncState } from '@couture/api-client'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '../test-utils/edge-to-edge-modal'

@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-15.
-Added Steps 40 to 57:
+Updated: 2026-11-19.
+Added Steps 40 to 58:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -21,6 +21,7 @@ Added Steps 40 to 57:
 - Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
 - Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
+- Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -28,6 +29,9 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
+Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
+Added Step 57's production follow-ups, PRs #237 to #255.
 Moved Step 57 to completed after PR #238 merged as `5bd54123`, and added the pending-teen sign-in loop to its takeaways and tests.
 Added Step 57 for Story 6.17 while its PR is in review, with Step 57 in `Current position` and `The whole project in plain English`.
 Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -131,7 +135,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest completed step: Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
+- Latest step: Step 58, production status and nightly health, the project close on 2026-11-19.
+  It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
+  Delivery is done: `6-15b-expo-sdk-55-58-upgrade` stays `backlog`, so `epic-6` stays `in-progress`.
+- Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
   The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
@@ -295,6 +302,7 @@ Read it before changing or adding a numbered step.
 |   55 | Climb one SDK at a time to the fix. Make text grow live with no restart.     |
 |   56 | Let visitors try a sample closet first. Save only comfort, and only on yes.  |
 |   57 | Sign in with Google. Ask a new person only their birthdate.                  |
+|   58 | Check production every day. Make every red night say why.                    |
 
 ## Special feature: AI garment tagging
 
@@ -11767,3 +11775,154 @@ each merged on green CI. Most were CI reliability; three were product defects re
    The Vercel Hobby team reached 98 of 100 build hours and 77% of its edge requests, almost all
    from CI. #243 cut both at the source and kept every test. Changed real-session specs now get
    burn-in inside the lane that owns their stack (#251).
+
+## Step 58: Production status and nightly health
+
+User/business impact:
+
+With the stories done, the open question becomes "is production still working today?".
+Production can break with no merge: an expired secret, a provider outage, a plan quota or drifted
+data. Before this step the production suite ran only after a push to `main`, so a quiet week said
+nothing about production. The production Playwright suite now also runs once a day, and the
+README's `production status` badge shows the latest result. Three nightly native workflows were
+red (iOS native, accessibility focus and the share-card native lanes); iOS runs only nightly or by
+dispatch, since macOS jobs never run on pull requests. This step fixes each cause, including one
+real app defect a user could hit.
+
+Key takeaways:
+
+1. **A status check is the push suite on a clock.**
+   The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves `main`'s
+   latest commit (or one with the same build inputs), then runs the same suite a push runs. No
+   second suite drifts from the first.
+2. **A scheduled run must not cost a push its verdict.**
+   GitHub keeps one pending run per concurrency group and replaces it on every arrival. In the
+   push group, a scheduled run could replace a pending push verification. The scheduled run has
+   its own group; a push that deploys mid-run can fail the scheduled run's SHA check, and the push
+   run then gives the verdict.
+3. **A badge has no age.**
+   The badge shows the latest run, not when it ran. GitHub can delay or drop a scheduled run and
+   disables a public repository's schedules after 60 days with no activity, so the run list is
+   where freshness is read.
+4. **Make the next failure name its cause.**
+   Each nightly fix also adds the evidence the failing run lacked: the Release font lane reports
+   an emulator that exits during the build with memory and kernel OOM lines, the iOS build summary
+   lists xcodebuild's failed commands, and a failed iOS live font leg or shard publishes a masked
+   record of the local API's requests. The service logs themselves stay private, since the
+   repository is public and they can carry runtime credentials.
+
+Hard-won lessons from the implementation and code review of this step:
+
+- The accessibility-focus nightly failed before any test ran: Maven Central and the Gradle plugin
+  portal answered HTTP 429 for `gson` 2.9.1 during plugin resolution. Every Gradle call in that
+  workflow, the TalkBack connected runs included, now goes through
+  `scripts/ci/gradle-resolution-retry.mjs`, which retries only resolution failures; a failing test
+  still runs once. The Codex review found the connected runs still resolved their UTP
+  dependencies outside the retry.
+- The Release font share-card lane lost its emulator during a 12-minute Release build on a runner
+  that also hosts Supabase and the app's services. Memory exhaustion is a working hypothesis: the
+  run kept no kernel log. The lane now adds swap sized inside the native build's 15 GiB disk guard;
+  the Codex review caught that a fixed 8 GiB swap could push free disk under that guard.
+- The 11-17 and 11-18 iOS nightlies failed five ways, no two alike, on a runner with 3 CPUs and
+  under 0.5 GB free memory. The share-card opener's touch was cancelled after its press-in, a flow
+  passed its last step and was then killed at the 120 s default deadline, and a negative check
+  read the backgrounded app after iOS Settings opened. The opener now retries until the sheet
+  title shows and never taps once it is open, the flows that position the opener get a budget
+  derived from their subflows, and the iOS Settings proof is the "back to CoutureCast" link Settings
+  shows.
+- The community live font leg ended on "We could not load the community feed." The proof harness
+  drags past the top of the feed after each capture, which fires pull-to-refresh. One refresh
+  failed, and the app kept its error panel through every later refresh that succeeded. That was a
+  real defect: a member who pulls again after a network blip saw the error above a feed that loaded.
+  A load that answers now clears a stale load error, and a failed withdraw stays on screen.
+- A first change to the accessibility device script broke two Playwright helper specs that read
+  the script and its workflow; nobody ran them until the review round. Run every spec that reads a
+  changed file before committing.
+
+Story/Task mapping:
+
+- No story: this step closes the project's delivery phase. It is operational work requested by the
+  owner on 2026-11-19, the same departure from instruction 2 that Steps 38, 39, 49 and 55 took.
+- `6-15b-expo-sdk-55-58-upgrade` stays `backlog` in `sprint-status.yaml`, so `epic-6` stays
+  `in-progress`.
+
+Story reference:
+
+- `_bmad-output/project-knowledge/deployment-guide.md`, `Production deployment verification`.
+- `README.md`, `Production status`.
+
+Cross-links:
+
+- Step 7 provides the CI gates and the deployed E2E workflows this step schedules.
+- Step 12 provides the cross-surface E2E suite the production run executes.
+- Step 38 provides the community screen whose stale error this step clears.
+- Step 46 provides the accessibility-focus module and its TalkBack lanes.
+- Step 48 provides the share-card native lanes, the Release font proof and the story68 flows.
+- Step 55 provides the live font-scale proof whose iOS legs run nightly.
+
+Sequence to follow:
+
+1. `.github/workflows/pw-e2e-prod.yml` (triggers, concurrency and the served-commit waits).
+2. `scripts/ci/gradle-resolution-retry.mjs`, `.github/workflows/pr-accessibility-focus.yml` and
+   `scripts/ci/accessibility-focus-device-tests.sh`.
+3. `scripts/ci/share-card-android-release-font.sh`.
+4. `maestro/story68/tap-outfit-open.yaml`, `maestro/story68/settings.yaml` and
+   `scripts/lib/story68-flow-timeouts.mjs`.
+5. `scripts/lib/native-build-failure.mjs`.
+6. `apps/mobile/src/features/community/community-screen.tsx` (the load-error reset).
+7. `scripts/ci/native-api-requests.mjs`, `.github/workflows/ios-native-jobs.yml` and
+   `scripts/ci/native-ios-public-diagnostics.mjs`.
+
+Task owner map:
+
+- Production status owner: schedule and isolate the daily production run in `.github/workflows/pw-e2e-prod.yml`, documented in `README.md` and `_bmad-output/project-knowledge/deployment-guide.md`.
+- Android nightly owner: retry dependency resolution in `scripts/ci/gradle-resolution-retry.mjs`, called from `.github/workflows/pr-accessibility-focus.yml` and `scripts/ci/accessibility-focus-device-tests.sh`, and keep the Release font emulator alive in `scripts/ci/share-card-android-release-font.sh`.
+- iOS nightly owner: open the share-card sheet in `maestro/story68/tap-outfit-open.yaml`, budget the flows in `scripts/lib/story68-flow-timeouts.mjs`, classify build failures in `scripts/lib/native-build-failure.mjs`, and publish the API record from `scripts/ci/native-api-requests.mjs` through `.github/workflows/ios-native-jobs.yml`.
+- Community screen owner: clear a stale load error in `apps/mobile/src/features/community/community-screen.tsx`.
+
+Tests that cover this step:
+
+Workflow contracts, Vitest:
+
+- [`apps/api/integration/deployment-workflows.spec.ts`](../../apps/api/integration/deployment-workflows.spec.ts):
+  proves the daily schedule, the separate concurrency group, that no Prod E2E job is conditional
+  on the event, and the README badge.
+- [`playwright/support/helpers/accessibility-focus-workflow.spec.ts`](../../playwright/support/helpers/accessibility-focus-workflow.spec.ts):
+  proves the accessibility-focus path filters list the retry files.
+- [`playwright/support/helpers/accessibility-focus-results.spec.ts`](../../playwright/support/helpers/accessibility-focus-results.spec.ts):
+  proves the lane runner finds the retry next to the device script.
+
+CI scripts, node:test:
+
+- [`scripts/ci/gradle-resolution-retry.test.mjs`](../../scripts/ci/gradle-resolution-retry.test.mjs):
+  proves every Gradle call in the accessibility workflow goes through the retry, every Android job
+  sets up the Gradle cache, and a 429 in a connected run retries while a failing test runs once.
+- [`scripts/ci/share-card-android-release-font.test.mjs`](../../scripts/ci/share-card-android-release-font.test.mjs):
+  proves swap sized against the disk guard, the emulator check after the build, and that kernel
+  OOM lines reach the log.
+- [`scripts/lib/story68-outfit-open-tap.test.mjs`](../../scripts/lib/story68-outfit-open-tap.test.mjs):
+  proves the opener flows tap through the retry subflow and the subflow never taps an open sheet.
+- [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
+  proves the flow budgets derive from the positioning and tap subflows.
+- [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
+  proves the iOS Settings proof reads the return link and the Android title check stays.
+- [`scripts/lib/native-build-failure.test.mjs`](../../scripts/lib/native-build-failure.test.mjs):
+  proves xcodebuild's failed commands, Swift errors and failed build scripts are named.
+- [`scripts/ci/native-api-requests.test.mjs`](../../scripts/ci/native-api-requests.test.mjs):
+  proves the API record masks dynamic route segments, counts slow and unanswered requests, and is
+  wired into the failed-run evidence.
+
+Mobile, Vitest:
+
+- [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx)
+  (cases in `apps/mobile/src/test-utils/community-screen/feed.cases.tsx`): 6.1-MOB-096 proves a
+  refresh that answers clears an earlier load error; 6.1-MOB-097 proves it keeps a failed
+  withdraw.
+
+Evidence boundaries:
+
+- The daily production run, the swap step, the Gradle cache and the iOS fixes run only on GitHub's
+  runners. Their proof is the first scheduled runs after merge and the manual dispatches named in
+  the pull request.
+- The Release font emulator loss and the failed community refresh have no recorded cause beyond
+  what this step names; the new evidence records exist so the next failure names one.
