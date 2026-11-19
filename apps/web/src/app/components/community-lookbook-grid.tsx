@@ -2152,8 +2152,9 @@ function CommunitySettingsLink({
         href={href}
         // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a
         // stored session not verified yet, never sees it (globals.css, lib/landing-session.ts).
-        // A refused stored session keeps the link visible without the marker.
-        data-landing={guestOnly ? 'guest-inline' : undefined}
+        // A refused stored session keeps the link while the landing reads it as a member, and
+        // hides it with the guest link while the landing is still pending (globals.css).
+        data-landing={guestOnly ? 'guest-inline' : 'refused-inline'}
         className="flex min-h-[44px] items-center px-2 text-sm font-medium text-[color:var(--theme-card-text)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
       >
         {label}

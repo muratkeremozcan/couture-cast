@@ -228,6 +228,9 @@ body {
  * A pending session is almost always a member's, so it holds the member actions' space without
  * showing them, and the page does not move when they appear (TEA R3). `guest-inline` marks a
  * signed-out link inside another section (the Community feed's), which keeps its own space.
+ * `refused-inline` marks the Sign in link of a stored session the API refused: the landing may
+ * still read that session as a member, so the link stays visible then, and hides only while the
+ * landing is pending.
  */
 html:not([data-session='member']):not([data-session='pending']) [data-landing='member'] {
   display: none !important;
@@ -240,6 +243,7 @@ html[data-session='pending'] [data-landing='guest'],
 html[data-session='member'] [data-landing='guest-inline'] {
   display: none !important;
 }
-html[data-session='pending'] [data-landing='guest-inline'] {
+html[data-session='pending'] [data-landing='guest-inline'],
+html[data-session='pending'] [data-landing='refused-inline'] {
   visibility: hidden;
 }
