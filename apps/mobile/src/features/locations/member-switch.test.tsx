@@ -140,6 +140,13 @@ function renderScreen(guided = false) {
           <></>
         </AccessibilityAnnouncerProvider>
       ),
+    /** Locations opens again under the same announcer. */
+    reopen: () =>
+      view.rerender(
+        <AccessibilityAnnouncerProvider>
+          <LocationsScreen guided={guided} />
+        </AccessibilityAnnouncerProvider>
+      ),
   }
 }
 
@@ -651,27 +658,25 @@ describe(
     // Codex product review 7. Each case below is one window where the phone's member has already
     // changed (or is about to) while A's screen, press or deferred effect is still in play.
 
-    /** A from-search handler that records each save's bearer and answers with A's place. */
+    /** A from-search handler that records each save's bearer and answers with the sent label. */
     function answerSaves() {
       server.use(
-        http.post('*/api/v1/locations/from-search', ({ request }) => {
+        http.post('*/api/v1/locations/from-search', async ({ request }) => {
           saveBearers.push(request.headers.get('authorization'))
+          const { label } = (await request.json()) as { label: string }
           return HttpResponse.json(
-            { data: savedLocation({ id: 'a-9', label: 'Alpha Studio' }) },
+            { data: savedLocation({ id: 'a-9', label }) },
             { status: 201 }
           )
         })
       )
     }
 
-    /** A picks Springfield and names it, ready to save. */
-    async function pickAndName() {
+    /** The member picks Springfield and names it, ready to save. */
+    async function pickAndName(label = 'Alpha Studio') {
       await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Spring')
       await userEvent.click(await screen.findByTestId('location-search-option-0'))
-      await userEvent.fill(
-        await screen.findByTestId('location-label-input'),
-        'Alpha Studio'
-      )
+      await userEvent.fill(await screen.findByTestId('location-label-input'), label)
       await settle()
     }
 
@@ -776,6 +781,46 @@ describe(
       expect(document.body.textContent).not.toMatch(/Alpha/)
     })
 
+    // Codex review 12 finding 4: clearing A's message must also clear the memory the announcer
+    // uses to skip repeats, or B's identical feedback is silently dropped.
+    it('LOC-MEMBER-MOB-16b feedback B earns is heard even when it repeats what A last heard', async () => {
+      const { back, reopen } = renderScreen()
+      const liveRegion = () => document.getElementById('a11y-live-announcer')
+      const resultCount = i18n.t('locations.resultCount', { count: 1 })
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      // The last thing A hears is the result count of a search.
+      await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Spring')
+      await waitFor(() => expect(liveRegion()?.textContent).toBe(resultCount))
+      await settle()
+
+      act(() => back())
+      switchTo(null)
+      await settle()
+      expect(liveRegion()?.textContent ?? '').toBe('')
+
+      // B signs in on the same app, opens Locations and runs the same search: the first thing B
+      // hears is the very message A heard last.
+      switchTo('member-b')
+      act(() => reopen())
+      expect(await screen.findByText('Bravo Office')).toBeTruthy()
+      await settle()
+      await waitPastAnnouncements()
+      const { announcements, stop } = recordAnnouncements()
+      try {
+        await userEvent.fill(
+          await screen.findByTestId('locations-search-input'),
+          'Spring'
+        )
+        expect(await screen.findByTestId('location-search-option-0')).toBeTruthy()
+        await settle()
+        await waitPastAnnouncements()
+
+        expect(announcements).toEqual([resultCount])
+      } finally {
+        stop()
+      }
+    })
+
     // Finding 5: a guided save that succeeds goes Back and still confirms, exactly once.
     it('LOC-MEMBER-MOB-17 a guided save confirms once on the screen Back returns to', async () => {
       answerSaves()
@@ -848,8 +893,9 @@ describe(
 
       it('LOC-MEMBER-MOB-18 control: with no switch, focus goes to the Locations heading', async () => {
         await deleteAlphaHome(false)
+        // Exactly the Locations intro, the element the screen's heading ref points at.
         expect(focusCalls).toHaveLength(1)
-        expect(focusCalls[0]).toBeInstanceOf(HTMLElement)
+        expect(focusCalls[0]).toBe(screen.getByText(i18n.t('locations.intro')))
       })
 
       it('LOC-MEMBER-MOB-19 a focus decided for A is not carried out after the phone switched', async () => {

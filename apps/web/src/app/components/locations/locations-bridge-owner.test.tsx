@@ -24,7 +24,11 @@ import { LOCATION_SEARCH_DEBOUNCE_MS } from './location-search-form'
 import { LocationsSection } from './locations-section'
 
 /** Every client call the section or form starts, kept until it settles. */
-const tracked = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+const tracked = vi.hoisted(() => ({
+  promises: [] as Promise<unknown>[],
+  /** The labels of the last list the client handed to the section. */
+  lastListLabels: [] as string[],
+}))
 
 function track<T>(promise: Promise<T>): Promise<T> {
   tracked.promises.push(promise)
@@ -47,7 +51,13 @@ vi.mock('../../../lib/locations', async (importOriginal) => {
       track(call(...args))
   return {
     ...actual,
-    listLocationsFromWeb: wrap(actual.listLocationsFromWeb),
+    listLocationsFromWeb: (...args: Parameters<typeof actual.listLocationsFromWeb>) =>
+      track(
+        actual.listLocationsFromWeb(...args).then((rows) => {
+          tracked.lastListLabels = rows.map((row) => row.label)
+          return rows
+        })
+      ),
     searchLocationsFromWeb: wrap(actual.searchLocationsFromWeb),
     locationsFromCoordinatesFromWeb: wrap(actual.locationsFromCoordinatesFromWeb),
     saveLocationFromSearchFromWeb: wrap(actual.saveLocationFromSearchFromWeb),
@@ -57,6 +67,9 @@ vi.mock('../../../lib/locations', async (importOriginal) => {
   }
 })
 
+/** The browser's own frame scheduler: the test's waits never pass through a spy on it. */
+const realFrame = window.requestAnimationFrame.bind(window)
+
 /** Every tracked call has settled and React has applied what its handlers set. */
 async function settleClient() {
   for (let round = 0; round < 3; round += 1) {
@@ -64,7 +77,7 @@ async function settleClient() {
       await Promise.allSettled(tracked.promises)
     })
     await act(async () => {
-      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+      await new Promise((resolve) => realFrame(() => resolve(undefined)))
     })
   }
 }
@@ -139,6 +152,33 @@ let requests: {
 let bridgeMoved: boolean
 let renamedTo: string | null
 let pendingPosition: { success: PositionCallback } | null
+/** When set, the next search or city lookup answer waits for the test to release it. */
+let holdNextAnswer: boolean
+let heldAnswer: { release: () => void } | null
+
+async function maybeHold() {
+  if (!holdNextAnswer) return
+  holdNextAnswer = false
+  await new Promise<void>((resolve) => {
+    heldAnswer = { release: resolve }
+  })
+}
+
+/** Every text the status and alert regions show from now on. */
+function recordFeedback(): string[] {
+  const seen: string[] = []
+  const read = () => {
+    for (const region of document.querySelectorAll('[role="status"], [role="alert"]')) {
+      const text = region.textContent?.trim()
+      if (text) seen.push(text)
+    }
+  }
+  const observer = new MutationObserver(read)
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
+  feedbackObservers.push(observer)
+  return seen
+}
+let feedbackObservers: MutationObserver[] = []
 
 /** Requests sent after the bridge moved, before the section heard: all of them are A's. */
 const staleRequests = () => requests.filter((request) => request.afterMove)
@@ -206,7 +246,11 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
     bridgeMoved = false
     renamedTo = null
     pendingPosition = null
+    holdNextAnswer = false
+    heldAnswer = null
+    feedbackObservers = []
     tracked.promises = []
+    tracked.lastListLabels = []
     navigation.push.mockClear()
     session.identity = 'member-a'
     session.stored = true
@@ -238,12 +282,14 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
           data: [renamedTo ? { ...A_HOME, label: renamedTo } : A_HOME, A_WORK],
         })
       }),
-      http.get('/api/v1/locations/search', ({ request }) => {
+      http.get('/api/v1/locations/search', async ({ request }) => {
         log(request)
+        await maybeHold()
         return HttpResponse.json({ data: [SPRINGFIELD] })
       }),
-      http.post('/api/v1/locations/from-coordinates', ({ request }) => {
+      http.post('/api/v1/locations/from-coordinates', async ({ request }) => {
         log(request)
+        await maybeHold()
         return HttpResponse.json({ data: [CHICAGO] })
       }),
       http.post('/api/v1/locations/from-search', ({ request }) => {
@@ -269,6 +315,7 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
   })
 
   afterEach(() => {
+    for (const observer of feedbackObservers) observer.disconnect()
     vi.restoreAllMocks()
     window.sessionStorage.clear()
     Reflect.deleteProperty(window.navigator, 'geolocation')
@@ -336,6 +383,65 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
     await expectCleanB()
   })
 
+  // Codex review 12 finding 1: a request A sent before the bridge moved answers after it moved.
+  it('LOC-BRIDGE-WEB-09 a city lookup A sent that answers after the bridge moved shows and says nothing', async () => {
+    await renderA()
+    holdNextAnswer = true
+    await user.click(screen.getByRole('button', { name: 'Use my location' }))
+    await waitFor(() => expect(pendingPosition).not.toBeNull())
+    await act(async () => {
+      pendingPosition!.success({
+        coords: { latitude: 41.878113, longitude: -87.629799 },
+      } as GeolocationPosition)
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(heldAnswer).not.toBeNull())
+    expect(requests.at(-1)).toMatchObject({
+      path: '/api/v1/locations/from-coordinates',
+      bearer: 'Bearer token-a',
+      afterMove: false,
+    })
+
+    moveBridgeToB()
+    const feedback = recordFeedback()
+    await act(async () => {
+      heldAnswer!.release()
+      await Promise.resolve()
+    })
+    await settleClient()
+
+    // Before B's section loads: A's late Chicago is neither offered nor announced.
+    expect(screen.queryByRole('option', { name: CHICAGO.displayLabel })).toBeNull()
+    expect(feedback.filter((text) => /Chicago|result/i.test(text))).toEqual([])
+    await expectCleanB()
+    expect(feedback.filter((text) => /Chicago|result/i.test(text))).toEqual([])
+  })
+
+  it('LOC-BRIDGE-WEB-10 a search A sent that answers after the bridge moved shows and says nothing', async () => {
+    await renderA()
+    holdNextAnswer = true
+    await user.type(searchInput(), 'Spring')
+    await waitFor(() => expect(heldAnswer).not.toBeNull())
+    expect(requests.at(-1)).toMatchObject({
+      path: '/api/v1/locations/search',
+      bearer: 'Bearer token-a',
+      afterMove: false,
+    })
+
+    moveBridgeToB()
+    const feedback = recordFeedback()
+    await act(async () => {
+      heldAnswer!.release()
+      await Promise.resolve()
+    })
+    await settleClient()
+
+    expect(screen.queryByRole('option', { name: SPRINGFIELD.displayLabel })).toBeNull()
+    expect(feedback.filter((text) => /Springfield|result/i.test(text))).toEqual([])
+    await expectCleanB()
+    expect(feedback.filter((text) => /Springfield|result/i.test(text))).toEqual([])
+  })
+
   it('LOC-BRIDGE-WEB-03 Save pressed after the bridge moved sends no save', async () => {
     await renderA()
     await user.type(searchInput(), 'Springfield')
@@ -393,7 +499,10 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
   })
 
   describe('focus after a rename (finding 6)', () => {
+    let labelsAtSwitch: string[] | null = null
+
     async function renameAlphaHome(moveOnAnnouncement: boolean) {
+      labelsAtSwitch = null
       await renderA()
       await user.click(screen.getByRole('button', { name: 'Rename, Alpha Home' }))
       const field = screen.getByRole('textbox', { name: 'New name' })
@@ -402,11 +511,13 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
       if (moveOnAnnouncement) {
         // The section decides focus and queues its announcement in one step after the reload; the
         // bridge moves right there, before React commits and the focus is carried out.
-        const realFrame = window.requestAnimationFrame.bind(window)
+        // Only the section's own frames reach this spy (the test waits on the real scheduler), and
+        // the switch waits until the rename's reload handed Alpha Studio to the section.
         let moved = false
         vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-          if (!moved && renamedTo !== null) {
+          if (!moved && tracked.lastListLabels.includes('Alpha Studio')) {
             moved = true
+            labelsAtSwitch = [...tracked.lastListLabels]
             moveBridgeToB()
           }
           return realFrame(callback)
@@ -425,6 +536,11 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
     it('LOC-BRIDGE-WEB-08 a focus decided for A is dropped when the bridge moved before it ran', async () => {
       await renameAlphaHome(true)
       expect(bridgeMoved).toBe(true)
+      // The switch came after the reload: the focus decision was made for a list with A's new name.
+      expect(labelsAtSwitch).toEqual(['Alpha Studio', 'Alpha Work'])
+      expect(
+        requests.filter((request) => request.method === 'GET' && !request.afterMove)
+      ).toHaveLength(2)
       expect(screen.queryAllByTestId('location-item-label')).not.toContainEqual(
         document.activeElement
       )
