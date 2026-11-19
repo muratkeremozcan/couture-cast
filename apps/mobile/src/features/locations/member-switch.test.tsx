@@ -109,6 +109,18 @@ async function settle() {
   }
 }
 
+/**
+ * The accessibility announcer publishes its live-region message 80 ms after a call
+ * (apps/mobile/src/hooks/use-accessibility-announcer.ts). Wait past that, so a late completion's
+ * announcement is on screen before the test looks for it.
+ */
+const ANNOUNCER_DEBOUNCE_MS = 80
+async function waitPastAnnouncements() {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, ANNOUNCER_DEBOUNCE_MS * 3))
+  })
+}
+
 describe(
   'the Locations screen belongs to one member at a time (mobile)',
   { timeout: 30_000 },
@@ -119,6 +131,7 @@ describe(
     let listBearers: (string | null)[]
     let saveBearers: (string | null)[]
     let holdAList: { promise: Promise<void>; resolve: () => void } | null
+    let holdBList: { promise: Promise<void>; resolve: () => void } | null
     let restoreAccessTokenResolver: () => void
     const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
 
@@ -134,6 +147,7 @@ describe(
       listBearers = []
       saveBearers = []
       holdAList = null
+      holdBList = null
       tracked.promises = []
       router.back.mockClear()
       process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
@@ -149,8 +163,10 @@ describe(
         http.get('*/api/v1/locations', async ({ request }) => {
           const authorization = request.headers.get('authorization')
           listBearers.push(authorization)
-          if (authorization === 'Bearer token-b')
+          if (authorization === 'Bearer token-b') {
+            if (holdBList) await holdBList.promise
             return HttpResponse.json({ data: [B_OFFICE] })
+          }
           if (holdAList) await holdAList.promise
           return HttpResponse.json({ data: [A_HOME] })
         }),
@@ -274,10 +290,73 @@ describe(
       act(() => answer.resolve())
       await settle()
 
+      await waitPastAnnouncements()
+
       expect(router.back).not.toHaveBeenCalled()
       expect(screen.getByTestId('locations-search-input')).toHaveValue('Bra')
       expect(listBearers).toEqual(listsBefore)
+      // The live region included: A's label is never announced on B's screen.
       noAlpha()
+    })
+
+    it('LOC-MEMBER-MOB-06 A rows and A rename editor are gone while B list is still loading', async () => {
+      holdBList = deferred<void>()
+      renderScreen()
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      await userEvent.click(await screen.findByTestId('location-rename-0'))
+      expect(await screen.findByTestId('location-rename-input-0')).toBeTruthy()
+
+      switchTo('member-b')
+      await waitFor(() => expect(listBearers).toContain('Bearer token-b'))
+
+      noAlpha()
+      expect(screen.queryByTestId('location-item-0')).toBeNull()
+      expect(screen.queryByTestId('location-rename-input-0')).toBeNull()
+
+      act(() => holdBList!.resolve())
+      expect(await screen.findByText('Bravo Office')).toBeTruthy()
+      noAlpha()
+    })
+
+    it('LOC-MEMBER-MOB-07 a save sent as A that fails after the switch shows no error on B screen', async () => {
+      const answer = deferred<void>()
+      server.use(
+        http.post('*/api/v1/locations/from-search', async ({ request }) => {
+          saveBearers.push(request.headers.get('authorization'))
+          await answer.promise
+          return HttpResponse.json(
+            {
+              statusCode: 503,
+              code: 'provider_unavailable',
+              retryable: true,
+              message: 'down',
+              error: 'Service Unavailable',
+            },
+            { status: 503 }
+          )
+        })
+      )
+      await prepareSave()
+
+      await userEvent.click(screen.getByTestId('location-save-button'))
+      await waitFor(() => expect(saveBearers).toEqual(['Bearer token-a']))
+      switchTo('member-b')
+      expect(await screen.findByText('Bravo Office')).toBeTruthy()
+
+      act(() => answer.resolve())
+      await settle()
+      await waitPastAnnouncements()
+
+      expect(screen.queryByTestId('location-error')).toBeNull()
+      expect(screen.queryByTestId('location-retry-button')).toBeNull()
+      noAlpha()
+
+      // B goes on to pick a city: A's failure is not waiting in B's save form either.
+      await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Spring')
+      await userEvent.click(await screen.findByTestId('location-search-option-0'))
+      expect(await screen.findByTestId('location-save-button')).toBeTruthy()
+      expect(screen.queryByTestId('location-error')).toBeNull()
+      expect(screen.queryByTestId('location-retry-button')).toBeNull()
     })
   }
 )

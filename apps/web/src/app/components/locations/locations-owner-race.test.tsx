@@ -299,6 +299,39 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     expect(listBearers).toEqual(historyBefore)
   })
 
+  // Codex review 7 finding 4: the section stays mounted, the bridge has already switched the
+  // session to B (identity and bearer), and A's rename settles before React has seen any event.
+  it('LOC-OWNER-WEB-07 a rename that settles after the session moved to B, before the section heard, sends no list request', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+    holdNextPatch = true
+    await user.click(screen.getByRole('button', { name: /Rename/ }))
+    const field = screen.getByRole('textbox', { name: 'New name' })
+    await user.clear(field)
+    await user.type(field, 'Alpha Studio')
+    await user.click(screen.getByRole('button', { name: /Save name/ }))
+    await waitFor(() => expect(heldPatch).not.toBeNull())
+
+    // The backing session is B's now; no couture:session event has reached the section yet.
+    session.identity = 'member-b'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
+    const historyBefore = [...listBearers]
+
+    act(() => heldPatch!.release())
+    await settleRenames()
+    await settleLists()
+
+    expect(listBearers).toEqual(historyBefore)
+
+    // When the event arrives, B's list loads exactly once.
+    publish('member-b', 'token-b', true)
+    expect(await screen.findByText('Bravo Office')).toBeInTheDocument()
+    await settleLists()
+    expect(listBearers).toEqual([...historyBefore, 'Bearer token-b'])
+    expect(screen.queryByText(/Alpha/)).toBeNull()
+  })
+
   it('LOC-OWNER-WEB-01 a list that lands after sign-out shows none of the signed-out member', async () => {
     await renameAndHoldTheReload()
 

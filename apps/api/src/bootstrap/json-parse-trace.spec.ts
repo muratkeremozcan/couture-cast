@@ -26,6 +26,10 @@ import { httpTestUrl, listenHttpApp } from '../testing/loopback-http-app.js'
 
 /** Text that can only come from the posted bodies. */
 const SENTINEL = 'ZZSENTINEL4188'
+/** Synthetic coordinates no other text in a span could contain, checked one by one. */
+const LATITUDE = '41.8761234'
+const LONGITUDE = '-87.6549876'
+const BODY_FRAGMENTS = [SENTINEL, LATITUDE, LONGITUDE.slice(1)]
 const UNREADABLE_BODY = {
   statusCode: 400,
   code: 'invalid_request',
@@ -102,7 +106,8 @@ beforeAll(async () => {
   const moduleFixture = await Test.createTestingModule({
     controllers: [ProbeController],
   }).compile()
-  app = moduleFixture.createNestApplication()
+  // Both API entry points (main.ts and api/index.ts) keep the raw body for webhook signatures.
+  app = moduleFixture.createNestApplication({ rawBody: true })
   configureApp(app, {
     telemetry: {
       captureEvent: vi.fn().mockResolvedValue(undefined),
@@ -125,9 +130,14 @@ beforeEach(() => {
 
 describe('an unreadable JSON body leaves no text in traces', () => {
   it.each([
-    ['a truncated object', `{"latitude":41.88,"note":"${SENTINEL}`],
-    ['unquoted names', `{latitude:41.88,note:${SENTINEL}}`],
-    ['a bare token', `${SENTINEL}=41.88`],
+    // The syntax error sits right next to the coordinates, where a parser excerpt would quote them.
+    [
+      'a truncated object',
+      `{"latitude":${LATITUDE},"longitude":${LONGITUDE},"note":"${SENTINEL}`,
+    ],
+    ['unquoted names', `{latitude:${LATITUDE},longitude:${LONGITUDE},note:${SENTINEL}}`],
+    ['a bare pair', `${LATITUDE},${LONGITUDE}`],
+    ['a bare token', `${SENTINEL}=${LATITUDE}`],
   ])('JSON-TRACE-01 %s: fixed 400, and no span carries the body', async (_case, body) => {
     const response = await request(httpTestUrl(app))
       .post('/api/v1/trace-probe')
@@ -146,11 +156,12 @@ describe('an unreadable JSON body leaves no text in traces', () => {
           span.instrumentationScope.name === '@opentelemetry/instrumentation-express'
       )
     ).toBe(true)
-    const leaks = spans.flatMap((span) =>
-      exportedText(span).filter(
-        (text) =>
-          text.includes(SENTINEL) || /Unexpected token|in JSON at position/.test(text)
-      )
+    const exported = spans.flatMap(exportedText)
+    // Each fragment of the body on its own: a coordinate alone is a leak too.
+    const leaks = exported.filter(
+      (text) =>
+        BODY_FRAGMENTS.some((fragment) => text.includes(fragment)) ||
+        /Unexpected token|in JSON at position|Unterminated/.test(text)
     )
     expect(leaks).toEqual([])
   })
