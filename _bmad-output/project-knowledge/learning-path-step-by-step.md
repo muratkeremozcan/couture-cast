@@ -11854,7 +11854,10 @@ Hard-won lessons from the implementation and code review of this story:
   log and maps every path onto the OpenAPI contract's route templates. The next review found the
   public selector's token filter dropped the whole record for long template names such as
   `api/v1/community/notification-preferences`, which every iOS sign-in requests; the selector now
-  checks each route against the contract and runs the token filter on every other string.
+  checks each route against the contract and runs the token filter on every other string. The
+  same filter dropped the opener timing receipt over long flow paths; flow fields now must name a
+  flow file in the repository. Every closed field is checked inside the one depth- and
+  entry-bounded walk, so a malformed record is omitted alone.
 - The Gradle retry missed a resolution failure printed over several lines under a test task's own
   `FAILED` line. The classifier now reads a cause nested under a failed download, and counts a
   download only on a line Gradle or Robolectric prints, so an assertion that quotes
@@ -11863,11 +11866,14 @@ Hard-won lessons from the implementation and code review of this story:
 - The tap retry first shipped with structural YAML tests only, which a retry that never retries
   passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
   with the subset of Maestro 2.8.0's rules and timing the subflow uses. The review found the first
-  model invented its timing: under the pinned Maestro the guard reads the screen at most once
-  plus a 500 ms search after the 8 s title wait gives up, so a title that draws later than that
-  still gets a second press. No subflow change removes that, since a title can draw arbitrarily
-  late; the tests run both sides of the boundary, and each run now records how many opener
-  presses a flow made, so a rise in cancelled presses shows in the evidence. The model proves
+  model invented its timing, and the next review that it skipped the hierarchy read Maestro takes
+  for each lookup miss. Under the pinned Maestro the guard's last read comes after the settle, the
+  8 s title wait, two error reads, one opener read and a 500 ms search, so a title that draws later
+  than that still gets a second press. No subflow change removes that, since a title can draw
+  arbitrarily late; the tests run both sides of the boundary. Each run, passed, failed,
+  deadline-killed or discarded for a snapshot retry, now records how many opener tap commands
+  Maestro started, so a rise in retries shows in the evidence; a started command is not proof of
+  a delivered touch. The model proves
   scripted control flow, not device touch delivery or real hierarchy timing.
 - This pull request's own Playwright shard failed before any test: the WebKit package cache hit,
   then a refused `security.ubuntu.com` fetch made the install script drop every cached package,
@@ -11954,7 +11960,7 @@ CI scripts, node:test:
   cancelled first press opens on the second, a title drawn at the guard boundary gets one press
   and one drawn 1 ms later gets two, and a broken opener fails by name inside the budget. It also
   checks each opener flow calls the subflow once and never taps bare, the opener budgets in
-  `scripts/lib/story68-flow-timeouts.mjs` against the subflows, and the press count in the run
+  `scripts/lib/story68-flow-timeouts.mjs` against the subflows, and the tap attempts in the run
   evidence.
 - [`scripts/lib/maestro-flow-model.test.mjs`](../../scripts/lib/maestro-flow-model.test.mjs):
   proves the model's implemented subset of Maestro 2.8.0's retry, condition, lookup-window, tap
@@ -11962,8 +11968,8 @@ CI scripts, node:test:
   know, and that its version equals the repository's pinned Maestro version. Its fidelity rests on
   the pinned Maestro source it cites, read by hand; no test runs real Maestro against it.
 - [`scripts/ci/native-ios-maestro-trace.test.mjs`](../../scripts/ci/native-ios-maestro-trace.test.mjs):
-  proves the opener press count read from the Maestro log, a press cut off by the deadline
-  included.
+  proves the opener tap attempts read from the Maestro log, a command cut off by the deadline
+  included, and their outcome on every run path.
 - [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
   proves every opener flow positions the opener for its platform and scrolls with the guard.
 - [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
