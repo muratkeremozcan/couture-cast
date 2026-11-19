@@ -112,11 +112,26 @@ It adds a `retry` job that `maintenance` logs as unknown and ignores, no hosted 
 Closed codes: `timeout`, `network`, `http_3xx`, `http_4xx`, `http_5xx`, `invalid_config` and `interrupted`.
 `interrupted` means a worker stopped during an attempt.
 
+## Push to moderator devices
+
+Since 2026-11-19 an alert can reach a moderator's phone without any outside account.
+With no webhook URL set, the sweep sends each alert by Expo push, the provider the app already uses for community notifications, to every device with push permission granted of the accounts named in `MODERATION_OPS_PUSH_USER_IDS`.
+The value is a comma-separated list of account ids, set on the worker that runs the sweep: the Northflank service `community-worker`.
+An account receives alerts only after signing in to the mobile app on a device and allowing notifications.
+With no such device the attempt fails as `invalid_config`, the alert stays owed, and `/moderation/sla` still shows it.
+A screening hold is due 30 minutes after it is flagged and is at risk from the start, so its alert is sent on the next sweep.
+The sweep polls every minute; disabled flags, an overlapping sweep or a delivery backlog delay it.
+The console also re-reads the first page of the queue every minute while it is open.
+The notification itself says only that a case needs attention: risk, source and the case link stay behind the console's role check.
+When a moderator leaves the role, remove their account id from `MODERATION_OPS_PUSH_USER_IDS` and restart the worker in the same change as the role removal.
+Expo's acceptance of a message is recorded as delivered. The accepted ticket ids are stored in `ModerationSlaPushReceipt`, and each sweep reads their receipts every 5 minutes, through worker restarts, until Expo reports or 24 hours pass. A failure Expo reports later (a removed app, bad credentials) is logged as `moderation_sla_push_receipt_failed`, a receipt still missing at 24 hours as `moderation_sla_push_receipt_unknown`, and a failed lookup as `moderation_sla_push_receipt_read_failed`; none of them reopens the alert.
+On Android the alert posts to the `community` notification channel, which every registered app version creates, so a moderator on an older build still receives it. That channel has default importance: the alert lands in the notification shade with a sound, and Android does not promise a heads-up banner for it, with the app open or not. On iOS it shows as a banner. The agreed presentation is a notification in the shade with sound; confirm it on each moderator's device in rollout step 3.
+`npm run moderation:sla:drill -- --env-file .env.prod` sends one drill alert through the configured channel.
+
 ## Webhook setup
 
-The repo holds no email, Slack, PagerDuty or other outbound integration, so a generic webhook is the only external channel.
-With no URL set, alerts appear on `/moderation/sla` as console only, and nobody is notified.
-This is the production state until the release owner sets a URL (Story 6.12 D8).
+The repo holds no email, Slack, PagerDuty or other outbound integration besides Expo push, so a generic webhook is the only other external channel, and a set URL wins over push.
+With neither a URL nor push accounts set, alerts appear on `/moderation/sla` as console only, and nobody is notified.
 
 1. Create an incoming webhook at the destination the team reads.
 2. Set `MODERATION_OPS_WEBHOOK_URL` on the worker that runs the sweep: the Northflank service `community-worker`.
@@ -131,8 +146,9 @@ Slack and Discord acceptance is unverified, because the repo holds no such accou
 
 ## Drill
 
-`npm run moderation:sla:drill` posts one `kind: 'drill'` payload through the real adapter, names no case and touches no table.
-It exits 0 on delivery, 1 on a failure and 2 when no URL is set.
+`npm run moderation:sla:drill` posts one `kind: 'drill'` payload through the real adapter and names no case.
+With a webhook URL it touches no table. With push accounts it reads their device tokens through the verified production database client.
+It exits 0 on delivery, 1 on a failure and 2 when neither a URL nor push accounts are set.
 Add `--local` to run against a loopback server with no configured webhook.
 Add `--env-file <path>` to read the URL from a file.
 
@@ -140,9 +156,10 @@ Add `--env-file <path>` to read the URL from a file.
 
 Keep both flags off until each step passes.
 
-1. Deploy the migration `20261105120000_moderation_sla_monitoring`. It is additive.
+1. Deploy the migrations `20261105120000_moderation_sla_monitoring`, `20261119110000_screening_hold_sla` and `20261119120000_moderation_sla_push_channel` before the worker that writes 30-minute screening deadlines or the `push` channel starts. The first is additive; the second widens a check and the third widens one and adds the `ModerationSlaPushReceipt` table, so an older build keeps working beside them.
 2. Confirm the hosted worker runs the release: `community-worker@<COMMIT_SHA>`.
-3. Set the webhook and run the drill, or accept console only.
+3. Set the webhook, or the push accounts, and run the drill, or accept console only. Set `MODERATION_OPS_PUSH_USER_IDS` only after the API and web builds that read the `push` channel are live: an older API or dashboard rejects a monitor row stamped `push`. For push, each named moderator first opens the current app, signs in and allows notifications, and the drill must show the notification on that device before the sweep relies on it.
+   Rollback: unset `MODERATION_OPS_PUSH_USER_IDS` and restart the worker first, wait for the next sweep to stamp the monitor row `console`, then roll the API and web back; reload any open dashboard.
 4. Turn on `moderation_console_enabled` and `moderation_sla_monitoring_enabled` in PostHog for everyone, or for the subject `system:moderation-sla`, which is the identity the worker evaluates. The fallback table does not carry a production opening, because the `maintenance` job that syncs it has no hosted consumer.
 5. Open `/moderation/sla` and wait for the stale banner to clear.
 6. Enable the PostHog alert below.

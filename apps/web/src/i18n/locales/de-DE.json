@@ -889,6 +889,7 @@
       "monitorStaleShort": "Die Überwachung läuft nicht mehr. Es werden keine Warnungen gesendet.",
       "monitorNever": "Die Überwachung lief noch nicht. Es werden keine Warnungen gesendet.",
       "channelWebhook": "Warnungen gehen an den Betriebs-Webhook und erscheinen auf dieser Seite.",
+      "channelPush": "Warnungen gehen als Push-Benachrichtigung an die Geräte der Moderation und erscheinen auf dieser Seite.",
       "channelConsole": "Es ist kein Webhook eingerichtet. Warnungen erscheinen nur auf dieser Seite und niemand wird benachrichtigt.",
       "queueTitle": "Offene Fälle",
       "escalated": "Eskaliert",

@@ -889,6 +889,7 @@
       "monitorStaleShort": "The monitor stopped running. No alerts are going out.",
       "monitorNever": "The monitor has not run yet. No alerts are going out.",
       "channelWebhook": "Alerts go to the operations webhook and appear on this page.",
+      "channelPush": "Alerts go to moderator devices by push notification and appear on this page.",
       "channelConsole": "No webhook is set, so alerts appear on this page only and nobody is notified.",
       "queueTitle": "Open cases",
       "escalated": "Escalated",

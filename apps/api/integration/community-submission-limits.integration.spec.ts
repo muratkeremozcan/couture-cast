@@ -422,6 +422,11 @@ describe('6.1 community submission and report limits', () => {
       expect(report.sla_due_at.getTime()).toBeGreaterThanOrEqual(
         before + REPORT_SLA_HOURS * 60 * 60 * 1000 - 5_000
       )
+      // A member report keeps the 24-hour SLA; only screening holds moved to 30 minutes
+      // (2026-11-19). The upper bound stops a member report inheriting a longer clock.
+      expect(report.sla_due_at.getTime()).toBeLessThanOrEqual(
+        Date.now() + REPORT_SLA_HOURS * 60 * 60 * 1000
+      )
       expect(report.resolved_at).toBeNull()
 
       // An append-only moderation entry accompanies it. The UNIQUE that used to

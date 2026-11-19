@@ -889,6 +889,7 @@
       "monitorStaleShort": "Le moniteur ne s’exécute plus. Aucune alerte n’est envoyée.",
       "monitorNever": "Le moniteur ne s’est pas encore exécuté. Aucune alerte n’est envoyée.",
       "channelWebhook": "Les alertes vont au webhook des opérations et s’affichent sur cette page.",
+      "channelPush": "Les alertes arrivent sur les appareils de modération par notification push et s’affichent sur cette page.",
       "channelConsole": "Aucun webhook n’est défini : les alertes s’affichent seulement sur cette page et personne n’est prévenu.",
       "queueTitle": "Cas ouverts",
       "escalated": "Remontés",

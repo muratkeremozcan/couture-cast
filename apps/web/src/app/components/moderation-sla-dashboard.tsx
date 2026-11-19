@@ -267,6 +267,11 @@ function MonitorPanel({ summary }: { summary: ModerationSlaSummary }) {
           {t('moderation.sla.channelWebhook')}
         </p>
       ) : null}
+      {channel === 'push' && !stale ? (
+        <p data-channel={channel} className="text-sm">
+          {t('moderation.sla.channelPush')}
+        </p>
+      ) : null}
     </section>
   )
 }

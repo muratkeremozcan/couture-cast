@@ -39,7 +39,7 @@ export const moderationSlaFailureCodes = [
 export const moderationSlaFailureCodeSchema = z.enum([...moderationSlaFailureCodes])
 export type ModerationSlaFailureCode = z.infer<typeof moderationSlaFailureCodeSchema>
 
-export const moderationSlaChannels = ['webhook', 'console'] as const
+export const moderationSlaChannels = ['webhook', 'push', 'console'] as const
 export const moderationSlaChannelSchema = z.enum([...moderationSlaChannels])
 export type ModerationSlaChannel = z.infer<typeof moderationSlaChannelSchema>
 

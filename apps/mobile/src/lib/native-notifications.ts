@@ -399,6 +399,15 @@ async function unbind(accessToken?: string) {
     await secure.deleteItemAsync(registrationKey)
   }
 }
+/** The data block `apps/api/src/modules/moderation/moderation-sla.channel.ts` sends. */
+export function isModerationSlaPush(data: unknown): boolean {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as { source?: unknown }).source === 'moderation_sla'
+  )
+}
+
 export async function startNativeNotifications(options: {
   ready: () => boolean
   subscribeReady?: (listener: () => void) => () => void
@@ -414,13 +423,16 @@ export async function startNativeNotifications(options: {
   const notifications = await import('expo-notifications')
   notifications.setNotificationHandler({
     handleNotification: (notification) => {
-      const community = communityNotificationDataSchema.safeParse(
-        notification.request.content.data
-      ).success
+      const data = notification.request.content.data
+      // A moderation SLA alert (the API's push channel) shows like a community one, so a
+      // moderator with the app open still sees it. Tapping it opens nothing in the app.
+      const moderation = isModerationSlaPush(data)
+      const shown = communityNotificationDataSchema.safeParse(data).success || moderation
       return Promise.resolve({
-        shouldShowBanner: community,
-        shouldShowList: community,
-        shouldPlaySound: false,
+        shouldShowBanner: shown,
+        shouldShowList: shown,
+        // A moderation alert sounds, so a moderator with the app open notices it.
+        shouldPlaySound: moderation,
         shouldSetBadge: false,
       })
     },

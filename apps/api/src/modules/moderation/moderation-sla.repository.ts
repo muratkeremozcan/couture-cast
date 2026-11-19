@@ -75,7 +75,8 @@ export type ModerationSlaClaim =
       firstProcessing: boolean
     }
   | {
-      disposition: 'superseded' | 'console_only'
+      /** `delivered`: Expo already accepted this alert's push before a worker stopped. */
+      disposition: 'superseded' | 'console_only' | 'delivered'
       alert: ClaimedModerationSlaAlert
       firstProcessing: boolean
     }
@@ -239,6 +240,26 @@ export class ModerationSlaRepository {
       }
       const firstProcessing = row.attempts === 0
 
+      // A worker that stopped after Expo accepted this alert's push, before it recorded the
+      // delivery, left the tickets behind. Under the row lock they decide first: the alert was
+      // sent, whatever the channel is now or however the case moved since.
+      const accepted = await tx.moderationSlaPushReceipt.findFirst({
+        where: { alert_id: row.id },
+        select: { accepted_at: true },
+      })
+      if (accepted) {
+        await tx.moderationSlaAlert.update({
+          where: { id: row.id },
+          data: {
+            delivery: 'delivered',
+            delivered_at: accepted.accepted_at,
+            lease_until: null,
+            last_error_code: null,
+          },
+        })
+        return { disposition: 'delivered', alert, firstProcessing }
+      }
+
       const relevance = moderationSlaAlertRelevance({
         kind: row.kind,
         slaDueAt: row.sla_due_at,
@@ -281,6 +302,63 @@ export class ModerationSlaRepository {
         interrupted,
         firstProcessing,
       }
+    })
+  }
+
+  /** Records the Expo tickets an alert push was accepted with; their receipts are read later. */
+  async recordPushTickets(
+    alertId: string,
+    ticketIds: readonly string[],
+    acceptedAt: Date,
+    checkAfter: Date,
+    expiresAt: Date
+  ): Promise<void> {
+    await this.prisma.moderationSlaPushReceipt.createMany({
+      data: ticketIds.map((ticket_id) => ({
+        ticket_id,
+        alert_id: alertId,
+        accepted_at: acceptedAt,
+        check_after: checkAfter,
+        expires_at: expiresAt,
+      })),
+      skipDuplicates: true,
+    })
+  }
+
+  /** Owed receipts whose next look is due, oldest first. */
+  async duePushReceipts(
+    now: Date,
+    limit: number
+  ): Promise<{ ticketId: string; alertId: string; expiresAt: Date }[]> {
+    const rows = await this.prisma.moderationSlaPushReceipt.findMany({
+      where: { outcome: null, check_after: { lte: now } },
+      orderBy: { check_after: 'asc' },
+      take: limit,
+      select: { ticket_id: true, alert_id: true, expires_at: true },
+    })
+    return rows.map((row) => ({
+      ticketId: row.ticket_id,
+      alertId: row.alert_id,
+      expiresAt: row.expires_at,
+    }))
+  }
+
+  async settlePushReceipt(
+    ticketId: string,
+    outcome: 'ok' | 'failed' | 'unknown',
+    error: string | null,
+    now: Date
+  ): Promise<void> {
+    await this.prisma.moderationSlaPushReceipt.updateMany({
+      where: { ticket_id: ticketId, outcome: null },
+      data: { outcome, error, checked_at: now },
+    })
+  }
+
+  async deferPushReceipts(ticketIds: readonly string[], checkAfter: Date): Promise<void> {
+    await this.prisma.moderationSlaPushReceipt.updateMany({
+      where: { ticket_id: { in: [...ticketIds] }, outcome: null },
+      data: { check_after: checkAfter },
     })
   }
 

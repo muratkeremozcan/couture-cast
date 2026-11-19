@@ -212,9 +212,14 @@ describe('comment worker Redis retry and generation ownership', () => {
       })
       expect(reports).toHaveLength(1)
       expect(reports[0]).toMatchObject({
+        origin: 'screening',
         content_snapshot: null,
         audit: [{ action: 'screening_failed', reason: 'screening_unavailable' }],
       })
+      // Owner ruling 2026-11-19: a screening hold on a comment is due 30 minutes after intake.
+      expect(reports[0]!.sla_due_at.getTime() - reports[0]!.accepted_at.getTime()).toBe(
+        30 * 60_000
+      )
       expect(screen).toHaveBeenCalledTimes(3)
     })
   }, 20_000)

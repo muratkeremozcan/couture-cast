@@ -172,6 +172,13 @@ export const MODERATION_REASON_RISK_RANK: Readonly<
 export const MODERATION_REPORTER_BUMP_THRESHOLD = 3
 
 export const SLA_DURATION_MS = 24 * 60 * 60 * 1000
+/**
+ * A post or comment the screener held waits for a human. The owner ruled on 2026-11-19 that a
+ * held safe look waits minutes, not hours, so a screening hold is due 30 minutes after it is
+ * flagged. Member reports keep the 24-hour SLA. A screening hold is therefore at risk from the
+ * moment it enters the queue, which is the urgency it carries.
+ */
+export const SCREENING_HOLD_SLA_MS = 30 * 60 * 1000
 /** A quarter of the 24-hour SLA. At or below this remaining time a case is at risk. */
 export const SLA_AT_RISK_WINDOW_MS = 6 * 60 * 60 * 1000
 

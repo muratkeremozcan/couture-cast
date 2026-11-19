@@ -18,7 +18,10 @@ import type { ModerationQueuePosition } from './moderation-queue-cursor.js'
 import {
   buildModerationSlaPayload,
   createModerationOpsChannel,
+  parseModerationOpsPushUserIds,
+  readExpoPushReceipts,
   resolveModerationSlaAppUrl,
+  type ExpoPushReceipt,
   type ModerationOpsChannel,
 } from './moderation-sla.channel.js'
 import {
@@ -78,7 +81,15 @@ export interface ModerationSlaSweepDeps {
   appUrl?: string
   /** Lets a test cross page boundaries with a small seed. */
   detectionPageSize?: number
+  /** Reads Expo receipts for recorded push tickets; defaults to Expo's API. */
+  readPushReceipts?: (ids: readonly string[]) => Promise<Map<string, ExpoPushReceipt>>
 }
+
+/** First receipt look, and the retry spacing while Expo has none yet or the lookup fails. */
+export const MODERATION_SLA_PUSH_RECEIPT_RETRY_MS = 5 * 60_000
+/** Expo keeps receipts about a day; an id with no receipt by then is recorded as unknown. */
+export const MODERATION_SLA_PUSH_RECEIPT_EXPIRY_MS = 24 * 60 * 60_000
+const PUSH_RECEIPTS_PER_SWEEP = 1000
 
 /** Integer counts only, because `maintenance.processor.ts` logs whatever a sweep returns. */
 export interface ModerationSlaSweepResult {
@@ -131,12 +142,81 @@ export class ModerationSlaSweep {
       throw new Error(MODERATION_SLA_DETECTION_FAILED)
     }
     await this.deliver(result)
+    // Accepted tickets drain whatever channel new alerts use now, so a switch to webhook or console
+    // still settles the pushes already sent.
+    await this.checkPushReceipts()
     // A run that could not finish delivery must look like one: no stamp and no snapshot, so the
     // dashboard and the absence alert both show it, and the general worker's retries apply.
     if (result.errors > 0) throw new Error(MODERATION_SLA_DELIVERY_INCOMPLETE)
     await this.repository.stampMonitor(this.deps.clock(), this.deps.channel.kind)
     await this.publishSignals(sweepNow, result)
     return result
+  }
+
+  /**
+   * Reads owed Expo receipts. Acceptance already counted the alert delivered; a failure Expo
+   * reports later, or no receipt by expiry, is logged so a dead device is visible. A failed lookup
+   * leaves the rows owed for the next try and never fails the sweep.
+   */
+  private async checkPushReceipts(): Promise<void> {
+    const read = this.deps.readPushReceipts
+    if (!read) return
+    try {
+      await this.settlePushReceipts(read)
+    } catch (error) {
+      // Receipts are a side signal: a database or provider failure here leaves the rows due and
+      // never costs the run its stamp.
+      const event = MODERATION_SLA_LOG_EVENTS.pushReceiptReadFailed
+      this.deps.logger.warn({ event, prismaCode: prismaErrorCode(error) }, event)
+    }
+  }
+
+  private async settlePushReceipts(
+    read: NonNullable<ModerationSlaSweepDeps['readPushReceipts']>
+  ): Promise<void> {
+    const now = this.deps.clock()
+    const due = await this.repository.duePushReceipts(now, PUSH_RECEIPTS_PER_SWEEP)
+    if (due.length === 0) return
+    let receipts = new Map<string, ExpoPushReceipt>()
+    let readFailed = false
+    try {
+      receipts = await read(due.map((row) => row.ticketId))
+    } catch {
+      readFailed = true
+      const event = MODERATION_SLA_LOG_EVENTS.pushReceiptReadFailed
+      this.deps.logger.warn({ event, owed: due.length }, event)
+    }
+    const waiting: string[] = []
+    for (const row of due) {
+      // Expiry is checked first, so a provider outage cannot keep an expired ticket owed forever.
+      const receipt = receipts.get(row.ticketId)
+      if (receipt?.status === 'ok') {
+        await this.repository.settlePushReceipt(row.ticketId, 'ok', null, now)
+      } else if (receipt?.status === 'error') {
+        const event = MODERATION_SLA_LOG_EVENTS.pushReceiptFailed
+        this.deps.logger.warn(
+          { event, alertId: row.alertId, error: receipt.error },
+          event
+        )
+        await this.repository.settlePushReceipt(
+          row.ticketId,
+          'failed',
+          receipt.error,
+          now
+        )
+      } else if (row.expiresAt.getTime() <= now.getTime()) {
+        const event = MODERATION_SLA_LOG_EVENTS.pushReceiptUnknown
+        this.deps.logger.warn({ event, alertId: row.alertId, readFailed }, event)
+        await this.repository.settlePushReceipt(row.ticketId, 'unknown', null, now)
+      } else {
+        waiting.push(row.ticketId)
+      }
+    }
+    if (waiting.length > 0)
+      await this.repository.deferPushReceipts(
+        waiting,
+        new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_RETRY_MS)
+      )
   }
 
   /** Flags come first and an outage reads as off, so the sweep does nothing while closed. */
@@ -234,6 +314,7 @@ export class ModerationSlaSweep {
       }
       if (claim.disposition !== 'claimed') {
         if (claim.disposition === 'superseded') result.superseded += 1
+        else if (claim.disposition === 'delivered') result.delivered += 1
         else result.consoleOnly += 1
         continue
       }
@@ -407,11 +488,39 @@ export class ModerationSlaSweep {
 export function createModerationSlaSweep(
   deps: Pick<ModerationSlaSweepDeps, 'prisma' | 'flags' | 'analytics'>
 ): ModerationSlaSweep {
+  const logger = createBaseLogger().child({ feature: 'moderation-sla' })
+  const repository = new ModerationSlaRepository(deps.prisma)
+  const accessToken = process.env.EXPO_PUSH_ACCESS_TOKEN
   return new ModerationSlaSweep({
     ...deps,
     clock: () => new Date(),
-    channel: createModerationOpsChannel({ url: process.env.MODERATION_OPS_WEBHOOK_URL }),
-    logger: createBaseLogger().child({ feature: 'moderation-sla' }),
+    channel: createModerationOpsChannel({
+      url: process.env.MODERATION_OPS_WEBHOOK_URL,
+      push: {
+        userIds: parseModerationOpsPushUserIds(process.env.MODERATION_OPS_PUSH_USER_IDS),
+        accessToken,
+        tokens: async (userIds) =>
+          (
+            await deps.prisma.pushToken.findMany({
+              where: { user_id: { in: [...userIds] }, permission: 'granted' },
+              select: { token: true },
+            })
+          ).map((row) => row.token),
+        // Recorded before the alert counts as delivered, so receipts survive a worker restart.
+        onAccepted: async (alertId, ticketIds) => {
+          const now = new Date()
+          await repository.recordPushTickets(
+            alertId,
+            ticketIds,
+            now,
+            new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_RETRY_MS),
+            new Date(now.getTime() + MODERATION_SLA_PUSH_RECEIPT_EXPIRY_MS)
+          )
+        },
+      },
+    }),
+    logger,
+    readPushReceipts: (ids) => readExpoPushReceipts(ids, { accessToken }),
     meter: createOpenTelemetryModerationSlaMeter(),
     appUrl: resolveModerationSlaAppUrl(),
   })

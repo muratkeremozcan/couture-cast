@@ -889,6 +889,7 @@
       "monitorStaleShort": "Il monitor ha smesso di funzionare. Nessun avviso viene inviato.",
       "monitorNever": "Il monitor non è ancora stato eseguito. Nessun avviso viene inviato.",
       "channelWebhook": "Gli avvisi vanno al webhook operativo e compaiono in questa pagina.",
+      "channelPush": "Gli avvisi arrivano ai dispositivi dei moderatori come notifica push e compaiono in questa pagina.",
       "channelConsole": "Nessun webhook impostato: gli avvisi compaiono solo in questa pagina e nessuno riceve una notifica.",
       "queueTitle": "Casi aperti",
       "escalated": "Riassegnati",

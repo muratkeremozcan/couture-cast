@@ -889,6 +889,7 @@
       "monitorStaleShort": "İzleyici durdu. Uyarı gönderilmiyor.",
       "monitorNever": "İzleyici henüz çalışmadı. Uyarı gönderilmiyor.",
       "channelWebhook": "Uyarılar operasyon webhook'una gider ve bu sayfada görünür.",
+      "channelPush": "Uyarılar moderatör cihazlarına anlık bildirim olarak gider ve bu sayfada görünür.",
       "channelConsole": "Webhook ayarlı değil, bu yüzden uyarılar yalnızca bu sayfada görünür ve kimseye bildirilmez.",
       "queueTitle": "Açık vakalar",
       "escalated": "Üst düzeye taşındı",

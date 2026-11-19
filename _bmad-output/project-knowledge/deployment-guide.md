@@ -1302,8 +1302,11 @@ Follow the rollout and rollback steps in the [moderation SLA runbook](./moderati
     Current custom queue/cache/realtime/database dashboards are placeholders rather than live
     operational signals. The moderation SLA dashboard has real metrics locally, and its hosted
     panels stay empty because neither hosted runtime starts the OpenTelemetry SDK.
-11. **No moderation alert reaches a person in production yet.** `MODERATION_OPS_WEBHOOK_URL` has no
-    production destination, so alerts stop at `/moderation/sla` (Story 6.12 D8). The owner signed off
+11. **Moderation alerts can reach moderators by push.** `MODERATION_OPS_WEBHOOK_URL` has no
+    production destination. Since 2026-11-19 the sweep can push alerts to the devices of the
+    accounts in `MODERATION_OPS_PUSH_USER_IDS` on the community worker (see the moderation SLA
+    runbook). With neither set, alerts stay console only; with no granted device they fail as
+    `invalid_config`. No hosted drill or device delivery is recorded here yet. The owner signed off
     staffing on 2026-11-05, and no roster or schedule exists
     ([gate record](../test-artifacts/community-beta-gate-signatures.md)).
 
