@@ -81,6 +81,9 @@ import {
   SavedLocationWeatherTargetSource,
 } from '../modules/weather/weather-target-source'
 import { createBaseLogger } from '../logger/pino.config.js'
+import { SilhouettePhotoProcessingQueue } from '../modules/wardrobe/silhouette-photo-processing.queue'
+import { WardrobeProcessingQueue } from '../modules/wardrobe/wardrobe-processing.queue'
+import { PaletteAnalysisProcessingQueue } from '../modules/commerce/palette-analysis-processing.queue'
 import { createWorker, defaultWorkerOptions } from './base.worker'
 import { disconnectPrismaClient, getPrismaClient } from './prisma'
 import { shutdownWorkerResources, type ShutdownQueue } from './shutdown-resources'
@@ -364,6 +367,27 @@ export async function startWorkers(state: WorkerProcessState) {
       disconnect: () => community.close(),
     })
 
+    // The hourly wardrobe job re-enqueues processing garments and photos whose job handoff never
+    // happened (or that a legal hold deferred). The producers open their Redis connection
+    // lazily, on the first re-enqueue.
+    const garmentHandoff = new WardrobeProcessingQueue()
+    const silhouetteHandoff = new SilhouettePhotoProcessingQueue()
+    const paletteHandoff = new PaletteAnalysisProcessingQueue()
+    closeables.push(
+      {
+        close: () => garmentHandoff.onModuleDestroy(),
+        disconnect: () => garmentHandoff.onModuleDestroy(),
+      },
+      {
+        close: () => silhouetteHandoff.onModuleDestroy(),
+        disconnect: () => silhouetteHandoff.onModuleDestroy(),
+      },
+      {
+        close: () => paletteHandoff.onModuleDestroy(),
+        disconnect: () => paletteHandoff.onModuleDestroy(),
+      }
+    )
+
     const maintenanceProcessor = createMaintenanceProcessor({
       admin: new AdminService(),
       featureFlags: new FeatureFlagsService(
@@ -385,6 +409,11 @@ export async function startWorkers(state: WorkerProcessState) {
         {
           invalidateUserCache: (userId: string) =>
             invalidateRitualCacheForUser(maintenanceRedis, userId),
+        },
+        {
+          garment: garmentHandoff,
+          silhouette: silhouetteHandoff,
+          palette: paletteHandoff,
         }
       ),
       community: community.sweeps,

@@ -349,9 +349,9 @@ export function realSessionConsentPolicy(env = process.env) {
  * named that way and missing here would run nowhere; real-session-harness.spec.ts checks.
  */
 export const REAL_SESSION_SPEC_PATTERN =
-  /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session|settings-locations-real-session)\.spec\.ts$/
+  /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session|settings-locations-real-session|wardrobe-upload-account-switch-real-session)\.spec\.ts$/
 
-export const EXPECTED_REAL_SESSION_TESTS = 48
+export const EXPECTED_REAL_SESSION_TESTS = 55
 
 /** The `@consent-required` cases in `google-sign-in-real-session.spec.ts`: E-TEEN and its four. */
 export const EXPECTED_CONSENT_REQUIRED_TESTS = 5

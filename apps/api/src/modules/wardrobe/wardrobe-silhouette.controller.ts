@@ -9,34 +9,26 @@ import {
   Headers,
   HttpCode,
   Inject,
-  Param,
-  PayloadTooLargeException,
   Post,
   Put,
-  Req,
   Res,
-  UnsupportedMediaTypeException,
   UseGuards,
 } from '@nestjs/common'
-import type { Request, Response } from 'express'
+import type { Response } from 'express'
 import { z } from 'zod'
 import {
   commitSilhouettePhotoInputSchema,
   createSilhouetteUploadUrlInputSchema,
-  silhouetteUploadSessionPathParamsSchema,
   updateSilhouetteSlidersInputSchema,
 } from '@couture/api-client/contracts/http'
 import { AuthContext } from '../auth/security.decorators.js'
 import { RequestAuthGuard } from '../auth/security.guards.js'
 import type { RequestAuthContext } from '../auth/security.types.js'
 import { WardrobeUploadGuard } from './wardrobe.guard.js'
-import { MAX_SILHOUETTE_PHOTO_BYTES } from './wardrobe-silhouette-image-validation.js'
 import {
   formatSilhouetteETag,
   WardrobeSilhouetteService,
 } from './wardrobe-silhouette.service.js'
-
-const silhouetteMimeTypeSchema = z.enum(['image/jpeg', 'image/png', 'image/webp'])
 
 function validationMessage(prefix: string, error: z.ZodError): string {
   const details = error.issues
@@ -120,48 +112,6 @@ export class WardrobeSilhouetteController {
     )
     res.status(result.replayed ? 200 : 201)
     return result.response
-  }
-
-  @Put('my-form/uploads/:uploadSessionId')
-  @HttpCode(204)
-  async uploadMyFormBytes(
-    @AuthContext() auth: RequestAuthContext,
-    @Param('uploadSessionId') uploadSessionIdParam: string,
-    @Headers('x-upload-token') uploadToken: string,
-    @Headers('content-type') mimeType: string,
-    @Headers('content-length') contentLengthHeader: string | undefined,
-    @Req() request: Request
-  ) {
-    const { uploadSessionId } = silhouetteUploadSessionPathParamsSchema.parse({
-      uploadSessionId: uploadSessionIdParam,
-    })
-
-    if (!uploadToken) {
-      throw new BadRequestException('Missing upload token header')
-    }
-    const parsedMimeType = silhouetteMimeTypeSchema.safeParse(mimeType)
-    if (!parsedMimeType.success) {
-      throw new UnsupportedMediaTypeException('UNSUPPORTED_IMAGE_TYPE')
-    }
-
-    const rawBody = (request as unknown as { body?: unknown }).body
-    const bodyBuffer = Buffer.isBuffer(rawBody) ? rawBody : Buffer.alloc(0)
-    const contentLength = contentLengthHeader
-      ? Number.parseInt(contentLengthHeader, 10)
-      : undefined
-    if (contentLength !== undefined && contentLength > MAX_SILHOUETTE_PHOTO_BYTES) {
-      throw new PayloadTooLargeException('IMAGE_TOO_LARGE')
-    }
-
-    await this.silhouetteService.uploadMyFormBytes(
-      uploadSessionId,
-      uploadToken,
-      auth.userId,
-      auth.role,
-      parsedMimeType.data,
-      Number.isSafeInteger(contentLength) ? contentLength : undefined,
-      bodyBuffer
-    )
   }
 
   @Post('my-form/commit')

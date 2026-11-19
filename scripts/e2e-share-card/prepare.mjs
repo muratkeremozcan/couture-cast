@@ -126,7 +126,6 @@ const owned = {
   PORT: '4088',
   API_BASE_URL: 'http://127.0.0.1:4088',
   API_LISTEN_HOST: '127.0.0.1',
-  PUBLIC_API_URL: 'http://127.0.0.1:4088',
   WEB_E2E_BASE_URL: 'http://127.0.0.1:3088',
   HTTP_CORS_ORIGIN: 'http://127.0.0.1:3088',
   E2E_WEATHER_DOUBLE_PORT: '4086',

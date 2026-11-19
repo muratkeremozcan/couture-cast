@@ -4,7 +4,6 @@ import {
   RequestMethod,
   type NestModule,
 } from '@nestjs/common'
-import { raw } from 'express'
 import { RequestAuthGuard } from '../auth/security.guards'
 import { AuthStateModule } from '../auth/auth-state.module'
 import { AnalyticsModule } from '../../analytics/analytics.module'
@@ -28,8 +27,6 @@ import { SupabaseWardrobeStorageAdapter } from './wardrobe-storage.adapter'
 import { WardrobeProcessingQueue } from './wardrobe-processing.queue'
 import { SilhouettePhotoProcessingQueue } from './silhouette-photo-processing.queue'
 import { WardrobeRetentionService } from './wardrobe-retention.service'
-import { MAX_GARMENT_IMAGE_BYTES } from './wardrobe-image-validation'
-import { MAX_SILHOUETTE_PHOTO_BYTES } from './wardrobe-silhouette-image-validation'
 
 @Module({
   imports: [
@@ -75,32 +72,6 @@ import { MAX_SILHOUETTE_PHOTO_BYTES } from './wardrobe-silhouette-image-validati
 })
 export class WardrobeModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer
-      .apply(
-        raw({
-          inflate: false,
-          limit: MAX_GARMENT_IMAGE_BYTES,
-          type: ['image/jpeg', 'image/png', 'image/webp'],
-        })
-      )
-      .forRoutes({
-        path: '/api/v1/wardrobe/uploads/:uploadSessionId',
-        method: RequestMethod.PUT,
-      })
-
-    consumer
-      .apply(
-        raw({
-          inflate: false,
-          limit: MAX_SILHOUETTE_PHOTO_BYTES,
-          type: ['image/jpeg', 'image/png', 'image/webp'],
-        })
-      )
-      .forRoutes({
-        path: '/api/v1/wardrobe/silhouette/my-form/uploads/:uploadSessionId',
-        method: RequestMethod.PUT,
-      })
-
     /**
      * Applied as middleware rather than per handler so that `Cache-Control`
      * reaches error responses too, including those raised by guards and by

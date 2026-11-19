@@ -139,7 +139,8 @@
       "network_timeout": "Zeitüberschreitung beim Hochladen.",
       "storage_forbidden": "Zugriff auf den Speicher verweigert.",
       "consent_required": "Für Uploads ist die Zustimmung einer erziehungsberechtigten Person erforderlich.",
-      "upload_expired": "Die Upload-Sitzung ist abgelaufen."
+      "upload_expired": "Die Upload-Sitzung ist abgelaufen.",
+      "upload_session_changed": "Du hast dich während dieses Uploads abgemeldet oder das Konto gewechselt. Wähle das Foto erneut aus."
     },
     "crop": {
       "title": "Zuschneiden und positionieren",
@@ -316,7 +317,8 @@
         "privacy_violation": "Dieses Foto kann nicht verwendet werden. Wähle ein anderes Foto.",
         "timeout": "Die Verarbeitung hat zu lange gedauert. Versuche es erneut.",
         "storage_error": "Dieses Foto konnte nicht gespeichert werden. Versuche es erneut.",
-        "confirm_required": "Bestätige den Hinweis zur Grundkleidung, bevor du hochlädst."
+        "confirm_required": "Bestätige den Hinweis zur Grundkleidung, bevor du hochlädst.",
+        "session_changed": "Du hast dich während dieses Uploads abgemeldet oder das Konto gewechselt. Wähle das Foto erneut aus."
       }
     }
   },

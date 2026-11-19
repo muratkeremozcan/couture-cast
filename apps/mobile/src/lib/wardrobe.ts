@@ -28,6 +28,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { createMobileApiClient } from './api-client'
 import { waitForPoll } from './native-utils'
+import { throwUploadStepError } from './upload-attempts'
 
 async function actionableWardrobeError(error: unknown, fallback: string): Promise<Error> {
   if (error instanceof ResponseError) {
@@ -449,7 +450,10 @@ export async function createSilhouetteUploadUrlFromMobile(
     )
     return createSilhouetteUploadUrlResponseSchema.parse(response).data
   } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to start the My Form upload.')
+    // The API's status and code ride along on the surfaced error for the upload attempt runner.
+    return throwUploadStepError(error, (raw) =>
+      actionableWardrobeError(raw, 'Unable to start the My Form upload.')
+    )
   }
 }
 
@@ -468,7 +472,9 @@ export async function commitSilhouettePhotoFromMobile(
     )
     return silhouetteProfileResponseSchema.parse(response).data
   } catch (error) {
-    throw await actionableWardrobeError(error, 'Unable to save your My Form photo.')
+    return throwUploadStepError(error, (raw) =>
+      actionableWardrobeError(raw, 'Unable to save your My Form photo.')
+    )
   }
 }
 

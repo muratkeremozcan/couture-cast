@@ -1,7 +1,7 @@
 import type { Queue } from 'bullmq'
 
 /**
- * The five periodic sweeps, re-hosted off NestJS `@Cron` onto BullMQ Job
+ * The periodic sweeps, re-hosted off NestJS `@Cron` onto BullMQ Job
  * Schedulers (`billing-reconciliation.scheduler.ts` precedent, story 5.2
  * Decision 4a).
  *
@@ -25,6 +25,7 @@ export const ADMIN_JOB_FAILURE_PRUNE_JOB_NAME = 'admin-job-failure-prune'
 export const GUARDIAN_EMANCIPATION_JOB_NAME = 'guardian-emancipation'
 export const WARDROBE_RETENTION_PURGE_JOB_NAME = 'wardrobe-retention-purge'
 export const TELEMETRY_EVENT_PRUNE_JOB_NAME = 'telemetry-event-prune'
+export const WARDROBE_DELETION_DRAIN_JOB_NAME = 'wardrobe-deletion-drain'
 
 // Every five minutes, transcribed from the `@Cron` on
 // `FeatureFlagsWarmup.syncFeatureFlags` (then `FeatureFlagsCron`). This bounds how stale the fallback flag
@@ -49,12 +50,23 @@ export const WARDROBE_RETENTION_PURGE_CRON_PATTERN = '0 * * * *'
 /** Was `@Cron(CronExpression.EVERY_HOUR)` on the telemetry prune. */
 export const TELEMETRY_EVENT_PRUNE_CRON_PATTERN = '0 * * * *'
 
+/**
+ * Not transcribed: added 2026-11-19 (upload review round 6, Codex C5-8). The wardrobe deletion
+ * outbox drains on its own every 15 minutes, apart from the hourly retention job. A repeating
+ * removal (an erased or purged photo whose publication may still write late) is due again 15
+ * minutes after each run until 24 hours after its publication's lease started; an hourly drain
+ * left such a write readable for up to an hour. Offset from the hourly jobs' minute 0 so the
+ * serial maintenance worker does not start both at once.
+ */
+export const WARDROBE_DELETION_DRAIN_CRON_PATTERN = '7,22,37,52 * * * *'
+
 export const MAINTENANCE_JOB_NAMES = [
   FEATURE_FLAGS_SYNC_JOB_NAME,
   ADMIN_JOB_FAILURE_PRUNE_JOB_NAME,
   GUARDIAN_EMANCIPATION_JOB_NAME,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
+  WARDROBE_DELETION_DRAIN_JOB_NAME,
 ] as const
 
 export type MaintenanceJobName = (typeof MAINTENANCE_JOB_NAMES)[number]
@@ -64,7 +76,7 @@ type MaintenanceSchedulerQueue = Pick<Queue, 'upsertJobScheduler'>
 /**
  * `upsertJobScheduler` is keyed on the scheduler id, so re-running this on every
  * worker start is the intended usage rather than a leak: a restart updates the
- * existing scheduler instead of adding a sixth one.
+ * existing scheduler instead of adding another one.
  */
 export async function registerMaintenanceSchedulers(
   queue: MaintenanceSchedulerQueue
@@ -97,6 +109,11 @@ export async function registerMaintenanceSchedulers(
       TELEMETRY_EVENT_PRUNE_JOB_NAME,
       { pattern: TELEMETRY_EVENT_PRUNE_CRON_PATTERN },
       { name: TELEMETRY_EVENT_PRUNE_JOB_NAME, data: {} }
+    ),
+    queue.upsertJobScheduler(
+      WARDROBE_DELETION_DRAIN_JOB_NAME,
+      { pattern: WARDROBE_DELETION_DRAIN_CRON_PATTERN },
+      { name: WARDROBE_DELETION_DRAIN_JOB_NAME, data: {} }
     ),
   ])
 }

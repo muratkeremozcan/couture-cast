@@ -24,6 +24,7 @@ import { LocationPreferencesService } from '../location-preferences/location-pre
 import { FeatureFlagsService } from '../feature-flags/feature-flags.service.js'
 import { TelemetryService } from '../telemetry/telemetry.service.js'
 import { SupabaseWardrobeStorageAdapter } from '../wardrobe/wardrobe-storage.adapter.js'
+import { isOwnGarmentObject } from '../wardrobe/wardrobe-upload-paths.js'
 import type { CapsuleWithJoins } from './capsule-recommendation.engine.js'
 import {
   dailyProjectionToScenarioInputs,
@@ -592,6 +593,13 @@ export class PlannerService {
     await Promise.all(
       garments.map(async (garment) => {
         if (!garment.object_path) {
+          signed.set(garment.id, null)
+          return
+        }
+        // Signed only from the garment's own object: before the 2026-11-19 revoke migration a
+        // member could write `object_path`, so any other path is skipped and logged.
+        if (!isOwnGarmentObject(garment)) {
+          this.logger.error(`Planner garment image path is not its own: ${garment.id}`)
           signed.set(garment.id, null)
           return
         }

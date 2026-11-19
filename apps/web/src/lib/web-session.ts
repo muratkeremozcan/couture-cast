@@ -22,6 +22,7 @@ import {
 } from './signup'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import { readStorage } from './browser-persistence'
+import { forgetAllUploadAttempts, setUploadAttemptAccount } from './upload-attempts'
 let client: SupabaseClient | undefined
 let member: string | null = null
 let principal: string | null = null
@@ -36,7 +37,93 @@ type VerificationFlight = {
 let verification: VerificationFlight | undefined
 let localSignedOut = false
 const authStorageKey = 'couturecast.auth-session'
+/**
+ * Stored in sessionStorage beside the bearer, and written and removed with it: the Supabase
+ * user (`session.user.id`) the stored bearer was verified for, and the app member that
+ * verification named, as `{"principal":…,"member":…}`. A fresh document of this tab (a reload,
+ * a typed URL) restores both from here, so a restored Supabase session of the same user keeps
+ * the bearer and the identity in place while verification runs again.
+ */
+export const WEB_SESSION_PRINCIPAL_STORAGE_KEY = 'couturecast.access-principal'
 export const webSessionIdentity = () => member
+/** Calls `listener` after every identity publication; returns the unsubscribe. */
+export function onWebSessionIdentity(listener: () => void): () => void {
+  window.addEventListener('couture:session', listener)
+  return () => window.removeEventListener('couture:session', listener)
+}
+/**
+ * Every change of verified account goes through here, so upload attempts follow it: an auth
+ * state change that switches or drops the account forgets every open attempt and fences
+ * uploads still under way, the same as an explicit sign-out.
+ *
+ * The account and its bearer are published together (final review F-1): the stored bearer is
+ * replaced (or removed) before subscribers hear of the change, so a listener that reads at once
+ * never pairs the new account with the previous account's token, and the next account's read
+ * finds its own token already stored. The verified principal is stored and removed with it.
+ */
+function setMember(
+  verified: { principal: string; member: string; token: string } | null
+) {
+  acceptedToken = verified?.token ?? null
+  if (verified === null) {
+    window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    window.sessionStorage.removeItem(WEB_SESSION_PRINCIPAL_STORAGE_KEY)
+  } else {
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, verified.token)
+    window.sessionStorage.setItem(
+      WEB_SESSION_PRINCIPAL_STORAGE_KEY,
+      JSON.stringify({ principal: verified.principal, member: verified.member })
+    )
+  }
+  member = verified?.member ?? null
+  setUploadAttemptAccount(member)
+}
+function parseStored(raw: string | null): unknown {
+  try {
+    return raw === null ? null : JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+/**
+ * A fresh document of this tab (a reload or a typed URL) starts here, before any page reads the
+ * bearer. Without this, verification saw no principal, took the restored session for an account
+ * change and removed the bearer until the profile check answered, so a page that read the bearer
+ * at mount in that window found none ("Your session expired" on a reload of /wardrobe).
+ *
+ * The stored principal is restored only while the browser's stored Supabase session is still
+ * that same user; verification then re-runs as for a token refresh. When another account signed
+ * in from another tab (the auth session is shared, the bearer is per tab), or the session is
+ * gone, the previous account's bearer and principal are removed here, before anything reads
+ * them, and the next account's bearer is stored only once its own verification passes. A
+ * bearer with no stored principal (the local E2E fixture token) is left as it is. On the server
+ * every storage read answers null, so nothing happens there.
+ */
+function restoreVerifiedPrincipal() {
+  const raw = readStorage('session', WEB_SESSION_PRINCIPAL_STORAGE_KEY)
+  if (raw === null) return
+  const stored = parseStored(raw) as { principal?: unknown; member?: unknown } | null
+  const auth = parseStored(readStorage('local', authStorageKey)) as {
+    user?: { id?: unknown }
+  } | null
+  const token = readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)
+  if (
+    typeof stored?.principal === 'string' &&
+    stored.principal === auth?.user?.id &&
+    typeof stored.member === 'string' &&
+    stored.member !== '' &&
+    token
+  ) {
+    principal = stored.principal
+    member = stored.member
+    acceptedToken = token
+    setUploadAttemptAccount(member)
+    return
+  }
+  window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  window.sessionStorage.removeItem(WEB_SESSION_PRINCIPAL_STORAGE_KEY)
+}
+restoreVerifiedPrincipal()
 /** A stored session that verification has not yet named a member for, or cleared. */
 export const hasStoredWebSession = () =>
   !localSignedOut && readStorage('local', authStorageKey) !== null
@@ -162,9 +249,7 @@ async function verifySession(session: Session | null) {
   const changed = principal !== (session?.user.id ?? null)
   principal = session?.user.id ?? null
   if (changed || !session) {
-    member = null
-    acceptedToken = null
-    window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+    setMember(null)
     publishIdentity()
   }
   if (!session) return
@@ -179,9 +264,11 @@ async function verifySession(session: Session | null) {
       if (localSignedOut) return
       throw new Error('Session verification is unavailable.')
     }
-    member = profile.user.id
-    acceptedToken = session.access_token
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, session.access_token)
+    setMember({
+      principal: session.user.id,
+      member: profile.user.id,
+      token: session.access_token,
+    })
     // Token refresh preserves same-owner draft/cache scope; account switching changes identity.
     publishIdentity()
   } catch (error) {
@@ -190,9 +277,7 @@ async function verifySession(session: Session | null) {
       throw new Error('Session verification is unavailable.')
     }
     if (changed || sessionDenied(error)) {
-      member = null
-      acceptedToken = null
-      window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      setMember(null)
       if (previous !== null) publishIdentity()
     }
     throw error
@@ -333,10 +418,12 @@ export async function signOutWebSession() {
   localSignedOut = true
   generation++
   verification = undefined
-  member = null
   principal = null
-  acceptedToken = null
-  window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+  // The bearer goes before any subscriber hears of the sign-out (final review F-1).
+  setMember(null)
+  // An open upload attempt belongs to the account that allocated it; this also fences uploads
+  // still under way when no account was verified (the E2E fixture token).
+  forgetAllUploadAttempts()
   clearFederatedFinishMarker()
   window.dispatchEvent(new Event('couture:session'))
   try {

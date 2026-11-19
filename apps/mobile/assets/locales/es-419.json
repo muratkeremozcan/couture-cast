@@ -139,7 +139,8 @@
       "network_timeout": "Se agotó el tiempo para subir la imagen.",
       "storage_forbidden": "No tienes acceso al almacenamiento.",
       "consent_required": "Se requiere el consentimiento de un tutor para subir prendas.",
-      "upload_expired": "La sesión de carga venció."
+      "upload_expired": "La sesión de carga venció.",
+      "upload_session_changed": "Cerraste sesión o cambiaste de cuenta durante esta carga. Vuelve a elegir la foto."
     },
     "crop": {
       "title": "Recortar y posicionar",
@@ -316,7 +317,8 @@
         "privacy_violation": "Esta foto no se puede usar. Elige otra foto.",
         "timeout": "El procesamiento tardó demasiado. Inténtalo de nuevo.",
         "storage_error": "No pudimos guardar esta foto. Inténtalo de nuevo.",
-        "confirm_required": "Confirma la indicación sobre la ropa base antes de subir la foto."
+        "confirm_required": "Confirma la indicación sobre la ropa base antes de subir la foto.",
+        "session_changed": "Cerraste sesión o cambiaste de cuenta durante esta carga. Vuelve a elegir la foto."
       }
     }
   },

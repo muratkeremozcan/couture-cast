@@ -20,6 +20,8 @@ import {
   removeOrphanAuthUserSweepScheduler,
   TELEMETRY_EVENT_PRUNE_CRON_PATTERN,
   TELEMETRY_EVENT_PRUNE_JOB_NAME,
+  WARDROBE_DELETION_DRAIN_CRON_PATTERN,
+  WARDROBE_DELETION_DRAIN_JOB_NAME,
   WARDROBE_RETENTION_PURGE_CRON_PATTERN,
   WARDROBE_RETENTION_PURGE_JOB_NAME,
 } from './maintenance.scheduler'
@@ -87,12 +89,12 @@ describe('Story 6.17 TEA-4: registerOrphanAuthUserSweepScheduler', () => {
 })
 
 describe('registerMaintenanceSchedulers', () => {
-  it('registers exactly the five sweeps and nothing else', async () => {
+  it('registers exactly the five sweeps and the deletion drain, nothing else', async () => {
     const { upsertJobScheduler, queue, calls } = createQueue()
 
     await registerMaintenanceSchedulers(queue)
 
-    expect(upsertJobScheduler).toHaveBeenCalledTimes(5)
+    expect(upsertJobScheduler).toHaveBeenCalledTimes(6)
     expect(
       calls()
         .map((call) => call[0])
@@ -152,8 +154,31 @@ describe('registerMaintenanceSchedulers', () => {
     await registerMaintenanceSchedulers(queue)
 
     const ids = new Set(calls().map((call) => call[0]))
-    expect(upsertJobScheduler).toHaveBeenCalledTimes(10)
-    expect(ids.size).toBe(5)
+    expect(upsertJobScheduler).toHaveBeenCalledTimes(12)
+    expect(ids.size).toBe(6)
+  })
+
+  /**
+   * Learning path Step 58: Image uploads straight to storage.
+   * See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+   *
+   * Production follow-up 2026-11-19 (review round 6, Codex C5-8): a repeating removal is due
+   * again 15 minutes after each run, so the outbox drains every 15 minutes on its own scheduler.
+   * On the hourly job alone, a late write after a drain stayed readable for up to an hour.
+   */
+  it('drains the wardrobe deletion outbox every 15 minutes, apart from the hourly job', async () => {
+    const { queue, calls } = createQueue()
+
+    await registerMaintenanceSchedulers(queue)
+
+    expect(schedulerCall(calls(), WARDROBE_DELETION_DRAIN_JOB_NAME)).toEqual([
+      WARDROBE_DELETION_DRAIN_JOB_NAME,
+      { pattern: '7,22,37,52 * * * *' },
+      { name: WARDROBE_DELETION_DRAIN_JOB_NAME, data: {} },
+    ])
+    expect(WARDROBE_DELETION_DRAIN_CRON_PATTERN).not.toBe(
+      WARDROBE_RETENTION_PURGE_CRON_PATTERN
+    )
   })
 })
 

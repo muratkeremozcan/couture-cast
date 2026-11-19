@@ -10,12 +10,11 @@ import { allowsTestOnlySecrets } from '../../config/runtime-environment.js'
  * returns 200" rule, would let any holder of a partner secret attribute revenue
  * to guessed identifiers.
  *
- * The secret-resolution shape is deliberately identical to
- * `requireUploadTokenSecret` in `wardrobe-upload-token.ts`: a >= 32 character
- * guard, then an `allowsTestOnlySecrets()` fallback so local runs and the test
- * suite work without a real secret, then a hard failure. Copying that shape
- * rather than inventing one keeps every signing path in this API auditable in
- * the same way.
+ * The secret resolution is a >= 32 character guard, then an
+ * `allowsTestOnlySecrets()` fallback so local runs and the test suite work
+ * without a real secret, then a hard failure. `affiliate-webhook-signature.ts`
+ * follows the same shape, which keeps every signing path in this API auditable
+ * in the same way.
  */
 export function requireClickTokenSecret(): string {
   const configuredSecret = process.env.COMMERCE_CLICK_TOKEN_SECRET?.trim()

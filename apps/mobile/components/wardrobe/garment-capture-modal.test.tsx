@@ -2,16 +2,22 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-29-garment-capture-flow
 // Learning path Step 32: Wardrobe onboarding and silhouette setup.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-32-wardrobe-onboarding-and-silhouette-setup
+// Learning path Step 58: Image uploads straight to storage.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
 import React from 'react'
 import type * as ReactNativeModule from 'react-native'
 import type * as EdgeToEdgeTestUtils from '@/src/test-utils/edge-to-edge-modal'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { forgetAllUploadAttempts } from '@/src/lib/upload-attempts'
 import { AccessibilityInfo, findNodeHandle, Platform } from 'react-native'
 import { http, HttpResponse } from 'msw'
 
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { MobileGarmentCaptureModal } from './garment-capture-modal'
 import {
   EDGE_TO_EDGE_MODAL_PROPS,
@@ -85,7 +91,7 @@ const imageManipulator = vi.hoisted(() => ({ manipulateAsync: vi.fn() }))
 
 vi.mock('expo-image-manipulator', () => ({
   manipulateAsync: imageManipulator.manipulateAsync,
-  SaveFormat: { PNG: 'png' },
+  SaveFormat: { PNG: 'png', JPEG: 'jpeg' },
 }))
 
 const fileSystem = vi.hoisted(() => {
@@ -172,6 +178,9 @@ describe('MobileGarmentCaptureModal', () => {
   })
 
   afterEach(() => {
+    // Upload attempts live for the app session; each test starts signed out with none open.
+    setMobileApplicationUserId(null)
+    forgetAllUploadAttempts()
     if (originalBaseUrl === undefined) {
       delete process.env.EXPO_PUBLIC_API_BASE_URL
     } else {
@@ -259,20 +268,30 @@ describe('MobileGarmentCaptureModal', () => {
       committedAt: '2026-08-09T00:00:01.000Z',
       imageAccess: null,
     }
+    const seen: {
+      declaredMimeType?: string
+      uploadedContentType?: string | null
+      uploadedCacheControl?: string | null
+    } = {}
     server.use(
-      http.post('*/api/v1/wardrobe/upload-url', () =>
-        HttpResponse.json({
+      http.post('*/api/v1/wardrobe/upload-url', async ({ request }) => {
+        seen.declaredMimeType = ((await request.json()) as { mimeType: string }).mimeType
+        return HttpResponse.json({
           data: {
             garmentId: 'garment-1',
             uploadSessionId: 'session-1',
             uploadUrl: `${window.location.origin}/mock-storage/session-1`,
             uploadToken: 'upload-token-1',
-            requiredHeaders: { 'content-type': 'image/png' },
+            requiredHeaders: { 'content-type': 'image/jpeg' },
             expiresAt: '2026-08-09T01:00:00.000Z',
           },
         })
-      ),
-      http.put('*/mock-storage/session-1', () => new HttpResponse(null, { status: 204 })),
+      }),
+      http.put('*/mock-storage/session-1', ({ request }) => {
+        seen.uploadedContentType = request.headers.get('content-type')
+        seen.uploadedCacheControl = request.headers.get('cache-control')
+        return new HttpResponse(null, { status: 204 })
+      }),
       http.post('*/api/v1/wardrobe/garments', () =>
         HttpResponse.json({ data: committedGarment })
       )
@@ -284,6 +303,11 @@ describe('MobileGarmentCaptureModal', () => {
     await waitFor(() => {
       expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
     })
+    expect(seen.declaredMimeType).toBe('image/jpeg')
+    expect(seen.uploadedContentType).toBe('image/jpeg')
+    // Review round 1, 2026-11-19: the object is a private photo; the PUT carries the policy
+    // the removed server upload set.
+    expect(seen.uploadedCacheControl).toBe('private, max-age=0')
     expect(onGarmentCommitted).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'garment-1' }),
       'test-access-token'
@@ -319,6 +343,360 @@ describe('MobileGarmentCaptureModal', () => {
       expect(screen.getByText('Storage rejected the upload.')).toBeInTheDocument()
     })
     expect(screen.getByTestId('garment-crop-preview')).toBeInTheDocument()
+  })
+
+  /**
+   * Production follow-up 2026-11-19 (review round 2, Codex 6): tapping upload again with the
+   * same prepared image is the same attempt. It commits first with the attempt's key, so a
+   * commit whose answer was lost replays instead of creating a second garment, and the bytes go
+   * out again only when commit reports them missing.
+   */
+  it.each([
+    {
+      retryCommit: 'replays the lost commit',
+      commitAnswers: [503, 200],
+      expectedPuts: 1,
+    },
+    {
+      retryCommit: 'reports the bytes missing',
+      commitAnswers: [503, 409, 200],
+      expectedPuts: 2,
+    },
+  ])(
+    '4.4-MOB-CAP-08B keeps the attempt across a retry when commit $retryCommit',
+    async ({ commitAnswers, expectedPuts }) => {
+      const seen = { allocateKeys: [] as string[], puts: 0, commitKeys: [] as string[] }
+      server.use(
+        http.post('*/api/v1/wardrobe/upload-url', ({ request }) => {
+          seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+          return HttpResponse.json({
+            data: {
+              garmentId: 'garment-1',
+              uploadSessionId: 'session-1',
+              uploadUrl: `${window.location.origin}/mock-storage/session-1`,
+              uploadToken: 'upload-token-1',
+              requiredHeaders: { 'content-type': 'image/jpeg' },
+              expiresAt: '2026-08-09T01:00:00.000Z',
+            },
+          })
+        }),
+        http.put('*/mock-storage/session-1', () => {
+          seen.puts += 1
+          return new HttpResponse(null, { status: 204 })
+        }),
+        http.post('*/api/v1/wardrobe/garments', ({ request }) => {
+          seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+          const status = commitAnswers[seen.commitKeys.length - 1]
+          if (status === 503) {
+            return HttpResponse.json({ message: 'Service Unavailable' }, { status: 503 })
+          }
+          if (status === 409) {
+            return HttpResponse.json(
+              { statusCode: 409, message: 'UPLOAD_BYTES_MISSING', error: 'Conflict' },
+              { status: 409 }
+            )
+          }
+          return HttpResponse.json({
+            data: {
+              id: 'garment-1',
+              status: 'processing',
+              category: null,
+              material: null,
+              comfortRange: null,
+              tagsConfirmedAt: null,
+              fileSizeBytes: 4,
+              mimeType: 'image/jpeg',
+              retentionStatus: 'active',
+              createdAt: '2026-08-09T00:00:00.000Z',
+              committedAt: '2026-08-09T00:00:01.000Z',
+              imageAccess: null,
+            },
+          })
+        })
+      )
+
+      const { onGarmentCommitted } = renderModal()
+      await pickLibraryPhotoAndConfirm()
+      await waitFor(() => {
+        expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByTestId('garment-confirm-image'))
+      await waitFor(() => {
+        expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
+      })
+
+      expect(seen.allocateKeys).toHaveLength(1)
+      expect(seen.allocateKeys[0]).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+      )
+      expect(seen.puts).toBe(expectedPuts)
+      expect(seen.commitKeys).toHaveLength(commitAnswers.length)
+      expect(new Set(seen.commitKeys).size).toBe(1)
+      expect(seen.commitKeys[0]).not.toBe(seen.allocateKeys[0])
+      expect(onGarmentCommitted).toHaveBeenCalledTimes(1)
+    }
+  )
+
+  /**
+   * Review round 4 (C3-9): an open attempt belongs to the member who opened it. An auth state
+   * change to another member (no explicit sign-out) forgets it, so the next member's upload of
+   * the same photo allocates its own garment and never commits the first member's session.
+   */
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('4.4-MOB-CAP-08C drops the picked photo on an account change, and the same photo picked again starts a new garment', async () => {
+    const seen = { allocateKeys: [] as string[], commitKeys: [] as string[] }
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', ({ request }) => {
+        seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+        return HttpResponse.json({
+          data: {
+            garmentId: `garment-${seen.allocateKeys.length}`,
+            uploadSessionId: `session-${seen.allocateKeys.length}`,
+            uploadUrl: `${window.location.origin}/mock-storage/session`,
+            uploadToken: 'upload-token-1',
+            requiredHeaders: { 'content-type': 'image/jpeg' },
+            expiresAt: '2026-08-09T01:00:00.000Z',
+          },
+        })
+      }),
+      http.put('*/mock-storage/session', () => new HttpResponse(null, { status: 204 })),
+      http.post('*/api/v1/wardrobe/garments', async ({ request }) => {
+        seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+        const body = (await request.json()) as { garmentId: string }
+        if (seen.commitKeys.length === 1) {
+          return HttpResponse.json({ message: 'Service Unavailable' }, { status: 503 })
+        }
+        return HttpResponse.json({
+          data: {
+            id: body.garmentId,
+            status: 'processing',
+            category: null,
+            material: null,
+            comfortRange: null,
+            tagsConfirmedAt: null,
+            fileSizeBytes: 4,
+            mimeType: 'image/jpeg',
+            retentionStatus: 'active',
+            createdAt: '2026-08-09T00:00:00.000Z',
+            committedAt: '2026-08-09T00:00:01.000Z',
+            imageAccess: null,
+          },
+        })
+      })
+    )
+    setMobileApplicationUserId('member-a')
+
+    const { onGarmentCommitted } = renderModal()
+    await pickLibraryPhotoAndConfirm()
+    await waitFor(() => {
+      expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
+    })
+    // Round 5 account epoch: member A's photo, waiting on Retry, is dropped with the account.
+    act(() => setMobileApplicationUserId('member-b'))
+    expect(screen.queryByTestId('garment-crop-preview')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('garment-confirm-image')).not.toBeInTheDocument()
+    expect(screen.getByTestId('garment-source-library')).toBeInTheDocument()
+    expect(seen.allocateKeys).toHaveLength(1)
+
+    // Member B picks the same photo: a new attempt with fresh keys, never A's open one.
+    await pickLibraryPhotoAndConfirm()
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
+    })
+
+    expect(seen.allocateKeys).toHaveLength(2)
+    expect(seen.allocateKeys[1]).not.toBe(seen.allocateKeys[0])
+    expect(seen.commitKeys).toHaveLength(2)
+    expect(seen.commitKeys[1]).not.toBe(seen.commitKeys[0])
+    expect(onGarmentCommitted).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'garment-2' }),
+      'test-access-token'
+    )
+  })
+
+  /** Counts allocation requests; none of the account-epoch cases below may reach the API. */
+  function countAllocations() {
+    const seen = { allocations: 0 }
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', () => {
+        seen.allocations += 1
+        return HttpResponse.json({ message: 'Service Unavailable' }, { status: 503 })
+      })
+    )
+    return seen
+  }
+
+  // Learning path Step 58: Image uploads straight to storage.
+  // See _bmad-output/project-knowledge/learning-path-step-by-step.md#image-uploads-straight-to-storage
+  it('4.4-MOB-CAP-24 drops a photo the picker returns after the account changed', async () => {
+    const seen = countAllocations()
+    let returnPick: (result: unknown) => void = () => undefined
+    imagePicker.launchImageLibraryAsync.mockReturnValueOnce(
+      new Promise((resolve) => {
+        returnPick = resolve
+      })
+    )
+    setMobileApplicationUserId('member-a')
+    renderModal()
+
+    fireEvent.click(screen.getByTestId('garment-source-library'))
+    await waitFor(() => expect(imagePicker.launchImageLibraryAsync).toHaveBeenCalled())
+    act(() => setMobileApplicationUserId('member-b'))
+    await act(async () => {
+      returnPick({ canceled: false, assets: [libraryAsset] })
+      // The picker callback resumes on microtasks only, so one macrotask turn lets it finish.
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.queryByTestId('garment-crop-preview')).not.toBeInTheDocument()
+    expect(screen.getByTestId('garment-source-library')).toBeInTheDocument()
+    expect(seen.allocations).toBe(0)
+  })
+
+  it('4.4-MOB-CAP-23 refuses the upload when resolving the bearer finds another account signed in', async () => {
+    const seen = countAllocations()
+    setMobileApplicationUserId('member-a')
+    const { onGarmentCommitted } = renderModal()
+    await pickLibraryPhoto()
+    // Resolving the token is where the app notices the stored session now belongs to member B.
+    const restoreSwitchingResolver = setMobileAccessTokenResolver(() => {
+      setMobileApplicationUserId('member-b')
+      return 'member-b-access-token'
+    })
+
+    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-source-library')).toBeInTheDocument()
+    })
+    restoreSwitchingResolver()
+
+    expect(screen.queryByTestId('garment-crop-preview')).not.toBeInTheDocument()
+    expect(seen.allocations).toBe(0)
+    expect(onGarmentCommitted).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Retry routes for the same prepared photo: each leg answers from its own queue and records
+   * the idempotency key it was sent.
+   */
+  function garmentRetryRoutes(commitAnswers: (() => Response)[]) {
+    const seen = { allocateKeys: [] as string[], puts: 0, commitKeys: [] as string[] }
+    server.use(
+      http.post('*/api/v1/wardrobe/upload-url', ({ request }) => {
+        seen.allocateKeys.push(request.headers.get('idempotency-key') ?? '')
+        return HttpResponse.json({
+          data: {
+            garmentId: 'garment-1',
+            uploadSessionId: `session-${seen.allocateKeys.length}`,
+            uploadUrl: `${window.location.origin}/mock-storage/garment-retry`,
+            uploadToken: 'upload-token-1',
+            requiredHeaders: { 'content-type': 'image/jpeg' },
+            expiresAt: '2026-08-09T01:00:00.000Z',
+          },
+        })
+      }),
+      http.put('*/mock-storage/garment-retry', () => {
+        seen.puts += 1
+        return new HttpResponse(null, { status: 204 })
+      }),
+      http.post('*/api/v1/wardrobe/garments', ({ request }) => {
+        seen.commitKeys.push(request.headers.get('idempotency-key') ?? '')
+        const answer = commitAnswers.shift()
+        if (!answer) throw new Error('No commit answer left')
+        return answer()
+      })
+    )
+    return seen
+  }
+
+  const committedGarmentAnswer = () =>
+    HttpResponse.json({
+      data: {
+        id: 'garment-1',
+        status: 'processing',
+        category: null,
+        material: null,
+        comfortRange: null,
+        tagsConfirmedAt: null,
+        fileSizeBytes: 4,
+        mimeType: 'image/jpeg',
+        retentionStatus: 'active',
+        createdAt: '2026-08-09T00:00:00.000Z',
+        committedAt: '2026-08-09T00:00:01.000Z',
+        imageAccess: null,
+      },
+    })
+
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+
+  /**
+   * Production follow-up 2026-11-19: when the commit a retry resumed answers that the server
+   * ended the attempt (its session expired), that same tap starts one fresh attempt: a new
+   * allocation and keys, the bytes again, and a commit. The member never taps a second time.
+   */
+  it('4.4-MOB-CAP-08D starts one fresh attempt in the same retry tap once the session expired', async () => {
+    const seen = garmentRetryRoutes([
+      () => HttpResponse.json({ message: 'Service Unavailable' }, { status: 503 }),
+      () =>
+        HttpResponse.json(
+          { statusCode: 409, message: 'UPLOAD_SESSION_EXPIRED', error: 'Conflict' },
+          { status: 409 }
+        ),
+      committedGarmentAnswer,
+    ])
+
+    const { onGarmentCommitted } = renderModal()
+    await pickLibraryPhotoAndConfirm()
+    await waitFor(() => {
+      expect(screen.getByText('Service Unavailable')).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText('UPLOAD_SESSION_EXPIRED')).not.toBeInTheDocument()
+    expect(onGarmentCommitted).toHaveBeenCalledTimes(1)
+    expect(seen.allocateKeys).toHaveLength(2)
+    expect(seen.allocateKeys[1]).toMatch(UUID_V4)
+    expect(seen.allocateKeys[1]).not.toBe(seen.allocateKeys[0])
+    expect(seen.puts).toBe(2)
+    expect(seen.commitKeys).toHaveLength(3)
+    expect(seen.commitKeys[0]).toMatch(UUID_V4)
+    expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
+    expect(seen.commitKeys[2]).toMatch(UUID_V4)
+    expect(seen.commitKeys[2]).not.toBe(seen.commitKeys[0])
+  })
+
+  it('4.4-MOB-CAP-08E keeps the attempt on the next tap after UPLOAD_IN_PROGRESS', async () => {
+    const seen = garmentRetryRoutes([
+      () =>
+        HttpResponse.json(
+          { statusCode: 409, message: 'UPLOAD_IN_PROGRESS', error: 'Conflict' },
+          { status: 409 }
+        ),
+      committedGarmentAnswer,
+    ])
+
+    const { onGarmentCommitted } = renderModal()
+    await pickLibraryPhotoAndConfirm()
+    await waitFor(() => {
+      expect(
+        screen.getByText('This photo is still being saved. Try again in a moment.')
+      ).toBeInTheDocument()
+    })
+    fireEvent.click(screen.getByTestId('garment-confirm-image'))
+    await waitFor(() => {
+      expect(screen.getByTestId('garment-capture-complete')).toBeInTheDocument()
+    })
+
+    expect(onGarmentCommitted).toHaveBeenCalledTimes(1)
+    expect(seen.allocateKeys).toHaveLength(1)
+    expect(seen.puts).toBe(1)
+    expect(seen.commitKeys).toHaveLength(2)
+    expect(seen.commitKeys[0]).toMatch(UUID_V4)
+    expect(seen.commitKeys[1]).toBe(seen.commitKeys[0])
   })
 
   it('4.4-MOB-CAP-10 rejects a photo below the minimum resolution', async () => {
@@ -450,7 +828,9 @@ describe('MobileGarmentCaptureModal', () => {
           { crop: { originX: 463, originY: 0, width: 675, height: 900 } },
           { resize: { width: 675, height: 900 } },
         ],
-        expect.objectContaining({ format: 'png' })
+        // JPEG: a 12 MP photo saved as PNG came to 5 MB or more (production follow-up
+        // 2026-11-19).
+        { compress: 0.9, format: 'jpeg' }
       )
     })
   })

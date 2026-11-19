@@ -5,6 +5,7 @@ import { type Prisma, type PrismaClient, type SilhouetteProfile } from '@prisma/
 import { createBaseLogger } from '../../logger/pino.config'
 import type { SilhouettePhotoModerationEngine } from './silhouette-photo-moderation.engine'
 import type { WardrobeStorage } from './wardrobe-storage.adapter'
+import { isOwnSessionObject } from './wardrobe-upload-paths'
 import { interactiveTransaction } from '../../prisma/prisma-client.js'
 import { resolveGuardianConsentPolicy } from '../auth/guardian-consent-policy.js'
 
@@ -32,21 +33,54 @@ export class SilhouettePhotoProcessor {
     private readonly moderationEngine: SilhouettePhotoModerationEngine
   ) {}
 
+  /**
+   * Every write is fenced on the session the job was enqueued for (and the processing status),
+   * so a job that finishes after the member replaced the photo cannot stamp the newer session.
+   */
   private processingGuard(profile: ProcessableSilhouetteProfile) {
     return {
       id: profile.id,
       user_id: profile.user_id,
       my_form_object_path: profile.my_form_object_path,
+      my_form_upload_session_id: profile.my_form_upload_session_id,
       my_form_status: 'processing' as const,
     }
   }
 
-  async process(silhouetteProfileId: string): Promise<void> {
+  /**
+   * `uploadSessionId` is the session the job was enqueued for, read from its deterministic job id
+   * (`silhouetteSessionFromJobId`), so a job from before the payload carried it still names its
+   * own. A job whose session is unknown, or is not the one the profile is processing, exits
+   * without writing anything.
+   */
+  async process(
+    silhouetteProfileId: string,
+    uploadSessionId: string | null
+  ): Promise<void> {
     const startedAt = Date.now()
     const profile = await this.prisma.silhouetteProfile.findUnique({
       where: { id: silhouetteProfileId },
     })
     if (!isProcessableProfile(profile)) {
+      return
+    }
+    if (!uploadSessionId || profile.my_form_upload_session_id !== uploadSessionId) {
+      // The member replaced the photo since this job was enqueued; its own job handles that.
+      this.logCompletion(profile.id, startedAt, 'superseded', false)
+      return
+    }
+    // The path column was member-writable before the 2026-11-19 revoke migration: never read
+    // an object that is not this member's own My Form photo for this very session.
+    if (
+      !isOwnSessionObject(
+        profile.my_form_object_path,
+        profile.user_id,
+        'silhouette',
+        profile.my_form_upload_session_id
+      )
+    ) {
+      this.logger.error({ silhouetteProfileId }, 'silhouette_object_path_not_own')
+      await this.markFailed(profile.id, 'storage_error', uploadSessionId)
       return
     }
 
@@ -183,10 +217,18 @@ export class SilhouettePhotoProcessor {
    */
   async markFailed(
     silhouetteProfileId: string,
-    reason: 'timeout' | 'storage_error'
+    reason: 'timeout' | 'storage_error',
+    uploadSessionId: string | null
   ): Promise<void> {
+    // Fenced on the job's own session: retry exhaustion of an old job must not fail a newer
+    // one, and a job whose session is unknown fails nothing.
+    if (!uploadSessionId) return
     await this.prisma.silhouetteProfile.updateMany({
-      where: { id: silhouetteProfileId, my_form_status: 'processing' },
+      where: {
+        id: silhouetteProfileId,
+        my_form_status: 'processing',
+        my_form_upload_session_id: uploadSessionId,
+      },
       data: {
         my_form_status: 'failed',
         my_form_failure_reason: reason,

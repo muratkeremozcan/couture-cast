@@ -195,10 +195,6 @@ export const garmentListResponseSchema = z
   })
   .strict()
 
-export const uploadSessionPathParamsSchema = z.object({
-  uploadSessionId: nonEmptyStringSchema.describe('Opaque upload session ID.'),
-})
-
 export const garmentIdPathParamsSchema = z
   .object({
     garmentId: nonEmptyStringSchema.max(128).describe('Unique garment item ID.'),
@@ -921,16 +917,80 @@ export const createSilhouetteUploadUrlResponseSchema = z
   })
   .strict()
 
-export const silhouetteUploadSessionPathParamsSchema = z.object({
-  uploadSessionId: nonEmptyStringSchema.describe('Opaque upload session ID.'),
-})
-
 export const commitSilhouettePhotoInputSchema = z
   .object({
     uploadSessionId: nonEmptyStringSchema,
     confirmsBasewearGuidance: z.literal(true),
   })
   .strict()
+
+/**
+ * The refusals a commit can answer now that it is the only place upload bytes are checked
+ * (production follow-up 2026-11-19): the client PUTs straight to storage, and commit verifies
+ * the stored object before anything else happens.
+ */
+export const uploadCommitConflictMessages = [
+  'IDEMPOTENCY_KEY_REUSED',
+  'UPLOAD_ALREADY_CLAIMED',
+  'UPLOAD_BYTES_MISSING',
+  'UPLOAD_SESSION_EXPIRED',
+  // Round 4: another commit of the same session owns its publication right now. Nothing was
+  // touched; the attempt stays open and a later retry replays that commit's outcome.
+  'UPLOAD_IN_PROGRESS',
+] as const
+
+/**
+ * Round 4: an upload-url replay found bytes already stored for the session. Staging keys take
+ * one write only, so the URL cannot be signed again; the bytes are there to commit.
+ */
+export const UPLOAD_BYTES_PRESENT_MESSAGE = 'UPLOAD_BYTES_PRESENT'
+
+export const uploadCommitUnprocessableMessages = [
+  'IMAGE_SIZE_MISMATCH',
+  'IMAGE_CHECKSUM_MISMATCH',
+  'IMAGE_DIMENSIONS_INVALID',
+  'IMAGE_NOT_PORTRAIT_FRAMED',
+  'IMAGE_DECODE_FAILED',
+] as const
+
+export const uploadCommitConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.enum(uploadCommitConflictMessages),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+  .openapi('UploadCommitConflictError')
+
+export const uploadCommitUnsupportedMediaTypeErrorSchema = z
+  .object({
+    statusCode: z.literal(415),
+    message: z.literal('UNSUPPORTED_IMAGE_TYPE'),
+    error: z.literal('Unsupported Media Type'),
+  })
+  .strict()
+  .openapi('UploadCommitUnsupportedMediaTypeError')
+
+export const uploadCommitUnprocessableErrorSchema = z
+  .object({
+    statusCode: z.literal(422),
+    message: z.enum(uploadCommitUnprocessableMessages),
+    error: z.literal('Unprocessable Entity'),
+  })
+  .strict()
+  .openapi('UploadCommitUnprocessableError')
+
+const silhouetteCommitConflictErrorSchema = z
+  .object({
+    statusCode: z.literal(409),
+    message: z.enum([
+      'CONFIRM_BASEWEAR_GUIDANCE_REQUIRED',
+      ...uploadCommitConflictMessages,
+    ]),
+    error: z.literal('Conflict'),
+  })
+  .strict()
+  .openapi('SilhouetteCommitConflictError')
 
 const silhouetteBadRequestErrorSchema = z
   .object({
@@ -959,7 +1019,12 @@ const silhouetteNotFoundErrorSchema = z
 const silhouetteConflictErrorSchema = z
   .object({
     statusCode: z.literal(409),
-    message: z.enum(['CONFIRM_BASEWEAR_GUIDANCE_REQUIRED', 'IDEMPOTENCY_KEY_REUSED']),
+    message: z.enum([
+      'CONFIRM_BASEWEAR_GUIDANCE_REQUIRED',
+      'IDEMPOTENCY_KEY_REUSED',
+      'UPLOAD_SESSION_EXPIRED',
+      UPLOAD_BYTES_PRESENT_MESSAGE,
+    ]),
     error: z.literal('Conflict'),
   })
   .strict()
@@ -1313,79 +1378,8 @@ export function registerWardrobeContracts(
         },
       },
       409: {
-        description: 'Idempotency key reused or upload session expired.',
-        content: {
-          'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
-        },
-      },
-    },
-  })
-
-  registry.registerPath({
-    method: 'put',
-    path: '/api/v1/wardrobe/uploads/{uploadSessionId}',
-    tags: ['wardrobe'],
-    summary: 'Upload binary image bytes for a pending upload session',
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: uploadSessionPathParamsSchema,
-      headers: z.object({
-        'x-upload-token': z.string().min(1),
-        'content-type': z.enum(['image/jpeg', 'image/png', 'image/webp']),
-      }),
-      body: {
-        required: true,
-        content: {
-          'image/jpeg': {
-            schema: z.string().openapi({ format: 'binary' }),
-          },
-          'image/png': {
-            schema: z.string().openapi({ format: 'binary' }),
-          },
-          'image/webp': {
-            schema: z.string().openapi({ format: 'binary' }),
-          },
-        },
-      },
-    },
-    responses: {
-      204: {
-        description: 'Bytes uploaded and verified successfully.',
-      },
-      400: {
-        description: 'Invalid upload body.',
-        content: {
-          'application/json': {
-            schema: commonSchemas.badRequestHttpErrorSchema,
-          },
-        },
-      },
-      401: {
-        description: 'Missing or invalid authentication headers.',
-        content: {
-          'application/json': {
-            schema: commonSchemas.unauthorizedHttpErrorSchema,
-          },
-        },
-      },
-      403: {
-        description: 'Guardian consent required or token invalid.',
-        content: {
-          'application/json': {
-            schema: commonSchemas.forbiddenHttpErrorSchema,
-          },
-        },
-      },
-      404: {
-        description: 'Upload session not found.',
-        content: {
-          'application/json': {
-            schema: commonSchemas.notFoundHttpErrorSchema,
-          },
-        },
-      },
-      409: {
-        description: 'Upload session expired or token already consumed.',
+        description:
+          'Idempotency key reused, upload session expired, or bytes already stored for a replayed session (UPLOAD_BYTES_PRESENT).',
         content: {
           'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
         },
@@ -1461,8 +1455,22 @@ export function registerWardrobeContracts(
           },
         },
       },
+      415: {
+        description: 'The uploaded bytes are not the declared image type.',
+        content: {
+          'application/json': { schema: uploadCommitUnsupportedMediaTypeErrorSchema },
+        },
+      },
+      422: {
+        description:
+          'The uploaded bytes do not match the declared size, checksum or dimensions, or do not decode.',
+        content: {
+          'application/json': { schema: uploadCommitUnprocessableErrorSchema },
+        },
+      },
       409: {
-        description: 'Idempotency key reused, session expired, or upload claimed.',
+        description:
+          'Idempotency key reused, session expired, upload claimed, no uploaded bytes yet (UPLOAD_BYTES_MISSING), or another commit of the session is publishing it (UPLOAD_IN_PROGRESS).',
         content: {
           'application/json': { schema: commonSchemas.conflictHttpErrorSchema },
         },
@@ -2268,83 +2276,11 @@ export function registerWardrobeContracts(
         },
       },
       409: {
-        description: 'Idempotency key reused with a different payload.',
+        description:
+          'Idempotency key reused with a different payload, the session expired, or bytes already stored for a replayed session (UPLOAD_BYTES_PRESENT).',
         content: {
           'application/json': {
             schema: registeredSilhouetteConflictError,
-          },
-        },
-      },
-    },
-  })
-
-  registry.registerPath({
-    method: 'put',
-    path: '/api/v1/wardrobe/silhouette/my-form/uploads/{uploadSessionId}',
-    tags: ['wardrobe'],
-    summary: 'Upload My Form photo bytes to a previously allocated session',
-    security: [{ bearerAuth: [] }],
-    request: {
-      params: silhouetteUploadSessionPathParamsSchema,
-      // Mirrors the sibling garment bytes-PUT endpoint
-      // (`/api/v1/wardrobe/uploads/{uploadSessionId}`) exactly: without a
-      // declared header/body contract, the generated SDK method for this
-      // operation has no way to actually send the upload token or the
-      // image bytes, and provider drift on token validation or MIME
-      // handling has no contract to catch it — a gap independent review
-      // (bmad-code-review) flagged and this registration closes.
-      headers: z.object({
-        'x-upload-token': z.string().min(1),
-        'content-type': z.enum(['image/jpeg', 'image/png', 'image/webp']),
-      }),
-      body: {
-        required: true,
-        content: {
-          'image/jpeg': {
-            schema: z.string().openapi({ format: 'binary' }),
-          },
-          'image/png': {
-            schema: z.string().openapi({ format: 'binary' }),
-          },
-          'image/webp': {
-            schema: z.string().openapi({ format: 'binary' }),
-          },
-        },
-      },
-    },
-    responses: {
-      204: {
-        description: 'Bytes accepted.',
-      },
-      400: {
-        description: 'Missing upload token or malformed request.',
-        content: {
-          'application/json': {
-            schema: registeredSilhouetteBadRequestError,
-          },
-        },
-      },
-      401: {
-        description: 'Missing or invalid authentication headers.',
-        content: {
-          'application/json': {
-            schema: commonSchemas.unauthorizedHttpErrorSchema,
-          },
-        },
-      },
-      403: {
-        description: 'Guardian consent forbidden or upload token mismatch.',
-        content: {
-          'application/json': {
-            schema: registeredSilhouetteForbiddenError,
-          },
-        },
-      },
-      404: {
-        description: 'Upload session not found or expired.',
-        content: {
-          'application/json': {
-            schema: registeredSilhouetteNotFoundError,
           },
         },
       },
@@ -2425,11 +2361,25 @@ export function registerWardrobeContracts(
         },
       },
       409: {
-        description: 'Basewear guidance not confirmed, or idempotency key reused.',
+        description:
+          'Basewear guidance not confirmed, idempotency key reused, upload already claimed, no uploaded bytes yet, or the session expired.',
         content: {
           'application/json': {
-            schema: registeredSilhouetteConflictError,
+            schema: silhouetteCommitConflictErrorSchema,
           },
+        },
+      },
+      415: {
+        description: 'The uploaded bytes are not the declared image type.',
+        content: {
+          'application/json': { schema: uploadCommitUnsupportedMediaTypeErrorSchema },
+        },
+      },
+      422: {
+        description:
+          'The uploaded bytes do not match the declaration, do not decode, or are not portrait framed.',
+        content: {
+          'application/json': { schema: uploadCommitUnprocessableErrorSchema },
         },
       },
     },
@@ -2510,6 +2460,36 @@ export interface UploadGarmentBytesOptions {
    * other paths, such as storage signed URLs, are used as given.
    */
   apiBaseUrl?: string
+  /**
+   * Sent as the object's `cache-control`. Wardrobe uploads pass `private, max-age=0`: the
+   * object is a member's private photo, and storage keeps the header with the object.
+   */
+  cacheControl?: string
+  /**
+   * Treat storage's "already exists" answer as uploaded. A signed URL writes one object and
+   * never overwrites, so a retry after a PUT whose answer was lost finds the object already
+   * there; commit then verifies the stored bytes against the declared sha256, which makes
+   * accepting it safe. Only for flows whose commit verifies the bytes.
+   */
+  acceptExistingObject?: boolean
+}
+
+/** The `cacheControl` every wardrobe, My Form and selfie upload sends. */
+export const WARDROBE_UPLOAD_CACHE_CONTROL = 'private, max-age=0'
+
+/** Storage's answer to a PUT whose object already exists: 409, or 400 naming 409/Duplicate. */
+async function isStorageDuplicate(response: Response): Promise<boolean> {
+  if (response.status === 409) return true
+  if (response.status !== 400) return false
+  try {
+    const body = (await response.clone().json()) as {
+      statusCode?: unknown
+      error?: unknown
+    }
+    return String(body.statusCode) === '409' || body.error === 'Duplicate'
+  } catch {
+    return false
+  }
 }
 
 const API_UPLOAD_PATH = /^\/api\/v1\//
@@ -2538,12 +2518,15 @@ export async function uploadGarmentBytes({
   signal,
   timeoutMs,
   fetchFn = globalThis.fetch,
+  cacheControl,
+  acceptExistingObject = false,
 }: UploadGarmentBytesOptions): Promise<void> {
   const headers: Record<string, string> = {
     Authorization: `Bearer ${bearerToken}`,
     'X-Upload-Token': uploadToken,
     'Content-Type': mimeType,
   }
+  if (cacheControl !== undefined) headers['Cache-Control'] = cacheControl
 
   const totalBytes = 'byteLength' in body ? body.byteLength : body.size
 
@@ -2556,6 +2539,9 @@ export async function uploadGarmentBytes({
     })
 
     if (!response.ok) {
+      if (acceptExistingObject && (await isStorageDuplicate(response))) {
+        return
+      }
       let errorMessage = `Upload failed with HTTP ${response.status}`
       try {
         const errorJson = (await response.json()) as { error?: { message?: string } }
@@ -2576,3 +2562,409 @@ export async function uploadGarmentBytes({
     onProgress?.(totalBytes, totalBytes)
   }
 }
+
+/**
+ * One logical garment, My Form or selfie upload, kept across the member's retries of it. A
+ * retry reuses both idempotency keys: a commit whose answer was lost replays the committed
+ * result, and an allocation whose answer was lost replays the same session. The keys live as
+ * long as the outcome is ambiguous; once the server ends the attempt (expired, rejected, or any
+ * other terminal answer) it is forgotten, and the next upload of the same photo gets fresh keys.
+ */
+export interface DirectUploadAttempt<TAllocation> {
+  readonly allocateKey: string
+  readonly commitKey: string
+  /** The session this attempt was given; null until an allocation answer arrives. */
+  allocation: TAllocation | null
+}
+
+export interface DirectUploadSteps<TAllocation, TResult> {
+  allocate(idempotencyKey: string): Promise<TAllocation>
+  /** PUTs the bytes to the allocation's signed storage URL. */
+  upload(allocation: TAllocation): Promise<void>
+  commit(allocation: TAllocation, idempotencyKey: string): Promise<TResult>
+  /** True when commit answered `UPLOAD_BYTES_MISSING`: storage holds nothing for the session. */
+  isBytesMissing(error: unknown): boolean | Promise<boolean>
+}
+
+/**
+ * Runs one attempt. The first run allocates, uploads and commits. A retry of an attempt that
+ * already holds an allocation commits first, because the bytes or even the commit may already
+ * have landed with only the answer lost; it re-uploads only when commit reports the bytes
+ * missing. A staging key takes its first write only: a repeated PUT is refused as a duplicate,
+ * which `uploadGarmentBytes` (with `acceptExistingObject`) reads as uploaded, and commit then
+ * verifies the stored bytes against the declared sha256.
+ */
+export async function runDirectUploadAttempt<TAllocation, TResult>(
+  attempt: DirectUploadAttempt<TAllocation>,
+  steps: DirectUploadSteps<TAllocation, TResult>
+): Promise<TResult> {
+  let allocation = attempt.allocation
+  if (allocation) {
+    try {
+      return await steps.commit(allocation, attempt.commitKey)
+    } catch (error) {
+      if (!(await steps.isBytesMissing(error))) throw error
+    }
+  } else {
+    allocation = await steps.allocate(attempt.allocateKey)
+    attempt.allocation = allocation
+  }
+  await steps.upload(allocation)
+  return steps.commit(allocation, attempt.commitKey)
+}
+
+/**
+ * The open upload attempts of one flow, keyed by the signed-in account and by what identifies a
+ * retry of the same upload (the prepared image's fingerprint). An attempt is forgotten when it
+ * succeeds or fails for good, so uploading the same photo again later is a new upload. Bounded,
+ * oldest first, so abandoned attempts cannot accumulate; the map is the only record of which
+ * attempts are open, so an evicted or cleared attempt leaves nothing behind.
+ */
+export class DirectUploadAttempts<TAllocation> {
+  private readonly attempts = new Map<string, DirectUploadAttempt<TAllocation>>()
+
+  constructor(
+    private readonly newKey: () => string,
+    private readonly limit = 8
+  ) {}
+
+  private static entryKey(account: string | null, id: string): string {
+    return JSON.stringify([account, id])
+  }
+
+  /** The open attempt for `id` under `account`, or a new one with fresh keys. */
+  open(account: string | null, id: string): DirectUploadAttempt<TAllocation> {
+    const key = DirectUploadAttempts.entryKey(account, id)
+    const existing = this.attempts.get(key)
+    if (existing) return existing
+    const attempt: DirectUploadAttempt<TAllocation> = {
+      allocateKey: this.newKey(),
+      commitKey: this.newKey(),
+      allocation: null,
+    }
+    this.attempts.set(key, attempt)
+    while (this.attempts.size > this.limit) {
+      const oldest = this.attempts.keys().next().value
+      if (oldest === undefined) break
+      this.attempts.delete(oldest)
+    }
+    return attempt
+  }
+
+  /**
+   * Forgets `attempt`: it succeeded, or failed in a way no retry of it can fix. Only that exact
+   * attempt is removed, so a late answer for one that was already replaced leaves the newer
+   * attempt open.
+   */
+  close(
+    account: string | null,
+    id: string,
+    attempt: DirectUploadAttempt<TAllocation>
+  ): void {
+    const key = DirectUploadAttempts.entryKey(account, id)
+    if (this.attempts.get(key) === attempt) this.attempts.delete(key)
+  }
+
+  /** Forgets every open attempt. */
+  clear(): void {
+    this.attempts.clear()
+  }
+
+  get size(): number {
+    return this.attempts.size
+  }
+}
+
+/** The signed-in account an upload began under, and the session epoch it began in. */
+export interface UploadAttemptSession {
+  readonly account: string | null
+  readonly epoch: number
+}
+
+/**
+ * Thrown when the signed-in session changed (sign-out, a switch to another account, or an
+ * auth state change the client noticed) while an upload was under way. The attempt belonged
+ * to the previous session, so nothing it learned is kept and nothing more is sent for it.
+ */
+export class UploadSessionChangedError extends Error {
+  constructor() {
+    super(
+      'You signed out or switched accounts during this upload. Sign in and try again.'
+    )
+    this.name = 'UploadSessionChangedError'
+  }
+}
+
+/** Classifies a failed step for {@link DirectUploadAttemptRegistry.run}. */
+export interface DirectUploadFailureClassifier {
+  /** True when commit answered `UPLOAD_BYTES_MISSING`. */
+  isBytesMissing(error: unknown): boolean | Promise<boolean>
+  /** True when the server ended the attempt, so no retry of it can succeed. */
+  isTerminal(error: unknown): boolean
+  /**
+   * How the server ended the attempt, when it did so definitively: `session` for a session that
+   * expired, ended or cannot be signed again, `rejected` for stored bytes commit refused. Null
+   * for anything else (an ambiguous fault, or a refusal a fresh attempt cannot fix).
+   */
+  ending(error: unknown): UploadAttemptEnding | null
+}
+
+/**
+ * Every flow's open upload attempts on one client, scoped to the signed-in account. The client
+ * reports each account change (sign-in, sign-out, a switch through an auth state change); a
+ * change forgets every attempt of every flow and starts a new epoch. A flow takes a
+ * {@link UploadAttemptSession} before it opens a picker or camera, binds the photo it gets back
+ * and anything the member confirmed for it to that session, and resolves its bearer token for
+ * it with {@link bearerFor}. Every answer that arrives after the epoch moved is fenced: it is
+ * discarded and the run fails with {@link UploadSessionChangedError}, so one account's photo
+ * never uploads under another account and an old account's late allocation can never be found
+ * by the next account's upload of the same photo.
+ */
+export class DirectUploadAttemptRegistry {
+  private account: string | null = null
+  private epoch = 0
+  private readonly stores = new Set<DirectUploadAttempts<unknown>>()
+  private readonly listeners = new Set<() => void>()
+
+  /** A new flow store whose fresh keys come from `newKey`. */
+  createStore<TAllocation>(newKey: () => string, limit?: number) {
+    const store = new DirectUploadAttempts<TAllocation>(newKey, limit)
+    this.stores.add(store as DirectUploadAttempts<unknown>)
+    return store
+  }
+
+  /** The current account and epoch, taken by a flow together with its bearer token. */
+  session(): UploadAttemptSession {
+    return { account: this.account, epoch: this.epoch }
+  }
+
+  /** Reports the signed-in account (null when signed out); a change forgets every attempt. */
+  setAccount(account: string | null): void {
+    if (account === this.account) return
+    this.account = account
+    this.forgetAll()
+  }
+
+  /**
+   * Forgets every open attempt of every flow, fences every upload still under way, and tells
+   * every subscriber, so a picked photo or confirmation bound to the old epoch is dropped.
+   */
+  forgetAll(): void {
+    this.epoch += 1
+    for (const store of this.stores) store.clear()
+    for (const listener of [...this.listeners]) listener()
+  }
+
+  /** Calls `listener` after every epoch change; returns the unsubscribe. */
+  subscribe(listener: () => void): () => void {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  /** True while the session's account is still signed in and its epoch has not moved. */
+  isCurrent(session: UploadAttemptSession): boolean {
+    return session.epoch === this.epoch && session.account === this.account
+  }
+
+  private assertCurrent(session: UploadAttemptSession): void {
+    if (!this.isCurrent(session)) throw new UploadSessionChangedError()
+  }
+
+  /**
+   * Resolves the bearer token for the account `session` captured. Refuses with
+   * {@link UploadSessionChangedError} when the session is already stale, and again when the
+   * account changed while `resolve` ran (resolving can itself notice a switch to another
+   * account), so an upload never pairs one account's photo with another account's token.
+   */
+  async bearerFor<TBearer>(
+    session: UploadAttemptSession,
+    resolve: () => TBearer | Promise<TBearer>
+  ): Promise<TBearer> {
+    this.assertCurrent(session)
+    const bearer = await resolve()
+    this.assertCurrent(session)
+    return bearer
+  }
+
+  /**
+   * Runs the attempt `id` names under the session's account: a first run allocates, uploads
+   * and commits; a retry of an attempt that already holds its allocation commits first. The
+   * attempt is forgotten on success and on a terminal failure; an ambiguous failure (a network
+   * fault, timeout, abort, 5xx, or a commit another request is still publishing) keeps it, with
+   * its allocation and keys, for the member's retry.
+   */
+  async run<TAllocation, TResult>(
+    store: DirectUploadAttempts<TAllocation>,
+    session: UploadAttemptSession,
+    id: string,
+    steps: Omit<DirectUploadSteps<TAllocation, TResult>, 'isBytesMissing'>,
+    classify: DirectUploadFailureClassifier
+  ): Promise<TResult> {
+    this.assertCurrent(session)
+    const attempt = store.open(session.account, id)
+    // An attempt the member is retrying already holds the session an earlier run was given.
+    const resumed = attempt.allocation !== null
+    try {
+      return await this.runAttempt(store, session, id, attempt, steps, classify)
+    } catch (error) {
+      if (!shouldRestartUploadAttempt(classify.ending(error), resumed)) throw error
+      // The server ended the attempt for good, and runAttempt has forgotten it: the same
+      // Retry or pick starts one fresh attempt (new allocation and keys, PUT, commit) at once,
+      // so the member does not tap again. A failure of that fresh attempt is surfaced as is.
+      store.close(session.account, id, attempt)
+      this.assertCurrent(session)
+      const fresh = store.open(session.account, id)
+      return this.runAttempt(store, session, id, fresh, steps, classify)
+    }
+  }
+
+  private async runAttempt<TAllocation, TResult>(
+    store: DirectUploadAttempts<TAllocation>,
+    session: UploadAttemptSession,
+    id: string,
+    attempt: DirectUploadAttempt<TAllocation>,
+    steps: Omit<DirectUploadSteps<TAllocation, TResult>, 'isBytesMissing'>,
+    classify: DirectUploadFailureClassifier
+  ): Promise<TResult> {
+    const fenced = <TArgs extends unknown[], TOut>(
+      step: (...args: TArgs) => Promise<TOut>
+    ) => {
+      return async (...args: TArgs): Promise<TOut> => {
+        let result: TOut
+        try {
+          result = await step(...args)
+        } catch (error) {
+          this.assertCurrent(session)
+          throw error
+        }
+        this.assertCurrent(session)
+        return result
+      }
+    }
+    try {
+      const result = await runDirectUploadAttempt(attempt, {
+        allocate: fenced((key: string) => steps.allocate(key)),
+        upload: fenced((allocation: TAllocation) => steps.upload(allocation)),
+        commit: fenced((allocation: TAllocation, key: string) =>
+          steps.commit(allocation, key)
+        ),
+        isBytesMissing: (error) => classify.isBytesMissing(error),
+      })
+      store.close(session.account, id, attempt)
+      return result
+    } catch (error) {
+      if (classify.isTerminal(error)) store.close(session.account, id, attempt)
+      throw error
+    }
+  }
+}
+
+/**
+ * How the server ended an attempt for good: `session` when its session expired, ended or can no
+ * longer be signed, `rejected` when commit refused the stored bytes.
+ */
+export type UploadAttemptEnding = 'session' | 'rejected'
+
+const SESSION_ENDING_CODES: ReadonlySet<string> = new Set([
+  'UPLOAD_SESSION_EXPIRED',
+  'UPLOAD_SESSION_NOT_FOUND',
+  'UPLOAD_ALREADY_CLAIMED',
+  'IDEMPOTENCY_KEY_REUSED',
+  UPLOAD_BYTES_PRESENT_MESSAGE,
+])
+
+/**
+ * Round 5: the palette selfie commit answers a refusal of the stored bytes with 400 and one of
+ * these codes, and ends the session (`palette-advisor.service.ts`, `mapImageValidationError`).
+ * Only these codes: any other 400 (`INVALID_UPLOAD_DECLARATION`, say) is no image rejection.
+ */
+const BAD_REQUEST_IMAGE_REJECTION_CODES: ReadonlySet<string> = new Set([
+  'IMAGE_CHECKSUM_MISMATCH',
+  'IMAGE_DIMENSIONS_INVALID',
+  'IMAGE_DECODE_FAILED',
+])
+
+/** Classifies a failed answer as a definitive end of its attempt, or null. */
+export function uploadAttemptEnding(
+  status: number | null | undefined,
+  code: string | null | undefined
+): UploadAttemptEnding | null {
+  if (code && SESSION_ENDING_CODES.has(code)) return 'session'
+  if (
+    status === 415 ||
+    (status === 422 && typeof code === 'string' && /^IMAGE_/.test(code)) ||
+    (status === 400 &&
+      typeof code === 'string' &&
+      BAD_REQUEST_IMAGE_REJECTION_CODES.has(code))
+  ) {
+    return 'rejected'
+  }
+  return null
+}
+
+/**
+ * Whether a run starts one fresh attempt after the server ended this one. An ended session
+ * always restarts. A rejection restarts only when the attempt was resumed: its staged bytes came
+ * from an earlier run, and a fresh session takes this run's own prepared bytes. A rejection of
+ * bytes this run just uploaded would only be refused again.
+ */
+export function shouldRestartUploadAttempt(
+  ending: UploadAttemptEnding | null,
+  resumed: boolean
+): boolean {
+  return ending === 'session' || (ending === 'rejected' && resumed)
+}
+
+/**
+ * Answers that leave the attempt open whatever their status. `UPLOAD_IN_PROGRESS`: another
+ * commit of the same session owns its publication right now and nothing changed, so the next
+ * retry commits again with the same keys and replays that commit's outcome.
+ */
+const AMBIGUOUS_UPLOAD_CODES: ReadonlySet<string> = new Set(['UPLOAD_IN_PROGRESS'])
+
+/**
+ * Answers that end the attempt whatever their status. `UPLOAD_BYTES_PRESENT` answers an
+ * allocation replay, which the client sends only when it never received the allocation: it
+ * holds no session to commit, so the next upload starts over with fresh keys.
+ */
+const TERMINAL_UPLOAD_CODES: ReadonlySet<string> = new Set([
+  'UPLOAD_SESSION_EXPIRED',
+  'UPLOAD_SESSION_NOT_FOUND',
+  'IDEMPOTENCY_KEY_REUSED',
+  UPLOAD_BYTES_PRESENT_MESSAGE,
+])
+
+/**
+ * True when a failed request cannot succeed on a retry of the same attempt: a 4xx answer such
+ * as an expired or ended session, a declaration storage refused, stored bytes commit refused
+ * (the selfie's 400 image codes included, as {@link uploadAttemptEnding} reads them), or a
+ * reused key. Network
+ * faults, timeouts, 5xx answers, a lapsed sign-in (401), 408, 429 and `UPLOAD_IN_PROGRESS`
+ * leave the attempt open.
+ */
+export function isTerminalUploadStatus(
+  status: number | null | undefined,
+  code?: string | null
+): boolean {
+  if (code && AMBIGUOUS_UPLOAD_CODES.has(code)) return false
+  if (code && TERMINAL_UPLOAD_CODES.has(code)) return true
+  return (
+    typeof status === 'number' &&
+    status >= 400 &&
+    status < 500 &&
+    status !== 401 &&
+    status !== 408 &&
+    status !== 429
+  )
+}
+
+/** True for the answer that says another commit of the session is publishing it now. */
+export function isUploadInProgressCode(code: string | null | undefined): boolean {
+  return code === 'UPLOAD_IN_PROGRESS'
+}
+
+/** What a member reads when a commit met another commit of the same upload still publishing. */
+export const UPLOAD_IN_PROGRESS_USER_MESSAGE =
+  'This photo is still being saved. Try again in a moment.'

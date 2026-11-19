@@ -18060,6 +18060,64 @@ export type SilhouetteBadRequestErrorErrorEnum =
 /**
  *
  * @export
+ * @interface SilhouetteCommitConflictError
+ */
+export interface SilhouetteCommitConflictError {
+  /**
+   *
+   * @type {SilhouetteCommitConflictErrorStatusCodeEnum}
+   * @memberof SilhouetteCommitConflictError
+   */
+  statusCode: SilhouetteCommitConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {SilhouetteCommitConflictErrorMessageEnum}
+   * @memberof SilhouetteCommitConflictError
+   */
+  message: SilhouetteCommitConflictErrorMessageEnum
+  /**
+   *
+   * @type {SilhouetteCommitConflictErrorErrorEnum}
+   * @memberof SilhouetteCommitConflictError
+   */
+  error: SilhouetteCommitConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const SilhouetteCommitConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type SilhouetteCommitConflictErrorStatusCodeEnum =
+  (typeof SilhouetteCommitConflictErrorStatusCodeEnum)[keyof typeof SilhouetteCommitConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteCommitConflictErrorMessageEnum = {
+  CONFIRM_BASEWEAR_GUIDANCE_REQUIRED: 'CONFIRM_BASEWEAR_GUIDANCE_REQUIRED',
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+  UPLOAD_ALREADY_CLAIMED: 'UPLOAD_ALREADY_CLAIMED',
+  UPLOAD_BYTES_MISSING: 'UPLOAD_BYTES_MISSING',
+  UPLOAD_SESSION_EXPIRED: 'UPLOAD_SESSION_EXPIRED',
+  UPLOAD_IN_PROGRESS: 'UPLOAD_IN_PROGRESS',
+} as const
+export type SilhouetteCommitConflictErrorMessageEnum =
+  (typeof SilhouetteCommitConflictErrorMessageEnum)[keyof typeof SilhouetteCommitConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const SilhouetteCommitConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type SilhouetteCommitConflictErrorErrorEnum =
+  (typeof SilhouetteCommitConflictErrorErrorEnum)[keyof typeof SilhouetteCommitConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
  * @interface SilhouetteConflictError
  */
 export interface SilhouetteConflictError {
@@ -18098,6 +18156,8 @@ export type SilhouetteConflictErrorStatusCodeEnum =
 export const SilhouetteConflictErrorMessageEnum = {
   CONFIRM_BASEWEAR_GUIDANCE_REQUIRED: 'CONFIRM_BASEWEAR_GUIDANCE_REQUIRED',
   IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+  UPLOAD_SESSION_EXPIRED: 'UPLOAD_SESSION_EXPIRED',
+  UPLOAD_BYTES_PRESENT: 'UPLOAD_BYTES_PRESENT',
 } as const
 export type SilhouetteConflictErrorMessageEnum =
   (typeof SilhouetteConflictErrorMessageEnum)[keyof typeof SilhouetteConflictErrorMessageEnum]
@@ -19770,6 +19830,173 @@ export const UpdateWardrobeOnboardingStateInputTargetStepEnum = {
 } as const
 export type UpdateWardrobeOnboardingStateInputTargetStepEnum =
   (typeof UpdateWardrobeOnboardingStateInputTargetStepEnum)[keyof typeof UpdateWardrobeOnboardingStateInputTargetStepEnum]
+
+/**
+ *
+ * @export
+ * @interface UploadCommitConflictError
+ */
+export interface UploadCommitConflictError {
+  /**
+   *
+   * @type {UploadCommitConflictErrorStatusCodeEnum}
+   * @memberof UploadCommitConflictError
+   */
+  statusCode: UploadCommitConflictErrorStatusCodeEnum
+  /**
+   *
+   * @type {UploadCommitConflictErrorMessageEnum}
+   * @memberof UploadCommitConflictError
+   */
+  message: UploadCommitConflictErrorMessageEnum
+  /**
+   *
+   * @type {UploadCommitConflictErrorErrorEnum}
+   * @memberof UploadCommitConflictError
+   */
+  error: UploadCommitConflictErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const UploadCommitConflictErrorStatusCodeEnum = {
+  NUMBER_409: 409,
+} as const
+export type UploadCommitConflictErrorStatusCodeEnum =
+  (typeof UploadCommitConflictErrorStatusCodeEnum)[keyof typeof UploadCommitConflictErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const UploadCommitConflictErrorMessageEnum = {
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+  UPLOAD_ALREADY_CLAIMED: 'UPLOAD_ALREADY_CLAIMED',
+  UPLOAD_BYTES_MISSING: 'UPLOAD_BYTES_MISSING',
+  UPLOAD_SESSION_EXPIRED: 'UPLOAD_SESSION_EXPIRED',
+  UPLOAD_IN_PROGRESS: 'UPLOAD_IN_PROGRESS',
+} as const
+export type UploadCommitConflictErrorMessageEnum =
+  (typeof UploadCommitConflictErrorMessageEnum)[keyof typeof UploadCommitConflictErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const UploadCommitConflictErrorErrorEnum = {
+  Conflict: 'Conflict',
+} as const
+export type UploadCommitConflictErrorErrorEnum =
+  (typeof UploadCommitConflictErrorErrorEnum)[keyof typeof UploadCommitConflictErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface UploadCommitUnprocessableError
+ */
+export interface UploadCommitUnprocessableError {
+  /**
+   *
+   * @type {UploadCommitUnprocessableErrorStatusCodeEnum}
+   * @memberof UploadCommitUnprocessableError
+   */
+  statusCode: UploadCommitUnprocessableErrorStatusCodeEnum
+  /**
+   *
+   * @type {UploadCommitUnprocessableErrorMessageEnum}
+   * @memberof UploadCommitUnprocessableError
+   */
+  message: UploadCommitUnprocessableErrorMessageEnum
+  /**
+   *
+   * @type {UploadCommitUnprocessableErrorErrorEnum}
+   * @memberof UploadCommitUnprocessableError
+   */
+  error: UploadCommitUnprocessableErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const UploadCommitUnprocessableErrorStatusCodeEnum = {
+  NUMBER_422: 422,
+} as const
+export type UploadCommitUnprocessableErrorStatusCodeEnum =
+  (typeof UploadCommitUnprocessableErrorStatusCodeEnum)[keyof typeof UploadCommitUnprocessableErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const UploadCommitUnprocessableErrorMessageEnum = {
+  IMAGE_SIZE_MISMATCH: 'IMAGE_SIZE_MISMATCH',
+  IMAGE_CHECKSUM_MISMATCH: 'IMAGE_CHECKSUM_MISMATCH',
+  IMAGE_DIMENSIONS_INVALID: 'IMAGE_DIMENSIONS_INVALID',
+  IMAGE_NOT_PORTRAIT_FRAMED: 'IMAGE_NOT_PORTRAIT_FRAMED',
+  IMAGE_DECODE_FAILED: 'IMAGE_DECODE_FAILED',
+} as const
+export type UploadCommitUnprocessableErrorMessageEnum =
+  (typeof UploadCommitUnprocessableErrorMessageEnum)[keyof typeof UploadCommitUnprocessableErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const UploadCommitUnprocessableErrorErrorEnum = {
+  Unprocessable_Entity: 'Unprocessable Entity',
+} as const
+export type UploadCommitUnprocessableErrorErrorEnum =
+  (typeof UploadCommitUnprocessableErrorErrorEnum)[keyof typeof UploadCommitUnprocessableErrorErrorEnum]
+
+/**
+ *
+ * @export
+ * @interface UploadCommitUnsupportedMediaTypeError
+ */
+export interface UploadCommitUnsupportedMediaTypeError {
+  /**
+   *
+   * @type {UploadCommitUnsupportedMediaTypeErrorStatusCodeEnum}
+   * @memberof UploadCommitUnsupportedMediaTypeError
+   */
+  statusCode: UploadCommitUnsupportedMediaTypeErrorStatusCodeEnum
+  /**
+   *
+   * @type {UploadCommitUnsupportedMediaTypeErrorMessageEnum}
+   * @memberof UploadCommitUnsupportedMediaTypeError
+   */
+  message: UploadCommitUnsupportedMediaTypeErrorMessageEnum
+  /**
+   *
+   * @type {UploadCommitUnsupportedMediaTypeErrorErrorEnum}
+   * @memberof UploadCommitUnsupportedMediaTypeError
+   */
+  error: UploadCommitUnsupportedMediaTypeErrorErrorEnum
+}
+
+/**
+ * @export
+ */
+export const UploadCommitUnsupportedMediaTypeErrorStatusCodeEnum = {
+  NUMBER_415: 415,
+} as const
+export type UploadCommitUnsupportedMediaTypeErrorStatusCodeEnum =
+  (typeof UploadCommitUnsupportedMediaTypeErrorStatusCodeEnum)[keyof typeof UploadCommitUnsupportedMediaTypeErrorStatusCodeEnum]
+
+/**
+ * @export
+ */
+export const UploadCommitUnsupportedMediaTypeErrorMessageEnum = {
+  UNSUPPORTED_IMAGE_TYPE: 'UNSUPPORTED_IMAGE_TYPE',
+} as const
+export type UploadCommitUnsupportedMediaTypeErrorMessageEnum =
+  (typeof UploadCommitUnsupportedMediaTypeErrorMessageEnum)[keyof typeof UploadCommitUnsupportedMediaTypeErrorMessageEnum]
+
+/**
+ * @export
+ */
+export const UploadCommitUnsupportedMediaTypeErrorErrorEnum = {
+  Unsupported_Media_Type: 'Unsupported Media Type',
+} as const
+export type UploadCommitUnsupportedMediaTypeErrorErrorEnum =
+  (typeof UploadCommitUnsupportedMediaTypeErrorErrorEnum)[keyof typeof UploadCommitUnsupportedMediaTypeErrorErrorEnum]
 
 /**
  *

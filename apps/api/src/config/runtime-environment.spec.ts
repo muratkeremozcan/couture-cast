@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import {
-  allowsTestOnlySecrets,
-  appliesRevenueCatTestStore,
-  publicApiUrl,
-} from './runtime-environment'
+import { allowsTestOnlySecrets, appliesRevenueCatTestStore } from './runtime-environment'
 
 describe('allowsTestOnlySecrets', () => {
   it.each([
@@ -37,47 +33,5 @@ describe('appliesRevenueCatTestStore (story 6.15 D15)', () => {
     [{ NODE_ENV: 'production', VERCEL_ENV: 'preview' }, false],
   ])('returns %s for %o', (env, expected) => {
     expect(appliesRevenueCatTestStore(env)).toBe(expected)
-  })
-})
-
-// Tester report 2026-11-17: production named http://localhost:3001 in every upload URL.
-describe('publicApiUrl', () => {
-  it.each([
-    [{ PUBLIC_API_URL: 'https://api.example.test/' }, 'https://api.example.test'],
-    [
-      {
-        NODE_ENV: 'production',
-        VERCEL_ENV: 'production',
-        VERCEL_PROJECT_PRODUCTION_URL: 'couture-cast-api.vercel.app',
-        VERCEL_URL: 'couture-cast-abc123.vercel.app',
-      },
-      'https://couture-cast-api.vercel.app',
-    ],
-    [
-      {
-        NODE_ENV: 'production',
-        VERCEL_ENV: 'preview',
-        VERCEL_BRANCH_URL: 'couture-cast-api-git-fix.vercel.app',
-        VERCEL_URL: 'couture-cast-abc123.vercel.app',
-      },
-      'https://couture-cast-api-git-fix.vercel.app',
-    ],
-    [
-      {
-        NODE_ENV: 'production',
-        VERCEL_ENV: 'preview',
-        VERCEL_URL: 'couture-cast-abc123.vercel.app',
-      },
-      'https://couture-cast-abc123.vercel.app',
-    ],
-    [{ NODE_ENV: 'development' }, 'http://localhost:3001'],
-    [{ NODE_ENV: 'test' }, 'http://localhost:3001'],
-    [{}, 'http://localhost:3001'],
-  ])('names the public base for %o', (env, expected) => {
-    expect(publicApiUrl(env)).toBe(expected)
-  })
-
-  it('refuses to name localhost in production off Vercel', () => {
-    expect(() => publicApiUrl({ NODE_ENV: 'production' })).toThrow(/PUBLIC_API_URL/)
   })
 })

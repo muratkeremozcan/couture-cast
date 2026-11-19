@@ -400,7 +400,7 @@ export function WardrobeOnboardingScreen() {
 
       {phase === 'silhouette' ? (
         <View testID="onboarding-silhouette-step">
-          <SilhouetteEditor accessToken={accessToken} />
+          <SilhouetteEditor />
           <Pressable
             accessibilityRole="button"
             testID="onboarding-finish"
