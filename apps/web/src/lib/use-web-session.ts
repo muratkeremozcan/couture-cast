@@ -18,6 +18,7 @@ import {
   Fragment,
   useEffect,
   useCallback,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -249,7 +250,13 @@ export function currentWebSessionBearer(): string | null {
 /**
  * One member read, with the bearer read at the moment it is sent. A denial (`isDenial`) of a
  * bearer the bridge has since replaced for the same member says nothing about that member: the
- * read is retried once with the current bearer. A denial of the current bearer stands.
+ * read is retried once with the current bearer.
+ *
+ * The bridge keeps the old bearer installed while it verifies the member's next one, so a
+ * denial can arrive before the replacement is published. With a stored session, the read then
+ * joins the bridge's verification (`resolveWebSessionToken` joins one in flight, or confirms the
+ * session) and retries once if the same live member now holds a different bearer. Otherwise,
+ * including a denial of the genuinely current bearer, the denial stands.
  */
 export async function readAsMember<T>(
   owner: string,
@@ -260,8 +267,17 @@ export async function readAsMember<T>(
   try {
     return await read()
   } catch (error: unknown) {
-    if (!isDenial(error) || !isLiveOwner(owner) || currentWebSessionBearer() === sentWith)
-      throw error
+    if (!isDenial(error) || !isLiveOwner(owner)) throw error
+    if (currentWebSessionBearer() === sentWith) {
+      // The e2e fixture bearer has no stored session behind it and nothing to verify.
+      if (!hasStoredWebSession()) throw error
+      try {
+        await resolveWebSessionToken()
+      } catch {
+        throw error
+      }
+      if (!isLiveOwner(owner) || currentWebSessionBearer() === sentWith) throw error
+    }
     return read()
   }
 }
@@ -274,7 +290,10 @@ export async function readAsMember<T>(
  */
 export function useMountSignal(): () => AbortSignal {
   const controllerRef = useRef<AbortController | null>(null)
-  useEffect(() => {
+  // A layout effect, so the signal dies in the commit that removes the component: a passive
+  // cleanup can be deferred past a concurrent route transition, leaving a window in which a
+  // late billing or sponsored answer still sees a live signal (Settings Codex review 2).
+  useLayoutEffect(() => {
     // A remount (StrictMode re-runs this effect) starts a fresh lifetime.
     const live = controllerRef.current
     const controller = live && !live.signal.aborted ? live : new AbortController()

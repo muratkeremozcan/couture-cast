@@ -20,7 +20,7 @@
 // a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
@@ -48,6 +48,7 @@ import {
   MemberScope,
   readAsMember,
   useMountSignal,
+  useWebSessionOwner,
   type MemberSession,
 } from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
@@ -338,12 +339,21 @@ function useBillingReturn(): (owner: string) => BillingReturn {
   const router = useRouter()
   const routerRef = useRef(router)
   routerRef.current = router
-  const boundRef = useRef<{ kind: BillingReturn; owner: string } | undefined>(undefined)
+  const boundRef = useRef<
+    { kind: BillingReturn; owner: string; spent: boolean } | undefined
+  >(undefined)
+  // The return lives as long as the member scope that took it: once the bridge names anyone
+  // else, it is spent, so that member signing in again on this page loads normally.
+  const liveOwner = useWebSessionOwner()
+  useLayoutEffect(() => {
+    const bound = boundRef.current
+    if (bound && bound.owner !== liveOwner) bound.spent = true
+  }, [liveOwner])
   return useCallback((owner: string) => {
     if (boundRef.current === undefined) {
       const url = new URL(window.location.href)
       const { kind, key } = readBillingReturn(url.searchParams)
-      boundRef.current = { kind, owner }
+      boundRef.current = { kind, owner, spent: false }
       if (key) {
         url.searchParams.delete(key)
         routerRef.current.replace(`${url.pathname}${url.search}${url.hash}`, {
@@ -351,7 +361,8 @@ function useBillingReturn(): (owner: string) => BillingReturn {
         })
       }
     }
-    return boundRef.current.owner === owner ? boundRef.current.kind : null
+    const bound = boundRef.current
+    return bound.owner === owner && !bound.spent ? bound.kind : null
   }, [])
 }
 
@@ -491,26 +502,29 @@ function MemberSubscriptionSection({
          * renders the section exactly as before (TEA-14), so it can never break the read.
          */
         const accessRead = Promise.race([
-          getPremiumAccessFromWeb(controller.signal).catch(() => null),
+          // A denial of a superseded token is read again once, before the null fallback.
+          readAsMember(
+            owner,
+            () => getPremiumAccessFromWeb(controller.signal),
+            isDenial
+          ).catch(() => null),
           // A hung access read never holds the section: it renders as it did before 6.14.
           new Promise<null>((resolve) => {
             window.setTimeout(() => resolve(null), ACCESS_READ_TIMEOUT_MS)
           }),
         ])
-        // The fallback read is checked before it is sent, like every follow-up request.
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const read = () =>
+          readAsMember(owner, () => getSubscriptionFromWeb(controller.signal), isDenial)
+        // The portal refresh runs once; only its fallback read is retried, and that read is
+        // checked before it is sent, like every follow-up request.
         const fallback = () => {
           if (!current()) throw new DOMException('Aborted', 'AbortError')
-          return getSubscriptionFromWeb(controller.signal)
+          return read()
         }
-        // A denial of a token the bridge has since rotated for this member is read again once.
-        const next = await readAsMember(
-          owner,
-          () =>
-            isPortalReturn
-              ? refreshSubscriptionFromWeb(controller.signal).catch(fallback)
-              : getSubscriptionFromWeb(controller.signal),
-          isDenial
-        )
+        const next = isPortalReturn
+          ? await refreshSubscriptionFromWeb(controller.signal).catch(fallback)
+          : await read()
         const nextAccess = await accessRead
         if (!current()) {
           return

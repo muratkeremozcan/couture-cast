@@ -11,7 +11,11 @@ const session = vi.hoisted(() => ({
   start: undefined as undefined | ((stop: () => void) => void),
   resume: vi.fn(() => Promise.resolve(null as string | null)),
 }))
-vi.mock('../../lib/web-session', () => ({
+import type * as WebSession from '../../lib/web-session'
+
+vi.mock('../../lib/web-session', async (importOriginal) => ({
+  // The bridge also reads the session owner (palette release); keep the real readers.
+  ...(await importOriginal<typeof WebSession>()),
   startWebSession: () =>
     new Promise<() => void>((resolve) => {
       session.start = resolve

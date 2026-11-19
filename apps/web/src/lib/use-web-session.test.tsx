@@ -5,7 +5,7 @@
 // told a signed-in member to sign in. They now share one primitive, `MemberScope`: it renders
 // member-owned UI keyed by the live owner and hands it the session in one shape. These cases pin
 // that shape and the keying; each section's own transitions live in its *-session.test.tsx.
-import { useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,6 +16,7 @@ import {
   MemberScope,
   memberSessionOf,
   type MemberSession,
+  useMountSignal,
 } from './use-web-session'
 
 /** The session bridge's state, driven by hand: who verification named, and each pending check. */
@@ -184,5 +185,38 @@ describe('memberSessionOf and isLiveOwner', () => {
     // The bridge removed the bearer while it verifies again: nobody is live.
     window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
     expect(isLiveOwner('member-1')).toBe(false)
+  })
+})
+
+// Settings Codex review 2, finding 4: a billing redirect or sponsored navigation checks the mount
+// signal last. It has to be dead in the very commit that removes the component, before any
+// passive cleanup that a concurrent route transition could defer.
+describe('useMountSignal', () => {
+  it('MEMBER-SCOPE-07 the signal is aborted in the commit that unmounts its component', () => {
+    let captured: AbortSignal | null = null
+    let seenByNextScreen: boolean | null = null
+
+    function Leaving() {
+      const signal = useMountSignal()
+      useLayoutEffect(() => {
+        captured = signal()
+      }, [signal])
+      return <p>leaving</p>
+    }
+
+    /** Mounted in the same commit; its layout effect runs before any passive cleanup. */
+    function Arriving() {
+      useLayoutEffect(() => {
+        seenByNextScreen = captured?.aborted ?? null
+      }, [])
+      return <p>arriving</p>
+    }
+
+    const view = render(<Leaving />)
+    expect(captured).not.toBeNull()
+    expect((captured as AbortSignal | null)?.aborted).toBe(false)
+
+    view.rerender(<Arriving />)
+    expect(seenByNextScreen).toBe(true)
   })
 })

@@ -390,3 +390,271 @@ describe('Premium checks a billing follow-up read before sending it', () => {
     expect(getBearers).toEqual([])
   })
 })
+
+// Settings Codex review 2: a denial, a billing return and a portal fallback, each kept with the
+// member and the token that made them.
+describe('Premium keeps reads with the member through a token rotation and a member switch', () => {
+  const NONE = CASES[1]!.body as { data: Record<string, unknown> }
+  const ACTIVE = {
+    data: {
+      ...NONE.data,
+      status: 'active',
+      store: 'stripe',
+      productId: 'premium_monthly',
+      willRenew: true,
+      currentPeriodEnd: '2026-12-19T00:00:00.000Z',
+      syncedAt: '2026-11-19T08:00:00.000Z',
+    },
+  }
+  const DENIED = { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' }
+  const SIGN_IN_HINT = /Sign in to subscribe or manage Premium/
+  let getBearers: (string | null)[]
+  let accessBearers: (string | null)[]
+  let refreshCount: number
+
+  beforeEach(async () => {
+    getBearers = []
+    accessBearers = []
+    refreshCount = 0
+    session.identity = 'member-1'
+    session.stored = true
+    session.pending = []
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    await getI18n().changeLanguage('en-US')
+  })
+
+  afterEach(() => {
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
+  })
+
+  function renderPremium() {
+    return render(
+      <I18nextProvider i18n={getI18n()}>
+        <main>
+          <SubscriptionSection />
+        </main>
+      </I18nextProvider>
+    )
+  }
+
+  /** What the bridge does when it names (or clears) a member and installs their bearer. */
+  function publish(identity: string | null, bearer: string | null) {
+    act(() => {
+      session.identity = identity
+      if (bearer === null) window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+      else window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, bearer)
+      window.dispatchEvent(new Event('couture:session'))
+    })
+  }
+
+  async function settle() {
+    for (let round = 0; round < 3; round += 1)
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+  }
+
+  /** member-1's reads: token-1a is denied, token-1b answers, member-2 has no subscription. */
+  function useRotatingMemberReads(access: Record<string, unknown> = {}) {
+    useMswHandlers(
+      http.get('/api/v1/commerce/subscription', ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        getBearers.push(bearer)
+        if (bearer === 'Bearer token-1a')
+          return HttpResponse.json(DENIED, { status: 401 })
+        return HttpResponse.json(bearer === 'Bearer token-1b' ? ACTIVE : NONE)
+      }),
+      http.get('/api/v1/commerce/premium/access', ({ request }) => {
+        accessBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: { premium: false, source: 'none', ...access } })
+      })
+    )
+  }
+
+  it('SESSION-DENIAL-WEB-01 a denial that lands before the fresh token is published waits for it, then reads once', async () => {
+    useRotatingMemberReads()
+    const { container } = renderPremium()
+
+    // The old bearer is still installed, so the read joins the bridge's verification.
+    await vi.waitFor(() => expect(session.pending).toHaveLength(1))
+    expect(container.textContent).not.toMatch(SIGN_IN_HINT)
+
+    publish('member-1', 'token-1b')
+    await act(async () => {
+      session.pending[0]!.resolve('token-1b')
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+    await settle()
+    expect(container.textContent).not.toMatch(SIGN_IN_HINT)
+    expect(getBearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('SESSION-DENIAL-WEB-02 a denial that lands after the fresh token is published reads once with it', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get('/api/v1/commerce/subscription', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        getBearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(DENIED, { status: 401 })
+        }
+        return HttpResponse.json(ACTIVE)
+      }),
+      http.get('/api/v1/commerce/premium/access', () =>
+        HttpResponse.json({ data: { premium: false, source: 'none' } })
+      )
+    )
+    renderPremium()
+    await vi.waitFor(() => expect(getBearers).toEqual(['Bearer token-1a']))
+
+    publish('member-1', 'token-1b')
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+    expect(session.pending).toHaveLength(0)
+    expect(getBearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('SESSION-DENIAL-WEB-03 control: a denial the bridge confirms for the current token stands', async () => {
+    useRotatingMemberReads()
+    renderPremium()
+    await vi.waitFor(() => expect(session.pending).toHaveLength(1))
+
+    // Verification answers with the same token: the API's denial is the member's.
+    await act(async () => {
+      session.pending[0]!.resolve('token-1a')
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-signed-out-hint')).toHaveTextContent(
+      SIGN_IN_HINT
+    )
+    expect(getBearers).toEqual(['Bearer token-1a'])
+  })
+
+  it('SESSION-ACCESS-WEB-01 a superseded denial of the access read is read again, so a complimentary member is offered nothing to buy', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get('/api/v1/commerce/subscription', ({ request }) => {
+        getBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json(NONE)
+      }),
+      http.get('/api/v1/commerce/premium/access', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        accessBearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(DENIED, { status: 401 })
+        }
+        return HttpResponse.json({ data: { premium: true, source: 'complimentary' } })
+      })
+    )
+    renderPremium()
+    await vi.waitFor(() => expect(accessBearers).toEqual(['Bearer token-1a']))
+
+    publish('member-1', 'token-1b')
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-status-line')).toHaveTextContent(
+      'You have complimentary Premium access from CoutureCast.'
+    )
+    expect(screen.queryByTestId('premium-subscribe-monthly')).toBeNull()
+    expect(accessBearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  it('SESSION-RETURN-WEB-01 a checkout return is spent when its member leaves, so the same member coming back loads normally', async () => {
+    window.history.replaceState(null, '', '/settings?checkout=success')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
+    useMswHandlers(
+      http.post('/api/v1/commerce/subscription/refresh', () => {
+        refreshCount += 1
+        return HttpResponse.json(ACTIVE)
+      }),
+      http.get('/api/v1/commerce/subscription', ({ request }) => {
+        getBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json(NONE)
+      }),
+      http.get('/api/v1/commerce/premium/access', () =>
+        HttpResponse.json({ data: { premium: false, source: 'none' } })
+      )
+    )
+    renderPremium()
+    await vi.waitFor(() => expect(refreshCount).toBe(1))
+
+    publish(null, null)
+    publish('member-2', 'token-2')
+    expect(await screen.findByTestId('premium-subscribe-monthly')).toBeEnabled()
+    publish(null, null)
+    publish('member-1', 'token-1b')
+    expect(await screen.findByTestId('premium-subscribe-monthly')).toBeEnabled()
+    await settle()
+
+    expect(refreshCount).toBe(1)
+    expect(getBearers).toEqual(['Bearer token-2', 'Bearer token-1b'])
+    expect(
+      screen.queryByText('Payment received. Activating your Premium subscription…')
+    ).toBeNull()
+  })
+
+  it('SESSION-PORTAL-WEB-01 a portal return refreshes once; only its fallback read is retried after a rotation', async () => {
+    window.history.replaceState(null, '', '/settings?portal=return')
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.post('/api/v1/commerce/subscription/refresh', () => {
+        refreshCount += 1
+        return HttpResponse.json(
+          {
+            statusCode: 503,
+            message: 'Ledger unavailable',
+            error: 'Service Unavailable',
+          },
+          { status: 503 }
+        )
+      }),
+      http.get('/api/v1/commerce/subscription', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        getBearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(DENIED, { status: 401 })
+        }
+        return HttpResponse.json(ACTIVE)
+      }),
+      http.get('/api/v1/commerce/premium/access', () =>
+        HttpResponse.json({ data: { premium: false, source: 'none' } })
+      )
+    )
+    renderPremium()
+    await vi.waitFor(() => expect(getBearers).toEqual(['Bearer token-1a']))
+
+    publish('member-1', 'token-1b')
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+    await settle()
+    expect(refreshCount).toBe(1)
+    expect(getBearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+})
