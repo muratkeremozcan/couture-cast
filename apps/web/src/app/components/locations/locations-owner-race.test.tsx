@@ -273,6 +273,32 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
   })
 
+  // Codex review 5 finding 4: A leaves Profile while the rename is in flight, then B signs in.
+  it('LOC-OWNER-WEB-06 a rename that settles after the section unmounted and B signed in sends no list request', async () => {
+    const user = userEvent.setup()
+    const view = renderSection()
+    expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+    holdNextPatch = true
+    await user.click(screen.getByRole('button', { name: /Rename/ }))
+    const field = screen.getByRole('textbox', { name: 'New name' })
+    await user.clear(field)
+    await user.type(field, 'Alpha Studio')
+    await user.click(screen.getByRole('button', { name: /Save name/ }))
+    await waitFor(() => expect(heldPatch).not.toBeNull())
+
+    // A navigates away from Profile, then B signs in on the same tab.
+    view.unmount()
+    publish(null, null, true)
+    publish('member-b', 'token-b', true)
+    const historyBefore = [...listBearers]
+
+    act(() => heldPatch!.release())
+    await settleRenames()
+    await settleLists()
+
+    expect(listBearers).toEqual(historyBefore)
+  })
+
   it('LOC-OWNER-WEB-01 a list that lands after sign-out shows none of the signed-out member', async () => {
     await renameAndHoldTheReload()
 
