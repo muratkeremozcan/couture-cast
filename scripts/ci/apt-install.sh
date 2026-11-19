@@ -117,13 +117,26 @@ verify_archives() {
   drop() {
     if discard "$2"; then eval "$1=\$(( $1 + 1 ))"; else stuck=$((stuck + 1)); fi
   }
+  # The listings and the index extract live here. Each is written to a file and its producer's
+  # status checked: a listing that failed part way (a directory that cannot be read) would look
+  # like an empty restore and leave unchecked files for apt.
+  local work
+  if ! work=$(mktemp -d); then
+    echo "::warning::Could not create a working directory; the restored package files are not checked."
+    return 1
+  fi
+  if ! find "$archives" -maxdepth 1 -type l -name '*.deb' -print0 > "$work/links" ||
+    ! find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 > "$work/listed" ||
+    ! sort -z "$work/listed" > "$work/files"; then
+    echo "::warning::Could not list the restored package files in $archives."
+    rm -rf "$work"
+    return 1
+  fi
   # A symlink is not a file this script downloaded, and apt would follow it past the hash check
   # below, which reads regular files only. Listed NUL-delimited, so any name counts once.
-  while IFS= read -r -d '' deb; do drop links "$deb"; done \
-    < <(find "$archives" -maxdepth 1 -type l -name '*.deb' -print0)
-  while IFS= read -r -d '' deb; do debs+=("$deb"); done \
-    < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
-  (( ${#debs[@]} > 0 )) || { report; return; }
+  while IFS= read -r -d '' deb; do drop links "$deb"; done < "$work/links"
+  while IFS= read -r -d '' deb; do debs+=("$deb"); done < "$work/files"
+  (( ${#debs[@]} > 0 )) || { rm -rf "$work"; report; return; }
   local kept_debs=() packages=() versions=()
   for deb in "${debs[@]}"; do
     if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
@@ -143,7 +156,7 @@ verify_archives() {
     ids+=("$package|$arch|$version")
     specs+=("$package=$version")
   done
-  (( ${#specs[@]} > 0 )) || { report; return; }
+  (( ${#specs[@]} > 0 )) || { rm -rf "$work"; report; return; }
   # Error-Mode any makes a partial refresh visible. A failed refresh still leaves apt the signed
   # indexes it held before, and the install that follows (Playwright's install-deps runs its own
   # update and tolerates the same failure) installs from those or from fresher ones. So each
@@ -155,11 +168,7 @@ verify_archives() {
   if ! sudo -n apt-get -o APT::Update::Error-Mode=any update; then
     echo "::warning::The package index refresh was partial; checking the restored package files against the indexes apt holds."
   fi
-  local index
-  if ! index=$(mktemp); then
-    echo "::warning::Could not create a file for the package index; the restored package files are not checked."
-    return 1
-  fi
+  local index=$work/index
   # One line per package, architecture and version the index knows, from one signed stanza: its
   # SHA256 and the architecture apt names the file by (Architecture-Variant, else Architecture).
   # Versions it no longer lists print nothing and are dropped below.
@@ -190,7 +199,7 @@ verify_archives() {
       drop unvouched "$deb"
     fi
   done
-  rm -f "$index"
+  rm -rf "$work"
   report
 }
 

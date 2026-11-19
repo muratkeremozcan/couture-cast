@@ -225,7 +225,11 @@ ${next}`
   )
   const held =
     '${APT_INSTALL_ARCHIVES:+ holding $(find "$APT_INSTALL_ARCHIVES" -maxdepth 1 -name "*.deb" | wc -l | tr -d " ")}'
-  stub('npx', `echo "npx $*${held}" >> "${stubs}/calls"\n${next}`)
+  // The installer records the apt settings it ran with, so a test sees what the install used.
+  stub(
+    'npx',
+    `echo "npx $*${held}" >> "${stubs}/calls"\ncat "${stubs}/tee" >> "${stubs}/install-config" 2>/dev/null\necho "--" >> "${stubs}/install-config"\n${next}`
+  )
   stub('sleep', `echo "$1" >> "${stubs}/sleeps"`)
   // A package file is named <package>_<version>_<architecture>.deb; one named broken_* is not
   // a readable archive. A <file>.control next to it gives control fields that differ from the
@@ -263,6 +267,7 @@ printf 'Package: %s\\nVersion: %s\\nArchitecture: %s\\n' "$p" "$v" "$a"`
       calls: lines('calls'),
       sleeps: lines('sleeps'),
       config: read('tee'),
+      installConfigs: read('install-config').split('--\n').filter(Boolean),
       stdout: result.stdout,
       stderr: result.stderr,
     }
@@ -667,6 +672,34 @@ describe('apt-install.sh', () => {
       assert.match(config, /Acquire::Retries "5";/)
     })
 
+    // Codex review 18: a listing that fails part way looks like an empty restore unless its
+    // producer's status is checked; then apt must not be pointed at the directory.
+    for (const [what, type] of [
+      ['symlinks', 'l'],
+      ['package files', 'f'],
+    ]) {
+      test(`a failed listing of the restored ${what} leaves the restore unused`, () => {
+        const { status, stdout, installConfigs, left } = withArchives(
+          (archives) => writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one'),
+          {
+            index: indexOf([['libone', '1.0', 'amd64', 'one']]),
+            // find prints nothing and fails for this listing, as on an unreadable directory.
+            extraStubs: {
+              find: `case " $* " in *" -type ${type} "*) echo "find: Permission denied" >&2; exit 1;; esac\nexec /usr/bin/find "$@"`,
+            },
+          }
+        )
+        assert.equal(status, 0)
+        assert.deepEqual(left, ['libone_1.0_amd64.deb'])
+        assert.match(stdout, /::warning::Could not list the restored package files in /)
+        assert.match(stdout, /could not all be checked and cleaned up\./)
+        // The one install ran with settings that name no archive directory.
+        assert.equal(installConfigs.length, 1)
+        assert.doesNotMatch(installConfigs[0], /Dir::Cache::Archives/)
+        assert.match(installConfigs[0], /Acquire::Retries "5";/)
+      })
+    }
+
     test('a symlink whose name holds a newline counts once', () => {
       const { stdout, left } = withArchives(
         (archives) => {
@@ -695,7 +728,7 @@ describe('apt-install.sh', () => {
       )
       assert.equal(status, 0)
       assert.deepEqual(left, ['libone_1.0_amd64.deb'])
-      assert.match(stdout, /::warning::Could not create a file for the package index/)
+      assert.match(stdout, /::warning::Could not create a working directory/)
       assert.match(stdout, /could not all be checked and cleaned up\./)
       assert.doesNotMatch(config, /Dir::Cache::Archives/)
     })
