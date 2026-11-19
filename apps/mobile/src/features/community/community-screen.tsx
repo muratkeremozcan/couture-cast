@@ -1,4 +1,5 @@
 // Story 6.7 mobile destination owner: intent copy, outcomes and the focused notice in `apps/mobile/src/features/community/community-screen.tsx`, with handled-request retirement in `apps/mobile/src/features/community/use-community-spotlight.ts`
+// Step 58 step 7 owner: searchable owner anchor
 import { useAndroidSpotlightDetailPresentation } from '@/components/android-spotlight-detail-presentation'
 import {
   ScreenShareCardComposer,

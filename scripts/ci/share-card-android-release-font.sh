@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Step 58 step 3 owner: searchable owner anchor
 set -euo pipefail
 : "${ANDROID_SERIAL:?explicit owned Android serial required}"
 restore_normal_generation() {

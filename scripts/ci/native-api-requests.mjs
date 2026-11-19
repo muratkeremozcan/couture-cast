@@ -1,3 +1,4 @@
+// Step 58 step 6 owner: searchable owner anchor
 /**
  * The closed record of what the owned services did during a native job, for a failed run's
  * public evidence. The service logs stay private: they can carry owned-runtime credentials,

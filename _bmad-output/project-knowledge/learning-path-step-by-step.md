@@ -11782,21 +11782,23 @@ User/business impact:
 
 With the stories done, the open question becomes "is production still working today?".
 Production can break with no merge: an expired secret, a provider outage, a plan quota or drifted
-data. Before this step the production suite ran only after a push to `main`, so a quiet week said
-nothing about production. The production Playwright suite now also runs once a day, and the
-README's `production status` badge shows the latest result. Three nightly native workflows were
-red (iOS native, accessibility focus and the share-card native lanes); iOS runs only nightly or by
-dispatch, since macOS jobs never run on pull requests. This step fixes each cause, including one
-real app defect a user could hit.
+data. Before this step the production suite ran after a push to `main` or by hand, and nothing ran
+it between pushes. The production Playwright suite now also runs once a day, and the README's
+`production status` badge shows the latest result. Three nightly native workflows were red (iOS
+native, accessibility focus and the share-card native lanes); iOS runs only nightly or by
+dispatch, since macOS jobs never run on pull requests. This step fixes the causes the evidence
+showed, including one app defect a user could hit, and makes the failures it could not explain
+record their cause next time.
 
 Key takeaways:
 
 1. **A status check is the push suite on a clock.**
-   The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves `main`'s
-   latest commit (or one with the same build inputs), then runs the same suite a push runs. No
-   second suite drifts from the first.
+   The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves the commit
+   `main` pointed at when the run started (or one with the same build inputs), then runs the same
+   suite a push runs. No second suite drifts from the first.
 2. **A scheduled run must not cost a push its verdict.**
-   GitHub keeps one pending run per concurrency group and replaces it on every arrival. In the
+   By default GitHub keeps one pending run per concurrency group and replaces it on every
+   arrival, and this workflow uses that default. In the
    push group, a scheduled run could replace a pending push verification. The scheduled run has
    its own group; a push that deploys mid-run can fail the scheduled run's SHA check, and the push
    run then gives the verdict.
@@ -11811,32 +11813,37 @@ Key takeaways:
    record of the local API's requests. The service logs themselves stay private, since the
    repository is public and they can carry runtime credentials.
 
-Hard-won lessons from the implementation and code review of this step:
+Hard-won lessons from the implementation and code review of this story:
 
-- The accessibility-focus nightly failed before any test ran: Maven Central and the Gradle plugin
-  portal answered HTTP 429 for `gson` 2.9.1 during plugin resolution. Every Gradle call in that
-  workflow, the TalkBack connected runs included, now goes through
-  `scripts/ci/gradle-resolution-retry.mjs`, which retries only resolution failures; a failing test
-  still runs once. The Codex review found the connected runs still resolved their UTP
+- The accessibility-focus nightly failed before any test ran: Maven Central answered HTTP 429 for
+  `gson` 2.9.1 during plugin resolution, reached through both the Gradle plugin portal and Maven
+  Central lookups. Every Gradle call in that workflow, the TalkBack connected runs included, now
+  goes through `scripts/ci/gradle-resolution-retry.mjs`. It retries a run whose output shows a
+  failed download with a transient cause, on the same line or nested under it. A run with failing
+  test cases and no such download runs once; one that also shows a failed download retries, which
+  is the Robolectric case. The Codex review found the connected runs still resolved their UTP
   dependencies outside the retry.
 - The Release font share-card lane lost its emulator during a 12-minute Release build on a runner
   that also hosts Supabase and the app's services. Memory exhaustion is a working hypothesis: the
   run kept no kernel log. The lane now adds swap sized inside the native build's 15 GiB disk guard;
   the Codex review caught that a fixed 8 GiB swap could push free disk under that guard.
-- The 11-17 and 11-18 iOS nightlies failed five ways, no two alike, on a runner with 3 CPUs and
-  under 0.5 GB free memory. The share-card opener's touch was cancelled after its press-in, a flow
-  passed its last step and was then killed at the 120 s default deadline, and a negative check
-  read the backgrounded app after iOS Settings opened. The opener now retries until the sheet
-  title shows and never taps once it is open, the flows that position the opener get a budget
-  derived from their subflows, and the iOS Settings proof is the "back to CoutureCast" link Settings
-  shows.
-- The community live font leg ended on "We could not load the community feed." The proof harness
-  drags past the top of the feed after each capture, which fires pull-to-refresh. One refresh
-  failed, and the app kept its error panel through every later refresh that succeeded. That was a
-  real defect: a member who pulls again after a network blip saw the error above a feed that loaded.
-  A load that answers now clears a stale load error, on the pull path and the realtime rebuild
-  alike (the review found the first fix covered only the pull), and a failed withdraw stays on
-  screen.
+- The 11-17 and 11-18 iOS nightlies failed five ways, no two alike, in separate jobs. The
+  share-card opener's touch was cancelled after its press-in, a flow passed its last step and was
+  then killed at the 120 s default deadline, and a negative check read the backgrounded app after
+  iOS Settings opened. The opener now retries until the sheet title shows and skips the tap when
+  its guard sees the title, the flows that position the opener get a budget derived from their
+  subflows, and the iOS Settings proof is the "back to CoutureCast" link Settings shows. The fifth,
+  a Release build that exited 65, left no failed command in its record; its cause is unknown, and
+  the build summary now lists xcodebuild's failed commands so the next one is named.
+- The community live font leg ended on "We could not load the community feed." with the feed
+  text pushed down by the error panel. The working hypothesis: the proof harness drags past the
+  top of the feed after each capture, which fires pull-to-refresh, and one refresh failed. The
+  artifact holds no request timeline, so the failed request is not identified. The app defect
+  behind it is proven by test: after a failed refresh, the error panel stayed through every later
+  load that answered, so a member who pulls again after a network blip saw the error above a feed
+  that loaded. A load that answers now clears a stale load error, on the pull path and the
+  realtime rebuild alike (the review found the first fix covered only the pull), and a failed
+  withdraw stays on screen.
 - The first API record read the launcher's log, which holds no HTTP lines, so a failed leg would
   have published an empty record; and it kept any lowercase path segment, which would have
   published a lowercase private value once the right log was wired. It now reads the API child's
@@ -11846,16 +11853,17 @@ Hard-won lessons from the implementation and code review of this step:
   per-case failures as failing tests.
 - The tap retry first shipped with structural YAML tests only, which a retry that never retries
   passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
-  with Maestro 2.8.0's rules; Maestro's web beta, the other option, crashed on the scripted page.
-  The model proves the retry logic, not device touch delivery or real hierarchy timing.
+  with the subset of Maestro 2.8.0's rules the subflow uses. The model proves the retry logic,
+  not device touch delivery.
 - A first change to the accessibility device script broke two Playwright helper specs that read
-  the script and its workflow; nobody ran them until the review round. Run every spec that reads a
+  the script and its workflow, and the review round found them. Run every spec that reads a
   changed file before committing.
 
 Story/Task mapping:
 
 - No story: this step closes the project's delivery phase. It is operational work requested by the
   owner on 2026-11-19, the same departure from instruction 2 that Steps 38, 39, 49 and 55 took.
+  The lessons heading keeps the template's wording "of this story"; here it means this step.
 - `6-15b-expo-sdk-55-58-upgrade` stays `backlog` in `sprint-status.yaml`, so `epic-6` stays
   `in-progress`.
 
@@ -11888,10 +11896,13 @@ Sequence to follow:
 
 Task owner map:
 
-- Production status owner: schedule and isolate the daily production run in `.github/workflows/pw-e2e-prod.yml`, documented in `README.md` and `_bmad-output/project-knowledge/deployment-guide.md`.
-- Android nightly owner: retry dependency resolution in `scripts/ci/gradle-resolution-retry.mjs`, called from `.github/workflows/pr-accessibility-focus.yml` and `scripts/ci/accessibility-focus-device-tests.sh`, and keep the Release font emulator alive in `scripts/ci/share-card-android-release-font.sh`.
-- iOS nightly owner: open the share-card sheet in `maestro/story68/tap-outfit-open.yaml`, budget the flows in `scripts/lib/story68-flow-timeouts.mjs`, classify build failures in `scripts/lib/native-build-failure.mjs`, and publish the API record from `scripts/ci/native-api-requests.mjs` through `.github/workflows/ios-native-jobs.yml`.
-- Community screen owner: clear a stale load error in `apps/mobile/src/features/community/community-screen.tsx`.
+- Step 58 step 1 owner: schedule and isolate the daily production run in `.github/workflows/pw-e2e-prod.yml`, documented in `README.md` and `_bmad-output/project-knowledge/deployment-guide.md`.
+- Step 58 step 2 owner: retry dependency resolution in `scripts/ci/gradle-resolution-retry.mjs`, called from `.github/workflows/pr-accessibility-focus.yml` and `scripts/ci/accessibility-focus-device-tests.sh`.
+- Step 58 step 3 owner: keep the Release font emulator alive and report its loss in `scripts/ci/share-card-android-release-font.sh`.
+- Step 58 step 4 owner: open the share-card sheet through the tap retry in `maestro/story68/tap-outfit-open.yaml`, with flow budgets in `scripts/lib/story68-flow-timeouts.mjs`.
+- Step 58 step 5 owner: name a failed iOS build's commands in `scripts/lib/native-build-failure.mjs`.
+- Step 58 step 6 owner: publish the masked API record from `scripts/ci/native-api-requests.mjs` through `.github/workflows/ios-native-jobs.yml`.
+- Step 58 step 7 owner: clear a stale load error in `apps/mobile/src/features/community/community-screen.tsx`.
 
 Tests that cover this step:
 
@@ -11915,13 +11926,15 @@ CI scripts, node:test:
   OOM lines reach the log.
 - [`scripts/lib/story68-outfit-open-tap.test.mjs`](../../scripts/lib/story68-outfit-open-tap.test.mjs):
   runs the real `tap-outfit-open.yaml` against a scripted opener: a cancelled first press opens on
-  the second, a title drawn late gets no second press, and a broken opener fails by name inside
-  the budget.
+  the second and a broken opener fails by name inside the budget; it also checks the opener
+  budgets in `scripts/lib/story68-flow-timeouts.mjs` against the subflows.
 - [`scripts/lib/maestro-flow-model.test.mjs`](../../scripts/lib/maestro-flow-model.test.mjs):
-  proves the executable model of Maestro 2.8.0's retry, condition and `optional` rules, and that it
-  throws on any command it does not know.
+  proves the model's implemented subset of Maestro 2.8.0's retry, condition and `optional` rules
+  against its own virtual clock, and that it throws on any command it does not know. It does not
+  prove the model matches Maestro; the pinned Maestro source it cites is that evidence.
 - [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
-  proves the flow budgets derive from the positioning and tap subflows.
+  proves every opener flow positions the opener, scrolls with the guard and taps through the
+  subflow, never bare.
 - [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
   proves the iOS Settings proof reads the return link and the Android title check stays.
 - [`scripts/lib/native-build-failure.test.mjs`](../../scripts/lib/native-build-failure.test.mjs):
@@ -11943,7 +11956,7 @@ Mobile, Vitest:
 Evidence boundaries:
 
 - The daily production run, the swap step, the Gradle cache and the iOS fixes run only on GitHub's
-  runners. Their proof is the first scheduled runs after merge and the manual dispatches named in
-  the pull request.
+  runners. Their native proof is pending until the first scheduled runs after merge and the manual
+  dispatches named in the pull request; the device scripts and their fixtures also run locally.
 - The Release font emulator loss and the failed community refresh have no recorded cause beyond
   what this step names; the new evidence records exist so the next failure names one.
