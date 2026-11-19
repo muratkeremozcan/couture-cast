@@ -14,6 +14,10 @@
 // - `?portal=return` fires exactly one refresh and shows lag copy: RevenueCat
 //   documents Stripe-sourced cancellations taking up to ~2 hours to sync, so
 //   the state is lagging, not wrong, and the copy says so.
+//
+// The section follows the session (`MemberScope`): while a stored session is still being
+// verified it stays `checking`, and it reads once per member. A one-shot check on mount once told
+// a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -33,12 +37,13 @@ import {
   createPortalSessionFromWeb,
   getPremiumAccessFromWeb,
   getSubscriptionFromWeb,
-  hasWebSession,
   premiumFailureReason,
   type PremiumFailureReason,
   redirectToExternalUrl,
   refreshSubscriptionFromWeb,
 } from '../../lib/premium'
+import { isLiveOwner, MemberScope, type MemberSession } from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 
 const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
 
@@ -50,8 +55,9 @@ const ACTIVATION_POLL_MAX_ATTEMPTS = 24
 const ACCESS_READ_TIMEOUT_MS = 5_000
 
 /**
- * `checking` is the server render and the first client tick, before
- * `sessionStorage` can be read, so hydration never reconciles two trees.
+ * `checking` is the server render, the first client tick, and every moment a
+ * stored session is still being verified, so hydration never reconciles two
+ * trees and a signed-in member never sees the sign-in hint.
  */
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -258,7 +264,9 @@ function resolveSectionView(
 
   return {
     showDisclosure: showsDisclosure(sectionState, entitled, complimentary),
-    showStatusLine: isIdle && sectionState !== 'load_failed',
+    // Nothing is known while the session is verified, so "no subscription yet" waits too.
+    showStatusLine:
+      isIdle && sectionState !== 'load_failed' && sectionState !== 'checking',
     showComplimentaryNote: readyBody !== null && entitled && complimentary,
     // The grace banner still warns a paying grantee about their payment method; only the
     // ended note ("subscribe again") is withheld from a member whose grant keeps Premium on.
@@ -295,8 +303,22 @@ const FAILURE_MESSAGE_KEYS: Readonly<Record<PremiumFailureReason, string | null>
   unknown: null,
 }
 
+/**
+ * Everything in the section belongs to the member the session bridge names right now: it is
+ * keyed by that owner, so a change of member (or sign-out) discards the last member's
+ * subscription, access, activation poll, redirect and messages in the same render.
+ */
 export function SubscriptionSection() {
+  return (
+    <MemberScope>
+      {(session) => <MemberSubscriptionSection session={session} />}
+    </MemberScope>
+  )
+}
+
+function MemberSubscriptionSection({ session }: { session: MemberSession }) {
   const { t } = useTranslation()
+  const { status, owner } = session
   const [sectionState, setSectionState] = useState<SectionState>('checking')
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [access, setAccess] = useState<PremiumAccess | null>(null)
@@ -312,15 +334,33 @@ export function SubscriptionSection() {
    */
   const loadErrorMessage = t('commerce.premium.errorLoad')
 
+  // One read (or one activation poll) per member: a session event that names the same member
+  // again (a token refresh, the end of a verification already answered) asks nothing.
   useEffect(() => {
-    if (!hasWebSession()) {
+    if (status === 'checking') {
+      setError(null)
+      setSectionState('checking')
+      return
+    }
+    if (status === 'unavailable') {
+      // Verification failed: an outage the member can retry, never the sign-in hint.
+      setError(loadErrorMessage)
+      setSectionState('load_failed')
+      return
+    }
+    if (owner === null) {
+      setError(null)
       setSectionState('signed_out')
       return
     }
+    // The bridge publishes again once it names this member; until then nothing is asked.
+    if (!isLiveOwner(owner)) return
 
     const params = new URLSearchParams(window.location.search)
     const controller = new AbortController()
+    const current = () => !controller.signal.aborted && isLiveOwner(owner)
     let timer: number | undefined
+    setError(null)
 
     if (params.get('checkout') === 'success') {
       /*
@@ -338,7 +378,7 @@ export function SubscriptionSection() {
           const next = viaRefresh
             ? await refreshSubscriptionFromWeb(controller.signal)
             : await getSubscriptionFromWeb(controller.signal)
-          if (controller.signal.aborted) {
+          if (!current()) {
             return
           }
           setSubscription(next)
@@ -347,7 +387,7 @@ export function SubscriptionSection() {
             return
           }
         } catch {
-          if (controller.signal.aborted) {
+          if (!current()) {
             return
           }
         }
@@ -399,14 +439,14 @@ export function SubscriptionSection() {
             )
           : await getSubscriptionFromWeb(controller.signal)
         const nextAccess = await accessRead
-        if (controller.signal.aborted) {
+        if (!current()) {
           return
         }
         setAccess(nextAccess)
         setSubscription(next)
         setSectionState('ready')
       } catch (loadError: unknown) {
-        if (controller.signal.aborted) {
+        if (!current()) {
           return
         }
         if (premiumFailureReason(loadError) === 'signed_out') {
@@ -425,7 +465,7 @@ export function SubscriptionSection() {
     })()
 
     return () => controller.abort()
-  }, [loadErrorMessage])
+  }, [status, owner, loadErrorMessage])
 
   /**
    * Turns a rejection into localized copy, or into the signed-out state.
@@ -446,7 +486,7 @@ export function SubscriptionSection() {
   }
 
   async function handleSubscribe(plan: SubscriptionPlan): Promise<void> {
-    if (isRedirecting) {
+    if (isRedirecting || !isLiveOwner(owner)) {
       return
     }
     setIsRedirecting(true)
@@ -466,23 +506,27 @@ export function SubscriptionSection() {
 
     try {
       const url = await createCheckoutSessionFromWeb(plan)
+      if (!isLiveOwner(owner)) return
       redirectToExternalUrl(url)
     } catch (checkoutError: unknown) {
+      if (!isLiveOwner(owner)) return
       applyFailure(checkoutError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
   }
 
   async function handleManage(): Promise<void> {
-    if (isRedirecting) {
+    if (isRedirecting || !isLiveOwner(owner)) {
       return
     }
     setIsRedirecting(true)
     setError(null)
     try {
       const url = await createPortalSessionFromWeb()
+      if (!isLiveOwner(owner)) return
       redirectToExternalUrl(url)
     } catch (portalError: unknown) {
+      if (!isLiveOwner(owner)) return
       applyFailure(portalError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
@@ -603,6 +647,8 @@ export function SubscriptionSection() {
           {error}
         </p>
       )}
+
+      <SessionRetryButton session={session} testId="premium-session-retry" />
     </section>
   )
 }

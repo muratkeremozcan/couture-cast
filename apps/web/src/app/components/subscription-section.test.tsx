@@ -14,7 +14,10 @@ import { http, HttpResponse } from 'msw'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import {
+  FIXTURE_ACCESS_TOKEN,
+  signInFixtureMember,
+} from '../../test-utils/member-session'
 import { redirectToExternalUrl } from '../../lib/premium'
 import type * as PremiumModule from '../../lib/premium'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -55,8 +58,9 @@ function entitledSubscription(overrides: SubscriptionBody = {}): SubscriptionBod
   }
 }
 
+/** The fixture member: the bearer the section's session follower counts. */
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
 }
 
 function setPath(path: string) {
@@ -106,7 +110,9 @@ describe('SubscriptionSection', () => {
     const monthly = screen.getByTestId('premium-subscribe-monthly')
     expect(monthly).toBeDisabled()
     expect(monthly).toHaveAccessibleDescription(/Sign in to subscribe or manage Premium/)
-    expect(screen.getByTestId('premium-subscribe-annual')).toBeDisabled()
+    const annual = screen.getByTestId('premium-subscribe-annual')
+    expect(annual).toBeDisabled()
+    expect(annual).toHaveAccessibleDescription(/Sign in to subscribe or manage Premium/)
     expect(screen.getByTestId('premium-signed-out-hint')).toBeInTheDocument()
     expect(seen).not.toHaveBeenCalled()
   })
@@ -131,7 +137,7 @@ describe('SubscriptionSection', () => {
     expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
       /You don.t have a Premium subscription yet\./
     )
-    expect(authorization).toHaveBeenCalledWith('Bearer test-access-token')
+    expect(authorization).toHaveBeenCalledWith(`Bearer ${FIXTURE_ACCESS_TOKEN}`)
     expect(screen.getByTestId('premium-subscribe-annual')).toBeEnabled()
     expect(screen.queryByTestId('premium-signed-out-hint')).not.toBeInTheDocument()
   })

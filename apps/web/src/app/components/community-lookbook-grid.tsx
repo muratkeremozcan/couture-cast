@@ -64,7 +64,6 @@ import {
   generateIdempotencyKey,
   getCommunityFeedFromWeb,
   getCommunityPostFromWeb,
-  hasWebSession,
   openCommunityPostFromWeb,
   openCommunitySpotlightPostFromWeb,
   publishCommunityLookFromWeb,
@@ -73,6 +72,7 @@ import {
   type CommunityFailureReason,
 } from '../../lib/community'
 import { resolveWebApiBaseUrl } from '../../lib/api-client'
+import { useMemberSession, type MemberSession } from '../../lib/use-web-session'
 import {
   LiveSponsorshipLedger,
   type LiveReadStamp,
@@ -2011,26 +2011,42 @@ function SpotlightFocusNotice({
 /** A ban hides the feed, its author states and every action, like lost access does. */
 const feedVisible = (available: boolean, banned: unknown) => available && !banned
 
+/**
+ * What the grid offers for where the session stands. A stored session still under verification
+ * (or one whose check failed) offers neither the member's actions nor the guest's sign-in link:
+ * the reader may well be signed in, and is not known to be yet (2026-11-19 follow-up).
+ */
+function sessionAffordances(status: MemberSession['status']) {
+  const hasSession = status === 'signed_in'
+  const settled = hasSession || status === 'signed_out'
+  return {
+    hasSession,
+    settingsHref: settled ? (hasSession ? '/notification-settings' : '/signin') : null,
+    settingsLabel: hasSession
+      ? 'community.notifications.title'
+      : 'community.notifications.signin',
+  }
+}
+
 function communityPresentation(
   available: boolean,
-  hasSession: boolean,
+  sessionStatus: MemberSession['status'],
   items: CommunityFeedItem[],
   authorStates: CommunityAuthorPostState[],
   nextCursor: string | null,
   newLooks: CommunityFeedItem[],
   openedItem: CommunityFeedItem | null
 ) {
+  const affordances = sessionAffordances(sessionStatus)
   return {
     items: available ? items : [],
     authorStates: available ? authorStates : [],
     nextCursor: available ? nextCursor : null,
     showNewLooks: available && newLooks.length > 0,
     detail: openedItem,
-    canAct: available && hasSession,
-    settingsHref: hasSession ? '/notification-settings' : '/signin',
-    settingsLabel: hasSession
-      ? 'community.notifications.title'
-      : 'community.notifications.signin',
+    canAct: available && affordances.hasSession,
+    settingsHref: affordances.settingsHref,
+    settingsLabel: affordances.settingsLabel,
   }
 }
 
@@ -2045,10 +2061,11 @@ function CommunitySettingsLink({
   label,
 }: {
   banned: boolean
-  href: string
+  /** Null while the session is still being verified: neither the member's link nor the guest's. */
+  href: string | null
   label: string
 }) {
-  if (banned) return null
+  if (banned || href === null) return null
   return (
     <Link
       href={href}
@@ -2327,7 +2344,9 @@ export function CommunityLookbookGrid({
 
   const [notice, setNotice] = useState<Notice | null>(null)
   const [failedImages, setFailedImages] = useState<FailedImages>(NO_FAILED_IMAGES)
-  const [hasSession, setHasSession] = useState(false)
+  // Follows the verified session: `checking` while a stored session is verified, never signed out.
+  const memberSession = useMemberSession()
+  const hasSession = memberSession.status === 'signed_in'
   const [sessionScope, setSessionScope] = useState<string | null>(null)
   const sessionScopeRef = useRef<string | null | undefined>(undefined)
 
@@ -2429,10 +2448,6 @@ export function CommunityLookbookGrid({
   useEffect(() => {
     itemsRef.current = items
   }, [items])
-
-  useEffect(() => {
-    setHasSession(hasWebSession())
-  }, [])
 
   useEffect(() => {
     setCurrentMode(activeTab)
@@ -2680,7 +2695,6 @@ export function CommunityLookbookGrid({
       const previous = sessionScopeRef.current
       sessionScopeRef.current = identity
       comments.setSession(identity)
-      setHasSession(hasWebSession())
       setSessionScope(identity)
       if (previous !== undefined && previous !== identity) {
         clearScope()
@@ -3584,7 +3598,7 @@ export function CommunityLookbookGrid({
 
   const presentation = communityPresentation(
     feedVisible(communityAvailable, bannedSanction),
-    hasSession,
+    memberSession.status,
     displayedItems,
     authorStates,
     nextCursor,

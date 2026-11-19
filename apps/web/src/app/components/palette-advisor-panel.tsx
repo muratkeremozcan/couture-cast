@@ -22,6 +22,10 @@
 //   fired on first press. A native `confirm()` would block the page and is
 //   untranslatable; the confirmation is a rendered step with its own catalog
 //   key.
+//
+// The panel follows the session (`MemberScope`): while a stored session is still being verified
+// it stays `checking`, and it reads once per member. A one-shot check on mount once showed an
+// entitled member the signed-out "Sign in and subscribe" panel on a direct load (2026-11-19).
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -41,13 +45,14 @@ import {
   erasePaletteAdvisorFromWeb,
   generateIdempotencyKey,
   getPaletteAdvisorFromWeb,
-  hasWebSession,
   paletteAdvisorFailureReason,
   setPaletteConsentFromWeb,
   updateAdvisorRecommendationFromWeb,
   uploadPaletteSelfieFromWeb,
   type PaletteSelfieUploadState,
 } from '../../lib/palette-advisor'
+import { isLiveOwner, MemberScope, type MemberSession } from '../../lib/use-web-session'
+import { SessionRetryButton } from './session-retry-button'
 
 /**
  * True when a stored palette was derived under a rule table this build has
@@ -82,10 +87,10 @@ const SELFIE_HINT_ID = 'palette-advisor-selfie-hint'
 const SELFIE_INPUT_ID = 'palette-advisor-selfie-input'
 
 /**
- * `checking` is the server render and the first client tick, before
- * `sessionStorage` can be read, so hydration never reconciles two trees. It
- * renders the heading and the intro and nothing else, which is also what
- * `loading` renders.
+ * `checking` is the server render, the first client tick, and every moment a
+ * stored session is still being verified, so hydration never reconciles two
+ * trees. It renders the heading and the intro and nothing else, which is also
+ * what `loading` renders.
  */
 type PanelState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
 
@@ -648,8 +653,20 @@ function AnalysisStatus({
   )
 }
 
+/**
+ * Everything in the panel belongs to the member the session bridge names right now: it is keyed
+ * by that owner, so a change of member (or sign-out) discards the last member's profile, busy
+ * state, upload, confirmations and messages in the same render.
+ */
 export function PaletteAdvisorPanel() {
+  return (
+    <MemberScope>{(session) => <MemberPaletteAdvisor session={session} />}</MemberScope>
+  )
+}
+
+function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
   const { t, i18n } = useTranslation()
+  const { status, owner } = session
   const [panelState, setPanelState] = useState<PanelState>('checking')
   const [profile, setProfile] = useState<PaletteAdvisorProfile | null>(null)
   const [busy, setBusy] = useState<BusyKind>(null)
@@ -671,23 +688,41 @@ export function PaletteAdvisorPanel() {
    */
   const loadErrorMessage = t('commerce.premium.palette.loadError')
 
+  // One read per member: a session event that names the same member again (a token refresh,
+  // the end of a verification already answered) asks nothing.
   useEffect(() => {
-    if (!hasWebSession()) {
+    if (status === 'checking') {
+      setError(null)
+      setPanelState('checking')
+      return
+    }
+    if (status === 'unavailable') {
+      // Verification failed: an outage the member can retry, never the signed-out panel.
+      setError(loadErrorMessage)
+      setPanelState('load_failed')
+      return
+    }
+    if (owner === null) {
+      setError(null)
       setPanelState('signed_out')
       return
     }
+    // The bridge publishes again once it names this member; until then nothing is asked.
+    if (!isLiveOwner(owner)) return
 
     const controller = new AbortController()
+    const current = () => !controller.signal.aborted && isLiveOwner(owner)
+    setError(null)
     setPanelState('loading')
 
     void (async () => {
       try {
         const next = await getPaletteAdvisorFromWeb(controller.signal)
-        if (controller.signal.aborted) return
+        if (!current()) return
         setProfile(next)
         setPanelState('ready')
       } catch (loadError: unknown) {
-        if (controller.signal.aborted) return
+        if (!current()) return
         if (paletteAdvisorFailureReason(loadError) === 'signed_out') {
           // An expired or cleared token is not a broken read. Show the locked
           // panel rather than an error the reader cannot act on, and never
@@ -701,7 +736,7 @@ export function PaletteAdvisorPanel() {
     })()
 
     return () => controller.abort()
-  }, [loadErrorMessage])
+  }, [status, owner, loadErrorMessage])
 
   /**
    * Re-reads the server's view without touching the busy state.
@@ -713,13 +748,14 @@ export function PaletteAdvisorPanel() {
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const next = await getPaletteAdvisorFromWeb()
+      if (!isLiveOwner(owner)) return
       setProfile(next)
       setPanelState('ready')
     } catch {
       // A failed refresh leaves the last known state on screen rather than
       // blanking a panel the reader is mid-interaction with.
     }
-  }, [])
+  }, [owner])
 
   /**
    * A rejected write re-resolves the panel, it does not just print a line.
@@ -775,9 +811,9 @@ export function PaletteAdvisorPanel() {
     ): Promise<void> => {
       if (busy !== null) return
 
-      if (!hasWebSession()) {
-        // The session is re-read here, not trusted from mount. Signing out in
-        // another tab leaves this panel rendered and interactive, and without
+      if (!isLiveOwner(owner)) {
+        // The live owner is re-read here, not trusted from the render. Signing out
+        // in another tab leaves this panel rendered and interactive, and without
         // this check the write would fail inside the lib and surface
         // PALETTE_ADVISOR_SIGNED_OUT_MESSAGE -- a developer string with no
         // catalog entry, so English in all ten locales.
@@ -794,11 +830,11 @@ export function PaletteAdvisorPanel() {
 
       try {
         const next = await write(controller.signal)
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || !isLiveOwner(owner)) return
         setProfile(next)
         setPanelState('ready')
       } catch (writeError: unknown) {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || !isLiveOwner(owner)) return
         applyWriteFailure(writeError, fallbackKey)
       } finally {
         if (writeControllerRef.current === controller) {
@@ -810,7 +846,7 @@ export function PaletteAdvisorPanel() {
         }
       }
     },
-    [applyWriteFailure, busy]
+    [applyWriteFailure, busy, owner]
   )
 
   function handleGrantConsent(): void {
@@ -924,7 +960,12 @@ export function PaletteAdvisorPanel() {
       })
       // Only navigate once the click is attributed. Traffic the partner cannot
       // attribute is worth nothing to them and cannot be audited by us, so a
-      // failed mint stops here.
+      // failed mint stops here. A click minted for a member who has since left
+      // stops here too.
+      if (!isLiveOwner(owner)) {
+        handoff.cancel()
+        return
+      }
       handoff.navigate(redirectUrl)
     } catch {
       handoff.cancel()
@@ -1096,6 +1137,8 @@ export function PaletteAdvisorPanel() {
           {error}
         </p>
       )}
+
+      <SessionRetryButton session={session} testId="palette-advisor-session-retry" />
     </section>
   )
 }

@@ -10,7 +10,7 @@ import {
   PLANNER_DAY_CHANGED_MESSAGE,
 } from '@couture/api-client/contracts/http'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { getI18n } from '../../i18n'
 import { AccessibleModal } from './accessible-modal'
 import { PlannerRail } from './planner-rail'
@@ -126,7 +126,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows a checking skeleton before the request resolves', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let resolveResponse!: (value: Response) => void
     useMswHandlers(
       http.get(
@@ -149,7 +149,7 @@ describe('PlannerRail', () => {
   })
 
   it('renders a ready week with weather, scenarios, and starter-wardrobe marker', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const days = SEVEN_DATES.map((d, index) =>
       buildReadyDay(d, index === 2 ? { isStarterWardrobe: true } : {})
     )
@@ -170,7 +170,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows an unavailable weather note without a precision claim', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const days = SEVEN_DATES.map((d, index) =>
       buildReadyDay(
         d,
@@ -194,7 +194,7 @@ describe('PlannerRail', () => {
   })
 
   it('renders an isolated day error beside otherwise-ready days, with retry', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const days = SEVEN_DATES.map((d, index) =>
       index === 1 ? buildErrorDay(d) : buildReadyDay(d)
     )
@@ -227,7 +227,7 @@ describe('PlannerRail', () => {
   })
 
   it('locks with the not-entitled upsell on a 403 from PremiumEntitlementGuard', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
         HttpResponse.json(errorBody(403, PREMIUM_REQUIRED_MESSAGE), { status: 403 })
@@ -238,7 +238,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows the disabled note (not the upsell) when the flag is off', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
         HttpResponse.json(errorBody(503, PREMIUM_PLANNER_DISABLED_MESSAGE), {
@@ -252,7 +252,7 @@ describe('PlannerRail', () => {
   })
 
   it('offers a localized retry on an unclassified failure', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -271,7 +271,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows a per-day reshuffle error on an unclassified reshuffle failure', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -291,7 +291,7 @@ describe('PlannerRail', () => {
   })
 
   it('reshuffles a day and announces the update', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -317,7 +317,7 @@ describe('PlannerRail', () => {
   })
 
   it('announces no alternative when reshuffle reports unchanged', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -341,7 +341,7 @@ describe('PlannerRail', () => {
   })
 
   it('refreshes the date on a reshuffle version conflict', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     let getCount = 0
     useMswHandlers(
@@ -366,7 +366,7 @@ describe('PlannerRail', () => {
   })
 
   it('prevents a second reshuffle while one is in flight', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     const reshuffleCalls = vi.fn()
     let resolveReshuffle!: (value: Response) => void
@@ -401,7 +401,7 @@ describe('PlannerRail', () => {
   })
 
   it('aborts the in-flight request when the rail closes', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let capturedSignal: AbortSignal | undefined
     useMswHandlers(
       http.get(PLANNER_PATH, ({ request }) => {
@@ -424,7 +424,7 @@ describe('PlannerRail', () => {
   })
 
   it('traps focus and closes on Escape only in the overlay variant', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
         HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))
@@ -507,7 +507,7 @@ describe('PlannerRail', () => {
   })
 
   it('aborts an in-flight reshuffle, not just the week fetch, when the rail closes', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     let reshuffleSignal: AbortSignal | undefined
     useMswHandlers(
@@ -537,7 +537,7 @@ describe('PlannerRail', () => {
   })
 
   it('refreshes silently on window focus while open and entitled', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -561,7 +561,7 @@ describe('PlannerRail', () => {
     // but before React re-registered the focus listener, so the listener that answered
     // still saw the checking state and refreshed nothing. A MutationObserver runs right
     // after the commit, ahead of React's passive effects, which pins that order.
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -588,7 +588,7 @@ describe('PlannerRail', () => {
   })
 
   it('does not refresh on window focus once closed', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     let requestCount = 0
     useMswHandlers(
       http.get(PLANNER_PATH, () => {
@@ -610,7 +610,7 @@ describe('PlannerRail', () => {
   })
 
   it('locks with the not-entitled upsell when a reshuffle discovers entitlement lapsed', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -631,7 +631,7 @@ describe('PlannerRail', () => {
   })
 
   it('shows the disabled note when a reshuffle discovers the flag went off', async () => {
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+    signInFixtureMember()
     const target = SEVEN_DATES[0]!
     useMswHandlers(
       http.get(PLANNER_PATH, () =>
@@ -712,7 +712,7 @@ describe('PlannerRail', () => {
     })
 
     it('passes entitled with a full ready week', async () => {
-      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token')
+      signInFixtureMember()
       useMswHandlers(
         http.get(PLANNER_PATH, () =>
           HttpResponse.json(buildResponse(SEVEN_DATES.map((d) => buildReadyDay(d))))

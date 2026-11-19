@@ -1223,5 +1223,8 @@
     "community": "Community",
     "profile": "Profilo",
     "navigatedTo": "Scheda {{label}} aperta"
+  },
+  "session": {
+    "retry": "Riprova"
   }
 }

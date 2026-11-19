@@ -11,7 +11,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
+import { signInFixtureMember } from '../../test-utils/member-session'
 import { createCheckoutSessionFromWeb } from '../../lib/premium'
 import type * as PremiumModule from '../../lib/premium'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
@@ -98,7 +98,7 @@ async function loaded() {
 beforeEach(async () => {
   window.sessionStorage.clear()
   window.history.replaceState(null, '', '/settings')
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
   await getI18n().changeLanguage('en-US')
 })
 

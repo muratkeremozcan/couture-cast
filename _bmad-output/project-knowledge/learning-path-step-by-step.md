@@ -22,7 +22,7 @@ Added Steps 40 to 58:
 - Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
 - Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
-  - Production follow-ups after the project close: Jade's profile and location fix, on `fix/profile-location`.
+  - Production follow-ups after the project close: Jade's profile and location fix (PR #257), and the Settings sections that follow the verified session, on `fix/settings-session-race`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -12159,3 +12159,71 @@ Evidence boundaries:
 - The provider keys were set on Vercel production and preview on 2026-11-19 and both were
   redeployed.
 - Android coarse-only location is proven on the merged manifest, not on a device.
+
+Settings sections follow the verified session (`fix/settings-session-race`). User/business impact:
+
+Right after the Locations fix, the owner loaded `/settings` directly on production `8b0fed06`
+while signed in with complimentary Premium. Shopping and partners said "Sign in to change this",
+Premium said "You don't have a Premium subscription yet" with a sign-in hint, and Interface
+palettes said "Sign in and subscribe to Premium". Locations, on the same page, was signed in. A
+member who pays for Premium, or holds it free, was told to sign in on every direct load or
+reload. The palette advisor and the planner rail on Home had the same check.
+Every member-owned section now follows the session: it shows its loading state while the session
+is verified, the member's own state once the member is named, and the signed-out state only
+after verification ends with no member.
+
+#### Lessons
+
+1. **One primitive for one question.**
+   Locations was fixed with its own session follower, and the four sections beside it kept the
+   one-shot `hasWebSession()` check on mount. `MemberScope` in `apps/web/src/lib/use-web-session.ts`
+   now answers "who is the member" for every section: it renders the section keyed by the live
+   owner and hands it `{ status, owner, retry }`. Locations, Shopping and partners, Premium,
+   Interface palettes, the palette advisor and the planner rail all use it, so the next section
+   gets the rule by using the primitive.
+2. **Key member-owned state by the member.**
+   A change of member (or sign-out) remounts the section, so the last member's preference,
+   subscription, palette, advisor profile or planner week is gone in the same render, before any
+   effect runs. Every late answer checks `isLiveOwner(owner)` before it touches the section, and
+   a save or checkout re-checks the live owner the moment the member acts. The palette on
+   `<html data-theme>` is cleared when the owner changes and applied again only from the next
+   member's own read.
+3. **An outage reads as an outage.**
+   A profile check that fails (a timeout, a 5xx) shows each section's load error with one shared
+   Try again control (`session.retry`, ten locales). The retry verifies the session again, and the
+   section reads once when the member is named. A refusal (401, 403, 404) or a verification with
+   no member is the signed-out state with today's hints and locked panels.
+4. **Community shows neither affordance while it waits.**
+   While a stored session is verified, the community grid shows neither the member's share and
+   notification settings nor the guest's sign-in link; its own owner reset (`clearScope`) is
+   unchanged.
+
+Tests:
+
+Web unit, Vitest:
+
+- [`apps/web/src/lib/use-web-session.test.tsx`](../../apps/web/src/lib/use-web-session.test.tsx):
+  proves `MemberScope` reads checking through verification, signed out without a stored session,
+  an outage with a retry that verifies again, keeps one scope per member across a token refresh
+  and starts a fresh one for the next member (MEMBER-SCOPE-01..06).
+- [`apps/web/src/app/components/commerce-preferences-session.test.tsx`](../../apps/web/src/app/components/commerce-preferences-session.test.tsx),
+  [`apps/web/src/app/components/subscription-section-session.test.tsx`](../../apps/web/src/app/components/subscription-section-session.test.tsx),
+  [`apps/web/src/app/components/premium-theme-section-session.test.tsx`](../../apps/web/src/app/components/premium-theme-section-session.test.tsx),
+  [`apps/web/src/app/components/palette-advisor-panel-session.test.tsx`](../../apps/web/src/app/components/palette-advisor-panel-session.test.tsx)
+  and [`apps/web/src/app/components/planner-rail-session.test.tsx`](../../apps/web/src/app/components/planner-rail-session.test.tsx):
+  prove each section waits through verification with no hint and no read, reads once with the
+  fresh bearer, says sign in only after verification ends with no member, and keeps nothing of
+  one member for the next.
+- [`apps/web/src/app/components/member-sections-verification.test.tsx`](../../apps/web/src/app/components/member-sections-verification.test.tsx):
+  proves each section shows no sign-in wording, no "no subscription yet" and no read while the
+  session is verified (SESSION-CHECKING-WEB), and that a failed session check shows each
+  section's load error and retry, whose verification reads once (SESSION-OUTAGE-WEB).
+- [`apps/web/src/i18n/session-locales.spec.ts`](../../apps/web/src/i18n/session-locales.spec.ts):
+  proves the shared retry string ships in all ten locales (SESSION-I18N-WEB-01..04).
+
+Web E2E, Playwright:
+
+- [`playwright/tests/settings-sections-real-session.spec.ts`](../../playwright/tests/settings-sections-real-session.spec.ts):
+  proves a signed-in member opening `/settings` in a new tab or after a reload sees Shopping and
+  partners, Premium and Interface palettes signed in through real GoTrue, with no sign-in hint
+  painted at any point and one read per section (PS-1, PS-2).

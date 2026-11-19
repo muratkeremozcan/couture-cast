@@ -25,7 +25,7 @@ import {
   type CommunitySponsorship,
   type EmbeddedCommunityChallenge,
 } from '@couture/api-client/contracts/http'
-import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../lib/wardrobe'
+import { signInFixtureMember } from './member-session'
 import { CommunityLookbookGrid } from '../app/components/community-lookbook-grid'
 export { COMMUNITY_FEED_MODES } from '../app/components/community-lookbook-grid'
 
@@ -273,8 +273,9 @@ export function imageFixtureHandler() {
   )
 }
 
+/** Signs in as the e2e fixture member, the bearer the grid's session follower counts. */
 export function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  signInFixtureMember()
 }
 
 export function renderGrid(

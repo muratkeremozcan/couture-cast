@@ -13,7 +13,15 @@
 // again. A bearer no verification named counts only as the e2e fixture bearer.
 'use client'
 
-import { useEffect, useState, useSyncExternalStore } from 'react'
+import {
+  createElement,
+  Fragment,
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react'
 import { hasWebSession } from './commerce'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import { readStorage } from './browser-persistence'
@@ -166,4 +174,67 @@ export function useWebSession(): WebSessionState {
   }, [])
 
   return state
+}
+
+/**
+ * The session as a member-owned section reads it (2026-11-19 follow-up: Shopping and partners,
+ * Premium, Interface palettes, the palette advisor and the planner rail each asked once, on
+ * mount, and told a signed-in member to sign in). One shape for every section:
+ *
+ * - `checking`: render the section's loading state, ask nothing member-owned;
+ * - `signed_in`: `owner` names the verified member, load that member's data once;
+ * - `signed_out`: verification settled with no member, render the signed-out state;
+ * - `unavailable`: verification failed, render the section's load error, and `retry`
+ *   verifies again.
+ */
+export type MemberSession = {
+  status: WebSessionState['status']
+  /** The verified member, set only while `status` is `signed_in`. */
+  owner: string | null
+  /** Verifies the stored session again; does nothing unless `status` is `unavailable`. */
+  retry: () => void
+}
+
+const NO_RETRY = () => undefined
+
+export function memberSessionOf(state: WebSessionState): MemberSession {
+  return {
+    status: state.status,
+    owner: state.status === 'signed_in' ? state.owner : null,
+    retry: state.status === 'unavailable' ? state.retry : NO_RETRY,
+  }
+}
+
+/**
+ * True only while `owner` is the member the session bridge names right now. A section checks it
+ * before it sends member-owned work and again before a late answer touches its state, so an
+ * answer for one member never lands on another's section, or after sign-out.
+ */
+export function isLiveOwner(owner: string | null): owner is string {
+  return owner !== null && currentWebSessionOwner() === owner
+}
+
+/** `useWebSession`, in the shape member-owned sections read. */
+export function useMemberSession(): MemberSession {
+  const state = useWebSession()
+  return useMemo(() => memberSessionOf(state), [state])
+}
+
+/** The scope key of a tab no member holds. */
+export const NO_MEMBER_SCOPE = 'no-member'
+
+/**
+ * Renders member-owned UI keyed by the member the session bridge names right now, so a change of
+ * member (or sign-out) discards the last member's data, busy state and errors in the same render,
+ * before any effect runs. The session follower sits above the key: a member change starts no
+ * second verification.
+ */
+export function MemberScope({
+  children,
+}: {
+  children: (session: MemberSession) => ReactNode
+}) {
+  const liveOwner = useWebSessionOwner()
+  const session = useMemberSession()
+  return createElement(Fragment, { key: liveOwner ?? NO_MEMBER_SCOPE }, children(session))
 }

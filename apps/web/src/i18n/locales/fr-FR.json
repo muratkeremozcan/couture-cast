@@ -1223,5 +1223,8 @@
     "community": "Communauté",
     "profile": "Profil",
     "navigatedTo": "Onglet {{label}} ouvert"
+  },
+  "session": {
+    "retry": "Réessayer"
   }
 }
