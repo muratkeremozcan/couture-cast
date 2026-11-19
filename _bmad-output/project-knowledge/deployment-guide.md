@@ -274,8 +274,8 @@ day on a schedule (`41 11 * * *`, 11:41 UTC), and manually. It uses fixed Vercel
 
 The scheduled run is the production status check. Production can break with no merge: an expired
 secret, a provider outage, a plan quota or drifted data. The scheduled run waits for production to
-serve `main`'s latest commit (or one with the same build inputs), then runs the same suite a push
-runs. The `production status` badge at the top of the README shows the latest run on `main` and
+serve the scheduled event's commit, `main` as of the event (or one with the same build inputs),
+then runs the same suite a push runs. The `production status` badge at the top of the README shows the latest run on `main` and
 carries no age; the run list shows when it finished. GitHub can delay or drop a scheduled run, and
 disables a public repository's schedules after 60 days with no repository activity; re-enable
 them from the Actions tab.
