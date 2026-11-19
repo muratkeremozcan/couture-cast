@@ -1,21 +1,32 @@
 // Story 6.12 test owner: I-W-DRILL, U-GF-METRICS and U-RB-RUNBOOK, the operating surface of the monitor.
 // The drill is the real script through the real adapter against a real socket.
-// DATABASE_URL points nowhere on every run, so a drill that touched a table would fail here.
-import { spawn } from 'node:child_process'
+// DATABASE_URL points nowhere on every webhook run, so a webhook drill that touched a table would fail
+// here. I-W-DRILL-PUSH (production follow-up 2026-11-19) is the one exception: the push drill reads
+// moderator devices from its own disposable database, and Expo's URLs go to a loopback receiver.
+import { spawn, spawnSync } from 'node:child_process'
 import { once } from 'node:events'
 import { readFileSync } from 'node:fs'
 import { createServer, type IncomingHttpHeaders } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import path from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { randomUUID } from 'node:crypto'
+import { PrismaClient } from '@prisma/client'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { isolatedCommunityDatabase } from './helpers/isolated-community-database.js'
+import { newRunId, seedMember } from './helpers/moderation-queue-seed.js'
 
 vi.setConfig({ testTimeout: 60_000 })
 
 const repoRoot = path.resolve(__dirname, '../../..')
 const SCRIPT = 'scripts/moderation-sla-drill.mjs'
 
-async function runDrill(args: string[], env: Record<string, string>) {
-  const child = spawn(process.execPath, ['--import', 'tsx', SCRIPT, ...args], {
+async function runDrill(
+  args: string[],
+  env: Record<string, string>,
+  preloads: string[] = []
+) {
+  const imports = ['tsx', ...preloads].flatMap((preload) => ['--import', preload])
+  const child = spawn(process.execPath, [...imports, SCRIPT, ...args], {
     cwd: repoRoot,
     env: {
       PATH: process.env.PATH,
@@ -101,6 +112,30 @@ describe('I-W-DRILL', () => {
     expect(code, output).toBe(2)
   })
 
+  it('exits 2 and names both settings when neither a URL nor moderator ids are set', async () => {
+    const { code, output } = await runDrill([], {
+      MODERATION_OPS_WEBHOOK_URL: ' ',
+      MODERATION_OPS_PUSH_USER_IDS: ' , ',
+    })
+    expect(code, output).toBe(2)
+    expect(output).toContain(
+      'moderation_sla_drill result=unconfigured: neither MODERATION_OPS_WEBHOOK_URL nor MODERATION_OPS_PUSH_USER_IDS is set'
+    )
+  })
+
+  it('a webhook URL wins over moderator ids, and the database is never read', async () => {
+    await withServer(204, async (url, received) => {
+      const { code, output } = await runDrill([], {
+        MODERATION_OPS_WEBHOOK_URL: url,
+        MODERATION_OPS_PUSH_USER_IDS: 'mod-1,mod-2',
+      })
+      expect(code, output).toBe(0)
+      expect(output).toMatch(/target=webhook result=delivered/)
+      expect(received).toHaveLength(1)
+      expect(received[0]!.body.kind).toBe('drill')
+    })
+  })
+
   it('refuses a URL the adapter refuses, without printing it', async () => {
     const { code, output } = await runDrill([], {
       MODERATION_OPS_WEBHOOK_URL: 'http://CANARYSECRET.example.test/hook',
@@ -108,6 +143,219 @@ describe('I-W-DRILL', () => {
     expect(code, output).toBe(1)
     expect(output).toMatch(/result=invalid_config/)
     expect(output.toLowerCase()).not.toContain('canarysecret')
+  })
+})
+
+describe('I-W-DRILL-PUSH: the drill through the push channel', () => {
+  const PRELOAD = path.join(__dirname, 'helpers/expo-push-loopback.mjs')
+  const database = isolatedCommunityDatabase()
+  const prisma = new PrismaClient({ datasourceUrl: database.url })
+  const devices: {
+    moderator: string
+    second: string
+    denied: string
+    granted: string[]
+  } = {
+    moderator: '',
+    second: '',
+    denied: '',
+    granted: [],
+  }
+
+  const runId = newRunId()
+
+  beforeAll(async () => {
+    await database.migrate()
+    const moderator = await seedMember(prisma, runId, 'moderator', { alias: false })
+    const second = await seedMember(prisma, runId, 'second-moderator', { alias: false })
+    const denied = await seedMember(prisma, runId, 'denied', { alias: false })
+    const outsider = await seedMember(prisma, runId, 'outsider', { alias: false })
+    const device = async (userId: string, permission: string) => {
+      const token = `ExponentPushToken[tea-drill-${randomUUID()}]`
+      await prisma.pushToken.create({ data: { user_id: userId, token, permission } })
+      return token
+    }
+    devices.moderator = moderator.id
+    devices.second = second.id
+    devices.denied = denied.id
+    // Each of the two named moderators holds a granted device, so a drill that reads only the
+    // first named id misses one.
+    devices.granted = [
+      await device(moderator.id, 'granted'),
+      await device(second.id, 'granted'),
+    ].sort()
+    await device(moderator.id, 'denied')
+    await device(denied.id, 'denied')
+    await device(outsider.id, 'granted')
+  }, 120_000)
+
+  afterAll(async () => {
+    try {
+      await prisma.$disconnect()
+    } finally {
+      await database.drop()
+    }
+  })
+
+  /** A loopback Expo: every message accepted with a ticket id. */
+  async function withExpo(run: (url: string, received: Received[]) => Promise<void>) {
+    const received: Received[] = []
+    const server = createServer((request, response) => {
+      let body = ''
+      request.on('data', (chunk: Buffer) => {
+        body += chunk.toString()
+      })
+      request.on('end', () => {
+        const parsed = JSON.parse(body) as { to: string }[]
+        received.push({
+          headers: { ...request.headers, path: request.url },
+          body: parsed as unknown as Record<string, unknown>,
+        })
+        response.writeHead(200, { 'Content-Type': 'application/json' })
+        response.end(
+          JSON.stringify({
+            data: Array.isArray(parsed)
+              ? parsed.map((message) => ({ status: 'ok', id: `ticket:${message.to}` }))
+              : {},
+          })
+        )
+      })
+    })
+    server.listen(0, '127.0.0.1')
+    await once(server, 'listening')
+    try {
+      const { port } = server.address() as AddressInfo
+      await run(`http://127.0.0.1:${port}`, received)
+    } finally {
+      server.close()
+    }
+  }
+
+  // The preload must keep a drill test off the network: only Expo's two push routes are remapped
+  // to the loopback, and every other destination, another exp.host path included, is refused. A
+  // recording transport is installed before the preload, so the preload wraps it in place of the
+  // real fetch: a refusal that still called through would show up in its calls.
+  const RECORDING_TRANSPORT = `data:text/javascript,${encodeURIComponent(
+    "globalThis.teaUnderlying = []; globalThis.fetch = (input) => { globalThis.teaUnderlying.push(String(input?.url ?? input)); return Promise.reject(new TypeError('tea: underlying transport')) }"
+  )}`
+  it.each([
+    ['another host', 'https://example.test/hook', 'http://127.0.0.1:9'],
+    [
+      'another exp.host path',
+      'https://exp.host/--/api/v2/push/other',
+      'http://127.0.0.1:9',
+    ],
+    ['Expo send with no loopback set', 'https://exp.host/--/api/v2/push/send', ''],
+  ])(
+    'the Expo preload refuses %s without calling the transport',
+    (_name, url, loopback) => {
+      const child = spawnSync(
+        process.execPath,
+        [
+          '--import',
+          RECORDING_TRANSPORT,
+          '--import',
+          PRELOAD,
+          '--input-type=module',
+          '-e',
+          `const message = await fetch(${JSON.stringify(url)}).then(() => 'resolved', (error) => error.message); console.log(JSON.stringify({ message, underlying: globalThis.teaUnderlying }))`,
+        ],
+        { encoding: 'utf8', env: { ...process.env, TEA_EXPO_LOOPBACK_URL: loopback } }
+      )
+      expect(child.status, child.stderr).toBe(0)
+      expect(JSON.parse(child.stdout.trim())).toEqual({
+        message: `tea: unexpected fetch ${url}`,
+        underlying: [],
+      })
+    }
+  )
+
+  // The control: a remapped Expo route does reach the transport, at the loopback.
+  it('the Expo preload sends Expo send to the loopback through the transport', () => {
+    const child = spawnSync(
+      process.execPath,
+      [
+        '--import',
+        RECORDING_TRANSPORT,
+        '--import',
+        PRELOAD,
+        '--input-type=module',
+        '-e',
+        "await fetch('https://exp.host/--/api/v2/push/send').catch(() => undefined); console.log(JSON.stringify(globalThis.teaUnderlying))",
+      ],
+      {
+        encoding: 'utf8',
+        env: { ...process.env, TEA_EXPO_LOOPBACK_URL: 'http://127.0.0.1:9' },
+      }
+    )
+    expect(child.status, child.stderr).toBe(0)
+    expect(JSON.parse(child.stdout.trim())).toEqual([
+      'http://127.0.0.1:9/--/api/v2/push/send',
+    ])
+  })
+
+  it('sends one generic drill push to each granted device of the named moderators and exits 0', async () => {
+    await withExpo(async (loopback, received) => {
+      const { code, output } = await runDrill(
+        [],
+        {
+          DATABASE_URL: database.url,
+          MODERATION_OPS_PUSH_USER_IDS: `${devices.moderator} ${devices.second} ${devices.denied}`,
+          EXPO_PUSH_ACCESS_TOKEN: 'CANARYEXPOTOKEN',
+          TEA_EXPO_LOOPBACK_URL: loopback,
+        },
+        [PRELOAD]
+      )
+      expect(code, output).toBe(0)
+      expect(output).toMatch(/moderation_sla_drill target=push result=delivered/)
+      expect(output).not.toContain('CANARYEXPOTOKEN')
+      expect(received).toHaveLength(1)
+      expect(received[0]!.headers.path).toBe('/--/api/v2/push/send')
+      expect(received[0]!.headers.authorization).toBe('Bearer CANARYEXPOTOKEN')
+      const sent = received[0]!.body as unknown as { to: string }[]
+      expect([...sent].sort((a, b) => a.to.localeCompare(b.to))).toEqual(
+        devices.granted.map((to) => ({
+          to,
+          title: 'Moderation needs attention',
+          body: 'Open the moderation console to review the queue.',
+          priority: 'high',
+          sound: 'default',
+          channelId: 'community',
+          data: { version: 1, source: 'moderation_sla' },
+        }))
+      )
+    })
+  })
+
+  it('exits 1 with invalid_config and sends nothing when no named moderator has a granted device', async () => {
+    await withExpo(async (loopback, received) => {
+      const { code, output } = await runDrill(
+        [],
+        {
+          DATABASE_URL: database.url,
+          MODERATION_OPS_PUSH_USER_IDS: devices.denied,
+          TEA_EXPO_LOOPBACK_URL: loopback,
+        },
+        [PRELOAD]
+      )
+      expect(code, output).toBe(1)
+      expect(output).toMatch(/moderation_sla_drill target=push result=invalid_config/)
+      expect(received).toEqual([])
+    })
+  })
+
+  it('exits 1 with network when the database is unreachable, printing no credential', async () => {
+    const { code, output } = await runDrill(
+      [],
+      {
+        DATABASE_URL: 'postgresql://x:CANARYDBPASSWORD@127.0.0.1:1/none',
+        MODERATION_OPS_PUSH_USER_IDS: 'mod-1',
+      },
+      [PRELOAD]
+    )
+    expect(code, output).toBe(1)
+    expect(output).toMatch(/moderation_sla_drill target=push result=network/)
+    expect(output).not.toContain('CANARYDBPASSWORD')
   })
 })
 

@@ -1,7 +1,8 @@
 // Learning path Step 53: Immutable moderation history.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-53-immutable-moderation-history
 // Story 6.13 test owner: the daily prune and the drift check on real Postgres.
-// I-R-BOUNDARY, -PENDING, -OWED, -13-MONTH, -BATCH, -TZ, -DRIFT-LOG, -REALERT, -CONCURRENT
+// I-R-BOUNDARY, -PENDING, -OWED, -13-MONTH, -BATCH, -TZ, -DRIFT-LOG, -REALERT, -CONCURRENT,
+// -PUSH-RECEIPTS (production follow-up 2026-11-19: receipt rows cascade with their alert)
 import { randomUUID } from 'node:crypto'
 import { PrismaClient } from '@prisma/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -82,6 +83,35 @@ describe('I-R-BOUNDARY', () => {
       expect(await exists(old.id)).toBe(false)
     }
   )
+
+  it("[I-R-PUSH-RECEIPTS] takes a pruned alert's push receipts with it, and leaves a kept alert's", async () => {
+    const receipts = (alertId: string, count: number) =>
+      prisma.moderationSlaPushReceipt.createMany({
+        data: Array.from({ length: count }, () => ({
+          ticket_id: `ticket:${randomUUID()}`,
+          alert_id: alertId,
+          accepted_at: ago(401 * DAY),
+          check_after: ago(401 * DAY),
+          expires_at: ago(400 * DAY),
+          outcome: 'ok',
+        })),
+      })
+    const old = await alert(ago(401 * DAY), 'delivered')
+    const young = await alert(ago(399 * DAY), 'delivered')
+    await receipts(old.id, 2)
+    await receipts(young.id, 1)
+
+    await expect(retention().run()).resolves.toMatchObject({ pruned: 1 })
+
+    expect(await exists(old.id)).toBe(false)
+    expect(
+      await prisma.moderationSlaPushReceipt.count({ where: { alert_id: old.id } })
+    ).toBe(0)
+    expect(await exists(young.id)).toBe(true)
+    expect(
+      await prisma.moderationSlaPushReceipt.count({ where: { alert_id: young.id } })
+    ).toBe(1)
+  })
 
   it('[I-R-PENDING] keeps a pending alert at 500 days', async () => {
     const row = await alert(ago(500 * DAY), 'pending')

@@ -153,6 +153,46 @@ describe('C-WEB-STATES: every state renders on its own', () => {
     expect(screen.queryByText(labels.channelWebhook)).toBeNull()
   })
 
+  it('the push notice says alerts go to moderator devices, and names no other channel', async () => {
+    serve(summary({ monitor: { lastSweepAt: NOW, stale: false, channel: 'push' } }))
+    const { container } = render(<ModerationSlaDashboard />)
+    const panel = await screen.findByRole('region', { name: labels.monitorTitle })
+    expect(within(panel).getByText(labels.channelPush)).toBeVisible()
+    expect(labels.channelPush).toBe(
+      'Alerts go to moderator devices by push notification and appear on this page.'
+    )
+    expect(container.querySelector('[data-channel]')?.getAttribute('data-channel')).toBe(
+      'push'
+    )
+    expect(screen.queryByText(labels.channelWebhook)).toBeNull()
+    expect(screen.queryByText(labels.channelConsole)).toBeNull()
+    expect(panel.textContent).not.toContain('moderation.sla.')
+  })
+
+  it('a stale push monitor drops the push notice, because no alert is going out', async () => {
+    serve(summary({ monitor: { lastSweepAt: NOW, stale: true, channel: 'push' } }))
+    const { container } = render(<ModerationSlaDashboard />)
+    await screen.findByRole('region', { name: labels.queueTitle })
+    expect(container.querySelector('[data-monitor-stale="true"]')).not.toBeNull()
+    expect(screen.queryByText(labels.channelPush)).toBeNull()
+    expect(container.querySelector('[data-channel]')).toBeNull()
+  })
+
+  it('every locale has its own push notice, with nothing to interpolate and no raw key', () => {
+    const dir = join(__dirname, '../../i18n/locales')
+    const locales = readdirSync(dir).filter((name) => name.endsWith('.json'))
+    expect(locales).toHaveLength(10)
+    for (const name of locales) {
+      const sla = (JSON.parse(readFileSync(join(dir, name), 'utf8')) as typeof enUS)
+        .moderation.sla
+      expect(sla.channelPush, name).toMatch(/\S/)
+      expect(sla.channelPush, name).not.toContain('{{')
+      expect(sla.channelPush, name).not.toContain('channelPush')
+      expect(sla.channelPush, name).not.toBe(sla.channelWebhook)
+      expect(sla.channelPush, name).not.toBe(sla.channelConsole)
+    }
+  })
+
   it('disabled: 503 moderation_sla_disabled shows the turned-off text and no data', async () => {
     serve(json({ statusCode: 503, code: 'moderation_sla_disabled', message: 'x' }, 503))
     render(<ModerationSlaDashboard />)
