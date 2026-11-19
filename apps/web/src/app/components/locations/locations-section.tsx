@@ -35,7 +35,12 @@ import {
   MAX_SAVED_LOCATIONS,
   safeReturnPath,
 } from './location-format'
-import { currentWebSessionOwner, useWebSession } from '../../../lib/use-web-session'
+import {
+  currentWebSessionOwner,
+  useWebSession,
+  useWebSessionOwner,
+  type WebSessionState,
+} from '../../../lib/use-web-session'
 import { LocationSearchForm, type LocationClaim } from './location-search-form'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
@@ -47,7 +52,19 @@ function reasonOf(error: unknown): LocationFailureReason {
   return error instanceof LocationRequestError ? error.reason : 'unknown'
 }
 
+/**
+ * Everything in the section belongs to the member the session bridge names right now: it is
+ * keyed by that owner, so a change of member (or sign-out) discards the last member's rows,
+ * editors, status, form and every handler they hold in the same render, before any effect runs.
+ */
 export function LocationsSection() {
+  const liveOwner = useWebSessionOwner()
+  // Above the key: one session follower, so a member change starts no second verification.
+  const session = useWebSession()
+  return <MemberLocationsSection key={liveOwner ?? 'no-member'} session={session} />
+}
+
+function MemberLocationsSection({ session }: { session: WebSessionState }) {
   const { t, i18n } = useTranslation()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -66,7 +83,6 @@ export function LocationsSection() {
   const headingRef = useRef<HTMLHeadingElement>(null)
   /** Where focus goes once the change renders, with the ownership check of the work that set it. */
   const pendingFocusRef = useRef<{ target: string; current: () => boolean } | null>(null)
-  const session = useWebSession()
   const owner = session.status === 'signed_in' ? session.owner : null
   const [loadAttempt, setLoadAttempt] = useState(0)
   /*
@@ -91,18 +107,21 @@ export function LocationsSection() {
   }, [])
 
   /**
-   * Fixes the credentials of one member-owned operation at the moment the
-   * member acts: the owner this section rendered for, which must still be the
-   * one the session bridge names, and the bearer this tab holds now. Every
-   * request in the operation sends that bearer, and every step after an await
-   * (and every deferred announcement, focus or navigation) checks `current`.
-   * Null refuses the action: the member already changed.
+   * Pins one member-owned operation to its owner at the moment the member acts:
+   * the owner this section rendered for, which must still be the one the
+   * session bridge names (null refuses the action). Each request reads the
+   * bearer only when it is sent, after checking the owner is unchanged, so the
+   * same member's refreshed token is used and another member's never is. Every
+   * step after an await, and every deferred announcement, focus or navigation,
+   * checks `current`.
    */
   const claim = useCallback((): LocationClaim | null => {
     if (owner === null || currentWebSessionOwner() !== owner) return null
-    const credentials = captureLocationCredentials()
-    if (!credentials) return null
-    return { current: ownedBy(owner), credentials }
+    const current = ownedBy(owner)
+    return {
+      current,
+      credentials: () => (current() ? captureLocationCredentials() : null),
+    }
   }, [owner, ownedBy])
 
   const focusLater = useCallback((target: string, current: () => boolean) => {
@@ -130,8 +149,9 @@ export function LocationsSection() {
    */
   const reload = useCallback(
     async (claimed: LocationClaim, signal?: AbortSignal): Promise<boolean> => {
-      const { current, credentials } = claimed
-      if (!current()) return false
+      const { current } = claimed
+      const credentials = claimed.credentials()
+      if (!credentials) return false
       const next = await listLocationsFromWeb(signal, credentials)
       if (signal?.aborted || !current()) return false
       setLocations(next)
@@ -225,7 +245,9 @@ export function LocationsSection() {
     setBusyId(locationId)
     setError(null)
     try {
-      await mutate(claimed.credentials)
+      const credentials = claimed.credentials()
+      if (!credentials) return
+      await mutate(credentials)
       if (!current()) return
       const message = settled()
       if (!(await reload(claimed)) || !current()) return

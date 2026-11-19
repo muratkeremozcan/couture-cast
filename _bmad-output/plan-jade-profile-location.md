@@ -132,6 +132,8 @@ Round 3 Codex (/Users/murat/opensource/cc/jade-issues/profile-codex-review-3.md,
 - R3-8 medium, TEA: native flow state requires rounded values to equal the injected Maestro fix, which reduced accuracy can change.
 - R3-9 low, patch: Step 58 anchors and "every city search" wording.
 
+Coordinator decision (2026-11-19, after product round 8): member-owned UI is keyed by the signed-in member (S1) and operations pin the owner, not the bearer (S2). Fix the two user-facing bugs (third save loses its confirmation and focus; Locations stuck loading when sign-in lands mid-mount) with tests, run one Codex round on the structural change, address it, then report ready for PR. Findings outside this change go to the report as follow-ups.
+
 ## Design Notes
 
 POST with body keeps coordinates out of Vercel request logs and browser history. The client rounds to 2 decimals (about 1 km) to match the PRD's "approximate" auto-detect. The candidate the API returns carries the provider's place coordinates, which the existing from-search save already stores, so the save path and token stay unchanged.

@@ -7,12 +7,16 @@
 // the session: a stored session under verification is `checking`, never signed out, and the list
 // is requested once per member. The browser proof is PL-1 and PL-2 in
 // playwright/tests/settings-locations-real-session.spec.ts; these pin each transition.
+import { useLayoutEffect, useSyncExternalStore } from 'react'
 import { http, HttpResponse } from 'msw'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { SavedLocation } from '@couture/api-client/contracts/http'
+import type {
+  LocationSearchCandidate,
+  SavedLocation,
+} from '@couture/api-client/contracts/http'
 import { getI18n } from '../../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../../lib/wardrobe'
 import { useMswHandlers } from '../../../test-utils/msw/runtime'
@@ -346,5 +350,196 @@ describe('LocationsSection follows the web session', () => {
     })
 
     expect(listBearers.length - listsBefore).toBe(0)
+  })
+
+  /*
+   * Review round 8 (2026-11-19): member-owned UI is keyed by the owner the
+   * bridge names, read as an external store, so the next member's first commit
+   * holds none of the last member's rows, before any effect has run.
+   */
+  it('LOC-KEYED-WEB-01 the next member first commit shows none of the last member rows', async () => {
+    const commits: number[] = []
+    const subscribe = (onChange: () => void) => {
+      window.addEventListener('couture:session', onChange)
+      return () => window.removeEventListener('couture:session', onChange)
+    }
+    /** Re-renders with every session change and records each commit, before passive effects. */
+    function CommitProbe() {
+      useSyncExternalStore(subscribe, () => session.identity)
+      useLayoutEffect(() => {
+        commits.push(document.querySelectorAll('[data-testid="location-item"]').length)
+      })
+      return null
+    }
+    session.identity = 'member-1'
+    session.stored = true
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'first-token')
+    render(
+      <I18nextProvider i18n={getI18n()}>
+        <main>
+          <LocationsSection />
+          <CommitProbe />
+        </main>
+      </I18nextProvider>
+    )
+    await screen.findByTestId('location-item')
+    const before = commits.length
+
+    publish({ identity: 'member-2', bearer: 'second-token' })
+
+    expect(commits[before]).toBe(0)
+  })
+
+  it('LOC-SAVE-WEB-02 the third save removes the form, confirms once and focuses the saved place', async () => {
+    const user = userEvent.setup()
+    const office = {
+      ...HOME,
+      id: 'loc-2',
+      label: 'Office',
+      isPrimary: false,
+      sortOrder: 1,
+    }
+    const studio = {
+      ...HOME,
+      id: 'loc-3',
+      label: 'Studio',
+      isPrimary: false,
+      sortOrder: 2,
+    }
+    const candidate: LocationSearchCandidate = {
+      city: 'Chicago',
+      region: 'Illinois',
+      country: 'US',
+      latitude: 41.878,
+      longitude: -87.63,
+      displayLabel: 'Chicago, Illinois, United States',
+      candidateToken: 'chicago.signature',
+    }
+    let saved = [HOME, office]
+    useMswHandlers(
+      http.get('/api/v1/locations', () => HttpResponse.json({ data: saved })),
+      http.get('/api/v1/locations/search', () =>
+        HttpResponse.json({ data: [candidate] })
+      ),
+      http.post('/api/v1/locations/from-search', () => {
+        saved = [HOME, office, studio]
+        return HttpResponse.json({ data: studio }, { status: 201 })
+      })
+    )
+    session.identity = 'member-1'
+    session.stored = true
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'first-token')
+    renderSection()
+    await user.type(await screen.findByTestId('location-search-input'), 'Chicago')
+    await user.click(await screen.findByRole('option', { name: candidate.displayLabel }))
+    const spoken: string[] = []
+    const region = screen.getByTestId('locations-status-region')
+    const observer = new MutationObserver(() => {
+      if (region.textContent) spoken.push(region.textContent)
+    })
+    observer.observe(region, { childList: true, characterData: true, subtree: true })
+    try {
+      await user.clear(screen.getByRole('textbox', { name: 'Name this place' }))
+      await user.type(
+        screen.getByRole('textbox', { name: 'Name this place' }),
+        'Studio{Enter}'
+      )
+
+      await waitFor(() => expect(screen.getAllByTestId('location-item')).toHaveLength(3))
+      expect(screen.queryByTestId('location-add-form')).toBeNull()
+      const studioLabel = screen.getAllByTestId('location-item-label')[2]!
+      await waitFor(() => expect(studioLabel).toHaveFocus())
+      await waitFor(() => expect(region).toHaveTextContent('Studio saved.'))
+      expect(spoken.filter((text) => text === 'Studio saved.')).toHaveLength(1)
+    } finally {
+      observer.disconnect()
+    }
+  })
+
+  /*
+   * Review round 8: the owner is pinned at the tap and the bearer read when the
+   * lookup is sent, so a token the same member refreshed during the browser's
+   * consent is the one used, and another member's never is.
+   */
+  function holdPosition() {
+    const held: { answer?: PositionCallback } = {}
+    Object.defineProperty(window.navigator, 'geolocation', {
+      configurable: true,
+      value: {
+        getCurrentPosition: (success: PositionCallback) => {
+          held.answer = success
+        },
+      },
+    })
+    return held
+  }
+
+  it('LOC-ROTATE-WEB-01 a token the same member refreshed during consent is the one sent', async () => {
+    const user = userEvent.setup()
+    const lookups: (string | null)[] = []
+    useMswHandlers(
+      http.post('/api/v1/locations/from-coordinates', ({ request }) => {
+        lookups.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    const held = holdPosition()
+    try {
+      session.identity = 'member-1'
+      session.stored = true
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'first-token')
+      renderSection()
+      await screen.findByTestId('location-item')
+      await user.click(screen.getByRole('button', { name: 'Use my location' }))
+      await waitFor(() => expect(held.answer).toBeDefined())
+
+      // The same member's session refreshes while the browser asks for consent.
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'refreshed-token')
+      act(() => {
+        held.answer!({
+          coords: { latitude: 41.88, longitude: -87.63 },
+        } as GeolocationPosition)
+      })
+
+      await waitFor(() => expect(lookups).toEqual(['Bearer refreshed-token']))
+    } finally {
+      Reflect.deleteProperty(window.navigator, 'geolocation')
+    }
+  })
+
+  it('LOC-ROTATE-WEB-02 a position that arrives after another member signed in is never sent', async () => {
+    const user = userEvent.setup()
+    const lookups: (string | null)[] = []
+    useMswHandlers(
+      http.post('/api/v1/locations/from-coordinates', ({ request }) => {
+        lookups.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: [] })
+      })
+    )
+    const held = holdPosition()
+    try {
+      session.identity = 'member-1'
+      session.stored = true
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'first-token')
+      renderSection()
+      await screen.findByTestId('location-item')
+      await user.click(screen.getByRole('button', { name: 'Use my location' }))
+      await waitFor(() => expect(held.answer).toBeDefined())
+
+      publish({ identity: 'member-2', bearer: 'second-token' })
+      await act(async () => {
+        held.answer!({
+          coords: { latitude: 41.88, longitude: -87.63 },
+        } as GeolocationPosition)
+        await Promise.resolve()
+      })
+      // The next member's own list is the tracked point after which a stale lookup would show.
+      await waitFor(() => expect(listBearers).toContain('Bearer second-token'))
+      await screen.findByTestId('location-item')
+
+      expect(lookups).toEqual([])
+    } finally {
+      Reflect.deleteProperty(window.navigator, 'geolocation')
+    }
   })
 })

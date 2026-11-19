@@ -53,13 +53,14 @@ const MAX_QUERY_LENGTH = 80
 type SearchState = 'idle' | 'searching' | 'done'
 
 /**
- * One member-owned operation's credentials, fixed when the member acted: `credentials` is the
- * bearer every request in it sends, and `current` is false once the member (or this section) is
- * gone. Every step after an await, and every deferred announcement or focus, checks `current`.
+ * One member-owned operation, pinned to the member who acted. `current` is false once that member
+ * (or the section) is gone; every step after an await, and every deferred announcement or focus,
+ * checks it. `credentials` reads the bearer when a request is sent, and only while `current`
+ * holds, so a refreshed token of the same member is used and another member's never is.
  */
 export interface LocationClaim {
   current: () => boolean
-  credentials: LocationCredentials
+  credentials: () => LocationCredentials | null
 }
 
 interface LocationSearchFormProps {
@@ -133,7 +134,8 @@ export function LocationSearchForm({
   claimRef.current = claim
 
   useEffect(() => {
-    if (autoFocus) searchInputRef.current?.focus()
+    // Delivered only while the member the section rendered for is still the one signed in.
+    if (autoFocus && claimRef.current()?.current()) searchInputRef.current?.focus()
   }, [autoFocus])
 
   // Unmounted (signed out, or another member) means a late save or locate is ignored.
@@ -154,13 +156,21 @@ export function LocationSearchForm({
     setIsLocating(false)
   }
 
-  /** The section's claim, also ended when this form unmounts. */
-  const claimHere = useCallback((): LocationClaim | null => {
+  /**
+   * The section's claim, also ended when this form unmounts, for this form's own updates.
+   * `section` is the section's claim itself: what the section does after a save (its list,
+   * confirmation and focus) outlives this form, which the third saved place removes.
+   */
+  const claimHere = useCallback(():
+    | (LocationClaim & { section: LocationClaim })
+    | null => {
     const claimed = claimRef.current()
     if (!claimed) return null
+    const current = () => mountedRef.current && claimed.current()
     return {
-      credentials: claimed.credentials,
-      current: () => mountedRef.current && claimed.current(),
+      section: claimed,
+      current,
+      credentials: () => (current() ? claimed.credentials() : null),
     }
   }, [])
 
@@ -180,7 +190,9 @@ export function LocationSearchForm({
     const timer = setTimeout(() => {
       if (!current()) return
       setSearchState('searching')
-      void searchLocationsFromWeb(trimmed, locale, controller.signal, claimed.credentials)
+      const credentials = claimed.credentials()
+      if (!credentials) return
+      void searchLocationsFromWeb(trimmed, locale, controller.signal, credentials)
         .then((results) => {
           if (!current()) return
           searchClaimRef.current = claimed
@@ -257,12 +269,14 @@ export function LocationSearchForm({
     setSearchState('idle')
     try {
       const position = await readApproximatePosition()
-      if (!current()) return
+      // The bearer is read now, after the browser's consent, for the same member.
+      const credentials = current() ? claimed.credentials() : null
+      if (!credentials) return
       const results = await locationsFromCoordinatesFromWeb(
         position,
         locale,
         controller.signal,
-        claimed.credentials
+        credentials
       )
       if (!current()) return
       if (results.length === 0) {
@@ -292,7 +306,8 @@ export function LocationSearchForm({
     } finally {
       if (locateRef.current === controller) {
         locateRef.current = null
-        setIsLocating(false)
+        // The busy state is the member's; a stale locate leaves it to whoever replaced it.
+        if (claimed.current()) setIsLocating(false)
       }
     }
   }
@@ -326,10 +341,12 @@ export function LocationSearchForm({
     setIsSaving(true)
     setError(null)
     try {
+      const credentials = claimed.credentials()
+      if (!credentials) return
       const saved = await saveLocationFromSearchFromWeb(
         selected.candidateToken,
         trimmedLabel,
-        claimed.credentials
+        credentials
       )
       if (!claimed.current()) return
       setSelected(null)
@@ -337,7 +354,7 @@ export function LocationSearchForm({
       setLabel('')
       setCandidates([])
       setSearchState('idle')
-      onSaved(saved, claimed)
+      onSaved(saved, claimed.section)
     } catch (caught) {
       if (!claimed.current()) return
       const reason = failureReason(caught)

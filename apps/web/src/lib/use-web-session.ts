@@ -13,7 +13,7 @@
 // again. A bearer no verification named counts only as the e2e fixture bearer.
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useSyncExternalStore } from 'react'
 import { hasWebSession } from './commerce'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import { readStorage } from './browser-persistence'
@@ -70,6 +70,28 @@ export function currentWebSessionOwner(): string | null {
   if (hasWebSession() && !hasStoredWebSession() && isE2EFixtureBearer(fixtureBearer()))
     return UNVERIFIED_BEARER_OWNER
   return null
+}
+
+function subscribeWebSessionOwner(onChange: () => void): () => void {
+  window.addEventListener('couture:session', onChange)
+  window.addEventListener('storage', onChange)
+  return () => {
+    window.removeEventListener('couture:session', onChange)
+    window.removeEventListener('storage', onChange)
+  }
+}
+
+/**
+ * The member this tab holds, read as an external store: a render always sees the owner the
+ * session bridge names at that moment, and a change re-renders before any effect runs. A parent
+ * keys member-owned UI by it, so the next member's first render holds none of the last one's.
+ */
+export function useWebSessionOwner(): string | null {
+  return useSyncExternalStore(
+    subscribeWebSessionOwner,
+    currentWebSessionOwner,
+    () => null
+  )
 }
 
 function fixtureBearer(): string | null {

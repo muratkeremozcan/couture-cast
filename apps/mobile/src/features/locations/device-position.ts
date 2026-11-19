@@ -47,17 +47,34 @@ function withDeadline<T>(work: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([work, deadline]).finally(() => clearTimeout(timer))
 }
 
+/** The tap was superseded (typing, another tap, another member): the OS is asked nothing more. */
+export class DevicePositionSupersededError extends Error {
+  constructor() {
+    super('Use my location was superseded.')
+    this.name = 'AbortError'
+  }
+}
+
 /**
  * Asks for when-in-use permission, then reads one position at the lowest
- * accuracy the platform offers. Rejects with a `DevicePositionError` only.
+ * accuracy the platform offers. `stillCurrent` is checked immediately before
+ * the permission prompt and before the reading starts, so a superseded tap
+ * neither prompts nor starts the GPS. Rejects with a `DevicePositionError`, or
+ * a `DevicePositionSupersededError` once the tap no longer counts.
  */
 export async function readDevicePosition(
-  timeoutMs = DEVICE_POSITION_TIMEOUT_MS
+  timeoutMs = DEVICE_POSITION_TIMEOUT_MS,
+  stillCurrent: () => boolean = () => true
 ): Promise<DevicePosition> {
   let Location: typeof LocationModule
   let permission: LocationModule.LocationPermissionResponse
   try {
     Location = await import('expo-location')
+  } catch {
+    throw new DevicePositionError('location_unavailable')
+  }
+  if (!stillCurrent()) throw new DevicePositionSupersededError()
+  try {
     permission = await Location.requestForegroundPermissionsAsync()
   } catch {
     throw new DevicePositionError('location_unavailable')
@@ -65,6 +82,7 @@ export async function readDevicePosition(
   if (permission.status !== Location.PermissionStatus.GRANTED) {
     throw new DevicePositionError('location_denied')
   }
+  if (!stillCurrent()) throw new DevicePositionSupersededError()
   try {
     const position = await withDeadline(
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Lowest }),

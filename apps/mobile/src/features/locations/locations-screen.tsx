@@ -12,7 +12,7 @@
 // reloads on `onLocationsChanged`. Use my location asks for permission only
 // when tapped, rounds the position to two decimals and offers the cities the
 // API finds near it as ordinary picks; any failure leaves search ready.
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
 import {
@@ -47,8 +47,6 @@ import {
   locationsNearFromMobile,
   searchLocationsFromMobile,
   setPrimaryLocationFromMobile,
-  captureMobileBearer,
-  type CapturedBearer,
   type LocationFailureReason,
 } from '@/src/lib/locations'
 import {
@@ -135,8 +133,6 @@ interface MemberClaim {
   current: () => boolean
   /** This member only: for a confirmation that outlives an intended navigation. */
   memberCurrent: () => boolean
-  /** The bearer captured at the action; every request in the operation sends it. */
-  bearer: CapturedBearer
 }
 
 export interface LocationsScreenProps {
@@ -144,7 +140,30 @@ export interface LocationsScreenProps {
   guided?: boolean
 }
 
+/**
+ * Everything on the screen belongs to the member signed in on the device: it is keyed by the
+ * identity epoch, read as an external store, so a change of member (or sign-out) discards the
+ * last member's rows, editors, inputs, form and every handler they hold in the same render,
+ * before any effect runs, and the next member's screen loads its own list. Reading the epoch as
+ * a store also catches a change that lands between the first render and the subscription.
+ */
 export function LocationsScreen({ guided = false }: LocationsScreenProps) {
+  const memberEpoch = useSyncExternalStore(
+    subscribeMobileApplicationUser,
+    mobileIdentityEpoch
+  )
+  return (
+    <MemberLocationsScreen key={memberEpoch} guided={guided} memberEpoch={memberEpoch} />
+  )
+}
+
+function MemberLocationsScreen({
+  guided,
+  memberEpoch,
+}: {
+  guided: boolean
+  memberEpoch: number
+}) {
   const { t, i18n } = useTranslation()
   const palette = useHeroPalette()
   const { announce } = useAccessibilityAnnouncer()
@@ -178,9 +197,6 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   const listActionControllerRef = useRef<AbortController | null>(null)
   // False once the screen is gone: nothing it started may write, announce or navigate.
   const mountedRef = useRef(true)
-  // Every list, mutation and save belongs to the member signed in when it
-  // started; this epoch moves with each change of member, sign-out included.
-  const [memberEpoch, setMemberEpoch] = useState(mobileIdentityEpoch)
   const announceRef = useRef(announce)
   announceRef.current = announce
   const tRef = useRef(t)
@@ -205,23 +221,22 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   }, [memberEpoch])
 
   /**
-   * Claims one member-owned operation at the moment the member acts. The owner
-   * is the member this screen rendered for (refused if that is no longer who
-   * is signed in), and the bearer is captured now: every request in the
-   * operation sends it, never a later read. `current` (this member, this
-   * screen, this operation) is checked after every await and by every deferred
-   * announcement, focus or navigation; `memberCurrent` drops the screen, for a
-   * confirmation that outlives an intended navigation.
+   * Pins one member-owned operation to its owner at the moment the member acts:
+   * the member this screen rendered for, refused if that is no longer who is
+   * signed in. Each request resolves the bearer only when it is sent, checking
+   * this claim before and after, so a token the same member refreshed in the
+   * meantime is used and another member's never is. `current` (this member,
+   * this screen, this operation) is checked after every await and by every
+   * deferred announcement, focus or navigation; `memberCurrent` drops the
+   * screen, for a confirmation that outlives an intended navigation.
    */
   const claim = useCallback(
     (controller: AbortController): MemberClaim | null => {
       const onScreen = memberPredicate()
       if (!onScreen) return null
-      const epoch = memberEpoch
       return {
         current: () => onScreen() && !controller.signal.aborted,
-        memberCurrent: () => epoch === mobileIdentityEpoch(),
-        bearer: captureMobileBearer(),
+        memberCurrent: () => memberEpoch === mobileIdentityEpoch(),
       }
     },
     [memberPredicate, memberEpoch]
@@ -230,7 +245,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   /** True when the list landed for the member who asked for it. */
   const reload = useCallback(
     async (claimed: MemberClaim, signal: AbortSignal): Promise<boolean> => {
-      const next = await listLocationsFromMobile(signal, claimed.current, claimed.bearer)
+      const next = await listLocationsFromMobile(signal, claimed.current)
       if (!claimed.current()) return false
       setLocations(next)
       setScreenState('ready')
@@ -257,38 +272,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     }
   }, [cancelLocate])
 
-  // Everything on this screen belongs to the member who is signed in. Another
-  // member (or none) cancels what is pending, starts from an empty screen and
-  // loads their own list (or the signed-out state).
-  useEffect(
-    () =>
-      subscribeMobileApplicationUser(() => {
-        cancelLocate()
-        saveControllerRef.current?.abort()
-        saveControllerRef.current = null
-        listActionControllerRef.current?.abort()
-        listActionControllerRef.current = null
-        setIsSaving(false)
-        setLocations([])
-        setBusyId(null)
-        setRenamingId(null)
-        setRenameValue('')
-        setConfirmingId(null)
-        setListError(null)
-        setQuery('')
-        setCandidates([])
-        setSelected(null)
-        setLabel('')
-        setFormError(null)
-        setScreenState('loading')
-        setMemberEpoch(mobileIdentityEpoch())
-      }),
-    [cancelLocate]
-  )
-
   useEffect(() => {
     const controller = new AbortController()
-    // A member change re-renders with the next epoch and runs this again.
+    // A member change mounts a new screen for the next member, which loads its own list.
     const claimed = claim(controller)
     if (!claimed) return
     reload(claimed, controller.signal).catch((error: unknown) => {
@@ -308,20 +294,14 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       return
     }
     const controller = new AbortController()
-    // Claimed at the keystroke that starts the quiet wait, with its bearer.
+    // Claimed at the keystroke that starts the quiet wait.
     const claimed = claim(controller)
     if (!claimed) return
     const { current } = claimed
     const timer = setTimeout(() => {
       if (!current()) return
       setIsSearching(true)
-      searchLocationsFromMobile(
-        trimmed,
-        locale,
-        controller.signal,
-        current,
-        claimed.bearer
-      )
+      searchLocationsFromMobile(trimmed, locale, controller.signal, current)
         .then((results) => {
           if (!current()) return
           setCandidates(results)
@@ -362,11 +342,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
    */
   async function runListAction(
     locationId: string,
-    mutate: (
-      signal: AbortSignal,
-      stillCurrent: () => boolean,
-      bearer: CapturedBearer
-    ) => Promise<unknown>,
+    mutate: (signal: AbortSignal, stillCurrent: () => boolean) => Promise<unknown>,
     settled: () => string
   ): Promise<(() => boolean) | null> {
     if (busyId) return null
@@ -378,7 +354,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     setBusyId(locationId)
     setListError(null)
     try {
-      await mutate(controller.signal, current, claimed.bearer)
+      await mutate(controller.signal, current)
       if (!current()) return null
       const message = settled()
       if (!(await reload(claimed, controller.signal)) || !current()) return null
@@ -437,15 +413,16 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       searchInputRef.current?.focus()
     }
     try {
-      const position = await readDevicePosition()
+      // The permission prompt and the reading start only while this tap is still current.
+      const position = await readDevicePosition(undefined, current)
       if (!current()) return
+      // The bearer is resolved now, after the OS consent, for the same member.
       const results = await locationsNearFromMobile(
         position.latitude,
         position.longitude,
         locale,
         controller.signal,
-        current,
-        claimed.bearer
+        current
       )
       if (!current()) return
       if (results.length === 0) {
@@ -485,8 +462,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         selected.candidateToken,
         label.trim() || selected.city,
         controller.signal,
-        current,
-        claimed.bearer
+        current
       )
       if (!current()) return
       setSelected(null)
@@ -596,7 +572,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     accessibilityLabel={t('locations.renameField')}
                     value={renameValue}
                     maxLength={80}
-                    onChangeText={setRenameValue}
+                    onChangeText={(value) => {
+                      if (memberPredicate()) setRenameValue(value)
+                    }}
                     style={[inputStyle, styles.flex]}
                     testID={`location-rename-input-${index}`}
                   />
@@ -609,14 +587,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       if (!next) return
                       void runListAction(
                         location.id,
-                        (signal, current, bearer) =>
-                          renameLocationFromMobile(
-                            location.id,
-                            next,
-                            signal,
-                            current,
-                            bearer
-                          ),
+                        (signal, current) =>
+                          renameLocationFromMobile(location.id, next, signal, current),
                         () => {
                           setRenamingId(null)
                           return t('locations.renamed', { label: next })
@@ -650,8 +622,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     onPress={() => {
                       void runListAction(
                         location.id,
-                        (signal, current, bearer) =>
-                          deleteLocationFromMobile(location.id, signal, current, bearer),
+                        (signal, current) =>
+                          deleteLocationFromMobile(location.id, signal, current),
                         () => {
                           setConfirmingId(null)
                           return t('locations.deleted', { label: location.label })
@@ -687,13 +659,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       onPress={() => {
                         void runListAction(
                           location.id,
-                          (signal, current, bearer) =>
-                            setPrimaryLocationFromMobile(
-                              location.id,
-                              signal,
-                              current,
-                              bearer
-                            ),
+                          (signal, current) =>
+                            setPrimaryLocationFromMobile(location.id, signal, current),
                           () => t('locations.primaryChanged', { label: location.label })
                         )
                       }}
@@ -763,6 +730,8 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                 value={query}
                 maxLength={80}
                 onChangeText={(value) => {
+                  // A keystroke queued before the member changed is not the next member's.
+                  if (!memberPredicate()) return
                   // Typing takes over from a pending Use my location: its late answer is dropped.
                   cancelLocate()
                   setQuery(value)
@@ -803,7 +772,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     accessibilityLabel={t('locations.labelField')}
                     value={label}
                     maxLength={80}
-                    onChangeText={setLabel}
+                    onChangeText={(value) => {
+                      if (memberPredicate()) setLabel(value)
+                    }}
                     style={inputStyle}
                     testID="location-label-input"
                   />

@@ -3,7 +3,7 @@
 // Story 1.2b: the mobile Locations screen through MSW, so the request shapes,
 // the platform header and the contract parsing run with the UI. Input goes
 // through the browser runner's real user events.
-import React, { useState } from 'react'
+import React, { useLayoutEffect, useState } from 'react'
 import { userEvent } from 'vitest/browser'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -188,9 +188,7 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
       'en-US',
       expect.anything(),
       // The ownership check the request runs after its bearer resolves.
-      expect.any(Function),
-      // The bearer captured when the quiet wait started.
-      expect.any(Promise)
+      expect.any(Function)
     )
     vi.useRealTimers()
 
@@ -736,6 +734,28 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
 
       await waitFor(() => expect(liveRegion()).toBe(''))
     })
+
+    it('LOC-TEXT-MOB-01 a keystroke queued before the switch renders never becomes the next member search', async () => {
+      server.use(searchHandler())
+      renderScreen()
+      await screen.findByTestId('location-label-0')
+      const input = await screen.findByTestId<HTMLInputElement>('locations-search-input')
+
+      // The switch is published; A's keystroke is delivered before the screen re-renders.
+      bearer = 'token-b'
+      setMobileApplicationUserId('member-b')
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+        input,
+        'Chicago'
+      )
+      input.dispatchEvent(new Event('input', { bubbles: true }))
+
+      await waitFor(() =>
+        expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      )
+      expect(screen.getByTestId('locations-search-input')).toHaveValue('')
+      expect(vi.mocked(searchLocationsFromMobile)).not.toHaveBeenCalled()
+    })
   })
 
   /*
@@ -803,6 +823,30 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     await waitFor(() => expect(routerMock.back).toHaveBeenCalledTimes(1))
     expect(screen.queryByTestId('locations-screen')).toBeNull()
     await waitFor(() => expect(liveRegion()).toBe('Home saved.'))
+    // Past the announcer's 80 ms delay, so a second confirmation would have been delivered.
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    await vi.advanceTimersByTimeAsync(200)
+    vi.useRealTimers()
     expect(announcements.filter((entry) => entry.text === 'Home saved.')).toHaveLength(1)
+  })
+
+  it('LOC-MOUNT-MOB-01 a member named between the first render and the subscription still gets their list', async () => {
+    saved = [savedLocation()]
+    cleanups.push(() => setMobileApplicationUserId(null))
+    /** Publishes the member after the screen rendered, before its passive effects subscribe. */
+    function VerificationLands() {
+      useLayoutEffect(() => {
+        setMobileApplicationUserId('member-a')
+      }, [])
+      return null
+    }
+    render(
+      <AccessibilityAnnouncerProvider>
+        <LocationsScreen />
+        <VerificationLands />
+      </AccessibilityAnnouncerProvider>
+    )
+
+    expect((await screen.findByTestId('location-label-0')).textContent).toBe('Home')
   })
 })

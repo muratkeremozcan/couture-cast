@@ -12,6 +12,7 @@ import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type { SavedLocation } from '@couture/api-client/contracts/http'
+import type * as DevicePositionModule from './device-position'
 
 vi.mock('expo-localization', () => ({
   getLocales: () => [{ languageTag: 'en-US', languageCode: 'en', regionCode: 'US' }],
@@ -34,6 +35,20 @@ vi.mock('expo-location', () => ({
   },
   Accuracy: { Lowest: 1, Low: 2, Balanced: 3, High: 4, Highest: 5, BestForNavigation: 6 },
 }))
+
+/** Every device reading the screen starts, so a test can wait for each to settle. */
+const readings = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+vi.mock('./device-position', async (importOriginal) => {
+  const actual = await importOriginal<typeof DevicePositionModule>()
+  return {
+    ...actual,
+    readDevicePosition: (...args: Parameters<typeof actual.readDevicePosition>) => {
+      const reading = actual.readDevicePosition(...args)
+      readings.promises.push(reading)
+      return reading
+    },
+  }
+})
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
@@ -388,6 +403,94 @@ describe('Use my location (mobile)', { timeout: 30_000 }, () => {
     expect(saves).toEqual(['Bearer session-token'])
     expect(input).toHaveValue('Spr')
     expect(liveRegionText()).not.toContain('Home saved.')
+  })
+  /*
+   * Review round 8 (2026-11-19): a superseded tap asks the OS for nothing more,
+   * and the bearer is resolved when the lookup is sent: the same member's
+   * refreshed token is used, another member is sent nothing.
+   */
+  function holdPermission() {
+    let release!: (status: string) => void
+    const decision = new Promise<{ status: string }>((resolve) => {
+      release = (status) => resolve({ status })
+    })
+    location.requestForegroundPermissionsAsync.mockReturnValue(decision)
+    location.getCurrentPositionAsync.mockResolvedValue({
+      coords: { ...DEVICE, accuracy: 3000 },
+      timestamp: 0,
+    })
+    return { release }
+  }
+
+  async function settleReadings() {
+    await act(async () => {
+      await Promise.allSettled(readings.promises)
+    })
+  }
+
+  it('LOC-DEVICE-MOB-01 typing while the permission prompt is open starts no reading', async () => {
+    readings.promises = []
+    const permission = holdPermission()
+    server.use(fromCoordinatesHandler(() => HttpResponse.json({ data: [CANDIDATE] })))
+    renderScreen()
+
+    await tapUseMyLocation()
+    await waitFor(() =>
+      expect(location.requestForegroundPermissionsAsync).toHaveBeenCalled()
+    )
+    await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Ch')
+    permission.release('granted')
+    await settleReadings()
+
+    expect(location.getCurrentPositionAsync).not.toHaveBeenCalled()
+    expect(posted).toHaveLength(0)
+  })
+
+  it('LOC-ROTATE-MOB-01 a token the same member refreshed during the prompt is the one sent', async () => {
+    readings.promises = []
+    setMobileApplicationUserId('member-a')
+    const permission = holdPermission()
+    const bearers: (string | null)[] = []
+    server.use(
+      http.post(FROM_COORDINATES, ({ request }) => {
+        bearers.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: [CANDIDATE] })
+      })
+    )
+    renderScreen()
+
+    await tapUseMyLocation()
+    await waitFor(() =>
+      expect(location.requestForegroundPermissionsAsync).toHaveBeenCalled()
+    )
+    // The same member's session refreshes while the OS asks for consent.
+    const restore = setMobileAccessTokenResolver(() => 'refreshed-token')
+    try {
+      permission.release('granted')
+      await screen.findByTestId('location-search-option-0')
+      expect(bearers).toEqual(['Bearer refreshed-token'])
+    } finally {
+      restore()
+    }
+  })
+
+  it('LOC-ROTATE-MOB-02 a member switch during the prompt sends nothing', async () => {
+    readings.promises = []
+    setMobileApplicationUserId('member-a')
+    const permission = holdPermission()
+    server.use(fromCoordinatesHandler(() => HttpResponse.json({ data: [CANDIDATE] })))
+    renderScreen()
+
+    await tapUseMyLocation()
+    await waitFor(() =>
+      expect(location.requestForegroundPermissionsAsync).toHaveBeenCalled()
+    )
+    act(() => setMobileApplicationUserId('member-b'))
+    permission.release('granted')
+    await settleReadings()
+
+    expect(location.getCurrentPositionAsync).not.toHaveBeenCalled()
+    expect(posted).toHaveLength(0)
   })
 })
 

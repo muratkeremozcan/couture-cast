@@ -125,32 +125,15 @@ function supersededError(): Error {
 type StillCurrent = () => boolean
 const always: StillCurrent = () => true
 
-/**
- * The bearer an operation captured when the member acted (a pending resolution started then).
- * Every request in that operation sends it; without one, the request resolves its own.
- */
-export type CapturedBearer = Promise<string | null | undefined>
-
-/** Starts resolving the signed-in member's bearer now, for one operation to use throughout. */
-export function captureMobileBearer(): CapturedBearer {
-  const bearer = resolveMobileAccessToken()
-  // Marked handled here; whoever awaits it still sees a rejection.
-  bearer.catch(() => undefined)
-  return bearer
-}
-
 function owned(signal: AbortSignal | undefined, stillCurrent: StillCurrent): boolean {
   return !signal?.aborted && stillCurrent()
 }
 
 /** The API client for this member's request, or a superseded error before anything is sent. */
-async function ownedClient(
-  signal: AbortSignal | undefined,
-  stillCurrent: StillCurrent,
-  bearer?: CapturedBearer
-) {
+async function ownedClient(signal: AbortSignal | undefined, stillCurrent: StillCurrent) {
   if (!owned(signal, stillCurrent)) throw supersededError()
-  const api = await client(bearer)
+  // The bearer is resolved here, when the request is sent, and the claim is checked after.
+  const api = await client()
   if (!owned(signal, stillCurrent)) throw supersededError()
   return api
 }
@@ -163,8 +146,8 @@ function notifyIfOwned(
   if (owned(signal, stillCurrent)) notifyLocationsChanged()
 }
 
-async function client(bearer?: CapturedBearer) {
-  const accessToken = (await (bearer ?? resolveMobileAccessToken()))?.trim()
+async function client() {
+  const accessToken = (await resolveMobileAccessToken())?.trim()
   if (!accessToken) {
     throw new LocationRequestError('signed_out', 'Sign in to manage locations.')
   }
@@ -173,11 +156,10 @@ async function client(bearer?: CapturedBearer) {
 
 export async function listLocationsFromMobile(
   signal?: AbortSignal,
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation[]> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsGet({ signal: requestSignal })
     )
@@ -191,11 +173,10 @@ export async function searchLocationsFromMobile(
   query: string,
   locale: SupportedLocale,
   signal?: AbortSignal,
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsSearchGet(
         { q: query, locale, xCouturePlatform: 'mobile' },
@@ -225,11 +206,10 @@ export async function locationsNearFromMobile(
   locale: SupportedLocale,
   signal?: AbortSignal,
   /** False once the tap is superseded or the member changed: nothing more is sent. */
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<LocationSearchCandidate[]> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromCoordinatesPost(
         {
@@ -254,11 +234,10 @@ export async function saveLocationFromSearchFromMobile(
   label: string,
   signal?: AbortSignal,
   /** False once the member who picked the place is gone: nothing is sent. */
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromSearchPost(
         {
@@ -279,11 +258,10 @@ export async function saveLocationFromSearchFromMobile(
 export async function setPrimaryLocationFromMobile(
   locationId: string,
   signal?: AbortSignal,
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdPrimaryPost({ locationId }, { signal: requestSignal })
     )
@@ -299,11 +277,10 @@ export async function renameLocationFromMobile(
   locationId: string,
   label: string,
   signal?: AbortSignal,
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<SavedLocation> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdPatch(
         { locationId, updateSavedLocationInput: { label } },
@@ -321,11 +298,10 @@ export async function renameLocationFromMobile(
 export async function deleteLocationFromMobile(
   locationId: string,
   signal?: AbortSignal,
-  stillCurrent: StillCurrent = always,
-  bearer?: CapturedBearer
+  stillCurrent: StillCurrent = always
 ): Promise<void> {
   try {
-    const api = await ownedClient(signal, stillCurrent, bearer)
+    const api = await ownedClient(signal, stillCurrent)
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsLocationIdDelete({ locationId }, { signal: requestSignal })
     )
