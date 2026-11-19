@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 6.12 test owner: I-W-DRILL, U-GF-METRICS and U-RB-RUNBOOK, the operating surface of the monitor.
 // The drill is the real script through the real adapter against a real socket.
 // DATABASE_URL points nowhere on every webhook run, so a webhook drill that touched a table would fail

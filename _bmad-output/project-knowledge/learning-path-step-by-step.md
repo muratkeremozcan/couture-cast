@@ -12198,6 +12198,26 @@ measured in minutes.
    Every production read returned zero published looks while the Community Beta flags were at 0%
    and write was open only to complimentary members. That was a possible explanation; the count of
    submissions held in screening stayed unknown, because production tables were not read.
+6. **Opening a gated feature is a change of its own, with a written waiver.**
+   The owner opened the Community Beta on 2026-11-19 with five of eight gate signatures unsigned.
+   The waiver is recorded row by row with each limit kept
+   ([gate record](../test-artifacts/community-beta-gate-signatures.md)), the hourly PostHog drift
+   check pins the community and moderation flags at `true`, and code defaults stay `false` so a
+   degraded PostHog still fails closed.
+7. **Cut false holds only where the data proves the unsafe side holds.**
+   Locale-bound caption allow rules cleared 26 of 30 held clean holdout captions while all 1520
+   disallowed fixtures per language stayed held. Every bypass review found in a first draft (a
+   German slur, body slang, sexual phrasings, code-switching, an epithet across a sentence break)
+   was closed or its caption left held. Tuning spent the holdouts, so they are retired and a fresh
+   sealed one is a recorded follow-up. Photo thresholds stayed: with no unsafe photo set, nothing
+   can show a looser bound still catches unsafe images
+   ([retune record](../test-artifacts/community-screening-retune-2026-11-19.md)).
+8. **Make the human path fast instead.**
+   A screening hold is due in 30 minutes, the moderation console re-reads its queue every minute,
+   and SLA alerts can reach moderator phones by Expo push. Accepted tickets are stored and their
+   receipts read through restarts, a restart never resends an accepted alert, and the rollout
+   order keeps older API and web readers from meeting the new `push` channel value
+   ([moderation SLA runbook](./moderation-sla-runbook.md)).
 
 Tests:
 
@@ -12221,6 +12241,47 @@ Tests:
   proves the bottom-nav Community tab lands on the lookbook at phone width, the pinned chip bar
   and filters, and the `/community` home link (3.6-E2E-002, 3.6-E2E-007, 3.6-E2E-008);
   [`community-feed.spec.ts`](../../playwright/tests/community-feed.spec.ts) runs on `/community`.
+- Community launch, API Vitest:
+  [`community-text-production-retune.spec.ts`](../../apps/api/src/modules/community/community-text-production-retune.spec.ts)
+  pins every cleared holdout caption and every bypass review found (slurs, body slang, sexual
+  phrasings, code-switching, an epithet across a sentence break) as held;
+  [`community-text-corpus.evaluation.spec.ts`](../../apps/api/src/modules/community/community-text-corpus.evaluation.spec.ts)
+  runs the in-sample, disallowed, disguised and review-term gates in development mode while every
+  holdout is retired, and refuses a release run;
+  [`moderation-sla.rules.spec.ts`](../../apps/api/src/modules/moderation/moderation-sla.rules.spec.ts)
+  proves the push channel: batching, ticket validation, failure mapping, a failed ticket record left
+  delivered, and receipt reads;
+  [`community-moderation.worker.spec.ts`](../../apps/api/src/modules/community/community-moderation.worker.spec.ts)
+  proves a screening-held post is due 30 minutes after it is flagged.
+- Community launch, API integration:
+  [`moderation-sla-push.integration.spec.ts`](../../apps/api/integration/moderation-sla-push.integration.spec.ts)
+  sends to a loopback Expo, stores tickets, reads receipts through restarts and never resends an
+  accepted alert;
+  [`moderation-sla-operations.spec.ts`](../../apps/api/integration/moderation-sla-operations.spec.ts)
+  runs the drill through the push channel and the verified operator client;
+  [`moderation-history-retention.integration.spec.ts`](../../apps/api/integration/moderation-history-retention.integration.spec.ts)
+  proves alert retention prunes the push receipts with their alert;
+  [`community-comments-worker.integration.spec.ts`](../../apps/api/integration/community-comments-worker.integration.spec.ts)
+  proves a screening-held comment is due 30 minutes after intake;
+  [`community-moderation-pipeline.integration.spec.ts`](../../apps/api/integration/community-moderation-pipeline.integration.spec.ts)
+  proves a held post enters the queue due 30 minutes after it is flagged;
+  [`community-submission-limits.integration.spec.ts`](../../apps/api/integration/community-submission-limits.integration.spec.ts)
+  keeps a member report at 24 hours;
+  [`moderation-history-gate.spec.ts`](../../apps/api/integration/moderation-history-gate.spec.ts)
+  pins the owner waiver rows of the gate record.
+- Community launch, database:
+  [`screening-hold-sla-schema.spec.ts`](../../packages/db/test/screening-hold-sla-schema.spec.ts)
+  proves the comment deadline check accepts screening at 30 minutes or 24 hours and members at 24
+  hours;
+  [`moderation-sla-schema.spec.ts`](../../packages/db/test/moderation-sla-schema.spec.ts)
+  proves the push channel value and the receipt table, its check and cascade.
+- Community launch, web and mobile:
+  [`moderation-queue.test.tsx`](../../apps/web/src/app/components/moderation-queue.test.tsx)
+  proves the console re-reads its queue every minute, and not while hidden, busy or paged;
+  [`moderation-sla-dashboard.test.tsx`](../../apps/web/src/app/components/moderation-sla-dashboard.test.tsx)
+  proves the dashboard copy for the push channel;
+  [`native-notifications.test.ts`](../../apps/mobile/src/lib/native-notifications.test.ts)
+  proves a moderation alert shows and sounds in the foreground.
 - Native, Android instrumentation:
   [`ShareCardComposerTalkBackTest.kt`](../../apps/mobile/modules/accessibility-focus/android/src/androidTest/java/expo/modules/accessibilityfocus/ShareCardComposerTalkBackTest.kt)
   and

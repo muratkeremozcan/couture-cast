@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 53: Immutable moderation history.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-53-immutable-moderation-history
 // Story 6.13 test owner: U-GATE-RECORD, U-GATE-UNTOUCHED, U-RUNBOOK-STAFFING, U-GUIDE-LIMITS.

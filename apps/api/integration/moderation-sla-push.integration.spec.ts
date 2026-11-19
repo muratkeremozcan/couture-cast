@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up 2026-11-19 test owner: the Expo push channel of the SLA sweep, on a real
 // database. U-W-FACTORY-PUSH: `createModerationSlaSweep` reads MODERATION_OPS_PUSH_USER_IDS, asks for
 // granted devices only, records the accepted tickets and stamps the monitor `push`.

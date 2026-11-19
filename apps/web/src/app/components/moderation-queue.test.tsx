@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 50: Moderator queue and case detail.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-50-moderator-queue-and-case-detail
 // Story 6.10 test owner: C-WEB-Q-QUEUE, -STATES, -FORBIDDEN-NO-DATA, -DEDUPE, -FILTERS, -HOSTILE-TEXT, -NO-ACTIONS.

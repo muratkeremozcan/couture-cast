@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 6.12 test owner: the pure rules of the SLA sweep. U-S-BOUNDARY, U-S-RELEVANCE, U-S-BACKOFF,
 // U-R-STALE, the dedupe key, and the source scans U-S-NO-THRESHOLD, U-S-NO-DB-CLOCK and I-S-NO-REOPEN.
 // The oracle tables are written by hand from the spec, so a change to the rule fails here.

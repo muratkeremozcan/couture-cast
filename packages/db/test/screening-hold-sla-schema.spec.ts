@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up 2026-11-19 test owner: comment_report_routing_deadline after the 30-minute
 // screening hold (migration 20261119110000_screening_hold_sla). The API sets the deadline, and this
 // constraint is the last line that refuses a wrong one, so each case below is the database itself.

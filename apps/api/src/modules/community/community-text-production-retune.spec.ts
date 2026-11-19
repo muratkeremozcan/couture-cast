@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up 2026-11-19 test owner: the caption retune that cut false holds.
 //
 // The owner asked for fewer safe captions held for review with no drop in unsafe catch. The allow

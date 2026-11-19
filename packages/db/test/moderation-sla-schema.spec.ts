@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 6.12 test owner: what the database itself guarantees about the SLA alert tables.
 // D-SCHEMA: the unique key that makes a retry harmless, closed values, the deliverable index, and
 // no column that could hold member content. D-RLS: enabled with zero policies.

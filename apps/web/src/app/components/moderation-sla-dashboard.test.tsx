@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 6.12 test owner: C-WEB-STATES, -NO-WRITE, -LINKS, -ANNOUNCE, -LABELS, -TIME, -A11Y.
 // The page is read-only and every state it can reach renders on its own. Fixtures parse through the
 // shipped contract, so a drifting field fails here first.
