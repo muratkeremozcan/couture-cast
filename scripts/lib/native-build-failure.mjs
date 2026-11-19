@@ -36,7 +36,8 @@ const signatures = [
   ['native', /CMake Error|ninja: build stopped|clang\S*: error:|\bld: error:/],
   // xcodebuild: a Swift compiler error, a failed script phase (the React Native bundle, Hermes,
   // Expo's configure scripts) and xcodebuild refusing to start (no destination, bad scheme).
-  ['swift', /^\S+\.swift:\d+:\d+: error:/m],
+  // The path may hold spaces: CocoaPods generates Swift under `Pods/Target Support Files/`.
+  ['swift', /^[^\n]*\.swift:\d+:\d+: error:/m],
   ['scriptphase', /Command PhaseScriptExecution failed with a nonzero exit code/],
   ['xcodebuild', /^xcodebuild: error:/m],
 ]
@@ -51,8 +52,12 @@ const TASK = /^(?::[A-Za-z0-9_.-]+)+(?:\[[A-Za-z0-9_.-]{1,40}\])?$/
 // empty record: the task list only knew Gradle's `> Task ... FAILED` lines.
 const XCODE_TASK = /^[A-Z][A-Za-z]{1,40}@[A-Za-z0-9_.+-]{1,60}$/
 const XCODE_FAILED = /^The following build commands failed:$/
+// xcodebuild escapes the spaces of a multi-word command name (`SwiftDriver\ Compilation\
+// Requirements`); the words are joined into one identifier, and a name past the bound is dropped.
 const XCODE_ENTRY =
-  /^\s+([A-Z][A-Za-z]{1,40})\s.*\(in target '([^']+)' from project '[^']+'\)\s*$/
+  /^\s+([A-Z][A-Za-z]*(?:\\ [A-Za-z]+)*)\s.*\(in target '([^']+)' from project '[^']+'\)\s*$/
+// The list ends at its `(N failures)` footer, or at the first line that is not an indented entry.
+const XCODE_LIST_END = /^\(\d+ failures?\)$/
 const MAX_TASKS = 10
 const invalid = () => {
   throw new Error('invalid_native_build_failure')
@@ -94,9 +99,11 @@ function failedTaskNames(text) {
   const listed = lines.findIndex((line) => XCODE_FAILED.test(line.trim()))
   if (listed > -1)
     for (const line of lines.slice(listed + 1)) {
+      if (XCODE_LIST_END.test(line.trim()) || !/^\s/.test(line)) break
+      // An entry with no target (`Building workspace ... with scheme ...`) is skipped, not an end.
       const entry = XCODE_ENTRY.exec(line)
-      if (!entry) break
-      const task = `${entry[1]}@${entry[2]}`
+      if (!entry) continue
+      const task = `${entry[1].replaceAll('\\ ', '')}@${entry[2]}`
       if (XCODE_TASK.test(task)) names.push(task)
     }
   return [...new Set(names)].slice(0, MAX_TASKS)

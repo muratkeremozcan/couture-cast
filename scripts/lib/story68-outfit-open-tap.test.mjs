@@ -21,6 +21,11 @@ import {
   WAIT_FOR_ANIMATION_CAP_MS,
   flowTimeoutMs,
 } from './story68-flow-timeouts.mjs'
+import {
+  MODEL_READ_MS,
+  MaestroModelStepFailed,
+  runMaestroModel,
+} from './maestro-flow-model.mjs'
 
 // Nightly run 44078916466 shard 2: open-outfit.yaml tapped the opener clear of the chip bar and the
 // tab bar, the app traced opener-press-in then opener-touch-cancel 0.2 s later, and the sheet never
@@ -97,6 +102,66 @@ test('tap-outfit-open taps the opener only while the sheet is closed, and waits 
   assert.ok(
     wait.extendedWaitUntil.timeout >= 5000 && wait.extendedWaitUntil.timeout <= 10000
   )
+})
+
+// Behavior of the real tap-outfit-open.yaml under the pinned Maestro's retry, `when` and wait rules
+// (maestro-flow-model.mjs), against an opener whose presses are scripted: `lands` names the press
+// numbers the app receives (the others are cancelled, as 44078916466 shard 2 traced), and the
+// title draws `titleAfterMs` after the first received press. A device cannot cancel a touch on
+// demand, so these faults run here; the device lanes prove the happy path on real hardware.
+function outfitOpener({ lands, titleAfterMs }) {
+  const presses = []
+  let titleFrom = Infinity
+  return {
+    presses,
+    received: () => presses.filter((press) => press.received).length,
+    isVisible: (id, at) =>
+      id === opener ? true : id === title ? at >= titleFrom : false,
+    press: (id, at) => {
+      assert.equal(id, opener)
+      const received = lands.includes(presses.length + 1)
+      presses.push({ at, received })
+      if (received && titleFrom === Infinity) titleFrom = at + titleAfterMs
+    },
+  }
+}
+const runSubflow = (screen) =>
+  runMaestroModel(flowCommands(subflow), screen, { lookupMs: CONDITION_CHECK_MS })
+
+test('behavior: a cancelled first press is pressed again, and the second press opens the sheet', () => {
+  const screen = outfitOpener({ lands: [2], titleAfterMs: 300 })
+  const elapsed = runSubflow(screen)
+  assert.equal(screen.presses.length, 2)
+  assert.equal(screen.received(), 1)
+  assert.ok(elapsed <= OUTFIT_OPEN_TAP_WORST_CASE_MS, `${elapsed}`)
+})
+
+test('behavior: a title that draws after the wait gave up stops the next attempt from pressing again', () => {
+  // The first press lands, but the sheet draws after the 8 s wait has failed. The next attempt's
+  // guard reads the opener, then finds the title on screen, so it skips the tap and the wait
+  // passes at once. The guard holds only for a title on screen when its notVisible read starts: a
+  // title that draws after that read would get a second press, which no guard can rule out.
+  const screen = outfitOpener({
+    lands: [1],
+    titleAfterMs: wait.extendedWaitUntil.timeout + 1.5 * MODEL_READ_MS,
+  })
+  runSubflow(screen)
+  assert.equal(screen.presses.length, 1)
+  assert.equal(screen.received(), 1)
+})
+
+test('behavior: an opener that never receives a press fails the flow after four presses, inside its budget', () => {
+  const screen = outfitOpener({ lands: [], titleAfterMs: 0 })
+  assert.throws(
+    () => runSubflow(screen),
+    (error) =>
+      error instanceof MaestroModelStepFailed &&
+      error.message ===
+        `extendedWaitUntil ${title}: not visible after ${wait.extendedWaitUntil.timeout} ms` &&
+      error.elapsedMs <= OUTFIT_OPEN_TAP_WORST_CASE_MS
+  )
+  assert.equal(screen.presses.length, OUTFIT_OPEN_TAP_ATTEMPTS)
+  assert.equal(screen.received(), 0)
 })
 
 test('every flow that opens the sheet runs tap-outfit-open once, after positioning, with no bare tap', () => {

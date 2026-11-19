@@ -165,6 +165,79 @@ describe('native build failure record', () => {
       })
   })
 
+  // Codex review of cb8b22d2: xcodebuild escapes the spaces in multi-word command names
+  // (`SwiftDriver\ Compilation`), and the first parser stopped the list at that entry, so a Swift
+  // build failure kept its empty record and lost every supported command after it.
+  test('reads escaped xcodebuild command names and keeps reading the list to its footer', () => {
+    const ios = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
+    const log = [
+      '** BUILD FAILED **',
+      '',
+      'The following build commands failed:',
+      "\tSwiftDriver\\ Compilation normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ExpoModulesCore' from project 'Pods')",
+      `\tBuilding workspace ${personal} with scheme CoutureCastStory68`,
+      "\tSwiftDriver\\ Compilation\\ Requirements normal arm64 com.apple.xcode.tools.swift.compiler (in target 'CoutureCastStory68' from project 'CoutureCastStory68')",
+      "\tPhaseScriptExecution [CP-User]\\ [Hermes]\\ Replace\\ Hermes /tmp/a.sh (in target 'hermes-engine' from project 'Pods')",
+      '(4 failures)',
+      "\tLd /tmp/x (in target 'after-the-list' from project 'Pods')",
+    ].join('\n')
+    const record = summarizeNativeBuildFailure({ ...ios, log })
+    assert.deepEqual(record.failedTasks, [
+      'SwiftDriverCompilation@ExpoModulesCore',
+      'SwiftDriverCompilationRequirements@CoutureCastStory68',
+      'PhaseScriptExecution@hermes-engine',
+    ])
+    assert.equal(JSON.stringify(record).includes('Avery'), false)
+    assertNativeBuildFailure(record)
+    // A list with no footer ends at the first line that is not an indented entry.
+    assert.deepEqual(
+      summarizeNativeBuildFailure({
+        ...ios,
+        log: [
+          'The following build commands failed:',
+          "\tSwiftDriver\\ Compilation normal arm64 x (in target 'A' from project 'Pods')",
+          "Ld /tmp/x (in target 'not-listed' from project 'Pods')",
+          "\tLd /tmp/y (in target 'not-listed-either' from project 'Pods')",
+        ].join('\n'),
+      }).failedTasks,
+      ['SwiftDriverCompilation@A']
+    )
+    // A joined name past the 41-character identifier bound is dropped, never truncated.
+    assert.deepEqual(
+      summarizeNativeBuildFailure({
+        ...ios,
+        log: [
+          'The following build commands failed:',
+          `\tSwiftDriver\\ ${'Compilation\\ '.repeat(4)}Requirements x (in target 'A' from project 'Pods')`,
+          "\tLd /tmp/x (in target 'B' from project 'Pods')",
+          '(2 failures)',
+        ].join('\n'),
+      }).failedTasks,
+      ['Ld@B']
+    )
+  })
+
+  // Codex review of cb8b22d2: CocoaPods generates Swift sources under `Target Support Files`, so a
+  // compiler error at one of them carries a path with spaces, and `^\S+\.swift` left it unknown.
+  test('classifies a Swift error at a path with spaces', () => {
+    const ios = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
+    const classify = (text) =>
+      summarizeNativeBuildFailure({ ...ios, log: text }).classification
+    assert.equal(
+      classify(
+        '/Users/runner/work/couture-cast/couture-cast/apps/mobile/ios/Pods/Target Support Files/Pods-CoutureCastStory68/ExpoModulesProvider.swift:12:5: error: cannot find type'
+      ),
+      'swift'
+    )
+    // The error suffix stays required: a warning at the same path is not a Swift error.
+    assert.equal(
+      classify(
+        '/tmp/Target Support Files/Pods-CoutureCastStory68/ExpoModulesProvider.swift:12:5: warning: unused'
+      ),
+      'unknown'
+    )
+  })
+
   test('the schema refuses any open field', () => {
     const record = summarizeNativeBuildFailure({ ...base, log: '' })
     assertNativeBuildFailure(record)
