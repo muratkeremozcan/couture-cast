@@ -686,6 +686,11 @@ test('the opener trace is read from the app container and reduced to closed name
         { e: 'secret-token', t: 15 },
         { e: 'composer-prepare', t: -1 },
         { e: 'composer-cached', t: 20 },
+        { e: 'signin-email-focus', t: 25 },
+        { e: 'signin-request-press', t: 26, n: 30 },
+        { e: 'signin-request-press', t: 27, n: 'person@private.invalid' },
+        { e: 'signin-request-unavailable', t: 28 },
+        { e: 'signin-request-ok', t: 29 },
         { e: 'signin-code-change', t: 30, n: 6 },
         { e: 'signin-code-change', t: 31, n: '123456' },
         { e: 'signin-verify-press', t: 32, n: 250 },
@@ -704,6 +709,11 @@ test('the opener trace is read from the app container and reduced to closed name
     { event: 'press', ms: 10 },
     { event: 'state-open', ms: 14 },
     { event: 'composer-cached', ms: 20 },
+    { event: 'signin-email-focus', ms: 25 },
+    { event: 'signin-request-press', ms: 26, length: 30 },
+    { event: 'signin-request-press', ms: 27 },
+    { event: 'signin-request-unavailable', ms: 28 },
+    { event: 'signin-request-ok', ms: 29 },
     { event: 'signin-code-change', ms: 30, length: 6 },
     { event: 'signin-code-change', ms: 31 },
     { event: 'signin-verify-press', ms: 32 },
@@ -885,6 +895,8 @@ test('the input surface reports the code field flags and length, never a charact
   const surface = inputSurface(hierarchy)
   assert.deepEqual(surface, {
     codeInput: { focused: true, enabled: true, textLength: 6 },
+    emailInput: null,
+    submit: null,
     focusedNodeCount: 1,
   })
   const text = JSON.stringify(surface)
@@ -899,14 +911,54 @@ test('the input surface tells an unfocused empty field from an absent one', () =
     }),
     {
       codeInput: { focused: false, enabled: true, textLength: 0 },
+      emailInput: null,
+      submit: null,
       focusedNodeCount: 0,
     }
   )
   assert.deepEqual(inputSurface({ attributes: {}, children: [] }), {
     codeInput: null,
+    emailInput: null,
+    submit: null,
     focusedNodeCount: 0,
   })
   assert.equal(inputSurface(null), null)
+})
+
+// Nightly run 44532964440 shard 3: Send tapped, no code request, and no field state published.
+test('the input surface reports the email field and Send state, never the address', () => {
+  const address = 'story65-real-0f4c@example.test'
+  const screen = (emailChildren, submitEnabled) => ({
+    attributes: {},
+    children: [
+      field({ text: 'Email' }),
+      field(
+        { 'resource-id': 'signin-email-input', enabled: 'true' },
+        { children: emailChildren }
+      ),
+      field({ 'resource-id': 'signin-submit', enabled: String(submitEnabled) }),
+    ],
+  })
+  // The address and the focus on the testID node's child, as iOS can report them.
+  const typed = inputSurface(screen([field({ text: address }, { focused: true })], false))
+  assert.deepEqual(typed, {
+    codeInput: null,
+    emailInput: { focused: true, enabled: true, textLength: address.length },
+    submit: { enabled: false },
+    focusedNodeCount: 1,
+  })
+  assert.ok(!/story65|example|0f4c/.test(JSON.stringify(typed)))
+  // An address that missed the field: empty and unfocused, Send disabled by the empty state.
+  assert.deepEqual(inputSurface(screen([], false)), {
+    codeInput: null,
+    emailInput: { focused: false, enabled: true, textLength: 0 },
+    submit: { enabled: false },
+    focusedNodeCount: 0,
+  })
+  // A full field beside an enabled Send: the tap never reached the app.
+  assert.deepEqual(inputSurface(screen([field({ text: address })], true)).submit, {
+    enabled: true,
+  })
 })
 
 test('community preference rows keep phase, method, status and duration only', () => {
