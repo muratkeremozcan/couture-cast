@@ -1,5 +1,7 @@
 // Learning path Step 54: Complimentary full access (CI apt retries).
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-54-complimentary-full-access
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 //
 // CI installs Ubuntu packages in one place, scripts/ci/apt-install.sh. Its calls (apt-get, apt with
 // a verb, dpkg -i, Playwright's dependency installer) may appear nowhere else under .github or
@@ -17,6 +19,7 @@ import {
   readdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs'
 import os from 'node:os'
@@ -218,10 +221,12 @@ ${next}`
   stub('npx', `echo "npx $*${held}" >> "${stubs}/calls"\n${next}`)
   stub('sleep', `echo "$1" >> "${stubs}/sleeps"`)
   // A package file is named <package>_<version>_<architecture>.deb; one named broken_* is not
-  // a readable archive. The package index is the `index` text.
+  // a readable archive. A <file>.control next to it gives control fields that differ from the
+  // name. The package index is the `index` text.
   stub(
     'dpkg-deb',
-    `f=$(basename "$2" .deb); IFS=_ read -r p v a <<< "$f"
+    `[ -f "$2.control" ] && exec cat "$2.control"
+f=$(basename "$2" .deb); IFS=_ read -r p v a <<< "$f"
 [ "$p" = broken ] && exit 2
 printf 'Package: %s\\nVersion: %s\\nArchitecture: %s\\n' "$p" "$v" "$a"`
   )
@@ -407,22 +412,114 @@ describe('apt-install.sh', () => {
     }
   })
 
-  test('drops every restored file when the package index cannot be updated', () => {
+  // PR 256 run 44523768936: security.ubuntu.com refused one index refresh, the cache was dropped
+  // whole, and the re-download from a slow mirror ran past the step's 600 s bound. A partial
+  // refresh leaves apt its signed indexes, which install-deps installs from too, so the check
+  // runs against them: a file they vouch for stays, any other goes.
+  test('a partial index refresh still checks the restored files against the indexes apt holds', () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
     try {
       const archives = path.join(directory, 'ubuntu-packages')
       mkdirSync(archives)
       writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
-      const { status, calls } = runScript(['--playwright', 'chromium'], {
+      // Same size as the indexed bytes, different content.
+      writeFileSync(path.join(archives, 'libtwo_2.0_amd64.deb'), 'tvo')
+      const { status, calls, stdout } = runScript(['--playwright', 'chromium'], {
         statuses: [100, 0],
         env: { APT_INSTALL_ARCHIVES: archives },
-        index: indexOf([['libone', '1.0', 'amd64', 'one']]),
+        index: indexOf([
+          ['libone', '1.0', 'amd64', 'one'],
+          ['libtwo', '2.0', 'amd64', 'two'],
+        ]),
       })
       assert.equal(status, 0)
       assert.deepEqual(calls, [
         'sudo apt-get -o APT::Update::Error-Mode=any update',
+        'apt-cache show libone=1.0 libtwo=2.0',
+        'npx --no-install playwright install-deps chromium holding 1',
+      ])
+      assert.deepEqual(
+        readdirSync(archives).filter((name) => name.endsWith('.deb')),
+        ['libone_1.0_amd64.deb']
+      )
+      assert.match(stdout, /::warning::The package index refresh was partial;/)
+      assert.match(stdout, /kept 1, dropped 1\./)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  // Codex check of the PR 256 apt fix: apt picks a cached file by the name it builds from the
+  // version it installs (package_version_arch.deb, ':' as %3a) and checks only the size, so an
+  // authentic older archive the index still vouches for, stored under a newer version's name,
+  // would install as that version. A file must sit at its own name, and a symlink, which the
+  // regular-file scan would not check, is dropped.
+  test("drops a vouched-for archive stored under another version's name, and any symlink", () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      // libone 1.0's real bytes, stored where apt looks for libone 2.0.
+      writeFileSync(path.join(archives, 'libone_2.0_amd64.deb'), 'one')
+      writeFileSync(
+        path.join(archives, 'libone_2.0_amd64.deb.control'),
+        'Package: libone\nVersion: 1.0\nArchitecture: amd64\n'
+      )
+      // An epoch version: apt names the file with ':' as %3a.
+      writeFileSync(path.join(archives, 'libep_1%3a2.0_amd64.deb'), 'epo')
+      writeFileSync(
+        path.join(archives, 'libep_1%3a2.0_amd64.deb.control'),
+        'Package: libep\nVersion: 1:2.0\nArchitecture: amd64\n'
+      )
+      writeFileSync(path.join(directory, 'outside.deb'), 'two')
+      symlinkSync(
+        path.join(directory, 'outside.deb'),
+        path.join(archives, 'libtwo_2.0_amd64.deb')
+      )
+      const { status, calls, stdout } = runScript(['--playwright', 'chromium'], {
+        env: { APT_INSTALL_ARCHIVES: archives },
+        index: indexOf([
+          ['libone', '1.0', 'amd64', 'one'],
+          ['libone', '2.0', 'amd64', 'new'],
+          ['libep', '1:2.0', 'amd64', 'epo'],
+          ['libtwo', '2.0', 'amd64', 'two'],
+        ]),
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(
+        readdirSync(archives)
+          .filter((name) => name.endsWith('.deb'))
+          .sort(),
+        ['libep_1%3a2.0_amd64.deb']
+      )
+      assert.equal(
+        calls.at(-1),
+        'npx --no-install playwright install-deps chromium holding 1'
+      )
+      assert.match(stdout, /kept 1, dropped 1\./)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('a partial refresh whose indexes vouch for no restored file leaves nothing to install from', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
+      const { status, calls, stdout } = runScript(['--playwright', 'chromium'], {
+        statuses: [100, 0],
+        env: { APT_INSTALL_ARCHIVES: archives },
+        index: '',
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(calls, [
+        'sudo apt-get -o APT::Update::Error-Mode=any update',
+        'apt-cache show libone=1.0',
         'npx --no-install playwright install-deps chromium holding 0',
       ])
+      assert.match(stdout, /kept 0, dropped 1\./)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

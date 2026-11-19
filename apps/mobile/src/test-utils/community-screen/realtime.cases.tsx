@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import { modalRenders } from '@/src/test-utils/edge-to-edge-modal'
 import { press } from '@/src/test-utils/press'
 /* eslint-disable @typescript-eslint/await-thenable */
@@ -12,7 +14,17 @@ import { render } from 'vitest-browser-react'
 import { expect, it, vi } from 'vitest'
 import { CommunityScreen } from '@/src/features/community/community-screen'
 import { server } from '@/src/test-utils/msw/server'
-import { feedJson, item, serveFeed, UPLOAD_URL, imagePicker, cursor } from './harness'
+import {
+  feedJson,
+  item,
+  serveFeed,
+  UPLOAD_URL,
+  imagePicker,
+  cursor,
+  errorEnvelope,
+} from './harness'
+import { refreshEvents } from './mock-state'
+import enUS from '@/assets/locales/en-US.json'
 
 function recoveryCoordinator() {
   const syncs: CommunitySyncState[] = []
@@ -905,5 +917,45 @@ export function registerCommunityRealtimeCases() {
     expect(screen.getByTestId('community-reaction-total-post-a').textContent).toBe(
       '1 reaction'
     )
+  })
+
+  /*
+   * Nightly run 44298434117 follow-up (Codex review 4): a failed pull leaves "We could not load
+   * the community feed." beside the feed. A realtime rebuild that answers recovers the feed the
+   * same way a pull that answers does, so it must clear that stale message too. The rebuild's
+   * new post waits behind the new-looks button, which proves the rebuild, not a pull, landed.
+   */
+  it('6.1-MOB-098 a realtime rebuild that answers clears the load error a failed pull left', async () => {
+    const recover = recoveryCoordinator()
+    let failNext = false
+    let rebuilt = false
+    serveFeed(() => {
+      if (failNext) {
+        failNext = false
+        return errorEnvelope(500, 'Internal server error.')
+      }
+      return feedJson({
+        items: rebuilt
+          ? [item({ id: 'post-a' }), item({ id: 'post-fresh' })]
+          : [item({ id: 'post-a' })],
+        nextCursor: null,
+      })
+    })
+
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    failNext = true
+    act(() => refreshEvents.onRefresh!())
+    const panel = await screen.findByTestId('community-action-error')
+    expect(panel.textContent).toBe(enUS.community.error.load)
+
+    rebuilt = true
+    await act(recover)
+    await screen.findByText(
+      enUS.community.realtime.showNewLooks.replace('{{count}}', '1')
+    )
+    expect(screen.queryByTestId('community-action-error')).toBeNull()
+    expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
   })
 }

@@ -4,6 +4,11 @@ appId: ${MAESTRO_APP_ID}
     id: share-card-settings
     text: ${MAESTRO_SETTINGS}
 # The OS Settings app must be in front; the harness reads it again before recording it.
+# iOS: the status-bar link back to this app is the proof, read in a flow scoped to Settings.
+# Nothing here asserts on this app's own tree while Settings is in front: nightly run 44298434117
+# shard 1 passed that wait, then an assertNotVisible on the sheet title under this app's
+# appId kept matching for 38 s while the app was still preparing its card in the background, and
+# the hierarchy captured at that failure was the Settings app's.
 - runFlow:
     when:
       platform: iOS
@@ -16,5 +21,5 @@ appId: ${MAESTRO_APP_ID}
           visible:
             id: com.android.settings:id/.*
           timeout: 15000
-- assertNotVisible:
-    id: share-card-title
+      - assertNotVisible:
+          id: share-card-title

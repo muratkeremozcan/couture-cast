@@ -13,6 +13,12 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import {
+  API_REQUESTS_FILE,
+  UNKNOWN_ROUTE,
+  contractRouteTemplates,
+} from './native-api-requests.mjs'
 
 /** Records projected for the run report, each validated by value, never copied unchecked. */
 export const PUBLIC_DIAGNOSTIC_FILES = Object.freeze([
@@ -28,6 +34,8 @@ export const PUBLIC_DIAGNOSTIC_FILES = Object.freeze([
   'native-ios-flow-command-timings.json',
   'native-ios-flow-progress.json',
   'native-ios-expo-go-probe.json',
+  // native-api-requests.mjs: the owned services' closed request and exit record.
+  API_REQUESTS_FILE,
 ])
 
 /** Never opened by the selector. The first three can carry paths, keys and tokens. */
@@ -109,26 +117,99 @@ const STRING_RULES = [
 const stringProblem = (text) => STRING_RULES.find(([broken]) => broken(text))?.[1] ?? null
 const unsafeKey = (key) => !KEY.test(key) || UUID.test(key) || LONG_TOKEN.test(key)
 
-function firstProblem(values, depth, budget) {
-  for (const item of values) {
-    const problem = closedValueProblem(item, depth + 1, budget)
-    if (problem) return problem
-  }
-  return null
-}
-
-/** The first reason `value` is not closed, or null. A string reason names the rule only. */
-export function closedValueProblem(value, depth = 0, budget = { entries: 0 }) {
+/**
+ * The first reason `value` is not closed, or null. A string reason names the rule only.
+ * `fields` maps a key to a closed identifier set: a value under that key, at any depth, must be a
+ * string in the set (else the set's reason), and is then exempt from the generic string rules. The
+ * walk is one pass under the depth and entry budgets, so a malformed record of any shape is
+ * omitted by reason and never throws.
+ */
+export function closedValueProblem(
+  value,
+  depth = 0,
+  budget = { entries: 0 },
+  fields = {}
+) {
   if (++budget.entries > MAX_ENTRIES) return 'too_many_entries'
   if (depth > MAX_DEPTH) return 'too_deep'
   if (value === null || typeof value === 'boolean') return null
   if (typeof value === 'number')
     return Number.isFinite(value) ? null : 'non_finite_number'
   if (typeof value === 'string') return stringProblem(value)
-  if (Array.isArray(value)) return firstProblem(value, depth, budget)
+  if (Array.isArray(value))
+    return firstProblem(value, (item) =>
+      closedValueProblem(item, depth + 1, budget, fields)
+    )
   if (typeof value !== 'object') return 'unsupported_value'
-  if (Object.keys(value).some(unsafeKey)) return 'unsafe_key'
-  return firstProblem(Object.values(value), depth, budget)
+  const keys = Object.keys(value)
+  if (keys.some(unsafeKey)) return 'unsafe_key'
+  return firstProblem(keys, (key) =>
+    Object.hasOwn(fields, key)
+      ? closedFieldProblem(fields[key], value[key], budget)
+      : closedValueProblem(value[key], depth + 1, budget, fields)
+  )
+}
+
+/** The first problem `check` reports over `items`, checking each only while none has. */
+function firstProblem(items, check) {
+  for (const item of items) {
+    const problem = check(item)
+    if (problem) return problem
+  }
+  return null
+}
+
+/** A closed field's value: a string in its set (counted against the budget), else its reason. */
+function closedFieldProblem(closed, item, budget) {
+  if (typeof item !== 'string' || !closed.values().has(item)) return closed.reason
+  return ++budget.entries > MAX_ENTRIES ? 'too_many_entries' : null
+}
+
+/**
+ * The API request record names each request by its OpenAPI path template, and 13 of the 87
+ * templates (the notification preferences every iOS sign-in requests among them) are 40 or more
+ * token characters long, the generic token rule's bound. So that record's `route` fields are
+ * checked against the contract itself: each must be a contract template with no leading slash, or
+ * `unknown`.
+ */
+let contractRoutes = null
+const knownRoutes = () =>
+  (contractRoutes ??= new Set([
+    UNKNOWN_ROUTE,
+    ...contractRouteTemplates().map((template) => template.slice(1)),
+  ]))
+
+/**
+ * The flow timing receipt and the flow progress record name each flow by its repository path
+ * (`maestro/story68/community-draft-background-ios.yaml`), which can exceed the generic token
+ * rule's bound. Their `flow` fields are checked against the repository's Maestro flow files.
+ */
+const REPOSITORY = fileURLToPath(new URL('../../', import.meta.url))
+export function maestroFlowPaths(root = REPOSITORY) {
+  const flows = new Set()
+  const walk = (relative) => {
+    for (const entry of fs.readdirSync(path.join(root, relative), {
+      withFileTypes: true,
+    })) {
+      const child = `${relative}/${entry.name}`
+      if (entry.isDirectory()) walk(child)
+      else if (entry.isFile() && entry.name.endsWith('.yaml')) flows.add(child)
+    }
+  }
+  walk('maestro')
+  return flows
+}
+let repositoryFlows = null
+const knownFlows = () => (repositoryFlows ??= maestroFlowPaths())
+
+const FLOW_FIELDS = { flow: { values: knownFlows, reason: 'flow_not_in_repository' } }
+/** Per record, the keys whose values are closed identifiers rather than free strings. */
+const CLOSED_FIELDS = {
+  [API_REQUESTS_FILE]: {
+    route: { values: knownRoutes, reason: 'route_not_in_contract' },
+  },
+  'native-ios-flow-command-timings.json': FLOW_FIELDS,
+  'native-ios-flow-progress.json': FLOW_FIELDS,
 }
 
 /**
@@ -152,7 +233,12 @@ export function selectPublicDiagnostics(directory) {
       omitted.push({ name, reason: 'not_json' })
       continue
     }
-    const problem = closedValueProblem(value)
+    const problem = closedValueProblem(
+      value,
+      0,
+      { entries: 0 },
+      CLOSED_FIELDS[name] ?? {}
+    )
     if (problem) omitted.push({ name, reason: problem })
     else published.set(name, value)
   }

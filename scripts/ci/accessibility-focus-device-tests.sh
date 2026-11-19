@@ -16,7 +16,19 @@ results="${ACCESSIBILITY_FOCUS_RESULTS:-$module/build/talkback-results}"
 window_wait="${ACCESSIBILITY_FOCUS_WINDOW_WAIT:-30}"
 # Native code is built only for the emulator's ABI.
 abi=$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')
-gradle() { (cd apps/mobile/android && ./gradlew --console=plain -PreactNativeArchitectures="$abi" "$@"); }
+# Every Gradle call goes through the retry: a 429 or 5xx from Maven Central or the plugin portal
+# is retried twice, any other failure fails at once. The build resolves the plugins and the APKs'
+# dependencies; each connected run resolves the test runner's own (AGP's UTP artifacts) when it
+# starts, before any test runs. A failing test is retried only when the same run also printed a
+# download failure with a transient cause where the tool prints one: a Gradle cause tree at
+# column 0, or Robolectric's own runtime fetch (scripts/lib/transient-resolution-retry.cjs). An
+# assertion that fails, quotes a download error or prints one in a multiline message runs once,
+# so the suppressed-focus control still fails exactly once.
+gradle_retry() {
+  (cd apps/mobile/android &&
+    node "$here/gradle-resolution-retry.mjs" -- \
+      ./gradlew --console=plain -PreactNativeArchitectures="$abi" "$@")
+}
 
 # diagnose NAME: what the window system and accessibility showed, kept with the results.
 diagnose() {
@@ -61,7 +73,7 @@ run() {
   rm -rf "$raw" "${results:?}/$name"
   mkdir -p "$results/$name"
   app_window_tracked "the $name run" || return 1
-  gradle :accessibility-focus:connectedDebugAndroidTest "$@"
+  gradle_retry :accessibility-focus:connectedDebugAndroidTest "$@"
   local status=$?
   [ -d "$raw" ] && cp -R "$raw/." "$results/$name/"
   return $status
@@ -69,7 +81,7 @@ run() {
 
 rm -rf "${results:?}"
 # Build first, so TalkBack and the backdrop are set up right before the runs.
-gradle :accessibility-focus:assembleDebugAndroidTest || exit 1
+gradle_retry :accessibility-focus:assembleDebugAndroidTest || exit 1
 bash "$here/android-talkback.sh" enable || exit 1
 park_backdrop || { bash "$here/android-talkback.sh" disable || true; exit 1; }
 

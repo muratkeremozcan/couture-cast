@@ -3,7 +3,10 @@ appId: ${MAESTRO_APP_ID}
 # Taps Share until the app shows what a received press does, like tap-save.yaml does for Save.
 # MAESTRO_SHARE_OUTCOME is the copy this attempt must settle on. It may not be on screen before
 # the tap: the guard would then never tap and the wait would pass on an earlier attempt's copy.
-# MAESTRO_SHARING is the in-flight copy, so a press that landed late is never repeated.
+# MAESTRO_SHARING is the in-flight copy, so a press whose copy shows by the guard's read is not
+# repeated. Under the pinned Maestro the guard reads the screen at most once
+# plus a 500 ms search after the wait gives up (tap-outfit-open.yaml states the boundary), so an
+# effect that draws later than that still gets a second press.
 - assertNotVisible: ${MAESTRO_SHARE_OUTCOME}
 # Share sits after Save. A small screen or large text can leave it below the fold.
 - scrollUntilVisible:

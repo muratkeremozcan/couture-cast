@@ -1,5 +1,7 @@
 // Learning path Step 46: Home spotlight teaser.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-46-home-spotlight-teaser
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import fs from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -37,6 +39,9 @@ const REQUIRED = [
   'scripts/ci/fetch-gradle-wrapper.sh',
   'scripts/ci/android-sdk-install.sh',
   'scripts/ci/android-gradle-sdk-packages.mjs',
+  // Every Gradle call in the lane goes through the resolution retry.
+  'scripts/ci/gradle-resolution-retry.mjs',
+  'scripts/lib/transient-resolution-retry.cjs',
   'scripts/ci/check-accessibility-focus-results.mjs',
   'scripts/ci/check-accessibility-focus-builds.sh',
   'scripts/run-story67-talkback.mjs',

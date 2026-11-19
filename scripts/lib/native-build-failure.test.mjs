@@ -1,5 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import {
@@ -19,6 +21,11 @@ const base = {
   status: 1,
   signal: null,
 }
+
+// The iOS Release build of nightly run 44298434117 (exit 65), the record every iOS case reads.
+const iosRelease = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
+const classifyIosRelease = (log) =>
+  summarizeNativeBuildFailure({ ...iosRelease, log }).classification
 
 describe('native build failure record', () => {
   test('names the failed tasks and the signature, and carries no log text', () => {
@@ -55,14 +62,16 @@ describe('native build failure record', () => {
     assert.equal(classify('Gradle build daemon disappeared unexpectedly'), 'daemondied')
     assert.equal(classify('java.io.IOException: No space left on device'), 'diskfull')
     assert.equal(
-      classify(
+      classifyIosRelease(
         "Could not resolve all files for configuration ':app:debugRuntimeClasspath'."
       ),
       'dependencies'
     )
     assert.equal(classify('e: file:///x/Foo.kt:3:1 Unresolved reference: bar'), 'kotlin')
     assert.equal(
-      classify('Compilation failed; see the compiler error output for details.'),
+      classifyIosRelease(
+        'Compilation failed; see the compiler error output for details.'
+      ),
       'java'
     )
     assert.equal(classify('ninja: build stopped: subcommand failed.'), 'native')
@@ -71,6 +80,70 @@ describe('native build failure record', () => {
     assert.equal(classify('', { status: 137 }), 'killed')
     assert.equal(classify(personal), 'unknown')
     assert.equal(classify(undefined), 'unknown')
+  })
+
+  // PR 256 dispatch 44523804534 (matrix-2, 15 s) and run 44117971285 (controls, 24 s): the
+  // Android build failed before any task with `unknown` and no failed task, because Gradle's
+  // configuration-phase failures matched no signature. Each now names its class.
+  test('names a Gradle failure that comes before any task runs', () => {
+    const classify = (log) => summarizeNativeBuildFailure({ ...base, log }).classification
+    const configurationPhase = (cause) =>
+      [
+        'FAILURE: Build failed with an exception.',
+        '* What went wrong:',
+        ...cause,
+        'BUILD FAILED in 15s',
+      ].join('\n')
+    assert.equal(
+      classify(
+        configurationPhase([
+          "Error resolving plugin [id: 'com.facebook.react.settings']",
+          "> A problem occurred configuring project ':gradle-plugin'.",
+          "   > Could not resolve all artifacts for configuration 'classpath'.",
+          '      > Could not find org.gradle.toolchains:foojay-resolver:0.5.0.',
+        ])
+      ),
+      'dependencies'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          "Plugin [id: 'com.facebook.react.settings'] was not found in any of the following sources:",
+        ])
+      ),
+      'dependencies'
+    )
+    assert.equal(
+      classify(
+        configurationPhase(['Could not find junit-4.13.2.jar (junit:junit:4.13.2).'])
+      ),
+      'dependencies'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          'Timeout waiting to lock journal cache (/home/runner/.gradle/caches/journal-1). It is currently in use by another Gradle instance.',
+        ])
+      ),
+      'locktimeout'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          "A problem occurred evaluating project ':app'.",
+          '> Cannot invoke method get() on null object',
+        ])
+      ),
+      'configuration'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          "Could not compile settings file '/x/apps/mobile/android/settings.gradle'.",
+        ])
+      ),
+      'configuration'
+    )
   })
 
   test('keeps at most ten task paths and only path-shaped ones', () => {
@@ -106,6 +179,129 @@ describe('native build failure record', () => {
       assert.throws(() => assertNativeBuildFailure({ ...record, failedTasks: [task] }), {
         message: 'invalid_native_build_failure',
       })
+  })
+
+  // Nightly run 44298434117, iOS live font scale (settings): the Release build exited 65 after
+  // 358 s and the record read classification unknown with no failed task, because only Gradle's
+  // `> Task ... FAILED` lines were read. xcodebuild lists its failed commands after a header.
+  test('names the failed xcodebuild commands by target and classifies the xcodebuild causes', () => {
+    const log = [
+      `CompileC /tmp/${personal}.o (in target 'CoutureCastStory68' from project 'CoutureCastStory68')`,
+      'error: Command PhaseScriptExecution failed with a nonzero exit code',
+      '** BUILD FAILED **',
+      '',
+      'The following build commands failed:',
+      `\tPhaseScriptExecution [CP-User]\\ [Hermes]\\ Replace\\ Hermes /tmp/${personal}.sh (in target 'hermes-engine' from project 'Pods')`,
+      "\tPhaseScriptExecution Bundle\\ React\\ Native\\ code\\ and\\ images /tmp/Script-1.sh (in target 'CoutureCastStory68' from project 'CoutureCastStory68')",
+      `\tSwiftCompile normal arm64 /tmp/a.swift (in target '${personal}' from project 'Pods')`,
+      "\tPhaseScriptExecution Bundle\\ React\\ Native\\ code\\ and\\ images /tmp/Script-1.sh (in target 'CoutureCastStory68' from project 'CoutureCastStory68')",
+      '(4 failures)',
+      "\tLd /tmp/x (in target 'after-the-list' from project 'Pods')",
+    ].join('\n')
+    const record = summarizeNativeBuildFailure({ ...iosRelease, log })
+    assert.deepEqual(record, {
+      platform: 'ios',
+      configuration: 'Release',
+      durationMs: 529000,
+      exitCode: 65,
+      signal: null,
+      classification: 'scriptphase',
+      failedTasks: [
+        'PhaseScriptExecution@hermes-engine',
+        'PhaseScriptExecution@CoutureCastStory68',
+      ],
+    })
+    assert.equal(JSON.stringify(record).includes('Avery'), false)
+    assertNativeBuildFailure(record)
+    assert.equal(
+      classifyIosRelease('/tmp/App/AppDelegate.swift:12:5: error: cannot find type'),
+      'swift'
+    )
+    assert.equal(
+      classifyIosRelease('xcodebuild: error: Unable to find a destination matching'),
+      'xcodebuild'
+    )
+    // Without the header nothing is read as a failed command.
+    assert.deepEqual(
+      summarizeNativeBuildFailure({
+        ...iosRelease,
+        log: "\tLd /tmp/x (in target 'Pods-App' from project 'Pods')",
+      }).failedTasks,
+      []
+    )
+    for (const task of ['Ld@', '@Pods', 'ld@Pods', 'Ld@a b', `Ld@${'a'.repeat(61)}`])
+      assert.throws(() => assertNativeBuildFailure({ ...record, failedTasks: [task] }), {
+        message: 'invalid_native_build_failure',
+      })
+  })
+
+  // Codex review of cb8b22d2: xcodebuild escapes the spaces in multi-word command names
+  // (`SwiftDriver\ Compilation`), and the first parser stopped the list at that entry, so a Swift
+  // build failure kept its empty record and lost every supported command after it.
+  test('reads escaped xcodebuild command names and keeps reading the list to its footer', () => {
+    const log = [
+      '** BUILD FAILED **',
+      '',
+      'The following build commands failed:',
+      "\tSwiftDriver\\ Compilation normal arm64 com.apple.xcode.tools.swift.compiler (in target 'ExpoModulesCore' from project 'Pods')",
+      `\tBuilding workspace ${personal} with scheme CoutureCastStory68`,
+      "\tSwiftDriver\\ Compilation\\ Requirements normal arm64 com.apple.xcode.tools.swift.compiler (in target 'CoutureCastStory68' from project 'CoutureCastStory68')",
+      "\tPhaseScriptExecution [CP-User]\\ [Hermes]\\ Replace\\ Hermes /tmp/a.sh (in target 'hermes-engine' from project 'Pods')",
+      '(4 failures)',
+      "\tLd /tmp/x (in target 'after-the-list' from project 'Pods')",
+    ].join('\n')
+    const record = summarizeNativeBuildFailure({ ...iosRelease, log })
+    assert.deepEqual(record.failedTasks, [
+      'SwiftDriverCompilation@ExpoModulesCore',
+      'SwiftDriverCompilationRequirements@CoutureCastStory68',
+      'PhaseScriptExecution@hermes-engine',
+    ])
+    assert.equal(JSON.stringify(record).includes('Avery'), false)
+    assertNativeBuildFailure(record)
+    // A list with no footer ends at the first line that is not an indented entry.
+    assert.deepEqual(
+      summarizeNativeBuildFailure({
+        ...iosRelease,
+        log: [
+          'The following build commands failed:',
+          "\tSwiftDriver\\ Compilation normal arm64 x (in target 'A' from project 'Pods')",
+          "Ld /tmp/x (in target 'not-listed' from project 'Pods')",
+          "\tLd /tmp/y (in target 'not-listed-either' from project 'Pods')",
+        ].join('\n'),
+      }).failedTasks,
+      ['SwiftDriverCompilation@A']
+    )
+    // A joined name past the 41-character identifier bound is dropped, never truncated.
+    assert.deepEqual(
+      summarizeNativeBuildFailure({
+        ...iosRelease,
+        log: [
+          'The following build commands failed:',
+          `\tSwiftDriver\\ ${'Compilation\\ '.repeat(4)}Requirements x (in target 'A' from project 'Pods')`,
+          "\tLd /tmp/x (in target 'B' from project 'Pods')",
+          '(2 failures)',
+        ].join('\n'),
+      }).failedTasks,
+      ['Ld@B']
+    )
+  })
+
+  // Codex review of cb8b22d2: CocoaPods generates Swift sources under `Target Support Files`, so a
+  // compiler error at one of them carries a path with spaces, and `^\S+\.swift` left it unknown.
+  test('classifies a Swift error at a path with spaces', () => {
+    assert.equal(
+      classifyIosRelease(
+        '/Users/runner/work/couture-cast/couture-cast/apps/mobile/ios/Pods/Target Support Files/Pods-CoutureCastStory68/ExpoModulesProvider.swift:12:5: error: cannot find type'
+      ),
+      'swift'
+    )
+    // The error suffix stays required: a warning at the same path is not a Swift error.
+    assert.equal(
+      classifyIosRelease(
+        '/tmp/Target Support Files/Pods-CoutureCastStory68/ExpoModulesProvider.swift:12:5: warning: unused'
+      ),
+      'unknown'
+    )
   })
 
   test('the schema refuses any open field', () => {

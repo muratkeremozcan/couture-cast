@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// Step 58 step 2 owner: searchable owner anchor
 // Runs a Gradle command and retries it when it fails on a transient download error: a 429 from
 // Maven Central or the Gradle plugin portal, a 5xx, or a dropped connection. PR 238's run
 // 43767969866 failed the modal system bars module before any test ran, because both registries
@@ -61,6 +62,21 @@ export function runOnce(command, { spawn = spawnSync } = {}) {
   }
 }
 
+/**
+ * The command with Gradle's --refresh-dependencies, when it runs a Gradle launcher (`gradlew` or
+ * `gradle`): Gradle keeps a missing-artifact result for 24 hours, so a retry after an artifact
+ * miss must ask it to re-check. Any other command is returned unchanged.
+ */
+export function withRefreshDependencies(command) {
+  const launcher = path.basename(command[0] ?? '')
+  if (
+    !['gradlew', 'gradle'].includes(launcher) ||
+    command.includes('--refresh-dependencies')
+  )
+    return command
+  return [...command, '--refresh-dependencies']
+}
+
 /** Runs the command with the shared retry; returns the exit status of the last attempt. */
 export function runGradleWithResolutionRetry(
   argv,
@@ -72,11 +88,17 @@ export function runGradleWithResolutionRetry(
   } = {}
 ) {
   const command = parseArgs(argv)
-  const result = runWithResolutionRetry(() => runOnce(command, { spawn }), {
-    log,
-    ...(wait ? { wait } : {}),
-    ...(delaysMs ? { delaysMs } : {}),
-  })
+  const result = runWithResolutionRetry(
+    ({ refreshDependencies } = {}) =>
+      runOnce(refreshDependencies ? withRefreshDependencies(command) : command, {
+        spawn,
+      }),
+    {
+      log,
+      ...(wait ? { wait } : {}),
+      ...(delaysMs ? { delaysMs } : {}),
+    }
+  )
   return result.status ?? 1
 }
 

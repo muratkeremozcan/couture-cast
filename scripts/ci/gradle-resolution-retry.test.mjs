@@ -1,13 +1,18 @@
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import test, { describe } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { parse } from 'yaml'
 import { parseArgs, runGradleWithResolutionRetry } from './gradle-resolution-retry.mjs'
+import { EXPECTED_TESTS, NEED_OS_REPORT } from './check-accessibility-focus-results.mjs'
 import {
   RESOLUTION_RETRY_DELAYS_MS,
+  missingArtifactFailure,
   runWithResolutionRetry,
   transientResolutionFailure,
 } from '../lib/transient-resolution-retry.cjs'
@@ -185,15 +190,308 @@ test('a failing test is not retried when its output only mentions a timeout or a
 })
 
 test('a failing test whose failure is a rate-limited artifact download still retries', () => {
-  for (const download of [ROBOLECTRIC_RATE_LIMITED, RATE_LIMITED])
-    assert.match(
-      transientResolutionFailure({
-        status: 1,
-        signal: null,
-        stdout: `${TEST_FAILED}\n    ${download}\n${TEST_TASK_FAILED}`,
-      }),
-      /^(?:HTTP response code: 429|status code 429)$/
+  // Robolectric fetches its runtime inside the test JVM, so its exception sits in the case's
+  // output; Gradle's own download failure sits in its failure report.
+  const robolectric = `${TEST_FAILED}\n    ${ROBOLECTRIC_RATE_LIMITED}\n${TEST_TASK_FAILED}`
+  const gradleReport = [
+    TEST_FAILED,
+    'FAILURE: Build failed with an exception.',
+    '* What went wrong:',
+    "Execution failed for task ':modal-system-bars:testDebugUnitTest'.",
+    "> Could not resolve all files for configuration ':modal-system-bars:debugUnitTestRuntimeClasspath'.",
+    '   > Could not resolve com.google.code.gson:gson:2.9.1.',
+    `      > ${RATE_LIMITED}`,
+    '* Try:',
+    'BUILD FAILED in 41s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: robolectric }),
+    'HTTP response code: 429'
+  )
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: gradleReport }),
+    'status code 429'
+  )
+  // A download nested under a cause that is not itself a download (an artifact transform) is
+  // still Gradle's: it sits in the column-0 tree.
+  const transform = [
+    TEST_FAILED,
+    '* What went wrong:',
+    "Execution failed for task ':modal-system-bars:testDebugUnitTest'.",
+    '> Failed to transform core-1.13.1.aar (androidx.core:core:1.13.1) to match attributes {artifactType=android-classes-jar}.',
+    '   > Could not download core-1.13.1.aar (androidx.core:core:1.13.1)',
+    "      > Could not GET 'https://dl.google.com/dl/android/maven2/androidx/core/core/1.13.1/core-1.13.1.aar'.",
+    '         > Read timed out',
+    'BUILD FAILED in 41s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: transform }),
+    'Read timed out'
+  )
+})
+
+// Codex review 7 of PR 256: Gradle indents a test's own output under its case line, so a
+// multiline assertion message or fixture diff that prints whole download lines, a nested `>`
+// tree included, is the test's text, not Gradle's. Before this, any line that started with
+// `Could not GET` after optional spaces counted, and these retried.
+test('a failing test is not retried by download lines its own multiline output prints', () => {
+  for (const printed of [
+    [`    ${RATE_LIMITED}`],
+    [
+      "    > Could not GET 'https://repo.maven.apache.org/maven2/com/example/fixture/1.0/fixture-1.0.pom'.",
+      '       > Read timed out',
+    ],
+    [
+      '    java.io.IOException: Server returned HTTP response code: 429 for URL: https://example.test/fixture.json',
+    ],
+  ]) {
+    const output = [
+      'ArtifactFixtureTest > printsTheFixtureLog FAILED',
+      '    org.opentest4j.AssertionFailedError: expected the log to read:',
+      ...printed,
+      '    but it was empty',
+      TEST_TASK_FAILED,
+    ].join('\n')
+    assert.equal(
+      transientResolutionFailure({ status: 1, signal: null, stdout: output }),
+      undefined,
+      output
     )
+  }
+  // A `> Task` header is not a cause, so a test's standard output printed under it is not
+  // Gradle's either.
+  const underHeader = [
+    '> Task :modal-system-bars:testDebugUnitTest',
+    "    > Could not GET 'https://repo.maven.apache.org/maven2/com/example/fixture/1.0/fixture-1.0.pom'.",
+    '       > Read timed out',
+    TEST_FAILED,
+    TEST_TASK_FAILED,
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: underHeader }),
+    undefined
+  )
+})
+
+test('a test task that failed resolving before its tests ran retries on a nested transient cause', () => {
+  // The old classifier read the task's FAILED line as a failing test and needed the transient
+  // word on the download's own line, so this failed on the first attempt.
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: UTP_READ_TIMED_OUT }),
+    'Read timed out'
+  )
+})
+
+// Codex review 6: with a failed case in the output, a download failure counts only as Gradle or
+// Robolectric prints it, never quoted inside an assertion's message.
+test('a failing test is not retried by an assertion that quotes a rate-limited download', () => {
+  const quoted = [
+    'ArtifactFixtureTest > reportsRateLimit FAILED',
+    `    java.lang.AssertionError: expected the fixture "${RATE_LIMITED}" to be reported`,
+    TEST_TASK_FAILED,
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: quoted }),
+    undefined
+  )
+})
+
+test('a failing test retries on a real download whose transient cause is nested under it', () => {
+  // The cause sits only on the nested line, so this retries only through nested-cause reading.
+  const nested = [
+    TEST_FAILED,
+    '> Could not resolve org.robolectric:android-all-instrumented:13-robolectric-9030017-i6.',
+    "   > Could not GET 'https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/13-robolectric-9030017-i6/android-all-instrumented-13-robolectric-9030017-i6.pom'.",
+    '      > Read timed out',
+    TEST_TASK_FAILED,
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: nested }),
+    'Read timed out'
+  )
+})
+
+test('a crashed test task is not retried when its timeout sits under no failed download', () => {
+  // The test JVM died (exit 137) and a test's own output named a timeout. No artifact download
+  // failed, so a rerun would only turn a crash that passes the second time green.
+  const crashed = [
+    '> Task :app:testDebugUnitTest FAILED',
+    "Process 'Gradle Test Executor 1' finished with non-zero exit value 137",
+    'java.net.SocketTimeoutException: Read timed out',
+    'FAILURE: Build failed with an exception.',
+    '* What went wrong:',
+    "Execution failed for task ':app:testDebugUnitTest'.",
+    'BUILD FAILED in 1m 3s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: crashed }),
+    undefined
+  )
+})
+
+test('a failing test is not retried by a transient word beside, not under, a failed download', () => {
+  // A case's own output: the timeout is not a nested cause of the download line above it.
+  const assertion = [
+    'AccessibilityFocusTalkBackTest > reportsFocus[emulator-5554] FAILED',
+    "    java.lang.AssertionError: Could not GET 'https://example.test/fixture.json' in the stub",
+    '    Read timed out',
+    '> There were failing tests. See the report.',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: assertion }),
+    undefined
+  )
+  // A failed download whose nested cause is not transient (a 404) retries nothing either.
+  const missing = [
+    '> Could not resolve com.example:absent:1.0.0.',
+    "   > Could not GET 'https://repo.maven.apache.org/maven2/com/example/absent/1.0.0/absent-1.0.0.pom'.",
+    '      > Received status code 404 from server: Not Found',
+    'BUILD FAILED in 4s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: missing }),
+    undefined
+  )
+})
+
+// PR 256 dispatch 44523800625, Android app build: Maven Central answered "not found" for two
+// artifacts it serves, after their modules' metadata had resolved; the same restored Gradle cache
+// built green on the PR run 22 minutes earlier. Gradle 8.14.3 keeps a missing-artifact result for
+// 24 h (DefaultCachePolicy), so the retry asks Gradle to re-check (--refresh-dependencies)
+// instead of rerunning into its own cached miss.
+const MISSING_ARTIFACT = [
+  '> Task :accessibility-focus:checkDebugAndroidTestDuplicateClasses FAILED',
+  'FAILURE: Build failed with an exception.',
+  '* What went wrong:',
+  "Execution failed for task ':accessibility-focus:checkDebugAndroidTestDuplicateClasses'.",
+  "> Could not resolve all files for configuration ':accessibility-focus:debugAndroidTestRuntimeClasspath'.",
+  '   > Failed to transform junit-4.13.2.jar (junit:junit:4.13.2) to match attributes {artifactType=enumerated-runtime-classes}.',
+  '      > Could not find junit-4.13.2.jar (junit:junit:4.13.2).',
+  '        Searched in the following locations:',
+  '            https://repo.maven.apache.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar',
+  '   > Failed to transform hamcrest-core-1.3.jar (org.hamcrest:hamcrest-core:1.3) to match attributes {artifactType=enumerated-runtime-classes}.',
+  '      > Could not find hamcrest-core-1.3.jar (org.hamcrest:hamcrest-core:1.3).',
+  'BUILD FAILED in 6m 30s',
+].join('\n')
+
+describe('an artifact the repository did not serve for a resolved module', () => {
+  test('retries and asks Gradle to re-check its cached missing result', () => {
+    const result = { status: 1, signal: null, stdout: MISSING_ARTIFACT }
+    assert.equal(
+      transientResolutionFailure(result),
+      'Could not find junit-4.13.2.jar (junit:junit:4.13.2)'
+    )
+    assert.equal(missingArtifactFailure(result), true)
+  })
+
+  test('a module or version that does not exist still fails at once', () => {
+    const missingModule = [
+      '* What went wrong:',
+      "> Could not resolve all files for configuration ':app:debugRuntimeClasspath'.",
+      '   > Could not find junit:junit:9.99.',
+      '     Searched in the following locations:',
+      '       - https://repo.maven.apache.org/maven2/junit/junit/9.99/junit-9.99.pom',
+      'BUILD FAILED in 9s',
+    ].join('\n')
+    const result = { status: 1, signal: null, stdout: missingModule }
+    assert.equal(transientResolutionFailure(result), undefined)
+    assert.equal(missingArtifactFailure(result), false)
+  })
+
+  test("a failing test's own output naming a missing jar does not retry", () => {
+    const quoted = [
+      'FixtureTest > reportsMissingJar FAILED',
+      '    java.lang.AssertionError: expected',
+      '      > Could not find junit-4.13.2.jar (junit:junit:4.13.2).',
+      TEST_TASK_FAILED,
+    ].join('\n')
+    const result = { status: 1, signal: null, stdout: quoted }
+    assert.equal(transientResolutionFailure(result), undefined)
+    assert.equal(missingArtifactFailure(result), false)
+  })
+
+  test('the retry loop tells each later attempt to refresh, and logs why', () => {
+    const outcomes = [
+      { status: 1, signal: null, stdout: MISSING_ARTIFACT },
+      { status: 0, signal: null, stdout: 'BUILD SUCCESSFUL' },
+    ]
+    const calls = []
+    const logs = []
+    const result = runWithResolutionRetry(
+      (options) => {
+        calls.push(options)
+        return outcomes.shift()
+      },
+      { wait: () => undefined, log: (message) => logs.push(message) }
+    )
+    assert.equal(result.status, 0)
+    assert.deepEqual(calls, [
+      { refreshDependencies: false },
+      { refreshDependencies: true },
+    ])
+    assert.deepEqual(logs, [
+      'Attempt 1/3 hit a transient download error (Could not find junit-4.13.2.jar (junit:junit:4.13.2)); retrying in 20 s with --refresh-dependencies.',
+    ])
+  })
+
+  test('the CLI adds --refresh-dependencies to the Gradle wrapper on the retry', (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gradle-missing-artifact-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    const record = path.join(directory, 'calls')
+    const failure = path.join(directory, 'failure.txt')
+    const gradlew = path.join(directory, 'gradlew')
+    fs.writeFileSync(failure, MISSING_ARTIFACT)
+    fs.writeFileSync(
+      gradlew,
+      `#!/usr/bin/env bash
+echo "$*" >> "${record}"
+if [ "$(wc -l < "${record}")" -ge 2 ]; then echo 'BUILD SUCCESSFUL'; exit 0; fi
+cat "${failure}"
+exit 1
+`
+    )
+    fs.chmodSync(gradlew, 0o755)
+    const logs = []
+    const status = runGradleWithResolutionRetry(['--', gradlew, 'assembleDebug'], {
+      wait: () => undefined,
+      log: (message) => logs.push(message),
+    })
+    assert.equal(status, 0)
+    assert.deepEqual(fs.readFileSync(record, 'utf8').trim().split('\n'), [
+      'assembleDebug',
+      'assembleDebug --refresh-dependencies',
+    ])
+    assert.equal(logs.length, 1)
+    assert.match(logs[0], /retrying in 20 s with --refresh-dependencies\.$/)
+  })
+
+  test('a command that is not a Gradle launcher is retried unchanged', (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gradle-missing-artifact-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    const record = path.join(directory, 'calls')
+    const failure = path.join(directory, 'failure.txt')
+    const tool = path.join(directory, 'build-tool')
+    fs.writeFileSync(failure, MISSING_ARTIFACT)
+    fs.writeFileSync(
+      tool,
+      `#!/usr/bin/env bash
+echo "$*" >> "${record}"
+if [ "$(wc -l < "${record}")" -ge 2 ]; then exit 0; fi
+cat "${failure}"
+exit 1
+`
+    )
+    fs.chmodSync(tool, 0o755)
+    const status = runGradleWithResolutionRetry(['--', tool, 'build'], {
+      wait: () => undefined,
+      log: () => undefined,
+    })
+    assert.equal(status, 0)
+    assert.deepEqual(fs.readFileSync(record, 'utf8').trim().split('\n'), [
+      'build',
+      'build',
+    ])
+  })
 })
 
 test('the modal system bars workflow runs its Gradle build through the retry', () => {
@@ -235,3 +533,261 @@ test('the modal system bars workflow runs its Gradle build through the retry', (
       `${file} must be in both path filters`
     )
 })
+
+// Scheduled run 44311237727 failed the accessibility-focus Robolectric job before any test ran:
+// both registries answered 429 for gson, the foojay toolchain resolver plugin's dependency, the
+// same failure the modal system bars job retries above.
+describe('the accessibility focus workflow', () => {
+  const read = (file) =>
+    fs.readFileSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)), 'utf8')
+  const workflow = parse(read('.github/workflows/pr-accessibility-focus.yml'))
+  const { jobs } = workflow
+  const retry =
+    /^node \.\.\/\.\.\/\.\.\/scripts\/ci\/gradle-resolution-retry\.mjs -- \.\/gradlew /
+  const gradleRuns = (job) =>
+    job.steps.filter((step) =>
+      /\.\/gradlew|npm run test:accessibility-focus/.test(step.run ?? '')
+    )
+  // The device script's code lines: comments dropped and indentation trimmed, so a comment that
+  // names a command or a re-indent cannot change what these checks read.
+  const deviceCode = read('scripts/ci/accessibility-focus-device-tests.sh')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'))
+
+  test('runs every Gradle build through the retry', () => {
+    // The app build and the Robolectric tests call Gradle in their own steps; both retry.
+    for (const id of ['android', 'android-robolectric']) {
+      const runs = gradleRuns(jobs[id])
+      assert.equal(runs.length, 1, `${id} runs Gradle in one step`)
+      assert.match(runs[0].run, retry, `${id}: Gradle goes through the retry`)
+      assert.equal(runs[0]['working-directory'], 'apps/mobile/android')
+    }
+    // The TalkBack job builds and runs inside its device script, whose every Gradle call goes
+    // through the retry (the run itself is proved by the device-script test below).
+    assert.deepEqual(gradleRuns(jobs['android-talkback']), [])
+    const gradlewCalls = deviceCode.filter((line) => line.includes('./gradlew'))
+    assert.equal(gradlewCalls.length, 1, 'one Gradle call site, inside gradle_retry')
+    const retryCall = deviceCode.indexOf('node "$here/gradle-resolution-retry.mjs" -- \\')
+    assert.notEqual(retryCall, -1, 'gradle_retry calls the retry command')
+    assert.match(deviceCode[retryCall + 1], /^\.\/gradlew /)
+    assert.deepEqual(
+      deviceCode.flatMap(
+        (line) => line.match(/^gradle\w* :accessibility-focus:\w+/) ?? []
+      ),
+      [
+        'gradle_retry :accessibility-focus:connectedDebugAndroidTest',
+        'gradle_retry :accessibility-focus:assembleDebugAndroidTest',
+      ]
+    )
+  })
+
+  test("restores Gradle's cache in every Android job, written only on main, before generation", () => {
+    for (const id of ['android', 'android-robolectric', 'android-talkback']) {
+      const steps = jobs[id].steps
+      const setup = steps.findIndex((step) =>
+        String(step.uses ?? '').startsWith('gradle/actions/setup-gradle@')
+      )
+      assert.notEqual(setup, -1, `${id} sets up Gradle's cache`)
+      assert.equal(
+        steps[setup].with['cache-read-only'],
+        "${{ github.ref != 'refs/heads/main' }}",
+        `${id}: only main writes Gradle's cache`
+      )
+      const generate = steps.findIndex(
+        (step) => step.name === 'Generate the Android project'
+      )
+      assert.ok(
+        setup < generate,
+        `${id}: Gradle's cache is set up before the project is generated`
+      )
+    }
+  })
+
+  test('lists the retry files in both path filters', () => {
+    const filters = {
+      pull_request: workflow.on.pull_request.paths,
+      push: workflow.on.push.paths,
+    }
+    for (const file of [
+      'scripts/ci/gradle-resolution-retry.mjs',
+      'scripts/lib/transient-resolution-retry.cjs',
+    ])
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(filters).map(([event, paths]) => [event, paths.includes(file)])
+        ),
+        { pull_request: true, push: true },
+        `${file} must be in both path filters`
+      )
+  })
+})
+
+// Codex review of 384b830d: each connected run resolves AGP's UTP test-runner artifacts when it
+// starts, after the APK build, so a 429 there failed the lane past the build's retry. This runs
+// the real device script with a stand-in Gradle and adb: the build passes, the TalkBack run's
+// first start is rate-limited, and the suppressed-focus control fails on its assertion.
+// Codex review 4: a connected run whose UTP resolution fails before any test runs marks its task
+// FAILED and prints the transient cause on a nested line, not beside the download.
+const UTP_READ_TIMED_OUT = [
+  '> Task :accessibility-focus:connectedDebugAndroidTest FAILED',
+  'FAILURE: Build failed with an exception.',
+  '* What went wrong:',
+  "Execution failed for task ':accessibility-focus:connectedDebugAndroidTest'.",
+  "> Could not resolve all files for configuration ':accessibility-focus:_internal-unified-test-platform-android-device-provider-ddmlib'.",
+  '   > Could not resolve com.android.tools.utp:android-device-provider-ddmlib:31.11.0.',
+  "      > Could not get resource 'https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib/31.11.0/android-device-provider-ddmlib-31.11.0.pom'.",
+  "         > Could not GET 'https://dl.google.com/dl/android/maven2/com/android/tools/utp/android-device-provider-ddmlib/31.11.0/android-device-provider-ddmlib-31.11.0.pom'.",
+  '            > Read timed out',
+  'BUILD FAILED in 31s',
+].join('\n')
+
+function runDeviceScript(t, firstConnectedFailure) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-focus-device-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const android = path.join(root, 'apps/mobile/android')
+  fs.mkdirSync(android, { recursive: true })
+  const calls = path.join(root, 'gradle-calls.jsonl')
+  const waits = path.join(root, 'waits.jsonl')
+  const testcase = (name, failing) =>
+    failing
+      ? `<testcase name="${name}" classname="AccessibilityFocusTalkBackTest"><failure message="focus">java.lang.AssertionError: the OS reported focus on nothing</failure></testcase>`
+      : `<testcase name="${name}" classname="AccessibilityFocusTalkBackTest" />`
+  const xml = (failing) =>
+    `<?xml version="1.0"?><testsuite name="AccessibilityFocusTalkBackTest">${EXPECTED_TESTS.map(
+      (name) => testcase(name, failing.includes(name))
+    ).join('')}</testsuite>`
+  fs.writeFileSync(
+    path.join(android, 'gradlew'),
+    `#!${process.execPath}
+const fs = require('node:fs')
+const path = require('node:path')
+const calls = ${JSON.stringify(calls)}
+const args = process.argv.slice(2)
+const task = args.find((arg) => arg.startsWith(':accessibility-focus:'))
+const suppressed = args.some((arg) => arg.endsWith('suppressFocus=true'))
+const prior = fs.existsSync(calls)
+  ? fs.readFileSync(calls, 'utf8').trim().split('\\n').map((line) => JSON.parse(line))
+  : []
+fs.appendFileSync(calls, JSON.stringify({ task, suppressed }) + '\\n')
+if (task === ':accessibility-focus:assembleDebugAndroidTest') {
+  console.log('BUILD SUCCESSFUL')
+  process.exit(0)
+}
+const earlier = prior.filter((call) => call.task === task && call.suppressed === suppressed)
+if (!suppressed && earlier.length === 0) {
+  console.error(${JSON.stringify(firstConnectedFailure)})
+  process.exit(1)
+}
+const raw = '../modules/accessibility-focus/android/build/outputs/androidTest-results/connected'
+fs.mkdirSync(raw, { recursive: true })
+fs.writeFileSync(
+  path.join(raw, 'TEST-emulator.xml'),
+  suppressed ? ${JSON.stringify(xml(NEED_OS_REPORT))} : ${JSON.stringify(xml([]))}
+)
+if (!suppressed) {
+  console.log('BUILD SUCCESSFUL')
+  process.exit(0)
+}
+console.error('> Task :accessibility-focus:connectedDebugAndroidTest FAILED')
+console.error('> There were failing tests. See the report.')
+process.exit(1)
+`,
+    { mode: 0o755 }
+  )
+  const settings = path.join(root, 'touch-exploration')
+  const adb = path.join(root, 'adb')
+  fs.writeFileSync(
+    adb,
+    `#!${process.execPath}
+const fs = require('node:fs')
+const settings = ${JSON.stringify(settings)}
+const args = process.argv.slice(2).join(' ')
+if (args === 'shell getprop ro.product.cpu.abi') console.log('x86_64')
+if (args === 'shell settings put secure accessibility_enabled 1') fs.writeFileSync(settings, '1')
+if (args === 'shell settings put secure accessibility_enabled 0') fs.writeFileSync(settings, '0')
+if (args === 'shell settings get secure touch_exploration_enabled')
+  console.log(fs.existsSync(settings) ? fs.readFileSync(settings, 'utf8') : '0')
+if (args === 'shell dumpsys accessibility')
+  console.log('  A11yWindow[AccessibilityWindowInfo[title=Settings, id=12, type=TYPE_APPLICATION, active=true]]')
+`,
+    { mode: 0o755 }
+  )
+  // The retry's waits are recorded and skipped, so the test does not sleep 20 s.
+  const noWait = path.join(root, 'no-wait.cjs')
+  fs.writeFileSync(
+    noWait,
+    `const fs = require('node:fs')
+Atomics.wait = (array, index, value, ms) => {
+  fs.appendFileSync(${JSON.stringify(waits)}, JSON.stringify(ms) + '\\n')
+  return 'timed-out'
+}
+`
+  )
+  const device = fileURLToPath(
+    new URL('./accessibility-focus-device-tests.sh', import.meta.url)
+  )
+  const result = spawnSync('bash', [device], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 60000,
+    env: {
+      ...process.env,
+      ADB: adb,
+      NODE_OPTIONS: `--require ${noWait}`,
+      ACCESSIBILITY_FOCUS_WINDOW_WAIT: '1',
+    },
+  })
+  return {
+    result,
+    calls: fs
+      .readFileSync(calls, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line)),
+    waits: fs.existsSync(waits)
+      ? fs.readFileSync(waits, 'utf8').trim().split('\n').map(Number)
+      : [],
+  }
+}
+
+for (const [cause, failure, error] of [
+  [
+    'a 429 beside the download',
+    [
+      '> Could not resolve com.android.tools.utp:android-test-plugin-host-retention:31.11.0.',
+      `   > ${RATE_LIMITED}`,
+      'BUILD FAILED in 9s',
+    ].join('\n'),
+    'status code 429',
+  ],
+  [
+    'a read timeout nested under the download, with the task FAILED',
+    UTP_READ_TIMED_OUT,
+    'Read timed out',
+  ],
+])
+  test(`the TalkBack device script retries a connected run that failed resolving (${cause}) and never the control`, (t) => {
+    const { result, calls, waits } = runDeviceScript(t, failure)
+    assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+    // The build once; the TalkBack run twice, its first start failed resolving; the control once.
+    assert.deepEqual(calls, [
+      { task: ':accessibility-focus:assembleDebugAndroidTest', suppressed: false },
+      { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: false },
+      { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: false },
+      { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: true },
+    ])
+    assert.deepEqual(waits, [RESOLUTION_RETRY_DELAYS_MS[0]])
+    assert.ok(
+      result.stdout
+        .split('\n')
+        .includes(
+          `::warning::Attempt 1/3 hit a transient download error (${error}); retrying in 20 s.`
+        ),
+      result.stdout
+    )
+    assert.match(
+      result.stdout,
+      /^TalkBack run: 5 passed\. Suppressed-focus control: the 4 tests that need the OS focus report failed on it, the rest passed\.$/m
+    )
+  })

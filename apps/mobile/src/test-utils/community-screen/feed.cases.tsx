@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import {
   mockCapture,
   SDK_ERROR_MESSAGE,
@@ -9,7 +11,7 @@ import {
   serveFeed,
   setMockParams,
 } from './harness'
-import { routing } from './mock-state'
+import { refreshEvents, routing } from './mock-state'
 import { userEvent as browserUser } from 'vitest/browser'
 import { screen, waitFor, within, fireEvent, act } from '@testing-library/react'
 import { delay, http, HttpResponse } from 'msw'
@@ -761,6 +763,116 @@ export function registerCommunityFeedCases() {
      */
     expect(panel.textContent).toBe(enUS.community.error.load)
     expect(panel.textContent).not.toBe(enUS.community.error.withdraw)
+  })
+
+  /*
+   * Nightly run 44298434117, iOS live font scale (community): the leg ended on "We could not load
+   * the community feed." with the feed pushed down under it. The run kept no request timeline, so
+   * a failed pull-to-refresh from the harness's drags past the top is the working hypothesis, not
+   * an observed sequence. This case reproduces the app defect on its own: after a failed refresh,
+   * the load error stayed through later reads that answered. A read that answers clears the stale
+   * load error; a withdraw failure is about another action and stays.
+   */
+  it('6.1-MOB-096 a refresh that answers clears the load error an earlier refresh left', async () => {
+    let reads = 0
+    let failNext = false
+    serveFeed(() => {
+      reads += 1
+      if (failNext) {
+        failNext = false
+        return errorEnvelope(500, 'Internal server error.')
+      }
+      return feedJson({ items: [item({ id: 'post-a' })], nextCursor: null })
+    })
+
+    await render(<CommunityScreen />)
+    await screen.findByTestId('community-post-card-post-a')
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+
+    failNext = true
+    act(() => refreshEvents.onRefresh!())
+    const panel = await screen.findByTestId('community-action-error')
+    expect(panel.textContent).toBe(enUS.community.error.load)
+    expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
+
+    const readsBeforeRecovery = reads
+    act(() => refreshEvents.onRefresh!())
+    await waitFor(() => expect(reads).toBe(readsBeforeRecovery + 1))
+    await waitFor(() => expect(screen.queryByTestId('community-action-error')).toBeNull())
+    expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
+    expect(screen.queryByTestId('community-feed-error')).toBeNull()
+  })
+
+  it('6.1-MOB-097 a refresh that answers leaves a failed withdraw on screen', async () => {
+    let reads = 0
+    serveFeed(() => {
+      reads += 1
+      const own = item({ id: 'post-self', author: { displayName: 'You', isSelf: true } })
+      // The refresh's answer differs, so the test can see that it landed.
+      return feedJson({ items: reads === 1 ? [own] : [own, item({ id: 'post-fresh' })] })
+    })
+    server.use(
+      http.post('*/api/v1/community/posts/:postId/withdraw', () =>
+        errorEnvelope(500, 'Internal server error.')
+      )
+    )
+
+    await render(<CommunityScreen />)
+    press(await screen.findByTestId('community-card-withdraw-post-self'))
+    const panel = await screen.findByTestId('community-action-error')
+    expect(panel.textContent).toBe(enUS.community.error.withdraw)
+
+    await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
+    act(() => refreshEvents.onRefresh!())
+    await screen.findByTestId('community-post-card-post-fresh')
+    expect(screen.getByTestId('community-action-error').textContent).toBe(
+      enUS.community.error.withdraw
+    )
+  })
+
+  /*
+   * CodeRabbit on PR 256: an action error names what the signed-in member tried. When another
+   * member takes the session, the identity reset clears the feed, drafts and sheets; it must clear
+   * the previous member's failure too, or the next member reads a withdraw they never made.
+   */
+  it("6.1-MOB-099 a new member does not inherit the previous member's failed action", async () => {
+    let identity = 'member-one-token'
+    let reads = 0
+    const restore = setMobileAccessTokenResolver(() => {
+      reads++
+      return identity
+    })
+    const nextRead = async () => {
+      const before = reads
+      await waitFor(() => expect(reads).toBeGreaterThan(before), { timeout: 2500 })
+    }
+    let feedReads = 0
+    serveFeed(() => {
+      feedReads += 1
+      const own = item({ id: 'post-self', author: { displayName: 'You', isSelf: true } })
+      return feedJson({
+        items: feedReads === 1 ? [own] : [item({ id: 'post-member-two' })],
+      })
+    })
+    server.use(
+      http.post('*/api/v1/community/posts/:postId/withdraw', () =>
+        errorEnvelope(500, 'Internal server error.')
+      )
+    )
+    try {
+      await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-withdraw-post-self'))
+      const panel = await screen.findByTestId('community-action-error')
+      expect(panel.textContent).toBe(enUS.community.error.withdraw)
+
+      identity = 'member-two-token'
+      await nextRead()
+      // The second member's feed has landed, so the identity reset has run.
+      await screen.findByTestId('community-post-card-post-member-two')
+      expect(screen.queryByTestId('community-action-error')).toBeNull()
+    } finally {
+      restore()
+    }
   })
 
   it('6.1-MOB-089 restarts paging on a rejected cursor and never sends it twice', async () => {

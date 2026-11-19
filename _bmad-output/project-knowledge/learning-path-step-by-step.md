@@ -1,7 +1,7 @@
 # Couture Cast Learning Path (step by step)
 
-Updated: 2026-11-15.
-Added Steps 40 to 57:
+Updated: 2026-11-19.
+Added Steps 40 to 58:
 
 - Step 40: Story 6.2b, community screening release gate and hosted worker, `abfdf88a` (PR #151).
 - Step 41: Story 6.3, curated reactions, `989d1017` (PR #153).
@@ -21,6 +21,7 @@ Added Steps 40 to 57:
 - Step 55: Story 6.15, SDK 54 readiness and the live font-scale proof, `814ce811` (PR #226) and `f49027e4` (PR #229), closing with PR #230; the SDK 55 to 58 upgrade moved to Story 6.15b.
 - Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
+- Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -28,6 +29,9 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
+Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
+Added Step 57's production follow-ups, PRs #237 to #255.
 Moved Step 57 to completed after PR #238 merged as `5bd54123`, and added the pending-teen sign-in loop to its takeaways and tests.
 Added Step 57 for Story 6.17 while its PR is in review, with Step 57 in `Current position` and `The whole project in plain English`.
 Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
@@ -131,7 +135,10 @@ Read it before changing or adding a numbered step.
 
 ## Current position
 
-- Latest completed step: Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
+- Latest step: Step 58, production status and nightly health, the project close on 2026-11-19.
+  It has no story; its `Evidence boundaries` section names what only GitHub's runners can prove.
+  Delivery is done: `6-15b-expo-sdk-55-58-upgrade` stays `backlog`, so `epic-6` stays `in-progress`.
+- Step 57, Story 6.17, Google sign-in, status `done`, merged as `5bd54123` (PR #238) on 2026-11-15.
   Its plan is `_bmad-output/implementation-artifacts/spec-6-17-google-sign-in.md`.
   Step 57 was written before review and merge, and its `Evidence boundaries` section says what ran and what did not.
   The pending-teen sign-in fix on `fix/pending-teen-sign-in` follows it.
@@ -295,6 +302,7 @@ Read it before changing or adding a numbered step.
 |   55 | Climb one SDK at a time to the fix. Make text grow live with no restart.     |
 |   56 | Let visitors try a sample closet first. Save only comfort, and only on yes.  |
 |   57 | Sign in with Google. Ask a new person only their birthdate.                  |
+|   58 | Check production every day. Make every red night say why.                    |
 
 ## Special feature: AI garment tagging
 
@@ -11733,3 +11741,275 @@ Evidence boundaries:
 - Real Google is exercised by hand; CI signs in through the Keycloak stand-in only.
 - `ORPHAN_AUTH_USER_SWEEP_ENABLED=true` is set on the hosted community worker (2026-11-15).
 - The legal pages are engineering copy matched to the code, not counsel-reviewed text.
+
+### Production follow-ups (PRs #237 to #255)
+
+Between the Story 6.17 merge and the project close, every fix landed as its own PR, one at a time,
+each merged on green CI. Most were CI reliability; three were product defects real users found.
+
+1. **Real users find what lanes do not.**
+   A teen waiting on a guardian looped on sign-in (#244, recorded in the lessons above). Signed-in
+   teens on iPhone Safari saw the landing's Start signup and Sign in, because the landing never
+   read the session; a head script now names the session before first paint (#248). A tester on
+   Android Chrome got "Failed to fetch" on garment upload, because production had no
+   `PUBLIC_API_URL` and the API handed the browser a localhost upload URL; uploads now go through
+   the web app's `/api/v1` rewrite, and the camera preview shows the whole frame the photo keeps
+   (#254).
+2. **A third-party download is a flake waiting for a busy day.**
+   Maven Central, the Gradle plugin portal, dl.google.com and an Ubuntu mirror each failed a run
+   with 429s or timeouts. Each now has a cache, an explicit install step before Gradle can fetch
+   on its own, or a bounded retry that prints why it failed (#239, #245, #246, #255).
+3. **A flaky oracle is a test defect, not an app defect.**
+   The advisory-lock test compared clocks from three processes (#241). A landing check read two
+   boxes in two frames while the feed above them loaded (#250). Maestro flows centered elements
+   pinned to a scroll edge (#252) and erased text past the device deadline (#240). The fixes kept
+   each invariant at the same strictness, and seeded the real defect to prove it still goes red.
+   #241 replaced its oracle: it checks enter and leave order in one shared log and per-worker
+   counts, and no longer compares clocks across processes.
+4. **A nightly lane that never passed proves nothing.**
+   The iOS live font job shipped its Release build without the text layout probe (#237), then
+   needed its legs to reach a verdict at all (#242, #247). The Android network-timeout flow sat
+   on a signed-out welcome card after Story 6.16 made the request member-only (#249). TalkBack
+   placed its own focus after the app's request in the reopened composer (#253).
+5. **Stay inside the plan's limits.**
+   The Vercel Hobby team reached 98 of 100 build hours and 77% of its edge requests, almost all
+   from CI. #243 cut both at the source and kept every test. Changed real-session specs now get
+   burn-in inside the lane that owns their stack (#251).
+
+## Step 58: Production status and nightly health
+
+User/business impact:
+
+With the stories done, the open question becomes "is production still working today?".
+Production can break with no merge: an expired secret, a provider outage, a plan quota or drifted
+data. Before this step the production suite ran after a push to `main` or when someone dispatched
+it, so between pushes nothing ran it on its own. The production Playwright suite now also runs once a day, and the README's
+`production status` badge shows the latest result. Three nightly native workflows were red (iOS
+native, accessibility focus and the share-card native lanes); iOS runs only nightly or by
+dispatch, since macOS jobs never run on pull requests. This step fixes the causes the evidence
+showed, including one app defect a user could hit, and makes the failures it could not explain
+record their cause next time.
+
+Key takeaways:
+
+1. **A status check is the push suite on a clock.**
+   The daily run reuses `pw-e2e-prod.yml` end to end: it waits until production serves the
+   scheduled event's commit, `main` as of the event (or one with the same build inputs), then runs
+   the same suite a push runs, with the same lane setting, so the Playwright helper unit tests stay
+   in the PR checks and a red badge means production. No second suite drifts from the first.
+2. **A scheduled run must not cost a push its verdict.**
+   By default GitHub keeps one pending run per concurrency group and replaces it on every
+   arrival, and this workflow uses that default. In the
+   push group, a scheduled run could replace a pending push verification. The scheduled run has
+   its own group; a push that deploys mid-run can fail the scheduled run's SHA check, and the push
+   run then gives the verdict.
+3. **A badge has no age.**
+   The badge shows the latest run, not when it ran. GitHub can delay or drop a scheduled run and
+   disables a public repository's schedules after 60 days with no activity, so the run list is
+   where freshness is read.
+4. **Make the next failure name its cause.**
+   Each nightly fix also adds the evidence the failing run lacked: the Release font lane reports
+   an emulator that exits during the build with memory and kernel OOM lines, the iOS build summary
+   lists xcodebuild's failed commands, and a failed iOS live font leg or shard publishes a masked
+   record of the local API's requests. The service logs themselves stay private, since the
+   repository is public and they can carry runtime credentials.
+
+Hard-won lessons from the implementation and code review of this story:
+
+- The accessibility-focus nightly failed before any test ran: Maven Central answered HTTP 429 for
+  `gson` 2.9.1 during plugin resolution, reached through both the Gradle plugin portal and Maven
+  Central lookups. Every Gradle call in that workflow, the TalkBack connected runs included, now
+  goes through `scripts/ci/gradle-resolution-retry.mjs`. It retries a run whose output shows a
+  failed download, printed by Gradle or Robolectric, with a transient cause on the same line or
+  nested under it. A run with failing tests and no such download runs once; one that also shows a
+  failed download retries, which is the Robolectric case. The Codex review found the connected runs still resolved their UTP
+  dependencies outside the retry.
+- The Release font share-card lane lost its emulator during a 12-minute Release build on a runner
+  that also hosts Supabase and the app's services. Memory exhaustion is a working hypothesis: the
+  run kept no kernel log. The lane now adds swap sized inside the native build's 15 GiB disk guard;
+  the Codex review caught that a fixed 8 GiB swap could push free disk under that guard. The
+  emulator, memory and kernel diagnostics now run after a failed Release build too, and the lane
+  keeps the build's own exit status.
+- The 11-17 and 11-18 iOS nightlies failed five ways, no two alike, in separate jobs. The
+  share-card opener's touch was cancelled after its press-in, a flow passed its last step and was
+  then killed at the 120 s default deadline, and a negative check read the backgrounded app after
+  iOS Settings opened. The opener now retries until the sheet title shows and skips the tap when
+  its guard sees the title, the flows that position the opener get a budget derived from their
+  subflows, and the iOS Settings proof is the "back to CoutureCast" link Settings shows. The fifth,
+  a Release build that exited 65, left no failed command in its record; its cause is unknown, and
+  the build summary now lists xcodebuild's failed commands so the next one is named.
+- The community live font leg ended on "We could not load the community feed." with the feed
+  text pushed down by the error panel. The working hypothesis: the extra downward drags the proof
+  harness makes after its scrolled captures can fire pull-to-refresh, and one such read failed.
+  The artifact holds no request timeline, so neither the failed request nor any later refresh is
+  identified. Investigating it found an app defect, reproduced independently by test: after a
+  failed read, the error panel stayed through every later load that answered, so a member who
+  pulls again after a network blip saw the error above a feed that loaded. A load that answers now clears a stale load error, on the pull path and the
+  realtime rebuild alike (the review found the first fix covered only the pull), and a failed
+  withdraw stays on screen. CodeRabbit then found the identity reset left a failed action on screen
+  for the next member who signed in; it now clears with the rest of the previous member's state.
+- The first API record read the launcher's log, which holds no HTTP lines, so a failed leg would
+  have published an empty record; and it kept any lowercase path segment, which would have
+  published a lowercase private value once the right log was wired. It now reads the API child's
+  log and maps every path onto the OpenAPI contract's route templates. The next review found the
+  public selector's token filter dropped the whole record for long template names such as
+  `api/v1/community/notification-preferences`, which every iOS sign-in requests; the selector now
+  checks each route against the contract and runs the token filter on every other string. The
+  same filter dropped the opener timing receipt over long flow paths; flow fields now must name a
+  flow file in the repository. Every closed field is checked inside the one depth- and
+  entry-bounded walk, so a malformed record is omitted alone.
+- The Gradle retry missed a resolution failure printed over several lines under a test task's own
+  `FAILED` line. The classifier now reads a cause nested under a failed download, and counts a
+  download only on a line Gradle or Robolectric prints, so an assertion that quotes
+  `Could not GET ... 429` does not retry. A test task that failed, a crashed JVM included,
+  retries only when the run also printed a real failed download.
+- The tap retry first shipped with structural YAML tests only, which a retry that never retries
+  passes. `scripts/lib/maestro-flow-model.mjs` now executes the real subflow on a virtual clock
+  with the subset of Maestro 2.8.0's rules and timing the subflow uses. The review found the first
+  model invented its timing, and the next review that it skipped the hierarchy read Maestro takes
+  for each lookup miss. Under the pinned Maestro the guard's last read comes after the settle, the
+  8 s title wait, two error reads, one opener read and a 500 ms search, so a title that draws later
+  than that still gets a second press. No subflow change removes that, since a title can draw
+  arbitrarily late; the tests run both sides of the boundary. Each run, passed, failed,
+  deadline-killed or discarded for a snapshot retry, now records how many opener tap commands
+  Maestro started, so a rise in retries shows in the evidence; a started command is not proof of
+  a delivered touch. The model proves
+  scripted control flow, not device touch delivery or real hierarchy timing.
+- This pull request's own dispatch of the accessibility workflow then failed on
+  `Could not find junit-4.13.2.jar`, a file Maven Central serves; the pull request run of the same
+  workflow had passed on the same cache 22 minutes earlier. Gradle 8.14.3 caches a missing-artifact
+  result for a day, so a plain rerun in the same Gradle home fails again. The classifier now counts
+  a missing file for a resolved module, inside Gradle's cause tree, as transient, and the retry
+  adds `--refresh-dependencies`; a missing module or version still fails at once. The story68
+  Android build, whose share-card lane failed in 15 s with no task named, now runs through the same
+  retry, and the build summary names plugin and dependency failures.
+- This pull request's own Playwright shard failed before any test: the WebKit package cache hit,
+  then a refused `security.ubuntu.com` fetch made the install script drop every cached package,
+  and the re-download from a slow mirror ran into the 600 s bound. A partial index refresh now
+  keeps each cached package whose SHA256 a signed index apt holds still vouches for, and drops the
+  rest; a failed install still drops all of them before its retry. The Codex check found apt picks
+  a cached file by the name it builds from the version it installs and checks only its size, so a
+  package must also sit at its own name, and a symlink is dropped.
+- A first change to the accessibility device script broke two Playwright helper specs that read
+  the script and its workflow, and the review round found them. Run every spec that reads a
+  changed file before committing.
+
+Story/Task mapping:
+
+- No story: this step closes the project's delivery phase. It is operational work requested by the
+  owner on 2026-11-19, the same departure from instruction 2 that Steps 38, 39, 49 and 55 took.
+  The lessons heading keeps the template's wording "of this story"; here it means this step.
+- `6-15b-expo-sdk-55-58-upgrade` stays `backlog` in `sprint-status.yaml`, so `epic-6` stays
+  `in-progress`.
+
+Story reference:
+
+- `_bmad-output/project-knowledge/deployment-guide.md`, `Production deployment verification`.
+- `README.md`, `Production status`.
+
+Cross-links:
+
+- Step 7 provides the CI gates and the deployed E2E workflows this step schedules.
+- Step 12 provides the cross-surface E2E suite the production run executes.
+- Step 38 provides the community screen whose stale error this step clears.
+- Step 46 provides the accessibility-focus module and its TalkBack lanes.
+- Step 48 provides the share-card native lanes, the Release font proof and the story68 flows.
+- Step 55 provides the live font-scale proof whose iOS legs run nightly.
+
+Sequence to follow:
+
+1. `.github/workflows/pw-e2e-prod.yml` (triggers, concurrency and the served-commit waits).
+2. `scripts/ci/gradle-resolution-retry.mjs`, `.github/workflows/pr-accessibility-focus.yml` and
+   `scripts/ci/accessibility-focus-device-tests.sh`.
+3. `scripts/ci/share-card-android-release-font.sh`.
+4. `maestro/story68/tap-outfit-open.yaml`, `maestro/story68/settings.yaml` and
+   `scripts/lib/story68-flow-timeouts.mjs`.
+5. `scripts/lib/native-build-failure.mjs`, `scripts/lib/maestro-flow-model.mjs` and
+   `scripts/ci/native-ios-maestro-trace.mjs`.
+6. `scripts/ci/native-api-requests.mjs`, `.github/workflows/ios-native-jobs.yml` and
+   `scripts/ci/native-ios-public-diagnostics.mjs`.
+7. `apps/mobile/src/features/community/community-screen.tsx` (the load-error reset).
+
+Task owner map:
+
+- Step 58 step 1 owner: schedule and isolate the daily production run in `.github/workflows/pw-e2e-prod.yml`, documented in `README.md` and `_bmad-output/project-knowledge/deployment-guide.md`.
+- Step 58 step 2 owner: retry dependency resolution in `scripts/ci/gradle-resolution-retry.mjs`, called from `.github/workflows/pr-accessibility-focus.yml` and `scripts/ci/accessibility-focus-device-tests.sh`.
+- Step 58 step 3 owner: keep the Release font emulator alive and report its loss in `scripts/ci/share-card-android-release-font.sh`.
+- Step 58 step 4 owner: open the share-card sheet through the tap retry in `maestro/story68/tap-outfit-open.yaml`, with flow budgets in `scripts/lib/story68-flow-timeouts.mjs`.
+- Step 58 step 5 owner: name a failed iOS build's commands in `scripts/lib/native-build-failure.mjs`.
+- Step 58 step 6 owner: publish the masked API record from `scripts/ci/native-api-requests.mjs` through `.github/workflows/ios-native-jobs.yml`.
+- Step 58 step 7 owner: clear a stale load error in `apps/mobile/src/features/community/community-screen.tsx`.
+
+Tests that cover this step:
+
+Workflow contracts, Vitest:
+
+- [`apps/api/integration/deployment-workflows.spec.ts`](../../apps/api/integration/deployment-workflows.spec.ts):
+  parses `pw-e2e-prod.yml` and proves the daily schedule, the separate concurrency group, that no
+  job or step here or in the reusable workflows it calls is conditional on the event, and the
+  README badge.
+- [`playwright/support/helpers/accessibility-focus-workflow.spec.ts`](../../playwright/support/helpers/accessibility-focus-workflow.spec.ts):
+  proves the accessibility-focus path filters list the retry files.
+- [`playwright/support/helpers/accessibility-focus-results.spec.ts`](../../playwright/support/helpers/accessibility-focus-results.spec.ts):
+  proves the lane runner finds the retry next to the device script.
+
+CI scripts, node:test:
+
+- [`scripts/ci/gradle-resolution-retry.test.mjs`](../../scripts/ci/gradle-resolution-retry.test.mjs):
+  proves every Gradle call in the accessibility workflow goes through the retry, every Android job
+  sets up the Gradle cache, and the classifier's outcomes: a same-line or nested transient download
+  failure retries, a quoted download line or a crashed test task with no real download runs once.
+- [`scripts/ci/apt-install.test.mjs`](../../scripts/ci/apt-install.test.mjs):
+  proves a partial index refresh keeps the cached package a signed index vouches for and drops an
+  altered one, drops everything when no index vouches for it, and drops a vouched-for archive
+  stored under another version's name and any symlink.
+- [`scripts/ci/share-card-android-release-font.test.mjs`](../../scripts/ci/share-card-android-release-font.test.mjs):
+  proves swap sized against the disk guard, the emulator check after the build, and that kernel
+  OOM lines reach the log.
+- [`scripts/lib/story68-outfit-open-tap.test.mjs`](../../scripts/lib/story68-outfit-open-tap.test.mjs):
+  runs the real `tap-outfit-open.yaml` against a scripted opener under fast and slow timing: a
+  cancelled first press opens on the second, a title drawn at the guard boundary gets one press
+  and one drawn 1 ms later gets two, and a broken opener fails by name inside the budget. It also
+  checks each opener flow calls the subflow once and never taps bare, the opener budgets in
+  `scripts/lib/story68-flow-timeouts.mjs` against the subflows, and the tap attempts in the run
+  evidence.
+- [`scripts/lib/maestro-flow-model.test.mjs`](../../scripts/lib/maestro-flow-model.test.mjs):
+  proves the model's implemented subset of Maestro 2.8.0's retry, condition, lookup-window, tap
+  and `optional` rules against its own virtual clock, that it throws on any command it does not
+  know, and that its version equals the repository's pinned Maestro version. Its fidelity rests on
+  the pinned Maestro source it cites, read by hand; no test runs real Maestro against it.
+- [`scripts/ci/native-ios-maestro-trace.test.mjs`](../../scripts/ci/native-ios-maestro-trace.test.mjs):
+  proves the opener tap attempts read from the Maestro log, a command cut off by the deadline
+  included, and their outcome on every run path.
+- [`scripts/lib/story68-outfit-opener-flows.test.mjs`](../../scripts/lib/story68-outfit-opener-flows.test.mjs):
+  proves every opener flow positions the opener for its platform and scrolls with the guard.
+- [`scripts/lib/story68-native-evidence-schema.test.mjs`](../../scripts/lib/story68-native-evidence-schema.test.mjs):
+  proves the harness's Settings re-read accepts only the Settings breadcrumb on iOS and the
+  resumed package on Android, and walks the parsed `settings.yaml` so no iOS title check returns.
+- [`scripts/lib/native-build-failure.test.mjs`](../../scripts/lib/native-build-failure.test.mjs):
+  proves xcodebuild's failed commands are named, escaped names included, through the list footer,
+  and that Swift errors, also in paths with spaces, and failed build scripts are classified.
+- [`scripts/ci/native-api-requests.test.mjs`](../../scripts/ci/native-api-requests.test.mjs):
+  proves the API record reads the log name the harness writes, names each request by its OpenAPI
+  route template (an unknown path reads `unknown`, so a lowercase private value never reaches the
+  public record), publishes whole through the real selector with a preferences and a feed request
+  in one record, counts slow and unanswered requests, and runs after the service-exit check.
+
+Mobile, Vitest:
+
+- [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx)
+  (cases in `apps/mobile/src/test-utils/community-screen/feed.cases.tsx` and
+  `realtime.cases.tsx`): 6.1-MOB-096 proves a refresh that answers clears an earlier load error,
+  6.1-MOB-097 proves it keeps a failed withdraw, 6.1-MOB-098 proves a realtime rebuild that
+  answers clears it too, and 6.1-MOB-099 proves a new member does not inherit the previous
+  member's failed action.
+
+Evidence boundaries:
+
+- The daily production run, the swap step, the Gradle cache and the iOS fixes have no hosted CI
+  result yet; their fixtures and scripts ran locally. The hosted proof is the manual dispatches of
+  the native workflows from this branch and the first scheduled runs after merge.
+- The Release font emulator loss and the community leg's failed read have no recorded cause beyond
+  the hypotheses this step names. The new evidence records make the next failure more likely to
+  name one; a build log with no xcodebuild command list or a run with no kernel OOM record still
+  leaves it open.

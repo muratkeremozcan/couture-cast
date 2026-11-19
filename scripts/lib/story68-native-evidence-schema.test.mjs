@@ -1,5 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -12,7 +14,9 @@ import {
   IOS_SETTINGS_MARKERS,
   assertNativeEvidence,
   nativeEvidenceFamilies,
+  osSettingsForeground,
 } from './story68-native-evidence-schema.mjs'
+import { parse } from 'yaml'
 import {
   closedShareCardAuditReport,
   shareCardAuditTestIDs,
@@ -284,21 +288,170 @@ test('the iOS Settings markers are the breadcrumb pair, which every Settings scr
 // FAILED), a flow with appId com.apple.Preferences does, and a parent flow can run such a flow.
 // Both CI waits (the General row, then the breadcrumb) sat under the app's appId and could never
 // succeed, whatever Settings showed.
-test('settings.yaml waits for the breadcrumb in a subflow scoped to the Settings app', async () => {
-  const { readFileSync } = await import('node:fs')
+/**
+ * Every check a Maestro command list makes on the screen, with the platform it runs on and the
+ * command's whole body (timeouts and `optional` included): the commands of a `runFlow` with
+ * `when.platform` run on that platform only, everything else on both. It descends into inline
+ * `runFlow`, `retry` and `repeat` command lists, and reads the parsed flow, so a comment that
+ * names an id is never counted.
+ */
+function screenChecks(commands, platform = 'both') {
+  const checks = []
+  for (const command of commands ?? []) {
+    for (const [name, argument] of Object.entries(command)) {
+      if (name === 'runFlow') {
+        const scoped = argument.when?.platform ?? platform
+        if (argument.file)
+          checks.push({ platform: scoped, command: 'runFlow', body: argument.file })
+        checks.push(...screenChecks(argument.commands, scoped))
+      } else if (name === 'retry' || name === 'repeat')
+        checks.push(...screenChecks(argument.commands, platform))
+      else if (['assertVisible', 'assertNotVisible', 'extendedWaitUntil'].includes(name))
+        checks.push({ platform, command: name, body: argument })
+    }
+  }
+  return checks
+}
+
+/** The selector ids (or bare texts) a screen check looks for. */
+function checkedIds({ command, body }) {
+  if (command === 'runFlow') return []
+  const selectors =
+    command === 'extendedWaitUntil' ? [body.visible, body.notVisible] : [body]
+  return selectors
+    .filter((selector) => selector !== undefined)
+    .map((selector) =>
+      typeof selector === 'string' ? selector : (selector.id ?? selector.text)
+    )
+}
+
+describe('settings.yaml and the harness re-read prove the OS Settings app is in front', () => {
   const read = (name) =>
-    readFileSync(new URL(`../../maestro/story68/${name}`, import.meta.url), 'utf8')
-  const flow = read('settings.yaml')
-  const ios = flow.slice(flow.indexOf('platform: iOS'), flow.indexOf('platform: Android'))
-  assert.match(ios, /file: wait-os-settings-ios\.yaml/)
-  assert.doesNotMatch(flow, /breadcrumb|com\.apple\.settings\./)
-  assert.match(flow, /assertNotVisible:\s+id: share-card-title/)
-  const sub = read('wait-os-settings-ios.yaml')
-  assert.match(sub, /^appId: com\.apple\.Preferences\n---/)
-  assert.match(
-    sub,
-    /extendedWaitUntil:\s+visible:\s+id: breadcrumb\s+text: ".\*CoutureCast Story68"\s+timeout: 15000/
-  )
+    fs.readFileSync(new URL(`../../maestro/story68/${name}`, import.meta.url), 'utf8')
+  const checks = screenChecks(parse(read('settings.yaml').split(/^---$/m)[1]))
+
+  // Maestro scopes a flow to its appId. Probed on iOS 26.1 (2026-10-29) with the Settings app in
+  // front: a flow with appId = the app under test does not see the breadcrumb (extendedWaitUntil
+  // FAILED), a flow with appId com.apple.Preferences does, and a parent flow can run such a flow.
+  // Both CI waits (the General row, then the breadcrumb) sat under the app's appId and could never
+  // succeed, whatever Settings showed.
+  test('iOS waits for the breadcrumb in a subflow scoped to the Settings app', () => {
+    assert.deepEqual(
+      checks.filter((check) => check.platform === 'iOS'),
+      [{ platform: 'iOS', command: 'runFlow', body: 'wait-os-settings-ios.yaml' }]
+    )
+    // No check under this app's appId looks for the breadcrumb or a Settings row.
+    assert.deepEqual(
+      checks.filter((check) =>
+        checkedIds(check).some((id) => /breadcrumb|^com\.apple\.settings\./.test(id))
+      ),
+      []
+    )
+    const sub = read('wait-os-settings-ios.yaml')
+    assert.match(sub, /^appId: com\.apple\.Preferences\n---/)
+    assert.deepEqual(parse(sub.split(/^---$/m)[1]), [
+      {
+        extendedWaitUntil: {
+          visible: { id: 'breadcrumb', text: '.*CoutureCast Story68' },
+          timeout: 15000,
+        },
+      },
+    ])
+  })
+
+  // Nightly run 44298434117 shard 1: with Settings in front (breadcrumb wait passed), an
+  // assertNotVisible on the sheet title under this app's appId matched for 38 s while the app kept
+  // preparing its card in the background. On iOS the breadcrumb, in the flow and again in the
+  // harness, is the proof; the title check stays where the hierarchy is the foreground's.
+  test('the sheet title check runs on Android only, after Settings is in front', () => {
+    // Exact bodies: a 1 ms timeout or an `optional: true` title check is a different check.
+    assert.deepEqual(
+      checks.filter((check) => check.platform === 'Android'),
+      [
+        {
+          platform: 'Android',
+          command: 'extendedWaitUntil',
+          body: { visible: { id: 'com.android.settings:id/.*' }, timeout: 15000 },
+        },
+        {
+          platform: 'Android',
+          command: 'assertNotVisible',
+          body: { id: 'share-card-title' },
+        },
+      ]
+    )
+    assert.deepEqual(
+      checks.filter(
+        (check) =>
+          checkedIds(check).includes('share-card-title') && check.platform !== 'Android'
+      ),
+      [],
+      'no title check runs on iOS, inline or inside a retry or repeat'
+    )
+  })
+
+  test('the harness re-read accepts Settings in front and rejects anything else', () => {
+    const tree = (id, text) => ({
+      attributes: {},
+      children: [{ attributes: { 'resource-id': id, text }, children: [] }],
+    })
+    let reads = 0
+    const ios = (hierarchy) =>
+      osSettingsForeground({
+        platform: 'ios',
+        readAndroidActivities: () => assert.fail('iOS never reads Android activities'),
+        readIosHierarchy: () => {
+          reads += 1
+          return hierarchy
+        },
+      })
+    assert.deepEqual(ios(tree('breadcrumb', '◀ CoutureCast Story68')), {
+      foregroundMarkers: IOS_SETTINGS_MARKERS,
+    })
+    assert.equal(reads, 1, 'iOS reads the hierarchy once, after the flow')
+    // The app's own sheet still in front, or another app's breadcrumb: not Settings for this app.
+    for (const hierarchy of [
+      tree('share-card-title', 'Share card'),
+      tree('breadcrumb', '◀ Safari'),
+    ])
+      assert.throws(() => ios(hierarchy), { message: 'os_settings_not_opened' })
+
+    const android = (activities) =>
+      osSettingsForeground({
+        platform: 'android',
+        readAndroidActivities: () => activities,
+        readIosHierarchy: () => assert.fail('Android never reads an iOS hierarchy'),
+      })
+    assert.deepEqual(
+      android(
+        '  topResumedActivity=ActivityRecord{1a2b u0 com.android.settings/.SubSettings t42}'
+      ),
+      { foregroundPackage: 'com.android.settings' }
+    )
+    assert.throws(
+      () =>
+        android(
+          '  topResumedActivity=ActivityRecord{1a2b u0 com.couturecast.story68/.MainActivity t7}'
+        ),
+      { message: 'os_settings_not_opened' }
+    )
+  })
+
+  test('openOsSettings returns the re-read for both platforms', () => {
+    const code = fs
+      .readFileSync(new URL('../run-story68-native.mjs', import.meta.url), 'utf8')
+      .split('\n')
+      .filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line))
+      .join('\n')
+    const body = code.slice(code.indexOf('function openOsSettings()'))
+    const returns = body
+      .slice(0, body.indexOf('\n}\n'))
+      .split('\n')
+      .filter((line) => /\breturn\b/.test(line))
+      .map((line) => line.trim())
+    // One return, the re-read: no platform leaves openOsSettings before it.
+    assert.deepEqual(returns, ['return osSettingsForeground({'])
+  })
 })
 
 test('the breadcrumb check accepts both label forms the status bar shows and rejects other apps', async () => {

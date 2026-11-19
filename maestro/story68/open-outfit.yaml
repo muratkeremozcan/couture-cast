@@ -27,8 +27,7 @@ appId: ${MAESTRO_APP_ID}
 - assertNotVisible:
     id: outfit-share-card-open
     index: 1
-- tapOn:
-    id: outfit-share-card-open
+- runFlow: tap-outfit-open.yaml
 - extendedWaitUntil:
     visible:
       id: share-card-preview-loaded-.*

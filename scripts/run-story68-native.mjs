@@ -36,6 +36,8 @@ import { nativeFlowTimeoutMs } from './ci/native-ios-flow-budget.mjs'
 import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
+  recordIosOpenerTapAttempts,
+  openerTapOutcome,
   recordIosFlowProgress,
   captureIosTimeoutHierarchy,
   recordIosHostSample,
@@ -81,8 +83,7 @@ import { MAESTRO_BIN } from './maestro-version.mjs'
 import { STORY68_AUTH_PROXY_PORT } from './lib/story68-public-build-env.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
-  breadcrumbIn,
-  IOS_SETTINGS_MARKERS,
+  osSettingsForeground,
 } from './lib/story68-native-evidence-schema.mjs'
 import { spawnIosFlow, recordIosFlowTiming } from './ci/native-ios-flow-deadline.mjs'
 import {
@@ -322,19 +323,13 @@ function composerLayout() {
 function openOsSettings() {
   maestro('maestro/story68/settings.yaml')
   requireDevice()
-  if (platform === 'android') {
-    const resumed = run(adb, ['-s', device, 'shell', 'dumpsys', 'activity', 'activities'])
-      .split('\n')
-      .find((line) =>
-        /^\s*(topResumedActivity|mResumedActivity|ResumedActivity)/.test(line)
-      )
-      ?.match(/ActivityRecord\{\S+ \S+ ([\w.]+)\//)?.[1]
-    if (resumed !== 'com.android.settings') throw new Error('os_settings_not_opened')
-    return { foregroundPackage: resumed }
-  }
-  if (!breadcrumbIn(JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy']))))
-    throw new Error('os_settings_not_opened')
-  return { foregroundMarkers: IOS_SETTINGS_MARKERS }
+  return osSettingsForeground({
+    platform,
+    readAndroidActivities: () =>
+      run(adb, ['-s', device, 'shell', 'dumpsys', 'activity', 'activities']),
+    readIosHierarchy: () =>
+      JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy'])),
+  })
 }
 // A cold Metro needs longer to build the launch bundle than open-app.yaml waits for the
 // tab bar, so the dev client is only pointed at Metro once that exact bundle is built. Expo Go
@@ -524,6 +519,15 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
+  // Every run's opener tap attempts, whatever its outcome, so a repeated tap is never hidden by a
+  // failure, a deadline kill or a discarded snapshot attempt.
+  recordIosOpenerTapAttempts({
+    platform,
+    flow,
+    directory,
+    progressLog: snapshotLog,
+    outcome: openerTapOutcome(result, recoverSnapshot),
+  })
   if (result.status !== 0 && !recoverSnapshot) {
     // A deadline kill leaves no failed-step screen; read it once more while the device lives.
     // The deadline, not the read's success, decides which screen is current (Codex RUNS-R5-01).
@@ -591,7 +595,12 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   )
   if (recoverSnapshot) return maestro(flow, env, secret, attempt + 1)
   if (result.status !== 0) throw new Error(`native_flow_failed:${flow}`)
-  recordIosCommandTimings({ platform, flow, output: successOutput, directory })
+  recordIosCommandTimings({
+    platform,
+    flow,
+    output: successOutput,
+    directory,
+  })
   recordIosStackPop({
     platform,
     flow,
@@ -649,6 +658,7 @@ function rapidWatermarkFlow(signal, control) {
     return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
   }
   const fd = fs.openSync(path.join(output, 'process.log'), 'wx', 0o600)
+  let heldOutcome = 'passed'
   return new Promise((resolve, reject) => {
     const process = spawn(
       maestroBinary,
@@ -713,6 +723,7 @@ function rapidWatermarkFlow(signal, control) {
     })
   })
     .catch((error) => {
+      heldOutcome = 'failed'
       const processLog = path.join(output, 'process.log')
       const logs = `${maestroLog()}\n${fs.existsSync(processLog) ? fs.readFileSync(processLog, 'utf8') : ''}`
       privateJson(
@@ -750,6 +761,13 @@ function rapidWatermarkFlow(signal, control) {
         directory,
         minMs: 0,
         maestroLog: maestroLog(),
+      })
+      recordIosOpenerTapAttempts({
+        platform,
+        flow,
+        directory,
+        progressLog: maestroLog(),
+        outcome: heldOutcome,
       })
       redactRapidWatermarkControl(output, control.url)
     })

@@ -1,4 +1,5 @@
 // Story 6.7 mobile destination owner: intent copy, outcomes and the focused notice in `apps/mobile/src/features/community/community-screen.tsx`, with handled-request retirement in `apps/mobile/src/features/community/use-community-spotlight.ts`
+// Step 58 step 7 owner: searchable owner anchor
 import { useAndroidSpotlightDetailPresentation } from '@/components/android-spotlight-detail-presentation'
 import {
   ScreenShareCardComposer,
@@ -212,6 +213,19 @@ function spotlightDetailForVisit(
 
 function UnlessBanned({ banned, children }: { banned: boolean; children: ReactNode }) {
   return banned ? null : <>{children}</>
+}
+
+type CommunityActionError = { error: unknown; fallbackKey: string }
+
+/**
+ * A feed read that failed after the first page spoke up beside the feed
+ * (`community.error.load`). A later read that answers, a pull or a realtime rebuild, makes that
+ * message stale, so it goes; an unrelated action's failure (a withdraw, a report) stays.
+ */
+function withoutStaleLoadError(
+  current: CommunityActionError | null
+): CommunityActionError | null {
+  return current?.fallbackKey === 'community.error.load' ? null : current
 }
 
 export function CommunityScreen() {
@@ -504,10 +518,7 @@ export function CommunityScreen() {
    * action failure borrowed the withdraw string, so a next page that 500'd told the
    * reader "We could not withdraw this look. It is still in the feed."
    */
-  const [actionError, setActionError] = useState<{
-    error: unknown
-    fallbackKey: string
-  } | null>(null)
+  const [actionError, setActionError] = useState<CommunityActionError | null>(null)
 
   useEffect(() => {
     highlightedTargetRef.current = null
@@ -946,6 +957,7 @@ export function CommunityScreen() {
             setBandUnresolvedReason(feed.bandUnresolvedReason)
             setActiveChallenge(feed.activeChallenge)
             setFeedError(null)
+            setActionError(withoutStaleLoadError)
             setBannedSanction(null)
             if (syncDeniedRef.current) {
               syncDeniedRef.current = false
@@ -1000,6 +1012,8 @@ export function CommunityScreen() {
       if (previous === undefined || previous === identity) return
       // A sanction names one member's ban, so it leaves with that member.
       setBannedSanction(null)
+      // An action error names what the previous member tried; it leaves with them too.
+      setActionError(null)
       // A block is per viewer: a new member starts with no live answers.
       sponsorships.clear()
       commentDrafts.forgetAll()
@@ -1150,6 +1164,8 @@ export function CommunityScreen() {
       setActiveChallenge(page.activeChallenge)
       setIsLoadingMore(false)
       setIsRefreshing(false)
+      // A realtime rebuild that answered is the same recovery as a pull that answered.
+      setActionError(withoutStaleLoadError)
       setFeedState('ready')
 
       const ids = new Set(realtimeItems.current.map((item) => item.id))

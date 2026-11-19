@@ -1,5 +1,7 @@
 // Learning path Step 48: Safe branded share-card export.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-48-safe-branded-share-card-export
+// Learning path Step 58: Production status and nightly health.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-status-and-nightly-health
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -70,7 +72,11 @@ test('no story68 flow centres the outfit opener on iOS or taps it past a header 
     const flow = read(name)
     assert.doesNotMatch(flow, /header-info-modal/, name)
     if (POSITIONED_BY_PREVIOUS_FLOW.includes(name)) continue
-    if (!/outfit-share-card-open/.test(flow) || name === 'position-outfit-open.yaml')
+    // The two subflows position and tap the opener for the flows that run them.
+    if (
+      !/outfit-share-card-open/.test(flow) ||
+      ['position-outfit-open.yaml', 'tap-outfit-open.yaml'].includes(name)
+    )
       continue
     assert.match(flow, /file: position-outfit-open\.yaml/, `${name} positions the opener`)
   }

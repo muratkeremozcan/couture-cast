@@ -641,6 +641,14 @@ jobs:
             fi
           done
           exit "$status"
+      # Nightly run 44298434117 (community): the screen said the feed failed to load and nothing
+      # public said what the API did. The service logs stay private; their closed record is
+      # published with the host evidence. It runs after the exit check, so a service that exits
+      # after a passing proof, which fails the job only there, is recorded too.
+      - &api_requests
+        name: Record the owned services' closed request evidence
+        if: ${{ !cancelled() && failure() }}
+        run: node scripts/ci/native-api-requests.mjs
       - &select_evidence
         name: Select and scan closed evidence
         if: always()
@@ -1155,6 +1163,7 @@ jobs:
           retention-days: 7
           if-no-files-found: error
       - *report_exits
+      - *api_requests
       - *select_evidence
       - name: Collect live font host evidence
         if: always()

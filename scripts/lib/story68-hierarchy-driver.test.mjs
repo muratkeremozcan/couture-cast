@@ -35,7 +35,11 @@ test('only the Settings breadcrumb read keeps a bare hierarchy call', () => {
     ...source.matchAll(/run\(maestroBinary, \['--device', device, 'hierarchy'\]\)/g),
   ]
   assert.equal(bare.length, 1)
-  assert.ok(source.slice(bare[0].index - 120, bare[0].index).includes('breadcrumbIn'))
+  // openOsSettings hands this read to osSettingsForeground, which looks for the breadcrumb.
+  assert.match(
+    source.slice(bare[0].index - 120, bare[0].index),
+    /readIosHierarchy: \(\) =>\s+JSON\.parse\($/
+  )
 })
 
 // Antigravity audit-diag P2: the audit failure screen is read through the owned driver after the

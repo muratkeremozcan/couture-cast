@@ -1,12 +1,19 @@
+# Step 58 step 1 owner: searchable owner anchor
 name: "Prod E2E (Playwright)"
 
-# Runs E2E tests against production after deployment
-# Waits for health endpoint to return correct SHA before testing
+# Runs E2E tests against production after each deployment, and once a day as the
+# production status check (the README badge reads this workflow on main).
+# Waits for health endpoint to return correct SHA before testing.
 
 on:
   push:
     branches:
       - main
+  schedule:
+    # Production status between pushes: proves production still serves main and still works
+    # when nothing merged (expired secrets, provider outages, quota limits, data drift).
+    # 11:41 UTC is 05:41 in Chicago (06:41 in summer): a fresh status before the workday.
+    - cron: '41 11 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,8 +24,11 @@ permissions:
 # One run per ref. Web and API serve only the newest main commit, so a run left
 # going after the next push tests a deployment that moves under it (web-health-sha
 # then reads the newer SHA). The newer push supersedes the older run.
+# The daily scheduled run has its own group: in the push group it would cancel a running
+# push verification or replace a pending one. A push that deploys while the scheduled run
+# is testing can fail that scheduled run's SHA check; the push run then gives the verdict.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'schedule' && '-status' || '' }}
   cancel-in-progress: true
 
 jobs:
@@ -27,7 +37,6 @@ jobs:
   # serving an earlier commit that builds the same source. Each wait accepts the commits on
   # main's first-parent history with this commit's inputs (scripts/vercel-build-inputs.mjs).
   served-commits:
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:

@@ -231,6 +231,7 @@ describe('withRapidWatermarkControl', () => {
     const records = []
     const timings = []
     const progress = []
+    const attempts = []
     const killed = []
     const child = new EventEmitter()
     child.pid = 4242
@@ -273,12 +274,13 @@ describe('withRapidWatermarkControl', () => {
       recordIosFlowProgress: (options) => progress.push(options),
       redactRapidWatermarkControl: () => undefined,
       recordIosCommandTimings: (options) => timings.push(options),
+      recordIosOpenerTapAttempts: (options) => attempts.push(options),
     }
     const result = vm.runInNewContext(
       `(${source.slice(start, end)})(signal, control)`,
       context
     )
-    return { result, records, timings, progress, killed }
+    return { result, records, timings, progress, attempts, killed }
   }
 
   test('the actual async child failure path publishes only the closed four-field native record', async () => {
@@ -334,5 +336,31 @@ describe('withRapidWatermarkControl', () => {
     assert.equal(progress[0].apiLogFromByte, 77)
     assert.equal(progress[0].appId, 'com.couturecast.story68')
     assert.equal(timings[0].maestroLog, maestroLog)
+  })
+
+  test('the held flow records its opener tap attempts with the outcome it ended on', async () => {
+    // Review 7: the held press counts on every outcome, a killed or failed hold included.
+    const maestroLog = 'Tap on id: outfit-share-card-open RUNNING'
+    const passing = runHeldFlow({
+      signal: new AbortController().signal,
+      exitCode: 0,
+      maestroLog,
+    })
+    await passing.result
+    const failing = runHeldFlow({
+      signal: new AbortController().signal,
+      exitCode: 1,
+      maestroLog,
+    })
+    await assert.rejects(failing.result, /native_rapid_watermark_flow_failed/)
+    for (const [run, outcome] of [
+      [passing, 'passed'],
+      [failing, 'failed'],
+    ]) {
+      assert.equal(run.attempts.length, 1, outcome)
+      assert.equal(run.attempts[0].outcome, outcome)
+      assert.equal(run.attempts[0].progressLog, maestroLog)
+      assert.equal(run.attempts[0].flow, 'maestro/story68/rapid-watermark-held.yaml')
+    }
   })
 })

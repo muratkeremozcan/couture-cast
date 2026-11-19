@@ -3,6 +3,7 @@
  * the harness so scripts/ci/native-build-cache.mjs can key a cached binary by them: a change to a
  * flag here changes the key, and the next run builds again.
  */
+import { fileURLToPath } from 'node:url'
 
 /** The ABI or architecture of this host, which the emulator and simulator also run. */
 export const hostNativeArch = (platform, arch = process.arch) =>
@@ -13,6 +14,11 @@ export const hostNativeArch = (platform, arch = process.arch) =>
     : arch === 'arm64'
       ? 'arm64-v8a'
       : 'x86_64'
+
+/** The Gradle retry an Android build runs through (nativeBuildCommand). */
+const GRADLE_RESOLUTION_RETRY = fileURLToPath(
+  new URL('../ci/gradle-resolution-retry.mjs', import.meta.url)
+)
 
 export const IOS_DERIVED_DATA = '/tmp/cc68-ios-build'
 export const IOS_APP_NAME = 'CoutureCastStory68.app'
@@ -119,10 +125,17 @@ export function nativeBuildCommand({
         'build',
       ],
     }
+  // The Gradle build runs through the shared resolution retry: PR 256 dispatch 44523804534
+  // (matrix-2) and run 44117971285 (controls) failed within 25 s with no failed task and no named
+  // cause, and a 429 or an artifact miss is retried only there (scripts/lib/
+  // transient-resolution-retry.cjs). Any other failure still fails at once.
   if (platform === 'android')
     return {
-      binary: './gradlew',
+      binary: process.execPath,
       args: [
+        GRADLE_RESOLUTION_RETRY,
+        '--',
+        './gradlew',
         `assemble${configuration}`,
         ...workletsArgs,
         '--no-daemon',

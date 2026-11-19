@@ -30,6 +30,31 @@ export function breadcrumbIn(node) {
     (Array.isArray(node.children) ? node.children : []).some(breadcrumbIn)
   )
 }
+
+/**
+ * The harness's own read that the OS Settings app is in front after settings.yaml, taken once the
+ * flow has ended. Android: the resumed activity's package. iOS: a fresh hierarchy read that must
+ * hold the breadcrumb, since settings.yaml asserts nothing on this app's tree there (nightly run
+ * 44298434117 shard 1). Throws `os_settings_not_opened` otherwise.
+ */
+export function osSettingsForeground({
+  platform,
+  readAndroidActivities,
+  readIosHierarchy,
+}) {
+  if (platform === 'android') {
+    const resumed = readAndroidActivities()
+      .split('\n')
+      .find((line) =>
+        /^\s*(topResumedActivity|mResumedActivity|ResumedActivity)/.test(line)
+      )
+      ?.match(/ActivityRecord\{\S+ \S+ ([\w.]+)\//)?.[1]
+    if (resumed !== 'com.android.settings') throw new Error('os_settings_not_opened')
+    return { foregroundPackage: resumed }
+  }
+  if (!breadcrumbIn(readIosHierarchy())) throw new Error('os_settings_not_opened')
+  return { foregroundMarkers: IOS_SETTINGS_MARKERS }
+}
 export const IOS_RETRYABLE_DENIAL_EVIDENCE =
   'restricted adapter response; iOS denies further runtime prompts after its first real denial'
 // Mirrors the states bridge-a11y.mjs requires per locale.
