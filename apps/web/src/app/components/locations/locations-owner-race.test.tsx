@@ -78,9 +78,11 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
     ),
 }))
 
+/** The router's push, and the query the section reads (a guided entry sets returnTo). */
+const navigation = vi.hoisted(() => ({ push: vi.fn(), query: '' }))
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
-  useSearchParams: () => new URLSearchParams(),
+  useRouter: () => ({ push: navigation.push }),
+  useSearchParams: () => new URLSearchParams(navigation.query),
 }))
 
 function place(id: string, label: string, city: string): SavedLocation {
@@ -156,6 +158,8 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     holdNextAList = false
     lists.promises = []
     lists.renames = []
+    navigation.push.mockClear()
+    navigation.query = ''
     renamed = false
     heldPatch = null
     holdNextPatch = false
@@ -175,6 +179,25 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
           })
         }
         return HttpResponse.json({ data: [renamed ? A_RENAMED : A_HOME] })
+      }),
+      http.get('/api/v1/locations/search', () =>
+        HttpResponse.json({
+          data: [
+            {
+              city: 'Chicago',
+              region: 'Illinois',
+              country: 'US',
+              latitude: 41.878,
+              longitude: -87.63,
+              displayLabel: 'Chicago, Illinois, United States',
+              candidateToken: 'chicago-payload.signature',
+            },
+          ],
+        })
+      ),
+      http.post('/api/v1/locations/from-search', () => {
+        renamed = true
+        return HttpResponse.json({ data: A_RENAMED }, { status: 201 })
       }),
       http.patch('/api/v1/locations/:id', async () => {
         if (holdNextPatch) {
@@ -330,6 +353,37 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     await settleLists()
     expect(listBearers).toEqual([...historyBefore, 'Bearer token-b'])
     expect(screen.queryByText(/Alpha/)).toBeNull()
+  })
+
+  // Codex product review 6 finding 2: A saves from a guided entry; the list that follows is held,
+  // the bridge moves the session to B, and the list answers before the section heard the switch.
+  it('LOC-OWNER-WEB-08 a post-save list answering after the session moved to B shows, announces and navigates nothing of A', async () => {
+    navigation.query = 'addLocation=1&returnTo=%2F'
+    const user = userEvent.setup()
+    renderSection()
+    expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+    const search = screen.getByRole('combobox', { name: 'Search for a city' })
+    await user.type(search, 'Chicago')
+    await user.click(await screen.findByRole('option', { name: /Chicago, Illinois/ }))
+    const label = screen.getByRole('textbox', { name: 'Name this place' })
+    await user.clear(label)
+    await user.type(label, 'Alpha Studio')
+    holdNextAList = true
+    await user.click(screen.getByRole('button', { name: 'Save location' }))
+    await waitFor(() => expect(heldList).not.toBeNull())
+
+    // The backing session is B's; the section has not heard yet.
+    session.identity = 'member-b'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
+    act(() => heldList!.release())
+    await settleLists()
+    await act(async () => {
+      await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
+    })
+
+    expect(screen.queryByText('Alpha Studio')).toBeNull()
+    expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
+    expect(navigation.push).not.toHaveBeenCalled()
   })
 
   it('LOC-OWNER-WEB-01 a list that lands after sign-out shows none of the signed-out member', async () => {

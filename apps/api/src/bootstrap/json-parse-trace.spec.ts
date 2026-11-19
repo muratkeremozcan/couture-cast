@@ -165,4 +165,18 @@ describe('an unreadable JSON body leaves no text in traces', () => {
     )
     expect(leaks).toEqual([])
   })
+
+  // Codex product review 6 finding 5: Nest skips its default parser only when it finds one by
+  // name, and the instrumentation renames every layer handle to `patched`, so a traced app could
+  // run the body through two JSON parsers.
+  it('JSON-TRACE-02 the traced app has exactly one JSON parser and one URL-encoded parser', () => {
+    const express = app.getHttpAdapter().getInstance() as {
+      router?: { stack: { name: string }[] }
+      _router?: { stack: { name: string }[] }
+    }
+    const stack = (express.router ?? express._router)?.stack ?? []
+    const names = stack.map((layer) => layer.name)
+    expect(names.filter((name) => name === 'jsonParser')).toHaveLength(1)
+    expect(names.filter((name) => name === 'urlencodedParser')).toHaveLength(1)
+  })
 })
