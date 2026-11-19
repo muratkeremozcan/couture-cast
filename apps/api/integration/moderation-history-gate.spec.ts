@@ -12,6 +12,7 @@ const read = (file: string) => readFileSync(path.join(repoRoot, file), 'utf8')
 const RECORD = '_bmad-output/test-artifacts/community-beta-gate-signatures.md'
 const OWNER_DATE = '2026-11-05'
 const SIGNED = 'Signed off by owner'
+const WAIVER_DATE = '2026-11-19'
 
 /** The first markdown table in the record that names a signature, as objects keyed by header. */
 function signatureRows(): Record<string, string>[] {
@@ -94,15 +95,74 @@ describe('U-GATE-RECORD', () => {
     )
   })
 
-  it.each([/SLA alert/i, /localization/i, /accessibility/i, /rollback/i])(
-    'leaves %s open, so Community Beta stays closed',
-    (signature) => {
-      expect(rowFor(signature).status).toMatch(/^open/i)
+  // Owner ruling 2026-11-19: the owner authorized opening the Community Beta to every member
+  // before these five rows were signed. That is an authorization recorded here, not evidence of
+  // a rollout: the record makes the 100 percent flag change conditional on a later deploy.
+  // This table is a historical snapshot, so its rows are pinned by exact text. A waived row must
+  // keep the work that was still outstanding when it was waived, name the dated ruling it rests
+  // on, and never sit beside a second row for the same signature that claims a sign-off.
+  const WAIVER_SOURCE =
+    "The owner's ruling of 2026-11-19, relayed by the coordinator: open the Community Beta to every member now"
+  /** Signature, then the proof and the limit as recorded on the day of the waiver. */
+  const WAIVED: [RegExp, string, string][] = [
+    [
+      /^Model$/,
+      'The readiness verdict is fail (2026-10-17: safe photo withheld upper bound 0.1286 above 0.05; clean-copy holdout withheld in es, fr, it and pt). The same ruling asks for the screening to be retuned on the measured holdouts without lowering the unsafe catch rate; that change records its own before and after numbers',
+      'Launched without a passing readiness payload; no `npm run community:screening:sign` approval exists',
+    ],
+    [
+      /^SLA alerts$/,
+      "Story 6.12's SLA sweep and console banner; the owner ruled SLA alerts console-only for now",
+      'No production webhook destination: `MODERATION_OPS_WEBHOOK_URL` stays unset, so a breach shows only on `/moderation/sla`',
+    ],
+    [
+      /^Localization$/,
+      'Community copy ships in all 10 web and mobile catalogs',
+      'No localization review was recorded against this gate',
+    ],
+    [
+      /^Accessibility$/,
+      'The community accessibility tests listed in the learning path Steps 38 to 58',
+      'No accessibility sign-off was recorded against this gate',
+    ],
+    [
+      /^Rollback$/,
+      'The rollback steps in `_bmad-output/project-knowledge/deployment-guide.md`: turn the PostHog flags off, plus `complimentary_access_enabled` for grantees, and redeploy or stop the worker',
+      'No automated rollback exists, and no rollback drill was run',
+    ],
+  ]
+
+  it('lists each of the nine signatures exactly once', () => {
+    const names = signatureRows().map((row) => row.signature ?? '')
+    expect(names).toEqual([
+      'Audit (not one of the eight named signatures; AC 3 of CC-6.13 names it)',
+      'Privacy',
+      'Deletion',
+      'Moderation staffing',
+      'Model',
+      'SLA alerts',
+      'Localization',
+      'Accessibility',
+      'Rollback',
+    ])
+  })
+
+  it.each(WAIVED)(
+    'records %s as waived by the dated owner ruling, with its proof and outstanding limit kept',
+    (signature, proof, limit) => {
+      const row = rowFor(signature)
+      expect(row.status).toBe('Waived by owner')
+      expect(row.date).toBe(WAIVER_DATE)
+      expect(row.source).toBe(WAIVER_SOURCE)
+      // The proof says what existed, not that the gate passed: the Model row keeps the failed
+      // readiness verdict, and no waived row may claim a review or approval it never had.
+      expect(row.proof).toBe(proof)
+      expect(row.limit).toBe(limit)
     }
   )
 
-  it('leaves the model row as it was', () => {
-    expect(rowFor(/^Model/i).status).toMatch(/unchanged/i)
+  it('says a waiver is not a signature', () => {
+    expect(read(RECORD)).toMatch(/A waiver is not a signature/)
   })
 
   it('invents no signature, hash, roster or schedule', () => {
