@@ -115,7 +115,7 @@ function ShareCardShareButton({
     <button
       ref={buttonRef}
       type="button"
-      className="min-h-[44px] rounded border border-[#292724] px-5 text-[#292724] disabled:opacity-50 aria-disabled:opacity-50 dark:border-zinc-100 dark:text-zinc-100"
+      className="min-h-[44px] rounded border border-[color:var(--theme-card-text)] px-5 text-[color:var(--theme-card-text)] disabled:opacity-50 aria-disabled:opacity-50"
       data-testid="share-card-share"
       {...state}
       aria-busy={busyAttribute(sharing)}
@@ -136,7 +136,7 @@ function ShareCardShareNote({ note }: { note: ShareFeedback | null }) {
   const { t } = useTranslation(undefined, { i18n: currentI18n() })
   return (
     <p
-      className="mt-2 min-h-5 text-sm text-[#292724] dark:text-zinc-100"
+      className="mt-2 min-h-5 text-sm text-[color:var(--theme-card-text)]"
       data-testid="share-card-feedback"
       aria-hidden="true"
     >
@@ -586,6 +586,9 @@ export function ShareCardDialog({
     <AccessibleModal
       isOpen={open}
       onClose={close}
+      // The share card opens from the lookbook, so its panel follows the lookbook theme: a
+      // premium palette stays light under a dark system setting, like the opener.
+      surface="theme"
       titleId="share-card-title"
       title={t('shareCard.title')}
       columnLayout
@@ -664,7 +667,7 @@ export function ShareCardDialog({
           <button
             ref={saveRef}
             type="button"
-            className="min-h-[44px] rounded bg-[#292724] px-5 text-white disabled:opacity-50 aria-disabled:opacity-50"
+            className="min-h-[44px] rounded bg-[var(--theme-card-text)] px-5 text-[color:var(--theme-card-bg)] disabled:opacity-50 aria-disabled:opacity-50"
             data-testid="share-card-save"
             {...saveButtonState(changed, busy, saveUnavailable)}
             aria-busy={busyAttribute(downloadBusy)}

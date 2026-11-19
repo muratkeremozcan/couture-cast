@@ -1391,7 +1391,7 @@ function CommunityReportModal({
             maxLength={500}
             rows={3}
             placeholder={t('community.report.detailsPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.report.detailsCount', { count: details.length })}
@@ -1598,7 +1598,7 @@ function PostCreationModal({
             maxLength={200}
             rows={2}
             placeholder={t('community.compose.altPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {altTextSuggestion
@@ -1643,7 +1643,7 @@ function PostCreationModal({
             maxLength={280}
             rows={3}
             placeholder={t('community.compose.captionPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] placeholder:text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.captionCount', { count: caption.length })}
