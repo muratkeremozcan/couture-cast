@@ -148,9 +148,15 @@ export function LocationsSection() {
     target?.focus()
   }, [locations, renamingId, confirmingId])
 
+  /**
+   * One mutation for the member who started it. Ownership is checked the moment
+   * the request settles, before any editor closes or a reload starts, and again
+   * after the reload lands.
+   */
   async function run(
     locationId: string,
-    work: () => Promise<string>,
+    mutate: () => Promise<unknown>,
+    settled: () => string,
     focusAfter: string
   ): Promise<void> {
     if (busyId) return
@@ -159,7 +165,9 @@ export function LocationsSection() {
     setBusyId(locationId)
     setError(null)
     try {
-      const message = await work()
+      await mutate()
+      if (!current()) return
+      const message = settled()
       if (!(await reload()) || !current()) return
       pendingFocusRef.current = focusAfter
       announce(message)
@@ -173,10 +181,8 @@ export function LocationsSection() {
   function makePrimary(location: SavedLocation) {
     void run(
       location.id,
-      async () => {
-        await setPrimaryLocationFromWeb(location.id)
-        return t('locations.primaryChanged', { label: location.label })
-      },
+      () => setPrimaryLocationFromWeb(location.id),
+      () => t('locations.primaryChanged', { label: location.label }),
       location.id
     )
   }
@@ -186,8 +192,8 @@ export function LocationsSection() {
     if (!label) return
     void run(
       location.id,
-      async () => {
-        await renameLocationFromWeb(location.id, label)
+      () => renameLocationFromWeb(location.id, label),
+      () => {
         setRenamingId(null)
         return t('locations.renamed', { label })
       },
@@ -198,8 +204,8 @@ export function LocationsSection() {
   function confirmDelete(location: SavedLocation) {
     void run(
       location.id,
-      async () => {
-        await deleteLocationFromWeb(location.id)
+      () => deleteLocationFromWeb(location.id),
+      () => {
         setConfirmingId(null)
         return t('locations.deleted', { label: location.label })
       },

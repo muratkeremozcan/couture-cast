@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19): the Settings page became the
 // Profile, and the bottom nav labels moved from hardcoded English into the catalogs. Every
 // `nav` and `settings` key ships in all ten web locales.

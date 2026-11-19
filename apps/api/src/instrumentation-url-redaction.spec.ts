@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up (2026-11-19), review finding: the auto-instrumentations exported every
 // outgoing provider URL to Grafana, query included, and so the provider API key (`appid`, `key`),
 // the city search text (`q`) and the approximate device position (`lat`, `lon`). This drives real

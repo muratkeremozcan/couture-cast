@@ -3,7 +3,7 @@
 // Learning path Step 26: Chip navigation and sticky bottom nav.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-26-chip-navigation-and-sticky-bottom-nav
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 3.6 Task 5 step 2 owner: sticky bottom navigation mobile visibility and telemetry.
 import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'

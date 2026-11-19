@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up (2026-11-19): the Settings tab became the Profile, with an account header.
 // Both strings ship in all ten mobile locales, and the copy that sent members to Settings now
 // names the Profile in each locale's own word.

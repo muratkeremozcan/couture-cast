@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up (2026-11-19): Jade could not find a profile. The settings tab now reads
 // Profile in every locale. Its route, its `tab-settings` id (which the Maestro flows tap) and its
 // analytics tab id stay, so only the words a member sees change. The tab navigator is the

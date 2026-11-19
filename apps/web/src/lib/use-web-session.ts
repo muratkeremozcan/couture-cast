@@ -8,14 +8,19 @@
 // This hook follows the session instead: it listens for `couture:session`, which web-session.ts
 // dispatches whenever verification names, changes or clears the member, and it treats a stored
 // session that verification has not settled yet as `checking`, never as signed out. Only a
-// verification that resolves with no member means signed out; one that fails (a timeout, a 503)
-// is `unavailable`, with a retry that verifies again.
+// verification that resolves with no member, or that the API refuses (401, 403, 404), means
+// signed out; one that fails (a timeout, a 5xx) is `unavailable`, with a retry that verifies
+// again. A bearer no verification named counts only as the e2e fixture bearer.
 'use client'
 
 import { useEffect, useState } from 'react'
 import { hasWebSession } from './commerce'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
+import { readStorage } from './browser-persistence'
 import {
   hasStoredWebSession,
+  isE2EFixtureBearer,
+  isWebSessionDenial,
   resolveWebSessionToken,
   webSessionIdentity,
 } from './web-session'
@@ -28,7 +33,7 @@ export type WebSessionState =
   /** `owner` changes when the member does, so a section reloads once per member. */
   | { status: 'signed_in'; owner: string }
 
-/** The owner of a bearer no verification named: the e2e fixture bearer. */
+/** The owner of the e2e fixture bearer, which no verification names. */
 export const UNVERIFIED_BEARER_OWNER = 'bearer'
 
 /** What this hook's own verification of the stored session concluded, if it finished. */
@@ -49,9 +54,14 @@ export function readWebSessionState(
   const stored = hasStoredWebSession()
   if (stored && outcome === 'failed') return { status: 'unavailable', retry }
   if (stored && outcome === 'pending') return { status: 'checking' }
-  if (hasWebSession() && !stored)
+  // A leftover bearer from another member's session is not a member: only the fixture counts.
+  if (hasWebSession() && !stored && isE2EFixtureBearer(fixtureBearer()))
     return { status: 'signed_in', owner: UNVERIFIED_BEARER_OWNER }
   return { status: 'signed_out' }
+}
+
+function fixtureBearer(): string | null {
+  return readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null
 }
 
 function sameState(a: WebSessionState, b: WebSessionState): boolean {
@@ -103,9 +113,9 @@ export function useWebSession(): WebSessionState {
           if (token === undefined) outcome = 'no_member'
           sync()
         },
-        () => {
+        (error: unknown) => {
           if (!active || mine !== attempt) return
-          outcome = 'failed'
+          outcome = isWebSessionDenial(error) ? 'no_member' : 'failed'
           sync()
         }
       )

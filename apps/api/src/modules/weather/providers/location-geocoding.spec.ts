@@ -1,7 +1,7 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   REVERSE_DOWN_COORDINATE,

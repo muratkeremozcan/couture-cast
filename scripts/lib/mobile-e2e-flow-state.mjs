@@ -365,19 +365,19 @@ export const useMyLocationWeatherDoubleCause = ({
   ) {
     return 'the precise device position reached the weather provider; the app must round it first'
   }
-  const seen = reverse.map((entry) => `${entry.latitude},${entry.longitude}`).join('; ')
   const unrounded = reverse.filter(
     (entry) => !twoDecimals(entry.latitude) || !twoDecimals(entry.longitude)
   )
   if (unrounded.length > 0) {
-    return `a reverse lookup carried more than two decimals (reverse lookups during the flow: ${seen})`
+    // Counts only: a failure reason is logged in CI and must not carry a position.
+    return `${unrounded.length} of ${reverse.length} reverse lookups carried more than two decimals`
   }
   if (
     !reverse.some(
       (entry) => reversePlaces(entry.latitude, entry.longitude)[0]?.name === city
     )
   ) {
-    return `no reverse lookup resolved to ${city} (reverse lookups during the flow: ${seen})`
+    return `none of ${reverse.length} reverse lookups resolved to ${city}`
   }
   return undefined
 }

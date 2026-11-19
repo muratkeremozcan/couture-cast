@@ -12032,8 +12032,9 @@ its weather provider keys.
 
 1. **A deployed route that no run calls is an untested route.**
    The production API had no `OPENWEATHER_API_KEY`, `WEATHERAPI_API_KEY` or
-   `WEATHER_PROVIDER_MODE`. Every city search answered HTTP 503 with code `provider_unavailable`,
-   and PostHog recorded `location_search_failed` with outcome `provider_unconfigured`. The
+   `WEATHER_PROVIDER_MODE`. Jade's three city searches answered HTTP 503 with code
+   `provider_unavailable`, and PostHog recorded three `location_search_failed` events with outcome
+   `provider_unconfigured`. The
    Story 1.2b location specs all ran against the provider double. The keys are set on production
    and preview, and an untagged API spec now searches a deployed API. That spec skips production
    (no provisioned member there), so production was verified by a manual signed-in probe in
@@ -12054,10 +12055,16 @@ its weather provider keys.
    `POST /api/v1/locations/from-coordinates`. The API rounds again, asks the provider's reverse
    geocoding, and answers the same signed candidates as search, so the save path, token and
    stored values are unchanged: a saved location holds the provider's place, never the device
-   position. No log line, analytics event, URL or error message carries a coordinate. The review
-   found one more path: the OpenTelemetry HTTP and undici instrumentations exported each
-   outgoing provider URL to Grafana, query and API key included. Span URLs now keep origin and
-   path only. The Privacy Policy says the approximate position reaches the weather provider.
+   position. No log line, analytics event or error message carries a coordinate, and the rounded
+   position reaches a URL only in the provider's own query. The review found two more paths. The
+   OpenTelemetry HTTP and undici instrumentations would export each outgoing provider URL, query
+   and API key included; span URLs now keep origin and path only. These hooks protect the
+   processes that start the SDK: the standalone API (`src/main.ts`) and the hosted workers
+   (`src/workers/bootstrap.ts`), whose weather ingestion calls OpenWeather with the key in the
+   query. The Vercel function (`api/index.ts`) does not start the SDK and exports no traces. A
+   malformed JSON body came back with the parser's message, which can quote the body; every parse
+   failure now answers one fixed 400. The Privacy Policy says the approximate position reaches the
+   weather provider in use, and that CoutureCast stores only the place the member picks.
 4. **Every failure points back at the working path.**
    Denied, unsupported, timed out, no city nearby and provider outage each get their own copy in
    all ten locales, and focus moves to the city search, which still works.

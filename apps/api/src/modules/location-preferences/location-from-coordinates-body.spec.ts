@@ -28,8 +28,16 @@ const HEADERS = {
   'x-couture-platform': 'web',
   'content-type': 'application/json',
 }
-/** Anything a parser diagnostic could quote from these bodies. */
-const BODY_TEXT = /41\.8|87\.6|latitude|longitude|Unexpected|JSON|position|token/i
+/**
+ * The one public answer to any unreadable body, written out here as the contract: the same for
+ * every input, so nothing about the body can vary into it.
+ */
+const UNREADABLE_BODY = {
+  statusCode: 400,
+  code: 'invalid_request',
+  message: 'The request body could not be read.',
+  error: 'Bad Request',
+}
 
 describe('from-coordinates refuses a malformed body without echoing it', () => {
   let app: INestApplication | undefined
@@ -84,9 +92,11 @@ describe('from-coordinates refuses a malformed body without echoing it', () => {
       const response = await request(httpTestUrl(app!)).post(PATH).set(HEADERS).send(body)
 
       expect(response.status).toBe(400)
-      const error = locationRequestErrorResponseSchema.parse(response.body)
-      expect(error.code).toBe('invalid_request')
-      expect(JSON.stringify(response.body)).not.toMatch(BODY_TEXT)
+      expect(response.body).toStrictEqual(UNREADABLE_BODY)
+      // The clients read it as the typed location 400.
+      expect(locationRequestErrorResponseSchema.parse(response.body).code).toBe(
+        'invalid_request'
+      )
       expect(fromCoordinates).not.toHaveBeenCalled()
     }
   )

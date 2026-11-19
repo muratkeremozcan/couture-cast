@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19): the web position reader behind
 // Use my location. It rounds before anything else sees the position and never waits forever on a
 // browser that does not answer a dismissed permission prompt.

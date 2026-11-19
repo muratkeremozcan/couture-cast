@@ -5,7 +5,7 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 5.1 Task 7 owner: Web settings page and commerce opt-out section.
 //
 // These go through MSW rather than a mocked `lib/commerce`, so the request
@@ -104,7 +104,9 @@ function profileHandler(
 }
 
 function signIn() {
-  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+  // Only the e2e fixture bearer counts without a verified member.
+  vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+  window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-member')
 }
 
 /** A promise the test resolves by hand, so a pending request needs no timer. */
@@ -199,6 +201,7 @@ describe('Web settings page', () => {
   })
 
   afterEach(async () => {
+    vi.unstubAllEnvs()
     window.sessionStorage.clear()
     await getI18n().changeLanguage('en-US')
   })
@@ -265,7 +268,7 @@ describe('Web settings page', () => {
 
     await waitFor(() => expect(toggle()).toBeEnabled())
     expect(toggle()).toBeChecked()
-    expect(authorization).toHaveBeenCalledWith('Bearer test-access-token')
+    expect(authorization).toHaveBeenCalledWith('Bearer test-token-member')
     expect(screen.queryByTestId('commerce-signed-out-hint')).not.toBeInTheDocument()
   })
 
@@ -571,7 +574,7 @@ describe('Web settings page', () => {
     expect(screen.getByTestId('profile-account-email')).toHaveTextContent(
       'jade@example.test'
     )
-    expect(bearers).toEqual(['Bearer test-access-token'])
+    expect(bearers).toEqual(['Bearer test-token-member'])
     for (const section of [
       'locations-section',
       'commerce-preferences-section',

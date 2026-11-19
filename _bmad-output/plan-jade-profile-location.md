@@ -120,6 +120,18 @@ Round 1 Codex (/Users/murat/opensource/cc/jade-issues/profile-codex-review-1.md)
 - C8 low, patch: same as quick-lens Settings copy.
 - C9 low, patch: Step 58 overstates; attribute the reload symptom to our reproduction, name outcome provider_unconfigured and that the deployed search spec skips prod (prod verified by a manual Chrome probe).
 
+Round 3 Codex (/Users/murat/opensource/cc/jade-issues/profile-codex-review-3.md, product at b394c455). Verdicts: high 2, medium 6, low 1.
+
+- R3-1 high, patch: mobile locate not bound to the member (identity epoch); A's position can go under B's bearer.
+- R3-2 high, patch: use-web-session accepts any leftover sessionStorage bearer as the fixture; restrict to the E2E flag plus test-token prefix.
+- R3-3 medium, patch: rename/delete completion after an owner switch writes B's UI and reloads as B before checking ownership.
+- R3-4 medium, patch: profile 401/403/404 loops on Try again; denial must mean signed_out.
+- R3-5 medium, patch: Express JSON parse errors forward body-derived text; normalize to a fixed 400 for all routes.
+- R3-6 medium, patch: Vercel api/index.ts never starts the OTel SDK (only src/main.ts and src/workers/bootstrap.ts), so the trace claim is scoped to the standalone API and the hosted workers; weather ingestion on the workers still sends the OpenWeather key in its query, so the redaction and key rotation stand.
+- R3-7 medium, patch: privacy page must name WeatherAPI too and say CoutureCast stores only the picked place.
+- R3-8 medium, TEA: native flow state requires rounded values to equal the injected Maestro fix, which reduced accuracy can change.
+- R3-9 low, patch: Step 58 anchors and "every city search" wording.
+
 ## Design Notes
 
 POST with body keeps coordinates out of Vercel request logs and browser history. The client rounds to 2 decimals (about 1 km) to match the PRD's "approximate" auto-detect. The candidate the API returns carries the provider's place coordinates, which the existing from-search save already stores, so the save path and token stay unchanged.

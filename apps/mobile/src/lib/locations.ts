@@ -165,10 +165,20 @@ export async function locationsNearFromMobile(
   latitude: number,
   longitude: number,
   locale: SupportedLocale,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  /** False once the tap is superseded or the member changed: nothing more is sent. */
+  stillCurrent: () => boolean = () => true
 ): Promise<LocationSearchCandidate[]> {
+  const superseded = () => {
+    const error = new Error('Use my location was superseded.')
+    error.name = 'AbortError'
+    return error
+  }
   try {
+    if (!stillCurrent() || signal?.aborted) throw superseded()
     const api = await client()
+    // The bearer just resolved may belong to another member by now.
+    if (!stillCurrent() || signal?.aborted) throw superseded()
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromCoordinatesPost(
         {

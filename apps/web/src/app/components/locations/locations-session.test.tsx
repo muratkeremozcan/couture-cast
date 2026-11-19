@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19). Jade reloaded /settings while
 // signed in and Locations said "Sign in to manage your locations": the section checked the bearer
 // once, on mount, while the session bridge was still verifying the stored session (it clears a
@@ -8,7 +8,8 @@
 // is requested once per member. The browser proof is PL-1 and PL-2 in
 // playwright/tests/settings-locations-real-session.spec.ts; these pin each transition.
 import { http, HttpResponse } from 'msw'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { SavedLocation } from '@couture/api-client/contracts/http'
@@ -116,6 +117,7 @@ describe('LocationsSection follows the web session', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     window.sessionStorage.clear()
   })
 
@@ -222,5 +224,94 @@ describe('LocationsSection follows the web session', () => {
     await screen.findByTestId('location-item')
     await finishVerification('recovered-token')
     expect(listBearers).toEqual(['Bearer recovered-token'])
+  })
+
+  it('LOC-SESSION-WEB-06 counts a leftover bearer only as the e2e fixture', async () => {
+    // Another tab cleared the shared session; this restored tab still holds a bearer.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'previous-member-token')
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    const leftover = renderSection()
+    expect(section()).toHaveAttribute('data-state', 'signed_out')
+    leftover.unmount()
+
+    // The fixture prefix alone is not enough without the e2e flag.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-member')
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'false')
+    const unflagged = renderSection()
+    expect(section()).toHaveAttribute('data-state', 'signed_out')
+    unflagged.unmount()
+    expect(listBearers).toEqual([])
+
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    renderSection()
+    await screen.findByTestId('location-item')
+    expect(listBearers).toEqual(['Bearer test-token-member'])
+  })
+
+  it.each([
+    [403, 'signed_out'],
+    [503, 'load_failed'],
+  ])(
+    'LOC-SESSION-WEB-07 a profile %i during verification reads as %s',
+    async (status, state) => {
+      session.stored = true
+      renderSection()
+
+      await act(async () => {
+        session.fail?.(
+          Object.assign(new Error(`HTTP ${status}`), {
+            response: new Response(null, { status }),
+          })
+        )
+        await Promise.resolve()
+      })
+
+      expect(section()).toHaveAttribute('data-state', state)
+      expect(screen.queryByTestId('locations-load-retry') !== null).toBe(
+        state === 'load_failed'
+      )
+      expect(screen.queryByTestId('locations-signed-out') !== null).toBe(
+        state === 'signed_out'
+      )
+    }
+  )
+
+  it('LOC-SESSION-WEB-08 a rename that settles after the next member loaded touches nothing of theirs', async () => {
+    const user = userEvent.setup()
+    let releasePatch: (() => void) | undefined
+    useMswHandlers(
+      http.patch('/api/v1/locations/:id', async () => {
+        await new Promise<void>((resolve) => {
+          releasePatch = resolve
+        })
+        return HttpResponse.json({ data: { ...HOME, label: 'Studio' } })
+      })
+    )
+    session.identity = 'member-1'
+    session.stored = true
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'first-token')
+    renderSection()
+    await screen.findByTestId('location-item')
+
+    await user.click(screen.getByTestId('location-rename'))
+    await user.clear(screen.getByTestId('location-rename-input'))
+    await user.type(screen.getByTestId('location-rename-input'), 'Studio{Enter}')
+    await waitFor(() => expect(releasePatch).toBeDefined())
+
+    publish({ identity: null, bearer: null })
+    publish({ identity: 'member-2', bearer: 'second-token' })
+    await screen.findByTestId('location-item')
+    // The next member opens their own editor.
+    await user.click(screen.getByTestId('location-rename'))
+    expect(screen.getByTestId('location-rename-input')).toHaveValue('Home')
+
+    await act(async () => {
+      releasePatch?.()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(screen.getByTestId('location-rename-input')).toHaveValue('Home')
+    expect(screen.getByTestId('locations-status-region')).toHaveTextContent('')
+    expect(listBearers).toEqual(['Bearer first-token', 'Bearer second-token'])
   })
 })

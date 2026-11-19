@@ -256,19 +256,19 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     await user.click(screen.getByRole('button', { name: /Rename/ }))
     const bField = screen.getByRole('textbox', { name: 'New name' })
     expect(bField).toHaveValue('Bravo Office')
-    const bListsBefore = listBearers.filter(
-      (bearer) => bearer === 'Bearer token-b'
-    ).length
+    // B types a name they have not saved yet.
+    await user.clear(bField)
+    await user.type(bField, 'Bravo Draft')
+    const historyBefore = [...listBearers]
 
     act(() => heldPatch!.release())
     // The rename settles first, then any list it would start has settled too.
     await settleRenames()
     await settleLists()
 
-    expect(listBearers.filter((bearer) => bearer === 'Bearer token-b')).toHaveLength(
-      bListsBefore
-    )
-    expect(screen.getByRole('textbox', { name: 'New name' })).toHaveValue('Bravo Office')
+    // No list request of any kind, for either member, and B's draft is untouched.
+    expect(listBearers).toEqual(historyBefore)
+    expect(screen.getByRole('textbox', { name: 'New name' })).toHaveValue('Bravo Draft')
     expect(screen.queryByText(/Alpha/)).toBeNull()
     expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
   })

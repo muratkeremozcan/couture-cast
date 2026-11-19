@@ -1,5 +1,7 @@
 import { HttpAdapterHost } from '@nestjs/core'
-import type { INestApplication } from '@nestjs/common'
+import { BadRequestException, type INestApplication } from '@nestjs/common'
+import type { NestExpressApplication } from '@nestjs/platform-express'
+import type { NextFunction, Request, Response } from 'express'
 import { ApiExceptionFilter } from '../filters/api-exception.filter.js'
 import { bindRequestContext } from '../logger/request-context.js'
 import { createRequestLoggerMiddleware } from '../logger/request-logger.middleware.js'
@@ -59,6 +61,37 @@ export function resolveHttpCorsOrigins(env: NodeJS.ProcessEnv = process.env): st
 }
 
 /**
+ * The one answer to a body the JSON parser refused, on every route. `code` matches the
+ * location routes' typed 400, which the clients already read; the text names nothing the
+ * body held.
+ */
+export const UNPARSABLE_BODY_RESPONSE = Object.freeze({
+  statusCode: 400,
+  code: 'invalid_request',
+  message: 'The request body could not be read.',
+  error: 'Bad Request',
+})
+
+/**
+ * Express's JSON parser fails with a SyntaxError whose message can quote the body (a coordinate
+ * pair from Use my location, a search, anything), and Nest forwards that message to the client.
+ * Every parse failure gets one fixed 400 instead, with no text from the body.
+ */
+export function rejectUnparsableJson(
+  error: unknown,
+  _request: Request,
+  _response: Response,
+  next: NextFunction
+): void {
+  const parseFailed =
+    typeof error === 'object' &&
+    error !== null &&
+    (('type' in error && error.type === 'entity.parse.failed') ||
+      (error instanceof SyntaxError && 'body' in error))
+  next(parseFailed ? new BadRequestException({ ...UNPARSABLE_BODY_RESPONSE }) : error)
+}
+
+/**
  * Must be called BEFORE `app.init()` or `app.listen()`. Express middleware
  * registered after initialization never joins the stack, so a late call fails
  * open — no error, no request context, no logs.
@@ -73,6 +106,11 @@ export function configureApp(
   })
   app.use(bindRequestContext)
   app.use(createRequestLoggerMiddleware())
+  // The JSON parser is registered here, ahead of Nest's default (which then skips its own),
+  // so a parse failure can be answered right after it with fixed text.
+  const expressApp = app as NestExpressApplication
+  expressApp.useBodyParser('json')
+  app.use(rejectUnparsableJson)
 
   const adapterHost: HttpAdapterHost =
     overrides.adapterHost ?? app.get<HttpAdapterHost>(HttpAdapterHost)

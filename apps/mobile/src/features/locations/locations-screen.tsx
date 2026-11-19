@@ -35,6 +35,10 @@ import { useHeroPalette } from '@/components/hero/hero-theme'
 import { useAccessibilityAnnouncer } from '@/src/hooks/use-accessibility-announcer'
 import { safeFindNodeHandle } from '@/src/lib/accessibility-focus'
 import {
+  mobileIdentityEpoch,
+  subscribeMobileApplicationUser,
+} from '@/src/lib/mobile-auth'
+import {
   deleteLocationFromMobile,
   listLocationsFromMobile,
   locationFailureReason,
@@ -157,6 +161,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   // Each tap supersedes the last; a result that lands after unmount or a newer
   // tap is dropped.
   const locateAttemptRef = useRef(0)
+  const locateControllerRef = useRef<AbortController | null>(null)
   const announceRef = useRef(announce)
   announceRef.current = announce
   const tRef = useRef(t)
@@ -176,11 +181,29 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     setScreenState('ready')
   }, [])
 
+  /** Drops a pending Use my location: its position, request and answer go nowhere. */
+  const cancelLocate = useCallback(() => {
+    locateAttemptRef.current += 1
+    locateControllerRef.current?.abort()
+    locateControllerRef.current = null
+    setIsLocating(false)
+  }, [])
+
+  useEffect(() => cancelLocate, [cancelLocate])
+
+  // A Use my location belongs to the member who tapped it. Another member (or
+  // none) cancels it and starts from an empty form.
   useEffect(
-    () => () => {
-      locateAttemptRef.current += 1
-    },
-    []
+    () =>
+      subscribeMobileApplicationUser(() => {
+        cancelLocate()
+        setQuery('')
+        setCandidates([])
+        setSelected(null)
+        setLabel('')
+        setFormError(null)
+      }),
+    [cancelLocate]
   )
 
   useEffect(() => {
@@ -269,8 +292,16 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
    */
   async function locate() {
     if (isLocating || isSaving) return
+    locateControllerRef.current?.abort()
     const attempt = ++locateAttemptRef.current
-    const current = () => attempt === locateAttemptRef.current
+    const epoch = mobileIdentityEpoch()
+    const controller = new AbortController()
+    locateControllerRef.current = controller
+    // Still this tap, for the member who tapped.
+    const current = () =>
+      attempt === locateAttemptRef.current &&
+      epoch === mobileIdentityEpoch() &&
+      !controller.signal.aborted
     setIsLocating(true)
     setFormError(null)
     setSelected(null)
@@ -287,7 +318,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       const results = await locationsNearFromMobile(
         position.latitude,
         position.longitude,
-        locale
+        locale,
+        controller.signal,
+        current
       )
       if (!current()) return
       if (results.length === 0) {
@@ -302,7 +335,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         error instanceof DevicePositionError ? error.reason : locationFailureReason(error)
       )
     } finally {
-      if (current()) setIsLocating(false)
+      if (current()) {
+        locateControllerRef.current = null
+        setIsLocating(false)
+      }
     }
   }
 
@@ -557,8 +593,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                 maxLength={80}
                 onChangeText={(value) => {
                   // Typing takes over from a pending Use my location: its late answer is dropped.
-                  locateAttemptRef.current += 1
-                  setIsLocating(false)
+                  cancelLocate()
                   setQuery(value)
                   setSelected(null)
                 }}

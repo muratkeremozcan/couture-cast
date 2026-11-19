@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiExceptionFilter } from '../filters/api-exception.filter'
 import { bindRequestContext } from '../logger/request-context'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
-import { configureApp, resolveHttpCorsOrigins } from './configure-app'
+import {
+  configureApp,
+  rejectUnparsableJson,
+  resolveHttpCorsOrigins,
+} from './configure-app'
 
 /**
  * These tests exist because the deployed entrypoint silently lacked all four of
@@ -19,6 +23,7 @@ import { configureApp, resolveHttpCorsOrigins } from './configure-app'
 type AppDouble = {
   enableCors: ReturnType<typeof vi.fn>
   use: ReturnType<typeof vi.fn>
+  useBodyParser: ReturnType<typeof vi.fn>
   useGlobalFilters: ReturnType<typeof vi.fn>
   get: ReturnType<typeof vi.fn>
 }
@@ -27,6 +32,7 @@ function createAppDouble(): AppDouble {
   return {
     enableCors: vi.fn(),
     use: vi.fn(),
+    useBodyParser: vi.fn(),
     useGlobalFilters: vi.fn(),
     get: vi.fn(),
   }
@@ -92,9 +98,20 @@ describe('configureApp', () => {
   it('binds the request context before the request logger', () => {
     configure()
 
-    expect(app.use).toHaveBeenCalledTimes(2)
+    expect(app.use).toHaveBeenCalledTimes(3)
     expect(app.use.mock.calls[0]?.[0]).toBe(bindRequestContext)
     expect(typeof app.use.mock.calls[1]?.[0]).toBe('function')
+  })
+
+  // 2026-11-19 review: a JSON parse failure must not quote the body back to the client.
+  it('parses JSON itself and answers a parse failure right after the parser', () => {
+    configure()
+
+    expect(app.useBodyParser).toHaveBeenCalledWith('json')
+    expect(app.use.mock.calls[2]?.[0]).toBe(rejectUnparsableJson)
+    expect(app.useBodyParser.mock.invocationCallOrder[0]).toBeLessThan(
+      app.use.mock.invocationCallOrder[2]!
+    )
   })
 
   it('installs ApiExceptionFilter as a global filter', () => {
@@ -122,7 +139,7 @@ describe('configureApp', () => {
     configure()
 
     expect(app.enableCors).toHaveBeenCalledTimes(1)
-    expect(app.use).toHaveBeenCalledTimes(2)
+    expect(app.use).toHaveBeenCalledTimes(3)
     expect(app.useGlobalFilters).toHaveBeenCalledTimes(1)
   })
 })

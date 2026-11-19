@@ -95,6 +95,8 @@ describe('LocationsSection trusts only a verified member', () => {
     session.stored = false
     session.pending = []
     vi.unstubAllEnvs()
+    // Explicit in every case, never inherited from the build that runs the suite.
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'false')
     useMswHandlers(
       http.get('/api/v1/locations', ({ request }) => {
         listBearers.push(request.headers.get('authorization'))
@@ -142,6 +144,22 @@ describe('LocationsSection trusts only a verified member', () => {
 
     expect(await screen.findByText('Previous Home')).toBeInTheDocument()
     expect(listBearers).toEqual(['Bearer test-token-guardian'])
+  })
+
+  it('LOC-TRUST-WEB-06 under the e2e build, a bearer that is not the fixture is still no member', async () => {
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(
+      WEB_ACCESS_TOKEN_STORAGE_KEY,
+      'eyJleftover.previous.member'
+    )
+
+    renderSection()
+    await flush()
+
+    expect(section()).toHaveAttribute('data-state', 'signed_out')
+    expect(screen.getByTestId('locations-signed-out')).toBeInTheDocument()
+    expect(screen.queryByText('Previous Home')).toBeNull()
+    expect(listBearers).toEqual([])
   })
 
   it.each([401, 403, 404])(

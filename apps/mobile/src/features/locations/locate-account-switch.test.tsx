@@ -112,6 +112,9 @@ describe(
   () => {
     /** The bearer the session resolver hands out right now. */
     let bearer: string
+    /** When set, the next bearer lookup waits for the test, as a native session read can. */
+    let holdNextToken = false
+    let heldToken: { resolve: (token: string) => void } | null = null
     let postedBearers: (string | null)[]
     let restoreAccessTokenResolver: () => void
     const originalBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL
@@ -131,7 +134,14 @@ describe(
       location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' })
       process.env.EXPO_PUBLIC_API_BASE_URL = window.location.origin
       setMobileApplicationUserId('member-a')
-      restoreAccessTokenResolver = setMobileAccessTokenResolver(() => bearer)
+      heldToken = null
+      restoreAccessTokenResolver = setMobileAccessTokenResolver(() => {
+        if (!holdNextToken) return bearer
+        holdNextToken = false
+        const token = deferred<string>()
+        heldToken = token
+        return token.promise
+      })
       server.use(http.get('*/api/v1/locations', () => HttpResponse.json({ data: [] })))
     })
 
@@ -208,6 +218,50 @@ describe(
 
       expect(postedBearers).toEqual(['Bearer token-a'])
       expectNothingOfA()
+    })
+
+    it('LOC-SWITCH-MOB-03 a switch while the lookup waits for its bearer sends nothing, and B can still search', async () => {
+      location.getCurrentPositionAsync.mockResolvedValue({
+        coords: { ...DEVICE, accuracy: 3000 },
+        timestamp: 0,
+      })
+      server.use(
+        http.post('*/api/v1/locations/from-coordinates', ({ request }) => {
+          postedBearers.push(request.headers.get('authorization'))
+          return HttpResponse.json({ data: [CHICAGO] })
+        }),
+        http.get('*/api/v1/locations/search', ({ request }) => {
+          postedBearers.push(`search ${request.headers.get('authorization')}`)
+          return HttpResponse.json({ data: [CHICAGO] })
+        })
+      )
+      renderScreen()
+      // The first list has finished before the tap.
+      await screen.findByTestId('locations-use-my-location')
+      await waitFor(() => expect(screen.queryByTestId('locations-loading')).toBeNull())
+
+      holdNextToken = true
+      await userEvent.click(screen.getByTestId('locations-use-my-location'))
+      await waitFor(() => expect(heldToken).not.toBeNull())
+
+      switchToB()
+      await act(async () => {
+        heldToken!.resolve('token-b')
+        await Promise.resolve()
+      })
+      await settleClient()
+
+      expect(postedBearers).toEqual([])
+      expectNothingOfA()
+
+      // B can still use the screen.
+      await userEvent.fill(await screen.findByTestId('locations-search-input'), 'Chicago')
+      await waitFor(() =>
+        expect(screen.getByTestId('location-search-option-0').textContent).toContain(
+          'Chicago'
+        )
+      )
+      expect(postedBearers).toEqual(['search Bearer token-b'])
     })
   }
 )

@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19). Jade: the app never offered to use
 // her location. Locations now has "Use my location": the browser is asked for the position only
 // on the tap, the client rounds it to two decimals and POSTs it, and the nearest city comes back
@@ -126,7 +126,9 @@ describe('Use my location (web)', () => {
     saved = []
     posted = []
     fromCoordinates = () => HttpResponse.json({ data: [CHICAGO] })
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    // Only the e2e fixture bearer counts without a verified member.
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-member')
     useMswHandlers(
       http.get('/api/v1/locations', () => HttpResponse.json({ data: saved })),
       http.post(FROM_COORDINATES_PATH, ({ request }) => {
@@ -143,6 +145,7 @@ describe('Use my location (web)', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     window.sessionStorage.clear()
     Reflect.deleteProperty(window.navigator, 'geolocation')
   })

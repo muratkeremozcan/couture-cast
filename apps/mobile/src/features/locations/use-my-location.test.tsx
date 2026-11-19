@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up (2026-11-19): Jade asked for the app to find her city with her approval.
 // Use my location on the mobile Locations screen asks for when-in-use permission only on the
 // tap, reads one low-accuracy fix, rounds it to two decimals, posts it in a body and offers the
@@ -8,7 +8,7 @@
 // here (expo-location is mocked); requests still run through MSW and the real client.
 import React from 'react'
 import { userEvent } from 'vitest/browser'
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type { SavedLocation } from '@couture/api-client/contracts/http'
@@ -37,7 +37,10 @@ vi.mock('expo-location', () => ({
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import * as Location from 'expo-location'
 import { approximateCoordinate } from '@/src/lib/locations'
@@ -118,6 +121,7 @@ describe('Use my location (mobile)', { timeout: 30_000 }, () => {
     if (originalBaseUrl === undefined) delete process.env.EXPO_PUBLIC_API_BASE_URL
     else process.env.EXPO_PUBLIC_API_BASE_URL = originalBaseUrl
     restoreAccessTokenResolver()
+    setMobileApplicationUserId(null)
   })
 
   function fromCoordinatesHandler(respond: () => Response) {
@@ -241,6 +245,76 @@ describe('Use my location (mobile)', { timeout: 30_000 }, () => {
     expect(screen.queryByTestId('location-error')).toBeNull()
     expect(attempts).toBe(2)
     expect(location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(2)
+  })
+  /*
+   * Review finding (2026-11-19): a tap belongs to the member who made it. A
+   * session switch while the position or the request is pending must not send
+   * A's position under B's bearer, nor show A's city to B.
+   */
+  function hold<T>() {
+    let release!: (value: T) => void
+    const promise = new Promise<T>((resolve) => {
+      release = resolve
+    })
+    return { promise, release }
+  }
+
+  async function expectNothingLeftForTheNextMember() {
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Use my location' })).not.toHaveAttribute(
+        'aria-busy',
+        'true'
+      )
+    )
+    expect(screen.queryByTestId('location-search-option-0')).toBeNull()
+    expect(screen.queryByTestId('location-error')).toBeNull()
+  }
+
+  it('ULM-MOB-09 a member switch before the position arrives sends nothing', async () => {
+    setMobileApplicationUserId('member-a')
+    const fix = hold<unknown>()
+    location.requestForegroundPermissionsAsync.mockResolvedValue({ status: 'granted' })
+    location.getCurrentPositionAsync.mockReturnValue(fix.promise)
+    server.use(fromCoordinatesHandler(() => HttpResponse.json({ data: [CANDIDATE] })))
+    renderScreen()
+
+    await tapUseMyLocation()
+    await waitFor(() => expect(location.getCurrentPositionAsync).toHaveBeenCalled())
+    act(() => setMobileApplicationUserId('member-b'))
+    await act(async () => {
+      fix.release({ coords: { ...DEVICE, accuracy: 3000 }, timestamp: 0 })
+      await fix.promise
+    })
+
+    await expectNothingLeftForTheNextMember()
+    expect(posted).toHaveLength(0)
+  })
+
+  it('ULM-MOB-10 a member switch after the request starts drops its answer', async () => {
+    setMobileApplicationUserId('member-a')
+    grant()
+    const answer = hold<void>()
+    const bearers: (string | null)[] = []
+    server.use(
+      http.post(FROM_COORDINATES, async ({ request }) => {
+        bearers.push(request.headers.get('authorization'))
+        posted.push({ url: request.url, body: null, platform: null })
+        await answer.promise
+        return HttpResponse.json({ data: [CANDIDATE] })
+      })
+    )
+    renderScreen()
+
+    await tapUseMyLocation()
+    await waitFor(() => expect(posted).toHaveLength(1))
+    act(() => setMobileApplicationUserId('member-b'))
+    await act(async () => {
+      answer.release()
+      await answer.promise
+    })
+
+    await expectNothingLeftForTheNextMember()
+    expect(bearers).toEqual(['Bearer session-token'])
   })
 })
 

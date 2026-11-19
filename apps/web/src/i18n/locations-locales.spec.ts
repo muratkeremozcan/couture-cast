@@ -1,7 +1,7 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Story 1.2b: every locations key ships in all ten web locales.
 import { describe, expect, it } from 'vitest'
 import type { LocationFailureReason } from '../lib/locations'

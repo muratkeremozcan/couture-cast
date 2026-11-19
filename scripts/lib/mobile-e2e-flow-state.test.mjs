@@ -100,24 +100,40 @@ describe('Use my location weather double verdict', () => {
     )
   })
 
-  test('fails when a lookup carried more than two decimals', () => {
-    assert.equal(
-      useMyLocationWeatherDoubleCause({
-        before,
-        requests: { geocoding: [reverse(5, 41.873, -87.64)] },
-      }),
-      'a reverse lookup carried more than two decimals (reverse lookups during the flow: 41.873,-87.64)'
-    )
+  /** No failure reason may carry a position: the runner logs it in CI. */
+  const expectNoPosition = (cause, ...values) => {
+    for (const value of values)
+      assert.ok(!cause.includes(String(value)), `${cause} names ${value}`)
+    assert.doesNotMatch(cause, /\d+\.\d+/)
+  }
+
+  test('fails when a lookup carried more than two decimals, without naming it', () => {
+    const cause = useMyLocationWeatherDoubleCause({
+      before,
+      requests: { geocoding: [reverse(5, 41.873, -87.64)] },
+    })
+    assert.equal(cause, '1 of 1 reverse lookups carried more than two decimals')
+    expectNoPosition(cause, 41.873, -87.64)
   })
 
-  test('fails when no lookup resolved to the city the flow saves', () => {
-    assert.equal(
-      useMyLocationWeatherDoubleCause({
-        before,
-        requests: { geocoding: [reverse(5, 40.71, -74.01)] },
-      }),
-      'no reverse lookup resolved to Chicago (reverse lookups during the flow: 40.71,-74.01)'
-    )
+  test('checks every lookup on both axes: a valid Chicago first does not excuse a later longitude', () => {
+    const cause = useMyLocationWeatherDoubleCause({
+      before,
+      requests: {
+        geocoding: [reverse(5, 41.87, -87.64), reverse(6, 41.87, -87.6412)],
+      },
+    })
+    assert.equal(cause, '1 of 2 reverse lookups carried more than two decimals')
+    expectNoPosition(cause, 41.87, -87.6412)
+  })
+
+  test('fails when no lookup resolved to the city the flow saves, without naming them', () => {
+    const cause = useMyLocationWeatherDoubleCause({
+      before,
+      requests: { geocoding: [reverse(5, 40.71, -74.01)] },
+    })
+    assert.equal(cause, 'none of 1 reverse lookups resolved to Chicago')
+    expectNoPosition(cause, 40.71, -74.01)
   })
 })
 
