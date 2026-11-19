@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19), Codex review 1 finding 3: a session
 // check that fails (a timeout, a 503 from the profile check) was read like a session that has no
 // member, so a signed-in member was told to sign in and lost city search. A failed check is now

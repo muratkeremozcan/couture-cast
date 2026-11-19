@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19), Codex review 1 finding 5: a member
 // taps Use my location, then types another city while the browser is still finding the position.
 // Whatever answers last, the typed search wins: the late device position (or its error) changes
@@ -162,7 +162,9 @@ describe('Use my location never overrides a city the member typed (web)', () => 
     holdFromCoordinates = null
     holdSave = null
     installPendingGeolocation()
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-access-token')
+    // Only the e2e fixture bearer counts without a verified member.
+    vi.stubEnv('NEXT_PUBLIC_E2E_AUTH', 'true')
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'test-token-member')
     useMswHandlers(
       http.get('/api/v1/locations', () =>
         HttpResponse.json({ data: [] as SavedLocation[] })
@@ -192,6 +194,7 @@ describe('Use my location never overrides a city the member typed (web)', () => 
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     window.sessionStorage.clear()
     Reflect.deleteProperty(window.navigator, 'geolocation')
   })

@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up (2026-11-19), Codex review 1 finding 1: Use my location asks the weather
 // provider about the member's rounded position in a GET query (OpenWeather lat/lon, WeatherAPI
 // q=lat,lon), next to the provider key. The provider has to see it; our traces must not. This
