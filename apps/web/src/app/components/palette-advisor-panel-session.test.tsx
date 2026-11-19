@@ -30,7 +30,8 @@ import { PaletteAdvisorPanel } from './palette-advisor-panel'
 const session = vi.hoisted(() => ({
   identity: null as string | null,
   stored: false,
-  verify: null as null | ((token: string | undefined) => void),
+  /** Every verification asked for and not yet answered: a section may join one in flight. */
+  verifiers: [] as ((token: string | undefined) => void)[],
 }))
 
 vi.mock('../../lib/web-session', async (importOriginal) => ({
@@ -39,7 +40,7 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   hasStoredWebSession: () => session.stored,
   resolveWebSessionToken: () =>
     new Promise<string | undefined>((resolve) => {
-      session.verify = resolve
+      session.verifiers.push(resolve)
     }),
 }))
 
@@ -78,7 +79,7 @@ function publish(change: { identity: string | null; bearer: string | null }) {
 
 async function finishVerification(token: string | undefined) {
   await act(async () => {
-    session.verify?.(token)
+    for (const verify of session.verifiers.splice(0)) verify(token)
     await Promise.resolve()
   })
 }
@@ -108,7 +109,7 @@ function resetSession() {
   bearers = []
   session.identity = null
   session.stored = false
-  session.verify = null
+  session.verifiers = []
 }
 
 /** member-1 is entitled; member-2 is signed in without Premium. */
@@ -385,5 +386,65 @@ describe('PaletteAdvisorPanel follows the web session', () => {
     expect(locked()).toBeNull()
     await settle()
     expect(bearers).toEqual(['Bearer token-1a'])
+  })
+})
+
+// Settings Codex review 2, finding 2: the bridge keeps member-1's old bearer installed until the
+// replacement verifies, so the old read's 401 can arrive first. It is not a sign-out: the
+// section waits for that verification and reads once with the fresh token. (The 401 arriving
+// after the fresh token was published is the rotation case above.)
+describe('a 401 while the bridge still verifies a replacement token', () => {
+  beforeEach(async () => {
+    resetSession()
+    await getI18n().changeLanguage('en-US')
+  })
+
+  afterEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  it('PALETTE-SESSION-WEB-08 waits for the verification, then reads once with the fresh token', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get(PALETTE_PATH, async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(
+            { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+            { status: 401 }
+          )
+        }
+        return HttpResponse.json({ data: profile({ isEntitled: true }) })
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    // The old token is denied while it is still the installed one.
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+    await settle()
+    expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
+    expect(bearers).toEqual(['Bearer token-1a'])
+
+    // Verification answers with member-1's fresh token, and the bridge publishes it.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
+    await finishVerification('token-1b')
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+
+    expect(await screen.findByTestId('palette-advisor-consent')).toBeInTheDocument()
+    expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 })

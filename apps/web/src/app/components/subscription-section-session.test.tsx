@@ -24,7 +24,8 @@ import { SubscriptionSection } from './subscription-section'
 const session = vi.hoisted(() => ({
   identity: null as string | null,
   stored: false,
-  verify: null as null | ((token: string | undefined) => void),
+  /** Every verification asked for and not yet answered: a section may join one in flight. */
+  verifiers: [] as ((token: string | undefined) => void)[],
 }))
 
 vi.mock('../../lib/web-session', async (importOriginal) => ({
@@ -33,7 +34,7 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
   hasStoredWebSession: () => session.stored,
   resolveWebSessionToken: () =>
     new Promise<string | undefined>((resolve) => {
-      session.verify = resolve
+      session.verifiers.push(resolve)
     }),
 }))
 
@@ -81,7 +82,7 @@ function publish(change: { identity: string | null; bearer: string | null }) {
 
 async function finishVerification(token: string | undefined) {
   await act(async () => {
-    session.verify?.(token)
+    for (const verify of session.verifiers.splice(0)) verify(token)
     await Promise.resolve()
   })
 }
@@ -111,7 +112,7 @@ function resetSession() {
   bearers = []
   session.identity = null
   session.stored = false
-  session.verify = null
+  session.verifiers = []
 }
 
 const NONE = {
@@ -595,5 +596,226 @@ describe('SubscriptionSection follows the web session', () => {
         expect(vi.mocked(redirectToExternalUrl)).not.toHaveBeenCalled()
       }
     )
+
+    // Settings Codex review 2, finding 5: the return belongs to the first member scope on the
+    // page. Once member-1 leaves, it is spent, so member-1 signing in again loads normally.
+    it.each([
+      ['checkout', '/settings?checkout=success'],
+      ['portal', '/settings?portal=return'],
+    ])(
+      'SUBSCRIPTION-SESSION-WEB-13 a %s return spent by member-1 is not replayed when member-1 signs in again',
+      async (_kind, url) => {
+        useMswHandlers(
+          http.get('/api/v1/commerce/subscription', ({ request }) => {
+            const bearer = request.headers.get('authorization')
+            bearers.push(bearer)
+            return HttpResponse.json({ data: SUBSCRIPTION[bearer ?? ''] ?? NONE })
+          })
+        )
+        window.history.replaceState({}, '', url)
+        session.stored = true
+        session.identity = 'member-1'
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+        renderSection()
+        await waitFor(() => expect(refreshBearers).toEqual(['Bearer token-1']))
+        expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+        await settle()
+
+        publish({ identity: null, bearer: null })
+        publish({ identity: 'member-2', bearer: 'token-2' })
+        expect(await screen.findByTestId('premium-subscribe-monthly')).toBeEnabled()
+        await settle()
+
+        publish({ identity: null, bearer: null })
+        publish({ identity: 'member-1', bearer: 'token-1' })
+        expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+        await settle()
+
+        // member-1's second scope reads once, plainly: no second refresh, no return messages.
+        expect(refreshBearers).toEqual(['Bearer token-1'])
+        expect(bearers.filter((bearer) => bearer === 'Bearer token-1')).toEqual([
+          'Bearer token-1',
+        ])
+        expect(screen.queryByText(ACTIVATING)).toBeNull()
+        expect(screen.queryByTestId('premium-portal-lag-hint')).toBeNull()
+        expect(document.body.textContent).not.toMatch(PORTAL_LAG)
+      }
+    )
+
+    // Settings Codex review 2, finding 6: the portal return sends one refresh. When it fails, the
+    // fallback read is the only part retried after a superseded-token denial.
+    it('SUBSCRIPTION-SESSION-WEB-14 a portal return whose fallback read is denied after a rotation refreshes once', async () => {
+      const old = hold()
+      useMswHandlers(
+        http.post(REFRESH_PATH, ({ request }) => {
+          refreshBearers.push(request.headers.get('authorization'))
+          return HttpResponse.json(
+            { statusCode: 503, message: 'ledger unavailable' },
+            { status: 503 }
+          )
+        }),
+        http.get('/api/v1/commerce/subscription', async ({ request }) => {
+          const bearer = request.headers.get('authorization')
+          bearers.push(bearer)
+          if (bearer === 'Bearer token-1a') {
+            await old.gate
+            return HttpResponse.json(
+              { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+              { status: 401 }
+            )
+          }
+          return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
+        })
+      )
+      window.history.replaceState({}, '', '/settings?portal=return')
+      session.stored = true
+      session.identity = 'member-1'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+      renderSection()
+      // The refresh failed and the fallback read went out with the old token.
+      await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+      expect(refreshBearers).toEqual(['Bearer token-1a'])
+
+      publish({ identity: 'member-1', bearer: 'token-1b' })
+      await settle()
+      await act(async () => {
+        old.release()
+        await Promise.resolve()
+      })
+
+      expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+      await settle()
+      expect(hint()).toBeNull()
+      expect(refreshBearers).toEqual(['Bearer token-1a'])
+      expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+    })
   })
+})
+
+// Settings Codex review 2, finding 2: the bridge keeps member-1's old bearer installed until the
+// replacement verifies, so the old read's 401 can arrive first. It is not a sign-out: the
+// section waits for that verification and reads once with the fresh token. (The 401 arriving
+// after the fresh token was published is the rotation case above.)
+describe('a 401 while the bridge still verifies a replacement token', () => {
+  beforeEach(async () => {
+    resetSession()
+    await getI18n().changeLanguage('en-US')
+  })
+
+  afterEach(() => {
+    window.sessionStorage.clear()
+  })
+
+  it('SUBSCRIPTION-SESSION-WEB-12 waits for the verification, then reads once with the fresh token', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get('/api/v1/commerce/subscription', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(
+            { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+            { status: 401 }
+          )
+        }
+        return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    // The old token is denied while it is still the installed one.
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+    await settle()
+    expect(hint()).toBeNull()
+    expect(bearers).toEqual(['Bearer token-1a'])
+
+    // Verification answers with member-1's fresh token, and the bridge publishes it.
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
+    await finishVerification('token-1b')
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+
+    expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+    expect(hint()).toBeNull()
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  // Settings Codex review 2, finding 3: the access read rides beside the subscription read. A
+  // denial of member-1's superseded token is read again, so a complimentary member whose
+  // subscription is "none" is never offered a purchase.
+  it.each(['after', 'before'])(
+    'SUBSCRIPTION-SESSION-WEB-15 a complimentary member whose access read is denied %s the fresh token publishes keeps complimentary access',
+    async (timing) => {
+      const COMPLIMENTARY = 'You have complimentary Premium access from CoutureCast.'
+      const accessBearers: (string | null)[] = []
+      let releaseOld!: () => void
+      const old = new Promise<void>((resolve) => {
+        releaseOld = resolve
+      })
+      useMswHandlers(
+        http.get('/api/v1/commerce/subscription', ({ request }) => {
+          bearers.push(request.headers.get('authorization'))
+          return HttpResponse.json({ data: NONE })
+        }),
+        http.get('/api/v1/commerce/premium/access', async ({ request }) => {
+          const bearer = request.headers.get('authorization')
+          accessBearers.push(bearer)
+          if (bearer === 'Bearer token-1a') {
+            await old
+            return HttpResponse.json(
+              { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+              { status: 401 }
+            )
+          }
+          return HttpResponse.json({ data: { premium: true, source: 'complimentary' } })
+        })
+      )
+      session.stored = true
+      session.identity = 'member-1'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+      renderSection()
+      await waitFor(() => expect(accessBearers).toEqual(['Bearer token-1a']))
+      await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+      const deny = async () => {
+        await act(async () => {
+          releaseOld()
+          await Promise.resolve()
+        })
+        await settle()
+      }
+      if (timing === 'after') {
+        publish({ identity: 'member-1', bearer: 'token-1b' })
+        await settle()
+        await deny()
+      } else {
+        await deny()
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
+        await finishVerification('token-1b')
+        publish({ identity: 'member-1', bearer: 'token-1b' })
+      }
+
+      await waitFor(() =>
+        expect(screen.getByTestId('premium-status-line')).toHaveTextContent(COMPLIMENTARY)
+      )
+      await settle()
+      expect(screen.getByTestId('premium-status-line')).toHaveTextContent(COMPLIMENTARY)
+      expect(subscribe()).toBeNull()
+      expect(screen.queryByTestId('premium-subscribe-annual')).toBeNull()
+      expect(hint()).toBeNull()
+      expect(accessBearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+      expect(bearers).toEqual(['Bearer token-1a'])
+    }
+  )
 })
