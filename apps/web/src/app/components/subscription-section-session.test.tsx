@@ -192,6 +192,9 @@ describe('SubscriptionSection follows the web session', () => {
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
     renderSection()
     expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+    expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+      /Premium is active/
+    )
 
     publish({ identity: null, bearer: null })
     expect(manage()).toBeNull()
@@ -206,8 +209,14 @@ describe('SubscriptionSection follows the web session', () => {
     await waitFor(() =>
       expect(hint()).toHaveTextContent('Sign in to subscribe or manage Premium')
     )
+    // Nothing of a member's subscription survives (no manage control), and the controls are the
+    // signed-out ones 5.2-WEB-SEC-01 pins: present, disabled, described by the sign-in hint.
     expect(manage()).toBeNull()
-    expect(subscribe()).toBeNull()
+    expect(subscribe()).toBeDisabled()
+    expect(screen.getByTestId('premium-subscribe-annual')).toBeDisabled()
+    expect(screen.queryByTestId('premium-status-line')?.textContent ?? '').not.toMatch(
+      /Premium is active/
+    )
     expect(bearers).toHaveLength(2)
   })
 })
