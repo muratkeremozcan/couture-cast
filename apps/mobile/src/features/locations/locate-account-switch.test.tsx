@@ -350,5 +350,20 @@ describe(
         )
       )
     })
+
+    // Codex review 14 finding 1: the tap stops counting before the helper's Expo import resumes.
+    // The helper asks the OS for nothing: no permission prompt, no reading.
+    it('LOC-SWITCH-MOB-07 a tap retired before the location module loads opens no prompt and reads nothing', async () => {
+      const { readDevicePosition, DevicePositionSupersededError } =
+        await vi.importActual<typeof DevicePosition>('./device-position')
+      let current = true
+      const reading = readDevicePosition(5_000, () => current)
+      // Synchronously after the call: the helper is still awaiting its dynamic import.
+      current = false
+      await expect(reading).rejects.toBeInstanceOf(DevicePositionSupersededError)
+
+      expect(location.requestForegroundPermissionsAsync).not.toHaveBeenCalled()
+      expect(location.getCurrentPositionAsync).not.toHaveBeenCalled()
+    })
   }
 )

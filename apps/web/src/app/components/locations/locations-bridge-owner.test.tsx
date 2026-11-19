@@ -675,7 +675,21 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
 
     // Finding 7: the guided search's autofocus is delivered for the member who still owns it.
     describe('guided autofocus when the form mounts after a delete', () => {
+      /** Every element that received focus from the delete confirmation until the test reads it. */
+      let focusTargets: { combobox: boolean; element: Element }[] = []
+      const onFocusIn = (event: FocusEvent) => {
+        const element = event.target as Element
+        focusTargets.push({
+          combobox: element.getAttribute('role') === 'combobox',
+          element,
+        })
+      }
+      afterEach(() => {
+        document.removeEventListener('focusin', onFocusIn)
+      })
+
       async function deleteFromFull(moveOnAnnouncement: boolean) {
+        focusTargets = []
         navigation.query = 'addLocation=1'
         savedRows = [place('a-3', 'Alpha Third', false)]
         renderSection()
@@ -693,7 +707,9 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
           return realFrame(callback)
         })
         const item = screen.getByText('Alpha Third').closest('li')!
-        await user.click(within(item).getByRole('button', { name: /Yes, delete/ }))
+        const confirm = within(item).getByRole('button', { name: /Yes, delete/ })
+        document.addEventListener('focusin', onFocusIn)
+        await user.click(confirm)
         await settleClient()
         vi.restoreAllMocks()
       }
@@ -703,15 +719,22 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
         expect(
           screen.getByRole('combobox', { name: 'Search for a city' })
         ).toBeInTheDocument()
-        expect(searchInput()).not.toHaveFocus()
+        // The section's own focus decision wins: the Locations heading, exactly.
+        expect(document.activeElement).toBe(document.getElementById('locations-title'))
         expect(bridgeMoved).toBe(false)
       })
 
       it('LOC-BRIDGE-WEB-15 a guided form mounting after the bridge moved does not take focus', async () => {
         await deleteFromFull(true)
         expect(bridgeMoved).toBe(true)
-        const input = screen.queryByRole('combobox', { name: 'Search for a city' })
-        expect(input === null || document.activeElement !== input).toBe(true)
+        // From the bridge change until B is published, the stale guided search never took focus,
+        // even for a moment before a later effect moved it on. (B's own guided form may focus its
+        // search once B loads; that is B's.)
+        document.removeEventListener('focusin', onFocusIn)
+        expect(focusTargets.filter((target) => target.combobox)).toEqual([])
+        expect(focusTargets.map((target) => target.element)).not.toContain(
+          document.getElementById('locations-title')
+        )
         await expectCleanB()
       })
     })
