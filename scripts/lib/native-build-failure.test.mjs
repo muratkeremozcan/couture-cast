@@ -82,6 +82,70 @@ describe('native build failure record', () => {
     assert.equal(classify(undefined), 'unknown')
   })
 
+  // PR 256 dispatch 44523804534 (matrix-2, 15 s) and run 44117971285 (controls, 24 s): the
+  // Android build failed before any task with `unknown` and no failed task, because Gradle's
+  // configuration-phase failures matched no signature. Each now names its class.
+  test('names a Gradle failure that comes before any task runs', () => {
+    const classify = (log) => summarizeNativeBuildFailure({ ...base, log }).classification
+    const configurationPhase = (cause) =>
+      [
+        'FAILURE: Build failed with an exception.',
+        '* What went wrong:',
+        ...cause,
+        'BUILD FAILED in 15s',
+      ].join('\n')
+    assert.equal(
+      classify(
+        configurationPhase([
+          "Error resolving plugin [id: 'com.facebook.react.settings']",
+          "> A problem occurred configuring project ':gradle-plugin'.",
+          "   > Could not resolve all artifacts for configuration 'classpath'.",
+          '      > Could not find org.gradle.toolchains:foojay-resolver:0.5.0.',
+        ])
+      ),
+      'dependencies'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          "Plugin [id: 'com.facebook.react.settings'] was not found in any of the following sources:",
+        ])
+      ),
+      'dependencies'
+    )
+    assert.equal(
+      classify(
+        configurationPhase(['Could not find junit-4.13.2.jar (junit:junit:4.13.2).'])
+      ),
+      'dependencies'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          'Timeout waiting to lock journal cache (/home/runner/.gradle/caches/journal-1). It is currently in use by another Gradle instance.',
+        ])
+      ),
+      'locktimeout'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          "A problem occurred evaluating project ':app'.",
+          '> Cannot invoke method get() on null object',
+        ])
+      ),
+      'configuration'
+    )
+    assert.equal(
+      classify(
+        configurationPhase([
+          "Could not compile settings file '/x/apps/mobile/android/settings.gradle'.",
+        ])
+      ),
+      'configuration'
+    )
+  })
+
   test('keeps at most ten task paths and only path-shaped ones', () => {
     const log = [
       ...Array.from({ length: 12 }, (_, index) => `> Task :lib${index}:build FAILED`),

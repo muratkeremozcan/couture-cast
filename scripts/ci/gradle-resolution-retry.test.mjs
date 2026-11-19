@@ -12,6 +12,7 @@ import { parseArgs, runGradleWithResolutionRetry } from './gradle-resolution-ret
 import { EXPECTED_TESTS, NEED_OS_REPORT } from './check-accessibility-focus-results.mjs'
 import {
   RESOLUTION_RETRY_DELAYS_MS,
+  missingArtifactFailure,
   runWithResolutionRetry,
   transientResolutionFailure,
 } from '../lib/transient-resolution-retry.cjs'
@@ -351,6 +352,146 @@ test('a failing test is not retried by a transient word beside, not under, a fai
     transientResolutionFailure({ status: 1, signal: null, stdout: missing }),
     undefined
   )
+})
+
+// PR 256 dispatch 44523800625, Android app build: Maven Central answered "not found" for two
+// artifacts it serves, after their modules' metadata had resolved; the same restored Gradle cache
+// built green on the PR run 22 minutes earlier. Gradle 8.14.3 keeps a missing-artifact result for
+// 24 h (DefaultCachePolicy), so the retry asks Gradle to re-check (--refresh-dependencies)
+// instead of rerunning into its own cached miss.
+const MISSING_ARTIFACT = [
+  '> Task :accessibility-focus:checkDebugAndroidTestDuplicateClasses FAILED',
+  'FAILURE: Build failed with an exception.',
+  '* What went wrong:',
+  "Execution failed for task ':accessibility-focus:checkDebugAndroidTestDuplicateClasses'.",
+  "> Could not resolve all files for configuration ':accessibility-focus:debugAndroidTestRuntimeClasspath'.",
+  '   > Failed to transform junit-4.13.2.jar (junit:junit:4.13.2) to match attributes {artifactType=enumerated-runtime-classes}.',
+  '      > Could not find junit-4.13.2.jar (junit:junit:4.13.2).',
+  '        Searched in the following locations:',
+  '            https://repo.maven.apache.org/maven2/junit/junit/4.13.2/junit-4.13.2.jar',
+  '   > Failed to transform hamcrest-core-1.3.jar (org.hamcrest:hamcrest-core:1.3) to match attributes {artifactType=enumerated-runtime-classes}.',
+  '      > Could not find hamcrest-core-1.3.jar (org.hamcrest:hamcrest-core:1.3).',
+  'BUILD FAILED in 6m 30s',
+].join('\n')
+
+describe('an artifact the repository did not serve for a resolved module', () => {
+  test('retries and asks Gradle to re-check its cached missing result', () => {
+    const result = { status: 1, signal: null, stdout: MISSING_ARTIFACT }
+    assert.equal(
+      transientResolutionFailure(result),
+      'Could not find junit-4.13.2.jar (junit:junit:4.13.2)'
+    )
+    assert.equal(missingArtifactFailure(result), true)
+  })
+
+  test('a module or version that does not exist still fails at once', () => {
+    const missingModule = [
+      '* What went wrong:',
+      "> Could not resolve all files for configuration ':app:debugRuntimeClasspath'.",
+      '   > Could not find junit:junit:9.99.',
+      '     Searched in the following locations:',
+      '       - https://repo.maven.apache.org/maven2/junit/junit/9.99/junit-9.99.pom',
+      'BUILD FAILED in 9s',
+    ].join('\n')
+    const result = { status: 1, signal: null, stdout: missingModule }
+    assert.equal(transientResolutionFailure(result), undefined)
+    assert.equal(missingArtifactFailure(result), false)
+  })
+
+  test("a failing test's own output naming a missing jar does not retry", () => {
+    const quoted = [
+      'FixtureTest > reportsMissingJar FAILED',
+      '    java.lang.AssertionError: expected',
+      '      > Could not find junit-4.13.2.jar (junit:junit:4.13.2).',
+      TEST_TASK_FAILED,
+    ].join('\n')
+    const result = { status: 1, signal: null, stdout: quoted }
+    assert.equal(transientResolutionFailure(result), undefined)
+    assert.equal(missingArtifactFailure(result), false)
+  })
+
+  test('the retry loop tells each later attempt to refresh, and logs why', () => {
+    const outcomes = [
+      { status: 1, signal: null, stdout: MISSING_ARTIFACT },
+      { status: 0, signal: null, stdout: 'BUILD SUCCESSFUL' },
+    ]
+    const calls = []
+    const logs = []
+    const result = runWithResolutionRetry(
+      (options) => {
+        calls.push(options)
+        return outcomes.shift()
+      },
+      { wait: () => undefined, log: (message) => logs.push(message) }
+    )
+    assert.equal(result.status, 0)
+    assert.deepEqual(calls, [
+      { refreshDependencies: false },
+      { refreshDependencies: true },
+    ])
+    assert.deepEqual(logs, [
+      'Attempt 1/3 hit a transient download error (Could not find junit-4.13.2.jar (junit:junit:4.13.2)); retrying in 20 s with --refresh-dependencies.',
+    ])
+  })
+
+  test('the CLI adds --refresh-dependencies to the Gradle wrapper on the retry', (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gradle-missing-artifact-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    const record = path.join(directory, 'calls')
+    const failure = path.join(directory, 'failure.txt')
+    const gradlew = path.join(directory, 'gradlew')
+    fs.writeFileSync(failure, MISSING_ARTIFACT)
+    fs.writeFileSync(
+      gradlew,
+      `#!/usr/bin/env bash
+echo "$*" >> "${record}"
+if [ "$(wc -l < "${record}")" -ge 2 ]; then echo 'BUILD SUCCESSFUL'; exit 0; fi
+cat "${failure}"
+exit 1
+`
+    )
+    fs.chmodSync(gradlew, 0o755)
+    const logs = []
+    const status = runGradleWithResolutionRetry(['--', gradlew, 'assembleDebug'], {
+      wait: () => undefined,
+      log: (message) => logs.push(message),
+    })
+    assert.equal(status, 0)
+    assert.deepEqual(fs.readFileSync(record, 'utf8').trim().split('\n'), [
+      'assembleDebug',
+      'assembleDebug --refresh-dependencies',
+    ])
+    assert.equal(logs.length, 1)
+    assert.match(logs[0], /retrying in 20 s with --refresh-dependencies\.$/)
+  })
+
+  test('a command that is not a Gradle launcher is retried unchanged', (t) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'gradle-missing-artifact-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    const record = path.join(directory, 'calls')
+    const failure = path.join(directory, 'failure.txt')
+    const tool = path.join(directory, 'build-tool')
+    fs.writeFileSync(failure, MISSING_ARTIFACT)
+    fs.writeFileSync(
+      tool,
+      `#!/usr/bin/env bash
+echo "$*" >> "${record}"
+if [ "$(wc -l < "${record}")" -ge 2 ]; then exit 0; fi
+cat "${failure}"
+exit 1
+`
+    )
+    fs.chmodSync(tool, 0o755)
+    const status = runGradleWithResolutionRetry(['--', tool, 'build'], {
+      wait: () => undefined,
+      log: () => undefined,
+    })
+    assert.equal(status, 0)
+    assert.deepEqual(fs.readFileSync(record, 'utf8').trim().split('\n'), [
+      'build',
+      'build',
+    ])
+  })
 })
 
 test('the modal system bars workflow runs its Gradle build through the retry', () => {

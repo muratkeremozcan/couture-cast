@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
 import { describe, test } from 'node:test'
+import { fileURLToPath } from 'node:url'
 import {
   IOS_APP_NAME,
   IOS_DERIVED_DATA,
@@ -53,15 +55,22 @@ describe('Story 6.8 native build commands', () => {
     assert.equal(args.at(-1), 'build')
   })
 
-  test('Android assembles the configuration with the Worklets staging and the device ABI', () => {
+  // PR 256 dispatch 44523804534 matrix-2 and run 44117971285 controls: the Android build failed
+  // within 25 s with no failed task and no named cause, the shape of a dependency or plugin
+  // resolution failure, and this build ran Gradle with no retry. It now runs through the shared
+  // resolution retry, which reruns only a transient download failure or an artifact miss.
+  test('Android assembles the configuration through the resolution retry, with the Worklets staging and the device ABI', () => {
     const { binary, args } = nativeBuildCommand({
       platform: 'android',
       configuration: 'Release',
       arch: 'x86_64',
       workletsArgs: ['--init-script', '/owned/worklets.gradle'],
     })
-    assert.equal(binary, './gradlew')
+    assert.equal(binary, process.execPath)
     assert.deepEqual(args, [
+      fileURLToPath(new URL('../ci/gradle-resolution-retry.mjs', import.meta.url)),
+      '--',
+      './gradlew',
       'assembleRelease',
       '--init-script',
       '/owned/worklets.gradle',
@@ -69,6 +78,7 @@ describe('Story 6.8 native build commands', () => {
       '--max-workers=2',
       '-PreactNativeArchitectures=x86_64',
     ])
+    assert.equal(fs.existsSync(args[0]), true)
   })
 
   test('refuses an unknown configuration or platform', () => {

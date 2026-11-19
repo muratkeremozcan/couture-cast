@@ -418,8 +418,14 @@ describe('Android build environment', () => {
           spawnSync: (_binary, args, options) => {
             events.push('build')
             observed = options.env
-            assert.deepEqual(Array.from(args.slice(1, 3)), selected.args)
-            assert.ok(fs.readFileSync(args[2], 'utf8').includes('externalNativeBuild'))
+            // The build runs Gradle through the resolution retry (nativeBuildCommand).
+            assert.deepEqual(Array.from(args.slice(1, 4)), [
+              '--',
+              './gradlew',
+              'assembleDebug',
+            ])
+            assert.deepEqual(Array.from(args.slice(4, 6)), selected.args)
+            assert.ok(fs.readFileSync(args[5], 'utf8').includes('externalNativeBuild'))
             assert.ok(args.includes('-PreactNativeArchitectures=arm64-v8a'))
             const workletsProject = path.join(
               selected.projectRoot,

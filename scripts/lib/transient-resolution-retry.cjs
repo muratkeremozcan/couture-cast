@@ -3,8 +3,10 @@
 // or a dropped connection happens too: PR 233's run 43719645437 failed the share-card merger proof
 // on a 429 for gson and kotlin-stdlib, and PR 238's run 43767969866 failed the modal system bars
 // module on a 429 for gson (the foojay toolchain resolver plugin's dependency). Those failures say
-// nothing about the code under test, so the build is retried after a wait. Any other failure (a
-// compile error, a failing test, a merge conflict, an unresolvable version) fails at once.
+// nothing about the code under test, so the build is retried after a wait. So is an artifact the
+// repository did not serve for a module that resolved (PR 256 dispatch 44523800625), with
+// --refresh-dependencies. Any other failure (a compile error, a failing test, a merge conflict,
+// an unresolvable version) fails at once.
 //
 // CommonJS, so the share-card merger proof (apps/mobile/plugins, CommonJS) and the Gradle retry
 // command (scripts/ci/gradle-resolution-retry.mjs) share one signature and one retry loop.
@@ -75,6 +77,16 @@ const ROBOLECTRIC_RUNTIME_DOWNLOAD_FAILURE =
  */
 const NESTED_CAUSE = /^(\s*)> /
 
+/**
+ * An artifact file the repository did not serve for a module whose metadata already resolved, as
+ * Gradle prints it in its cause tree: `> Could not find junit-4.13.2.jar (junit:junit:4.13.2).`
+ * PR 256 dispatch 44523800625 failed this way on two jars Maven Central serves, with the same
+ * restored Gradle cache that built green 22 minutes earlier. A missing module or version
+ * (`> Could not find junit:junit:9.99.`) names no file and still fails at once.
+ */
+const MISSING_ARTIFACT =
+  /^\s*> (Could not find [^\s()]+\.(?:jar|aar|pom|module|klib) \([^\s():]+:[^\s():]+:[^\s()]+\))\.?\s*$/
+
 /** For each line, whether it sits in a Gradle cause tree rooted at column 0. */
 function gradleOwnedLines(lines) {
   let inTree = false
@@ -110,6 +122,27 @@ function transientDownloadFailure(output, { toolOwnedOnly = false } = {}) {
   return undefined
 }
 
+/** The first artifact miss Gradle's own cause tree prints, or undefined. */
+function missingArtifact(output) {
+  const lines = output.split('\n')
+  const owned = gradleOwnedLines(lines)
+  for (const [at, line] of lines.entries()) {
+    const match = owned[at] ? MISSING_ARTIFACT.exec(line) : null
+    if (match) return match[1]
+  }
+  return undefined
+}
+
+/**
+ * Whether a failed run's cause is an artifact miss (MISSING_ARTIFACT). Gradle 8.14.3 keeps a
+ * missing-artifact result for 24 hours (DefaultCachePolicy), so a plain rerun in the same Gradle
+ * home fails on its own cached miss; the retry has Gradle re-check with --refresh-dependencies.
+ */
+function missingArtifactFailure(result) {
+  if (result.status === 0 || result.signal) return false
+  return missingArtifact(`${result.stdout ?? ''}\n${result.stderr ?? ''}`) !== undefined
+}
+
 /** Waits before the second and third attempts. */
 const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
 
@@ -117,6 +150,8 @@ const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
  * The transient download error a failed run printed, or undefined when it printed none.
  *
  * - A run killed by a signal (a timeout) is never retried.
+ * - A run whose Gradle cause tree names an artifact miss for a resolved module
+ *   (MISSING_ARTIFACT) is retried, with --refresh-dependencies (see runWithResolutionRetry).
  * - A run whose test cases failed (GRADLE_TEST_FAILURE: a failed case, the failing-tests
  *   summary or a connected run's per-device summary) is retried only when it also printed a
  *   failed artifact download whose own line or nested cause is transient, and only where the
@@ -136,6 +171,8 @@ const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
 function transientResolutionFailure(result) {
   if (result.status === 0 || result.signal) return undefined
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
+  const miss = missingArtifact(output)
+  if (miss !== undefined) return miss
   if (GRADLE_TEST_FAILURE.test(output) || GRADLE_TEST_TASK_FAILURE.test(output))
     return transientDownloadFailure(output, { toolOwnedOnly: true })
   const download = transientDownloadFailure(output)
@@ -151,7 +188,9 @@ function isTransientResolutionFailure(result) {
 /**
  * Runs `run` until it succeeds, fails for a real reason, or the waits run out, and logs each
  * retry with the attempt number and the error that caused it. `run` returns a spawnSync-like
- * result ({ status, stdout, stderr }).
+ * result ({ status, stdout, stderr }) and receives `{ refreshDependencies }`: true on every
+ * attempt after one that failed on an artifact miss, so a Gradle caller re-checks the cached
+ * miss. A caller that runs no Gradle launcher may ignore it.
  */
 function runWithResolutionRetry(
   run,
@@ -162,16 +201,18 @@ function runWithResolutionRetry(
   } = {}
 ) {
   const attempts = delaysMs.length + 1
-  let result = run()
+  let refreshDependencies = false
+  let result = run({ refreshDependencies })
   for (const [index, delay] of delaysMs.entries()) {
     const failure = transientResolutionFailure(result)
     if (failure === undefined) return result
+    refreshDependencies ||= missingArtifactFailure(result)
     log(
       `Attempt ${index + 1}/${attempts} hit a transient download error (${failure}); ` +
-        `retrying in ${delay / 1000} s.`
+        `retrying in ${delay / 1000} s${refreshDependencies ? ' with --refresh-dependencies' : ''}.`
     )
     wait(delay)
-    result = run()
+    result = run({ refreshDependencies })
   }
   const failure = transientResolutionFailure(result)
   if (failure !== undefined)
@@ -190,8 +231,10 @@ module.exports = {
   GRADLE_TEST_FAILURE,
   GRADLE_TEST_TASK_FAILURE,
   RESOLUTION_RETRY_DELAYS_MS,
+  MISSING_ARTIFACT,
   TRANSIENT_RESOLUTION_FAILURE,
   isTransientResolutionFailure,
+  missingArtifactFailure,
   runWithResolutionRetry,
   transientResolutionFailure,
 }

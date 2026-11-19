@@ -28,9 +28,17 @@ const signatures = [
     /Gradle build daemon disappeared unexpectedly|daemon has (crashed|died)/i,
   ],
   ['diskfull', /No space left on device/],
+  // Also Gradle's configuration-phase resolution failures, which come before any task: a plugin
+  // that did not resolve, a classpath's artifacts, a module or artifact the repository did not
+  // serve (PR 256 dispatch 44523804534 and run 44117971285 read `unknown` with no failed task).
   [
     'dependencies',
-    /Could not resolve (all files|all dependencies|[\w.-]+:[\w.-]+)|Could not (GET|HEAD|download) /,
+    /Could not resolve (all files|all dependencies|all artifacts|[\w.-]+:[\w.-]+)|Could not (GET|HEAD|download) |Error resolving plugin \[id: |Plugin \[id: '[^']+'[^\]]*\] was not found|^\s*(?:> )?Could not find \S/m,
+  ],
+  ['locktimeout', /Timeout waiting to lock /],
+  [
+    'configuration',
+    /A problem occurred (?:configuring|evaluating) (?:root )?project|Could not compile (?:settings|build|init script) file/,
   ],
   ['kotlin', /^e: file:\/\/|Compilation error\. See log for more details/m],
   ['java', /Compilation failed; see the compiler error output for details/],
