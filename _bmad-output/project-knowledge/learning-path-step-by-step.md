@@ -30,6 +30,7 @@ PR and CI status below describe the 2026-10-31 snapshot.
 Owner maps also include historical or descriptive labels whose exact source anchors need reconciliation.
 The read-only review records those contract gaps under `Evidence boundaries`.
 
+Added the community lookbook fix to Step 58's production follow-ups: the real `/community` page, Latest looks, the climate explainer and pinned sticky navigation.
 Added Step 58, production status and nightly health, with the daily production run and the nightly lane fixes, and Step 58 in `Current position` and `The whole project in plain English`.
 Step 58 departs from instruction 2 the same way Steps 38, 39, 49 and 55 did: it has no story.
 Added Step 57's production follow-ups, PRs #237 to #255.
@@ -12159,3 +12160,69 @@ Evidence boundaries:
 - The provider keys were set on Vercel production and preview on 2026-11-19 and both were
   redeployed.
 - Android coarse-only location is proven on the merged manifest, not on a device.
+
+Community lookbook fix (`fix/community-lookbook`). User/business impact:
+
+A PM testing production on Android Chrome tapped Community and found a placeholder, and on Home
+nothing explained the climate filters. The feed was empty while the Community Beta flags sat at
+0%. `/community` now renders the real lookbook, the owner opened the Community Beta to every
+member on 2026-11-19, caption screening holds fewer safe captions, and moderator review is
+measured in minutes.
+
+#### Lessons
+
+1. **A placeholder route is a defect once real people use the product.**
+   A PM testing production on Android Chrome tapped the bottom-nav Community tab and landed on the
+   Story 3.6 stub: a dark page holding only the word "Community", while the real lookbook lived
+   only on Home. [`apps/web/src/app/community/page.tsx`](../../apps/web/src/app/community/page.tsx)
+   now renders `CommunityLookbookGrid` with its filter nav, plus a home link for widths where the
+   bottom nav hides.
+2. **`overflow-x-hidden` on a page wrapper breaks every sticky child.**
+   It makes the wrapper a scroll container, so the Home chip bar and the community filters stuck
+   to it and scrolled off with the page. Home and `/community` now use `overflow-x-clip`, which
+   still stops sideways scroll from the bleed layout. A test that accepted `y <= 1` had hidden it;
+   the tightened check asserts the pinned position.
+3. **Name what the feed does, and explain its vocabulary next to it.**
+   "Living community lookbook" became "Latest looks" in all 10 web and mobile catalogs, because
+   the feed is newest first by `published_at`; "Trending" would promise a ranking that does not
+   exist. One line under the heading says a climate band is the week's forecast at the sharer's
+   saved location, which is what `resolveViewerBand` classifies at publish. On Home the heading
+   and chips moved from the hero column to the feed they filter.
+4. **A refused session is signed out for every member action until it is accepted again.**
+   A stored token the API answers 401 still reads as a member to the landing script. The grid
+   records the refusal against that session scope: the Sign in link drops its guest-only marker,
+   New post and challenge entry hide, and a pending allocation, publish or report is aborted so a
+   late answer cannot refill the next draft. A 503 or a loading state keeps the refusal; a
+   successful read, a realtime rebuild included, or a different session lifts it.
+5. **An empty feed needs evidence, not a likely story.**
+   Every production read returned zero published looks while the Community Beta flags were at 0%
+   and write was open only to complimentary members. That was a possible explanation; the count of
+   submissions held in screening stayed unknown, because production tables were not read.
+
+Tests:
+
+- Web, Vitest:
+  [`community-filter-explainer.test.tsx`](../../apps/web/src/app/components/community-filter-explainer.test.tsx)
+  proves the heading and explainer in all 10 locales and the nav description;
+  [`community-lookbook-grid.test.tsx`](../../apps/web/src/app/components/community-lookbook-grid.test.tsx)
+  and
+  [`community-lookbook-grid.surface.test.tsx`](../../apps/web/src/app/components/community-lookbook-grid.surface.test.tsx)
+  prove the signed-out note, the 401 refusal, a 503 after a 401, the late allocation, the open
+  report, realtime recovery and challenge entry (6.1-WEB-004, 6.1-WEB-077 to 6.1-WEB-083);
+  [`lookbook-prism-layout.test.tsx`](../../apps/web/src/app/components/lookbook-prism-layout.test.tsx)
+  and
+  [`home-spotlight-teaser.test.tsx`](../../apps/web/src/app/components/home-spotlight-teaser.test.tsx)
+  prove Home has one nav, beside the feed.
+- Mobile, Vitest:
+  [`community-filter-chips.test.tsx`](../../apps/mobile/components/community/community-filter-chips.test.tsx)
+  proves the explainer above the chips.
+- E2E, Playwright:
+  [`chip-navigation-bottom-nav.spec.ts`](../../playwright/tests/chip-navigation-bottom-nav.spec.ts)
+  proves the bottom-nav Community tab lands on the lookbook at phone width, the pinned chip bar
+  and filters, and the `/community` home link (3.6-E2E-002, 3.6-E2E-007, 3.6-E2E-008);
+  [`community-feed.spec.ts`](../../playwright/tests/community-feed.spec.ts) runs on `/community`.
+- Native, Android instrumentation:
+  [`ShareCardComposerTalkBackTest.kt`](../../apps/mobile/modules/accessibility-focus/android/src/androidTest/java/expo/modules/accessibilityfocus/ShareCardComposerTalkBackTest.kt)
+  and
+  [`ShareCardFallbackTalkBackTest.kt`](../../apps/mobile/modules/accessibility-focus/android/src/androidTest/java/expo/modules/accessibilityfocus/ShareCardFallbackTalkBackTest.kt)
+  assert the renamed heading never returns as a content heading.

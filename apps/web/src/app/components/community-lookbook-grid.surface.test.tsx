@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Community grid journeys through the real web transport and MSW.
 import axe from 'axe-core'
 import { http, HttpResponse } from 'msw'

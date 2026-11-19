@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
 // Story 3.5 Task 6 step 2 owner: unit-test community lookbook filter chip interactions and ARIA status in `apps/web/src/app/components/community-lookbook-grid.test.tsx`

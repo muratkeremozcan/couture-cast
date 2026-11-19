@@ -1,3 +1,5 @@
+// Learning path Step 58: Production status and nightly health, production follow-ups.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Learning path Step 38: Community feed by climate band.
 // Story 6.1 Task 8 owner: the community feed's sticky filter strip.
 //
