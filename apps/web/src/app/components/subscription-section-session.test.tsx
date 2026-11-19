@@ -219,4 +219,37 @@ describe('SubscriptionSection follows the web session', () => {
     )
     expect(bearers).toHaveLength(2)
   })
+
+  // Codex review 20: the switch case signs out from a member with no subscription, so a section
+  // that kept the last status would pass it. Here the member who signs out is the active one.
+  it('SUBSCRIPTION-SESSION-WEB-05 an active member who signs out leaves no trace of the subscription', async () => {
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    renderSection()
+    expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+    expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+      /Premium is active/
+    )
+
+    const statusText = () =>
+      screen.queryByTestId('premium-status-line')?.textContent ?? ''
+
+    // The owner is gone while the bridge still verifies: nothing of member-1 stays on screen.
+    publish({ identity: null, bearer: null })
+    expect(statusText()).not.toMatch(/Premium is active/)
+    expect(manage()).toBeNull()
+
+    // Verification ends without a member: the signed-out section, still nothing of member-1.
+    session.stored = false
+    await finishVerification(undefined)
+    publish({ identity: null, bearer: null })
+    await waitFor(() =>
+      expect(hint()).toHaveTextContent('Sign in to subscribe or manage Premium')
+    )
+    expect(statusText()).not.toMatch(/Premium is active/)
+    expect(manage()).toBeNull()
+    expect(subscribe()).toBeDisabled()
+    expect(bearers).toEqual(['Bearer token-1'])
+  })
 })
