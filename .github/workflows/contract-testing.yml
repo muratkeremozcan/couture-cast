@@ -133,10 +133,31 @@ jobs:
             exit 1
           fi
 
+      # The generator jar downloads from Maven Central on first use. A one-off 404 there failed
+      # this job on 2026-11-19 (the artifact exists), so the jar is cached by the pinned version
+      # in openapitools.json and a cold download retries with backoff.
+      - name: Schema validation, cache the OpenAPI generator jar
+        if: ${{ !cancelled() && github.event_name != 'push' && steps.utils.outcome == 'success' }}
+        uses: actions/cache@v4
+        with:
+          path: node_modules/@openapitools/openapi-generator-cli/versions
+          key: openapi-generator-jar-${{ hashFiles('openapitools.json') }}
+
       - name: Schema validation, checked-in SDK is current
         if: ${{ !cancelled() && github.event_name != 'push' && steps.utils.outcome == 'success' }}
         run: |
-          npm run generate:api-client
+          jars=node_modules/@openapitools/openapi-generator-cli/versions
+          for attempt in 1 2 3 4; do
+            if npm run generate:api-client; then break; fi
+            if [ "$attempt" = 4 ]; then
+              echo "::error::generate:api-client failed after $attempt attempts."
+              exit 1
+            fi
+            delay=$((attempt * attempt * 5))
+            echo "::warning::generate:api-client failed (attempt $attempt); a partial jar is removed and the run retries in ${delay}s."
+            find "$jars" -name '*.jar' -size -1000k -delete 2>/dev/null || true
+            sleep "$delay"
+          done
           if ! git diff --exit-code -- packages/api-client/src/generated; then
             echo "::error::packages/api-client/src/generated is behind packages/api-client/docs/http.openapi.json. Run 'npm run generate:api-client' locally and commit the result."
             exit 1
