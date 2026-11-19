@@ -50,7 +50,8 @@ const UNRELATED_KERNEL_LINES = [
 ]
 
 // Fake commands on PATH record each call with the proof flags it saw. CC68_CI_FAILURE picks one
-// failure: the proof, the cleanup prebuild, the swap, or the emulator gone after the build.
+// failure: the proof, the cleanup prebuild, the swap, the emulator gone after the build, or the
+// Release build failing (exit 41) with the emulator still up or gone.
 // CC68_CI_FREE_MIB is the free disk df reports under RUNNER_TEMP.
 const FAKE = `
 const fs = require('node:fs')
@@ -70,9 +71,10 @@ if (command === 'sudo' && args.join(' ') === '-n dmesg') {
   process.exit(0)
 }
 if (command === 'adb' && args.includes('get-state')) {
-  if (failure === 'emulator-gone') { console.error("error: device 'emulator-5554' not found"); process.exit(1) }
+  if (failure === 'emulator-gone' || failure === 'build-emulator-gone') { console.error("error: device 'emulator-5554' not found"); process.exit(1) }
   console.log('device')
 }
+if (failure.startsWith('build') && command === 'node' && args[1] === 'build') process.exit(41)
 if (failure === 'proof' && args.includes('release-live-font')) process.exit(19)
 if (failure === 'cleanup' && args.includes('prebuild') && flags.CC68_RELEASE_PROOF_LOOPBACK === '0') process.exit(37)
 if (failure === 'swap' && command === 'sudo' && args[0] === 'fallocate') process.exit(28)
@@ -192,6 +194,43 @@ describe('share-card-android-release-font.sh', () => {
     assert.deepEqual(records.at(-1).args, CLEANUP_ARGS)
     assert.equal(records.at(-1).flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
   })
+
+  // Codex review 7 of PR 256: under `set -e` a failed Release build used to exit before any
+  // evidence, so memory pressure that failed Gradle and the emulator together left nothing.
+  for (const { failure, emulator, stream } of [
+    {
+      failure: 'build',
+      emulator: '== The emulator emulator-5554 still answers.',
+      stream: 'stdout',
+    },
+    {
+      failure: 'build-emulator-gone',
+      emulator: '::error::The emulator emulator-5554 exited during the Release build.',
+      stream: 'stderr',
+    },
+  ])
+    test(`a failed Release build keeps its exit status and the evidence (${failure})`, () => {
+      const { result, records } = runScript({ failure })
+      assert.equal(result.status, 41, result.stderr)
+      assert.match(result.stderr, /^::error::The Release build failed \(exit 41\)\.$/m)
+      assert.ok(result[stream].split('\n').includes(emulator), result[stream])
+      // The emulator's state, memory, swap and the OOM records, and no install or proof.
+      assert.deepEqual(
+        records
+          .filter((record) => record.command !== 'node')
+          .map((record) => record.args),
+        [['-s', 'emulator-5554', 'get-state'], ['-m'], ['--show'], ['-n', 'dmesg']]
+      )
+      const kernel = result.stdout.split('== Kernel OOM records\n')[1]
+      assert.equal(kernel, `${OOM_RECORDS.join('\n')}\n`)
+      // Normal generation is still restored, and its success does not hide the build's status.
+      assert.deepEqual(
+        nodeCalls(records).map((record) => record.args[1]),
+        ['prebuild', 'build', 'prebuild']
+      )
+      assert.deepEqual(records.at(-1).args, CLEANUP_ARGS)
+      assert.equal(records.at(-1).flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
+    })
 
   // The swap file shares RUNNER_TEMP's filesystem with the repository on GitHub's runners, and
   // run-story68-native.mjs refuses prebuild, build and release-live-font under 15 GiB free there.

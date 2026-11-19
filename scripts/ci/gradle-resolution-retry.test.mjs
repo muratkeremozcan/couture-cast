@@ -189,15 +189,87 @@ test('a failing test is not retried when its output only mentions a timeout or a
 })
 
 test('a failing test whose failure is a rate-limited artifact download still retries', () => {
-  for (const download of [ROBOLECTRIC_RATE_LIMITED, RATE_LIMITED])
-    assert.match(
-      transientResolutionFailure({
-        status: 1,
-        signal: null,
-        stdout: `${TEST_FAILED}\n    ${download}\n${TEST_TASK_FAILED}`,
-      }),
-      /^(?:HTTP response code: 429|status code 429)$/
+  // Robolectric fetches its runtime inside the test JVM, so its exception sits in the case's
+  // output; Gradle's own download failure sits in its failure report.
+  const robolectric = `${TEST_FAILED}\n    ${ROBOLECTRIC_RATE_LIMITED}\n${TEST_TASK_FAILED}`
+  const gradleReport = [
+    TEST_FAILED,
+    'FAILURE: Build failed with an exception.',
+    '* What went wrong:',
+    "Execution failed for task ':modal-system-bars:testDebugUnitTest'.",
+    "> Could not resolve all files for configuration ':modal-system-bars:debugUnitTestRuntimeClasspath'.",
+    '   > Could not resolve com.google.code.gson:gson:2.9.1.',
+    `      > ${RATE_LIMITED}`,
+    '* Try:',
+    'BUILD FAILED in 41s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: robolectric }),
+    'HTTP response code: 429'
+  )
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: gradleReport }),
+    'status code 429'
+  )
+  // A download nested under a cause that is not itself a download (an artifact transform) is
+  // still Gradle's: it sits in the column-0 tree.
+  const transform = [
+    TEST_FAILED,
+    '* What went wrong:',
+    "Execution failed for task ':modal-system-bars:testDebugUnitTest'.",
+    '> Failed to transform core-1.13.1.aar (androidx.core:core:1.13.1) to match attributes {artifactType=android-classes-jar}.',
+    '   > Could not download core-1.13.1.aar (androidx.core:core:1.13.1)',
+    "      > Could not GET 'https://dl.google.com/dl/android/maven2/androidx/core/core/1.13.1/core-1.13.1.aar'.",
+    '         > Read timed out',
+    'BUILD FAILED in 41s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: transform }),
+    'Read timed out'
+  )
+})
+
+// Codex review 7 of PR 256: Gradle indents a test's own output under its case line, so a
+// multiline assertion message or fixture diff that prints whole download lines, a nested `>`
+// tree included, is the test's text, not Gradle's. Before this, any line that started with
+// `Could not GET` after optional spaces counted, and these retried.
+test('a failing test is not retried by download lines its own multiline output prints', () => {
+  for (const printed of [
+    [`    ${RATE_LIMITED}`],
+    [
+      "    > Could not GET 'https://repo.maven.apache.org/maven2/com/example/fixture/1.0/fixture-1.0.pom'.",
+      '       > Read timed out',
+    ],
+    [
+      '    java.io.IOException: Server returned HTTP response code: 429 for URL: https://example.test/fixture.json',
+    ],
+  ]) {
+    const output = [
+      'ArtifactFixtureTest > printsTheFixtureLog FAILED',
+      '    org.opentest4j.AssertionFailedError: expected the log to read:',
+      ...printed,
+      '    but it was empty',
+      TEST_TASK_FAILED,
+    ].join('\n')
+    assert.equal(
+      transientResolutionFailure({ status: 1, signal: null, stdout: output }),
+      undefined,
+      output
     )
+  }
+  // A `> Task` header is not a cause, so a test's standard output printed under it is not
+  // Gradle's either.
+  const underHeader = [
+    '> Task :modal-system-bars:testDebugUnitTest',
+    "    > Could not GET 'https://repo.maven.apache.org/maven2/com/example/fixture/1.0/fixture-1.0.pom'.",
+    '       > Read timed out',
+    TEST_FAILED,
+    TEST_TASK_FAILED,
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: underHeader }),
+    undefined
+  )
 })
 
 test('a test task that failed resolving before its tests ran retries on a nested transient cause', () => {

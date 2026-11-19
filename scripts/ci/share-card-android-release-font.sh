@@ -57,21 +57,45 @@ add_build_swap() {
   fi
   memory_report "with $size_mib MiB of the Release build's swap ($free_mib MiB was free)"
 }
+emulator_answers() {
+  [ "$(adb -s "$ANDROID_SERIAL" get-state 2>/dev/null)" = device ]
+}
+kernel_oom_records() {
+  echo "== Kernel OOM records"
+  sudo -n dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -n 20 || true
+}
 # The install below would only say "device not found"; this names the emulator's exit and keeps
 # the kernel's account of it.
 require_emulator() {
-  if [ "$(adb -s "$ANDROID_SERIAL" get-state 2>/dev/null)" = device ]; then return 0; fi
+  if emulator_answers; then return 0; fi
   echo "::error::The emulator $ANDROID_SERIAL exited during the Release build." >&2
   memory_report "after the emulator exited"
-  echo "== Kernel OOM records"
-  sudo -n dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' | tail -n 20 || true
+  kernel_oom_records
   return 1
+}
+# The same memory pressure can fail the Gradle build itself (a killed daemon, a failed fork), so a
+# failed Release build keeps the same account, and the script still exits with the build's status.
+report_failed_release_build() {
+  echo "::error::The Release build failed (exit $1)." >&2
+  if emulator_answers; then
+    echo "== The emulator $ANDROID_SERIAL still answers."
+  else
+    echo "::error::The emulator $ANDROID_SERIAL exited during the Release build." >&2
+  fi
+  memory_report "after the Release build failed"
+  kernel_oom_records
 }
 add_build_swap
 STORY68_NATIVE_TEST_BUILD=1 CC68_RELEASE_PROOF_LOOPBACK=1 EAS_BUILD_PROFILE=cc68-release-proof \
   node scripts/run-story68-native.mjs prebuild --platform android --clean yes
+release_build_status=0
 STORY68_NATIVE_TEST_BUILD=1 CC68_RELEASE_PROOF_LOOPBACK=1 EAS_BUILD_PROFILE=cc68-release-proof \
-  node scripts/run-story68-native.mjs build --platform android --configuration Release --arch x86_64
+  node scripts/run-story68-native.mjs build --platform android --configuration Release --arch x86_64 ||
+  release_build_status=$?
+if [ "$release_build_status" -ne 0 ]; then
+  report_failed_release_build "$release_build_status"
+  exit "$release_build_status"
+fi
 require_emulator
 # Over the debug dev client, so the session its sign-in left carries over: this proof build signs
 # release with the same pinned test-only key (apps/mobile/plugins/with-minified-debuggable.js).

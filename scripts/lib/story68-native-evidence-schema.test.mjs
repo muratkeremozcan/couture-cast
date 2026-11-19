@@ -289,9 +289,11 @@ test('the iOS Settings markers are the breadcrumb pair, which every Settings scr
 // Both CI waits (the General row, then the breadcrumb) sat under the app's appId and could never
 // succeed, whatever Settings showed.
 /**
- * Every check a Maestro command list makes on the screen, with the platform it runs on: the
- * commands of a `runFlow` with `when.platform` run on that platform only, everything else on both.
- * Reads the parsed flow, so a comment that names an id is never counted.
+ * Every check a Maestro command list makes on the screen, with the platform it runs on and the
+ * command's whole body (timeouts and `optional` included): the commands of a `runFlow` with
+ * `when.platform` run on that platform only, everything else on both. It descends into inline
+ * `runFlow`, `retry` and `repeat` command lists, and reads the parsed flow, so a comment that
+ * names an id is never counted.
  */
 function screenChecks(commands, platform = 'both') {
   const checks = []
@@ -300,17 +302,27 @@ function screenChecks(commands, platform = 'both') {
       if (name === 'runFlow') {
         const scoped = argument.when?.platform ?? platform
         if (argument.file)
-          checks.push({ platform: scoped, command: 'runFlow', file: argument.file })
+          checks.push({ platform: scoped, command: 'runFlow', body: argument.file })
         checks.push(...screenChecks(argument.commands, scoped))
-      } else if (name === 'assertVisible' || name === 'assertNotVisible')
-        checks.push({ platform, command: name, id: argument.id })
-      else if (name === 'extendedWaitUntil')
-        for (const state of ['visible', 'notVisible'])
-          if (argument[state])
-            checks.push({ platform, command: `${name}.${state}`, id: argument[state].id })
+      } else if (name === 'retry' || name === 'repeat')
+        checks.push(...screenChecks(argument.commands, platform))
+      else if (['assertVisible', 'assertNotVisible', 'extendedWaitUntil'].includes(name))
+        checks.push({ platform, command: name, body: argument })
     }
   }
   return checks
+}
+
+/** The selector ids (or bare texts) a screen check looks for. */
+function checkedIds({ command, body }) {
+  if (command === 'runFlow') return []
+  const selectors =
+    command === 'extendedWaitUntil' ? [body.visible, body.notVisible] : [body]
+  return selectors
+    .filter((selector) => selector !== undefined)
+    .map((selector) =>
+      typeof selector === 'string' ? selector : (selector.id ?? selector.text)
+    )
 }
 
 describe('settings.yaml and the harness re-read prove the OS Settings app is in front', () => {
@@ -326,11 +338,13 @@ describe('settings.yaml and the harness re-read prove the OS Settings app is in 
   test('iOS waits for the breadcrumb in a subflow scoped to the Settings app', () => {
     assert.deepEqual(
       checks.filter((check) => check.platform === 'iOS'),
-      [{ platform: 'iOS', command: 'runFlow', file: 'wait-os-settings-ios.yaml' }]
+      [{ platform: 'iOS', command: 'runFlow', body: 'wait-os-settings-ios.yaml' }]
     )
     // No check under this app's appId looks for the breadcrumb or a Settings row.
     assert.deepEqual(
-      checks.filter((check) => /breadcrumb|^com\.apple\.settings\./.test(check.id ?? '')),
+      checks.filter((check) =>
+        checkedIds(check).some((id) => /breadcrumb|^com\.apple\.settings\./.test(id))
+      ),
       []
     )
     const sub = read('wait-os-settings-ios.yaml')
@@ -350,23 +364,29 @@ describe('settings.yaml and the harness re-read prove the OS Settings app is in 
   // preparing its card in the background. On iOS the breadcrumb, in the flow and again in the
   // harness, is the proof; the title check stays where the hierarchy is the foreground's.
   test('the sheet title check runs on Android only, after Settings is in front', () => {
+    // Exact bodies: a 1 ms timeout or an `optional: true` title check is a different check.
     assert.deepEqual(
       checks.filter((check) => check.platform === 'Android'),
       [
         {
           platform: 'Android',
-          command: 'extendedWaitUntil.visible',
-          id: 'com.android.settings:id/.*',
+          command: 'extendedWaitUntil',
+          body: { visible: { id: 'com.android.settings:id/.*' }, timeout: 15000 },
         },
-        { platform: 'Android', command: 'assertNotVisible', id: 'share-card-title' },
+        {
+          platform: 'Android',
+          command: 'assertNotVisible',
+          body: { id: 'share-card-title' },
+        },
       ]
     )
     assert.deepEqual(
       checks.filter(
-        (check) => check.id === 'share-card-title' && check.platform !== 'Android'
+        (check) =>
+          checkedIds(check).includes('share-card-title') && check.platform !== 'Android'
       ),
       [],
-      'no title check runs on iOS'
+      'no title check runs on iOS, inline or inside a retry or repeat'
     )
   })
 

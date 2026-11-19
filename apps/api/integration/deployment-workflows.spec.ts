@@ -72,9 +72,12 @@ type ProdWorkflow = {
 
 /**
  * Every job or step condition in a workflow, and in the local reusable workflows its jobs call,
- * that reads the triggering event (`github.event_name`, `github.event.*`). A condition like that
- * could let one trigger, the daily schedule for one, run no tests while its run still passes.
+ * that reads the triggering event, in dot form (`github.event_name`, `github.event.*`) or
+ * bracket form (`github['event_name']`, `github["event"]`). A condition like that could let one
+ * trigger, the daily schedule for one, run no tests while its run still passes.
  */
+const READS_EVENT =
+  /github\s*(?:\.\s*event(?:_name\b|\s*[.[])|\[\s*['"]event(?:_name)?['"]\s*\])/
 function eventConditions(workflowPath: string, seen = new Set<string>()): string[] {
   if (seen.has(workflowPath)) return []
   seen.add(workflowPath)
@@ -82,8 +85,7 @@ function eventConditions(workflowPath: string, seen = new Set<string>()): string
     jobs: Record<string, WorkflowJob>
   }
   const found: string[] = []
-  const readsEvent = (condition: WorkflowCondition) =>
-    /github\.event(?:_name|\.)/.test(String(condition))
+  const readsEvent = (condition: WorkflowCondition) => READS_EVENT.test(String(condition))
   for (const [id, job] of Object.entries(jobs)) {
     if (job.if !== undefined && readsEvent(job.if))
       found.push(`${path.basename(workflowPath)} ${id}: ${String(job.if)}`)
@@ -289,14 +291,71 @@ describe('deployment workflows', () => {
       'wait-api',
       'run-prod-tests',
     ])
-    // Every trigger waits for the commits production serves and runs the suite: no job or
-    // step condition, here or in the reusable workflows these jobs call, reads the event.
+    // Every trigger waits for the commits production serves and runs the suite. The four
+    // required jobs carry no condition at all (an `if: false` would skip the suite while the
+    // run passes), and no job or step condition, here or in the reusable workflows these jobs
+    // call, reads the event in either syntax.
+    expect(
+      Object.entries(workflow.jobs).map(([id, job]) => ({ id, if: job.if }))
+    ).toEqual([
+      { id: 'served-commits', if: undefined },
+      { id: 'wait-web', if: undefined },
+      { id: 'wait-api', if: undefined },
+      { id: 'run-prod-tests', if: undefined },
+    ])
     expect(eventConditions(prodE2eWorkflow)).toEqual([])
+    // The schedule takes the push path through the reusable suite: the Playwright helper unit
+    // tests a push leaves to pr-checks.yml stay out of the daily run, so its badge measures
+    // production (Codex review 7 of PR 256).
+    const reusable = parseYaml(fs.readFileSync(e2eReusableWorkflow, 'utf8')) as {
+      env: Record<string, string>
+    }
+    expect(reusable.env.PLAYWRIGHT_UNIT_LANE).toBe(
+      "${{ (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule') && '1' || '' }}"
+    )
     // The README status badge reads this workflow on main.
     const readme = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8')
     expect(readme).toContain(
       'https://github.com/muratkeremozcan/couture-cast/actions/workflows/pw-e2e-prod.yml/badge.svg?branch=main'
     )
+  })
+
+  it('the event-condition scan reads dot and bracket forms, through reusable workflows', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'event-conditions-'))
+    try {
+      fs.writeFileSync(
+        path.join(dir, 'caller.yml'),
+        [
+          'jobs:',
+          '  dot:',
+          "    if: github.event_name != 'schedule'",
+          '    runs-on: ubuntu-latest',
+          '  bracket:',
+          '    runs-on: ubuntu-latest',
+          '    steps:',
+          '      - name: bracket step',
+          "        if: github['event_name'] == 'push'",
+          '  quoted:',
+          '    if: github["event"].schedule == null',
+          '    runs-on: ubuntu-latest',
+          '  payload:',
+          "    if: github.event.inputs.scope == 'full'",
+          '    runs-on: ubuntu-latest',
+          '  plain:',
+          "    if: github.ref == 'refs/heads/main'",
+          '    runs-on: ubuntu-latest',
+          '',
+        ].join('\n')
+      )
+      expect(eventConditions(path.join(dir, 'caller.yml'))).toEqual([
+        "caller.yml dot: github.event_name != 'schedule'",
+        "caller.yml bracket / bracket step: github['event_name'] == 'push'",
+        'caller.yml quoted: github["event"].schedule == null',
+        "caller.yml payload: github.event.inputs.scope == 'full'",
+      ])
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true })
+    }
   })
 
   it('mobile workflow exists and deploys manually with Expo token (Android-only)', () => {

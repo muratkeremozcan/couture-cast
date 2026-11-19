@@ -176,12 +176,19 @@ test('Playwright jobs beside pr-checks leave the helper unit tests to its playwr
   // pr-checks.yml runs the playwright-unit job on every event it runs, its own Lighthouse
   // gate's included.
   assert.equal(workflow('pr-checks.yml').env.PLAYWRIGHT_UNIT_LANE, '1')
-  for (const file of ['pr-pw-e2e-local.yml', 'rwf-e2e.yml', 'rwf-burn-in.yml'])
+  for (const file of ['pr-pw-e2e-local.yml', 'rwf-burn-in.yml'])
     assert.equal(
       workflow(file).env.PLAYWRIGHT_UNIT_LANE,
       "${{ (github.event_name == 'pull_request' || github.event_name == 'push') && '1' || '' }}",
       file
     )
+  // rwf-e2e.yml also serves pw-e2e-prod.yml's daily schedule, the production status check. It
+  // tests main, whose push already ran the helper tests, so the schedule takes the push path and
+  // a red badge means production failed, not a helper (Codex review 7 of PR 256).
+  assert.equal(
+    workflow('rwf-e2e.yml').env.PLAYWRIGHT_UNIT_LANE,
+    "${{ (github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'schedule') && '1' || '' }}"
+  )
   const unit = workflow('pr-checks.yml').jobs['playwright-unit']
   assert.equal(unit.name, 'Playwright helper unit tests')
   assert.equal(unit.steps.at(-1).run, 'npm run test:playwright-unit')

@@ -40,11 +40,29 @@ const GRADLE_TEST_TASK_FAILURE = /^> Task \S*[Tt]est\S* FAILED\s*$/m
  * with Gradle's `Could not GET` (or HEAD, resolve, download), bare or as a nested `>` cause, or
  * with the `java.io.IOException: Server returned HTTP response code: 429 for URL:` that
  * Robolectric's runtime fetch prints (bare or after `Caused by:`). The same words quoted inside an
- * assertion's message (`AssertionError: expected "Could not GET ..."`) do not start the line, so
- * a failing test that quotes a download error is never read as one.
+ * assertion's message (`AssertionError: expected "Could not GET ..."`) do not start the line.
  */
 const ARTIFACT_DOWNLOAD_FAILURE =
   /^\s*(?:> )?Could not (?:GET|HEAD|resolve|download)\b|^\s*(?:Caused by: )?java\.io\.IOException: Server returned HTTP response code: \d{3} for URL:/
+
+/**
+ * A Gradle download failure in a run whose tests failed counts only where Gradle itself prints
+ * it: in a cause tree that starts at column 0 (`> Could not resolve ...` and the indented `>`
+ * lines under it), which is how Gradle's failure report (`* What went wrong:`) and its plugin
+ * resolution errors print every download failure. Gradle's console indents a test's own output
+ * under its case line, so a multiline assertion message or fixture diff that prints
+ * `    Could not GET ... 429`, or an indented `>` tree, is never one (Codex review 7 of PR 256).
+ */
+// A `> Task :...` line is a task header, not a cause: the task's output follows it.
+const GRADLE_CAUSE_ROOT = /^> (?!Task :)/
+
+/**
+ * Robolectric fetches its Android runtime (`org.robolectric:android-all*`) inside the test JVM,
+ * so its failure prints inside a test's output. Only that fetch's own exception counts there: the
+ * IOException line naming a Robolectric artifact URL.
+ */
+const ROBOLECTRIC_RUNTIME_DOWNLOAD_FAILURE =
+  /^\s*(?:Caused by: )?java\.io\.IOException: Server returned HTTP response code: \d{3} for URL: \S*\/org\/robolectric\//
 
 /**
  * Gradle nests a failure's causes as indented `>` lines under the line they explain:
@@ -57,14 +75,27 @@ const ARTIFACT_DOWNLOAD_FAILURE =
  */
 const NESTED_CAUSE = /^(\s*)> /
 
+/** For each line, whether it sits in a Gradle cause tree rooted at column 0. */
+function gradleOwnedLines(lines) {
+  let inTree = false
+  return lines.map((line) => {
+    if (GRADLE_CAUSE_ROOT.test(line)) inTree = true
+    else if (inTree && !/^\s+> /.test(line)) inTree = false
+    return inTree
+  })
+}
+
 /**
  * The transient error inside the first failed artifact download that has one: the download's own
  * line, or a cause nested under it. Undefined when no failed download names a transient error.
+ * With `toolOwnedOnly`, a download counts only where the tool printed it (see above).
  */
-function transientDownloadFailure(output) {
+function transientDownloadFailure(output, { toolOwnedOnly = false } = {}) {
   const lines = output.split('\n')
+  const owned = toolOwnedOnly ? gradleOwnedLines(lines) : undefined
   for (const [at, line] of lines.entries()) {
     if (!ARTIFACT_DOWNLOAD_FAILURE.test(line)) continue
+    if (owned && !owned[at] && !ROBOLECTRIC_RUNTIME_DOWNLOAD_FAILURE.test(line)) continue
     const depth = (NESTED_CAUSE.exec(line)?.[1] ?? '').length
     for (let next = at; next < lines.length; next += 1) {
       const cause = lines[next]
@@ -88,10 +119,11 @@ const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
  * - A run killed by a signal (a timeout) is never retried.
  * - A run whose test cases failed (GRADLE_TEST_FAILURE: a failed case, the failing-tests
  *   summary or a connected run's per-device summary) is retried only when it also printed a
- *   failed artifact download (ARTIFACT_DOWNLOAD_FAILURE, a line Gradle or Robolectric starts)
- *   whose own line or nested cause is transient: Robolectric fetching its Android runtime fails
- *   the cases that way. A timeout or a 429 that a test's own output mentions or quotes, with no
- *   such download line, never retries it. So an assertion failure runs once unless the same run
+ *   failed artifact download whose own line or nested cause is transient, and only where the
+ *   tool printed it: a Gradle download in Gradle's failure report or a column-0 cause tree, or
+ *   Robolectric's own runtime fetch exception (it fails the cases that way). A timeout, a 429 or
+ *   a whole `Could not GET ... 429` line that a test's own output mentions, quotes or prints in a
+ *   multiline message never retries it. So an assertion failure runs once unless the same run
  *   also failed a transient artifact download.
  * - A run whose test task failed (GRADLE_TEST_TASK_FAILURE) with no failed cases follows the
  *   same rule: a test task that could not resolve its inputs before any test ran (the connected
@@ -104,9 +136,9 @@ const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
 function transientResolutionFailure(result) {
   if (result.status === 0 || result.signal) return undefined
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
-  const download = transientDownloadFailure(output)
   if (GRADLE_TEST_FAILURE.test(output) || GRADLE_TEST_TASK_FAILURE.test(output))
-    return download
+    return transientDownloadFailure(output, { toolOwnedOnly: true })
+  const download = transientDownloadFailure(output)
   if (download !== undefined) return download
   const match = TRANSIENT_RESOLUTION_FAILURE.exec(output)
   return match ? match[0] : undefined
