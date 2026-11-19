@@ -407,22 +407,61 @@ describe('apt-install.sh', () => {
     }
   })
 
-  test('drops every restored file when the package index cannot be updated', () => {
+  // PR 256 run 44523768936: security.ubuntu.com refused one index refresh, the cache was dropped
+  // whole, and the re-download from a slow mirror ran past the step's 600 s bound. A partial
+  // refresh leaves apt its signed indexes, which install-deps installs from too, so the check
+  // runs against them: a file they vouch for stays, any other goes.
+  test('a partial index refresh still checks the restored files against the indexes apt holds', () => {
     const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
     try {
       const archives = path.join(directory, 'ubuntu-packages')
       mkdirSync(archives)
       writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
-      const { status, calls } = runScript(['--playwright', 'chromium'], {
+      // Same size as the indexed bytes, different content.
+      writeFileSync(path.join(archives, 'libtwo_2.0_amd64.deb'), 'tvo')
+      const { status, calls, stdout } = runScript(['--playwright', 'chromium'], {
         statuses: [100, 0],
         env: { APT_INSTALL_ARCHIVES: archives },
-        index: indexOf([['libone', '1.0', 'amd64', 'one']]),
+        index: indexOf([
+          ['libone', '1.0', 'amd64', 'one'],
+          ['libtwo', '2.0', 'amd64', 'two'],
+        ]),
       })
       assert.equal(status, 0)
       assert.deepEqual(calls, [
         'sudo apt-get -o APT::Update::Error-Mode=any update',
+        'apt-cache show libone=1.0 libtwo=2.0',
+        'npx --no-install playwright install-deps chromium holding 1',
+      ])
+      assert.deepEqual(
+        readdirSync(archives).filter((name) => name.endsWith('.deb')),
+        ['libone_1.0_amd64.deb']
+      )
+      assert.match(stdout, /::warning::The package index refresh was partial;/)
+      assert.match(stdout, /kept 1, dropped 1\./)
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
+  })
+
+  test('a partial refresh whose indexes vouch for no restored file leaves nothing to install from', () => {
+    const directory = mkdtempSync(path.join(os.tmpdir(), 'apt-archives-'))
+    try {
+      const archives = path.join(directory, 'ubuntu-packages')
+      mkdirSync(archives)
+      writeFileSync(path.join(archives, 'libone_1.0_amd64.deb'), 'one')
+      const { status, calls, stdout } = runScript(['--playwright', 'chromium'], {
+        statuses: [100, 0],
+        env: { APT_INSTALL_ARCHIVES: archives },
+        index: '',
+      })
+      assert.equal(status, 0)
+      assert.deepEqual(calls, [
+        'sudo apt-get -o APT::Update::Error-Mode=any update',
+        'apt-cache show libone=1.0',
         'npx --no-install playwright install-deps chromium holding 0',
       ])
+      assert.match(stdout, /kept 0, dropped 1\./)
     } finally {
       rmSync(directory, { recursive: true, force: true })
     }

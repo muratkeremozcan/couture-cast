@@ -11,9 +11,10 @@
 #
 # With APT_INSTALL_ARCHIVES set to an absolute directory, apt keeps the package files it downloads
 # there, so a workflow can cache them and a later run downloads none of them again. Before the
-# first install every file there is checked against the SHA256 in the current package index and
-# dropped when it differs (apt itself checks only the size), and a failed install drops every
-# package file before the retry, so a corrupt, altered or stale cache falls back to a download.
+# first install every file there is checked against the SHA256 in the package index apt holds after
+# a refresh (a partial refresh included) and dropped when it differs (apt itself checks only the
+# size), and a failed install drops every package file before the retry, so a corrupt, altered or
+# stale cache falls back to a download.
 #
 #   bash scripts/ci/apt-install.sh --playwright <browser>...   Playwright's system packages
 #   bash scripts/ci/apt-install.sh <package>...                Ubuntu packages
@@ -82,13 +83,17 @@ verify_archives() {
     ids+=("$package|$arch|$version")
     specs+=("$package=$version")
   done
-  # Error-Mode any: an index that fails to refresh fails the update, so no file is accepted
-  # against an index apt kept from before.
-  if (( ${#specs[@]} == 0 )) ||
-    ! sudo -n apt-get -o APT::Update::Error-Mode=any update; then
-    echo "::warning::Could not check the restored package files against a fully refreshed package index; dropping them."
-    drop_archives
-    return 0
+  (( ${#specs[@]} > 0 )) || return 0
+  # Error-Mode any makes a partial refresh visible. A failed refresh still leaves apt the signed
+  # indexes it held before, and the install that follows (Playwright's install-deps runs its own
+  # update and tolerates the same failure) installs from those or from fresher ones. So each
+  # restored file is checked against the indexes apt holds either way: a file whose hash one of
+  # them vouches for is a genuine archive package, apt uses it only when the index it installs
+  # from names that version, and dropping it buys nothing. PR 256 run 44523768936: security.ubuntu.com
+  # refused one refresh, the old rule dropped the whole WebKit cache, and the re-download from a
+  # slow mirror ran into the step's 600 s bound while install-deps' own update, 15 s later, worked.
+  if ! sudo -n apt-get -o APT::Update::Error-Mode=any update; then
+    echo "::warning::The package index refresh was partial; checking the restored package files against the indexes apt holds."
   fi
   local index
   index=$(mktemp) || { drop_archives; return 0; }
