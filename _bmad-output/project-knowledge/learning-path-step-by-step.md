@@ -12218,6 +12218,13 @@ measured in minutes.
    receipts read through restarts, a restart never resends an accepted alert, and the rollout
    order keeps older API and web readers from meeting the new `push` channel value
    ([moderation SLA runbook](./moderation-sla-runbook.md)).
+9. **Follow the system color scheme on every page, or on none.**
+   Wardrobe and Moderation followed a dark system setting while the lookbook stayed white. The
+   lookbook now reads surface tokens with dark values for the Default system; a premium palette
+   stays the light design the member chose, and its dialogs, native controls and focus rings
+   follow the same surface. Review measured every pairing as Chromium paints it, which found
+   Merlot text at 1.84:1, placeholders at 2.54:1 and a bottom-tab focus ring at 1.12:1 before
+   they shipped.
 
 Tests:
 
@@ -12240,7 +12247,11 @@ Tests:
   [`chip-navigation-bottom-nav.spec.ts`](../../playwright/tests/chip-navigation-bottom-nav.spec.ts)
   proves the bottom-nav Community tab lands on the lookbook at phone width, the pinned chip bar
   and filters, and the `/community` home link (3.6-E2E-002, 3.6-E2E-007, 3.6-E2E-008);
-  [`community-feed.spec.ts`](../../playwright/tests/community-feed.spec.ts) runs on `/community`.
+  [`community-feed.spec.ts`](../../playwright/tests/community-feed.spec.ts) runs on `/community`;
+  [`community-dark-mode.spec.ts`](../../playwright/tests/community-dark-mode.spec.ts) measures
+  the painted contrast of the lookbook, its dialogs, placeholders, actions and focus rings under
+  a dark system setting and each premium palette, and the heading-row actions inside a 320 px
+  viewport in French and Spanish (3.6-E2E-009 to 3.6-E2E-018).
 - Community launch, API Vitest:
   [`community-text-production-retune.spec.ts`](../../apps/api/src/modules/community/community-text-production-retune.spec.ts)
   pins every cleared holdout caption and every bypass review found (slurs, body slang, sexual
