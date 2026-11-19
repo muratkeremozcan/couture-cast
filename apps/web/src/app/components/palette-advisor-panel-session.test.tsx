@@ -429,6 +429,7 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
     await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
 
     // The old token is denied while it is still the installed one.
+    expect(session.verifiers).toHaveLength(0)
     await act(async () => {
       releaseOld()
       await Promise.resolve()
@@ -437,10 +438,19 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
     expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
     expect(bearers).toEqual(['Bearer token-1a'])
 
-    // Verification answers with member-1's fresh token, and the bridge publishes it.
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
-    await finishVerification('token-1b')
+    // The denial joined the bridge's verification while the old token is still installed.
+    await waitFor(() => expect(session.verifiers.length).toBeGreaterThan(0))
+    expect(window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)).toBe('token-1a')
+    expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
+    expect(bearers).toEqual(['Bearer token-1a'])
+
+    // As the bridge does: install and publish member-1's fresh token, then answer the
+    // verification. Publication alone starts no read; the retry waits for the verification.
     publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a'])
+    expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
+    await finishVerification('token-1b')
 
     expect(await screen.findByTestId('palette-advisor-consent')).toBeInTheDocument()
     expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)

@@ -678,6 +678,9 @@ describe('SubscriptionSection follows the web session', () => {
 
       publish({ identity: 'member-1', bearer: 'token-1b' })
       await settle()
+      // The rotation alone sends nothing: any second read below answers the denial.
+      expect(bearers).toEqual(['Bearer token-1a'])
+      expect(refreshBearers).toEqual(['Bearer token-1a'])
       await act(async () => {
         old.release()
         await Promise.resolve()
@@ -723,7 +726,10 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
           )
         }
         return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
-      })
+      }),
+      http.get('/api/v1/commerce/premium/access', () =>
+        HttpResponse.json({ data: { premium: false, source: 'none' } })
+      )
     )
     session.stored = true
     session.identity = 'member-1'
@@ -732,6 +738,7 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
     await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
 
     // The old token is denied while it is still the installed one.
+    expect(session.verifiers).toHaveLength(0)
     await act(async () => {
       releaseOld()
       await Promise.resolve()
@@ -740,10 +747,19 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
     expect(hint()).toBeNull()
     expect(bearers).toEqual(['Bearer token-1a'])
 
-    // Verification answers with member-1's fresh token, and the bridge publishes it.
-    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
-    await finishVerification('token-1b')
+    // The denial joined the bridge's verification while the old token is still installed.
+    await waitFor(() => expect(session.verifiers.length).toBeGreaterThan(0))
+    expect(window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)).toBe('token-1a')
+    expect(hint()).toBeNull()
+    expect(bearers).toEqual(['Bearer token-1a'])
+
+    // As the bridge does: install and publish member-1's fresh token, then answer the
+    // verification. Publication alone starts no read; the retry waits for the verification.
     publish({ identity: 'member-1', bearer: 'token-1b' })
+    await settle()
+    expect(bearers).toEqual(['Bearer token-1a'])
+    expect(hint()).toBeNull()
+    await finishVerification('token-1b')
 
     expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
     expect(hint()).toBeNull()
@@ -758,10 +774,15 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
     'SUBSCRIPTION-SESSION-WEB-15 a complimentary member whose access read is denied %s the fresh token publishes keeps complimentary access',
     async (timing) => {
       const COMPLIMENTARY = 'You have complimentary Premium access from CoutureCast.'
+      const NO_SUBSCRIPTION = "You don't have a Premium subscription yet."
       const accessBearers: (string | null)[] = []
       let releaseOld!: () => void
       const old = new Promise<void>((resolve) => {
         releaseOld = resolve
+      })
+      let releaseFresh!: () => void
+      const fresh = new Promise<void>((resolve) => {
+        releaseFresh = resolve
       })
       useMswHandlers(
         http.get('/api/v1/commerce/subscription', ({ request }) => {
@@ -778,6 +799,7 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
               { status: 401 }
             )
           }
+          await fresh
           return HttpResponse.json({ data: { premium: true, source: 'complimentary' } })
         })
       )
@@ -787,6 +809,7 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
       renderSection()
       await waitFor(() => expect(accessBearers).toEqual(['Bearer token-1a']))
       await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+      expect(session.verifiers).toHaveLength(0)
 
       const deny = async () => {
         await act(async () => {
@@ -798,14 +821,36 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
       if (timing === 'after') {
         publish({ identity: 'member-1', bearer: 'token-1b' })
         await settle()
+        // The rotation alone sends nothing: any second access read answers the denial.
+        expect(accessBearers).toEqual(['Bearer token-1a'])
+        expect(bearers).toEqual(['Bearer token-1a'])
         await deny()
       } else {
         await deny()
-        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1b')
-        await finishVerification('token-1b')
+        // The denial joined the bridge's verification while the old token is still installed.
+        await waitFor(() => expect(session.verifiers.length).toBeGreaterThan(0))
+        expect(window.sessionStorage.getItem(WEB_ACCESS_TOKEN_STORAGE_KEY)).toBe(
+          'token-1a'
+        )
+        expect(accessBearers).toEqual(['Bearer token-1a'])
+        // As the bridge does: install and publish the fresh token, then answer. Publication
+        // alone starts no read; the retry waits for the verification it joined.
         publish({ identity: 'member-1', bearer: 'token-1b' })
+        await settle()
+        expect(accessBearers).toEqual(['Bearer token-1a'])
+        await finishVerification('token-1b')
       }
 
+      // While the fresh access read is out, nothing offers a purchase or says "no subscription".
+      await waitFor(() =>
+        expect(accessBearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+      )
+      await settle()
+      expect(subscribe()).toBeNull()
+      expect(screen.queryByTestId('premium-subscribe-annual')).toBeNull()
+      expect(document.body.textContent).not.toContain(NO_SUBSCRIPTION)
+
+      act(() => releaseFresh())
       await waitFor(() =>
         expect(screen.getByTestId('premium-status-line')).toHaveTextContent(COMPLIMENTARY)
       )
