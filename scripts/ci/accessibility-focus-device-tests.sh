@@ -16,13 +16,14 @@ results="${ACCESSIBILITY_FOCUS_RESULTS:-$module/build/talkback-results}"
 window_wait="${ACCESSIBILITY_FOCUS_WINDOW_WAIT:-30}"
 # Native code is built only for the emulator's ABI.
 abi=$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')
-gradle() { (cd apps/mobile/android && ./gradlew --console=plain -PreactNativeArchitectures="$abi" "$@"); }
-# The build resolves every plugin and dependency, so it alone goes through the retry: a 429 or
-# 5xx from Maven Central or the plugin portal is retried twice, any other failure fails at once.
-# The connected runs keep plain Gradle; the suppressed-focus control must fail exactly once.
-gradle_build() {
+# Every Gradle call goes through the retry: a 429 or 5xx from Maven Central or the plugin portal
+# is retried twice, any other failure fails at once. The build resolves the plugins and the APKs'
+# dependencies; each connected run resolves the test runner's own (AGP's UTP artifacts) when it
+# starts, before any test runs. A failing test is never retried, so the suppressed-focus control
+# still fails exactly once.
+gradle_retry() {
   (cd apps/mobile/android &&
-    node ../../../scripts/ci/gradle-resolution-retry.mjs -- \
+    node "$here/gradle-resolution-retry.mjs" -- \
       ./gradlew --console=plain -PreactNativeArchitectures="$abi" "$@")
 }
 
@@ -69,7 +70,7 @@ run() {
   rm -rf "$raw" "${results:?}/$name"
   mkdir -p "$results/$name"
   app_window_tracked "the $name run" || return 1
-  gradle :accessibility-focus:connectedDebugAndroidTest "$@"
+  gradle_retry :accessibility-focus:connectedDebugAndroidTest "$@"
   local status=$?
   [ -d "$raw" ] && cp -R "$raw/." "$results/$name/"
   return $status
@@ -77,7 +78,7 @@ run() {
 
 rm -rf "${results:?}"
 # Build first, so TalkBack and the backdrop are set up right before the runs.
-gradle_build :accessibility-focus:assembleDebugAndroidTest || exit 1
+gradle_retry :accessibility-focus:assembleDebugAndroidTest || exit 1
 bash "$here/android-talkback.sh" enable || exit 1
 park_backdrop || { bash "$here/android-talkback.sh" disable || true; exit 1; }
 

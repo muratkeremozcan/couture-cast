@@ -7,6 +7,7 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { parseArgs, runGradleWithResolutionRetry } from './gradle-resolution-retry.mjs'
+import { EXPECTED_TESTS, NEED_OS_REPORT } from './check-accessibility-focus-results.mjs'
 import {
   RESOLUTION_RETRY_DELAYS_MS,
   runWithResolutionRetry,
@@ -259,18 +260,19 @@ test('the accessibility focus workflow runs every Gradle build through the retry
     assert.match(runs[0].run, retry, `${id}: Gradle goes through the retry`)
     assert.equal(runs[0]['working-directory'], 'apps/mobile/android')
   }
-  // The TalkBack job builds inside its device script, whose build goes through the retry.
+  // The TalkBack job builds and runs inside its device script, whose every Gradle call goes
+  // through the retry (the run itself is proved by the device-script test below).
   assert.deepEqual(gradleRuns(jobs['android-talkback']), [])
   const device = read('scripts/ci/accessibility-focus-device-tests.sh')
   assert.match(
     device,
-    /node \.\.\/\.\.\/\.\.\/scripts\/ci\/gradle-resolution-retry\.mjs -- \\\n\s+\.\/gradlew /
+    /node "\$here\/gradle-resolution-retry\.mjs" -- \\\n\s+\.\/gradlew /
   )
-  assert.match(
-    device,
-    /^gradle_build :accessibility-focus:assembleDebugAndroidTest \|\| exit 1$/m
-  )
-  assert.doesNotMatch(device, /^gradle :accessibility-focus:assembleDebugAndroidTest/m)
+  assert.equal(device.match(/\.\/gradlew/g).length, 1, 'one Gradle call site, the retry')
+  assert.deepEqual(device.match(/^\s*gradle\w* :accessibility-focus:\w+/gm), [
+    '  gradle_retry :accessibility-focus:connectedDebugAndroidTest',
+    'gradle_retry :accessibility-focus:assembleDebugAndroidTest',
+  ])
 
   // Every Android job restores Gradle's cache, written only on main, before Gradle runs.
   for (const id of ['android', 'android-robolectric', 'android-talkback']) {
@@ -301,4 +303,137 @@ test('the accessibility focus workflow runs every Gradle build through the retry
       2,
       `${file} must be in both path filters`
     )
+})
+
+// Codex review of 384b830d: each connected run resolves AGP's UTP test-runner artifacts when it
+// starts, after the APK build, so a 429 there failed the lane past the build's retry. This runs
+// the real device script with a stand-in Gradle and adb: the build passes, the TalkBack run's
+// first start is rate-limited, and the suppressed-focus control fails on its assertion.
+test('the TalkBack device script retries a rate-limited connected run and never the control', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'a11y-focus-device-'))
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }))
+  const android = path.join(root, 'apps/mobile/android')
+  fs.mkdirSync(android, { recursive: true })
+  const calls = path.join(root, 'gradle-calls.jsonl')
+  const waits = path.join(root, 'waits.jsonl')
+  const testcase = (name, failing) =>
+    failing
+      ? `<testcase name="${name}" classname="AccessibilityFocusTalkBackTest"><failure message="focus">java.lang.AssertionError: the OS reported focus on nothing</failure></testcase>`
+      : `<testcase name="${name}" classname="AccessibilityFocusTalkBackTest" />`
+  const xml = (failing) =>
+    `<?xml version="1.0"?><testsuite name="AccessibilityFocusTalkBackTest">${EXPECTED_TESTS.map(
+      (name) => testcase(name, failing.includes(name))
+    ).join('')}</testsuite>`
+  const rateLimited = [
+    '> Could not resolve com.android.tools.utp:android-test-plugin-host-retention:31.11.0.',
+    `   > ${RATE_LIMITED}`,
+    'BUILD FAILED in 9s',
+  ].join('\n')
+  fs.writeFileSync(
+    path.join(android, 'gradlew'),
+    `#!${process.execPath}
+const fs = require('node:fs')
+const path = require('node:path')
+const calls = ${JSON.stringify(calls)}
+const args = process.argv.slice(2)
+const task = args.find((arg) => arg.startsWith(':accessibility-focus:'))
+const suppressed = args.some((arg) => arg.endsWith('suppressFocus=true'))
+const prior = fs.existsSync(calls)
+  ? fs.readFileSync(calls, 'utf8').trim().split('\\n').map((line) => JSON.parse(line))
+  : []
+fs.appendFileSync(calls, JSON.stringify({ task, suppressed }) + '\\n')
+if (task === ':accessibility-focus:assembleDebugAndroidTest') {
+  console.log('BUILD SUCCESSFUL')
+  process.exit(0)
+}
+const earlier = prior.filter((call) => call.task === task && call.suppressed === suppressed)
+if (!suppressed && earlier.length === 0) {
+  console.error(${JSON.stringify(rateLimited)})
+  process.exit(1)
+}
+const raw = '../modules/accessibility-focus/android/build/outputs/androidTest-results/connected'
+fs.mkdirSync(raw, { recursive: true })
+fs.writeFileSync(
+  path.join(raw, 'TEST-emulator.xml'),
+  suppressed ? ${JSON.stringify(xml(NEED_OS_REPORT))} : ${JSON.stringify(xml([]))}
+)
+if (!suppressed) {
+  console.log('BUILD SUCCESSFUL')
+  process.exit(0)
+}
+console.error('> Task :accessibility-focus:connectedDebugAndroidTest FAILED')
+console.error('> There were failing tests. See the report.')
+process.exit(1)
+`,
+    { mode: 0o755 }
+  )
+  const settings = path.join(root, 'touch-exploration')
+  const adb = path.join(root, 'adb')
+  fs.writeFileSync(
+    adb,
+    `#!${process.execPath}
+const fs = require('node:fs')
+const settings = ${JSON.stringify(settings)}
+const args = process.argv.slice(2).join(' ')
+if (args === 'shell getprop ro.product.cpu.abi') console.log('x86_64')
+if (args === 'shell settings put secure accessibility_enabled 1') fs.writeFileSync(settings, '1')
+if (args === 'shell settings put secure accessibility_enabled 0') fs.writeFileSync(settings, '0')
+if (args === 'shell settings get secure touch_exploration_enabled')
+  console.log(fs.existsSync(settings) ? fs.readFileSync(settings, 'utf8') : '0')
+if (args === 'shell dumpsys accessibility')
+  console.log('  A11yWindow[AccessibilityWindowInfo[title=Settings, id=12, type=TYPE_APPLICATION, active=true]]')
+`,
+    { mode: 0o755 }
+  )
+  // The retry's waits are recorded and skipped, so the test does not sleep 20 s.
+  const noWait = path.join(root, 'no-wait.cjs')
+  fs.writeFileSync(
+    noWait,
+    `const fs = require('node:fs')
+Atomics.wait = (array, index, value, ms) => {
+  fs.appendFileSync(${JSON.stringify(waits)}, JSON.stringify(ms) + '\\n')
+  return 'timed-out'
+}
+`
+  )
+  const device = fileURLToPath(
+    new URL('./accessibility-focus-device-tests.sh', import.meta.url)
+  )
+  const result = spawnSync('bash', [device], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 60000,
+    env: {
+      ...process.env,
+      ADB: adb,
+      NODE_OPTIONS: `--require ${noWait}`,
+      ACCESSIBILITY_FOCUS_WINDOW_WAIT: '1',
+    },
+  })
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`)
+  // The build once; the TalkBack run twice, its first start rate-limited; the control once.
+  assert.deepEqual(
+    fs
+      .readFileSync(calls, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line)),
+    [
+      { task: ':accessibility-focus:assembleDebugAndroidTest', suppressed: false },
+      { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: false },
+      { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: false },
+      { task: ':accessibility-focus:connectedDebugAndroidTest', suppressed: true },
+    ]
+  )
+  assert.deepEqual(fs.readFileSync(waits, 'utf8').trim().split('\n').map(Number), [
+    RESOLUTION_RETRY_DELAYS_MS[0],
+  ])
+  assert.match(
+    result.stdout,
+    /^::warning::Attempt 1\/3 hit a transient download error \(status code 429\); retrying in 20 s\.$/m
+  )
+  assert.match(
+    result.stdout,
+    /^TalkBack run: 5 passed\. Suppressed-focus control: the 4 tests that need the OS focus report failed on it, the rest passed\.$/m
+  )
 })

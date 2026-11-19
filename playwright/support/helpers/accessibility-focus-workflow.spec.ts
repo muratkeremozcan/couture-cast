@@ -37,6 +37,9 @@ const REQUIRED = [
   'scripts/ci/fetch-gradle-wrapper.sh',
   'scripts/ci/android-sdk-install.sh',
   'scripts/ci/android-gradle-sdk-packages.mjs',
+  // Every Gradle call in the lane goes through the resolution retry.
+  'scripts/ci/gradle-resolution-retry.mjs',
+  'scripts/lib/transient-resolution-retry.cjs',
   'scripts/ci/check-accessibility-focus-results.mjs',
   'scripts/ci/check-accessibility-focus-builds.sh',
   'scripts/run-story67-talkback.mjs',

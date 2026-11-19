@@ -6,6 +6,10 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
+import {
+  STORY68_NATIVE_MINIMUM_FREE_BYTES,
+  assertStory68DiskSpace,
+} from '../lib/test-disk-space.mjs'
 
 const FLAG_KEYS = [
   'STORY68_NATIVE_TEST_BUILD',
@@ -31,8 +35,21 @@ const CLEANUP_ARGS = [
   'yes',
 ]
 
+const MIB = 1024 ** 2
+// What the kernel log holds when the OOM killer ends the emulator, among unrelated lines.
+const OOM_RECORDS = [
+  '[ 1203.512001] java invoked oom-killer: gfp_mask=0x140cca(GFP_HIGHUSER_MOVABLE|__GFP_COMP), order=0, oom_score_adj=0',
+  '[ 1203.540000] oom-kill:constraint=CONSTRAINT_NONE,nodemask=(null),cpuset=/,mems_allowed=0,global_oom,task=qemu-system-x86,pid=4321,uid=1001',
+  '[ 1203.551234] Out of memory: Killed process 4321 (qemu-system-x86) total-vm:9876543kB, anon-rss:4123456kB, file-rss:0kB, shmem-rss:0kB, UID:1001 pgtables:9000kB oom_score_adj:0',
+]
+const UNRELATED_KERNEL_LINES = [
+  '[   12.004211] EXT4-fs (sda1): mounted filesystem with ordered data mode.',
+  '[  901.337000] audit: type=1400 audit(1763467200.000:42): apparmor="STATUS" operation="profile_load"',
+]
+
 // Fake commands on PATH record each call with the proof flags it saw. CC68_CI_FAILURE picks one
 // failure: the proof, the cleanup prebuild, the swap, or the emulator gone after the build.
+// CC68_CI_FREE_MIB is the free disk df reports under RUNNER_TEMP.
 const FAKE = `
 const fs = require('node:fs')
 const command = require('node:path').basename(process.argv[1])
@@ -41,6 +58,15 @@ const flags = Object.fromEntries(${JSON.stringify(FLAG_KEYS)}.map(key => [key, p
 fs.appendFileSync(process.env.CC68_CI_EVENTS, JSON.stringify({ command, args, flags }) + '\\n')
 const failure = process.env.CC68_CI_FAILURE
 if (command === 'uname') { console.log('Linux'); process.exit(0) }
+if (command === 'df') {
+  console.log('Filesystem     1048576-blocks   Used Available Capacity Mounted on')
+  console.log('/dev/root             ' + (Number(process.env.CC68_CI_FREE_MIB) + 50000) + ' 50000 ' + process.env.CC68_CI_FREE_MIB + '       30% /')
+  process.exit(0)
+}
+if (command === 'sudo' && args.join(' ') === '-n dmesg') {
+  console.log(${JSON.stringify([UNRELATED_KERNEL_LINES[0], ...OOM_RECORDS, UNRELATED_KERNEL_LINES[1]].join('\n'))})
+  process.exit(0)
+}
 if (command === 'adb' && args.includes('get-state')) {
   if (failure === 'emulator-gone') { console.error("error: device 'emulator-5554' not found"); process.exit(1) }
   console.log('device')
@@ -50,7 +76,7 @@ if (failure === 'cleanup' && args.includes('prebuild') && flags.CC68_RELEASE_PRO
 if (failure === 'swap' && command === 'sudo' && args[0] === 'fallocate') process.exit(28)
 `
 
-function runScript({ failure = 'none', githubLinux = false } = {}) {
+function runScript({ failure = 'none', githubLinux = false, freeMib = 200 * 1024 } = {}) {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-release-ci-'))
   try {
     const bin = path.join(directory, 'bin')
@@ -62,7 +88,7 @@ function runScript({ failure = 'none', githubLinux = false } = {}) {
       'sudo',
       'free',
       'swapon',
-      ...(githubLinux ? ['uname'] : []),
+      ...(githubLinux ? ['uname', 'df'] : []),
     ]
     for (const command of commands)
       fs.writeFileSync(path.join(bin, command), `#!${process.execPath}\n${FAKE}`, {
@@ -77,6 +103,7 @@ function runScript({ failure = 'none', githubLinux = false } = {}) {
         ANDROID_SERIAL: 'emulator-5554',
         CC68_CI_EVENTS: events,
         CC68_CI_FAILURE: failure,
+        CC68_CI_FREE_MIB: String(freeMib),
         CC68_RELEASE_PROOF_LOOPBACK: undefined,
         STORY68_NATIVE_TEST_BUILD: undefined,
         EAS_BUILD_PROFILE: undefined,
@@ -149,6 +176,9 @@ describe('share-card-android-release-font.sh', () => {
       records.filter((record) => record.command !== 'node').map((record) => record.args),
       [['-s', 'emulator-5554', 'get-state'], ['-m'], ['--show'], ['-n', 'dmesg']]
     )
+    // Every OOM record reaches the log, in order, and nothing else the kernel logged.
+    const kernel = result.stdout.split('== Kernel OOM records\n')[1]
+    assert.equal(kernel, `${OOM_RECORDS.join('\n')}\n`)
     // Normal generation is still restored.
     assert.deepEqual(
       nodeCalls(records).map((record) => record.args[1]),
@@ -158,32 +188,69 @@ describe('share-card-android-release-font.sh', () => {
     assert.equal(records.at(-1).flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
   })
 
-  test('a GitHub-hosted Linux runner adds 8 GiB of swap before the Release prebuild', () => {
-    const { result, records } = runScript({ githubLinux: true })
-    assert.equal(result.status, 0, result.stderr)
-    const file = '/runner-temp/cc68-release-build.swap'
-    const swap = records.filter((record) => record.command === 'sudo').map((r) => r.args)
-    assert.deepEqual(swap, [
-      ['fallocate', '-l', '8G', file],
-      ['chmod', '600', file],
-      ['mkswap', file],
-      ['swapon', file],
-    ])
-    const lastSwap = records.findLastIndex((record) => record.command === 'sudo')
-    const firstNode = records.findIndex((record) => record.command === 'node')
-    assert.ok(lastSwap < firstNode, 'the swap is on before the Release prebuild starts')
-    assert.deepEqual(
-      nodeCalls(records).map((record) => record.args[1]),
-      ['prebuild', 'build', 'release-live-font', 'prebuild']
-    )
-  })
+  // The swap file shares RUNNER_TEMP's filesystem with the repository on GitHub's runners, and
+  // run-story68-native.mjs refuses prebuild, build and release-live-font under 15 GiB free there.
+  // Each case models the disk the guard then sees: free before, less the swap the script added.
+  for (const { label, freeMib, swapMib } of [
+    { label: 'a roomy runner gets the full 8 GiB', freeMib: 115 * 1024, swapMib: 8192 },
+    {
+      label: 'a 22 GiB runner gets only what keeps the guard and margin',
+      freeMib: 22 * 1024,
+      swapMib: 2048,
+    },
+    {
+      label: 'a 20.5 GiB runner gets no swap at all',
+      freeMib: 20 * 1024 + 512,
+      swapMib: 0,
+    },
+  ])
+    test(`swap within the disk guard: ${label}`, () => {
+      const { result, records } = runScript({ githubLinux: true, freeMib })
+      assert.equal(result.status, 0, result.stderr)
+      const file = '/runner-temp/cc68-release-build.swap'
+      const swap = records
+        .filter((record) => record.command === 'sudo')
+        .map((r) => r.args)
+      assert.deepEqual(
+        swap,
+        swapMib === 0
+          ? []
+          : [
+              ['fallocate', '-l', `${swapMib}M`, file],
+              ['chmod', '600', file],
+              ['mkswap', file],
+              ['swapon', file],
+            ]
+      )
+      // Skipping the swap is said once in the log; adding it says nothing.
+      assert.deepEqual(
+        result.stdout.match(/^::warning::.*$/gm) ?? [],
+        swapMib === 0
+          ? [
+              `::warning::Only ${freeMib} MiB free under /runner-temp; the Release build runs without added swap so the 15 GiB disk guard still holds.`,
+            ]
+          : []
+      )
+      // The guard each native command runs still passes, with the 5 GiB build margin to spare.
+      const leftBytes = (freeMib - swapMib) * MIB
+      assert.equal(assertStory68DiskSpace('.', leftBytes), leftBytes)
+      assert.ok(leftBytes >= STORY68_NATIVE_MINIMUM_FREE_BYTES + 5 * 1024 * MIB)
+      // The swap is on before the Release prebuild starts, and the proof runs either way.
+      const lastSwap = records.findLastIndex((record) => record.command === 'sudo')
+      const firstNode = records.findIndex((record) => record.command === 'node')
+      assert.ok(lastSwap < firstNode)
+      assert.deepEqual(
+        nodeCalls(records).map((record) => record.args[1]),
+        ['prebuild', 'build', 'release-live-font', 'prebuild']
+      )
+    })
 
   test('a swap that cannot be added fails before any build and restores normal generation', () => {
     const { result, records } = runScript({ failure: 'swap', githubLinux: true })
     assert.equal(result.status, 1, result.stderr)
     assert.match(
       result.stderr,
-      /^::error::Adding 8 GiB of swap for the Release build failed; see the output above\.$/m
+      /^::error::Adding 8192 MiB of swap for the Release build failed; see the output above\.$/m
     )
     assert.deepEqual(
       nodeCalls(records).map((record) => record.args),
