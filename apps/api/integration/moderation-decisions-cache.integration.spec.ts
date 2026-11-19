@@ -63,7 +63,6 @@ const NOW = new Date('2026-11-04T12:00:30.000Z')
 const AS_OF = new Date('2026-11-04T12:00:00.000Z')
 /** Inside the spotlight window and before `as_of`, so a seeded post can rank. */
 const RANKED_AT = new Date(AS_OF.getTime() - 30 * 60_000)
-const DAY_MS = 86_400_000
 const REASON = 'Breaks the community rules.'
 /** Room for a bump that outlived the 1000 ms response bound, and below the 30 s test timeout. */
 const BUMP_DEADLINE_MS = 10_000
@@ -976,7 +975,7 @@ describe('I-K-RELEASE: a release shows on the next read and resolve or escalate 
 // --- Screening intake ---
 
 describe('I-S-INTAKE: a screener flag reaches the queue through the real processor (S1, D11)', () => {
-  it('queues post.<id> with one screening report, due in 24 hours, and offers release', async () => {
+  it('queues post.<id> with one screening report, due in 30 minutes, and offers release', async () => {
     const author = await fx.member('author')
     const { postId, objectPath } = await pendingPost(author)
     const caseId = `post.${postId}`
@@ -992,7 +991,9 @@ describe('I-S-INTAKE: a screener flag reaches the queue through the real process
       status: 'flagged',
       moderation_reason: 'text_policy_match',
     })
-    const due = new Date(NOW.getTime() + DAY_MS)
+    // A screening hold is reviewed within 30 minutes (Community Beta, 2026-11-19); a member
+    // report keeps 24 hours. Literal here, so the expectation does not move with the code.
+    const due = new Date(NOW.getTime() + 30 * 60_000)
     const reports = await prisma.communityPostReport.findMany({
       where: { post_id: postId },
     })
@@ -1015,7 +1016,9 @@ describe('I-S-INTAKE: a screener flag reaches the queue through the real process
       reportCount: 1,
       reasons: ['inappropriate_content'],
       slaDueAt: due.toISOString(),
-      slaState: 'on_track',
+      // Due inside the 6-hour at-risk window from the moment it is queued, so a screening hold
+      // never reads on track.
+      slaState: 'at_risk',
       hasFinding: true,
     })
 
