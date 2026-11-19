@@ -271,7 +271,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Anzeige. CoutureCast erhält eine Provision, wenn du über diesen Link kaufst. Das ändert nichts an den empfohlenen Tönen, und du kannst gesponserte Links in den Einstellungen abschalten.",
+          "disclosure": "Anzeige. CoutureCast erhält eine Provision, wenn du über diesen Link kaufst. Das ändert nichts an den empfohlenen Tönen, und du kannst gesponserte Links im Profil abschalten.",
           "partnerLabel": "Von {{partner}}",
           "cta": "Diesen Ton kaufen"
         },
@@ -284,7 +284,7 @@
         },
         "locked": {
           "title": "Farbberatung ist eine Premium-Funktion",
-          "body": "Schließe in den Einstellungen ein Premium-Abo ab, um Make-up-Töne und Accessoire-Kombinationen passend zu deinen Farbtönen zu erhalten.",
+          "body": "Schließe im Profil ein Premium-Abo ab, um Make-up-Töne und Accessoire-Kombinationen passend zu deinen Farbtönen zu erhalten.",
           "signedOutBody": "Melde dich an und schließe ein Premium-Abo ab, um Make-up-Töne und Accessoire-Kombinationen passend zu deinen Farbtönen zu erhalten."
         },
         "staleVersion": "Diese Palette stammt aus einer früheren Version unserer Empfehlungen. Starte die Analyse erneut, um ein aktuelles Ergebnis zu erhalten.",
@@ -728,6 +728,7 @@
     "empty": "Noch keine Orte gespeichert. Suche nach einer Stadt, um einen hinzuzufügen.",
     "signedOutHint": "Melde dich an, um deine Orte zu verwalten.",
     "loadError": "Deine Orte konnten nicht geladen werden.",
+    "loadRetry": "Erneut versuchen",
     "primary": "Hauptort",
     "makePrimary": "Als Hauptort festlegen",
     "rename": "Umbenennen",
@@ -752,6 +753,8 @@
     "deleted": "{{label}} gelöscht.",
     "limit": "Du hast drei Orte gespeichert. Lösche einen, um einen neuen hinzuzufügen.",
     "retry": "Erneut versuchen",
+    "useMyLocation": "Meinen Standort verwenden",
+    "locating": "Standort wird ermittelt...",
     "guided": {
       "add": "Ort hinzufügen"
     },
@@ -763,11 +766,15 @@
       "duplicate": "Dieser Ort ist bereits gespeichert.",
       "rate_limited": "Zu viele Suchen. Warte kurz und versuche es erneut.",
       "invalid_query": "Gib zwischen 2 und 80 Zeichen ein.",
-      "unknown": "Etwas ist schiefgelaufen. Versuche es erneut."
+      "unknown": "Etwas ist schiefgelaufen. Versuche es erneut.",
+      "location_denied": "Der Standortzugriff ist aus. Suche stattdessen nach deiner Stadt.",
+      "location_unavailable": "Dein Standort ist gerade nicht verfügbar. Suche stattdessen nach deiner Stadt.",
+      "no_city_nearby": "In deiner Nähe wurde keine Stadt gefunden. Suche stattdessen nach deiner Stadt."
     }
   },
   "settings": {
-    "title": "Einstellungen"
+    "title": "Profil",
+    "account": "Dein Konto"
   },
   "home": {
     "spotlightTeaser": {
@@ -1208,5 +1215,13 @@
         "unavailable": "Der Export ist nicht verfügbar. Versuchen Sie es erneut."
       }
     }
+  },
+  "nav": {
+    "label": "Untere Navigation",
+    "home": "Startseite",
+    "wardrobe": "Garderobe",
+    "community": "Community",
+    "profile": "Profil",
+    "navigatedTo": "Zum Tab {{label}} gewechselt"
   }
 }

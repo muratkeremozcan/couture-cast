@@ -35,6 +35,8 @@ export interface WeatherApiGeocodingClientOptions {
  * the country in English; `canonicalCountryCode` turns it into ISO 3166-1
  * alpha-2 and a name that resolves to nothing drops the candidate. WeatherAPI
  * offers no localized names, so the display label stays the default name.
+ * `search.json` also answers a `lat,lon` query with the nearest places, which
+ * serves `reverse` through the same mapping.
  */
 @Injectable()
 export class WeatherApiGeocodingClient implements ILocationGeocoder {
@@ -52,6 +54,22 @@ export class WeatherApiGeocodingClient implements ILocationGeocoder {
   async search(
     query: string,
     _language: string,
+    signal: AbortSignal
+  ): Promise<GeocodedPlace[]> {
+    return this.fetchPlaces(query, signal)
+  }
+
+  async reverse(
+    latitude: number,
+    longitude: number,
+    _language: string,
+    signal: AbortSignal
+  ): Promise<GeocodedPlace[]> {
+    return this.fetchPlaces(`${latitude},${longitude}`, signal)
+  }
+
+  private async fetchPlaces(
+    query: string,
     signal: AbortSignal
   ): Promise<GeocodedPlace[]> {
     if (!this.apiKey) {

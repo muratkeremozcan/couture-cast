@@ -1,4 +1,6 @@
 // Story 5.1 Task 7 owner: the real Web settings page, replacing the placeholder.
+// 2026-11-19: the page reads Profile (title and bottom nav) and names the signed-in account
+// above its sections; the route stays /settings.
 'use client'
 
 import { Suspense } from 'react'
@@ -7,6 +9,7 @@ import { getI18n } from '../../i18n'
 import { CommercePreferencesSection } from '../components/commerce-preferences-section'
 import { LocationsSection } from '../components/locations/locations-section'
 import { PremiumThemeSection } from '../components/premium-theme-section'
+import { ProfileAccount } from '../components/profile-account'
 import { StickyBottomNav } from '../components/sticky-bottom-nav'
 import { SubscriptionSection } from '../components/subscription-section'
 
@@ -41,6 +44,7 @@ export default function SettingsPage() {
         className="min-h-screen bg-neutral-950 px-6 py-16 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] text-white outline-none"
       >
         <SettingsTitle />
+        <ProfileAccount />
         {/* `useSearchParams` reads the guided-entry query, which needs a boundary. */}
         <Suspense fallback={null}>
           <LocationsSection />

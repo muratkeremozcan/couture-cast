@@ -5,7 +5,7 @@
     "home": "Ana Sayfa",
     "wardrobe": "Gardırop",
     "community": "Topluluk",
-    "settings": "Ayarlar"
+    "profile": "Profil"
   },
   "hero": {
     "scenarios": {
@@ -59,6 +59,9 @@
   },
   "settings": {
     "title": "Ayarlar",
+    "account": {
+      "label": "Hesap"
+    },
     "language": "Dil",
     "locale_sync_error": "Dil bu cihazda değiştirildi. Profil eşitlemesi daha sonra yeniden denenecek.",
     "locale_change_error": "Dil değiştirilemedi. Lütfen tekrar deneyin.",
@@ -518,7 +521,7 @@
           }
         },
         "sponsored": {
-          "disclosure": "Sponsorlu. Bu bağlantıdan alışveriş yaparsan CoutureCast komisyon kazanır. Bu, önerilen tonları değiştirmez ve sponsorlu bağlantıları Ayarlar'dan kapatabilirsin.",
+          "disclosure": "Sponsorlu. Bu bağlantıdan alışveriş yaparsan CoutureCast komisyon kazanır. Bu, önerilen tonları değiştirmez ve sponsorlu bağlantıları Profil'den kapatabilirsin.",
           "partnerLabel": "{{partner}} tarafından",
           "cta": "Bu tonu satın al"
         },
@@ -531,7 +534,7 @@
         },
         "locked": {
           "title": "Renk danışmanlığı bir Premium özelliğidir",
-          "body": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için Ayarlar'dan Premium'a abone ol.",
+          "body": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için Profil'den Premium'a abone ol.",
           "signedOutBody": "Tonlarına uygun makyaj tonları ve aksesuar eşleşmeleri için giriş yap ve Premium'a abone ol."
         },
         "staleVersion": "Bu palet, önerilerimizin daha eski bir sürümünden geliyor. Güncel bir sonuç için analizi yeniden çalıştır.",
@@ -924,6 +927,9 @@
     "searchLabel": "Şehir arayın",
     "searchHint": "En az iki harf yazın.",
     "searching": "Aranıyor...",
+    "useMyLocation": "Konumumu kullan",
+    "useMyLocationHint": "Şehrinizi bulmak için yaklaşık konumunuzu bir kez ister.",
+    "locating": "Şehriniz bulunuyor...",
     "resultCount": "Sonuçlar: {{count}}",
     "noResults": "Bu aramayla eşleşen şehir yok.",
     "selected": "Seçilen: {{place}}",
@@ -947,7 +953,10 @@
       "duplicate": "Bu konum zaten kayıtlı.",
       "rate_limited": "Çok fazla arama yapıldı. Biraz bekleyip tekrar deneyin.",
       "invalid_query": "2 ile 80 karakter arasında yazın.",
-      "unknown": "Bir sorun oluştu. Tekrar deneyin."
+      "unknown": "Bir sorun oluştu. Tekrar deneyin.",
+      "location_denied": "Konum erişimi kapalı. Bunun yerine şehrinizi arayın.",
+      "location_unavailable": "Konumunuz şu anda kullanılamıyor. Bunun yerine şehrinizi arayın.",
+      "no_city_nearby": "Yakınınızda şehir bulunamadı. Bunun yerine şehrinizi arayın."
     }
   },
   "home": {

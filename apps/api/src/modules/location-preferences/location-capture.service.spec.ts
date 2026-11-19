@@ -1,5 +1,7 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
 import {
   BadRequestException,
   type HttpException,
@@ -7,6 +9,23 @@ import {
 } from '@nestjs/common'
 import type { Prisma } from '@prisma/client'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
+
+/** Every line the service logs, so a test can prove none carries a coordinate. */
+const logged = vi.hoisted(() => [] as unknown[][])
+vi.mock('../../logger/pino.config.js', () => {
+  const record =
+    (level: string) =>
+    (...args: unknown[]) =>
+      logged.push([level, ...args])
+  const logger = {
+    debug: record('debug'),
+    info: record('info'),
+    warn: record('warn'),
+    error: record('error'),
+    child: () => logger,
+  }
+  return { createBaseLogger: () => logger }
+})
 import type {
   GeocodedPlace,
   ILocationGeocoder,
@@ -127,7 +146,10 @@ describe('LocationCaptureService', () => {
     [K in keyof LocationPreferencesRepository]: Mock<LocationPreferencesRepository[K]>
   }
   let persistForecastWithin: ReturnType<typeof vi.fn>
-  let geocoder: ILocationGeocoder & { search: ReturnType<typeof vi.fn> }
+  let geocoder: ILocationGeocoder & {
+    search: ReturnType<typeof vi.fn>
+    reverse: ReturnType<typeof vi.fn>
+  }
   let fetchForecast: Mock<IWeatherProvider['fetchForecast']>
   let captureEvent: ReturnType<typeof vi.fn>
   let searches: number
@@ -181,6 +203,7 @@ describe('LocationCaptureService', () => {
     geocoder = {
       provider: 'openweather',
       search: vi.fn().mockResolvedValue([chicago]),
+      reverse: vi.fn().mockResolvedValue([chicago]),
     }
     fetchForecast = vi
       .fn<IWeatherProvider['fetchForecast']>()
@@ -200,6 +223,7 @@ describe('LocationCaptureService', () => {
   })
 
   afterEach(() => {
+    logged.length = 0
     vi.unstubAllEnvs()
     vi.restoreAllMocks()
     vi.useRealTimers()
@@ -354,6 +378,210 @@ describe('LocationCaptureService', () => {
         outcome: 'service_unavailable',
         resultCount: 0,
       })
+    })
+  })
+
+  /*
+   * Production follow-up (2026-11-19), Use my location: the device position
+   * reaches the provider rounded to two decimals and nothing else. The saved
+   * location holds the provider place, through the unchanged from-search path.
+   */
+  describe('fromCoordinates', () => {
+    const DEVICE = { latitude: 41.878113, longitude: -87.629799 }
+    const COORDINATE_TEXT = /41\.87|41\.88|87\.62|87\.63/
+
+    it('LOC-COORD-UNIT-01 asks the provider about the rounded position and answers search-shaped candidates', async () => {
+      const timeout = vi.spyOn(AbortSignal, 'timeout')
+
+      const candidates = await service.fromCoordinates(
+        userId,
+        DEVICE.latitude,
+        DEVICE.longitude,
+        'fr-FR',
+        'web'
+      )
+
+      expect(geocoder.reverse).toHaveBeenCalledWith(
+        41.88,
+        -87.63,
+        'fr',
+        expect.any(AbortSignal)
+      )
+      expect(geocoder.reverse.mock.calls[0]?.[3]).toBe(timeout.mock.results[0]?.value)
+      expect(timeout).toHaveBeenCalledWith(PROVIDER_DEADLINE_MS)
+      expect(geocoder.search).not.toHaveBeenCalled()
+      expect(candidates).toEqual([
+        {
+          city: 'Chicago',
+          region: 'Illinois',
+          country: 'US',
+          latitude: 41.878,
+          longitude: -87.63,
+          displayLabel: 'シカゴ, Illinois, États-Unis',
+          candidateToken: candidates[0]?.candidateToken,
+        },
+      ])
+      expect(captureEvent).not.toHaveBeenCalled()
+    })
+
+    it('LOC-COORD-UNIT-02 saves the provider place, never the device position, through from-search', async () => {
+      const [candidate] = await service.fromCoordinates(
+        userId,
+        DEVICE.latitude,
+        DEVICE.longitude,
+        'en-US',
+        'mobile'
+      )
+
+      await service.saveFromSearch(userId, candidate!.candidateToken, 'Home', 'mobile')
+
+      expect(repository.create).toHaveBeenCalledWith(
+        userId,
+        expect.objectContaining({ city: 'Chicago', latitude: 41.878, longitude: -87.63 }),
+        expect.anything()
+      )
+      expect(captureEvent).toHaveBeenLastCalledWith(userId, 'location_saved', {
+        platform: 'mobile',
+        outcome: 'saved',
+        resultCount: 1,
+      })
+    })
+
+    it('LOC-COORD-UNIT-03 answers an empty list and records no_results with platform and outcome only', async () => {
+      geocoder.reverse.mockResolvedValueOnce([])
+
+      expect(
+        await service.fromCoordinates(userId, 0.004, -0.004, 'en-US', 'web')
+      ).toEqual([])
+      expect(geocoder.reverse).toHaveBeenCalledWith(0, 0, 'en', expect.any(AbortSignal))
+      expect(captureEvent).toHaveBeenCalledWith(userId, 'location_search_failed', {
+        platform: 'web',
+        outcome: 'no_results',
+        resultCount: 0,
+      })
+    })
+
+    it('LOC-COORD-UNIT-04 answers a provider failure with the typed 503 and keeps coordinates out of logs, events and the error', async () => {
+      geocoder.reverse.mockRejectedValueOnce(
+        new WeatherProviderError('down', {
+          provider: 'openweather',
+          kind: 'retryable_http',
+        })
+      )
+
+      const failure = await service
+        .fromCoordinates(userId, DEVICE.latitude, DEVICE.longitude, 'en-US', 'web')
+        .catch((caught: unknown) => caught)
+
+      expect((failure as HttpException).getResponse()).toEqual({
+        statusCode: 503,
+        code: 'provider_unavailable',
+        retryable: true,
+        message: 'The location provider is temporarily unavailable. Try again.',
+        error: 'Service Unavailable',
+      })
+      expect(captureEvent).toHaveBeenCalledWith(userId, 'location_search_failed', {
+        platform: 'web',
+        outcome: 'provider_unavailable',
+        resultCount: 0,
+      })
+      expect(logged).toEqual([
+        [
+          'warn',
+          { provider: 'openweather', outcome: 'provider_unavailable' },
+          'location search failed',
+        ],
+      ])
+      expect(JSON.stringify(logged)).not.toMatch(COORDINATE_TEXT)
+      expect(JSON.stringify(captureEvent.mock.calls)).not.toMatch(COORDINATE_TEXT)
+      expect(JSON.stringify((failure as HttpException).getResponse())).not.toMatch(
+        COORDINATE_TEXT
+      )
+    })
+
+    it('LOC-COORD-UNIT-05 shares the search rate limit and refuses before any provider call', async () => {
+      for (let index = 0; index < 30; index += 1) {
+        await service.search(userId, 'Chicago', 'en-US', 'web')
+      }
+
+      const refused = await service
+        .fromCoordinates(userId, DEVICE.latitude, DEVICE.longitude, 'en-US', 'web')
+        .catch((caught: unknown) => caught)
+
+      expect(refused).toBeInstanceOf(LocationSearchRateLimitException)
+      expect(geocoder.reverse).not.toHaveBeenCalled()
+    })
+
+    it('LOC-COORD-UNIT-06 fails closed with a 503 when the candidate secret is missing', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+      vi.stubEnv('TEST_ENV', '')
+      vi.stubEnv('LOCATION_CANDIDATE_SECRET', '')
+
+      const failure = await service
+        .fromCoordinates(userId, DEVICE.latitude, DEVICE.longitude, 'en-US', 'web')
+        .catch((caught: unknown) => caught)
+
+      expect((failure as HttpException).getResponse()).toMatchObject({
+        statusCode: 503,
+        code: 'location_service_unavailable',
+      })
+      expect(geocoder.reverse).not.toHaveBeenCalled()
+    })
+  })
+
+  /*
+   * Production follow-up (2026-11-19): a provider answered "chicago" in lower
+   * case. The label capitalizes such a name in the member's locale; the stored
+   * city stays what the provider said.
+   */
+  describe('display label capitalization', () => {
+    const kenya: GeocodedPlace = {
+      city: 'chicago',
+      region: 'Mombasa County',
+      country: 'KE',
+      latitude: -4.05,
+      longitude: 39.667,
+      localizedName: null,
+    }
+
+    it.each([
+      ['an all-lowercase name', kenya, 'en-US', 'Chicago, Mombasa County, Kenya'],
+      [
+        'every word of an all-lowercase name',
+        { ...kenya, city: 'new chicago' },
+        'en-US',
+        'New Chicago, Mombasa County, Kenya',
+      ],
+      [
+        'a lowercase name in the Turkish locale',
+        { ...kenya, city: 'istanbul', region: null, country: 'TR' },
+        'tr-TR',
+        'İstanbul, Türkiye',
+      ],
+      [
+        'a mixed-case name, untouched',
+        { ...kenya, city: 'McAllen', region: 'Texas', country: 'US' },
+        'en-US',
+        'McAllen, Texas, United States',
+      ],
+      [
+        'a name with a lowercase particle, untouched',
+        { ...kenya, city: 'Rio de Janeiro', region: null, country: 'BR' },
+        'en-US',
+        'Rio de Janeiro, Brazil',
+      ],
+    ])('LOC-LABEL-UNIT-01 labels %s', async (_case, place, locale, label) => {
+      geocoder.search.mockResolvedValueOnce([place])
+
+      const [candidate] = await service.search(
+        userId,
+        'chicago',
+        locale as 'en-US' | 'tr-TR',
+        'web'
+      )
+
+      expect(candidate?.displayLabel).toBe(label)
+      expect(candidate?.city).toBe(place.city)
     })
   })
 

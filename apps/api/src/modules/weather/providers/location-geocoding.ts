@@ -26,6 +26,16 @@ export interface GeocodedPlace {
 export interface ILocationGeocoder {
   readonly provider: WeatherProviderName
   search(query: string, language: string, signal: AbortSignal): Promise<GeocodedPlace[]>
+  /**
+   * The places nearest a coordinate, mapped exactly as `search` maps them. Callers
+   * pass coordinates already rounded to about a kilometre; the client never logs them.
+   */
+  reverse(
+    latitude: number,
+    longitude: number,
+    language: string,
+    signal: AbortSignal
+  ): Promise<GeocodedPlace[]>
 }
 
 /** The precision `LocationPreferencesService` stores coordinates at. */

@@ -114,9 +114,14 @@ export default function PrivacyPage() {
           <li>Northflank and Upstash: background jobs and their queues.</li>
           <li>PostHog: the analytics described above.</li>
           <li>Grafana Cloud: performance traces and metrics from our servers.</li>
+          {/* Use my location: the client and the API round the position to two decimals
+              (apps/web/src/lib/device-position.ts, location-capture.service.ts) and only
+              the provider's place is saved. */}
           <li>
             OpenWeather: forecasts and place search. It receives the place or city you
-            enter and the coordinates of the places you get forecasts for.
+            enter and the coordinates of the places you get forecasts for. When you tap
+            Use my location, it also receives your approximate position, rounded to about
+            1 km, to find the city near you; that position is not stored.
           </li>
           <li>
             Expo, with Apple and Google delivery: push notifications you turn on in the

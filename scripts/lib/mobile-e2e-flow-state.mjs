@@ -106,6 +106,21 @@ export const LOCATION_CAPTURE_FLOW = 'maestro/location-capture.yaml'
 export const COMMUNITY_COMMENTS_FLOW = 'maestro/community-comments.yaml'
 
 /**
+ * Production follow-up (2026-11-19): Use my location on mobile. The flow sets the device to
+ * USE_MY_LOCATION_DEVICE, which the app must round to USE_MY_LOCATION_ROUNDED before it leaves
+ * the phone; the double's reverse lookup resolves that to its catalog Chicago.
+ */
+export const USE_MY_LOCATION_FLOW = 'maestro/location-use-my-location.yaml'
+export const USE_MY_LOCATION_DEVICE = Object.freeze({
+  latitude: 41.871234,
+  longitude: -87.641234,
+})
+export const USE_MY_LOCATION_ROUNDED = Object.freeze({
+  latitude: 41.87,
+  longitude: -87.64,
+})
+
+/**
  * Story 6.4: the published root `community-comments.yaml` replies to with the
  * keyboard open, the longest reply context the composer has to keep on screen.
  * The flow used to type a root this long itself, and on the local Play AVD that
@@ -245,6 +260,12 @@ export const mobileE2EFlowStateHooks = ({
       clearMobileE2ELocations(prisma, userId, locationSentinelKeySuffix),
     after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
   },
+  // Starts with no saved location, so the Chicago it saves is not a duplicate of the baseline.
+  [USE_MY_LOCATION_FLOW]: {
+    before: (prisma, userId) =>
+      clearMobileE2ELocations(prisma, userId, locationSentinelKeySuffix),
+    after: (prisma, userId) => restoreMobileE2EBaselineLocation(prisma, userId),
+  },
   [COMMUNITY_COMMENTS_FLOW]: {
     before: (prisma) =>
       seedCommunityCommentsLongRoot(prisma, cleanupComments, longRootTarget),
@@ -300,6 +321,51 @@ export const locationCaptureWeatherDoubleCause = ({ before, requests, query, pla
   )
   if (!atPlace) {
     return `no save-time forecast was fetched at the saved candidate's coordinates ${place.lat},${place.lon} (forecast calls during the flow: ${describeForecasts(forecasts)})`
+  }
+  return undefined
+}
+
+/**
+ * Production follow-up (2026-11-19): judges what the weather provider double saw while the Use
+ * my location flow ran. The app must have asked about the rounded position exactly as rounded,
+ * and the precise device position must never have reached the provider. Returns the named cause
+ * that fails the flow, or `undefined`.
+ *
+ * @param {{
+ *   before: { geocoding: number },
+ *   requests: { geocoding: { seq: number, query: string, latitude?: number, longitude?: number }[] },
+ *   rounded?: { latitude: number, longitude: number },
+ *   device?: { latitude: number, longitude: number },
+ * }} observed
+ * @returns {string | undefined}
+ */
+export const useMyLocationWeatherDoubleCause = ({
+  before,
+  requests,
+  rounded = USE_MY_LOCATION_ROUNDED,
+  device = USE_MY_LOCATION_DEVICE,
+}) => {
+  const lookups = requests.geocoding.filter((entry) => entry.seq > before.geocoding)
+  const reverse = lookups.filter((entry) => typeof entry.latitude === 'number')
+  if (reverse.length === 0) {
+    return 'weather provider double saw no reverse lookup during the flow'
+  }
+  const precise = [String(device.latitude), String(device.longitude)]
+  if (
+    lookups.some((entry) =>
+      precise.some((value) => JSON.stringify(entry).includes(value))
+    )
+  ) {
+    return 'the precise device position reached the weather provider; the app must round it first'
+  }
+  if (
+    !reverse.some(
+      (entry) =>
+        entry.latitude === rounded.latitude && entry.longitude === rounded.longitude
+    )
+  ) {
+    const seen = reverse.map((entry) => `${entry.latitude},${entry.longitude}`).join('; ')
+    return `no reverse lookup at the rounded position ${rounded.latitude},${rounded.longitude} (reverse lookups during the flow: ${seen})`
   }
   return undefined
 }

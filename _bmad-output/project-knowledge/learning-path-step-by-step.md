@@ -22,6 +22,7 @@ Added Steps 40 to 58:
 - Step 56: Story 6.16, guest wardrobe and outfit preview, `08ac8314` (PR #234), merged on 2026-11-15.
 - Step 57: Story 6.17, Google sign-in, `5bd54123` (PR #238), merged on 2026-11-15, with the pending-teen sign-in fix on `fix/pending-teen-sign-in`.
 - Step 58: production status and nightly health, the project close on 2026-11-19, with no story.
+  - Production follow-ups after the project close: Jade's profile and location fix, on `fix/profile-location`.
 
 Repository evidence was checked against `main` at `185e827c` and Step 49 against `origin/feat/cc69-native-platform-sharing` at `37a00d33`.
 Step 49's status was then updated after PR #167 squash-merged as `6d92598f`, with the iPad proof fix that squash merge forced.
@@ -12013,3 +12014,135 @@ Evidence boundaries:
   the hypotheses this step names. The new evidence records make the next failure more likely to
   name one; a build log with no xcodebuild command list or a run with no kernel OOM record still
   leaves it open.
+
+### Production follow-ups after the project close
+
+Jade's profile and location fix (`fix/profile-location`). User/business impact:
+
+Jade, a new web member, signed in on 2026-11-19 and could not finish setting up. She looked for a
+profile and found a page called Settings with no sign of her account. City search answered "City
+search is temporarily unavailable" three times, and the app never offered to use her location.
+Reproducing her session, we also found that a reload of that page told a signed-in member to sign
+in to manage their locations.
+The page is now the Profile, with the member's name or email at the top; Locations follows the
+session; "Use my location" finds the city with the member's permission; and the deployed API has
+its weather provider keys.
+
+#### Lessons
+
+1. **A deployed route that no run calls is an untested route.**
+   The production API had no `OPENWEATHER_API_KEY`, `WEATHERAPI_API_KEY` or
+   `WEATHER_PROVIDER_MODE`. Every city search answered HTTP 503 with code `provider_unavailable`,
+   and PostHog recorded `location_search_failed` with outcome `provider_unconfigured`. The
+   Story 1.2b location specs all ran against the provider double. The keys are set on production
+   and preview, and an untagged API spec now searches a deployed API. That spec skips production
+   (no provisioned member there), so production was verified by a manual signed-in probe in
+   Chrome.
+2. **Ask about a session by subscribing to it.**
+   The Locations section checked the bearer once, on mount. A real session writes the bearer only
+   after the profile check, and a reload first clears the stale one, so the section settled on
+   signed out. `useWebSession` reads `couture:session` and treats a stored session under
+   verification as `checking`; only a verification that resolves with no member reads as signed
+   out, and one that fails shows the load error with a retry that verifies again. The section
+   lists once per member, and every late answer is checked against the member who asked, so one
+   member's places or status never land on another's section. The local lane never saw the race
+   because its fixture bearer is in session storage before the first render.
+3. **Coordinates are personal data: round, POST, forget.**
+   Use my location asks for permission only on the tap, at low accuracy (web) or
+   `Accuracy.Lowest` with when-in-use and coarse-only permissions (mobile). The client rounds to
+   two decimals (about 1 km) and sends the position only in the body of
+   `POST /api/v1/locations/from-coordinates`. The API rounds again, asks the provider's reverse
+   geocoding, and answers the same signed candidates as search, so the save path, token and
+   stored values are unchanged: a saved location holds the provider's place, never the device
+   position. No log line, analytics event, URL or error message carries a coordinate. The review
+   found one more path: the OpenTelemetry HTTP and undici instrumentations exported each
+   outgoing provider URL to Grafana, query and API key included. Span URLs now keep origin and
+   path only. The Privacy Policy says the approximate position reaches the weather provider.
+4. **Every failure points back at the working path.**
+   Denied, unsupported, timed out, no city nearby and provider outage each get their own copy in
+   all ten locales, and focus moves to the city search, which still works.
+5. **Name the page for what people look for.**
+   The Settings tab and page read Profile on web and mobile, with the account header, and copy
+   that sent members to Settings now names the Profile. The route stays `/settings` and the tab
+   id stays `settings`. On web, analytics keeps one English label; mobile still records the
+   localized label, as before. On a wide screen the bottom nav is hidden, so the web home header
+   gained a Profile link too.
+6. **Fix the label, keep the data.**
+   A provider answered "chicago, Mombasa County, Kenya". The display label upper-cases each word
+   of an all-lowercase city name in the member's locale; the stored city stays as given.
+
+Tests:
+
+API unit, Vitest:
+
+- [`apps/api/src/modules/weather/providers/location-geocoding.spec.ts`](../../apps/api/src/modules/weather/providers/location-geocoding.spec.ts):
+  proves both providers' `reverse` maps the nearest place like search, sends only the rounded
+  position, and classifies outages and a missing key (GEO-REV-01..04).
+- [`apps/api/src/modules/location-preferences/location-capture.service.spec.ts`](../../apps/api/src/modules/location-preferences/location-capture.service.spec.ts):
+  proves `fromCoordinates` rounds again, shares the rate limit and secret check, saves the
+  provider place, and keeps coordinates out of logs, events and errors (LOC-COORD-UNIT-01..06),
+  and the lowercase label fix (LOC-LABEL-UNIT-01).
+- [`apps/api/src/modules/location-preferences/location-preferences.controller.spec.ts`](../../apps/api/src/modules/location-preferences/location-preferences.controller.spec.ts):
+  proves the route's 200, typed 400 without an echo, auth, platform header and `Retry-After`
+  (LOC-COORD-API-01..05).
+- [`apps/api/src/instrumentation-url-redaction.spec.ts`](../../apps/api/src/instrumentation-url-redaction.spec.ts):
+  drives real requests through the registered instrumentations and fails on any span attribute
+  that holds a query (OTEL-URL-01).
+
+Web unit, Vitest:
+
+- [`apps/web/src/app/components/locations/locations-session.test.tsx`](../../apps/web/src/app/components/locations/locations-session.test.tsx):
+  proves the section waits through verification and lists once per member (LOC-SESSION-WEB-01..05);
+  the first four fail against the one-shot check.
+- [`apps/web/src/app/components/locations/locations-verification-outage.test.tsx`](../../apps/web/src/app/components/locations/locations-verification-outage.test.tsx),
+  [`apps/web/src/app/components/locations/locations-owner-race.test.tsx`](../../apps/web/src/app/components/locations/locations-owner-race.test.tsx)
+  and [`apps/web/src/app/components/locations/locate-race.test.tsx`](../../apps/web/src/app/components/locations/locate-race.test.tsx):
+  prove a failed verification retries, late answers stay with their member, and typing or a save
+  in flight wins over a pending Use my location.
+- [`apps/web/src/app/components/locations/use-my-location.test.tsx`](../../apps/web/src/app/components/locations/use-my-location.test.tsx):
+  proves permission only on the tap, the rounded body, the save, and each failure's copy and focus
+  (LOC-USE-WEB-01..06).
+- [`apps/web/src/lib/device-position.test.ts`](../../apps/web/src/lib/device-position.test.ts):
+  proves rounding and the give-up on a browser that never answers.
+- [`apps/web/src/app/settings/page.test.tsx`](../../apps/web/src/app/settings/page.test.tsx),
+  [`apps/web/src/app/components/sticky-bottom-nav.test.tsx`](../../apps/web/src/app/components/sticky-bottom-nav.test.tsx)
+  and [`apps/web/src/i18n/profile-locales.spec.ts`](../../apps/web/src/i18n/profile-locales.spec.ts):
+  prove the Profile title, account header, localized tabs and header link, catalog parity, and
+  copy that points at the Profile.
+- [`apps/web/src/app/privacy/legal-pages.test.tsx`](../../apps/web/src/app/privacy/legal-pages.test.tsx):
+  proves the Privacy Policy discloses the approximate position.
+
+Mobile unit, Vitest:
+
+- [`apps/mobile/src/features/locations/use-my-location.test.tsx`](../../apps/mobile/src/features/locations/use-my-location.test.tsx):
+  proves the permission request on the tap only, `Accuracy.Lowest`, the rounded body and each
+  failure.
+- [`apps/mobile/src/features/locations/locate-race.test.tsx`](../../apps/mobile/src/features/locations/locate-race.test.tsx):
+  proves typing drops a pending Use my location.
+- [`apps/mobile/src/screens/profile-tab.test.tsx`](../../apps/mobile/src/screens/profile-tab.test.tsx),
+  [`apps/mobile/src/screens/tab-two-screen.test.tsx`](../../apps/mobile/src/screens/tab-two-screen.test.tsx)
+  and [`apps/mobile/src/i18n/profile-locales.spec.ts`](../../apps/mobile/src/i18n/profile-locales.spec.ts):
+  prove the Profile tab label, the account header and catalog parity.
+
+Mobile native config, node:test:
+
+- [`apps/mobile/plugins/with-share-card-permissions.test.js`](../../apps/mobile/plugins/with-share-card-permissions.test.js):
+  proves the iOS when-in-use string in every locale, reduced accuracy by default, and a merged
+  Android manifest with coarse location only.
+
+Web E2E, Playwright:
+
+- [`playwright/tests/settings-locations-real-session.spec.ts`](../../playwright/tests/settings-locations-real-session.spec.ts):
+  proves a signed-in member opening Profile in a new tab or after a reload manages Locations
+  through real GoTrue, with one list request (PL-1, PL-2).
+- [`playwright/tests/location-use-my-location.spec.ts`](../../playwright/tests/location-use-my-location.spec.ts):
+  proves Use my location end to end against the provider double, and the Profile navigation
+  (UL-1..UL-6).
+- [`playwright/tests/api/location-search.api.spec.ts`](../../playwright/tests/api/location-search.api.spec.ts):
+  proves the deployed API can search a city.
+
+Evidence boundaries:
+
+- The provider keys were set on Vercel production and preview on 2026-11-19 and both were
+  redeployed.
+- Android coarse-only location is proven on the merged manifest, not on a device.

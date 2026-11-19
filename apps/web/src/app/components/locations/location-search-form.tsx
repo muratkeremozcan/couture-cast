@@ -5,6 +5,11 @@
 // active option, Enter picks it and Escape closes the list. The result count and
 // every outcome are announced once, through the section's single status region;
 // errors render in this form's own alert.
+//
+// Use my location asks the browser for the position only when the member taps
+// it, rounds it to two decimals and lists the nearest city as an option in the
+// same listbox, so it saves through the same pick, name and save steps. Every
+// failure explains itself and moves focus to the city search.
 'use client'
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react'
@@ -15,12 +20,22 @@ import type {
   SupportedLocale,
 } from '@couture/api-client/contracts/http'
 import {
+  DevicePositionError,
+  readApproximatePosition,
+} from '../../../lib/device-position'
+import {
   LocationRequestError,
+  locationsFromCoordinatesFromWeb,
   saveLocationFromSearchFromWeb,
   searchLocationsFromWeb,
   type LocationFailureReason,
 } from '../../../lib/locations'
-import { errorKey, type LocationFailureStep } from './location-format'
+import {
+  errorKey,
+  locateErrorKey,
+  type LocateFailure,
+  type LocationFailureStep,
+} from './location-format'
 
 /** Story 1.2b: search waits for 300 ms of quiet typing. */
 export const LOCATION_SEARCH_DEBOUNCE_MS = 300
@@ -38,6 +53,26 @@ interface LocationSearchFormProps {
 
 function failureReason(error: unknown): LocationFailureReason {
   return error instanceof LocationRequestError ? error.reason : 'unknown'
+}
+
+type FormError =
+  | { reason: LocationFailureReason; step: LocationFailureStep }
+  | { reason: LocateFailure; step: 'locate' }
+
+const LOCATE_FAILURES: ReadonlySet<string> = new Set<LocateFailure>([
+  'location_denied',
+  'location_unavailable',
+  'no_city_nearby',
+])
+
+function isLocateFailure(reason: string): reason is LocateFailure {
+  return LOCATE_FAILURES.has(reason)
+}
+
+function formErrorKey(error: FormError): string {
+  return isLocateFailure(error.reason)
+    ? locateErrorKey(error.reason)
+    : errorKey(error.reason, error.step)
 }
 
 export function LocationSearchForm({
@@ -62,11 +97,10 @@ export function LocationSearchForm({
   const [selected, setSelected] = useState<LocationSearchCandidate | null>(null)
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
-  const [error, setError] = useState<{
-    reason: LocationFailureReason
-    step: LocationFailureStep
-  } | null>(null)
+  const [error, setError] = useState<FormError | null>(null)
   const [searchAttempt, setSearchAttempt] = useState(0)
+  const [isLocating, setIsLocating] = useState(false)
+  const locateRef = useRef<AbortController | null>(null)
 
   const resultCountMessage = t('locations.resultCount', { count: candidates.length })
   const noResultsMessage = t('locations.noResults')
@@ -76,6 +110,24 @@ export function LocationSearchForm({
   useEffect(() => {
     if (autoFocus) searchInputRef.current?.focus()
   }, [autoFocus])
+
+  // Unmounted (signed out, or another member) means a late save or locate is ignored.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      locateRef.current?.abort()
+    }
+  }, [])
+
+  /** Typing takes over from a pending Use my location: its late answer is dropped. */
+  function cancelLocate() {
+    if (!locateRef.current) return
+    locateRef.current.abort()
+    locateRef.current = null
+    setIsLocating(false)
+  }
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -126,6 +178,64 @@ export function LocationSearchForm({
     requestAnimationFrame(() => labelInputRef.current?.focus())
   }
 
+  /** A failed Use my location says why and hands the member the city search. */
+  function locateFailed(next: FormError) {
+    setCandidates([])
+    setIsOpen(false)
+    setSearchState('idle')
+    setError(next)
+    searchInputRef.current?.focus()
+  }
+
+  async function locateMe() {
+    // A save in flight owns the form, as on mobile.
+    if (isLocating || isSaving) return
+    locateRef.current?.abort()
+    const controller = new AbortController()
+    locateRef.current = controller
+    setIsLocating(true)
+    setError(null)
+    setSelected(null)
+    setQuery('')
+    setCandidates([])
+    setIsOpen(false)
+    setSearchState('idle')
+    try {
+      const position = await readApproximatePosition()
+      if (controller.signal.aborted) return
+      const results = await locationsFromCoordinatesFromWeb(
+        position,
+        locale,
+        controller.signal
+      )
+      if (controller.signal.aborted) return
+      if (results.length === 0) {
+        locateFailed({ reason: 'no_city_nearby', step: 'locate' })
+        return
+      }
+      setCandidates(results)
+      setActiveIndex(0)
+      setIsOpen(true)
+      setSearchState('done')
+      searchInputRef.current?.focus()
+    } catch (caught) {
+      if (controller.signal.aborted) return
+      if (caught instanceof DevicePositionError) {
+        locateFailed({
+          reason: caught.reason === 'denied' ? 'location_denied' : 'location_unavailable',
+          step: 'locate',
+        })
+        return
+      }
+      locateFailed({ reason: failureReason(caught), step: 'locate' })
+    } finally {
+      if (locateRef.current === controller) {
+        locateRef.current = null
+        setIsLocating(false)
+      }
+    }
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.key === 'ArrowDown' && candidates.length > 0) {
       event.preventDefault()
@@ -156,6 +266,7 @@ export function LocationSearchForm({
         selected.candidateToken,
         trimmedLabel
       )
+      if (!mountedRef.current) return
       setSelected(null)
       setQuery('')
       setLabel('')
@@ -177,6 +288,19 @@ export function LocationSearchForm({
     isOpen && activeIndex >= 0 ? `${listboxId}-option-${activeIndex}` : undefined
   const canRetry =
     error?.reason === 'provider_unavailable' || error?.reason === 'service_unavailable'
+  const retry =
+    error?.step === 'locate'
+      ? () => {
+          void locateMe()
+        }
+      : () => {
+          // Leave 'done' first: clearing the error on a finished,
+          // empty search would announce "no cities match" before
+          // the retry has asked anything.
+          setSearchState('searching')
+          setError(null)
+          setSearchAttempt((attempt) => attempt + 1)
+        }
 
   return (
     <form
@@ -206,6 +330,7 @@ export function LocationSearchForm({
           maxLength={MAX_QUERY_LENGTH}
           value={query}
           onChange={(event) => {
+            cancelLocate()
             setQuery(event.target.value)
             setSelected(null)
           }}
@@ -240,10 +365,24 @@ export function LocationSearchForm({
         </ul>
       </div>
       <p id={hintId} className="text-sm text-neutral-300">
-        {searchState === 'searching'
-          ? t('locations.searching')
-          : t('locations.searchHint')}
+        {isLocating
+          ? t('locations.locating')
+          : searchState === 'searching'
+            ? t('locations.searching')
+            : t('locations.searchHint')}
       </p>
+      <button
+        type="button"
+        aria-busy={isLocating}
+        disabled={isSaving}
+        onClick={() => {
+          void locateMe()
+        }}
+        className="min-h-[44px] self-start rounded-md border border-[#c9a14a] px-4 text-white disabled:cursor-not-allowed disabled:opacity-60"
+        data-testid="location-use-my-location"
+      >
+        {t('locations.useMyLocation')}
+      </button>
 
       {selected && (
         <div className="flex flex-col gap-3" data-testid="location-selected">
@@ -277,23 +416,12 @@ export function LocationSearchForm({
       {error && (
         <div className="flex flex-col gap-2">
           <p role="alert" className="text-sm text-red-300" data-testid="location-error">
-            {t(errorKey(error.reason, error.step))}
+            {t(formErrorKey(error))}
           </p>
           {canRetry && (
             <button
               type={selected ? 'submit' : 'button'}
-              onClick={
-                selected
-                  ? undefined
-                  : () => {
-                      // Leave 'done' first: clearing the error on a finished,
-                      // empty search would announce "no cities match" before
-                      // the retry has asked anything.
-                      setSearchState('searching')
-                      setError(null)
-                      setSearchAttempt((attempt) => attempt + 1)
-                    }
-              }
+              onClick={selected ? undefined : retry}
               className="min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-white"
               data-testid="location-retry-button"
             >

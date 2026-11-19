@@ -150,6 +150,30 @@ export const DOUBLE_PLACES = [
   },
 ]
 
+/**
+ * Reverse geocoding ("Use my location"): the catalog place nearest to a coordinate within this
+ * many degrees, or none. Chicago's catalog point is 41.8781, -87.6298, so a device position
+ * rounded to 41.88, -87.63 resolves to it.
+ */
+export const REVERSE_MATCH_DEGREES = 0.25
+
+/** A coordinate whose reverse lookup fails with 500, for the provider-down path. */
+export const REVERSE_DOWN_COORDINATE = Object.freeze({ lat: 7.77, lon: 7.77 })
+
+/** The nearest catalog place within REVERSE_MATCH_DEGREES, as a one-element list, or []. */
+export function reversePlaces(lat, lon) {
+  let best = null
+  let bestDistance = Infinity
+  for (const place of DOUBLE_PLACES) {
+    const distance = Math.hypot(place.lat - lat, place.lon - lon)
+    if (distance <= REVERSE_MATCH_DEGREES && distance < bestDistance) {
+      best = place
+      bestDistance = distance
+    }
+  }
+  return best ? [best] : []
+}
+
 export function fold(value) {
   return value
     .normalize('NFKD')

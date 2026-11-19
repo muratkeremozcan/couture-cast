@@ -109,7 +109,7 @@ tags:
 # The signed-in variant, not the signed-out one: the harness user has a session,
 # so the copy points at the subscribe controls that actually exist for them.
 - assertVisible:
-    text: 'Subscribe to Premium from Settings to get makeup shades and accessory pairings matched to your tones.'
+    text: 'Subscribe to Premium from Profile to get makeup shades and accessory pairings matched to your tones.'
     label: 'Locked body is the signed-in upsell'
 
 # AC 1: consent is entitlement-gated on the way in. Offering the grant control

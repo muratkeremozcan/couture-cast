@@ -150,6 +150,44 @@ export async function searchLocationsFromMobile(
   }
 }
 
+/** Two decimals, about a kilometre: all of the device position that leaves the phone. */
+export function approximateCoordinate(value: number): number {
+  const rounded = Math.round(value * 100) / 100
+  return Object.is(rounded, -0) ? 0 : rounded
+}
+
+/**
+ * Use my location: the cities nearest the device position, as search
+ * candidates. The position is rounded to two decimals here and travels only in
+ * the POST body; this module never logs it or sends it to analytics.
+ */
+export async function locationsNearFromMobile(
+  latitude: number,
+  longitude: number,
+  locale: SupportedLocale,
+  signal?: AbortSignal
+): Promise<LocationSearchCandidate[]> {
+  try {
+    const api = await client()
+    const response = await withRequestTimeout(signal, (requestSignal) =>
+      api.apiV1LocationsFromCoordinatesPost(
+        {
+          xCouturePlatform: 'mobile',
+          locationsFromCoordinatesInput: {
+            latitude: approximateCoordinate(latitude),
+            longitude: approximateCoordinate(longitude),
+            locale,
+          },
+        },
+        { signal: requestSignal }
+      )
+    )
+    return locationSearchResponseSchema.parse(response).data
+  } catch (error) {
+    throw await locationError(error)
+  }
+}
+
 export async function saveLocationFromSearchFromMobile(
   candidateToken: string,
   label: string

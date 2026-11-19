@@ -1,5 +1,7 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
 import 'reflect-metadata'
 import { type INestApplication } from '@nestjs/common'
 import { Test, type TestingModule } from '@nestjs/testing'
@@ -70,6 +72,17 @@ describe('LocationPreferencesController', () => {
       },
     ]),
     saveFromSearch: vi.fn().mockResolvedValue(savedLocation),
+    fromCoordinates: vi.fn().mockResolvedValue([
+      {
+        city: 'Chicago',
+        region: 'Illinois',
+        country: 'US',
+        latitude: 41.878,
+        longitude: -87.63,
+        displayLabel: 'Chicago, Illinois, United States',
+        candidateToken: 'payload.signature',
+      },
+    ]),
   }
 
   const baseUrl = (): string => {
@@ -128,6 +141,7 @@ describe('LocationPreferencesController', () => {
     service.updateLocation.mockClear()
     captureService.search.mockClear()
     captureService.saveFromSearch.mockClear()
+    captureService.fromCoordinates.mockClear()
 
     if (app) {
       await app.close()
@@ -323,5 +337,99 @@ describe('LocationPreferencesController', () => {
       expect(refused.status).toBe(400)
     }
     expect(captureService.saveFromSearch).toHaveBeenCalledTimes(1)
+  })
+  /*
+   * Production follow-up (2026-11-19), Use my location. The coordinates ride
+   * only in the POST body; a refusal never echoes them back.
+   */
+  it('LOC-COORD-API-01 resolves the posted position with locale and platform and answers 200', async () => {
+    const response = await request(baseUrl())
+      .post('/api/v1/locations/from-coordinates')
+      .set({ ...authHeaders, 'x-couture-platform': 'web' })
+      .send({ latitude: 41.88, longitude: -87.63, locale: 'fr-FR' })
+
+    expect(response.status).toBe(200)
+    expect(locationSearchResponseSchema.parse(response.body).data).toHaveLength(1)
+    expect(captureService.fromCoordinates).toHaveBeenCalledWith(
+      'user-1',
+      41.88,
+      -87.63,
+      'fr-FR',
+      'web'
+    )
+  })
+
+  it('LOC-COORD-API-02 defaults the locale like search does', async () => {
+    await request(baseUrl())
+      .post('/api/v1/locations/from-coordinates')
+      .set({ ...authHeaders, 'x-couture-platform': 'mobile' })
+      .send({ latitude: 0, longitude: 0 })
+
+    expect(captureService.fromCoordinates).toHaveBeenCalledWith(
+      'user-1',
+      0,
+      0,
+      'en-US',
+      'mobile'
+    )
+  })
+
+  it.each([
+    [{ latitude: 91, longitude: 0 }],
+    [{ latitude: -90.5, longitude: 0 }],
+    [{ latitude: 0, longitude: 180.01 }],
+    [{ latitude: '41.88', longitude: -87.63 }],
+    [{ latitude: 41.88 }],
+    [{ latitude: null, longitude: -87.63 }],
+    [{ latitude: 41.88, longitude: -87.63, locale: 'xx-XX' }],
+    [{ latitude: 41.88, longitude: -87.63, accuracy: 10 }],
+  ])(
+    'LOC-COORD-API-03 refuses %j with a typed 400, no service call and no echo',
+    async (body) => {
+      const response = await request(baseUrl())
+        .post('/api/v1/locations/from-coordinates')
+        .set({ ...authHeaders, 'x-couture-platform': 'web' })
+        .send(body)
+
+      expect(response.status).toBe(400)
+      const error = locationRequestErrorResponseSchema.parse(response.body)
+      expect(error.code).toBe('invalid_request')
+      expect(error.message).not.toMatch(/41\.88|87\.63|91|90\.5|180\.01/)
+      expect(captureService.fromCoordinates).not.toHaveBeenCalled()
+    }
+  )
+
+  it('LOC-COORD-API-04 requires auth and the platform header', async () => {
+    const body = { latitude: 41.88, longitude: -87.63 }
+    const withoutAuth = await request(baseUrl())
+      .post('/api/v1/locations/from-coordinates')
+      .set({ 'x-couture-platform': 'web' })
+      .send(body)
+    const withoutPlatform = await request(baseUrl())
+      .post('/api/v1/locations/from-coordinates')
+      .set(authHeaders)
+      .send(body)
+
+    expect(withoutAuth.status).toBe(401)
+    expect(withoutPlatform.status).toBe(400)
+    expect(locationRequestErrorResponseSchema.parse(withoutPlatform.body).code).toBe(
+      'invalid_request'
+    )
+    expect(captureService.fromCoordinates).not.toHaveBeenCalled()
+  })
+
+  it('LOC-COORD-API-05 sets Retry-After on the shared 429 body', async () => {
+    captureService.fromCoordinates.mockRejectedValueOnce(
+      new LocationSearchRateLimitException(9)
+    )
+
+    const response = await request(baseUrl())
+      .post('/api/v1/locations/from-coordinates')
+      .set({ ...authHeaders, 'x-couture-platform': 'web' })
+      .send({ latitude: 41.88, longitude: -87.63 })
+
+    expect(response.status).toBe(429)
+    expect(response.headers['retry-after']).toBe('9')
+    expect(tooManyRequestsHttpErrorSchema.parse(response.body).statusCode).toBe(429)
   })
 })

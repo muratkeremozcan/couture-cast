@@ -111,8 +111,8 @@ test('at the cap the checkout itself lists the specs, by policy', () => {
   const off = burnInSpecs(capped(COMPARE_FILES_CAP), 'off')
   const consent = burnInSpecs(capped(COMPARE_FILES_CAP), 'required_13_15')
   const lane =
-    /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session)\.spec\.ts$/
-  assert.equal(off.length, 5)
+    /(community-real-session(-identity)?|guest-preview-real-session|google-sign-in-real-session|signed-in-landing-real-session|settings-locations-real-session)\.spec\.ts$/
+  assert.equal(off.length, 6)
   assert.deepEqual(off, [...off].sort())
   for (const file of off) {
     assert.ok(file.startsWith('playwright/tests/') && lane.test(file), file)

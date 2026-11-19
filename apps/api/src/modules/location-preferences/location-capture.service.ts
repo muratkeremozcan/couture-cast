@@ -94,11 +94,32 @@ function countryDisplayName(country: string, locale: string): string {
   }
 }
 
+/** Two decimals, about a kilometre: the precision Use my location works at. */
+export function roundDeviceCoordinate(value: number): number {
+  const rounded = Math.round(value * 100) / 100
+  return Object.is(rounded, -0) ? 0 : rounded
+}
+
+/**
+ * A provider sometimes answers a city name entirely in lower case (seen live:
+ * "chicago, Mombasa County, Kenya"). Such a name gets each word's first letter
+ * upper-cased in the member's locale; a name with any capital is left as given.
+ */
+function displayCityName(name: string, locale: string): string {
+  if (name !== name.toLocaleLowerCase(locale) || name === name.toLocaleUpperCase(locale))
+    return name
+  return name.replace(
+    /(^|\s)(\p{Ll})/gu,
+    (_match, boundary: string, letter: string) =>
+      `${boundary}${letter.toLocaleUpperCase(locale)}`
+  )
+}
+
 /** City states such as Monaco name the city and country alike; say it once. */
 function displayLabel(place: GeocodedPlace, locale: string): string {
   const seen = new Set<string>()
   return [
-    place.localizedName ?? place.city,
+    displayCityName(place.localizedName ?? place.city, locale),
     place.region,
     countryDisplayName(place.country, locale),
   ]
@@ -142,6 +163,41 @@ export class LocationCaptureService {
     locale: SupportedLocale,
     platform: LocationPlatform
   ): Promise<LocationSearchCandidate[]> {
+    return this.resolveCandidates(userId, locale, platform, (language, signal) =>
+      this.geocoder.search(query, language, signal)
+    )
+  }
+
+  /**
+   * Use my location: the places nearest an approximate device position, as
+   * search candidates. The position is rounded to two decimals again here, so a
+   * client that sent more precision still never sends it on. It reaches the
+   * provider only; no log line, event or error carries it.
+   */
+  async fromCoordinates(
+    userId: string,
+    latitude: number,
+    longitude: number,
+    locale: SupportedLocale,
+    platform: LocationPlatform
+  ): Promise<LocationSearchCandidate[]> {
+    const approximateLatitude = roundDeviceCoordinate(latitude)
+    const approximateLongitude = roundDeviceCoordinate(longitude)
+    return this.resolveCandidates(userId, locale, platform, (language, signal) =>
+      this.geocoder.reverse(approximateLatitude, approximateLongitude, language, signal)
+    )
+  }
+
+  /**
+   * The shared path of search and from-coordinates: the rate limit, the
+   * candidate secret, one provider call and the signed, de-duplicated candidates.
+   */
+  private async resolveCandidates(
+    userId: string,
+    locale: SupportedLocale,
+    platform: LocationPlatform,
+    lookup: (language: string, signal: AbortSignal) => Promise<GeocodedPlace[]>
+  ): Promise<LocationSearchCandidate[]> {
     await this.limitSearches(userId)
 
     const secret = resolveLocationCandidateSecret()
@@ -155,8 +211,7 @@ export class LocationCaptureService {
 
     let places: GeocodedPlace[]
     try {
-      places = await this.geocoder.search(
-        query,
+      places = await lookup(
         locale.split('-')[0] ?? 'en',
         AbortSignal.timeout(LOCATION_PROVIDER_TIMEOUT_MS)
       )

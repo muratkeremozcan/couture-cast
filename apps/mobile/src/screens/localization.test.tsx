@@ -26,44 +26,62 @@ describe('Localization Client System tests', () => {
     expect(i18n.t('tabs.home')).toBe('Home')
     expect(i18n.t('tabs.wardrobe')).toBe('Wardrobe')
     expect(i18n.t('tabs.community')).toBe('Community')
-    expect(i18n.t('tabs.settings')).toBe('Settings')
+    expect(i18n.t('tabs.profile')).toBe('Profile')
     expect(i18n.t('settings.language')).toBe('Language')
   })
 
   it('translates UI keys dynamically when language changes to Turkish (tr-TR)', async () => {
     await i18n.changeLanguage('tr-TR')
-    expect(i18n.t('tabs.settings')).toBe('Ayarlar')
+    expect(i18n.t('tabs.profile')).toBe('Profil')
     expect(i18n.t('settings.language')).toBe('Dil')
   })
 
   it('translates UI keys dynamically when language changes to French (fr-CA)', async () => {
     await i18n.changeLanguage('fr-CA')
-    expect(i18n.t('tabs.settings')).toBe('Paramètres')
+    expect(i18n.t('tabs.profile')).toBe('Profil')
     expect(i18n.t('settings.language')).toBe('Langue')
   })
 
   it('translates UI keys dynamically when language changes to German (de-DE)', async () => {
     await i18n.changeLanguage('de-DE')
-    expect(i18n.t('tabs.settings')).toBe('Einstellungen')
+    expect(i18n.t('tabs.profile')).toBe('Profil')
     expect(i18n.t('settings.language')).toBe('Sprache')
   })
 
   it('translates UI keys dynamically when language changes to Italian (it-IT)', async () => {
     await i18n.changeLanguage('it-IT')
-    expect(i18n.t('tabs.settings')).toBe('Impostazioni')
+    expect(i18n.t('tabs.profile')).toBe('Profilo')
     expect(i18n.t('settings.language')).toBe('Lingua')
   })
 
   it('translates UI keys dynamically when language changes to Portuguese (pt-BR)', async () => {
     await i18n.changeLanguage('pt-BR')
-    expect(i18n.t('tabs.settings')).toBe('Configurações')
+    expect(i18n.t('tabs.profile')).toBe('Perfil')
     expect(i18n.t('settings.language')).toBe('Idioma')
   })
 
   it('translates UI keys dynamically when language changes to Portuguese (pt-PT)', async () => {
     await i18n.changeLanguage('pt-PT')
-    expect(i18n.t('tabs.settings')).toBe('Definições')
+    expect(i18n.t('tabs.profile')).toBe('Perfil')
     expect(i18n.t('settings.language')).toBe('Idioma')
+  })
+
+  it('translates UI keys dynamically when language changes to English (en-CA)', async () => {
+    await i18n.changeLanguage('en-CA')
+    expect(i18n.t('tabs.profile')).toBe('Profile')
+    expect(i18n.t('settings.language')).toBe('Language')
+  })
+
+  it('translates UI keys dynamically when language changes to Spanish (es-419)', async () => {
+    await i18n.changeLanguage('es-419')
+    expect(i18n.t('tabs.profile')).toBe('Perfil')
+    expect(i18n.t('settings.language')).toBe('Idioma')
+  })
+
+  it('translates UI keys dynamically when language changes to French (fr-FR)', async () => {
+    await i18n.changeLanguage('fr-FR')
+    expect(i18n.t('tabs.profile')).toBe('Profil')
+    expect(i18n.t('settings.language')).toBe('Langue')
   })
 
   it('falls back to English copy when translation key is missing in another language', async () => {

@@ -15,6 +15,7 @@ import { resolveWeatherProviderOrigin } from './weather-provider-origin.js'
 
 const PROVIDER = 'openweather' as const
 const GEOCODING_PATH = '/geo/1.0/direct'
+const REVERSE_GEOCODING_PATH = '/geo/1.0/reverse'
 
 const OpenWeatherGeocodingEntrySchema = z.object({
   name: z.string().trim().min(1).max(120),
@@ -31,6 +32,7 @@ const OpenWeatherGeocodingEntrySchema = z.object({
 export interface OpenWeatherGeocodingClientOptions {
   apiKey?: string
   baseUrl?: string
+  reverseBaseUrl?: string
   env?: NodeJS.ProcessEnv
 }
 
@@ -38,19 +40,22 @@ export interface OpenWeatherGeocodingClientOptions {
  * Story 1.2b: OpenWeather Geocoding `direct`, on the One Call key. `name` is
  * the provider's default name and becomes the stored city; `local_names` only
  * localizes the display label. A missing `state` stays null, so City Spotlight
- * resolves that place at country level.
+ * resolves that place at country level. `reverse` asks Geocoding `reverse`,
+ * which answers the same entry shape, so both map through one parser.
  */
 @Injectable()
 export class OpenWeatherGeocodingClient implements ILocationGeocoder {
   readonly provider = PROVIDER
   private readonly apiKey: string
   private readonly baseUrl: string
+  private readonly reverseBaseUrl: string
 
   constructor(options: OpenWeatherGeocodingClientOptions = {}) {
     const env = options.env ?? process.env
     this.apiKey = options.apiKey ?? env.OPENWEATHER_API_KEY ?? ''
-    this.baseUrl =
-      options.baseUrl ?? `${resolveWeatherProviderOrigin(PROVIDER, env)}${GEOCODING_PATH}`
+    const origin = resolveWeatherProviderOrigin(PROVIDER, env)
+    this.baseUrl = options.baseUrl ?? `${origin}${GEOCODING_PATH}`
+    this.reverseBaseUrl = options.reverseBaseUrl ?? `${origin}${REVERSE_GEOCODING_PATH}`
   }
 
   async search(
@@ -58,18 +63,43 @@ export class OpenWeatherGeocodingClient implements ILocationGeocoder {
     language: string,
     signal: AbortSignal
   ): Promise<GeocodedPlace[]> {
+    this.requireKey()
+    const url = buildProviderUrl(PROVIDER, this.baseUrl)
+    url.searchParams.set('q', query)
+    url.searchParams.set('limit', String(GEOCODING_RESULT_LIMIT))
+    url.searchParams.set('appid', this.apiKey)
+    return this.fetchPlaces(url, language, signal)
+  }
+
+  async reverse(
+    latitude: number,
+    longitude: number,
+    language: string,
+    signal: AbortSignal
+  ): Promise<GeocodedPlace[]> {
+    this.requireKey()
+    const url = buildProviderUrl(PROVIDER, this.reverseBaseUrl)
+    url.searchParams.set('lat', String(latitude))
+    url.searchParams.set('lon', String(longitude))
+    url.searchParams.set('limit', String(GEOCODING_RESULT_LIMIT))
+    url.searchParams.set('appid', this.apiKey)
+    return this.fetchPlaces(url, language, signal)
+  }
+
+  private requireKey(): void {
     if (!this.apiKey) {
       throw new WeatherProviderError('OpenWeather API key is not configured', {
         provider: PROVIDER,
         kind: 'invalid_configuration',
       })
     }
+  }
 
-    const url = buildProviderUrl(PROVIDER, this.baseUrl)
-    url.searchParams.set('q', query)
-    url.searchParams.set('limit', String(GEOCODING_RESULT_LIMIT))
-    url.searchParams.set('appid', this.apiKey)
-
+  private async fetchPlaces(
+    url: URL,
+    language: string,
+    signal: AbortSignal
+  ): Promise<GeocodedPlace[]> {
     const raw = await fetchGeocodingJson(PROVIDER, url, signal)
     if (!Array.isArray(raw)) {
       throw new WeatherProviderError('OpenWeather geocoding response is not a list', {

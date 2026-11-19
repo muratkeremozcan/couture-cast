@@ -32,6 +32,8 @@ import {
   flakySavePlace,
   fold,
   isFlakySaveCoordinate,
+  REVERSE_DOWN_COORDINATE,
+  reversePlaces,
   sentinelPlace,
   SENTINEL_OPENWEATHER_CONDITION_ID,
   SENTINEL_TEMPERATURE_C,
@@ -163,9 +165,31 @@ function send(response, status, body) {
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-const GEOCODING_PATHS = new Set(['/geo/1.0/direct', '/v1/search.json'])
+const GEOCODING_PATHS = new Set([
+  '/geo/1.0/direct',
+  '/geo/1.0/reverse',
+  '/v1/search.json',
+])
 const FORECAST_PATHS = new Set(['/data/3.0/onecall', '/v1/forecast.json'])
-const OPENWEATHER_PATHS = new Set(['/geo/1.0/direct', '/data/3.0/onecall'])
+const OPENWEATHER_PATHS = new Set([
+  '/geo/1.0/direct',
+  '/geo/1.0/reverse',
+  '/data/3.0/onecall',
+])
+const COORDINATE_QUERY = /^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$/
+
+/**
+ * The coordinates of a reverse lookup: OpenWeather's /geo/1.0/reverse lat and lon, or a
+ * WeatherAPI search.json whose q is "lat,lon". Null for a name search.
+ */
+function reverseCoordinates(url) {
+  if (url.pathname === '/geo/1.0/reverse') {
+    return [Number(url.searchParams.get('lat')), Number(url.searchParams.get('lon'))]
+  }
+  if (url.pathname !== '/v1/search.json') return null
+  const match = COORDINATE_QUERY.exec(url.searchParams.get('q') ?? '')
+  return match ? [Number(match[1]), Number(match[2])] : null
+}
 
 /** The newest entries the request log keeps per endpoint. */
 export const DOUBLE_REQUEST_LOG_LIMIT = 500
@@ -212,7 +236,26 @@ function failsOnce(failedOnce, key) {
   return true
 }
 
+function handleReverse(url, response, [lat, lon]) {
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return send(response, 400, { message: 'bad coordinates' })
+  }
+  if (lat === REVERSE_DOWN_COORDINATE.lat && lon === REVERSE_DOWN_COORDINATE.lon) {
+    return send(response, 500, { message: 'down' })
+  }
+  const places = reversePlaces(lat, lon)
+  return send(
+    response,
+    200,
+    url.pathname === '/geo/1.0/reverse'
+      ? openWeatherGeocodingBody(places)
+      : weatherApiSearchBody(places)
+  )
+}
+
 async function handleGeocoding(url, response, failedOnce) {
+  const reverse = reverseCoordinates(url)
+  if (reverse) return handleReverse(url, response, reverse)
   const query = url.searchParams.get('q') ?? ''
   const folded = fold(query)
   if (folded === 'provider down') return send(response, 500, { message: 'down' })
@@ -298,10 +341,12 @@ async function handle(request, response, { stats, requests, now, failedOnce }) {
   const provider = OPENWEATHER_PATHS.has(url.pathname) ? 'openweather' : 'weatherapi'
   if (isGeocoding) {
     stats.geocoding += 1
+    const reverse = reverseCoordinates(url)
     logRequest(requests.geocoding, {
       seq: stats.geocoding,
       provider,
       query: url.searchParams.get('q') ?? '',
+      ...(reverse ? { latitude: reverse[0], longitude: reverse[1] } : {}),
     })
     return handleGeocoding(url, response, failedOnce)
   }

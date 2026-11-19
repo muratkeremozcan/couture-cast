@@ -9,7 +9,9 @@
 // error uses the alert role. Busy actions set `aria-busy` beside
 // `accessibilityState.busy`, which react-native-web 0.21 no longer renders.
 // Opened from a guided entry, a save returns to the originating screen, which
-// reloads on `onLocationsChanged`.
+// reloads on `onLocationsChanged`. Use my location asks for permission only
+// when tapped, rounds the position to two decimals and offers the cities the
+// API finds near it as ordinary picks; any failure leaves search ready.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { router } from 'expo-router'
@@ -38,10 +40,16 @@ import {
   locationFailureReason,
   renameLocationFromMobile,
   saveLocationFromSearchFromMobile,
+  locationsNearFromMobile,
   searchLocationsFromMobile,
   setPrimaryLocationFromMobile,
   type LocationFailureReason,
 } from '@/src/lib/locations'
+import {
+  DevicePositionError,
+  readDevicePosition,
+  type DevicePositionFailure,
+} from './device-position'
 
 /** Story 1.2b: search waits for 300 ms of quiet typing. */
 export const LOCATION_SEARCH_DEBOUNCE_MS = 300
@@ -50,14 +58,26 @@ const MIN_QUERY_LENGTH = 2
 
 type ScreenState = 'loading' | 'ready' | 'signed_out' | 'load_failed'
 
-/** Which request failed: the same provider outage reads differently on save. */
-export type LocationFailureStep = 'search' | 'save'
+/**
+ * Which request failed: the same provider outage reads differently on save.
+ * `locate` is Use my location, whose provider outage reads as search's.
+ */
+export type LocationFailureStep = 'search' | 'save' | 'locate'
+
+/** Use my location's own outcomes: no permission, no position, no city near it. */
+export type LocateFailureReason = DevicePositionFailure | 'no_city_nearby'
+
+type FormFailureReason = LocationFailureReason | LocateFailureReason
 
 export function errorKey(
-  reason: LocationFailureReason,
+  reason: FormFailureReason,
   step: LocationFailureStep = 'search'
 ): string {
   switch (reason) {
+    case 'location_denied':
+    case 'location_unavailable':
+    case 'no_city_nearby':
+      return `locations.errors.${reason}`
     case 'provider_unavailable':
       // The save-time forecast is a different request from city search, and
       // telling the member search is down when their pick could not be saved
@@ -128,10 +148,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   const [label, setLabel] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [formError, setFormError] = useState<{
-    reason: LocationFailureReason
+    reason: FormFailureReason
     step: LocationFailureStep
   } | null>(null)
+  const [isLocating, setIsLocating] = useState(false)
   const headingRef = useRef<Text>(null)
+  const searchInputRef = useRef<TextInput>(null)
+  // Each tap supersedes the last; a result that lands after unmount or a newer
+  // tap is dropped.
+  const locateAttemptRef = useRef(0)
   const announceRef = useRef(announce)
   announceRef.current = announce
   const tRef = useRef(t)
@@ -150,6 +175,13 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     setLocations(next)
     setScreenState('ready')
   }, [])
+
+  useEffect(
+    () => () => {
+      locateAttemptRef.current += 1
+    },
+    []
+  )
 
   useEffect(() => {
     const controller = new AbortController()
@@ -228,6 +260,50 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     setCandidates([])
     setFormError(null)
     announce('feedback', t('locations.selected', { place: candidate.displayLabel }))
+  }
+
+  /**
+   * Use my location. Permission is asked here, on the tap, never before. A
+   * failure is explained and focus returns to the search field, which works
+   * exactly as before.
+   */
+  async function locate() {
+    if (isLocating || isSaving) return
+    const attempt = ++locateAttemptRef.current
+    const current = () => attempt === locateAttemptRef.current
+    setIsLocating(true)
+    setFormError(null)
+    setSelected(null)
+    setQuery('')
+    setCandidates([])
+    const fail = (reason: FormFailureReason) => {
+      setFormError({ reason, step: 'locate' })
+      announce('error', t(errorKey(reason, 'locate')))
+      searchInputRef.current?.focus()
+    }
+    try {
+      const position = await readDevicePosition()
+      if (!current()) return
+      const results = await locationsNearFromMobile(
+        position.latitude,
+        position.longitude,
+        locale
+      )
+      if (!current()) return
+      if (results.length === 0) {
+        fail('no_city_nearby')
+        return
+      }
+      setCandidates(results)
+      announce('feedback', t('locations.resultCount', { count: results.length }))
+    } catch (error) {
+      if (!current()) return
+      fail(
+        error instanceof DevicePositionError ? error.reason : locationFailureReason(error)
+      )
+    } finally {
+      if (current()) setIsLocating(false)
+    }
   }
 
   async function save() {
@@ -463,8 +539,15 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
             </Text>
           ) : (
             <View style={styles.form} testID="location-add-form">
+              <UseMyLocationButton
+                isLocating={isLocating}
+                onPress={() => {
+                  void locate()
+                }}
+              />
               <Text style={[styles.label, textStyle]}>{t('locations.searchLabel')}</Text>
               <TextInput
+                ref={searchInputRef}
                 autoFocus={guided}
                 accessibilityLabel={t('locations.searchLabel')}
                 accessibilityHint={t('locations.searchHint')}
@@ -473,6 +556,9 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                 value={query}
                 maxLength={80}
                 onChangeText={(value) => {
+                  // Typing takes over from a pending Use my location: its late answer is dropped.
+                  locateAttemptRef.current += 1
+                  setIsLocating(false)
                   setQuery(value)
                   setSelected(null)
                 }}
@@ -554,6 +640,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                           void save()
                           return
                         }
+                        if (formError.step === 'locate') {
+                          void locate()
+                          return
+                        }
                         setFormError(null)
                         setSearchAttempt((attempt) => attempt + 1)
                       }}
@@ -570,6 +660,40 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
         </>
       )}
     </ScrollView>
+  )
+}
+
+/** Use my location, busy while the device and the API answer. */
+function UseMyLocationButton({
+  isLocating,
+  onPress,
+}: {
+  isLocating: boolean
+  onPress: () => void
+}) {
+  const { t } = useTranslation()
+  const palette = useHeroPalette()
+  const textStyle = { color: palette.text }
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t('locations.useMyLocation')}
+      accessibilityHint={t('locations.useMyLocationHint')}
+      accessibilityState={{ busy: isLocating }}
+      aria-busy={isLocating}
+      onPress={onPress}
+      style={[styles.secondaryButton, styles.locateButton, { borderColor: '#C9A14A' }]}
+      testID="locations-use-my-location"
+    >
+      {isLocating ? (
+        <View style={styles.row}>
+          <ActivityIndicator color={palette.text} />
+          <Text style={textStyle}>{t('locations.locating')}</Text>
+        </View>
+      ) : (
+        <Text style={textStyle}>{t('locations.useMyLocation')}</Text>
+      )}
+    </Pressable>
   )
 }
 
@@ -616,6 +740,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
   },
   primaryButtonText: { color: '#111111', fontWeight: '700' },
+  locateButton: { alignSelf: 'flex-start' },
   secondaryButton: {
     minHeight: 44,
     minWidth: 44,

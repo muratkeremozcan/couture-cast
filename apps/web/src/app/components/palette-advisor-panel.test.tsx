@@ -60,7 +60,7 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
       renderPanel()
 
       const locked = await screen.findByTestId('palette-advisor-locked')
-      expect(locked).toHaveTextContent('Subscribe to Premium from Settings')
+      expect(locked).toHaveTextContent('Subscribe to Premium from Profile')
       expect(screen.queryByTestId('palette-advisor-consent')).not.toBeInTheDocument()
     })
 

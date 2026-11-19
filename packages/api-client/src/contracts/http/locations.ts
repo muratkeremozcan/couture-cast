@@ -185,6 +185,35 @@ export const locationSearchResponseSchema = z.object({
   data: z.array(locationSearchCandidateSchema).max(LOCATION_SEARCH_MAX_RESULTS),
 })
 
+/**
+ * Production follow-up (2026-11-19), Use my location: the device position the
+ * member chose to share, rounded by the client to two decimals (about 1 km). It
+ * travels only in this POST body, so it never reaches a URL or request log.
+ */
+export const locationsFromCoordinatesInputSchema = z
+  .object({
+    latitude: z
+      .number()
+      .finite()
+      .min(-90)
+      .max(90)
+      .describe(
+        'Approximate device latitude. Never logged, stored or sent to analytics.'
+      ),
+    longitude: z
+      .number()
+      .finite()
+      .min(-180)
+      .max(180)
+      .describe(
+        'Approximate device longitude. Never logged, stored or sent to analytics.'
+      ),
+    locale: supportedLocaleSchema
+      .optional()
+      .describe('Display locale for candidate labels. Never changes stored values.'),
+  })
+  .strict()
+
 export const createSavedLocationFromSearchInputSchema = z
   .object({
     candidateToken: z.string().min(1).max(2048),
@@ -245,6 +274,9 @@ export type LocationPlatform = z.infer<typeof locationPlatformSchema>
 export type LocationSearchQueryParams = z.infer<typeof locationSearchQueryParamsSchema>
 export type LocationSearchCandidate = z.infer<typeof locationSearchCandidateSchema>
 export type LocationSearchResponse = z.infer<typeof locationSearchResponseSchema>
+export type LocationsFromCoordinatesInput = z.infer<
+  typeof locationsFromCoordinatesInputSchema
+>
 export type CreateSavedLocationFromSearchInput = z.infer<
   typeof createSavedLocationFromSearchInputSchema
 >
@@ -313,6 +345,10 @@ export function registerLocationsContracts(
     'LocationSearchResponse',
     locationSearchResponseSchema
   )
+  const registeredLocationsFromCoordinatesInputSchema = registry.register(
+    'LocationsFromCoordinatesInput',
+    locationsFromCoordinatesInputSchema
+  )
   const registeredCreateSavedLocationFromSearchInputSchema = registry.register(
     'CreateSavedLocationFromSearchInput',
     createSavedLocationFromSearchInputSchema
@@ -370,6 +406,72 @@ export function registerLocationsContracts(
       },
       429: {
         description: `${LOCATION_SEARCH_REQUESTS_PER_MINUTE} searches per member per minute.`,
+        headers: {
+          'Retry-After': {
+            description: 'Seconds until the member may search again.',
+            schema: { type: 'integer', minimum: 1 },
+          },
+        },
+        content: {
+          'application/json': { schema: commonSchemas.tooManyRequestsHttpErrorSchema },
+        },
+      },
+      503: {
+        description:
+          'The provider failed, timed out after 3 seconds or has no key, or the candidate secret is missing. Retryable.',
+        content: {
+          'application/json': { schema: registeredLocationUnavailableResponseSchema },
+        },
+      },
+    },
+  })
+
+  registry.registerPath({
+    method: 'post',
+    path: '/api/v1/locations/from-coordinates',
+    tags: ['locations'],
+    summary: 'Find the city at an approximate device position',
+    description:
+      'Use my location. Resolves the posted coordinates to at most five city candidates through the configured provider reverse geocoding, in the same shape and with the same signed candidateToken as search, so the city saves through POST /api/v1/locations/from-search. The coordinates are rounded to two decimals, never logged, stored or sent to analytics; only the provider place coordinates of a saved candidate are stored. Counts against the search rate limit.',
+    security: [{ bearerAuth: [] }],
+    request: {
+      headers: registeredLocationHeadersSchema,
+      body: {
+        required: true,
+        content: {
+          'application/json': { schema: registeredLocationsFromCoordinatesInputSchema },
+        },
+      },
+    },
+    responses: {
+      200: {
+        description:
+          'Candidates nearest the position; an empty list when no city is near',
+        content: {
+          'application/json': { schema: registeredLocationSearchResponseSchema },
+        },
+      },
+      400: {
+        description:
+          'Latitude or longitude missing, not a number or out of range, an unknown field, or a missing platform header',
+        content: {
+          'application/json': { schema: registeredLocationRequestErrorResponseSchema },
+        },
+      },
+      401: {
+        description: 'Missing or invalid authentication headers',
+        content: {
+          'application/json': { schema: commonSchemas.unauthorizedHttpErrorSchema },
+        },
+      },
+      403: {
+        description: 'Guardian consent is required for teen access',
+        content: {
+          'application/json': { schema: commonSchemas.forbiddenHttpErrorSchema },
+        },
+      },
+      429: {
+        description: `Shares the ${LOCATION_SEARCH_REQUESTS_PER_MINUTE} searches per member per minute.`,
         headers: {
           'Retry-After': {
             description: 'Seconds until the member may search again.',

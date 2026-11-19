@@ -4,6 +4,7 @@ import { PostHogClickTracker } from './components/posthog-click-tracker'
 import { GuestPreviewEntry } from './components/guest-preview/guest-preview-entry'
 import { LegalLinks } from './components/legal-page'
 import { LookbookPrismLayout } from './components/lookbook-prism-layout'
+import { ProfileNavLink } from './components/profile-nav-link'
 import { StickyBottomNav } from './components/sticky-bottom-nav'
 
 const navLinks = [
@@ -48,6 +49,9 @@ export default function Home() {
               {link.label}
             </a>
           ))}
+          {/* 2026-11-19: on a wide screen the bottom nav is hidden, so this is where a member
+              finds their profile (Jade looked for one and found nothing). */}
+          <ProfileNavLink className="whitespace-nowrap hover:text-amber-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300" />
         </nav>
       </header>
 

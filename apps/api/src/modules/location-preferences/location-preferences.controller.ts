@@ -23,6 +23,7 @@ import {
   locationHeadersSchema,
   locationSearchQueryParamsSchema,
   locationSearchResponseSchema,
+  locationsFromCoordinatesInputSchema,
   type CreateSavedLocationFromSearchResponse,
   type LocationPlatform,
   type LocationSearchResponse,
@@ -122,6 +123,45 @@ export class LocationPreferencesController {
         auth.userId,
         query.data.q,
         query.data.locale ?? defaultSupportedLocale,
+        platform
+      )
+      return locationSearchResponseSchema.parse({ data })
+    } catch (error) {
+      if (error instanceof LocationSearchRateLimitException) {
+        response.setHeader('Retry-After', String(error.retryAfterSeconds))
+      }
+      throw error
+    }
+  }
+
+  /**
+   * Use my location. The body is validated before anything else runs, so an
+   * out-of-range or non-numeric coordinate never reaches the rate limit or the
+   * provider, and the refusal never echoes the values. Coordinates travel only
+   * in this body: never in the URL, a log line or an analytics event.
+   */
+  @Post('from-coordinates')
+  @HttpCode(200)
+  async locationsFromCoordinates(
+    @AuthContext() auth: RequestAuthContext,
+    @Body() body: unknown,
+    @Headers('x-couture-platform') platformHeader: string | undefined,
+    @Res({ passthrough: true }) response: Response
+  ): Promise<LocationSearchResponse> {
+    const input = locationsFromCoordinatesInputSchema.safeParse(body)
+    if (!input.success) {
+      throw locationRequestError(
+        'invalid_request',
+        'Latitude must be -90 to 90 and longitude -180 to 180'
+      )
+    }
+    const platform = parsePlatform(platformHeader)
+    try {
+      const data = await this.locationCaptureService.fromCoordinates(
+        auth.userId,
+        input.data.latitude,
+        input.data.longitude,
+        input.data.locale ?? defaultSupportedLocale,
         platform
       )
       return locationSearchResponseSchema.parse({ data })

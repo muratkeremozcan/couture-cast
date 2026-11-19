@@ -21,6 +21,7 @@ import {
 } from '@couture/api-client/contracts/http'
 import { FetchError, ResponseError } from '@couture/api-client'
 import { createWebApiClient } from './api-client'
+import { approximateCoordinate } from './device-position'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from './wardrobe'
 import { readStorage } from './browser-persistence'
 
@@ -133,6 +134,34 @@ export async function searchLocationsFromWeb(
   try {
     const response = await client().apiV1LocationsSearchGet(
       { q: query, locale, xCouturePlatform: 'web' },
+      { signal }
+    )
+    return locationSearchResponseSchema.parse(response).data
+  } catch (error) {
+    throw await locationError(error)
+  }
+}
+
+/**
+ * Use my location: the cities nearest an approximate position, as search
+ * candidates that save through `saveLocationFromSearchFromWeb`. The position is
+ * rounded to two decimals here as well and travels only in the POST body.
+ */
+export async function locationsFromCoordinatesFromWeb(
+  position: { latitude: number; longitude: number },
+  locale: SupportedLocale,
+  signal?: AbortSignal
+): Promise<LocationSearchCandidate[]> {
+  try {
+    const response = await client().apiV1LocationsFromCoordinatesPost(
+      {
+        xCouturePlatform: 'web',
+        locationsFromCoordinatesInput: {
+          latitude: approximateCoordinate(position.latitude),
+          longitude: approximateCoordinate(position.longitude),
+          locale,
+        },
+      },
       { signal }
     )
     return locationSearchResponseSchema.parse(response).data

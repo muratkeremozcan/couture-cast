@@ -2170,6 +2170,44 @@
           "data"
         ]
       },
+      "LocationsFromCoordinatesInput": {
+        "type": "object",
+        "properties": {
+          "latitude": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Approximate device latitude. Never logged, stored or sent to analytics."
+          },
+          "longitude": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Approximate device longitude. Never logged, stored or sent to analytics."
+          },
+          "locale": {
+            "type": "string",
+            "enum": [
+              "en-US",
+              "en-CA",
+              "es-419",
+              "fr-CA",
+              "fr-FR",
+              "tr-TR",
+              "de-DE",
+              "it-IT",
+              "pt-BR",
+              "pt-PT"
+            ],
+            "description": "Display locale for candidate labels. Never changes stored values."
+          }
+        },
+        "required": [
+          "latitude",
+          "longitude"
+        ],
+        "additionalProperties": false
+      },
       "CreateSavedLocationFromSearchInput": {
         "type": "object",
         "properties": {
@@ -21528,6 +21566,117 @@
           },
           "429": {
             "description": "30 searches per member per minute.",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the member may search again.",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TooManyRequestsHttpError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The provider failed, timed out after 3 seconds or has no key, or the candidate secret is missing. Retryable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationUnavailableResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/locations/from-coordinates": {
+      "post": {
+        "tags": [
+          "locations"
+        ],
+        "summary": "Find the city at an approximate device position",
+        "description": "Use my location. Resolves the posted coordinates to at most five city candidates through the configured provider reverse geocoding, in the same shape and with the same signed candidateToken as search, so the city saves through POST /api/v1/locations/from-search. The coordinates are rounded to two decimals, never logged, stored or sent to analytics; only the provider place coordinates of a saved candidate are stored. Counts against the search rate limit.",
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "web",
+                "mobile"
+              ],
+              "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics."
+            },
+            "required": true,
+            "description": "Which client is calling. Required on search and save from search; drives the platform property on location analytics.",
+            "name": "x-couture-platform",
+            "in": "header"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LocationsFromCoordinatesInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Candidates nearest the position; an empty list when no city is near",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationSearchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Latitude or longitude missing, not a number or out of range, an unknown field, or a missing platform header",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LocationRequestErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid authentication headers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UnauthorizedHttpError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Guardian consent is required for teen access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForbiddenHttpError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Shares the 30 searches per member per minute.",
             "headers": {
               "Retry-After": {
                 "description": "Seconds until the member may search again.",

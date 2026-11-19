@@ -1,4 +1,5 @@
-# Navigate to the Settings tab and prove you actually landed there.
+# Navigate to the Settings tab and prove you actually landed there. The tab reads Profile
+# since 2026-11-19; its id stays `tab-settings`, so nothing here depends on the label.
 #
 # A bare `tapOn: id: tab-settings` is not reliable in Expo Go. The developer
 # sheet can rise over the lower half of the screen at any point after mount,

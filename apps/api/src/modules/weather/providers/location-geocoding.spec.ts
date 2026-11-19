@@ -1,7 +1,10 @@
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
+  REVERSE_DOWN_COORDINATE,
   startWeatherProviderDouble,
   type WeatherProviderDouble,
 } from '../../../../../../scripts/weather-provider-double.mjs'
@@ -118,6 +121,76 @@ describe('WeatherApiGeocodingClient', () => {
     await expect(weatherApi('').search('Chicago', 'en', signal())).rejects.toMatchObject({
       kind: 'invalid_configuration',
     })
+  })
+})
+
+/**
+ * Production follow-up (2026-11-19), Use my location: `reverse` asks each provider
+ * for the place nearest a coordinate and maps it exactly as a name search does.
+ */
+describe('reverse geocoding', () => {
+  it('GEO-REV-01 OpenWeather reverse maps the nearest place through the search mapping', async () => {
+    const before = double.requests.geocoding.length
+
+    const places = await openWeather().reverse(41.88, -87.63, 'ja', signal())
+
+    expect(places).toEqual([
+      {
+        city: 'Chicago',
+        region: 'Illinois',
+        country: 'US',
+        latitude: 41.878,
+        longitude: -87.63,
+        localizedName: 'シカゴ',
+      },
+    ])
+    expect(double.requests.geocoding.slice(before)).toEqual([
+      expect.objectContaining({
+        provider: 'openweather',
+        query: '',
+        latitude: 41.88,
+        longitude: -87.63,
+      }),
+    ])
+  })
+
+  it('GEO-REV-02 WeatherAPI reverse sends lat,lon as the search query', async () => {
+    const before = double.requests.geocoding.length
+
+    const [istanbul] = await weatherApi().reverse(41.01, 28.98, 'tr', signal())
+
+    expect(istanbul).toMatchObject({
+      city: 'İstanbul',
+      country: 'TR',
+      localizedName: null,
+    })
+    expect(double.requests.geocoding.slice(before)).toEqual([
+      expect.objectContaining({ provider: 'weatherapi', query: '41.01,28.98' }),
+    ])
+  })
+
+  it('GEO-REV-03 answers an empty list where no place is near', async () => {
+    expect(await openWeather().reverse(-45, -140, 'en', signal())).toEqual([])
+    expect(await weatherApi().reverse(-45, -140, 'en', signal())).toEqual([])
+  })
+
+  it('GEO-REV-04 classifies a provider failure and never calls without a key', async () => {
+    const down = REVERSE_DOWN_COORDINATE
+    await expect(
+      openWeather().reverse(down.lat, down.lon, 'en', signal())
+    ).rejects.toMatchObject({ kind: 'retryable_http' })
+    await expect(
+      weatherApi().reverse(down.lat, down.lon, 'en', signal())
+    ).rejects.toMatchObject({ kind: 'retryable_http' })
+
+    const before = double.stats.geocoding
+    await expect(
+      openWeather('').reverse(41.88, -87.63, 'en', signal())
+    ).rejects.toMatchObject({ kind: 'invalid_configuration' })
+    await expect(
+      weatherApi('').reverse(41.88, -87.63, 'en', signal())
+    ).rejects.toMatchObject({ kind: 'invalid_configuration' })
+    expect(double.stats.geocoding).toBe(before)
   })
 })
 

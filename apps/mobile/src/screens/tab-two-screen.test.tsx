@@ -6,6 +6,8 @@
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-33-affiliate-shop-this-look-cta
 // Learning path Step 45: Client location capture.
 // See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-45-client-location-capture
+// Learning path Step 58: Production follow-ups after the project close.
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
 // Step 22 step 7 owner: verify Settings screen layout boundaries in headless Chromium in apps/mobile/src/screens/tab-two-screen.test.tsx
 import { act, fireEvent, screen, waitFor } from '@testing-library/react'
 import { render } from 'vitest-browser-react'
@@ -42,6 +44,7 @@ const {
   ensurePurchasesConfiguredMock,
   premiumPassthroughMocks,
   resolveMobileAccessTokenMock,
+  getUserProfileMock,
 } = vi.hoisted(() => ({
   analyticsCaptureMock: vi.fn(),
   analyticsDistinctIdMock: vi.fn(() => 'test-user-id'),
@@ -61,6 +64,7 @@ const {
     isEntitledSubscription: vi.fn(),
   },
   resolveMobileAccessTokenMock: vi.fn(),
+  getUserProfileMock: vi.fn(),
 }))
 
 // The member's session is a boundary too: shopping preferences and the subscription
@@ -87,8 +91,9 @@ vi.mock('@/src/lib/api-health', () => ({
 vi.mock('@/src/lib/user', () => ({
   updatePreferredLocaleFromMobile: updatePreferredLocaleMock,
   // The real premium lib (loaded via vi.importActual for its pure exports)
-  // imports this from './user'; the mocked module has to keep the name.
-  getUserProfileFromMobile: vi.fn(),
+  // imports this from './user'; the mocked module has to keep the name. The
+  // Profile header reads it too.
+  getUserProfileFromMobile: getUserProfileMock,
 }))
 
 // The commerce preference is a network boundary. Owning it here keeps the
@@ -126,6 +131,20 @@ import SettingsScreen, { API_HEALTH_TIMEOUT_MS } from '../../app/(tabs)/settings
 
 const SUBPIXEL_ROUNDING_SLACK_PX = 2
 
+function memberProfile(displayName: string | null) {
+  return {
+    user: {
+      id: 'member-1',
+      email: 'jade@example.test',
+      displayName,
+      birthdate: null,
+      role: 'guardian',
+    },
+    linkedGuardians: [],
+    linkedTeens: [],
+  }
+}
+
 const SETTINGS_STORAGE_KEY = 'couture-cast-settings.json'
 
 describe('SettingsScreen', () => {
@@ -146,6 +165,8 @@ describe('SettingsScreen', () => {
     updatePreferredLocaleMock.mockResolvedValue({ success: true })
     resolveMobileAccessTokenMock.mockReset()
     resolveMobileAccessTokenMock.mockResolvedValue('member-token')
+    getUserProfileMock.mockReset()
+    getUserProfileMock.mockResolvedValue(memberProfile(null))
     getCommercePreferenceMock.mockReset()
     getCommercePreferenceMock.mockResolvedValue({ affiliateCtasEnabled: true })
     updateCommercePreferenceMock.mockReset()
@@ -513,6 +534,60 @@ describe('SettingsScreen', () => {
     expect(screen.queryByTestId('commerce-opt-out-toggle')).toBeNull()
     expect(getCommercePreferenceMock).not.toHaveBeenCalled()
     expect(getSubscriptionMock).not.toHaveBeenCalled()
+  })
+
+  /*
+   * Production follow-up (2026-11-19): Jade could not find a profile. The tab reads Profile and
+   * opens on whose account it is, above everything Settings already held.
+   */
+  it('PROFILE-MOB-01 opens on the member display name and email, above the language section', async () => {
+    getUserProfileMock.mockResolvedValue(memberProfile('Jade'))
+
+    await render(<SettingsScreen />)
+
+    const header = await screen.findByTestId('profile-account')
+    expect(screen.getByTestId('profile-account-name').textContent).toBe('Jade')
+    expect(screen.getByTestId('profile-account-email').textContent).toBe(
+      'jade@example.test'
+    )
+    expect(header).toHaveTextContent('Account')
+    expect(
+      header.compareDocumentPosition(screen.getByTestId('settings-language-title')) &
+        Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(screen.getByTestId('locations-link')).toBeInTheDocument()
+    expect(screen.getByTestId('commerce-settings-section')).toBeInTheDocument()
+  })
+
+  it('PROFILE-MOB-02 shows the email alone when the member set no display name', async () => {
+    getUserProfileMock.mockResolvedValue(memberProfile('   '))
+
+    await render(<SettingsScreen />)
+
+    expect((await screen.findByTestId('profile-account-email')).textContent).toBe(
+      'jade@example.test'
+    )
+    expect(screen.queryByTestId('profile-account-name')).toBeNull()
+  })
+
+  it('PROFILE-MOB-03 shows no account header signed out or when the profile read fails, and the rest still renders', async () => {
+    resolveMobileAccessTokenMock.mockResolvedValue(undefined)
+
+    const signedOut = await render(<SettingsScreen />)
+
+    await screen.findByTestId('commerce-settings-signed-out')
+    expect(getUserProfileMock).not.toHaveBeenCalled()
+    expect(screen.queryByTestId('profile-account')).toBeNull()
+    await signedOut.unmount()
+
+    resolveMobileAccessTokenMock.mockResolvedValue('member-token')
+    getUserProfileMock.mockRejectedValue(new Error('503'))
+
+    await render(<SettingsScreen />)
+
+    await waitFor(() => expect(getUserProfileMock).toHaveBeenCalled())
+    expect(await screen.findByTestId('commerce-opt-out-toggle')).toBeInTheDocument()
+    expect(screen.queryByTestId('profile-account')).toBeNull()
   })
 
   it('6.5-MOB-POLISH-11 never tells a member they are signed out when the session read fails transiently', async () => {

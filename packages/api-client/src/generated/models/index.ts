@@ -11303,6 +11303,50 @@ export type LocationUnavailableResponseErrorEnum =
 /**
  *
  * @export
+ * @interface LocationsFromCoordinatesInput
+ */
+export interface LocationsFromCoordinatesInput {
+  /**
+   * Approximate device latitude. Never logged, stored or sent to analytics.
+   * @type {number}
+   * @memberof LocationsFromCoordinatesInput
+   */
+  latitude: number
+  /**
+   * Approximate device longitude. Never logged, stored or sent to analytics.
+   * @type {number}
+   * @memberof LocationsFromCoordinatesInput
+   */
+  longitude: number
+  /**
+   * Display locale for candidate labels. Never changes stored values.
+   * @type {LocationsFromCoordinatesInputLocaleEnum}
+   * @memberof LocationsFromCoordinatesInput
+   */
+  locale?: LocationsFromCoordinatesInputLocaleEnum
+}
+
+/**
+ * @export
+ */
+export const LocationsFromCoordinatesInputLocaleEnum = {
+  en_US: 'en-US',
+  en_CA: 'en-CA',
+  es_419: 'es-419',
+  fr_CA: 'fr-CA',
+  fr_FR: 'fr-FR',
+  tr_TR: 'tr-TR',
+  de_DE: 'de-DE',
+  it_IT: 'it-IT',
+  pt_BR: 'pt-BR',
+  pt_PT: 'pt-PT',
+} as const
+export type LocationsFromCoordinatesInputLocaleEnum =
+  (typeof LocationsFromCoordinatesInputLocaleEnum)[keyof typeof LocationsFromCoordinatesInputLocaleEnum]
+
+/**
+ *
+ * @export
  * @interface ModerationActionInput
  */
 export interface ModerationActionInput {

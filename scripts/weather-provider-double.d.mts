@@ -6,6 +6,9 @@ export interface WeatherProviderDoubleGeocodingRequest {
   seq: number
   provider: 'openweather' | 'weatherapi'
   query: string
+  /** Present on a reverse lookup: the coordinates the API asked the provider about. */
+  latitude?: number
+  longitude?: number
 }
 
 export interface WeatherProviderDoubleForecastRequest {

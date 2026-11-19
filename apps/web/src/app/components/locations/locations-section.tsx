@@ -5,6 +5,11 @@
 // is one press. Outcomes are announced once through the status region below;
 // failures render as alerts. Signed out, it renders the same calm shell the
 // unauthenticated accessibility audit of `/settings` scans.
+//
+// The section follows the session (`useWebSession`): while a stored session is
+// still being verified it stays `checking`, and it lists once per member. A
+// one-shot check on mount once told a signed-in member to sign in (Jade,
+// 2026-11-19).
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -16,7 +21,6 @@ import {
 } from '@couture/api-client/contracts/http'
 import {
   deleteLocationFromWeb,
-  hasWebSession,
   listLocationsFromWeb,
   LocationRequestError,
   renameLocationFromWeb,
@@ -29,6 +33,7 @@ import {
   MAX_SAVED_LOCATIONS,
   safeReturnPath,
 } from './location-format'
+import { useWebSession } from '../../../lib/use-web-session'
 import { LocationSearchForm } from './location-search-form'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
@@ -58,6 +63,15 @@ export function LocationsSection() {
   const itemRefs = useRef(new Map<string, HTMLElement>())
   const headingRef = useRef<HTMLHeadingElement>(null)
   const pendingFocusRef = useRef<string | null>(null)
+  const session = useWebSession()
+  const owner = session.status === 'signed_in' ? session.owner : null
+  const [loadAttempt, setLoadAttempt] = useState(0)
+  /*
+   * Bumped whenever the member changes (or leaves). Every async completion
+   * checks it, so a late answer for one member never shows on another's
+   * section, or after sign out.
+   */
+  const ownerGenerationRef = useRef(0)
 
   const loadErrorMessage = t('locations.loadError')
 
@@ -66,19 +80,48 @@ export function LocationsSection() {
    * still reaches assistive technology: the region is cleared, then filled.
    */
   const announce = useCallback((message: string) => {
+    const generation = ownerGenerationRef.current
     setStatus('')
-    requestAnimationFrame(() => setStatus(message))
+    requestAnimationFrame(() => {
+      if (generation === ownerGenerationRef.current) setStatus(message)
+    })
   }, [])
 
-  const reload = useCallback(async (signal?: AbortSignal) => {
+  /** True when the list landed for the member who asked for it. */
+  const reload = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+    const generation = ownerGenerationRef.current
     const next = await listLocationsFromWeb(signal)
-    if (signal?.aborted) return
+    if (signal?.aborted || generation !== ownerGenerationRef.current) return false
     setLocations(next)
     setSectionState('ready')
+    return true
   }, [])
 
+  // A new member (or none) starts from an empty section.
   useEffect(() => {
-    if (!hasWebSession()) {
+    ownerGenerationRef.current += 1
+    setLocations([])
+    setStatus('')
+    setError(null)
+    setBusyId(null)
+    setRenamingId(null)
+    setConfirmingId(null)
+    pendingFocusRef.current = null
+  }, [owner])
+
+  // One list request per member: a session event that names the same member
+  // again (a token refresh, the end of a verification already answered) asks
+  // nothing. A retry after a failed load asks once more.
+  useEffect(() => {
+    if (session.status === 'checking') {
+      setSectionState('checking')
+      return
+    }
+    if (session.status === 'unavailable') {
+      setSectionState('load_failed')
+      return
+    }
+    if (!owner) {
       setSectionState('signed_out')
       return
     }
@@ -89,7 +132,12 @@ export function LocationsSection() {
       setSectionState('load_failed')
     })
     return () => controller.abort()
-  }, [reload, loadErrorMessage])
+  }, [reload, session.status, owner, loadAttempt])
+
+  function retryLoad() {
+    if (session.status === 'unavailable') session.retry()
+    else setLoadAttempt((attempt) => attempt + 1)
+  }
 
   // Focus moves to the item an action changed, once it has rendered.
   useEffect(() => {
@@ -106,17 +154,19 @@ export function LocationsSection() {
     focusAfter: string
   ): Promise<void> {
     if (busyId) return
+    const generation = ownerGenerationRef.current
+    const current = () => generation === ownerGenerationRef.current
     setBusyId(locationId)
     setError(null)
     try {
       const message = await work()
-      await reload()
+      if (!(await reload()) || !current()) return
       pendingFocusRef.current = focusAfter
       announce(message)
     } catch (caught) {
-      setError(reasonOf(caught))
+      if (current()) setError(reasonOf(caught))
     } finally {
-      setBusyId(null)
+      if (current()) setBusyId(null)
     }
   }
 
@@ -158,7 +208,12 @@ export function LocationsSection() {
   }
 
   async function handleSaved(location: SavedLocation) {
-    await reload().catch(() => setSectionState('load_failed'))
+    const generation = ownerGenerationRef.current
+    const loaded = await reload().catch(() => {
+      if (generation === ownerGenerationRef.current) setSectionState('load_failed')
+      return false
+    })
+    if (!loaded || generation !== ownerGenerationRef.current) return
     announce(t('locations.saved', { label: location.label }))
     pendingFocusRef.current = location.id
     const target = safeReturnPath(returnTo, window.location.origin)
@@ -194,13 +249,23 @@ export function LocationsSection() {
       )}
 
       {sectionState === 'load_failed' && (
-        <p
-          role="alert"
-          className="mt-4 text-sm text-red-300"
-          data-testid="locations-load-error"
-        >
-          {loadErrorMessage}
-        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <p
+            role="alert"
+            className="text-sm text-red-300"
+            data-testid="locations-load-error"
+          >
+            {loadErrorMessage}
+          </p>
+          <button
+            type="button"
+            onClick={retryLoad}
+            className="min-h-[44px] self-start rounded-md border border-neutral-500 px-4 text-white"
+            data-testid="locations-load-retry"
+          >
+            {t('locations.loadRetry')}
+          </button>
+        </div>
       )}
 
       {sectionState === 'ready' && (
@@ -375,6 +440,8 @@ export function LocationsSection() {
             </p>
           ) : (
             <LocationSearchForm
+              // A new member gets a fresh form: no query, pick or late save of the last one.
+              key={owner ?? 'signed-out'}
               locale={locale}
               autoFocus={guided}
               announce={announce}
