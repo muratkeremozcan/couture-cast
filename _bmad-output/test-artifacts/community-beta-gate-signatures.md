@@ -38,4 +38,4 @@ The Supabase patch version was not read.
 
 Owner waiver, 2026-11-19: the Model, SLA alerts, Localization, Accessibility and Rollback rows were open or unchanged, and the owner waived them to open the Community Beta to every member.
 Photo screening keeps the policy-v2 bounds: 27 of 298 safe holdout photographs (9.1 percent, Wilson upper bound 12.9 percent) wait for a moderator, because no unsafe photo set exists to show a looser bound keeps catching unsafe images.
-A waiver is not a signature: each row keeps its limit. `community_read_enabled` and `community_write_enabled` go to 100 percent in production after the change that pins them in the PostHog drift check deploys.
+A waiver is not a signature: each row keeps its limit. `community_read_enabled` and `community_write_enabled` go to 100 percent in production after the community launch change deploys, and a follow-up change then pins them in the PostHog drift check.

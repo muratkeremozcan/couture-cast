@@ -12201,9 +12201,11 @@ measured in minutes.
 6. **Opening a gated feature is a change of its own, with a written waiver.**
    The owner opened the Community Beta on 2026-11-19 with five of eight gate signatures unsigned.
    The waiver is recorded row by row with each limit kept
-   ([gate record](../test-artifacts/community-beta-gate-signatures.md)), the hourly PostHog drift
-   check pins the community and moderation flags at `true`, and code defaults stay `false` so a
-   degraded PostHog still fails closed.
+   ([gate record](../test-artifacts/community-beta-gate-signatures.md)), and code defaults stay
+   `false` so a degraded PostHog still fails closed. The flags flip only after the new code
+   serves production, and the drift-check pins land in a follow-up change once they have: the
+   drift check reads production, so pins that land with the code fail the merge gate before the
+   flip, and flipping first would open the feature on the old code.
 7. **Cut false holds only where the data proves the unsafe side holds.**
    Locale-bound caption allow rules cleared 26 of 30 held clean holdout captions while all 1520
    disallowed fixtures per language stayed held. Every bypass review found in a first draft (a

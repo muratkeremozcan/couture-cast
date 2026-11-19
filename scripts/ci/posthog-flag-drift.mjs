@@ -50,49 +50,7 @@ export const INTENTIONAL_OVERRIDES = Object.freeze({
       'Owner decision 2026-11-11: color analysis stays on in production; the code default ' +
       'stays false so a degraded PostHog fails closed.',
   },
-  community_read_enabled: {
-    value: true,
-    reason:
-      'Owner decision 2026-11-19: the Community Beta opens to every member, so the feed and single-post reads are on in ' +
-      'production; the code default stays false so a degraded PostHog fails closed.',
-  },
-  community_write_enabled: {
-    value: true,
-    reason:
-      'Owner decision 2026-11-19: the Community Beta opens to every member, so posting, reporting and withdrawing are on in ' +
-      'production; the code default stays false so a degraded PostHog fails closed.',
-  },
-  moderation_console_enabled: {
-    value: true,
-    reason:
-      'Owner decision 2026-11-19: the Community Beta opens to every member, so the moderation console is open in ' +
-      'production; the code default stays false so a degraded PostHog fails closed.',
-  },
-  moderation_decisions_enabled: {
-    value: true,
-    reason:
-      'Owner decision 2026-11-19: the Community Beta opens to every member, so moderator decisions and sanctions are on in ' +
-      'production; the code default stays false so a degraded PostHog fails closed.',
-  },
-  moderation_sla_monitoring_enabled: {
-    value: true,
-    reason:
-      'Owner decision 2026-11-19: the Community Beta opens to every member, so the SLA sweep runs in ' +
-      'production; the code default stays false so a degraded PostHog fails closed.',
-  },
-  moderation_history_enabled: {
-    value: true,
-    reason:
-      'Owner decision 2026-11-19: the Community Beta opens to every member, so the moderation history is readable in ' +
-      'production; the code default stays false so a degraded PostHog fails closed.',
-  },
 })
-
-/** "1 pinned override" or "3 pinned overrides". */
-export function pinnedOverrideCount(overrides) {
-  const count = Object.keys(overrides).length
-  return `${count} pinned override${count === 1 ? '' : 's'}`
-}
 
 /** One /flags call for one subject: the answered flags, or why there is no definitive answer. */
 async function evaluate({ keys, token, host, subject, fetchImpl }) {
@@ -463,7 +421,7 @@ async function main() {
   console.log(
     `All ${FEATURE_FLAG_KEYS.length} declared flags are released uniformly and answer their ` +
       'expected value in production ' +
-      `for ${SUBJECTS.length} subjects (${pinnedOverrideCount(INTENTIONAL_OVERRIDES)}).`
+      `for ${SUBJECTS.length} subjects (${Object.keys(INTENTIONAL_OVERRIDES).length} pinned override).`
   )
   return 0
 }
