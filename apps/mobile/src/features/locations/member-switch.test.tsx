@@ -7,7 +7,7 @@
 //   own list loads;
 // - a save A started never writes A's place to B's account (switch before the request goes out),
 //   and a save already sent as A changes nothing on B's screen when it answers.
-import React from 'react'
+import React, { useEffect } from 'react'
 import { userEvent } from 'vitest/browser'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -69,6 +69,7 @@ vi.mock('@/src/lib/locations', async (importOriginal) => {
   return {
     ...actual,
     listLocationsFromMobile: track(actual.listLocationsFromMobile),
+    searchLocationsFromMobile: track(actual.searchLocationsFromMobile),
     renameLocationFromMobile: track(actual.renameLocationFromMobile),
     setPrimaryLocationFromMobile: track(actual.setPrimaryLocationFromMobile),
     deleteLocationFromMobile: track(actual.deleteLocationFromMobile),
@@ -94,7 +95,7 @@ import {
 } from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import { locationCandidate, savedLocation } from '@/src/test-utils/locations'
-import { LocationsScreen } from './locations-screen'
+import { LOCATION_SEARCH_DEBOUNCE_MS, LocationsScreen } from './locations-screen'
 
 const A_HOME = savedLocation({ id: 'a-1', label: 'Alpha Home' })
 const A_CABIN = savedLocation({
@@ -845,6 +846,91 @@ describe(
       } finally {
         stop()
       }
+    })
+
+    // Codex product review 8 finding 1: A's keyboard delivers a text change after the identity
+    // listener queued B's reset but before B's render commits.
+    it('LOC-MEMBER-MOB-20 a text change queued on A screen when the phone switched never searches for B', async () => {
+      const searchBearers: (string | null)[] = []
+      server.use(
+        http.get('*/api/v1/locations/search', ({ request }) => {
+          searchBearers.push(request.headers.get('authorization'))
+          return HttpResponse.json({ data: [SPRINGFIELD] })
+        })
+      )
+      // Hold the search debounce so the test, not the clock, decides when it fires.
+      const realSetTimeout = globalThis.setTimeout
+      const realClearTimeout = globalThis.clearTimeout
+      const held: { run: () => void; cleared: boolean }[] = []
+      const setSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+        callback: () => void,
+        delay?: number,
+        ...args: unknown[]
+      ) => {
+        if (delay !== LOCATION_SEARCH_DEBOUNCE_MS)
+          return realSetTimeout(callback, delay, ...args)
+        const entry = { run: callback, cleared: false }
+        held.push(entry)
+        return entry as unknown as ReturnType<typeof setTimeout>
+      }) as unknown as typeof setTimeout)
+      const clearSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementation(((
+        id?: ReturnType<typeof setTimeout>
+      ) => {
+        const entry = held.find((each) => (each as unknown) === id)
+        if (entry) entry.cleared = true
+        else realClearTimeout(id)
+      }) as unknown as typeof clearTimeout)
+      try {
+        renderScreen()
+        expect(await screen.findByText('Alpha Home')).toBeTruthy()
+        await settle()
+        const input = screen.getByTestId<HTMLInputElement>('locations-search-input')
+
+        switchWithoutRender()
+        // The queued keystroke: React sees an input event on A's field in the same batch.
+        act(() => {
+          // The native value setter, as a keyboard sets it, so React's input tracking sees the change.
+          Reflect.set(HTMLInputElement.prototype, 'value', 'Spring', input)
+          input.dispatchEvent(new Event('input', { bubbles: true }))
+        })
+        await settle()
+        for (const entry of held.filter((each) => !each.cleared)) {
+          entry.cleared = true
+          act(() => entry.run())
+        }
+        await settle()
+
+        expect(searchBearers).toEqual([])
+        expect(await screen.findByText('Bravo Office')).toBeTruthy()
+        expect(screen.getByTestId<HTMLInputElement>('locations-search-input').value).toBe(
+          ''
+        )
+        noAlpha()
+      } finally {
+        setSpy.mockRestore()
+        clearSpy.mockRestore()
+      }
+    })
+
+    // Finding 4: verification publishes the member after the screen rendered, before it subscribed.
+    it('LOC-MEMBER-MOB-21 a member published between the first render and the subscription still gets a list', async () => {
+      setMobileApplicationUserId(null)
+      /** Placed before the screen: its passive effect runs before the screen's own. */
+      function VerificationLands() {
+        useEffect(() => {
+          setMobileApplicationUserId('member-a')
+        }, [])
+        return null
+      }
+      render(
+        <AccessibilityAnnouncerProvider>
+          <VerificationLands />
+          <LocationsScreen />
+        </AccessibilityAnnouncerProvider>
+      )
+
+      expect(await screen.findByText('Alpha Home')).toBeTruthy()
+      expect(listBearers).toEqual(['Bearer token-a'])
     })
 
     // Finding 6: the focus a delete decided for A is not carried out after the phone switched.

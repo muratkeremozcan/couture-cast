@@ -6,6 +6,7 @@
 // reach the API: a held device position, an armed search timer, a save, a rename, a primary change
 // or a delete sends zero requests. A focus decided for A is not carried out on B's turn either.
 import { http, HttpResponse } from 'msw'
+import { useLayoutEffect } from 'react'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { I18nextProvider } from 'react-i18next'
@@ -21,6 +22,7 @@ import type * as DevicePosition from '../../../lib/device-position'
 import type * as Locations from '../../../lib/locations'
 import type * as WebSession from '../../../lib/web-session'
 import { LOCATION_SEARCH_DEBOUNCE_MS } from './location-search-form'
+import { useWebSession } from '../../../lib/use-web-session'
 import { LocationsSection } from './locations-section'
 
 /** Every client call the section or form starts, kept until it settles. */
@@ -100,10 +102,10 @@ vi.mock('../../../lib/web-session', async (importOriginal) => ({
     ),
 }))
 
-const navigation = vi.hoisted(() => ({ push: vi.fn() }))
+const navigation = vi.hoisted(() => ({ push: vi.fn(), query: '' }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: navigation.push }),
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(navigation.query),
 }))
 
 function place(id: string, label: string, isPrimary: boolean): SavedLocation {
@@ -151,6 +153,8 @@ let requests: {
 }[]
 let bridgeMoved: boolean
 let renamedTo: string | null
+/** Places A saved during the test, listed after A's two. */
+let savedRows: SavedLocation[]
 let pendingPosition: { success: PositionCallback } | null
 /** When set, the next search or city lookup answer waits for the test to release it. */
 let holdNextAnswer: boolean
@@ -164,13 +168,20 @@ async function maybeHold() {
   })
 }
 
-/** Every text the status and alert regions show from now on. */
+/**
+ * Every message the status and alert regions show from now on, once per change: a region that
+ * goes from empty (or another text) to a message adds that message.
+ */
 function recordFeedback(): string[] {
   const seen: string[] = []
+  const last = new Map<Element, string>()
+  for (const region of document.querySelectorAll('[role="status"], [role="alert"]'))
+    last.set(region, region.textContent?.trim() ?? '')
   const read = () => {
     for (const region of document.querySelectorAll('[role="status"], [role="alert"]')) {
-      const text = region.textContent?.trim()
-      if (text) seen.push(text)
+      const text = region.textContent?.trim() ?? ''
+      if (text !== (last.get(region) ?? '') && text) seen.push(text)
+      last.set(region, text)
     }
   }
   const observer = new MutationObserver(read)
@@ -199,11 +210,25 @@ async function publishB() {
   expect(await screen.findByText('Bravo Office')).toBeInTheDocument()
 }
 
-function renderSection() {
+/**
+ * Reads the page in the same commit as the section, before any passive effect runs: a sibling's
+ * layout effect sees exactly what the successor's first commit put on screen.
+ */
+function FirstCommitProbe({ onCommit }: { onCommit: (owner: string | null) => void }) {
+  const webSession = useWebSession()
+  const owner = webSession.status === 'signed_in' ? webSession.owner : null
+  useLayoutEffect(() => {
+    onCommit(owner)
+  }, [owner, onCommit])
+  return null
+}
+
+function renderSection(onCommit?: (owner: string | null) => void) {
   return render(
     <I18nextProvider i18n={getI18n()}>
       <main>
         <LocationsSection />
+        {onCommit && <FirstCommitProbe onCommit={onCommit} />}
       </main>
     </I18nextProvider>
   )
@@ -252,6 +277,8 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
     tracked.promises = []
     tracked.lastListLabels = []
     navigation.push.mockClear()
+    navigation.query = ''
+    savedRows = []
     session.identity = 'member-a'
     session.stored = true
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-a')
@@ -279,7 +306,11 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
         if (request.headers.get('authorization') === 'Bearer token-b')
           return HttpResponse.json({ data: [B_OFFICE] })
         return HttpResponse.json({
-          data: [renamedTo ? { ...A_HOME, label: renamedTo } : A_HOME, A_WORK],
+          data: [
+            renamedTo ? { ...A_HOME, label: renamedTo } : A_HOME,
+            A_WORK,
+            ...savedRows,
+          ],
         })
       }),
       http.get('/api/v1/locations/search', async ({ request }) => {
@@ -294,7 +325,9 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
       }),
       http.post('/api/v1/locations/from-search', ({ request }) => {
         log(request)
-        return HttpResponse.json({ data: place('a-3', 'Springfield', false) })
+        const saved = place('a-3', 'Springfield', false)
+        savedRows.push(saved)
+        return HttpResponse.json({ data: saved })
       }),
       http.patch('/api/v1/locations/:id', async ({ request }) => {
         log(request)
@@ -306,8 +339,9 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
         log(request)
         return HttpResponse.json({ data: { ...A_WORK, isPrimary: true } })
       }),
-      http.delete('/api/v1/locations/:id', ({ request }) => {
+      http.delete('/api/v1/locations/:id', ({ request, params }) => {
         log(request)
+        savedRows = savedRows.filter((row) => row.id !== params.id)
         return HttpResponse.json({ data: { deleted: true } })
       })
     )
@@ -412,9 +446,9 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
 
     // Before B's section loads: A's late Chicago is neither offered nor announced.
     expect(screen.queryByRole('option', { name: CHICAGO.displayLabel })).toBeNull()
-    expect(feedback.filter((text) => /Chicago|result/i.test(text))).toEqual([])
+    expect(feedback).toEqual([])
     await expectCleanB()
-    expect(feedback.filter((text) => /Chicago|result/i.test(text))).toEqual([])
+    expect(feedback).toEqual([])
   })
 
   it('LOC-BRIDGE-WEB-10 a search A sent that answers after the bridge moved shows and says nothing', async () => {
@@ -437,9 +471,9 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
     await settleClient()
 
     expect(screen.queryByRole('option', { name: SPRINGFIELD.displayLabel })).toBeNull()
-    expect(feedback.filter((text) => /Springfield|result/i.test(text))).toEqual([])
+    expect(feedback).toEqual([])
     await expectCleanB()
-    expect(feedback.filter((text) => /Springfield|result/i.test(text))).toEqual([])
+    expect(feedback).toEqual([])
   })
 
   it('LOC-BRIDGE-WEB-03 Save pressed after the bridge moved sends no save', async () => {
@@ -547,6 +581,139 @@ describe('nothing A started reaches the API once the bridge holds B', () => {
       expect(statusRegion()).not.toHaveTextContent(/Alpha/)
       vi.restoreAllMocks()
       await expectCleanB()
+    })
+  })
+
+  // Codex product review 8. Each case pins one window the structural round closes.
+  describe('product review 8', () => {
+    // Finding 2: the successor's first commit, read before passive effects run.
+    it.each([
+      ['member B signs in', 'member-b' as const],
+      ['A signs out', null],
+    ])(
+      'LOC-BRIDGE-WEB-11 when %s, the first commit for the successor shows none of A rows',
+      async (_case, successor) => {
+        const commits: { owner: string | null; text: string }[] = []
+        renderSection((owner) =>
+          commits.push({ owner, text: document.body.textContent ?? '' })
+        )
+        expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+        await settleClient()
+        commits.length = 0
+
+        act(() => {
+          session.identity = successor
+          session.stored = successor !== null
+          if (successor)
+            window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
+          else window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+          window.dispatchEvent(new Event('couture:session'))
+        })
+
+        expect(commits[0]).toMatchObject({ owner: successor })
+        expect(commits[0]!.text).not.toMatch(/Alpha/)
+      }
+    )
+
+    // Finding 5: the third place fills the list and removes the form, and the save still lands.
+    it('LOC-BRIDGE-WEB-12 saving a third place announces it once and focuses its row', async () => {
+      await renderA()
+      const feedback = recordFeedback()
+      await user.type(searchInput(), 'Springfield')
+      await user.click(
+        await screen.findByRole('option', { name: SPRINGFIELD.displayLabel })
+      )
+      await user.click(screen.getByRole('button', { name: 'Save location' }))
+      await settleClient()
+
+      expect(screen.getByTestId('locations-limit')).toBeInTheDocument()
+      expect(screen.queryByRole('combobox', { name: 'Search for a city' })).toBeNull()
+      expect(statusRegion()).toHaveTextContent('Springfield saved.')
+      expect(feedback.filter((text) => /saved\./.test(text))).toEqual([
+        'Springfield saved.',
+      ])
+      const row = screen
+        .getAllByTestId('location-item-label')
+        .find((label) => label.textContent === 'Springfield')
+      expect(row).toHaveFocus()
+    })
+
+    // Finding 6: the same member's token refreshes while the browser asks for consent.
+    it('LOC-BRIDGE-WEB-13 a token refreshed for the same member during consent sends the fresh token', async () => {
+      await renderA()
+      await user.click(screen.getByRole('button', { name: 'Use my location' }))
+      await waitFor(() => expect(pendingPosition).not.toBeNull())
+
+      act(() => {
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-a2')
+        window.dispatchEvent(new Event('couture:session'))
+      })
+      await act(async () => {
+        pendingPosition!.success({
+          coords: { latitude: 41.878113, longitude: -87.629799 },
+        } as GeolocationPosition)
+        await Promise.resolve()
+      })
+      await settleClient()
+
+      expect(
+        requests.filter(
+          (request) => request.path === '/api/v1/locations/from-coordinates'
+        )
+      ).toEqual([
+        {
+          method: 'POST',
+          path: '/api/v1/locations/from-coordinates',
+          bearer: 'Bearer token-a2',
+          afterMove: false,
+        },
+      ])
+      expect(
+        await screen.findByRole('option', { name: CHICAGO.displayLabel })
+      ).toBeInTheDocument()
+    })
+
+    // Finding 7: the guided search's autofocus is delivered for the member who still owns it.
+    describe('guided autofocus when the form mounts after a delete', () => {
+      async function deleteFromFull(moveOnAnnouncement: boolean) {
+        navigation.query = 'addLocation=1'
+        savedRows = [place('a-3', 'Alpha Third', false)]
+        renderSection()
+        expect(await screen.findByText('Alpha Third')).toBeInTheDocument()
+        expect(screen.getByTestId('locations-limit')).toBeInTheDocument()
+        await settleClient()
+        await user.click(screen.getByRole('button', { name: 'Delete, Alpha Third' }))
+        let moved = false
+        vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+          // The delete's reload has two rows: the form mounts in this commit.
+          if (moveOnAnnouncement && !moved && tracked.lastListLabels.length === 2) {
+            moved = true
+            moveBridgeToB()
+          }
+          return realFrame(callback)
+        })
+        const item = screen.getByText('Alpha Third').closest('li')!
+        await user.click(within(item).getByRole('button', { name: /Yes, delete/ }))
+        await settleClient()
+        vi.restoreAllMocks()
+      }
+
+      it('LOC-BRIDGE-WEB-14 control: with no member change, the form mounts and focus lands on the heading', async () => {
+        await deleteFromFull(false)
+        expect(
+          screen.getByRole('combobox', { name: 'Search for a city' })
+        ).toBeInTheDocument()
+        expect(searchInput()).not.toHaveFocus()
+        expect(bridgeMoved).toBe(false)
+      })
+
+      it('LOC-BRIDGE-WEB-15 a guided form mounting after the bridge moved does not take focus', async () => {
+        await deleteFromFull(true)
+        expect(bridgeMoved).toBe(true)
+        const input = screen.queryByRole('combobox', { name: 'Search for a city' })
+        expect(input === null || document.activeElement !== input).toBe(true)
+        await expectCleanB()
+      })
     })
   })
 })

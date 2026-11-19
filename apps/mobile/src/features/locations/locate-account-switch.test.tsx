@@ -263,5 +263,92 @@ describe(
       )
       expect(postedBearers).toEqual(['search Bearer token-b'])
     })
+
+    // Codex product review 8 finding 3: the OS permission decision is still pending when the tap
+    // stops counting. Granting it afterwards starts no reading and sends nothing.
+    function holdPermission() {
+      const decision = deferred<{ status: string }>()
+      location.requestForegroundPermissionsAsync.mockReturnValueOnce(decision.promise)
+      location.getCurrentPositionAsync.mockResolvedValue({
+        coords: { ...DEVICE, accuracy: 3000 },
+        timestamp: 0,
+      })
+      server.use(
+        http.post('*/api/v1/locations/from-coordinates', ({ request }) => {
+          postedBearers.push(request.headers.get('authorization'))
+          return HttpResponse.json({ data: [CHICAGO] })
+        }),
+        http.get('*/api/v1/locations/search', ({ request }) => {
+          postedBearers.push(`search ${request.headers.get('authorization')}`)
+          return HttpResponse.json({ data: [CHICAGO] })
+        })
+      )
+      return decision
+    }
+
+    async function tapUseMyLocation() {
+      renderScreen()
+      await screen.findByTestId('locations-use-my-location')
+      await waitFor(() => expect(screen.queryByTestId('locations-loading')).toBeNull())
+      await userEvent.click(screen.getByTestId('locations-use-my-location'))
+      await waitFor(() =>
+        expect(location.requestForegroundPermissionsAsync).toHaveBeenCalledTimes(1)
+      )
+    }
+
+    it('LOC-SWITCH-MOB-04 a permission granted after the member started typing starts no position reading', async () => {
+      const decision = holdPermission()
+      await tapUseMyLocation()
+
+      // The member types instead of waiting; that supersedes the tap.
+      await userEvent.fill(screen.getByTestId('locations-search-input'), 'Chi')
+      await act(async () => {
+        decision.resolve({ status: 'granted' })
+        await Promise.resolve()
+      })
+      await settleClient()
+
+      expect(location.getCurrentPositionAsync).not.toHaveBeenCalled()
+      expect(postedBearers.filter((entry) => !entry?.startsWith('search'))).toEqual([])
+      expect(screen.queryByTestId('location-error')).toBeNull()
+    })
+
+    it('LOC-SWITCH-MOB-05 a permission granted after the phone switched members starts no position reading', async () => {
+      const decision = holdPermission()
+      await tapUseMyLocation()
+
+      switchToB()
+      await act(async () => {
+        decision.resolve({ status: 'granted' })
+        await Promise.resolve()
+      })
+      await settleClient()
+
+      expect(location.getCurrentPositionAsync).not.toHaveBeenCalled()
+      expect(postedBearers).toEqual([])
+      expectNothingOfA()
+    })
+
+    // Finding 6: the same member's token refreshes during the OS prompt; the lookup uses the fresh
+    // one (an account switch in the same window is LOC-SWITCH-MOB-05: nothing at all).
+    it('LOC-SWITCH-MOB-06 a token refreshed for the same member during the prompt sends the fresh token', async () => {
+      const decision = holdPermission()
+      await tapUseMyLocation()
+
+      bearer = 'token-a2'
+      await act(async () => {
+        decision.resolve({ status: 'granted' })
+        await Promise.resolve()
+      })
+      await settleClient()
+
+      expect(location.getCurrentPositionAsync).toHaveBeenCalledTimes(1)
+      expect(postedBearers).toEqual(['Bearer token-a2'])
+      await waitFor(() =>
+        expect(screen.getByTestId('location-search-option-0').textContent).toContain(
+          'Chicago'
+        )
+      )
+    })
   }
 )
