@@ -29,6 +29,8 @@ on:
       - 'scripts/ci/fetch-gradle-wrapper.sh'
       - 'scripts/ci/android-sdk-install.sh'
       - 'scripts/ci/android-gradle-sdk-packages.mjs'
+      - 'scripts/ci/gradle-resolution-retry.mjs'
+      - 'scripts/lib/transient-resolution-retry.cjs'
       - 'scripts/ci/check-accessibility-focus-results.mjs'
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
@@ -50,6 +52,8 @@ on:
       - 'scripts/ci/fetch-gradle-wrapper.sh'
       - 'scripts/ci/android-sdk-install.sh'
       - 'scripts/ci/android-gradle-sdk-packages.mjs'
+      - 'scripts/ci/gradle-resolution-retry.mjs'
+      - 'scripts/lib/transient-resolution-retry.cjs'
       - 'scripts/ci/check-accessibility-focus-results.mjs'
       - 'scripts/ci/check-accessibility-focus-builds.sh'
       - 'scripts/run-story67-talkback.mjs'
@@ -99,6 +103,14 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Gradle's plugins, dependencies and wrapper distribution, so a run does not download them
+      # all from Maven Central and the plugin portal again; main writes the cache, every other
+      # ref reads it.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
       # Expo's generated gradle.properties gives the Gradle daemon 2 GiB of heap and
       # 512 MiB of metaspace. The release app, its lint and the module's test APK in one
       # build ran out of both: D8 hit OutOfMemoryError in run 41251255523, and the daemon
@@ -141,7 +153,12 @@ jobs:
         working-directory: apps/mobile/android
         env:
           NODE_ENV: production
-        run: ./gradlew :app:assembleRelease :accessibility-focus:assembleDebugAndroidTest -PreactNativeArchitectures=x86_64 --console=plain
+        # A 429 or 5xx from Maven Central or the plugin portal is retried twice, after 20 s and
+        # 40 s; any other failure fails here at once.
+        run: |
+          node ../../../scripts/ci/gradle-resolution-retry.mjs -- ./gradlew \
+            :app:assembleRelease :accessibility-focus:assembleDebugAndroidTest \
+            -PreactNativeArchitectures=x86_64 --console=plain
 
       - name: Check what each APK carries
         if: ${{ !cancelled() && steps.apk_build.outcome == 'success' }}
@@ -171,6 +188,14 @@ jobs:
           distribution: temurin
           java-version: '21'
 
+      # Gradle's plugins, dependencies and wrapper distribution, so a run does not download them
+      # all from Maven Central and the plugin portal again; main writes the cache, every other
+      # ref reads it.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
         with:
@@ -194,12 +219,15 @@ jobs:
       - name: Fetch the Gradle wrapper
         run: bash scripts/ci/fetch-gradle-wrapper.sh apps/mobile/android
 
+      # The project is already generated above, so Gradle runs here directly. Scheduled run
+      # 44311237727 failed before any test ran: Maven Central and the plugin portal answered 429
+      # for gson, a dependency of the foojay toolchain resolver plugin. A 429 or 5xx is retried
+      # twice, after 20 s and 40 s; any other failure fails here at once.
       - name: Robolectric tests for the focus observer
-        working-directory: apps/mobile
-        env:
-          CI: '1'
-          EXPO_NO_GIT_STATUS: '1'
-        run: npm run test:accessibility-focus:android
+        working-directory: apps/mobile/android
+        run: |
+          node ../../../scripts/ci/gradle-resolution-retry.mjs -- ./gradlew \
+            :accessibility-focus:testDebugUnitTest --console=plain
 
   ios:
     name: iOS module tests
@@ -238,6 +266,14 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      # Gradle's plugins, dependencies and wrapper distribution, so a run does not download them
+      # all from Maven Central and the plugin portal again; main writes the cache, every other
+      # ref reads it.
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.ref != 'refs/heads/main' }}
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3

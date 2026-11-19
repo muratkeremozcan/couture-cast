@@ -7,95 +7,188 @@ import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, test } from 'node:test'
 
+const FLAG_KEYS = [
+  'STORY68_NATIVE_TEST_BUILD',
+  'CC68_RELEASE_PROOF_LOOPBACK',
+  'EAS_BUILD_PROFILE',
+]
+const NO_FLAGS = {
+  STORY68_NATIVE_TEST_BUILD: null,
+  CC68_RELEASE_PROOF_LOOPBACK: null,
+  EAS_BUILD_PROFILE: null,
+}
+const PROOF_FLAGS = {
+  STORY68_NATIVE_TEST_BUILD: '1',
+  CC68_RELEASE_PROOF_LOOPBACK: '1',
+  EAS_BUILD_PROFILE: 'cc68-release-proof',
+}
+const CLEANUP_ARGS = [
+  'scripts/run-story68-native.mjs',
+  'prebuild',
+  '--platform',
+  'android',
+  '--clean',
+  'yes',
+]
+
+// Fake commands on PATH record each call with the proof flags it saw. CC68_CI_FAILURE picks one
+// failure: the proof, the cleanup prebuild, the swap, or the emulator gone after the build.
+const FAKE = `
+const fs = require('node:fs')
+const command = require('node:path').basename(process.argv[1])
+const args = process.argv.slice(2)
+const flags = Object.fromEntries(${JSON.stringify(FLAG_KEYS)}.map(key => [key, process.env[key] ?? null]))
+fs.appendFileSync(process.env.CC68_CI_EVENTS, JSON.stringify({ command, args, flags }) + '\\n')
+const failure = process.env.CC68_CI_FAILURE
+if (command === 'uname') { console.log('Linux'); process.exit(0) }
+if (command === 'adb' && args.includes('get-state')) {
+  if (failure === 'emulator-gone') { console.error("error: device 'emulator-5554' not found"); process.exit(1) }
+  console.log('device')
+}
+if (failure === 'proof' && args.includes('release-live-font')) process.exit(19)
+if (failure === 'cleanup' && args.includes('prebuild') && flags.CC68_RELEASE_PROOF_LOOPBACK === '0') process.exit(37)
+if (failure === 'swap' && command === 'sudo' && args[0] === 'fallocate') process.exit(28)
+`
+
+function runScript({ failure = 'none', githubLinux = false } = {}) {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-release-ci-'))
+  try {
+    const bin = path.join(directory, 'bin')
+    fs.mkdirSync(bin)
+    const events = path.join(directory, 'events.jsonl')
+    const commands = [
+      'node',
+      'adb',
+      'sudo',
+      'free',
+      'swapon',
+      ...(githubLinux ? ['uname'] : []),
+    ]
+    for (const command of commands)
+      fs.writeFileSync(path.join(bin, command), `#!${process.execPath}\n${FAKE}`, {
+        mode: 0o755,
+      })
+    const result = spawnSync('bash', ['scripts/ci/share-card-android-release-font.sh'], {
+      encoding: 'utf8',
+      timeout: 5000,
+      env: {
+        ...process.env,
+        PATH: `${bin}${path.delimiter}${process.env.PATH}`,
+        ANDROID_SERIAL: 'emulator-5554',
+        CC68_CI_EVENTS: events,
+        CC68_CI_FAILURE: failure,
+        CC68_RELEASE_PROOF_LOOPBACK: undefined,
+        STORY68_NATIVE_TEST_BUILD: undefined,
+        EAS_BUILD_PROFILE: undefined,
+        // This spec itself runs on GitHub's Linux runners; only the swap tests take that path.
+        GITHUB_ACTIONS: githubLinux ? 'true' : undefined,
+        RUNNER_TEMP: githubLinux ? '/runner-temp' : undefined,
+      },
+    })
+    const records = fs
+      .readFileSync(events, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line))
+    return { result, records }
+  } finally {
+    fs.rmSync(directory, { recursive: true })
+  }
+}
+
+const nodeCalls = (records) => records.filter((record) => record.command === 'node')
+
 describe('share-card-android-release-font.sh', () => {
   for (const failure of ['none', 'proof', 'cleanup']) {
     test(`actual CI Release script scopes proof flags and cleanly switches off after ${failure}`, () => {
-      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-release-ci-'))
-      try {
-        const bin = path.join(directory, 'bin')
-        fs.mkdirSync(bin)
-        const events = path.join(directory, 'events.jsonl')
-        for (const command of ['node', 'adb']) {
-          fs.writeFileSync(
-            path.join(bin, command),
-            `#!${process.execPath}
-const fs = require('node:fs')
-const args = process.argv.slice(2)
-const flags = Object.fromEntries(['STORY68_NATIVE_TEST_BUILD', 'CC68_RELEASE_PROOF_LOOPBACK', 'EAS_BUILD_PROFILE'].map(key => [key, process.env[key] ?? null]))
-fs.appendFileSync(process.env.CC68_CI_EVENTS, JSON.stringify({ command: '${command}', args, flags }) + '\\n')
-if (process.env.CC68_CI_FAILURE === 'proof' && args.includes('release-live-font')) process.exit(19)
-if (process.env.CC68_CI_FAILURE === 'cleanup' && args.includes('prebuild') && flags.CC68_RELEASE_PROOF_LOOPBACK === '0') process.exit(37)
-`,
-            { mode: 0o755 }
-          )
-        }
-        const result = spawnSync(
-          'bash',
-          ['scripts/ci/share-card-android-release-font.sh'],
-          {
-            encoding: 'utf8',
-            timeout: 5000,
-            env: {
-              ...process.env,
-              PATH: `${bin}${path.delimiter}${process.env.PATH}`,
-              ANDROID_SERIAL: 'emulator-5554',
-              CC68_CI_EVENTS: events,
-              CC68_CI_FAILURE: failure,
-              CC68_RELEASE_PROOF_LOOPBACK: undefined,
-              STORY68_NATIVE_TEST_BUILD: undefined,
-              EAS_BUILD_PROFILE: undefined,
-            },
-          }
-        )
-        assert.equal(
-          result.status,
-          failure === 'proof' ? 19 : failure === 'cleanup' ? 37 : 0,
-          result.stderr
-        )
-        const records = fs
-          .readFileSync(events, 'utf8')
-          .trim()
-          .split('\n')
-          .map((line) => JSON.parse(line))
-        assert.equal(records.length, 5)
-        for (const record of records.slice(0, 2))
-          assert.deepEqual(record.flags, {
-            STORY68_NATIVE_TEST_BUILD: '1',
-            CC68_RELEASE_PROOF_LOOPBACK: '1',
-            EAS_BUILD_PROFILE: 'cc68-release-proof',
-          })
-        assert.ok(records[0].args.includes('--clean') && records[0].args.includes('yes'))
-        assert.ok(records[1].args.includes('Release'))
-        // Over the dev client, keeping its session: the proof build shares its signing key.
-        assert.deepEqual(records[2], {
-          command: 'adb',
-          args: [
-            '-s',
-            'emulator-5554',
-            'install',
-            '-r',
-            'apps/mobile/android/app/build/outputs/apk/release/app-release.apk',
-          ],
-          flags: {
-            STORY68_NATIVE_TEST_BUILD: null,
-            CC68_RELEASE_PROOF_LOOPBACK: null,
-            EAS_BUILD_PROFILE: null,
-          },
-        })
-        assert.equal(records[3].args.includes('release-live-font'), true)
-        assert.equal(records[3].flags.CC68_RELEASE_PROOF_LOOPBACK, null)
-        assert.deepEqual(records[4].args, [
-          'scripts/run-story68-native.mjs',
-          'prebuild',
-          '--platform',
-          'android',
-          '--clean',
-          'yes',
-        ])
-        assert.equal(records[4].flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
-      } finally {
-        fs.rmSync(directory, { recursive: true })
-      }
+      const { result, records } = runScript({ failure })
+      assert.equal(
+        result.status,
+        failure === 'proof' ? 19 : failure === 'cleanup' ? 37 : 0,
+        result.stderr
+      )
+      assert.deepEqual(
+        records.map((record) => record.command),
+        ['node', 'node', 'adb', 'adb', 'node', 'node']
+      )
+      for (const record of records.slice(0, 2))
+        assert.deepEqual(record.flags, PROOF_FLAGS)
+      assert.ok(records[0].args.includes('--clean') && records[0].args.includes('yes'))
+      assert.ok(records[1].args.includes('Release'))
+      // The emulator still answers after the Release build, before anything is installed.
+      assert.deepEqual(records[2].args, ['-s', 'emulator-5554', 'get-state'])
+      // Over the dev client, keeping its session: the proof build shares its signing key.
+      assert.deepEqual(records[3], {
+        command: 'adb',
+        args: [
+          '-s',
+          'emulator-5554',
+          'install',
+          '-r',
+          'apps/mobile/android/app/build/outputs/apk/release/app-release.apk',
+        ],
+        flags: NO_FLAGS,
+      })
+      assert.equal(records[4].args.includes('release-live-font'), true)
+      assert.equal(records[4].flags.CC68_RELEASE_PROOF_LOOPBACK, null)
+      assert.deepEqual(records[5].args, CLEANUP_ARGS)
+      assert.equal(records[5].flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
     })
   }
+
+  test('an emulator that exits during the Release build fails before the install, named', () => {
+    const { result, records } = runScript({ failure: 'emulator-gone' })
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(
+      result.stderr,
+      /^::error::The emulator emulator-5554 exited during the Release build\.$/m
+    )
+    assert.doesNotMatch(result.stdout + result.stderr, /install -r/)
+    // The kernel's account is kept: memory, swap and the OOM records.
+    assert.deepEqual(
+      records.filter((record) => record.command !== 'node').map((record) => record.args),
+      [['-s', 'emulator-5554', 'get-state'], ['-m'], ['--show'], ['-n', 'dmesg']]
+    )
+    // Normal generation is still restored.
+    assert.deepEqual(
+      nodeCalls(records).map((record) => record.args[1]),
+      ['prebuild', 'build', 'prebuild']
+    )
+    assert.deepEqual(records.at(-1).args, CLEANUP_ARGS)
+    assert.equal(records.at(-1).flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
+  })
+
+  test('a GitHub-hosted Linux runner adds 8 GiB of swap before the Release prebuild', () => {
+    const { result, records } = runScript({ githubLinux: true })
+    assert.equal(result.status, 0, result.stderr)
+    const file = '/runner-temp/cc68-release-build.swap'
+    const swap = records.filter((record) => record.command === 'sudo').map((r) => r.args)
+    assert.deepEqual(swap, [
+      ['fallocate', '-l', '8G', file],
+      ['chmod', '600', file],
+      ['mkswap', file],
+      ['swapon', file],
+    ])
+    const lastSwap = records.findLastIndex((record) => record.command === 'sudo')
+    const firstNode = records.findIndex((record) => record.command === 'node')
+    assert.ok(lastSwap < firstNode, 'the swap is on before the Release prebuild starts')
+    assert.deepEqual(
+      nodeCalls(records).map((record) => record.args[1]),
+      ['prebuild', 'build', 'release-live-font', 'prebuild']
+    )
+  })
+
+  test('a swap that cannot be added fails before any build and restores normal generation', () => {
+    const { result, records } = runScript({ failure: 'swap', githubLinux: true })
+    assert.equal(result.status, 1, result.stderr)
+    assert.match(
+      result.stderr,
+      /^::error::Adding 8 GiB of swap for the Release build failed; see the output above\.$/m
+    )
+    assert.deepEqual(
+      nodeCalls(records).map((record) => record.args),
+      [CLEANUP_ARGS]
+    )
+    assert.equal(records.at(-1).flags.CC68_RELEASE_PROOF_LOOPBACK, '0')
+  })
 })

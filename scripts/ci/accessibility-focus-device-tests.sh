@@ -17,6 +17,14 @@ window_wait="${ACCESSIBILITY_FOCUS_WINDOW_WAIT:-30}"
 # Native code is built only for the emulator's ABI.
 abi=$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')
 gradle() { (cd apps/mobile/android && ./gradlew --console=plain -PreactNativeArchitectures="$abi" "$@"); }
+# The build resolves every plugin and dependency, so it alone goes through the retry: a 429 or
+# 5xx from Maven Central or the plugin portal is retried twice, any other failure fails at once.
+# The connected runs keep plain Gradle; the suppressed-focus control must fail exactly once.
+gradle_build() {
+  (cd apps/mobile/android &&
+    node ../../../scripts/ci/gradle-resolution-retry.mjs -- \
+      ./gradlew --console=plain -PreactNativeArchitectures="$abi" "$@")
+}
 
 # diagnose NAME: what the window system and accessibility showed, kept with the results.
 diagnose() {
@@ -69,7 +77,7 @@ run() {
 
 rm -rf "${results:?}"
 # Build first, so TalkBack and the backdrop are set up right before the runs.
-gradle :accessibility-focus:assembleDebugAndroidTest || exit 1
+gradle_build :accessibility-focus:assembleDebugAndroidTest || exit 1
 bash "$here/android-talkback.sh" enable || exit 1
 park_backdrop || { bash "$here/android-talkback.sh" disable || true; exit 1; }
 
