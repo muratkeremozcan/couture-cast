@@ -8,7 +8,16 @@
 // attribute, event and status message, next to the response.
 import 'reflect-metadata'
 import { createRequire } from 'node:module'
-import { Controller, HttpCode, Post, type INestApplication } from '@nestjs/common'
+import {
+  Body,
+  Controller,
+  HttpCode,
+  Post,
+  Req,
+  type INestApplication,
+  type RawBodyRequest,
+} from '@nestjs/common'
+import type { Request } from 'express'
 import { context } from '@opentelemetry/api'
 import { AsyncLocalStorageContextManager } from '@opentelemetry/context-async-hooks'
 import type { Instrumentation } from '@opentelemetry/instrumentation'
@@ -43,6 +52,13 @@ class ProbeController {
   @HttpCode(204)
   accept(): string {
     return 'accepted'
+  }
+
+  /** What the app parsed, and the exact bytes it kept for signature checks. */
+  @Post('echo')
+  @HttpCode(200)
+  echo(@Body() body: unknown, @Req() request: RawBodyRequest<Request>) {
+    return { body, raw: request.rawBody?.toString('utf8') ?? null }
   }
 }
 
@@ -106,8 +122,9 @@ beforeAll(async () => {
   const moduleFixture = await Test.createTestingModule({
     controllers: [ProbeController],
   }).compile()
-  // Both API entry points (main.ts and api/index.ts) keep the raw body for webhook signatures.
-  app = moduleFixture.createNestApplication({ rawBody: true })
+  // As both API entry points create it (main.ts and api/index.ts): the raw body kept for webhook
+  // signatures, and Nest's own parsers off so configureApp's are the only ones.
+  app = moduleFixture.createNestApplication({ rawBody: true, bodyParser: false })
   configureApp(app, {
     telemetry: {
       captureEvent: vi.fn().mockResolvedValue(undefined),
@@ -178,5 +195,54 @@ describe('an unreadable JSON body leaves no text in traces', () => {
     const names = stack.map((layer) => layer.name)
     expect(names.filter((name) => name === 'jsonParser')).toHaveLength(1)
     expect(names.filter((name) => name === 'urlencodedParser')).toHaveLength(1)
+  })
+
+  // The parsers configureApp registers keep working under tracing: URL-encoded forms, the exact
+  // raw bytes, and the 100 kB limit.
+  describe('valid bodies under tracing', () => {
+    const LIMIT_BYTES = 102_400
+    const jsonOfLength = (bytes: number) => {
+      const body = `{"a":"${'x'.repeat(bytes - 8)}"}`
+      expect(Buffer.byteLength(body)).toBe(bytes)
+      return body
+    }
+
+    it('JSON-TRACE-03 parses a URL-encoded form', async () => {
+      const response = await request(httpTestUrl(app))
+        .post('/api/v1/trace-probe/echo')
+        .set('content-type', 'application/x-www-form-urlencoded')
+        .send('city=S%C3%A3o+Paulo&tags%5B%5D=rain&tags%5B%5D=wind')
+
+      expect(response.status).toBe(200)
+      expect(response.body).toEqual({
+        body: { city: 'São Paulo', tags: ['rain', 'wind'] },
+        raw: 'city=S%C3%A3o+Paulo&tags%5B%5D=rain&tags%5B%5D=wind',
+      })
+    })
+
+    it('JSON-TRACE-04 keeps the exact JSON bytes, whitespace and non-ASCII included', async () => {
+      const raw = '{ "label" : "Zürich  Süd",\n  "n": 1 }'
+      const response = await request(httpTestUrl(app))
+        .post('/api/v1/trace-probe/echo')
+        .set('content-type', 'application/json')
+        .send(raw)
+
+      expect(response.status).toBe(200)
+      expect(response.body).toEqual({ body: { label: 'Zürich  Süd', n: 1 }, raw })
+    })
+
+    it('JSON-TRACE-05 accepts 102400 bytes and answers 413 at 102401', async () => {
+      const at = await request(httpTestUrl(app))
+        .post('/api/v1/trace-probe')
+        .set('content-type', 'application/json')
+        .send(jsonOfLength(LIMIT_BYTES))
+      const over = await request(httpTestUrl(app))
+        .post('/api/v1/trace-probe')
+        .set('content-type', 'application/json')
+        .send(jsonOfLength(LIMIT_BYTES + 1))
+
+      expect(at.status).toBe(204)
+      expect(over.status).toBe(413)
+    })
   })
 })

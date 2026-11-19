@@ -39,6 +39,8 @@ const tracked = vi.hoisted(() => ({
   promises: [] as Promise<unknown>[],
   /** When set, the screen's save call gets this promise: the test answers it by hand. */
   saveAnswer: null as Promise<unknown> | null,
+  /** How many times the screen called save while saveAnswer was set. */
+  saveCalls: 0,
 }))
 
 vi.mock('@/src/lib/locations', async (importOriginal) => {
@@ -53,10 +55,16 @@ vi.mock('@/src/lib/locations', async (importOriginal) => {
   return {
     ...actual,
     listLocationsFromMobile: track(actual.listLocationsFromMobile),
+    renameLocationFromMobile: track(actual.renameLocationFromMobile),
+    setPrimaryLocationFromMobile: track(actual.setPrimaryLocationFromMobile),
+    deleteLocationFromMobile: track(actual.deleteLocationFromMobile),
     saveLocationFromSearchFromMobile: (
       ...args: Parameters<typeof actual.saveLocationFromSearchFromMobile>
     ) => {
-      if (tracked.saveAnswer) return tracked.saveAnswer
+      if (tracked.saveAnswer) {
+        tracked.saveCalls += 1
+        return tracked.saveAnswer
+      }
       const pending = actual.saveLocationFromSearchFromMobile(...args)
       tracked.promises.push(pending)
       return pending
@@ -148,6 +156,59 @@ async function waitPastAnnouncements() {
   })
 }
 
+/** Every message the shared announcer renders, in order: each mounts a fresh live-region node. */
+function recordAnnouncements(): { announcements: string[]; stop: () => void } {
+  const announcements: string[] = []
+  const observer = new MutationObserver((records) => {
+    for (const record of records)
+      for (const node of Array.from(record.addedNodes))
+        if (node instanceof HTMLElement && node.id === 'a11y-live-announcer')
+          announcements.push(node.textContent ?? '')
+  })
+  observer.observe(document.body, { childList: true, subtree: true })
+  return { announcements, stop: () => observer.disconnect() }
+}
+
+/**
+ * Holds the announcer's delivery timers (its 80 ms debounce) instead of scheduling them, so a
+ * test can switch members while an announcement is queued and then deliver it on purpose.
+ */
+function holdAnnouncerTimers() {
+  const realSetTimeout = globalThis.setTimeout
+  const realClearTimeout = globalThis.clearTimeout
+  const held = new Map<number, () => void>()
+  let nextId = 900_000
+  const setSpy = vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+    callback: () => void,
+    delay?: number,
+    ...args: unknown[]
+  ) => {
+    if (delay !== ANNOUNCER_DEBOUNCE_MS) return realSetTimeout(callback, delay, ...args)
+    nextId += 1
+    held.set(nextId, () => callback())
+    return nextId
+  }) as unknown as typeof setTimeout)
+  const clearSpy = vi.spyOn(globalThis, 'clearTimeout').mockImplementation(((
+    id?: number
+  ) => {
+    if (id !== undefined && held.delete(id)) return
+    realClearTimeout(id)
+  }) as unknown as typeof clearTimeout)
+  return {
+    held: () => held.size,
+    release: () =>
+      act(() => {
+        const due = [...held.values()]
+        held.clear()
+        for (const deliver of due) deliver()
+      }),
+    restore: () => {
+      setSpy.mockRestore()
+      clearSpy.mockRestore()
+    },
+  }
+}
+
 describe(
   'the Locations screen belongs to one member at a time (mobile)',
   { timeout: 30_000 },
@@ -179,6 +240,7 @@ describe(
       holdAList = null
       holdBList = null
       tracked.saveAnswer = null
+      tracked.saveCalls = 0
       aRows = [A_HOME]
       mutations = []
       tracked.promises = []
@@ -222,7 +284,8 @@ describe(
           mutations.push(
             `DELETE ${new URL(request.url).pathname} ${request.headers.get('authorization')}`
           )
-          return new HttpResponse(null, { status: 204 })
+          // What the API answers (location-preferences.controller.ts).
+          return HttpResponse.json({ data: { deleted: true } })
         })
       )
     })
@@ -508,16 +571,29 @@ describe(
         await screen.findByTestId('location-label-input'),
         'Alpha Studio'
       )
-      await userEvent.click(screen.getByTestId('location-save-button'))
-      // The save completes as A (its announcement is queued for 80 ms), then the phone switches.
-      await waitFor(() => expect(saveBearers).toEqual(['Bearer token-a']))
-      await act(async () => {
-        await Promise.allSettled(tracked.promises)
-      })
-      switchTo('member-b')
+      // Earlier announcements (search results) are delivered before the announcer's timer is held.
       await waitPastAnnouncements()
+      const timers = holdAnnouncerTimers()
+      const { announcements, stop } = recordAnnouncements()
+      try {
+        await userEvent.click(screen.getByTestId('location-save-button'))
+        // The save completed as A and its announcement is queued, not yet delivered.
+        await waitFor(() => expect(saveBearers).toEqual(['Bearer token-a']))
+        await settle()
+        await waitFor(() => expect(timers.held()).toBeGreaterThan(0))
+        expect(announcements).toEqual([])
 
-      expect(screen.queryByText(/Alpha Studio/)).toBeNull()
+        switchTo('member-b')
+        timers.release()
+        await settle()
+        await waitPastAnnouncements()
+
+        expect(announcements.filter((text) => /Alpha/.test(text))).toEqual([])
+        noAlpha()
+      } finally {
+        timers.restore()
+        stop()
+      }
     })
 
     // Codex review 8: the screen itself receives A's provider failure after B loaded (no abort can
@@ -529,6 +605,8 @@ describe(
       })
       await prepareSave()
       await userEvent.click(screen.getByTestId('location-save-button'))
+      // The screen really called save and holds the deferred answer.
+      await waitFor(() => expect(tracked.saveCalls).toBe(1))
 
       switchTo('member-b')
       expect(await screen.findByText('Bravo Office')).toBeTruthy()

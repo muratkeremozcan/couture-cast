@@ -110,6 +110,8 @@ const B_OFFICE = place('b-1', 'Bravo Office', 'Springfield')
 /** A list answer the test releases by hand, for the list a rename starts. */
 let heldList: { release: () => void } | null
 let holdNextAList: boolean
+/** The held A list answers 503 when released. */
+let failHeldList: boolean
 let renamed: boolean
 /** A rename the test releases by hand, and every list GET's bearer. */
 let heldPatch: { release: () => void } | null
@@ -177,6 +179,11 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
           await new Promise<void>((resolve) => {
             heldList = { release: resolve }
           })
+          if (failHeldList)
+            return HttpResponse.json(
+              { statusCode: 503, message: 'down', error: 'Service Unavailable' },
+              { status: 503 }
+            )
         }
         return HttpResponse.json({ data: [renamed ? A_RENAMED : A_HOME] })
       }),
@@ -384,6 +391,39 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     expect(screen.queryByText('Alpha Studio')).toBeNull()
     expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
     expect(navigation.push).not.toHaveBeenCalled()
+  })
+
+  // Codex review 9 finding 3: the same ordering as WEB-08, with A's post-save list failing.
+  it('LOC-OWNER-WEB-09 a post-save list failing after the session moved to B leaves no error behind, and B loads', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+    await user.type(
+      screen.getByRole('combobox', { name: 'Search for a city' }),
+      'Chicago'
+    )
+    await user.click(await screen.findByRole('option', { name: /Chicago, Illinois/ }))
+    const label = screen.getByRole('textbox', { name: 'Name this place' })
+    await user.clear(label)
+    await user.type(label, 'Alpha Studio')
+    holdNextAList = true
+    failHeldList = true
+    await user.click(screen.getByRole('button', { name: 'Save location' }))
+    await waitFor(() => expect(heldList).not.toBeNull())
+
+    session.identity = 'member-b'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
+    act(() => heldList!.release())
+    await settleLists()
+
+    expect(section()).not.toHaveAttribute('data-state', 'load_failed')
+    expect(screen.queryByTestId('locations-load-error')).toBeNull()
+
+    publish('member-b', 'token-b', true)
+    expect(await screen.findByText('Bravo Office')).toBeInTheDocument()
+    expect(section()).toHaveAttribute('data-state', 'ready')
+    expect(screen.queryByTestId('locations-load-error')).toBeNull()
+    expect(screen.queryByText(/Alpha/)).toBeNull()
   })
 
   it('LOC-OWNER-WEB-01 a list that lands after sign-out shows none of the signed-out member', async () => {

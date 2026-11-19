@@ -68,7 +68,8 @@ describe('from-coordinates refuses a malformed body without echoing it', () => {
       .useValue(new RequestAuthGuard(consent, identity))
       .compile()
 
-    app = moduleFixture.createNestApplication()
+    // As both API entry points create it: raw body kept, Nest's own parsers off.
+    app = moduleFixture.createNestApplication({ rawBody: true, bodyParser: false })
     const telemetry = {
       captureEvent: vi.fn().mockResolvedValue(undefined),
     } as unknown as TelemetryService
