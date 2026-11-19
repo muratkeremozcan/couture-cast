@@ -3,7 +3,7 @@ title: 'Jade follow-up: Profile tab, Use my location, and the web Locations sess
 type: 'bugfix'
 ticket: ''
 created: '2026-11-19'
-status: 'in-review'
+status: 'built'
 baseline_revision: 'f913ce6f2c62f760ac5529a67cbcdf24a3729de4'
 route: 'full'
 route_source: 'auto'
@@ -133,6 +133,8 @@ Round 3 Codex (/Users/murat/opensource/cc/jade-issues/profile-codex-review-3.md,
 - R3-9 low, patch: Step 58 anchors and "every city search" wording.
 
 Coordinator decision (2026-11-19, after product round 8): member-owned UI is keyed by the signed-in member (S1) and operations pin the owner, not the bearer (S2). Fix the two user-facing bugs (third save loses its confirmation and focus; Locations stuck loading when sign-in lands mid-mount) with tests, run one Codex round on the structural change, address it, then report ready for PR. Findings outside this change go to the report as follow-ups.
+
+Final structural review (Codex, /Users/murat/opensource/cc/jade-issues/profile-codex-review-9.md, a06be412): no production or security blocker. Five in-change test-coverage items, all fixed (c842e5d3, d6145dfd); the credentials comment follow-up fixed in d6145dfd. Nothing deferred.
 
 ## Design Notes
 
