@@ -314,4 +314,37 @@ describe('LocationsSection follows the web session', () => {
     expect(screen.getByTestId('locations-status-region')).toHaveTextContent('')
     expect(listBearers).toEqual(['Bearer first-token', 'Bearer second-token'])
   })
+
+  it('LOC-SESSION-WEB-09 a rename that settles after the section unmounted and the member changed sends no list', async () => {
+    const user = userEvent.setup()
+    let releasePatch: (() => void) | undefined
+    useMswHandlers(
+      http.patch('/api/v1/locations/:id', async () => {
+        await new Promise<void>((resolve) => {
+          releasePatch = resolve
+        })
+        return HttpResponse.json({ data: { ...HOME, label: 'Studio' } })
+      })
+    )
+    session.identity = 'member-1'
+    session.stored = true
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'first-token')
+    const view = renderSection()
+    await screen.findByTestId('location-item')
+    await user.click(screen.getByTestId('location-rename'))
+    await user.clear(screen.getByTestId('location-rename-input'))
+    await user.type(screen.getByTestId('location-rename-input'), 'Studio{Enter}')
+    await waitFor(() => expect(releasePatch).toBeDefined())
+    const listsBefore = listBearers.length
+
+    // The member leaves Profile, and the next member signs in elsewhere in the app.
+    view.unmount()
+    publish({ identity: 'member-2', bearer: 'second-token' })
+    await act(async () => {
+      releasePatch?.()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(listBearers.length - listsBefore).toBe(0)
+  })
 })

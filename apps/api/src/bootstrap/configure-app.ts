@@ -1,7 +1,6 @@
 import { HttpAdapterHost } from '@nestjs/core'
 import { BadRequestException, type INestApplication } from '@nestjs/common'
-import type { NestExpressApplication } from '@nestjs/platform-express'
-import type { NextFunction, Request, Response } from 'express'
+import { json, type NextFunction, type Request, type Response } from 'express'
 import { ApiExceptionFilter } from '../filters/api-exception.filter.js'
 import { bindRequestContext } from '../logger/request-context.js'
 import { createRequestLoggerMiddleware } from '../logger/request-logger.middleware.js'
@@ -72,23 +71,43 @@ export const UNPARSABLE_BODY_RESPONSE = Object.freeze({
   error: 'Bad Request',
 })
 
-/**
- * Express's JSON parser fails with a SyntaxError whose message can quote the body (a coordinate
- * pair from Use my location, a search, anything), and Nest forwards that message to the client.
- * Every parse failure gets one fixed 400 instead, with no text from the body.
- */
-export function rejectUnparsableJson(
-  error: unknown,
-  _request: Request,
-  _response: Response,
-  next: NextFunction
-): void {
-  const parseFailed =
+/** Body-parser's default JSON limit, kept explicit: 100 kB. */
+export const JSON_BODY_LIMIT_BYTES = 102_400
+
+function isJsonParseFailure(error: unknown): boolean {
+  return (
     typeof error === 'object' &&
     error !== null &&
     (('type' in error && error.type === 'entity.parse.failed') ||
       (error instanceof SyntaxError && 'body' in error))
-  next(parseFailed ? new BadRequestException({ ...UNPARSABLE_BODY_RESPONSE }) : error)
+  )
+}
+
+/**
+ * The application's JSON parser. Express's parser fails with a SyntaxError whose message can quote
+ * the body (a coordinate pair from Use my location, a search, anything). Its own callback swaps
+ * that error for one fixed 400 before anything else sees it, so neither the client, the
+ * exception filter nor a tracing wrapper around this middleware can record body text. It keeps
+ * `request.rawBody` for the signed webhooks, as Nest's `rawBody: true` does, and the same 100 kB
+ * limit. Named `jsonParser`, so Nest does not add its own JSON parser after it.
+ */
+export function createJsonBodyParser() {
+  const parse = json({
+    limit: JSON_BODY_LIMIT_BYTES,
+    verify: (request: Request & { rawBody?: Buffer }, _response, buffer) => {
+      if (Buffer.isBuffer(buffer)) request.rawBody = buffer
+    },
+  })
+  return function jsonParser(request: Request, response: Response, next: NextFunction) {
+    parse(request, response, (error?: unknown) => {
+      if (error === undefined) return next()
+      next(
+        isJsonParseFailure(error)
+          ? new BadRequestException({ ...UNPARSABLE_BODY_RESPONSE })
+          : error
+      )
+    })
+  }
 }
 
 /**
@@ -107,10 +126,8 @@ export function configureApp(
   app.use(bindRequestContext)
   app.use(createRequestLoggerMiddleware())
   // The JSON parser is registered here, ahead of Nest's default (which then skips its own),
-  // so a parse failure can be answered right after it with fixed text.
-  const expressApp = app as NestExpressApplication
-  expressApp.useBodyParser('json')
-  app.use(rejectUnparsableJson)
+  // and answers a parse failure inside its own callback with fixed text.
+  app.use(createJsonBodyParser())
 
   const adapterHost: HttpAdapterHost =
     overrides.adapterHost ?? app.get<HttpAdapterHost>(HttpAdapterHost)

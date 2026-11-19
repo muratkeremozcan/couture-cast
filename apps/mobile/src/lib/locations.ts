@@ -150,6 +150,13 @@ export async function searchLocationsFromMobile(
   }
 }
 
+/** Work started for a member who is no longer signed in on this device. */
+function supersededError(): Error {
+  const error = new Error('The member who started this request is no longer signed in.')
+  error.name = 'AbortError'
+  return error
+}
+
 /** Two decimals, about a kilometre: all of the device position that leaves the phone. */
 export function approximateCoordinate(value: number): number {
   const rounded = Math.round(value * 100) / 100
@@ -169,16 +176,11 @@ export async function locationsNearFromMobile(
   /** False once the tap is superseded or the member changed: nothing more is sent. */
   stillCurrent: () => boolean = () => true
 ): Promise<LocationSearchCandidate[]> {
-  const superseded = () => {
-    const error = new Error('Use my location was superseded.')
-    error.name = 'AbortError'
-    return error
-  }
   try {
-    if (!stillCurrent() || signal?.aborted) throw superseded()
+    if (!stillCurrent() || signal?.aborted) throw supersededError()
     const api = await client()
     // The bearer just resolved may belong to another member by now.
-    if (!stillCurrent() || signal?.aborted) throw superseded()
+    if (!stillCurrent() || signal?.aborted) throw supersededError()
     const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromCoordinatesPost(
         {
@@ -200,11 +202,17 @@ export async function locationsNearFromMobile(
 
 export async function saveLocationFromSearchFromMobile(
   candidateToken: string,
-  label: string
+  label: string,
+  signal?: AbortSignal,
+  /** False once the member who picked the place is gone: nothing is sent. */
+  stillCurrent: () => boolean = () => true
 ): Promise<SavedLocation> {
   try {
+    if (!stillCurrent() || signal?.aborted) throw supersededError()
     const api = await client()
-    const response = await withRequestTimeout(undefined, (requestSignal) =>
+    // The bearer just resolved may belong to another member by now.
+    if (!stillCurrent() || signal?.aborted) throw supersededError()
+    const response = await withRequestTimeout(signal, (requestSignal) =>
       api.apiV1LocationsFromSearchPost(
         {
           xCouturePlatform: 'mobile',

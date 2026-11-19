@@ -5,7 +5,7 @@
 // through the browser runner's real user events.
 import React from 'react'
 import { userEvent } from 'vitest/browser'
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import type {
@@ -29,7 +29,10 @@ vi.mock('@/src/lib/locations', { spy: true })
 
 import i18n, { initI18n } from '@/src/lib/i18n'
 import { server } from '@/src/test-utils/msw/server'
-import { setMobileAccessTokenResolver } from '@/src/lib/mobile-auth'
+import {
+  setMobileAccessTokenResolver,
+  setMobileApplicationUserId,
+} from '@/src/lib/mobile-auth'
 import { AccessibilityAnnouncerProvider } from '@/src/hooks/use-accessibility-announcer'
 import {
   onLocationsChanged,
@@ -624,5 +627,93 @@ describe('LocationsScreen', { timeout: 30_000 }, () => {
     )
     expect(screen.queryByTestId('locations-signed-out')).toBeNull()
     expect(screen.queryByTestId('location-add-form')).toBeNull()
+  })
+
+  /*
+   * Production follow-up (2026-11-19), review finding: the screen belongs to the
+   * member signed in on the device. A switch (or sign-out) shows none of the
+   * previous member's places, editors or late list, and loads the next list.
+   */
+  describe('across a change of member', () => {
+    const A_HOME = savedLocation({ id: 'a-1', label: 'Alpha Home' })
+    const B_OFFICE = officeLocation({ id: 'b-1', label: 'Bravo Office', isPrimary: true })
+    let bearer: string | null
+    let holdA: { release: () => void } | null
+    let holdNextA: boolean
+    let listBearers: (string | null)[]
+
+    beforeEach(() => {
+      bearer = 'token-a'
+      holdA = null
+      holdNextA = false
+      listBearers = []
+      setMobileApplicationUserId('member-a')
+      cleanups.push(setMobileAccessTokenResolver(() => bearer ?? undefined))
+      cleanups.push(() => setMobileApplicationUserId(null))
+      server.use(
+        http.get('*/api/v1/locations', async ({ request }) => {
+          const authorization = request.headers.get('authorization')
+          listBearers.push(authorization)
+          if (authorization === 'Bearer token-b')
+            return HttpResponse.json({ data: [B_OFFICE] })
+          if (holdNextA) {
+            holdNextA = false
+            await new Promise<void>((resolve) => {
+              holdA = { release: resolve }
+            })
+          }
+          return HttpResponse.json({ data: [A_HOME] })
+        })
+      )
+    })
+
+    function switchTo(next: { member: string | null; bearer: string | null }) {
+      act(() => {
+        bearer = next.bearer
+        setMobileApplicationUserId(next.member)
+      })
+    }
+
+    it('LOC-MEMBER-MOB-01 shows the next member only their own places, with A editing at the switch', async () => {
+      renderScreen()
+      expect((await screen.findByTestId('location-label-0')).textContent).toBe(
+        'Alpha Home'
+      )
+      await userEvent.click(screen.getByTestId('location-rename-0'))
+      expect(screen.getByTestId('location-rename-input-0')).toBeInTheDocument()
+
+      switchTo({ member: 'member-b', bearer: 'token-b' })
+
+      await waitFor(() =>
+        expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      )
+      expect(screen.queryByText('Alpha Home')).toBeNull()
+      expect(screen.queryByTestId('location-rename-input-0')).toBeNull()
+      expect(listBearers).toEqual(['Bearer token-a', 'Bearer token-b'])
+
+      switchTo({ member: null, bearer: null })
+
+      expect(await screen.findByTestId('locations-signed-out')).toBeInTheDocument()
+      expect(screen.queryByTestId('location-item-0')).toBeNull()
+    })
+
+    it('LOC-MEMBER-MOB-02 drops a list for A that lands after B loaded', async () => {
+      holdNextA = true
+      renderScreen()
+      await waitFor(() => expect(holdA).not.toBeNull())
+
+      switchTo({ member: 'member-b', bearer: 'token-b' })
+      await waitFor(() =>
+        expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      )
+
+      await act(async () => {
+        holdA!.release()
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      })
+
+      expect(screen.getByTestId('location-label-0').textContent).toBe('Bravo Office')
+      expect(screen.queryByText('Alpha Home')).toBeNull()
+    })
   })
 })

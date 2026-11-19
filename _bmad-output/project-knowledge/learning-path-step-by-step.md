@@ -12043,10 +12043,13 @@ its weather provider keys.
    The Locations section checked the bearer once, on mount. A real session writes the bearer only
    after the profile check, and a reload first clears the stale one, so the section settled on
    signed out. `useWebSession` reads `couture:session` and treats a stored session under
-   verification as `checking`; only a verification that resolves with no member reads as signed
-   out, and one that fails shows the load error with a retry that verifies again. The section
+   verification as `checking`. A verification that resolves with no member, or a profile check
+   the API refuses with 401, 403 or 404, reads as signed out (the sign-in path); a temporary
+   failure (a timeout, a 5xx) shows the load error with a retry that verifies again. The section
    lists once per member, and every late answer is checked against the member who asked, so one
-   member's places or status never land on another's section. The local lane never saw the race
+   member's places or status never land on another's section, even after the section unmounts.
+   On mobile, a change of member clears the Locations screen, cancels a pending lookup, save or
+   list, and loads the next member's list. The local lane never saw the race
    because its fixture bearer is in session storage before the first render.
 3. **Coordinates are personal data: round, POST, forget.**
    Use my location asks for permission only on the tap, at low accuracy (web) or
@@ -12061,10 +12064,13 @@ its weather provider keys.
    and API key included; span URLs now keep origin and path only. These hooks protect the
    processes that start the SDK: the standalone API (`src/main.ts`) and the hosted workers
    (`src/workers/bootstrap.ts`), whose weather ingestion calls OpenWeather with the key in the
-   query. The Vercel function (`api/index.ts`) does not start the SDK and exports no traces. A
-   malformed JSON body came back with the parser's message, which can quote the body; every parse
-   failure now answers one fixed 400. The Privacy Policy says the approximate position reaches the
-   weather provider in use, and that CoutureCast stores only the place the member picks.
+   query. The Vercel function (`api/index.ts`) does not start the application's OpenTelemetry
+   SDK, so these hooks do not run there; whether the platform adds instrumentation of its own is
+   unverified. A malformed JSON body came back with the parser's message, which can quote the
+   body; the JSON parser now swaps every parse failure for one fixed 400 inside its own callback,
+   before the exception filter or any tracing wrapper sees it. The Privacy Policy says the
+   approximate position reaches the weather provider in use, and that CoutureCast stores only the
+   place the member picks.
 4. **Every failure points back at the working path.**
    Denied, unsupported, timed out, no city nearby and provider outage each get their own copy in
    all ten locales, and focus moves to the city search, which still works.

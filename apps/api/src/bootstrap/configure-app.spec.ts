@@ -1,13 +1,17 @@
 import { HttpAdapterHost } from '@nestjs/core'
-import type { INestApplication } from '@nestjs/common'
+import { BadRequestException, type INestApplication } from '@nestjs/common'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiExceptionFilter } from '../filters/api-exception.filter'
 import { bindRequestContext } from '../logger/request-context'
 import { TelemetryService } from '../modules/telemetry/telemetry.service'
+import express, { type NextFunction, type Request, type Response } from 'express'
+import request from 'supertest'
 import {
   configureApp,
-  rejectUnparsableJson,
+  createJsonBodyParser,
+  JSON_BODY_LIMIT_BYTES,
   resolveHttpCorsOrigins,
+  UNPARSABLE_BODY_RESPONSE,
 } from './configure-app'
 
 /**
@@ -23,7 +27,6 @@ import {
 type AppDouble = {
   enableCors: ReturnType<typeof vi.fn>
   use: ReturnType<typeof vi.fn>
-  useBodyParser: ReturnType<typeof vi.fn>
   useGlobalFilters: ReturnType<typeof vi.fn>
   get: ReturnType<typeof vi.fn>
 }
@@ -32,7 +35,6 @@ function createAppDouble(): AppDouble {
   return {
     enableCors: vi.fn(),
     use: vi.fn(),
-    useBodyParser: vi.fn(),
     useGlobalFilters: vi.fn(),
     get: vi.fn(),
   }
@@ -103,15 +105,12 @@ describe('configureApp', () => {
     expect(typeof app.use.mock.calls[1]?.[0]).toBe('function')
   })
 
-  // 2026-11-19 review: a JSON parse failure must not quote the body back to the client.
-  it('parses JSON itself and answers a parse failure right after the parser', () => {
+  // 2026-11-19 review: a JSON parse failure must not quote the body anywhere.
+  it('installs the JSON parser after the request logger, named so Nest adds no second one', () => {
     configure()
 
-    expect(app.useBodyParser).toHaveBeenCalledWith('json')
-    expect(app.use.mock.calls[2]?.[0]).toBe(rejectUnparsableJson)
-    expect(app.useBodyParser.mock.invocationCallOrder[0]).toBeLessThan(
-      app.use.mock.invocationCallOrder[2]!
-    )
+    const parser = app.use.mock.calls[2]?.[0] as { name: string } | undefined
+    expect(parser?.name).toBe('jsonParser')
   })
 
   it('installs ApiExceptionFilter as a global filter', () => {
@@ -141,5 +140,80 @@ describe('configureApp', () => {
     expect(app.enableCors).toHaveBeenCalledTimes(1)
     expect(app.use).toHaveBeenCalledTimes(3)
     expect(app.useGlobalFilters).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * The parser alone behind a recording error handler: what reaches `next` is what an exception
+ * filter, a log line or a tracing wrapper around the middleware could see.
+ */
+describe('createJsonBodyParser', () => {
+  function harness() {
+    const handed: unknown[] = []
+    const server = express()
+    server.use(createJsonBodyParser())
+    server.post('/', (req: Request & { rawBody?: Buffer }, res: Response) => {
+      res.json({
+        rawBytes: req.rawBody?.length ?? null,
+        keys: Object.keys((req.body as Record<string, unknown> | undefined) ?? {}),
+      })
+    })
+    server.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
+      handed.push(error)
+      const status =
+        error instanceof BadRequestException
+          ? error.getStatus()
+          : ((error as { status?: number }).status ?? 500)
+      res.status(status).end()
+    })
+    return { server, handed }
+  }
+
+  const BODY_TEXT = /41\.88|87\.63|latitude|longitude|Unexpected|JSON/
+
+  it('hands next one fixed 400 that carries no body text', async () => {
+    const { server, handed } = harness()
+
+    const response = await request(server)
+      .post('/')
+      .set('content-type', 'application/json')
+      .send('{"latitude": 41.88, "longitude": -87.63x}')
+
+    expect(response.status).toBe(400)
+    expect(handed).toHaveLength(1)
+    const error = handed[0] as BadRequestException
+    expect(error).toBeInstanceOf(BadRequestException)
+    expect(error.getResponse()).toEqual(UNPARSABLE_BODY_RESPONSE)
+    expect(error.cause).toBeUndefined()
+    for (const text of [
+      error.message,
+      JSON.stringify(error.getResponse()),
+      String(error.stack),
+    ])
+      expect(text).not.toMatch(BODY_TEXT)
+  })
+
+  function bodyOf(bytes: number) {
+    const prefix = '{"pad":"'
+    const suffix = '"}'
+    return prefix + 'a'.repeat(bytes - prefix.length - suffix.length) + suffix
+  }
+
+  it('keeps the raw bytes and the 100 kB limit', async () => {
+    const { server, handed } = harness()
+
+    const atLimit = await request(server)
+      .post('/')
+      .set('content-type', 'application/json')
+      .send(bodyOf(JSON_BODY_LIMIT_BYTES))
+    expect(atLimit.status).toBe(200)
+    expect(atLimit.body).toEqual({ rawBytes: 102_400, keys: ['pad'] })
+
+    const overLimit = await request(server)
+      .post('/')
+      .set('content-type', 'application/json')
+      .send(bodyOf(JSON_BODY_LIMIT_BYTES + 1))
+    expect(overLimit.status).toBe(413)
+    expect((handed[0] as { type?: string }).type).toBe('entity.too.large')
   })
 })

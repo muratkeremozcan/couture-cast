@@ -60,6 +60,18 @@ export function readWebSessionState(
   return { status: 'signed_out' }
 }
 
+/**
+ * The member this tab holds right now, read synchronously from the session bridge: what a late
+ * completion compares with the member who started its work, before any follow-up request.
+ */
+export function currentWebSessionOwner(): string | null {
+  const identity = webSessionIdentity()
+  if (identity && hasWebSession()) return identity
+  if (hasWebSession() && !hasStoredWebSession() && isE2EFixtureBearer(fixtureBearer()))
+    return UNVERIFIED_BEARER_OWNER
+  return null
+}
+
 function fixtureBearer(): string | null {
   return readStorage('session', WEB_ACCESS_TOKEN_STORAGE_KEY)?.trim() ?? null
 }

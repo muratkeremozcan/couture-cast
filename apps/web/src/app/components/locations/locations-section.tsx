@@ -33,7 +33,7 @@ import {
   MAX_SAVED_LOCATIONS,
   safeReturnPath,
 } from './location-format'
-import { useWebSession } from '../../../lib/use-web-session'
+import { currentWebSessionOwner, useWebSession } from '../../../lib/use-web-session'
 import { LocationSearchForm } from './location-search-form'
 
 type SectionState = 'checking' | 'signed_out' | 'loading' | 'ready' | 'load_failed'
@@ -72,6 +72,19 @@ export function LocationsSection() {
    * section, or after sign out.
    */
   const ownerGenerationRef = useRef(0)
+  /**
+   * Work started for `startedFor` may still touch this section: the section is
+   * mounted for the same member, and the session bridge still names them. The
+   * bridge is read synchronously, so a member change counts even before this
+   * section's effects have run.
+   */
+  const stillOwnedBy = useCallback(
+    (generation: number, startedFor: string | null) =>
+      generation === ownerGenerationRef.current &&
+      startedFor !== null &&
+      currentWebSessionOwner() === startedFor,
+    []
+  )
 
   const loadErrorMessage = t('locations.loadError')
 
@@ -96,6 +109,14 @@ export function LocationsSection() {
     setSectionState('ready')
     return true
   }, [])
+
+  // Unmounted, nothing pending may write here or start a request.
+  useEffect(
+    () => () => {
+      ownerGenerationRef.current += 1
+    },
+    []
+  )
 
   // A new member (or none) starts from an empty section.
   useEffect(() => {
@@ -161,7 +182,8 @@ export function LocationsSection() {
   ): Promise<void> {
     if (busyId) return
     const generation = ownerGenerationRef.current
-    const current = () => generation === ownerGenerationRef.current
+    const startedFor = owner
+    const current = () => stillOwnedBy(generation, startedFor)
     setBusyId(locationId)
     setError(null)
     try {
@@ -215,6 +237,7 @@ export function LocationsSection() {
 
   async function handleSaved(location: SavedLocation) {
     const generation = ownerGenerationRef.current
+    if (!stillOwnedBy(generation, owner)) return
     const loaded = await reload().catch(() => {
       if (generation === ownerGenerationRef.current) setSectionState('load_failed')
       return false

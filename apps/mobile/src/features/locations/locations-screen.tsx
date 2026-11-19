@@ -162,6 +162,10 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
   // tap is dropped.
   const locateAttemptRef = useRef(0)
   const locateControllerRef = useRef<AbortController | null>(null)
+  const saveControllerRef = useRef<AbortController | null>(null)
+  // Every list, mutation and save belongs to the member signed in when it
+  // started; this epoch moves with each change of member, sign-out included.
+  const [memberEpoch, setMemberEpoch] = useState(mobileIdentityEpoch)
   const announceRef = useRef(announce)
   announceRef.current = announce
   const tRef = useRef(t)
@@ -174,11 +178,14 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     }
   }, [])
 
-  const reload = useCallback(async (signal?: AbortSignal) => {
+  /** True when the list landed for the member who asked for it. */
+  const reload = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+    const epoch = mobileIdentityEpoch()
     const next = await listLocationsFromMobile(signal)
-    if (signal?.aborted) return
+    if (signal?.aborted || epoch !== mobileIdentityEpoch()) return false
     setLocations(next)
     setScreenState('ready')
+    return true
   }, [])
 
   /** Drops a pending Use my location: its position, request and answer go nowhere. */
@@ -191,17 +198,29 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
 
   useEffect(() => cancelLocate, [cancelLocate])
 
-  // A Use my location belongs to the member who tapped it. Another member (or
-  // none) cancels it and starts from an empty form.
+  // Everything on this screen belongs to the member who is signed in. Another
+  // member (or none) cancels what is pending, starts from an empty screen and
+  // loads their own list (or the signed-out state).
   useEffect(
     () =>
       subscribeMobileApplicationUser(() => {
         cancelLocate()
+        saveControllerRef.current?.abort()
+        saveControllerRef.current = null
+        setIsSaving(false)
+        setLocations([])
+        setBusyId(null)
+        setRenamingId(null)
+        setRenameValue('')
+        setConfirmingId(null)
+        setListError(null)
         setQuery('')
         setCandidates([])
         setSelected(null)
         setLabel('')
         setFormError(null)
+        setScreenState('loading')
+        setMemberEpoch(mobileIdentityEpoch())
       }),
     [cancelLocate]
   )
@@ -215,7 +234,7 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       )
     })
     return () => controller.abort()
-  }, [reload])
+  }, [reload, memberEpoch])
 
   useEffect(() => {
     const trimmed = query.trim()
@@ -257,23 +276,36 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
     }
   }, [query, locale, selected, searchAttempt])
 
+  /**
+   * One list action for the member who started it. Ownership is checked the
+   * moment the request settles, before any editor closes or a reload starts,
+   * and again after the reload.
+   */
   async function runListAction(
     locationId: string,
-    work: () => Promise<string>
-  ): Promise<void> {
-    if (busyId) return
+    mutate: () => Promise<unknown>,
+    settled: () => string
+  ): Promise<boolean> {
+    if (busyId) return false
+    const epoch = mobileIdentityEpoch()
+    const current = () => epoch === mobileIdentityEpoch()
     setBusyId(locationId)
     setListError(null)
     try {
-      const message = await work()
-      await reload()
+      await mutate()
+      if (!current()) return false
+      const message = settled()
+      if (!(await reload()) || !current()) return false
       announce('feedback', message)
+      return true
     } catch (error) {
+      if (!current()) return false
       const reason = locationFailureReason(error)
       setListError(reason)
       announce('error', t(errorKey(reason)))
+      return false
     } finally {
-      setBusyId(null)
+      if (current()) setBusyId(null)
     }
   }
 
@@ -344,13 +376,21 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
 
   async function save() {
     if (isSaving || !selected) return
+    const epoch = mobileIdentityEpoch()
+    const controller = new AbortController()
+    saveControllerRef.current = controller
+    // Still the member who picked this place.
+    const current = () => epoch === mobileIdentityEpoch() && !controller.signal.aborted
     setIsSaving(true)
     setFormError(null)
     try {
       const saved = await saveLocationFromSearchFromMobile(
         selected.candidateToken,
-        label.trim() || selected.city
+        label.trim() || selected.city,
+        controller.signal,
+        current
       )
+      if (!current()) return
       setSelected(null)
       setQuery('')
       setLabel('')
@@ -361,12 +401,16 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
       }
       await reload()
     } catch (error) {
+      if (!current()) return
       const reason = locationFailureReason(error)
       if (reason === 'invalid_candidate') setSelected(null)
       setFormError({ reason, step: 'save' })
       announce('error', t(errorKey(reason, 'save')))
     } finally {
-      setIsSaving(false)
+      if (current()) {
+        saveControllerRef.current = null
+        setIsSaving(false)
+      }
     }
   }
 
@@ -460,11 +504,14 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     onPress={() => {
                       const next = renameValue.trim()
                       if (!next) return
-                      void runListAction(location.id, async () => {
-                        await renameLocationFromMobile(location.id, next)
-                        setRenamingId(null)
-                        return t('locations.renamed', { label: next })
-                      })
+                      void runListAction(
+                        location.id,
+                        () => renameLocationFromMobile(location.id, next),
+                        () => {
+                          setRenamingId(null)
+                          return t('locations.renamed', { label: next })
+                        }
+                      )
                     }}
                     style={styles.primaryButton}
                     testID={`location-rename-save-${index}`}
@@ -491,11 +538,16 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                     accessibilityState={{ busy: busyId === location.id }}
                     aria-busy={busyId === location.id}
                     onPress={() => {
-                      void runListAction(location.id, async () => {
-                        await deleteLocationFromMobile(location.id)
-                        setConfirmingId(null)
-                        return t('locations.deleted', { label: location.label })
-                      }).then(() => focus(headingRef.current))
+                      void runListAction(
+                        location.id,
+                        () => deleteLocationFromMobile(location.id),
+                        () => {
+                          setConfirmingId(null)
+                          return t('locations.deleted', { label: location.label })
+                        }
+                      ).then((done) => {
+                        if (done) focus(headingRef.current)
+                      })
                     }}
                     style={[styles.secondaryButton, { borderColor: palette.danger }]}
                     testID="location-delete-confirm"
@@ -521,10 +573,11 @@ export function LocationsScreen({ guided = false }: LocationsScreenProps) {
                       accessibilityState={{ busy: busyId === location.id }}
                       aria-busy={busyId === location.id}
                       onPress={() => {
-                        void runListAction(location.id, async () => {
-                          await setPrimaryLocationFromMobile(location.id)
-                          return t('locations.primaryChanged', { label: location.label })
-                        })
+                        void runListAction(
+                          location.id,
+                          () => setPrimaryLocationFromMobile(location.id),
+                          () => t('locations.primaryChanged', { label: location.label })
+                        )
                       }}
                       style={[styles.secondaryButton, { borderColor: '#C9A14A' }]}
                       testID={`location-make-primary-${index}`}

@@ -316,6 +316,79 @@ describe('Use my location (mobile)', { timeout: 30_000 }, () => {
     await expectNothingLeftForTheNextMember()
     expect(bearers).toEqual(['Bearer session-token'])
   })
+
+  /*
+   * Review finding (2026-11-19): a save belongs to the member who picked the
+   * place. A switch while the bearer is still resolving sends nothing; a switch
+   * after the POST left leaves the next member's screen alone.
+   */
+  async function pickTheCityNearby() {
+    grant()
+    server.use(fromCoordinatesHandler(() => HttpResponse.json({ data: [CANDIDATE] })))
+    renderScreen()
+    await tapUseMyLocation()
+    await userEvent.click(await screen.findByTestId('location-search-option-0'))
+    await userEvent.fill(await screen.findByTestId('location-label-input'), 'Home')
+  }
+
+  function liveRegionText() {
+    return document.getElementById('a11y-live-announcer')?.textContent ?? ''
+  }
+
+  it('ULM-MOB-11 a member switch while the save waits for its bearer sends nothing', async () => {
+    setMobileApplicationUserId('member-a')
+    const saves: (string | null)[] = []
+    server.use(
+      http.post('*/api/v1/locations/from-search', ({ request }) => {
+        saves.push(request.headers.get('authorization'))
+        return HttpResponse.json({ data: savedLocation() }, { status: 201 })
+      })
+    )
+    await pickTheCityNearby()
+    const token = hold<string>()
+    const restore = setMobileAccessTokenResolver(() => token.promise)
+
+    await userEvent.click(screen.getByTestId('location-save-button'))
+    act(() => setMobileApplicationUserId('member-b'))
+    await act(async () => {
+      token.release('member-b-token')
+      await token.promise
+    })
+    restore()
+
+    await waitFor(() => expect(screen.queryByTestId('location-label-input')).toBeNull())
+    expect(saves).toEqual([])
+    expect(liveRegionText()).not.toContain('Home saved.')
+  })
+
+  it('ULM-MOB-12 a save that answers after the switch leaves the next member alone', async () => {
+    setMobileApplicationUserId('member-a')
+    const answer = hold<void>()
+    const saves: (string | null)[] = []
+    server.use(
+      http.post('*/api/v1/locations/from-search', async ({ request }) => {
+        saves.push(request.headers.get('authorization'))
+        await answer.promise
+        return HttpResponse.json({ data: savedLocation() }, { status: 201 })
+      })
+    )
+    await pickTheCityNearby()
+
+    await userEvent.click(screen.getByTestId('location-save-button'))
+    await waitFor(() => expect(saves).toHaveLength(1))
+    act(() => setMobileApplicationUserId('member-b'))
+    // The next member starts a search of their own.
+    const input = await screen.findByTestId('locations-search-input')
+    await userEvent.fill(input, 'Spr')
+    await act(async () => {
+      answer.release()
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    })
+
+    expect(saves).toEqual(['Bearer session-token'])
+    expect(input).toHaveValue('Spr')
+    expect(liveRegionText()).not.toContain('Home saved.')
+  })
 })
 
 describe('readDevicePosition', () => {
