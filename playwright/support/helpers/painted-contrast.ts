@@ -137,21 +137,39 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
       // Each background region is rated on its own: glyph pixels are grouped by the luminance
       // under them (2% contrast steps), each group by its strongest stem (the pixel whose ink
       // differs most from its own background, where a translucent text color is painted over
-      // that region), and the text takes its weakest group. A group needs 3% of the glyph pixels
-      // (and at least 8) to count, so a few antialiased pixels cannot decide the result.
-      const groups = new Map<number, { count: number; strongest: number }>()
+      // that region), held against the weakest background in the group, and the text takes its
+      // weakest group. A group needs 3% of the glyph pixels (and at least 8) to count, so a few
+      // antialiased pixels cannot decide the result.
+      const groups = new Map<
+        number,
+        { count: number; strongest: number; ink: number; unders: number[] }
+      >()
       for (const [under, inked] of onBackground) {
         const key = Math.round(Math.log(under + 0.05) / Math.log(1.02))
-        const group = groups.get(key) ?? { count: 0, strongest: 1 }
+        const group = groups.get(key) ?? {
+          count: 0,
+          strongest: 1,
+          ink: inked,
+          unders: [],
+        }
         group.count += 1
-        group.strongest = Math.max(group.strongest, contrast(under, inked))
+        group.unders.push(under)
+        const local = contrast(under, inked)
+        if (local > group.strongest) {
+          group.strongest = local
+          group.ink = inked
+        }
         groups.set(key, group)
       }
       const floor = Math.max(8, 0.03 * onBackground.length)
       const counted = [...groups.values()].filter((group) => group.count >= floor)
       const rated = counted.length > 0 ? counted : [...groups.values()]
+      // Within a group the stem's ink is held against every background in it, so two near
+      // backgrounds sharing a step cannot lend the stronger one's figure to the weaker.
+      const worst = (group: { ink: number; unders: number[] }) =>
+        Math.min(...group.unders.map((under) => contrast(group.ink, under)))
       let ratio = 1
-      if (rated.length > 0) ratio = Math.min(...rated.map((group) => group.strongest))
+      if (rated.length > 0) ratio = Math.min(...rated.map(worst))
       return { painted, ratio, uniform }
     },
     { a: inked, b: bare, m: mask ?? null }
