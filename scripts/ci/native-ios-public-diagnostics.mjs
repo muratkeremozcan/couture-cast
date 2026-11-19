@@ -13,6 +13,11 @@
  */
 import fs from 'node:fs'
 import path from 'node:path'
+import {
+  API_REQUESTS_FILE,
+  UNKNOWN_ROUTE,
+  contractRouteTemplates,
+} from './native-api-requests.mjs'
 
 /** Records projected for the run report, each validated by value, never copied unchecked. */
 export const PUBLIC_DIAGNOSTIC_FILES = Object.freeze([
@@ -29,7 +34,7 @@ export const PUBLIC_DIAGNOSTIC_FILES = Object.freeze([
   'native-ios-flow-progress.json',
   'native-ios-expo-go-probe.json',
   // native-api-requests.mjs: the owned services' closed request and exit record.
-  'native-ios-api-requests.json',
+  API_REQUESTS_FILE,
 ])
 
 /** Never opened by the selector. The first three can carry paths, keys and tokens. */
@@ -134,6 +139,45 @@ export function closedValueProblem(value, depth = 0, budget = { entries: 0 }) {
 }
 
 /**
+ * The API request record names each request by its OpenAPI path template, and 13 of the 87
+ * templates (the notification preferences every iOS sign-in requests among them) are 40 or more
+ * token characters long, the generic token rule's bound. So that record's `route` fields are
+ * checked against the contract itself: each must be a contract template with no leading slash, or
+ * `unknown`. Every other string in the record still meets the generic rules.
+ */
+let contractRoutes = null
+const knownRoutes = () =>
+  (contractRoutes ??= new Set([
+    UNKNOWN_ROUTE,
+    ...contractRouteTemplates().map((template) => template.slice(1)),
+  ]))
+
+function routeFields(value, visit) {
+  if (Array.isArray(value)) return value.map((item) => routeFields(item, visit))
+  if (!value || typeof value !== 'object') return value
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      key === 'route' ? visit(item) : routeFields(item, visit),
+    ])
+  )
+}
+
+/** `route_not_in_contract` when a `route` field is anything but a contract route, else null. */
+function contractRouteProblem(value) {
+  let problem = null
+  routeFields(value, (route) => {
+    if (typeof route !== 'string' || !knownRoutes().has(route))
+      problem = 'route_not_in_contract'
+    return route
+  })
+  return problem
+}
+
+/** The record with each (already checked) contract route replaced, for the generic rules. */
+const withoutContractRoutes = (value) => routeFields(value, () => 'contract_route')
+
+/**
  * Reads each listed record from `directory`. Returns the records that are closed and, for each
  * record that exists but is not, its name and reason.
  */
@@ -154,7 +198,11 @@ export function selectPublicDiagnostics(directory) {
       omitted.push({ name, reason: 'not_json' })
       continue
     }
-    const problem = closedValueProblem(value)
+    const problem =
+      name === API_REQUESTS_FILE
+        ? (contractRouteProblem(value) ??
+          closedValueProblem(withoutContractRoutes(value)))
+        : closedValueProblem(value)
     if (problem) omitted.push({ name, reason: problem })
     else published.set(name, value)
   }

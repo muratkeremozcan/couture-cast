@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { test } from 'node:test'
+import { describe, test } from 'node:test'
 import { parse } from 'yaml'
 import {
   API_CHILD_LOG,
@@ -88,79 +88,83 @@ function apiLog() {
   ].join('\n')
 }
 
-test('a request path becomes its contract template, with no leading slash and no request value', () => {
-  assert.equal(routeOf(feed), 'api/v1/community/feed')
-  assert.equal(
-    routeOf(`/api/v1/community/posts/${userId}`),
-    'api/v1/community/posts/{postId}'
-  )
-  assert.equal(
-    routeOf(`/api/v1/community/posts/${canary}/comments`),
-    'api/v1/community/posts/{postId}/comments'
-  )
-  // A lowercase value in a parameter position is masked like any other.
-  assert.equal(routeOf(`/api/v1/locations/${canary}`), 'api/v1/locations/{locationId}')
-  // A static segment outranks a parameter.
-  assert.equal(
-    routeOf('/api/v1/community/posts/allocate'),
-    'api/v1/community/posts/allocate'
-  )
-  // A path the contract does not name keeps none of its segments.
-  assert.equal(routeOf(`/api/v1/${canary}`), UNKNOWN_ROUTE)
-  assert.equal(routeOf(`/api/v1/community/feed/${canary}`), UNKNOWN_ROUTE)
-  assert.equal(routeOf('/api/v1/community/posts//comments'), UNKNOWN_ROUTE)
-  assert.equal(routeOf('api/v1/feed'), null)
-  assert.equal(routeOf(undefined), null)
+describe('routeOf', () => {
+  test('a request path becomes its contract template, with no leading slash and no request value', () => {
+    assert.equal(routeOf(feed), 'api/v1/community/feed')
+    assert.equal(
+      routeOf(`/api/v1/community/posts/${userId}`),
+      'api/v1/community/posts/{postId}'
+    )
+    assert.equal(
+      routeOf(`/api/v1/community/posts/${canary}/comments`),
+      'api/v1/community/posts/{postId}/comments'
+    )
+    // A lowercase value in a parameter position is masked like any other.
+    assert.equal(routeOf(`/api/v1/locations/${canary}`), 'api/v1/locations/{locationId}')
+    // A static segment outranks a parameter.
+    assert.equal(
+      routeOf('/api/v1/community/posts/allocate'),
+      'api/v1/community/posts/allocate'
+    )
+    // A path the contract does not name keeps none of its segments.
+    assert.equal(routeOf(`/api/v1/${canary}`), UNKNOWN_ROUTE)
+    assert.equal(routeOf(`/api/v1/community/feed/${canary}`), UNKNOWN_ROUTE)
+    assert.equal(routeOf('/api/v1/community/posts//comments'), UNKNOWN_ROUTE)
+    assert.equal(routeOf('api/v1/feed'), null)
+    assert.equal(routeOf(undefined), null)
+  })
+
+  test('every contract template, filled with a lowercase value, comes back as itself', () => {
+    const templates = contractRouteTemplates()
+    // The table is the canonical contract itself, so it cannot drift from it; the incident's
+    // route and a parameterized community route must be in it.
+    assert.ok(templates.includes('/api/v1/community/feed'))
+    assert.ok(templates.includes('/api/v1/community/posts/{postId}'))
+    for (const template of templates) {
+      const filled = template.replace(/\{[^}]+\}/g, canary)
+      assert.equal(routeOf(filled, templates), template.slice(1), template)
+    }
+  })
 })
 
-test('every contract template, filled with a lowercase value, comes back as itself', () => {
-  const templates = contractRouteTemplates()
-  // The table is the canonical contract itself, so it cannot drift from it; the incident's
-  // route and a parameterized community route must be in it.
-  assert.ok(templates.includes('/api/v1/community/feed'))
-  assert.ok(templates.includes('/api/v1/community/posts/{postId}'))
-  for (const template of templates) {
-    const filled = template.replace(/\{[^}]+\}/g, canary)
-    assert.equal(routeOf(filled, templates), template.slice(1), template)
-  }
-})
-
-test('the record counts answers, failures, slow and unanswered requests and carries no log text', () => {
-  const record = apiRequestRecord(apiLog())
-  assert.deepEqual(record.routes, [
-    {
+describe('apiRequestRecord', () => {
+  test('the record counts answers, failures, slow and unanswered requests and carries no log text', () => {
+    const record = apiRequestRecord(apiLog())
+    assert.deepEqual(record.routes, [
+      {
+        route: 'api/v1/community/feed',
+        method: 'GET',
+        completed: { 200: 2 },
+        failed: { 500: 1 },
+        unanswered: 0,
+        overDeadline: 1,
+        slowestMs: APP_REQUEST_DEADLINE_MS + 2400,
+      },
+      {
+        route: 'api/v1/community/posts/{postId}',
+        method: 'GET',
+        completed: {},
+        failed: {},
+        unanswered: 1,
+        overDeadline: 0,
+        slowestMs: null,
+      },
+    ])
+    assert.equal(record.lines, 9)
+    assert.equal(record.otherLines, 2)
+    assert.deepEqual(record.recent[1], {
+      at: 0.9,
       route: 'api/v1/community/feed',
       method: 'GET',
-      completed: { 200: 2 },
-      failed: { 500: 1 },
-      unanswered: 0,
-      overDeadline: 1,
-      slowestMs: APP_REQUEST_DEADLINE_MS + 2400,
-    },
-    {
-      route: 'api/v1/community/posts/{postId}',
-      method: 'GET',
-      completed: {},
-      failed: {},
-      unanswered: 1,
-      overDeadline: 0,
-      slowestMs: null,
-    },
-  ])
-  assert.equal(record.lines, 9)
-  assert.equal(record.otherLines, 2)
-  assert.deepEqual(record.recent[1], {
-    at: 0.9,
-    route: 'api/v1/community/feed',
-    method: 'GET',
-    phase: 'completed',
-    status: 200,
-    ms: 812,
+      phase: 'completed',
+      status: 200,
+      ms: 812,
+    })
+    const text = JSON.stringify(record)
+    for (const leak of [userId, requestId, secret, 'token', 'database', 'mode=auto'])
+      assert.equal(text.includes(leak), false, leak)
+    assert.equal(closedValueProblem(record), null)
   })
-  const text = JSON.stringify(record)
-  for (const leak of [userId, requestId, secret, 'token', 'database', 'mode=auto'])
-    assert.equal(text.includes(leak), false, leak)
-  assert.equal(closedValueProblem(record), null)
 })
 
 // The real file split: `serve > /tmp/cc68-api.log` captures only the launcher, and the launcher
@@ -181,114 +185,199 @@ function ownedRuntime(t) {
   return { services, harness }
 }
 
-test('the record reads the API child log in the harness directory, not the launcher log', (t) => {
-  const { services, harness } = ownedRuntime(t)
-  fs.writeFileSync(path.join(harness, API_CHILD_LOG), `${apiLog()}\n`)
-  const record = writeApiRequestEvidence({
-    harnessDirectory: harness,
-    serviceDirectory: services,
-  })
-  assert.equal(record.apiLog, 'read')
-  assert.equal(record.lines, 9)
-  assert.deepEqual(
-    record.routes.map(({ method, route }) => `${method} ${route}`),
-    ['GET api/v1/community/feed', 'GET api/v1/community/posts/{postId}']
+// Codex review 6: the fixtures named the child log through the collector's own constant, so a
+// rename on the collector's side alone kept them green while real runs read `missing`. The name
+// they write is the one the harness gives the API child it spawns (scripts/run-story68-native.mjs).
+const producerChildLog = (() => {
+  const code = fs
+    .readFileSync(new URL('../run-story68-native.mjs', import.meta.url), 'utf8')
+    .split('\n')
+    .filter((text) => !/^\s*(\/\/|\*|\/\*)/.test(text))
+    .join('\n')
+  const spawned = code.match(
+    /child\(\s*process\.execPath,\s*\['scripts\/lib\/story68-api-entry\.mjs'\],\s*env,\s*'([^']+)'\s*\)/
   )
-  // Service status still comes from the wrapper files.
-  assert.deepEqual(record.services, {
-    auth: { logLines: 2, exited: false, exitStatus: null },
-    api: { logLines: 2, exited: false, exitStatus: null },
-    metro: { logLines: null, exited: true, exitStatus: 137 },
+  assert.ok(spawned, 'the harness spawns the API child with a literal log name')
+  return spawned[1]
+})()
+
+describe('writeApiRequestEvidence', () => {
+  test('the collector reads the log the harness gives the API child', () => {
+    assert.equal(API_CHILD_LOG, producerChildLog)
+  })
+
+  test('the record reads the API child log in the harness directory, not the launcher log', (t) => {
+    const { services, harness } = ownedRuntime(t)
+    fs.writeFileSync(path.join(harness, producerChildLog), `${apiLog()}\n`)
+    const record = writeApiRequestEvidence({
+      harnessDirectory: harness,
+      serviceDirectory: services,
+    })
+    assert.equal(record.apiLog, 'read')
+    assert.equal(record.lines, 9)
+    assert.deepEqual(
+      record.routes.map(({ method, route }) => `${method} ${route}`),
+      ['GET api/v1/community/feed', 'GET api/v1/community/posts/{postId}']
+    )
+    // Service status still comes from the wrapper files.
+    assert.deepEqual(record.services, {
+      auth: { logLines: 2, exited: false, exitStatus: null },
+      api: { logLines: 2, exited: false, exitStatus: null },
+      metro: { logLines: null, exited: true, exitStatus: 137 },
+    })
+  })
+
+  test('a missing API child log reads as not measured, even when the launcher log has lines', (t) => {
+    const { services, harness } = ownedRuntime(t)
+    fs.writeFileSync(path.join(services, 'cc68-api.log'), `${apiLog()}\n`)
+    const record = writeApiRequestEvidence({
+      harnessDirectory: harness,
+      serviceDirectory: services,
+    })
+    assert.equal(record.apiLog, 'missing')
+    assert.equal(record.lines, 0)
+    assert.deepEqual(record.routes, [])
+  })
+
+  test('the published record carries no request value, on a known route or an unknown one', (t) => {
+    const { services, harness } = ownedRuntime(t)
+    fs.writeFileSync(
+      path.join(harness, producerChildLog),
+      [
+        apiLog(),
+        line({
+          message: 'request_received',
+          requestId: 'r9',
+          method: 'GET',
+          path: `/api/v1/locations/${canary}`,
+        }),
+        line({
+          message: 'request_completed',
+          requestId: 'r10',
+          method: 'GET',
+          path: `/internal/${canary}/probe`,
+          statusCode: 404,
+          durationMs: 3,
+        }),
+      ].join('\n')
+    )
+    const record = writeApiRequestEvidence({
+      harnessDirectory: harness,
+      serviceDirectory: services,
+    })
+    assert.ok(PUBLIC_DIAGNOSTIC_FILES.includes(API_REQUESTS_FILE))
+    const { published, omitted } = selectPublicDiagnostics(harness)
+    assert.deepEqual(omitted, [])
+    assert.deepEqual(published.get(API_REQUESTS_FILE), record)
+    const text = JSON.stringify(published.get(API_REQUESTS_FILE))
+    for (const leak of [canary, 'internal', 'probe', secret, userId])
+      assert.equal(text.includes(leak), false, leak)
+    assert.deepEqual(
+      record.routes.map(({ method, route }) => `${method} ${route}`),
+      [
+        'GET api/v1/community/feed',
+        'GET api/v1/community/posts/{postId}',
+        'GET api/v1/locations/{locationId}',
+        `GET ${UNKNOWN_ROUTE}`,
+      ]
+    )
   })
 })
 
-test('a missing API child log reads as not measured, even when the launcher log has lines', (t) => {
-  const { services, harness } = ownedRuntime(t)
-  fs.writeFileSync(path.join(services, 'cc68-api.log'), `${apiLog()}\n`)
-  const record = writeApiRequestEvidence({
-    harnessDirectory: harness,
-    serviceDirectory: services,
-  })
-  assert.equal(record.apiLog, 'missing')
-  assert.equal(record.lines, 0)
-  assert.deepEqual(record.routes, [])
-})
-
-test('the published record carries no request value, on a known route or an unknown one', (t) => {
-  const { services, harness } = ownedRuntime(t)
-  fs.writeFileSync(
-    path.join(harness, API_CHILD_LOG),
-    [
-      apiLog(),
-      line({
-        message: 'request_received',
-        requestId: 'r9',
-        method: 'GET',
-        path: `/api/v1/locations/${canary}`,
-      }),
-      line({
-        message: 'request_completed',
-        requestId: 'r10',
-        method: 'GET',
-        path: `/internal/${canary}/probe`,
-        statusCode: 404,
-        durationMs: 3,
-      }),
-    ].join('\n')
-  )
-  const record = writeApiRequestEvidence({
-    harnessDirectory: harness,
-    serviceDirectory: services,
-  })
-  assert.ok(PUBLIC_DIAGNOSTIC_FILES.includes(API_REQUESTS_FILE))
-  const { published, omitted } = selectPublicDiagnostics(harness)
-  assert.deepEqual(omitted, [])
-  assert.deepEqual(published.get(API_REQUESTS_FILE), record)
-  const text = JSON.stringify(published.get(API_REQUESTS_FILE))
-  for (const leak of [canary, 'internal', 'probe', secret, userId])
-    assert.equal(text.includes(leak), false, leak)
-  assert.deepEqual(
-    record.routes.map(({ method, route }) => `${method} ${route}`),
-    [
-      'GET api/v1/community/feed',
-      'GET api/v1/community/posts/{postId}',
-      'GET api/v1/locations/{locationId}',
-      `GET ${UNKNOWN_ROUTE}`,
-    ]
-  )
-})
-
-test('every iOS live font leg and shard records it on failure after the service exit check and before selection', () => {
-  const jobs = parse(
-    fs.readFileSync(
-      new URL('../../.github/workflows/ios-native-jobs.yml', import.meta.url),
-      'utf8'
-    )
-  ).jobs
-  const runs = (step) => String(step.run ?? '')
-  for (const name of ['ios-live-font', 'ios-shard']) {
-    const steps = jobs[name].steps
-    const record = steps.findIndex((step) =>
-      /^\s*node scripts\/ci\/native-api-requests\.mjs\s*$/m.test(runs(step))
-    )
-    assert.ok(record > -1, `${name} records the services' closed evidence`)
-    assert.equal(steps[record].if, '${{ !cancelled() && failure() }}', name)
-    // A service that exits after a passing proof fails the job only at the exit check, so the
-    // record must come after it to run on that failure too.
-    const exits = steps.findIndex(
-      (step) => step.name === 'Report owned background service exits'
-    )
-    assert.ok(exits > -1, `${name} reports the owned service exits`)
-    assert.ok(record > exits, `${name}: recorded after the service exit check`)
-    const select = steps.findIndex((step) =>
-      runs(step).includes('node scripts/e2e-share-card/public-evidence.mjs')
-    )
-    assert.ok(select > record, `${name}: selected after it is written`)
-    const upload = steps.findIndex(
-      (step) =>
-        step.uses?.startsWith('actions/upload-artifact') &&
-        step.with?.path?.endsWith('public-evidence/')
-    )
-    assert.ok(upload > select, `${name}: uploaded after it is selected`)
+// Codex review 6: 13 of the contract's templates, the notification preferences every iOS sign-in
+// requests among them, are 40 or more token characters long, and the selector's generic token
+// rule dropped the whole record. Route fields are checked against the contract instead.
+describe('publication of contract routes', () => {
+  const requestPair = (requestId, requestPath, statusCode) => [
+    line({ message: 'request_received', requestId, method: 'GET', path: requestPath }),
+    line({
+      message: 'request_completed',
+      requestId,
+      method: 'GET',
+      path: requestPath,
+      statusCode,
+      durationMs: 12,
+    }),
+  ]
+  const write = (t, record) => {
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'cc68-api-record-'))
+    t.after(() => fs.rmSync(directory, { recursive: true, force: true }))
+    fs.writeFileSync(path.join(directory, API_REQUESTS_FILE), JSON.stringify(record))
+    return selectPublicDiagnostics(directory)
   }
+
+  test('a record with the sign-in preferences request and a feed request is published whole', (t) => {
+    const preferences = '/api/v1/community/notification-preferences'
+    assert.ok(
+      preferences.length - 1 >= 40,
+      'the template is long enough to look token shaped'
+    )
+    const record = apiRequestRecord(
+      [...requestPair('p1', preferences, 200), ...requestPair('f1', feed, 504)].join('\n')
+    )
+    const { published, omitted } = write(t, record)
+    assert.deepEqual(omitted, [])
+    assert.deepEqual(
+      published
+        .get(API_REQUESTS_FILE)
+        .routes.map(({ route, completed }) => ({ route, completed })),
+      [
+        { route: 'api/v1/community/feed', completed: { 504: 1 } },
+        { route: 'api/v1/community/notification-preferences', completed: { 200: 1 } },
+      ]
+    )
+  })
+
+  test('a route field the contract does not name is not published', (t) => {
+    const record = apiRequestRecord(requestPair('f1', feed, 200).join('\n'))
+    record.recent[0].route = `api/v1/community/${canary}`
+    assert.deepEqual(write(t, record).omitted, [
+      { name: API_REQUESTS_FILE, reason: 'route_not_in_contract' },
+    ])
+  })
+
+  test('the generic token rule still applies to every other string in the record', (t) => {
+    const record = apiRequestRecord(requestPair('f1', feed, 200).join('\n'))
+    record.routes[0].method = `GET-${'a1'.repeat(30)}`
+    assert.deepEqual(write(t, record).omitted, [
+      { name: API_REQUESTS_FILE, reason: 'token_shaped_string' },
+    ])
+  })
+})
+
+describe('ios-native-jobs wiring', () => {
+  test('every iOS live font leg and shard records it on failure after the service exit check and before selection', () => {
+    const jobs = parse(
+      fs.readFileSync(
+        new URL('../../.github/workflows/ios-native-jobs.yml', import.meta.url),
+        'utf8'
+      )
+    ).jobs
+    const runs = (step) => String(step.run ?? '')
+    for (const name of ['ios-live-font', 'ios-shard']) {
+      const steps = jobs[name].steps
+      const record = steps.findIndex((step) =>
+        /^\s*node scripts\/ci\/native-api-requests\.mjs\s*$/m.test(runs(step))
+      )
+      assert.ok(record > -1, `${name} records the services' closed evidence`)
+      assert.equal(steps[record].if, '${{ !cancelled() && failure() }}', name)
+      // A service that exits after a passing proof fails the job only at the exit check, so the
+      // record must come after it to run on that failure too.
+      const exits = steps.findIndex(
+        (step) => step.name === 'Report owned background service exits'
+      )
+      assert.ok(exits > -1, `${name} reports the owned service exits`)
+      assert.ok(record > exits, `${name}: recorded after the service exit check`)
+      const select = steps.findIndex((step) =>
+        runs(step).includes('node scripts/e2e-share-card/public-evidence.mjs')
+      )
+      assert.ok(select > record, `${name}: selected after it is written`)
+      const upload = steps.findIndex(
+        (step) =>
+          step.uses?.startsWith('actions/upload-artifact') &&
+          step.with?.path?.endsWith('public-evidence/')
+      )
+      assert.ok(upload > select, `${name}: uploaded after it is selected`)
+    }
+  })
 })

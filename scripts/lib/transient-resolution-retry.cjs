@@ -29,11 +29,22 @@ const GRADLE_TEST_FAILURE =
   /^\S+ > .+ FAILED\s*$|There were failing tests|^Tests on .+ failed: \d+/m
 
 /**
- * An artifact download that failed: Gradle's `Could not GET` (or HEAD, resolve, download) and the
- * `Server returned HTTP response code: 429 for URL:` that Robolectric's runtime fetch prints.
+ * A test task's own FAILED line (`> Task :app:testDebugUnitTest FAILED`, or
+ * `connectedDebugAndroidTest`). It marks a run whose test task failed, whether its cases failed,
+ * its test JVM crashed, or it could not resolve its inputs before any test ran.
+ */
+const GRADLE_TEST_TASK_FAILURE = /^> Task \S*[Tt]est\S* FAILED\s*$/m
+
+/**
+ * An artifact download that failed, as the tool that downloaded it prints it: a line that starts
+ * with Gradle's `Could not GET` (or HEAD, resolve, download), bare or as a nested `>` cause, or
+ * with the `java.io.IOException: Server returned HTTP response code: 429 for URL:` that
+ * Robolectric's runtime fetch prints (bare or after `Caused by:`). The same words quoted inside an
+ * assertion's message (`AssertionError: expected "Could not GET ..."`) do not start the line, so
+ * a failing test that quotes a download error is never read as one.
  */
 const ARTIFACT_DOWNLOAD_FAILURE =
-  /Could not (?:GET|HEAD|resolve|download)\b|Server returned HTTP response code: \d{3} for URL:/
+  /^\s*(?:> )?Could not (?:GET|HEAD|resolve|download)\b|^\s*(?:Caused by: )?java\.io\.IOException: Server returned HTTP response code: \d{3} for URL:/
 
 /**
  * Gradle nests a failure's causes as indented `>` lines under the line they explain:
@@ -75,20 +86,27 @@ const RESOLUTION_RETRY_DELAYS_MS = Object.freeze([20000, 40000])
  * The transient download error a failed run printed, or undefined when it printed none.
  *
  * - A run killed by a signal (a timeout) is never retried.
- * - A run whose test cases failed (GRADLE_TEST_FAILURE) is retried only when it also printed a
- *   failed artifact download whose own line or nested cause is transient: Robolectric fetching
- *   its Android runtime fails the cases that way. A timeout or a 429 that a test's own output
- *   merely mentions, with no failed download, never retries it. So an assertion failure runs
- *   once unless the same run also failed a transient artifact download.
- * - Any other failed run, a test task that failed before its tests ran included, is retried on a
- *   transient failed download (multiline causes included) or any other transient error it
- *   printed (the wrapper's distribution download, a reset connection).
+ * - A run whose test cases failed (GRADLE_TEST_FAILURE: a failed case, the failing-tests
+ *   summary or a connected run's per-device summary) is retried only when it also printed a
+ *   failed artifact download (ARTIFACT_DOWNLOAD_FAILURE, a line Gradle or Robolectric starts)
+ *   whose own line or nested cause is transient: Robolectric fetching its Android runtime fails
+ *   the cases that way. A timeout or a 429 that a test's own output mentions or quotes, with no
+ *   such download line, never retries it. So an assertion failure runs once unless the same run
+ *   also failed a transient artifact download.
+ * - A run whose test task failed (GRADLE_TEST_TASK_FAILURE) with no failed cases follows the
+ *   same rule: a test task that could not resolve its inputs before any test ran (the connected
+ *   task's UTP dependencies) prints a failed download and retries; a crashed test JVM whose
+ *   output only mentions a timeout prints none and fails at once.
+ * - Any other failed run is retried on a transient failed download (multiline causes included)
+ *   or any other transient error it printed (the wrapper's distribution download, a reset
+ *   connection).
  */
 function transientResolutionFailure(result) {
   if (result.status === 0 || result.signal) return undefined
   const output = `${result.stdout ?? ''}\n${result.stderr ?? ''}`
   const download = transientDownloadFailure(output)
-  if (GRADLE_TEST_FAILURE.test(output)) return download
+  if (GRADLE_TEST_FAILURE.test(output) || GRADLE_TEST_TASK_FAILURE.test(output))
+    return download
   if (download !== undefined) return download
   const match = TRANSIENT_RESOLUTION_FAILURE.exec(output)
   return match ? match[0] : undefined
@@ -138,6 +156,7 @@ function sleepSync(ms) {
 module.exports = {
   ARTIFACT_DOWNLOAD_FAILURE,
   GRADLE_TEST_FAILURE,
+  GRADLE_TEST_TASK_FAILURE,
   RESOLUTION_RETRY_DELAYS_MS,
   TRANSIENT_RESOLUTION_FAILURE,
   isTransientResolutionFailure,

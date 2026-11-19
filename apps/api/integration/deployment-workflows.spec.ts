@@ -7,6 +7,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
+import { parse as parseYaml } from 'yaml'
 
 const repoRoot = path.resolve(__dirname, '../../..')
 
@@ -59,6 +60,43 @@ const reserveSupabasePortsAction = path.join(
 )
 const startLocalSupabaseUse = 'uses: ./.github/actions/start-local-supabase'
 const reservePortsUse = 'uses: ./.github/actions/configure-ci-supabase-ports'
+
+// A workflow condition is an expression string, or a YAML boolean.
+type WorkflowCondition = string | boolean
+type WorkflowStep = { name?: string; if?: WorkflowCondition }
+type WorkflowJob = { if?: WorkflowCondition; uses?: string; steps?: WorkflowStep[] }
+type ProdWorkflow = {
+  on: { push: unknown; schedule: unknown; workflow_dispatch: unknown }
+  jobs: Record<string, WorkflowJob>
+}
+
+/**
+ * Every job or step condition in a workflow, and in the local reusable workflows its jobs call,
+ * that reads the triggering event (`github.event_name`, `github.event.*`). A condition like that
+ * could let one trigger, the daily schedule for one, run no tests while its run still passes.
+ */
+function eventConditions(workflowPath: string, seen = new Set<string>()): string[] {
+  if (seen.has(workflowPath)) return []
+  seen.add(workflowPath)
+  const { jobs } = parseYaml(fs.readFileSync(workflowPath, 'utf8')) as {
+    jobs: Record<string, WorkflowJob>
+  }
+  const found: string[] = []
+  const readsEvent = (condition: WorkflowCondition) =>
+    /github\.event(?:_name|\.)/.test(String(condition))
+  for (const [id, job] of Object.entries(jobs)) {
+    if (job.if !== undefined && readsEvent(job.if))
+      found.push(`${path.basename(workflowPath)} ${id}: ${String(job.if)}`)
+    for (const step of job.steps ?? [])
+      if (step.if !== undefined && readsEvent(step.if))
+        found.push(
+          `${path.basename(workflowPath)} ${id} / ${step.name ?? '?'}: ${String(step.if)}`
+        )
+    if (job.uses?.startsWith('./.github/workflows/'))
+      found.push(...eventConditions(path.join(repoRoot, job.uses), seen))
+  }
+  return found
+}
 
 /**
  * Each job's steps in order, as the raw text of each `- ` step entry. A job whose
@@ -230,26 +268,30 @@ describe('deployment workflows', () => {
     // The daily scheduled run takes its own group, so it can neither cancel a running
     // push verification nor replace a pending one; push and dispatch keep the shared group.
     const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
-    expect(content).toMatch(
-      /^concurrency:\n {2}group: \$\{\{ github\.workflow \}\}-\$\{\{ github\.ref \}\}\$\{\{ github\.event_name == 'schedule' && '-status' \|\| '' \}\}\n {2}cancel-in-progress: true$/m
-    )
+    expect((parseYaml(content) as { concurrency: unknown }).concurrency).toEqual({
+      group:
+        "${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'schedule' && '-status' || '' }}",
+      'cancel-in-progress': true,
+    })
     expect(content).not.toMatch(/github\.run_id/)
   })
 
   it('prod e2e runs on a schedule as the production status check', () => {
     // Step 58: production can break with no merge (an expired secret, a provider
     // outage, a quota), so the prod suite also runs once a day on main.
-    const content = fs.readFileSync(prodE2eWorkflow, 'utf8')
-    const on = content.slice(content.indexOf('\non:'), content.indexOf('\npermissions:'))
-    expect(on).toMatch(/^ {2}push:\n {4}branches:\n {6}- main$/m)
-    expect(on).toMatch(/^ {2}schedule:\n(?: {4}#.*\n)* {4}- cron: '41 11 \* \* \*'$/m)
-    expect(on).toMatch(/^ {2}workflow_dispatch:$/m)
-    // Every trigger waits for the commits production serves and runs the suite: no job
-    // in the workflow is conditional on the event.
-    const jobs = content.slice(content.indexOf('\njobs:\n'))
-    for (const job of ['served-commits', 'wait-web', 'wait-api', 'run-prod-tests'])
-      expect(jobs).toMatch(new RegExp(`^ {2}${job}:$`, 'm'))
-    expect(jobs).not.toMatch(/^ {4}if:/m)
+    const workflow = parseYaml(fs.readFileSync(prodE2eWorkflow, 'utf8')) as ProdWorkflow
+    expect(Object.keys(workflow.on)).toEqual(['push', 'schedule', 'workflow_dispatch'])
+    expect(workflow.on.push).toEqual({ branches: ['main'] })
+    expect(workflow.on.schedule).toEqual([{ cron: '41 11 * * *' }])
+    expect(Object.keys(workflow.jobs)).toEqual([
+      'served-commits',
+      'wait-web',
+      'wait-api',
+      'run-prod-tests',
+    ])
+    // Every trigger waits for the commits production serves and runs the suite: no job or
+    // step condition, here or in the reusable workflows these jobs call, reads the event.
+    expect(eventConditions(prodE2eWorkflow)).toEqual([])
     // The README status badge reads this workflow on main.
     const readme = fs.readFileSync(path.join(repoRoot, 'README.md'), 'utf8')
     expect(readme).toContain(

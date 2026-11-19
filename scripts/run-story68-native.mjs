@@ -81,8 +81,7 @@ import { MAESTRO_BIN } from './maestro-version.mjs'
 import { STORY68_AUTH_PROXY_PORT } from './lib/story68-public-build-env.mjs'
 import {
   IOS_RETRYABLE_DENIAL_EVIDENCE,
-  breadcrumbIn,
-  IOS_SETTINGS_MARKERS,
+  osSettingsForeground,
 } from './lib/story68-native-evidence-schema.mjs'
 import { spawnIosFlow, recordIosFlowTiming } from './ci/native-ios-flow-deadline.mjs'
 import {
@@ -322,19 +321,13 @@ function composerLayout() {
 function openOsSettings() {
   maestro('maestro/story68/settings.yaml')
   requireDevice()
-  if (platform === 'android') {
-    const resumed = run(adb, ['-s', device, 'shell', 'dumpsys', 'activity', 'activities'])
-      .split('\n')
-      .find((line) =>
-        /^\s*(topResumedActivity|mResumedActivity|ResumedActivity)/.test(line)
-      )
-      ?.match(/ActivityRecord\{\S+ \S+ ([\w.]+)\//)?.[1]
-    if (resumed !== 'com.android.settings') throw new Error('os_settings_not_opened')
-    return { foregroundPackage: resumed }
-  }
-  if (!breadcrumbIn(JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy']))))
-    throw new Error('os_settings_not_opened')
-  return { foregroundMarkers: IOS_SETTINGS_MARKERS }
+  return osSettingsForeground({
+    platform,
+    readAndroidActivities: () =>
+      run(adb, ['-s', device, 'shell', 'dumpsys', 'activity', 'activities']),
+    readIosHierarchy: () =>
+      JSON.parse(run(maestroBinary, ['--device', device, 'hierarchy'])),
+  })
 }
 // A cold Metro needs longer to build the launch bundle than open-app.yaml waits for the
 // tab bar, so the dev client is only pointed at Metro once that exact bundle is built. Expo Go

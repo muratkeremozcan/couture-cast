@@ -98,7 +98,8 @@ function runScript({ failure = 'none', githubLinux = false, freeMib = 200 * 1024
       })
     const result = spawnSync('bash', ['scripts/ci/share-card-android-release-font.sh'], {
       encoding: 'utf8',
-      timeout: 5000,
+      // About a dozen fake commands, each a Node cold start; a loaded runner needs headroom.
+      timeout: 30000,
       env: {
         ...process.env,
         PATH: `${bin}${path.delimiter}${process.env.PATH}`,
@@ -114,6 +115,8 @@ function runScript({ failure = 'none', githubLinux = false, freeMib = 200 * 1024
         RUNNER_TEMP: githubLinux ? '/runner-temp' : undefined,
       },
     })
+    // A timed-out run names itself here, before any assertion reads its partial output.
+    assert.equal(result.error, undefined, String(result.error))
     const records = fs
       .readFileSync(events, 'utf8')
       .trim()

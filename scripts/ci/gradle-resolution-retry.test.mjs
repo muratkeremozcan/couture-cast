@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import test from 'node:test'
+import test, { describe } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
 import { parseArgs, runGradleWithResolutionRetry } from './gradle-resolution-retry.mjs'
@@ -209,6 +209,53 @@ test('a test task that failed resolving before its tests ran retries on a nested
   )
 })
 
+// Codex review 6: with a failed case in the output, a download failure counts only as Gradle or
+// Robolectric prints it, never quoted inside an assertion's message.
+test('a failing test is not retried by an assertion that quotes a rate-limited download', () => {
+  const quoted = [
+    'ArtifactFixtureTest > reportsRateLimit FAILED',
+    `    java.lang.AssertionError: expected the fixture "${RATE_LIMITED}" to be reported`,
+    TEST_TASK_FAILED,
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: quoted }),
+    undefined
+  )
+})
+
+test('a failing test retries on a real download whose transient cause is nested under it', () => {
+  // The cause sits only on the nested line, so this retries only through nested-cause reading.
+  const nested = [
+    TEST_FAILED,
+    '> Could not resolve org.robolectric:android-all-instrumented:13-robolectric-9030017-i6.',
+    "   > Could not GET 'https://repo1.maven.org/maven2/org/robolectric/android-all-instrumented/13-robolectric-9030017-i6/android-all-instrumented-13-robolectric-9030017-i6.pom'.",
+    '      > Read timed out',
+    TEST_TASK_FAILED,
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: nested }),
+    'Read timed out'
+  )
+})
+
+test('a crashed test task is not retried when its timeout sits under no failed download', () => {
+  // The test JVM died (exit 137) and a test's own output named a timeout. No artifact download
+  // failed, so a rerun would only turn a crash that passes the second time green.
+  const crashed = [
+    '> Task :app:testDebugUnitTest FAILED',
+    "Process 'Gradle Test Executor 1' finished with non-zero exit value 137",
+    'java.net.SocketTimeoutException: Read timed out',
+    'FAILURE: Build failed with an exception.',
+    '* What went wrong:',
+    "Execution failed for task ':app:testDebugUnitTest'.",
+    'BUILD FAILED in 1m 3s',
+  ].join('\n')
+  assert.equal(
+    transientResolutionFailure({ status: 1, signal: null, stdout: crashed }),
+    undefined
+  )
+})
+
 test('a failing test is not retried by a transient word beside, not under, a failed download', () => {
   // A case's own output: the timeout is not a nested cause of the download line above it.
   const assertion = [
@@ -277,68 +324,90 @@ test('the modal system bars workflow runs its Gradle build through the retry', (
 // Scheduled run 44311237727 failed the accessibility-focus Robolectric job before any test ran:
 // both registries answered 429 for gson, the foojay toolchain resolver plugin's dependency, the
 // same failure the modal system bars job retries above.
-test('the accessibility focus workflow runs every Gradle build through the retry', () => {
+describe('the accessibility focus workflow', () => {
   const read = (file) =>
     fs.readFileSync(fileURLToPath(new URL(`../../${file}`, import.meta.url)), 'utf8')
-  const text = read('.github/workflows/pr-accessibility-focus.yml')
-  const { jobs } = parse(text)
+  const workflow = parse(read('.github/workflows/pr-accessibility-focus.yml'))
+  const { jobs } = workflow
   const retry =
     /^node \.\.\/\.\.\/\.\.\/scripts\/ci\/gradle-resolution-retry\.mjs -- \.\/gradlew /
   const gradleRuns = (job) =>
     job.steps.filter((step) =>
       /\.\/gradlew|npm run test:accessibility-focus/.test(step.run ?? '')
     )
+  // The device script's code lines: comments dropped and indentation trimmed, so a comment that
+  // names a command or a re-indent cannot change what these checks read.
+  const deviceCode = read('scripts/ci/accessibility-focus-device-tests.sh')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'))
 
-  // The app build and the Robolectric tests call Gradle in their own steps; both retry.
-  for (const id of ['android', 'android-robolectric']) {
-    const runs = gradleRuns(jobs[id])
-    assert.equal(runs.length, 1, `${id} runs Gradle in one step`)
-    assert.match(runs[0].run, retry, `${id}: Gradle goes through the retry`)
-    assert.equal(runs[0]['working-directory'], 'apps/mobile/android')
-  }
-  // The TalkBack job builds and runs inside its device script, whose every Gradle call goes
-  // through the retry (the run itself is proved by the device-script test below).
-  assert.deepEqual(gradleRuns(jobs['android-talkback']), [])
-  const device = read('scripts/ci/accessibility-focus-device-tests.sh')
-  assert.match(
-    device,
-    /node "\$here\/gradle-resolution-retry\.mjs" -- \\\n\s+\.\/gradlew /
-  )
-  assert.equal(device.match(/\.\/gradlew/g).length, 1, 'one Gradle call site, the retry')
-  assert.deepEqual(device.match(/^\s*gradle\w* :accessibility-focus:\w+/gm), [
-    '  gradle_retry :accessibility-focus:connectedDebugAndroidTest',
-    'gradle_retry :accessibility-focus:assembleDebugAndroidTest',
-  ])
+  test('runs every Gradle build through the retry', () => {
+    // The app build and the Robolectric tests call Gradle in their own steps; both retry.
+    for (const id of ['android', 'android-robolectric']) {
+      const runs = gradleRuns(jobs[id])
+      assert.equal(runs.length, 1, `${id} runs Gradle in one step`)
+      assert.match(runs[0].run, retry, `${id}: Gradle goes through the retry`)
+      assert.equal(runs[0]['working-directory'], 'apps/mobile/android')
+    }
+    // The TalkBack job builds and runs inside its device script, whose every Gradle call goes
+    // through the retry (the run itself is proved by the device-script test below).
+    assert.deepEqual(gradleRuns(jobs['android-talkback']), [])
+    const gradlewCalls = deviceCode.filter((line) => line.includes('./gradlew'))
+    assert.equal(gradlewCalls.length, 1, 'one Gradle call site, inside gradle_retry')
+    const retryCall = deviceCode.indexOf('node "$here/gradle-resolution-retry.mjs" -- \\')
+    assert.notEqual(retryCall, -1, 'gradle_retry calls the retry command')
+    assert.match(deviceCode[retryCall + 1], /^\.\/gradlew /)
+    assert.deepEqual(
+      deviceCode.flatMap(
+        (line) => line.match(/^gradle\w* :accessibility-focus:\w+/) ?? []
+      ),
+      [
+        'gradle_retry :accessibility-focus:connectedDebugAndroidTest',
+        'gradle_retry :accessibility-focus:assembleDebugAndroidTest',
+      ]
+    )
+  })
 
-  // Every Android job restores Gradle's cache, written only on main, before Gradle runs.
-  for (const id of ['android', 'android-robolectric', 'android-talkback']) {
-    const steps = jobs[id].steps
-    const setup = steps.findIndex((step) =>
-      String(step.uses ?? '').startsWith('gradle/actions/setup-gradle@')
-    )
-    assert.notEqual(setup, -1, `${id} sets up Gradle's cache`)
-    assert.equal(
-      steps[setup].with['cache-read-only'],
-      "${{ github.ref != 'refs/heads/main' }}",
-      `${id}: only main writes Gradle's cache`
-    )
-    const generate = steps.findIndex(
-      (step) => step.name === 'Generate the Android project'
-    )
-    assert.ok(
-      setup < generate,
-      `${id}: Gradle's cache is set up before the project is generated`
-    )
-  }
-  for (const file of [
-    'scripts/ci/gradle-resolution-retry.mjs',
-    'scripts/lib/transient-resolution-retry.cjs',
-  ])
-    assert.equal(
-      text.split(`- '${file}'`).length - 1,
-      2,
-      `${file} must be in both path filters`
-    )
+  test("restores Gradle's cache in every Android job, written only on main, before generation", () => {
+    for (const id of ['android', 'android-robolectric', 'android-talkback']) {
+      const steps = jobs[id].steps
+      const setup = steps.findIndex((step) =>
+        String(step.uses ?? '').startsWith('gradle/actions/setup-gradle@')
+      )
+      assert.notEqual(setup, -1, `${id} sets up Gradle's cache`)
+      assert.equal(
+        steps[setup].with['cache-read-only'],
+        "${{ github.ref != 'refs/heads/main' }}",
+        `${id}: only main writes Gradle's cache`
+      )
+      const generate = steps.findIndex(
+        (step) => step.name === 'Generate the Android project'
+      )
+      assert.ok(
+        setup < generate,
+        `${id}: Gradle's cache is set up before the project is generated`
+      )
+    }
+  })
+
+  test('lists the retry files in both path filters', () => {
+    const filters = {
+      pull_request: workflow.on.pull_request.paths,
+      push: workflow.on.push.paths,
+    }
+    for (const file of [
+      'scripts/ci/gradle-resolution-retry.mjs',
+      'scripts/lib/transient-resolution-retry.cjs',
+    ])
+      assert.deepEqual(
+        Object.fromEntries(
+          Object.entries(filters).map(([event, paths]) => [event, paths.includes(file)])
+        ),
+        { pull_request: true, push: true },
+        `${file} must be in both path filters`
+      )
+  })
 })
 
 // Codex review of 384b830d: each connected run resolves AGP's UTP test-runner artifacts when it

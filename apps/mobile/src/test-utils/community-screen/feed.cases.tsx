@@ -766,31 +766,38 @@ export function registerCommunityFeedCases() {
   })
 
   /*
-   * Nightly run 44298434117, iOS live font scale (community): a pull-to-refresh failed once and
-   * "We could not load the community feed." stayed above the feed through the harness's later
-   * refreshes, so the screen never came back to its capture. A read that answers clears the
-   * stale load error; a withdraw failure is about another action and stays.
+   * Nightly run 44298434117, iOS live font scale (community): the leg ended on "We could not load
+   * the community feed." with the feed pushed down under it. The run kept no request timeline, so
+   * a failed pull-to-refresh from the harness's drags past the top is the working hypothesis, not
+   * an observed sequence. This case reproduces the app defect on its own: after a failed refresh,
+   * the load error stayed through later reads that answered. A read that answers clears the stale
+   * load error; a withdraw failure is about another action and stays.
    */
   it('6.1-MOB-096 a refresh that answers clears the load error an earlier refresh left', async () => {
     let reads = 0
+    let failNext = false
     serveFeed(() => {
       reads += 1
-      return reads === 2
-        ? errorEnvelope(500, 'Internal server error.')
-        : feedJson({ items: [item({ id: 'post-a' })], nextCursor: null })
+      if (failNext) {
+        failNext = false
+        return errorEnvelope(500, 'Internal server error.')
+      }
+      return feedJson({ items: [item({ id: 'post-a' })], nextCursor: null })
     })
 
     await render(<CommunityScreen />)
     await screen.findByTestId('community-post-card-post-a')
     await waitFor(() => expect(refreshEvents.onRefresh).toBeTypeOf('function'))
 
+    failNext = true
     act(() => refreshEvents.onRefresh!())
     const panel = await screen.findByTestId('community-action-error')
     expect(panel.textContent).toBe(enUS.community.error.load)
     expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
 
+    const readsBeforeRecovery = reads
     act(() => refreshEvents.onRefresh!())
-    await waitFor(() => expect(reads).toBe(3))
+    await waitFor(() => expect(reads).toBe(readsBeforeRecovery + 1))
     await waitFor(() => expect(screen.queryByTestId('community-action-error')).toBeNull())
     expect(screen.getByTestId('community-post-card-post-a')).toBeTruthy()
     expect(screen.queryByTestId('community-feed-error')).toBeNull()

@@ -22,6 +22,11 @@ const base = {
   signal: null,
 }
 
+// The iOS Release build of nightly run 44298434117 (exit 65), the record every iOS case reads.
+const iosRelease = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
+const classifyIosRelease = (log) =>
+  summarizeNativeBuildFailure({ ...iosRelease, log }).classification
+
 describe('native build failure record', () => {
   test('names the failed tasks and the signature, and carries no log text', () => {
     const log = [
@@ -57,14 +62,16 @@ describe('native build failure record', () => {
     assert.equal(classify('Gradle build daemon disappeared unexpectedly'), 'daemondied')
     assert.equal(classify('java.io.IOException: No space left on device'), 'diskfull')
     assert.equal(
-      classify(
+      classifyIosRelease(
         "Could not resolve all files for configuration ':app:debugRuntimeClasspath'."
       ),
       'dependencies'
     )
     assert.equal(classify('e: file:///x/Foo.kt:3:1 Unresolved reference: bar'), 'kotlin')
     assert.equal(
-      classify('Compilation failed; see the compiler error output for details.'),
+      classifyIosRelease(
+        'Compilation failed; see the compiler error output for details.'
+      ),
       'java'
     )
     assert.equal(classify('ninja: build stopped: subcommand failed.'), 'native')
@@ -114,7 +121,6 @@ describe('native build failure record', () => {
   // 358 s and the record read classification unknown with no failed task, because only Gradle's
   // `> Task ... FAILED` lines were read. xcodebuild lists its failed commands after a header.
   test('names the failed xcodebuild commands by target and classifies the xcodebuild causes', () => {
-    const ios = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
     const log = [
       `CompileC /tmp/${personal}.o (in target 'CoutureCastStory68' from project 'CoutureCastStory68')`,
       'error: Command PhaseScriptExecution failed with a nonzero exit code',
@@ -128,7 +134,7 @@ describe('native build failure record', () => {
       '(4 failures)',
       "\tLd /tmp/x (in target 'after-the-list' from project 'Pods')",
     ].join('\n')
-    const record = summarizeNativeBuildFailure({ ...ios, log })
+    const record = summarizeNativeBuildFailure({ ...iosRelease, log })
     assert.deepEqual(record, {
       platform: 'ios',
       configuration: 'Release',
@@ -143,20 +149,18 @@ describe('native build failure record', () => {
     })
     assert.equal(JSON.stringify(record).includes('Avery'), false)
     assertNativeBuildFailure(record)
-    const classify = (text) =>
-      summarizeNativeBuildFailure({ ...ios, log: text }).classification
     assert.equal(
-      classify('/tmp/App/AppDelegate.swift:12:5: error: cannot find type'),
+      classifyIosRelease('/tmp/App/AppDelegate.swift:12:5: error: cannot find type'),
       'swift'
     )
     assert.equal(
-      classify('xcodebuild: error: Unable to find a destination matching'),
+      classifyIosRelease('xcodebuild: error: Unable to find a destination matching'),
       'xcodebuild'
     )
     // Without the header nothing is read as a failed command.
     assert.deepEqual(
       summarizeNativeBuildFailure({
-        ...ios,
+        ...iosRelease,
         log: "\tLd /tmp/x (in target 'Pods-App' from project 'Pods')",
       }).failedTasks,
       []
@@ -171,7 +175,6 @@ describe('native build failure record', () => {
   // (`SwiftDriver\ Compilation`), and the first parser stopped the list at that entry, so a Swift
   // build failure kept its empty record and lost every supported command after it.
   test('reads escaped xcodebuild command names and keeps reading the list to its footer', () => {
-    const ios = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
     const log = [
       '** BUILD FAILED **',
       '',
@@ -183,7 +186,7 @@ describe('native build failure record', () => {
       '(4 failures)',
       "\tLd /tmp/x (in target 'after-the-list' from project 'Pods')",
     ].join('\n')
-    const record = summarizeNativeBuildFailure({ ...ios, log })
+    const record = summarizeNativeBuildFailure({ ...iosRelease, log })
     assert.deepEqual(record.failedTasks, [
       'SwiftDriverCompilation@ExpoModulesCore',
       'SwiftDriverCompilationRequirements@CoutureCastStory68',
@@ -194,7 +197,7 @@ describe('native build failure record', () => {
     // A list with no footer ends at the first line that is not an indented entry.
     assert.deepEqual(
       summarizeNativeBuildFailure({
-        ...ios,
+        ...iosRelease,
         log: [
           'The following build commands failed:',
           "\tSwiftDriver\\ Compilation normal arm64 x (in target 'A' from project 'Pods')",
@@ -207,7 +210,7 @@ describe('native build failure record', () => {
     // A joined name past the 41-character identifier bound is dropped, never truncated.
     assert.deepEqual(
       summarizeNativeBuildFailure({
-        ...ios,
+        ...iosRelease,
         log: [
           'The following build commands failed:',
           `\tSwiftDriver\\ ${'Compilation\\ '.repeat(4)}Requirements x (in target 'A' from project 'Pods')`,
@@ -222,18 +225,15 @@ describe('native build failure record', () => {
   // Codex review of cb8b22d2: CocoaPods generates Swift sources under `Target Support Files`, so a
   // compiler error at one of them carries a path with spaces, and `^\S+\.swift` left it unknown.
   test('classifies a Swift error at a path with spaces', () => {
-    const ios = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
-    const classify = (text) =>
-      summarizeNativeBuildFailure({ ...ios, log: text }).classification
     assert.equal(
-      classify(
+      classifyIosRelease(
         '/Users/runner/work/couture-cast/couture-cast/apps/mobile/ios/Pods/Target Support Files/Pods-CoutureCastStory68/ExpoModulesProvider.swift:12:5: error: cannot find type'
       ),
       'swift'
     )
     // The error suffix stays required: a warning at the same path is not a Swift error.
     assert.equal(
-      classify(
+      classifyIosRelease(
         '/tmp/Target Support Files/Pods-CoutureCastStory68/ExpoModulesProvider.swift:12:5: warning: unused'
       ),
       'unknown'

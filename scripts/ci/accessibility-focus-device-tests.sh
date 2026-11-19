@@ -19,8 +19,10 @@ abi=$("$ADB" shell getprop ro.product.cpu.abi | tr -d '\r')
 # Every Gradle call goes through the retry: a 429 or 5xx from Maven Central or the plugin portal
 # is retried twice, any other failure fails at once. The build resolves the plugins and the APKs'
 # dependencies; each connected run resolves the test runner's own (AGP's UTP artifacts) when it
-# starts, before any test runs. A failing test is never retried, so the suppressed-focus control
-# still fails exactly once.
+# starts, before any test runs. A failing test is retried only when the same run also printed a
+# Gradle or Robolectric download failure with a transient cause (scripts/lib/
+# transient-resolution-retry.cjs); an assertion that fails, or quotes a download error, runs
+# once, so the suppressed-focus control still fails exactly once.
 gradle_retry() {
   (cd apps/mobile/android &&
     node "$here/gradle-resolution-retry.mjs" -- \
