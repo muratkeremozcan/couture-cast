@@ -112,6 +112,8 @@ let heldList: { release: () => void } | null
 let holdNextAList: boolean
 /** The held A list answers 503 when released. */
 let failHeldList: boolean
+/** What the held A list answered once released: A's rows or the 503. */
+let heldListAnswer: 'rows' | 'failed' | null
 let renamed: boolean
 /** A rename the test releases by hand, and every list GET's bearer. */
 let heldPatch: { release: () => void } | null
@@ -158,6 +160,8 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
   beforeEach(async () => {
     heldList = null
     holdNextAList = false
+    failHeldList = false
+    heldListAnswer = null
     lists.promises = []
     lists.renames = []
     navigation.push.mockClear()
@@ -179,6 +183,7 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
           await new Promise<void>((resolve) => {
             heldList = { release: resolve }
           })
+          heldListAnswer = failHeldList ? 'failed' : 'rows'
           if (failHeldList)
             return HttpResponse.json(
               { statusCode: 503, message: 'down', error: 'Service Unavailable' },
@@ -384,6 +389,7 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
     act(() => heldList!.release())
     await settleLists()
+    expect(heldListAnswer).toBe('rows')
     await act(async () => {
       await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
     })
@@ -415,6 +421,7 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-b')
     act(() => heldList!.release())
     await settleLists()
+    expect(heldListAnswer).toBe('failed')
 
     expect(section()).not.toHaveAttribute('data-state', 'load_failed')
     expect(screen.queryByTestId('locations-load-error')).toBeNull()
@@ -434,6 +441,8 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
 
     act(() => heldList!.release())
     await settleLists()
+    // The late answer carried A's rows (a 503 here would test nothing about disclosure).
+    expect(heldListAnswer).toBe('rows')
 
     expect(section()).toHaveAttribute('data-state', 'signed_out')
     expect(screen.queryByText(/Alpha/)).toBeNull()
@@ -449,6 +458,7 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
 
     act(() => heldList!.release())
     await settleLists()
+    expect(heldListAnswer).toBe('rows')
 
     expect(section()).toHaveAttribute('data-state', 'ready')
     expect(screen.getByText('Bravo Office')).toBeInTheDocument()
