@@ -883,7 +883,7 @@ jobs:
           eligible=$(node -e "const l=require('./test/fixtures/community-text-corpus/holdout-retirements.json');console.log(Object.keys(l.eligible??{}).length)")
           if [ "$eligible" = "0" ]; then
             echo "development" > .cache/community-screening/corpus-ci-mode
-            COMMUNITY_SCREENING_RUN_PRODUCT_DIR= npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
+            COMMUNITY_SCREENING_RUN_PRODUCT_DIR= COMMUNITY_SCREENING_DEVELOPMENT_DIR=.cache/community-screening npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
           else
             echo "release" > .cache/community-screening/corpus-ci-mode
             npx vitest run src/modules/community/community-text-corpus.evaluation.spec.ts --reporter=default --reporter=json --outputFile=.cache/community-screening/corpus-ci-tests.json
@@ -924,27 +924,57 @@ jobs:
                 report.numFailedTests !== 0 || report.numTodoTests !== 0)
               problems.push(`${file}: ${report.numPassedTests}/${report.numTotalTests} passed`)
           }
-          // The corpus evaluator skips by mode, so its report is checked by test title: the seven
-          // per-locale Wilson gates run only in a release evaluation, and the two development
-          // cases only while no holdout is eligible. Every other case must pass.
+          // The corpus evaluator skips by mode, so its report is checked case by case, by the full
+          // locale-qualified name: the seven per-locale Wilson gates run only in a release
+          // evaluation and the two development cases only while no holdout is eligible. Each of
+          // those nine must appear exactly once with the status its mode requires, and every other
+          // case must pass, at least 63 in all. A development run must also leave its seven held
+          // counts, each within 0 and its denominator, in text-corpus-development.json and write no
+          // release product.
           const corpus = `${dir}/corpus-ci-tests.json`
           const modeFile = `${dir}/corpus-ci-mode`
           if (!fs.existsSync(corpus) || !fs.existsSync(modeFile)) problems.push('corpus-ci-tests.json: no report or mode')
           else {
             const mode = fs.readFileSync(modeFile,'utf8').trim()
+            const locales = ['de','en','es','fr','it','pt','tr']
+            const wilson = locales.map((l) => `text corpus: ${l} keeps the Wilson 95% upper bound on withheld holdout copy at or below 1%`)
+            const development = ['refuses a release run on the same selector','reports the held count and denominator of each retired holdout as development data']
+              .map((t) => `development run while no holdout is eligible ${t}`)
+            // The selector and manifest checks guard the development path itself, so each must run
+            // in either mode.
+            const classification = [
+              'classifies a selection whose every pair is retired for its locale as retired',
+              'hands a selection with no retired pair to the strict loader',
+              'refuses a retired pair beside an unclassified one',
+              'refuses a retired pair beside an eligible fresh cohort',
+              'refuses a version retired only for another locale',
+              'refuses a mixed selection before reading any freeze manifest',
+              'refuses a retired manifest with another version',
+              'refuses a retired manifest with no seal time',
+              'refuses a retired manifest with no aggregate hash',
+            ].map((t) => `development selection classification ${t}`)
             const cases = JSON.parse(fs.readFileSync(corpus,'utf8')).testResults.flatMap((result) => result.assertionResults)
-            const wilson = (c) => c.title === 'keeps the Wilson 95% upper bound on withheld holdout copy at or below 1%'
-            const developmentOnly = (c) => ['refuses a release run on the same selector', 'reports the held count and denominator of each retired holdout as development data'].includes(c.title)
-            const expectSkipped = mode === 'development' ? wilson : developmentOnly
-            const expectRun = mode === 'development' ? developmentOnly : wilson
-            const wanted = { development: [7, 2], release: [2, 7] }[mode]
-            if (!wanted) problems.push(`corpus-ci-mode: unknown mode ${mode}`)
+            const status = new Map()
+            for (const c of cases) status.set(c.fullName, [...(status.get(c.fullName) ?? []), c.status])
+            const expected = { development: [wilson, development], release: [development, wilson] }[mode]
+            if (!expected) problems.push(`corpus-ci-mode: unknown mode ${mode}`)
             else {
-              const skipped = cases.filter((c) => c.status !== 'passed')
-              const wrong = skipped.filter((c) => !(expectSkipped(c) && c.status === 'skipped'))
-              const ran = cases.filter((c) => expectRun(c) && c.status === 'passed').length
-              if (cases.length < 58 || wrong.length > 0 || skipped.length !== wanted[0] || ran !== wanted[1])
-                problems.push(`corpus-ci-tests.json (${mode}): ${cases.length} cases, ${skipped.length} not passed, ${wrong.map((c) => `${c.title}=${c.status}`).join(', ')}; mode cases passed ${ran}`)
+              const [skippedNames, modePassedNames] = expected
+              const passedNames = [...modePassedNames, ...classification]
+              for (const name of skippedNames) if (String(status.get(name)) !== 'skipped') problems.push(`${name}: ${status.get(name) ?? 'missing'} (want skipped once)`)
+              for (const name of passedNames) if (String(status.get(name)) !== 'passed') problems.push(`${name}: ${status.get(name) ?? 'missing'} (want passed once)`)
+              const others = cases.filter((c) => !skippedNames.includes(c.fullName) && !passedNames.includes(c.fullName))
+              const notPassed = others.filter((c) => c.status !== 'passed')
+              if (cases.length < 63 || notPassed.length > 0)
+                problems.push(`corpus-ci-tests.json (${mode}): ${cases.length} cases; not passed: ${notPassed.map((c) => `${c.fullName}=${c.status}`).join(', ')}`)
+              if (mode === 'development') {
+                const artifact = `${dir}/text-corpus-development.json`
+                const figures = fs.existsSync(artifact) ? JSON.parse(fs.readFileSync(artifact,'utf8')).languages ?? {} : {}
+                const complete = locales.every((l) => Number.isInteger(figures[l]?.held) && Number.isInteger(figures[l]?.total) &&
+                  figures[l].total > 0 && figures[l].held >= 0 && figures[l].held <= figures[l].total)
+                if (!complete) problems.push('text-corpus-development.json: missing or incomplete held counts')
+                if (fs.existsSync(`${dir}/text-corpus-evaluation.json`)) problems.push('text-corpus-evaluation.json: a development run wrote a release product')
+              }
             }
           }
           if (problems.length) throw new Error(`Incomplete mandatory screening execution: ${problems.join('; ')}`)

@@ -64,6 +64,9 @@ describe('retune 2026-11-19: a clearing frame counts only when joined by plain s
     'Ich trete in die.\nPedale!',
     'in die\npedale',
     '"in die" pedale',
+    // A break between the first two words of the three-word frame, not only the last join.
+    'in. die Pedale',
+    'in, die Pedale',
   ])('holds %j', (text) => {
     expect(disposition(text, 'de-DE')).not.toBe('pass')
   })
@@ -86,10 +89,44 @@ describe('retune 2026-11-19: the ordinary use each new rule clears', () => {
     ['fr-FR', 'lapins'],
     ['fr-FR', 'rayées'],
     ['it-IT', 'toppa sul gomito'],
+    // One ordinary caption per remaining context rule (Codex review 26).
+    ['es-419', 'una rosa y un capullo en el broche'],
+    ['es-419', 'me pinto las uñas de rojo'],
+    ['es-419', 'el rocío de la mañana'],
+    ['it-IT', 'senza bagnarsi sotto la pioggia'],
+    ['it-IT', 'giacca color burro'],
+    ['it-IT', 'tutto nero tranne le scarpe'],
+    ['it-IT', 'tifosi sugli spalti'],
+    ['de-DE', 'keine Lust auf Regen'],
+    ['de-DE', 'Muff aus Kunstpelz'],
+    ['en-US', 'a fur muff'],
+    ['en-US', 'wool dryer balls'],
     ['tr-TR', 'boşta'],
     ['tr-TR', 'tüten'],
   ])('%s clears %j', (locale, text) => {
     expect(disposition(text, locale)).toBe('pass')
+  })
+
+  // The five new standalone scoped words clear in their own language only.
+  it.each([
+    ['tintes', 'es-419'],
+    ['lapins', 'fr-FR'],
+    ['rayées', 'fr-FR'],
+    ['boşta', 'tr-TR'],
+    ['tüten', 'tr-TR'],
+  ])('keeps %j held outside %s', (word, home) => {
+    for (const locale of [
+      'de-DE',
+      'en-US',
+      'es-419',
+      'fr-FR',
+      'it-IT',
+      'pt-BR',
+      'tr-TR',
+    ]) {
+      if (locale === home) continue
+      expect(disposition(word, locale), `${word} under ${locale}`).not.toBe('pass')
+    }
   })
 
   it('binds each cleared use to its own language', () => {
