@@ -1,5 +1,5 @@
 # Learning path Step 58: Production follow-ups after the project close.
-# See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+# See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 # Production follow-up (2026-11-19): Use my location on mobile.
 #
 # Jade asked for the app to use her location with her approval, or let her type the city. The
@@ -10,9 +10,11 @@
 # The runner removes the member's saved locations before the flow and restores the baseline
 # Chicago after it (`FLOW_STATE_HOOKS` in scripts/run-maestro.mjs), refuses the flow unless the
 # API reaches the double, and after the flow reads the double's request log: it fails the flow
-# unless a reverse lookup arrived at exactly the rounded position and the precise device position
-# (`USE_MY_LOCATION_LATITUDE`, `USE_MY_LOCATION_LONGITUDE`) never reached the provider
-# (`useMyLocationWeatherDoubleCause` in scripts/lib/mobile-e2e-flow-state.mjs).
+# unless every reverse lookup carried at most two decimals, one resolved to Chicago, and the
+# precise injected position (`USE_MY_LOCATION_LATITUDE`, `USE_MY_LOCATION_LONGITUDE`) never
+# reached the provider (`useMyLocationWeatherDoubleCause` in scripts/lib/mobile-e2e-flow-state.mjs).
+# The OS answers at reduced accuracy (iOS reduced, Android coarse), so the fix it hands the app can
+# differ from the injected pair; the exact rounding is pinned by the mocked-device unit tests.
 appId: ${MAESTRO_APP_ID}
 name: 'Use my location'
 tags:
@@ -100,7 +102,7 @@ tags:
 - assertVisible:
     id: 'location-search-option-0'
     text: 'Chicago, Illinois.*'
-    label: 'The offered city is the one at the rounded position'
+    label: 'The offered city is the one near the phone'
 - assertNotVisible:
     id: 'location-error'
 - tapOn:

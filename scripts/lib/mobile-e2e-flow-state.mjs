@@ -1,5 +1,5 @@
 // Story 6.3 device-reset owner: reset a member's reaction state between flow attempts in `scripts/lib/mobile-e2e-flow-state.mjs` and `scripts/lib/mobile-e2e-flow-retry.mjs`
-import { fold } from './weather-provider-double-data.mjs'
+import { fold, reversePlaces } from './weather-provider-double-data.mjs'
 
 // The native harness owns an isolated UUID database, genuine identities and source fixtures.
 // Its flow never uses the shared Expo Go member or reset hooks.
@@ -107,8 +107,8 @@ export const COMMUNITY_COMMENTS_FLOW = 'maestro/community-comments.yaml'
 
 /**
  * Production follow-up (2026-11-19): Use my location on mobile. The flow sets the device to
- * USE_MY_LOCATION_DEVICE, which the app must round to USE_MY_LOCATION_ROUNDED before it leaves
- * the phone; the double's reverse lookup resolves that to its catalog Chicago.
+ * USE_MY_LOCATION_DEVICE. Read at full accuracy it rounds to USE_MY_LOCATION_ROUNDED; the OS may
+ * answer a reduced-accuracy fix near it instead, which still resolves to the double's Chicago.
  */
 export const USE_MY_LOCATION_FLOW = 'maestro/location-use-my-location.yaml'
 export const USE_MY_LOCATION_DEVICE = Object.freeze({
@@ -325,25 +325,32 @@ export const locationCaptureWeatherDoubleCause = ({ before, requests, query, pla
   return undefined
 }
 
+/** True when a coordinate carries at most two decimals, the precision the app may send. */
+const twoDecimals = (value) =>
+  Number.isFinite(value) && Math.round(value * 100) / 100 === value
+
 /**
  * Production follow-up (2026-11-19): judges what the weather provider double saw while the Use
- * my location flow ran. The app must have asked about the rounded position exactly as rounded,
- * and the precise device position must never have reached the provider. Returns the named cause
- * that fails the flow, or `undefined`.
+ * my location flow ran. On a device the OS answers the injected position at reduced accuracy, so
+ * the fix the app reads (and rounds) can differ from the injected pair: the verdict checks what a
+ * correct client guarantees instead. Every reverse lookup carried at most two decimals, the
+ * precise injected position never reached the provider, and a lookup resolved to the city the
+ * flow saves (Chicago). The exact rounding arithmetic is pinned by the mocked-device unit tests.
+ * Returns the named cause that fails the flow, or `undefined`.
  *
  * @param {{
  *   before: { geocoding: number },
  *   requests: { geocoding: { seq: number, query: string, latitude?: number, longitude?: number }[] },
- *   rounded?: { latitude: number, longitude: number },
  *   device?: { latitude: number, longitude: number },
+ *   city?: string,
  * }} observed
  * @returns {string | undefined}
  */
 export const useMyLocationWeatherDoubleCause = ({
   before,
   requests,
-  rounded = USE_MY_LOCATION_ROUNDED,
   device = USE_MY_LOCATION_DEVICE,
+  city = 'Chicago',
 }) => {
   const lookups = requests.geocoding.filter((entry) => entry.seq > before.geocoding)
   const reverse = lookups.filter((entry) => typeof entry.latitude === 'number')
@@ -358,14 +365,19 @@ export const useMyLocationWeatherDoubleCause = ({
   ) {
     return 'the precise device position reached the weather provider; the app must round it first'
   }
+  const seen = reverse.map((entry) => `${entry.latitude},${entry.longitude}`).join('; ')
+  const unrounded = reverse.filter(
+    (entry) => !twoDecimals(entry.latitude) || !twoDecimals(entry.longitude)
+  )
+  if (unrounded.length > 0) {
+    return `a reverse lookup carried more than two decimals (reverse lookups during the flow: ${seen})`
+  }
   if (
     !reverse.some(
-      (entry) =>
-        entry.latitude === rounded.latitude && entry.longitude === rounded.longitude
+      (entry) => reversePlaces(entry.latitude, entry.longitude)[0]?.name === city
     )
   ) {
-    const seen = reverse.map((entry) => `${entry.latitude},${entry.longitude}`).join('; ')
-    return `no reverse lookup at the rounded position ${rounded.latitude},${rounded.longitude} (reverse lookups during the flow: ${seen})`
+    return `no reverse lookup resolved to ${city} (reverse lookups during the flow: ${seen})`
   }
   return undefined
 }

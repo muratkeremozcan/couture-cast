@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up after the project close (2026-11-19), Codex review 1 finding 2: only the
 // first list load was tied to the member who asked for it. The list a rename starts is still in
 // flight when member A signs out (or when member B signs in on the same tab); when it lands it
@@ -17,8 +17,11 @@ import type * as WebSession from '../../../lib/web-session'
 import type * as Locations from '../../../lib/locations'
 import { LocationsSection } from './locations-section'
 
-/** Every list the section starts, kept until it settles, so a test waits for the late answer. */
-const lists = vi.hoisted(() => ({ promises: [] as Promise<unknown>[] }))
+/** Every list and rename the section starts, kept until it settles, so a test waits for it. */
+const lists = vi.hoisted(() => ({
+  promises: [] as Promise<unknown>[],
+  renames: [] as Promise<unknown>[],
+}))
 
 vi.mock('../../../lib/locations', async (importOriginal) => {
   const actual = await importOriginal<typeof Locations>()
@@ -29,8 +32,23 @@ vi.mock('../../../lib/locations', async (importOriginal) => {
       lists.promises.push(listing)
       return listing
     },
+    renameLocationFromWeb: (...args: Parameters<typeof actual.renameLocationFromWeb>) => {
+      const renaming = actual.renameLocationFromWeb(...args)
+      lists.renames.push(renaming)
+      return renaming
+    },
   }
 })
+
+/** Every rename has settled and React has applied whatever its handlers set. */
+async function settleRenames() {
+  await act(async () => {
+    await Promise.allSettled(lists.renames)
+  })
+  await act(async () => {
+    await Promise.resolve()
+  })
+}
 
 /** Every list has settled and React has applied whatever its handlers set. */
 async function settleLists() {
@@ -91,6 +109,10 @@ const B_OFFICE = place('b-1', 'Bravo Office', 'Springfield')
 let heldList: { release: () => void } | null
 let holdNextAList: boolean
 let renamed: boolean
+/** A rename the test releases by hand, and every list GET's bearer. */
+let heldPatch: { release: () => void } | null
+let holdNextPatch: boolean
+let listBearers: (string | null)[]
 
 function renderSection() {
   return render(
@@ -133,13 +155,18 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
     heldList = null
     holdNextAList = false
     lists.promises = []
+    lists.renames = []
     renamed = false
+    heldPatch = null
+    holdNextPatch = false
+    listBearers = []
     session.identity = 'member-a'
     session.stored = true
     window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-a')
     useMswHandlers(
       http.get('/api/v1/locations', async ({ request }) => {
         const bearer = request.headers.get('authorization')
+        listBearers.push(bearer)
         if (bearer === 'Bearer token-b') return HttpResponse.json({ data: [B_OFFICE] })
         if (holdNextAList) {
           holdNextAList = false
@@ -149,7 +176,13 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
         }
         return HttpResponse.json({ data: [renamed ? A_RENAMED : A_HOME] })
       }),
-      http.patch('/api/v1/locations/:id', () => {
+      http.patch('/api/v1/locations/:id', async () => {
+        if (holdNextPatch) {
+          holdNextPatch = false
+          await new Promise<void>((resolve) => {
+            heldPatch = { release: resolve }
+          })
+        }
         renamed = true
         return HttpResponse.json({ data: A_RENAMED })
       })
@@ -200,6 +233,44 @@ describe('LocationsSection keeps a late list with the member who asked for it', 
 
     expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
     expect(screen.queryByText(/Alpha/)).toBeNull()
+  })
+
+  // Codex review 3 finding 3: the rename itself (not its list) is still in flight at the switch.
+  it('LOC-OWNER-WEB-05 a rename that finishes after the next member loaded starts no list and leaves their editor open', async () => {
+    const user = userEvent.setup()
+    renderSection()
+    expect(await screen.findByText('Alpha Home')).toBeInTheDocument()
+    holdNextPatch = true
+    await user.click(screen.getByRole('button', { name: /Rename/ }))
+    const field = screen.getByRole('textbox', { name: 'New name' })
+    await user.clear(field)
+    await user.type(field, 'Alpha Studio')
+    await user.click(screen.getByRole('button', { name: /Save name/ }))
+    await waitFor(() => expect(heldPatch).not.toBeNull())
+
+    publish(null, null, true)
+    publish('member-b', 'token-b', true)
+    expect(await screen.findByText('Bravo Office')).toBeInTheDocument()
+    await settleLists()
+    // B starts renaming their own place.
+    await user.click(screen.getByRole('button', { name: /Rename/ }))
+    const bField = screen.getByRole('textbox', { name: 'New name' })
+    expect(bField).toHaveValue('Bravo Office')
+    const bListsBefore = listBearers.filter(
+      (bearer) => bearer === 'Bearer token-b'
+    ).length
+
+    act(() => heldPatch!.release())
+    // The rename settles first, then any list it would start has settled too.
+    await settleRenames()
+    await settleLists()
+
+    expect(listBearers.filter((bearer) => bearer === 'Bearer token-b')).toHaveLength(
+      bListsBefore
+    )
+    expect(screen.getByRole('textbox', { name: 'New name' })).toHaveValue('Bravo Office')
+    expect(screen.queryByText(/Alpha/)).toBeNull()
+    expect(screen.getByTestId('locations-status-region')).not.toHaveTextContent(/Alpha/)
   })
 
   it('LOC-OWNER-WEB-01 a list that lands after sign-out shows none of the signed-out member', async () => {

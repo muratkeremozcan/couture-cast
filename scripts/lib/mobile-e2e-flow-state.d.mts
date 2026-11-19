@@ -69,8 +69,8 @@ export declare function useMyLocationWeatherDoubleCause(observed: {
   requests: {
     geocoding: { seq: number; query: string; latitude?: number; longitude?: number }[]
   }
-  rounded?: { latitude: number; longitude: number }
   device?: { latitude: number; longitude: number }
+  city?: string
 }): string | undefined
 
 export declare const COMMUNITY_COMMENTS_LONG_ROOT: string

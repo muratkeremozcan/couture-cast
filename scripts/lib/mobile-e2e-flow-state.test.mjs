@@ -1,5 +1,5 @@
 // Learning path Step 58: Production follow-ups after the project close.
-// See _bmad-output/project-knowledge/learning-path-step-by-step.md#step-58-production-follow-ups-after-the-project-close
+// See _bmad-output/project-knowledge/learning-path-step-by-step.md#production-follow-ups-after-the-project-close
 // Production follow-up (2026-11-19): the runner's verdict on what the weather provider double saw
 // while maestro/location-use-my-location.yaml ran, and the saved-location hooks around that flow.
 import assert from 'node:assert/strict'
@@ -89,13 +89,34 @@ describe('Use my location weather double verdict', () => {
     )
   })
 
-  test('fails when the lookup used some other rounding', () => {
+  test('passes a reduced-accuracy fix the OS moved, rounded to two decimals, near Chicago', () => {
+    // Coarse location answered a fix a few hundred metres from the injected position.
     assert.equal(
       useMyLocationWeatherDoubleCause({
         before,
-        requests: { geocoding: [reverse(5, 41.9, -87.6)] },
+        requests: { geocoding: [reverse(5, 41.9, -87.68)] },
       }),
-      'no reverse lookup at the rounded position 41.87,-87.64 (reverse lookups during the flow: 41.9,-87.6)'
+      undefined
+    )
+  })
+
+  test('fails when a lookup carried more than two decimals', () => {
+    assert.equal(
+      useMyLocationWeatherDoubleCause({
+        before,
+        requests: { geocoding: [reverse(5, 41.873, -87.64)] },
+      }),
+      'a reverse lookup carried more than two decimals (reverse lookups during the flow: 41.873,-87.64)'
+    )
+  })
+
+  test('fails when no lookup resolved to the city the flow saves', () => {
+    assert.equal(
+      useMyLocationWeatherDoubleCause({
+        before,
+        requests: { geocoding: [reverse(5, 40.71, -74.01)] },
+      }),
+      'no reverse lookup resolved to Chicago (reverse lookups during the flow: 40.71,-74.01)'
     )
   })
 })
