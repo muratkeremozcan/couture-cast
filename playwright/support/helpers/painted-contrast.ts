@@ -134,24 +134,24 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
       const uniform = pairs.length === 0 || onBackground.length >= 0.95 * pairs.length
       const contrast = (x: number, y: number) =>
         (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
-      // The text color is read where a glyph's stem reaches it: the pixel whose ink differs most
-      // from the background under it. The ratio is that color's worst contrast against every
-      // background pixel under the glyphs, so a background that lightens or darkens within the
-      // band still counts where the text is weakest.
-      let ink = -1
-      let strongest = 1
+      // Each background region is rated on its own: glyph pixels are grouped by the luminance
+      // under them (2% contrast steps), each group by its strongest stem (the pixel whose ink
+      // differs most from its own background, where a translucent text color is painted over
+      // that region), and the text takes its weakest group. A group needs 3% of the glyph pixels
+      // (and at least 8) to count, so a few antialiased pixels cannot decide the result.
+      const groups = new Map<number, { count: number; strongest: number }>()
       for (const [under, inked] of onBackground) {
-        const local = contrast(under, inked)
-        if (local > strongest) {
-          strongest = local
-          ink = inked
-        }
+        const key = Math.round(Math.log(under + 0.05) / Math.log(1.02))
+        const group = groups.get(key) ?? { count: 0, strongest: 1 }
+        group.count += 1
+        group.strongest = Math.max(group.strongest, contrast(under, inked))
+        groups.set(key, group)
       }
+      const floor = Math.max(8, 0.03 * onBackground.length)
+      const counted = [...groups.values()].filter((group) => group.count >= floor)
+      const rated = counted.length > 0 ? counted : [...groups.values()]
       let ratio = 1
-      if (ink >= 0) {
-        ratio = Infinity
-        for (const [under] of onBackground) ratio = Math.min(ratio, contrast(ink, under))
-      }
+      if (rated.length > 0) ratio = Math.min(...rated.map((group) => group.strongest))
       return { painted, ratio, uniform }
     },
     { a: inked, b: bare, m: mask ?? null }
