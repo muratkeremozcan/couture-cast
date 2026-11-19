@@ -15,6 +15,11 @@
 //   - disguised terms: at least 100 cases spanning every obfuscation family
 //     Story 6.2 AC 4 names, and none of them may reach `pass`.
 //
+// With no eligible holdout (production follow-up 2026-11-19: v6 and v8 were retired after the
+// allow list was tuned against them), the PR run is a development run: every gate that needs no
+// eligible holdout still runs and the retired holdout figures are measured and labelled
+// development, while a release run (COMMUNITY_SCREENING_RUN_PRODUCT_DIR set) refuses to start.
+//
 // It runs in the ordinary unit suite, so a term list or allow-list change that
 // starts flagging ordinary copy, or opens a bypass, fails the pull request that
 // made it. Failure messages carry case ids and reason codes and never the text
@@ -29,6 +34,10 @@ import {
   wilsonInterval,
 } from './community-text-corpus-gate.js'
 import { assertLocaleFileSealed } from './community-text-holdout-eligibility.js'
+import {
+  parseActiveHoldout,
+  requireEligibleHoldout,
+} from './community-text-holdout-eligibility-core.mjs'
 import {
   assertVersionDirectorySealed,
   describeCleanGates,
@@ -51,9 +60,94 @@ async function currentInputSetHash(): Promise<string> {
 }
 
 const corpusDir = path.resolve(__dirname, '../../../test/fixtures/community-text-corpus')
-// Each locale names its own active holdout version; every one must be eligible for that
-// locale with a registered seal before any corpus file is read.
-const { holdouts, manifests } = loadActiveHoldouts(corpusDir)
+
+/** Set by the release command that writes the run product. */
+const RELEASE_RUN = Boolean(process.env.COMMUNITY_SCREENING_RUN_PRODUCT_DIR?.trim())
+
+type ActiveHoldouts = ReturnType<typeof loadActiveHoldouts>
+
+const readJson = (file: string): unknown => JSON.parse(fs.readFileSync(file, 'utf8'))
+
+/**
+ * A development run is allowed only when every selected locale/version pair carries an explicit
+ * retirement for that locale. An eligible pair beside a retired one, an unclassified pair, or any
+ * other refusal stops the run before a single version-specific file is opened, so a fresh cohort
+ * can never have its clean figures disclosed outside an independent release evaluation.
+ */
+function assertEveryHoldoutRetired(
+  active: Record<string, string>,
+  ledger: unknown
+): void {
+  const notRetired: string[] = []
+  for (const [locale, version] of Object.entries(active)) {
+    try {
+      requireEligibleHoldout(version, ledger, locale)
+      notRetired.push(`${locale} ${version} is eligible`)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (!message.includes(`${version} is retired for ${locale}`))
+        notRetired.push(`${locale}: ${message}`)
+    }
+  }
+  if (notRetired.length > 0)
+    throw new Error(
+      `a development corpus run needs every selected holdout retired; ${notRetired.join('; ')}`
+    )
+}
+
+/**
+ * Each locale names its own active holdout version; for a release run every one must be eligible
+ * for that locale with a registered seal before any corpus file is read. A PR run whose selector
+ * names only retired holdouts reads them as development data instead, after every pair is
+ * classified as retired: the version each locale is selected on and the seal its freeze manifest
+ * records, with no eligibility claimed. Any other refusal, and every refusal in a release run,
+ * still stops the file.
+ */
+function loadHoldoutsForRun(release: boolean): ActiveHoldouts & { development: boolean } {
+  try {
+    return { ...loadActiveHoldouts(corpusDir), development: false }
+  } catch (error) {
+    if (release || !/is retired for [a-z]{2}/.test(String(error))) throw error
+    const active = parseActiveHoldout(
+      readJson(path.join(corpusDir, 'active-holdout.json'))
+    )
+    assertEveryHoldoutRetired(
+      active,
+      readJson(path.join(corpusDir, 'holdout-retirements.json'))
+    )
+    const manifests: ActiveHoldouts['manifests'] = new Map()
+    const holdouts: ActiveHoldouts['holdouts'] = {}
+    for (const [locale, version] of Object.entries(active)) {
+      if (!manifests.has(version)) {
+        manifests.set(
+          version,
+          readJson(path.join(corpusDir, version, 'freeze-manifest.json')) as Parameters<
+            typeof assertVersionDirectorySealed
+          >[2]
+        )
+      }
+      const manifest = manifests.get(version) as {
+        sealedAt: string
+        corpusSha256: string
+      }
+      holdouts[locale] = {
+        version,
+        seal: {
+          corpusVersion: version,
+          sealedAt: manifest.sealedAt,
+          corpusSha256: manifest.corpusSha256,
+        },
+      }
+    }
+    return { holdouts, manifests, development: true }
+  }
+}
+
+const {
+  holdouts,
+  manifests,
+  development: DEVELOPMENT_RUN,
+} = loadHoldoutsForRun(RELEASE_RUN)
 const holdoutVersion = (language: string): string => holdouts[language]?.version ?? ''
 const holdoutPath = (language: string): string =>
   path.join(corpusDir, holdoutVersion(language), `${language}.json`)
@@ -217,9 +311,6 @@ function evaluateLanguage(language: string): LanguageResult {
   }
 }
 
-/** Set by the release command that writes the run product. */
-const RELEASE_RUN = Boolean(process.env.COMMUNITY_SCREENING_RUN_PRODUCT_DIR?.trim())
-
 const languages = Object.keys(LANGUAGE_LOCALE)
 const results = new Map(
   languages.map((language) => [language, evaluateLanguage(language)])
@@ -324,6 +415,87 @@ describe.each(languages)('text corpus: %s', (language) => {
 
   it('withholds every disguised term, whatever the obfuscation family', () => {
     expect(result.disallowed.bypassIds).toEqual([])
+  })
+})
+
+describe('development run while no holdout is eligible', () => {
+  it.runIf(DEVELOPMENT_RUN)('refuses a release run on the same selector', () => {
+    expect(() => loadHoldoutsForRun(true)).toThrow(/is retired for [a-z]{2}/)
+  })
+
+  // The rules were tuned against these entries, so a Wilson bound on them would not estimate
+  // new captions. The figures are the observed held count over the denominator, per locale; the
+  // Wilson release gate is reserved for a fresh, eligible holdout.
+  it.runIf(DEVELOPMENT_RUN)(
+    'reports the held count and denominator of each retired holdout as development data',
+    ({ annotate }) => {
+      const figures = languages.map((language) => {
+        const { clean } = results.get(language) as LanguageResult
+        expect(clean.total, language).toBeGreaterThanOrEqual(MINIMUM_CLEAN)
+        return `${language} ${holdoutVersion(language)} held ${clean.withheld} of ${clean.total}`
+      })
+      void annotate(`development data, not release evidence: ${figures.join('; ')}`)
+    }
+  )
+})
+
+describe('development selection classification', () => {
+  const seal = (version: string, locales: string[]) => ({
+    corpusVersion: version,
+    sealedAt: '2026-11-19T00:00:00.000Z',
+    corpusSha256: 'c'.repeat(64),
+    locales,
+  })
+  const retiredFor = (locales: string[]) => ({ locales, reason: 'tuned against' })
+  const ledger = (
+    eligible: Record<string, unknown>,
+    retired: Record<string, unknown>
+  ) => ({
+    schemaVersion: 3,
+    eligible,
+    retired,
+  })
+
+  it('accepts a selection whose every pair is retired for its locale', () => {
+    expect(() =>
+      assertEveryHoldoutRetired(
+        { de: 'holdout-v90', pt: 'holdout-v91' },
+        ledger(
+          {},
+          { 'holdout-v90': retiredFor(['de']), 'holdout-v91': retiredFor(['pt']) }
+        )
+      )
+    ).not.toThrow()
+  })
+
+  it('refuses a retired pair beside an unclassified one', () => {
+    expect(() =>
+      assertEveryHoldoutRetired(
+        { de: 'holdout-v90', pt: 'holdout-v91' },
+        ledger({}, { 'holdout-v90': retiredFor(['de']) })
+      )
+    ).toThrow(/every selected holdout retired; pt: /)
+  })
+
+  it('refuses a retired pair beside an eligible fresh cohort', () => {
+    expect(() =>
+      assertEveryHoldoutRetired(
+        { de: 'holdout-v90', pt: 'holdout-v91' },
+        ledger(
+          { 'holdout-v91': seal('holdout-v91', ['pt']) },
+          { 'holdout-v90': retiredFor(['de']) }
+        )
+      )
+    ).toThrow(/pt holdout-v91 is eligible/)
+  })
+
+  it('refuses a version retired only for another locale', () => {
+    expect(() =>
+      assertEveryHoldoutRetired(
+        { de: 'holdout-v90', pt: 'holdout-v90' },
+        ledger({}, { 'holdout-v90': retiredFor(['de']) })
+      )
+    ).toThrow(/every selected holdout retired; pt: /)
   })
 })
 

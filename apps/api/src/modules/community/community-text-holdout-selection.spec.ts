@@ -44,41 +44,45 @@ describe('checked-in selector', () => {
     '../../../test/fixtures/community-text-corpus'
   )
 
-  it('gates Portuguese on holdout-v8 and the other six locales on holdout-v6', () => {
-    const { holdouts } = loadActiveHoldouts(corpusDir)
-    expect(describeCleanGates(holdouts).cleanGatedOn).toEqual({
-      de: 'holdout-v6',
-      en: 'holdout-v6',
-      es: 'holdout-v6',
-      fr: 'holdout-v6',
-      it: 'holdout-v6',
-      pt: 'holdout-v8',
-      tr: 'holdout-v6',
-    })
+  const LOCALES = ['de', 'en', 'es', 'fr', 'it', 'pt', 'tr'] as const
+  const readLedger = (): unknown =>
+    JSON.parse(fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8'))
+
+  // Production follow-up 2026-11-19: the allow list was tuned against the row-level false
+  // positives of holdout-v6 (de, en, es, fr, it, tr) and holdout-v8 (pt), so both were retired
+  // for every locale they gated. Until a fresh holdout is sealed and released, the checked-in
+  // selector must refuse, so no run can present a tuned-against figure as release evidence.
+  it('refuses the checked-in selector while every active holdout is retired', () => {
+    expect(() => loadActiveHoldouts(corpusDir)).toThrow(
+      /active text holdout holdout-v\d+ is retired for [a-z]{2}/
+    )
+  })
+
+  it('registers no eligible holdout', () => {
+    expect((readLedger() as { eligible: Record<string, unknown> }).eligible).toEqual({})
+  })
+
+  it('retires the version each locale is still selected on, with the tuning disclosed', () => {
+    const active = parseActiveHoldout(
+      JSON.parse(fs.readFileSync(path.join(corpusDir, 'active-holdout.json'), 'utf8'))
+    )
+    const ledger = readLedger()
+    for (const locale of LOCALES) {
+      const version = active[locale] as string
+      expect(version, locale).toBe(locale === 'pt' ? 'holdout-v8' : 'holdout-v6')
+      expect(() => requireEligibleHoldout(version, ledger, locale)).toThrow(
+        new RegExp(`${version} is retired for ${locale}: .*tuned the allow list`)
+      )
+    }
   })
 
   it('keeps the spent Portuguese holdouts retired', () => {
     const ledger: unknown = JSON.parse(
       fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
     )
-    for (const version of ['holdout-v6', 'holdout-v7']) {
+    for (const version of ['holdout-v6', 'holdout-v7', 'holdout-v8']) {
       expect(() => requireEligibleHoldout(version, ledger, 'pt')).toThrow(
         new RegExp(`${version} is retired for pt`)
-      )
-    }
-  })
-
-  it('names holdout-v6 for the six locales it is eligible for', () => {
-    const active = parseActiveHoldout(
-      JSON.parse(fs.readFileSync(path.join(corpusDir, 'active-holdout.json'), 'utf8'))
-    )
-    const ledger: unknown = JSON.parse(
-      fs.readFileSync(path.join(corpusDir, 'holdout-retirements.json'), 'utf8')
-    )
-    for (const locale of ['de', 'en', 'es', 'fr', 'it', 'tr']) {
-      expect(active[locale]).toBe('holdout-v6')
-      expect(requireEligibleHoldout('holdout-v6', ledger, locale).corpusVersion).toBe(
-        'holdout-v6'
       )
     }
   })
