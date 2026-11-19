@@ -25,6 +25,12 @@
 //   again (Maestro.tap and hierarchyBasedTap).
 // - `extendedWaitUntil` with `visible` looks the element up for its timeout, adjusted the same way.
 // - `optional: true` on a command turns its failure into a pass.
+// - A lookup that misses costs one more hierarchy read: Orchestra.findElement throws
+//   ElementNotFound carrying maestro.viewHierarchy(). That holds for a missed `visible` condition,
+//   for every nested `notVisible` search that misses (the read comes after the miss decided the
+//   condition) and for a tapOn lookup. An `extendedWaitUntil` that misses reads twice: the
+//   ElementNotFound read, then the AssertionFailure that assertConditionCommand throws with another
+//   maestro.viewHierarchy(). These reads only spend time; nothing decides on what they see.
 // Any other command, key, condition or retry value throws, so the model never skips a step it does
 // not know. Timing (one read, one settle, one press) is a parameter: the tests run both sides of a
 // boundary that moves with it.
@@ -98,12 +104,23 @@ export function runMaestroModel(commands, screen, { readMs, settleMs, pressMs } 
     } while (now < end)
     return null
   }
-  /** Maestro.findElementWithTimeout: one hierarchy read per try. */
-  const found = (id, windowMs) =>
-    withTimeout(windowMs, () => {
-      now += readMs
-      return screen.isVisible(id, now) ? true : null
-    }) === true
+  /** Hierarchy read for an exception's report (ElementNotFound, AssertionFailure). */
+  const failureRead = () => {
+    now += readMs
+  }
+  /**
+   * Orchestra.findElement over Maestro.findElementWithTimeout: one hierarchy read per try, and on a
+   * miss the ElementNotFound read.
+   */
+  const found = (id, windowMs) => {
+    const hit =
+      withTimeout(windowMs, () => {
+        now += readMs
+        return screen.isVisible(id, now) ? true : null
+      }) === true
+    if (!hit) failureRead()
+    return hit
+  }
 
   const condition = (when) => {
     onlyKeys('when', when, ['visible', 'notVisible'])
@@ -163,8 +180,11 @@ export function runMaestroModel(commands, screen, { readMs, settleMs, pressMs } 
       onlyKeys('extendedWaitUntil', body, ['visible', 'timeout', 'optional'])
       positive('extended_wait_timeout', body.timeout)
       const id = elementId(body.visible)
-      if (!found(id, adjusted(body.timeout)))
+      if (!found(id, adjusted(body.timeout))) {
+        // assertConditionCommand: AssertionFailure carries its own maestro.viewHierarchy().
+        failureRead()
         fail(`extendedWaitUntil ${id}: not visible after ${body.timeout} ms`)
+      }
       return false
     },
   }

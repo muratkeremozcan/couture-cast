@@ -93,6 +93,8 @@ function invokeMaestro(t, capture) {
     logSize: () => 0,
     recordIosFlowTiming: () => undefined,
     recordIosFlowProgress: () => undefined,
+    recordIosOpenerTapAttempts: () => undefined,
+    openerTapOutcome: () => 'failed',
     afterTimeoutHierarchy: () => null,
     iosDeadlineKill: () => false,
     scheduleIosInFlowSample: () => false,

@@ -64,7 +64,6 @@ export function recordIosCommandTimings({
   directory,
   minMs = 1000,
   maestroLog = '',
-  progressLog = '',
   log = console.log,
 }) {
   if (platform !== 'ios') return null
@@ -72,24 +71,72 @@ export function recordIosCommandTimings({
     commandFiles(output).length || !maestroLog
       ? { flow, commands: slowMaestroCommands(output, minMs) }
       : { flow, source: 'maestro-log', commands: maestroLogCommands(maestroLog, minMs) }
-  // tap-outfit-open.yaml retries a cancelled opener press up to four times and still passes, so
-  // the count of presses it issued is the only record of how often the first one is lost.
-  const openerTaps = outfitOpenerTaps(progressLog || maestroLog)
-  if (openerTaps > 0) entry.outfitOpenerTaps = openerTaps
-  if (openerTaps > 1)
-    log(JSON.stringify({ outfitOpenerRetried: { flow, taps: openerTaps } }))
-  const file = path.join(directory, 'native-ios-flow-command-timings.json')
+  appendTimingReceipt(directory, 'flows', entry, log)
+  return entry
+}
+
+export const COMMAND_TIMINGS_FILE = 'native-ios-flow-command-timings.json'
+
+/** Appends `entry` to the receipt's `list`, keeping every other list the receipt holds. */
+function appendTimingReceipt(directory, list, entry, log) {
+  const file = path.join(directory, COMMAND_TIMINGS_FILE)
   try {
     const record = fs.existsSync(file)
       ? JSON.parse(fs.readFileSync(file, 'utf8'))
       : { version: 1, flows: [] }
-    record.flows.push(entry)
+    ;(record[list] ??= []).push(entry)
     fs.writeFileSync(file, JSON.stringify(record, null, 2) + '\n', { mode: 0o600 })
   } catch (error) {
     log(
       JSON.stringify({ iosCommandTimingsWriteFailure: { errorCode: error.code ?? null } })
     )
   }
+}
+
+/** How one maestro() run of a flow ended, for its opener tap attempts. */
+export const OPENER_TAP_OUTCOMES = Object.freeze([
+  'passed',
+  'failed',
+  'deadline-killed',
+  'discarded-for-snapshot-retry',
+])
+
+/**
+ * The outcome of one maestro() run from its spawn result: a pass, an attempt the snapshot retry
+ * discards, a kill by the iOS flow deadline (spawnIosFlow's `deadline.timedOut`) or a failure.
+ */
+export function openerTapOutcome(result, recoverSnapshot) {
+  if (result.status === 0) return 'passed'
+  if (recoverSnapshot) return 'discarded-for-snapshot-retry'
+  return result.deadline?.timedOut === true ? 'deadline-killed' : 'failed'
+}
+
+/**
+ * tap-outfit-open.yaml retries the outfit opener tap up to four times and still passes, so the
+ * count of tap commands a run started is the only record of how often the first one is repeated.
+ * Every run counts, whatever its outcome: a passing flow, a failed one, one the deadline killed
+ * and an attempt discarded for the snapshot retry. A count is of tap commands Maestro started (one
+ * RUNNING line each): a started command may end before it sends a touch (its lookup failed, the
+ * deadline struck), and a sent touch may be cancelled by the app; only app or driver evidence
+ * tells those apart. Runs with no opener tap write nothing.
+ */
+export function recordIosOpenerTapAttempts({
+  platform,
+  flow,
+  outcome,
+  progressLog,
+  directory,
+  log = console.log,
+}) {
+  if (platform !== 'ios') return null
+  if (!OPENER_TAP_OUTCOMES.includes(outcome))
+    throw new Error(`opener_tap_outcome_unknown:${outcome}`)
+  const attempts = outfitOpenerTapAttempts(progressLog)
+  if (attempts === 0) return null
+  const entry = { flow, outcome, attempts }
+  appendTimingReceipt(directory, 'openerTapAttempts', entry, log)
+  if (attempts > 1 || outcome !== 'passed')
+    log(JSON.stringify({ outfitOpenerTapAttempts: entry }))
   return entry
 }
 
@@ -101,8 +148,12 @@ const verbOf = (label) => /^[A-Za-z]+(?: [A-Za-z]+){0,2}/.exec(label)?.[0] ?? 'u
 // The outfit opener tap as the progressive log labels it, with or without its `, Index: 0`.
 const OUTFIT_OPENER_TAP = /^Tap on id: outfit-share-card-open(?:,|$)/
 
-/** How many outfit opener presses a flow issued: one RUNNING line per press, counted only. */
-export function outfitOpenerTaps(log) {
+/**
+ * How many outfit opener tap commands a run started: one RUNNING line each, counted only. Maestro
+ * logs RUNNING before it looks the element up or sends input, so this counts attempts, never
+ * delivered touches.
+ */
+export function outfitOpenerTapAttempts(log) {
   let taps = 0
   for (const line of String(log ?? '').split('\n')) {
     const match = PROGRESS_LINE.exec(line)

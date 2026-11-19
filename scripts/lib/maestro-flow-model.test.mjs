@@ -106,7 +106,8 @@ describe('runMaestroModel', () => {
         (error) =>
           error instanceof MaestroModelStepFailed &&
           error.message === 'tapOn missing: not visible' &&
-          error.elapsedMs === MAESTRO_LOOKUP_MS
+          // The 17 s of reads, then the ElementNotFound read.
+          error.elapsedMs === MAESTRO_LOOKUP_MS + timing.readMs
       )
       const s = screen({ next: 0 })
       const elapsed = runMaestroModel(
@@ -118,37 +119,40 @@ describe('runMaestroModel', () => {
         s.presses.map(({ id }) => id),
         ['next']
       )
-      // The optional lookup gave up at 7 s; the later tap's window shrank by those 7 s and still read.
+      // The optional lookup gave up at 7 s and read once more for ElementNotFound; the later tap's
+      // window shrank by that time and still read.
       assert.equal(
         s.presses[0].at,
-        MAESTRO_OPTIONAL_LOOKUP_MS + timing.readMs + timing.settleMs + timing.pressMs
+        MAESTRO_OPTIONAL_LOOKUP_MS + 2 * timing.readMs + timing.settleMs + timing.pressMs
       )
       assert.equal(elapsed, s.presses[0].at + timing.settleMs)
     })
   })
   describe('lookup windows', () => {
     test('model: a window shrinks by the time since the last tap, and a zero window still reads once', () => {
-      // After the tap, an optional 2 s wait that misses leaves a second 2 s wait no time: it reads
-      // exactly once.
+      // After the tap, an optional 2 s wait that misses (2 s of reads, then its ElementNotFound and
+      // AssertionFailure reads) leaves a second 2 s wait no time: it reads exactly once.
       const tapped = timing.readMs + 2 * timing.settleMs + timing.pressMs
+      const missed = 2_000 + 2 * timing.readMs
       const commands = [
         { tapOn: { id: 'button' } },
         { extendedWaitUntil: { visible: { id: 'gap' }, timeout: 2_000, optional: true } },
         { extendedWaitUntil: { visible: { id: 'late' }, timeout: 2_000 } },
       ]
-      // The one read lands at tapped + 2 s + one read: shown by then, the wait passes.
-      const passes = screen({ button: 0, late: tapped + 2_000 + timing.readMs })
+      // The one read lands at tapped + the missed wait + one read: shown by then, the wait passes.
+      const passes = screen({ button: 0, late: tapped + missed + timing.readMs })
       assert.equal(
         runMaestroModel(commands, passes, timing),
-        tapped + 2_000 + timing.readMs
+        tapped + missed + timing.readMs
       )
-      // Shown one millisecond later, the single read misses it and the wait fails at once.
-      const misses = screen({ button: 0, late: tapped + 2_000 + timing.readMs + 1 })
+      // Shown one millisecond later, the single read misses it and the wait fails after its two
+      // report reads.
+      const misses = screen({ button: 0, late: tapped + missed + timing.readMs + 1 })
       assert.throws(
         () => runMaestroModel(commands, misses, timing),
         (error) =>
           error instanceof MaestroModelStepFailed &&
-          error.elapsedMs === tapped + 2_000 + timing.readMs
+          error.elapsedMs === tapped + missed + 3 * timing.readMs
       )
     })
   })
@@ -162,10 +166,11 @@ describe('runMaestroModel', () => {
           },
         },
       ]
-      // Sheet absent: one visible read, then one nested search of 500 ms of reads, then the tap.
+      // Sheet absent: one visible read, one nested search of 500 ms of reads and its ElementNotFound
+      // read, then the tap.
       const absent = screen({ button: 0 })
       runMaestroModel(guarded, absent, timing)
-      const searched = timing.readMs + MAESTRO_NOT_VISIBLE_SEARCH_MS
+      const searched = timing.readMs + MAESTRO_NOT_VISIBLE_SEARCH_MS + timing.readMs
       assert.deepEqual(absent.presses, [
         { id: 'button', at: searched + timing.readMs + timing.settleMs + timing.pressMs },
       ])
@@ -175,9 +180,13 @@ describe('runMaestroModel', () => {
       const elapsed = runMaestroModel(guarded, shown, timing)
       assert.equal(shown.presses.length, 0)
       assert.equal(elapsed, MAESTRO_OPTIONAL_LOOKUP_MS)
-      // No button within 7 s: the condition fails before notVisible is read.
+      // No button within 7 s: the condition fails, after its ElementNotFound read, before notVisible
+      // is read.
       const none = screen({})
-      assert.equal(runMaestroModel(guarded, none, timing), MAESTRO_OPTIONAL_LOOKUP_MS)
+      assert.equal(
+        runMaestroModel(guarded, none, timing),
+        MAESTRO_OPTIONAL_LOOKUP_MS + timing.readMs
+      )
       assert.equal(none.presses.length, 0)
     })
   })

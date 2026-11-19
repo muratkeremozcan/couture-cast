@@ -509,6 +509,8 @@ describe('Maestro driver port', () => {
           closedRapidWatermarkFailure: () => 'native_rapid_watermark_failed',
           redactRapidWatermarkControl: () => undefined,
           recordIosCommandTimings: () => undefined,
+          recordIosOpenerTapAttempts: () => undefined,
+          openerTapOutcome: () => 'failed',
           spawnSync: capture,
           spawn: capture,
           flowTimeoutMs: () => 120_000,

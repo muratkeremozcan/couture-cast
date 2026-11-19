@@ -36,6 +36,8 @@ import { nativeFlowTimeoutMs } from './ci/native-ios-flow-budget.mjs'
 import { metroServerArgs, metroServerEnv } from './lib/story68-metro-env.mjs'
 import {
   recordIosCommandTimings,
+  recordIosOpenerTapAttempts,
+  openerTapOutcome,
   recordIosFlowProgress,
   captureIosTimeoutHierarchy,
   recordIosHostSample,
@@ -517,6 +519,15 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
   const recoverSnapshot =
     result.status !== 0 &&
     shouldRetryIosSnapshot({ platform, attempt, log: snapshotLog, flow })
+  // Every run's opener tap attempts, whatever its outcome, so a repeated tap is never hidden by a
+  // failure, a deadline kill or a discarded snapshot attempt.
+  recordIosOpenerTapAttempts({
+    platform,
+    flow,
+    directory,
+    progressLog: snapshotLog,
+    outcome: openerTapOutcome(result, recoverSnapshot),
+  })
   if (result.status !== 0 && !recoverSnapshot) {
     // A deadline kill leaves no failed-step screen; read it once more while the device lives.
     // The deadline, not the read's success, decides which screen is current (Codex RUNS-R5-01).
@@ -589,7 +600,6 @@ function maestro(flow, env = {}, secret = '', attempt = 0) {
     flow,
     output: successOutput,
     directory,
-    progressLog: snapshotLog,
   })
   recordIosStackPop({
     platform,
@@ -648,6 +658,7 @@ function rapidWatermarkFlow(signal, control) {
     return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : ''
   }
   const fd = fs.openSync(path.join(output, 'process.log'), 'wx', 0o600)
+  let heldOutcome = 'passed'
   return new Promise((resolve, reject) => {
     const process = spawn(
       maestroBinary,
@@ -712,6 +723,7 @@ function rapidWatermarkFlow(signal, control) {
     })
   })
     .catch((error) => {
+      heldOutcome = 'failed'
       const processLog = path.join(output, 'process.log')
       const logs = `${maestroLog()}\n${fs.existsSync(processLog) ? fs.readFileSync(processLog, 'utf8') : ''}`
       privateJson(
@@ -749,6 +761,13 @@ function rapidWatermarkFlow(signal, control) {
         directory,
         minMs: 0,
         maestroLog: maestroLog(),
+      })
+      recordIosOpenerTapAttempts({
+        platform,
+        flow,
+        directory,
+        progressLog: maestroLog(),
+        outcome: heldOutcome,
       })
       redactRapidWatermarkControl(output, control.url)
     })

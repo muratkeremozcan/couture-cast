@@ -30,6 +30,7 @@ import {
   MaestroModelStepFailed,
   runMaestroModel,
 } from './maestro-flow-model.mjs'
+import { openerTapOutcome } from '../ci/native-ios-maestro-trace.mjs'
 
 // Nightly run 44078916466 shard 2: open-outfit.yaml tapped the opener clear of the chip bar and the
 // tab bar, the app traced opener-press-in then opener-touch-cancel 0.2 s later, and the sheet never
@@ -145,12 +146,16 @@ describe('behavior under the Maestro model', () => {
    * How long after a received press the next attempt's guard last reads the screen, when the title
    * has not drawn by the end of the wait. Derived here from the pinned rules, independently of the
    * model: the press settles, the wait reads for its whole timeout (the tap was the last interaction,
-   * so nothing shrinks it), then the guard's windows have shrunk to zero, so `visible` reads once
-   * and `notVisible` runs one nested 500 ms search.
+   * so nothing shrinks it), the missed wait reads the hierarchy twice more (Orchestra.findElement's
+   * ElementNotFound, then assertConditionCommand's AssertionFailure), then the guard's windows have
+   * shrunk to zero, so `visible` reads once and `notVisible` runs one nested 500 ms search. The
+   * search's last read decides; its own ElementNotFound read comes after.
    */
+  const MISSED_WAIT_REPORT_READS = 2
   const guardLastReadAfterPress = (timing) =>
     timing.settleMs +
     readsSpanning(wait.extendedWaitUntil.timeout, timing) +
+    MISSED_WAIT_REPORT_READS * timing.readMs +
     timing.readMs +
     readsSpanning(MAESTRO_NOT_VISIBLE_SEARCH_MS, timing)
 
@@ -309,17 +314,21 @@ describe('callers and budgets', () => {
 })
 
 describe('evidence', () => {
-  test('a passing iOS flow hands its progressive Maestro log to the timing receipt, which counts opener presses', () => {
-    // Runs the runner's real maestro() to a passing exit with every device seam stubbed, and reads
-    // what it gives recordIosCommandTimings.
-    const source = fs.readFileSync(
-      new URL('../run-story68-native.mjs', import.meta.url),
-      'utf8'
-    )
-    const start = source.indexOf('function maestro(')
-    const end = source.indexOf('\nasync function signin(', start)
-    const progressLog = 'Tap on id: outfit-share-card-open RUNNING (stub log)'
+  // Runs the runner's real maestro() with every device seam stubbed: `runs` scripts each spawn's
+  // exit (0 passes; `deadline` marks a kill by the iOS flow deadline; `snapshot` asks for the
+  // snapshot retry), and the test reads what the runner hands the timing receipt.
+  const source = fs.readFileSync(
+    new URL('../run-story68-native.mjs', import.meta.url),
+    'utf8'
+  )
+  const start = source.indexOf('function maestro(')
+  const end = source.indexOf('\nasync function signin(', start)
+  const progressLog = 'Tap on id: outfit-share-card-open RUNNING (stub log)'
+  function runMaestro(runs) {
     const timings = []
+    const attempts = []
+    const spawns = [...runs]
+    let last = null
     const files = new Map([['/owned/runtime/maestro-ios-1/maestro.log', progressLog]])
     const context = {
       platform: 'ios',
@@ -327,6 +336,7 @@ describe('evidence', () => {
       directory: '/owned/runtime',
       root: '/owned/repo',
       device: 'owned-device',
+      appId: 'com.couturecast.story68',
       maestroBinary: 'maestro',
       Date: { now: () => 1 },
       requireDevice: () => undefined,
@@ -334,7 +344,16 @@ describe('evidence', () => {
       scheduleIosInFlowSample: () => false,
       withNativeTransport: (work) => work(),
       reverse: () => undefined,
-      spawnIosFlow: () => ({ status: 0, stdout: '', stderr: '' }),
+      spawnIosFlow: () => {
+        const run = spawns.shift()
+        last = run
+        return {
+          status: run.status,
+          stdout: '',
+          stderr: '',
+          deadline: { timedOut: run.deadline === true },
+        }
+      },
       iosDriverGlobalArgs: () => [],
       iosDriverTestArgs: () => [],
       DRIVER_HOST_PORT_ARG: '--driver-host-port',
@@ -350,17 +369,66 @@ describe('evidence', () => {
         rmSync: () => undefined,
       },
       recordIosFlowTiming: () => undefined,
-      shouldRetryIosSnapshot: () => false,
+      iosDeadlineKill: (platform, result) =>
+        platform === 'ios' && result.deadline?.timedOut === true,
+      // The real outcome decision the runner imports.
+      openerTapOutcome,
+      shouldRetryIosSnapshot: () => last?.afterSnapshot === true,
+      afterTimeoutHierarchy: () => null,
+      recordIosFlowProgress: () => undefined,
+      privateJson: () => undefined,
+      summarizeNativeFlowFailure: () => ({}),
+      recordNativeFlowDiagnostics: () => undefined,
       recordIosDriverFlow: () => null,
       recordIosCommandTimings: (options) => timings.push(options),
+      recordIosOpenerTapAttempts: (options) => attempts.push(options),
       recordIosStackPop: () => undefined,
     }
-    vm.runInNewContext(
-      `(${source.slice(start, end)})("maestro/story68/open-outfit.yaml")`,
-      context
+    let error = null
+    try {
+      vm.runInNewContext(
+        `(${source.slice(start, end)})("maestro/story68/open-outfit.yaml")`,
+        context
+      )
+    } catch (caught) {
+      error = caught
+    }
+    return { timings, attempts, error }
+  }
+
+  test('every maestro() run hands its progressive log to the opener tap attempts, with its outcome', () => {
+    const passed = runMaestro([{ status: 0 }])
+    assert.equal(passed.error, null)
+    assert.equal(passed.timings.length, 1)
+    assert.equal(passed.timings[0].flow, 'maestro/story68/open-outfit.yaml')
+    const failed = runMaestro([{ status: 1 }])
+    const killed = runMaestro([{ status: 1, deadline: true }])
+    // The first attempt is discarded for the snapshot retry; the retry passes.
+    const retried = runMaestro([{ status: 1, afterSnapshot: true }, { status: 0 }])
+    for (const run of [failed, killed]) {
+      assert.match(
+        String(run.error),
+        /native_flow_failed:maestro\/story68\/open-outfit\.yaml/
+      )
+      assert.equal(run.timings.length, 0, 'a failed flow writes no command timings')
+    }
+    assert.deepEqual(
+      [passed, failed, killed, retried].map((run) =>
+        run.attempts.map(({ flow, outcome, progressLog: log }) => [flow, outcome, log])
+      ),
+      [
+        [['maestro/story68/open-outfit.yaml', 'passed', progressLog]],
+        [['maestro/story68/open-outfit.yaml', 'failed', progressLog]],
+        [['maestro/story68/open-outfit.yaml', 'deadline-killed', progressLog]],
+        [
+          [
+            'maestro/story68/open-outfit.yaml',
+            'discarded-for-snapshot-retry',
+            progressLog,
+          ],
+          ['maestro/story68/open-outfit.yaml', 'passed', progressLog],
+        ],
+      ]
     )
-    assert.equal(timings.length, 1)
-    assert.equal(timings[0].progressLog, progressLog)
-    assert.equal(timings[0].flow, 'maestro/story68/open-outfit.yaml')
   })
 })
