@@ -51,22 +51,42 @@ printf '%s' "$config" |
   { echo "::error::Could not write apt's retry settings." >&2; exit 1; }
 
 drop_archives() {
-  find "$archives" -maxdepth 1 -type f -name '*.deb' -delete
+  find "$archives" -maxdepth 1 \( -type f -o -type l \) -name '*.deb' -delete
+}
+
+# The name apt gives a package file it downloads (QuoteString in apt's acquire-item.cc): package,
+# version and architecture joined by '_', with '%', '_' and ':' percent-encoded, and '.' too in
+# the architecture. apt finds a cached file by this name and checks only its size.
+apt_cache_name() {
+  local package=$1 version=$2 arch=$3
+  quote() {
+    local value=$1 dots=${2:-}
+    value=${value//%/%25}
+    value=${value//_/%5f}
+    value=${value//:/%3a}
+    [[ -z "$dots" ]] || value=${value//./%2e}
+    printf '%s' "$value"
+  }
+  printf '%s_%s_%s.deb' "$(quote "$package")" "$(quote "$version")" "$(quote "$arch" dots)"
 }
 
 # apt reuses a file in its archive directory when the name and size match the index, without
 # checking its hash, so a restored file with the same size and different bytes would install.
 # Every restored file is checked against the SHA256 the current package index gives for its
-# package, version and architecture; a file the index does not list, or whose hash differs, is
-# dropped and apt downloads it again.
+# package, version and architecture, and must sit at the name apt builds from those fields; a file
+# the index does not list, whose hash differs, or whose name says another version is dropped, as
+# is any symlink, and apt downloads it again.
 verify_archives() {
   # Plain indexed arrays and a lookup file, so the script runs on macOS's Bash 3.2, where the
   # harness that tests it also runs.
   local debs=() ids=() specs=() deb fields package version arch
+  # A symlink is not a file this script downloaded, and apt would follow it past the hash check
+  # below, which reads regular files only.
+  find "$archives" -maxdepth 1 -type l -name '*.deb' -delete
   while IFS= read -r -d '' deb; do debs+=("$deb"); done \
     < <(find "$archives" -maxdepth 1 -type f -name '*.deb' -print0 | sort -z)
   (( ${#debs[@]} > 0 )) || return 0
-  local kept_debs=()
+  local kept_debs=() misnamed=0
   for deb in "${debs[@]}"; do
     if ! fields=$(dpkg-deb --field "$deb" Package Version Architecture 2>/dev/null); then
       rm -f "$deb"
@@ -77,6 +97,13 @@ verify_archives() {
     arch=$(sed -n 's/^Architecture: //p' <<<"$fields")
     if [[ -z "$package" || -z "$version" || -z "$arch" ]]; then
       rm -f "$deb"
+      continue
+    fi
+    # apt would hand this file to dpkg as whatever version its name says, so an authentic older
+    # archive stored under a newer version's name must not pass the hash check for its own version.
+    if [[ "$(basename "$deb")" != "$(apt_cache_name "$package" "$version" "$arch")" ]]; then
+      rm -f "$deb"
+      misnamed=$((misnamed + 1))
       continue
     fi
     kept_debs+=("$deb")
@@ -104,7 +131,7 @@ verify_archives() {
     /^SHA256: / { h = $2 }
     /^$/ { if (p && v && a && h) print p "|" a "|" v " " h; p = v = a = h = "" }
     END { if (p && v && a && h) print p "|" a "|" v " " h }' > "$index"
-  local i hash kept=0 dropped=0
+  local i hash kept=0 dropped=$misnamed
   for (( i = 0; i < ${#kept_debs[@]}; i++ )); do
     deb=${kept_debs[i]}
     hash=$(awk -v id="${ids[i]}" '$1 == id { print $2; exit }' "$index")

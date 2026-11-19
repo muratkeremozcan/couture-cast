@@ -11879,7 +11879,9 @@ Hard-won lessons from the implementation and code review of this story:
   then a refused `security.ubuntu.com` fetch made the install script drop every cached package,
   and the re-download from a slow mirror ran into the 600 s bound. A partial index refresh now
   keeps each cached package whose SHA256 a signed index apt holds still vouches for, and drops the
-  rest; a failed install still drops all of them before its retry.
+  rest; a failed install still drops all of them before its retry. The Codex check found apt picks
+  a cached file by the name it builds from the version it installs and checks only its size, so a
+  package must also sit at its own name, and a symlink is dropped.
 - A first change to the accessibility device script broke two Playwright helper specs that read
   the script and its workflow, and the review round found them. Run every spec that reads a
   changed file before committing.
@@ -11951,7 +11953,8 @@ CI scripts, node:test:
   failure retries, a quoted download line or a crashed test task with no real download runs once.
 - [`scripts/ci/apt-install.test.mjs`](../../scripts/ci/apt-install.test.mjs):
   proves a partial index refresh keeps the cached package a signed index vouches for and drops an
-  altered one, and drops everything when no index vouches for it.
+  altered one, drops everything when no index vouches for it, and drops a vouched-for archive
+  stored under another version's name and any symlink.
 - [`scripts/ci/share-card-android-release-font.test.mjs`](../../scripts/ci/share-card-android-release-font.test.mjs):
   proves swap sized against the disk guard, the emulator check after the build, and that kernel
   OOM lines reach the log.
