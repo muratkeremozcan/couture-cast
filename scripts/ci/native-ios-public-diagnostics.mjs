@@ -28,6 +28,8 @@ export const PUBLIC_DIAGNOSTIC_FILES = Object.freeze([
   'native-ios-flow-command-timings.json',
   'native-ios-flow-progress.json',
   'native-ios-expo-go-probe.json',
+  // native-api-requests.mjs: the owned services' closed request and exit record.
+  'native-ios-api-requests.json',
 ])
 
 /** Never opened by the selector. The first three can carry paths, keys and tokens. */

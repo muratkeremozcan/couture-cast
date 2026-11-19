@@ -946,6 +946,11 @@ export function CommunityScreen() {
             setBandUnresolvedReason(feed.bandUnresolvedReason)
             setActiveChallenge(feed.activeChallenge)
             setFeedError(null)
+            // A read that failed before spoke up beside the feed; this one answered, so
+            // the stale "could not load" goes. An unrelated action's failure stays.
+            setActionError((current) =>
+              current?.fallbackKey === 'community.error.load' ? null : current
+            )
             setBannedSanction(null)
             if (syncDeniedRef.current) {
               syncDeniedRef.current = false
