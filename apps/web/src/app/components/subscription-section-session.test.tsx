@@ -727,8 +727,9 @@ describe('a 401 while the bridge still verifies a replacement token', () => {
         }
         return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
       }),
+      // The recovered subscription is active, and the access source says so.
       http.get('/api/v1/commerce/premium/access', () =>
-        HttpResponse.json({ data: { premium: false, source: 'none' } })
+        HttpResponse.json({ data: { premium: true, source: 'subscription' } })
       )
     )
     session.stored = true

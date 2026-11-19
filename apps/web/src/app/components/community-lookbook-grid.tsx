@@ -2938,9 +2938,22 @@ export function CommunityLookbookGrid({
             const scope = feedScopeRef.current
             void getCommunityFeedFromWeb({ mode: currentMode, limit: 1 }).catch(
               (error: unknown) => {
+                if (!active || scope !== feedScopeRef.current) return
                 const sanction = communitySanctionOf(error)
-                if (!active || scope !== feedScopeRef.current || !sanction) return
-                closeForBan(sanction)
+                if (sanction) {
+                  closeForBan(sanction)
+                  return
+                }
+                // The denial can abort the feed read still in flight, whose own catch then
+                // returns silently. The probe answers the same refusal, so the member ends on
+                // the same copy whichever answer lands first.
+                const message = messageForError(
+                  error,
+                  'community.error.load',
+                  languageRef.current
+                )
+                setFeedError(message)
+                setAnnouncement(message)
               }
             )
           }
