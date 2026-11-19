@@ -1,0 +1,24 @@
+appId: ${MAESTRO_APP_ID}
+---
+# Taps the outfit card opener until the share card sheet shows its title. Maestro reports a tap
+# COMPLETED whether or not the product got it: nightly run 44078916466 shard 2 (open-outfit.yaml)
+# tapped the opener clear of the chip bar and the tab bar, and the app logged opener-press-in and
+# then opener-touch-cancel 0.2 s later, so the Home ScrollView took the touch and the sheet never
+# opened. The title is the first thing an opened sheet shows, in every state (preparing, loaded,
+# unavailable), so a press that only landed late already shows it and is never repeated.
+- retry:
+    maxRetries: 3
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: outfit-share-card-open
+            notVisible:
+              id: share-card-title
+          commands:
+            - tapOn:
+                id: outfit-share-card-open
+      - extendedWaitUntil:
+          visible:
+            id: share-card-title
+          timeout: 8000

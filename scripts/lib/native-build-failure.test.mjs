@@ -108,6 +108,63 @@ describe('native build failure record', () => {
       })
   })
 
+  // Nightly run 44298434117, iOS live font scale (settings): the Release build exited 65 after
+  // 358 s and the record read classification unknown with no failed task, because only Gradle's
+  // `> Task ... FAILED` lines were read. xcodebuild lists its failed commands after a header.
+  test('names the failed xcodebuild commands by target and classifies the xcodebuild causes', () => {
+    const ios = { ...base, platform: 'ios', configuration: 'Release', status: 65 }
+    const log = [
+      `CompileC /tmp/${personal}.o (in target 'CoutureCastStory68' from project 'CoutureCastStory68')`,
+      'error: Command PhaseScriptExecution failed with a nonzero exit code',
+      '** BUILD FAILED **',
+      '',
+      'The following build commands failed:',
+      `\tPhaseScriptExecution [CP-User]\\ [Hermes]\\ Replace\\ Hermes /tmp/${personal}.sh (in target 'hermes-engine' from project 'Pods')`,
+      "\tPhaseScriptExecution Bundle\\ React\\ Native\\ code\\ and\\ images /tmp/Script-1.sh (in target 'CoutureCastStory68' from project 'CoutureCastStory68')",
+      `\tSwiftCompile normal arm64 /tmp/a.swift (in target '${personal}' from project 'Pods')`,
+      "\tPhaseScriptExecution Bundle\\ React\\ Native\\ code\\ and\\ images /tmp/Script-1.sh (in target 'CoutureCastStory68' from project 'CoutureCastStory68')",
+      '(4 failures)',
+      "\tLd /tmp/x (in target 'after-the-list' from project 'Pods')",
+    ].join('\n')
+    const record = summarizeNativeBuildFailure({ ...ios, log })
+    assert.deepEqual(record, {
+      platform: 'ios',
+      configuration: 'Release',
+      durationMs: 529000,
+      exitCode: 65,
+      signal: null,
+      classification: 'scriptphase',
+      failedTasks: [
+        'PhaseScriptExecution@hermes-engine',
+        'PhaseScriptExecution@CoutureCastStory68',
+      ],
+    })
+    assert.equal(JSON.stringify(record).includes('Avery'), false)
+    assertNativeBuildFailure(record)
+    const classify = (text) =>
+      summarizeNativeBuildFailure({ ...ios, log: text }).classification
+    assert.equal(
+      classify('/tmp/App/AppDelegate.swift:12:5: error: cannot find type'),
+      'swift'
+    )
+    assert.equal(
+      classify('xcodebuild: error: Unable to find a destination matching'),
+      'xcodebuild'
+    )
+    // Without the header nothing is read as a failed command.
+    assert.deepEqual(
+      summarizeNativeBuildFailure({
+        ...ios,
+        log: "\tLd /tmp/x (in target 'Pods-App' from project 'Pods')",
+      }).failedTasks,
+      []
+    )
+    for (const task of ['Ld@', '@Pods', 'ld@Pods', 'Ld@a b', `Ld@${'a'.repeat(61)}`])
+      assert.throws(() => assertNativeBuildFailure({ ...record, failedTasks: [task] }), {
+        message: 'invalid_native_build_failure',
+      })
+  })
+
   test('the schema refuses any open field', () => {
     const record = summarizeNativeBuildFailure({ ...base, log: '' })
     assertNativeBuildFailure(record)

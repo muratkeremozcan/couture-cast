@@ -290,9 +290,39 @@ test('settings.yaml waits for the breadcrumb in a subflow scoped to the Settings
     readFileSync(new URL(`../../maestro/story68/${name}`, import.meta.url), 'utf8')
   const flow = read('settings.yaml')
   const ios = flow.slice(flow.indexOf('platform: iOS'), flow.indexOf('platform: Android'))
+  const { parse } = await import('yaml')
+  const steps = parse(flow.split(/^---$/m)[1])
   assert.match(ios, /file: wait-os-settings-ios\.yaml/)
   assert.doesNotMatch(flow, /breadcrumb|com\.apple\.settings\./)
-  assert.match(flow, /assertNotVisible:\s+id: share-card-title/)
+  // Nightly run 44298434117 shard 1: with Settings in front (breadcrumb wait passed), an
+  // assertNotVisible on the sheet title under this app's appId matched for 38 s while the app kept
+  // preparing its card in the background. On iOS the breadcrumb, here and again in
+  // openOsSettings(), is the proof; the title check stays where the hierarchy is the foreground's.
+  const android = steps.find((step) => step.runFlow?.when?.platform === 'Android')
+  assert.deepEqual(android.runFlow.commands, [
+    {
+      extendedWaitUntil: {
+        visible: { id: 'com.android.settings:id/.*' },
+        timeout: 15000,
+      },
+    },
+    { assertNotVisible: { id: 'share-card-title' } },
+  ])
+  assert.equal(
+    steps.some((step) => step.assertNotVisible || step.assertVisible),
+    false,
+    'no title check runs on iOS'
+  )
+  assert.equal((flow.match(/share-card-title/g) ?? []).length, 1, 'no iOS title check')
+  const harness = readFileSync(
+    new URL('../run-story68-native.mjs', import.meta.url),
+    'utf8'
+  )
+  const reread = harness.slice(harness.indexOf('function openOsSettings()'))
+  assert.match(
+    reread.slice(0, reread.indexOf('\n}\n')),
+    /breadcrumbIn\(JSON\.parse\(run\(maestroBinary, \['--device', device, 'hierarchy'\]\)\)\)\)\s+throw new Error\('os_settings_not_opened'\)/
+  )
   const sub = read('wait-os-settings-ios.yaml')
   assert.match(sub, /^appId: com\.apple\.Preferences\n---/)
   assert.match(

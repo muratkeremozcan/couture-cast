@@ -222,7 +222,55 @@ export const SHARE_SHEET_NATIVE_TEST_ESTIMATE_MS = Object.freeze({
   ios: 6 * 60_000,
 })
 
+/**
+ * The flows that bring the outfit card opener into view and open the share card sheet. On iOS
+ * position-outfit-open.yaml returns Home to offset 0: three swipes, a settle wait, a guarded scroll
+ * (its `when` check, the 30 s scroll and its poll, the lift swipe and a second settle wait) and the
+ * clear-of-tab-bar assertion. `waitForAnimationToEnd` is capped at 15 s and returns at its cap
+ * (open-outfit.yaml took 15.6 s on it in nightly run 44298434117 shard 4), so each counts 15 s.
+ * The Android branch (two 30 s scrolls, their polls and one settle wait) costs less. Nightly run
+ * 44298434117 shard 4 killed open-outfit.yaml at the 120 s default after its last command passed:
+ * the subflow alone declares 102 s.
+ *
+ * tap-outfit-open.yaml then taps the opener inside a retry of maxRetries 3 (4 attempts) shaped like
+ * tap-save.yaml: the guard (its two condition checks), the 8 s wait for the sheet title and that
+ * wait's poll. Tests read both subflows and keep these numbers equal to what they declare.
+ */
+export const WAIT_FOR_ANIMATION_CAP_MS = 15_000
+export const OUTFIT_OPEN_POSITION_WAITS_MS = 30_000 + 2 * WAIT_FOR_ANIMATION_CAP_MS
+export const OUTFIT_OPEN_POSITION_STEPS = 7
+export const OUTFIT_OPEN_POSITION_WORST_CASE_MS =
+  OUTFIT_OPEN_POSITION_WAITS_MS + OUTFIT_OPEN_POSITION_STEPS * CONDITION_CHECK_MS
+export const OUTFIT_OPEN_TAP_ATTEMPTS = 4
+export const OUTFIT_OPEN_TAP_ATTEMPT_MS =
+  2 * CONDITION_CHECK_MS + 8_000 + CONDITION_CHECK_MS
+export const OUTFIT_OPEN_TAP_WORST_CASE_MS =
+  OUTFIT_OPEN_TAP_ATTEMPTS * OUTFIT_OPEN_TAP_ATTEMPT_MS
+// The flows that tap the opener through tap-outfit-open.yaml.
+export const OUTFIT_OPEN_FLOWS = Object.freeze([
+  'maestro/story68/open-outfit.yaml',
+  'maestro/story68/preparing-cancel.yaml',
+  'maestro/story68/expo-go-unavailable.yaml',
+])
+// rapid-ready-outfit.yaml positions the opener and leaves the tap to rapid-watermark-held.yaml.
+export const OUTFIT_POSITION_ONLY_FLOWS = Object.freeze([
+  'maestro/story68/rapid-ready-outfit.yaml',
+])
+const outfitPositionTimeoutMs = Math.ceil(
+  (DEFAULT_FLOW_TIMEOUT_MS + OUTFIT_OPEN_POSITION_WORST_CASE_MS) * FLOW_TIMEOUT_MARGIN
+)
+const outfitOpenTimeoutMs = Math.ceil(
+  (DEFAULT_FLOW_TIMEOUT_MS +
+    OUTFIT_OPEN_POSITION_WORST_CASE_MS +
+    OUTFIT_OPEN_TAP_WORST_CASE_MS) *
+    FLOW_TIMEOUT_MARGIN
+)
+
 const flowTimeouts = {
+  ...Object.fromEntries(
+    OUTFIT_POSITION_ONLY_FLOWS.map((flow) => [flow, outfitPositionTimeoutMs])
+  ),
+  ...Object.fromEntries(OUTFIT_OPEN_FLOWS.map((flow) => [flow, outfitOpenTimeoutMs])),
   ...Object.fromEntries(SAVE_TAP_FLOWS.map((flow) => [flow, saveTapTimeoutMs])),
   ...Object.fromEntries(SHARE_TAP_FLOWS.map((flow) => [flow, shareTapTimeoutMs])),
   [SHARE_SHEET_FLOW]: shareSheetTimeoutMs,
