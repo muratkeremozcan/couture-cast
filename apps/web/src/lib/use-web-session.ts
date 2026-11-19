@@ -17,7 +17,9 @@ import {
   createElement,
   Fragment,
   useEffect,
+  useCallback,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   type ReactNode,
@@ -237,4 +239,51 @@ export function MemberScope({
   const liveOwner = useWebSessionOwner()
   const session = useMemberSession()
   return createElement(Fragment, { key: liveOwner ?? NO_MEMBER_SCOPE }, children(session))
+}
+
+/** The bearer this tab holds right now, read where a member request reads it. */
+export function currentWebSessionBearer(): string | null {
+  return fixtureBearer()
+}
+
+/**
+ * One member read, with the bearer read at the moment it is sent. A denial (`isDenial`) of a
+ * bearer the bridge has since replaced for the same member says nothing about that member: the
+ * read is retried once with the current bearer. A denial of the current bearer stands.
+ */
+export async function readAsMember<T>(
+  owner: string,
+  read: () => Promise<T>,
+  isDenial: (error: unknown) => boolean
+): Promise<T> {
+  const sentWith = currentWebSessionBearer()
+  try {
+    return await read()
+  } catch (error: unknown) {
+    if (!isDenial(error) || !isLiveOwner(owner) || currentWebSessionBearer() === sentWith)
+      throw error
+    return read()
+  }
+}
+
+/**
+ * The signal of the current mount: aborted when the component unmounts (a route change, or a
+ * member change that remounts a `MemberScope`). An operation captures it when it starts and
+ * checks it before every completion, so an answer that arrives after its mount is gone never
+ * navigates, opens a tab or touches state.
+ */
+export function useMountSignal(): () => AbortSignal {
+  const controllerRef = useRef<AbortController | null>(null)
+  useEffect(() => {
+    // A remount (StrictMode re-runs this effect) starts a fresh lifetime.
+    const live = controllerRef.current
+    const controller = live && !live.signal.aborted ? live : new AbortController()
+    controllerRef.current = controller
+    return () => controller.abort()
+  }, [])
+  return useCallback(() => {
+    // Before the first effect (never for a user action) the mount counts as live.
+    controllerRef.current ??= new AbortController()
+    return controllerRef.current.signal
+  }, [])
 }

@@ -21,6 +21,7 @@ import {
   PALETTE_CONSENT_REQUIRED_MESSAGE,
   PREMIUM_REQUIRED_MESSAGE,
 } from '@couture/api-client/contracts/http'
+import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { stubPartnerTab } from '../../test-utils/partner-tab'
 import {
@@ -821,6 +822,55 @@ describe('PaletteAdvisorPanel (Story 5.4)', () => {
         expect(created).toHaveLength(1)
         // Reset immediately, so choosing the same file twice still fires `change`.
         expect((input as HTMLInputElement).value).toBe('')
+      } finally {
+        URL.createObjectURL = originalCreate
+        URL.revokeObjectURL = originalRevoke
+      }
+    })
+
+    // Settings Codex review 1, finding 8: a selfie chosen when the write is refused (here the
+    // member left the tab before the choice landed) leaves no object URL behind.
+    it('5.4-WEB-041b allocates no object URL for a selfie whose write is refused', async () => {
+      signIn()
+      const created: string[] = []
+      const revoked: string[] = []
+      const originalCreate = URL.createObjectURL.bind(URL)
+      const originalRevoke = URL.revokeObjectURL.bind(URL)
+      URL.createObjectURL = function stubCreateObjectURL(): string {
+        const url = `blob:selfie-${created.length}`
+        created.push(url)
+        return url
+      } as typeof URL.createObjectURL
+      URL.revokeObjectURL = function stubRevokeObjectURL(url: string): void {
+        revoked.push(url)
+      } as typeof URL.revokeObjectURL
+
+      try {
+        let allocateCount = 0
+        useMswHandlers(
+          getHandler({ hasConsent: true }),
+          http.post(`${PALETTE_PATH}/selfie/upload-url`, () => {
+            allocateCount += 1
+            return errorBody(
+              503,
+              PALETTE_ANALYSIS_DISABLED_MESSAGE,
+              'Service Unavailable'
+            )
+          })
+        )
+        renderPanel()
+        const input = await screen.findByTestId('palette-advisor-selfie-input')
+
+        // The member leaves the tab; the panel has not heard yet.
+        window.sessionStorage.removeItem(WEB_ACCESS_TOKEN_STORAGE_KEY)
+        await userEvent.upload(
+          input,
+          new File(['selfie-bytes'], 'selfie.png', { type: 'image/png' })
+        )
+
+        expect(allocateCount).toBe(0)
+        expect(revoked).toEqual(created)
+        expect(created).toEqual([])
       } finally {
         URL.createObjectURL = originalCreate
         URL.revokeObjectURL = originalRevoke

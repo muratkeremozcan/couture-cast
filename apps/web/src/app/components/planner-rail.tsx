@@ -46,7 +46,12 @@ import {
   plannerFailureReason,
   reshufflePlannerDayFromWeb,
 } from '../../lib/planner'
-import { isLiveOwner, MemberScope, type MemberSession } from '../../lib/use-web-session'
+import {
+  isLiveOwner,
+  MemberScope,
+  readAsMember,
+  type MemberSession,
+} from '../../lib/use-web-session'
 import { acquireScrollLock } from './modal-stack'
 
 export interface PlannerRailProps {
@@ -583,7 +588,12 @@ function PlannerWeek({
       }
       const current = () => !signal.aborted && isLiveOwner(owner)
       try {
-        const data = await getPlannerFromWeb(signal)
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const data = await readAsMember(
+          owner,
+          () => getPlannerFromWeb(signal),
+          (error) => plannerFailureReason(error) === 'signed_out'
+        )
         if (!current()) return
         setPlannerData(data)
         setEntitlementState('entitled')

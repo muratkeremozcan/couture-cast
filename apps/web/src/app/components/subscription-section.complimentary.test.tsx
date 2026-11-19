@@ -12,15 +12,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { COMPLIMENTARY_ACCESS_ACTIVE_MESSAGE } from '@couture/api-client/contracts/http'
 import { getI18n } from '../../i18n'
 import { signInFixtureMember } from '../../test-utils/member-session'
-import { createCheckoutSessionFromWeb } from '../../lib/premium'
+import { createCheckoutSessionFromWeb, getSubscriptionFromWeb } from '../../lib/premium'
 import type * as PremiumModule from '../../lib/premium'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import { SubscriptionSection } from './subscription-section'
 import enUS from '../../i18n/locales/en-US.json'
 
+/** The section consumes a Stripe return marker with `router.replace`. */
+const router = vi.hoisted(() => ({ replace: vi.fn(), push: vi.fn() }))
+vi.mock('next/navigation', () => ({
+  useRouter: () => router,
+  useSearchParams: () => new URLSearchParams(window.location.search),
+  usePathname: () => window.location.pathname,
+}))
+
 vi.mock('../../lib/premium', async (importOriginal) => {
   const actual = await importOriginal<typeof PremiumModule>()
-  return { ...actual, redirectToExternalUrl: vi.fn() }
+  return {
+    ...actual,
+    redirectToExternalUrl: vi.fn(),
+    // A passthrough spy: the real read runs, and a test can await the promise it returned.
+    getSubscriptionFromWeb: vi.fn(actual.getSubscriptionFromWeb),
+  }
 })
 
 const SUBSCRIPTION_PATH = '/api/v1/commerce/subscription'
@@ -151,11 +164,13 @@ describe('SubscriptionSection complimentary access', () => {
     try {
       renderSection()
       // The subscription read lands while the access read is still held. The status line now
-      // waits for both reads, so the wait is on the subscription request, then one task for
-      // its answer to reach the section.
+      // waits for both reads, so the wait is on the subscription request, then on the read's
+      // own promise: the section holds the answer before the mid-hold assertion and the release.
       await waitFor(() => expect(subscriptionRequests).toBe(1))
+      const subscriptionRead = vi.mocked(getSubscriptionFromWeb).mock.results[0]
+      expect(subscriptionRead?.type).toBe('return')
       await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 0))
+        await expect(subscriptionRead?.value).resolves.toMatchObject({ status: 'none' })
       })
       expect(screen.queryByTestId('premium-disclosure')).not.toBeInTheDocument()
       release()

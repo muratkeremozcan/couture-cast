@@ -20,7 +20,8 @@
 // a signed-in member to sign in on every direct load of /settings (owner, 2026-11-19).
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import {
@@ -42,7 +43,13 @@ import {
   redirectToExternalUrl,
   refreshSubscriptionFromWeb,
 } from '../../lib/premium'
-import { isLiveOwner, MemberScope, type MemberSession } from '../../lib/use-web-session'
+import {
+  isLiveOwner,
+  MemberScope,
+  readAsMember,
+  useMountSignal,
+  type MemberSession,
+} from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
 
 const SIGNED_OUT_HINT_ID = 'premium-signed-out-hint'
@@ -309,15 +316,66 @@ const FAILURE_MESSAGE_KEYS: Readonly<Record<PremiumFailureReason, string | null>
  * keyed by that owner, so a change of member (or sign-out) discards the last member's
  * subscription, access, activation poll, redirect and messages in the same render.
  */
+/** What a Stripe return marker on this page's URL asks the section to do. */
+type BillingReturn = 'checkout' | 'portal' | null
+
+/** The marker and its query key, read from the URL as the page holds it now. */
+function readBillingReturn(params: URLSearchParams): {
+  kind: BillingReturn
+  key?: string
+} {
+  if (params.get('checkout') === 'success') return { kind: 'checkout', key: 'checkout' }
+  if (params.get('portal') === 'return') return { kind: 'portal', key: 'portal' }
+  return { kind: null }
+}
+
+/**
+ * The page's billing return belongs to the first member the bridge verifies on it: that
+ * member's section runs the activation poll or the portal refresh, the marker leaves the URL,
+ * and any later member on the same page loads normally (Settings Codex review 1, finding 3).
+ */
+function useBillingReturn(): (owner: string) => BillingReturn {
+  const router = useRouter()
+  const routerRef = useRef(router)
+  routerRef.current = router
+  const boundRef = useRef<{ kind: BillingReturn; owner: string } | undefined>(undefined)
+  return useCallback((owner: string) => {
+    if (boundRef.current === undefined) {
+      const url = new URL(window.location.href)
+      const { kind, key } = readBillingReturn(url.searchParams)
+      boundRef.current = { kind, owner }
+      if (key) {
+        url.searchParams.delete(key)
+        routerRef.current.replace(`${url.pathname}${url.search}${url.hash}`, {
+          scroll: false,
+        })
+      }
+    }
+    return boundRef.current.owner === owner ? boundRef.current.kind : null
+  }, [])
+}
+
 export function SubscriptionSection() {
+  const claimBillingReturn = useBillingReturn()
   return (
     <MemberScope>
-      {(session) => <MemberSubscriptionSection session={session} />}
+      {(session) => (
+        <MemberSubscriptionSection
+          session={session}
+          claimBillingReturn={claimBillingReturn}
+        />
+      )}
     </MemberScope>
   )
 }
 
-function MemberSubscriptionSection({ session }: { session: MemberSession }) {
+function MemberSubscriptionSection({
+  session,
+  claimBillingReturn,
+}: {
+  session: MemberSession
+  claimBillingReturn: (owner: string) => BillingReturn
+}) {
   const { t } = useTranslation()
   const { status, owner } = session
   const [sectionState, setSectionState] = useState<SectionState>('checking')
@@ -327,6 +385,8 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
   const [showPortalLagHint, setShowPortalLagHint] = useState(false)
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  /** This mount's lifetime: a checkout or portal answer after it ends navigates nowhere. */
+  const mountSignal = useMountSignal()
 
   /*
    * Resolved outside the effect and depended on by value, mirroring
@@ -357,13 +417,13 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
     // The bridge publishes again once it names this member; until then nothing is asked.
     if (!isLiveOwner(owner)) return
 
-    const params = new URLSearchParams(window.location.search)
+    const billingReturn = claimBillingReturn(owner)
     const controller = new AbortController()
     const current = () => !controller.signal.aborted && isLiveOwner(owner)
     let timer: number | undefined
     setError(null)
 
-    if (params.get('checkout') === 'success') {
+    if (billingReturn === 'checkout') {
       /*
        * The poll starts with a refresh (beats webhook latency), then reads
        * status. A failed tick is treated as transient and the poll simply
@@ -375,6 +435,8 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
       let attempts = 0
 
       const tick = async (viaRefresh: boolean): Promise<void> => {
+        // A timer that fires after the member changed sends nothing.
+        if (!current()) return
         try {
           const next = viaRefresh
             ? await refreshSubscriptionFromWeb(controller.signal)
@@ -411,7 +473,8 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
       }
     }
 
-    const isPortalReturn = params.get('portal') === 'return'
+    const isPortalReturn = billingReturn === 'portal'
+    const isDenial = (error: unknown) => premiumFailureReason(error) === 'signed_out'
     setSectionState('loading')
     setShowPortalLagHint(isPortalReturn)
 
@@ -434,11 +497,20 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
             window.setTimeout(() => resolve(null), ACCESS_READ_TIMEOUT_MS)
           }),
         ])
-        const next = isPortalReturn
-          ? await refreshSubscriptionFromWeb(controller.signal).catch(() =>
-              getSubscriptionFromWeb(controller.signal)
-            )
-          : await getSubscriptionFromWeb(controller.signal)
+        // The fallback read is checked before it is sent, like every follow-up request.
+        const fallback = () => {
+          if (!current()) throw new DOMException('Aborted', 'AbortError')
+          return getSubscriptionFromWeb(controller.signal)
+        }
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const next = await readAsMember(
+          owner,
+          () =>
+            isPortalReturn
+              ? refreshSubscriptionFromWeb(controller.signal).catch(fallback)
+              : getSubscriptionFromWeb(controller.signal),
+          isDenial
+        )
         const nextAccess = await accessRead
         if (!current()) {
           return
@@ -466,7 +538,7 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
     })()
 
     return () => controller.abort()
-  }, [status, owner, loadErrorMessage])
+  }, [status, owner, loadErrorMessage, claimBillingReturn])
 
   /**
    * Turns a rejection into localized copy, or into the signed-out state.
@@ -505,12 +577,14 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
       // Analytics must never stop checkout.
     }
 
+    const signal = mountSignal()
+    const current = () => !signal.aborted && isLiveOwner(owner)
     try {
-      const url = await createCheckoutSessionFromWeb(plan)
-      if (!isLiveOwner(owner)) return
+      const url = await createCheckoutSessionFromWeb(plan, signal)
+      if (!current()) return
       redirectToExternalUrl(url)
     } catch (checkoutError: unknown) {
-      if (!isLiveOwner(owner)) return
+      if (!current()) return
       applyFailure(checkoutError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }
@@ -522,12 +596,14 @@ function MemberSubscriptionSection({ session }: { session: MemberSession }) {
     }
     setIsRedirecting(true)
     setError(null)
+    const signal = mountSignal()
+    const current = () => !signal.aborted && isLiveOwner(owner)
     try {
-      const url = await createPortalSessionFromWeb()
-      if (!isLiveOwner(owner)) return
+      const url = await createPortalSessionFromWeb(signal)
+      if (!current()) return
       redirectToExternalUrl(url)
     } catch (portalError: unknown) {
-      if (!isLiveOwner(owner)) return
+      if (!current()) return
       applyFailure(portalError, 'commerce.premium.errorPurchase')
       setIsRedirecting(false)
     }

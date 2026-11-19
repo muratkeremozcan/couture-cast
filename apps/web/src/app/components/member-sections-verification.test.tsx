@@ -264,3 +264,129 @@ describe('member-owned sections say nothing about the member while the session i
     expect(screen.queryByTestId('premium-subscribe-monthly')).toBeNull()
   })
 })
+
+// Settings Codex review 1, finding 6: a billing follow-up (the activation poll's next read, the
+// portal return's fallback read) is checked before it is sent, so a member who left while it
+// waited never has a read sent for them with the next member's bearer.
+describe('Premium checks a billing follow-up read before sending it', () => {
+  const NONE_SUBSCRIPTION = CASES[1]!.body as { data: Record<string, unknown> }
+  let getBearers: (string | null)[]
+  let refreshBearers: (string | null)[]
+
+  beforeEach(async () => {
+    getBearers = []
+    refreshBearers = []
+    session.identity = 'member-1'
+    session.stored = true
+    session.pending = []
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    await getI18n().changeLanguage('en-US')
+  })
+
+  afterEach(() => {
+    window.sessionStorage.clear()
+    window.history.replaceState(null, '', '/')
+  })
+
+  function renderPremium() {
+    return render(
+      <I18nextProvider i18n={getI18n()}>
+        <main>
+          <SubscriptionSection />
+        </main>
+      </I18nextProvider>
+    )
+  }
+
+  /** The bridge moved to member-2; the section has not heard yet. */
+  function switchMemberSilently() {
+    session.identity = 'member-2'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-2')
+  }
+
+  async function settle() {
+    for (let round = 0; round < 3; round += 1)
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+  }
+
+  it('SESSION-BILLING-WEB-01 the activation poll sends no next read once its member left', async () => {
+    window.history.replaceState(null, '', '/settings?checkout=success')
+    const realSetTimeout = window.setTimeout.bind(window)
+    const pollTicks: (() => void)[] = []
+    vi.spyOn(window, 'setTimeout').mockImplementation(((
+      handler: () => void,
+      delay?: number
+    ) => {
+      // The poll's 5-second interval is held for the test; every other timer runs.
+      if (delay === 5_000) {
+        pollTicks.push(handler)
+        return 0
+      }
+      return realSetTimeout(handler, delay)
+    }) as typeof window.setTimeout)
+    useMswHandlers(
+      http.post('/api/v1/commerce/subscription/refresh', ({ request }) => {
+        refreshBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json(NONE_SUBSCRIPTION)
+      }),
+      http.get('/api/v1/commerce/subscription', ({ request }) => {
+        getBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json(NONE_SUBSCRIPTION)
+      })
+    )
+    renderPremium()
+    await vi.waitFor(() => expect(pollTicks).toHaveLength(1))
+    expect(refreshBearers).toEqual(['Bearer token-1'])
+
+    switchMemberSilently()
+    await act(async () => {
+      pollTicks[0]!()
+      await Promise.resolve()
+    })
+    await settle()
+
+    expect(getBearers).toEqual([])
+  })
+
+  it("SESSION-BILLING-WEB-02 a portal return's fallback read is not sent once its member left", async () => {
+    window.history.replaceState(null, '', '/settings?portal=return')
+    let releaseRefresh!: () => void
+    const refreshHeld = new Promise<void>((resolve) => {
+      releaseRefresh = resolve
+    })
+    useMswHandlers(
+      http.post('/api/v1/commerce/subscription/refresh', async ({ request }) => {
+        refreshBearers.push(request.headers.get('authorization'))
+        await refreshHeld
+        return HttpResponse.json(
+          {
+            statusCode: 503,
+            message: 'Ledger unavailable',
+            error: 'Service Unavailable',
+          },
+          { status: 503 }
+        )
+      }),
+      http.get('/api/v1/commerce/subscription', ({ request }) => {
+        getBearers.push(request.headers.get('authorization'))
+        return HttpResponse.json(NONE_SUBSCRIPTION)
+      }),
+      http.get('/api/v1/commerce/premium/access', () =>
+        HttpResponse.json({ statusCode: 500, message: 'down' }, { status: 500 })
+      )
+    )
+    renderPremium()
+    await vi.waitFor(() => expect(refreshBearers).toEqual(['Bearer token-1']))
+
+    switchMemberSilently()
+    await act(async () => {
+      releaseRefresh()
+      await Promise.resolve()
+    })
+    await settle()
+
+    expect(getBearers).toEqual([])
+  })
+})

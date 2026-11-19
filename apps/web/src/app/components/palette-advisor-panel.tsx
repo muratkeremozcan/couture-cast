@@ -51,7 +51,13 @@ import {
   uploadPaletteSelfieFromWeb,
   type PaletteSelfieUploadState,
 } from '../../lib/palette-advisor'
-import { isLiveOwner, MemberScope, type MemberSession } from '../../lib/use-web-session'
+import {
+  isLiveOwner,
+  MemberScope,
+  readAsMember,
+  useMountSignal,
+  type MemberSession,
+} from '../../lib/use-web-session'
 import { SessionRetryButton } from './session-retry-button'
 
 /**
@@ -679,6 +685,8 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
 
   /** Every in-flight write, so unmounting cancels them. */
   const writeControllerRef = useRef<AbortController | null>(null)
+  /** This mount's lifetime: a sponsored click answering after it ends navigates nothing. */
+  const mountSignal = useMountSignal()
   useEffect(() => () => writeControllerRef.current?.abort(), [])
 
   /*
@@ -717,7 +725,12 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
 
     void (async () => {
       try {
-        const next = await getPaletteAdvisorFromWeb(controller.signal)
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const next = await readAsMember(
+          owner,
+          () => getPaletteAdvisorFromWeb(controller.signal),
+          (error) => paletteAdvisorFailureReason(error) === 'signed_out'
+        )
         if (!current()) return
         setProfile(next)
         setPanelState('ready')
@@ -746,6 +759,8 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
    * is the server's current state rather than an error line.
    */
   const refresh = useCallback(async (): Promise<void> => {
+    // Checked before the read is sent, and again when it answers.
+    if (!isLiveOwner(owner)) return
     try {
       const next = await getPaletteAdvisorFromWeb()
       if (!isLiveOwner(owner)) return
@@ -889,9 +904,11 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
     if (!file) return
 
     setLastDismissal(null)
-    const imagePreview = URL.createObjectURL(file)
     const idempotencyKey = generateIdempotencyKey()
     void runWrite('selfie', 'commerce.premium.palette.saveError', async (signal) => {
+      // Allocated only once the write is accepted (a busy panel or a member who has left
+      // returns before this runs), so every object URL made here is revoked below.
+      const imagePreview = URL.createObjectURL(file)
       try {
         return await uploadPaletteSelfieFromWeb({
           imagePreview,
@@ -939,6 +956,11 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
     const sponsored = card.sponsored
     const profileId = profile?.profileId ?? null
     if (!sponsored || !profileId) return
+    // This card is the rendered member's. A press handled after the bridge moved on opens no
+    // tab and sends nothing: the click helper reads whatever bearer is current.
+    if (!isLiveOwner(owner)) return
+    const signal = mountSignal()
+    const current = () => !signal.aborted && isLiveOwner(owner)
 
     // Claimed before the first await, while the press still counts as a user
     // gesture. A blocked tab mints nothing.
@@ -949,27 +971,30 @@ function MemberPaletteAdvisor({ session }: { session: MemberSession }) {
     }
     setSponsoredErrorItemKey(null)
     try {
-      const redirectUrl = await mintAffiliateClickFromWeb({
-        offerId: sponsored.offerId,
-        // Decision 7: the advisor's `recommendationId` is the PaletteProfile id.
-        // The server re-resolves it from the session and does not trust this
-        // value; sending it keeps the request truthful rather than filler.
-        recommendationId: profileId,
-        surface: 'palette_advisor',
-        platform: 'web',
-      })
+      const redirectUrl = await mintAffiliateClickFromWeb(
+        {
+          offerId: sponsored.offerId,
+          // Decision 7: the advisor's `recommendationId` is the PaletteProfile id.
+          // The server re-resolves it from the session and does not trust this
+          // value; sending it keeps the request truthful rather than filler.
+          recommendationId: profileId,
+          surface: 'palette_advisor',
+          platform: 'web',
+        },
+        signal
+      )
       // Only navigate once the click is attributed. Traffic the partner cannot
       // attribute is worth nothing to them and cannot be audited by us, so a
-      // failed mint stops here. A click minted for a member who has since left
-      // stops here too.
-      if (!isLiveOwner(owner)) {
+      // failed mint stops here. A click answered after this panel closed, or
+      // after its member left, closes the tab it opened.
+      if (!current()) {
         handoff.cancel()
         return
       }
       handoff.navigate(redirectUrl)
     } catch {
       handoff.cancel()
-      setSponsoredErrorItemKey(card.itemKey)
+      if (current()) setSponsoredErrorItemKey(card.itemKey)
     }
   }
 

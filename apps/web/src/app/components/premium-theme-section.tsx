@@ -35,15 +35,17 @@ import { useTranslation } from 'react-i18next'
 import type { PremiumTheme, PremiumThemeKey } from '@couture/api-client/contracts/http'
 import { formatLocalizedList } from '@couture/utils'
 import {
-  applyWebThemeAttribute,
+  applyMemberTheme,
   DEFAULT_THEME_ATTRIBUTE,
   getThemeFromWeb,
+  releaseThemeOfDepartedOwner,
   premiumThemeFailureReason,
   PREMIUM_THEME_KEYS,
   setThemeFromWeb,
 } from '../../lib/premium-theme'
 import {
   isLiveOwner,
+  readAsMember,
   MemberScope,
   useWebSessionOwner,
   type MemberSession,
@@ -332,11 +334,9 @@ function LockedPanel({ isSignedOut }: { isSignedOut: boolean }) {
  */
 export function PremiumThemeSection() {
   const liveOwner = useWebSessionOwner()
-  const previousOwnerRef = useRef(liveOwner)
+  // Before the next member's first effect; SessionBridge does the same off Settings.
   useLayoutEffect(() => {
-    if (previousOwnerRef.current === liveOwner) return
-    previousOwnerRef.current = liveOwner
-    applyWebThemeAttribute(null)
+    releaseThemeOfDepartedOwner(liveOwner)
   }, [liveOwner])
   return (
     <MemberScope>{(session) => <MemberThemeSection session={session} />}</MemberScope>
@@ -386,7 +386,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     }
     if (owner === null) {
       // A signed-out reader gets Default, whatever a previous session left behind.
-      applyWebThemeAttribute(null)
+      applyMemberTheme(null, null)
       setError(null)
       setSectionState('signed_out')
       return
@@ -401,12 +401,17 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
 
     void (async () => {
       try {
-        const next = await getThemeFromWeb(controller.signal)
+        // A denial of a token the bridge has since rotated for this member is read again once.
+        const next = await readAsMember(
+          owner,
+          () => getThemeFromWeb(controller.signal),
+          (error) => premiumThemeFailureReason(error) === 'signed_out'
+        )
         if (!current()) {
           return
         }
         setTheme(next)
-        applyWebThemeAttribute(next.theme)
+        applyMemberTheme(next.theme, owner)
         setSectionState('ready')
       } catch (loadError: unknown) {
         if (!current()) {
@@ -417,7 +422,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
          * block the rest of the settings page, and it must not leave the surface
          * showing a palette the server no longer confirms.
          */
-        applyWebThemeAttribute(null)
+        applyMemberTheme(null, null)
         if (premiumThemeFailureReason(loadError) === 'signed_out') {
           // An expired or cleared token is not a broken read. Show the locked panel the
           // signed-out branch already renders instead of an error the reader cannot act
@@ -463,7 +468,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
     // would fail inside the lib and surface PREMIUM_THEME_SIGNED_OUT_MESSAGE — a
     // developer string with no catalog entry, so English in all ten locales.
     if (!isLiveOwner(owner)) {
-      applyWebThemeAttribute(null)
+      applyMemberTheme(null, null)
       setTheme(null)
       setError(null)
       setSectionState('signed_out')
@@ -481,7 +486,7 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
         return
       }
       setTheme(saved)
-      applyWebThemeAttribute(saved.theme)
+      applyMemberTheme(saved.theme, owner)
     } catch (saveError: unknown) {
       if (controller.signal.aborted || !isLiveOwner(owner)) {
         return
@@ -514,12 +519,12 @@ function MemberThemeSection({ session }: { session: MemberSession }) {
   function applySaveFailure(saveError: unknown): void {
     switch (premiumThemeFailureReason(saveError)) {
       case 'signed_out':
-        applyWebThemeAttribute(null)
+        applyMemberTheme(null, null)
         setTheme(null)
         setSectionState('signed_out')
         return
       case 'not_entitled':
-        applyWebThemeAttribute(null)
+        applyMemberTheme(null, null)
         setTheme((current) =>
           current === null ? null : { ...current, theme: null, isEntitled: false }
         )
