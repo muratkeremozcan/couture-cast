@@ -102,6 +102,13 @@
   --lookbook-line: #e6e6ed;
   --lookbook-gold-ink: #8a691f;
   --lookbook-danger: #b91c1c;
+  /* Merlot as a foreground (an error, a flag, Withdraw); a Merlot fill under white text keeps
+     #7a1f2d in both modes. */
+  --lookbook-merlot-ink: #7a1f2d;
+  /* The ritual card's warm paper (Create my outfit card) and the share-card control's ink. */
+  --lookbook-cream: #f7f3e8;
+  --lookbook-cream-line: #d7c8a7;
+  --lookbook-cream-ink: #292724;
 }
 
 /*
@@ -125,6 +132,10 @@
     --lookbook-line: #2e2e36;
     --lookbook-gold-ink: #d9b75e;
     --lookbook-danger: #f87171;
+    --lookbook-merlot-ink: #f0a3ae;
+    --lookbook-cream: #24211b;
+    --lookbook-cream-line: #4a4232;
+    --lookbook-cream-ink: #f5f0e3;
   }
 
   /*

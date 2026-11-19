@@ -120,6 +120,9 @@ export function StickyBottomNav({ isMobilePreview = false }: StickyBottomNavProp
     <nav
       aria-label={t('nav.label')}
       data-testid="sticky-bottom-nav"
+      // The nav paints the lookbook surface, light unless the Default system is dark, so it names
+      // that surface for its focus ring instead of inheriting a dark page's white one.
+      data-focus-surface="light"
       className={`bottom-0 left-0 right-0 z-30 border-t border-[color:var(--lookbook-line)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] pt-2 backdrop-blur pb-[env(safe-area-inset-bottom,0.75rem)] ${
         isMobilePreview ? 'sticky flex' : 'fixed flex min-[768px]:hidden'
       }`}

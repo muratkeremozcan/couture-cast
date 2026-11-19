@@ -29,6 +29,8 @@ import {
 } from '../../lib/community'
 
 const MERLOT = '#7A1F2D'
+/** Merlot as text or a border: globals.css gives it a dark-mode value that reads on the dark surface. */
+const MERLOT_INK = 'var(--lookbook-merlot-ink)'
 
 type Translate = (key: string, options?: Record<string, unknown>) => string
 
@@ -440,7 +442,7 @@ function SpotlightStates({
     return (
       <div
         data-testid="community-spotlight-error"
-        style={{ color: MERLOT, borderColor: MERLOT }}
+        style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
         className="flex items-center justify-between gap-3 rounded-[8px] border bg-[var(--theme-card-bg)] p-4 text-xs"
       >
         <span>{t('community.spotlight.error')}</span>
@@ -554,7 +556,7 @@ function SpotlightRow({
       {state.moreFailed && (
         <p
           data-testid="community-spotlight-more-error"
-          style={{ color: MERLOT }}
+          style={{ color: MERLOT_INK }}
           className="text-center text-xs"
         >
           {t('community.spotlight.error')}

@@ -386,7 +386,7 @@ function LockedPanel({
       </p>
       <a
         href="/settings"
-        className="inline-block min-h-[44px] rounded-lg bg-[var(--theme-secondary)] px-4 py-2 text-xs font-semibold text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-primary)]"
+        className="inline-block min-h-[44px] rounded-lg bg-[#C9A14A] px-4 py-2 text-xs font-semibold text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-primary)]"
         data-testid="planner-rail-get-premium"
       >
         {t('commerce.premium.plannerLocked.cta')}

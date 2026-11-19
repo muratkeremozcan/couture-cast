@@ -31,6 +31,25 @@ export interface AccessibleModalProps {
   errorMessage?: string | null
 }
 
+/**
+ * The header and error colors per surface. A theme surface follows the lookbook theme (a premium
+ * palette stays light under a dark system setting), so the system `dark:` variants would put
+ * light text on its light panel.
+ */
+const SURFACE_PARTS = {
+  default: {
+    rule: 'border-zinc-200 dark:border-zinc-800',
+    description: 'text-zinc-500 dark:text-zinc-400',
+    error: 'bg-red-50 text-red-800 dark:bg-red-950 dark:text-red-200',
+  },
+  theme: {
+    rule: 'border-[color:var(--theme-card-border)]',
+    description: 'text-[color:var(--theme-card-text)]',
+    error:
+      'border border-[color:var(--lookbook-merlot-ink)] bg-[var(--lookbook-surface)] text-[color:var(--lookbook-merlot-ink)]',
+  },
+} as const
+
 function surfaceClassName(surface: 'default' | 'theme', columnLayout: boolean) {
   const layout = columnLayout ? ' flex flex-col' : ''
   const colors =
@@ -228,7 +247,9 @@ export function AccessibleModal({
         tabIndex={-1}
         className={surfaceClassName(surface, columnLayout)}
       >
-        <div className="flex items-center justify-between border-b border-zinc-200 pb-3 dark:border-zinc-800">
+        <div
+          className={`flex items-center justify-between border-b pb-3 ${SURFACE_PARTS[surface].rule}`}
+        >
           <div>
             <h2 id={titleId} className="text-xl font-bold">
               {title}
@@ -236,7 +257,7 @@ export function AccessibleModal({
             {description && (
               <p
                 id={descriptionId}
-                className="mt-1 text-xs text-zinc-500 dark:text-zinc-400"
+                className={`mt-1 text-xs ${SURFACE_PARTS[surface].description}`}
               >
                 {description}
               </p>
@@ -260,7 +281,7 @@ export function AccessibleModal({
           <div
             role="alert"
             aria-live="assertive"
-            className="mt-4 rounded-md bg-red-50 p-3 text-sm font-medium text-red-800 dark:bg-red-950 dark:text-red-200"
+            className={`mt-4 rounded-md p-3 text-sm font-medium ${SURFACE_PARTS[surface].error}`}
           >
             {errorMessage}
           </div>

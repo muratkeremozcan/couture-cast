@@ -158,7 +158,7 @@ function ShareCardOpenButton({
       type="button"
       data-testid="share-card-open"
       onClick={(event) => onOpen(event.currentTarget)}
-      className="min-h-[44px] rounded border border-[#B28D46] px-4 text-sm text-[#292724]"
+      className="min-h-[44px] rounded border border-[#B28D46] px-4 text-sm text-[color:var(--lookbook-cream-ink)]"
     >
       {t('shareCard.title')}
     </button>

@@ -180,6 +180,8 @@ const MINIMUM_TARGET_ATTEMPT_MS = 250
  * custom properties in `globals.css`.
  */
 const MERLOT = '#7A1F2D'
+/** Merlot as text or a border: globals.css gives it a dark-mode value that reads on the dark surface. */
+const MERLOT_INK = 'var(--lookbook-merlot-ink)'
 
 /**
  * Every reason the community wrappers can throw, mapped onto catalog copy.
@@ -490,7 +492,8 @@ export function LookbookFilterNav({
       style={{ top: stickyTop }}
       className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur"
     >
-      <div className="flex items-center justify-between gap-3">
+      {/* Translated actions can outgrow a 320 px row, so they wrap below the heading as a group. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h2
           tabIndex={-1}
           data-share-card-focus-fallback="community"
@@ -854,7 +857,7 @@ function LookbookCardContent({
               onClick={() => {
                 onWithdraw(item.id)
               }}
-              style={{ color: MERLOT }}
+              style={{ color: MERLOT_INK }}
               className="min-h-[44px] font-medium hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
             >
               {t('community.card.withdraw')}
@@ -1247,7 +1250,9 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
             >
               <span
                 data-testid={`status-badge-${state.id}`}
-                style={isFlagged ? { color: MERLOT, borderColor: MERLOT } : undefined}
+                style={
+                  isFlagged ? { color: MERLOT_INK, borderColor: MERLOT_INK } : undefined
+                }
                 className={`lookbook-metrics inline-block rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase ${
                   isFlagged
                     ? ''
@@ -1259,7 +1264,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {REMOVED_STATUSES.has(state.status) && (
                 <p
                   data-testid={`author-state-explanation-${state.id}`}
-                  style={isFlagged ? { color: MERLOT } : undefined}
+                  style={isFlagged ? { color: MERLOT_INK } : undefined}
                   className={`text-xs leading-relaxed ${isFlagged ? '' : 'text-[color:var(--lookbook-ink-muted)]'}`}
                 >
                   {t(`community.removed.${state.status}`)}
@@ -1318,6 +1323,9 @@ function CommunityReportModal({
       suspended={suspended}
       isOpen
       onClose={onClose}
+      // The panel follows the lookbook theme, so a premium palette under a dark system setting
+      // keeps its light panel and the controls inside it match.
+      surface="theme"
       title={t('community.report.title')}
       titleId="report-modal-title"
       description={t('community.report.description')}
@@ -1335,7 +1343,7 @@ function CommunityReportModal({
           <div
             role="alert"
             data-testid="report-error-message"
-            style={{ color: MERLOT, borderColor: MERLOT }}
+            style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
             className="rounded-md border p-3 text-xs"
           >
             {errorMessage}
@@ -1345,7 +1353,7 @@ function CommunityReportModal({
         <div className="space-y-2">
           <label
             htmlFor="report-reason-select"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.report.reasonLabel')}
           </label>
@@ -1356,7 +1364,7 @@ function CommunityReportModal({
             onChange={(event) => {
               setReason(event.target.value as CommunityReportReason)
             }}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {communityReportReasonSchema.options.map((option) => (
               <option key={option} value={option}>
@@ -1369,7 +1377,7 @@ function CommunityReportModal({
         <div className="space-y-2">
           <label
             htmlFor="report-details-input"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.report.detailsLabel')}
           </label>
@@ -1383,7 +1391,7 @@ function CommunityReportModal({
             maxLength={500}
             rows={3}
             placeholder={t('community.report.detailsPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.report.detailsCount', { count: details.length })}
@@ -1508,6 +1516,9 @@ function PostCreationModal({
       suspended={suspended}
       isOpen
       onClose={onClose}
+      // The panel follows the lookbook theme, so a premium palette under a dark system setting
+      // keeps its light panel and the controls inside it match.
+      surface="theme"
       title={t('community.compose.title')}
       titleId="create-post-modal-title"
       description={t('community.compose.description')}
@@ -1519,7 +1530,7 @@ function PostCreationModal({
           <div
             role="alert"
             data-testid="create-post-error"
-            style={{ color: MERLOT, borderColor: MERLOT }}
+            style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
             className="rounded-md border p-3 text-xs"
           >
             {errorMessage ?? (validationKey ? t(validationKey) : '')}
@@ -1529,7 +1540,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-image-file"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.compose.photoLabel')}
           </label>
@@ -1572,7 +1583,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-alt-text"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.compose.altLabel')}
           </label>
@@ -1587,7 +1598,7 @@ function PostCreationModal({
             maxLength={200}
             rows={2}
             placeholder={t('community.compose.altPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {altTextSuggestion
@@ -1607,7 +1618,7 @@ function PostCreationModal({
             />
             <label
               htmlFor="confirm-alt-text"
-              className="text-xs font-medium text-[color:var(--theme-primary)]"
+              className="text-xs font-medium text-[color:var(--theme-card-text)]"
             >
               {t('community.compose.altConfirm')}
             </label>
@@ -1617,7 +1628,7 @@ function PostCreationModal({
         <div className="space-y-2">
           <label
             htmlFor="post-caption-input"
-            className="text-xs font-semibold text-[color:var(--theme-primary)]"
+            className="text-xs font-semibold text-[color:var(--theme-card-text)]"
           >
             {t('community.compose.captionLabel')}
           </label>
@@ -1632,7 +1643,7 @@ function PostCreationModal({
             maxLength={280}
             rows={3}
             placeholder={t('community.compose.captionPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
           <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.captionCount', { count: caption.length })}
@@ -1643,7 +1654,7 @@ function PostCreationModal({
           <div className="space-y-2">
             <label
               htmlFor="post-challenge-select"
-              className="text-xs font-semibold text-[color:var(--theme-primary)]"
+              className="text-xs font-semibold text-[color:var(--theme-card-text)]"
             >
               {t('community.compose.challengeLabel')}
             </label>
@@ -1654,7 +1665,7 @@ function PostCreationModal({
               onChange={(event) => {
                 setSelectedChallengeId(event.target.value || null)
               }}
-              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
             >
               <option value="">{t('community.compose.challengeNone')}</option>
               <option value={activeChallenge.id}>{activeChallenge.title}</option>
@@ -1714,7 +1725,7 @@ function CommunityHeaderActions({
   t,
 }: CommunityHeaderActionsProps) {
   return (
-    <div className="flex shrink-0 items-center justify-end gap-2">
+    <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
       {settingsLink}
       {canShare && (
         <button
@@ -1794,7 +1805,9 @@ function CommunityNotices({
           data-testid="community-action-notice"
           data-tone={notice.tone}
           style={
-            notice.tone === 'error' ? { color: MERLOT, borderColor: MERLOT } : undefined
+            notice.tone === 'error'
+              ? { color: MERLOT_INK, borderColor: MERLOT_INK }
+              : undefined
           }
           className={`rounded-[8px] border p-3 text-xs ${NOTICE_CLASSES[notice.tone]}`}
         >
@@ -1847,7 +1860,7 @@ function CommunityFeedStates({
         <div
           role="alert"
           data-testid="community-feed-error"
-          style={{ color: MERLOT, borderColor: MERLOT }}
+          style={{ color: MERLOT_INK, borderColor: MERLOT_INK }}
           className="flex items-center justify-between gap-3 rounded-[8px] border p-4 text-xs"
         >
           <span>{errorText}</span>
@@ -2091,6 +2104,7 @@ function communityPresentation(
     showNewLooks: available && newLooks.length > 0,
     detail: openedItem,
     canAct: available && hasSession,
+    settingsSignIn: !hasSession,
     settingsHref: hasSession ? '/notification-settings' : '/signin',
     settingsLabel: hasSession
       ? 'community.notifications.title'
@@ -2120,22 +2134,26 @@ function CommunitySettingsLink({
   banned,
   href,
   label,
+  signIn,
   guestOnly,
 }: {
   banned: boolean
   href: string
   label: string
+  /** The link asks the reader to sign in: no session, or one the API refused. */
+  signIn: boolean
   /** Hidden by globals.css once the page knows a member is signed in. */
   guestOnly: boolean
 }) {
   if (banned) return null
-  if (guestOnly) {
+  if (signIn) {
     return (
       <Link
         href={href}
         // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a
         // stored session not verified yet, never sees it (globals.css, lib/landing-session.ts).
-        data-landing="guest-inline"
+        // A refused stored session keeps the link visible without the marker.
+        data-landing={guestOnly ? 'guest-inline' : undefined}
         className="flex min-h-[44px] items-center px-2 text-sm font-medium text-[color:var(--theme-card-text)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
       >
         {label}
@@ -3755,6 +3773,7 @@ export function CommunityLookbookGrid({
           banned={banned}
           href={presentation.settingsHref}
           label={t(presentation.settingsLabel)}
+          signIn={presentation.settingsSignIn}
           // A refused stored session still reads as a member to the landing script, so its
           // Sign in link must not carry the guest-only marker, or nothing offers sign-in.
           guestOnly={!hasSession}
