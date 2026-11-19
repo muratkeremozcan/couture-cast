@@ -52,8 +52,14 @@ export const IMAGE_URL = 'https://storage.local/community/post-1.jpg'
 
 export const REFRESHED_IMAGE_URL = 'https://storage.local/community/post-1-refreshed.jpg'
 
-/** The premium accent system's error/destructive colour, kept a literal in the grid. */
+/** The premium accent system's error/destructive fill, under white labels. */
 export const MERLOT = '#7A1F2D'
+
+/**
+ * Merlot as text or border. It is mode-aware (globals.css `--lookbook-merlot-ink`: #7a1f2d light,
+ * #f0a3ae dark), so the grid sets the token; the Playwright dark-mode spec measures its contrast.
+ */
+export const MERLOT_INK = 'var(--lookbook-merlot-ink)'
 
 /** Success gold. Flagged content must never wear it. */
 export const GOLD = '#C9A14A'

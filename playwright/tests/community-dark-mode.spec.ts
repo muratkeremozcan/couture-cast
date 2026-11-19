@@ -8,12 +8,28 @@
 // feed's actions (New post and a bell for members, Sign in for guests) sit in the heading row.
 import { type Locator, type Page } from '@playwright/test'
 import enUS from '../../apps/web/src/i18n/locales/en-US.json'
+import es419 from '../../apps/web/src/i18n/locales/es-419.json'
+import frFR from '../../apps/web/src/i18n/locales/fr-FR.json'
 import { checkA11y, contrastRatio } from '../support/helpers/accessibility'
 import {
+  focusRing,
+  inkOfText,
+  paletteCardSurface,
+  placeholderContrastFailures,
+  resolved,
+  textContrastFailures,
+  surfacePixel,
+} from '../support/helpers/painted-contrast'
+import { resolveApiBaseUrl } from '../support/helpers/api-test'
+import {
+  COMMUNITY_FEED_PATH,
   communityTest as test,
   completedCommunityFeed,
   expect,
   expectCommunityFeedLoaded,
+  loadCommunityFixture,
+  publishCommunityLook,
+  waitForTerminalAuthorState,
 } from '../support/helpers/community-session'
 
 const DARK_SURFACE = 'rgb(18, 18, 20)'
@@ -42,14 +58,28 @@ async function surfaceAndInk(page: Page) {
   })
 }
 
-/** An action sits in the heading row: its vertical middle falls inside the heading's box. */
+/**
+ * An action sits in the heading row: its vertical middle falls inside the heading's box and it
+ * starts right of the heading. Both boxes are read in one frame and polled, because a notice
+ * arriving above the nav moves the whole row between two separate reads.
+ */
 async function expectInHeadingRow(page: Page, action: Locator) {
-  const title = (await heading(page).boundingBox())!
-  const box = (await action.boundingBox())!
-  const middle = box.y + box.height / 2
-  expect(middle).toBeGreaterThanOrEqual(title.y)
-  expect(middle).toBeLessThanOrEqual(title.y + title.height)
-  expect(box.x).toBeGreaterThan(title.x + title.width)
+  const title = heading(page)
+  await expect
+    .poll(async () => {
+      const handle = await action.elementHandle()
+      return title.evaluate((h, el) => {
+        if (!el) return 'action missing'
+        const t = h.getBoundingClientRect()
+        const a = el.getBoundingClientRect()
+        const middle = a.top + a.height / 2
+        if (middle < t.top || middle > t.bottom)
+          return `middle ${middle} outside ${t.top}..${t.bottom}`
+        if (a.left <= t.right) return `starts at ${a.left}, heading ends at ${t.right}`
+        return 'in row'
+      }, handle)
+    })
+    .toBe('in row')
 }
 
 test.describe('Community lookbook under the system color scheme (production follow-up)', () => {
@@ -159,4 +189,369 @@ test.describe('Community lookbook under the system color scheme (production foll
       expect((await surfaceAndInk(page)).surface, palette).toBe(LIGHT_SURFACE)
     }
   })
+})
+
+/* Codex review 31 regression checks; colors are measured as painted (support/helpers/painted-contrast.ts). */
+const PREMIUM_PALETTES = ['jewel_radiance', 'autumn_umber', 'winter_metallic'] as const
+
+const setPalette = (page: Page, palette: string | null) =>
+  page.evaluate((value) => {
+    if (value) document.documentElement.setAttribute('data-theme', value)
+    else document.documentElement.removeAttribute('data-theme')
+  }, palette)
+
+const MERLOT_LIGHT = 'rgb(122, 31, 45)'
+const MERLOT_DARK = 'rgb(240, 163, 174)'
+
+function authorStateRow(id: string, status: string, moderationReason: string | null) {
+  return {
+    id,
+    caption: `Synthetic ${status} look`,
+    altText: null,
+    climateBand: null,
+    imageAccess: null,
+    createdAt: new Date().toISOString(),
+    publishedAt: null,
+    status,
+    challengeId: null,
+    moderationReason,
+  }
+}
+
+test.describe('Community lookbook contrast and fit (Codex review 31)', () => {
+  test.beforeEach(({ interceptNetworkCall }) => {
+    void interceptNetworkCall({
+      url: '**/api/v1/events/poll**',
+      fulfillResponse: {
+        status: 200,
+        body: { events: [], nextSince: new Date(0).toISOString() },
+      },
+    })
+  })
+
+  // The monitor is off: the 503 is the state under test.
+  test(
+    '3.6-E2E-012: a failed feed read and a flagged post stay readable, and Merlot marks only the flagged state, in both schemes',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ page, communitySession }) => {
+      expect(communitySession.userId).toBeTruthy()
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await page.setViewportSize({ width: 1280, height: 900 })
+
+      // The member's own looks, one flagged and one withdrawn, ride on the real feed answer.
+      // Every feed read fails until the banner is measured, so no later read clears it first.
+      let failing = true
+      await page.route(`**${COMMUNITY_FEED_PATH}*`, async (route) => {
+        if (failing) {
+          await route.fulfill({ status: 503, json: { message: 'upstream unavailable' } })
+          return
+        }
+        const response = await route.fetch()
+        const body = (await response.json()) as { data?: { authorStates?: unknown[] } }
+        const target = body.data ?? (body as { authorStates?: unknown[] })
+        target.authorStates = [
+          authorStateRow(
+            'tea-flagged-look',
+            'flagged',
+            'Nudity detected by automated screening.'
+          ),
+          authorStateRow('tea-withdrawn-look', 'withdrawn', null),
+          ...(target.authorStates ?? []),
+        ]
+        await route.fulfill({ response, json: body })
+      })
+      await page.goto('/community')
+
+      const failure = page.getByTestId('community-feed-error')
+      await expect(failure).toBeVisible()
+      expect(await textContrastFailures(failure)).toEqual([])
+      expect((await resolved(failure)).color).toBe(MERLOT_DARK)
+      failing = false
+
+      await page.getByTestId('community-feed-retry-button').click()
+      const badge = page.getByTestId('status-badge-tea-flagged-look')
+      const reason = page.getByTestId('author-state-explanation-tea-flagged-look')
+      const withdrawn = page.getByTestId('status-badge-tea-withdrawn-look')
+      await expect(badge).toBeVisible()
+      await expect(withdrawn).toBeVisible()
+      const states = page.getByTestId('community-author-states')
+
+      for (const [scheme, merlot] of [
+        ['dark', MERLOT_DARK],
+        ['light', MERLOT_LIGHT],
+      ] as const) {
+        await page.emulateMedia({ colorScheme: scheme })
+        expect(await textContrastFailures(states), scheme).toEqual([])
+        expect(await resolved(badge), scheme).toEqual({ color: merlot, border: merlot })
+        expect((await resolved(reason)).color, scheme).toBe(merlot)
+        // Merlot is reserved for the destructive state: a withdrawal stays neutral.
+        const neutral = await resolved(withdrawn)
+        expect(neutral.color, scheme).not.toBe(merlot)
+        expect(neutral.border, scheme).not.toBe(merlot)
+      }
+    }
+  )
+
+  for (const palette of PREMIUM_PALETTES) {
+    test(`3.6-E2E-013: the compose and report dialogs use the ${palette} surface and keep every field readable under a dark system setting`, async ({
+      page,
+      communitySession,
+    }) => {
+      expect(communitySession.userId).toBeTruthy()
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await page.setViewportSize({ width: 1280, height: 900 })
+      const feed = completedCommunityFeed(page)
+      await page.goto('/community')
+      expect((await feed).status).toBe(200)
+      await expectCommunityFeedLoaded(page)
+      await setPalette(page, palette)
+      // The member chose a light palette: its card surface, as computed on the root. The dialog
+      // role sits on the dimming overlay; the panel is its first child, sampled as rendered.
+      const paletteSurface = await paletteCardSurface(page)
+      const panelSurface = (dialog: Locator) =>
+        surfacePixel(dialog.locator(':scope > div').first())
+
+      await filtersOf(page)
+        .getByRole('button', { name: enUS.community.newPost, exact: true })
+        .click()
+      const compose = page.getByRole('dialog')
+      await expect(compose).toBeVisible()
+      // Empty first: each field's prompt is read before anything is typed.
+      expect(await placeholderContrastFailures(compose)).toEqual([])
+      await page.getByTestId('post-alt-text-input').fill('Synthetic plum satin fabric')
+      await page
+        .getByTestId('post-caption-input')
+        .fill('Synthetic caption for a contrast check')
+      expect(await panelSurface(compose)).toBe(paletteSurface)
+      expect(await textContrastFailures(compose)).toEqual([])
+      await page.keyboard.press('Escape')
+      await expect(compose).toBeHidden()
+
+      await page.locator('[data-testid^="report-button-"]').first().click()
+      const report = page.getByRole('dialog')
+      await expect(report).toBeVisible()
+      expect(await placeholderContrastFailures(report)).toEqual([])
+      await page.getByTestId('report-reason-select').selectOption('spam')
+      await page.getByTestId('report-details-input').fill('Synthetic report detail')
+      expect(await panelSurface(report)).toBe(paletteSurface)
+      // The closed select is measured on its selected option's text.
+      expect(await textContrastFailures(report)).toEqual([])
+    })
+  }
+
+  // The share dialog opens from a member's own published look: detail, then Share.
+  for (const palette of [null, ...PREMIUM_PALETTES]) {
+    const name = palette ?? 'Default'
+    test(`3.6-E2E-018: the share-card dialog uses the ${name} surface and keeps its text readable under a dark system setting`, async ({
+      page,
+      request,
+      apiRequest,
+      recurse,
+      communitySession,
+    }, testInfo) => {
+      expect(communitySession.userId).toBeTruthy()
+      const apiBaseUrl = resolveApiBaseUrl(testInfo, {
+        fallback: 'http://localhost:4000',
+      })
+      const published = await publishCommunityLook(request, {
+        apiBaseUrl,
+        userId: communitySession.userId,
+        fixture: loadCommunityFixture('safe-satin-plum-512x512.jpg'),
+        altText: 'Synthetic plum satin fabric',
+        caption: `Share surface ${name}`,
+      })
+      const terminal = await waitForTerminalAuthorState(
+        { apiRequest, recurse },
+        { apiBaseUrl, userId: communitySession.userId, postId: published.postId }
+      )
+      expect(terminal.status).toBe('published')
+
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await page.setViewportSize({ width: 1280, height: 900 })
+      const feed = completedCommunityFeed(page)
+      await page.goto('/community')
+      expect((await feed).status).toBe(200)
+      await setPalette(page, palette)
+      const cardSurface = await paletteCardSurface(page)
+
+      await page
+        .locator(`[data-testid$="lookbook-card-${published.postId}"]`)
+        .first()
+        .getByTestId(`lookbook-open-${published.postId}`)
+        .click()
+      const detail = page.locator('[aria-labelledby="community-detail-title"]')
+      await expect(detail).toBeVisible()
+      await detail.getByTestId('share-card-open').click()
+      const share = page
+        .getByRole('dialog')
+        .filter({ has: page.getByTestId('share-card-preview') })
+      await expect(share.getByTestId('share-card-preview')).toHaveAttribute(
+        'data-loaded',
+        'true'
+      )
+      const panel = share.locator(':scope > div').first()
+      expect(await surfacePixel(panel)).toBe(cardSurface)
+      // The stubbed native share shows Share; sending fills the visible feedback line, which is
+      // aria-hidden (its status region announces it) but painted, so both are measured.
+      // Share and its feedback line need a member web session, which the share-card lane's owned
+      // runtime provides; share-card-native-share.spec.ts measures them.
+      expect(await textContrastFailures(share.getByTestId('share-card-save'))).toEqual([])
+      expect(await textContrastFailures(panel)).toEqual([])
+    })
+  }
+
+  const NEW_POST: Record<'fr-FR' | 'es-419', string> = {
+    'fr-FR': frFR.community.newPost,
+    'es-419': es419.community.newPost,
+  }
+  for (const locale of ['fr-FR', 'es-419'] as const) {
+    test.describe(`at 320 CSS pixels in ${locale}`, () => {
+      test.use({ locale })
+
+      test(`3.6-E2E-014: New post stays entirely on screen for a member in ${locale}`, async ({
+        page,
+        communitySession,
+      }) => {
+        expect(communitySession.userId).toBeTruthy()
+        await page.setViewportSize({ width: 320, height: 800 })
+        const feed = completedCommunityFeed(page)
+        await page.goto('/community')
+        expect((await feed).status).toBe(200)
+        await expect(page.locator('html')).toHaveAttribute('lang', locale)
+
+        const newPost = page.getByTestId('create-post-button')
+        await expect(newPost).toHaveText(NEW_POST[locale])
+        // One frame: the box sits inside the viewport, and the point at its center is the button.
+        const placement = await newPost.evaluate((button) => {
+          const box = button.getBoundingClientRect()
+          const hit = document.elementFromPoint(
+            box.left + box.width / 2,
+            box.top + box.height / 2
+          )
+          return {
+            inViewport:
+              box.left >= 0 &&
+              box.top >= 0 &&
+              box.right <= window.innerWidth &&
+              box.bottom <= window.innerHeight,
+            hitsButton: hit !== null && button.contains(hit),
+            scrollWidth: document.documentElement.scrollWidth,
+          }
+        })
+        expect(placement).toEqual({
+          inViewport: true,
+          hitsButton: true,
+          scrollWidth: 320,
+        })
+      })
+    })
+  }
+
+  // The monitor is off: the 401 is the refused session under test.
+  test(
+    '3.6-E2E-015: a refused stored session paints Sign in as visible text in the heading row',
+    { annotation: [{ type: 'skipNetworkMonitoring' }] },
+    async ({ page, communitySession }) => {
+      expect(communitySession.userId).toBeTruthy()
+      await page.setViewportSize({ width: 390, height: 844 })
+      const refused = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === COMMUNITY_FEED_PATH &&
+          response.status() === 401
+      )
+      await page.route(`**${COMMUNITY_FEED_PATH}*`, (route) =>
+        route.fulfill({ status: 401, json: { message: 'Unauthorized' } })
+      )
+      await page.goto('/community')
+      await refused
+      await expect(page.getByTestId('community-feed-signed-out')).toBeVisible()
+
+      const signIn = filtersOf(page).getByRole('link', {
+        name: enUS.community.notifications.signin,
+        exact: true,
+      })
+      await expect(signIn).toBeVisible()
+      await expect(signIn).toHaveAttribute('href', '/signin')
+      await expect(signIn).toHaveText(enUS.community.notifications.signin)
+      await expect(signIn.locator('svg')).toHaveCount(0)
+      await expectInHeadingRow(page, signIn)
+      // Painted, not only present: its own text changes pixels, legibly.
+      const label = await inkOfText(signIn)
+      expect(label!.painted).toBeGreaterThan(20)
+      expect(label!.ratio).toBeGreaterThanOrEqual(4.5)
+      expect(await textContrastFailures(signIn)).toEqual([])
+
+      // Negative controls beside the link: the same words visually hidden (sr-only), and full-size
+      // but clipped away (clip-path: inset(50%)). Neither paints a pixel of text.
+      await signIn.evaluate((link) => {
+        const controls: [string, string][] = [
+          ['tea-sr-only-control', ''],
+          ['tea-clipped-control', 'display:inline-block;clip-path:inset(50%)'],
+        ]
+        for (const [id, css] of controls) {
+          const control = document.createElement('span')
+          if (!css) control.className = 'sr-only'
+          control.setAttribute('style', css)
+          control.dataset.testid = id
+          control.textContent = link.textContent
+          link.parentElement!.append(control)
+        }
+      })
+      const clipped = await inkOfText(page.getByTestId('tea-clipped-control'))
+      expect(clipped).not.toBeNull()
+      expect(clipped!.painted).toBe(0)
+      expect(
+        await textContrastFailures(page.getByTestId('tea-clipped-control'))
+      ).toHaveLength(1)
+      const hidden = await inkOfText(page.getByTestId('tea-sr-only-control'))
+      expect(hidden?.painted ?? 0).toBeLessThanOrEqual(1)
+    }
+  )
+
+  for (const scheme of ['dark', 'light'] as const) {
+    for (const palette of [null, ...PREMIUM_PALETTES]) {
+      const name = palette ?? 'Default'
+      // The monitor is off: a reader without Premium gets 403 from the planner read, the locked
+      // state under test.
+      test(
+        `3.6-E2E-016: the locked planner's Get Premium is readable (${name}, ${scheme} system)`,
+        { annotation: [{ type: 'skipNetworkMonitoring' }] },
+        async ({ page, communitySession }) => {
+          expect(communitySession.userId).toBeTruthy()
+          await page.emulateMedia({ colorScheme: scheme })
+          await page.setViewportSize({ width: 390, height: 844 })
+          await page.goto('/')
+          await setPalette(page, palette)
+
+          await page
+            .getByRole('button', { name: enUS.commerce.premium.planner.openControl })
+            .click()
+          const cta = page.getByTestId('planner-rail-get-premium')
+          await expect(cta).toBeVisible()
+          expect(await textContrastFailures(cta)).toEqual([])
+        }
+      )
+
+      test(`3.6-E2E-017: a keyboard-focused bottom tab draws a visible ring (${name}, ${scheme} system)`, async ({
+        page,
+      }) => {
+        await page.emulateMedia({ colorScheme: scheme })
+        await page.setViewportSize({ width: 390, height: 844 })
+        await page.goto('/community')
+        await setPalette(page, palette)
+
+        const nav = page.getByTestId('sticky-bottom-nav')
+        const home = nav.getByRole('link', { name: /home/i })
+        await home.focus()
+        // Keyboard focus, so :focus-visible draws the ring.
+        await page.keyboard.press('Shift+Tab')
+        await page.keyboard.press('Tab')
+        await expect(home).toBeFocused()
+        const ring = await focusRing(home)
+        // Drawn: the outline changes pixels around the tab, and they reach 3:1 on the nav.
+        expect(ring!.painted).toBeGreaterThan(20)
+        expect(ring!.ratio).toBeGreaterThanOrEqual(3)
+      })
+    }
+  }
 })
