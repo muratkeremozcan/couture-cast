@@ -132,12 +132,26 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
         1.15
       const onBackground = pairs.filter(([bare]) => near(bare))
       const uniform = pairs.length === 0 || onBackground.length >= 0.95 * pairs.length
+      const contrast = (x: number, y: number) =>
+        (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)
+      // The text color is read where a glyph's stem reaches it: the pixel whose ink differs most
+      // from the background under it. The ratio is that color's worst contrast against every
+      // background pixel under the glyphs, so a background that lightens or darkens within the
+      // band still counts where the text is weakest.
+      let ink = -1
+      let strongest = 1
+      for (const [under, inked] of onBackground) {
+        const local = contrast(under, inked)
+        if (local > strongest) {
+          strongest = local
+          ink = inked
+        }
+      }
       let ratio = 1
-      for (const [bare, ink] of onBackground)
-        ratio = Math.max(
-          ratio,
-          (Math.max(bare, ink) + 0.05) / (Math.min(bare, ink) + 0.05)
-        )
+      if (ink >= 0) {
+        ratio = Infinity
+        for (const [under] of onBackground) ratio = Math.min(ratio, contrast(ink, under))
+      }
       return { painted, ratio, uniform }
     },
     { a: inked, b: bare, m: mask ?? null }
