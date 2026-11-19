@@ -189,6 +189,11 @@ function compare(page: Page, bare: string, inked: string, mask?: string): Promis
           for (const group of counted.length > 0 ? counted : steps)
             rated.push(worstOf(group))
         }
+        // A glyph too small for either floor (a period paints a few pixels) is still rated: each
+        // exact background under it by its own strongest stem.
+        if (rated.length === 0)
+          for (const group of groupBy(glyphs, (under) => under))
+            rated.push(group.strongest)
         return rated
       }
       const rated = rate(onBackground)
