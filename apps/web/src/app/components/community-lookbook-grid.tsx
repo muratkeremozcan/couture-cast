@@ -442,6 +442,11 @@ export interface LookbookFilterNavProps {
    * chip bar above it, so it sticks to the top edge there instead of floating under a gap.
    */
   stickyTop?: number
+  /**
+   * Production feedback 2026-11-19: the feed's own actions (New post, the notifications link) sit in
+   * the heading row, so nothing floats between the chips and the feed.
+   */
+  actions?: React.ReactNode
 }
 
 // A phone row scrolls and fades at its right edge, so a chip the edge cuts reads as more to scroll
@@ -457,6 +462,7 @@ export function LookbookFilterNav({
   viewerBand = null,
   closed = false,
   stickyTop = CHIP_NAVIGATION_HEIGHT_PX,
+  actions,
 }: LookbookFilterNavProps) {
   const { t } = useCommunityTranslation()
   // Per instance, so a nav only ever points at its own explainer.
@@ -482,21 +488,24 @@ export function LookbookFilterNav({
       aria-label={t('community.filters.label')}
       aria-describedby={explainerId}
       style={{ top: stickyTop }}
-      className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-white/95 py-3 backdrop-blur"
+      className="sticky z-10 flex flex-col gap-3 border-b border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] py-3 backdrop-blur"
     >
-      <h2
-        tabIndex={-1}
-        data-share-card-focus-fallback="community"
-        className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
-      >
-        {t('community.heading')}
-      </h2>
+      <div className="flex items-center justify-between gap-3">
+        <h2
+          tabIndex={-1}
+          data-share-card-focus-fallback="community"
+          className="lookbook-display text-2xl font-semibold text-[color:var(--theme-primary)]"
+        >
+          {t('community.heading')}
+        </h2>
+        {actions}
+      </div>
       {/* Production feedback 2026-11-19 asked what "Cold and wet" means: the chips name a
           climate band and nothing said what a band is, so one visible line does. */}
       <p
         id={explainerId}
         data-testid="community-filters-explainer"
-        className="-mt-1 text-xs leading-snug text-neutral-600"
+        className="-mt-1 text-xs leading-snug text-[color:var(--lookbook-ink-muted)]"
       >
         {t('community.filters.explainer')}
       </p>
@@ -510,7 +519,7 @@ export function LookbookFilterNav({
           // colour, so it survives a monochrome or high-contrast rendering.
           const activeStyles = isActive
             ? 'border-[color:var(--theme-secondary)] font-bold text-[color:var(--theme-card-text)] underline underline-offset-4'
-            : 'border-transparent font-medium text-neutral-600 min-[768px]:border-[color:var(--theme-card-border)] min-[768px]:bg-[var(--theme-card-bg)]'
+            : 'border-transparent font-medium text-[color:var(--lookbook-ink-muted)] min-[768px]:border-[color:var(--theme-card-border)] min-[768px]:bg-[var(--theme-card-bg)]'
 
           return (
             <button
@@ -586,7 +595,7 @@ function WeeklyChallengeBanner({
               ? bandLabel(challenge.climateBand, t)
               : t('community.challenge.allClimates')}
           </span>
-          <span className="lookbook-metrics text-[11px] text-neutral-600">
+          <span className="lookbook-metrics text-[11px] text-[color:var(--lookbook-ink-muted)]">
             {formattedDates}
           </span>
         </div>
@@ -599,7 +608,9 @@ function WeeklyChallengeBanner({
         >
           {challenge.title}
         </h3>
-        <p className="text-xs leading-relaxed text-neutral-600">{challenge.body}</p>
+        <p className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)]">
+          {challenge.body}
+        </p>
       </div>
 
       {canParticipate && (
@@ -665,7 +676,7 @@ function LookbookCardImageSurface({
           data-testid={`${scope}image-unavailable-${item.id}`}
           className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-[var(--theme-card-bg)] p-4 text-center"
         >
-          <span className="text-xs font-medium text-neutral-600">
+          <span className="text-xs font-medium text-[color:var(--lookbook-ink-muted)]">
             {t('community.card.imageUnavailable')}
           </span>
           <button
@@ -713,7 +724,7 @@ function LookbookCardImageSurface({
         >
           <span
             aria-hidden="true"
-            className="lookbook-metrics rounded-full bg-white/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-colors"
+            className="lookbook-metrics rounded-full bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-[color:var(--theme-card-text)] shadow-sm motion-safe:transition-colors"
           >
             {t('community.card.open')}
           </span>
@@ -745,7 +756,7 @@ function LookbookCardImageSurface({
         {item.status !== 'published' && (
           <span
             data-testid={`${scope}status-badge-${item.id}`}
-            className="lookbook-metrics rounded-md border border-[color:var(--theme-card-border)] bg-white/95 px-2 py-0.5 text-[9px] font-medium uppercase text-[color:var(--theme-card-text)]"
+            className="lookbook-metrics rounded-md border border-[color:var(--theme-card-border)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-2 py-0.5 text-[9px] font-medium uppercase text-[color:var(--theme-card-text)]"
           >
             {t(`community.status.${item.status}`)}
           </span>
@@ -758,7 +769,7 @@ function LookbookCardImageSurface({
         {item.sponsorship && (
           <span
             data-testid={`${scope}sponsored-badge-${item.id}`}
-            className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-white/95 px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
+            className="lookbook-metrics rounded-md border border-[color:var(--theme-secondary)] bg-[color:color-mix(in_srgb,var(--lookbook-surface)_95%,transparent)] px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--theme-card-text)]"
           >
             <span aria-hidden="true">{t('community.card.sponsored')}</span>
             <span id={sponsoredDisclosureId(scope, item.id)} className="sr-only">
@@ -818,7 +829,7 @@ function LookbookCardContent({
         {item.caption && (
           <p
             data-testid={`${scope}caption-${item.id}`}
-            className="text-xs leading-relaxed text-neutral-600 line-clamp-3"
+            className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)] line-clamp-3"
           >
             {item.caption}
           </p>
@@ -859,7 +870,7 @@ function LookbookCardContent({
               className={`min-h-[44px] font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] ${
                 isReported
                   ? 'cursor-default text-[color:var(--theme-card-text)]'
-                  : 'text-neutral-600 hover:underline'
+                  : 'text-[color:var(--lookbook-ink-muted)] hover:underline'
               }`}
             >
               {isReported ? t('community.card.reported') : t('community.card.report')}
@@ -1140,7 +1151,7 @@ function LookbookDetailDialog({
         {item.caption && (
           <p
             data-testid="community-detail-caption"
-            className="text-xs leading-relaxed text-neutral-600"
+            className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)]"
           >
             {item.caption}
           </p>
@@ -1220,7 +1231,9 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
         >
           {t('community.feed.yourPostsTitle')}
         </h3>
-        <p className="text-xs text-neutral-600">{t('community.feed.yourPostsBody')}</p>
+        <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
+          {t('community.feed.yourPostsBody')}
+        </p>
       </div>
 
       <ul className="flex flex-col gap-3">
@@ -1247,7 +1260,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
                 <p
                   data-testid={`author-state-explanation-${state.id}`}
                   style={isFlagged ? { color: MERLOT } : undefined}
-                  className={`text-xs leading-relaxed ${isFlagged ? '' : 'text-neutral-600'}`}
+                  className={`text-xs leading-relaxed ${isFlagged ? '' : 'text-[color:var(--lookbook-ink-muted)]'}`}
                 >
                   {t(`community.removed.${state.status}`)}
                 </p>
@@ -1255,7 +1268,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {state.moderationReason && (
                 <p
                   data-testid={`author-state-reason-${state.id}`}
-                  className="text-xs text-neutral-600"
+                  className="text-xs text-[color:var(--lookbook-ink-muted)]"
                 >
                   {moderationReasonText(state.moderationReason, t)}
                 </p>
@@ -1263,7 +1276,7 @@ function AuthorStatesSection({ states, t }: AuthorStatesSectionProps) {
               {state.caption && (
                 <p
                   data-testid={`author-state-caption-${state.id}`}
-                  className="text-xs leading-relaxed text-neutral-600 line-clamp-2"
+                  className="text-xs leading-relaxed text-[color:var(--lookbook-ink-muted)] line-clamp-2"
                 >
                   {state.caption}
                 </p>
@@ -1343,7 +1356,7 @@ function CommunityReportModal({
             onChange={(event) => {
               setReason(event.target.value as CommunityReportReason)
             }}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-white px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {communityReportReasonSchema.options.map((option) => (
               <option key={option} value={option}>
@@ -1370,9 +1383,9 @@ function CommunityReportModal({
             maxLength={500}
             rows={3}
             placeholder={t('community.report.detailsPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <span className="text-[10px] text-neutral-500">
+          <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.report.detailsCount', { count: details.length })}
           </span>
         </div>
@@ -1382,7 +1395,7 @@ function CommunityReportModal({
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-neutral-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {t('community.report.cancel')}
           </button>
@@ -1532,9 +1545,9 @@ function PostCreationModal({
                 onSelectPhoto(file)
               }
             }}
-            className="w-full text-xs text-neutral-600 file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[#C9A14A] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full text-xs text-[color:var(--lookbook-ink-muted)] file:mr-3 file:min-h-[44px] file:rounded-full file:border-0 file:bg-[#C9A14A] file:px-4 file:py-2 file:text-xs file:font-semibold file:text-[#111111] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <p className="text-[10px] text-neutral-500">
+          <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.photoHint')}
           </p>
           {photoPreview && (
@@ -1549,7 +1562,7 @@ function PostCreationModal({
           {isPreparing && (
             <p
               data-testid="create-post-progress"
-              className="text-[10px] text-neutral-500"
+              className="text-[10px] text-[color:var(--lookbook-ink-muted)]"
             >
               {t('community.compose.uploading')}
             </p>
@@ -1574,9 +1587,9 @@ function PostCreationModal({
             maxLength={200}
             rows={2}
             placeholder={t('community.compose.altPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <p className="text-[10px] text-neutral-500">
+          <p className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {altTextSuggestion
               ? t('community.compose.altSuggested')
               : t('community.compose.altHint')}
@@ -1619,9 +1632,9 @@ function PostCreationModal({
             maxLength={280}
             rows={3}
             placeholder={t('community.compose.captionPlaceholder')}
-            className="w-full rounded-md border border-[color:var(--theme-card-border)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-2.5 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           />
-          <span className="text-[10px] text-neutral-500">
+          <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
             {t('community.compose.captionCount', { count: caption.length })}
           </span>
         </div>
@@ -1641,7 +1654,7 @@ function PostCreationModal({
               onChange={(event) => {
                 setSelectedChallengeId(event.target.value || null)
               }}
-              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-white px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+              className="w-full rounded-md border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] px-3 py-2 text-xs text-[color:var(--theme-primary)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
             >
               <option value="">{t('community.compose.challengeNone')}</option>
               <option value={activeChallenge.id}>{activeChallenge.title}</option>
@@ -1654,7 +1667,7 @@ function PostCreationModal({
             type="button"
             onClick={onClose}
             disabled={isPublishing}
-            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-neutral-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+            className="min-h-[44px] rounded-full border border-[color:var(--theme-card-border)] px-4 py-2 text-xs font-medium text-[color:var(--lookbook-ink-muted)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
           >
             {t('community.compose.cancel')}
           </button>
@@ -1683,18 +1696,26 @@ function PostCreationModal({
 // lifecycle.
 // ---------------------------------------------------------------------------
 
-interface CommunityHeaderProps {
+interface CommunityHeaderActionsProps {
   canShare: boolean
   onShare: () => void
+  settingsLink: React.ReactNode
   t: Translate
 }
 
-function CommunityHeader({ canShare, onShare, t }: CommunityHeaderProps) {
+/**
+ * Production feedback 2026-11-19: the "Community inspirations" label repeated the "Latest looks"
+ * heading, and the notifications link floated alone above it, so both actions share one row.
+ */
+function CommunityHeaderActions({
+  canShare,
+  onShare,
+  settingsLink,
+  t,
+}: CommunityHeaderActionsProps) {
   return (
-    <div className="flex items-center justify-between">
-      <span className="lookbook-metrics text-xs uppercase tracking-widest text-[color:var(--theme-card-text)]">
-        {t('community.inspirations')}
-      </span>
+    <div className="flex shrink-0 items-center justify-end gap-2">
+      {settingsLink}
       {canShare && (
         <button
           type="button"
@@ -1869,7 +1890,9 @@ function CommunityFeedStates({
           <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
             {t('community.feed.emptyTitle')}
           </p>
-          <p className="mt-1 text-xs text-neutral-600">{t('community.feed.emptyBody')}</p>
+          <p className="mt-1 text-xs text-[color:var(--lookbook-ink-muted)]">
+            {t('community.feed.emptyBody')}
+          </p>
           {canShare && (
             <button
               type="button"
@@ -2075,6 +2098,19 @@ function communityPresentation(
   }
 }
 
+/** Without the filter nav (a ban closes it) the feed actions keep a row of their own. */
+function StandaloneHeaderActions({
+  filterNavShown,
+  banned,
+  children,
+}: {
+  filterNavShown: boolean
+  banned: boolean
+  children: React.ReactNode
+}) {
+  return filterNavShown && !banned ? null : children
+}
+
 /** Story 6.11: the notifications link holds the section off the divider, and a ban removes it. */
 const communityAsideClass = (banned: boolean) =>
   banned ? 'flex flex-col gap-6 pt-6' : 'flex flex-col gap-6'
@@ -2093,15 +2129,42 @@ function CommunitySettingsLink({
   guestOnly: boolean
 }) {
   if (banned) return null
+  if (guestOnly) {
+    return (
+      <Link
+        href={href}
+        // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a
+        // stored session not verified yet, never sees it (globals.css, lib/landing-session.ts).
+        data-landing="guest-inline"
+        className="flex min-h-[44px] items-center px-2 text-sm font-medium text-[color:var(--theme-card-text)] underline underline-offset-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)]"
+      >
+        {label}
+      </Link>
+    )
+  }
+  // A member's link is a bell in the heading row; its name stays the full label for assistive
+  // technology, and the tooltip shows it to a pointer.
   return (
     <Link
       href={href}
-      // Owner report 2026-11-16: the signed-out link is a sign-in action, so a member, or a stored
-      // session not verified yet, never sees it (globals.css, lib/landing-session.ts).
-      data-landing={guestOnly ? 'guest-inline' : undefined}
-      className="min-h-12 self-start py-3 underline"
+      aria-label={label}
+      title={label}
+      className="flex h-11 w-11 items-center justify-center rounded-full border border-[color:var(--theme-card-border)] text-[color:var(--theme-card-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[color:var(--theme-secondary)] motion-safe:transition-colors hover:border-[color:var(--theme-secondary)]"
     >
-      {label}
+      <svg
+        aria-hidden="true"
+        viewBox="0 0 24 24"
+        width="20"
+        height="20"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d="M6 8a6 6 0 1 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+      </svg>
     </Link>
   )
 }
@@ -3683,6 +3746,24 @@ export function CommunityLookbookGrid({
     presentation.canAct
   )
 
+  const headerActions = (
+    <CommunityHeaderActions
+      canShare={presentation.canAct}
+      onShare={openCreateModal}
+      settingsLink={
+        <CommunitySettingsLink
+          banned={banned}
+          href={presentation.settingsHref}
+          label={t(presentation.settingsLabel)}
+          // A refused stored session still reads as a member to the landing script, so its
+          // Sign in link must not carry the guest-only marker, or nothing offers sign-in.
+          guestOnly={!hasSession}
+        />
+      }
+      t={t}
+    />
+  )
+
   return (
     <ShareCardHostContext.Provider value={shareHost}>
       <aside
@@ -3740,18 +3821,13 @@ export function CommunityLookbookGrid({
             viewerBand={viewerBand}
             closed={banned}
             stickyTop={filterNavStickyTop}
+            actions={headerActions}
           />
         )}
 
-        <CommunitySettingsLink
-          banned={banned}
-          href={presentation.settingsHref}
-          label={t(presentation.settingsLabel)}
-          // A refused stored session still reads as a member to the landing script, so its
-          // Sign in link must not carry the guest-only marker, or nothing offers sign-in.
-          guestOnly={!hasSession}
-        />
-        <CommunityHeader canShare={presentation.canAct} onShare={openCreateModal} t={t} />
+        <StandaloneHeaderActions filterNavShown={showFilterNav} banned={banned}>
+          {headerActions}
+        </StandaloneHeaderActions>
 
         <CommunityNotices
           bandUnresolvedReason={bandNoticeReason}

@@ -188,7 +188,7 @@ export function CommunitySponsoredCta({
       <span
         id={opensId}
         data-testid={`${ctaId}-opens`}
-        className="text-[10px] text-neutral-600"
+        className="text-[10px] text-[color:var(--lookbook-ink-muted)]"
       >
         {t('community.card.shopOpensInBrowser')}
       </span>

@@ -102,7 +102,7 @@ function GarmentThumb({
         </div>
       )}
       {garment.category && (
-        <span className="text-[10px] text-neutral-500">
+        <span className="text-[10px] text-[color:var(--lookbook-ink-muted)]">
           {t(`commerce.premium.planner.garmentCategory.${garment.category}`)}
         </span>
       )}
@@ -119,7 +119,7 @@ function OutfitCard({
 }) {
   return (
     <li
-      className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-white p-3"
+      className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-3"
       data-testid={`planner-outfit-${outfit.scenario}`}
     >
       {/*
@@ -144,13 +144,15 @@ function OutfitCard({
           <GarmentThumb key={garment.id} garment={garment} t={t} />
         ))}
       </ul>
-      <p className="text-xs text-neutral-600">{outfit.comfortNotes}</p>
+      <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
+        {outfit.comfortNotes}
+      </p>
       {outfit.reasoningBadges.length > 0 && (
         <ul className="flex flex-wrap gap-1">
           {outfit.reasoningBadges.map((badge) => (
             <li
               key={badge.key}
-              className="rounded-full border border-[color:var(--theme-card-border)] px-2 py-0.5 text-[10px] text-neutral-600"
+              className="rounded-full border border-[color:var(--theme-card-border)] px-2 py-0.5 text-[10px] text-[color:var(--lookbook-ink-muted)]"
             >
               {badge.label}
             </li>
@@ -171,7 +173,7 @@ function WeatherSummary({
   t: (key: string) => string
 }) {
   if (weather.confidence === 'unavailable') {
-    // `text-neutral-500` measured 4.35:1 against this card's
+    // `text-[color:var(--lookbook-ink-muted)]` measured 4.35:1 against this card's
     // `--theme-card-bg` (a `ReadyDayCard` root, not the white `OutfitCard`
     // background `--theme-card-text`'s sibling fix at `OutfitCard` above
     // addresses), just under WCAG's 4.5:1 small-text minimum.
@@ -201,7 +203,7 @@ function WeatherSummary({
 
   return (
     <p
-      className="lookbook-metrics text-xs text-neutral-600"
+      className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]"
       data-testid="planner-weather"
     >
       {[high, low].filter(Boolean).join(' / ')}
@@ -252,7 +254,7 @@ function ReadyDayCard({
         </div>
         {day.isStarterWardrobe && (
           <span
-            className="rounded-full border border-[color:var(--theme-card-border)] px-2 py-0.5 text-[10px] text-neutral-600"
+            className="rounded-full border border-[color:var(--theme-card-border)] px-2 py-0.5 text-[10px] text-[color:var(--lookbook-ink-muted)]"
             data-testid={`planner-starter-${day.planDate}`}
           >
             {t('commerce.premium.planner.starterWardrobe')}
@@ -284,7 +286,7 @@ function ReadyDayCard({
         <p
           role="alert"
           aria-live="assertive"
-          className="text-xs font-medium text-red-700"
+          className="text-xs font-medium text-[color:var(--lookbook-danger)]"
           data-testid={`planner-day-alert-${day.planDate}`}
         >
           {dayError}
@@ -322,7 +324,11 @@ function ErrorDayCard({
       <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
         {dayLabel}
       </p>
-      <p role="alert" aria-live="assertive" className="text-xs font-medium text-red-700">
+      <p
+        role="alert"
+        aria-live="assertive"
+        className="text-xs font-medium text-[color:var(--lookbook-danger)]"
+      >
         {t('commerce.premium.planner.dayError')}
       </p>
       <button
@@ -360,7 +366,7 @@ function LockedPanel({
   if (reason === 'disabled') {
     return (
       <div
-        className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-white p-4"
+        className="space-y-2 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-4"
         data-testid="planner-rail-disabled"
       >
         <p className="text-sm font-medium text-[color:var(--theme-card-text)]">
@@ -372,7 +378,7 @@ function LockedPanel({
 
   return (
     <div
-      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-white p-4"
+      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-4"
       data-testid="planner-rail-locked"
     >
       <p className="text-sm font-medium text-[color:var(--theme-card-text)]">
@@ -392,10 +398,14 @@ function LockedPanel({
 function ErrorPanel({ onRetry, t }: { onRetry: () => void; t: (key: string) => string }) {
   return (
     <div
-      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-white p-4"
+      className="space-y-3 rounded-lg border border-[color:var(--theme-card-border)] bg-[var(--lookbook-surface)] p-4"
       data-testid="planner-rail-error"
     >
-      <p role="alert" aria-live="assertive" className="text-sm font-medium text-red-700">
+      <p
+        role="alert"
+        aria-live="assertive"
+        className="text-sm font-medium text-[color:var(--lookbook-danger)]"
+      >
         {t('commerce.premium.planner.errorTitle')}
       </p>
       <button

@@ -464,7 +464,7 @@ function SpotlightStates({
       <p className="text-sm font-semibold text-[color:var(--theme-card-text)]">
         {t('community.spotlight.emptyTitle')}
       </p>
-      <p className="mt-1 text-xs text-neutral-600">
+      <p className="mt-1 text-xs text-[color:var(--lookbook-ink-muted)]">
         {t('community.spotlight.emptyBody')}
       </p>
     </div>

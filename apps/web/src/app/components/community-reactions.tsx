@@ -57,7 +57,7 @@ export function CommunityReactions({
           </button>
         ))}
       </div>
-      <p className="text-xs text-neutral-600">
+      <p className="text-xs text-[color:var(--lookbook-ink-muted)]">
         {t('community.reactions.total', { count: summary.total })}
       </p>
       {pending && <p className="text-xs">{t('community.reactions.pending')}</p>}

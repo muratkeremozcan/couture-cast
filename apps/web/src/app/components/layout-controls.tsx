@@ -47,7 +47,7 @@ export function LayoutControls({
   return (
     <div
       aria-label="Layout Controls"
-      className="flex flex-wrap items-center gap-3 rounded-[8px] border border-[#E6E6ED] bg-[#F5F5F7] p-3"
+      className="flex flex-wrap items-center gap-3 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface-muted)] p-3"
     >
       <button
         type="button"
@@ -56,7 +56,7 @@ export function LayoutControls({
         className={`rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
           isComparisonMode
             ? 'border-[#C9A14A] bg-[#C9A14A] text-[#111111]'
-            : 'border-[#E6E6ED] bg-[#FFFFFF] text-[#111111]'
+            : 'border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)]'
         }`}
       >
         Comparison Mode
@@ -69,7 +69,7 @@ export function LayoutControls({
         className={`rounded-lg border px-4 py-2 text-xs font-semibold uppercase tracking-wider motion-safe:transition-colors motion-safe:duration-200 motion-reduce:transition-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#C9A14A] ${
           isMobilePreview
             ? 'border-[#C9A14A] bg-[#C9A14A] text-[#111111]'
-            : 'border-[#E6E6ED] bg-[#FFFFFF] text-[#111111]'
+            : 'border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] text-[color:var(--lookbook-ink)]'
         }`}
       >
         Mobile Preview

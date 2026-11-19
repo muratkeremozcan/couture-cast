@@ -35,12 +35,12 @@ export default function CommunityPage() {
           CoutureCast
         </Link>
         <h1 className="mb-6 text-3xl font-semibold">{t('community.title')}</h1>
-        {/* The same light lookbook surface Home's prism container gives the grid. The wrapper
+        {/* The same lookbook surface Home's prism container gives the grid. The wrapper
             clips with overflow-x-clip: overflow-x-hidden makes it a scroll container, and the
             sticky filter nav would then stick to it and scroll off the screen. */}
         <div
           data-focus-surface="light"
-          className="lookbook-body rounded-[16px] bg-[#FFFFFF] px-4 py-6 text-[#111111] sm:px-6"
+          className="lookbook-body rounded-[16px] bg-[var(--lookbook-surface)] px-4 py-6 text-[color:var(--lookbook-ink)] sm:px-6"
         >
           <CommunityLookbookGrid
             showFilterNav

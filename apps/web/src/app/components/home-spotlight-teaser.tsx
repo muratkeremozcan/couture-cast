@@ -227,7 +227,7 @@ export function HomeSpotlightTeaser({
           event.preventDefault()
           onOpen()
         }}
-        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[#E6E6ED] bg-[#FFFFFF] p-4 text-left motion-safe:transition-colors motion-safe:duration-300 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
+        className="group flex min-h-[44px] items-center gap-4 rounded-[8px] border border-[color:var(--lookbook-line)] bg-[var(--lookbook-surface)] p-4 text-left motion-safe:transition-colors motion-safe:duration-300 hover:border-[#C9A14A] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#C9A14A] motion-reduce:transition-none"
       >
         <Image
           data-testid="home-spotlight-teaser-image"
@@ -239,7 +239,7 @@ export function HomeSpotlightTeaser({
           // Signed, short-lived URLs, like the community cards.
           unoptimized
           onError={onImageError}
-          className="h-[72px] w-[72px] shrink-0 rounded-[6px] bg-[#E6E6ED] object-cover"
+          className="h-[72px] w-[72px] shrink-0 rounded-[6px] bg-[var(--lookbook-line)] object-cover"
         />
         {/*
         The name comes from content, so it always contains what the link says.
@@ -256,31 +256,31 @@ export function HomeSpotlightTeaser({
         <span aria-hidden="true" className="flex min-w-0 flex-col gap-0.5">
           <span
             data-testid="home-spotlight-teaser-heading"
-            className="lookbook-display text-base font-semibold text-[#111111]"
+            className="lookbook-display text-base font-semibold text-[color:var(--lookbook-ink)]"
           >
             {t('home.spotlightTeaser.heading', { label })}
           </span>
           <span
             data-testid="home-spotlight-teaser-author"
-            className="truncate text-xs text-[#36363D]"
+            className="truncate text-xs text-[color:var(--lookbook-ink-soft)]"
           >
             {author}
           </span>
           {sponsorship && (
             <span
               data-testid="home-spotlight-teaser-sponsored"
-              className="lookbook-metrics self-start rounded-md border border-[#C9A14A] px-2 py-0.5 text-[9px] font-semibold uppercase text-[#111111]"
+              className="lookbook-metrics self-start rounded-md border border-[#C9A14A] px-2 py-0.5 text-[9px] font-semibold uppercase text-[color:var(--lookbook-ink)]"
             >
               {t('community.card.sponsored')}
             </span>
           )}
           <span
             data-testid="home-spotlight-teaser-reactions"
-            className="lookbook-metrics text-xs text-[#5C5C66]"
+            className="lookbook-metrics text-xs text-[color:var(--lookbook-ink-muted)]"
           >
             {t('home.spotlightTeaser.reactions', { count })}
           </span>
-          <span className="mt-1 text-xs font-semibold text-[#8A691F] group-hover:underline">
+          <span className="mt-1 text-xs font-semibold text-[color:var(--lookbook-gold-ink)] group-hover:underline">
             {t('home.spotlightTeaser.cta')}
           </span>
         </span>

@@ -36,7 +36,9 @@ function surfaceClassName(surface: 'default' | 'theme', columnLayout: boolean) {
   const colors =
     surface === 'theme'
       ? 'bg-[var(--theme-card-bg)] text-[color:var(--theme-card-text)]'
-      : 'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100'
+      : // The dark surface also darkens native controls (a checkbox, the file picker), which
+        // otherwise keep their light rendering on it.
+        'bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 dark:[color-scheme:dark]'
   return `max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto rounded-xl p-6 shadow-2xl${layout} ${colors}`
 }
 
