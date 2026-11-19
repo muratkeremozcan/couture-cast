@@ -15,7 +15,14 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import type * as WebSession from '../../lib/web-session'
-import { PALETTE_PATH, profile } from '../../test-utils/palette-advisor-panel'
+import { ADVISOR_RULES } from '@couture/api-client/contracts/http'
+import {
+  PALETTE_PATH,
+  card,
+  profile,
+  readyAnalysis,
+} from '../../test-utils/palette-advisor-panel'
+import { stubPartnerTab } from '../../test-utils/partner-tab'
 import { PaletteAdvisorPanel } from './palette-advisor-panel'
 
 /** The session bridge's state, driven by hand: who verification named, and its pending answer. */
@@ -186,5 +193,137 @@ describe('PaletteAdvisorPanel follows the web session', () => {
     await waitFor(() => expect(locked()).toHaveTextContent(SIGNED_OUT))
     expect(consent()).toBeNull()
     expect(bearers).toHaveLength(2)
+  })
+
+  // Settings Codex review 1, findings 2, 4 and 5.
+  describe('sponsored handoff and denials belong to the member and the page that made them', () => {
+    const FOUNDATION = ADVISOR_RULES.warm.foundation.withDepth.medium
+    const CTA = `palette-advisor-sponsored-cta-${FOUNDATION.itemKey}`
+    const CLICKS_PATH = '/api/v1/commerce/affiliate/clicks'
+    const sponsoredProfile = profile({
+      isEntitled: true,
+      hasConsent: true,
+      analysis: readyAnalysis('medium'),
+      recommendations: [
+        card(FOUNDATION, {
+          sponsored: {
+            partnerId: 'lumen-beauty',
+            partnerDisplayName: 'Lumen Beauty',
+            offerId: 'offer-foundation-1',
+            offerTitle: 'Lumen Skin Tint',
+          },
+        }),
+      ],
+    })
+    let clickBearers: (string | null)[]
+    let releaseClick: () => void
+
+    beforeEach(() => {
+      clickBearers = []
+      let release!: () => void
+      const held = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      releaseClick = release
+      useMswHandlers(
+        http.get(PALETTE_PATH, ({ request }) => {
+          bearers.push(request.headers.get('authorization'))
+          return HttpResponse.json({ data: sponsoredProfile })
+        }),
+        http.post(CLICKS_PATH, async ({ request }) => {
+          clickBearers.push(request.headers.get('authorization'))
+          await held
+          return HttpResponse.json({
+            data: { redirectUrl: 'https://partner.example/offer?click=abc' },
+          })
+        })
+      )
+    })
+
+    function signInMemberOne() {
+      session.stored = true
+      session.identity = 'member-1'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    }
+
+    // Finding 2: the bridge already names member-2; member-1's card is still on screen.
+    it('PALETTE-SESSION-WEB-05 a sponsored press after the session moved on mints nothing and opens no tab', async () => {
+      const partner = stubPartnerTab()
+      signInMemberOne()
+      renderSection()
+      const cta = await screen.findByTestId(CTA)
+
+      // The bridge moved to member-2 and React has not heard yet.
+      session.identity = 'member-2'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-2')
+      act(() => {
+        cta.click()
+      })
+      releaseClick()
+      await settle()
+
+      expect(clickBearers).toEqual([])
+      expect(partner.openSpy).not.toHaveBeenCalled()
+      expect(partner.navigations).toEqual([])
+    })
+
+    // Finding 5: the press was member-1's and the mint answers after the panel closed.
+    it('PALETTE-SESSION-WEB-06 a sponsored mint answering after the panel closed never navigates its tab', async () => {
+      const partner = stubPartnerTab()
+      signInMemberOne()
+      const view = renderSection()
+      const cta = await screen.findByTestId(CTA)
+      act(() => {
+        cta.click()
+      })
+      await waitFor(() => expect(clickBearers).toEqual(['Bearer token-1']))
+
+      view.unmount()
+      await act(async () => {
+        releaseClick()
+        await Promise.resolve()
+      })
+      await settle()
+
+      expect(partner.navigations).toEqual([])
+      expect(partner.tab.close).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  // Finding 4: a denial of member-1's superseded token is not a sign-out.
+  it('PALETTE-SESSION-WEB-07 a late 401 for the old token after a same-member rotation reads again with the fresh one', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get(PALETTE_PATH, async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(
+            { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+            { status: 401 }
+          )
+        }
+        return HttpResponse.json({ data: profile({ isEntitled: true }) })
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('palette-advisor-consent')).toBeInTheDocument()
+    expect(locked()).toBeNull()
+    expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 })

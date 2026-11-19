@@ -16,6 +16,8 @@ import { getI18n } from '../../i18n'
 import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import type * as WebSession from '../../lib/web-session'
+import type * as Premium from '../../lib/premium'
+import { redirectToExternalUrl } from '../../lib/premium'
 import { SubscriptionSection } from './subscription-section'
 
 /** The session bridge's state, driven by hand: who verification named, and its pending answer. */
@@ -33,6 +35,12 @@ vi.mock('../../lib/web-session', async (importOriginal) => ({
     new Promise<string | undefined>((resolve) => {
       session.verify = resolve
     }),
+}))
+
+// jsdom's location cannot be assigned, so the external redirect is recorded instead.
+vi.mock('../../lib/premium', async (importOriginal) => ({
+  ...(await importOriginal<typeof Premium>()),
+  redirectToExternalUrl: vi.fn(),
 }))
 
 vi.mock('next/navigation', () => ({
@@ -259,7 +267,7 @@ describe('SubscriptionSection follows the web session', () => {
   describe('the status line never claims "no subscription" before the reads answer', () => {
     const NO_SUBSCRIPTION = "You don't have a Premium subscription yet."
 
-    /** Every text the status line shows, from first paint on, in order. */
+    /** The status line's text each time the observer delivers, from first paint on, in order. */
     function recordStatusLine() {
       const seen: string[] = []
       const note = () => {
@@ -307,8 +315,9 @@ describe('SubscriptionSection follows the web session', () => {
         expect(seen).not.toContain(NO_SUBSCRIPTION)
 
         act(() => access.release())
+        // The same recording holds the member's own status, so a silent recorder fails here.
         await waitFor(() =>
-          expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
+          expect(seen).toContain(
             'You have complimentary Premium access from CoutureCast.'
           )
         )
@@ -339,14 +348,149 @@ describe('SubscriptionSection follows the web session', () => {
 
         act(() => subscription.release())
         await waitFor(() =>
-          expect(screen.getByTestId('premium-status-line')).toHaveTextContent(
-            /Premium is active/
-          )
+          expect(seen.some((text) => /Premium is active/.test(text))).toBe(true)
         )
       } finally {
         stop()
       }
       expect(seen).not.toContain(NO_SUBSCRIPTION)
     })
+  })
+
+  // Settings Codex review 1, findings 3 to 5.
+  describe('billing work belongs to the member and the page that started it', () => {
+    const REFRESH_PATH = '/api/v1/commerce/subscription/refresh'
+    const PORTAL_PATH = '/api/v1/commerce/subscription/portal-session'
+    const ACTIVATING = 'Payment received. Activating your Premium subscription…'
+    const PORTAL_LAG = /billing portal, especially cancellations/
+    let refreshBearers: (string | null)[]
+
+    beforeEach(() => {
+      refreshBearers = []
+      vi.mocked(redirectToExternalUrl).mockClear()
+      useMswHandlers(
+        http.post(REFRESH_PATH, ({ request }) => {
+          const bearer = request.headers.get('authorization')
+          refreshBearers.push(bearer)
+          return HttpResponse.json({ data: SUBSCRIPTION[bearer ?? ''] ?? NONE })
+        })
+      )
+    })
+
+    afterEach(() => {
+      window.history.replaceState({}, '', '/')
+    })
+
+    // Finding 3: a return marker on the open page is member-1's, not the next member's.
+    it.each([
+      ['checkout', '/settings?checkout=success'],
+      ['portal', '/settings?portal=return'],
+    ])(
+      'SUBSCRIPTION-SESSION-WEB-08 a %s return is not replayed for the next member on the same page',
+      async (_kind, url) => {
+        window.history.replaceState({}, '', url)
+        session.stored = true
+        session.identity = 'member-1'
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+        renderSection()
+        await waitFor(() => expect(refreshBearers).toEqual(['Bearer token-1']))
+
+        publish({ identity: null, bearer: null })
+        publish({ identity: 'member-2', bearer: 'token-2' })
+        expect(await screen.findByTestId('premium-subscribe-monthly')).toBeEnabled()
+        await settle()
+
+        // member-2 loads normally: one plain read, no refresh, no return messages.
+        expect(refreshBearers).toEqual(['Bearer token-1'])
+        expect(bearers.filter((bearer) => bearer === 'Bearer token-2')).toEqual([
+          'Bearer token-2',
+        ])
+        expect(screen.queryByText(ACTIVATING)).toBeNull()
+        expect(screen.queryByTestId('premium-portal-lag-hint')).toBeNull()
+        expect(document.body.textContent).not.toMatch(PORTAL_LAG)
+      }
+    )
+
+    // Finding 4: a denial of member-1's superseded token is not a sign-out.
+    it('SUBSCRIPTION-SESSION-WEB-09 a late 401 for the old token after a same-member rotation reads again with the fresh one', async () => {
+      let releaseOld!: () => void
+      const old = new Promise<void>((resolve) => {
+        releaseOld = resolve
+      })
+      useMswHandlers(
+        http.get('/api/v1/commerce/subscription', async ({ request }) => {
+          const bearer = request.headers.get('authorization')
+          bearers.push(bearer)
+          if (bearer === 'Bearer token-1a') {
+            await old
+            return HttpResponse.json(
+              { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+              { status: 401 }
+            )
+          }
+          return HttpResponse.json({ data: SUBSCRIPTION['Bearer token-1'] })
+        })
+      )
+      session.stored = true
+      session.identity = 'member-1'
+      window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+      renderSection()
+      await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+      // The bridge refreshes member-1's token; the old read is still out.
+      publish({ identity: 'member-1', bearer: 'token-1b' })
+      await act(async () => {
+        releaseOld()
+        await Promise.resolve()
+      })
+
+      expect(await screen.findByTestId('premium-manage-button')).toBeInTheDocument()
+      expect(hint()).toBeNull()
+      expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+    })
+
+    // Finding 5: a portal session that answers after Settings closed sends nobody anywhere.
+    it.each([
+      ['Settings closes', 'unmount'],
+      ['member-1 leaves and comes back', 'a-b-a'],
+    ])(
+      'SUBSCRIPTION-SESSION-WEB-10 a portal session answering after %s does not redirect',
+      async (_case, how) => {
+        let releasePortal!: () => void
+        const portal = new Promise<void>((resolve) => {
+          releasePortal = resolve
+        })
+        let portalPosts = 0
+        useMswHandlers(
+          http.post(PORTAL_PATH, async () => {
+            portalPosts += 1
+            await portal
+            return HttpResponse.json({
+              data: { url: 'https://portal.stripe.test/session' },
+            })
+          })
+        )
+        session.stored = true
+        session.identity = 'member-1'
+        window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+        const view = renderSection()
+        ;(await screen.findByTestId('premium-manage-button')).click()
+        await waitFor(() => expect(portalPosts).toBe(1))
+
+        if (how === 'unmount') view.unmount()
+        else {
+          publish({ identity: 'member-2', bearer: 'token-2' })
+          publish({ identity: 'member-1', bearer: 'token-1' })
+          await settle()
+        }
+        await act(async () => {
+          releasePortal()
+          await Promise.resolve()
+        })
+        await settle()
+
+        expect(vi.mocked(redirectToExternalUrl)).not.toHaveBeenCalled()
+      }
+    )
   })
 })

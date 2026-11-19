@@ -17,6 +17,7 @@ import { WEB_ACCESS_TOKEN_STORAGE_KEY } from '../../lib/wardrobe'
 import { useMswHandlers } from '../../test-utils/msw/runtime'
 import type * as WebSession from '../../lib/web-session'
 import { PremiumThemeSection } from './premium-theme-section'
+import { SessionBridge } from './session-bridge'
 
 /** The session bridge's state, driven by hand: who verification named, and its pending answer. */
 const session = vi.hoisted(() => ({
@@ -190,5 +191,71 @@ describe('PremiumThemeSection follows the web session', () => {
     await waitFor(() => expect(locked()).toHaveTextContent(SIGNED_OUT))
     expect(appliedTheme()).toBe('')
     expect(bearers).toHaveLength(2)
+  })
+
+  // Settings Codex review 1, finding 4: a denial of member-1's superseded token is not a sign-out.
+  it('THEME-SESSION-WEB-05 a late 401 for the old token after a same-member rotation reads again with the fresh one', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get('/api/v1/commerce/premium/theme', async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(
+            { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+            { status: 401 }
+          )
+        }
+        return HttpResponse.json({ data: THEME['Bearer token-1'] })
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('premium-theme-gallery')).toBeInTheDocument()
+    expect(locked()?.textContent ?? '').not.toMatch(SIGNED_OUT)
+    expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
+  })
+
+  // Settings Codex review 1, finding 7: the palette is applied to the whole document, which
+  // outlives Settings. Member-1 picks it, follows a link away, and signs out elsewhere.
+  it("THEME-SESSION-WEB-06 member-1's palette leaves the document when member-1 signs out after leaving Settings", async () => {
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1')
+    const shell = (settings: boolean) => (
+      <I18nextProvider i18n={getI18n()}>
+        <SessionBridge />
+        <main>{settings && <PremiumThemeSection />}</main>
+      </I18nextProvider>
+    )
+    const view = render(shell(true))
+    expect(await screen.findByTestId('premium-theme-gallery')).toBeInTheDocument()
+    const memberOnePalette = appliedTheme()
+    expect(memberOnePalette).not.toBe('')
+
+    // A client-side link away from Settings: the root shell stays, the section goes.
+    view.rerender(shell(false))
+    expect(screen.queryByTestId('premium-theme-section')).toBeNull()
+    expect(appliedTheme()).toBe(memberOnePalette)
+
+    session.stored = false
+    publish({ identity: null, bearer: null })
+    await settle()
+
+    expect(appliedTheme()).toBe('')
   })
 })

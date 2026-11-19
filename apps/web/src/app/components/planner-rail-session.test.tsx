@@ -8,7 +8,7 @@
 // is pending, one read per member with that member's bearer, and nothing of one member kept for
 // the next. The /settings browser proof is playwright/tests/settings-sections-real-session.spec.ts.
 import { http, HttpResponse } from 'msw'
-import { act, render, screen } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { I18nextProvider } from 'react-i18next'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getI18n } from '../../i18n'
@@ -208,5 +208,42 @@ describe('PlannerRail follows the web session', () => {
     expect(locked()).toBeInTheDocument()
     expect(days()).toBeNull()
     expect(bearers).toHaveLength(2)
+  })
+
+  // Settings Codex review 1, finding 4: a denial of member-1's superseded token is not a sign-out.
+  it('PLANNER-SESSION-WEB-05 a late 401 for the old token after a same-member rotation reads again with the fresh one', async () => {
+    let releaseOld!: () => void
+    const old = new Promise<void>((resolve) => {
+      releaseOld = resolve
+    })
+    useMswHandlers(
+      http.get(PLANNER_PATH, async ({ request }) => {
+        const bearer = request.headers.get('authorization')
+        bearers.push(bearer)
+        if (bearer === 'Bearer token-1a') {
+          await old
+          return HttpResponse.json(
+            { statusCode: 401, message: 'Unauthorized', error: 'Unauthorized' },
+            { status: 401 }
+          )
+        }
+        return HttpResponse.json(WEEK)
+      })
+    )
+    session.stored = true
+    session.identity = 'member-1'
+    window.sessionStorage.setItem(WEB_ACCESS_TOKEN_STORAGE_KEY, 'token-1a')
+    renderSection()
+    await waitFor(() => expect(bearers).toEqual(['Bearer token-1a']))
+
+    publish({ identity: 'member-1', bearer: 'token-1b' })
+    await act(async () => {
+      releaseOld()
+      await Promise.resolve()
+    })
+
+    expect(await screen.findByTestId('planner-days')).toBeInTheDocument()
+    expect(locked()).toBeNull()
+    expect(bearers).toEqual(['Bearer token-1a', 'Bearer token-1b'])
   })
 })
