@@ -830,6 +830,51 @@ export function registerCommunityFeedCases() {
     )
   })
 
+  /*
+   * CodeRabbit on PR 256: an action error names what the signed-in member tried. When another
+   * member takes the session, the identity reset clears the feed, drafts and sheets; it must clear
+   * the previous member's failure too, or the next member reads a withdraw they never made.
+   */
+  it("6.1-MOB-099 a new member does not inherit the previous member's failed action", async () => {
+    let identity = 'member-one-token'
+    let reads = 0
+    const restore = setMobileAccessTokenResolver(() => {
+      reads++
+      return identity
+    })
+    const nextRead = async () => {
+      const before = reads
+      await waitFor(() => expect(reads).toBeGreaterThan(before), { timeout: 2500 })
+    }
+    let feedReads = 0
+    serveFeed(() => {
+      feedReads += 1
+      const own = item({ id: 'post-self', author: { displayName: 'You', isSelf: true } })
+      return feedJson({
+        items: feedReads === 1 ? [own] : [item({ id: 'post-member-two' })],
+      })
+    })
+    server.use(
+      http.post('*/api/v1/community/posts/:postId/withdraw', () =>
+        errorEnvelope(500, 'Internal server error.')
+      )
+    )
+    try {
+      await render(<CommunityScreen />)
+      press(await screen.findByTestId('community-card-withdraw-post-self'))
+      const panel = await screen.findByTestId('community-action-error')
+      expect(panel.textContent).toBe(enUS.community.error.withdraw)
+
+      identity = 'member-two-token'
+      await nextRead()
+      // The second member's feed has landed, so the identity reset has run.
+      await screen.findByTestId('community-post-card-post-member-two')
+      expect(screen.queryByTestId('community-action-error')).toBeNull()
+    } finally {
+      restore()
+    }
+  })
+
   it('6.1-MOB-089 restarts paging on a rejected cursor and never sends it twice', async () => {
     // Both cursors are real: the band is what changes between them, which is the
     // whole mechanism. Under `auto` the server recomputes the band per request

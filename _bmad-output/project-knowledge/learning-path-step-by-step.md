@@ -11846,7 +11846,8 @@ Hard-won lessons from the implementation and code review of this story:
   failed read, the error panel stayed through every later load that answered, so a member who
   pulls again after a network blip saw the error above a feed that loaded. A load that answers now clears a stale load error, on the pull path and the
   realtime rebuild alike (the review found the first fix covered only the pull), and a failed
-  withdraw stays on screen.
+  withdraw stays on screen. CodeRabbit then found the identity reset left a failed action on screen
+  for the next member who signed in; it now clears with the rest of the previous member's state.
 - The first API record read the launcher's log, which holds no HTTP lines, so a failed leg would
   have published an empty record; and it kept any lowercase path segment, which would have
   published a lowercase private value once the right log was wired. It now reads the API child's
@@ -11982,8 +11983,9 @@ Mobile, Vitest:
 - [`apps/mobile/src/screens/community-screen.test.tsx`](../../apps/mobile/src/screens/community-screen.test.tsx)
   (cases in `apps/mobile/src/test-utils/community-screen/feed.cases.tsx` and
   `realtime.cases.tsx`): 6.1-MOB-096 proves a refresh that answers clears an earlier load error,
-  6.1-MOB-097 proves it keeps a failed withdraw, and 6.1-MOB-098 proves a realtime rebuild that
-  answers clears it too.
+  6.1-MOB-097 proves it keeps a failed withdraw, 6.1-MOB-098 proves a realtime rebuild that
+  answers clears it too, and 6.1-MOB-099 proves a new member does not inherit the previous
+  member's failed action.
 
 Evidence boundaries:
 

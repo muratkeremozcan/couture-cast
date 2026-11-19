@@ -1012,6 +1012,8 @@ export function CommunityScreen() {
       if (previous === undefined || previous === identity) return
       // A sanction names one member's ban, so it leaves with that member.
       setBannedSanction(null)
+      // An action error names what the previous member tried; it leaves with them too.
+      setActionError(null)
       // A block is per viewer: a new member starts with no live answers.
       sponsorships.clear()
       commentDrafts.forgetAll()
